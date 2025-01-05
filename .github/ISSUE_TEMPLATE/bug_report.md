@@ -8,16 +8,16 @@ assignees: ''
 ---
 
 **First steps**
-Let us know a little about your setup. Ideally, provide a screenshot of the window which appears when you choose  Help > Diagnostics in the menu will often be useful - as it captures all the relevant  system and settings information. Minimally, please let us know:
+Let us know a little about your setup. Ideally, provide your UUID for the application. Choose  Help > Diagnostics from the menu, and copy your UUID from that screen. If you cannot do this, please let us know:
 *Chirpity version:*
 *Operating system (PC/Mac):*
 
 
 **Describe the bug**
-Please explain the issue. Also, to fix bugs, they need to be reproduced. That means we need to get this problem to happen when we follow the steps you have taken that lead to the issue.
+Please explain the issue. 
 
 **What steps cause the issue?**
-Describe the steps followed to reproduce the problem, for example:
+Describe the steps taken to reproduce the problem, for example:
 1. Launch Chirpity
 2. Go to '...'
 3. Click on '....'
@@ -32,4 +32,4 @@ If applicable, add screenshots to help explain your problem.
 
 
 **Additional context**
-Add any other context about the problem here. If it's an analysis issue, mention the file type and audio duration...
+Add any other context about the problem here. If it's an analysis issue, mention the file type and audio duration. Ideally, provide an example audio file that demonstrates the issue (you can attach a zipped versino of the file to your issue)

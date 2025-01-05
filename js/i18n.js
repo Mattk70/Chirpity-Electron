@@ -309,6 +309,66 @@ const i18nToasts = { // UI.js
         conversionComplete: "Conversion terminée, ${successTotal} réussie(s), ${failedTotal} échouée(s).",
         libraryUpToDate: "La bibliothèque est à jour. Aucune action nécessaire"
     },
+    ja: {
+        info: '情報', warning: '警告', error: 'エラー',
+        maxFiles: "Chirpityは最大25,000ファイルのオープンを制限しています。試行された${STATE.openFiles.length}のうち最初の25,000のみが開かれます",
+        analysisUnderway:"分析が進行中です。新しい分析を実行する前に<b>Esc</b>を押してキャンセルしてください。",
+        placeOutOfBounds: "緯度は-90から90の間、経度は-180から180の間でなければなりません。",
+        placeNotFound: "この場所の検索に失敗しました。インターネット接続を確認するか、後でもう一度試してください。",
+        mustFilterSpecies: "オーディオファイルをエクスポートするには、種別で結果をフィルタリングしてください",
+        noNode: "このマシンで標準のバックエンドをロードできませんでした。代わりに実験的なバックエンド（webGPU）が使用されました。",
+        badMessage: "ワーカーからの認識されないメッセージ:${args.event}",
+        changeListBlocked:"分析が進行中のため、リスト設定を変更することはできません。ただし、分析が完了した後にリストを変更することは<b>可能</b>です",
+        cancelled: "操作がキャンセルされました",
+        badTime: "無効な時間形式です。次の形式のいずれかで時間を入力してください：\n1. 浮動小数点数（秒）\n2. コロンで区切られた2つの数字（分と秒）\n3. コロンで区切られた3つの数字（時、分、秒）",
+        complete: "分析が完了しました。",
+        feedback: "ありがとうございます。あなたのフィードバックはChirpityの予測を改善するのに役立ちます",
+        contextBlocked: "分析が進行中のため、コンテキストモード設定を変更することはできません。",
+        noCallCache: "コールキャッシュが見つかりませんでした。",
+        callCacheCleared: "コールキャッシュが正常にクリアされました。",
+        badThreshold: "しきい値は0.001から1の間の数値でなければなりません",
+        labelFileNeeded: "カスタム言語オプションを使用するには、リスト設定でラベルファイルを選択する必要があります。",
+        listFileNeeded: "カスタムリストオプションを使用する前に、モデルのカスタムリストをアップロードする必要があります。",
+        listNotFound: 'カスタムリストファイル: ${file}が見つかりませんでした。<b class="text-danger">検出は表示されません</b>。',
+        leafletError: 'マップの表示中にエラーが発生しました: ${error}',
+        noXC: "Xeno-canto APIが応答していません",
+        noComparisons: "Xeno-cantoサイトには比較可能なデータがありません",
+        noIUCNRecord: "IUCNレッドリストに<b>${sname}</b>の記録がありません。",
+        badMetadata: "${src}から重要なメタデータを抽出できません",
+        noLoad: '${model}モデルがロードされていません。Chirpityを再起動して続行してください。このメッセージが繰り返し表示される場合、お使いのコンピュータがAVX2をサポートしていない可能性があります。',
+        noDLL: 'モデルのロード中にエラーが発生しました。これはAVXサポートが欠如しているためかもしれません。Chirpity AIモデルはAVX2命令セットを必要とします。AVX2が有効であるにもかかわらずこの通知が表示される場合は、<a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">この問題</a>を参照してください。',
+        noFile: "ファイルが見つかりません: ${file}",
+        ffmpeg: 'オーディオ抽出中のFFMPEGエラー: ${error}',
+        noNight: '検出なし。${file}には予測が行われる期間が含まれていません。<b>ヒント:</b> このファイルで検出を表示するには、nocmigモードを無効にして再度分析を実行してください。',
+        saveBlocked: "他のアプリケーションで開かれているため、ファイル${filePath}を保存できません",
+        goodSave: '${filePath}が正常に書き込まれました。',
+        noDetections: "選択範囲に検出が見つかりません",
+        noDetectionsDetailed: '${nocmig} ${species}の検出が${archive}で見つかりませんでした。${list}リストを使用して検索しました。',
+        noDetectionsDetailed2: '${file}に検出が見つかりませんでした。${list}リストを使用して、最小信頼度${confidence}%のレコードを検索しました。',
+        dbNotLoaded: "データベースの読み込みが完了していません。アーカイブ内のファイルの存在確認はスキップされました",
+        noSnameFound: "カスタムリストの${line}行目にある'${sname}'が<strong>${model}</strong>モデルリストに見つかりません。<strong>ヒント:</strong> <ol><li>リストは<strong>${model}</strong>モデル用ですか？そうでない場合は、設定でモデルを変更してください</li><li>種名にタイプミスがないか確認してください</li></ol>",
+        noArchive: "アーカイブ場所にアクセスできません: ${location}. <br> 操作が中止されました",
+        noWriteArchive: "アーカイブ場所に書き込めません: ${location}. <br> 操作が中止されました",
+        multiDay: "マルチデイ操作はまだサポートされていません: ${file}はトリミングされません",
+        allDaylight: "${file}は全て日中のため、アーカイブに追加されません。",
+        conversionDone: "${file}の変換が完了しました",
+        badConversion: "${file}の変換中にエラーが発生しました: ${error}",
+        noDirectory: "フォルダ'${match}'を見つけることができません",
+        dbFileMissing: "サポートされているファイル拡張子のいずれかで保存されたファイルを見つけることができません: ${file}",
+        goodResultSave: "${number}の結果がアーカイブに保存されました",
+        NoOP: 'レコードは既に保存されています。何もすることはありません',
+        goodDBUpdate: 'データベースの更新が完了しました。${total}のレコードが${seconds}秒でアーカイブに追加されました',
+        fileLocationUpdated: 'ファイルの場所がアーカイブで正常に更新されました。結果を更新してレコードを確認してください。',
+        durationMismatch: '<span class="text-danger">変更なし</span>。選択されたファイルは元のファイルと異なる長さです。',
+        duplicateFIle: '<span class="text-danger">変更なし</span>。選択されたファイルは既にアーカイブに存在します。',
+        fileUpdateError: '<span class="text-danger">ファイルの更新中にエラーが発生しました: ${message}</span>',
+        goodFilePurge: '${file}とその関連レコードが正常に削除されました',
+        failedFilePrge: '${file}はアーカイブに見つかりませんでした',
+        fileToConvertNotFound: '${file}が見つかりません、変換をスキップします。',
+        mkDirFailed: 'ディレクトリの作成に失敗しました: ${path}<br>エラー: ${error}',
+        conversionComplete: '変換が完了しました。成功: ${successTotal}、失敗: ${failedTotal}',
+        libraryUpToDate: 'ライブラリは最新です。何もすることはありません'
+    },
     nl: {
         info: 'Kennisgeving', warning: 'Waarschuwing', error: 'Fout',
         maxFiles: "Chirpity beperkt het maximale aantal geopende bestanden tot 25.000. Alleen de eerste 25.000 van de ${STATE.openFiles.length} pogingen worden geopend.",
@@ -678,6 +738,17 @@ const i18nHeadings = {
         detections: 'Détections',
         location: "Emplacement"
     },
+    ja: {
+        position: ['位置', "検出時間で結果を並べ替える"],
+        time: ['時間', "検出時間で結果を並べ替える"],
+        species: ['種', "検出信頼度で結果を並べ替える"],
+        calls: 'コール',
+        label: 'ラベル',
+        notes: 'ノート',
+        max: '最大',
+        detections: '検出',
+        location: '場所'
+    },
     nl: {
         position: ['Positie', "Sorteer resultaten op detectietijd"],
         time: ['Tijd', "Sorteer resultaten op detectietijd"],
@@ -741,6 +812,7 @@ const i18nHelp = {
       fr: 'Raccourcis clavier',
       de: 'Tastenkombinationen',
       es: 'Atajos de teclado',
+      ja: 'キーボードショートカット',   // Japanese
       pt: 'Atalhos de teclado',
       ru: 'Горячие клавиши',
       nl: 'Sneltoetsen',
@@ -753,6 +825,7 @@ const i18nHelp = {
       fr: 'Aide des paramètres',
       de: 'Einstellungen Hilfe',
       es: 'Ayuda de configuración',
+      ja: '設定ヘルプ',               // Japanese
       pt: 'Ajuda de configurações',
       ru: 'Помощь по настройкам',
       nl: 'Instellingen help',
@@ -765,6 +838,7 @@ const i18nHelp = {
       fr: 'Guide d\'utilisation',
       de: 'Benutzerhandbuch',
       es: 'Guía de uso',
+      ja: '使用ガイド',               // Japanese
       pt: 'Guia de uso',
       ru: 'Руководство пользователя',
       nl: 'Gebruikershandleiding',
@@ -777,6 +851,7 @@ const i18nHelp = {
       fr: 'FAQ des enregistrements eBird',
       de: 'eBird Datensatz FAQ',
       es: 'Preguntas frecuentes sobre los registros de eBird',
+      ja: 'eBird記録FAQ',             // Japanese
       pt: 'FAQ de Registros do eBird',
       ru: 'Часто задаваемые вопросы о записях eBird',
       nl: 'eBird Record FAQ',
@@ -789,6 +864,7 @@ const i18nHelp = {
       fr: 'Rejoindre la communauté des utilisateurs de Chirpity',
       de: 'Treten Sie der Chirpity-Benutzergemeinschaft bei',
       es: 'Únete a la comunidad de usuarios de Chirpity',
+      ja: 'Chirpityユーザーコミュニティに参加する', // Japanese
       pt: 'Junte-se à comunidade de usuários do Chirpity',
       ru: 'Присоединиться к сообществу пользователей Chirpity',
       nl: 'Word lid van de Chirpity-gebruikersgemeenschap',
@@ -839,6 +915,14 @@ const i18nLocation = {
         'Ajouter, modifier ou supprimer un emplacement', 
         'Mettre à jour TOUS les fichiers ouverts à cet emplacement',
         "Lat:", "Long:"
+    ],
+    ja: [
+        '位置を設定', 
+        '位置を削除', 
+        '保存された位置を選択', 
+        '位置を追加、編集、または削除', 
+        'すべての開いているファイルをこの位置に更新',
+        "緯度:", "経度:"
     ],
     nl: [
         'Locatie instellen', 
@@ -968,6 +1052,23 @@ const i18nContext = {
         frequency: "Fréquence",
         length: "Longueur de la région"
     },
+    ja: {
+        lastNight: '昨夜', thisWeek: '今週', lastWeek: '先週', thisMonth: '今月', lastMonth: '先月', thisYear: '今年', lastYear: '昨年',
+        apply: '適用', cancel: 'キャンセル', filter: '日付フィルターを適用',
+        'nocturnal flight call': '夜間飛行コール', 'flight call': '飛行コール', call: 'コール', song: '歌',
+        play: '再生',
+        pause: '一時停止',
+        analyse: '分析',
+        create: '作成', edit: '編集', record: '記録',
+        export: 'オーディオクリップをエクスポート',
+        compare: '参照コールと比較',
+        delete: '記録を削除',
+        location: 'ファイルの録音場所を修正',
+        time: 'ファイルの開始時間を修正',
+        plural: '',
+        frequency: "周波数",
+        length: "領域の長さ"
+    },
     nl: {
         lastNight: 'Gisteravond', thisWeek: 'Deze week', lastWeek: 'Vorige week', thisMonth: 'Deze maand', lastMonth: 'Vorige maand', thisYear: 'Dit jaar', lastYear: 'Vorig jaar',
         apply: 'Toepassen', cancel: 'Annuleren', filter: 'Een datumfilter toepassen',
@@ -1061,6 +1162,7 @@ const i18nForm = {
     de: {submit: 'Absenden', cancel: 'Abbrechen', select: "Neues Datum und Uhrzeit auswählen:"},
     es: {submit: 'Enviar', cancel: 'Cancelar', select: "Seleccionar nueva fecha y hora:"},
     fr: {submit: 'Soumettre', cancel: 'Annuler', select: "Sélectionnez une nouvelle date et heure :"},
+    ja: {submit: '送信', cancel: 'キャンセル', select: "新しい日付と時間を選択:"},
     nl: {submit: 'Verzenden', cancel: 'Annuleren', select: "Selecteer een nieuwe datum en tijd:"},
     pt: {submit: 'Enviar', cancel: 'Cancelar', select: "Selecione uma nova data e hora:"},
     ru: {submit: 'Отправить', cancel: 'Отмена', select: "Выберите новую дату и время:"},
@@ -1103,6 +1205,13 @@ const i18nLIST_MAP = {
         birds: 'Recherche de tous les oiseaux',
         everything: 'Recherche de tout',
         custom: 'Utilisation d\'une liste personnalisée'
+    },
+    ja: {
+        location: 'あなたの地域の鳥を探しています',
+        nocturnal: '夜間のコールを探しています',
+        birds: 'すべての鳥を探しています',
+        everything: 'すべてを探しています',
+        custom: 'カスタムリストを使用しています'
     },
     // it: {
     //     location: 'Cercando uccelli nella tua regione',
@@ -1345,6 +1454,23 @@ const i18nTitles = {
         "clear-custom-list": "Cancella lista personalizzata",
         primaryLogoLink: "Visita il sito web di Chirpity"
     },
+    ja: {
+        filename: "右クリックしてファイルの開始時間または場所を更新",
+        controlsWrapper: "ドラッグしてスペクトログラムウィンドウのサイズを変更します。",
+        playToggle: "再生 / 一時停止 (スペースキー)",
+        zoomIn: "スペクトログラムをズームイン (ショートカットキー: + キー)",
+        zoomOut: "スペクトログラムをズームアウト (ショートカットキー: - キー)",
+        nocmigOn: "Nocmigモードオン",
+        nocmigOff: "Nocmigモードオフ",
+        audioFiltersOn: "オーディオフィルターが適用されました",
+        audioFiltersOff: "オーディオフィルターなし",
+        contextModeOn: "コンテキストモードが有効",
+        contextModeOff: "コンテキストモードが無効",
+        "frequency-range": "スペクトログラムの周波数範囲を調整",
+        "threshold-value": "予測信頼度のしきい値",
+        "clear-custom-list": "カスタムリストをクリア",
+        primaryLogoLink: "Chirpityのウェブサイトを訪問"
+    },
     pl: { // Also random! Polish
         filename: "Kliknij prawym przyciskiem myszy, aby zaktualizować czas rozpoczęcia lub lokalizację pliku",
       controlsWrapper: "Przeciągnij, aby zmienić rozmiar okna spektrogramu.",
@@ -1444,6 +1570,22 @@ const i18nTitles = {
         Mediterranean: "Méditerranée",
         customListPH: "Aucune liste définie", 
         libraryLocationPH: "Aucun emplacement défini" 
+    },
+    ja: {
+        location: '地域の鳥',
+        nocturnal: '夜間のコール',
+        birds: 'すべての鳥',
+        everything: 'すべて',
+        custom: 'カスタム',
+        timecode: 'タイムコード',
+        timeOfDay: '時刻',
+        ogg: '非可逆圧縮（推奨）',
+        flac: '可逆圧縮',
+        Global: "グローバル",
+        Europe: "ヨーロッパ",
+        Mediterranean: "地中海",
+        customListPH: 'カスタムリストが設定されていません',
+        libraryLocationPH: '場所が設定されていません'
     },
     // it: {
     //     location: 'Uccelli locali',
@@ -1910,6 +2052,78 @@ es: `
 
 
 `,
+ja: `
+    <!-- Carousel items -->
+    <div class="carousel-item active">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>Chirpity Nocmigへようこそ</h5>
+            <p>このツアーでは、アプリケーションの主要な機能のいくつかを紹介します。次の項目に進むには右矢印をクリックしてください</p>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#navbarSettings">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-start pb-4 ms-3">
+            <h5 class="text-center">はじめに</h5>
+            <ol class="ps-5 ms-5">
+                <li>まず、設定メニューで場所を設定します。</li>
+                <li>次に、ニーズに最適なモデルを検討します：</li>
+                <ul>
+                    <li><b>Nocmig</b> は夜間移動に最適化されていますが、<br> 英国リストの鳥のみが含まれています</li>
+                    <li><b>BirdNET</b> は世界中の鳥の種に対応しています</li>
+                </ul>
+            </ol>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#filter-panel">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>クイックアクセス設定パネル</h5>
+            <p>ここにあるアイコンを使用して、頻繁に使用する設定をすばやく切り替えることができます。</p>
+            これらには以下が含まれます：
+            <div class="w-75 ms-5">
+                <ol class="text-start ps-5"> 
+                    <li>Nocmigモード</li>
+                    <li>オーディオフィルター</li>
+                    <li>コンテキスト認識モード（Nocmigモデルのみ）</li>
+                    <li>スペクトログラムの周波数範囲の調整</li>
+                    <li>使用する検出リスト</li>
+                    <li>信頼度のしきい値</li>
+                </ol>
+            </div>
+            <p>これらの設定の説明は、ヘルプメニューの「設定」で確認できます。</p>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#fileContainer">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>コンテキストメニュー</h5>
+            <p>ほとんどのツールはコンテキストメニューからアクセスできます。これらはマウスの右クリックで表示されます。
+                検出、スペクトログラム上の選択領域、ファイル名のコンテキストメニューがあります。
+            </p>
+        </div>
+    </div>
+    <div class="carousel-item" data-element-selector="#navbarRecords">
+        <img src="img/logo/chirpity_logo2.png" class="w-100 rounded pb-4" alt="Chirpity Nocmig">
+        <div class="text-center pb-4">
+            <h5>保存された記録</h5>
+            <p>記録メニューから将来の参照用に記録を保存できます。ここには、アプリケーションのチャートと探索セクションもあります。
+                これらは、保存した検出を再訪し、種の出現のチャートを時間とともに表示することができます。
+            </p>
+        </div>
+    </div>
+    <!-- 必要に応じてさらにカルーセル項目を追加 -->
+</div>
+<!-- カルーセルナビゲーションコントロール -->
+<a class="carousel-control-prev" href="#carouselExample" role="button" data-bs-slide="prev">
+    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+    <span class="visually-hidden">前へ</span>
+</a>
+<a class="carousel-control-next" href="#carouselExample" role="button" data-bs-slide="next">
+    <span class="carousel-control-next-icon" aria-hidden="true"></span>
+    <span class="visually-hidden">次へ</span>
+</a>
+`,
 nl: `
     <!-- Carousel items -->
     <div class="carousel-item active">
@@ -2368,6 +2582,25 @@ const i18nSpeciesList = {
         <table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Nom commun</th><th>Nom scientifique</th></tr></thead><tbody>${includedList}</tbody></table>',
         excluded: '<br/><p>En revanche, l’application n’affichera pas de détections parmi les ${excludedCount} classes suivantes :</p><table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>${cname}</th><th>${sname}</th></tr></thead><tbody>${excludedList}</tbody></table>'
     },
+    ja: {
+        title: '現在の種リスト', 
+        includedButton: '含まれる', 
+        excludedButton: '除外される', 
+        cname: '一般名', 
+        sname: '学名',
+        localBirds: ' <b>地元の鳥</b>に限定',
+        week: '。現在のファイルは第 <b>${week}</b> 週に保存されました',
+        weekSpecific: '週ごとの',
+        threshold: '週ごとの種フィルターのしきい値 <b>${speciesThreshold}</b>',
+        location: ' <b>${place}</b> に焦点を当て、${species_filter_text}${current_file_text}',
+        depending: '、分析するファイルの日付に依存します',
+        upTo: ' 最大 ',
+        included: '<br/><p>検出された種の数は、モデル、使用されているリスト、および場所フィルターの場合、種フィルターのしきい値と録音が行われた週に依存します。<p>\
+        あなたは <b>${model}</b> モデルと <b>${listInUse}</b> リストを使用しています${localBirdsOnly}${location_filter_text}。これらの設定では、Chirpity は最大 ${upTo} \
+        <b>${count}</b> クラスの検出を表示します${depending}：</p>\
+        <table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>一般名</th><th>学名</th></tr></thead><tbody>${includedList}</tbody></table>',
+        excluded: '<br/><p>逆に、アプリケーションは次の ${excludedCount} クラスの検出を表示しません：</p><table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>${cname}</th><th>${sname}</th></tr></thead><tbody>${excludedList}</tbody></table>'
+    },
     nl: {
         title: 'Huidige soortenlijst', 
         includedButton: 'Inbegrepen', 
@@ -2520,6 +2753,17 @@ const IUCNLabel = {
         'CR': 'En danger critique',
         'EW': 'Éteint à l’état sauvage',
         'EX': 'Éteint'
+    },
+    ja: {
+        'NA': 'データなし',
+        'DD': 'データ不足',
+        'LC': '低懸念',
+        'VU': '危急',
+        'NT': '近危急',
+        'EN': '絶滅危惧',
+        'CR': '深刻な絶滅危惧',
+        'EW': '野生絶滅',
+        'EX': '絶滅'
     },
     nl: {
         'NA': 'Geen gegevens',
