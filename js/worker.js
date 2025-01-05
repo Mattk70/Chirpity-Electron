@@ -197,6 +197,15 @@ const createDB = async (file) => {
             const [sname, cname] = LABELS[i].split('_');
             await db.runAsync('INSERT INTO species VALUES (?,?,?)', i, sname, cname);
         }
+        await db.runAsync(`
+            CREATE TABLE IF NOT EXISTS db_upgrade (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            );
+        `);
+        await db.runAsync(`
+            INSERT INTO db_upgrade (key, value) VALUES ('last_update', 'add_columns_archiveName_and_metadata_and_foreign_key_to_files')
+        `);
     } else {
         const filename = diskDB.filename;
         let { code } = await db.runAsync('ATTACH ? as disk', filename);
@@ -339,7 +348,7 @@ async function checkAndApplyUpdates(db) {
 
     // Apply updates that come after the last update applied
     let updateIndex = DB_updates.findIndex(m => m.name === lastUpdate.value);
-    
+    trackEvent(STATE.UUID, 'DB', 'UPDATE', updateIndex);
     // Start from the next Update
     updateIndex = updateIndex >= 0 ? updateIndex + 1 : 0;
 
@@ -784,7 +793,7 @@ const prepSummaryStatement = (included) => {
     FROM ranked_records
     WHERE ranked_records.rank <= ${STATE.topRankin}`;
     
-    summaryStatement +=  ` GROUP BY speciesID  ORDER BY cname`;
+    summaryStatement +=  ` GROUP BY speciesID  ORDER BY ${STATE.summarySortOrder}`;
 
     return [summaryStatement, params]
 }
@@ -902,7 +911,7 @@ const prepResultsStatement = (species, noLimit, included, offset, topRankin) => 
     const limitClause = noLimit ? '' : 'LIMIT ?  OFFSET ?';
     noLimit || params.push(STATE.limit, offset);
 
-    resultStatement += ` ORDER BY ${STATE.sortOrder}, callCount DESC ${limitClause} `;
+    resultStatement += ` ORDER BY ${STATE.resultsSortOrder}, callCount DESC ${limitClause} `;
     
     return [resultStatement, params];
 }
@@ -2220,9 +2229,10 @@ const parsePredictions = async (response) => {
                 }
             }
         } 
-    } else if (index === 500){
+    } else if (index > 500){
         // Slow down the summary updates
         setGetSummaryQueryInterval(NUM_WORKERS)
+        DEBUG && console.log('Reducing summary updates to one every ', STATE.incrementor)
     }
     predictionsReceived[file]++;
     const received = sumObjectValues(predictionsReceived);
