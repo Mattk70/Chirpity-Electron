@@ -18,7 +18,7 @@ let isWin32 = false;
 const DATASET = true;
 const DATABASE = 'archive_test'
 const adding_chirpity_additions = false;
-const DATASET_SAVE_LOCATION = "/media/matt/36A5CC3B5FA24585/DATASETS/ATTENUATED_pngs/call";
+const DATASET_SAVE_LOCATION = "/media/matt/36A5CC3B5FA24585/DATASETS/European/call";
 let ntsuspend;
 if (process.platform === 'win32') {
     ntsuspend = require('ntsuspend');
@@ -1354,7 +1354,7 @@ const getPredictBuffers = async ({
 }
 
 async function processAudio (file, start, end, chunkStart, highWaterMark, samplesInBatch){
-    const MAX_CHUNKS = NUM_WORKERS * 2;
+    const MAX_CHUNKS = Math.max(12, NUM_WORKERS * 2);
     let isPaused = false;
     return new Promise((resolve, reject) => {
         // Many compressed files start with a small section of silence due to encoder padding, which affects predictions
@@ -1376,10 +1376,7 @@ async function processAudio (file, start, end, chunkStart, highWaterMark, sample
                 reject(error)
             }
         });
-        // command.on('progress', (progress) => {
-        //     DEBUG && console.log('progress: ', progress.timemark)
-        //     checkBacklog(command)
-        // })
+
         const STREAM = command.pipe();
         STREAM.on('data', (chunk) => {
             if (! isPaused && AUDIO_BACKLOG >= MAX_CHUNKS){
@@ -1389,7 +1386,7 @@ async function processAudio (file, start, end, chunkStart, highWaterMark, sample
                 console.log('about to set the interval ', pid)
                 const interval = setInterval(() =>{
                     console.log('Backlog', AUDIO_BACKLOG)
-                    if (AUDIO_BACKLOG < NUM_WORKERS){
+                    if (AUDIO_BACKLOG < NUM_WORKERS * 2){
                         resumeFfmpeg(command, pid)
                         console.log('resumed ', pid)
                         isPaused = false;

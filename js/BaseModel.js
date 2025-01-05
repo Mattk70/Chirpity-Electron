@@ -1,10 +1,9 @@
-let tf, BACKEND;
+let tf;
 
 try {
     tf = require('@tensorflow/tfjs-node');
 } catch {
     tf = require('@tensorflow/tfjs');
-    BACKEND = 'webgpu';
 }
 
 const DEBUG = false;
@@ -52,7 +51,7 @@ class BaseModel {
         // https://github.com/tensorflow/tfjs/pull/7755/files#diff-a70aa640d286e39c922aa79fc636e610cae6e3a50dd75b3960d0acbe543c3a49R316
         if (tf.getBackend() === 'webgl') {
             tf.env().set('ENGINE_COMPILE_ONLY', true);
-            const compileRes = this.model.predict(input, { batchSize: this.batchSize });
+            const compileRes = this.model.predict(input);
             tf.env().set('ENGINE_COMPILE_ONLY', false);
             await tf.backend().checkCompileCompletionAsync();
             tf.backend().getUniformLocations();
@@ -60,10 +59,10 @@ class BaseModel {
             input.dispose();
         } else if (tf.getBackend() === 'webgpu') {
             tf.env().set('WEBGPU_ENGINE_COMPILE_ONLY', true);
-            const compileRes = this.model.predict(input, { batchSize: this.batchSize });
-            tf.env().set('WEBGPU_ENGINE_COMPILE_ONLY', false);
+            const compileRes = this.model.predict(input);
             await tf.backend().checkCompileCompletionAsync();
             tf.dispose(compileRes);
+            tf.env().set('WEBGPU_ENGINE_COMPILE_ONLY', false);
         }
         input.dispose()
         DEBUG && console.log('WarmUp end', tf.memory().numTensors)

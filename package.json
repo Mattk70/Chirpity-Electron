@@ -1,6 +1,6 @@
 {
   "name": "chirpity",
-  "version": "2.4.7",
+  "version": "2.4.8",
   "description": "Chirpity Nocmig",
   "main": "main.js",
   "scripts": {
@@ -12,7 +12,7 @@
     "export": "electron-builder build --m  -p always",
     "AppImage": "electron-builder build --linux --x64  -p always",
     "build": "electron-builder --win --x64 -p always",
-    "testBuild": "electron-builder --m",
+    "testBuild": "electron-builder --win",
     "postinstall": "electron-builder install-app-deps",
     "test": "playwright test"
   },
