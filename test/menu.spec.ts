@@ -153,7 +153,7 @@ test("Amend file start dialog contains date", async () =>{
   await page.locator('#setFileStart').click();
   const fileStart = page.locator('#fileStart');
   const entry = await fileStart.inputValue();
-  const currentYear = (new Date().getFullYear() - 1).toString();
+  const currentYear = new Date().getFullYear().toString();
   expect(entry.toString()).toContain(currentYear);
   // await page.locator('#spectrogramWrapper button.btn-secondary').click();
 })
