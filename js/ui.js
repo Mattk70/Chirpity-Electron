@@ -313,7 +313,6 @@ function updateSpec({ buffer, play = false, position = 0, resetSpec = false }) {
     }
     wavesurfer.seekTo(position);
     play ? wavesurfer.play() : wavesurfer.pause();
-    
 }
 
 function createTimeline() {
@@ -2793,9 +2792,9 @@ function centreSpec(){
                 centreSpec();
             }
         },
-        D: function (e) {
-            if (( e.ctrlKey || e.metaKey)) worker.postMessage({ action: 'create-dataset' });
-        },
+        // D: function (e) {
+        //     if (( e.ctrlKey || e.metaKey)) worker.postMessage({ action: 'create-dataset' });
+        // },
         e: function (e) {
             if (( e.ctrlKey || e.metaKey) && region) exportAudio();
         },
@@ -3148,7 +3147,6 @@ function centreSpec(){
                 bufferStartTime = new Date(zero.getTime() + (fileBegin * 1000))
             }
             if (windowLength > currentFileDuration) windowLength = currentFileDuration;
-            
             
             updateSpec({ buffer: currentBuffer, position: position, play: play, resetSpec: resetSpec });
             wavesurfer.bufferRequested = false;

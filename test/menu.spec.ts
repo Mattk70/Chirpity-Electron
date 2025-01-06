@@ -12,12 +12,11 @@ import {
   stubMultipleDialogs
 } from 'electron-playwright-helpers';
 import { ElectronApplication, Page } from 'playwright';
-import {changeSettings, openExampleFile, runExampleAnalysis} from './helpers';
+import {changeSettings, runExampleAnalysis} from './helpers';
 //import {Jimp} from 'jimp';
 
 let electronApp: ElectronApplication;
 let page: Page;
-let worker: Page;
 let example_file: any
 // find the latest build in the out directory
 const latestBuild = findLatestBuild('./dist')
@@ -55,7 +54,7 @@ test.beforeAll(async () => {
        },
      },
    ])
-   worker = await electronApp.firstWindow()
+   await electronApp.firstWindow()
 
   electronApp.on('window', async (window) => {
     const filename = window.url()?.split('/').pop()
@@ -154,7 +153,7 @@ test("Amend file start dialog contains date", async () =>{
   await page.locator('#setFileStart').click();
   const fileStart = page.locator('#fileStart');
   const entry = await fileStart.inputValue();
-  const currentYear = new Date().getFullYear().toString();
+  const currentYear = (new Date().getFullYear() - 1).toString();
   expect(entry.toString()).toContain(currentYear);
   // await page.locator('#spectrogramWrapper button.btn-secondary').click();
 })

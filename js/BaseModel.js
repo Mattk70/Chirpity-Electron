@@ -7,16 +7,13 @@ try {
 }
 
 const DEBUG = false;
-const CONFIG = {
-    sampleRate: 24_000, specLength: 3, sigmoid: 1,
-};
 class BaseModel {
     constructor(appPath, version) {
         this.model = undefined;
         this.labels = undefined;
         this.height = undefined;
         this.width = undefined;
-        this.config = CONFIG;
+        this.config = {sampleRate: 24_000, specLength: 3, sigmoid: 1};
         this.chunkLength = this.config.sampleRate * this.config.specLength;
         this.model_loaded = false;
         this.frame_length = 512;
@@ -102,7 +99,7 @@ class BaseModel {
         indices.dispose();
         values.dispose();
 
-        keys = keys.map(key => (key / CONFIG.sampleRate).toFixed(3));
+        keys = keys.map(key => (key / this.config.sampleRate).toFixed(3));
         return [keys, topIndices, topValues];
     }
 

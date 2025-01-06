@@ -12,7 +12,7 @@ import {
   stubMultipleDialogs
 } from 'electron-playwright-helpers';
 import { ElectronApplication, Page } from 'playwright';
-import {changeSettings, openExampleFile, runExampleAnalysis} from './helpers';
+import {runExampleAnalysis} from './helpers';
 //import {Jimp} from 'jimp';
 
 let electronApp: ElectronApplication;

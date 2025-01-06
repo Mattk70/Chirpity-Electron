@@ -1,5 +1,5 @@
 {
-  "name": "chirpity",
+  "name": "Chirpity",
   "version": "2.5.0",
   "description": "Chirpity Nocmig",
   "main": "main.js",
@@ -23,7 +23,13 @@
   "build": {
     "appId": "com.electron.chirpity",
     "pkg": {
-      "license": "license.txt"
+      "license": "LICENSE.txt"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "license": "LICENSE.txt",
+      "installerSidebar": "build/uninstallerSidebar.bmp"
     },
     "publish": [
       {
@@ -134,10 +140,6 @@
       "target": [
         "AppImage"
       ]
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": true
     },
     "win": {
       "publish": [

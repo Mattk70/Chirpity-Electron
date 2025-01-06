@@ -41,6 +41,7 @@ function loadModel(params){
             tf.env().set("TOPK_LAST_DIM_CPU_HANDOFF_SIZE_THRESHOLD", 0);
         } else if (backend === "webgpu") {
             tf.env().set("WEBGPU_DEFERRED_SUBMIT_BATCH_SIZE", 64); // Affects GPU RAM at expense of speed
+            tf.env().set('CHECK_COMPUTATION_FOR_ERRORS', false);
             //tf.env().set("WEBGPU_MATMUL_PROGRAM_TYPE", 3); // MatMulPackedProgram 
         }
         tf.enableProdMode();

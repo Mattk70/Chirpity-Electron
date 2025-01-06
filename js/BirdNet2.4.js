@@ -14,11 +14,6 @@ import {BaseModel} from './BaseModel.js';
 //GLOBALS
 let myModel;
 
-const CONFIG = {
-    sampleRate: 48_000, specLength: 3, sigmoid: 1,
-};
-
-
 onmessage = async (e) => {
     const modelRequest = e.data.message;
     const worker = e.data.worker;
@@ -140,7 +135,7 @@ onmessage = async (e) => {
 class BirdNETModel extends BaseModel {
     constructor(appPath, version) {
         super(appPath, version);
-        this.config.sampleRate = 48_000;
+        this.config = {sampleRate: 48_000, specLength: 3, sigmoid: 1};
         this.chunkLength = this.config.sampleRate * this.config.specLength;
     }
 
