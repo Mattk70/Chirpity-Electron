@@ -348,13 +348,13 @@ async function checkAndApplyUpdates(db) {
 
     // Apply updates that come after the last update applied
     let updateIndex = DB_updates.findIndex(m => m.name === lastUpdate.value);
-    trackEvent(STATE.UUID, 'DB', 'UPDATE', updateIndex);
     // Start from the next Update
     updateIndex = updateIndex >= 0 ? updateIndex + 1 : 0;
 
     for (let i = updateIndex; i < DB_updates.length; i++) {
         const update = DB_updates[i];
         try {
+            trackEvent(STATE.UUID, 'DB', 'UPDATE', updateIndex);
             console.log(`Applying Update: ${update.name}`);
             await update.query(db);
 

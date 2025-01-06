@@ -2946,7 +2946,7 @@ async function localiseUI(locale) {
         // Tour Carousel items:
         const tour = document.querySelector('.carousel-inner');
         tour.innerHTML = i18nTour[locale];
-        console.warn('Translation', `${Date.now() - t0} ms`)
+        // console.warn('Translation', `${Date.now() - t0} ms`)
         return localisationData
     } catch (error) {
         console.error('Localisation Error:', error.message);
