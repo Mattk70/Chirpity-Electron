@@ -1547,7 +1547,7 @@ const fetchAudioBuffer = async ({
         
         command.on('error', error => {
             generateAlert({type: 'error',  message: 'ffmpeg', variables: {error}})
-            reject(new Error('fetchAudioBuffer: Error extracting audio segment:', error));
+            reject(new Error('fetchAudioBuffer: Error extracting audio segment:', JSON.stringify(error)));
         });
 
         stream.on('readable', () => {
