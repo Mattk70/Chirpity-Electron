@@ -5,7 +5,7 @@ export default defineConfig({
   testDir: './test',
   maxFailures: 2,
   timeout: 60 * 1000,
-  workers: 1,
+  workers: 2,
   use: {
     // Maximum time each action such as `click()` can take. Defaults to 0 (no limit).
     actionTimeout: 0,

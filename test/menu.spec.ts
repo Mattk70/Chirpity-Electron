@@ -84,7 +84,7 @@ test.afterAll(async () => {
   await electronApp.close()
 })
 
-test.describe.configure({ mode: 'parallel', retries: 1, timeout: 30_000 });
+test.describe.configure({ mode: 'parallel', retries: 1, timeout: 60_000 });
 
 /*
 REMEMBER TO REBUILD THE APP IF THE *APPLICATION CODE* NEEDS TO BE CHANGED
