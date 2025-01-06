@@ -6,7 +6,7 @@ let page: Page;
 async function openExampleFile(page: Page){
     await page.locator('#navBarFile').click()
     await page.locator('#open-file').click()
-    await page.locator('#spectrogram').first().waitFor({state: 'visible'})
+    await page.locator('#spectrogramWrapper').waitFor({state: 'visible'})
   }
   
   async function changeSettings(page: Page, type: string, elementID: string, value: any, timeout: number){

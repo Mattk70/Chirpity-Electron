@@ -39,6 +39,7 @@ test.beforeAll(async () => {
 
   // Get the path for the example file we want to load
   example_file = await ipcMainInvokeHandler(electronApp, 'getAudio')
+  console.log('example file:', example_file)
   await stubMultipleDialogs(electronApp, [
     {
       method: 'showOpenDialog',
