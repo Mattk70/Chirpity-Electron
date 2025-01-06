@@ -6,7 +6,7 @@ let page: Page;
 async function openExampleFile(page: Page){
     await page.locator('#navBarFile').click()
     await page.locator('#open-file').click()
-    await page.locator('wave').first().waitFor({state: 'visible'})
+    await page.locator('#spectrogram').first().waitFor({state: 'visible'})
   }
   
   async function changeSettings(page: Page, type: string, elementID: string, value: any, timeout: number){
@@ -28,7 +28,7 @@ async function openExampleFile(page: Page){
   
   async function runExampleAnalysis(page: Page, model: string){
     await openExampleFile(page)
-    await changeSettings(page,'select', 'model-to-use', model, 3000)
+    await changeSettings(page,'select', 'model-to-use', model, 1000)
   
     await  page.locator('#navbarAnalysis').click()
     await page.locator('#analyse').click()

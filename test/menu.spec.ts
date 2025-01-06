@@ -17,6 +17,7 @@ import {changeSettings, runExampleAnalysis} from './helpers';
 
 let electronApp: ElectronApplication;
 let page: Page;
+let _worker: Page;
 let example_file: any
 // find the latest build in the out directory
 const latestBuild = findLatestBuild('./dist')
@@ -54,7 +55,7 @@ test.beforeAll(async () => {
        },
      },
    ])
-   await electronApp.firstWindow()
+   _worker = await electronApp.firstWindow()
 
   electronApp.on('window', async (window) => {
     const filename = window.url()?.split('/').pop()
@@ -75,7 +76,7 @@ test.beforeAll(async () => {
         clearInterval(checkPage);
         resolve('');
       } 
-    }, 1000); 
+    }, 2000); 
   });
 })
 

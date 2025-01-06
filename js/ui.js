@@ -304,12 +304,10 @@ function loadAudioFile({ filePath = '', preserveResults = false }) {
 
 
 function updateSpec({ buffer, play = false, position = 0, resetSpec = false }) {
-    if (resetSpec || DOM.spectrogramWrapper.classList.contains('d-none')){
-        DOM.spectrogramWrapper.classList.remove('d-none');
-        wavesurfer.loadDecodedBuffer(buffer);
+    DOM.spectrogramWrapper.classList.remove('d-none');
+    wavesurfer.loadDecodedBuffer(buffer);
+    if (resetSpec){
         adjustSpecDims(true);
-    } else {
-        wavesurfer.loadDecodedBuffer(buffer);
     }
     wavesurfer.seekTo(position);
     play ? wavesurfer.play() : wavesurfer.pause();
@@ -3106,6 +3104,7 @@ function centreSpec(){
         goToRegion = true,
         metadata = undefined
     }) {
+        console.log("Example file loaded")
         fileLoaded = true, 
         clearTimeout(loadingTimeout)
         // Clear the loading animation
