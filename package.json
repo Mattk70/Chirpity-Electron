@@ -9,7 +9,7 @@
     "preexport": "node prebuild.js",
     "preAppImage": "node prebuild.js",
     "minify": "node minify.js",
-    "export": "electron-builder build --m  -p always",
+    "export": "electron-builder build --m ",
     "AppImage": "electron-builder build --linux --x64  -p always",
     "build": "electron-builder --win --x64 -p always",
     "testBuild": "electron-builder --win",
@@ -22,6 +22,9 @@
   },
   "build": {
     "appId": "com.electron.chirpity",
+    "pkg": {
+      "license": "license.txt"
+    },
     "publish": [
       {
         "provider": "github",
@@ -133,7 +136,7 @@
       ]
     },
     "nsis": {
-      "oneClick": true,
+      "oneClick": false,
       "perMachine": true
     },
     "win": {
