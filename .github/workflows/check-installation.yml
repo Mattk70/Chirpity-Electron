@@ -61,7 +61,7 @@ jobs:
         run: |
           echo "copying  ./build/$PLATFORM/$BINARY to ./node_modules/@ffmpeg-installer/$PLATFORM/$BINARY"
           cp ./build/$PLATFORM/$BINARY ./node_modules/@ffmpeg-installer/$PLATFORM/$BINARY
-          ls -l ./node_modules/@ffmpeg-installer/$PLATFORM/$BINARY
+          ./node_modules/@ffmpeg-installer/$PLATFORM/$BINARY
         shell: bash
 
       - name: Modify fluent-ffmpeg processor.js
