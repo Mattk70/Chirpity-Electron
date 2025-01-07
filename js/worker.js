@@ -348,13 +348,13 @@ async function checkAndApplyUpdates(db) {
 
     // Apply updates that come after the last update applied
     let updateIndex = DB_updates.findIndex(m => m.name === lastUpdate.value);
-    trackEvent(STATE.UUID, 'DB', 'UPDATE', updateIndex);
     // Start from the next Update
     updateIndex = updateIndex >= 0 ? updateIndex + 1 : 0;
 
     for (let i = updateIndex; i < DB_updates.length; i++) {
         const update = DB_updates[i];
         try {
+            trackEvent(STATE.UUID, 'DB', 'UPDATE', updateIndex);
             console.log(`Applying Update: ${update.name}`);
             await update.query(db);
 
@@ -1547,7 +1547,7 @@ const fetchAudioBuffer = async ({
         
         command.on('error', error => {
             generateAlert({type: 'error',  message: 'ffmpeg', variables: {error}})
-            reject(new Error('fetchAudioBuffer: Error extracting audio segment:', error));
+            reject(new Error('fetchAudioBuffer: Error extracting audio segment:', JSON.stringify(error)));
         });
 
         stream.on('readable', () => {
@@ -3454,7 +3454,7 @@ async function getIncludedIDs(file){
         const location = lat.toString() + lon.toString();
         if (STATE.included?.[STATE.model]?.[STATE.list]?.[week]?.[location] === undefined ) {
             // Cache miss
-            const list = await setIncludedIDs(lat,lon,week)
+            await setIncludedIDs(lat,lon,week)
         } 
         return STATE.included[STATE.model][STATE.list][week][location];
         
