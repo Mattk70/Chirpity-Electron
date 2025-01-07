@@ -1050,7 +1050,7 @@ const getDuration = async (src) => {
 async function getWorkingFile(file) {
     // find the file
     const source_file = fs.existsSync(file) ? file : await locateFile(file);
-    if (!source_file) return false;
+    if (!source_file) throw new Error('Source file not found:', file);
     const metadata = await setMetadata({ file: file, source_file: source_file });
     if (!metadata) return false
     METADATA[source_file] = METADATA[file];
@@ -1153,8 +1153,8 @@ async function loadAudioFile({
         .catch( (error) => {
             console.warn(error);
             // notify and return null if no matching file was found
-            //generateAlert({type: 'error',  message: 'noFile', variables: {file, error: error.message}});
-            error.code === 'ENOENT' && notifyMissingFile(file)
+            generateAlert({type: 'error',  message: 'noFile', variables: {file, error: error.message}});
+            //error.code === 'ENOENT' && notifyMissingFile(file)
         })
 
     }
@@ -1506,63 +1506,69 @@ function prepareWavForModel(audio, file, end, chunkStart) {
 }
 
 /**
-*  Called when file first loaded, when result clicked and when saving or sending file snippets
-* @param args
-* @returns {Promise<unknown>}
-*/
-const fetchAudioBuffer = async ({
-    file = '', start = 0, end = undefined
-}) => {
-    if (! fs.existsSync(file)) {
+ * Called when file first loaded, when result clicked and when saving or sending file snippets
+ * @param {Object} params - The parameters for fetching the audio buffer.
+ * @param {string} params.file - The file path.
+ * @param {number} params.start - The start time in seconds.
+ * @param {number} [params.end] - The end time in seconds.
+ * @returns {Promise<Buffer[]>} - The audio buffer and start time.
+ */
+const fetchAudioBuffer = async ({ file = '', start = 0, end }) => {
+    if (!fs.existsSync(file)) {
         const result = await getWorkingFile(file);
-        if (!result) return //throw new Error('Cannot locate ' + file);
-        else file = result;
+        if (!result) throw new Error(`Cannot locate ${file}`);
+        file = result;
     }
-    METADATA[file]?.duration || await setMetadata({file:file});
-    end ??= METADATA[file].duration; 
-    let concatenatedBuffer = Buffer.alloc(0);
-    if (start < 0 ){
-        // work back from file end
+
+    await setMetadata({ file });
+    end ??= METADATA[file].duration;
+
+    if (start < 0) {
+        // Work back from file end
         start += METADATA[file].duration;
         end += METADATA[file].duration;
     }
+
     // Ensure start is a minimum 0.1 seconds from the end of the file, and >= 0
-    start = METADATA[file].duration < 0.1 ? 0 : Math.min(METADATA[file].duration - 0.1, start)
+    start = METADATA[file].duration < 0.1 ? 0 : Math.min(METADATA[file].duration - 0.1, start);
     end = Math.min(end, METADATA[file].duration);
-    // Use ffmpeg to extract the specified audio segment
-    if (isNaN(start)) throw(new Error('fetchAudioBuffer: start is NaN', start));
+
+    // Validate start time
+    if (isNaN(start)) throw new Error('fetchAudioBuffer: start is NaN');
+
     return new Promise((resolve, reject) => {
         const additionalFilters = setAudioFilters();
         const command = setupFfmpegCommand({
             file,
             start,
             end,
-            sampleRate: 24_000,
+            sampleRate: 24000,
             format: 's16le',
             channels: 1,
-            additionalFilters: additionalFilters
+            additionalFilters
         });
 
         const stream = command.pipe();
-        
+        let concatenatedBuffer = Buffer.alloc(0);
+
         command.on('error', error => {
-            generateAlert({type: 'error',  message: 'ffmpeg', variables: {error}})
-            reject(new Error('fetchAudioBuffer: Error extracting audio segment:', JSON.stringify(error)));
+            generateAlert({ type: 'error', message: 'ffmpeg', variables: { error } });
+            reject(new Error(`fetchAudioBuffer: Error extracting audio segment: ${JSON.stringify(error)}`));
         });
 
         stream.on('readable', () => {
             const chunk = stream.read();
-            if (chunk === null){
+            if (chunk === null) {
                 // Last chunk
-                const audio = concatenatedBuffer;
-                resolve([audio, start])
+                resolve([concatenatedBuffer, start]);
                 stream.destroy();
             } else {
-                concatenatedBuffer = concatenatedBuffer.length ?  Buffer.concat([concatenatedBuffer, chunk]) : chunk;
+                concatenatedBuffer = concatenatedBuffer.length ? Buffer.concat([concatenatedBuffer, chunk]) : chunk;
             }
-        })
+        });
     });
-}
+};
+
 
 function setAudioFilters(){
     const filters = STATE.filters;
