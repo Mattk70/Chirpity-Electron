@@ -74,7 +74,7 @@ jobs:
                     }, 5000);' ./node_modules/fluent-ffmpeg/lib/processor.js
       
           # uncomment to view changed file
-          cat ./node_modules/fluent-ffmpeg/lib/processor.js
+          #cat ./node_modules/fluent-ffmpeg/lib/processor.js
         shell: bash
       
       - name: Modify colorScale.js - Add inverted greys colormap
