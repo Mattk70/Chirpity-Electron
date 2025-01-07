@@ -10,7 +10,7 @@ const {utimesSync} = require('utimes');
 const {writeToPath} = require('@fast-csv/format');
 const merge = require('lodash.merge');
 import { State } from './state.js';
-import { sqlite3 } from './database.js';
+import { sqlite3, Mutex } from './database.js';
 import {trackEvent} from './tracking.js';
 import {extractWaveMetadata} from './metadata.js';
 let isWin32 = false;
@@ -181,50 +181,56 @@ const createDB = async (file) => {
         DEBUG && console.log("Created new in-memory database");
     }
     const db = archiveMode ? diskDB : memoryDB;
-    await db.runAsync('BEGIN');
-    await db.runAsync('CREATE TABLE species(id INTEGER PRIMARY KEY, sname TEXT NOT NULL, cname TEXT NOT NULL)');
-    await db.runAsync(`CREATE TABLE locations( id INTEGER PRIMARY KEY, lat REAL NOT NULL, lon  REAL NOT NULL, place TEXT NOT NULL, UNIQUE (lat, lon))`);
-    await db.runAsync(`CREATE TABLE files(id INTEGER PRIMARY KEY, name TEXT NOT NULL, duration REAL, filestart INTEGER, locationID INTEGER, archiveName TEXT, metadata TEXT, UNIQUE (name),
-        CONSTRAINT fk_locations FOREIGN KEY (locationID) REFERENCES locations(id) ON DELETE SET NULL)`);
-    // Ensure place names are unique too
-    await db.runAsync('CREATE UNIQUE INDEX idx_unique_place ON locations(lat, lon)');
-    await db.runAsync(`CREATE TABLE records( dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, label  TEXT,  comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER, 
-        UNIQUE (dateTime, fileID, speciesID), CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,  FOREIGN KEY (speciesID) REFERENCES species(id))`);
-    await db.runAsync(`CREATE TABLE duration( day INTEGER, duration INTEGER, fileID INTEGER, UNIQUE (day, fileID), CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE)`);
 
-    if (archiveMode) {
-        for (let i = 0; i < LABELS.length; i++) {
-            const [sname, cname] = LABELS[i].split('_');
-            await db.runAsync('INSERT INTO species VALUES (?,?,?)', i, sname, cname);
+    await dbMutex.lock();
+    try {
+        await db.runAsync('BEGIN');
+        await db.runAsync('CREATE TABLE species(id INTEGER PRIMARY KEY, sname TEXT NOT NULL, cname TEXT NOT NULL)');
+        await db.runAsync(`CREATE TABLE locations( id INTEGER PRIMARY KEY, lat REAL NOT NULL, lon  REAL NOT NULL, place TEXT NOT NULL, UNIQUE (lat, lon))`);
+        await db.runAsync(`CREATE TABLE files(id INTEGER PRIMARY KEY, name TEXT NOT NULL, duration REAL, filestart INTEGER, locationID INTEGER, archiveName TEXT, metadata TEXT, UNIQUE (name),
+            CONSTRAINT fk_locations FOREIGN KEY (locationID) REFERENCES locations(id) ON DELETE SET NULL)`);
+        // Ensure place names are unique too
+        await db.runAsync('CREATE UNIQUE INDEX idx_unique_place ON locations(lat, lon)');
+        await db.runAsync(`CREATE TABLE records( dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, label  TEXT,  comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER, 
+            UNIQUE (dateTime, fileID, speciesID), CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,  FOREIGN KEY (speciesID) REFERENCES species(id))`);
+        await db.runAsync(`CREATE TABLE duration( day INTEGER, duration INTEGER, fileID INTEGER, UNIQUE (day, fileID), CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE)`);
+
+        if (archiveMode) {
+            for (let i = 0; i < LABELS.length; i++) {
+                const [sname, cname] = LABELS[i].split('_');
+                await db.runAsync('INSERT INTO species VALUES (?,?,?)', i, sname, cname);
+            }
+            await db.runAsync(`
+                CREATE TABLE IF NOT EXISTS db_upgrade (
+                    key TEXT PRIMARY KEY,
+                    value TEXT
+                );
+            `);
+            await db.runAsync(`
+                INSERT INTO db_upgrade (key, value) VALUES ('last_update', 'add_columns_archiveName_and_metadata_and_foreign_key_to_files')
+            `);
+        } else {
+            const filename = diskDB.filename;
+            let { code } = await db.runAsync('ATTACH ? as disk', filename);
+            // If the db is not ready
+            while (code === "SQLITE_BUSY") {
+                console.log("Disk DB busy")
+                setTimeout(() => {}, 10);
+                let response = await db.runAsync('ATTACH ? as disk', filename);
+                code = response.code;
+            }
+            let response = await db.runAsync('INSERT INTO files SELECT * FROM disk.files');
+            DEBUG && console.log(response.changes + ' files added to memory database')
+            response = await db.runAsync('INSERT INTO locations SELECT * FROM disk.locations');
+            DEBUG && console.log(response.changes + ' locations added to memory database')
+            response = await db.runAsync('INSERT INTO species SELECT * FROM disk.species');
+            DEBUG && console.log(response.changes + ' species added to memory database')
         }
-        await db.runAsync(`
-            CREATE TABLE IF NOT EXISTS db_upgrade (
-                key TEXT PRIMARY KEY,
-                value TEXT
-            );
-        `);
-        await db.runAsync(`
-            INSERT INTO db_upgrade (key, value) VALUES ('last_update', 'add_columns_archiveName_and_metadata_and_foreign_key_to_files')
-        `);
-    } else {
-        const filename = diskDB.filename;
-        let { code } = await db.runAsync('ATTACH ? as disk', filename);
-        // If the db is not ready
-        while (code === "SQLITE_BUSY") {
-            console.log("Disk DB busy")
-            setTimeout(() => {}, 10);
-            let response = await db.runAsync('ATTACH ? as disk', filename);
-            code = response.code;
-        }
-        let response = await db.runAsync('INSERT INTO files SELECT * FROM disk.files');
-        DEBUG && console.log(response.changes + ' files added to memory database')
-        response = await db.runAsync('INSERT INTO locations SELECT * FROM disk.locations');
-        DEBUG && console.log(response.changes + ' locations added to memory database')
-        response = await db.runAsync('INSERT INTO species SELECT * FROM disk.species');
-        DEBUG && console.log(response.changes + ' species added to memory database')
+        await db.runAsync('END');
+    } finally {
+        dbMutex.unlock();
     }
-    await db.runAsync('END');
-    return db
+    return db;
 }
 
 
@@ -2037,38 +2043,45 @@ const terminateWorkers = () => {
 async function batchInsertRecords(cname, label, files, originalCname) {
     const db = STATE.db;
     let params = [originalCname, STATE.detect.confidence];
-    t0 = Date.now();
+    const t0 = Date.now();
     let query = `SELECT * FROM records WHERE speciesID = (SELECT id FROM species WHERE cname = ?) AND confidence >= ? `;
     if (STATE.mode !== 'explore') {
-        query += ` AND fileID in (SELECT id FROM files WHERE name IN (${prepParams(files)}))`
+        query += ` AND fileID in (SELECT id FROM files WHERE name IN (${prepParams(files)}))`;
         params.push(...files);
     } else if (STATE.explore.range.start) {
         query += ` AND dateTime BETWEEN ${STATE.explore.range.start} AND ${STATE.explore.range.end}`;
     }
     const records = await STATE.db.allAsync(query, ...params);
     let count = 0;
-    await db.runAsync('BEGIN');
-    for (let i = 0; i< records.length; i++) {
-        const item = records[i];
-        const { dateTime, speciesID, fileID, position, end, comment, callCount } = item;
-        const { name } = await STATE.db.getAsync('SELECT name FROM files WHERE id = ?', fileID)
-        // Delete existing record
-        const changes = await db.runAsync('DELETE FROM records WHERE datetime = ? AND speciesID = ? AND fileID = ?', dateTime, speciesID, fileID)
-        count += await onInsertManualRecord({
-            cname: cname,
-            start: position,
-            end: end,
-            comment: comment,
-            count: callCount,
-            file: name,
-            label: label,
-            batch: false,
-            originalCname: undefined,
-            updateResults: i === records.length -1 // trigger a UI update after the last item
-        })
+
+    await dbMutex.lock();
+    try {
+        await db.runAsync('BEGIN');
+        for (let i = 0; i < records.length; i++) {
+            const item = records[i];
+            const { dateTime, speciesID, fileID, position, end, comment, callCount } = item;
+            const { name } = await STATE.db.getAsync('SELECT name FROM files WHERE id = ?', fileID);
+            // Delete existing record
+            await db.runAsync('DELETE FROM records WHERE datetime = ? AND speciesID = ? AND fileID = ?', dateTime, speciesID, fileID);
+            count += await onInsertManualRecord({
+                cname: cname,
+                start: position,
+                end: end,
+                comment: comment,
+                count: callCount,
+                file: name,
+                label: label,
+                batch: false,
+                originalCname: undefined,
+                updateResults: i === records.length - 1 // trigger a UI update after the last item
+            });
+        }
+        await db.runAsync('END');
+    } finally {
+        dbMutex.unlock();
     }
-    await db.runAsync('END');
-    DEBUG && console.log(`Batch record update took ${(Date.now() - t0) / 1000} seconds`)
+
+    DEBUG && console.log(`Batch record update took ${(Date.now() - t0) / 1000} seconds`);
 }
                         
 const onInsertManualRecord = async ({ cname, start, end, comment, count, file, label, batch, originalCname, confidence, position, speciesFiltered, updateResults = true }) => {
@@ -2124,6 +2137,7 @@ const insertDurations = async (file, id) => {
 
 const generateInsertQuery = async (latestResult, file) => {
     const db = STATE.db;
+    await dbMutex.lock();
     try {
         await db.runAsync('BEGIN');
         let insertQuery = 'INSERT OR IGNORE INTO records VALUES ';
@@ -2131,22 +2145,22 @@ const generateInsertQuery = async (latestResult, file) => {
         let res = await db.getAsync('SELECT id FROM files WHERE name = ?', file);
         if (!res) {
             let id = null;
-            if (METADATA[file].metadata){
+            if (METADATA[file].metadata) {
                 const metadata = JSON.parse(METADATA[file].metadata);
                 const guano = metadata.guano;
-                if (guano && guano['Loc Position']){
+                if (guano && guano['Loc Position']) {
                     const [lat, lon] = guano['Loc Position'].split(' ');
                     const place = guano['Site Name'] || guano['Loc Position'];
-                    const row = await db.getAsync('SELECT id FROM locations WHERE lat = ? AND lon = ?', parseFloat(lat), parseFloat(lon))
+                    const row = await db.getAsync('SELECT id FROM locations WHERE lat = ? AND lon = ?', parseFloat(lat), parseFloat(lon));
                     if (!row) {
                         const result = await db.runAsync('INSERT OR IGNORE INTO locations VALUES ( ?, ?,?,? )',
-                        undefined, parseFloat(lat), parseFloat(lon), place);
+                            undefined, parseFloat(lat), parseFloat(lon), place);
                         id = result.lastID;
                     }
                 }
             }
             res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,?,?,? )',
-            undefined, file, METADATA[file].duration, METADATA[file].fileStart, id, null, METADATA[file].metadata);
+                undefined, file, METADATA[file].duration, METADATA[file].fileStart, id, null, METADATA[file].metadata);
             fileID = res.lastID;
             await insertDurations(file, fileID);
         } else {
@@ -2172,12 +2186,16 @@ const generateInsertQuery = async (latestResult, file) => {
         insertQuery = insertQuery.slice(0, -2);
         //DEBUG && console.log(insertQuery);
         // Make sure we have some values to INSERT
-        insertQuery.endsWith(')') && await db.runAsync(insertQuery)
-            .catch( (error) => console.log("Database error:", error))
+        if (insertQuery.endsWith(')')) {
+            await db.runAsync(insertQuery).catch((error) => console.log("Database error:", error));
+        }
         await db.runAsync('END');
-        return fileID
-    } catch {
+        return fileID;
+    } catch (error) {
         await db.runAsync('ROLLBACK');
+        console.log("Transaction error:", error);
+    } finally {
+        dbMutex.unlock();
     }
 }
 
@@ -2827,49 +2845,57 @@ const getSavedFileInfo = async (file) => {
 *  Transfers data in memoryDB to diskDB
 * @returns {Promise<unknown>}
 */
-const onSave2DiskDB = async ({file}) => {
-    t0 = Date.now();
+const onSave2DiskDB = async ({ file }) => {
+    const t0 = Date.now();
     if (STATE.db === diskDB) {
-        generateAlert({message: 'NoOP'})
-        return // nothing to do. Also will crash if trying to update disk from disk.
+        generateAlert({ message: 'NoOP' });
+        return; // nothing to do. Also will crash if trying to update disk from disk.
     }
     const included = await getIncludedIDs(file);
-    let filterClause = filtersApplied(included) ? `AND speciesID IN (${included} )` : '';
+    let filterClause = filtersApplied(included) ? `AND speciesID IN (${included})` : '';
     if (STATE.detect.nocmig) filterClause += ' AND isDaylight = FALSE ';
-    await memoryDB.runAsync('BEGIN');
-    await memoryDB.runAsync(`INSERT OR IGNORE INTO disk.files SELECT * FROM files`);
-    await memoryDB.runAsync(`INSERT OR IGNORE INTO disk.locations SELECT * FROM locations`);
-    // Set the saved flag on files' METADATA
-    for (let file in METADATA) {
-        METADATA[file].isSaved = true
-    }
-    // Update the duration table
-    let response = await memoryDB.runAsync('INSERT OR IGNORE INTO disk.duration SELECT * FROM duration');
-    DEBUG && console.log(response.changes + ' date durations added to disk database');
-    // now update records
-    response = await memoryDB.runAsync(`
-    INSERT OR IGNORE INTO disk.records 
-    SELECT * FROM records
-    WHERE confidence >= ${STATE.detect.confidence} ${filterClause} `);
-    DEBUG && console.log(response?.changes + ' records added to disk database');
-    await memoryDB.runAsync('END');
-    DEBUG && console.log("transaction ended");
-    if (response?.changes) {
-        UI.postMessage({ event: 'diskDB-has-records' });
-        if (!DATASET) {
-            
-            // Now we have saved the records, set state to DiskDB
-            await onChangeMode('archive');
-            getLocations({ db: STATE.db, file: file });
-            const total = response.changes;
-            const seconds = (Date.now() - t0) / 1000;
-            generateAlert({
-                message: 'goodDBUpdate',
-                variables: {total, seconds},
-                updateFilenamePanel: true,
-                database: true
-            })
+
+    await dbMutex.lock();
+    try {
+        await memoryDB.runAsync('BEGIN');
+        await memoryDB.runAsync(`INSERT OR IGNORE INTO disk.files SELECT * FROM files`);
+        await memoryDB.runAsync(`INSERT OR IGNORE INTO disk.locations SELECT * FROM locations`);
+        // Set the saved flag on files' METADATA
+        for (let file in METADATA) {
+            METADATA[file].isSaved = true;
         }
+        // Update the duration table
+        let response = await memoryDB.runAsync('INSERT OR IGNORE INTO disk.duration SELECT * FROM duration');
+        DEBUG && console.log(response.changes + ' date durations added to disk database');
+        // now update records
+        response = await memoryDB.runAsync(`
+            INSERT OR IGNORE INTO disk.records 
+            SELECT * FROM records
+            WHERE confidence >= ${STATE.detect.confidence} ${filterClause}`);
+        DEBUG && console.log(response?.changes + ' records added to disk database');
+        await memoryDB.runAsync('END');
+        DEBUG && console.log("transaction ended");
+        if (response?.changes) {
+            UI.postMessage({ event: 'diskDB-has-records' });
+            if (!DATASET) {
+                // Now we have saved the records, set state to DiskDB
+                await onChangeMode('archive');
+                getLocations({ db: STATE.db, file: file });
+                const total = response.changes;
+                const seconds = (Date.now() - t0) / 1000;
+                generateAlert({
+                    message: 'goodDBUpdate',
+                    variables: { total, seconds },
+                    updateFilenamePanel: true,
+                    database: true
+                });
+            }
+        }
+    } catch (error) {
+        await memoryDB.runAsync('ROLLBACK');
+        console.log("Transaction error:", error);
+    } finally {
+        dbMutex.unlock();
     }
 };
 
@@ -3348,57 +3374,73 @@ const onFileDelete = async (fileName) => {
         generateAlert({ message: 'failedFilePurge', variables: {file: fileName}});
     }
 }
-    
-async function onUpdateLocale(locale, labels, refreshResults){
-    let t0 = performance.now();
-    await diskDB.runAsync('BEGIN');
-    await memoryDB.runAsync('BEGIN');
-    if (STATE.model === 'birdnet'){
-        for (let i = 0; i < labels.length; i++){
-            const [sname, cname] = labels[i].trim().split('_');
-            await diskDB.runAsync('UPDATE species SET cname = ? WHERE sname = ?', cname, sname);
-            await memoryDB.runAsync('UPDATE species SET cname = ? WHERE sname = ?', cname, sname);
-        }
-    } else {
-        for (let i = 0; i < labels.length; i++) {
-            const [sname, newCname] = labels[i].split('_');
-            // For chirpity, we check if the existing cname ends with a <call type> in brackets
-            const existingCnameResult = await memoryDB.allAsync('SELECT cname FROM species WHERE sname = ?', sname);
-            if (existingCnameResult.length) {
-                for (let i = 0; i < existingCnameResult.length; i++){
-                    const {cname} = existingCnameResult[i];
-                    const existingCname = cname;
-                    const existingCnameMatch = existingCname.match(/\(([^)]+)\)$/); // Regex to match word(s) within brackets at the end of the string
-                    const newCnameMatch = newCname.match(/\(([^)]+)\)$/);
-                    // Do we have a specific call type to match?
-                    if (newCnameMatch){
-                        // then only update the database where existing and new call types match
-                        if (newCnameMatch[0] === existingCnameMatch[0]){
-                            const callTypeMatch = '%' + newCnameMatch[0] + '%' ;
-                            await diskDB.runAsync("UPDATE species SET cname = ? WHERE sname = ? AND cname LIKE ?", newCname, sname, callTypeMatch);
-                            await memoryDB.runAsync("UPDATE species SET cname = ? WHERE sname = ? AND cname LIKE ?", newCname, sname, callTypeMatch);
-                        }
-                    } else { // No (<call type>) in the new label - so we add the new name to all the species call types in the database
-                        let appendedCname = newCname, bracketedWord;
-                        if (existingCnameMatch) {
-                            bracketedWord = existingCnameMatch[0];
-                            appendedCname += ` ${bracketedWord}`; // Append the bracketed word to the new cname (for each of the existingCnameResults)
-                            const callTypeMatch = '%' + bracketedWord + '%';
-                            await diskDB.runAsync("UPDATE species SET cname = ? WHERE sname = ? AND cname LIKE ?", appendedCname, sname, callTypeMatch);
-                            await memoryDB.runAsync("UPDATE species SET cname = ? WHERE sname = ? AND cname LIKE ?", appendedCname, sname, callTypeMatch);
-                        } else {
-                            await diskDB.runAsync("UPDATE species SET cname = ? WHERE sname = ?", appendedCname, sname);
-                            await memoryDB.runAsync("UPDATE species SET cname = ? WHERE sname = ?", appendedCname, sname);
+
+
+const dbMutex = new Mutex();
+/**
+ * Updates the locale and species names in the database.
+ * 
+ * @param {string} locale - The locale to update.
+ * @param {Array<string>} labels - The labels containing species names and common names.
+ * @param {boolean} refreshResults - Whether to refresh the results after updating.
+ * @returns {Promise<void>} - A promise that resolves when the update is complete.
+ * 
+ * @throws {Error} - Throws an error if the database transactions fail.
+ */
+async function onUpdateLocale(locale, labels, refreshResults) {
+    await dbMutex.lock();
+    try {
+        await diskDB.runAsync('BEGIN');
+        await memoryDB.runAsync('BEGIN');
+        if (STATE.model === 'birdnet') {
+            for (let i = 0; i < labels.length; i++) {
+                const [sname, cname] = labels[i].trim().split('_');
+                await diskDB.runAsync('UPDATE species SET cname = ? WHERE sname = ?', cname, sname);
+                await memoryDB.runAsync('UPDATE species SET cname = ? WHERE sname = ?', cname, sname);
+            }
+        } else {
+            for (let i = 0; i < labels.length; i++) {
+                const [sname, newCname] = labels[i].split('_');
+                // For chirpity, we check if the existing cname ends with a <call type> in brackets
+                const existingCnameResult = await memoryDB.allAsync('SELECT cname FROM species WHERE sname = ?', sname);
+                if (existingCnameResult.length) {
+                    for (let j = 0; j < existingCnameResult.length; j++) {
+                        const { cname } = existingCnameResult[j];
+                        const existingCname = cname;
+                        const existingCnameMatch = existingCname.match(/\(([^)]+)\)$/); // Regex to match word(s) within brackets at the end of the string
+                        const newCnameMatch = newCname.match(/\(([^)]+)\)$/);
+                        // Do we have a specific call type to match?
+                        if (newCnameMatch) {
+                            // then only update the database where existing and new call types match
+                            if (newCnameMatch[0] === existingCnameMatch[0]) {
+                                const callTypeMatch = '%' + newCnameMatch[0] + '%';
+                                await diskDB.runAsync("UPDATE species SET cname = ? WHERE sname = ? AND cname LIKE ?", newCname, sname, callTypeMatch);
+                                await memoryDB.runAsync("UPDATE species SET cname = ? WHERE sname = ? AND cname LIKE ?", newCname, sname, callTypeMatch);
+                            }
+                        } else { // No (<call type>) in the new label - so we add the new name to all the species call types in the database
+                            let appendedCname = newCname, bracketedWord;
+                            if (existingCnameMatch) {
+                                bracketedWord = existingCnameMatch[0];
+                                appendedCname += ` ${bracketedWord}`; // Append the bracketed word to the new cname (for each of the existingCnameResults)
+                                const callTypeMatch = '%' + bracketedWord + '%';
+                                await diskDB.runAsync("UPDATE species SET cname = ? WHERE sname = ? AND cname LIKE ?", appendedCname, sname, callTypeMatch);
+                                await memoryDB.runAsync("UPDATE species SET cname = ? WHERE sname = ? AND cname LIKE ?", appendedCname, sname, callTypeMatch);
+                            } else {
+                                await diskDB.runAsync("UPDATE species SET cname = ? WHERE sname = ?", appendedCname, sname);
+                                await memoryDB.runAsync("UPDATE species SET cname = ? WHERE sname = ?", appendedCname, sname);
+                            }
                         }
                     }
                 }
             }
         }
+        await diskDB.runAsync('END');
+        await memoryDB.runAsync('END');
+        STATE.update({ locale: locale });
+        if (refreshResults) await Promise.all([getResults(), getSummary()]);
+    } finally {
+        dbMutex.unlock();
     }
-    await diskDB.runAsync('END');
-    await memoryDB.runAsync('END');
-    STATE.update({locale: locale});
-    if (refreshResults) await Promise.all([getResults(), getSummary()])
 }
     
 async function onSetCustomLocation({ lat, lon, place, files, db = STATE.db }) {
