@@ -3454,7 +3454,7 @@ async function getIncludedIDs(file){
         const location = lat.toString() + lon.toString();
         if (STATE.included?.[STATE.model]?.[STATE.list]?.[week]?.[location] === undefined ) {
             // Cache miss
-            const list = await setIncludedIDs(lat,lon,week)
+            await setIncludedIDs(lat,lon,week)
         } 
         return STATE.included[STATE.model][STATE.list][week][location];
         
