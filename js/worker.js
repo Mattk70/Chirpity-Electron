@@ -15,6 +15,10 @@ import {trackEvent} from './tracking.js';
 import {extractWaveMetadata} from './metadata.js';
 let isWin32 = false;
 
+const DATASET = false;
+const DATABASE = 'archive_test'
+const adding_chirpity_additions = false;
+const DATASET_SAVE_LOCATION = "/media/matt/36A5CC3B5FA24585/DATASETS/European/call";
 let ntsuspend;
 if (process.platform === 'win32') {
     ntsuspend = require('ntsuspend');
@@ -93,10 +97,6 @@ let workerInstance = 0;
 let appPath, tempPath, BATCH_SIZE, LABELS, batchChunksToSend = {};
 let LIST_WORKER;
 
-const DATASET = false;
-const adding_chirpity_additions = true;
-const dataset_database = DATASET;
-const DATASET_SAVE_LOCATION = "E:/DATASETS/BirdNET_wavs";
 
 // Adapted from https://stackoverflow.com/questions/6117814/get-week-of-year-in-javascript-like-in-php
 Date.prototype.getWeekNumber = function(){
@@ -194,9 +194,18 @@ const createDB = async (file) => {
 
     if (archiveMode) {
         for (let i = 0; i < LABELS.length; i++) {
-            const [sname, cname] = LABELS[i].replaceAll("'", "''").split('_');
+            const [sname, cname] = LABELS[i].split('_');
             await db.runAsync('INSERT INTO species VALUES (?,?,?)', i, sname, cname);
         }
+        await db.runAsync(`
+            CREATE TABLE IF NOT EXISTS db_upgrade (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            );
+        `);
+        await db.runAsync(`
+            INSERT INTO db_upgrade (key, value) VALUES ('last_update', 'add_columns_archiveName_and_metadata_and_foreign_key_to_files')
+        `);
     } else {
         const filename = diskDB.filename;
         let { code } = await db.runAsync('ATTACH ? as disk', filename);
@@ -242,7 +251,7 @@ async function loadDB(path) {
     modelLabels.push("Unknown Sp._Unknown Sp.");
     const num_labels = modelLabels.length;
     LABELS = modelLabels; // these are the default english labels
-    const file = dataset_database ? p.join(path, `archive_dataset${num_labels}.sqlite`) : p.join(path, `archive${num_labels}.sqlite`)
+    const file = DATASET ? p.join(path, `${DATABASE}${num_labels}.sqlite`) : p.join(path, `archive${num_labels}.sqlite`)
 
     if (!fs.existsSync(file)) {
         await createDB(file);
@@ -339,13 +348,13 @@ async function checkAndApplyUpdates(db) {
 
     // Apply updates that come after the last update applied
     let updateIndex = DB_updates.findIndex(m => m.name === lastUpdate.value);
-    
     // Start from the next Update
     updateIndex = updateIndex >= 0 ? updateIndex + 1 : 0;
 
     for (let i = updateIndex; i < DB_updates.length; i++) {
         const update = DB_updates[i];
         try {
+            trackEvent(STATE.UUID, 'DB', 'UPDATE', updateIndex);
             console.log(`Applying Update: ${update.name}`);
             await update.query(db);
 
@@ -784,14 +793,15 @@ const prepSummaryStatement = (included) => {
     FROM ranked_records
     WHERE ranked_records.rank <= ${STATE.topRankin}`;
     
-    summaryStatement +=  ` GROUP BY speciesID  ORDER BY cname`;
+    summaryStatement +=  ` GROUP BY speciesID  ORDER BY ${STATE.summarySortOrder}`;
 
     return [summaryStatement, params]
 }
     
 
-const getTotal = async ({species = undefined, offset = undefined, included = STATE.included, file = undefined}= {}) => {
+const getTotal = async ({species = undefined, offset = undefined, included = undefined, file = undefined}= {}) => {
     let params = [];
+    included ??= await getIncludedIDs(file);
     const range = STATE.mode === 'explore' ? STATE.explore.range : undefined;
     offset = offset ?? (species !== undefined ? STATE.filteredOffset[species] : STATE.globalOffset);
     let SQL = ` WITH MaxConfidencePerDateTime AS (
@@ -801,12 +811,9 @@ const getTotal = async ({species = undefined, offset = undefined, included = STA
         FROM records 
         JOIN files ON records.fileID = files.id 
         WHERE confidence >= ${STATE.detect.confidence} `;
-    if (file) {
-        params.push(file)
-        SQL += ' AND files.name = ? '
-    }
-    else if (filtersApplied(included)) SQL += ` AND speciesID IN (${included}) `;
-    if (STATE.detect.nocmig) SQL += ' AND COALESCE(isDaylight, 0) != 1 ';
+
+    if (filtersApplied(included)) SQL += ` AND speciesID IN (${included}) `;
+    if (STATE.detect.nocmig) SQL += ' AND NOT isDaylight';
     if (STATE.locationID) SQL += ` AND locationID =  ${STATE.locationID}`;
     const [SQLtext, fileParams] = getFileSQLAndParams(range);
     SQL += SQLtext, params.push(...fileParams);
@@ -904,7 +911,7 @@ const prepResultsStatement = (species, noLimit, included, offset, topRankin) => 
     const limitClause = noLimit ? '' : 'LIMIT ?  OFFSET ?';
     noLimit || params.push(STATE.limit, offset);
 
-    resultStatement += ` ORDER BY ${STATE.sortOrder}, callCount DESC ${limitClause} `;
+    resultStatement += ` ORDER BY ${STATE.resultsSortOrder}, callCount DESC ${limitClause} `;
     
     return [resultStatement, params];
 }
@@ -1257,41 +1264,37 @@ function checkBacklog(ffmpegCommand = null) {
             console.warn('Ffmpeg process already exited in check backlog call')
             return 
         }
-        let firstRun = true, hysteresis_factor = 2;
+        const hysteresis_factor = 2;
 
         if (!aborted && AUDIO_BACKLOG < NUM_WORKERS * hysteresis_factor && ! STATE.processingPaused[pid]) {
+            console.log('no need to check further, backlog: ', AUDIO_BACKLOG, ' pid paused: ', pid, STATE.processingPaused[pid])
             resolve(true);
             return;
         }
-
         const interval = setInterval(() => {
             const backlog = AUDIO_BACKLOG;
+            console.log('Backlog in interval is:', backlog)
             if (aborted) {
+                console.log('clearing interval, aborted')
                 clearInterval(interval);
                 resolve(false);
                 return;
             }
-
-            if (firstRun) {
-                DEBUG && console.log('backlog (initial):', backlog);
-                firstRun = false; // Ensure this logs only on the first call
-            }
-
-            if (backlog >= NUM_WORKERS * hysteresis_factor) {
-                if (! STATE.processingPaused[pid]) {
+            if (! STATE.processingPaused[pid] && backlog >= NUM_WORKERS * hysteresis_factor) {
                     pauseFfmpeg(ffmpegCommand, pid);
                     DEBUG && console.log(`pause signal sent to ffmpeg(${pid}), backlog: ${backlog}`);
                     STATE.processingPaused[pid] = true;
-                }
-            } else if (backlog <= NUM_WORKERS) {
-                DEBUG && console.log('backlog (final):', backlog);
-                if (STATE.processingPaused[pid]) {
-                     resumeFfmpeg(ffmpegCommand, pid);
-                     DEBUG && console.log(`resume signal sent to ffmpeg(${pid}), backlog: ${backlog}`);
-                     STATE.processingPaused[pid] = false;
-                }
-                clearInterval(interval); // Backlog is within limits, stop checking
-                resolve(true); // Resolve the promise
+            }
+            else if (backlog <= NUM_WORKERS) {
+            DEBUG && console.log('backlog (final):', backlog);
+            if (STATE.processingPaused[pid]) {
+                resumeFfmpeg(ffmpegCommand, pid);
+                DEBUG && console.log(`resume signal sent to ffmpeg(${pid}), backlog: ${backlog}`);
+                STATE.processingPaused[pid] = false;
+            }
+            console.log('clearing interval, pressure eased')
+            clearInterval(interval); // Backlog is within limits, stop checking
+            resolve(true); // Resolve the promise
             }
         }, 200);
     });
@@ -1304,6 +1307,7 @@ function pauseFfmpeg(ffmpegCommand, pid){
         DEBUG && console.log(message)
     } else {
         ffmpegCommand.kill('SIGSTOP')
+        console.log('paused ', pid)
     }
 }
 
@@ -1314,6 +1318,7 @@ function resumeFfmpeg(ffmpegCommand, pid){
         DEBUG && console.log(message)
     } else {
         ffmpegCommand.kill('SIGCONT')
+        console.log('resumded ', pid)
     }
 }
 
@@ -1358,6 +1363,8 @@ const getPredictBuffers = async ({
 }
 
 async function processAudio (file, start, end, chunkStart, highWaterMark, samplesInBatch){
+    const MAX_CHUNKS = Math.max(12, NUM_WORKERS * 2);
+    let isPaused = false;
     return new Promise((resolve, reject) => {
         // Many compressed files start with a small section of silence due to encoder padding, which affects predictions
         // To compensate, we move the start back a small amount, and slice the data to remove the silence
@@ -1378,12 +1385,24 @@ async function processAudio (file, start, end, chunkStart, highWaterMark, sample
                 reject(error)
             }
         });
-        command.on('progress', (progress) => {
-            DEBUG && console.log('progress: ', progress.timemark)
-            checkBacklog(command)
-        })
+
         const STREAM = command.pipe();
         STREAM.on('data', (chunk) => {
+            if (! isPaused && AUDIO_BACKLOG >= MAX_CHUNKS){
+                isPaused = true;
+                const pid = command.ffmpegProc?.pid
+                pid && pauseFfmpeg(command, pid)
+                console.log('about to set the interval ', pid)
+                const interval = setInterval(() =>{
+                    console.log('Backlog', AUDIO_BACKLOG)
+                    if (AUDIO_BACKLOG < NUM_WORKERS * 2){
+                        resumeFfmpeg(command, pid)
+                        console.log('resumed ', pid)
+                        isPaused = false;
+                        clearInterval(interval)
+                    }
+                }, 10)
+            }
             if (aborted) {
                 STREAM.destroy();
                 return;
@@ -1518,7 +1537,7 @@ const fetchAudioBuffer = async ({
             file,
             start,
             end,
-            sampleRate: 24000,
+            sampleRate: 24_000,
             format: 's16le',
             channels: 1,
             additionalFilters: additionalFilters
@@ -1528,7 +1547,7 @@ const fetchAudioBuffer = async ({
         
         command.on('error', error => {
             generateAlert({type: 'error',  message: 'ffmpeg', variables: {error}})
-            reject(new Error('fetchAudioBuffer: Error extracting audio segment:', error));
+            reject(new Error('fetchAudioBuffer: Error extracting audio segment:', JSON.stringify(error)));
         });
 
         stream.on('readable', () => {
@@ -1614,29 +1633,86 @@ const speciesMatch = (path, sname) => {
     return species.includes(sname)
 }
 
+function findFile(pathParts, filename, species) {
+    const baseDir = pathParts.slice(0, 5).concat(['XC_ALL_mp3']).join(p.sep);
+
+    // List of suffixes to check, in order
+    const suffixes = ['', ' (call)', ' (fc)', ' (nfc)', ' (song)'];
+
+    // Extract existing suffix from species, if present
+    const suffixPattern = / \((call|fc|nfc|song)\)$/;
+    let speciesBase = species;
+    let existingSuffix = '';
+
+    const match = species.match(suffixPattern);
+    if (match) {
+        existingSuffix = match[0]; // e.g., " (call)"
+        speciesBase = species.replace(suffixPattern, ''); // Remove suffix
+    }
+
+    // First, check the species with its existing suffix
+    if (existingSuffix) {
+        const folder = p.join(baseDir, species);
+        const filePath = p.join(folder, filename + '.mp3');
+        if (fs.existsSync(filePath)) {
+            console.log(`File found: ${filePath}`);
+            return [filePath, species];
+        }
+    }
+
+    // Check species with other suffixes, removing the existing one
+    for (const suffix of suffixes) {
+        if (suffix === existingSuffix) continue; // Skip the suffix already checked
+        const found_calltype = speciesBase + suffix
+        const folder = p.join(baseDir, found_calltype);
+        const filePath = p.join(folder, filename + '.mp3');
+        if (fs.existsSync(filePath)) {
+            console.log(`File found: ${filePath}`);
+            
+            return [filePath, found_calltype];
+        }
+    }
+
+    console.log('File not found in any directory');
+    return [null, null];
+}
 const convertSpecsFromExistingSpecs = async (path) => {
-    path ??= '/mnt/608E21D98E21A88C/Users/simpo/PycharmProjects/Data/New_Dataset';
+    path ??= '/media/matt/36A5CC3B5FA24585/DATASETS/MISSING/NEW_DATASET_WITHOUT_ALSO_MERGED';
     const file_list = await getFiles([path], true);
     for (let i = 0; i < file_list.length; i++) {
+        if (i % 100 === 0){
+            console.log(`${i} records processed`)
+        }
         const parts = p.parse(file_list[i]);
-        let species = parts.dir.split(p.sep);
-        species = species[species.length - 1];
+        let path_parts = parts.dir.split(p.sep);
+        let species = path_parts[path_parts.length - 1];
+        const species_parts = species.split('~');
+        species = species_parts[1] + '~' + species_parts[0]
         const [filename, time] = parts.name.split('_');
         const [start, end] = time.split('-');
-        const path_to_save = path.replace('New_Dataset', 'New_Dataset_Converted') + p.sep + species;
-        const file_to_save = p.join(path_to_save, parts.base);
+        // const path_to_save = path.replace('New_Dataset', 'New_Dataset_Converted') + p.sep + species;
+        let path_to_save = '/media/matt/36A5CC3B5FA24585/DATASETS/ATTENUATED_pngs/converted' + p.sep + species;
+        let file_to_save = p.join(path_to_save, parts.base);
         if (fs.existsSync(file_to_save)) {
             DEBUG && console.log("skipping file as it is already saved")
         } else {
-            const file_to_analyse = parts.dir.replace('New_Dataset', 'XC_ALL_mp3') + p.sep + filename + '.mp3';
-            const AudioBuffer = await fetchAudioBuffer({
+            const [file_to_analyse, confirmed_species_folder] = findFile(path_parts, filename, species)
+            path_to_save = path_to_save.replace(species, confirmed_species_folder)
+            file_to_save = p.join(path_to_save, parts.base);
+            if (fs.existsSync(file_to_save)){
+                console.log("skipping file as it is already saved")
+                continue;
+            }
+            if (! file_to_analyse) continue
+            //parts.dir.replace('MISSING/NEW_DATASET_WITHOUT_ALSO_MERGED', 'XC_ALL_mp3') + p.sep + filename + '.mp3';
+            const [AudioBuffer, begin] = await fetchAudioBuffer({
                 start: parseFloat(start), end: parseFloat(end), file: file_to_analyse
             })
             if (AudioBuffer) {  // condition to prevent barfing when audio snippet is v short i.e. fetchAudioBUffer false when < 0.1s
                 if (++workerInstance === NUM_WORKERS) {
                     workerInstance = 0;
                 }
-                const buffer = AudioBuffer.getChannelData(0);
+                const buffer = getMonoChannelData(AudioBuffer);
                 predictWorkers[workerInstance].postMessage({
                     message: 'get-spectrogram',
                     filepath: path_to_save,
@@ -1652,7 +1728,8 @@ const convertSpecsFromExistingSpecs = async (path) => {
 }
             
 const saveResults2DataSet = ({species, included}) => {
-    const exportType = 'audio';
+    // STATE.specCount = 0; STATE.totalSpecs = 0;
+    const exportType = ''//audio';
     const rootDirectory = DATASET_SAVE_LOCATION;
     sampleRate = STATE.model === 'birdnet' ? 48_000 : 24_000;
     const height = 256, width = 384;
@@ -1687,12 +1764,12 @@ const saveResults2DataSet = ({species, included}) => {
         let ambient, threshold, value = STATE.detect.confidence;
         // adding_chirpity_additions is a flag for curated files, if true we assume every detection is correct
         if (!adding_chirpity_additions) {
-                ambient = (result.sname2 === 'Ambient Noise' ? result.score2 : result.sname3 === 'Ambient Noise' ? result.score3 : false)
-                console.log('Ambient', ambient)
-                // If we have a high level of ambient noise activation, insist on a high threshold for species detection
-                if (ambient && ambient > 0.2) {
-                    value = 0.7
-                }
+                // ambient = (result.sname2 === 'Ambient Noise' ? result.score2 : result.sname3 === 'Ambient Noise' ? result.score3 : false)
+                // console.log('Ambient', ambient)
+                // // If we have a high level of ambient noise activation, insist on a high threshold for species detection
+                // if (ambient && ambient > 0.2) {
+                //     value = 0.7
+                // }
             // Check whether top predicted species matches folder (i.e. the searched for species)
             // species not matching the top prediction sets threshold to 2000, effectively limiting treatment to manual records
             threshold = speciesMatch(result.file, result.sname) ? value : 2000;
@@ -1722,15 +1799,15 @@ const saveResults2DataSet = ({species, included}) => {
                     end = Math.min(end, result.duration);
                     if (exportType === 'audio') saveAudio(result.file, start, end, file.replace('.png', '.wav'), {Artist: 'Chirpity'}, filepath)
                     else {
-                        const AudioBuffer = await fetchAudioBuffer({
+                        const [AudioBuffer, _] = await fetchAudioBuffer({
                             start: start, end: end, file: result.file
                         })
                         if (AudioBuffer) {  // condition to prevent barfing when audio snippet is v short i.e. fetchAudioBUffer false when < 0.1s
                             if (++workerInstance === NUM_WORKERS) {
                                 workerInstance = 0;
                             }
-                            
-                            const buffer = AudioBuffer.getChannelData(0);
+                            const buffer = getMonoChannelData(AudioBuffer);
+                            // STATE.totalSpecs++
                             predictWorkers[workerInstance].postMessage({
                                 message: 'get-spectrogram',
                                 filepath: filepath,
@@ -1752,6 +1829,7 @@ const saveResults2DataSet = ({species, included}) => {
         promises.push(promise)
     }, (err) => {
         if (err) return console.log(err);
+
         Promise.all(promises).then(() => console.log(`Dataset created. ${count} files saved in ${(Date.now() - t0) / 1000} seconds`))
     })
     
@@ -1909,7 +1987,7 @@ const processQueue = async () => {
 function spawnPredictWorkers(model, list, batchSize, threads) {
     // And be ready to receive the list:
     for (let i = 0; i < threads; i++) {
-        const workerSrc = model === 'v3' ? 'BirdNet' : model === 'birdnet' ? 'BirdNet2.4' : 'model';
+        const workerSrc = model === 'birdnet' ? 'BirdNet2.4' : model;
         const worker = new Worker(`./js/${workerSrc}.js`, { type: 'module' });
         worker.isAvailable = true;
         worker.isReady = false;
@@ -2151,9 +2229,10 @@ const parsePredictions = async (response) => {
                 }
             }
         } 
-    } else if (index === 500){
+    } else if (index > 500){
         // Slow down the summary updates
         setGetSummaryQueryInterval(NUM_WORKERS)
+        DEBUG && console.log('Reducing summary updates to one every ', STATE.incrementor)
     }
     predictionsReceived[file]++;
     const received = sumObjectValues(predictionsReceived);
@@ -2171,7 +2250,7 @@ const parsePredictions = async (response) => {
 
     if (!STATE.selection && STATE.increment() === 0) {
         getSummary({ interim: true });
-        getTotal()
+        getTotal({file})
     }
 
     return response.worker
@@ -3219,7 +3298,7 @@ async function onChartRequest(args) {
     const pointStart = dateRange.start ??= Date.UTC(2020, 0, 0, 0, 0, 0);
     UI.postMessage({
         event: 'chart-data', // Restore species name
-        species: args.species ? args.species.replace("''", "'") : undefined,
+        species: args.species ? args.species : undefined,
         results: results,
         rate: rate,
         total: total,
@@ -3359,8 +3438,7 @@ async function getLocations({ db = STATE.db, file }) {
  * @returns a list of IDs included in filtered results
  */
 async function getIncludedIDs(file){
-    t0 = Date.now();
-    let lat, lon, week, hitOrMiss = 'hit';
+    let lat, lon, week;
     if (STATE.list === 'location' || (STATE.list === 'nocturnal' && STATE.local)){
         if (file){
             file = METADATA[file];
@@ -3376,19 +3454,15 @@ async function getIncludedIDs(file){
         const location = lat.toString() + lon.toString();
         if (STATE.included?.[STATE.model]?.[STATE.list]?.[week]?.[location] === undefined ) {
             // Cache miss
-            const list = await setIncludedIDs(lat,lon,week)
-            hitOrMiss = 'miss';
+            await setIncludedIDs(lat,lon,week)
         } 
-        //DEBUG && console.log(`Cache ${hitOrMiss}: setting the ${STATE.list} list took ${Date.now() -t0}ms`)
         return STATE.included[STATE.model][STATE.list][week][location];
         
     } else {
         if (STATE.included?.[STATE.model]?.[STATE.list] === undefined) {
             // The object lacks the week / location
             LIST_WORKER && await setIncludedIDs();
-            hitOrMiss = 'miss';
         }
-        //DEBUG && console.log(`Cache ${hitOrMiss}: setting the ${STATE.list} list took ${Date.now() -t0}ms`)
         return STATE.included[STATE.model][STATE.list];
     }
 }

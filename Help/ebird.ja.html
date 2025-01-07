@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>eBird 記録 FAQ</title>
+</head>
+<body>
+
+<table class="table table-hover p-1">
+    <tr>
+        <td colspan="2" class="text-center text-bg-light"><h5>eBird 記録 FAQ</h5></td>
+    </tr>
+    <tr>
+        <td><b>eBird とは何ですか？</b></td>
+        <td><a href="https://ebird.org/about" target="_blank">eBird</a> は、コーネル大学鳥類学研究所が管理する、鳥の観察データを共有するためのオンラインプラットフォームです。</td>
+    </tr>
+    <tr>
+        <td><b>eBird 記録ファイルとは何ですか？</b></td>
+        <td>記録ファイルは、eBird プラットフォームにインポートできる鳥の観察データのスプレッドシートです。</td>
+    </tr>
+    <tr>
+        <td><b>Chirpity はどのようにして私の検出を整理しますか？</b></td>
+        <td>
+            <p>アプリケーションは、エクスポートに関連付けられた各ファイルのチェックリストを作成します。これらのチェックリストには、そのファイル内の各種のコール検出の合計が含まれています。
+            コール数を入力した場合はその数値が使用され、そうでない場合は1コールと見なされます。</p>
+            <p>エクスポートされたファイルには、各列が何を表しているかを説明するヘッダーの行が含まれています。
+                詳細は <a href="https://support.ebird.org/en/support/solutions/articles/48000907878-upload-spreadsheet-data-to-ebird#anchorRecordFormat" target="_blank">eBird サイト</a> で確認できます。
+            </p>
+            <p><b>重要：</b> ファイルをアップロードする前にヘッダー行を削除する必要があります。</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>eBird 記録ファイルをどのようにアップロードしますか？</b></td>
+        <td>
+            <a href="https://www.ebird.org/home" target="_blank">eBird</a> にアクセスして、eBird アカウントにサインアップまたはサインインします。アカウントを作成し、ログインしたら <a href="https://ebird.org/import/upload.form?theme=ebird" target="_blank">インポートフォーム</a> に移動します。
+            <ol>
+                <li>"ファイルを選択" をクリックして、準備したファイルを選択します</li>
+                <li><b>重要：</b> "eBird 記録形式 (拡張)" をチェックします</li>
+                <li>"ファイルをインポート" をクリックします</li>
+            </ol>
+        </td>
+    </tr>
+    <tr>
+        <td><b>記録ファイルをアップロードしようとするとエラーが発生するのはなぜですか？</b></td>
+        <td>
+            <p>まず、ヘッダー行を削除したことを確認してください。eBird はファイルの最初の行に観察データが含まれていることを期待しています。</p>
+            <p>これが問題でない場合、種が認識されないというエラーが表示される場合は、Chirpity で設定した言語設定が eBird アカウントの設定と一致していることを確認してください。</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>国および州/県の列が空白なのはなぜですか？</b></td>
+        <td>
+            <p>これらのフィールドは eBird 記録形式ではオプションです。Chirpity が使用する OpenStreetMap の場所検索 API は州と国を提供しますが、eBird で使用される形式では提供しません。あなたの国と地域の正しい形式はこの <a href="https://support.ebird.org/helpdesk/attachments/48293281603" target="_blank">スプレッドシート</a> で確認できます。</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>なぜ eBird を選んだのですか？他のサイトと共有する計画はありますか？</b></td>
+        <td>
+            <p>eBird は最も簡単に使用できるプラットフォームです。これは、公開された記録形式があり、おそらく最も重要なことに、eBird の分類が BirdNET と Nocmig モデルの両方で使用される分類と一致しているためです。</p>
+            <p>将来のリリースで Xeno-Canto とオーディオクリップを共有できるようにすることを希望しています。これは、適切なアップロード API をリリースするかどうかに依存します。</p>
+        </td>
+    </tr>
+    <tr>
+        <td colspan="2">
+            <h6 class="justify-content-center">記録ファイルの正確性を確認する責任はあなたにあります。Chirpity は記録ファイル内のデータの正確性について一切の保証を行いません。この機能を使用することにより、あなたはこれを認識し、同意するものとします。</h6></td>
+    </tr>
+</table>
+
+</body>
+</html>

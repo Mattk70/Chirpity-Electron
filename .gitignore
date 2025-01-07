@@ -118,7 +118,8 @@ dist/
 
 # git
 .gitingnore
-
+.dockerignore
+Dockerfile
 poetry.lock
 pyproject.toml
 

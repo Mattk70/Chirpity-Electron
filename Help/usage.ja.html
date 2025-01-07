@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Chirpity Nocmig 使用ガイド</title>
+</head>
+
+<body>
+    <h4 class="text-center text-bg-light p-3">推奨ワークフロー</h4>
+
+    <ol>
+        <li>オーディオファイル、ファイルまたはオーディオフォルダーを開きます。これを行う方法は3つあります：
+            <ol>
+                <li>ファイルまたはフォルダーをChirpity Nocmigアプリケーションにドラッグアンドドロップします</li>
+                <li>Chirpity Nocmigアプリケーションで、ファイル &gt; オーディオファイルを開く を選択するか、Ctrl-Oを押して開くファイルを選択します</li>
+                <li>Windowsエクスプローラー（またはMacのFinder）でオーディオファイルを右クリックし、「開く」 &gt; Chirpity を選択します</li>
+            </ol>
+            理想的には、ファイルはデジタルレコーダーで録音された元のタイムスタンプ付きのものです。この場合、スペクトログラムタイムラインの<b>時刻</b>モードを利用して、実際にコールが検出された時間を表示できます。そうでない場合でも、ファイルと検出の正しい時刻を表示（および保存）することができます。開始時間を編集することでこれを行うことができます。
+            これは、コントロールバーのファイル名を右クリックして編集できます。
+            <figure class="figure float-end m-3">
+                <img src="Help/amend file.png"
+                    alt="ファイル名からアクセスできるコンテキストメニューには、ファイルの開始時間と録音場所を修正するオプションが含まれています"
+                    class="rounded figure-img float-end img-fluid">
+                <figcaption class="figure-caption text-muted text-end">ファイル名のコンテキストメニュー。</figcaption>
+            </figure>
+        </li>
+        <li>
+            <b>分析</b>メニューから&quot;<i>現在のファイルを分析</i>&quot;を選択します。ファイルの長さによっては、数分かかる場合があります。進行状況インジケーターが表示され、完了までの時間の目安が示されます。分析を途中で停止するには、<b>Esc</b>キーを押します。
+        </li>
+    </ol>
+    <h5 class="pt-2">検出の探索</h5>
+
+    <ol start="4">
+        <li>
+            モデルが検出を行うと、それらはスペクトログラムの下のテーブルに表示されます。テーブル内の検出行をクリックすると、再生ヘッドがその検出の開始位置にジャンプし、スペクトログラム上の位置がハイライトされます。
+            行を右クリックすると、検出コンテキストメニューが表示されます。
+
+            これには、現在ハイライトされている検出に特有のオプションが含まれています。
+            スペースバーを押すと、選択の開始位置から再生を開始し、再度スペースバーを押すまでオーディオの再生を続けます。スペクトログラムをクリックすると、再生ヘッドがその位置に移動します。
+            現在再生中の場合、再生は続行されるため、コールを繰り返し再生することができます。
+        </li>
+        <figure class="figure float-end m-3">
+            <img src="Help/detection menu.png"
+                alt="検出からアクセスできるコンテキストメニューには、記録を検査および修正するオプションが含まれています"
+                class="rounded figure-img float-end img-fluid">
+            <figcaption class="figure-caption text-muted text-end">検出コンテキストメニュー。</figcaption>
+        </figure>
+        <li>
+            特定の時間帯に複数の検出が適用される場合、種名の横に円が表示されます。
+            この円をクリックすると、その地域で検出された他の種と、それらのIDに与えられた信頼度が表示されます。
+        </li>
+    </ol>
+    <h5 class="pt-2">検出の要約とフィルタリング</h5>
+    <ol start="6">
+        <li>
+            モデルが分析を完了すると、結果の左側に要約テーブルが表示されます。重要なことに、このテーブルを使用して、メインの結果テーブルに表示される結果をフィルタリングできます。要約で種名をクリックすると、その単一の種に表示を制限できます。これは、数百のロビンコールが検出された場合に<i>非常に</i>便利です！
+        </li>
+    </ol>
+    <h5 class="pt-2">カスタム「ディープダイブ」検出</h5>
+    <ol start="7">
+        <li>時々、コールが見逃されたり、検出が誤っていたりすることがあります。これは、分析ウィンドウの位置がコールに対して適切でないためです。ウィンドウはドラッグして移動することができます。また、スペクトログラム上でクリックしてドラッグすることでカスタム領域を作成することもできます。新しい領域を作成したら、コンテキストメニューから<span class="material-symbols-outlined">search</span> <b>分析</b>を選択するか、メニューから<b>分析 &gt; 選択した間隔を分析</b>を選択します。
+            選択した領域の検出結果はオーバーレイウィンドウに表示され、結果に保存するか破棄するかを選択できます。
+        </li>
+    </ol>
+    
+    <h5 class="pt-2">結果の修正</h5>
+    <ol start="8">
+        <li>結果を削除することができます。コンテキストメニューで<span class="delete material-symbols-outlined">delete_forever</span> <b>レコードを削除</b>を選択します。
+            これは、結果テーブルで検出ごとに選択するか、要約で種ごとに選択することができます。
+        </li>
+    </ol>
+    
+    <h5 class="pt-2">結果の保存</h5>
+    <ol start="9">
+        <li><p><b>注意：</b> 結果はデフォルトでは保存されません。</p>結果を保存するには、<b>レコード &gt; <span class="material-symbols-outlined">archive</span> アーカイブに保存</b>を選択します。
+        </li>
+    </ol>
+    
+    <h5 id="reload" class="pt-2">結果の復元</h5>
+    <p>Chirpityで検出結果を保存すると、データベースに検出の詳細が更新されます。後日ファイルを再読み込みし、「現在のファイルの結果を取得」を選択すると、保存された結果が復元されます。<b>注意：</b> 元のファイルが欠落している場合でも、サポートされている形式（'.mp3', '.wav', '.mpga', '.ogg', '.opus', '.flac', '.aac'）のいずれかに圧縮されている場合、名前が同じで新しい拡張子が付いていれば、Chirpityはそのファイルを見つけて読み込み、ファイルの作成時間ではなく元の時間を使用します。</p>
+    <p>レコードメニューから、種ごとに保存された検出結果を閲覧したり、選択した日付範囲内で閲覧したりすることもできます。さらに、検出された種の時間経過にわたるチャートを生成することもできます。</p>
+    
+    <h5 id="export" class="pt-2">結果のエクスポート</h5>
+    検出結果をエクスポートする方法はいくつかあります。
+    <ol>
+        <li>
+            検出のオーディオクリップをエクスポートします。これを行うには、コンテキストメニューで<span class="material-symbols-outlined">music_note</span><b>オーディオクリップをエクスポート</b>を選択します。デフォルトでは、ファイル名には検出の種とタイムスタンプが含まれ、元のオーディオファイル内の位置を識別します。<b>設定</b>メニューでは、エクスポートファイルの形式と品質を制御し、オーディオの開始と終了にパディングとフェード効果を適用することができます。
+        </li>
+        <li>
+            最大1000種の検出のオーディオクリップを「バッチ」エクスポートします。これを行うには、要約テーブルのコンテキストメニューで<span class="material-symbols-outlined">music_note</span><b>オーディオクリップをエクスポート</b>を選択します。これらのファイルを保存するフォルダーを指定するように求められます。
+        </li>
+        <li>
+            検出結果のCSVファイルをエクスポートします。これを行うには、ファイルメニューから<span class="material-symbols-outlined">ios_share</span><b>結果をCSVにエクスポート</b>を選択します。これにより、選択したフォルダーに結果がCSVファイルとしてエクスポートされます。
+        </li>
+        <li>検出結果をAudacity形式のラベルファイルとして保存します。メニューから<b>ファイル &gt; Audacityラベルを保存</b>を選択します。デフォルトでは、ラベルファイルはオーディオファイルと同じ名前で、拡張子が「.txt」となります。
+        </li>
+    </ol>
+    <div class="row mb-3">
+        <div class="col-sm-6">
+            <div class="card">
+            <div class="card-header">Chirpityの使用例</div>
+            <div class="card-body">
+                <div class="ratio ratio-16x9">
+                <iframe width="100%" height="100%"
+                    src="https://www.youtube.com/embed/5_37FMPRkwY?si=qnQNUKJJyuCJ_U4b?vq=hd720&cc_load_policy=1"
+                    title="YouTubeビデオプレーヤー" frameborder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowfullscreen>
+                </iframe>
+                </div>
+                <p class="card-text">Chirpityの主要機能の紹介ツアー。</p>
+            </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

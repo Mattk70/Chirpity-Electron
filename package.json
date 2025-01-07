@@ -1,6 +1,6 @@
 {
-  "name": "chirpity",
-  "version": "2.4.7",
+  "name": "Chirpity",
+  "version": "2.5.1",
   "description": "Chirpity Nocmig",
   "main": "main.js",
   "scripts": {
@@ -9,10 +9,10 @@
     "preexport": "node prebuild.js",
     "preAppImage": "node prebuild.js",
     "minify": "node minify.js",
-    "export": "electron-builder build --m  -p always",
+    "export": "electron-builder build --m ",
     "AppImage": "electron-builder build --linux --x64  -p always",
     "build": "electron-builder --win --x64 -p always",
-    "testBuild": "electron-builder --m",
+    "testBuild": "electron-builder --win",
     "postinstall": "electron-builder install-app-deps",
     "test": "playwright test"
   },
@@ -22,6 +22,15 @@
   },
   "build": {
     "appId": "com.electron.chirpity",
+    "pkg": {
+      "license": "LICENSE.txt"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "license": "LICENSE.txt",
+      "installerSidebar": "build/uninstallerSidebar.bmp"
+    },
     "publish": [
       {
         "provider": "github",
@@ -132,10 +141,6 @@
         "AppImage"
       ]
     },
-    "nsis": {
-      "oneClick": true,
-      "perMachine": true
-    },
     "win": {
       "publish": [
         "github"
@@ -167,7 +172,7 @@
 
     "@playwright/test": "^1.48.2",
     "@types/node": "^22.9.0",
-    "electron": "27.3.11",
+    "electron": "32.2.7",
     "electron-builder": "^25.0.5",
     "electron-builder-squirrel-windows": "^25.0.5",
     "electron-playwright-helpers": "^1.7.1",
@@ -197,7 +202,7 @@
     "fluent-ffmpeg": "^2.1.2",
     "lodash.merge": "^4.6.2",
     "p-limit": "3.1.0",
-    "sqlite3": "^5.1.6",
+    "sqlite3": "^5.1.7",
     "suncalc": "^1.9.0",
     "utimes": "^5.2.1",
     "uuid": "^8.3.2",

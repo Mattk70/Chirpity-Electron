@@ -74,7 +74,7 @@ jobs:
                     }, 5000);' ./node_modules/fluent-ffmpeg/lib/processor.js
       
           # uncomment to view changed file
-          # cat ./node_modules/fluent-ffmpeg/lib/processor.js
+          cat ./node_modules/fluent-ffmpeg/lib/processor.js
         shell: bash
       
       - name: Modify colorScale.js - Add inverted greys colormap
@@ -151,11 +151,11 @@ jobs:
           VERSION=$(jq -r '.version' package.json)
           # Construct the filename
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            FILENAME="chirpity Setup $VERSION.exe"
+            FILENAME="Chirpity Setup $VERSION.exe"
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            FILENAME="chirpity-$VERSION-arm64.pkg"
+            FILENAME="Chirpity-$VERSION-arm64.pkg"
           else
-            FILENAME="chirpity-$VERSION.AppImage"
+            FILENAME="Chirpity-$VERSION.AppImage"
           fi
           # Check if the file exists
           if [ -f "./dist/$FILENAME" ]; then
