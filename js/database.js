@@ -51,6 +51,7 @@ class Mutex {
         return new Promise(resolve => {
             if (this.locked) {
                 this.queue.push(resolve);
+                console.log("mutex queue ", this.queue.length);
             } else {
                 this.locked = true;
                 resolve();

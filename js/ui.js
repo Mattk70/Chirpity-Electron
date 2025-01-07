@@ -3104,7 +3104,6 @@ function centreSpec(){
         goToRegion = true,
         metadata = undefined
     }) {
-        console.log("Example file loaded")
         fileLoaded = true, 
         clearTimeout(loadingTimeout)
         // Clear the loading animation

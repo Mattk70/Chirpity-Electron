@@ -1023,6 +1023,7 @@ function onAbort({
     predictionsRequested = {};
     index = 0;
     DEBUG && console.log("abort received")
+    STATE.backlogInterval && clearInterval(STATE.backlogInterval);
     //restart the workers
     terminateWorkers();
     setTimeout(() => spawnPredictWorkers(model, list, BATCH_SIZE, NUM_WORKERS), 20);
@@ -1398,14 +1399,13 @@ async function processAudio (file, start, end, chunkStart, highWaterMark, sample
                 isPaused = true;
                 const pid = command.ffmpegProc?.pid
                 pid && pauseFfmpeg(command, pid)
-                console.log('about to set the interval ', pid)
-                const interval = setInterval(() =>{
+                STATE.backlogInterval = setInterval(() =>{
                     console.log('Backlog', AUDIO_BACKLOG)
                     if (AUDIO_BACKLOG < NUM_WORKERS * 2){
                         resumeFfmpeg(command, pid)
                         console.log('resumed ', pid)
                         isPaused = false;
-                        clearInterval(interval)
+                        clearInterval(STATE.backlogInterval)
                     }
                 }, 10)
             }
