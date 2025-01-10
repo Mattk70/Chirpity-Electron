@@ -1,0 +1,9 @@
+# Exclude these files/directories from the build context
+.git
+node_modules
+dist
+*.log
+test
+custom_tfjs
+venv
+build

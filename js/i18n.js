@@ -2050,7 +2050,6 @@ es: `
     <span class="visually-hidden">Siguiente</span>
 </a>
 
-
 `,
 ja: `
     <!-- Carousel items -->

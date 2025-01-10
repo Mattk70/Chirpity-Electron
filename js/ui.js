@@ -3104,7 +3104,6 @@ function centreSpec(){
         goToRegion = true,
         metadata = undefined
     }) {
-        console.log("Example file loaded")
         fileLoaded = true, 
         clearTimeout(loadingTimeout)
         // Clear the loading animation
@@ -5594,6 +5593,7 @@ function getI18n(context){
     function generateToast({message = '', type = 'info', autohide = true, variables = undefined} ={}) {
         // i18n
         const i18n = getI18n(i18nToasts);
+        message === 'noFile' && clearTimeout(loadingTimeout) && DOM.loading.classList.add('d-none');
         message = variables ? interpolate(i18n[message], variables) : i18n[message] || message;
         const domEl = document.getElementById('toastContainer');
         

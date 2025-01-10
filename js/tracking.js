@@ -55,7 +55,7 @@ function sendHeartbeat() {
     }).then(() => {
         console.log('Heartbeat sent');
     }).catch(error => {
-        console.error('Error sending heartbeat:', error);
+        console.log('Error sending heartbeat:', error);
     });
 }
 export {trackEvent, trackVisit}
