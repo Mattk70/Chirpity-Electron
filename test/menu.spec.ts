@@ -17,7 +17,7 @@ import { ElectronApplication, Page } from 'playwright';
 let electronApp: ElectronApplication;
 let page: Page;
 let _worker: Page;
-let example_file: any
+let example_file: any;
 // find the latest build in the out directory
 const latestBuild = findLatestBuild('./dist')
 // parse the directory and find paths and other info

@@ -432,7 +432,7 @@ const initWavesurfer = ({
             } else {
                 postBufferUpdate({ begin: bufferBegin, play: true })
             }
-            bufferBegin += windowLength;
+            //bufferBegin += windowLength;
         }
     });
     
@@ -3091,12 +3091,11 @@ function centreSpec(){
     let NEXT_BUFFER;
     async function onWorkerLoadedAudio({
         location,
-        start = 0,
-        sourceDuration = 0,
-        fileBegin = 0,
+        fileStart = 0,
+        fileDuration = 0,
+        windowBegin = 0,
         file = '',
         position = 0,
-        buffer = undefined,
         contents = undefined,
         fileRegion = undefined,
         play = false,
@@ -3109,41 +3108,32 @@ function centreSpec(){
         // Clear the loading animation
         DOM.loading.classList.add('d-none');
         const resetSpec = !STATE.currentFile;
-        currentFileDuration = sourceDuration;
+        currentFileDuration = fileDuration;
         //if (preserveResults) completeDiv.hide();
-        console.log(`UI received worker-loaded-audio: ${file}, buffered: ${contents === undefined}`);
-        if (contents) {
-            currentBuffer = new AudioBuffer({ length: contents.length, numberOfChannels: 1, sampleRate: sampleRate });
-            currentBuffer.copyToChannel(contents, 0);
-        } else {
-            currentBuffer = buffer;
-        }
+        console.log(`UI received worker-loaded-audio: ${file}, buffered: ${queued === true}`);
         if (queued) {
             // Prepare arguments to call this function with
             NEXT_BUFFER = {
-                start: start, sourceDuration: sourceDuration, bufferBegin: fileBegin, file: file,
-                buffer: currentBuffer, play: true, resetSpec: false, queued: false
+                fileStart, fileDuration, windowBegin, file,
+                contents, play: true, resetSpec: false, queued: false
             }
         } else {
+            currentBuffer = new AudioBuffer({ length: contents.length, numberOfChannels: 1, sampleRate: sampleRate });
+            currentBuffer.copyToChannel(contents, 0);
+
             locationID = location;
-            bufferBegin = fileBegin;
+            bufferBegin = windowBegin;
             NEXT_BUFFER = undefined;
             if (STATE.currentFile !== file) {
                 STATE.currentFile = file;
-
-                fileStart = start;
                 fileEnd = new Date(fileStart + (currentFileDuration * 1000));
+                STATE.metadata[STATE.currentFile] = metadata;
+                renderFilenamePanel();
             }
-            
-            STATE.metadata[STATE.currentFile] = metadata;
-            renderFilenamePanel();
 
-            if (config.timeOfDay) {
-                bufferStartTime = new Date(fileStart + (fileBegin * 1000))
-            } else {
-                const zero = new Date(0,0,0, 0, 0, 0, 0);
-                bufferStartTime = new Date(zero.getTime() + (fileBegin * 1000))
-            }
+            const initialTime = config.timeOfDay ? new Date(fileStart) : new Date(0, 0, 0, 0, 0, 0, 0);
+            bufferStartTime = new Date(initialTime.getTime() + (windowBegin * 1000));
+            
             if (windowLength > currentFileDuration) windowLength = currentFileDuration;
             
             updateSpec({ buffer: currentBuffer, position: position, play: play, resetSpec: resetSpec });
