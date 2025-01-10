@@ -945,6 +945,7 @@ async function onAnalyse({
     FILE_QUEUE = filesInScope;
     AUDIO_BACKLOG = 0;
     STATE.processingPaused = {};
+    STATE.backlogInterval = {};
     
     
     if (!STATE.selection) {
@@ -1023,7 +1024,9 @@ function onAbort({
     predictionsRequested = {};
     index = 0;
     DEBUG && console.log("abort received")
-    STATE.backlogInterval && clearInterval(STATE.backlogInterval);
+    Object.keys(STATE.backlogInterval).forEach(pid => {
+        clearInterval(STATE.backlogInterval[pid]);
+    });
     //restart the workers
     terminateWorkers();
     setTimeout(() => spawnPredictWorkers(model, list, BATCH_SIZE, NUM_WORKERS), 20);
@@ -1306,24 +1309,30 @@ function checkBacklog(ffmpegCommand = null) {
 }
 
 function pauseFfmpeg(ffmpegCommand, pid){
-    if (isWin32){
-        const message = pid ? (ntsuspend.suspend(pid) ? 'Ffmpeg process paused' : 'Could not pause process') 
-            : 'Could not pause process (exited)';
-        DEBUG && console.log(message)
-    } else {
-        ffmpegCommand.kill('SIGSTOP')
-        console.log('paused ', pid)
+    if (!STATE.processingPaused[pid]){
+        if (isWin32){
+            const message = pid ? (ntsuspend.suspend(pid) ? 'Ffmpeg process paused' : 'Could not pause process') 
+                : 'Could not pause process (exited)';
+            DEBUG && console.log(message)
+        } else {
+            ffmpegCommand.kill('SIGSTOP')
+            console.log('paused ', pid)
+        }
+        STATE.processingPaused[pid] = true
     }
 }
 
 function resumeFfmpeg(ffmpegCommand, pid){
-    if (isWin32){
-        const message = pid ? (ntsuspend.resume(pid) ? 'Ffmpeg process resumed' : 'Could not resume process') 
-            : 'Could not resume process (exited)';
-        DEBUG && console.log(message)
-    } else {
-        ffmpegCommand.kill('SIGCONT')
-        console.log('resumded ', pid)
+    if (STATE.processingPaused[pid]){
+        if (isWin32){
+            const message = pid ? (ntsuspend.resume(pid) ? 'Ffmpeg process resumed' : `Could not resume process ${pid}`) 
+                : 'Could not resume process (exited)';
+            DEBUG && console.log(message)
+        } else {
+            ffmpegCommand.kill('SIGCONT')
+            console.log('resumed ', pid)
+        }
+        STATE.processingPaused[pid] = false;
     }
 }
 
@@ -1369,7 +1378,6 @@ const getPredictBuffers = async ({
 
 async function processAudio (file, start, end, chunkStart, highWaterMark, samplesInBatch){
     const MAX_CHUNKS = Math.max(12, NUM_WORKERS * 2);
-    let isPaused = false;
     return new Promise((resolve, reject) => {
         // Many compressed files start with a small section of silence due to encoder padding, which affects predictions
         // To compensate, we move the start back a small amount, and slice the data to remove the silence
@@ -1392,21 +1400,21 @@ async function processAudio (file, start, end, chunkStart, highWaterMark, sample
         });
 
         const STREAM = command.pipe();
+        
         STREAM.on('data', (chunk) => {
-            if (! isPaused && AUDIO_BACKLOG >= MAX_CHUNKS){
-                isPaused = true;
-                const pid = command.ffmpegProc?.pid
-                pid && pauseFfmpeg(command, pid)
-                STATE.backlogInterval = setInterval(() =>{
-                    console.log('Backlog', AUDIO_BACKLOG)
+            const pid = command.ffmpegProc?.pid
+            
+            if (!STATE.processingPaused[pid] && AUDIO_BACKLOG >= MAX_CHUNKS){
+                //console.log(`Backlog for pid: ${pid}`, AUDIO_BACKLOG)
+                pauseFfmpeg(command, pid)
+                STATE.backlogInterval[pid] = setInterval(() =>{
+                    
                     if (AUDIO_BACKLOG < NUM_WORKERS * 2){
                         resumeFfmpeg(command, pid)
-                        console.log('resumed ', pid)
-                        isPaused = false;
-                        clearInterval(STATE.backlogInterval)
+                        clearInterval(STATE.backlogInterval[pid])
                     }
                 }, 10)
-            }
+            } 
             if (aborted) {
                 STREAM.destroy();
                 return;
@@ -1458,7 +1466,6 @@ async function processAudio (file, start, end, chunkStart, highWaterMark, sample
                 prepareWavForModel(audioBuffer.subarray(0, currentIndex), file, end, chunkStart);
                 feedChunksToModel(...predictQueue.shift());
             }
-            
             DEBUG && console.log('All chunks sent for ', file);
             return resolve();
         });
