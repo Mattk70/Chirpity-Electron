@@ -1265,48 +1265,6 @@ const setMetadata = async ({ file, source_file = file }) => {
     return METADATA[file];
 }
 
-function checkBacklog(ffmpegCommand = null) {
-    return new Promise((resolve) => {
-        const pid = ffmpegCommand.ffmpegProc?.pid;
-        if (! pid){
-            console.warn('Ffmpeg process already exited in check backlog call')
-            return 
-        }
-        const hysteresis_factor = 2;
-
-        if (!aborted && AUDIO_BACKLOG < NUM_WORKERS * hysteresis_factor && ! STATE.processingPaused[pid]) {
-            console.log('no need to check further, backlog: ', AUDIO_BACKLOG, ' pid paused: ', pid, STATE.processingPaused[pid])
-            resolve(true);
-            return;
-        }
-        const interval = setInterval(() => {
-            const backlog = AUDIO_BACKLOG;
-            console.log('Backlog in interval is:', backlog)
-            if (aborted) {
-                console.log('clearing interval, aborted')
-                clearInterval(interval);
-                resolve(false);
-                return;
-            }
-            if (! STATE.processingPaused[pid] && backlog >= NUM_WORKERS * hysteresis_factor) {
-                    pauseFfmpeg(ffmpegCommand, pid);
-                    DEBUG && console.log(`pause signal sent to ffmpeg(${pid}), backlog: ${backlog}`);
-                    STATE.processingPaused[pid] = true;
-            }
-            else if (backlog <= NUM_WORKERS) {
-            DEBUG && console.log('backlog (final):', backlog);
-            if (STATE.processingPaused[pid]) {
-                resumeFfmpeg(ffmpegCommand, pid);
-                DEBUG && console.log(`resume signal sent to ffmpeg(${pid}), backlog: ${backlog}`);
-                STATE.processingPaused[pid] = false;
-            }
-            console.log('clearing interval, pressure eased')
-            clearInterval(interval); // Backlog is within limits, stop checking
-            resolve(true); // Resolve the promise
-            }
-        }, 200);
-    });
-}
 
 function pauseFfmpeg(ffmpegCommand, pid){
     if (!STATE.processingPaused[pid]){

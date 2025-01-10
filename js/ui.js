@@ -174,7 +174,7 @@ let appVersionLoaded = new Promise((resolve, reject) => {
 let modelReady = false, fileLoaded = false;
 let PREDICTING = false, t0;
 let region, AUDACITY_LABELS = {}, wavesurfer;
-let fileStart, bufferStartTime, fileEnd;
+let bufferStartTime, fileEnd;
 
 
 // set up some DOM element handles
@@ -581,7 +581,7 @@ function showDatePicker() {
     const datetimeInput = document.createElement("input");
     datetimeInput.setAttribute("type", "datetime-local");
     datetimeInput.setAttribute("id", "fileStart");
-    datetimeInput.setAttribute("value", getDatetimeLocalFromEpoch(fileStart));
+    datetimeInput.setAttribute("value", getDatetimeLocalFromEpoch(STATE.fileStart));
     datetimeInput.setAttribute("max", getDatetimeLocalFromEpoch(new Date()));
     datetimeInput.classList.add("form-control");
     form.appendChild(datetimeInput);
@@ -613,7 +613,7 @@ function showDatePicker() {
         worker.postMessage({ action: 'update-file-start', file: STATE.currentFile, start: timestamp });
         trackEvent(config.UUID, 'Settings Change', 'fileStart', newStart);
         resetResults();
-        fileStart = timestamp;
+        STATE.fileStart = timestamp;
         // Remove the form from the DOM
         form.remove();
     });
@@ -3120,7 +3120,7 @@ function centreSpec(){
         } else {
             currentBuffer = new AudioBuffer({ length: contents.length, numberOfChannels: 1, sampleRate: sampleRate });
             currentBuffer.copyToChannel(contents, 0);
-
+            STATE.fileStart = fileStart;
             locationID = location;
             bufferBegin = windowBegin;
             NEXT_BUFFER = undefined;
@@ -3670,7 +3670,7 @@ function formatDuration(seconds){
                 start = 0;
                 end = currentBuffer.duration;
             }
-            const dateArray = new Date(fileStart + (start * 1000)).toString().split(' ');
+            const dateArray = new Date(STATE.fileStart + (start * 1000)).toString().split(' ');
             const dateString = dateArray.slice(0, 5).join(' ');
             filename = dateString + '.' + config.audio.format;
         }
