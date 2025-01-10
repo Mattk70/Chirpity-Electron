@@ -305,10 +305,8 @@ function loadAudioFile({ filePath = '', preserveResults = false }) {
 
 function updateSpec({ buffer, play = false, position = 0, resetSpec = false }) {
     DOM.spectrogramWrapper.classList.remove('d-none');
-    wavesurfer.loadDecodedBuffer(buffer);
-    if (resetSpec){
-        adjustSpecDims(true);
-    }
+    // Reset spec true if no file has been loaded (and wavesurfer not initialised)
+    resetSpec ? adjustSpecDims(true) :  wavesurfer.loadDecodedBuffer(buffer);
     wavesurfer.seekTo(position);
     play ? wavesurfer.play() : wavesurfer.pause();
 }
