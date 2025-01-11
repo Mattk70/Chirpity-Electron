@@ -305,11 +305,9 @@ function loadAudioFile({ filePath = '', preserveResults = false }) {
 
 
 function updateSpec({ buffer, play = false, position = 0, resetSpec = false }) {
-    DOM.spectrogramWrapper.classList.remove('d-none');
-    wavesurfer.loadDecodedBuffer(buffer);
-    if (resetSpec){
-        adjustSpecDims(true);
-    }
+    DOM.spectrogramWrapper.classList.remove('d-none');   
+    resetSpec || !wavesurfer || !wavesurfer.isReady ? adjustSpecDims(true) 
+        : wavesurfer.loadDecodedBuffer(buffer);
     wavesurfer.seekTo(position);
     play ? wavesurfer.play() : wavesurfer.pause();
 }
@@ -352,8 +350,8 @@ const initWavesurfer = ({
     height = 0
 }) => {
     const loggedErrors = new Set();
-    if (wavesurfer) {
-        wavesurfer.pause();
+    if (wavesurfer?.isReady) {
+        wavesurfer.destroy();
     }
     const audioCtx = new AudioContext({ latencyHint: 'interactive', sampleRate: sampleRate });
     // Setup waveform and spec views
@@ -468,7 +466,7 @@ function increaseFFT(){
     if (wavesurfer.spectrogram.fftSamples <= 4096) {
         wavesurfer.spectrogram.fftSamples *= 2;
         const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
-        postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
+        postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false, play: wavesurfer.isPlaying() })
         console.log(wavesurfer.spectrogram.fftSamples);
     }
 }
@@ -477,7 +475,7 @@ function reduceFFT(){
     if (wavesurfer.spectrogram.fftSamples > 64) {
         wavesurfer.spectrogram.fftSamples /= 2;
         const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
-        postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
+        postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false, play: wavesurfer.isPlaying() })
         console.log(wavesurfer.spectrogram.fftSamples);
     }
 }
@@ -516,7 +514,7 @@ function zoomSpec(direction) {
             region.start = (oldBufferBegin + region.start) - bufferBegin;
             region.end = region.start + duration;          
         }
-        postBufferUpdate({ begin: bufferBegin, position: position, region: region, goToRegion: false })
+        postBufferUpdate({ begin: bufferBegin, position: position, region: region, goToRegion: false, play: wavesurfer.isPlaying() })
     }
 }
 
@@ -1452,7 +1450,7 @@ function adjustSpecDims(redraw, fftSamples, newHeight) {
         }
         if (STATE.currentFile) {
             // give the wrapper space for the transport controls and element padding/margins
-            if (!wavesurfer) {
+            if (!wavesurfer || !wavesurfer.isReady) {
                 initWavesurfer({
                     audio: currentBuffer,
                     height: specHeight,
@@ -1770,7 +1768,7 @@ window.onload = async () => {
         DIAGNOSTICS['UUID'] = config.UUID;
         
         // Initialize Spectrogram
-        initWavesurfer({});
+        //initWavesurfer({});
         // Set UI option state
         // Fontsize
         config.fontScale === 1 || setFontSizeScale(true);
@@ -4784,8 +4782,6 @@ function playRegion(){
                 checkFilteredFrequency();
                 worker.postMessage({action: 'update-state', audio: config.audio});
                 const fftSamples = wavesurfer.spectrogram.fftSamples;
-                wavesurfer.destroy();
-                wavesurfer = undefined;
                 adjustSpecDims(true, fftSamples);
                 document.getElementById('frequency-range').classList.remove('text-warning');
                 updatePrefs('config.json', config);
@@ -4993,8 +4989,6 @@ function playRegion(){
                     }
                     if (wavesurfer && STATE.currentFile) {
                         const fftSamples = wavesurfer.spectrogram.fftSamples;
-                        wavesurfer.destroy();
-                        wavesurfer = undefined;
                         adjustSpecDims(true, fftSamples)
                     }
                     break }
@@ -5008,8 +5002,6 @@ function playRegion(){
                     config.customColormap = {'loud': loud, 'mid': mid, 'quiet': quiet, 'threshold': threshold, 'windowFn': windowFn};
                     if (wavesurfer && STATE.currentFile) {
                         const fftSamples = wavesurfer.spectrogram.fftSamples;
-                        wavesurfer.destroy();
-                        wavesurfer = undefined;
                         adjustSpecDims(true, fftSamples)
                     }
                     break }
@@ -5026,9 +5018,7 @@ function playRegion(){
                 case 'spec-labels': {
                     config.specLabels = element.checked;                    
                     if (wavesurfer && STATE.currentFile) {
-                        const fftSamples = wavesurfer.spectrogram.fftSamples;
-                        wavesurfer.destroy();
-                        wavesurfer = undefined;
+                        const fftSamples = wavesurfer.spectrogram.fftSamples; 
                         adjustSpecDims(true, fftSamples)
                     }
                     break }
@@ -5037,8 +5027,6 @@ function playRegion(){
                     DOM.fromInput.value = config.audio.minFrequency;
                     DOM.fromSlider.value = config.audio.minFrequency;
                     const fftSamples = wavesurfer.spectrogram.fftSamples;
-                    wavesurfer.destroy();
-                    wavesurfer = undefined;
                     adjustSpecDims(true, fftSamples);
                     checkFilteredFrequency();
                     worker.postMessage({action: 'update-state', audio: config.audio});
@@ -5048,8 +5036,6 @@ function playRegion(){
                     DOM.toInput.value = config.audio.maxFrequency;
                     DOM.toSlider.value = config.audio.maxFrequency;
                     const fftSamples = wavesurfer.spectrogram.fftSamples;
-                    wavesurfer.destroy();
-                    wavesurfer = undefined;
                     adjustSpecDims(true, fftSamples);
                     checkFilteredFrequency();
                     worker.postMessage({action: 'update-state', audio: config.audio});
