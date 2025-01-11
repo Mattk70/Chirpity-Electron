@@ -71,6 +71,7 @@ let STATE = {
     },
     resultsSortOrder: 'timestamp',
     summarySortOrder: 'cname ASC',
+    dataForatOptions: { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' },
     birdList: { lastSelectedSpecies: undefined }, // Used to put the last selected species at the top of the all-species list
     selection: { start: undefined, end: undefined },
     currentAnalysis: {currentFile: null, openFiles: [],  mode: null, species: null, offset: 0, active: null},
@@ -3509,8 +3510,8 @@ function formatDuration(seconds){
             // store result for feedback function to use
             if (!selection) predictions[index] = result;
             // Format date and position for  UI
-            const tsArray = new Date(timestamp).toString().split(' ');
-            const UI_timestamp = `${tsArray[2]} ${tsArray[1]} ${tsArray[3].substring(2)}<br/>${tsArray[4]}`;
+            const date = new Date(timestamp);
+            const UI_timestamp = date.toLocaleString(undefined, STATE.dataForatOptions);            
             const spliceStart = position < 3600 ? 14 : 11;
             const UI_position = new Date(position * 1000).toISOString().substring(spliceStart, 19);
             const showTimeOfDay = config.timeOfDay ? '' : 'd-none';
@@ -3520,7 +3521,7 @@ function formatDuration(seconds){
             const hide = selection ? 'd-none' : '';
             const countIcon = count > 1 ? `<span class="circle pointer" title="Click to view the ${count} detections at this timecode">${count}</span>` : '';
             tr += `<tr tabindex="-1" id="result${index}" name="${file}|${position}|${end || position + 3}|${sname}|${cname}${isUncertain}" class='${activeTable} border-top border-2 border-secondary ${dayNight}'>
-            <td class='text-start text-nowrap timeOfDay ${showTimeOfDay}'>${UI_timestamp}</td>
+            <td class='text-start timeOfDay ${showTimeOfDay}'>${UI_timestamp}</td>
             <td class="text-start timestamp ${showTimestamp}">${UI_position} </td>
             <td name="${cname}" class='text-start cname'>
             <span class="cname">${cname}</span> ${countIcon} ${iconizeScore(score)}
