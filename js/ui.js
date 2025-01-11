@@ -2561,17 +2561,19 @@ function onChartData(args) {
     ///////////// Nav bar Option handlers //////////////
     
     function initRegion() {
-        if (wavesurfer.regions) wavesurfer.destroyPlugin('regions');
-        wavesurfer.addPlugin(WaveSurfer.regions.create({
-            formatTimeCallback: () => '',
-            dragSelection: true,
-            maxRegions: 1,
-            // Region length bug (likely mine) means I don't trust lengths > 60 seconds
-            //maxLength: config[config[config.model].backend].batchSize * 3,
-            slop: null,
-            color: "rgba(255, 255, 255, 0.2)"
-        })
-        ).initPlugin('regions')
+        if (wavesurfer) {
+            if (wavesurfer.regions) wavesurfer.destroyPlugin('regions');
+            wavesurfer.addPlugin(WaveSurfer.regions.create({
+                formatTimeCallback: () => '',
+                dragSelection: true,
+                maxRegions: 1,
+                // Region length bug (likely mine) means I don't trust lengths > 60 seconds
+                //maxLength: config[config[config.model].backend].batchSize * 3,
+                slop: null,
+                color: "rgba(255, 255, 255, 0.2)"
+            })
+            ).initPlugin('regions')
+        }
     }
     
     function initSpectrogram(height, fftSamples) {
