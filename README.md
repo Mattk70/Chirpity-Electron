@@ -21,8 +21,8 @@ Author: Matthew Kirkland
 Visit https://chirpity.mattkirkland.co.uk for platform specific installation instructions - Chirpity binaries are available for Windows, Mac and Linux platforms. 
 
 ## Running the application from source
-
-_This is not reommended - use the [releases](https://github.com/Mattk70/Chirpity-Electron/releases) provided for Windows, MacOS and Linux._
+> [!WARNING]
+>_This is not reommended, application testing is done at the build stage and the master branch may be broken - use the [releases](https://github.com/Mattk70/Chirpity-Electron/releases) provided for Windows, MacOS and Linux._
 
 First, clone the project and install all dependencies:
 
