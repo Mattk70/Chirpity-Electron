@@ -35,7 +35,7 @@ Once installed, run:
 npm install
 ```
 
-Next, launch the app with:
+N.B. Certain libraries are modified during the build process. Refer to  [check-installation.yml](https://github.com/Mattk70/Chirpity-Electron/blob/master/.github/workflows/check-installation.yml) for details. Next, launch the app with:
 
 ```
 npm start
