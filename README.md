@@ -1,4 +1,7 @@
-# Chirpity ![GitHub release (latest by date)](https://img.shields.io/github/v/release/Mattk70/Chirpity-Electron) ![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/Mattk70/Chirpity-Electron/latest/total?style=plastic&label=Latest%20Release%20Downloads)
+# Chirpity [![GitHub release (latest by date)](https://img.shields.io/github/v/release/Mattk70/Chirpity-Electron)](https://github.com/Mattk70/Chirpity-Electron/releases/latest)
+ ![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/Mattk70/Chirpity-Electron/latest/total?style=plastic&label=Latest%20Release%20Downloads) [![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/MattK70/Chirpity-Electron/check-installation.yml)](https://github.com/MattK70/Chirpity-Electron/actions/workflows/check-installation.yml)
+
+
 
 
 
@@ -21,8 +24,10 @@ Author: Matthew Kirkland
 Visit https://chirpity.mattkirkland.co.uk for platform specific installation instructions - Chirpity binaries are available for Windows, Mac and Linux platforms. 
 
 ## Running the application from source
+> [!WARNING]
+> [![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/MattK70/Chirpity-Electron/check-installation.yml)](https://github.com/MattK70/Chirpity-Electron/actions/workflows/check-installation.yml)
 
-_This is not reommended - use the [releases](https://github.com/Mattk70/Chirpity-Electron/releases) provided for Windows, MacOS and Linux._
+>_This is not reommended, application testing is done at the build stage and the master branch may be broken - use the [releases](https://github.com/Mattk70/Chirpity-Electron/releases) provided for Windows, MacOS and Linux._
 
 First, clone the project and install all dependencies:
 
@@ -36,8 +41,8 @@ Once installed, run:
 ```
 npm install
 ```
-
-N.B. Certain libraries are modified during the build process. Refer to  [check-installation.yml](https://github.com/Mattk70/Chirpity-Electron/blob/9c4aa2e50a6630985a1fe0d95477c61869c25f42/.github/workflows/check-installation.yml#L66)) for details. Next, launch the app with:
+> [!NOTE]
+> N.B. Certain libraries are modified during the build process. Refer to  [check-installation.yml](https://github.com/Mattk70/Chirpity-Electron/blob/9c4aa2e50a6630985a1fe0d95477c61869c25f42/.github/workflows/check-installation.yml#L66)) for details. Next, launch the app with:
 
 ```
 npm start
