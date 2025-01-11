@@ -1,5 +1,4 @@
-# Chirpity [![GitHub release (latest by date)](https://img.shields.io/github/v/release/Mattk70/Chirpity-Electron)](https://github.com/Mattk70/Chirpity-Electron/releases/latest)
- ![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/Mattk70/Chirpity-Electron/latest/total?style=plastic&label=Latest%20Release%20Downloads) [![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/MattK70/Chirpity-Electron/check-installation.yml)](https://github.com/MattK70/Chirpity-Electron/actions/workflows/check-installation.yml)
+# Chirpity [![GitHub release (latest by date)](https://img.shields.io/github/v/release/Mattk70/Chirpity-Electron)](https://github.com/Mattk70/Chirpity-Electron/releases/latest) [![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/MattK70/Chirpity-Electron/check-installation.yml)](https://github.com/MattK70/Chirpity-Electron/actions/workflows/check-installation.yml) ![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/Mattk70/Chirpity-Electron/latest/total?style=plastic&label=Latest%20Release%20Downloads) 
 
 
 
@@ -26,8 +25,8 @@ Visit https://chirpity.mattkirkland.co.uk for platform specific installation ins
 ## Running the application from source
 > [!WARNING]
 > [![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/MattK70/Chirpity-Electron/check-installation.yml)](https://github.com/MattK70/Chirpity-Electron/actions/workflows/check-installation.yml)
-
->_This is not reommended, application testing is done at the build stage and the master branch may be broken - use the [releases](https://github.com/Mattk70/Chirpity-Electron/releases) provided for Windows, MacOS and Linux._
+> 
+> _This is not reommended, application testing is done at the build stage and the master branch may be broken - use the [releases](https://github.com/Mattk70/Chirpity-Electron/releases) provided for Windows, MacOS and Linux._
 
 First, clone the project and install all dependencies:
 
