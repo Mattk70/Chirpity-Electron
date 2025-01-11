@@ -136,6 +136,7 @@
     "context": "上下文模式",
     "snrValue": "SNR滤波器：",
     "file-timestamp": "文件时间戳标记录音开始",
+    "buy-coffee": "隐藏咖啡小部件",
     "debug-mode": "调试模式"
   },
   "record-entry": {

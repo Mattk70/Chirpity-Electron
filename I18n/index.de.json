@@ -136,6 +136,7 @@
       "context": "Kontextmodus",
       "snrValue": "SNR-Filter:",
       "file-timestamp": "Datei-Timestamps kennzeichnen den Beginn der Aufnahme",
+      "buy-coffee": "Verstecke das Kaffee-Widget",
       "debug-mode": "Fehlermodus"
     },
     "record-entry": {

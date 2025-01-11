@@ -136,6 +136,7 @@
         "context": "Kontextläge",
         "snrValue": "SNR-filter:",
         "file-timestamp": "Filens tidsstämplar markerar inspelningens start",
+        "buy-coffee": "Dölj kaffewidgeten",
         "debug-mode": "Felsökningsläge"
     },
     "record-entry": {

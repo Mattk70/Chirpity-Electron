@@ -134,6 +134,7 @@
   "context": "コンテキストモード",
   "snrValue": "SNRフィルター：",
   "file-timestamp": "ファイルのタイムスタンプは録音開始を示す",
+  "buy-coffee": "コーヒーウィジェットを非表示にする",
   "debug-mode": "デバッグモード"
 },
 "record-entry":{

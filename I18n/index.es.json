@@ -136,6 +136,7 @@
       "context": "Modo contexto",
       "snrValue": "Filtro SNR:",
       "file-timestamp": "Las marcas de tiempo de los archivos marcan el inicio de la grabación",
+      "buy-coffee": "Ocultar el widget de café",
       "debug-mode": "Modo depuración"
     },
     "record-entry": {

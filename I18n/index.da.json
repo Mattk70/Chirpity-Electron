@@ -137,6 +137,7 @@
         "context": "Konteksttilstand",
         "snrValue": "SNR filter:",
         "file-timestamp": "Filens tidsstempler markerer optagelsens start",
+        "buy-coffee": "Skjul kaffewidget",
         "debug-mode": "Fejlfindingstilstand"
       },
       "record-entry": {

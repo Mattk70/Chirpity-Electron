@@ -137,6 +137,7 @@
         "context": "Contextmodus",
         "snrValue": "SNR-filter:",
         "file-timestamp": "Bestandstempels markeren het begin van de opname",
+        "buy-coffee": "Verberg de koffie-widget",
         "debug-mode": "Foutopsporingsmodus"
     },
     "record-entry": {

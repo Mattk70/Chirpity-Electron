@@ -141,6 +141,7 @@
       "context": "Context mode",
       "snrValue": "SNR filter:",
       "file-timestamp": "File timestamps mark recording start",
+      "buy-coffee": "Hide the coffee widget",
       "debug-mode": "Debug mode"
     },
     "record-entry":{

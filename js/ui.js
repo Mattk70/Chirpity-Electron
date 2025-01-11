@@ -1719,7 +1719,8 @@ const defaultConfig = {
     debug: false,
     VERSION: VERSION,
     powerSaveBlocker: false,
-    fileStartMtime: false
+    fileStartMtime: false,
+    hideBuyCoffeeWidget: true,
 };
 let appPath, tempPath, systemLocale, isMac;
 window.onload = async () => {
@@ -1750,7 +1751,7 @@ window.onload = async () => {
         } else {
             config = JSON.parse(data);
         }
-        
+
         // Attach an error event listener to the window object
         window.onerror = function(message, file, lineno, colno, error) {
             trackEvent(config.UUID, 'Error', error.message, encodeURIComponent(error.stack));
@@ -1759,6 +1760,9 @@ window.onload = async () => {
             };
         //fill in defaults - after updates add new items
         syncConfig(config, defaultConfig);
+        // Show Buy Me a Coffee widget?
+        config.hideBuyCoffeeWidget && DOM.buyMeCoffee.classList.add('d-none');
+        document.getElementById('buy-coffee').checked = config.hideBuyCoffeeWidget;
 
         // Disable SNR
         config.filters.SNR = 0;
@@ -5086,6 +5090,11 @@ function playRegion(){
                     config.audio.downmix = e.target.checked;
                     worker.postMessage({ action: 'update-state', audio: config.audio })
                     break };
+                case 'buy-coffee': {
+                    config.hideBuyCoffeeWidget = e.target.checked;
+                    config.hideBuyCoffeeWidget ? DOM.buyMeCoffee.classList.add('d-none') 
+                        : DOM.buyMeCoffee.classList.remove('d-none');  
+                    break }
             }
             updatePrefs('config.json', config)
             const value = element.type === "checkbox" ? element.checked : element.value;

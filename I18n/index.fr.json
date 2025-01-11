@@ -136,6 +136,7 @@
       "context": "Mode contexte",
       "snrValue": "Filtre SNR :",
       "file-timestamp": "Les horodatages des fichiers marquent le début de l'enregistrement",
+      "buy-coffee": "Cacher le widget de café",
       "debug-mode": "Mode débogage"
     },
     "record-entry": {

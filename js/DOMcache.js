@@ -66,6 +66,7 @@ const DOM = {
     get timelineSetting() { if (!this._timelineSetting) { this._timelineSetting = document.getElementById('timelineSetting') } return this._timelineSetting},
     get tooltipInstance() { if (!this._tooltipInstance) { this._tooltipInstance = new bootstrap.Tooltip(document.getElementById("copy-uuid")) } return this._tooltipInstance},
     get backendOptions() {if (!this._backendOptions) { this._backendOptions = document.getElementsByName('backend') } return this._backendOptions  },
+    get buyMeCoffee() {if (!this._buyMeCoffee) { this._buyMeCoffee = document.getElementById('bmc-wbtn') } return this._buyMeCoffee  },
     get contextMenu() { return document.getElementById('context-menu')},
     get filename() {return document.getElementById("filename")},
     get resultTable() {return document.getElementById('resultTableBody')},
