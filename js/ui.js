@@ -1744,7 +1744,7 @@ window.onload = async () => {
     await appVersionLoaded;
     await fs.readFile(p.join(appPath, 'config.json'), 'utf8', (err, data) => {
         if (err) {
-            console.log('JSON parse error ' + err);
+            console.log('Config not loaded, using defaults');
             // Use defaults
             config = defaultConfig;
         } else {

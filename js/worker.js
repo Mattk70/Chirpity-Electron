@@ -1040,9 +1040,9 @@ const getDuration = async (src) => {
 
         audio.src = src.replaceAll('#', '%23').replaceAll('?', '%3F'); // allow hash and ? in the path (https://github.com/Mattk70/Chirpity-Electron/issues/98)
         audio.addEventListener("loadedmetadata", function () {
-            if (audio.duration === Infinity){
+            if (audio.duration === Infinity || !audio.duration){
                 generateAlert({type: 'error',  message: 'badMetadata', variables: {src}}) 
-                return reject('Infinity duration', src)
+                return reject('File has an invalid duration', src)
             }
             const duration = audio.duration === Infinity ? Number.MAX_SAFE_INTEGER : audio.duration;
             audio.remove();
