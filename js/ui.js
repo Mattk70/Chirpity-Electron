@@ -1720,7 +1720,7 @@ const defaultConfig = {
     VERSION: VERSION,
     powerSaveBlocker: false,
     fileStartMtime: false,
-    hideBuyCoffeeWidget: true,
+    hideBuyCoffeeWidget: false,
 };
 let appPath, tempPath, systemLocale, isMac;
 window.onload = async () => {
