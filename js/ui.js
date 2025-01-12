@@ -5016,10 +5016,11 @@ function playRegion(){
                     element.blur();
                     config.audio.gain = element.value;
                     worker.postMessage({action:'update-state', audio: config.audio})
-                    const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
                     config.filters.active || toggleFilters();
-                    fileLoaded &&
+                    if (fileLoaded) {
+                        const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
                         postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
+                    }
                     break }
                 case 'spec-labels': {
                     config.specLabels = element.checked;                    
@@ -5035,6 +5036,7 @@ function playRegion(){
                     const fftSamples = wavesurfer.spectrogram.fftSamples;
                     adjustSpecDims(true, fftSamples);
                     checkFilteredFrequency();
+                    element.blur();
                     worker.postMessage({action: 'update-state', audio: config.audio});
                     break }
                 case 'toInput': case 'toSlider': {
@@ -5044,15 +5046,17 @@ function playRegion(){
                     const fftSamples = wavesurfer.spectrogram.fftSamples;
                     adjustSpecDims(true, fftSamples);
                     checkFilteredFrequency();
+                    element.blur();
                     worker.postMessage({action: 'update-state', audio: config.audio});
                     break }
                 case 'normalise': {
                     config.audio.normalise = element.checked;
                     worker.postMessage({action:'update-state', audio: config.audio})
-                    const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
                     element.blur();
-                    fileLoaded &&
+                    if (fileLoaded) {
+                        const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
                         postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false })
+                    }
                     break }
                 case 'send-filtered-audio-to-model': {
                     config.filters.sendToModel = element.checked;
