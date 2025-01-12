@@ -2539,7 +2539,7 @@ function onChartData(args) {
         }, 100, 'id1');
     });
     
-    const contextMenu = document.getElementById('context-menu')
+    
     
     function handleKeyDownDeBounce(e) {
         e.preventDefault();
@@ -2552,7 +2552,7 @@ function onChartData(args) {
         let action = e.key;
         config.debug && console.log(`${action} key pressed`);
         if (action in GLOBAL_ACTIONS) {
-            contextMenu.classList.add("d-none");
+            DOM.contextMenu.classList.add("d-none");
             if (document === e.target || document.body === e.target || e.target.attributes["data-action"]) {}
             const modifier = e.shiftKey ? 'Shift' : e.ctrlKey ? 'Control' : e.metaKey ? 'Alt' : 'no';
             trackEvent(config.UUID, 'KeyPress', action, modifier );
@@ -3123,6 +3123,8 @@ function centreSpec(){
                 contents, play: true, resetSpec: false, queued: false
             }
         } else {
+            // Dismiss a context menu if it's open
+            DOM.contextMenu.classList.add("d-none");
             currentBuffer = new AudioBuffer({ length: contents.length, numberOfChannels: 1, sampleRate: sampleRate });
             currentBuffer.copyToChannel(contents, 0);
             STATE.fileStart = fileStart;
@@ -4847,7 +4849,7 @@ function playRegion(){
             // XC API calls (no await)
             case 'context-xc': { getXCComparisons(); break}
         }
-        contextMenu.classList.add("d-none");
+        DOM.contextMenu.classList.add("d-none");
         if (target !=  'frequency-range' && !e.target.closest('#frequency-range-panel')){
             document.getElementById('frequency-range-panel').classList.add('d-none');
             document.getElementById('frequency-range').classList.remove('active');
@@ -5188,7 +5190,7 @@ function getI18n(context){
         if (region === undefined && ! inSummary) return;
         const createOrEdit = ((region?.attributes.label || target.closest('#summary'))) ? i18n.edit : i18n.create;
         
-        contextMenu.innerHTML = `
+        DOM.contextMenu.innerHTML = `
         <div id="${inSummary ? 'inSummary' : 'inResults'}">
             <a class="dropdown-item ${hideInSummary}" id="play-region"><span class='material-symbols-outlined'>play_circle</span> ${i18n.play}</a>
             <a class="dropdown-item ${hideInSummary} ${hideInSelection}" href="#" id="context-analyse-selection">
@@ -5235,7 +5237,7 @@ function getI18n(context){
             xc.classList.add('d-none');
             contextDelete.classList.add('d-none');
         }
-        positionMenu(contextMenu, e);
+        positionMenu(DOM.contextMenu, e);
     }
     
     function positionMenu(menu, event) {
