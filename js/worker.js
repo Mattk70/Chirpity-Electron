@@ -196,9 +196,14 @@ const createDB = async (file) => {
         await db.runAsync(`CREATE TABLE duration( day INTEGER, duration INTEGER, fileID INTEGER, UNIQUE (day, fileID), CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE)`);
 
         if (archiveMode) {
+            // Only called when creating a new archive database
             for (let i = 0; i < LABELS.length; i++) {
                 const [sname, cname] = LABELS[i].split('_');
                 await db.runAsync('INSERT INTO species VALUES (?,?,?)', i, sname, cname);
+            }
+            // If the locale is not English, we need to request translations
+            if (!['en', 'en_uk'].includes(STATE.locale)) {
+                UI.postMessage({event: 'label-translation-needed', locale: STATE.locale})
             }
             await db.runAsync(`
                 CREATE TABLE IF NOT EXISTS db_upgrade (

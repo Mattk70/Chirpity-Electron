@@ -1699,7 +1699,7 @@ const defaultConfig = {
     local: true,
     speciesThreshold: 0.03,
     useWeek: false,
-    model: 'chirpity',
+    model: 'birdnet',
     chirpity: {locale: 'en_uk', backend: 'tensorflow'},
     nocmig: {locale: 'en_uk', backend: 'tensorflow'},
     birdnet: {locale: 'en', backend: 'tensorflow'},
@@ -1721,6 +1721,7 @@ const defaultConfig = {
     powerSaveBlocker: false,
     fileStartMtime: false,
     hideBuyCoffeeWidget: false,
+    forceHideCoffeeReset: true,
 };
 let appPath, tempPath, systemLocale, isMac;
 window.onload = async () => {
@@ -1734,9 +1735,11 @@ window.onload = async () => {
     // Set default locale
     systemLocale = systemLocale.replace('en-GB', 'en_uk');
     systemLocale = systemLocale === 'en_uk' ? systemLocale : systemLocale.slice(0,2).toLowerCase();
-    defaultConfig.chirpity.locale = systemLocale;
-    defaultConfig.birdnet.locale = systemLocale;
-    defaultConfig.nocmig.locale = systemLocale;
+    if (['da', 'de', 'es', 'fr', 'ja', 'nl', 'pl', 'pt', 'ru', 'sv', 'zh' ].includes(systemLocale)) {
+        defaultConfig.chirpity.locale = systemLocale;
+        defaultConfig.birdnet.locale = systemLocale;
+        defaultConfig.nocmig.locale = systemLocale;
+    }
     // establish the message channel
     setUpWorkerMessaging()
 
@@ -1751,7 +1754,12 @@ window.onload = async () => {
         } else {
             config = JSON.parse(data);
         }
-
+        // One-time reset of hidecoffee
+        if (config.forceHideCoffeeReset) {
+            config.hideBuyCoffeeWidget = false;
+            config.forceHideCoffeeReset = false;
+            updatePrefs('config.json', config);
+        }
         // Attach an error event listener to the window object
         window.onerror = function(message, file, lineno, colno, error) {
             trackEvent(config.UUID, 'Error', error.message, encodeURIComponent(error.stack));
@@ -2008,6 +2016,12 @@ const setUpWorkerMessaging = () => {
                     */
                     // Read a custom list if applicable
                     config.list === 'custom' && setListUIState(config.list);
+                    break }
+                case 'label-translation-needed': {
+                    // Called when the initial system locale isn't english
+                    const locale = args.locale;
+                    const labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_${locale}.txt`; 
+                    readLabels(labelFile);
                     break }
                 case "location-list": {LOCATIONS = args.locations;
                     locationID = args.currentLocation;
