@@ -292,7 +292,6 @@ function updateProgress(val) {
 */
 function loadAudioFile({ filePath = '', preserveResults = false }) {
     fileLoaded = false; locationID = undefined;
-    //if (!preserveResults) worker.postMessage({ action: 'change-mode', mode: 'analyse' })
     worker.postMessage({
         action: 'file-load-request',
         file: filePath,
@@ -3481,6 +3480,7 @@ function formatDuration(seconds){
         let tr = '';
         if (index <= 1) {
             adjustSpecDims(true)
+            resetResults({clearResults: true, clearSummary: false, clearPagination: false});
             if (selection) {
                 const selectionTable = document.getElementById('selectionResultTableBody');
                 selectionTable.textContent = '';

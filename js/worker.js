@@ -201,10 +201,6 @@ const createDB = async (file) => {
                 const [sname, cname] = LABELS[i].split('_');
                 await db.runAsync('INSERT INTO species VALUES (?,?,?)', i, sname, cname);
             }
-            // If the locale is not English, we need to request translations
-            if (!['en', 'en_uk'].includes(STATE.locale)) {
-                UI.postMessage({event: 'label-translation-needed', locale: STATE.locale})
-            }
             await db.runAsync(`
                 CREATE TABLE IF NOT EXISTS db_upgrade (
                     key TEXT PRIMARY KEY,
@@ -220,7 +216,7 @@ const createDB = async (file) => {
             // If the db is not ready
             while (code === "SQLITE_BUSY") {
                 console.log("Disk DB busy")
-                setTimeout(() => {}, 10);
+                await new Promise(resolve => setTimeout(resolve, 10));
                 let response = await db.runAsync('ATTACH ? as disk', filename);
                 code = response.code;
             }
@@ -234,6 +230,10 @@ const createDB = async (file) => {
         await db.runAsync('END');
     } finally {
         dbMutex.unlock();
+        // If the locale is not English, we need to request translations
+        // if (!['en', 'en_uk'].includes(STATE.locale)) {
+        //     UI.postMessage({event: 'label-translation-needed', locale: STATE.locale})
+        // }
     }
     return db;
 }
