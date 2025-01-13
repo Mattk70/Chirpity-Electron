@@ -1734,7 +1734,7 @@ window.onload = async () => {
     // Set default locale
     systemLocale = systemLocale.replace('en-GB', 'en_uk');
     systemLocale = systemLocale === 'en_uk' ? systemLocale : systemLocale.slice(0,2).toLowerCase();
-    if (['da', 'de', 'es', 'fr', 'ja', 'nl', 'pl', 'pt', 'ru', 'sv', 'zh' ].includes(systemLocale)) {
+    if (['da', 'de', 'es', 'fr', 'ja', 'nl', 'pt', 'ru', 'sv', 'zh' ].includes(systemLocale)) {
         defaultConfig.chirpity.locale = systemLocale;
         defaultConfig.birdnet.locale = systemLocale;
         defaultConfig.nocmig.locale = systemLocale;
