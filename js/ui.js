@@ -625,7 +625,6 @@ function showDatePicker() {
 }
 
 const filename = DOM.filename;
-filename.addEventListener('click', openFileInList);
 filename.addEventListener('contextmenu', buildFileMenu);
 
 function extractFileNameAndFolder(path) {
@@ -1423,7 +1422,7 @@ const loadResultRegion = ({ file = '', start = 0, end = 3, label = '' } = {}) =>
     if (windowLength <= 3.5) windowLength = 6;
     bufferBegin = Math.max(0, start - (windowLength / 2) + 1.5)
     const region = { start: Math.max(start - bufferBegin, 0), end: end - bufferBegin, label: label };
-    const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
+    const position = wavesurfer? clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1) : 0;
     postBufferUpdate({ file: file, begin: bufferBegin, position: position, region: region })
 }
 
@@ -4056,12 +4055,6 @@ function formatDuration(seconds){
     }
 
     
-    DOM.debugMode.addEventListener('click', () =>{
-        config.debug = !config.debug;
-        DOM.debugMode.checked = config.debug;
-        updatePrefs('config.json', config)
-    })
-    
 
     
     const diagnosticMenu = document.getElementById('diagnostics');
@@ -4439,12 +4432,7 @@ function showSummarySortIcon(){
     const confidenceSliderDisplay = document.getElementById('confidenceSliderContainer'); // confidence span for slider in panel - show-hide
     const filterPanelRangeInput = document.getElementById('confidenceValue'); // panel range input 
     const settingsPanelRangeInput = document.getElementById('confidence'); // confidence range input in settings
-    
-    const setConfidence = (e) => {
-        //settingsPanelRangeInput.value = e.target.value;
-        handleThresholdChange(e);
-    }
-    
+
     filterPanelThresholdDisplay.addEventListener('click', (e) => {
         e.stopPropagation();
         filterPanelRangeInput.autofocus = true
@@ -4711,6 +4699,11 @@ function playRegion(){
                 element.closest('#inSummary') ? batchExportAudio() : exportAudio();
                 break;
             }
+            // XC compare play/pause
+            case 'playComparison': { ws.playPause(); break }
+            // Open files list
+            case 'filename': { openFileInList(); break }
+
             // --- Backends
             case 'tensorflow':
             case 'webgl':
@@ -4862,6 +4855,11 @@ function playRegion(){
 
             // XC API calls (no await)
             case 'context-xc': { getXCComparisons(); break}
+            case 'debug-mode': { 
+                config.debug = !config.debug;
+                updatePrefs('config.json', config)
+                break 
+            }
         }
         DOM.contextMenu.classList.add("d-none");
         if (target !=  'frequency-range' && !e.target.closest('#frequency-range-panel')){
@@ -5959,7 +5957,7 @@ function renderComparisons(lists, cname){
 }
 
 let ws;
-const playComparison = () => {ws.playPause()}
+
 
 function showCompareSpec() {
     if (ws) ws.destroy()
@@ -6014,14 +6012,7 @@ function showCompareSpec() {
     ws.on('ready', function () {
         mediaContainer.removeChild(loading);
     })
-
-
     ws.load(file)
-    const playButton = document.getElementById('playComparison')
-    // prevent listener accumulation
-    playButton.removeEventListener('click', playComparison)
-    playButton.addEventListener('click', playComparison)
-
 }
 
 
