@@ -65,7 +65,6 @@ test.beforeAll(async () => {
     executablePath: appInfo.executable,
     env: {
       ...process.env,
-      LOCALE: 'de-DE',
       TEST_ENV: 'true'
     }
 
