@@ -175,12 +175,17 @@ jobs:
 
       # Tests
       - name: Set locale to pt-BR.UTF-8 for Mac
-        if: runner.os == 'macOS'
+        if: runner.os == 'Windows'
         run: |
-            export LANG=pt_BR.UTF-8
-            export LC_ALL=pt_BR.UTF-8
+          Set-WinUILanguageOverride -Language pt-BR
+          Set-WinUserLanguageList -LanguageList pt-BR -Force
+          Set-Culture pt-BR
+          Set-SystemLocale pt-BR
+        shell: pwsh
       - name: Verify locale
-        run: locale
+        if: runner.os == 'Windows'
+        run: Get-WinSystemLocale
+        shell: pwsh
       - name: Test packaged application
         if: runner.os != 'Linux'
         run: npm test
