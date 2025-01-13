@@ -174,6 +174,13 @@ jobs:
       - run: echo "File check status is ${{ job.status }}."
 
       # Tests
+      - name: Set locale to pt-BR.UTF-8 for Mac
+        if: runner.os == 'macOS'
+        run: |
+            export LANG=pt_BR.UTF-8
+            export LC_ALL=pt_BR.UTF-8
+      - name: Verify locale
+        run: locale
       - name: Test packaged application
         if: runner.os != 'Linux'
         run: npm test
