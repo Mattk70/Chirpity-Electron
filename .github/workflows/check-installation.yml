@@ -174,20 +174,21 @@ jobs:
       - run: echo "File check status is ${{ job.status }}."
 
       # Tests
-      - name: Set locale to pt-BR.UTF-8 for Mac
-        if: runner.os == 'Windows'
+      - name: Set locale to de_DE.UTF-8 for Mac
+        if: runner.os == 'macOS'
         run: |
-          Set-WinUILanguageOverride -Language pt-BR
-          Set-WinUserLanguageList -LanguageList pt-BR -Force
-          Set-Culture pt-BR
-          Set-SystemLocale pt-BR
-        shell: pwsh
-      - name: Verify locale
-        if: runner.os == 'Windows'
-        run: Get-WinSystemLocale
-        shell: pwsh
+            export LC_ALL=de_DE.UTF-8
+            export LANG=de_DE.UTF-8
+
+
+      - name: Run Python command & verify locale
+        if: runner.os == 'macOS'
+        run: python -c "import locale; locale.setlocale(locale.LC_ALL, locale.getlocale()[0]); print(locale.localeconv()"
+
       - name: Test packaged application
         if: runner.os != 'Linux'
-        run: npm test
+        run: |
+          locale
+          npm test
 
 
