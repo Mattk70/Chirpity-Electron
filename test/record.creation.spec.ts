@@ -57,7 +57,10 @@ async function runExampleAnalysis(page: Page, model: string){
   await page.locator('#analyse').click()
   await  page.locator('#resultTableContainer').waitFor({state: 'visible'})
 }
-
+test.use({
+  locale: 'de-DE',
+  timezoneId: 'Europe/Berlin',
+});
 test.beforeAll(async () => {
 
   electronApp = await electron.launch({
