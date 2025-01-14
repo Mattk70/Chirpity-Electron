@@ -533,7 +533,7 @@ function powerSave(on) {
 }
 
 const openFileInList = async (e) => {
-    if (!PREDICTING && e.target.tagName === 'A') {
+    if (!PREDICTING && e.target?.tagName === 'A') {
         loadAudioFile({ filePath: e.target.id, preserveResults: true })
     }
 }
