@@ -184,6 +184,7 @@ const createDB = async (file) => {
 
     await dbMutex.lock();
     try {
+        db.locale = 'en';
         await db.runAsync('BEGIN');
         await db.runAsync('CREATE TABLE species(id INTEGER PRIMARY KEY, sname TEXT NOT NULL, cname TEXT NOT NULL)');
         await db.runAsync(`CREATE TABLE locations( id INTEGER PRIMARY KEY, lat REAL NOT NULL, lon  REAL NOT NULL, place TEXT NOT NULL, UNIQUE (lat, lon))`);
@@ -3380,6 +3381,7 @@ async function _updateSpeciesLocale(db, labels) {
     const updatePromises = [];
     const updateStmt = db.prepare('UPDATE species SET cname = ? WHERE sname = ?');
     const updateChirpityStmt = db.prepare('UPDATE species SET cname = ? WHERE sname = ? AND cname LIKE ?');
+    const speciesSelectStmt = db.prepare('SELECT cname FROM species WHERE sname = ?');
     await db.runAsync('BEGIN');
 
     if (STATE.model === 'birdnet') {
@@ -3390,7 +3392,7 @@ async function _updateSpeciesLocale(db, labels) {
     } else {
         for (const label of labels) {
             const [sname, newCname] = label.split('_');
-            const existingCnameResult = await db.allAsync('SELECT cname FROM species WHERE sname = ?', sname);
+            const existingCnameResult = await speciesSelectStmt.allAsync(sname);
             if (existingCnameResult.length) {
                 for (const { cname: existingCname } of existingCnameResult) {
                     const existingCnameMatch = existingCname.match(/\(([^)]+)\)$/);
@@ -3426,21 +3428,24 @@ async function _updateSpeciesLocale(db, labels) {
 }
 
 async function onUpdateLocale(locale, labels, refreshResults) {
-    const time = Date.now()
+    const time = Date.now();
     await dbMutex.lock();
     let db;
     try {
-        for (db of [diskDB, memoryDB]) {
-            await _updateSpeciesLocale(db, labels);
-        }
         STATE.update({ locale: locale });
+        for (db of [diskDB, memoryDB]) {
+            if (db.locale !== locale) {
+                db.locale = locale;
+                await _updateSpeciesLocale(db, labels);
+            }
+        }
         if (refreshResults) await Promise.all([getResults(), getSummary()]);
     } catch (error) {
         await db.runAsync('ROLLBACK');
         throw error;
     } finally {
         dbMutex.unlock();
-        console.log(`Update locale took ${(Date.now() - time) / 1000} seconds`)
+        console.log(`Locale update took ${(Date.now() - time) / 1000} seconds`);
     }
 }
     
