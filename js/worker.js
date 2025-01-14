@@ -213,12 +213,21 @@ const createDB = async (file) => {
         } else {
             const filename = diskDB.filename;
             let { code } = await db.runAsync('ATTACH ? as disk', filename);
+            const MAX_RETRIES = 100; // Set a maximum number of retries
+            let retries = 0;
+            
             // If the db is not ready
-            while (code === "SQLITE_BUSY") {
-                console.log("Disk DB busy")
+            while (code === "SQLITE_BUSY" && retries < MAX_RETRIES) {
+                console.log("Disk DB busy");
                 await new Promise(resolve => setTimeout(resolve, 10));
                 let response = await db.runAsync('ATTACH ? as disk', filename);
                 code = response.code;
+                retries++;
+            }
+            
+            if (retries === MAX_RETRIES) {
+                console.error("Exceeded maximum number of retries for attaching the disk database");
+                throw new Error("Exceeded maximum number of retries for attaching the disk database");
             }
             let response = await db.runAsync('INSERT INTO files SELECT * FROM disk.files');
             DEBUG && console.log(response.changes + ' files added to memory database')
@@ -228,12 +237,15 @@ const createDB = async (file) => {
             DEBUG && console.log(response.changes + ' species added to memory database')
         }
         await db.runAsync('END');
-    } finally {
+    } catch (error) {
+        console.error('Error during DB transaction:', error);
+        await db.runAsync('ROLLBACK'); // Rollback the transaction in case of error
+    }  finally {
         dbMutex.unlock();
         // If the locale is not English, we need to request translations
-        // if (!['en', 'en_uk'].includes(STATE.locale)) {
-        //     UI.postMessage({event: 'label-translation-needed', locale: STATE.locale})
-        // }
+        if (!['en', 'en_uk'].includes(STATE.locale)) {
+            UI.postMessage({event: 'label-translation-needed', locale: STATE.locale})
+        }
     }
     return db;
 }
@@ -2051,6 +2063,9 @@ async function batchInsertRecords(cname, label, files, originalCname) {
             });
         }
         await db.runAsync('END');
+    } catch (error) {
+        await db.runAsync('ROLLBACK');
+        throw error;
     } finally {
         dbMutex.unlock();
     }
@@ -3361,59 +3376,71 @@ const dbMutex = new Mutex();
  * 
  * @throws {Error} - Throws an error if the database transactions fail.
  */
-async function onUpdateLocale(locale, labels, refreshResults) {
-    await dbMutex.lock();
-    try {
-        await diskDB.runAsync('BEGIN');
-        await memoryDB.runAsync('BEGIN');
-        if (STATE.model === 'birdnet') {
-            for (let i = 0; i < labels.length; i++) {
-                const [sname, cname] = labels[i].trim().split('_');
-                await diskDB.runAsync('UPDATE species SET cname = ? WHERE sname = ?', cname, sname);
-                await memoryDB.runAsync('UPDATE species SET cname = ? WHERE sname = ?', cname, sname);
-            }
-        } else {
-            for (let i = 0; i < labels.length; i++) {
-                const [sname, newCname] = labels[i].split('_');
-                // For chirpity, we check if the existing cname ends with a <call type> in brackets
-                const existingCnameResult = await memoryDB.allAsync('SELECT cname FROM species WHERE sname = ?', sname);
-                if (existingCnameResult.length) {
-                    for (let j = 0; j < existingCnameResult.length; j++) {
-                        const { cname } = existingCnameResult[j];
-                        const existingCname = cname;
-                        const existingCnameMatch = existingCname.match(/\(([^)]+)\)$/); // Regex to match word(s) within brackets at the end of the string
-                        const newCnameMatch = newCname.match(/\(([^)]+)\)$/);
-                        // Do we have a specific call type to match?
-                        if (newCnameMatch) {
-                            // then only update the database where existing and new call types match
-                            if (newCnameMatch[0] === existingCnameMatch[0]) {
-                                const callTypeMatch = '%' + newCnameMatch[0] + '%';
-                                await diskDB.runAsync("UPDATE species SET cname = ? WHERE sname = ? AND cname LIKE ?", newCname, sname, callTypeMatch);
-                                await memoryDB.runAsync("UPDATE species SET cname = ? WHERE sname = ? AND cname LIKE ?", newCname, sname, callTypeMatch);
-                            }
-                        } else { // No (<call type>) in the new label - so we add the new name to all the species call types in the database
-                            let appendedCname = newCname, bracketedWord;
-                            if (existingCnameMatch) {
-                                bracketedWord = existingCnameMatch[0];
-                                appendedCname += ` ${bracketedWord}`; // Append the bracketed word to the new cname (for each of the existingCnameResults)
-                                const callTypeMatch = '%' + bracketedWord + '%';
-                                await diskDB.runAsync("UPDATE species SET cname = ? WHERE sname = ? AND cname LIKE ?", appendedCname, sname, callTypeMatch);
-                                await memoryDB.runAsync("UPDATE species SET cname = ? WHERE sname = ? AND cname LIKE ?", appendedCname, sname, callTypeMatch);
-                            } else {
-                                await diskDB.runAsync("UPDATE species SET cname = ? WHERE sname = ?", appendedCname, sname);
-                                await memoryDB.runAsync("UPDATE species SET cname = ? WHERE sname = ?", appendedCname, sname);
-                            }
+async function _updateSpeciesLocale(db, labels) {
+    const updatePromises = [];
+    const updateStmt = db.prepare('UPDATE species SET cname = ? WHERE sname = ?');
+    const updateChirpityStmt = db.prepare('UPDATE species SET cname = ? WHERE sname = ? AND cname LIKE ?');
+    await db.runAsync('BEGIN');
+
+    if (STATE.model === 'birdnet') {
+        for (const label of labels) {
+            const [sname, cname] = label.trim().split('_');
+            updatePromises.push(updateStmt.runAsync(cname, sname));
+        }
+    } else {
+        for (const label of labels) {
+            const [sname, newCname] = label.split('_');
+            const existingCnameResult = await db.allAsync('SELECT cname FROM species WHERE sname = ?', sname);
+            if (existingCnameResult.length) {
+                for (const { cname: existingCname } of existingCnameResult) {
+                    const existingCnameMatch = existingCname.match(/\(([^)]+)\)$/);
+                    const newCnameMatch = newCname.match(/\(([^)]+)\)$/);
+                    if (newCnameMatch) {
+                        if (newCnameMatch[0] === existingCnameMatch[0]) {
+                            const callTypeMatch = '%' + newCnameMatch[0] + '%';
+                            updatePromises.push(updateChirpityStmt.runAsync(newCname, sname, callTypeMatch));
+                        }
+                    } else {
+                        let appendedCname = newCname;
+                        if (existingCnameMatch) {
+                            const bracketedWord = existingCnameMatch[0];
+                            appendedCname += ` ${bracketedWord}`;
+                            const callTypeMatch = '%' + bracketedWord + '%';
+                            updatePromises.push(updateChirpityStmt.runAsync(appendedCname, sname, callTypeMatch));
+                        } else {
+                            updatePromises.push(updatePromises.push(updateStmt.runAsync(appendedCname, sname)));
                         }
                     }
                 }
             }
         }
-        await diskDB.runAsync('END');
-        await memoryDB.runAsync('END');
+    }
+
+    try {
+        await Promise.all(updatePromises);
+        await db.runAsync('END');
+    } catch (error) {
+        await db.runAsync('ROLLBACK');
+        throw error;
+    }
+}
+
+async function onUpdateLocale(locale, labels, refreshResults) {
+    const time = Date.now()
+    await dbMutex.lock();
+    let db;
+    try {
+        for (db of [diskDB, memoryDB]) {
+            await _updateSpeciesLocale(db, labels);
+        }
         STATE.update({ locale: locale });
         if (refreshResults) await Promise.all([getResults(), getSummary()]);
+    } catch (error) {
+        await db.runAsync('ROLLBACK');
+        throw error;
     } finally {
         dbMutex.unlock();
+        console.log(`Update locale took ${(Date.now() - time) / 1000} seconds`)
     }
 }
     

@@ -12,6 +12,17 @@ sqlite3.Database.prototype.runAsync = function (sql, ...params) {
     });
 };
 
+sqlite3.Statement.prototype.runAsync = function (...params) {
+    if (DEBUG) console.log('SQL\n', this.sql, '\nParams\n', params)
+    return new Promise((resolve, reject) => {
+        this.run(params, (err) => {
+            if (err) return reject(err, console.log(err, this.sql));
+            // if (DEBUG) console.log('\nRows:', rows)
+            resolve(this);
+        });
+    });
+};
+
 sqlite3.Database.prototype.allAsync = function (sql, ...params) {
     return new Promise((resolve, reject) => {
         this.all(sql, params, (err, rows) => {
