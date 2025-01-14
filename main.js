@@ -14,7 +14,7 @@ process.env['TF_ENABLE_ONEDNN_OPTS'] = "1";
 
 //require('update-electron-app')();
 let files = [];
-let DEBUG = true;
+let DEBUG = false;
 let unsavedRecords = false;
 
 

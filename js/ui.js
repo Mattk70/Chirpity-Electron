@@ -1698,9 +1698,10 @@ const defaultConfig = {
     speciesThreshold: 0.03,
     useWeek: false,
     model: 'birdnet',
-    chirpity: {locale: 'en_uk', backend: 'tensorflow'},
-    nocmig: {locale: 'en_uk', backend: 'tensorflow'},
-    birdnet: {locale: 'en', backend: 'tensorflow'},
+    locale: 'en',
+    chirpity: {backend: 'tensorflow'},
+    nocmig: {backend: 'tensorflow'},
+    birdnet: {backend: 'tensorflow'},
     latitude: 52.87,
     longitude: 0.89, 
     location: 'Great Snoring, North Norfolk',
@@ -1731,12 +1732,11 @@ window.onload = async () => {
     // Load preferences and override defaults
     [appPath, tempPath, systemLocale] = await getPaths();
     // Set default locale
+    console.log(systemLocale)
     systemLocale = systemLocale.replace('en-GB', 'en_uk');
     systemLocale = systemLocale === 'en_uk' ? systemLocale : systemLocale.slice(0,2).toLowerCase();
     if (['da', 'de', 'es', 'fr', 'ja', 'nl', 'pt', 'ru', 'sv', 'zh' ].includes(systemLocale)) {
-        defaultConfig.chirpity.locale = systemLocale;
-        defaultConfig.birdnet.locale = systemLocale;
-        defaultConfig.nocmig.locale = systemLocale;
+        defaultConfig.locale = systemLocale;
     }
     // establish the message channel
     setUpWorkerMessaging()
@@ -1796,7 +1796,7 @@ window.onload = async () => {
         DOM.localSwitch.checked = config.local;
 
         // Show Locale
-        DOM.locale.value = config[config.model].locale;
+        DOM.locale.value = config.locale;
         LIST_MAP = getI18n(i18nLIST_MAP)
         // Localise UI
         localiseUI(DOM.locale.value).then(result => STATE.i18n = result);
@@ -1902,7 +1902,7 @@ window.onload = async () => {
             filters: config.filters,
             audio: config.audio,
             limit: config.limit,
-            locale: config[config.model].locale,
+            locale: config.locale,
             speciesThreshold: config.speciesThreshold,
             list: config.list,
             useWeek: config.useWeek,
@@ -2133,7 +2133,7 @@ function generateBirdOptionList({ store, rows, selected }) {
         let sortedList = LABELS.map(label => label.split('_')[1]);
         
         // International language sorting, recommended for large arrays - 'en_uk' not valid, but same as 'en'
-        sortedList.sort(new Intl.Collator(config[config.model].locale.replace(/_.*$/, '')).compare);
+        sortedList.sort(new Intl.Collator(config.locale.replace(/_.*$/, '')).compare);
         // Check if we have prepared this before
         
         const lastSelectedSpecies = selected || STATE.birdList.lastSelectedSpecies;
@@ -3383,6 +3383,7 @@ function formatDuration(seconds){
             STATE.mode !== 'explore' && enableMenuItem(['save2db']);
         } else {
             disableMenuItem(['saveLabels', 'saveCSV', 'save-eBird', 'save-Raven', 'save2db']);
+            refreshResultsView()
         }
         if (STATE.currentFile) enableMenuItem(['analyse'])
     }
@@ -3818,7 +3819,7 @@ function formatDuration(seconds){
 
     const populateHelpModal = async (file, label) => {
         document.getElementById('helpModalLabel').textContent = label;
-        let locale = config[config.model].locale;
+        let locale = config.locale;
         const translations = ['en', 'da', 'de', 'es', 'fr', 'nl', 'pt', 'ru', 'sv', 'zh'];
         locale = translations.includes(locale) ? locale : 'en';
         const response = await localiseModal(file, locale)
@@ -4262,7 +4263,7 @@ function showSummarySortIcon(){
             element = document.getElementById(element);
             STATE.picker = new easepick.create({
                 element: element,
-                lang: config[config.model].locale.replace(/_.*$/, ''),
+                lang: config.locale.replace(/_.*$/, ''),
                 locale: {
                     cancel: i18n.cancel,
                     apply: i18n.apply
@@ -4614,7 +4615,7 @@ function playRegion(){
     document.addEventListener('click', function (e) {
         const element = e.target;
         const target = element.closest('[id]')?.id;
-        const locale = config[config.model].locale.replace(/_.*$/, '');
+        const locale = config.locale.replace(/_.*$/, '');
         switch (target)
         {
             // File menu
@@ -4776,7 +4777,7 @@ function playRegion(){
                     "sv": "Är du säker på att du vill återställa till standardinställningarna? Du måste starta om Chirpity för att se ändringarna.",
                     "zh": "您确定要恢复默认设置吗？您需要重新启动 Chirpity 才能看到更改。"
                 }
-                const locale = config[config.model].locale 
+                const locale = config.locale 
                 const message = i18n[locale] || i18n['en'];
                 if (confirm(message)){
                     const uuid = config.UUID;
@@ -4963,10 +4964,10 @@ function playRegion(){
                         const chirpity = element.value === 'en_uk' && config.model !== 'birdnet' ? 'chirpity' : '';
                         labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_${chirpity}Labels_${element.value}.txt`; 
                         localiseUI(DOM.locale.value).then(result => STATE.i18n = result);
-                        config[config.model].locale = element.value;
+                        config.locale = element.value;
                         initialiseDatePicker()
                     }
-                    config[config.model].locale = element.value;
+                    config.locale = element.value;
                     STATE.picker.options.lang = element.value.replace('_uk', '');
                     readLabels(labelFile, 'locale');
                     break }
@@ -4980,8 +4981,7 @@ function playRegion(){
                     modelSettingsDisplay();
                     DOM.customListFile.value = config.customListFile[config.model];
                     DOM.customListFile.value ? LIST_MAP = getI18n(i18nLIST_MAP) : delete LIST_MAP.custom;
-                    document.getElementById('locale').value = config[config.model].locale;
-                    //config[config.model].backend = config.hasNode ? 'tensorflow' : 'webgpu';
+                    document.getElementById('locale').value = config.locale;
                     document.getElementById(config[config.model].backend).checked = true;
                     handleBackendChange(config[config.model].backend);
                     setListUIState(config.list)
@@ -5162,7 +5162,7 @@ async function readLabels(labelFile, updating){
             worker.postMessage({ action: 'update-list', list: config.list, customList: LABELS, refreshResults: STATE.analysisDone});
             trackEvent(config.UUID, 'UI', 'Create', 'Custom list', LABELS.length)
         } else {
-            worker.postMessage({action: 'update-locale', locale: config[config.model].locale, labels: LABELS, refreshResults: STATE.analysisDone})
+            worker.postMessage({action: 'update-locale', locale: config.locale, labels: LABELS, refreshResults: STATE.analysisDone});
         }
 
     }).catch(error =>{
@@ -5171,7 +5171,7 @@ async function readLabels(labelFile, updating){
 }
 
 function getI18n(context){
-    const locale = config[config.model].locale.replace(/_.*$/, '');
+    const locale = config.locale.replace(/_.*$/, '');
     return context[locale] || context['en'];
 }
     

@@ -26,7 +26,7 @@ export class State {
             this.lon = undefined,
             this.place = undefined,
             this.locationID = undefined,
-            this.locale = 'en_uk',
+            this.locale = 'en',
             this.speciesThreshold = undefined,
             this.useWeek = false,
             this.week = -1,
