@@ -982,7 +982,8 @@ const i18nContext = {
         time: 'Amend File Start Time',
         frequency: 'Frequency',
         length: "Region Length",
-        plural: 's'
+        plural: 's',
+        gotoTimeOfDay: 'Go to Time', gotoPosition: 'Go to Timecode'
     },
     da: {
         lastNight: 'I går nat', thisWeek: 'Denne uge', lastWeek: 'Sidste uge', thisMonth: 'Denne måned', lastMonth: 'Sidste måned', thisYear: 'Dette år', lastYear: 'Sidste år',
@@ -999,7 +1000,8 @@ const i18nContext = {
         time: 'Rediger filens starttid',
         plural: 'er',
         frequency: "Frekvens",
-        length: "Regionslængde"
+        length: "Regionslængde",
+        gotoTimeOfDay: 'Gå til tid', gotoPosition: 'Gå til tidskode' 
     },
     de: {
         lastNight: 'Letzte Nacht', thisWeek: 'Diese Woche', lastWeek: 'Letzte Woche', thisMonth: 'Dieser Monat', lastMonth: 'Letzter Monat', thisYear: 'Dieses Jahr', lastYear: 'Letztes Jahr',
@@ -1016,7 +1018,8 @@ const i18nContext = {
         time: 'Startzeit der Datei ändern',
         plural: 'e',
         frequency: "Frequenz",
-        length: "Regionlänge"
+        length: "Regionlänge",
+        gotoTimeOfDay: 'Gehe zur Zeit', gotoPosition: 'Gehe zur Zeitcode' 
     },
     es: {
         lastNight: 'Anoche', thisWeek: 'Esta semana', lastWeek: 'La semana pasada', thisMonth: 'Este mes', lastMonth: 'El mes pasado', thisYear: 'Este año', lastYear: 'El año pasado',
@@ -1033,7 +1036,8 @@ const i18nContext = {
         time: 'Modificar la hora de inicio del archivo',
         plural: 's',
         frequency: "Frecuencia",
-        length: "Longitud de la región"
+        length: "Longitud de la región",
+        gotoTimeOfDay: 'Ir a la hora', gotoPosition: 'Ir al código de tiempo'
     },
     fr: {
         lastNight: 'La nuit dernière', thisWeek: 'Cette semaine', lastWeek: 'La semaine dernière', thisMonth: 'Ce mois-ci', lastMonth: 'Le mois dernier', thisYear: 'Cette année', lastYear: 'L’année dernière',
@@ -1050,7 +1054,8 @@ const i18nContext = {
         time: 'Modifier l’heure de début du fichier',
         plural: 's',
         frequency: "Fréquence",
-        length: "Longueur de la région"
+        length: "Longueur de la région",
+        gotoTimeOfDay: 'Aller à l’heure', gotoPosition: 'Aller au code temporel'
     },
     ja: {
         lastNight: '昨夜', thisWeek: '今週', lastWeek: '先週', thisMonth: '今月', lastMonth: '先月', thisYear: '今年', lastYear: '昨年',
@@ -1067,7 +1072,8 @@ const i18nContext = {
         time: 'ファイルの開始時間を修正',
         plural: '',
         frequency: "周波数",
-        length: "領域の長さ"
+        length: "領域の長さ",
+        gotoTimeOfDay: '時刻に移動', gotoPosition: 'タイムコードに移動'
     },
     nl: {
         lastNight: 'Gisteravond', thisWeek: 'Deze week', lastWeek: 'Vorige week', thisMonth: 'Deze maand', lastMonth: 'Vorige maand', thisYear: 'Dit jaar', lastYear: 'Vorig jaar',
@@ -1084,7 +1090,8 @@ const i18nContext = {
         time: 'Starttijd van bestand aanpassen',
         plural: 'en',
         frequency: "Frequentie",
-        length: "Regiolengte"
+        length: "Regiolengte",
+        gotoTimeOfDay: 'Ga naar tijd', gotoPosition: 'Ga naar tijdcode'
     },
     pt: {
         lastNight: 'Ontem à noite', thisWeek: 'Esta semana', lastWeek: 'Semana passada', thisMonth: 'Este mês', lastMonth: 'Mês passado', thisYear: 'Este ano', lastYear: 'Ano passado',
@@ -1101,7 +1108,8 @@ const i18nContext = {
         time: 'Alterar horário de início do arquivo',
         plural: 's',
         frequency: "Frequência",
-        length: "Comprimento da região"
+        length: "Comprimento da região",
+        gotoTimeOfDay: 'Ir para a hora', gotoPosition: 'Ir para o código de tempo'
     },
     ru: {
         lastNight: 'Прошлой ночью', thisWeek: 'На этой неделе', lastWeek: 'На прошлой неделе', thisMonth: 'В этом месяце', lastMonth: 'В прошлом месяце', thisYear: 'В этом году', lastYear: 'В прошлом году',
@@ -1118,7 +1126,8 @@ const i18nContext = {
         time: 'Изменить время начала файла',
         plural: '',
         frequency: "Частота",
-        length: "Длина региона"
+        length: "Длина региона",
+        gotoTimeOfDay: 'Перейти ко времени', gotoPosition: 'Перейти к таймкоду'
     },
     sv: {
         lastNight: 'I går kväll', thisWeek: 'Denna vecka', lastWeek: 'Förra veckan', thisMonth: 'Denna månad', lastMonth: 'Förra månaden', thisYear: 'Det här året', lastYear: 'Förra året',
@@ -1135,7 +1144,8 @@ const i18nContext = {
         time: 'Ändra filens starttid',
         plural: 'er',
         frequency: "Frekvens",
-        length: "Regionlängd"
+        length: "Regionlängd",
+        gotoTimeOfDay: 'Gå till tid', gotoPosition: 'Gå till tidkod'
     },
     zh: {
         lastNight: '昨晚', thisWeek: '本周', lastWeek: '上周', thisMonth: '本月', lastMonth: '上月', thisYear: '今年', lastYear: '去年',
@@ -1152,7 +1162,8 @@ const i18nContext = {
         time: '修改文件开始时间',
         plural: '',
         frequency: "频率",
-        length: "区域长度"
+        length: "区域长度",
+        gotoTimeOfDay: '跳转到时间', gotoPosition: '跳转到时间码'
     }
 };
 
@@ -1169,6 +1180,10 @@ const i18nForm = {
     sv: {submit: 'Skicka', cancel: 'Avbryt', select: "Välj nytt datum och tid:"},
     zh: {submit: '提交', cancel: '取消', select: "选择新的日期和时间："}
 };
+
+const i18nGoTo = {
+    en: {goTo: 'Go To', time: 'Time', position: 'Position', species: 'Species', call: 'Call', song: 'Song', notes: 'Notes', label: 'Label', location: 'Location'}
+}
 
 const i18nLIST_MAP = {
     en: { 
@@ -2945,7 +2960,6 @@ async function localiseUI(locale) {
         // Tour Carousel items:
         const tour = document.querySelector('.carousel-inner');
         tour.innerHTML = i18nTour[locale];
-        // console.warn('Translation', `${Date.now() - t0} ms`)
         return localisationData
     } catch (error) {
         console.error('Localisation Error:', error.message);

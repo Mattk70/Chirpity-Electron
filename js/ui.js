@@ -3027,6 +3027,9 @@ function centreSpec(){
     const goto = new bootstrap.Modal(document.getElementById('gotoModal'));
     const showGoToPosition = () => {
         if (STATE.currentFile) {
+            const gotoLabel = document.getElementById('gotoModalLabel')
+            const timeHeading = config.timeOfDay ? getI18n(i18nContext).gotoTimeOfDay : getI18n(i18nContext).gotoPosition;
+            gotoLabel.textContent = timeHeading;
             goto.show();
         }
     }
