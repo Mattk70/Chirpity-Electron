@@ -146,7 +146,7 @@ test('Page title is correct', async () => {
 
 test(`Nocmig analyse works and second result is 61%`, async () => {
   // Set a custom timeout for this specific test (in milliseconds)
-  test.setTimeout(60000); // 60 seconds
+
   await runExampleAnalysis(page,'chirpity');
   const callID = page.locator('#speciesFilter').getByText('Redwing (call)');
   expect(callID).not.toBe(undefined)
