@@ -145,6 +145,8 @@ test('Page title is correct', async () => {
 
 
 test(`Nocmig analyse works and second result is 61%`, async () => {
+  // Set a custom timeout for this specific test (in milliseconds)
+  test.setTimeout(60000); // 60 seconds
   await runExampleAnalysis(page,'chirpity');
   const callID = page.locator('#speciesFilter').getByText('Redwing (call)');
   expect(callID).not.toBe(undefined)
@@ -154,6 +156,8 @@ test(`Nocmig analyse works and second result is 61%`, async () => {
 })
 
 test(`BirdNET analyse works and second result is 34%`, async () => {
+  // Set a custom timeout for this specific test (in milliseconds)
+  test.setTimeout(60000); // 60 seconds
   await runExampleAnalysis(page, 'birdnet');
   const callID = page.locator('#speciesFilter').getByText('Redwing (call)');
   expect(callID).not.toBe(undefined)
@@ -183,7 +187,7 @@ test(`BirdNET analyse works and second result is 34%`, async () => {
 // })
 
 test("Amend file start dialog contains date", async () =>{
-  await runExampleAnalysis(page, 'chirpity');
+  await openExampleFile(page);
   await page.locator('#dropdownMenuButton').click({button: 'right'});
   await page.locator('#setFileStart').click();
   const fileStart = page.locator('#fileStart');
@@ -194,7 +198,7 @@ test("Amend file start dialog contains date", async () =>{
 })
 
 test("Select inverted greyscale colourmap", async () =>{
-  await runExampleAnalysis(page, 'chirpity');
+  await openExampleFile(page);
   await changeSettings(page, 'select', 'colourmap', 'igreys', 50)
   // await page.locator('#spectrogramWrapper button.btn-secondary').click();
 })

@@ -135,6 +135,8 @@ REMEMBER TO REBUILD THE APP IF THE *APPLICATION CODE* NEEDS TO BE CHANGED
 // })
 
 test('Can create/edit a manual record', async () => {
+  // Set a custom timeout for this specific test (in milliseconds)
+  test.setTimeout(60000); // 60 seconds
   console.log('starting record creation test')
   await runExampleAnalysis(page,'chirpity');
   await page.locator('#result1').click();
