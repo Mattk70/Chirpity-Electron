@@ -243,10 +243,7 @@ const createDB = async (file) => {
         await db.runAsync('ROLLBACK'); // Rollback the transaction in case of error
     }  finally {
         dbMutex.unlock();
-        // If the locale is not English, we need to request translations
-        if (!['en', 'en_uk'].includes(STATE.locale)) {
-            UI.postMessage({event: 'label-translation-needed', locale: STATE.locale})
-        }
+        UI.postMessage({event: 'label-translation-needed', locale: STATE.locale})
     }
     return db;
 }
@@ -1059,12 +1056,23 @@ const getDuration = async (src) => {
         audio.src = src.replaceAll('#', '%23').replaceAll('?', '%3F'); // allow hash and ? in the path (https://github.com/Mattk70/Chirpity-Electron/issues/98)
         audio.addEventListener("loadedmetadata", function () {
             if (audio.duration === Infinity || !audio.duration){
-                generateAlert({type: 'error',  message: 'badMetadata', variables: {src}}) 
-                return reject('File has an invalid duration', src)
+                const i18n = {
+                    en: "File duration",
+                    da: "Filens varighed",
+                    de: "Dateidauer",
+                    es: "Duración del archivo",
+                    fr: "Durée du fichier",
+                    ja: "ファイルの長さ",
+                    nl: "Bestandsduur",
+                    pt: "Duração do arquivo",
+                    ru: "Длительность файла",
+                    sv: "Filens varaktighet",
+                    zh: "文件时长"
+                  };
+                return reject(`${i18n[STATE.locale]} (${src}): ${audio.duration}`)
             }
-            const duration = audio.duration === Infinity ? Number.MAX_SAFE_INTEGER : audio.duration;
             audio.remove();
-            resolve(duration);
+            resolve(audio.duration);
         });
         audio.addEventListener('error', (error) => {
             generateAlert({type: 'error',  message: 'badMetadata', variables: {src}})
@@ -1082,7 +1090,22 @@ const getDuration = async (src) => {
 async function getWorkingFile(file) {
     // find the file
     const source_file = fs.existsSync(file) ? file : await locateFile(file);
-    if (!source_file) throw new Error('Source file not found:', file);
+    if (!source_file) {
+        const i18n = {
+            en: "File not found",
+            da: "Fil ikke fundet",
+            de: "Datei nicht gefunden",
+            es: "Archivo no encontrado",
+            fr: "Fichier non trouvé",
+            ja: "ファイルが見つかりません",
+            nl: "Bestand niet gevonden",
+            pt: "Arquivo não encontrado",
+            ru: "Файл не найден",
+            sv: "Fil kunde inte hittas",
+            zh: "文件未找到"
+          };
+        throw new Error(`${i18n[STATE.locale]}: ${file}`);
+    }
     const metadata = await setMetadata({ file: file, source_file: source_file });
     if (!metadata) return false
     METADATA[source_file] = METADATA[file];
@@ -1183,7 +1206,7 @@ async function loadAudioFile({
         .catch( (error) => {
             console.warn(error);
             // notify and return null if no matching file was found
-            generateAlert({type: 'error',  message: 'noFile', variables: {file, error: error.message}});
+            generateAlert({type: 'error',  message: 'noFile', variables: {error}});
             //error.code === 'ENOENT' && notifyMissingFile(file)
         })
 
@@ -1220,11 +1243,7 @@ const setMetadata = async ({ file, source_file = file }) => {
     let guanoTimestamp;    
     // savedMeta may just have a locationID if it was set by onSetCUstomLocation
     if (! savedMeta?.duration) {
-        try {
-            METADATA[file].duration = await getDuration(file)
-        } catch (e) {
-            throw new Error('Unable to determine file duration ', e);
-        }
+        METADATA[file].duration = await getDuration(file)
         if (file.toLowerCase().endsWith('wav')){
             const t0 = Date.now();
             const wavMetadata = await extractWaveMetadata(file)//.catch(error => console.warn("Error extracting GUANO", error));
@@ -2335,8 +2354,8 @@ async function processNextFile({
     if (FILE_QUEUE.length) {
         let file = FILE_QUEUE.shift()
         const found = await getWorkingFile(file).catch(error => {
-            console.warn('Can\'t locate: ', file);
-            generateAlert({type: 'warning',  message: 'noFile', variables: {file, error}})
+            console.warn('Error in getWorkingFile', error)  ;
+            generateAlert({type: 'warning',  message: 'noFile', variables: {error}})
         });
         if (found) {
             if (end) {}
@@ -3428,7 +3447,7 @@ async function _updateSpeciesLocale(db, labels) {
 }
 
 async function onUpdateLocale(locale, labels, refreshResults) {
-    const time = Date.now();
+    if (DEBUG) t0 = Date.now();
     await dbMutex.lock();
     let db;
     try {
@@ -3445,7 +3464,7 @@ async function onUpdateLocale(locale, labels, refreshResults) {
         throw error;
     } finally {
         dbMutex.unlock();
-        console.log(`Locale update took ${(Date.now() - time) / 1000} seconds`);
+        DEBUG && console.log(`Locale update took ${(Date.now() - t0) / 1000} seconds`);
     }
 }
     
