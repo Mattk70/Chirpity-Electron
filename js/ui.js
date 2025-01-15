@@ -75,7 +75,8 @@ let STATE = {
     birdList: { lastSelectedSpecies: undefined }, // Used to put the last selected species at the top of the all-species list
     selection: { start: undefined, end: undefined },
     currentAnalysis: {currentFile: null, openFiles: [],  mode: null, species: null, offset: 0, active: null},
-    IUCNcache:IUCNCache
+    IUCNcache:IUCNCache,
+    translations: ['da', 'de', 'es', 'fr', 'ja', 'nl', 'pt', 'ru', 'sv', 'zh' ]
 }
 
 // Batch size map for slider
@@ -1735,7 +1736,7 @@ window.onload = async () => {
     console.log(systemLocale)
     systemLocale = systemLocale.replace('en-GB', 'en_uk');
     systemLocale = systemLocale === 'en_uk' ? systemLocale : systemLocale.slice(0,2).toLowerCase();
-    if (['da', 'de', 'es', 'fr', 'ja', 'nl', 'pt', 'ru', 'sv', 'zh' ].includes(systemLocale)) {
+    if (STATE.translations.includes(systemLocale)) {
         defaultConfig.locale = systemLocale;
     }
     // establish the message channel
@@ -3820,8 +3821,7 @@ function formatDuration(seconds){
     const populateHelpModal = async (file, label) => {
         document.getElementById('helpModalLabel').textContent = label;
         let locale = config.locale;
-        const translations = ['en', 'da', 'de', 'es', 'fr', 'nl', 'pt', 'ru', 'sv', 'zh'];
-        locale = translations.includes(locale) ? locale : 'en';
+        locale = STATE.translations.includes(locale) ? locale : 'en';
         const response = await localiseModal(file, locale)
         document.getElementById('helpModalBody').innerHTML = response;
         const help = new bootstrap.Modal(document.getElementById('helpModal'));
