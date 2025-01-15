@@ -3827,12 +3827,6 @@ function formatDuration(seconds){
         const help = new bootstrap.Modal(document.getElementById('helpModal'));
         document.removeEventListener('show.bs.modal', replaceCtrlWithCommand);
         document.addEventListener('show.bs.modal', replaceCtrlWithCommand);
-        const close = {
-            da: 'Luk', de: 'Schließen', en: 'Close', es: 'Cerrar',
-            fr: 'Fermer', nl: 'Sluiten', pt: 'Fechar', ru: 'Закрыть',
-            sv: 'Stäng',  zh: '关闭'            
-          }
-        document.getElementById('help-modal-close').innerText = close[locale];
         help.show();
     }
 
@@ -5823,7 +5817,7 @@ function renderComparisons(lists, cname){
     compareDiv.id = "compareModal";
     compareDiv.tabIndex = -1;
     compareDiv.setAttribute('aria-labelledby', "compareModalLabel");
-    compareDiv.setAttribute('aria-hidden', "true");
+    compareDiv.setAttribute('aria-modal', "true");
     compareDiv.setAttribute( "data-bs-backdrop", "static");
     const compareHTML = `
         <div class="modal-dialog modal-lg modal-dialog-bottom w-100">
