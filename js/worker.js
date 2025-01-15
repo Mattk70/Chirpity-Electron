@@ -3480,7 +3480,6 @@ async function updateSpeciesLabelLocale() {
     const scope = filtersApplied(included) ? `WHERE id in (${included.join(',')}) ` : '';
     const res = await diskDB.allAsync(`SELECT sname || '_' || cname AS labels FROM species ${scope} ORDER BY id `)
     const labels = res.map(obj => obj.labels); // these are the labels in the preferred locale
-    STATE.list !== 'everything' && labels.push('Unknown sp._Unknown Sp.')
     UI.postMessage({event: 'labels', labels: labels})
 }
 

@@ -295,11 +295,10 @@ async function createWindow() {
     // and load the index.html of the app.
     mainWindow.loadFile('index.html');
     
-    // Open the DevTools. Comment out for release
-    if (DEBUG) mainWindow.webContents.openDevTools();
-    
+   
     mainWindow.once('ready-to-show', () => {
         mainWindow.show()
+        DEBUG && mainWindow.webContents.openDevTools({ mode: 'detach' });
     })
     DEBUG && console.log("main window created");
     // Emitted when the window is closed.
@@ -332,7 +331,7 @@ async function createWorker() {
     // Get window state
     const mainWindowStateKeeper = await windowStateKeeper('worker');
     workerWindow = new BrowserWindow({
-        show: DEBUG,
+        show: false,
         x: mainWindowStateKeeper.x,
         y: mainWindowStateKeeper.y,
         width: mainWindowStateKeeper.width,
@@ -352,7 +351,10 @@ async function createWorker() {
     workerWindow.on('closed', () => {
         workerWindow = undefined;
     });
-    if (DEBUG) workerWindow.webContents.openDevTools();
+    workerWindow.once('ready-to-show', () => {
+        workerWindow.show()
+        DEBUG && workerWindow.webContents.openDevTools();
+    })
     DEBUG && console.log("worker created");
 }
 
