@@ -565,6 +565,7 @@ async function handleMessage(e) {
             LIST_CACHE = {}; //[`${lat}-${lon}-${week}-${STATE.model}-${STATE.list}`];
             delete STATE.included?.[STATE.model]?.[STATE.list];
             LIST_WORKER && await setIncludedIDs(lat, lon, week )
+            updateSpeciesLabelLocale();
             args.refreshResults && await Promise.all([getResults(), getSummary()]);
             break;
         }
@@ -636,7 +637,10 @@ async function onChangeMode(mode) {
     });
 }
 
-const filtersApplied = (list) => list?.length && list.length < LABELS.length -1;
+const filtersApplied = (list) => {
+    const filtered = list?.length && list.length < LABELS.length -1;
+    return filtered;
+}
 
 /**
 * onLaunch called when Application is first opened or when model changed
@@ -1392,7 +1396,7 @@ async function processAudio (file, start, end, chunkStart, highWaterMark, sample
         const additionalFilters = STATE.filters.sendToModel ? setAudioFilters() : [];
         const command = setupFfmpegCommand({file, start, end, sampleRate, additionalFilters})
         command.on('error', (error) => {
-            if (error.message === 'Output stream closed'){
+            if (error.message === 'Output stream closed' & !aborted) {
                 console.warn(`processAudio: ${file} ${error}`);
             } else {
                 if (error.message.includes('SIGKILL')) console.log('FFMPEG process shut down at user request')
@@ -3465,9 +3469,21 @@ async function onUpdateLocale(locale, labels, refreshResults) {
     } finally {
         dbMutex.unlock();
         DEBUG && console.log(`Locale update took ${(Date.now() - t0) / 1000} seconds`);
+        updateSpeciesLabelLocale()
     }
 }
-    
+
+async function updateSpeciesLabelLocale() {
+    // Get labels in the new locale
+    DEBUG && console.log("Getting labels from disk db");
+    const included = await getIncludedIDs();
+    const scope = filtersApplied(included) ? `WHERE id in (${included.join(',')}) ` : '';
+    const res = await diskDB.allAsync(`SELECT sname || '_' || cname AS labels FROM species ${scope} ORDER BY id `)
+    const labels = res.map(obj => obj.labels); // these are the labels in the preferred locale
+    STATE.list !== 'everything' && labels.push('Unknown sp._Unknown Sp.')
+    UI.postMessage({event: 'labels', labels: labels})
+}
+
 async function onSetCustomLocation({ lat, lon, place, files, db = STATE.db }) {
     if (!place) {
         const { id } = await db.getAsync(`SELECT id FROM locations WHERE lat = ? AND lon = ?`, lat, lon);
@@ -3529,7 +3545,8 @@ async function getIncludedIDs(file){
             // Cache miss
             await setIncludedIDs(lat,lon,week)
         } 
-        return STATE.included[STATE.model][STATE.list][week][location];
+        const included = STATE.included[STATE.model][STATE.list][week][location];
+        return included;
         
     } else {
         if (STATE.included?.[STATE.model]?.[STATE.list] === undefined) {

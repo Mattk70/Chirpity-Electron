@@ -262,31 +262,27 @@
     </div>
     <!-- Goto Modal -->
     <div class="modal fade" id="gotoModal" tabindex="-1" aria-labelledby="gotoModalLabel" aria-modal="true">
-        <div class="modal-dialog modal-dialog-centered modal-sm">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="gotoModalLabel">Go to Position</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="gotoForm">
+        <form id="gotoForm">
+            <div class="modal-dialog modal-dialog-centered modal-sm">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="gotoModalLabel">Go to Position</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                        
+                    <div class="modal-body">
                         <div class="mb-3">
-                            <label for="timeInput" class="form-label">
-                                <input type="text" class="form-control" id="timeInput" name="timeInput"
-                                placeholder="Enter timecode">
-                                <small id="gotoHelp" class="form-text text-muted">Accepts seconds, mm:ss and
-                                    hh:mm:ss.</small>
-                                </label>
-                            </div>
-                        </form>
+                            <input type="time" step="1" class="form-control" id="timeInput" name="timeInput">
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-primary" id="go">Go</button>
+                        <button type="submit" class="btn btn-primary" id="go">Go</button>
                     </div>
                 </div>
             </div>
-        </div>
+        </form>
+    </div>
         <!-- Location Modal -->
         <div class="modal fade" id="locationModal" tabindex="-1" aria-labelledby="locationModalLabel"
         aria-modal="true">

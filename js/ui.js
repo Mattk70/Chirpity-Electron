@@ -448,7 +448,7 @@ const initWavesurfer = ({
     // Add event listener for the gesture events
     const wave = DOM.waveElement;
     wave.removeEventListener('wheel', handleGesture);
-    wave.addEventListener('wheel', handleGesture, false);
+    wave.addEventListener('wheel', handleGesture,  {passive: true});
 
     wave.removeEventListener('mousedown', resetRegions);
     wave.removeEventListener('mousemove', specTooltip);
@@ -2140,20 +2140,16 @@ function generateBirdOptionList({ store, rows, selected }) {
         const lastSelectedSpecies = selected || STATE.birdList.lastSelectedSpecies;
         listHTML += '<div class="form-floating"><select spellcheck="false" id="bird-list-all" class="input form-select mb-3" aria-label=".form-select" required>';
         listHTML += '<option value="">All</option>';
-        for (const item in sortedList) {
-            //const [sname, cname] = labels[item].split('_');
-            if (sortedList[item] !== lastSelectedSpecies) {
-                listHTML += `<option value="${sortedList[item]}">${sortedList[item]}</option>`;
-            } else {
-                listHTML += `<option value="${sortedList[item]}" selected>${sortedList[item]}</option>`;
-            }
-        }
+        for (const species of sortedList) {
+            const isSelected = species === lastSelectedSpecies ? 'selected' : '';
+            listHTML += `<option value="${species}" ${isSelected}>${species}</option>`;
+        }       
         listHTML += `</select><label for="bird-list-all">${i18n.species[0]}</label></div>`;
     } else {
         listHTML += '<select id="bird-list-seen" class="form-select"><option value="">All</option>';
-        for (const item in rows) {
-            const isSelected = rows[item].cname === STATE.chart.species ? 'selected' : '';
-            listHTML += `<option value="${rows[item].cname}" ${isSelected}>${rows[item].cname}</option>`;
+        for (const {cname} of rows) {
+            const isSelected = cname === STATE.chart.species ? 'selected' : '';
+            listHTML += `<option value="${cname}" ${isSelected}>${cname}</option>`;
         }
         listHTML += `</select><label for="bird-list-seen">${i18n.species[0]}</label>`;
     }
@@ -3048,35 +3044,46 @@ function centreSpec(){
     const gotoTime = (e) => {
         if (STATE.currentFile) {
             e.preventDefault();
-            let hours = 0, minutes = 0, seconds = 0;
             const time = document.getElementById('timeInput').value;
-            let timeArray = time.split(':');
-            if (timeArray.length === 1 && !isNaN(parseFloat(timeArray[0]))) {
-                seconds = parseFloat(timeArray[0]);
-            } else if (timeArray.length === 2 && !isNaN(parseInt(timeArray[0])) && !isNaN(parseInt(timeArray[1]))) {
-                // Case 2: Input is two numbers separated by a colon, take as minutes and seconds
-                minutes = Math.min(parseInt(timeArray[0]), 59);
-                seconds = Math.min(parseFloat(timeArray[1]), 59.999);
-            } else if (timeArray.length === 3 && !isNaN(parseInt(timeArray[0])) && !isNaN(parseInt(timeArray[1])) && !isNaN(parseInt(timeArray[2]))) {
-                // Case 3: Input is three numbers separated by colons, take as hours, minutes, and seconds
-                hours = Math.min(parseInt(timeArray[0]), 23);
-                minutes = Math.min(parseInt(timeArray[1]), 59);
-                seconds = Math.min(parseFloat(timeArray[2]), 59.999);
-            } else {
-                // Invalid input
-                generateToast({type: 'warning',  message:'badTime'});
+            // Nothing entered?
+            if (!time){
+                // generateToast({type: 'warning',  message:'badTime'});
                 return;
             }
-            let start = hours * 3600 + minutes * 60 + seconds;
+            let [hours, minutes, seconds] = time.split(':').map(Number);
+            hours ??= 0; minutes??= 0; seconds??= 0;
+            let  initialTime, start;
+            if(config.timeOfDay){
+                initialTime =  new Date(STATE.fileStart)
+                // Create a Date object for the input time on the same day as the file start
+                const inputDate = new Date(
+                    initialTime.getFullYear(),
+                    initialTime.getMonth(),
+                    initialTime.getDate(),
+                    hours,
+                    minutes,
+                    seconds
+                );
+                // Calculate the offset in milliseconds
+                const offsetMillis = inputDate - STATE.fileStart;
+                start = offsetMillis / 1000;
+                //if we move to a new day... add 24 hours
+                start += start < 0 ? 86400 : 0;
+            } else {
+                start = hours * 3600 + minutes * 60 + seconds;
+            }
             windowLength = 20;
+
+            start = Math.min(start, currentFileDuration);
             bufferBegin = Math.max(start - windowLength / 2, 0);
-            const position = bufferBegin === 0 ? start / windowLength : 0.5;
+            const position = start === 0 ? 0 : 0.5;
             postBufferUpdate({ begin: bufferBegin, position: position })
             // Close the modal
             goto.hide()
         }
     }
-    
+
+
     const gotoForm = document.getElementById('gotoForm')
     gotoForm.addEventListener('submit', gotoTime)
     
@@ -3482,7 +3489,7 @@ function formatDuration(seconds){
         let tr = '';
         if (index <= 1) {
             adjustSpecDims(true)
-            resetResults({clearResults: true, clearSummary: false, clearPagination: false});
+            selection || resetResults({clearResults: true, clearSummary: false, clearPagination: false});
             if (selection) {
                 const selectionTable = document.getElementById('selectionResultTableBody');
                 selectionTable.textContent = '';

@@ -28,7 +28,7 @@ async function openExampleFile(page: Page){
   
   async function runExampleAnalysis(page: Page, model: string){
     await openExampleFile(page)
-    await changeSettings(page,'select', 'model-to-use', model, 1000)
+    await changeSettings(page,'select', 'model-to-use', model, 2000)
   
     await  page.locator('#navbarAnalysis').click()
     await page.locator('#analyse').click()
