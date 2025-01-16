@@ -352,8 +352,10 @@ async function createWorker() {
         workerWindow = undefined;
     });
     workerWindow.once('ready-to-show', () => {
-        workerWindow.show()
-        DEBUG && workerWindow.webContents.openDevTools();
+        if (DEBUG) {
+            workerWindow.show();
+            workerWindow.webContents.openDevTools();
+        }
     })
     DEBUG && console.log("worker created");
 }
