@@ -91,7 +91,7 @@ const os = window.module.os;
 
 // Is this CI / playwright?
 const isTestEnv = window.env.TEST_ENV === 'true';
-
+isTestEnv && console.log('Running in test environment');
 function hexToRgb(hex) {
     // Remove the '#' character if present
     hex = hex.replace(/^#/, '');
@@ -4622,6 +4622,7 @@ function playRegion(){
     document.addEventListener('click', function (e) {
         const element = e.target;
         const target = element.closest('[id]')?.id;
+        if (isTestEnv) config.locale = 'en'; // CI seems to get here before the locale is set
         const locale = config.locale.replace(/_.*$/, '');
         switch (target)
         {
