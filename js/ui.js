@@ -534,8 +534,9 @@ function powerSave(on) {
 }
 
 const openFileInList = async (e) => {
-    if (!PREDICTING && e.target?.tagName === 'A') {
-        loadAudioFile({ filePath: e.target.id, preserveResults: true })
+    const target = e.target;
+    if (!PREDICTING && (target.type === 'submit' || target.tagName === 'A')) {
+        loadAudioFile({ filePath: target.id || STATE.currentFile, preserveResults: true })
     }
 }
 
@@ -625,6 +626,8 @@ function showDatePicker() {
 }
 
 const filename = DOM.filename;
+// This click handler is needed because the file links have their own id, so the global listener doesn't fire.
+filename.addEventListener('click', openFileInList);
 filename.addEventListener('contextmenu', buildFileMenu);
 
 function extractFileNameAndFolder(path) {
@@ -4706,8 +4709,6 @@ function playRegion(){
             }
             // XC compare play/pause
             case 'playComparison': { ws.playPause(); break }
-            // Open files list
-            case 'filename': { openFileInList(); break }
 
             // --- Backends
             case 'tensorflow':
