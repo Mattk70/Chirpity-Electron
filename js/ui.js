@@ -3495,12 +3495,12 @@ function formatDuration(seconds){
         let tr = '';
         if (index <= 1) {
             adjustSpecDims(true)
-            selection || resetResults({clearResults: true, clearSummary: false, clearPagination: false});
             if (selection) {
                 const selectionTable = document.getElementById('selectionResultTableBody');
                 selectionTable.textContent = '';
             }
             else {
+                resetResults({clearResults: true, clearSummary: false, clearPagination: false});
                 const i18n = getI18n(i18nHeadings);
                 DOM.resultHeader.innerHTML =`
                 <tr>
@@ -3512,8 +3512,8 @@ function formatDuration(seconds){
                     <th class="col text-end">${i18n.notes}</th>
                 </tr>`;
                 setTimelinePreferences();
-                showElement(['resultTableContainer', 'resultsHead'], false);
             }
+            showElement(['resultTableContainer', 'resultsHead'], false);
         }  else if (!isFromDB && index % (config.limit + 1) === 0) {
             addPagination(index, 0)
         }

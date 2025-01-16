@@ -770,7 +770,8 @@ function getFileSQLAndParams(range){
     if (range?.start) { // Prioritise range queries
         SQL += ' AND dateTime BETWEEN ? AND ? ';
         params.push(range.start, range.end);
-    } else if (['analyse'].includes(STATE.mode)) {
+        // If you create a record manually before analysis, STATE.filesToAnalyse will be empty 
+    } else if (['analyse'].includes(STATE.mode) && fileParams) {
         SQL += ` AND name IN  (${fileParams}) `;
         params.push(...STATE.filesToAnalyse);
     } else if (['archive'].includes(STATE.mode)) {
