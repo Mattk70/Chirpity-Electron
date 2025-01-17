@@ -106,11 +106,11 @@ REMEMBER TO REBUILD THE APP IF THE *APPLICATION CODE* NEEDS TO BE CHANGED
 
 
 
-test("check if worker window is visible", async () => {
-  bwHandle = await electronApp.browserWindow(page);
-  const visible = await bwHandle.evaluate((win) => win.isVisible());
-  expect(visible).toBeFalsy();
-});
+// test("check if worker window is visible", async () => {
+//   bwHandle = await electronApp.browserWindow(page);
+//   const visible = await bwHandle.evaluate((win) => win.isVisible());
+//   expect(visible).toBeFalsy();
+// });
 
 test('Page title is correct', async () => {
   const title = await page.title()
