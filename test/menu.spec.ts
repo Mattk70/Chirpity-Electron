@@ -61,27 +61,24 @@ test.beforeAll(async () => {
    ])
    _worker = await electronApp.firstWindow()
 
-  electronApp.on('window', async (window) => {
-    const filename = window.url()?.split('/').pop()
-    console.log(`Window opened: ${filename}`)
-    page = window;
-    page.on('pageerror', (error) => {
-      console.error(error)
-    })
-    // capture console messages
-    page.on('console', (msg) => {
-      console.log(msg.text())
+   await new Promise<void>((resolve) => {
+    electronApp.on('window', async (window) => {
+      const filename = window.url()?.split('/').pop()
+      console.log(`Window opened: ${filename}`)
+      page = window;
+      page.on('pageerror', (error) => {
+        console.error(error)
+      })
+      // capture console messages
+      page.on('console', (msg) => {
+        console.log(msg.text())
+      })
+      // Wait for the page to load
+      await page.waitForLoadState('load')
+      resolve();
     })
   })
 
-  await new Promise((resolve) => { 
-    const checkPage = setInterval(async () => { 
-      if (page) { 
-        clearInterval(checkPage);
-        resolve('');
-      } 
-    }, 2000); 
-  });
 })
 
 test.afterAll(async () => {

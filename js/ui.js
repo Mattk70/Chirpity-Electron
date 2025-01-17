@@ -4622,7 +4622,6 @@ function playRegion(){
     document.addEventListener('click', function (e) {
         const element = e.target;
         const target = element.closest('[id]')?.id;
-        if (isTestEnv) config.locale = 'en'; // CI seems to get here before the locale is set
         const locale = config.locale.replace(/_.*$/, '');
         switch (target)
         {
