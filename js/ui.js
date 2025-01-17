@@ -897,7 +897,6 @@ const setDefaultLocation = () => {
     button.innerHTML = 'Set <span class="material-symbols-outlined">done</span>';
 }
 
-
 async function setCustomLocation() {
     const savedLocationSelect = await generateLocationList('savedLocations');
     const latEl = document.getElementById('customLat');
@@ -1473,7 +1472,7 @@ function adjustSpecDims(redraw, fftSamples, newHeight) {
         specOffset = 0
     }
     DOM.resultTableElement.style.height = (contentHeight - specOffset - formOffset) + 'px';
-    STATE.timelineWidth = DOM.specCanvasElement.clientWidth;
+    STATE.timelineWidth = DOM.specElement.clientWidth;
 }
 
 ///////////////// Font functions ////////////////
@@ -4395,6 +4394,34 @@ function showSummarySortIcon(){
                 });
             })
         }
+        const divider = document.getElementById('divider');
+        const summary = document.getElementById('summary');
+        const resultsDiv = document.getElementById('resultsDiv');
+    
+        let isResizing = false;
+    
+        divider.addEventListener('mousedown', function (e) {
+            isResizing = true;
+            document.body.style.cursor = 'col-resize';
+        });
+    
+        document.addEventListener('mousemove', function (e) {
+            if (!isResizing) return;
+    
+            const containerRect = document.getElementById('resultTableContainer').getBoundingClientRect();
+            const newSummaryWidth = e.clientX - containerRect.left;
+            const newResultsWidth = containerRect.right - e.clientX;
+    
+            if (newSummaryWidth > 50 && newResultsWidth > 50) { // Minimum width for both divs
+                summary.style.width = newSummaryWidth + 'px';
+                resultsDiv.style.width = newResultsWidth + 'px';
+            }
+        });
+    
+        document.addEventListener('mouseup', function () {
+            isResizing = false;
+            document.body.style.cursor = 'default';
+        });
     });
     
     

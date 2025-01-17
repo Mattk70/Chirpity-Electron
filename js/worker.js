@@ -492,6 +492,7 @@ async function handleMessage(e) {
         }
         case "file-load-request": {
             index = 0;
+            STATE.cacheSummaryParams = false;
             filesBeingProcessed.length && onAbort(args);
             DEBUG && console.log("Worker received audio " + args.file);
             await loadAudioFile(args);
@@ -798,7 +799,21 @@ function getFileSQLAndParams(range){
     }
     return [SQL, params]
 }
+function getExcluded(included, fullRange = LABELS.length) {
+    const missing = [];
+    let currentIndex = 0;
 
+    for (let i = 0; i < fullRange; i++) {
+        // If the current value in the sorted list matches `i`, move to the next list item
+        if (currentIndex < included.length && included[currentIndex] === i) {
+            currentIndex++;
+        } else {
+            // Otherwise, `i` is missing
+            missing.push(i);
+        }
+    }
+    return missing;
+}
 const prepSummaryStatement = (included) => {
     const range = STATE.mode === 'explore' ? STATE.explore.range : undefined;
     const params = [STATE.detect.confidence];
@@ -813,10 +828,15 @@ const prepSummaryStatement = (included) => {
 
     const [SQLtext, fileParams] = getFileSQLAndParams(range);
     summaryStatement += SQLtext, params.push(...fileParams);
-
+    let not= '';
     if (filtersApplied(included)) {
+        if (STATE.list === 'birds'){
+            included = getExcluded(included);
+            not = 'NOT';
+        }
+        console.log('included', included.length, '# labels', LABELS.length)
         const includedParams = prepParams(included);
-        summaryStatement += ` AND speciesID IN (${includedParams}) `;
+        summaryStatement += ` AND speciesID ${not} IN (${includedParams}) `;
         params.push(...included);
     }
     if (STATE.detect.nocmig){
@@ -1002,6 +1022,7 @@ async function onAnalyse({
     DEBUG && console.log(`Worker received message: ${filesInScope}, ${STATE.detect.confidence}, start: ${start}, end: ${end}`);
     //Reset GLOBAL variables
     index = 0;
+    STATE.cacheSummaryParams = false;
     AUDACITY = {};
     batchChunksToSend = {};
     FILE_QUEUE = filesInScope;
@@ -1085,6 +1106,7 @@ function onAbort({
     predictionsReceived = {};
     predictionsRequested = {};
     index = 0;
+    STATE.cacheSummaryParams = false;
     DEBUG && console.log("abort received")
     Object.keys(STATE.backlogInterval).forEach(pid => {
         clearInterval(STATE.backlogInterval[pid]);
@@ -2346,6 +2368,7 @@ const parsePredictions = async (response) => {
 
     if (!STATE.selection && STATE.increment() === 0) {
         getSummary({ interim: true });
+        STATE.cacheSummaryParams = true;
         getTotal({file})
     }
 
@@ -2405,6 +2428,7 @@ function updateFilesBeingProcessed(file) {
         if (!STATE.selection) getSummary();
         // Need this here in case last file is not sent for analysis (e.g. nocmig mode)
         UI.postMessage({event: 'analysis-complete'})
+        STATE.cacheSummaryParams = false;
 
     }
 }
@@ -2539,36 +2563,19 @@ const getSummary = async ({
     interim = false,
     action = undefined,
 } = {}) => {
-    const included = STATE.selection ? [] : await getIncludedIDs();
-    const [sql, params] = prepSummaryStatement(included);
-    const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
-
-    const currentParams = { sql, params };
-
-    // Check if the parameters match the cached parameters
-    if (cachedSummaryParams && areParamsEqual(cachedSummaryParams, currentParams)) {
-        // Use the cached prepared statement
-
-        const summary = await cachedSummaryStatement.allAsync(...params);
-        const event = interim ? 'update-summary' : 'summary-complete';
-        UI.postMessage({
-            event: event,
-            summary: summary,
-            offset: offset,
-            audacityLabels: AUDACITY,
-            filterSpecies: species,
-            active: active,
-            action: action
-        });
-        return;
+    if (! STATE.cacheSummaryParams) {
+        cachedSummaryStatement && cachedSummaryStatement.finalize();
+        cachedSummaryStatement = null;
+        const included = STATE.selection ? [] : await getIncludedIDs();
+        const [sql, params] = prepSummaryStatement(included);
+        // Prepare the statement and cache it
+        cachedSummaryStatement = STATE.db.prepare(sql);
+        cachedSummaryParams = params;
     }
-
-    // Prepare the statement and cache it
-    cachedSummaryParams = currentParams;
-    cachedSummaryStatement = STATE.db.prepare(sql);
-    const summary = await cachedSummaryStatement.allAsync(...params);
-
+    const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
+    const summary = await cachedSummaryStatement.allAsync(...cachedSummaryParams);
     const event = interim ? 'update-summary' : 'summary-complete';
+    interim || STATE.cacheSummaryParams && (STATE.cacheSummaryParams = false);
     UI.postMessage({
         event: event,
         summary: summary,
