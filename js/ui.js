@@ -57,6 +57,7 @@ window.addEventListener('rejectionhandled', function(event) {
 
 let STATE = {
     metadata: {},
+    lastGestureTime: 0,
     mode: 'analyse',
     analysisDone: false,
     openFiles: [],
@@ -2151,13 +2152,13 @@ function getSpecies(target) {
     const species = speciesCell.textContent.split('\n')[0];
     return species;
 }
-let lastEventTime = 0;
+
 function handleGesture(e) {
     const currentTime = Date.now();
-    if (currentTime - lastEventTime < 1000) {
-        return; // Ignore successive events within 1 second
+    if (currentTime - STATE.lastGestureTime < 1200) {
+        return; // Ignore successive events within 1.2 second
     }
-    lastEventTime = currentTime;
+    STATE.lastGestureTime = currentTime;
         const moveDirection = e.deltaX || e.deltaY; // If deltaX is 0, use deltaY
         const key = moveDirection > 0 ? 'PageDown'  : 'PageUp';
         config.debug && console.log(`scrolling x: ${e.deltaX} y: ${e.deltaY}`)
