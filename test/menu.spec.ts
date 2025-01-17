@@ -1,4 +1,4 @@
-import { _electron as electron } from 'playwright';
+import { _electron as electron, JSHandle } from 'playwright';
 import { test, expect } from '@playwright/test';
 import { 
   findLatestBuild, 
@@ -18,6 +18,7 @@ import {changeSettings, openExampleFile, runExampleAnalysis} from './helpers'
 let electronApp: ElectronApplication;
 let page: Page;
 let _worker: Page;
+let bwHandle: JSHandle<Electron.BrowserWindow>;
 let example_file: any;
 // find the latest build in the out directory
 const latestBuild = findLatestBuild('./dist')
@@ -103,6 +104,13 @@ REMEMBER TO REBUILD THE APP IF THE *APPLICATION CODE* NEEDS TO BE CHANGED
 //   await page.locator('#close-tour').click();
 // })
 
+
+
+test("check if worker window is visible", async () => {
+  bwHandle = await electronApp.browserWindow(page);
+  const visible = await bwHandle.evaluate((win) => win.isVisible());
+  expect(visible).toBeFalsy();
+});
 
 test('Page title is correct', async () => {
   const title = await page.title()
