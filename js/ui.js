@@ -1472,6 +1472,7 @@ function adjustSpecDims(redraw, fftSamples, newHeight) {
         specOffset = 0
     }
     DOM.resultTableElement.style.height = (contentHeight - specOffset - formOffset) + 'px';
+    STATE.timelineWidth = DOM.specCanvasElement.clientWidth;
 }
 
 ///////////////// Font functions ////////////////
@@ -1522,137 +1523,94 @@ function formatRegionTooltip(regionLength, start, end) {
 
 function formatTimeCallback(secs) {
     secs = secs.toFixed(2);
-    const now = new Date(bufferStartTime.getTime() + (secs * 1000))
-    const milliSeconds = now.getMilliseconds();
+    // Add 500 to deal with overflow errors
+    let now = new Date(bufferStartTime.getTime() + (secs * 1000));
+    let milliseconds = now.getMilliseconds();
+    if (milliseconds >949) { 
+        // Deal with overflow errors
+        now = new Date(now.getTime() + 50);
+        milliseconds = 0;
+    }
+    // Extract the components
+    let hours = now.getHours();
+    let minutes = now.getMinutes();
     let seconds = now.getSeconds();
-    const minutes = now.getMinutes();
-    const hours = now.getHours();
-    
-    // fill up seconds with zeroes
-    let secondsStr;
-    if (windowLength >= 5) {
-        secondsStr = (seconds + milliSeconds / 1000).toFixed(2);
-        secondsStr = secondsStr.replace(/\.?0+$/, ''); // remove trailing zeroes
+ 
+    let formattedTime;
+    if (config.timeOfDay) {
+        // Format the time as hh:mm:ss
+        formattedTime = [
+            hours.toString().padStart(2, '0'),
+            minutes.toString().padStart(2, '0'),
+            seconds.toString().padStart(2, '0'),
+        ].join(':');
     } else {
-        let fraction = Math.round(milliSeconds / 100);
-        if (fraction === 10) {
-            seconds += 1;
-            fraction = 0;
+        if (hours === 0 && minutes === 0) {
+            // Format as ss
+            formattedTime = seconds.toString();
+        } else if (hours === 0) {
+            // Format as mm:ss
+            formattedTime = [
+                minutes.toString(),
+                seconds.toString().padStart(2, '0'),
+            ].join(':');
+        } else {
+            // Format as hh:mm:ss
+            formattedTime = [
+                hours.toString(),
+                minutes.toString().padStart(2, '0'),
+                seconds.toString().padStart(2, '0'),
+            ].join(':');
         }
-        secondsStr = seconds.toString() + '.' + fraction.toString();
     }
-    if (hours > 0 || minutes > 0 || config.timeOfDay) {
-        if (seconds < 10) {
-            secondsStr = '0' + secondsStr;
-        }
-    } else if (!config.timeOfDay) {
-        return secondsStr;
+    if (windowLength <= 5) {
+        formattedTime += '.' + milliseconds.toString()
+    } else  {
+        milliseconds = (milliseconds / 1000).toFixed(1);
+        formattedTime += milliseconds.slice(1);
     }
-    let minutesStr = minutes.toString();
-    if (config.timeOfDay || hours > 0) {
-        if (minutes < 10) {
-            minutesStr = '0' + minutesStr;
-        }
-    } else if (!config.timeOfDay) {
-        return `${minutes}:${secondsStr}`
-    }
-    if (hours < 10 && config.timeOfDay) {
-        let hoursStr = '0' + hours.toString();
-        return `${hoursStr}:${minutesStr}:${secondsStr}`
-    }
-    return `${hours}:${minutesStr}:${secondsStr}`
-}
 
+    return formattedTime;
+}
 /**
-* Use timeInterval to set the period between notches, in seconds,
-* adding notches as the number of pixels per second increases.
-*
-* Note that if you override the default function, you'll almost
-* certainly want to override formatTimeCallback, primaryLabelInterval
-* and/or secondaryLabelInterval so they all work together.
-*
-* @param: pxPerSec
-*/
+ * Dynamically calculate the time interval between labels
+ * to ensure there are always 5 labels on the timeline.
+ *
+ * @param {number} pxPerSec - Pixels per second
+ * @returns {number} - Time interval in seconds
+ */
 function timeInterval(pxPerSec) {
-    let retval;
-    const mulFactor = window.devicePixelRatio || 1;
-    const threshold = pxPerSec / mulFactor;
-    if (threshold >= 2500) {
-        retval = 0.01;
-    } else if (threshold >= 1000) {
-        retval = 0.025;
-    } else if (threshold >= 250) {
-        retval = 0.1;
-    } else if (threshold >= 100) {
-        retval = 0.25;
-    } else if (threshold >= 25) {
-        retval = 5;
-    } else if (threshold >= 5) {
-        retval = 10;
-    } else if (threshold >= 2) {
-        retval = 15;
-    } else {
-        retval = Math.ceil(0.5 / threshold) * 60;
-    }
-    return retval;
+    const width = DOM.specElement.clientWidth;
+    const visibleDuration = width / pxPerSec; // Total visible duration in seconds
+    return visibleDuration / 3; // Divide the duration into 5 equal intervals
 }
 
 /**
-* Return the cadence of notches that get labels in the primary color.
-* EG, return 2 if every 2nd notch should be labeled,
-* return 10 if every 10th notch should be labeled, etc.
-*
-* Note that if you override the default function, you'll almost
-* certainly want to override formatTimeCallback, primaryLabelInterval
-* and/or secondaryLabelInterval so they all work together.
-*
-* @param pxPerSec
-*/
+ * Dynamically calculate the interval for primary labels
+ * to ensure they align with the calculated timeInterval.
+ *
+ * @param {number} pxPerSec - Pixels per second
+ * @returns {number} - Number of intervals between primary labels
+ */
 function primaryLabelInterval(pxPerSec) {
-    let retval;
-    const mulFactor = window.devicePixelRatio || 1;
-    const threshold = pxPerSec / mulFactor;
-    if (threshold >= 2500) {
-        retval = 10;
-    } else if (threshold >= 1000) {
-        retval = 4;
-    } else if (threshold >= 250) {
-        retval = 10;
-    } else if (threshold >= 100) {
-        retval = 4;
-    } else if (threshold >= 20) {
-        retval = 1;
-    } else if (threshold >= 5) {
-        retval = 5;
-    } else if (threshold >= 2) {
-        retval = 15;
-    } else {
-        retval = Math.ceil(0.5 / threshold) * 60;
-    }
-    return retval;
+    // In this case, always label every interval
+    return 1;
 }
 
 /**
-* Return the cadence of notches to get labels in the secondary color.
-* EG, return 2 if every 2nd notch should be labeled,
-* return 10 if every 10th notch should be labeled, etc.
-*
-* Secondary labels are drawn after primary labels, so if
-* you want to have labels every 10 seconds and another color labels
-* every 60 seconds, the 60 second labels should be the secondary.
-*
-* Note that if you override the default function, you'll almost
-* certainly want to override formatTimeCallback, primaryLabelInterval
-* and/or secondaryLabelInterval so they all work together.
-*
-* @param pxPerSec
-*/
+ * Secondary labels can be adjusted similarly if needed,
+ * or you can omit them entirely.
+ *
+ * @param {number} pxPerSec - Pixels per second
+ * @returns {number} - Secondary label interval
+ */
 function secondaryLabelInterval(pxPerSec) {
-    const mulFactor = window.devicePixelRatio || 1;
-    const threshold = pxPerSec / mulFactor;
-    // draw one every 1s as an example
-    return Math.floor(1 / timeInterval(threshold));
+    return
+    // const width = DOM.specElement.clientWidth;
+    // const interval = timeInterval(pxPerSec, width);
+    // return .10 //Math.floor(interval/10); // Example: draw one secondary label every half of the primary interval
 }
+
 
 ////////// Store preferences //////////
 
@@ -2193,15 +2151,20 @@ function getSpecies(target) {
     const species = speciesCell.textContent.split('\n')[0];
     return species;
 }
-
+let lastEventTime = 0;
 function handleGesture(e) {
+    const currentTime = Date.now();
+    if (currentTime - lastEventTime < 1000) {
+        return; // Ignore successive events within 1 second
+    }
+    lastEventTime = currentTime;
         const moveDirection = e.deltaX || e.deltaY; // If deltaX is 0, use deltaY
         const key = moveDirection > 0 ? 'PageDown'  : 'PageUp';
         config.debug && console.log(`scrolling x: ${e.deltaX} y: ${e.deltaY}`)
-        waitForFinalEvent(() => {
+        // waitForFinalEvent(() => {
             GLOBAL_ACTIONS[key](e);
             trackEvent(config.UUID, 'Swipe', key, '' );
-        }, 200, 'swipe');
+        // }, 200, 'swipe');
 }
 
 
