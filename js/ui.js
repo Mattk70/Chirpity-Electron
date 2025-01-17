@@ -1,7 +1,7 @@
 import {trackVisit, trackEvent} from './tracking.js';
 import {DOM} from './DOMcache.js';
 import {IUCNCache} from './IUCNcache.js';
-import {i18nSpeciesList,i18nHeadings, localiseUI, i18nContext, i18nLocation, i18nForm, i18nHelp, i18nToasts, i18nTitles, i18nLIST_MAP, i18nLists, IUCNLabel} from './i18n.js';
+import {i18nAll, i18nSpeciesList,i18nHeadings, localiseUI, i18nContext, i18nLocation, i18nForm, i18nHelp, i18nToasts, i18nTitles, i18nLIST_MAP, i18nLists, IUCNLabel} from './i18n.js';
 let LOCATIONS, locationID = undefined, loadingTimeout, LIST_MAP;
 
 let LABELS = [], DELETE_HISTORY = [];
@@ -767,19 +767,7 @@ function customiseAnalysisMenu(saved) {
 
 
 async function generateLocationList(id) {
-    const d = {
-        "en": ["(Default)", "All"],
-        "da": ["(Standard)", "Alle"],
-        "de": ["(Standard)", "Alle"],
-        "es": ["(Predeterminado)", "Todos"],
-        "fr": ["(Par défaut)", "Tout"],
-        "nl": ["(Standaard)", "Alles"],
-        "pt": ["(Padrão)", "Todos"],
-        "ru": ["(По умолчанию)", "Все"],
-        "sv": ["(Standard)", "Alla"],
-        "zh": ["(默认)", "所有"]
-      }
-    const i18n = d[locale] || d['en'];
+    const i18n = i18nAll[config.locale] || i18nAll['en'];
     const defaultText = id === 'savedLocations' ? i18n[0] : i18n[1];
     const el = document.getElementById(id);
     LOCATIONS = undefined;
@@ -2091,6 +2079,7 @@ function generateBirdList(store, rows) {
 function generateBirdOptionList({ store, rows, selected }) {
     let listHTML = '';
     const i18n = getI18n(i18nHeadings);
+    const i18nTout = getI18n(i18nAll);
     if (store === 'allSpecies') {
         let sortedList = LABELS.map(label => label.split('_')[1]);
         
@@ -2100,14 +2089,14 @@ function generateBirdOptionList({ store, rows, selected }) {
         
         const lastSelectedSpecies = selected || STATE.birdList.lastSelectedSpecies;
         listHTML += '<div class="form-floating"><select spellcheck="false" id="bird-list-all" class="input form-select mb-3" aria-label=".form-select" required>';
-        listHTML += '<option value="">All</option>';
+        listHTML += `<option value="">${i18nTout[1]}</option>`;
         for (const species of sortedList) {
             const isSelected = species === lastSelectedSpecies ? 'selected' : '';
             listHTML += `<option value="${species}" ${isSelected}>${species}</option>`;
         }       
         listHTML += `</select><label for="bird-list-all">${i18n.species[0]}</label></div>`;
     } else {
-        listHTML += '<select id="bird-list-seen" class="form-select"><option value="">All</option>';
+        listHTML += `<select id="bird-list-seen" class="form-select"><option value="">${i18nTout[1]}</option>`;
         for (const {cname} of rows) {
             const isSelected = cname === STATE.chart.species ? 'selected' : '';
             listHTML += `<option value="${cname}" ${isSelected}>${cname}</option>`;
@@ -4771,8 +4760,10 @@ function playRegion(){
                     "pt": "Tem certeza de que deseja restaurar as configurações padrão? Você precisará reiniciar o Chirpity para ver as alterações.",
                     "ru": "Вы уверены, что хотите восстановить настройки по умолчанию? Вам нужно будет перезапустить Chirpity, чтобы увидеть изменения.",
                     "sv": "Är du säker på att du vill återställa till standardinställningarna? Du måste starta om Chirpity för att se ändringarna.",
-                    "zh": "您确定要恢复默认设置吗？您需要重新启动 Chirpity 才能看到更改。"
-                }
+                    "zh": "您确定要恢复默认设置吗？您需要重新启动 Chirpity 才能看到更改。",
+                    "ja": "デフォルト設定に戻してもよろしいですか？ 変更を反映するには、Chirpityを再起動する必要があります。"
+                };
+                
                 const locale = config.locale 
                 const message = i18n[locale] || i18n['en'];
                 if (confirm(message)){

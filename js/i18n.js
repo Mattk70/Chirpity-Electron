@@ -681,6 +681,19 @@ const i18nToasts = { // UI.js
     }
     
 };
+const i18nAll = {
+    "en": ["(Default)", "All"],
+    "da": ["(Standard)", "Alle"],
+    "de": ["(Standard)", "Alle"],
+    "es": ["(Predeterminado)", "Todos"],
+    "fr": ["(Par défaut)", "Tout"],
+    "nl": ["(Standaard)", "Alles"],
+    "pt": ["(Padrão)", "Todos"],
+    "ru": ["(По умолчанию)", "Все"],
+    "sv": ["(Standard)", "Alla"],
+    "zh": ["(默认)", "所有"],
+    "ja": ["(デフォルト)", "すべて"]
+};
 
 const i18nHeadings = {
     en: {
@@ -2966,4 +2979,4 @@ async function localiseUI(locale) {
     }
 }
 
-export {i18nSpeciesList,i18nHeadings, i18nContext, i18nLocation, i18nForm, i18nHelp, i18nToasts, i18nTitles, i18nLIST_MAP, i18nLists, IUCNLabel, localiseUI}
+export {i18nAll, i18nSpeciesList,i18nHeadings, i18nContext, i18nLocation, i18nForm, i18nHelp, i18nToasts, i18nTitles, i18nLIST_MAP, i18nLists, IUCNLabel, localiseUI}
