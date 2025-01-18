@@ -484,8 +484,8 @@ app.whenReady().then(async () => {
         })
     });
     //Update handling
-    if (!(isMac || process.env.CI)) {
-        console.log('Auto-updater disabled in CI and Mac environments.');
+    if (isMac ||  process.env.CI) {
+        console.log('Auto-updater disabled in CI and Mac environments. CI', 'is Mac', isMac);
     } else {
         autoUpdater.autoDownload = false;
         autoUpdater.checkForUpdatesAndNotify().catch(error => console.warn('Error checking for updates', error))

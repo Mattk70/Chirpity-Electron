@@ -30,8 +30,8 @@ let DEBUG;
 const originalWarn = console.warn;
 const originalError = console.error;
 
-const generateAlert =({message, type, autohide, variables}) => {
-    UI.postMessage({event: 'generate-alert', type: type || 'info',  message, autohide, variables});
+const generateAlert =({message, type, autohide, variables, file, updateFilenamePanel}) => {
+    UI.postMessage({event: 'generate-alert', type: type || 'info',  message, autohide, variables, file, updateFilenamePanel});
 }
 function customURLEncode(str) {
     return encodeURIComponent(str)
@@ -521,7 +521,10 @@ async function handleMessage(e) {
         case "get-valid-files-list": { await getFiles(args.files);
             break;
         }
-        case "insert-manual-record": { await onInsertManualRecord(args);
+        case "insert-manual-record": { 
+            await onInsertManualRecord(args);
+            await Promise.all([getResults(), getSummary()]);
+            STATE.db = memoryDB && UI.postMessage({event: 'unsaved-records'});
             break;
         }
         case "load-model": {
@@ -2192,19 +2195,28 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
     confidence = confidence || 2000;
     // Delete an existing record if it exists
     const result = await db.getAsync(`SELECT id as originalSpeciesID FROM species WHERE cname = ?`, originalCname);
-    result?.originalSpeciesID && await db.runAsync('DELETE FROM records WHERE datetime = ? AND speciesID = ? AND fileID = ?', dateTime, result.originalSpeciesID, fileID)
-    const response = await db.runAsync('INSERT OR REPLACE INTO records VALUES ( ?,?,?,?,?,?,?,?,?,?)',
-    dateTime, start, fileID, speciesID, confidence, label, comment, end, parseInt(count), isDaylight);
-    
-    if (response.changes){
-        STATE.db === diskDB ? UI.postMessage({ event: 'diskDB-has-records' }) : UI.postMessage({event: 'unsaved-records'});
+    result?.originalSpeciesID && await db.runAsync('DELETE FROM records WHERE datetime = ? AND speciesID = ? AND fileID = ?', dateTime, result.originalSpeciesID, fileID);
+
+    // Retry mechanism for SQLITE_BUSY error
+    let attempts = 0;
+    const maxAttempts = 5;
+    const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+    while (attempts < maxAttempts) {
+        try {
+            await db.runAsync('INSERT OR REPLACE INTO records VALUES ( ?,?,?,?,?,?,?,?,?,?)',
+                dateTime, start, fileID, speciesID, confidence, label, comment, end, parseInt(count), isDaylight);
+            break; // Exit loop if successful
+        } catch (error) {
+            if (error.code === 'SQLITE_BUSY') {
+                console.log("Database is busy, retrying...");
+                attempts++;
+                await delay(100); // Wait for 100ms before retrying
+            } else {
+                throw error; // Re-throw error if it's not SQLITE_BUSY
+            }
+        }
     }
-    if (updateResults){
-        if (position)  position.start = start;
-        await getResults({species:speciesFiltered, position: position});
-        await getSummary({species: speciesFiltered});
-    }
-    return changes;
 }
 
 const insertDurations = async (file, id) => {
