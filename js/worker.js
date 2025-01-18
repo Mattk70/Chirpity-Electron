@@ -240,7 +240,6 @@ const createDB = async (file) => {
             DEBUG && console.log(response.changes + ' species added to memory database')
         }
         await db.runAsync('END');
-        db.stmts = prepareDBQueries(db);
     } catch (error) {
         console.error('Error during DB transaction:', error);
         await db.runAsync('ROLLBACK'); // Rollback the transaction in case of error
@@ -284,6 +283,7 @@ async function loadDB(path) {
         STATE.update({ db: diskDB });
         await diskDB.runAsync('VACUUM');
         await diskDB.runAsync('PRAGMA foreign_keys = ON');
+        await diskDB.runAsync('PRAGMA busy_timeout = 1000');
         await diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_species_sname ON species(sname)');
         await diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_species_cname ON species(cname)');
 
@@ -524,7 +524,7 @@ async function handleMessage(e) {
         case "insert-manual-record": { 
             await onInsertManualRecord(args);
             await Promise.all([getResults(), getSummary()]);
-            STATE.db = memoryDB && UI.postMessage({event: 'unsaved-records'});
+            STATE.db === memoryDB && UI.postMessage({event: 'unsaved-records'});
             break;
         }
         case "load-model": {
@@ -861,11 +861,7 @@ const prepSummaryStatement = (included) => {
     return [summaryStatement, params]
 }
     
-let cachedTotalParams = null;
-let cachedTotalStatement = null;
-
-const getTotal = async ({ species = undefined, offset = undefined, included = undefined, file = undefined } = {}) => {
-    // const t0 = performance.now();
+const getTotal = async ({species = undefined, offset = undefined, included = undefined, file = undefined}= {}) => {
     let params = [];
     included ??= await getIncludedIDs(file);
     const range = STATE.mode === 'explore' ? STATE.explore.range : undefined;
@@ -883,41 +879,16 @@ const getTotal = async ({ species = undefined, offset = undefined, included = un
     if (STATE.locationID) SQL += ` AND locationID =  ${STATE.locationID}`;
     const [SQLtext, fileParams] = getFileSQLAndParams(range);
     SQL += SQLtext, params.push(...fileParams);
-    SQL += ' ) ';
+    SQL += ' ) '
     SQL += `SELECT COUNT(confidence) AS total FROM MaxConfidencePerDateTime WHERE rank <= ${STATE.topRankin}`;
-
+    
     if (species) {
         params.push(species);
-        SQL += ' AND speciesID = (SELECT id from species WHERE cname = ?) ';
+        SQL += ' AND speciesID = (SELECT id from species WHERE cname = ?) '; 
     }
-
-    const currentParams = { SQL, params };
-
-    // Check if the parameters match the cached parameters
-    if (cachedTotalParams && areParamsEqual(cachedTotalParams, currentParams)) {
-        // Use the cached prepared statement
-        const { total } = await cachedTotalStatement.getAsync(...params);
-        UI.postMessage({ event: 'total-records', total: total, offset: offset, species: species });
-        return;
-    }
-
-    // Prepare the statement and cache it
-    cachedTotalParams = currentParams;
-    cachedTotalStatement = STATE.db.prepare(SQL);
-
-    const { total } = await cachedTotalStatement.getAsync(...params);
-    UI.postMessage({ event: 'total-records', total: total, offset: offset, species: species });
-};
-
-// Helper function to compare parameters
-const areParamsEqual = (params1, params2) => {
-    if (params1.SQL !== params2.SQL) return false;
-    if (params1.params.length !== params2.params.length) return false;
-    for (let i = 0; i < params1.params.length; i++) {
-        if (params1.params[i] !== params2.params[i]) return false;
-    }
-    return true;
-};
+    const {total} = await STATE.db.getAsync(SQL, ...params)
+    UI.postMessage({event: 'total-records', total: total, offset: offset, species: species})
+}
 
 const prepResultsStatement = (species, noLimit, included, offset, topRankin) => {
     const params = [STATE.detect.confidence];
@@ -2197,26 +2168,8 @@ const onInsertManualRecord = async ({ cname, start, end, comment, count, file, l
     const result = await db.getAsync(`SELECT id as originalSpeciesID FROM species WHERE cname = ?`, originalCname);
     result?.originalSpeciesID && await db.runAsync('DELETE FROM records WHERE datetime = ? AND speciesID = ? AND fileID = ?', dateTime, result.originalSpeciesID, fileID);
 
-    // Retry mechanism for SQLITE_BUSY error
-    let attempts = 0;
-    const maxAttempts = 5;
-    const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-
-    while (attempts < maxAttempts) {
-        try {
-            await db.runAsync('INSERT OR REPLACE INTO records VALUES ( ?,?,?,?,?,?,?,?,?,?)',
-                dateTime, start, fileID, speciesID, confidence, label, comment, end, parseInt(count), isDaylight);
-            break; // Exit loop if successful
-        } catch (error) {
-            if (error.code === 'SQLITE_BUSY') {
-                console.log("Database is busy, retrying...");
-                attempts++;
-                await delay(100); // Wait for 100ms before retrying
-            } else {
-                throw error; // Re-throw error if it's not SQLITE_BUSY
-            }
-        }
-    }
+    await db.runAsync('INSERT OR REPLACE INTO records VALUES ( ?,?,?,?,?,?,?,?,?,?)',
+        dateTime, start, fileID, speciesID, confidence, label, comment, end, parseInt(count), isDaylight);
 }
 
 const insertDurations = async (file, id) => {
@@ -2226,47 +2179,33 @@ const insertDurations = async (file, id) => {
     const result = await STATE.db.runAsync(`INSERT INTO duration VALUES ${durationSQL}`);
 }
 
-const prepareDBQueries = (db) => {
-    const recordInsertStmt = db.prepare('INSERT OR IGNORE INTO records VALUES ( ?,?,?,?,?,?,?,?,?,? )')
-    const fileSelectStmt =  db.prepare('SELECT id FROM files WHERE name = ?')
-    const fileInsertStmt = db.prepare('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,?,?,? )')
-    const locationSelectStmt = db.prepare('SELECT id FROM locations WHERE lat = ? AND lon = ?')
-    const locationInsertStmt = db.prepare('INSERT OR IGNORE INTO locations VALUES ( ?, ?,?,? )')
-    const speciesSelectStmt = db.prepare('SELECT id FROM species WHERE cname = ?')
 
-    return { recordInsertStmt, fileSelectStmt, fileInsertStmt, locationSelectStmt, locationInsertStmt, speciesSelectStmt }
-
-}
-let timeTaken = 0;
 const generateInsertQuery = async (latestResult, file) => {
-    t0 = performance.now();
     const db = STATE.db;
-    const meta  = METADATA[file];
-    await dbMutex.lock();
     let fileID;
+    await dbMutex.lock();
     try {
         await db.runAsync('BEGIN');
         let insertQuery = 'INSERT OR IGNORE INTO records VALUES ';
-        let res = await db.stmts.fileSelectStmt.getAsync(file);
+        let res = await db.getAsync('SELECT id FROM files WHERE name = ?', file);
         if (!res) {
             let id = null;
-            if (meta.metadata) {
-                const metadata = JSON.parse(meta.metadata);
+            if (METADATA[file].metadata) {
+                const metadata = JSON.parse(METADATA[file].metadata);
                 const guano = metadata.guano;
                 if (guano && guano['Loc Position']) {
-                    let [lat, lon] = guano['Loc Position'].split(' ');
-                    lat = parseFloat(lat); lon = parseFloat(lon);
+                    const [lat, lon] = guano['Loc Position'].split(' ');
                     const place = guano['Site Name'] || guano['Loc Position'];
-                    const row = await db.getAsync('SELECT id FROM locations WHERE lat = ? AND lon = ?', lat, lon);
+                    const row = await db.getAsync('SELECT id FROM locations WHERE lat = ? AND lon = ?', parseFloat(lat), parseFloat(lon));
                     if (!row) {
                         const result = await db.runAsync('INSERT OR IGNORE INTO locations VALUES ( ?, ?,?,? )',
-                            undefined, lat, lon, place);
+                            undefined, parseFloat(lat), parseFloat(lon), place);
                         id = result.lastID;
                     }
                 }
             }
             res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,?,?,? )',
-                undefined, file, meta.duration, meta.fileStart, id, null, meta.metadata);
+                undefined, file, METADATA[file].duration, METADATA[file].fileStart, id, null, METADATA[file].metadata);
             fileID = res.lastID;
             await insertDurations(file, fileID);
         } else {
@@ -2277,7 +2216,7 @@ const generateInsertQuery = async (latestResult, file) => {
         const minConfidence = Math.min(STATE.detect.confidence, 150); // store results with 15% confidence and up unless confidence set lower
         for (let i = 0; i < keysArray.length; i++) {
             const key = parseFloat(keysArray[i]);
-            const timestamp = meta.fileStart + key * 1000;
+            const timestamp = METADATA[file].fileStart + key * 1000;
             const isDaylight = isDuringDaylight(timestamp, STATE.lat, STATE.lon);
             const confidenceArray = confidenceBatch[i];
             const speciesIDArray = speciesIDBatch[i];
@@ -2300,11 +2239,10 @@ const generateInsertQuery = async (latestResult, file) => {
         await db.runAsync('ROLLBACK');
         console.log("Transaction error:", error);
     } finally {
-        dbMutex.unlock();;
+        dbMutex.unlock();
+        return fileID;
     }
-    return fileID;
 }
-
 const parsePredictions = async (response) => {
     let file = response.file;
     AUDIO_BACKLOG--;
@@ -2566,28 +2504,19 @@ async function setStartEnd(file) {
     return boundaries;
 }
 
-let cachedSummaryParams = null;
-let cachedSummaryStatement = null;
-
 const getSummary = async ({
     species = undefined,
     active = undefined,
     interim = false,
     action = undefined,
 } = {}) => {
-    if (! STATE.cacheSummaryParams) {
-        cachedSummaryStatement && cachedSummaryStatement.finalize();
-        cachedSummaryStatement = null;
-        const included = STATE.selection ? [] : await getIncludedIDs();
-        const [sql, params] = prepSummaryStatement(included);
-        // Prepare the statement and cache it
-        cachedSummaryStatement = STATE.db.prepare(sql);
-        cachedSummaryParams = params;
-    }
+    const included = STATE.selection ? [] : await getIncludedIDs();
+    const [sql, params] = prepSummaryStatement(included);
     const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
-    const summary = await cachedSummaryStatement.allAsync(...cachedSummaryParams);
+
+
+    const summary = await STATE.db.allAsync(sql, ...params);
     const event = interim ? 'update-summary' : 'summary-complete';
-    interim || STATE.cacheSummaryParams && (STATE.cacheSummaryParams = false);
     UI.postMessage({
         event: event,
         summary: summary,
@@ -2596,7 +2525,7 @@ const getSummary = async ({
         filterSpecies: species,
         active: active,
         action: action
-    });
+    })
 };
 
 
@@ -2973,18 +2902,14 @@ const onSave2DiskDB = async ({ file }) => {
     const included = await getIncludedIDs(file);
     let filterClause = filtersApplied(included) ? `AND speciesID IN (${included})` : '';
     if (STATE.detect.nocmig) filterClause += ' AND isDaylight = FALSE ';
-
+    let response, errorOccurred = false;
     await dbMutex.lock();
     try {
         await memoryDB.runAsync('BEGIN');
         await memoryDB.runAsync(`INSERT OR IGNORE INTO disk.files SELECT * FROM files`);
         await memoryDB.runAsync(`INSERT OR IGNORE INTO disk.locations SELECT * FROM locations`);
-        // Set the saved flag on files' METADATA
-        for (let file in METADATA) {
-            METADATA[file].isSaved = true;
-        }
         // Update the duration table
-        let response = await memoryDB.runAsync('INSERT OR IGNORE INTO disk.duration SELECT * FROM duration');
+        response = await memoryDB.runAsync('INSERT OR IGNORE INTO disk.duration SELECT * FROM duration');
         DEBUG && console.log(response.changes + ' date durations added to disk database');
         // now update records
         response = await memoryDB.runAsync(`
@@ -2993,28 +2918,35 @@ const onSave2DiskDB = async ({ file }) => {
             WHERE confidence >= ${STATE.detect.confidence} ${filterClause}`);
         DEBUG && console.log(response?.changes + ' records added to disk database');
         await memoryDB.runAsync('END');
-        DEBUG && console.log("transaction ended");
-        if (response?.changes) {
-            UI.postMessage({ event: 'diskDB-has-records' });
-            if (!DATASET) {
-                // Now we have saved the records, set state to DiskDB
-                await onChangeMode('archive');
-                getLocations({ db: STATE.db, file: file });
-                const total = response.changes;
-                const seconds = (Date.now() - t0) / 1000;
-                generateAlert({
-                    message: 'goodDBUpdate',
-                    variables: { total, seconds },
-                    updateFilenamePanel: true,
-                    database: true
-                });
-            }
-        }
     } catch (error) {
         await memoryDB.runAsync('ROLLBACK');
+        errorOccurred = true;
         console.log("Transaction error:", error);
     } finally {
+        if (!errorOccurred){
+
+            if (response?.changes) {
+                UI.postMessage({ event: 'diskDB-has-records' });
+                if (!DATASET) {
+                    // Now we have saved the records, set state to DiskDB
+                    await onChangeMode('archive');
+                    await getLocations({ db: STATE.db, file: file });
+
+                }
+                // Set the saved flag on files' METADATA
+                Object.values(METADATA).forEach(file => file.isSaved = true);
+            }
+        }
         dbMutex.unlock();
+        DEBUG && console.log("transaction ended successfully");
+        const total = response.changes;
+        const seconds = (Date.now() - t0) / 1000;
+        generateAlert({
+            message: 'goodDBUpdate',
+            variables: { total, seconds },
+            updateFilenamePanel: true,
+            database: true
+        });
     }
 };
 
