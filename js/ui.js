@@ -2612,11 +2612,45 @@ function onChartData(args) {
     }
 
     const updateListIcon = () => {
-        DOM.listIcon.innerHTML = config.list === 'custom' ?
-            `<span class="material-symbols-outlined mt-1" title="${LIST_MAP[config.list]}" style="width: 30px">fact_check</span>` :
-            `<img class="icon" src="img/${config.list}.png" alt="${config.list}"  title="${LIST_MAP[config.list]}">`;
-
-    }
+        const listIconContainer = DOM.listIcon;
+        const isCustom = config.list === 'custom';
+        const title = LIST_MAP[config.list];
+    
+        // Check if the current child matches the desired type (span or img)
+        const currentChild = listIconContainer.firstChild;
+    
+        if (isCustom) {
+            if (!(currentChild instanceof HTMLSpanElement)) {
+                // Replace with a span element if it's not already
+                const span = document.createElement('span');
+                span.className = 'material-symbols-outlined mt-1';
+                span.style.width = '30px';
+                span.title = title;
+                span.textContent = 'fact_check';
+                listIconContainer.replaceChildren(span); // Efficient replacement
+            } else {
+                // Update attributes and content if the child is already a span
+                currentChild.title = title;
+                currentChild.textContent = 'fact_check';
+            }
+        } else {
+            if (!(currentChild instanceof HTMLImageElement)) {
+                // Replace with an img element if it's not already
+                const img = document.createElement('img');
+                img.className = 'icon';
+                img.alt = config.list;
+                img.title = title;
+                img.src = `img/${config.list}.png`;
+                listIconContainer.replaceChildren(img); // Efficient replacement
+            } else {
+                // Update attributes if the child is already an img
+                currentChild.alt = config.list;
+                currentChild.title = title;
+                currentChild.src = `img/${config.list}.png`;
+            }
+        }
+    };
+    
     DOM.listIcon.addEventListener('click', () => {
         if (PREDICTING){
             generateToast({message: 'changeListBlocked', type:'warning'})
@@ -4057,36 +4091,50 @@ function formatDuration(seconds){
         const timeHeadings = document.getElementsByClassName('time-sort-icon');
         const speciesHeadings = document.getElementsByClassName('species-sort-icon');
         const sortOrderScore = STATE.resultsSortOrder.includes('score');
-        
+        const fragment = document.createDocumentFragment();
+    
+        // Clone the result header and work on it in the fragment
+        const resultHeaderClone = DOM.resultHeader.cloneNode(true);
+        fragment.appendChild(resultHeaderClone);
+    
+        // Update time sort icons
         [...timeHeadings].forEach(heading => {
             heading.classList.toggle('d-none', sortOrderScore);
             heading.parentNode.classList.add('pointer');
         });
-        
+    
+        // Update species sort icons
         [...speciesHeadings].forEach(heading => {
             heading.classList.toggle('d-none', !sortOrderScore);
             heading.parentNode.classList.add('pointer');
-            if (sortOrderScore && STATE.resultsSortOrder.includes('ASC')){
-                // Flip the sort icon
-                heading.classList.add('flipped')
+            if (sortOrderScore && STATE.resultsSortOrder.includes('ASC')) {
+                heading.classList.add('flipped');
             } else {
-                heading.classList.remove('flipped')
+                heading.classList.remove('flipped');
             }
         });
-
-
+    
         // Add pointer icon to species summaries
         const summarySpecies = DOM.summaryTable.querySelectorAll('.cname');
-        summarySpecies.forEach(row => row.classList.add('pointer'))
-        // change results header to indicate activation
-        DOM.resultHeader.classList.remove('text-bg-secondary');
-        DOM.resultHeader.classList.add('text-bg-dark');
-        // Add a hover to summary to indicate activation
+        summarySpecies.forEach(row => row.classList.add('pointer'));
+    
+        // Update the cloned result header's classes
+        resultHeaderClone.classList.replace('text-bg-secondary', 'text-bg-dark');
+    
+        // Add hover to the summary
         const summary = document.getElementById('resultSummary');
-        // If there were no results, there'll be no summary
-        summary?.classList.add('table-hover');
-        showSummarySortIcon()
+        if (summary) {
+            const summaryClone = summary.cloneNode(true);
+            summaryClone.classList.add('table-hover');
+            fragment.appendChild(summaryClone);
+        }
+    
+        // Replace the old header with the updated one
+        DOM.resultHeader.replaceWith(resultHeaderClone);
+    
+        showSummarySortIcon();
     }
+    
     
 function showSummarySortIcon(){
     const [column, direction] = STATE.summarySortOrder.split(' ');
@@ -4102,12 +4150,12 @@ function showSummarySortIcon(){
     }
 }
 
-    const setSortOrder = (order) => {
-        STATE.resultsSortOrder = order;
-        worker.postMessage({ action: 'update-state', resultsSortOrder: order })
-        resetResults({clearSummary: false, clearPagination: false, clearResults: true});
-        filterResults();
-    }
+const setSortOrder = (order) => {
+    STATE.resultsSortOrder = order;
+    worker.postMessage({ action: 'update-state', resultsSortOrder: order })
+    // resetResults({clearSummary: false, clearPagination: false, clearResults: true});
+    filterResults();
+}
 
     const setSummarySortOrder = (order) => {
         STATE.summarySortOrder = order;
