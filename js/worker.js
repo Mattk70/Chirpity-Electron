@@ -1102,6 +1102,7 @@ const getDuration = async (src) => {
             if (duration === Infinity || !duration || isNaN(duration)) {
                 const i18n = {
                     en: "File duration",
+                    en_uk: "File duration",
                     da: "Filens varighed",
                     de: "Dateidauer",
                     es: "Duración del archivo",
@@ -1113,7 +1114,7 @@ const getDuration = async (src) => {
                     sv: "Filens varaktighet",
                     zh: "文件时长"
                   };
-                return reject(`${i18n[STATE.locale]} (${src}): ${duration}`)
+                return reject(`${i18n[STATE.locale]} <span style="color: red">${duration}</span> (${src})` )
             }
             audio.remove();
             resolve(duration);
