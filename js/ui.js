@@ -4122,7 +4122,13 @@ function showSummarySortIcon(){
             //include folders - file.type === '', audio & video files
             return !file.type || file.type.startsWith('audio/') || file.type.startsWith('video/');
         });
-        const filelist = audioFiles.map(file => window.electron.showFilePath(file));
+        let filelist = [];
+        for (const f of audioFiles) {
+            // Using the path attribute to get absolute file path
+            filelist.push(f.path);
+        }
+        // For electron 32+
+        // const filelist = audioFiles.map(file => window.electron.showFilePath(file));
         if (filelist.length) filterValidFiles({ filePaths: filelist })
     });
     
