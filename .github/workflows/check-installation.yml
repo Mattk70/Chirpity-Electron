@@ -59,6 +59,7 @@ jobs:
           echo "BINARY=$BINARY" >> $GITHUB_ENV
           
       - name: Overwrite FFmpeg binary
+        if: runner.os != 'Windows'
         run: |
           echo "copying  ./build/$PLATFORM/$BINARY to ./node_modules/@ffmpeg-installer/$PLATFORM/$BINARY"
           cp ./build/$PLATFORM/$BINARY ./node_modules/@ffmpeg-installer/$PLATFORM/$BINARY
