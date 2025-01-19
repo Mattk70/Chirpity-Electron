@@ -523,7 +523,7 @@ async function handleMessage(e) {
         }
         case "insert-manual-record": { 
             await onInsertManualRecord(args);
-            await Promise.all([getResults(), getSummary()]);
+            await Promise.all([getResults({position: args.position, species: args.speciesFiltered}), getSummary({species: args.speciesFiltered})]);
             STATE.db === memoryDB && UI.postMessage({event: 'unsaved-records'});
             break;
         }
@@ -2558,7 +2558,9 @@ const getResults = async ({
     if (position) {
         //const position = await getPosition({species: species, dateTime: select.dateTime, included: included});
         offset = (position.page - 1) * limit;
-        active = position.row;
+        // We want to consistently move to the next record. If results are sorted by time, this will be row + 1. 
+        // If by confidence, it wil not change, as the validated record will move to the top
+        active = ['timestamp', 'dateTime'].includes(STATE.resultsSortOrder) ? position.row + 1 : position.row;
         // update the pagination
         await getTotal({species: species, offset: offset, included: included})
     }
@@ -3655,6 +3657,7 @@ async function setIncludedIDs(lat, lon, week) {
             message.model = message.model.replace('chirpity', 'Nocmig');
             generateAlert({type: 'warning',  message: 'noSnameFound', variables: {sname: message.sname, line: message.line, model: message.model}})
         })
+        if (messages.length) throw new Error('Unrecognised labels in custom list')
         return STATE.included;
     })();
 

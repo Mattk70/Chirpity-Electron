@@ -2629,7 +2629,7 @@ function onChartData(args) {
         DOM.listToUse.value = config.list;
         updateListIcon();
         updatePrefs('config.json', config)
-        resetResults();
+        //resetResults();
         setListUIState(config.list);
         // Since the custom list function calls for its own update *after* reading the labels, we'll skip updates for custom lists here
         config.list === 'custom' || updateList()
@@ -3233,7 +3233,7 @@ function centreSpec(){
             // scroll to the selected species
             if (selectedRow){
                 const table = document.getElementById('resultSummary');
-                table.rows[selectedRow].scrollIntoView({ behavior: 'instant', block: 'center' });
+                table.rows[selectedRow].scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
         }
     }
@@ -3244,7 +3244,8 @@ function centreSpec(){
     function onResultsComplete({active = undefined, select = undefined} = {}){
         PREDICTING = false;
         disableSettingsDuringAnalysis(false)
-        DOM.resultTable.replaceWith(resultsBuffer);
+        DOM.resultTable.replaceWith(resultsBuffer.cloneNode(true));
+        resultsBuffer.textContent = ''
         const table = DOM.resultTable;
         showElement(['resultTableContainer', 'resultsHead'], false);
         // Set active Row        
@@ -3271,7 +3272,7 @@ function centreSpec(){
         
         if (activeRow) {
             activeRow.click();
-            activeRow.scrollIntoView({ behavior: 'instant', block: 'nearest' });
+            activeRow.scrollIntoView({ behavior: 'instant', block: 'center' });
         }
         // hide progress div
         DOM.progressDiv.classList.add('invisible');
@@ -3452,8 +3453,11 @@ function formatDuration(seconds){
                 selectionTable.textContent = '';
             }
             else {
-                resetResults({clearResults: true, clearSummary: false, clearPagination: false});
+                // if (!isFromDB) {
+                //     resetResults({clearResults: false, clearSummary: false, clearPagination: false});
+                // }
                 const i18n = getI18n(i18nHeadings);
+                // const fragment = new DocumentFragment();
                 DOM.resultHeader.innerHTML =`
                 <tr>
                     <th id="sort-time" class="time-sort col text-start timeOfDay" title="${i18n.time[1]}"><span class="text-muted material-symbols-outlined time-sort-icon d-none">sort</span> ${i18n.time[0]}</th>
@@ -3464,6 +3468,8 @@ function formatDuration(seconds){
                     <th class="col text-end">${i18n.notes}</th>
                 </tr>`;
                 setTimelinePreferences();
+                // DOM.resultHeader.innerHTML = fragment;
+
             }
             showElement(['resultTableContainer', 'resultsHead'], false);
         }  else if (!isFromDB && index % (config.limit + 1) === 0) {
@@ -3923,7 +3929,7 @@ function formatDuration(seconds){
         });
         updatePrefs('config.json', config)
         if (STATE.analysisDone){
-        resetResults({clearSummary: true, clearPagination: true, clearResults: false});
+        resetResults({clearSummary: false, clearPagination: true, clearResults: false});
         filterResults()
         }
     }
@@ -4467,7 +4473,7 @@ function showSummarySortIcon(){
         }
         if (!PREDICTING && !DOM.resultTableElement.classList.contains('d-none')) {
             worker.postMessage({ action: 'update-state', globalOffset: 0, filteredOffset: {}});
-            resetResults({clearSummary: true, clearPagination: true, clearResults: false});
+            resetResults({clearSummary: false, clearPagination: true, clearResults: false});
             filterResults();
         }
     }
@@ -4941,7 +4947,7 @@ function playRegion(){
                     setListUIState(element.value)
                     config.list = element.value;
                     updateListIcon();
-                    resetResults({clearSummary: true, clearPagination: true, clearResults: true});
+                    //resetResults({clearSummary: true, clearPagination: true, clearResults: true});
                     // Don't call this for custom lists
                     config.list === 'custom' || updateList()
                     break }
@@ -5349,7 +5355,7 @@ function getI18n(context){
             position: {row: activeRow?.rowIndex - 1, page: getCurrentPage()}, //  have to account for the header row
             speciesFiltered: isSpeciesViewFiltered(true)
         })
-        resetResults({clearPagination: false})
+        //resetResults({clearPagination: false})
     }
 
     function checkFilteredFrequency(){
