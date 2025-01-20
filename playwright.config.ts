@@ -8,7 +8,7 @@ export default defineConfig({
   expect: {
     timeout: 20_000,
   },
-  workers: 2,
+  workers: 1,
   use: {
     // Maximum time each action such as `click()` can take. Defaults to 0 (no limit).
     actionTimeout: 0,
