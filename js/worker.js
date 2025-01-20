@@ -78,7 +78,7 @@ self.addEventListener('unhandledrejection', function(event) {
 
 self.addEventListener('rejectionhandled', function(event) {
     // Extract the error message and stack trace from the event
-    const errorMessage = event.reason?.message;
+    orMessage = event.reason?.message;
     const stackTrace = event.reason?.stack;
     
     // Track the unhandled promise rejection
@@ -1120,7 +1120,8 @@ const getDuration = async (src) => {
                     sv: "Filens varaktighet",
                     zh: "文件时长"
                   };
-                return reject(`${i18n[STATE.locale]} <span style="color: red">${duration}</span> (${src})` )
+                const message = i18n[STATE.locale] || i18n['en'];
+                return reject(`${message} <span style="color: red">${duration}</span> (${src})` )
             }
             audio.remove();
             resolve(duration);
