@@ -73,9 +73,21 @@ test.beforeAll(async () => {
       page.on('console', (msg) => {
         console.log(msg.text())
       })
+
+      _worker.on('pageerror', (error) => {
+        console.error(error)
+      })
+      // capture console messages
+      _worker.on('console', (msg) => {
+        console.log(msg.text())
+      })
       // Wait for the page to load
       await page.waitForLoadState('load')
-      resolve();
+      _worker.on('worker', () => {
+        //console.log('worker.js worker data')
+        resolve();
+      });
+      
     })
   })
 
@@ -118,17 +130,6 @@ test('Page title is correct', async () => {
 })
 
 
-test(`Nocmig analyse works and second result is 61%`, async () => {
-  // Set a custom timeout for this specific test (in milliseconds)
-
-  await runExampleAnalysis(page,'chirpity');
-  const callID = page.locator('#speciesFilter').getByText('Redwing (call)');
-  expect(callID).not.toBe(undefined)
-  const secondResult = await (await page.waitForSelector('#result2 span.confidence-row > span')).textContent()
-  // console.log(secondResult, 'second result');
-  expect(secondResult).toBe('61%');
-})
-
 test(`BirdNET analyse works and second result is 34%`, async () => {
   // Set a custom timeout for this specific test (in milliseconds)
   test.setTimeout(60000); // 60 seconds
@@ -138,6 +139,17 @@ test(`BirdNET analyse works and second result is 34%`, async () => {
   const secondResult = await (await page.waitForSelector('#result2 span.confidence-row > span')).textContent()
   // console.log(secondResult, 'second result');
   expect(secondResult).toBe('34%');
+})
+
+test(`Nocmig analyse works and second result is 61%`, async () => {
+  // Set a custom timeout for this specific test (in milliseconds)
+
+  await runExampleAnalysis(page,'chirpity');
+  const callID = page.locator('#speciesFilter').getByText('Redwing (call)');
+  expect(callID).not.toBe(undefined)
+  const secondResult = await (await page.waitForSelector('#result2 span.confidence-row > span')).textContent()
+  // console.log(secondResult, 'second result');
+  expect(secondResult).toBe('61%');
 })
 
 

@@ -291,7 +291,7 @@ async function createWindow() {
     // Hide nav bar except in ci mode
 
     mainWindow.setMenuBarVisibility(!!process.env.CI);
-    
+
     // and load the index.html of the app.
     mainWindow.loadFile('index.html');
     

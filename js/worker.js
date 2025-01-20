@@ -26,6 +26,13 @@ if (process.platform === 'win32') {
   }
 let DEBUG;
 
+let METADATA = {};
+let index = 0, AUDACITY = {}, predictionStart;
+let sampleRate; // Should really make this a property of the model
+let predictWorkers = [], aborted = false;
+let UI;
+let FILE_QUEUE = [];
+let INITIALISED = null;
 // Save console.warn and console.error functions
 const originalWarn = console.warn;
 const originalError = console.error;
@@ -203,16 +210,6 @@ const createDB = async (file) => {
                 const [sname, cname] = LABELS[i].split('_');
                 await db.runAsync('INSERT INTO species VALUES (?,?,?)', i, sname, cname);
             }
-            await db.runAsync(`
-                CREATE TABLE IF NOT EXISTS db_upgrade (
-                    key TEXT PRIMARY KEY,
-                    value TEXT
-                );
-            `);
-            
-            await db.runAsync(`
-                INSERT INTO db_upgrade (key, value) VALUES ('last_update', 'add_columns_archiveName_and_metadata_and_foreign_key_to_files')
-            `);
         } else {
             const filename = diskDB.filename;
             let { code } = await db.runAsync('ATTACH ? as disk', filename);
@@ -275,7 +272,6 @@ async function loadDB(path) {
     const num_labels = modelLabels.length;
     LABELS = modelLabels; // these are the default english labels
     const file = DATASET ? p.join(path, `${DATABASE}${num_labels}.sqlite`) : p.join(path, `archive${num_labels}.sqlite`)
-
     if (!fs.existsSync(file)) {
         await createDB(file);
     } else if (diskDB?.filename !== file) {
@@ -284,9 +280,8 @@ async function loadDB(path) {
         await diskDB.runAsync('VACUUM');
         await diskDB.runAsync('PRAGMA foreign_keys = ON');
         await diskDB.runAsync('PRAGMA busy_timeout = 1000');
-        await diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_species_sname ON species(sname)');
+        await diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_species_sname ON species(sname)').catch(error => console.error(error));
         await diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_species_cname ON species(cname)');
-
         const { count } = await diskDB.getAsync('SELECT COUNT(*) as count FROM records')
         if (count) {
             UI.postMessage({ event: 'diskDB-has-records' })
@@ -307,6 +302,7 @@ const DB_updates = [
         name: 'add_columns_archiveName_and_metadata_and_foreign_key_to_files',
         query: async (db) => {
             try {
+                await dbMutex.lock()
                 // Disable foreign key checks (or dropping files will drop records too!!!)
                 await db.runAsync('PRAGMA foreign_keys = OFF');
                 // Update: Adding foreign key to files
@@ -343,6 +339,7 @@ const DB_updates = [
             } finally {
                 // Disable foreign key checks
                 await db.runAsync('PRAGMA foreign_keys = ON');
+                dbMutex.unlock()
             }
         }
     },
@@ -397,13 +394,6 @@ async function checkAndApplyUpdates(db) {
 }
 
 
-let METADATA = {};
-let index = 0, AUDACITY = {}, predictionStart;
-let sampleRate; // Should really make this a property of the model
-let predictWorkers = [], aborted = false;
-let UI;
-let FILE_QUEUE = [];
-let INITIALISED = null;
 
 async function handleMessage(e) {
     const args = e.data;
@@ -418,7 +408,7 @@ async function handleMessage(e) {
             let {model, batchSize, threads, backend, list} = args;
             const t0 = Date.now();
             STATE.detect.backend = backend;
-            INITIALISED = await (async () => {
+            INITIALISED = (async () => {
                 LIST_WORKER = await spawnListWorker(); // this can change the backend if tfjs-node isn't available
                 DEBUG && console.log('List worker took', Date.now() - t0, 'ms to load');
                 await onLaunch({model: model, batchSize: batchSize, threads: threads, backend: STATE.detect.backend, list: list});
@@ -462,6 +452,7 @@ async function handleMessage(e) {
             break;
         }
         case "change-mode": {
+            const mode = args.mode;
             await onChangeMode(args.mode);
             break;
         }
@@ -496,14 +487,9 @@ async function handleMessage(e) {
             filesBeingProcessed.length && onAbort(args);
             DEBUG && console.log("Worker received audio " + args.file);
             await loadAudioFile(args);
-            await new Promise(resolve => setTimeout(resolve, 10));
             const file = args.file;
             const mode = METADATA[file].isSaved ? 'archive' : 'analyse';
-            
-            console.log(METADATA[file], 'file metadata')
-            console.log(METADATA, mode)
             await onChangeMode(mode);
-            console.log(METADATA, mode)
             break;
         }
         case "filter": {
@@ -540,7 +526,7 @@ async function handleMessage(e) {
             else {
                 predictWorkers.length && terminateWorkers()
             };
-            INITIALISED =  await onLaunch(args);
+            INITIALISED =  onLaunch(args);
             break;
         }
         case "post": {await uploadOpus(args);
@@ -644,13 +630,15 @@ function setGetSummaryQueryInterval(threads){
 }
 
 async function onChangeMode(mode) {
-    memoryDB || await createDB();
-    UI.postMessage({ event: 'mode-changed', mode: mode })
-    STATE.changeMode({
-        mode: mode,
-        disk: diskDB,
-        memory: memoryDB
-    });
+    if (STATE.mode !== mode)  {
+        memoryDB || await createDB();
+        UI.postMessage({ event: 'mode-changed', mode: mode })
+        STATE.changeMode({
+            mode: mode,
+            disk: diskDB,
+            memory: memoryDB
+        });
+    }
 }
 
 const filtersApplied = (list) => {
@@ -1160,7 +1148,8 @@ async function getWorkingFile(file) {
     }
     const meta = await setMetadata({ file: file, source_file: source_file });
     if (!meta) return false
-    METADATA[source_file] = meta[file];
+    
+    METADATA[source_file] = METADATA[file];
     return source_file;
 }
 
@@ -1228,41 +1217,45 @@ async function loadAudioFile({
     queued = false,
     goToRegion = true
 }) {
+    return new Promise((resolve, reject) => {
+        if (file) {
+            fetchAudioBuffer({ file, start, end })
+            .then(([audio, start]) => {
+                let audioArray = getMonoChannelData(audio);
+                UI.postMessage({
+                    event: 'worker-loaded-audio',
+                    location: METADATA[file].locationID,
+                    fileStart: METADATA[file].fileStart,
+                    fileDuration: METADATA[file].duration,
+                    windowBegin: start,
+                    file: file,
+                    position: position,
+                    contents: audioArray,
+                    fileRegion: region,
+                    play: play,
+                    queued: queued,
+                    goToRegion,
+                    metadata: METADATA[file].metadata
+                }, [audioArray.buffer]);
+                let week;
+                if (STATE.list === 'location'){
+                    week = STATE.useWeek ? new Date(METADATA[file].fileStart).getWeekNumber() : -1
+                    // Send the week number of the surrent file
+                    UI.postMessage({event: 'current-file-week', week: week})
+                } else { UI.postMessage({event: 'current-file-week', week: undefined}) }
+                resolve()
+            })
+            .catch( (error) => {
+                console.warn(error);
+                // notify and return null if no matching file was found
+                reject(generateAlert({type: 'error',  message: 'noFile', variables: {error}}))
+                //error.code === 'ENOENT' && notifyMissingFile(file)
+            })
+        } else {
+            reject(generateAlert({type: 'error',  message: 'noFile'}))            
+        }
 
-    if (file) {
-        fetchAudioBuffer({ file, start, end })
-        .then(([audio, start]) => {
-            let audioArray = getMonoChannelData(audio);
-            UI.postMessage({
-                event: 'worker-loaded-audio',
-                location: METADATA[file].locationID,
-                fileStart: METADATA[file].fileStart,
-                fileDuration: METADATA[file].duration,
-                windowBegin: start,
-                file: file,
-                position: position,
-                contents: audioArray,
-                fileRegion: region,
-                play: play,
-                queued: queued,
-                goToRegion,
-                metadata: METADATA[file].metadata
-            }, [audioArray.buffer]);
-            let week;
-            if (STATE.list === 'location'){
-                week = STATE.useWeek ? new Date(METADATA[file].fileStart).getWeekNumber() : -1
-                // Send the week number of the surrent file
-                UI.postMessage({event: 'current-file-week', week: week})
-            } else { UI.postMessage({event: 'current-file-week', week: undefined}) }
-        })
-        .catch( (error) => {
-            console.warn(error);
-            // notify and return null if no matching file was found
-            generateAlert({type: 'error',  message: 'noFile', variables: {error}});
-            //error.code === 'ENOENT' && notifyMissingFile(file)
-        })
-
-    }
+    })
 }
 
 
