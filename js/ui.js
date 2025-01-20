@@ -285,14 +285,14 @@ function updateProgress(val) {
 }
 
 /**
-* LoadAudiofile: Called when user opens a file (just opens first file in multiple files)
+* loadAudioFileSync: Called when user opens a file (just opens first file in multiple files)
 * and when clicking on filename in list of open files.
 * 
 * @param {*} filePath: full path to file
 * @param {*} preserveResults: whether to clear results when opening file (i.e. don't clear results when clicking file in list of open files)
 *  
 */
-function loadAudioFile({ filePath = '', preserveResults = false }) {
+function loadAudioFileSync({ filePath = '', preserveResults = false }) {
     fileLoaded = false; locationID = undefined;
     worker.postMessage({
         action: 'file-load-request',
@@ -537,7 +537,7 @@ function powerSave(on) {
 const openFileInList = async (e) => {
     const target = e.target;
     if (!PREDICTING && (target.type === 'submit' || target.tagName === 'A')) {
-        loadAudioFile({ filePath: target.id || STATE.currentFile, preserveResults: true })
+        loadAudioFileSync({ filePath: target.id || STATE.currentFile, preserveResults: true })
     }
 }
 
@@ -1003,7 +1003,7 @@ async function onOpenFiles(args) {
     }
     // Reset analysis status
     STATE.analysisDone = false;
-    loadAudioFile({ filePath: STATE.openFiles[0] });
+    loadAudioFileSync({ filePath: STATE.openFiles[0] });
     disableMenuItem(['analyseSelection', 'analyse', 'analyseAll', 'reanalyse', 'reanalyseAll', 'save2db'])
     // Clear unsaved records warning
     window.electron.unsavedRecords(false);
@@ -1314,7 +1314,7 @@ async function showAnalyse() {
                 updateSummary: true });
         } else {
             clearActive();
-            loadAudioFile({filePath: STATE.currentFile});
+            loadAudioFileSync({filePath: STATE.currentFile});
         }
     }
     resetResults();
@@ -5563,7 +5563,7 @@ function getI18n(context){
             const example_file = await window.electron.getAudio();
             // create a canvas for the audio spec
             showElement(['spectrogramWrapper'], false);
-            loadAudioFile({ filePath: example_file });
+            loadAudioFileSync({ filePath: example_file });
         }
         startTour();
     }

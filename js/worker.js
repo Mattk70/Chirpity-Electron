@@ -418,7 +418,7 @@ async function handleMessage(e) {
             let {model, batchSize, threads, backend, list} = args;
             const t0 = Date.now();
             STATE.detect.backend = backend;
-            INITIALISED = (async () => {
+            INITIALISED = await (async () => {
                 LIST_WORKER = await spawnListWorker(); // this can change the backend if tfjs-node isn't available
                 DEBUG && console.log('List worker took', Date.now() - t0, 'ms to load');
                 await onLaunch({model: model, batchSize: batchSize, threads: threads, backend: STATE.detect.backend, list: list});
@@ -496,8 +496,14 @@ async function handleMessage(e) {
             filesBeingProcessed.length && onAbort(args);
             DEBUG && console.log("Worker received audio " + args.file);
             await loadAudioFile(args);
-            const mode = METADATA[args.file]?.isSaved ? 'archive' : 'analyse';
+            await new Promise(resolve => setTimeout(resolve, 10));
+            const file = args.file;
+            const mode = METADATA[file].isSaved ? 'archive' : 'analyse';
+            
+            console.log(METADATA[file], 'file metadata')
+            console.log(METADATA, mode)
             await onChangeMode(mode);
+            console.log(METADATA, mode)
             break;
         }
         case "filter": {
@@ -534,7 +540,7 @@ async function handleMessage(e) {
             else {
                 predictWorkers.length && terminateWorkers()
             };
-            INITIALISED =  onLaunch(args);
+            INITIALISED =  await onLaunch(args);
             break;
         }
         case "post": {await uploadOpus(args);
@@ -1151,9 +1157,9 @@ async function getWorkingFile(file) {
           };
         throw new Error(`${i18n[STATE.locale]}: ${file}`);
     }
-    const metadata = await setMetadata({ file: file, source_file: source_file });
-    if (!metadata) return false
-    METADATA[source_file] = METADATA[file];
+    const meta = await setMetadata({ file: file, source_file: source_file });
+    if (!meta) return false
+    METADATA[source_file] = meta[file];
     return source_file;
 }
 
@@ -1275,14 +1281,15 @@ function addDays(date, days) {
 * @returns {Promise<unknown>}
 */
 const setMetadata = async ({ file, source_file = file }) => {
-    METADATA[file] ??= {};
-    if (METADATA[file].isComplete) return METADATA[file];
+    if (METADATA[file]?.isComplete) return METADATA[file];
 
     // CHeck the database first, so we honour any manual updates.
     const savedMeta = await getSavedFileInfo(file).catch(error => console.warn('getSavedFileInfo error', error));
     if (savedMeta) {
         METADATA[file] = savedMeta;
         METADATA[file].isSaved = true; // Queried by UI to establish saved state of file.
+    } else {
+        METADATA[file] = {}
     }
 
     let guanoTimestamp;    
