@@ -1255,7 +1255,8 @@ async function loadAudioFile({
                 //error.code === 'ENOENT' && notifyMissingFile(file)
             })
         } else {
-            reject(generateAlert({type: 'error',  message: 'noFile'}))            
+            const error = 'No file'
+            reject(generateAlert({type: 'error',  message: 'noFile', variables: {error}}))            
         }
 
     })
