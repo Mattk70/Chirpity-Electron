@@ -967,7 +967,7 @@ const prepResultsStatement = (species, noLimit, included, offset, topRankin) => 
     const limitClause = noLimit ? '' : 'LIMIT ?  OFFSET ?';
     noLimit || params.push(STATE.limit, offset);
 
-    resultStatement += ` ORDER BY ${STATE.resultsSortOrder}, callCount DESC ${limitClause} `;
+    resultStatement += ` ORDER BY ${STATE.resultsSortOrder}, timestamp ASC ${limitClause} `;
     
     return [resultStatement, params];
 }
