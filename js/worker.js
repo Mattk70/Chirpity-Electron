@@ -486,7 +486,7 @@ async function handleMessage(e) {
             STATE.cacheSummaryParams = false;
             filesBeingProcessed.length && onAbort(args);
             DEBUG && console.log("Worker received audio " + args.file);
-            await loadAudioFile(args);
+            await loadAudioFile(args).catch(_e => console.warn('Error opening file:', args.file));
             const file = args.file;
             const mode = METADATA[file].isSaved ? 'archive' : 'analyse';
             await onChangeMode(mode);
@@ -1144,10 +1144,11 @@ async function getWorkingFile(file) {
             sv: "Fil kunde inte hittas",
             zh: "文件未找到"
           };
-        throw new Error(`${i18n[STATE.locale]}: ${file}`);
+        const message = i18n[STATE.locale] || i18n['en'];
+        throw new Error(`${message}: ${file}`);
     }
     const meta = await setMetadata({ file: file, source_file: source_file });
-    if (!meta) return false
+    if (!meta) throw new Error(`No metadata set for: ${file}`);
     
     METADATA[source_file] = METADATA[file];
     return source_file;
@@ -1246,9 +1247,11 @@ async function loadAudioFile({
                 resolve()
             })
             .catch( (error) => {
-                console.warn(error);
-                // notify and return null if no matching file was found
-                reject(generateAlert({type: 'error',  message: 'noFile', variables: {error}}))
+                // notify and throw error if no matching file was found
+                const size = fs.statSync(file).size === 0 ? '0 bytes' : '';
+                const message = error.message || `${file}: ${size}`;
+                console.warn(message);
+                reject(generateAlert({type: 'error',  message: 'noFile', variables: {error: message}}))
                 //error.code === 'ENOENT' && notifyMissingFile(file)
             })
         } else {
