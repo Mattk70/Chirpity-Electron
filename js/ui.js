@@ -1683,7 +1683,6 @@ window.onload = async () => {
     // Load preferences and override defaults
     [appPath, tempPath, systemLocale] = await getPaths();
     // Set default locale
-    console.log(systemLocale)
     systemLocale = systemLocale.replace('en-GB', 'en_uk');
     systemLocale = systemLocale === 'en_uk' ? systemLocale : systemLocale.slice(0,2).toLowerCase();
     if (STATE.translations.includes(systemLocale)) {

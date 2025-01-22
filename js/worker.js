@@ -830,7 +830,7 @@ const prepSummaryStatement = (included) => {
             included = getExcluded(included);
             not = 'NOT';
         }
-        console.log('included', included.length, '# labels', LABELS.length)
+        DEBUG && console.log('included', included.length, '# labels', LABELS.length)
         const includedParams = prepParams(included);
         summaryStatement += ` AND speciesID ${not} IN (${includedParams}) `;
         params.push(...included);
