@@ -149,8 +149,8 @@ onmessage = async (e) => {
         switch (message) {
 
             case "get-list": {
-                const {model, listType, useWeek, customList}  = e.data;
-                listModel.customList = customList;
+                const {model, listType, useWeek, customLabels}  = e.data;
+                listModel.customLabels = customLabels;
                 listModel.model = model;
                 NOT_BIRDS = model === 'birdnet' ? BIRDNET_NOT_BIRDS : CHIRPITY_NOT_BIRDS;
                 if (model !== 'birdnet'){
@@ -262,9 +262,9 @@ class Model {
                 includedIDs = additionalIDs.filter(id => local_ids[0].includes(id));
             }
         } else if (listType === 'custom'){
-            if (this.customList){ // hack: why it gets called first without a customlist I don't know! But it will be called a second time with one.
+            if (this.customLabels){ // hack: why it gets called first without customLabels I don't know! But it will be called a second time with one.
                 const labelsScientificNames = this.labels.map(getFirstElement);
-                const customScienticNames = this.customList.map(getFirstElement);
+                const customScienticNames = this.customLabels.map(getFirstElement);
                 let line = 0;
                 for (let i = 0; i < customScienticNames.length; i++) {
                     const sname = customScienticNames[i];
@@ -279,7 +279,7 @@ class Model {
                                 if (wordInBrackets) {
                                     const wordToMatch = wordInBrackets[0];
                                     // Check if the word in brackets exists in the custom list at the same index position
-                                    if (this.customList[i].includes(wordToMatch)) {
+                                    if (this.customLabels[i].includes(wordToMatch)) {
                                         selectedIndexes.push(idx);
                                     }
                                 } else {

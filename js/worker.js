@@ -292,7 +292,6 @@ async function loadDB(path) {
         LABELS = res.map(obj => obj.labels); // these are the labels in the preferred locale
         DEBUG && console.log("Opened and cleaned disk db " + file)
     }
-    UI.postMessage({event: 'labels', labels: LABELS})
     return true;
 }
 
@@ -453,7 +452,7 @@ async function handleMessage(e) {
         }
         case "change-mode": {
             const mode = args.mode;
-            await onChangeMode(args.mode);
+            await onChangeMode(mode);
             break;
         }
         case "chart": {
@@ -561,7 +560,7 @@ async function handleMessage(e) {
         }
         case "update-list": {
             STATE.list = args.list;
-            STATE.customList = args.list === 'custom' ? args.customList : STATE.customList;
+            STATE.customLabels = args.list === 'custom' ? args.customLabels : STATE.customLabels;
             const {lat, lon, week} = STATE;
             // Clear the LIST_CACHE & STATE.included keys to force list regeneration
             LIST_CACHE = {}; //[`${lat}-${lon}-${week}-${STATE.model}-${STATE.list}`];
@@ -2182,7 +2181,7 @@ const insertDurations = async (file, id) => {
     const durationSQL = Object.entries(METADATA[file].dateDuration)
     .map(entry => `(${entry.toString()},${id})`).join(',');
     // No "OR IGNORE" in this statement because it should only run when the file is new
-    const result = await STATE.db.runAsync(`INSERT INTO duration VALUES ${durationSQL}`);
+    const _result = await STATE.db.runAsync(`INSERT INTO duration VALUES ${durationSQL}`);
 }
 
 
@@ -2246,8 +2245,8 @@ const generateInsertQuery = async (latestResult, file) => {
         console.log("Transaction error:", error);
     } finally {
         dbMutex.unlock();
-        return fileID;
     }
+    return fileID;
 }
 const parsePredictions = async (response) => {
     let file = response.file;
@@ -2449,9 +2448,7 @@ function calculateNighttimeBoundaries(fileStart, fileEnd, latitude, longitude) {
     const activeIntervals = [];
     const maxFileOffset = (fileEnd - fileStart) / 1000;
     const dayNightBoundaries = [];
-    //testing
-    const startTime = new Date(fileStart);
-    //needed
+
     const endTime = new Date(fileEnd);
     endTime.setHours(23, 59, 59, 999);
     for (let currentDay = new Date(fileStart);
@@ -2647,7 +2644,7 @@ const getResults = async ({
         filename += format == 'Raven' ? `_selections.txt` : '_detections.csv';
         const filePath = p.join(directory, filename);
         writeToPath(filePath, formattedValues, {headers: true, delimiter: format === 'Raven' ? '\t' : ','})
-        .on('error', err => generateAlert({type: 'warning',  message: 'saveBlocked', variables: {filePath}}))
+        .on('error', _err => generateAlert({type: 'warning',  message: 'saveBlocked', variables: {filePath}}))
         .on('finish', () => {
             generateAlert({message:'goodSave', variables: {filePath}});
         });
@@ -2673,7 +2670,7 @@ const getResults = async ({
             const filename = p.basename(file, suffix)  + '.txt';
             const filePath = p.join(directory, filename);
             writeToPath(filePath, groupedResult[file], {headers: false, delimiter: '\t'})
-            .on('error', err => generateAlert({type: 'warning',  message: 'saveBlocked', variables: {filePath}}))
+            .on('error', _err => generateAlert({type: 'warning',  message: 'saveBlocked', variables: {filePath}}))
             .on('finish', () => {
                 generateAlert({message:'goodSave', variables: {filePath}});
             });
@@ -2820,7 +2817,7 @@ function formatRavenValues(obj) {
         const regex = /\(([^)]+)\)/;
         const matches = modifiedObj.cname.match(regex);
         // Splitting the input string based on the regular expression match
-        const [name, calltype] = modifiedObj.cname.split(regex);
+        const [name, _calltype] = modifiedObj.cname.split(regex);
         modifiedObj.cname = name.trim(); // Output: "words words"
     }
     // Create a new object with the right keys
@@ -3626,7 +3623,7 @@ async function setIncludedIDs(lat, lon, week) {
             message: 'get-list',
             model: STATE.model,
             listType: STATE.list,
-            customList: STATE.customList,
+            customLabels: STATE.customLabels,
             lat: lat || STATE.lat,
             lon: lon || STATE.lon,
             week: week || STATE.week,

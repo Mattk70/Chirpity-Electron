@@ -1743,6 +1743,7 @@ window.onload = async () => {
         setTimelinePreferences();
         // Show the list in use
         DOM.listToUse.value = config.list;
+        config.list === 'custom' && readLabels(config.customListFile[config.model], 'list')
         DOM.localSwitch.checked = config.local;
 
         // Show Locale
@@ -1839,7 +1840,7 @@ window.onload = async () => {
             autoArchive.checked = config.archive.auto;
 
         }
-        //setListUIState(config.list);
+        setListUIState(config.list);
         worker.postMessage({
             action: 'update-state',
             archive: config.archive,
@@ -1951,24 +1952,27 @@ const setUpWorkerMessaging = () => {
                 case "database-results-complete": {onResultsComplete(args);
                     break }
                 case "labels": { 
-                    LABELS = args.labels; 
-                    /* Code below to retrieve Red list data
-                    for (let i = 0;i< LABELS.length; i++){
-                        const label = LABELS[i];
-                        const sname = label.split('_')[0];
-                        if (! STATE.IUCNcache[sname]) { 
-                            await getIUCNStatus(sname)
-                            await new Promise(resolve => setTimeout(resolve, 300))
+                        LABELS = args.labels; 
+                        /* Code below to retrieve Red list data
+                        for (let i = 0;i< LABELS.length; i++){
+                            const label = LABELS[i];
+                            const sname = label.split('_')[0];
+                            if (! STATE.IUCNcache[sname]) { 
+                                await getIUCNStatus(sname)
+                                await new Promise(resolve => setTimeout(resolve, 300))
+                            }
                         }
-                    }
-                    */
-                    // Read a custom list if applicable
-                    config.list === 'custom' && setListUIState(config.list);
+                        */
                     break }
                 case 'label-translation-needed': {
                     // Called when the initial system locale isn't english
                     const locale = args.locale;
-                    const labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_${locale}.txt`; 
+                    let labelFile;
+                    if (config.list === "custom"){
+                        labelFile = config.customListFile[config.model]; 
+                    } else {
+                        labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_${locale}.txt`; 
+                    }
                     readLabels(labelFile);
                     break }
                 case "location-list": {LOCATIONS = args.locations;
@@ -2665,8 +2669,7 @@ function onChartData(args) {
         updatePrefs('config.json', config)
         //resetResults();
         setListUIState(config.list);
-        // Since the custom list function calls for its own update *after* reading the labels, we'll skip updates for custom lists here
-        config.list === 'custom' || updateList()
+        updateList()
     })
     
     DOM.customListSelector.addEventListener('click', async () =>{
@@ -2676,7 +2679,7 @@ function onChartData(args) {
             const customListFile = files.filePaths[0];
             config.customListFile[config.model] = customListFile;
             DOM.customListFile.value = customListFile;
-            readLabels(config.customListFile[config.model], 'list');
+            readLabels(customListFile, 'list');
             LIST_MAP = getI18n(i18nLIST_MAP);
             updatePrefs('config.json', config)
         }
@@ -4920,7 +4923,11 @@ function playRegion(){
     })
     
     function updateList () {
-        worker.postMessage({ action: 'update-list', list: config.list, refreshResults: STATE.analysisDone })
+        if (config.list === "custom"){
+            readLabels(config.customListFile[config.model], 'list')
+        } else {
+            worker.postMessage({ action: 'update-list', list: config.list, refreshResults: STATE.analysisDone })
+        }
     }
     
     function refreshSummary() {
@@ -4995,9 +5002,7 @@ function playRegion(){
                     setListUIState(element.value)
                     config.list = element.value;
                     updateListIcon();
-                    //resetResults({clearSummary: true, clearPagination: true, clearResults: true});
-                    // Don't call this for custom lists
-                    config.list === 'custom' || updateList()
+                    updateList();
                     break }
                 case 'locale': {
                     let labelFile;
@@ -5179,10 +5184,8 @@ function setListUIState(list){
         DOM.customListContainer.classList.remove('d-none');  
         if (!config.customListFile[config.model]) {
             generateToast({type: 'warning', message: 'listFileNeeded'})
-            return
         }
-        readLabels(config.customListFile[config.model], 'list');
-    } 
+    }
 }
 
 async function readLabels(labelFile, updating){
@@ -5203,10 +5206,10 @@ async function readLabels(labelFile, updating){
     }).then(filecontents => {
         LABELS = filecontents.trim().split(/\r?\n/);
         // Add unknown species
-        LABELS.push('Unknown Sp._Unknown Sp.');
+        !LABELS.includes('Unknown Sp._Unknown Sp.') && LABELS.push('Unknown Sp._Unknown Sp.');
         
         if (updating === 'list'){
-            worker.postMessage({ action: 'update-list', list: config.list, customList: LABELS, refreshResults: STATE.analysisDone});
+            worker.postMessage({ action: 'update-list', list: config.list, customLabels: LABELS, refreshResults: STATE.analysisDone});
             trackEvent(config.UUID, 'UI', 'Create', 'Custom list', LABELS.length)
         } else {
             worker.postMessage({action: 'update-locale', locale: config.locale, labels: LABELS, refreshResults: STATE.analysisDone});
