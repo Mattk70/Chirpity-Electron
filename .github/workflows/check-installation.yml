@@ -48,7 +48,6 @@ jobs:
               libxdamage1 \
               libxrandr2 \
               libgbm-dev \
-              libasound2 \
               libpangocairo-1.0-0 \
               libcups2 \
               libxss1 \
