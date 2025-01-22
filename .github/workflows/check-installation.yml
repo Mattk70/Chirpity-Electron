@@ -35,7 +35,27 @@ jobs:
         run: |
           npm install
           echo "Install's status is ${{ job.status }}."
-          
+      - name: Install dependencies for Electron
+        if: runner.os == 'Linux'
+        run: |
+            sudo apt-get install -y \
+              libnss3 \
+              libatk1.0-0 \
+              libatk-bridge2.0-0 \
+              libx11-xcb1 \
+              libxcomposite1 \
+              libxcursor1 \
+              libxdamage1 \
+              libxrandr2 \
+              libgbm-dev \
+              libasound2 \
+              libpangocairo-1.0-0 \
+              libcups2 \
+              libxss1 \
+              libxkbfile1 \
+              libgdk-pixbuf2.0-0 \
+              libgtk-3-0
+        
       - name: Set platform-specific ffmpeg path
         shell: bash
         run: |
