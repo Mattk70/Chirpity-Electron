@@ -101,7 +101,9 @@ span[id^="filename_"] {
     left: 25px;
     z-index: 2;
 }
-
+.bg-purple {
+    background-color: #6f42c1;
+}
 
 .filename {
     margin-left: auto;

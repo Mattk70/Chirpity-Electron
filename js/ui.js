@@ -1,6 +1,7 @@
 import {trackVisit, trackEvent} from './tracking.js';
 import {DOM} from './DOMcache.js';
 import {IUCNCache} from './IUCNcache.js';
+import {fetchIssuesByLabel, renderIssuesInModal} from './getKnownIssues.js';
 import {i18nAll, i18nSpeciesList,i18nHeadings, localiseUI, i18nContext, i18nLocation, i18nForm, i18nHelp, i18nToasts, i18nTitles, i18nLIST_MAP, i18nLists, IUCNLabel} from './i18n.js';
 let LOCATIONS, locationID = undefined, loadingTimeout, LIST_MAP;
 
@@ -4722,7 +4723,12 @@ function playRegion(){
             case 'keyboardHelp': { (async () => await populateHelpModal('keyboard', i18nHelp.keyboard[locale]))(); break }
             case 'settingsHelp': { (async () => await populateHelpModal('settings', i18nHelp.settings[locale]))(); break }
             case 'usage': { (async () => await populateHelpModal('usage', i18nHelp.usage[locale]))(); break }
-            case 'bugs': { (async () => await populateHelpModal('community', i18nHelp.community[locale]))(); break }
+            case 'community': { (async () => await populateHelpModal('community', i18nHelp.community[locale]))(); break }
+            case 'known-issues': {
+                fetchIssuesByLabel(['v'+ VERSION, 'All versions affected'])
+                    .then(issues => renderIssuesInModal(issues, VERSION))
+                    .catch(error => console.error("Error:", error));
+                break}
             case 'species': { worker.postMessage({action: 'get-valid-species', file: STATE.currentFile}); break }
             case 'startTour': { prepTour(); break }
             case 'eBird': { (async () => await populateHelpModal('ebird', i18nHelp.eBird[locale]))(); break }

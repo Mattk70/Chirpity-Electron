@@ -2397,10 +2397,14 @@ async function processNextFile({
         let file = FILE_QUEUE.shift()
         const found = await getWorkingFile(file).catch(error => {
             const message = error.message;
-            console.warn('Error in getWorkingFile', message)  ;
-            generateAlert({type: 'warning',  message: 'noFile', variables: {error: message}})
+            if (!STATE.notFound.file){
+                STATE.notFound[file] = true
+                console.warn('Error in getWorkingFile', message)  ;
+                generateAlert({type: 'warning',  message: 'noFile', variables: {error: message}})
+            }
         });
         if (found) {
+            delete STATE.notFound[file];
             if (end) {}
             let boundaries = [];
             if (!start) boundaries = await setStartEnd(file).catch( (error) => console.warn('Error in setStartEnd', error));
