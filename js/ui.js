@@ -1744,7 +1744,7 @@ window.onload = async () => {
         // Show the list in use
         DOM.listToUse.value = config.list;
         DOM.localSwitch.checked = config.local;
-
+        config.list === 'custom' && readLabels(config.customListFile[config.model], 'list')
         // Show Locale
         DOM.locale.value = config.locale;
         LIST_MAP = getI18n(i18nLIST_MAP)
