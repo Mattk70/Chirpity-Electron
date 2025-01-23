@@ -4,7 +4,7 @@ async function fetchIssuesByLabel(labelList) {
     try {
         const results = await Promise.all(
             labelList.map(label =>
-                fetch(`https://api.github.com/repos/${owner}/${repo}/issues?labels=${label}`)
+                fetch(`https://api.github.com/repos/${owner}/${repo}/issues?state=all&labels=${label}`)
                     .then(res => res.json())
             )
         );
