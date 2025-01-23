@@ -427,12 +427,12 @@ app.whenReady().then(async () => {
         let options;
         if (type === 'audio') {
              options = {
-                filters: [
-                    { name: 'Audio Files', extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg', 'mp4', 'opus', 'mov'] } 
-                ],
                 properties: [fileOrFolder, multi] ,
                 buttonLabel: buttonLabel,
                 title: title
+            }
+            if (fileOrFolder === 'openFiles' ){
+                options.filters = [{ name: 'Audio Files', extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg', 'mp4', 'opus', 'mov'] } ]
             }
         } else {
             options = {
