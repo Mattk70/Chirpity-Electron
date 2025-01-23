@@ -1743,7 +1743,6 @@ window.onload = async () => {
         setTimelinePreferences();
         // Show the list in use
         DOM.listToUse.value = config.list;
-        config.list === 'custom' && readLabels(config.customListFile[config.model], 'list')
         DOM.localSwitch.checked = config.local;
 
         // Show Locale
@@ -2616,45 +2615,15 @@ function onChartData(args) {
     }
 
     const updateListIcon = () => {
-        const listIconContainer = DOM.listIcon;
-        const isCustom = config.list === 'custom';
-        const title = LIST_MAP[config.list];
-    
-        // Check if the current child matches the desired type (span or img)
-        const currentChild = listIconContainer.firstChild;
-    
-        if (isCustom) {
-            if (!(currentChild instanceof HTMLSpanElement)) {
-                // Replace with a span element if it's not already
-                const span = document.createElement('span');
-                span.className = 'material-symbols-outlined mt-1';
-                span.style.width = '30px';
-                span.title = title;
-                span.textContent = 'fact_check';
-                listIconContainer.replaceChildren(span); // Efficient replacement
-            } else {
-                // Update attributes and content if the child is already a span
-                currentChild.title = title;
-                currentChild.textContent = 'fact_check';
-            }
-        } else {
-            if (!(currentChild instanceof HTMLImageElement)) {
-                // Replace with an img element if it's not already
-                const img = document.createElement('img');
-                img.className = 'icon';
-                img.alt = config.list;
-                img.title = title;
-                img.src = `img/${config.list}.png`;
-                listIconContainer.replaceChildren(img); // Efficient replacement
-            } else {
-                // Update attributes if the child is already an img
-                currentChild.alt = config.list;
-                currentChild.title = title;
-                currentChild.src = `img/${config.list}.png`;
-            }
-        }
-    };
-    
+        LIST_MAP = getI18n(i18nLIST_MAP);
+        DOM.listIcon.style.visibility = 'hidden';
+        DOM.listIcon.innerHTML = config.list === 'custom' ?
+            `<span class="material-symbols-outlined mt-1" title="${LIST_MAP[config.list]}" style="width: 30px">fact_check</span>` :
+            `<img class="icon" src="img/${config.list}.png" alt="${config.list}"  title="${LIST_MAP[config.list]}">`;
+            DOM.listIcon.style.visibility = 'visible';
+    }
+
+
     DOM.listIcon.addEventListener('click', () => {
         if (PREDICTING){
             generateToast({message: 'changeListBlocked', type:'warning'})
@@ -5196,12 +5165,15 @@ function setListUIState(list){
 async function readLabels(labelFile, updating){
     fetch(labelFile).then(response => {
         if (! response.ok) throw new Error('Network response was not ok');
+        if (!labelFile) throw new Error('Failed to fetch');
         return response.text();
     }).catch(error =>{
         if (error.message === 'Failed to fetch') {
             generateToast({type: 'error', message: 'listNotFound', variables: {file: labelFile}})
             DOM.customListSelector.classList.add('btn-outline-danger');
-            document.getElementById('navbarSettings').click();
+            if (!document.getElementById('settings').classList.contains('show')){
+                document.getElementById('navbarSettings').click();
+            }
             document.getElementById('list-file-selector').focus();
             throw new Error(`Missing label file: ${labelFile}`)
         }
@@ -5221,7 +5193,8 @@ async function readLabels(labelFile, updating){
         }
 
     }).catch(error =>{
-        console.error(error)
+        // No need to record the error if it's just that the label file wasn't entered in the form
+        labelFile && console.error(error)
     })
 }
 
