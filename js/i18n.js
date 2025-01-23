@@ -1711,6 +1711,19 @@ const i18nTitles = {
     }
 };
 
+const i18nLocate = {
+    en: { locate: 'Locate File', remove: 'Remove from archive' },
+    da: { locate: 'Find fil', remove: 'Fjern fra arkiv' },
+    de: { locate: 'Datei suchen', remove: 'Aus dem Archiv entfernen' },
+    es: { locate: 'Localizar archivo', remove: 'Eliminar del archivo' },
+    fr: { locate: 'Localiser le fichier', remove: 'Retirer de l’archive' },
+    ja: { locate: 'ファイルを探す', remove: 'アーカイブから削除' },
+    nl: { locate: 'Bestand zoeken', remove: 'Verwijderen uit archief' },
+    pt: { locate: 'Localizar arquivo', remove: 'Remover do arquivo' },
+    ru: { locate: 'Найти файл', remove: 'Удалить из архива' },
+    sv: { locate: 'Hitta fil', remove: 'Ta bort från arkiv' },
+    zh: { locate: '定位文件', remove: '从存档中删除' }
+};
 
 const i18nTour = {
     en: `
@@ -2979,4 +2992,4 @@ async function localiseUI(locale) {
     }
 }
 
-export {i18nAll, i18nSpeciesList,i18nHeadings, i18nContext, i18nLocation, i18nForm, i18nHelp, i18nToasts, i18nTitles, i18nLIST_MAP, i18nLists, IUCNLabel, localiseUI}
+export {i18nAll, i18nSpeciesList,i18nHeadings, i18nContext, i18nLocation, i18nForm, i18nHelp, i18nToasts, i18nTitles, i18nLIST_MAP, i18nLists, IUCNLabel, i18nLocate, localiseUI}

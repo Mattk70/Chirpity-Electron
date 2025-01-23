@@ -2,7 +2,7 @@ import {trackVisit, trackEvent} from './tracking.js';
 import {DOM} from './DOMcache.js';
 import {IUCNCache} from './IUCNcache.js';
 import {fetchIssuesByLabel, renderIssuesInModal} from './getKnownIssues.js';
-import {i18nAll, i18nSpeciesList,i18nHeadings, localiseUI, i18nContext, i18nLocation, i18nForm, i18nHelp, i18nToasts, i18nTitles, i18nLIST_MAP, i18nLists, IUCNLabel} from './i18n.js';
+import {i18nAll, i18nSpeciesList,i18nHeadings, localiseUI, i18nContext, i18nLocation, i18nForm, i18nHelp, i18nToasts, i18nTitles, i18nLIST_MAP, i18nLists, IUCNLabel, i18nLocate} from './i18n.js';
 let LOCATIONS, locationID = undefined, loadingTimeout, LIST_MAP;
 
 let LABELS = [], DELETE_HISTORY = [];
@@ -1932,13 +1932,14 @@ const setUpWorkerMessaging = () => {
                         clearTimeout(loadingTimeout)
                         DOM.loading.classList.add('d-none')
                         MISSING_FILE = args.file;
-                        args.message += `
+                        const i18n = getI18n(i18nLocate);
+                        args.locate = `
                             <div class="d-flex justify-content-center mt-2">
                                 <button id="locate-missing-file" class="btn btn-primary border-dark text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
-                                    Locate File
+                                    ${i18n.locate}
                                 </button>
                                 <button id="purge-from-toast" class="ms-3 btn btn-warning text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
-                                    Remove from Archive
+                                ${i18n.remove}
                                 </button>
                             </div>
                             `
@@ -5624,11 +5625,13 @@ function getI18n(context){
     
     
 
-    function generateToast({message = '', type = 'info', autohide = true, variables = undefined} ={}) {
+    function generateToast({message = '', type = 'info', autohide = true, variables = undefined, locate = ''} ={}) {
         // i18n
         const i18n = getI18n(i18nToasts);
         message === 'noFile' && clearTimeout(loadingTimeout) && DOM.loading.classList.add('d-none');
         message = variables ? interpolate(i18n[message], variables) : i18n[message] || message;
+        // add option to locate a missing file
+        message += locate;
         const domEl = document.getElementById('toastContainer');
         
         const wrapper = document.createElement('div');

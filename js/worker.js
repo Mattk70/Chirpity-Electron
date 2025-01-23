@@ -1247,11 +1247,15 @@ async function loadAudioFile({
             })
             .catch( (error) => {
                 // notify and throw error if no matching file was found
-                const size = fs.statSync(file).size === 0 ? '0 bytes' : '';
-                const message = error.message || `${file}: ${size}`;
-                console.warn(message);
-                reject(generateAlert({type: 'error',  message: 'noFile', variables: {error: message}}))
-                //error.code === 'ENOENT' && notifyMissingFile(file)
+                if (! fs.existsSync(file)) {
+                    generateAlert({type: 'error',  message: 'noFile', variables: {error}, file})
+                    //reject(error)
+                } else {
+                    const size = fs.statSync(file).size === 0 ? '0 bytes' : '';
+                    const message = error.message || `${file}: ${size}`;
+                    console.warn(message);
+                    reject(generateAlert({type: 'error',  message: 'noFile', variables: {error: message}}, file))
+                }
             })
         } else {
             const error = 'No file'
