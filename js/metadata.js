@@ -28,7 +28,7 @@ function extractWaveMetadata(filePath) {
                 const chunkId = buffer.toString('utf-8', 0, 4); // Should be "RIFF"
                 const format = buffer.toString('utf-8', 8, 12); // Should be "WAVE"
 
-                if (chunkId !== 'RIFF' || format !== 'WAVE') {
+                if (!(chunkId === 'RIFF' || chunkId === 'RF64') || format !== 'WAVE') {
                     fs.close(fd, () => {}); // Close the file descriptor
                     return reject(new Error('Invalid WAV file: ' + filePath));
                 }
