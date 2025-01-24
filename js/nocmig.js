@@ -31,14 +31,17 @@ function loadModel(params){
     DEBUG && console.log(`model received load instruction. Using list: ${list}, batch size ${batch}`);
     tf.setBackend(backend).then(async () => {
         if (backend === "webgl") {
-            tf.env().set("WEBGL_FORCE_F16_TEXTURES", true);
+            // tf.env().set("WEBGL_FORCE_F16_TEXTURES", true);
+            // tf.env().set("WEBGL_USE_SHAPES_UNIFORMS", true);
+
             tf.env().set("WEBGL_PACK", true);
             tf.env().set("WEBGL_EXP_CONV", true);
             tf.env().set("TOPK_K_CPU_HANDOFF_THRESHOLD", 128);
             tf.env().set("TOPK_LAST_DIM_CPU_HANDOFF_SIZE_THRESHOLD", 0);
         } else if (backend === "webgpu") {
             tf.env().set("WEBGPU_DEFERRED_SUBMIT_BATCH_SIZE", 64); // Affects GPU RAM at expense of speed
-            //tf.env().set("WEBGPU_MATMUL_PROGRAM_TYPE", 3); // MatMulPackedProgram 
+            tf.env().set("WEBGPU_MATMUL_PROGRAM_TYPE", 3); // MatMulPackedProgram 
+            tf.env().set('CHECK_COMPUTATION_FOR_ERRORS', false);
         }
         tf.enableProdMode();
         //tf.enableDebugMode();
@@ -130,6 +133,11 @@ onmessage = async (e) => {
                 };
                 postMessage(response);
                 break;
+            }
+            case "terminate": {
+                tf.backend().dispose();
+                console.log('pre termination', tf.memory());
+                self.close(); // Terminate the worker
             }
         }
     }

@@ -1194,10 +1194,6 @@ const i18nForm = {
     zh: {submit: '提交', cancel: '取消', select: "选择新的日期和时间："}
 };
 
-const i18nGoTo = {
-    en: {goTo: 'Go To', time: 'Time', position: 'Position', species: 'Species', call: 'Call', song: 'Song', notes: 'Notes', label: 'Label', location: 'Location'}
-}
-
 const i18nLIST_MAP = {
     en: { 
         location: 'Searching for birds in your region',
@@ -2874,7 +2870,6 @@ const IUCNLabel = {
 };
 
 async function localiseUI(locale) {
-    let t0 = Date.now();
     locale = locale.replace(/_.*$/, '');
     try {
          // Try fetching the localisation JSON file

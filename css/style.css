@@ -809,3 +809,12 @@ input[type="range"].vertical {
     width: 100%;  /* Ensure the table takes full width */
     table-layout: auto;
 }
+
+/* Settings display */
+.advanced {
+    display: none;
+}
+.advanced-visible {
+    display: block;
+    color: gold;
+}

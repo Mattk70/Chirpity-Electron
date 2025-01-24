@@ -1824,10 +1824,16 @@ window.onload = async () => {
         lowShelfAttenuationThreshold.textContent = lowShelfAttenuation.value + 'dB';
         DOM.sendFilteredAudio.checked = config.filters.sendToModel;
         filterIconDisplay();
+        if (config[config.model].backend.includes('web')){
+            // Force max three threads to prevent severe memory issues
+            config[config[config.model].backend].threads = Math.min(config[config[config.model].backend].threads, 3);
+            DOM.threadSlider.max = 3;
+        } else {
+            DOM.threadSlider.max = DIAGNOSTICS['Cores'];
+        }
         
-        DOM.threadSlider.max = DIAGNOSTICS['Cores'];
         DOM.threadSlider.value = config[config[config.model].backend].threads;
-        DOM.numberOfThreads.textContent = config[config[config.model].backend].threads;
+        DOM.numberOfThreads.textContent = DOM.threadSlider.value;
         DOM.defaultLat.value = config.latitude;
         DOM.defaultLon.value = config.longitude;
         place.innerHTML = '<span class="material-symbols-outlined">fmd_good</span>' + config.location;
@@ -2672,13 +2678,16 @@ function onChartData(args) {
     }
     
     const handleBackendChange = (backend) => {
-        config[config.model].backend = backend instanceof Event ? backend.target.value : backend;
-        const backendEL = document.getElementById(config[config.model].backend);
+        backend = backend instanceof Event ? backend.target.value : backend;
+        config[config.model].backend = backend;
+        const backendEL = document.getElementById(backend);
         backendEL.checked = true;
-        if (config[config.model].backend === 'webgl' || config[config.model].backend === 'webgpu') {
+        if (backend === 'webgl' || backend === 'webgpu') {
+            DOM.threadSlider.max = 3;
             SNRSlider.disabled = true;
             config.filters.SNR = 0;
         } else {
+            DOM.threadSlider.max = DIAGNOSTICS['Cores'];
             DOM.contextAware.disabled = false;
             if (DOM.contextAware.checked) {
                 config.detect.contextAware = true;
@@ -2695,9 +2704,9 @@ function onChartData(args) {
             }
         }
         // Update threads and batch Size in UI
-        DOM.threadSlider.value = config[config[config.model].backend].threads;
-        DOM.numberOfThreads.textContent = config[config[config.model].backend].threads;
-        DOM.batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(config[config[config.model].backend].batchSize);
+        DOM.threadSlider.value = config[backend].threads;
+        DOM.numberOfThreads.textContent = config[backend].threads;
+        DOM.batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(config[backend].batchSize);
         DOM.batchSizeValue.textContent = BATCH_SIZE_LIST[DOM.batchSizeSlider.value].toString();
         updatePrefs('config.json', config)
         // restart wavesurfer regions to set new maxLength
@@ -3952,15 +3961,14 @@ function formatDuration(seconds){
         })
     }
     const modelSettingsDisplay = () => {
+        // Sets system options according to model or machine cababilities
+        // cf. setListUIState
         const chirpityOnly = document.querySelectorAll('.chirpity-only');
         const noMac = document.querySelectorAll('.no-mac');
         const nodeOnly = document.querySelectorAll('.node-only');
         if (config.model === 'birdnet'){
             // hide chirpity-only features
             chirpityOnly.forEach(element => element.classList.add('d-none'));
-            if (config.list === 'nocturnal')  {
-                DOM.localSwitchContainer.classList.remove('d-none');
-            }
             DOM.contextAware.checked = false;
             DOM.contextAware.disabed = true;
             config.detect.contextAware = false;
@@ -3971,8 +3979,7 @@ function formatDuration(seconds){
             chirpityOnly.forEach(element => element.classList.remove('d-none'));
             // Remove GPU option on Mac
             isMac && noMac.forEach(element => element.classList.add('d-none'));
-            DOM.contextAware.checked = config.detect.contextAware;
-            DOM.localSwitchContainer.classList.add('d-none');
+            DOM.contextAware.checked = config.detect.contextAware;            
             SNRSlider.disabled = false;
             if (config.hasNode){
                 nodeOnly.forEach(element => element.classList.remove('d-none'));
@@ -4718,6 +4725,13 @@ function playRegion(){
                 break;
             }
 
+            // Settings
+            case 'basic': 
+            case 'advanced': {
+                changeSettingsMode(target)
+                break
+            }
+
             // Context-menu
             case 'play-region': { playRegion(); break }
             case 'context-analyse-selection': {getSelectionResults(); break }
@@ -4897,6 +4911,36 @@ function playRegion(){
         target && target !== 'result1' && trackEvent(config.UUID, 'UI', 'Click', target);
     })
     
+    function changeSettingsMode (target){
+        // Get references to the buttons
+        const basicButton = document.getElementById('basic');
+        const advancedButton = document.getElementById('advanced');
+        let showAdvanced;
+        if (target === 'advanced'){
+            basicButton.classList.remove('btn-primary');
+            basicButton.classList.add('btn-secondary');
+            advancedButton.classList.remove('btn-secondary');
+            advancedButton.classList.add('btn-primary');
+            showAdvanced = true;
+        } else {
+            basicButton.classList.remove('btn-secondary');
+            basicButton.classList.add('btn-primary');
+            advancedButton.classList.remove('btn-primary');
+            advancedButton.classList.add('btn-secondary');
+            showAdvanced = false;
+        };
+        const advancedElements = document.querySelectorAll('.advanced, .advanced-visible');
+        advancedElements.forEach(element => {
+            if (showAdvanced) {
+                element.classList.remove('advanced');
+                element.classList.add('advanced-visible');
+              } else {
+                element.classList.remove('advanced-visible');
+                element.classList.add('advanced');
+              }
+        });
+    }
+
     function updateList () {
         if (config.list === "custom"){
             readLabels(config.customListFile[config.model], 'list')
@@ -5015,7 +5059,7 @@ function playRegion(){
                     break }
             case 'thread-slider': {
                     // change number of threads
-                    DOM.numberOfThreads.textContent = DOM.threadSlider.value;
+                    DOM.numberOfThreads.innerHTML = DOM.threadSlider.value;
                     config[config[config.model].backend].threads = DOM.threadSlider.valueAsNumber;
                     worker.postMessage({action: 'change-threads', threads: DOM.threadSlider.valueAsNumber})
                     break }
@@ -5148,12 +5192,14 @@ function playRegion(){
     })
     
 function setListUIState(list){
+    // Sets User Preferences for chosen model
+    // cf. modelSettingsDisplay
     DOM.customListContainer.classList.add('d-none');  
     DOM.localSwitchContainer.classList.add('d-none')
     DOM.speciesThresholdEl.classList.add('d-none'); 
     if (list === 'location') {
         DOM.speciesThresholdEl.classList.remove('d-none');
-    } else if (list === 'nocturnal' && config.model === 'birdnet'){
+    } else if (list === 'nocturnal'){
         DOM.localSwitchContainer.classList.remove('d-none')
     } else if (list === 'custom') {
         DOM.customListContainer.classList.remove('d-none');  

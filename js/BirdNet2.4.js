@@ -123,7 +123,11 @@ onmessage = async (e) => {
                 }
                 break;
             }
-            
+            case "terminate": {
+                tf.backend().dispose();
+                console.log('pre termination', tf.memory());
+                self.close(); // Terminate the worker
+            }
         }
     }
     // If worker was respawned
