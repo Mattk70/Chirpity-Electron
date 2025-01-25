@@ -90,6 +90,8 @@
       "archive-location-select": ["Biblioteksplacering:"],
       "close-tour": ["Luk"],
       "settings": {
+        "basic": "Standard",
+        "advanced": "Ekspert",
         "clear-call-cache": ["Ryd referencelyd-cache"],
         "reset-defaults": ["Nulstil til standardindstillinger"],
         "model-to-use": "Model:",

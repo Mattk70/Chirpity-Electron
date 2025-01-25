@@ -89,6 +89,8 @@
   "archive-location-select": ["库位置："],
   "close-tour": ["关闭"],
   "settings": {
+    "basic": "标准",
+    "advanced": "专家",
     "clear-call-cache": ["清除参考通话缓存"],
     "reset-defaults": ["恢复默认设置"],
     "model-to-use": "模型：",

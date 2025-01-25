@@ -89,6 +89,8 @@
     "archive-location-select": ["Lieu de la Bibliothèque:"],
     "close-tour": ["Fermer"],
     "settings": {
+      "basic": "Standard",
+      "advanced": "Expert",
       "clear-call-cache": ["Effacer le cache des cris de référence"],
       "reset-defaults": ["Réinitialiser aux paramètres par défaut"],
       "model-to-use": "Modèle :",

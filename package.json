@@ -42,7 +42,6 @@
       "**/*",
       "!test*${/*}",
       "!build*${/*}",
-      "!node_modules{/*}",
       "!custom*{/*}",
       "!.github${/*}",
       "!.vscode${/*}",

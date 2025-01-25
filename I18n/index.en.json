@@ -94,6 +94,8 @@
     "archive-location-select": ["Library Location:"],
     "close-tour": ["Close"],
     "settings": {
+      "basic": "Standard",
+      "advanced": "Expert",
       "clear-call-cache": ["Clear Reference Call Cache"],
       "reset-defaults": ["Reset to default settings"],
       "model-to-use": "Model:",

@@ -89,6 +89,8 @@
   "archive-location-select": ["Localização da biblioteca:"],
   "close-tour": ["Fechar"],
   "settings": {
+    "basic": "Padrão",
+    "advanced": "Especialista",
     "clear-call-cache": ["Limpar cache de chamadas de referência"],
     "reset-defaults": ["Redefinir para as configurações padrão"],
     "model-to-use": "Modelo:",

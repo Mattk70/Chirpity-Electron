@@ -90,6 +90,8 @@
     "archive-location-select": ["Bibliotheeklocatie:"],
     "close-tour": ["Sluiten"],
     "settings": {
+        "basic": "Standaard",
+        "advanced": "Expert",
         "clear-call-cache": ["Referentieoproep-cache wissen"],
         "reset-defaults": ["Herstellen naar standaardinstellingen"],
         "model-to-use": "Model:",

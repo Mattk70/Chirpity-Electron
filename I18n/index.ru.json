@@ -89,6 +89,8 @@
     "archive-location-select": ["Расположение библиотеки:"],
     "close-tour": ["Закрыть"],
     "settings": {
+        "basic": "Стандартный",
+        "advanced": "Эксперт",
         "clear-call-cache": ["Очистить кэш справочных вызовов"],
         "reset-defaults": ["Сбросить настройки по умолчанию"],
         "model-to-use": "Модель:",

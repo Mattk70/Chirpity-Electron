@@ -2733,7 +2733,7 @@ const i18nSpeciesList = {
         excluded: '<br/><p>另一方面，应用程序不会显示以下 ${excludedCount} 类别的检测结果：</p><table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>${cname}</th><th>${sname}</th></tr></thead><tbody>${excludedList}</tbody></table>'
     }
 };
-    
+
 const IUCNLabel = {
     da: {
         'NA': 'Ingen data',

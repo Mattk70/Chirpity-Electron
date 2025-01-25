@@ -89,6 +89,8 @@
     "archive-location-select": ["Bibliotheksspeicherort:"],
     "close-tour": ["Schließen"],
     "settings": {
+      "basic": "Standard",
+      "advanced": "Experte",
       "clear-call-cache": ["Referenzruf-Cache löschen"],
       "reset-defaults": ["Auf Standardeinstellungen zurücksetzen"],
       "model-to-use": "Modell:",
