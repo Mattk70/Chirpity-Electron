@@ -3963,12 +3963,15 @@ function formatDuration(seconds){
     const modelSettingsDisplay = () => {
         // Sets system options according to model or machine cababilities
         // cf. setListUIState
-        const chirpityOnly = document.querySelectorAll('.chirpity-only');
+        const chirpityOnly = document.querySelectorAll('.chirpity-only, .chirpity-only-visible');
         const noMac = document.querySelectorAll('.no-mac');
         const nodeOnly = document.querySelectorAll('.node-only');
         if (config.model === 'birdnet'){
             // hide chirpity-only features
-            chirpityOnly.forEach(element => element.classList.add('d-none'));
+            chirpityOnly.forEach(element => {
+                element.classList.add('chirpity-only');
+                element.classList.remove('chirpity-only-visible')
+        });
             DOM.contextAware.checked = false;
             DOM.contextAware.disabed = true;
             config.detect.contextAware = false;
@@ -3976,7 +3979,10 @@ function formatDuration(seconds){
             config.filters.SNR = 0;
         } else {
             // show chirpity-only features
-            chirpityOnly.forEach(element => element.classList.remove('d-none'));
+            chirpityOnly.forEach(element => {
+                element.classList.remove('chirpity-only');
+                element.classList.add('chirpity-only-visible')
+        });
             // Remove GPU option on Mac
             isMac && noMac.forEach(element => element.classList.add('d-none'));
             DOM.contextAware.checked = config.detect.contextAware;            
