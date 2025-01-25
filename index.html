@@ -616,11 +616,11 @@
                                 <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Use Location settings" id="Use Location settings-circle-help"  data-bs-content="When activated, the Nocturnal birds filter reports birds based on your location settings.">?</a>
                             </div>
                         </div>
-                        <div id="species-threshold-el">
+                        <div class="advanced" id="species-threshold-el">
                             <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Species Threshold" id="Species Threshold-circle-help"  data-bs-content="Define the minimum eBird checklist frequency for species inclusion.
                             If 'Adjust list for the week of the year' is enabled, the list will be adjusted to include species expected for the recording week.">?</a>
                             <div class="pe-3 input-group rounded p-2 mb-1">
-                                <label class="input-group-text col-5" for="species-frequency-threshold">Species Threshold:</label>
+                                <label class="input-group-text bg-dark text-warning" for="species-frequency-threshold">Species Threshold:</label>
                                 <input id="species-frequency-threshold" type="number" class="form-control" style="width: 30%;" value="0.03" step="0.01" min="0.01" max="1" aria-label="species frequency threshold" aria-describedby="species-frequency-threshold">
                             </div>
                             <div class="text-nowrap mt-2"><label class="ms-2 me-2" for="species-week">Adjust list for the week of the year</label>
@@ -649,7 +649,7 @@
                     </div>
                     <div class="advanced">
                         <div class="pe-3 input-group rounded p-2 mb-1">
-                            <label for="iucn-scope" class="input-group-text col-5">Assessment Scope:</label>
+                            <label for="iucn-scope" class="input-group-text bg-dark text-warning">Assessment Scope:</label>
                             <select class="form-select mb-0" id="iucn-scope">
                                 <option value="Global">Global</option>
                                 <option value="Europe">Europe</option>

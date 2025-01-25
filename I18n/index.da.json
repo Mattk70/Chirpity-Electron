@@ -101,7 +101,7 @@
         "species-frequency-threshold": "Artstrøskel",
         "species-week": "Justér listen for årets uge",
         "nocmig": "Analyser kun nattetimer.",
-        "iucn": "Vis IUCN Rød Liste status for arter i oversigten.",
+        "iucn": "Vis IUCN Rød Liste status for arter",
         "iucn-scope": "Vurderingsomfang:",
         "latitude": "Bredde:", "longitude": "Længde:",
         "locale": "Sprog:",

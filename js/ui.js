@@ -982,10 +982,10 @@ async function onOpenFiles(args) {
     resetDiagnostics();
     STATE.openFiles = sanitisedList;
     // CHeck not more than 25k files
-    if (STATE.openFiles.length >= 25_000){
-        generateToast({message: 'maxFiles', variables: {'STATE.openFiles.length': STATE.openFiles.length}})
-        STATE.openFiles.splice(25000)
-    }
+    // if (STATE.openFiles.length >= 25_000){
+    //     generateToast({message: 'maxFiles', variables: {'STATE.openFiles.length': STATE.openFiles.length}})
+    //     STATE.openFiles.splice(25000)
+    // }
     // Store the file list and Load First audio file
 
     STATE.openFiles.length > 1 && worker.postMessage({action: 'check-all-files-saved', files: STATE.openFiles});
@@ -1657,14 +1657,15 @@ const defaultConfig = {
     longitude: 0.89, 
     location: 'Great Snoring, North Norfolk',
     detect: { nocmig: false, contextAware: false, confidence: 45, iucn: true , iucnScope: 'Global'},
-    filters: { active: false, highPassFrequency: 0, lowShelfFrequency: 0, lowShelfAttenuation: 0, SNR: 0, sendToModel: false },
+    filters: { active: false, highPassFrequency: 0, lowShelfFrequency: 0, lowShelfAttenuation: 0, SNR: 0, 
+        normalise: false, sendToModel: false },
     warmup: true,
     hasNode: false,
     tensorflow: { threads: DIAGNOSTICS['Cores'], batchSize: 8 },
     webgpu: { threads: 2, batchSize: 8 },
     webgl: { threads: 2, batchSize: 32 },
     audio: { gain: 0, format: 'mp3', bitrate: 192, quality: 5, downmix: false, padding: false, 
-        fade: false, notification: true, normalise: false, minFrequency: 0, maxFrequency: 11950 },
+        fade: false, notification: true, minFrequency: 0, maxFrequency: 11950 },
     limit: 500,
     debug: false,
     VERSION: VERSION,
@@ -1788,7 +1789,7 @@ window.onload = async () => {
         // Audio preferences:
         DOM.gain.value = config.audio.gain;
         DOM.gainAdjustment.textContent = config.audio.gain + 'dB';
-        DOM.normalise.checked = config.audio.normalise;
+        DOM.normalise.checked = config.filters.normalise;
         DOM.audioFormat.value = config.audio.format;
         DOM.audioBitrate.value = config.audio.bitrate;
         DOM.audioQuality.value = config.audio.quality;
@@ -3975,8 +3976,10 @@ function formatDuration(seconds){
             DOM.contextAware.checked = false;
             DOM.contextAware.disabed = true;
             config.detect.contextAware = false;
+            DOM.contextAwareIcon.classList.add('d-none')
+
             // SNRSlider.disabled = true;
-            config.filters.SNR = 0;
+            // config.filters.SNR = 0;
         } else {
             // show chirpity-only features
             chirpityOnly.forEach(element => {
@@ -3985,7 +3988,8 @@ function formatDuration(seconds){
         });
             // Remove GPU option on Mac
             isMac && noMac.forEach(element => element.classList.add('d-none'));
-            DOM.contextAware.checked = config.detect.contextAware;            
+            DOM.contextAware.checked = config.detect.contextAware;
+            DOM.contextAwareIcon.classList.remove('d-none')
             // SNRSlider.disabled = false;
             if (config.hasNode){
                 nodeOnly.forEach(element => element.classList.remove('d-none'));
@@ -4159,6 +4163,8 @@ const setSortOrder = (order) => {
         event.preventDefault();
         event.stopPropagation();
         const audioFiles = Array.from(event.dataTransfer.files).filter(file => {
+            // Exclude files/folders that start with '.'
+            if (file.name.startsWith('.')) return false;
             //include folders - file.type === '', audio & video files
             return !file.type || file.type.startsWith('audio/') || file.type.startsWith('video/');
         });
@@ -4515,7 +4521,7 @@ const setSortOrder = (order) => {
     // Filter handling
     const filterIconDisplay = () => {
         const i18n = getI18n(i18nTitles);
-        if (config.filters.active && (config.filters.highPassFrequency || (config.filters.lowShelfAttenuation && config.filters.lowShelfFrequency) || config.filters.SNR)) {
+        if (config.filters.active && (config.filters.highPassFrequency || (config.filters.lowShelfAttenuation && config.filters.lowShelfFrequency) || config.filters.normalise)) {
             DOM.audioFiltersIcon.classList.add('text-warning');
             DOM.audioFiltersIcon.title = i18n.audioFiltersOn;
         } else {
@@ -5141,8 +5147,9 @@ function playRegion(){
                     worker.postMessage({action: 'update-state', audio: config.audio});
                     break }
                 case 'normalise': {
-                    config.audio.normalise = element.checked;
-                    worker.postMessage({action:'update-state', audio: config.audio})
+                    config.filters.normalise = element.checked;
+                    element.checked && (config.filters.active = true);
+                    worker.postMessage({action:'update-state', filters: config.filters})
                     element.blur();
                     if (fileLoaded) {
                         const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);

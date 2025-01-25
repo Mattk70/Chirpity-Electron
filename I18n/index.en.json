@@ -105,7 +105,7 @@
       "species-frequency-threshold": "Species Threshold",
       "species-week": "Adjust list for the week of the year",
       "nocmig": "Only analyse night time periods.",
-      "iucn": "Show species IUCN Red List status in summary.",
+      "iucn": "Show species IUCN Red List status",
       "iucn-scope": "Assessment Scope:",
       "locale": "Language:",
       "latitude": "Lat:", "longitude": "Lon:",

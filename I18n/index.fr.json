@@ -100,7 +100,7 @@
       "species-frequency-threshold": "Seuil des Espèces",
       "species-week": "Ajuster la liste pour la semaine de l'année",
       "nocmig": "Analyser uniquement les périodes nocturnes.",
-      "iucn": "Afficher le statut de la liste rouge de l'UICN dans le résumé des espèces.",
+      "iucn": "Afficher le statut de la liste rouge de l'UICN des espèces",
       "iucn-scope": "Portée de l'évaluation :",
       "locale": "Langue :",
       "latitude": "Lat:", "longitude": "Long:",

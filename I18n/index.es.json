@@ -100,7 +100,7 @@
       "species-frequency-threshold": "Umbral",
       "species-week": "Ajustar la lista para la semana del año",
       "nocmig": "Analizar solo períodos nocturnos.",
-      "iucn": "Mostrar el estado de la Lista Roja de la UICN en el resumen de especies.",
+      "iucn": "Mostrar el estado de la Lista Roja de especies.",
       "iucn-scope": "Área:",
       "locale": "Idioma:",
       "latitude": "Latitud:", "longitude": "Longitud:",

@@ -783,8 +783,8 @@ function getFileSQLAndParams(range){
         params.push(range.start, range.end);
         // If you create a record manually before analysis, STATE.filesToAnalyse will be empty 
     } else if (['analyse'].includes(STATE.mode) && fileParams) {
-        SQL += ` AND name IN  (${fileParams}) `;
-        params.push(...STATE.filesToAnalyse);
+        // SQL += ` AND name IN  (${fileParams}) `;
+        // params.push(...STATE.filesToAnalyse);
     } else if (['archive'].includes(STATE.mode)) {
         SQL += ` AND ( name IN  (${fileParams}) `;
         params.push(...STATE.filesToAnalyse);
@@ -1646,11 +1646,11 @@ function setAudioFilters(){
             filter: 'highpass',
             options: `f=${filters.highPassFrequency}:poles=1`
         },
-        STATE.audio.gain && {
+        STATE.audio.gain > 0 && {
             filter: 'volume',
             options: `volume=${STATE.audio.gain}dB`
         },
-        STATE.audio.normalise && {
+        filters.normalise && {
             filter: 'loudnorm',
             options: "I=-16:LRA=11:TP=-1.5"
         }
@@ -2054,7 +2054,7 @@ const processQueue = async () => {
 };
 
                
-/// Workers  From the MDN example5
+/// Workers  From the MDN example
 function spawnPredictWorkers(model, list, batchSize, threads) {
     // And be ready to receive the list:
     for (let i = 0; i < threads; i++) {

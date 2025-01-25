@@ -812,16 +812,16 @@ input[type="range"].vertical {
 
 
 /* General settings for transitions */
-.advanced, .advanced-visible, .chirpity-only, .chirpity-only-visible {
+.advanced, .advanced-visible, .chirpity-only, .chirpity-only-visible, .list-visible {
     overflow: hidden; /* Prevent content from spilling out */
     transition: max-height 0.75s ease, opacity 0.5s ease, color 0.5s; /* Smooth transitions */
 }
 
 /* Hidden state */
-.advanced, .chirpity-only {
+.advanced, .chirpity-only, .list-hidden {
     max-height: 0; /* Collapse completely */
     opacity: 0; /* Fully transparent */
-    color: white
+    color: white;
 }
 
 /* Visible state */
@@ -831,8 +831,7 @@ input[type="range"].vertical {
     color: gold; /* Custom styles for visible state */
 }
 
-.chirpity-only-visible {
+.chirpity-only-visible, .list-visible {
     max-height: 5rem; /* Adjust to fit your content's height */
     opacity: 1; /* Fully visible */
-    color: gold; /* Custom styles for visible state */
 }
