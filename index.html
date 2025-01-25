@@ -1015,53 +1015,51 @@
                         </select>
                     </div>
                 </fieldset>
-                <div class="advanced">
-                    <fieldset class="border border-warning rounded m-2 p-2">
-                        <legend class="pb-2" style="font-size: large;font-weight:bold;">Advanced</legend>
+                <fieldset class="advanced border border-warning rounded m-2 p-2">
+                    <legend class="pb-2" style="font-size: large;font-weight:bold;">Advanced</legend>
 
-                        <!-- <div class="chirpity-only me-auto"> -->
-                        <div class="d-none me-auto">
-                            <div class="form-group rounded p-2 mb-2">
-                                <a class="circle text-bg-danger" tabindex="-1" data-bs-toggle="popover" data-bs-html="true" data-bs-trigger="focus" data-bs-title="Signal to Noise Ratio" id="Signal to Noise Ratio-circle-help"  data-bs-content="The SNR filter, when enabled, will skip over portions of audio where any audio event is below the threshold. Higher values skip increasingly noisy segments. 
-                                whilst this will result in faster processing it must be considered <b><i>experimental</i></b> and any non-zero value may miss detections. <b>Tip:</b> To find a workable SNR value, run analysis on a short file with the faintest detections you can confidently identify. Increase the SNR value until the detection is not picked up. 
-                                Once you find this threshold, back it off to the highest level that picks up the detection.">?</a>
-                                <label for="snrValue" class="form-label">
-                                    SNR filter:
-                                </label>
-                                <div class="input-group">
-                                    <input type="range" class="form-control-range w-75" min="0" max="10" step="0.5" id="snrValue">
-                                    <div class="input-group-append">
-                                        <span class="input-group-text" id="SNR-threshold">0</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
+                    <!-- <div class="chirpity-only me-auto"> -->
+                    <!-- <div class="d-none me-auto">
                         <div class="form-group rounded p-2 mb-2">
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" role="switch" id="buy-coffee">
-                                <label class="form-check-label" for="buy-coffee">
-                                    Hide the coffee widget
-                                </label>
-                            </div>
-                        </div>
-                        <hr>
-                        <div class=" col-auto form-group rounded p-2 mb-2">
-                            <div class="text-nowrap">   
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" role="switch" id="debug-mode">
-                                    <label class="form-check-label me-2" for="debug-mode">Debug mode</label><a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Debug Mode" id="Debug Mode-circle-help"  data-bs-content="Enter debug mode (changes to this setting require a Chirpity relaunch to take effect)">?</a>
+                            <a class="circle text-bg-danger" tabindex="-1" data-bs-toggle="popover" data-bs-html="true" data-bs-trigger="focus" data-bs-title="Signal to Noise Ratio" id="Signal to Noise Ratio-circle-help"  data-bs-content="The SNR filter, when enabled, will skip over portions of audio where any audio event is below the threshold. Higher values skip increasingly noisy segments. 
+                            whilst this will result in faster processing it must be considered <b><i>experimental</i></b> and any non-zero value may miss detections. <b>Tip:</b> To find a workable SNR value, run analysis on a short file with the faintest detections you can confidently identify. Increase the SNR value until the detection is not picked up. 
+                            Once you find this threshold, back it off to the highest level that picks up the detection.">?</a>
+                            <label for="snrValue" class="form-label">
+                                SNR filter:
+                            </label>
+                            <div class="input-group">
+                                <input type="range" class="form-control-range w-75" min="0" max="10" step="0.5" id="snrValue">
+                                <div class="input-group-append">
+                                    <span class="input-group-text" id="SNR-threshold">0</span>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-auto form-group rounded p-2 mb-2">
-                            <div class="text-nowrap">
-                                <button class="btn btn-warning" id="reset-defaults" onclick="return false">Reset to default settings</button>
-                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Default Settings" id="Default Settings-circle-help"  data-bs-content="Reset the configuration settings to their default values. N.B. Relaunch Chirpity to see changes, also, language settings will need to be re-set manually">?</a>
+                    </div> -->
+
+                    <div class="form-group rounded p-2 mb-2">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch" id="buy-coffee">
+                            <label class="form-check-label" for="buy-coffee">
+                                Hide the coffee widget
+                            </label>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class=" col-auto form-group rounded p-2 mb-2">
+                        <div class="text-nowrap">   
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="debug-mode">
+                                <label class="form-check-label me-2" for="debug-mode">Debug mode</label><a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Debug Mode" id="Debug Mode-circle-help"  data-bs-content="Enter debug mode (changes to this setting require a Chirpity relaunch to take effect)">?</a>
                             </div>
                         </div>
-                    </fieldset>
-                </div>
+                    </div>
+                    <div class="col-auto form-group rounded p-2 mb-2">
+                        <div class="text-nowrap">
+                            <button class="btn btn-warning" id="reset-defaults" onclick="return false">Reset to default settings</button>
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Default Settings" id="Default Settings-circle-help"  data-bs-content="Reset the configuration settings to their default values. N.B. Relaunch Chirpity to see changes, also, language settings will need to be re-set manually">?</a>
+                        </div>
+                    </div>
+                </fieldset>
             </form>                        
         </div>
     </div>      

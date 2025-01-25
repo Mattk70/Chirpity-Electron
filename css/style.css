@@ -810,11 +810,22 @@ input[type="range"].vertical {
     table-layout: auto;
 }
 
-/* Settings display */
-.advanced {
-    display: none;
+
+/* General settings for transitions */
+.advanced, .advanced-visible {
+    overflow: hidden; /* Prevent content from spilling out */
+    transition: max-height 0.75s ease-in-out, opacity 0.5s ease-in-out, color 0.5s; /* Smooth transitions */
 }
+
+/* Hidden state */
+.advanced {
+    max-height: 0; /* Collapse completely */
+    opacity: 0; /* Fully transparent */
+}
+
+/* Visible state */
 .advanced-visible {
-    display: block;
-    color: gold;
+    max-height: 20rem; /* Adjust to fit your content's height */
+    opacity: 1; /* Fully visible */
+    color: gold; /* Custom styles for visible state */
 }
