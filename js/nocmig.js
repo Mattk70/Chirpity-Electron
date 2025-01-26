@@ -30,7 +30,6 @@ function loadModel(params){
     backend === 'webgpu' &&  require('@tensorflow/tfjs-backend-webgpu');
     DEBUG && console.log(`model received load instruction. Using list: ${list}, batch size ${batch}`);
     tf.setBackend(backend).then(async () => {
-        console.log(tf.env().getFlags())
         if (backend === "webgl") {
             tf.env().set("WEBGL_FORCE_F16_TEXTURES", true);
             tf.env().set("WEBGL_EXP_CONV", true);
@@ -38,15 +37,12 @@ function loadModel(params){
             tf.env().set("TOPK_LAST_DIM_CPU_HANDOFF_SIZE_THRESHOLD", 128);
         } else if (backend === "webgpu") {
             tf.env().set("WEBGPU_DEFERRED_SUBMIT_BATCH_SIZE",256); // Affects GPU RAM at expense of speed
-            tf.env().set("WEBGPU_CPU_HANDOFF_SIZE_THRESHOLD", 0); // MatMulPackedProgram 
-            tf.env().set('CHECK_COMPUTATION_FOR_ERRORS', false);
+            tf.env().set("WEBGPU_CPU_HANDOFF_SIZE_THRESHOLD", 1000); // MatMulPackedProgram 
         }
-        console.log(tf.env().getFlags())
         tf.enableProdMode();
         //tf.enableDebugMode();
         if (DEBUG) {
             console.log(tf.env());
-            console.log(tf.env().getFlags());
         }
         myModel = new ChirpityModel(appPath, version);
         myModel.height = height;
