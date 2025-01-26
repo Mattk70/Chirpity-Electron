@@ -30,19 +30,18 @@ function loadModel(params){
     backend === 'webgpu' &&  require('@tensorflow/tfjs-backend-webgpu');
     DEBUG && console.log(`model received load instruction. Using list: ${list}, batch size ${batch}`);
     tf.setBackend(backend).then(async () => {
+        console.log(tf.env().getFlags())
         if (backend === "webgl") {
-            // tf.env().set("WEBGL_FORCE_F16_TEXTURES", true);
-            // tf.env().set("WEBGL_USE_SHAPES_UNIFORMS", true);
-
-            tf.env().set("WEBGL_PACK", true);
+            tf.env().set("WEBGL_FORCE_F16_TEXTURES", true);
             tf.env().set("WEBGL_EXP_CONV", true);
             tf.env().set("TOPK_K_CPU_HANDOFF_THRESHOLD", 128);
-            tf.env().set("TOPK_LAST_DIM_CPU_HANDOFF_SIZE_THRESHOLD", 0);
+            tf.env().set("TOPK_LAST_DIM_CPU_HANDOFF_SIZE_THRESHOLD", 128);
         } else if (backend === "webgpu") {
-            tf.env().set("WEBGPU_DEFERRED_SUBMIT_BATCH_SIZE", 64); // Affects GPU RAM at expense of speed
-            tf.env().set("WEBGPU_MATMUL_PROGRAM_TYPE", 3); // MatMulPackedProgram 
+            tf.env().set("WEBGPU_DEFERRED_SUBMIT_BATCH_SIZE",256); // Affects GPU RAM at expense of speed
+            tf.env().set("WEBGPU_CPU_HANDOFF_SIZE_THRESHOLD", 0); // MatMulPackedProgram 
             tf.env().set('CHECK_COMPUTATION_FOR_ERRORS', false);
         }
+        console.log(tf.env().getFlags())
         tf.enableProdMode();
         //tf.enableDebugMode();
         if (DEBUG) {
