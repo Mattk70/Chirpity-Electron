@@ -19,6 +19,7 @@ async function fetchIssuesByLabel(labelList) {
             title: issue.title,
             url: issue.html_url,
             state: issue.state,
+            labels: issue.labels.map(label => label.name)
         }));
 
         return processedIssues;
@@ -29,8 +30,20 @@ async function fetchIssuesByLabel(labelList) {
     }
 }
 function renderIssuesInModal(issues, VERSION) {
+
+    const currentVersion = parseSemVer(VERSION);
+    // Filter issues
+    issues = issues.filter(issue => {
+        const versionLabel = issue.labels.find(label => /^v\d+\.\d+\.\d+$/.test(label));
+        if (!versionLabel) return true; // Exclude issues without a version label
+        if (issue.state === 'closed'){
+            const fixVersion = parseSemVer(versionLabel);
+            const keep =  isNewVersion(fixVersion, currentVersion); // Keep issues >= VERSION
+            return keep
+        } else { return true}
+    });
     // Ensure the modal exists in the DOM
-    if (!document.querySelector("#issuesModal")) {
+    if (!document.getElementById("issuesModal")) {
         const modalHtml = `
             <div class="modal fade" id="issuesModal" tabindex="-1" aria-labelledby="issuesModalLabel" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
@@ -59,6 +72,7 @@ function renderIssuesInModal(issues, VERSION) {
 
     // Populate the modal body
     const modalBody = document.querySelector("#issuesModalBody");
+
     if (issues.length === 0) {
         modalBody.innerHTML = `
             <p class="text-center text-muted">There are no known issues with Chirpity ${VERSION}.</p>
@@ -75,8 +89,9 @@ function renderIssuesInModal(issues, VERSION) {
                 <tbody>
                     ${issues
                         .map(issue => {
+                            const versionLabel = issue.labels.find(label => /^v\d+\.\d+\.\d+$/.test(label)) || null;
                             const stateClass = issue.state === "open" ? "bg-purple" : "bg-success";
-                            const stateText = issue.state === "open" ? "Open" : "Fixed in new version";
+                            const stateText = issue.state === "open" ? "Open" : `Fixed ${versionLabel || ''}`;
                             return `
                                 <tr>
                                     <td>
@@ -99,5 +114,36 @@ function renderIssuesInModal(issues, VERSION) {
     modal.show();
 }
 
+function parseSemVer(versionString) {
+    const semVerRegex = /^[vV]?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-.]+))?(?:\+([0-9A-Za-z-.]+))?$/;
+    const matches = versionString.match(semVerRegex);
+    if (!matches) {
+        throw new Error('Invalid SemVer version string');
+    }
+    
+    const [, major, minor, patch, preRelease, buildMetadata] = matches;
+    
+    return {
+        major: parseInt(major),
+        minor: parseInt(minor),
+        patch: parseInt(patch),
+        preRelease: preRelease || null,
+        buildMetadata: buildMetadata || null
+    };
+}
 
-export {fetchIssuesByLabel, renderIssuesInModal}
+function isNewVersion(latest, current) {
+    if (latest.major > current.major) {
+        return true;
+    } else if (latest.major === current.major) {
+        if (latest.minor > current.minor) {
+            return true;
+        } else if (latest.minor === current.minor) {
+            if (latest.patch > current.patch) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+export {fetchIssuesByLabel, renderIssuesInModal, parseSemVer, isNewVersion}

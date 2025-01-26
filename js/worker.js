@@ -2721,7 +2721,7 @@ const getResults = async ({
                 generateAlert({message: `noDetectionsDetailed`, variables: {nocmig, archive, species, list: STATE.list }});
             }
         }
-        (STATE.selection && topRankin === STATE.topRankin)  || UI.postMessage({event: 'database-results-complete', active: active, select: position?.start});
+        (STATE.selection && topRankin !== STATE.topRankin)  || UI.postMessage({event: 'database-results-complete', active: active, select: position?.start});
     }
 };
 

@@ -1,7 +1,7 @@
 import {trackVisit, trackEvent} from './tracking.js';
 import {DOM} from './DOMcache.js';
 import {IUCNCache} from './IUCNcache.js';
-import {fetchIssuesByLabel, renderIssuesInModal} from './getKnownIssues.js';
+import {fetchIssuesByLabel, renderIssuesInModal, parseSemVer, isNewVersion} from './getKnownIssues.js';
 import {i18nAll, i18nSpeciesList,i18nHeadings, localiseUI, i18nContext, i18nLocation, i18nForm, i18nHelp, i18nToasts, i18nTitles, i18nLIST_MAP, i18nLists, IUCNLabel, i18nLocate} from './i18n.js';
 let LOCATIONS, locationID = undefined, loadingTimeout, LIST_MAP;
 
@@ -1077,7 +1077,7 @@ function postAnalyseMessage(args) {
         disableMenuItem(['analyseSelection', 'explore', 'charts']);
         const selection = !!args.end;
         const filesInScope = args.filesInScope;
-        PREDICTING = true;
+        args.fromDB || (PREDICTING = true);
         disableSettingsDuringAnalysis(true)
         if (!selection) {
             analyseReset();
@@ -1102,7 +1102,7 @@ function postAnalyseMessage(args) {
 }
 
 let openStreetMapTimer, currentRequest = null;
-async function fetchLocationAddress(lat, lon) {
+async function fetchLocationAddress(lat, lon, pushLocations) {
     const isInvalidLatitude = isNaN(lat) || lat === null || lat < -90 || lat > 90;
     const isInvalidLongitude = isNaN(lon) || lon === null || lon < -180 || lon > 180;
     
@@ -1138,7 +1138,7 @@ async function fetchLocationAddress(lat, lon) {
                 } else {
                     // Just take the first two elements of the address
                     address = data.display_name.split(',').slice(0, 2).join(",").trim();
-                    LOCATIONS.push({ id: LOCATIONS.length + 1, lat: lat, lon: lon, place: address });
+                    pushLocations && LOCATIONS.push({ id: LOCATIONS.length + 1, lat: lat, lon: lon, place: address });
                 }
 
                 resolve(address);
@@ -3482,7 +3482,7 @@ function formatDuration(seconds){
                     <th id="confidence-sort" class="text-start" title="${i18n.species[1]}"><span class="text-muted material-symbols-outlined species-sort-icon d-none">sort</span> ${i18n.species[0]}</th>
                     <th class="text-end">${i18n.calls}</th>
                     <th class="col">${i18n.label}</th>
-                    <th class="col text-end">${i18n.notes}</th>
+                    <th id="notes" class="col text-end">${i18n.notes}</th>
                 </tr>`;
                 setTimelinePreferences();
                 // DOM.resultHeader.innerHTML = fragment;
@@ -3528,7 +3528,7 @@ function formatDuration(seconds){
             const activeTable = active ? 'table-active' : '';
             const labelHTML = label ? tags[label] : '';
             const hide = selection ? 'd-none' : '';
-            const countIcon = count > 1 ? `<span class="circle pointer" title="Click to view the ${count} detections at this timecode">${count}</span>` : '';
+            const countIcon = count > 1 ? `<span class="circle" title="Click to view the ${count} detections at this timecode">${count}</span>` : '';
             tr += `<tr tabindex="-1" id="result${index}" name="${file}|${position}|${end || position + 3}|${sname}|${cname}${isUncertain}" class='${activeTable} border-top border-2 border-secondary ${dayNight}'>
             <td class='text-start timeOfDay ${showTimeOfDay}'>${UI_timestamp}</td>
             <td class="text-start timestamp ${showTimestamp}">${UI_position} </td>
@@ -4782,7 +4782,7 @@ function playRegion(){
             case 'sort-position':
             case 'sort-time': {
                 if (! PREDICTING){
-                    setSortOrder('timestamp')
+                    STATE.resultsSortOrder === "timestamp" || setSortOrder('timestamp')
                 }
                 break;
             }
@@ -5766,38 +5766,7 @@ function getI18n(context){
         }
     }
 
-    function parseSemVer(versionString) {
-        const semVerRegex = /^[vV]?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-.]+))?(?:\+([0-9A-Za-z-.]+))?$/;
-        const matches = versionString.match(semVerRegex);
-        if (!matches) {
-            throw new Error('Invalid SemVer version string');
-        }
-        
-        const [, major, minor, patch, preRelease, buildMetadata] = matches;
-        
-        return {
-            major: parseInt(major),
-            minor: parseInt(minor),
-            patch: parseInt(patch),
-            preRelease: preRelease || null,
-            buildMetadata: buildMetadata || null
-        };
-    }
-    
-    function isNewVersion(latest, current) {
-        if (latest.major > current.major) {
-            return true;
-        } else if (latest.major === current.major) {
-            if (latest.minor > current.minor) {
-                return true;
-            } else if (latest.minor === current.minor) {
-                if (latest.patch > current.patch) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
+
 
     // Not Harlem, but Fisher-Yates shuffle - used for xc call selection
     function shuffle(array) {

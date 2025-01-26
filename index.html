@@ -124,7 +124,7 @@
                 <div id="summaryTable"></div>
             </div>
                     <!-- Resizable divider -->
-        <div id="divider"></div>
+        <div id="divider" style="width: 5px; cursor: col-resize; background-color: #585858;"></div>
             <!-- Results table -->
             <div class="col ps-1 pe-0 h-100 position-relative overflow-auto" id="resultsDiv">
                 <table id="results" class="text-center table w-100 align-middle">
@@ -316,12 +316,12 @@
                                 <div class="row">
                                     <div class="input-group col">
                                         <label id="customLatLabel" class="input-group-text pe-2" for="customLat">Lat:</label>
-                                        <input id="customLat" type="text" class="form-control ps-2"
-                                        placeholder="0.0" aria-label="Latitude" aria-describedby="customLat"
+                                        <input id="customLat" type="number" class="form-control ps-2"
+                                        placeholder="0.00" step="0.1" max="90" min="-90" aria-label="Latitude" aria-describedby="customLat"
                                         required>
                                         <label id="customLonLabel" class="input-group-text pe-2" for="customLon">Lon:</label>
-                                        <input id="customLon" type="text" class="form-control ps-2"
-                                        placeholder="0.0" aria-label="Longitude" aria-describedby="customLon"
+                                        <input id="customLon" type="number" class="form-control ps-2"
+                                        placeholder="0.00" step="0.1" max="180" min="-180"  aria-label="Longitude" aria-describedby="customLon"
                                         required>
                                     </div>
                                     <div id="customLocationMap" class="mt-2 border border-secondary rounded" style="height: 200px"></div>
@@ -638,16 +638,17 @@
                             <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Nocmig Mode" id="Nocmig Mode-circle-help"  data-bs-content="When enabled, this 'Nocmig mode' only searches for and only displays detections found during the night">?</a>
                         </div>
                     </div>
-                    <hr>
-                    <div class="form-group rounded p-2 pe-0 mb-2">
-                        <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" role="switch" id="iucn">
-                            <label class="form-check-label" for="iucn">Show species IUCN Red List status in summary.</label>
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Red List Status" id="IUCN-circle-help"  
-                                data-bs-content="When enabled, the latest Global IUCN assessment status is displayed for each species in the summary. The icon links to the assessment page on the IUCN website. The Assessment Scope will display the IUCN assessment of the species in that region (where available).">?</a>
-                        </div>
-                    </div>
                     <div class="advanced">
+                        <hr>
+                        <div class="form-group rounded p-2 pe-0 mb-2">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="iucn">
+                                <label class="form-check-label" for="iucn">Show species IUCN Red List status in summary.</label>
+                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Red List Status" id="IUCN-circle-help"  
+                                    data-bs-content="When enabled, the latest Global IUCN assessment status is displayed for each species in the summary. The icon links to the assessment page on the IUCN website. The Assessment Scope will display the IUCN assessment of the species in that region (where available).">?</a>
+                            </div>
+                        </div>
+                    
                         <div class="pe-3 input-group rounded p-2 mb-1">
                             <label for="iucn-scope" class="input-group-text bg-dark text-warning">Assessment Scope:</label>
                             <select class="form-select mb-0" id="iucn-scope">
@@ -671,9 +672,9 @@
                     <div class="form-group rounded p-2 mb-2">
                         <div class="input-group">
                             <label class="input-group-text pe-2" for="latitude">Lat:</label>
-                            <input id="latitude" type="text" class="form-control ps-2 " placeholder="0.0" aria-label="Latitude" aria-describedby="latitude">
+                            <input id="latitude" type="number" class="form-control ps-2 " placeholder="0.00" step="0.1" max="90" min="-90" aria-label="Latitude" aria-describedby="latitude">
                             <label class="input-group-text pe-2" for="longitude">Lon:</label>
-                            <input id="longitude" type="text" class="form-control ps-2" placeholder="0.0" aria-label="Longitude" aria-describedby="longitude">
+                            <input id="longitude" type="number" class="form-control ps-2" placeholder="0.00" step="0.1"  max="180" min="-180" aria-label="Longitude" aria-describedby="longitude">
                         </div>
                         <div class="mt-1 float-end">
                             <button class="btn btn-primary" id="apply-location" onclick="return false">Set</button>
@@ -1015,8 +1016,8 @@
                         </select>
                     </div>
                 </fieldset>
-                <fieldset class="advanced border border-warning rounded m-2 p-2">
-                    <legend class="pb-2" style="font-size: large;font-weight:bold;">Advanced</legend>
+                <fieldset class="advanced border border-secondary rounded m-2 p-2">
+                    <legend class="pb-2" style="font-size: large;font-weight:bold;color: white">Advanced</legend>
 
                     <!-- <div class="chirpity-only me-auto"> -->
                     <!-- <div class="d-none me-auto">
@@ -1035,7 +1036,6 @@
                             </div>
                         </div>
                     </div> -->
-
                     <div class="form-group rounded p-2 mb-2">
                         <div class="form-check form-switch">
                             <input class="form-check-input" type="checkbox" role="switch" id="buy-coffee">
@@ -1431,7 +1431,7 @@
         el = document.getElementById(el);
         el.addEventListener('change', () => {
             showMap(where);
-            displayLocationAddress(where);
+            displayLocationAddress(where, true);
         });
     })
 

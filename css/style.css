@@ -604,14 +604,16 @@ input[type="range"].vertical {
     width: calc(20px * var(--font-size-scale));
     height: calc(20px * var(--font-size-scale));
     border-radius: 50%;
-    font-size: calc(14px * var(--font-size-scale));
-    background-color: gray;
+    font-size: calc(18px * var(--font-size-scale));
+    font-weight: bold;
     color: white;
+    background-color: gray;
     text-align: center;
     line-height: calc(20px * var(--font-size-scale));
-    float: right;
+    float: inline-end;
     text-decoration: none; /* Remove underline from <a> tags */
     transition: transform 0.2s; /* Add transition for smooth scaling */
+    cursor: pointer;
 }
 
 .new-circle {
@@ -626,7 +628,7 @@ input[type="range"].vertical {
 
 .circle:hover {
     transform: scale(1.1); /* Grow on mouseover */
-    color: white;
+    /* color: white; */
 }
 
 .circle:active {
