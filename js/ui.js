@@ -1648,7 +1648,7 @@ const defaultConfig = {
     local: true,
     speciesThreshold: 0.03,
     useWeek: false,
-    model: 'birdnet',
+    model: 'chirpity',
     locale: 'en',
     chirpity: {backend: 'tensorflow'},
     nocmig: {backend: 'tensorflow'},

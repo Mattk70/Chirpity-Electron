@@ -824,6 +824,13 @@ input[type="range"].vertical {
     color: white;
 }
 
+/* Results divider */
+#divider {
+    width: 5px; 
+    cursor: col-resize; 
+    background-color: #949494;
+}
+
 /* Visible state */
 .advanced-visible {
     max-height: 20rem; /* Adjust to fit your content's height */
