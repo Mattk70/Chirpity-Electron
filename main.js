@@ -444,7 +444,7 @@ app.whenReady().then(async () => {
                 buttonLabel: buttonLabel,
                 title: title
             }
-            if (fileOrFolder === 'openFiles' ){
+            if (fileOrFolder === 'openFile' ){
                 options.filters = [{ name: 'Audio Files', extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg', 'mp4', 'opus', 'mov'] } ]
             }
         } else {

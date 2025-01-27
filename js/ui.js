@@ -984,10 +984,10 @@ async function sortFilesByTime(fileNames) {
         .map(file => file.name);        // Return sorted file names
 }
 async function onOpenFiles(args) {
-    DOM.loading.querySelector('#loadingText').textContent = 'Loading files...';
-    DOM.loading.classList.remove('d-none');
     const sanitisedList = filterFilePaths(args.filePaths);
     if (!sanitisedList.length) return
+    DOM.loading.querySelector('#loadingText').textContent = 'Loading files...';
+    DOM.loading.classList.remove('d-none');
     // Store the sanitised file list and Load First audio file
     hideAll();
     showElement(['spectrogramWrapper'], false);
