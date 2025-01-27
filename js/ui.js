@@ -971,8 +971,21 @@ function filterFilePaths(filePaths) {
     return filteredPaths
 }
 
+async function sortFilesByTime(fileNames) {
+    const fileData = await Promise.all(
+        fileNames.map(async (fileName) => {
+            const stats = await fs.promises.stat(fileName);
+            return { name: fileName, time: stats.mtime.getTime() };
+        })
+    );
 
+    return fileData
+        .sort((a, b) => a.time - b.time) // Sort by modification time
+        .map(file => file.name);        // Return sorted file names
+}
 async function onOpenFiles(args) {
+    DOM.loading.querySelector('#loadingText').textContent = 'Loading files...';
+    DOM.loading.classList.remove('d-none');
     const sanitisedList = filterFilePaths(args.filePaths);
     if (!sanitisedList.length) return
     // Store the sanitised file list and Load First audio file
@@ -988,12 +1001,7 @@ async function onOpenFiles(args) {
     // Sort file by time created (the oldest first):
     if (STATE.openFiles.length > 1) {
         if (modelReady) enableMenuItem(['analyseAll', 'reanalyseAll'])
-        STATE.openFiles = STATE.openFiles.map(fileName => ({
-            name: fileName,
-            time: fs.statSync(fileName).mtime.getTime(),
-        }))
-        .sort((a, b) => a.time - b.time)
-        .map(file => file.name);
+        STATE.openFiles = await sortFilesByTime(STATE.openFiles)
     } else {
         disableMenuItem(['analyseAll', 'reanalyseAll'])
     }
