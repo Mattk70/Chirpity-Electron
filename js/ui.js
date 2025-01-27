@@ -257,7 +257,7 @@ DIAGNOSTICS['Cores'] = os.cpus().length;
 DIAGNOSTICS['System Memory'] = (os.totalmem() / (1024 ** 2 * 1000)).toFixed(0) + ' GB';
 
 function resetResults({clearSummary = true, clearPagination = true, clearResults = true} = {}) {
-    if (clearSummary) summaryTable.textContent = '';
+    if (clearSummary) DOM.summaryTable.textContent = '';
     if (clearPagination) pagination.forEach(item => item.classList.add('d-none'));
     resultsBuffer = DOM.resultTable.cloneNode(false)
     if (clearResults) {
@@ -981,14 +981,9 @@ async function onOpenFiles(args) {
     resetResults();
     resetDiagnostics();
     STATE.openFiles = sanitisedList;
-    // CHeck not more than 25k files
-    // if (STATE.openFiles.length >= 25_000){
-    //     generateToast({message: 'maxFiles', variables: {'STATE.openFiles.length': STATE.openFiles.length}})
-    //     STATE.openFiles.splice(25000)
-    // }
-    // Store the file list and Load First audio file
 
-    STATE.openFiles.length > 1 && worker.postMessage({action: 'check-all-files-saved', files: STATE.openFiles});
+    // Store the file list and Load First audio file
+    worker.postMessage({action: 'check-all-files-saved', files: STATE.openFiles});
 
     // Sort file by time created (the oldest first):
     if (STATE.openFiles.length > 1) {
@@ -1084,8 +1079,7 @@ function postAnalyseMessage(args) {
             refreshResultsView();
             resetResults();
             // change result header to indicate deactivation
-            DOM.resultHeader.classList.add('text-bg-secondary');
-            DOM.resultHeader.classList.remove('text-bg-dark');
+            DOM.resultHeader.classList.replace('text-bg-dark', 'text-bg-secondary');
         }
         worker.postMessage({
             action: 'analyse',
@@ -1196,6 +1190,7 @@ function showElement(id_list, makeFlex = true, empty = false) {
 function hideElement(id_list) {
     id_list.forEach(id => {
         const thisElement = document.getElementById(id);
+        // Don't use replace as d-flex may be absent
         thisElement.classList.remove('d-flex');
         thisElement.classList.add('d-none');
     })
@@ -2005,14 +2000,12 @@ const setUpWorkerMessaging = () => {
                     if (['archive', 'explore'].includes(mode)) {
                         enableMenuItem(['purge-file']);
                         // change header to indicate activation
-                        DOM.resultHeader.classList.remove('text-bg-secondary');
-                        DOM.resultHeader.classList.add('text-bg-dark');
+                        DOM.resultHeader.classList.replace('text-bg-secondary', 'text-bg-dark');
                         //adjustSpecDims(true)
                     } else {
                         disableMenuItem(['purge-file']);
                         // change header to indicate deactivation
-                        DOM.resultHeader.classList.add('text-bg-secondary');
-                        DOM.resultHeader.classList.remove('text-bg-dark');   
+                        DOM.resultHeader.classList.replace('text-bg-dark', 'text-bg-secondary');
                     }
                     break }
                 case "summary-complete": {onSummaryComplete(args);
@@ -3203,8 +3196,9 @@ function centreSpec(){
     const updateSummary = async ( { summary = [], filterSpecies = '' }) => {
         const i18n = getI18n(i18nHeadings);
         const showIUCN = config.detect.iucn;
-        if (summary.length){
-            let summaryHTML = `<table id="resultSummary" class="table table-dark p-1"><thead>
+        // if (summary.length){
+            let summaryHTML = `
+            <table id="resultSummary" class="table table-dark p-1"><thead>
             <tr class="pointer col-auto">
             <th id="summary-max" scope="col"><span id="summary-max-icon" class="text-muted material-symbols-outlined summary-sort-icon d-none">sort</span>${i18n.max}</th>
             <th id="summary-cname" scope="col"><span id="summary-cname-icon" class="text-muted material-symbols-outlined summary-sort-icon d-none">sort</span>${i18n.species[0]}</th>
@@ -3242,17 +3236,28 @@ function centreSpec(){
             }
             summaryHTML += '</tbody></table>';
             // Get rid of flicker...
-            const old_summary = summaryTable;
-            const buffer = old_summary.cloneNode();
-            buffer.innerHTML = summaryHTML;
-            old_summary.replaceWith(buffer);
+            const old_summary = DOM.summaryTable;
+            const fragment = document.createDocumentFragment(); // Create a document fragment
+            const tempDiv = document.createElement('div'); // Temporary container for parsing
+
+            // Parse the new HTML into DOM nodes
+            tempDiv.innerHTML = summaryHTML;
+
+            // Move parsed child nodes into the fragment
+            Array.from(tempDiv.childNodes).forEach(node => fragment.appendChild(node));
+
+            // Replace the contents of the #summaryTable
+            old_summary.replaceChildren(); // Clear existing children
+
+            old_summary.appendChild(fragment);
+
             showSummarySortIcon();
             // scroll to the selected species
             if (selectedRow){
                 const table = document.getElementById('resultSummary');
                 table.rows[selectedRow].scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
-        }
+        // }
     }
     
     /*
@@ -3367,7 +3372,6 @@ function formatDuration(seconds){
             STATE.mode !== 'explore' && enableMenuItem(['save2db']);
         } else {
             disableMenuItem(['saveLabels', 'saveCSV', 'save-eBird', 'save-Raven', 'save2db']);
-            refreshResultsView()
         }
         if (STATE.currentFile) enableMenuItem(['analyse'])
     }
@@ -3970,8 +3974,8 @@ function formatDuration(seconds){
         if (config.model === 'birdnet'){
             // hide chirpity-only features
             chirpityOnly.forEach(element => {
-                element.classList.add('chirpity-only');
-                element.classList.remove('chirpity-only-visible')
+                // element.classList.add('chirpity-only');
+                element.classList.replace('chirpity-only-visible', 'chirpity-only')
         });
             DOM.contextAware.checked = false;
             DOM.contextAware.disabed = true;
@@ -3983,8 +3987,7 @@ function formatDuration(seconds){
         } else {
             // show chirpity-only features
             chirpityOnly.forEach(element => {
-                element.classList.remove('chirpity-only');
-                element.classList.add('chirpity-only-visible')
+                element.classList.replace('chirpity-only','chirpity-only-visible')
         });
             // Remove GPU option on Mac
             isMac && noMac.forEach(element => element.classList.add('d-none'));
@@ -4162,17 +4165,10 @@ const setSortOrder = (order) => {
     document.addEventListener('drop', (event) => {
         event.preventDefault();
         event.stopPropagation();
-        const audioFiles = Array.from(event.dataTransfer.files).filter(file => {
-            // Exclude files/folders that start with '.'
-            if (file.name.startsWith('.')) return false;
-            //include folders - file.type === '', audio & video files
-            return !file.type || file.type.startsWith('audio/') || file.type.startsWith('video/');
-        });
-        let filelist = [];
-        for (const f of audioFiles) {
-            // Using the path attribute to get absolute file path
-            filelist.push(f.path);
-        }
+        const filelist = Array.from(event.dataTransfer.files)
+        .filter(file => !file.name.startsWith('.') && (!file.type || file.type.startsWith('audio/') || file.type.startsWith('video/')))
+        .map(file => file.path);
+    
         // For electron 32+
         // const filelist = audioFiles.map(file => window.electron.showFilePath(file));
         if (filelist.length) filterValidFiles({ filePaths: filelist })
@@ -4929,26 +4925,20 @@ function playRegion(){
         const advancedButton = document.getElementById('advanced');
         let showAdvanced;
         if (target === 'advanced'){
-            basicButton.classList.remove('btn-primary');
-            basicButton.classList.add('btn-secondary');
-            advancedButton.classList.remove('btn-secondary');
-            advancedButton.classList.add('btn-primary');
+            basicButton.classList.replace('btn-primary', 'btn-secondary');
+            advancedButton.classList.replace('btn-secondary', 'btn-primary');
             showAdvanced = true;
         } else {
-            basicButton.classList.remove('btn-secondary');
-            basicButton.classList.add('btn-primary');
-            advancedButton.classList.remove('btn-primary');
-            advancedButton.classList.add('btn-secondary');
+            basicButton.classList.replace('btn-secondary','btn-primary');
+            advancedButton.classList.replace('btn-primary','btn-secondary');
             showAdvanced = false;
         };
         const advancedElements = document.querySelectorAll('.advanced, .advanced-visible');
         advancedElements.forEach(element => {
             if (showAdvanced) {
-                element.classList.remove('advanced');
-                element.classList.add('advanced-visible');
+                element.classList.replace('advanced','advanced-visible');
               } else {
-                element.classList.remove('advanced-visible');
-                element.classList.add('advanced');
+                element.classList.replace('advanced-visible','advanced');
               }
         });
     }

@@ -482,7 +482,6 @@ async function handleMessage(e) {
         }
         case "file-load-request": {
             index = 0;
-            STATE.cacheSummaryParams = false;
             filesBeingProcessed.length && onAbort(args);
             DEBUG && console.log("Worker received audio " + args.file);
             await loadAudioFile(args).catch(_e => console.warn('Error opening file:', args.file));
@@ -603,24 +602,35 @@ ipcRenderer.on('new-client', async (event) => {
     UI.onmessage = handleMessage
 })
 
-function savedFileCheck(fileList) {
-    if (diskDB){
-        // Construct a parameterized query to count the matching files in the database
-        const query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${prepParams(fileList)})`;
+async function savedFileCheck(fileList) {
+    if (diskDB) {
+        // Slice the list into a # of params SQLITE can handle
+        const batchSize = 25_000;
+        let totalFilesChecked = 0;
+        for (let i = 0; i < fileList.length; i += batchSize) {
+            const fileSlice = fileList.slice(i, i + batchSize);
+            
+            // Construct a parameterized query to count matching files in the database
+            const query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${prepParams(fileSlice)})`;
 
-        // Execute the query with the file list as parameters
-        diskDB.get(query, fileList, (err, row) => {
-            if (err) {
-                console.error('Error querying database during savedFileCheck:', err);
-            } else {
-                const count = row.count;
-                const result = count === fileList.length;
-                UI.postMessage({event: 'all-files-saved-check-result', result: result});
+            // Execute the query with the slice as parameters
+            const countResult = await diskDB.getAsync(query, fileSlice);
+            const count = countResult?.count || 0;
+
+            if (count < fileSlice.length) {
+                UI.postMessage({ event: 'all-files-saved-check-result', result: false });
+                return false;
             }
-        });
+
+            totalFilesChecked += count;
+        }
+
+        const result = totalFilesChecked === fileList.length;
+        UI.postMessage({ event: 'all-files-saved-check-result', result: result });
+        return result;
     } else {
-        generateAlert({type: 'error',  message: 'dbNotLoaded'})
-        return undefined
+        generateAlert({ type: 'error', message: 'dbNotLoaded' });
+        return undefined;
     }
 }
 
@@ -717,38 +727,36 @@ async function spawnListWorker() {
 * @param {*} files must be a list of file paths
 */
 const getFiles = async (files, image) => {
-    let file_list = [], folderDropped = false;
-    for (let i = 0; i < files.length; i++) {
-        const path = files[i];
-        const stats = fs.lstatSync(path)
-        if (stats.isDirectory()) {
-            folderDropped = true
-            const dirFiles = await getFilesInDirectory(path)
-                .catch((error) => {
-                    if (error.code === 'EACCES') {
-                        generateAlert({type: 'error', message: `Permission Denied while attempting to access ${path}`});
-                    } else {
-                        generateAlert({type: 'error', message: error.message})
-                    }
-                    throw error
-                })
-            file_list = [...file_list,...dirFiles]
-        } else {
-            const filename = p.basename(path)
-            filename.startsWith('.') || file_list.push(path) // Exclude hidden files (in subfolders)
+    const supportedFiles = image ? ['.png'] : SUPPORTED_FILES;
+    let folderDropped = false;
+    let fileList = [];
+
+    for (const path of files) {
+        try {
+            const stats = fs.lstatSync(path);
+            if (stats.isDirectory()) {
+                folderDropped = true;
+                // Retrieve files in the directory and filter immediately
+                const dirFiles = (await getFilesInDirectory(path)).filter(
+                    (file) => supportedFiles.some((ext) => file.toLowerCase().endsWith(ext)) && !p.basename(file).startsWith('.')
+                );
+                fileList.push(...dirFiles);
+            } else if (!p.basename(path).startsWith('.') && supportedFiles.some((ext) => path.toLowerCase().endsWith(ext))) {
+                fileList.push(path);
+            }
+        } catch (error) {
+            if (error.code === 'EACCES') {
+                generateAlert({ type: 'error', message: `Permission Denied while attempting to access ${path}` });
+            } else {
+                generateAlert({ type: 'error', message: error.message });
+            }
+            throw error;
         }
     }
-    // filter out unsupported files
-    const supported_files = image ? ['.png'] : SUPPORTED_FILES;
-    
-    file_list = file_list.filter((file) => {
-        return supported_files.some(ext => file.toLowerCase().endsWith(ext))
-    }
-    )
     const fileOrFolder = folderDropped ? 'Open Folder(s)' : 'Open Files(s)'
-    trackEvent(STATE.UUID, 'UI', 'Drop', fileOrFolder, file_list.length);
-    UI.postMessage({ event: 'files', filePaths: file_list });
-    return file_list;
+    trackEvent(STATE.UUID, 'UI', 'Drop', fileOrFolder, fileList .length);
+    UI.postMessage({ event: 'files', filePaths: fileList  });
+    return fileList;
 }
 
 
@@ -773,7 +781,8 @@ const getFilesInDirectory = async (dir) => {
     return files;
 };
 
-const prepParams = (list) => list.map(_ => '?').join(',');
+const prepParams = (list) => '?'.repeat(list.length).split('').join(',');
+
 function getFileSQLAndParams(range){
     const fileParams = prepParams(STATE.filesToAnalyse)
     const params = [];
@@ -989,7 +998,6 @@ async function onAnalyse({
     DEBUG && console.log(`Worker received message: ${filesInScope}, ${STATE.detect.confidence}, start: ${start}, end: ${end}`);
     //Reset GLOBAL variables
     index = 0;
-    STATE.cacheSummaryParams = false;
     AUDACITY = {};
     batchChunksToSend = {};
     FILE_QUEUE = filesInScope;
@@ -1073,7 +1081,6 @@ function onAbort({
     predictionsReceived = {};
     predictionsRequested = {};
     index = 0;
-    STATE.cacheSummaryParams = false;
     DEBUG && console.log("abort received")
     Object.keys(STATE.backlogInterval).forEach(pid => {
         clearInterval(STATE.backlogInterval[pid]);
@@ -2191,7 +2198,8 @@ const insertDurations = async (file, id) => {
 
 const generateInsertQuery = async (latestResult, file) => {
     const db = STATE.db;
-    let fileID;
+    let fileID; 
+    const meta = METADATA[file];
     await dbMutex.lock();
     try {
         await db.runAsync('BEGIN');
@@ -2199,8 +2207,8 @@ const generateInsertQuery = async (latestResult, file) => {
         let res = await db.getAsync('SELECT id FROM files WHERE name = ?', file);
         if (!res) {
             let id = null;
-            if (METADATA[file].metadata) {
-                const metadata = JSON.parse(METADATA[file].metadata);
+            if (meta.metadata) {
+                const metadata = JSON.parse(meta.metadata);
                 const guano = metadata.guano;
                 if (guano && guano['Loc Position']) {
                     const [lat, lon] = guano['Loc Position'].split(' ');
@@ -2214,7 +2222,7 @@ const generateInsertQuery = async (latestResult, file) => {
                 }
             }
             res = await db.runAsync('INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,?,?,? )',
-                undefined, file, METADATA[file].duration, METADATA[file].fileStart, id, null, METADATA[file].metadata);
+                undefined, file, meta.duration, meta.fileStart, id, null, meta.metadata);
             fileID = res.lastID;
             await insertDurations(file, fileID);
         } else {
@@ -2225,7 +2233,7 @@ const generateInsertQuery = async (latestResult, file) => {
         const minConfidence = Math.min(STATE.detect.confidence, 150); // store results with 15% confidence and up unless confidence set lower
         for (let i = 0; i < keysArray.length; i++) {
             const key = parseFloat(keysArray[i]);
-            const timestamp = METADATA[file].fileStart + key * 1000;
+            const timestamp = meta.fileStart + key * 1000;
             const isDaylight = isDuringDaylight(timestamp, STATE.lat, STATE.lon);
             const confidenceArray = confidenceBatch[i];
             const speciesIDArray = speciesIDBatch[i];
@@ -2263,7 +2271,7 @@ const parsePredictions = async (response) => {
     DEBUG && console.log('worker being used:', response.worker);
     if (! STATE.selection) await generateInsertQuery(latestResult, file).catch(error => console.warn('Error generating insert query', error));
     let [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
-    if (index < 499){
+    if (index < 500){
         const included = await getIncludedIDs(file).catch( (error) => console.log('Error getting included IDs', error));
         for (let i = 0; i < keysArray.length; i++) {
             let updateUI = false;
@@ -2300,16 +2308,20 @@ const parsePredictions = async (response) => {
                             score: confidence
                         }
                         sendResult(++index, result, false);
+                        console.log('latest index: ', index)
+                        if (index >499 ) {
+                            setGetSummaryQueryInterval(NUM_WORKERS);
+                            DEBUG && console.log('Reducing summary updates to one every ', STATE.incrementor)
+                        }
                         // Only show the highest confidence detection, unless it's a selection analysis
                         if (! STATE.selection) break;
                     };
                 }
             }
         } 
-    } else if (index > 500){
-        // Slow down the summary updates
-        setGetSummaryQueryInterval(NUM_WORKERS)
-        DEBUG && console.log('Reducing summary updates to one every ', STATE.incrementor)
+    } else if (index++ === 5_000){
+            STATE.incrementor = 1000
+            DEBUG && console.log('Reducing summary updates to one every 1000')
     }
     predictionsReceived[file]++;
     const received = sumObjectValues(predictionsReceived);
@@ -2327,7 +2339,6 @@ const parsePredictions = async (response) => {
 
     if (!STATE.selection && STATE.increment() === 0) {
         getSummary({ interim: true });
-        STATE.cacheSummaryParams = true;
         getTotal({file})
     }
 
@@ -2387,8 +2398,6 @@ function updateFilesBeingProcessed(file) {
         if (!STATE.selection) getSummary();
         // Need this here in case last file is not sent for analysis (e.g. nocmig mode)
         UI.postMessage({event: 'analysis-complete'})
-        STATE.cacheSummaryParams = false;
-
     }
 }
         

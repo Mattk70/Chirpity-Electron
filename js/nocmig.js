@@ -30,7 +30,6 @@ function loadModel(params){
     backend === 'webgpu' &&  require('@tensorflow/tfjs-backend-webgpu');
     DEBUG && console.log(`model received load instruction. Using list: ${list}, batch size ${batch}`);
     tf.setBackend(backend).then(async () => {
-        console.log(tf.env().getFlags())
         if (backend === "webgl") {
             tf.env().set("WEBGL_FORCE_F16_TEXTURES", true);
             tf.env().set("WEBGL_EXP_CONV", true);
@@ -41,7 +40,6 @@ function loadModel(params){
             tf.env().set("WEBGPU_CPU_HANDOFF_SIZE_THRESHOLD", 0); // MatMulPackedProgram 
             tf.env().set('CHECK_COMPUTATION_FOR_ERRORS', false);
         }
-        console.log(tf.env().getFlags())
         tf.enableProdMode();
         //tf.enableDebugMode();
         if (DEBUG) {
@@ -189,7 +187,7 @@ class ChirpityModel extends BaseModel {
     }
     async predictBatch(TensorBatch, keys, threshold, confidence) {
         let paddedTensorBatch, maskedTensorBatch;
-        if (BACKEND === 'webgl' && TensorBatch.shape[0] < this.batchSize && !this.selection) {
+        if (BACKEND !== 'tensorflow' && TensorBatch.shape[0] < this.batchSize && !this.selection) {
             // WebGL backend works best when all batches are the same size
             paddedTensorBatch = this.padBatch(TensorBatch)  // + 1 tensor
         } else if (threshold && BACKEND === 'tensorflow' && !this.selection) {

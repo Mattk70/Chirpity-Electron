@@ -76,6 +76,8 @@ const DOM = {
     get specElement() { return document.getElementById('spectrogram')},
     get specCanvasElement() { return document.querySelector('#spectrogram canvas')},
     get waveCanvasElement() { return document.querySelector('#waveform canvas')},
+
+    set summaryTable(element) {this._summaryTable = element}
 }
 
 export {DOM}
