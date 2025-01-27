@@ -2308,7 +2308,6 @@ const parsePredictions = async (response) => {
                             score: confidence
                         }
                         sendResult(++index, result, false);
-                        console.log('latest index: ', index)
                         if (index >499 ) {
                             setGetSummaryQueryInterval(NUM_WORKERS);
                             DEBUG && console.log('Reducing summary updates to one every ', STATE.incrementor)
