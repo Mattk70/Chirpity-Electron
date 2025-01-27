@@ -2891,17 +2891,20 @@ const sendResult = (index, result, fromDBQuery) => {
 
 const getSavedFileInfo = async (file) => {
     if (diskDB){
+        await dbMutex.lock()
         const prefix = STATE.archive.location + p.sep;
         // Get rid of archive (library) location prefix
         const archiveFile = file.replace(prefix , '');
         let row = await diskDB.getAsync(`
             SELECT duration, filestart AS fileStart, metadata, locationID
             FROM files LEFT JOIN locations ON files.locationID = locations.id 
-            WHERE name = ? OR archiveName = ?`,file, archiveFile);
+            WHERE name = ? OR archiveName = ?`,file, archiveFile).catch(error => {console.warn(error); dbMutex.unlock()});
         if (!row) {
             const baseName = file.replace(/^(.*)\..*$/g, '$1%');
-            row = await diskDB.getAsync('SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name LIKE  (?)',baseName);
+            row = await diskDB.getAsync('SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name LIKE  (?)',baseName)
+                .catch(error => {console.warn(error); dbMutex.unlock()});;
         } 
+        dbMutex.unlock()
         return row
     } else {
         generateAlert({type: 'error',  message: 'dbNotLoaded'})
