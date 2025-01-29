@@ -138,10 +138,10 @@ const setupFfmpegCommand = ({
     const command = ffmpeg('file:' + file)
         .format(format)
         .audioChannels(channels)
-        .addOutputOption('-af',
-            `aresample=resampler=soxr:filter_type=kaiser:kaiser_beta=12.9846:osr=${sampleRate}`
-          )
-        // sampleRate && command.audioFrequency(sampleRate);
+        // .addOutputOption('-af',
+        //     `aresample=resampler=soxr:filter_type=kaiser:kaiser_beta=12.9846:osr=${sampleRate}`
+        //   )
+        sampleRate && command.audioFrequency(sampleRate);
         //.audioFilters('aresample=filter_type=kaiser:kaiser_beta=9.90322');
 
     // Add filters if provided
