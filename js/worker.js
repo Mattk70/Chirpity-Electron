@@ -219,19 +219,20 @@ const createDB = async (file) => {
             const MAX_RETRIES = 100; // Set a maximum number of retries
             let retries = 0;
             
-            // If the db is not ready
-            while (code === "SQLITE_BUSY" && retries < MAX_RETRIES) {
-                console.log("Disk DB busy");
-                await new Promise(resolve => setTimeout(resolve, 10));
-                let response = await db.runAsync('ATTACH ? as disk', filename);
-                code = response.code;
-                retries++;
-            }
+            // // If the db is not ready
+            // while (code === "SQLITE_BUSY" && retries < MAX_RETRIES) {
+            //     console.log("Disk DB busy");
+            //     await new Promise(resolve => setTimeout(resolve, 10));
+                // let response = 
+                await db.runAsync('ATTACH ? as disk', filename);
+            //     code = response.code;
+            //     retries++;
+            // }
             
-            if (retries === MAX_RETRIES) {
-                console.error("Exceeded maximum number of retries for attaching the disk database");
-                throw new Error("Exceeded maximum number of retries for attaching the disk database");
-            }
+            // if (retries === MAX_RETRIES) {
+            //     console.error("Exceeded maximum number of retries for attaching the disk database");
+            //     throw new Error("Exceeded maximum number of retries for attaching the disk database");
+            // }
             let response = await db.runAsync('INSERT INTO files SELECT * FROM disk.files');
             DEBUG && console.log(response.changes + ' files added to memory database')
             response = await db.runAsync('INSERT INTO locations SELECT * FROM disk.locations');
@@ -276,12 +277,15 @@ async function loadDB(path) {
     LABELS = modelLabels; // these are the default english labels
     const file = DATASET ? p.join(path, `${DATABASE}${num_labels}.sqlite`) : p.join(path, `archive${num_labels}.sqlite`)
     if (!fs.existsSync(file)) {
+        console.log('No db file: ', file)
         await createDB(file);
+        console.log('DB created at : ', file)
     } else if (diskDB?.filename !== file) {
         diskDB = new sqlite3.Database(file);
         STATE.update({ db: diskDB });
         await diskDB.runAsync('VACUUM');
         await diskDB.runAsync('PRAGMA foreign_keys = ON');
+        await diskDB.runAsync('PRAGMA journal_mode = WAL');
         await diskDB.runAsync('PRAGMA busy_timeout = 1000');
         await diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_species_sname ON species(sname)').catch(error => console.error(error));
         await diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_species_cname ON species(cname)');
@@ -671,7 +675,7 @@ async function onLaunch({model = 'chirpity', batchSize = 32, threads = 1, backen
     BATCH_SIZE = batchSize;
     STATE.update({ model: model });
     await loadDB(appPath); // load the diskdb
-    await checkAndApplyUpdates(diskDB);
+    diskDB && await checkAndApplyUpdates(diskDB);
     await createDB(); // now make the memoryDB
     STATE.update({ db: memoryDB })
     NUM_WORKERS = threads;
