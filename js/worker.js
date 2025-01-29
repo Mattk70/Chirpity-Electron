@@ -224,7 +224,7 @@ const createDB = async (file) => {
             //     console.log("Disk DB busy");
             //     await new Promise(resolve => setTimeout(resolve, 10));
                 // let response = 
-                await db.runAsync('ATTACH ? as disk', filename);
+                // await db.runAsync('ATTACH ? as disk', filename);
             //     code = response.code;
             //     retries++;
             // }
