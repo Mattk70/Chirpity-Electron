@@ -85,7 +85,7 @@ self.addEventListener('unhandledrejection', function(event) {
 
 self.addEventListener('rejectionhandled', function(event) {
     // Extract the error message and stack trace from the event
-    orMessage = event.reason?.message;
+    const errorMessage = event.reason?.message;
     const stackTrace = event.reason?.stack;
     
     // Track the unhandled promise rejection
@@ -137,8 +137,11 @@ const setupFfmpegCommand = ({
 }) => {
     const command = ffmpeg('file:' + file)
         .format(format)
-        .audioChannels(channels);
-        sampleRate && command.audioFrequency(sampleRate);
+        .audioChannels(channels)
+        .addOutputOption('-af',
+            `aresample=resampler=soxr:filter_type=kaiser:kaiser_beta=12.9846:osr=${sampleRate}`
+          )
+        // sampleRate && command.audioFrequency(sampleRate);
         //.audioFilters('aresample=filter_type=kaiser:kaiser_beta=9.90322');
 
     // Add filters if provided
@@ -1426,12 +1429,19 @@ const getPredictBuffers = async ({
     batchChunksToSend[file] = Math.ceil((end - start - MINIMUM_AUDIO_LENGTH) / (BATCH_SIZE * WINDOW_SIZE));
     predictionsReceived[file] = 0;
     predictionsRequested[file] = 0;
-    
-    const samplesInBatch = sampleRate * BATCH_SIZE * WINDOW_SIZE
-    const highWaterMark =  samplesInBatch * 2;
-    
-    let chunkStart = start * sampleRate;
 
+    const batchDuration = BATCH_SIZE * WINDOW_SIZE;
+    //reduce highWaterMark for small analyses
+    const samplesInWindow = sampleRate * WINDOW_SIZE;
+    let samplesInBatch;
+    if (end && end - start < batchDuration ) {
+        const audioDuration = end - start;
+        samplesInBatch = Math.ceil(audioDuration / WINDOW_SIZE) * samplesInWindow
+    } else {
+        samplesInBatch = samplesInWindow * BATCH_SIZE;
+    }
+    const highWaterMark =  samplesInBatch * 2;
+    let chunkStart = start * sampleRate;
 
     await processAudio(file, start, end, chunkStart, highWaterMark, samplesInBatch)
 
@@ -1442,10 +1452,10 @@ async function processAudio (file, start, end, chunkStart, highWaterMark, sample
     return new Promise((resolve, reject) => {
         // Many compressed files start with a small section of silence due to encoder padding, which affects predictions
         // To compensate, we move the start back a small amount, and slice the data to remove the silence
-        let remainingTrim;
-        if (start > 0) {
-            remainingTrim  = sampleRate * 0.1;
-            start -= 0.05;
+        let remainingTrim, adjustment = 0.05;
+        if (start > adjustment) {
+            remainingTrim  = sampleRate * 2 * adjustment;
+            start -= adjustment;
         }    
         let currentIndex = 0;
         const audioBuffer = Buffer.allocUnsafe(highWaterMark);
@@ -1461,6 +1471,8 @@ async function processAudio (file, start, end, chunkStart, highWaterMark, sample
         });
 
         const STREAM = command.pipe();
+        // const test = command.output('d:/test.wav').run()
+        // return
         
         STREAM.on('data', (chunk) => {
             const pid = command.ffmpegProc?.pid

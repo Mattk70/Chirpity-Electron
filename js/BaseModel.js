@@ -60,6 +60,9 @@ class BaseModel {
             await tf.backend().checkCompileCompletionAsync();
             tf.dispose(compileRes);
             tf.env().set('WEBGPU_ENGINE_COMPILE_ONLY', false);
+        } else { // Tensorflow backend
+            const compileRes = this.model.predict(input);
+            tf.dispose(compileRes);
         }
         input.dispose()
         DEBUG && console.log('WarmUp end', tf.memory().numTensors)

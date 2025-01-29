@@ -1058,7 +1058,7 @@ const getSelectionResults = (fromDB) => {
     if (fromDB instanceof PointerEvent) fromDB = false;
     let start = region.start + bufferBegin;
     // Remove small amount of region to avoid pulling in results from 'end'
-    let end = region.end + bufferBegin - 0.001;
+    let end = region.end + bufferBegin // - 0.001;
     STATE.selection = {};
     STATE['selection']['start'] = start.toFixed(3);
     STATE['selection']['end'] = end.toFixed(3);
