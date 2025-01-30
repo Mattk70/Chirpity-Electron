@@ -280,7 +280,7 @@ async function loadDB(path) {
         console.log('No db file: ', file)
         await createDB(file);
         console.log('DB created at : ', file)
-    } else if (diskDB?.filename !== file) {
+    } else if (!diskDB || diskDB.filename !== file) {
         diskDB = new sqlite3.Database(file);
         STATE.update({ db: diskDB });
         await diskDB.runAsync('VACUUM');
