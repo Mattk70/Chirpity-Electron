@@ -154,7 +154,7 @@ async function getPaths() {
     const appPath = await window.electron.getPath();
     const tempPath = await window.electron.getTemp();
     const locale = await window.electron.getLocale();
-    console.log('path is', appPath, 'temp is', tempPath, 'raw locale is', locale);
+    DEBUG && console.log('path is', appPath, 'temp is', tempPath, 'raw locale is', locale);
     return [appPath, tempPath, locale];
 }
 

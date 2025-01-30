@@ -289,6 +289,7 @@ async function loadDB(path) {
         await diskDB.runAsync('PRAGMA busy_timeout = 1000');
         await diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_species_sname ON species(sname)').catch(error => console.error(error));
         await diskDB.runAsync('CREATE INDEX IF NOT EXISTS idx_species_cname ON species(cname)');
+        await checkAndApplyUpdates(diskDB);
         const { count } = await diskDB.getAsync('SELECT COUNT(*) as count FROM records')
         if (count) {
             UI.postMessage({ event: 'diskDB-has-records' })
@@ -675,7 +676,6 @@ async function onLaunch({model = 'chirpity', batchSize = 32, threads = 1, backen
     BATCH_SIZE = batchSize;
     STATE.update({ model: model });
     await loadDB(appPath); // load the diskdb
-    diskDB && await checkAndApplyUpdates(diskDB);
     await createDB(); // now make the memoryDB
     STATE.update({ db: memoryDB })
     NUM_WORKERS = threads;
