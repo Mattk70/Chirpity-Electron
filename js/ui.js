@@ -330,17 +330,14 @@ function createTimeline() {
 }
 
 const resetRegions = () => {
-    if (wavesurfer) wavesurfer.clearRegions();
+    const regionToRemove = wavesurfer.regions.list['focussed'];
+    if (regionToRemove) regionToRemove.remove();
     region = undefined;
-    const orphanedRegions = document.querySelectorAll('wave>region');
-    // Sometimes, there is a region that is not attached the the wavesurfer regions list
-    orphanedRegions?.length && orphanedRegions.forEach(region => region.remove());
     disableMenuItem(['analyseSelection', 'export-audio']);
     if (fileLoaded) enableMenuItem(['analyse']);
 }
 
 function clearActive() {
-    resetRegions();
     STATE.selection = false;
     worker.postMessage({ action: 'update-state', selection: false })
     activeRow?.classList.remove('table-active');
@@ -1351,6 +1348,7 @@ function createRegion(start, end, label, goToRegion) {
     wavesurfer.pause();
     resetRegions();
     wavesurfer.addRegion({
+        id: 'focussed',
         start: start,
         end: end,
         color: "rgba(255, 255, 255, 0.1)",
@@ -3151,9 +3149,7 @@ function centreSpec(){
                 if (fileRegion.play) {
                     region.play()
                 }
-            } else {
-                resetRegions();
-            }
+            } 
             fileLoaded = true;
             //if (activeRow) activeRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
@@ -4991,12 +4987,10 @@ function playRegion(){
                 case 'nocmig': { changeNocmigMode(e); break }
                 case 'iucn': { 
                     config.detect.iucn = element.checked;
-                    resetRegions(); 
                     refreshSummary();
                     break } 
                 case 'iucn-scope': { 
                     config.detect.iucnScope = element.value; 
-                    resetRegions(); 
                     refreshSummary();
                     break }
                 case 'auto-archive': { config.archive.auto = element.checked;
