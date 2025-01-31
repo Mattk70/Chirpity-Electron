@@ -1346,7 +1346,6 @@ const checkWidth = (text) => {
 
 function createRegion(start, end, label, goToRegion) {
     wavesurfer.pause();
-    resetRegions();
     wavesurfer.addRegion({
         id: 'focussed',
         start: start,
@@ -3118,6 +3117,7 @@ function centreSpec(){
                 contents, play: true, resetSpec: false, queued: false
             }
         } else {
+
             // Dismiss a context menu if it's open
             DOM.contextMenu.classList.add("d-none");
             currentBuffer = new AudioBuffer({ length: contents.length, numberOfChannels: 1, sampleRate: sampleRate });
@@ -3139,6 +3139,7 @@ function centreSpec(){
             if (windowLength > currentFileDuration) windowLength = currentFileDuration;
             
             updateSpec({ buffer: currentBuffer, position: position, play: play, resetSpec: resetSpec });
+            resetRegions()
             wavesurfer.bufferRequested = false;
             if (modelReady) {
                 enableMenuItem(['analyse']);
