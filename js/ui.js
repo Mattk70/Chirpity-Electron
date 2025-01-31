@@ -73,7 +73,7 @@ let STATE = {
     },
     resultsSortOrder: 'timestamp',
     summarySortOrder: 'cname ASC',
-    dataForatOptions: { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' },
+    dataFormatOptions: { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' },
     birdList: { lastSelectedSpecies: undefined }, // Used to put the last selected species at the top of the all-species list
     selection: { start: undefined, end: undefined },
     currentAnalysis: {currentFile: null, openFiles: [],  mode: null, species: null, offset: 0, active: null},
@@ -3535,7 +3535,7 @@ function formatDuration(seconds){
             if (!selection) predictions[index] = result;
             // Format date and position for  UI
             const date = new Date(timestamp);
-            const UI_timestamp = date.toLocaleString(undefined, STATE.dataForatOptions);            
+            const UI_timestamp = date.toLocaleString(undefined, STATE.dataFormatOptions);            
             const spliceStart = position < 3600 ? 14 : 11;
             const UI_position = new Date(position * 1000).toISOString().substring(spliceStart, 19);
             const showTimeOfDay = config.timeOfDay ? '' : 'd-none';
