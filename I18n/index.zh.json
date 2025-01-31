@@ -91,6 +91,7 @@
   "settings": {
     "basic": "标准",
     "advanced": "专家",
+    "show-species": ["显示包含的物种"],
     "clear-call-cache": ["清除参考通话缓存"],
     "reset-defaults": ["恢复默认设置"],
     "model-to-use": "模型：",

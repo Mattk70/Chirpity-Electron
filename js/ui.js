@@ -4721,6 +4721,7 @@ function playRegion(){
                     .then(issues => renderIssuesInModal(issues, VERSION))
                     .catch(error => console.error("Error:", error));
                 break}
+            case 'show-species':
             case 'species': { worker.postMessage({action: 'get-valid-species', file: STATE.currentFile}); break }
             case 'startTour': { prepTour(); break }
             case 'eBird': { (async () => await populateHelpModal('ebird', i18nHelp.eBird[locale]))(); break }

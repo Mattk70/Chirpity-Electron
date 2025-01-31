@@ -91,6 +91,7 @@
     "settings": {
         "basic": "Standard",
         "advanced": "Expert",
+        "show-species": ["Visa de inkluderade arterna"],
         "clear-call-cache": ["Rensa referenssamtalscache"],
         "reset-defaults": ["Återställ till standardinställningar"],
         "model-to-use": "Modell:",

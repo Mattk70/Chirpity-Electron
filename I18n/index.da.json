@@ -92,6 +92,7 @@
       "settings": {
         "basic": "Standard",
         "advanced": "Ekspert",
+        "show-species": ["Vis de inkluderede arter"],
         "clear-call-cache": ["Ryd referencelyd-cache"],
         "reset-defaults": ["Nulstil til standardindstillinger"],
         "model-to-use": "Model:",

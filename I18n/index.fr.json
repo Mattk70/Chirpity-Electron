@@ -91,6 +91,7 @@
     "settings": {
       "basic": "Standard",
       "advanced": "Expert",
+      "show-species": ["Afficher les espèces incluses"],
       "clear-call-cache": ["Effacer le cache des cris de référence"],
       "reset-defaults": ["Réinitialiser aux paramètres par défaut"],
       "model-to-use": "Modèle :",

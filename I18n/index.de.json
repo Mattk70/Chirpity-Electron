@@ -91,6 +91,7 @@
     "settings": {
       "basic": "Standard",
       "advanced": "Experte",
+      "show-species": ["Zeige die enthaltenen Arten"],
       "clear-call-cache": ["Referenzruf-Cache löschen"],
       "reset-defaults": ["Auf Standardeinstellungen zurücksetzen"],
       "model-to-use": "Modell:",

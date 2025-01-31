@@ -92,6 +92,7 @@
     "settings": {
         "basic": "Standaard",
         "advanced": "Expert",
+        "show-species": ["Toon de opgenomen soorten"],
         "clear-call-cache": ["Referentieoproep-cache wissen"],
         "reset-defaults": ["Herstellen naar standaardinstellingen"],
         "model-to-use": "Model:",

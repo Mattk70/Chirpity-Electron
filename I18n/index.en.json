@@ -96,6 +96,7 @@
     "settings": {
       "basic": "Standard",
       "advanced": "Expert",
+      "show-species": ["Show the included species"],
       "clear-call-cache": ["Clear Reference Call Cache"],
       "reset-defaults": ["Reset to default settings"],
       "model-to-use": "Model:",

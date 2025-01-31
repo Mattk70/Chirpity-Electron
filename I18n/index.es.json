@@ -91,6 +91,7 @@
     "settings": {
       "basic": "Estándar",
       "advanced": "Experto",
+      "show-species": ["Mostrar las especies incluidas"],
       "clear-call-cache": ["Borrar la caché de los reclamos de referencia"],
       "reset-defaults": ["Volver a la configuración predeterminada"],
       "model-to-use": "Modelo:",

@@ -89,6 +89,7 @@
 "settings": {
   "basic": "標準",
   "advanced": "エキスパート",
+  "show-species": ["含まれる種を表示"],
   "clear-call-cache": ["参照コールキャッシュをクリア"],
   "reset-defaults": ["デフォルト設定にリセット"],
   "model-to-use": "モデル：",

@@ -2424,7 +2424,7 @@ async function processNextFile({
     if (FILE_QUEUE.length) {
         let file = FILE_QUEUE.shift()
         const found = await getWorkingFile(file).catch(error => {
-            const message = error.message;
+            const message = error.message || error;
             if (!STATE.notFound.file){
                 STATE.notFound[file] = true
                 console.warn('Error in getWorkingFile', message)  ;
