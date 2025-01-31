@@ -1,6 +1,6 @@
 import {trackVisit, trackEvent} from './tracking.js';
 import {DOM} from './DOMcache.js';
-import {IUCNCache} from './IUCNcache.js';
+import {IUCNCache, IUCNtaxonomy} from './IUCNcache.js';
 import {fetchIssuesByLabel, renderIssuesInModal, parseSemVer, isNewVersion} from './getKnownIssues.js';
 import {i18nAll, i18nSpeciesList,i18nHeadings, localiseUI, i18nContext, i18nLocation, i18nForm, i18nHelp, i18nToasts, i18nTitles, i18nLIST_MAP, i18nLists, IUCNLabel, i18nLocate} from './i18n.js';
 let LOCATIONS, locationID = undefined, loadingTimeout, LIST_MAP;
@@ -1902,7 +1902,7 @@ let MISSING_FILE;
 
 const setUpWorkerMessaging = () => {
     establishMessageChannel.then(() => {
-        worker.addEventListener('message', function (e) {
+        worker.addEventListener('message', async function (e) {
             const args = e.data;
             const event = args.event;
             switch (event) {
@@ -1966,10 +1966,11 @@ const setUpWorkerMessaging = () => {
                         /* Code below to retrieve Red list data
                         for (let i = 0;i< LABELS.length; i++){
                             const label = LABELS[i];
-                            const sname = label.split('_')[0];
-                            if (! STATE.IUCNcache[sname]) { 
+                            let  sname = label.split('_')[0];
+                            sname = IUCNtaxonomy[sname]
+                            if (sname && ! STATE.IUCNcache[sname]) { 
                                 await getIUCNStatus(sname)
-                                await new Promise(resolve => setTimeout(resolve, 300))
+                                await new Promise(resolve => setTimeout(resolve, 500))
                             }
                         }
                         */
@@ -3204,6 +3205,7 @@ function centreSpec(){
     const updateSummary = async ( { summary = [], filterSpecies = '' }) => {
         const i18n = getI18n(i18nHeadings);
         const showIUCN = config.detect.iucn;
+
         // if (summary.length){
             let summaryHTML = `
             <table id="resultSummary" class="table table-dark p-1"><thead>
@@ -3228,7 +3230,8 @@ function centreSpec(){
                     </td>`;
 
                 if (showIUCN) {
-                    const record = STATE.IUCNcache[item.sname];
+                    const species = IUCNtaxonomy[item.sname] || item.sname;
+                    const record = STATE.IUCNcache[species];
                     // there might not be a record...
                     const iucn = record?.scopes.find(obj => obj.scope === config.detect.iucnScope);
                     const status = iucn?.status || 'NA';
@@ -5206,15 +5209,19 @@ function playRegion(){
 function setListUIState(list){
     // Sets User Preferences for chosen model
     // cf. modelSettingsDisplay
-    DOM.customListContainer.classList.add('d-none');  
-    DOM.localSwitchContainer.classList.add('d-none')
-    DOM.speciesThresholdEl.classList.add('d-none'); 
+    const listElements = document.querySelectorAll('.list-hidden, .list-visible');
+    listElements.forEach(element => {
+        element.classList.replace('list-visible','list-hidden');
+    });
+    // DOM.customListContainer.classList.add('d-none');  
+    // DOM.localSwitchContainer.classList.add('d-none')
+    // DOM.speciesThresholdEl.classList.add('d-none'); 
     if (list === 'location') {
-        DOM.speciesThresholdEl.classList.remove('d-none');
+        DOM.speciesThresholdEl.classList.replace('list-hidden', 'list-visible')
     } else if (list === 'nocturnal'){
-        DOM.localSwitchContainer.classList.remove('d-none')
+        DOM.localSwitchContainer.classList.replace('list-hidden', 'list-visible')
     } else if (list === 'custom') {
-        DOM.customListContainer.classList.remove('d-none');  
+        DOM.customListContainer.classList.replace('list-hidden', 'list-visible')
         if (!config.customListFile[config.model]) {
             generateToast({type: 'warning', message: 'listFileNeeded'})
         }
@@ -6116,7 +6123,7 @@ async function getIUCNStatus(sname = 'Anser anser') {
                     throw new Error(`Network error: code ${response.status} fetching IUCN data.`);
                 }
                 const data = await response.json();
-                await new Promise(resolve => setTimeout(resolve, 300));
+                await new Promise(resolve => setTimeout(resolve, 500));
                 return data;
             })
         );

@@ -814,14 +814,14 @@ input[type="range"].vertical {
 
 
 /* General settings for transitions */
-.advanced, .advanced-visible, .chirpity-only, .chirpity-only-visible, .list-visible {
+.advanced, .advanced-visible, .chirpity-only, .chirpity-only-visible, .list-visible, .list-hidden {
     overflow: hidden; /* Prevent content from spilling out */
     transition: max-height 0.75s ease, opacity 0.5s ease, color 0.5s; /* Smooth transitions */
 }
 
 /* Hidden state */
 .advanced, .chirpity-only, .list-hidden {
-    max-height: 0; /* Collapse completely */
+    max-height: 0 !important; /* Collapse completely */
     opacity: 0; /* Fully transparent */
     color: white;
 }

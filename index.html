@@ -602,21 +602,21 @@
                                 <option value="custom">Custom</option>
                             </select>
                         </div>
-                        <div class="d-none p-2" id="choose-file-container">
-                            <div class="col-auto input-group rounded pe-2">
+                        <div class="list-hidden" id="choose-file-container">
+                            <div class="col-auto input-group rounded p-2 pe-3">
                                 <button class="btn btn-outline-secondary" type="button" id="list-file-selector"> Select file</button>
                                 <input type="text" class="form-control" id="custom-list-location" aria-describedby="list-file-selector" placeholder="No custom list set" disabled="" readonly="">
                                 <span id="clear-custom-list" class="material-symbols-outlined btn btn-outline-secondary p-1" title="Clear custom list">clear</span>
                             </div>
                         </div>
-                        <div class="d-none" id="use-location-container">
+                        <div class="list-hidden pb-2" id="use-location-container">
                             <div class="form-switch ms-2">
                                 <input class="form-check-input" type="checkbox" role="switch" id="local">
                                 <label class="form-check-label" for="local">Use Location settings</label>
                                 <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Use Location settings" id="Use Location settings-circle-help"  data-bs-content="When activated, the Nocturnal birds filter reports birds based on your location settings.">?</a>
                             </div>
                         </div>
-                        <div class="advanced" id="species-threshold-el">
+                        <div class="advanced list-hidden" id="species-threshold-el">
                             <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Species Threshold" id="Species Threshold-circle-help"  data-bs-content="Define the minimum eBird checklist frequency for species inclusion.
                             If 'Adjust list for the week of the year' is enabled, the list will be adjusted to include species expected for the recording week.">?</a>
                             <div class="pe-3 input-group rounded p-2 mb-1">
@@ -630,9 +630,9 @@
                             </div>                                                                
                         </div>
                     </div>
-                    <div class="m-2"></div>
-                    <div class="form-group rounded">
-                        <div class="form-check form-switch ps-2">
+                    
+                    <div class="form-group rounded p-2">
+                        <div class="form-check form-switch ps-0">
                             <button class="btn btn-primary" id="show-species" onclick="return false">Show the species included</button>
                         </div>
                     </div>
