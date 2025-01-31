@@ -384,6 +384,7 @@ const initWavesurfer = ({
     // Enable analyse selection when region created
     wavesurfer.on('region-created', function (e) {
         region = e;
+        region.id = 'focussed';
         enableMenuItem(['export-audio']);
         if (modelReady && !PREDICTING) {
             enableMenuItem(['analyseSelection']);
@@ -1347,7 +1348,6 @@ const checkWidth = (text) => {
 function createRegion(start, end, label, goToRegion) {
     wavesurfer.pause();
     wavesurfer.addRegion({
-        id: 'focussed',
         start: start,
         end: end,
         color: "rgba(255, 255, 255, 0.1)",
