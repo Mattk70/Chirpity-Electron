@@ -1362,7 +1362,7 @@ function createRegion(start, end, label, goToRegion, colour) {
     wavesurfer.pause();
     const region = wavesurfer.addRegion({
         start: start,
-        end: end,
+        end: Math.min(end, (bufferBegin + windowLength - 0.05)),
         color: colour || "rgba(255, 255, 255, 0.1)",
         attributes: {
             label: label || '',

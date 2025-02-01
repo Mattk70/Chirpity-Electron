@@ -257,6 +257,7 @@ region.wavesurfer-region:before {
     top: 0.75rem;
     left: 0.5rem;
     padding-left: 0.5rem;
+    z-index: 5;
 }
 
 region.wavesurfer-region[data-region-highlight] {

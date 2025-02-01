@@ -1293,13 +1293,16 @@ async function sendDetections(file, start, end) {
     const db = STATE.db;
     start = METADATA[file].fileStart + (start * 1000)
     end = METADATA[file].fileStart + (end * 1000)
+    const included = await getIncludedIDs();
+    const includedSQL = filtersApplied(included) ? ` AND speciesID IN (${prepParams(included)})` : '';
     const results = await db.allAsync(`
         SELECT position as start, end, cname as label
         FROM records
         JOIN species ON speciesID = species.ID
         JOIN files ON fileID = files.ID
-        WHERE name = ? AND dateTime BETWEEN ? AND ?`, 
-        file, start, end
+        WHERE name = ? AND dateTime BETWEEN ? AND ?
+        AND confidence >= ? ${includedSQL}`, 
+        file, start, end, STATE.detect.confidence, ...included
     )
     UI.postMessage({event: 'window-detections', detections: results})
 }
