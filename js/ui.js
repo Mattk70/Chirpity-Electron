@@ -331,10 +331,7 @@ function createTimeline() {
 
 const resetRegions = () => {
     wavesurfer.clearRegions()
-    const regions = document.querySelectorAll('region')
-    regions.forEach(r => r.remove())
-    // const regionToRemove = wavesurfer.regions.list['focussed'];
-    // if (regionToRemove) regionToRemove.remove();
+    wavesurfer.regions.list = {}
     region = undefined;
     disableMenuItem(['analyseSelection', 'export-audio']);
     if (fileLoaded) enableMenuItem(['analyse']);
@@ -386,7 +383,7 @@ const initWavesurfer = ({
 
     // Enable analyse selection when region created
     wavesurfer.on('region-created', function (e) {
-        const focussedRegion = e.color === "rgba(255, 255, 255, 0.1)";
+        const focussedRegion = e.color === "rgba(255, 255, 0, 0.1)";
         if (focussedRegion ){
             region = e;
             region.id = 'focussed';
@@ -397,15 +394,16 @@ const initWavesurfer = ({
         }
     });
     // Focus region on mouseenter
-    wavesurfer.on('region-mouseenter', (r) => {
-        const blurredRegon = wavesurfer.regions.list['focussed'];
+    wavesurfer.on('region-click', (r) => {
+        const blurredRegon = Object.values(wavesurfer.regions.list).find(r => r.id === 'focussed');
         if (blurredRegon){
             delete blurredRegon.id;
             blurredRegon.id = wavesurfer.util.getId();
-            blurredRegon.color =  "rgba(255, 255, 0, 0.1)";
+            blurredRegon.color =  "rgba(255, 255, 255, 0.1)";
+            blurredRegon.updateRender()
         }
         r.id = 'focussed';
-        r.color =  "rgba(255, 255, 255, 0.1)";
+        r.color =  "rgba(255, 255, 0, 0.1)";
         r.updateRender(r)
         region = r; //update global region variable
         const regionElement = r.element; // Get the DOM element for the region
@@ -416,10 +414,6 @@ const initWavesurfer = ({
         regionElement.addEventListener('mousemove', handleMouseMove);
         // Blur region on mouseout
         const handleMouseLeave = () => {
-            delete r.id;
-            r.id = wavesurfer.util.getId();
-            r.color =  "rgba(255, 255, 0, 0.1)";
-            r.updateRender(r)
             regionElement.removeEventListener('mousemove', handleMouseMove);
         };
         regionElement.addEventListener('mouseleave', handleMouseLeave);
@@ -1386,9 +1380,9 @@ function showWindwoDetections(detectionList, queued){
     else {
         detectionList.forEach(detection =>{
             const start = detection.start - bufferBegin;
-            if (start !== region?.start) {
+            if (start < windowLength && start !== region?.start) {
                 const end = detection.end - bufferBegin;
-                const colour =  "rgba(255, 255, 0, 0.1)"
+                const colour =  "rgba(255, 255, 255, 0.1)"
                 createRegion(start, end, detection.label, false, colour)
             }
         })
@@ -1397,17 +1391,20 @@ function showWindwoDetections(detectionList, queued){
 
 function createRegion(start, end, label, goToRegion, colour) {
     colour || wavesurfer.pause(); // colour param only defined when additional detections are loaded
-    const noLabel =  ! label || end > windowLength;
-    const attributes = noLabel ? {} : { label: label || ''};
+    const attributes = { label: label };
     const region = wavesurfer.addRegion({
         start: start,
         end: Math.min(end, (windowLength - 0.05)),
-        color: colour || "rgba(255, 255, 255, 0.1)",
+        color: colour || "rgba(255, 255, 0, 0.1)",
         attributes: attributes
     });
     const text = region.attributes.label;
     const regionEl = region.element;
-    if (regionEl.clientWidth <= checkWidth(text)) {
+    const width = regionEl.clientWidth;
+    if (width <= 25) { // too small!
+        region.remove()
+        return
+    } else if (width <= checkWidth(text)) {
         regionEl.style.writingMode = 'vertical-rl';
     }
     if (goToRegion && wavesurfer.isReady) {
@@ -1654,7 +1651,10 @@ function secondaryLabelInterval(pxPerSec) {
 
 function updatePrefs(file, data) {
     try {
-        fs.writeFileSync(p.join(appPath, file), JSON.stringify(data))
+        const jsonData = JSON.stringify(data); // Convert object to JSON string
+        const hexData = utf8ToHex(jsonData); // Encode to hex
+        
+        fs.writeFileSync(p.join(appPath, file), hexData)
     } catch (error) {
         console.log(error)
     }
@@ -1682,6 +1682,7 @@ function syncConfig(config, defaultConfig) {
 /////////////////////////  Window Handlers ////////////////////////////
 // Set config defaults
 const defaultConfig = {
+    isMember: 0,
     archive: {location: undefined, format: 'ogg', auto: false, trim: false},
     fontScale: 1,
     seenTour: false,
@@ -1690,6 +1691,7 @@ const defaultConfig = {
     colormap: 'inferno',
     specMaxHeight: 260,
     specLabels: true,
+    specDetections: false,
     customColormap: {'loud': "#00f5d8", 'mid': "#000000", 'quiet': "#000000", 'threshold': 0.5, 'windowFn': 'hann'},
     timeOfDay: true,
     list: 'birds',
@@ -1744,13 +1746,18 @@ window.onload = async () => {
     // Set footer year
     document.getElementById('year').textContent = new Date().getFullYear();
     await appVersionLoaded;
-    await fs.readFile(p.join(appPath, 'config.json'), 'utf8', (err, data) => {
+    await fs.readFile(p.join(appPath, 'config.json'), 'utf8', (err, hexData) => {
         if (err) {
             console.log('Config not loaded, using defaults');
             // Use defaults
             config = defaultConfig;
         } else {
-            config = JSON.parse(data);
+            try {
+                const jsonData = hexToUtf8(hexData);
+                config = JSON.parse(jsonData);
+            } catch {
+                config = JSON.parse(hexData);
+            }
         }
         // One-time reset of hidecoffee
         if (config.forceHideCoffeeReset) {
@@ -1769,7 +1776,8 @@ window.onload = async () => {
         // Show Buy Me a Coffee widget?
         config.hideBuyCoffeeWidget && DOM.buyMeCoffee.classList.add('d-none');
         document.getElementById('buy-coffee').checked = config.hideBuyCoffeeWidget;
-
+        config.isMember = 0;
+        membershipCheck();
         // Disable SNR
         config.filters.SNR = 0;
 
@@ -1820,6 +1828,8 @@ window.onload = async () => {
         DOM.colourmap.value = config.colormap;
         // Spectrogram labels
         DOM.specLabels.checked = config.specLabels;
+        // Show all detections
+        DOM.specDetections.checked = config.specDetections;
         // Spectrogram frequencies
         DOM.fromInput.value = config.audio.minFrequency;
         DOM.fromSlider.value = config.audio.minFrequency;
@@ -2600,7 +2610,7 @@ function onChartData(args) {
                 // Region length bug (likely mine) means I don't trust lengths > 60 seconds
                 //maxLength: config[config[config.model].backend].batchSize * 3,
                 slop: null,
-                color: "rgba(255, 255, 255, 0.2)"
+                color: "rgba(255, 255, 0, 0.1)"
             })
             ).initPlugin('regions')
         }
@@ -5178,6 +5188,10 @@ function playRegion(){
                         adjustSpecDims(true, fftSamples)
                     }
                     break }
+                case 'spec-detections': {
+                    config.specDetections = element.checked;
+                    worker.postMessage({action: 'update-state', specDetections: config.specDetections});
+                    break }
                 case 'fromInput': case 'fromSlider': {
                     config.audio.minFrequency = Math.max(element.valueAsNumber, 0);
                     DOM.fromInput.value = config.audio.minFrequency;
@@ -6218,3 +6232,36 @@ const IUCNMap = {
 
 // Make config, LOCATIONS and displayLocationAddress and toasts available to the map script in index.html
 export { config, displayLocationAddress, LOCATIONS, generateToast };
+
+function membershipCheck(){
+    const lockedElements = document.querySelectorAll('.locked, .unlocked')
+    if (config.isMember){
+
+        lockedElements.forEach(el =>{
+            el.classList.replace('locked', 'unlocked');
+            el.disabled = false;
+            el.textContent = 'lock_open';
+        })
+    } else {
+        lockedElements.forEach(el =>{
+            el.classList.replace('unlocked', 'locked');
+            config.specDetections = false;
+            el.checked = false;
+            el.disabled = true;
+            el.textContent = 'lock';
+        })
+    }
+}
+
+function utf8ToHex(str) {
+    return Array.from(str)
+        .map(char => char.charCodeAt(0).toString(16).padStart(2, '0')) // Convert each char to hex
+        .join('');
+}
+
+function hexToUtf8(hex) {
+    return hex
+        .match(/.{1,2}/g) // Split the hex string into pairs
+        .map(byte => String.fromCharCode(parseInt(byte, 16))) // Convert each pair to a character
+        .join('');
+}

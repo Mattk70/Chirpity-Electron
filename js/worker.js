@@ -1252,9 +1252,9 @@ async function loadAudioFile({
                     metadata: METADATA[file].metadata
                 }, [audioArray.buffer]);
                 let week;
-                if (true){
-                    sendDetections(file, start, end, queued)
-                }
+
+                STATE.specDetections && sendDetections(file, start, end, queued)
+                
                 if (STATE.list === 'location'){
                     week = STATE.useWeek ? new Date(METADATA[file].fileStart).getWeekNumber() : -1
                     // Send the week number of the surrent file
@@ -1296,11 +1296,25 @@ async function sendDetections(file, start, end, queued) {
     const included = await getIncludedIDs();
     const includedSQL = filtersApplied(included) ? ` AND speciesID IN (${prepParams(included)})` : '';
     const results = await db.allAsync(`
-        SELECT position as start, end, cname as label
-        FROM records
-        JOIN species ON speciesID = species.ID
-        JOIN files ON fileID = files.ID
-        WHERE name = ? AND dateTime BETWEEN ? AND ?
+        WITH RankedRecords AS (
+            SELECT 
+                position AS start, 
+                end, 
+                cname AS label, 
+                RANK() OVER (PARTITION BY fileID, dateTime ORDER BY confidence DESC) AS rank,
+                confidence,
+                name,
+                dateTime,
+                speciesID
+            FROM records
+            JOIN species ON speciesID = species.ID
+            JOIN files ON fileID = files.ID
+        )
+        SELECT start, end, label
+        FROM RankedRecords
+        WHERE name = ? 
+        AND dateTime BETWEEN ? AND ?
+        AND rank = 1
         AND confidence >= ? ${includedSQL}`, 
         file, start, end, STATE.detect.confidence, ...included
     )
@@ -2341,6 +2355,10 @@ const parsePredictions = async (response) => {
                             cname: cname,
                             sname: sname,
                             score: confidence
+                        }
+                        if (key < BATCH_SIZE && STATE.specDetections) { // update with check for enabled
+                            // Send all the initial detections to the UI
+                            sendDetections(file, 0, 160)
                         }
                         sendResult(++index, result, false);
                         if (index >499 ) {

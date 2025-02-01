@@ -59,6 +59,7 @@ const DOM = {
     get spectrogramWrapper() { if (!this._spectrogramWrapper) { this._spectrogramWrapper = document.getElementById('spectrogramWrapper') } return this._spectrogramWrapper},
     get spectrogram() { if (!this._spectrogram) { this._spectrogram = document.getElementById('spectrogram') } return this._spectrogram},
     get specLabels() { if (!this._specLabels) { this._specLabels = document.getElementById('spec-labels') } return this._specLabels},
+    get specDetections() { if (!this._specDetections) { this._specDetections = document.getElementById('spec-detections') } return this._specDetections},
     get summaryTable() { if (!this._summaryTable) { this._summaryTable = document.getElementById('summaryTable') } return this._summaryTable},
     get resultHeader() { if (!this._resultHeader) { this._resultHeader = document.getElementById('resultsHead') } return this._resultHeader},
     get threadSlider() { if (!this._threadSlider) { this._threadSlider = document.getElementById('thread-slider') } return this._threadSlider},

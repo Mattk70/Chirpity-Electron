@@ -246,17 +246,13 @@ ul {
     color: #ffae42; /* Change to your desired text color */
 }
 
-
 region.wavesurfer-region:before {
     content: attr(data-region-label);
     position: absolute;
     color: beige;    
-    background-color: rgba(0, 0, 0, 0.2); /* Semi-transparent black background */
-    border-radius: 0.5rem; /* Optional: Rounds corners for a cleaner look */
-    padding: 0.1rem 0.5rem; /* Adds padding around the label text */
+    text-shadow: 2px 2px 3px rgb(0, 0, 0);
     top: 0.75rem;
-    left: 0.5rem;
-    padding-left: 0.5rem;
+    left: 2px;
     z-index: 5;
 }
 
@@ -272,7 +268,13 @@ region.wavesurfer-region[data-region-highlight] {
 .daytime {
     background-color: rgba(86, 180, 239, 0.2);
 }
+.locked{
+    color: coral;
+}
 
+.unlocked{
+    color: greenyellow;
+}
 
 .table {
     margin-bottom: 0;
