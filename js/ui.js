@@ -386,13 +386,45 @@ const initWavesurfer = ({
 
     // Enable analyse selection when region created
     wavesurfer.on('region-created', function (e) {
-        region = e;
-        region.id = 'focussed';
-        enableMenuItem(['export-audio']);
-        if (modelReady && !PREDICTING) {
-            enableMenuItem(['analyseSelection']);
+        const focussedRegion = e.color === "rgba(255, 255, 255, 0.1)";
+        if (focussedRegion ){
+            region = e;
+            region.id = 'focussed';
+            enableMenuItem(['export-audio']);
+            if (modelReady && !PREDICTING) {
+                enableMenuItem(['analyseSelection']);
+            }
         }
     });
+    // Focus region on mouseenter
+    wavesurfer.on('region-mouseenter', (r) => {
+        const blurredRegon = wavesurfer.regions.list['focussed'];
+        if (blurredRegon){
+            delete blurredRegon.id;
+            blurredRegon.id = wavesurfer.util.getId();
+            blurredRegon.color =  "rgba(255, 255, 0, 0.1)";
+        }
+        r.id = 'focussed';
+        r.color =  "rgba(255, 255, 255, 0.1)";
+        r.updateRender(r)
+        region = r; //update global region variable
+        const regionElement = r.element; // Get the DOM element for the region
+        const handleMouseMove = (event) => {
+            event.stopPropagation()
+            specTooltip(event, true, r); // Pass the mouse event here
+        };
+        regionElement.addEventListener('mousemove', handleMouseMove);
+        // Blur region on mouseout
+        const handleMouseLeave = () => {
+            delete r.id;
+            r.id = wavesurfer.util.getId();
+            r.color =  "rgba(255, 255, 0, 0.1)";
+            r.updateRender(r)
+            regionElement.removeEventListener('mousemove', handleMouseMove);
+        };
+        regionElement.addEventListener('mouseleave', handleMouseLeave);
+    });
+
     // Clear label on modifying region
     wavesurfer.on('region-updated', function (e) {
         region = e;
@@ -430,7 +462,9 @@ const initWavesurfer = ({
         if (currentFileDuration > bufferBegin + windowLength) {
             wavesurfer.stop()
             if (NEXT_BUFFER) {
+                const detections = NEXT_BUFFER.detectionList; // Save here as onworkerloaded audio squashes NEXT_BUFFER
                 onWorkerLoadedAudio(NEXT_BUFFER)
+                showWindwoDetections(detections)
             } else {
                 postBufferUpdate({ begin: bufferBegin, play: true })
             }
@@ -1347,27 +1381,29 @@ const checkWidth = (text) => {
     return textWidth + 5
 }
 
-function showWindwoDetections(detectionList){
-    detectionList.forEach(detection =>{
-        const start = detection.start - bufferBegin;
-        if (start !== region?.start) {
-            const end = detection.end - bufferBegin;
-            const colour =  "rgba(255, 255, 0, 0.1)"
-            createRegion(start, end, detection.label, false, colour)
-        }
-    })
+function showWindwoDetections(detectionList, queued){
+    if (queued) NEXT_BUFFER.detectionList = detectionList
+    else {
+        detectionList.forEach(detection =>{
+            const start = detection.start - bufferBegin;
+            if (start !== region?.start) {
+                const end = detection.end - bufferBegin;
+                const colour =  "rgba(255, 255, 0, 0.1)"
+                createRegion(start, end, detection.label, false, colour)
+            }
+        })
+    }
 }
 
 function createRegion(start, end, label, goToRegion, colour) {
-    wavesurfer.pause();
+    colour || wavesurfer.pause(); // colour param only defined when additional detections are loaded
+    const noLabel =  ! label || end > windowLength;
+    const attributes = noLabel ? {} : { label: label || ''};
     const region = wavesurfer.addRegion({
         start: start,
-        end: Math.min(end, (bufferBegin + windowLength - 0.05)),
+        end: Math.min(end, (windowLength - 0.05)),
         color: colour || "rgba(255, 255, 255, 0.1)",
-        attributes: {
-            label: label || '',
-            
-        },
+        attributes: attributes
     });
     const text = region.attributes.label;
     const regionEl = region.element;
@@ -2079,7 +2115,7 @@ const setUpWorkerMessaging = () => {
                     break }
                 case "update-summary": {updateSummary(args);
                     break }
-                case "window-detections": { showWindwoDetections(args.detections)
+                case "window-detections": { showWindwoDetections(args.detections, args.queued)
                     break
                 }
                 case "worker-loaded-audio": {
@@ -2609,32 +2645,34 @@ function onChartData(args) {
         DOM.tooltip.style.visibility = 'hidden';
     };
 
-    async function specTooltip(event) {
-        const i18n = getI18n(i18nContext);
-        const waveElement = event.target;
-        const specDimensions = waveElement.getBoundingClientRect();
-        const frequencyRange = Number(config.audio.maxFrequency) - Number(config.audio.minFrequency);
-        const yPosition = Math.round((specDimensions.bottom - event.clientY) * (frequencyRange / specDimensions.height)) + Number(config.audio.minFrequency);
-        
-        // Update the tooltip content
-        const tooltip = DOM.tooltip;
-        tooltip.textContent = `${i18n.frequency}: ${yPosition}Hz`;
-        if (region) {
-            const lineBreak = document.createElement('br');
-            const textNode = document.createTextNode(formatRegionTooltip(i18n.length, region.start, region.end));
+    function specTooltip(event, show = !config.specLabels, region) {
+        if (show){
+            const i18n = getI18n(i18nContext);
+            const waveElement = event.target;
+            const specDimensions = waveElement.getBoundingClientRect();
+            const frequencyRange = Number(config.audio.maxFrequency) - Number(config.audio.minFrequency);
+            const yPosition = Math.round((specDimensions.bottom - event.clientY) * (frequencyRange / specDimensions.height)) + Number(config.audio.minFrequency);
             
-            tooltip.appendChild(lineBreak);  // Add the line break
-            tooltip.appendChild(textNode);   // Add the text node
+            // Update the tooltip content
+            const tooltip = DOM.tooltip;
+            tooltip.textContent = `${i18n.frequency}: ${yPosition}Hz`;
+            if (region) {
+                const lineBreak = document.createElement('br');
+                const textNode = document.createTextNode(formatRegionTooltip(i18n.length, region.start, region.end));
+                
+                tooltip.appendChild(lineBreak);  // Add the line break
+                tooltip.appendChild(textNode);   // Add the text node
+            }
+        
+            // Apply styles to the tooltip
+            Object.assign(tooltip.style, {
+                top: `${event.clientY}px`,
+                left: `${event.clientX + 15}px`,
+                display: 'block',
+                visibility: 'visible',
+                opacity: 1
+            });
         }
-    
-        // Apply styles to the tooltip
-        Object.assign(tooltip.style, {
-            top: `${event.clientY}px`,
-            left: `${event.clientX + 15}px`,
-            display: 'block',
-            visibility: 'visible',
-            opacity: 1
-        });
     }
 
     const updateListIcon = () => {
@@ -2957,6 +2995,7 @@ function centreSpec(){
     
     //returns a region object with the start and end of the region supplied
     function getRegion(){
+        if (region?.end > windowLength || region?.start < 0) region = null;
         return region ? {
             start: region.start,
             end: region.end,

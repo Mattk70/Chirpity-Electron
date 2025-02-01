@@ -1253,7 +1253,7 @@ async function loadAudioFile({
                 }, [audioArray.buffer]);
                 let week;
                 if (true){
-                    sendDetections(file, start, end)
+                    sendDetections(file, start, end, queued)
                 }
                 if (STATE.list === 'location'){
                     week = STATE.useWeek ? new Date(METADATA[file].fileStart).getWeekNumber() : -1
@@ -1289,7 +1289,7 @@ function addDays(date, days) {
     return result;
 }
 
-async function sendDetections(file, start, end) {
+async function sendDetections(file, start, end, queued) {
     const db = STATE.db;
     start = METADATA[file].fileStart + (start * 1000)
     end = METADATA[file].fileStart + (end * 1000)
@@ -1304,7 +1304,7 @@ async function sendDetections(file, start, end) {
         AND confidence >= ? ${includedSQL}`, 
         file, start, end, STATE.detect.confidence, ...included
     )
-    UI.postMessage({event: 'window-detections', detections: results})
+    UI.postMessage({event: 'window-detections', detections: results, queued})
 }
 
 /**
