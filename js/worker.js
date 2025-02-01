@@ -1252,6 +1252,9 @@ async function loadAudioFile({
                     metadata: METADATA[file].metadata
                 }, [audioArray.buffer]);
                 let week;
+                if (true){
+                    sendDetections(file, start, end)
+                }
                 if (STATE.list === 'location'){
                     week = STATE.useWeek ? new Date(METADATA[file].fileStart).getWeekNumber() : -1
                     // Send the week number of the surrent file
@@ -1286,7 +1289,20 @@ function addDays(date, days) {
     return result;
 }
 
-
+async function sendDetections(file, start, end) {
+    const db = STATE.db;
+    start = METADATA[file].fileStart + (start * 1000)
+    end = METADATA[file].fileStart + (end * 1000)
+    const results = await db.allAsync(`
+        SELECT position as start, end, cname as label
+        FROM records
+        JOIN species ON speciesID = species.ID
+        JOIN files ON fileID = files.ID
+        WHERE name = ? AND dateTime BETWEEN ? AND ?`, 
+        file, start, end
+    )
+    UI.postMessage({event: 'window-detections', detections: results})
+}
 
 /**
 * Called by getWorkingFile, setCustomLocation

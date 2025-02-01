@@ -330,8 +330,11 @@ function createTimeline() {
 }
 
 const resetRegions = () => {
-    const regionToRemove = wavesurfer.regions.list['focussed'];
-    if (regionToRemove) regionToRemove.remove();
+    wavesurfer.clearRegions()
+    const regions = document.querySelectorAll('region')
+    regions.forEach(r => r.remove())
+    // const regionToRemove = wavesurfer.regions.list['focussed'];
+    // if (regionToRemove) regionToRemove.remove();
     region = undefined;
     disableMenuItem(['analyseSelection', 'export-audio']);
     if (fileLoaded) enableMenuItem(['analyse']);
@@ -1344,22 +1347,32 @@ const checkWidth = (text) => {
     return textWidth + 5
 }
 
+function showWindwoDetections(detectionList){
+    detectionList.forEach(detection =>{
+        const start = detection.start - bufferBegin;
+        if (start !== region?.start) {
+            const end = detection.end - bufferBegin;
+            const colour =  "rgba(255, 255, 0, 0.1)"
+            createRegion(start, end, detection.label, false, colour)
+        }
+    })
+}
 
-function createRegion(start, end, label, goToRegion) {
+function createRegion(start, end, label, goToRegion, colour) {
     wavesurfer.pause();
-    wavesurfer.addRegion({
+    const region = wavesurfer.addRegion({
         start: start,
         end: end,
-        color: "rgba(255, 255, 255, 0.1)",
+        color: colour || "rgba(255, 255, 255, 0.1)",
         attributes: {
             label: label || '',
             
         },
     });
-    const region = document.getElementsByTagName('region')[0];
-    const text = region.attributes['data-region-label'].value;
-    if (region.clientWidth <= checkWidth(text)) {
-        region.style.writingMode = 'vertical-rl';
+    const text = region.attributes.label;
+    const regionEl = region.element;
+    if (regionEl.clientWidth <= checkWidth(text)) {
+        regionEl.style.writingMode = 'vertical-rl';
     }
     if (goToRegion && wavesurfer.isReady) {
         const progress = start / wavesurfer.getDuration();
@@ -2066,6 +2079,9 @@ const setUpWorkerMessaging = () => {
                     break }
                 case "update-summary": {updateSummary(args);
                     break }
+                case "window-detections": { showWindwoDetections(args.detections)
+                    break
+                }
                 case "worker-loaded-audio": {
                     onWorkerLoadedAudio(args);
                     break }
@@ -2544,7 +2560,7 @@ function onChartData(args) {
             wavesurfer.addPlugin(WaveSurfer.regions.create({
                 formatTimeCallback: () => '',
                 dragSelection: true,
-                maxRegions: 1,
+                maxRegions: 100,
                 // Region length bug (likely mine) means I don't trust lengths > 60 seconds
                 //maxLength: config[config[config.model].backend].batchSize * 3,
                 slop: null,
