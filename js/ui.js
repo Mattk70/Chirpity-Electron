@@ -1682,6 +1682,7 @@ function syncConfig(config, defaultConfig) {
 /////////////////////////  Window Handlers ////////////////////////////
 // Set config defaults
 const defaultConfig = {
+    newInstallDate: 0,
     isMember: 0,
     archive: {location: undefined, format: 'ogg', auto: false, trim: false},
     fontScale: 1,
@@ -1925,7 +1926,8 @@ window.onload = async () => {
             local: config.local,
             UUID: config.UUID,
             debug: config.debug,
-            fileStartMtime: config.fileStartMtime
+            fileStartMtime: config.fileStartMtime,
+            specDetections: config.specDetections
         });
         const {model, list} = config;
         t0_warmup = Date.now();
@@ -6234,8 +6236,10 @@ const IUCNMap = {
 export { config, displayLocationAddress, LOCATIONS, generateToast };
 
 function membershipCheck(){
+    config.newInstallDate = config.newInstallDate || Date.now();
+    const inTrial = Date.now() - config.newInstallDate < 172_800_000;
     const lockedElements = document.querySelectorAll('.locked, .unlocked')
-    if (config.isMember){
+    if (config.isMember || inTrial){
 
         lockedElements.forEach(el =>{
             el.classList.replace('locked', 'unlocked');
