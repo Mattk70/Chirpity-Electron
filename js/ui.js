@@ -1747,17 +1747,22 @@ window.onload = async () => {
     // Set footer year
     document.getElementById('year').textContent = new Date().getFullYear();
     await appVersionLoaded;
-    await fs.readFile(p.join(appPath, 'config.json'), 'utf8', (err, hexData) => {
+    const configFile = p.join(appPath, 'config.json') 
+    await fs.readFile(configFile, 'utf8', (err, hexData) => {
         if (err) {
             console.log('Config not loaded, using defaults');
-            // Use defaults
-            config = defaultConfig;
+            // Use defaults if no config file
+            if (! fs.existsSync(configFile)) config = defaultConfig;
         } else {
             try {
                 const jsonData = hexToUtf8(hexData);
                 config = JSON.parse(jsonData);
-            } catch {
-                config = JSON.parse(hexData);
+            } catch { //ASCII config or corrupt config
+                try {
+                    config = JSON.parse(hexData);
+                } catch {
+                    alert('Config file is corrupt')
+                }
             }
         }
         // One-time reset of hidecoffee

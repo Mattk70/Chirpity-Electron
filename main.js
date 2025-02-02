@@ -397,6 +397,7 @@ app.whenReady().then(async () => {
         // Read the contents of the file synchronously
         fileContent = fs.readFileSync(filePath, 'utf8');
         config = JSON.parse(fileContent);
+        DEBUG =   process.env.CI === 'e2e' ? false : config.debug;
     }
     catch (error) {
         console.warn('CONFIG: ASCII read attempt failed:', error.message);
@@ -404,23 +405,13 @@ app.whenReady().then(async () => {
         try {
             const jsonData = hexToUtf8(fileContent);
             config = JSON.parse(jsonData);
+            DEBUG =   process.env.CI === 'e2e' ? false : config.debug;
         } catch {
             console.warn('CONFIG: Error reading Hex file:', error.message);
-            const dialogOpts = {
-                type: 'error',
-                title: 'Corrupt configuration',
-                detail: `Chirpity could not read its configuration file: ${filePath}`
-            };
-            dialog.showMessageBox(dialogOpts).then((returnValue) => {
-                if (returnValue.response === 0) {
-                    //app.relaunch();
-                    app.quit();
-                }
-            })
         }
     }
-    DEBUG =   process.env.CI === 'e2e' ? false : config.debug;
     DEBUG && console.log('CI mode' , process.env.CI)
+
     await createWorker();
     await createWindow();
     
