@@ -382,21 +382,45 @@ app.whenReady().then(async () => {
     ipcMain.handle('getAudio', () => path.join(__dirname.replace('app.asar', ''), 'Help', 'example.mp3'));
     ipcMain.handle('exitApplication', () => app.quit()); 
     
+
     // Debug mode
+    function hexToUtf8(hex) {
+        return hex
+            .match(/.{1,2}/g) // Split the hex string into pairs
+            .map(byte => String.fromCharCode(parseInt(byte, 16))) // Convert each pair to a character
+            .join('');
+    }
     try {
         // Specify the file path
-        const filePath = path.join(app.getPath('userData'), 'config.json');
+        filePath = path.join(app.getPath('userData'), 'config.json');
         
         // Read the contents of the file synchronously
-        const fileContent = fs.readFileSync(filePath, 'utf8');
-        const config = JSON.parse(fileContent);
-        DEBUG =   process.env.CI === 'e2e' ? false : config.debug;
-        DEBUG && console.log('CI mode' , process.env.CI)
+        fileContent = fs.readFileSync(filePath, 'utf8');
+        config = JSON.parse(fileContent);
     }
     catch (error) {
+        console.warn('CONFIG: ASCII read attempt failed:', error.message);
         // Handle errors, for example, file not found
-        console.warn('Error reading file:', error.message);
+        try {
+            const jsonData = hexToUtf8(fileContent);
+            config = JSON.parse(jsonData);
+        } catch {
+            console.warn('CONFIG: Error reading Hex file:', error.message);
+            const dialogOpts = {
+                type: 'error',
+                title: 'Corrupt configuration',
+                detail: `Chirpity could not read its configuration file: ${filePath}`
+            };
+            dialog.showMessageBox(dialogOpts).then((returnValue) => {
+                if (returnValue.response === 0) {
+                    //app.relaunch();
+                    app.quit();
+                }
+            })
+        }
     }
+    DEBUG =   process.env.CI === 'e2e' ? false : config.debug;
+    DEBUG && console.log('CI mode' , process.env.CI)
     await createWorker();
     await createWindow();
     

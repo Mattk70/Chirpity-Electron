@@ -2356,10 +2356,6 @@ const parsePredictions = async (response) => {
                             sname: sname,
                             score: confidence
                         }
-                        if (key < BATCH_SIZE && STATE.specDetections) { // update with check for enabled
-                            // Send all the initial detections to the UI
-                            sendDetections(file, 0, 160)
-                        }
                         sendResult(++index, result, false);
                         if (index >499 ) {
                             setGetSummaryQueryInterval(NUM_WORKERS);
