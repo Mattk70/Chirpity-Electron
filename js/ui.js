@@ -458,7 +458,7 @@ const initWavesurfer = ({
             if (NEXT_BUFFER) {
                 const detections = NEXT_BUFFER.detectionList; // Save here as onworkerloaded audio squashes NEXT_BUFFER
                 onWorkerLoadedAudio(NEXT_BUFFER)
-                showWindwoDetections(detections)
+                config.specDetections && showWindwoDetections(detections)
             } else {
                 postBufferUpdate({ begin: bufferBegin, play: true })
             }
