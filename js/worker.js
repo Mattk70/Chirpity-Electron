@@ -1293,8 +1293,10 @@ async function sendDetections(file, start, end, queued) {
     const db = STATE.db;
     start = METADATA[file].fileStart + (start * 1000)
     end = METADATA[file].fileStart + (end * 1000)
+    const params = [file, start, end, STATE.detect.confidence];
     const included = await getIncludedIDs();
     const includedSQL = filtersApplied(included) ? ` AND speciesID IN (${prepParams(included)})` : '';
+    includedSQL && params.push(...included)
     const results = await db.allAsync(`
         WITH RankedRecords AS (
             SELECT 
@@ -1315,8 +1317,7 @@ async function sendDetections(file, start, end, queued) {
         WHERE name = ? 
         AND dateTime BETWEEN ? AND ?
         AND rank = 1
-        AND confidence >= ? ${includedSQL}`, 
-        file, start, end, STATE.detect.confidence, ...included
+        AND confidence >= ? ${includedSQL}`, ...params
     )
     UI.postMessage({event: 'window-detections', detections: results, queued})
 }

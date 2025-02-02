@@ -3569,7 +3569,7 @@ function formatDuration(seconds){
             }
             showElement(['resultTableContainer', 'resultsHead'], false);
             // If  we have some results, let's update the view in case any are in the window
-            config.specDetections && postBufferUpdate({file, begin:bufferBegin})
+            config.specDetections && !isFromDB && postBufferUpdate({file, begin:bufferBegin})
         }  else if (!isFromDB && index % (config.limit + 1) === 0) {
             addPagination(index, 0)
         }
