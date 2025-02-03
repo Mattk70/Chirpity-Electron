@@ -318,6 +318,7 @@ async function updateSpec({ buffer, play = false, position = 0, resetSpec = fals
     DOM.spectrogramWrapper.classList.remove('d-none');   
     if (resetSpec || !wavesurfer) await adjustSpecDims(true) 
     else {await loadBuffer(buffer);}
+    refreshTimeline();
     wavesurfer.seekTo(position);
     play ? wavesurfer.play() : wavesurfer.pause();
 }
@@ -326,6 +327,7 @@ function createTimeline() {
     const primaryLabelInterval = windowLength/4;
     const secondaryLabelInterval = 0
     const timeinterval = primaryLabelInterval/10;
+    const colour = wsTextColour();
     const timeline = TimelinePlugin.create({
         // container: '#timeline',
         insertPosition: 'beforebegin',
@@ -334,19 +336,15 @@ function createTimeline() {
         primaryLabelInterval: primaryLabelInterval,
         secondaryLabelInterval: secondaryLabelInterval,
         secondaryLabelOpacity: 0.5,
-        primaryColor: 'white',
-        secondaryColor: 'white',
-        primaryFontColor: 'white',
-        secondaryFontColor: 'white',
         style: {
             fontSize: '0.75rem',
-            color: 'white'
+            color: colour
           },
     })
     return wavesurfer ? wavesurfer.registerPlugin(timeline) : timeline;
 }
 
-const resetRegions = (e) => {
+const resetRegions = () => {
     if (wavesurfer) regions.clearRegions(); 
     region = undefined;
     const orphanedRegions = document.querySelectorAll('wave>region');
@@ -392,6 +390,8 @@ async function loadBuffer(audio = currentBuffer){
         await wavesurfer.loadBlob(blob, peaks, duration);
 }
 
+const wsTextColour = () => config.colormap === 'custom' ? config.customColormap.loud : '#fff';
+
 const initWavesurfer = ({
     audio = undefined,
     height = 0
@@ -409,7 +409,7 @@ const initWavesurfer = ({
         waveColor: 'rgba(109,41,164,0)',
         progressColor: 'rgba(109,41,16,0)',
         // but keep the playhead
-        cursorColor: config.colormap === 'custom' ? config.customColormap.loud : '#fff',
+        cursorColor: wsTextColour(),
         cursorWidth: 2,
         fillParent: true,
         height: height,
@@ -521,6 +521,12 @@ function reduceFFT(){
     }
 }
 
+const refreshTimeline = () => {
+    timeline.destroy();
+    timeline = createTimeline();
+}
+
+
 function zoomSpec(direction) {
     if (fileLoaded) {
         if (typeof direction !== 'string') { // then it's an event
@@ -555,7 +561,6 @@ function zoomSpec(direction) {
             region.start = (oldBufferBegin + region.start) - bufferBegin;
             region.end = region.start + duration;          
         }
-
         postBufferUpdate({ begin: bufferBegin, position: position, region: region, goToRegion: false, play: wavesurfer.isPlaying() })
     }
 }
@@ -1488,7 +1493,7 @@ async function adjustSpecDims(redraw, fftSamples, newHeight) {
                     height: specHeight,
                 });
             } else {
-                wavesurfer.setOptions({ height: specHeight});
+                wavesurfer.setOptions({ height: specHeight, cursorColor: wsTextColour()});
                 spectrogram = initSpectrogram(specHeight, fftSamples)
                 wavesurfer.registerPlugin(spectrogram);
                 await loadBuffer()
@@ -1604,45 +1609,6 @@ function formatTimeCallback(secs) {
 
     return formattedTime;
 }
-/**
- * Dynamically calculate the time interval between labels
- * to ensure there are always 5 labels on the timeline.
- *
- * @param {number} pxPerSec - Pixels per second
- * @returns {number} - Time interval in seconds
- */
-function timeInterval(pxPerSec) {
-    const width = DOM.specElement.clientWidth;
-    const visibleDuration = width / pxPerSec; // Total visible duration in seconds
-    return visibleDuration / 3; // Divide the duration into 5 equal intervals
-}
-
-/**
- * Dynamically calculate the interval for primary labels
- * to ensure they align with the calculated timeInterval.
- *
- * @param {number} pxPerSec - Pixels per second
- * @returns {number} - Number of intervals between primary labels
- */
-function primaryLabelInterval(pxPerSec) {
-    // In this case, always label every interval
-    return 1;
-}
-
-/**
- * Secondary labels can be adjusted similarly if needed,
- * or you can omit them entirely.
- *
- * @param {number} pxPerSec - Pixels per second
- * @returns {number} - Secondary label interval
- */
-function secondaryLabelInterval(pxPerSec) {
-    return
-    // const width = DOM.specElement.clientWidth;
-    // const interval = timeInterval(pxPerSec, width);
-    // return .10 //Math.floor(interval/10); // Example: draw one secondary label every half of the primary interval
-}
-
 
 ////////// Store preferences //////////
 
@@ -2586,7 +2552,7 @@ function onChartData(args) {
         const myRegions = RegionsPlugin.create({
             formatTimeCallback: () => '',
             drag: true,
-            maxRegions: 1,
+            maxRegions: 100,
             enableDragSelection: true,
             // Region length bug (likely mine) means I don't trust lengths > 60 seconds
             //maxLength: config[config[config.model].backend].batchSize * 3,
@@ -3184,8 +3150,6 @@ function centreSpec(){
             if (windowLength > currentFileDuration) windowLength = currentFileDuration;
             
             await updateSpec({ buffer: currentBuffer, position: position, play: play, resetSpec: resetSpec });
-            timeline.destroy();
-            timeline = createTimeline();
             wavesurfer.bufferRequested = false;
             if (modelReady) {
                 enableMenuItem(['analyse']);
@@ -5153,6 +5117,7 @@ function playRegion(){
                     if (wavesurfer && STATE.currentFile) {
                         const fftSamples = spectrogram.fftSamples;
                         adjustSpecDims(true, fftSamples)
+                        refreshTimeline();
                     }
                     break }
                 case 'gain': {
