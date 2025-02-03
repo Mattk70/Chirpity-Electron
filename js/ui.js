@@ -11,6 +11,8 @@ import {fetchIssuesByLabel, renderIssuesInModal, parseSemVer, isNewVersion} from
 import {i18nAll, i18nSpeciesList,i18nHeadings, localiseUI, i18nContext, i18nLocation, i18nForm, i18nHelp, i18nToasts, i18nTitles, i18nLIST_MAP, i18nLists, IUCNLabel, i18nLocate} from './i18n.js';
 let LOCATIONS, locationID = undefined, loadingTimeout, LIST_MAP;
 
+let regions, spectrogram, timeline;
+
 let LABELS = [], DELETE_HISTORY = [];
 // Save console.warn and console.error functions
 const originalWarn = console.warn;
@@ -118,7 +120,7 @@ function createColormap(){
         {index: config.customColormap.threshold, rgb: hexToRgb(config.customColormap.mid)},
         {index: 1, rgb: hexToRgb(config.customColormap.loud)}
     ] : config.colormap;
-    return colormap({ colormap: map, nshades:256, format: 'float' });
+    return config.colormap === 'roseus' ? 'roseus' : colormap({ colormap: map, nshades:256, format: 'float' });
 }
 function interpolate(template, variables) {
     return template.replace(/\$\{(.*?)\}/g, (match, key) => {
@@ -223,7 +225,7 @@ DOM.controlsWrapper.addEventListener('mousedown', (e) => {
         newHeight = Math.min(newHeight, specMaxHeight());
         // Adjust the spectrogram dimensions accordingly
         debounceTimer = setTimeout(() => {
-            adjustSpecDims(true,  wavesurfer.spectrogram.fftSamples, newHeight);
+            adjustSpecDims(true,  spectrogram.fftSamples, newHeight);
         }, 5);
     }
     
@@ -312,31 +314,35 @@ function loadAudioFileSync({ filePath = '', preserveResults = false }) {
 }
 
 
-function updateSpec({ buffer, play = false, position = 0, resetSpec = false }) {
+async function updateSpec({ buffer, play = false, position = 0, resetSpec = false }) {
     DOM.spectrogramWrapper.classList.remove('d-none');   
-    resetSpec || !wavesurfer || !wavesurfer.isReady ? adjustSpecDims(true) 
-        : wavesurfer.loadDecodedBuffer(buffer);
+    if (resetSpec || !wavesurfer) await adjustSpecDims(true) 
+    else {await loadBuffer(buffer);}
     wavesurfer.seekTo(position);
     play ? wavesurfer.play() : wavesurfer.pause();
 }
 
 function createTimeline() {
-    wavesurfer.registerPlugin(TimelinePlugin.create({
+    return TimelinePlugin.create({
         container: '#timeline',
         formatTimeCallback: formatTimeCallback,
-        timeInterval: timeInterval,
-        primaryLabelInterval: primaryLabelInterval,
-        secondaryLabelInterval: secondaryLabelInterval,
+        //timeInterval: timeInterval,
+        // primaryLabelInterval: primaryLabelInterval,
+        // secondaryLabelInterval: secondaryLabelInterval,
         primaryColor: 'white',
         secondaryColor: 'white',
         primaryFontColor: 'white',
         secondaryFontColor: 'white',
-        fontSize: 14
-    }))
+        style: {
+            fontSize: '14px',
+            color: 'white',
+          },
+        // fontSize: 14
+    })
 }
 
-const resetRegions = () => {
-    if (wavesurfer) wavesurfer.clearRegions();
+const resetRegions = (e) => {
+    if (wavesurfer) regions.clearRegions(); 
     region = undefined;
     const orphanedRegions = document.querySelectorAll('wave>region');
     // Sometimes, there is a region that is not attached the the wavesurfer regions list
@@ -353,20 +359,46 @@ function clearActive() {
     activeRow = undefined;
 }
 
+
+const WSPluginPurge = () => {
+        // Destroy leaves the plugins in the plugin list.
+        // So, this is needed to remove plugins where the `wavesurfer` key is null
+        wavesurfer && (wavesurfer.plugins = wavesurfer.plugins.filter(plugin => plugin.wavesurfer !== null))
+}
+
+async function loadBuffer(audio = currentBuffer){
+        // Recreate TypedArray
+        const int16Array = new Int16Array(audio.buffer);
+
+        // Convert to Float32Array (Web Audio API uses Float32 samples)
+        const float32Array = new Float32Array(int16Array.length);
+        for (let i = 0; i < int16Array.length; i++) {
+            float32Array[i] = int16Array[i] / 32768; // Normalize from Int16 to Float32
+        }
+
+        // Create AudioBuffer using AudioContext
+        const audioContext = new AudioContext();
+        const audioBuffer = audioContext.createBuffer(1, float32Array.length, sampleRate); // Mono channel
+        // Populate the AudioBuffer with float32Array data
+        audioBuffer.copyToChannel(float32Array, 0);
+        const blob = new Blob([audio], { type: 'audio/wav' });
+        const peaks = [ audioBuffer.getChannelData(0) ]
+        const duration = audioBuffer.duration
+        await wavesurfer.loadBlob(blob, peaks, duration);
+}
+
 const initWavesurfer = ({
     audio = undefined,
     height = 0
 }) => {
+    wavesurfer && wavesurfer.destroy();
     const loggedErrors = new Set();
-    if (wavesurfer?.isReady) {
-        wavesurfer.destroy();
-    }
-    const audioCtx = new AudioContext({ latencyHint: 'interactive', sampleRate: sampleRate });
+    regions = initRegion();
+    spectrogram = initSpectrogram(height);
+    timeline = createTimeline();
     // Setup waveform and spec views
     wavesurfer = WaveSurfer.create({
         container: document.querySelector('#waveform'),
-        audioContext: audioCtx,
-        backend: 'WebAudio',
         // make waveform transparent
         backgroundColor: 'rgba(0,0,0,0)',
         waveColor: 'rgba(109,41,164,0)',
@@ -374,21 +406,14 @@ const initWavesurfer = ({
         // but keep the playhead
         cursorColor: config.colormap === 'custom' ? config.customColormap.loud : '#fff',
         cursorWidth: 2,
-        skipLength: 0.1,
-        partialRender: true,
-        scrollParent: false,
         fillParent: true,
-        responsive: true,
         height: height,
+        plugins: [regions, spectrogram, timeline]
     });
     wavesurfer.bufferRequested = false;
-    initRegion();
-    initSpectrogram();
-    createTimeline();
+
     if (audio) {
-        const peaks = [ audio.getChannelData(0) ]
-        const duration = audio.duration
-        wavesurfer.loadBlob(blob, peaks, duration);
+        loadBuffer(audio)
     }
     DOM.colourmap.value = config.colormap;
     // Set click event that removes all regions
@@ -429,7 +454,6 @@ const initWavesurfer = ({
             const errorKey = e.message || e.toString();
             if (!loggedErrors.has(errorKey)) {
                 // lets find out if it's because wavesurfer isn't ready
-                console.warn('onAudioProcessError', `isReady: ${wavesurfer.isReady}` )
                 console.warn('onAudioProcessError', e);
                 loggedErrors.add(errorKey);
             }
@@ -475,20 +499,20 @@ const initWavesurfer = ({
 }
 
 function increaseFFT(){
-    if (wavesurfer.spectrogram.fftSamples <= 4096) {
-        wavesurfer.spectrogram.fftSamples *= 2;
+    if (spectrogram.fftSamples <= 4096) {
+        spectrogram.fftSamples *= 2;
         const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
         postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false, play: wavesurfer.isPlaying() })
-        console.log(wavesurfer.spectrogram.fftSamples);
+        console.log(spectrogram.fftSamples);
     }
 }
 
 function reduceFFT(){
-    if (wavesurfer.spectrogram.fftSamples > 64) {
-        wavesurfer.spectrogram.fftSamples /= 2;
+    if (spectrogram.fftSamples > 64) {
+        spectrogram.fftSamples /= 2;
         const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
         postBufferUpdate({ begin: bufferBegin, position: position, region: getRegion(), goToRegion: false, play: wavesurfer.isPlaying() })
-        console.log(wavesurfer.spectrogram.fftSamples);
+        console.log(spectrogram.fftSamples);
     }
 }
 
@@ -1360,23 +1384,21 @@ const checkWidth = (text) => {
 function createRegion(start, end, label, goToRegion) {
     wavesurfer.pause();
     resetRegions();
-    wavesurfer.addRegion({
+    regions.addRegion({
         start: start,
         end: end,
         color: "rgba(255, 255, 255, 0.1)",
-        attributes: {
-            label: label || '',
-            
-        },
+        content: label || ''
     });
-    const region = document.getElementsByTagName('region')[0];
-    const text = region.attributes['data-region-label'].value;
-    if (region.clientWidth <= checkWidth(text)) {
-        region.style.writingMode = 'vertical-rl';
-    }
-    if (goToRegion && wavesurfer.isReady) {
-        const progress = start / wavesurfer.getDuration();
-        wavesurfer.seekAndCenter(progress);
+    // const regionsPlugin = wavesurfer.plugins.find(plugin => plugin.regions);
+    // const region = regionsPlugin.regions[0]
+    // const text = region.content.innerText;
+    // if (region.content.clientWidth <= checkWidth(text)) {
+    //     region.content.style.writingMode = 'vertical-rl';
+    // }
+    if (goToRegion) {
+        const progress = start / wavesurfer.getDuration();  
+        wavesurfer.seekTo(progress);
     }
 }
 
@@ -1437,7 +1459,7 @@ const loadResultRegion = ({ file = '', start = 0, end = 3, label = '' } = {}) =>
 * @param fftSamples: Optional, the number of fftsamples to use for rendering. Must be a factor of 2
 */
 
-function adjustSpecDims(redraw, fftSamples, newHeight) {
+async function adjustSpecDims(redraw, fftSamples, newHeight) {
     const footerHeight = DOM.footer.offsetHeight;
     const navHeight = DOM.navPadding.clientHeight;
     newHeight ??= 0;
@@ -1454,16 +1476,18 @@ function adjustSpecDims(redraw, fftSamples, newHeight) {
         }
         if (STATE.currentFile) {
             // give the wrapper space for the transport controls and element padding/margins
-            if (!wavesurfer || !wavesurfer.isReady) {
+            if (!wavesurfer) {
                 initWavesurfer({
                     audio: currentBuffer,
                     height: specHeight,
                 });
             } else {
-                wavesurfer.setHeight(specHeight);
-                initSpectrogram(specHeight, fftSamples);
+                wavesurfer.setOptions({ height: specHeight});
+                spectrogram = initSpectrogram(specHeight, fftSamples)
+                wavesurfer.registerPlugin(spectrogram);
+                await loadBuffer()
             }
-            DOM.specCanvasElement.style.width = '100%';
+            // DOM.specCanvasElement.style.width = '100%';
             DOM.specElement.style.zIndex = 0;
             //document.querySelector('.spec-labels').style.width = '55px';
         }
@@ -2552,23 +2576,27 @@ function onChartData(args) {
     ///////////// Nav bar Option handlers //////////////
     
     function initRegion() {
-        if (wavesurfer) {
-            if (wavesurfer.regions) wavesurfer.destroyPlugin('regions');
-            wavesurfer.registerPlugin(RegionsPlugin.create({
-                formatTimeCallback: () => '',
-                dragSelection: true,
-                maxRegions: 1,
-                // Region length bug (likely mine) means I don't trust lengths > 60 seconds
-                //maxLength: config[config[config.model].backend].batchSize * 3,
-                slop: null,
-                color: "rgba(255, 255, 255, 0.2)"
-            })
-            )
-        }
+        if (regions) regions.destroy();
+        const myRegions = RegionsPlugin.create({
+            formatTimeCallback: () => '',
+            drag: true,
+            maxRegions: 1,
+            enableDragSelection: true,
+            // Region length bug (likely mine) means I don't trust lengths > 60 seconds
+            //maxLength: config[config[config.model].backend].batchSize * 3,
+            slop: null,
+            color: "rgba(255, 255, 255, 0.1)"
+        })
+        myRegions.on('region-clicked', (region, e)=>{
+
+            createContextMenu(e)
+        })
+        return myRegions
     }
     
     function initSpectrogram(height, fftSamples) {
         config.debug && console.log("initializing spectrogram")
+        spectrogram && spectrogram.destroy() && WSPluginPurge();
         if (!fftSamples) {
             if (windowLength < 5) {
                 fftSamples = 256;
@@ -2581,25 +2609,24 @@ function onChartData(args) {
         if (!height) {
             height = fftSamples / 2
         }
-        if (wavesurfer.spectrogram) wavesurfer.destroyPlugin('spectrogram');
         // set colormap
         const colors = createColormap() ;
-        wavesurfer.registerPlugin(Spectrogram.create({
-            //deferInit: false,
-            wavesurfer: wavesurfer,
+        return Spectrogram.create({
             container: "#spectrogram",
-            scrollParent: false,
-            fillParent: true,
             windowFunc: config.customColormap.windowFn,
             frequencyMin: config.audio.minFrequency,
             frequencyMax: config.audio.maxFrequency,
-            normalize: false,
-            hideScrollbar: true,
+            // noverlap: 128, Auto (the default) seems fine
+            // gainDB: 50, Adjusts spec brightness without increasing volume
             labels: config.specLabels,
+            labelsColor: '#fff',
+            labelsHzColor: 'gold',
+            labelsBackground: 'rgba(0,0,0,0)',
             height: height,
             fftSamples: fftSamples, 
+            scale: 'linear',
             colorMap: colors
-        }))
+        })
     }
     
     function hideTooltip() {
@@ -2906,7 +2933,7 @@ function centreSpec(){
         ArrowLeft: function () {
             const skip = windowLength / 100;
             if (currentBuffer) {
-                wavesurfer.skipBackward(skip);
+                wavesurfer.setTime(wavesurfer.getCurrentTime() - skip);
                 const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
                 if (wavesurfer.getCurrentTime() < skip && bufferBegin > 0) {
                     bufferBegin -= skip;
@@ -2917,7 +2944,7 @@ function centreSpec(){
         ArrowRight: function () {
             const skip = windowLength / 100;
             if (wavesurfer) {
-                wavesurfer.skipForward(skip);
+                wavesurfer.setTime(wavesurfer.getCurrentTime() + skip);
                 const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
                 if (wavesurfer.getCurrentTime() > windowLength - skip) {
                     bufferBegin = Math.min(currentFileDuration - windowLength, bufferBegin += skip)
@@ -3132,7 +3159,7 @@ function centreSpec(){
         } else {
             // Dismiss a context menu if it's open
             DOM.contextMenu.classList.add("d-none");
-            currentBuffer = new Blob([contents], { type: 'audio/wav' });
+            currentBuffer = contents;
 
             STATE.fileStart = fileStart;
             locationID = location;
@@ -3150,7 +3177,7 @@ function centreSpec(){
             
             if (windowLength > currentFileDuration) windowLength = currentFileDuration;
             
-            updateSpec({ buffer: currentBuffer, position: position, play: play, resetSpec: resetSpec });
+            await updateSpec({ buffer: currentBuffer, position: position, play: play, resetSpec: resetSpec });
             wavesurfer.bufferRequested = false;
             if (modelReady) {
                 enableMenuItem(['analyse']);
@@ -3489,7 +3516,7 @@ function formatDuration(seconds){
 
         let tr = '';
         if (index <= 1) {
-            adjustSpecDims(true)
+            await adjustSpecDims(true)
             if (selection) {
                 const selectionTable = document.getElementById('selectionResultTableBody');
                 selectionTable.textContent = '';
@@ -4866,7 +4893,7 @@ function playRegion(){
                 fillSlider(DOM.fromInput, DOM.toInput,  '#C6C6C6', '#0d6efd', DOM.toSlider)
                 checkFilteredFrequency();
                 worker.postMessage({action: 'update-state', audio: config.audio});
-                const fftSamples = wavesurfer.spectrogram.fftSamples;
+                const fftSamples = spectrogram.fftSamples;
                 adjustSpecDims(true, fftSamples);
                 document.getElementById('frequency-range').classList.remove('text-warning');
                 updatePrefs('config.json', config);
@@ -5103,7 +5130,7 @@ function playRegion(){
                         colorMapFieldset.classList.add('d-none')
                     }
                     if (wavesurfer && STATE.currentFile) {
-                        const fftSamples = wavesurfer.spectrogram.fftSamples;
+                        const fftSamples = spectrogram.fftSamples;
                         adjustSpecDims(true, fftSamples)
                     }
                     break }
@@ -5116,7 +5143,7 @@ function playRegion(){
                     document.getElementById('color-threshold').textContent = threshold;
                     config.customColormap = {'loud': loud, 'mid': mid, 'quiet': quiet, 'threshold': threshold, 'windowFn': windowFn};
                     if (wavesurfer && STATE.currentFile) {
-                        const fftSamples = wavesurfer.spectrogram.fftSamples;
+                        const fftSamples = spectrogram.fftSamples;
                         adjustSpecDims(true, fftSamples)
                     }
                     break }
@@ -5134,7 +5161,7 @@ function playRegion(){
                 case 'spec-labels': {
                     config.specLabels = element.checked;                    
                     if (wavesurfer && STATE.currentFile) {
-                        const fftSamples = wavesurfer.spectrogram.fftSamples; 
+                        const fftSamples = spectrogram.fftSamples; 
                         adjustSpecDims(true, fftSamples)
                     }
                     break }
@@ -5142,7 +5169,7 @@ function playRegion(){
                     config.audio.minFrequency = Math.max(element.valueAsNumber, 0);
                     DOM.fromInput.value = config.audio.minFrequency;
                     DOM.fromSlider.value = config.audio.minFrequency;
-                    const fftSamples = wavesurfer.spectrogram.fftSamples;
+                    const fftSamples = spectrogram.fftSamples;
                     adjustSpecDims(true, fftSamples);
                     checkFilteredFrequency();
                     element.blur();
@@ -5152,7 +5179,7 @@ function playRegion(){
                     config.audio.maxFrequency = Math.min(element.valueAsNumber, 11950);
                     DOM.toInput.value = config.audio.maxFrequency;
                     DOM.toSlider.value = config.audio.maxFrequency;
-                    const fftSamples = wavesurfer.spectrogram.fftSamples;
+                    const fftSamples = spectrogram.fftSamples;
                     adjustSpecDims(true, fftSamples);
                     checkFilteredFrequency();
                     element.blur();
@@ -5278,109 +5305,110 @@ function getI18n(context){
     const locale = config.locale.replace(/_.*$/, '');
     return context[locale] || context['en'];
 }
+
+async function createContextMenu(e) {
+    e.stopPropagation()
+    const i18n = getI18n(i18nContext);
+    const target = e.target;
+    if (target.classList.contains('circle') || target.closest('thead')) return;
+    let hideInSummary = '', hideInSelection = '',
+    plural = '';
+    const inSummary = target.closest('#speciesFilter');
+    const resultContext = !target.closest('#summaryTable');
+    if (inSummary) {
+        hideInSummary = 'd-none';
+        plural = 's';
+    } else if (target.closest('#selectionResultTableBody')) {
+        hideInSelection = 'd-none';
+    }
     
-    async function createContextMenu(e) {
-        const i18n = getI18n(i18nContext);
-        const target = e.target;
-        if (target.classList.contains('circle') || target.closest('thead')) return;
-        let hideInSummary = '', hideInSelection = '',
-        plural = '';
-        const inSummary = target.closest('#speciesFilter');
-        const resultContext = !target.closest('#summaryTable');
-        if (inSummary) {
-            hideInSummary = 'd-none';
-            plural = 's';
-        } else if (target.closest('#selectionResultTableBody')) {
-            hideInSelection = 'd-none';
+    // If we haven't clicked the active row or we cleared the region, load the row we clicked
+    if (resultContext || hideInSelection || hideInSummary) {
+        // Lets check if the summary needs to be filtered
+        if ((inSummary && ! target.closest('tr').classList.contains('text-warning')) ||
+            (target.closest('#resultTableBody') && ! target.closest('tr').classList.contains('table-active'))) {
+            target.click(); // Wait for file to load
+            await waitFor(() => fileLoaded);
         }
-        
-        // If we haven't clicked the active row or we cleared the region, load the row we clicked
-        if (resultContext || hideInSelection || hideInSummary) {
-            // Lets check if the summary needs to be filtered
-            if ((inSummary && ! target.closest('tr').classList.contains('text-warning')) ||
-                (target.closest('#resultTableBody') && ! target.closest('tr').classList.contains('table-active'))) {
-                target.click(); // Wait for file to load
-                await waitFor(() => fileLoaded);
+    }
+    if (region === undefined && ! inSummary) return;
+    const createOrEdit = ((region?.attributes.label || target.closest('#summary'))) ? i18n.edit : i18n.create;
+    
+    DOM.contextMenu.innerHTML = `
+    <div id="${inSummary ? 'inSummary' : 'inResults'}">
+        <a class="dropdown-item ${hideInSummary}" id="play-region"><span class='material-symbols-outlined'>play_circle</span> ${i18n.play}</a>
+        <a class="dropdown-item ${hideInSummary} ${hideInSelection}" href="#" id="context-analyse-selection">
+        <span class="material-symbols-outlined">search</span> ${i18n.analyse}
+        </a>
+        <div class="dropdown-divider ${hideInSummary}"></div>
+        <a class="dropdown-item" id="create-manual-record" href="#">
+        <span class="material-symbols-outlined">edit_document</span> ${createOrEdit} ${i18n.record}
+        </a>
+        <a class="dropdown-item" id="context-create-clip" href="#">
+        <span class="material-symbols-outlined">music_note</span> ${i18n.export}
+        </a>
+        <span class="dropdown-item" id="context-xc" href='#' target="xc">
+        <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> ${i18n.compare}
+        </span>
+        <div class="dropdown-divider ${hideInSelection}"></div>
+        <a class="dropdown-item ${hideInSelection}" id="context-delete" href="#">
+        <span class='delete material-symbols-outlined'>delete_forever</span> ${i18n.delete}
+        </a>
+    </div>
+    `;
+    const modalTitle = document.getElementById('record-entry-modal-label');
+    const contextDelete = document.getElementById('context-delete');
+    modalTitle.textContent = `${createOrEdit}`;
+    if (!hideInSelection) {
+        resultContext ? contextDelete.addEventListener('click', deleteRecord) :
+        contextDelete.addEventListener('click', function () {
+            deleteSpecies(target);
+        });
+    }
+    // Add event Handlers
+    if (!hideInSelection) {
+        document.getElementById('create-manual-record').addEventListener('click', function (e) {
+            if (e.target.textContent.includes('Edit')) {
+                showRecordEntryForm('Update', !!hideInSummary);
+            } else {
+                showRecordEntryForm('Add', !!hideInSummary);
             }
-        }
-        if (region === undefined && ! inSummary) return;
-        const createOrEdit = ((region?.attributes.label || target.closest('#summary'))) ? i18n.edit : i18n.create;
-        
-        DOM.contextMenu.innerHTML = `
-        <div id="${inSummary ? 'inSummary' : 'inResults'}">
-            <a class="dropdown-item ${hideInSummary}" id="play-region"><span class='material-symbols-outlined'>play_circle</span> ${i18n.play}</a>
-            <a class="dropdown-item ${hideInSummary} ${hideInSelection}" href="#" id="context-analyse-selection">
-            <span class="material-symbols-outlined">search</span> ${i18n.analyse}
-            </a>
-            <div class="dropdown-divider ${hideInSummary}"></div>
-            <a class="dropdown-item" id="create-manual-record" href="#">
-            <span class="material-symbols-outlined">edit_document</span> ${createOrEdit} ${i18n.record}
-            </a>
-            <a class="dropdown-item" id="context-create-clip" href="#">
-            <span class="material-symbols-outlined">music_note</span> ${i18n.export}
-            </a>
-            <span class="dropdown-item" id="context-xc" href='#' target="xc">
-            <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> ${i18n.compare}
-            </span>
-            <div class="dropdown-divider ${hideInSelection}"></div>
-            <a class="dropdown-item ${hideInSelection}" id="context-delete" href="#">
-            <span class='delete material-symbols-outlined'>delete_forever</span> ${i18n.delete}
-            </a>
-        </div>
-        `;
-        const modalTitle = document.getElementById('record-entry-modal-label');
-        const contextDelete = document.getElementById('context-delete');
-        modalTitle.textContent = `${createOrEdit}`;
-        if (!hideInSelection) {
-            resultContext ? contextDelete.addEventListener('click', deleteRecord) :
-            contextDelete.addEventListener('click', function () {
-                deleteSpecies(target);
-            });
-        }
-        // Add event Handlers
-        if (!hideInSelection) {
-            document.getElementById('create-manual-record').addEventListener('click', function (e) {
-                if (e.target.textContent.includes('Edit')) {
-                    showRecordEntryForm('Update', !!hideInSummary);
-                } else {
-                    showRecordEntryForm('Add', !!hideInSummary);
-                }
-            })
-        }
-        if (inSummary ||  region?.attributes.label || hideInSummary) {}
-        else {
-            const xc = document.getElementById('context-xc');
-            xc.classList.add('d-none');
-            contextDelete.classList.add('d-none');
-        }
-        positionMenu(DOM.contextMenu, e);
+        })
+    }
+    if (inSummary ||  region?.attributes.label || hideInSummary) {}
+    else {
+        const xc = document.getElementById('context-xc');
+        xc.classList.add('d-none');
+        contextDelete.classList.add('d-none');
+    }
+    positionMenu(DOM.contextMenu, e);
+}
+
+function positionMenu(menu, event) {
+    menu.classList.remove("d-none");
+    // Calculate menu positioning:
+    const menuWidth = menu.clientWidth;
+    const menuHeight = menu.clientHeight;
+    let top = event.pageY - 50;
+    let left = event.pageX;
+    // Check if the menu would be displayed partially off-screen on the right
+    if (left + menuWidth > window.innerWidth) {
+        left = window.innerWidth - menuWidth - 15;
     }
     
-    function positionMenu(menu, event) {
-        menu.classList.remove("d-none");
-        // Calculate menu positioning:
-        const menuWidth = menu.clientWidth;
-        const menuHeight = menu.clientHeight;
-        let top = event.pageY - 50;
-        let left = event.pageX;
-        // Check if the menu would be displayed partially off-screen on the right
-        if (left + menuWidth > window.innerWidth) {
-            left = window.innerWidth - menuWidth - 15;
-        }
-        
-        // Check if the menu would be displayed partially off-screen on the bottom
-        if (top + menuHeight > window.innerHeight - 90) {
-            top = window.innerHeight - menuHeight - 90;
-        }
-        
-        menu.style.display = 'block';
-        menu.style.top =  top + 'px';
-        menu.style.left =  left + 'px';
+    // Check if the menu would be displayed partially off-screen on the bottom
+    if (top + menuHeight > window.innerHeight - 90) {
+        top = window.innerHeight - menuHeight - 90;
     }
     
-    [DOM.spectrogramWrapper, DOM.resultTableElement, selectionTable].forEach(el =>{
-        el.addEventListener('contextmenu', createContextMenu)
-    })
+    menu.style.display = 'block';
+    menu.style.top =  top + 'px';
+    menu.style.left =  left + 'px';
+}
+
+[DOM.spectrogramWrapper, DOM.resultTableElement, selectionTable].forEach(el =>{
+    el.addEventListener('contextmenu', createContextMenu)
+})
 
     
     const recordEntryModalDiv = document.getElementById('record-entry-modal')
