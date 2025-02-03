@@ -323,22 +323,27 @@ async function updateSpec({ buffer, play = false, position = 0, resetSpec = fals
 }
 
 function createTimeline() {
-    return TimelinePlugin.create({
-        container: '#timeline',
+    const primaryLabelInterval = windowLength/4;
+    const secondaryLabelInterval = 0
+    const timeinterval = primaryLabelInterval/10;
+    const timeline = TimelinePlugin.create({
+        // container: '#timeline',
+        insertPosition: 'beforebegin',
         formatTimeCallback: formatTimeCallback,
-        //timeInterval: timeInterval,
-        // primaryLabelInterval: primaryLabelInterval,
-        // secondaryLabelInterval: secondaryLabelInterval,
+        timeInterval: timeinterval,
+        primaryLabelInterval: primaryLabelInterval,
+        secondaryLabelInterval: secondaryLabelInterval,
+        secondaryLabelOpacity: 0.5,
         primaryColor: 'white',
         secondaryColor: 'white',
         primaryFontColor: 'white',
         secondaryFontColor: 'white',
         style: {
-            fontSize: '14px',
-            color: 'white',
+            fontSize: '0.75rem',
+            color: 'white'
           },
-        // fontSize: 14
     })
+    return wavesurfer ? wavesurfer.registerPlugin(timeline) : timeline;
 }
 
 const resetRegions = (e) => {
@@ -550,6 +555,7 @@ function zoomSpec(direction) {
             region.start = (oldBufferBegin + region.start) - bufferBegin;
             region.end = region.start + duration;          
         }
+
         postBufferUpdate({ begin: bufferBegin, position: position, region: region, goToRegion: false, play: wavesurfer.isPlaying() })
     }
 }
@@ -1488,7 +1494,7 @@ async function adjustSpecDims(redraw, fftSamples, newHeight) {
                 await loadBuffer()
             }
             // DOM.specCanvasElement.style.width = '100%';
-            DOM.specElement.style.zIndex = 0;
+            // DOM.specElement.style.zIndex = 0;
             //document.querySelector('.spec-labels').style.width = '55px';
         }
         if (wavesurfer && redraw) {
@@ -1498,7 +1504,7 @@ async function adjustSpecDims(redraw, fftSamples, newHeight) {
         specOffset = 0
     }
     DOM.resultTableElement.style.height = (contentHeight - specOffset - formOffset) + 'px';
-    STATE.timelineWidth = DOM.specElement.clientWidth;
+    // STATE.timelineWidth = DOM.specElement.clientWidth;
 }
 
 ///////////////// Font functions ////////////////
@@ -3178,6 +3184,8 @@ function centreSpec(){
             if (windowLength > currentFileDuration) windowLength = currentFileDuration;
             
             await updateSpec({ buffer: currentBuffer, position: position, play: play, resetSpec: resetSpec });
+            timeline.destroy();
+            timeline = createTimeline();
             wavesurfer.bufferRequested = false;
             if (modelReady) {
                 enableMenuItem(['analyse']);
