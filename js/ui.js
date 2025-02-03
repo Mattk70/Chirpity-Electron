@@ -1,6 +1,12 @@
 import {trackVisit, trackEvent} from './tracking.js';
 import {DOM} from './DOMcache.js';
 import {IUCNCache, IUCNtaxonomy} from './IUCNcache.js';
+import WaveSurfer from '../node_modules/wavesurfer.js/dist/wavesurfer.esm.js';
+import RegionsPlugin from '../node_modules/wavesurfer.js/dist/plugins/regions.esm.js';
+import Spectrogram from '../node_modules/wavesurfer.js/dist/plugins/spectrogram.esm.js';
+import TimelinePlugin from '../node_modules/wavesurfer.js/dist/plugins/timeline.esm.js';
+
+
 import {fetchIssuesByLabel, renderIssuesInModal, parseSemVer, isNewVersion} from './getKnownIssues.js';
 import {i18nAll, i18nSpeciesList,i18nHeadings, localiseUI, i18nContext, i18nLocation, i18nForm, i18nHelp, i18nToasts, i18nTitles, i18nLIST_MAP, i18nLists, IUCNLabel, i18nLocate} from './i18n.js';
 let LOCATIONS, locationID = undefined, loadingTimeout, LIST_MAP;
@@ -315,7 +321,7 @@ function updateSpec({ buffer, play = false, position = 0, resetSpec = false }) {
 }
 
 function createTimeline() {
-    wavesurfer.addPlugin(WaveSurfer.timeline.create({
+    wavesurfer.registerPlugin(TimelinePlugin.create({
         container: '#timeline',
         formatTimeCallback: formatTimeCallback,
         timeInterval: timeInterval,
@@ -326,7 +332,7 @@ function createTimeline() {
         primaryFontColor: 'white',
         secondaryFontColor: 'white',
         fontSize: 14
-    })).initPlugin('timeline');
+    }))
 }
 
 const resetRegions = () => {
@@ -379,7 +385,11 @@ const initWavesurfer = ({
     initRegion();
     initSpectrogram();
     createTimeline();
-    if (audio) wavesurfer.loadDecodedBuffer(audio);
+    if (audio) {
+        const peaks = [ audio.getChannelData(0) ]
+        const duration = audio.duration
+        wavesurfer.loadBlob(blob, peaks, duration);
+    }
     DOM.colourmap.value = config.colormap;
     // Set click event that removes all regions
     
@@ -2544,7 +2554,7 @@ function onChartData(args) {
     function initRegion() {
         if (wavesurfer) {
             if (wavesurfer.regions) wavesurfer.destroyPlugin('regions');
-            wavesurfer.addPlugin(WaveSurfer.regions.create({
+            wavesurfer.registerPlugin(RegionsPlugin.create({
                 formatTimeCallback: () => '',
                 dragSelection: true,
                 maxRegions: 1,
@@ -2553,7 +2563,7 @@ function onChartData(args) {
                 slop: null,
                 color: "rgba(255, 255, 255, 0.2)"
             })
-            ).initPlugin('regions')
+            )
         }
     }
     
@@ -2574,7 +2584,7 @@ function onChartData(args) {
         if (wavesurfer.spectrogram) wavesurfer.destroyPlugin('spectrogram');
         // set colormap
         const colors = createColormap() ;
-        wavesurfer.addPlugin(WaveSurfer.spectrogram.create({
+        wavesurfer.registerPlugin(Spectrogram.create({
             //deferInit: false,
             wavesurfer: wavesurfer,
             container: "#spectrogram",
@@ -2589,7 +2599,7 @@ function onChartData(args) {
             height: height,
             fftSamples: fftSamples, 
             colorMap: colors
-        })).initPlugin('spectrogram')
+        }))
     }
     
     function hideTooltip() {
@@ -3122,8 +3132,8 @@ function centreSpec(){
         } else {
             // Dismiss a context menu if it's open
             DOM.contextMenu.classList.add("d-none");
-            currentBuffer = new AudioBuffer({ length: contents.length, numberOfChannels: 1, sampleRate: sampleRate });
-            currentBuffer.copyToChannel(contents, 0);
+            currentBuffer = new Blob([contents], { type: 'audio/wav' });
+
             STATE.fileStart = fileStart;
             locationID = location;
             bufferBegin = windowBegin;
@@ -6059,7 +6069,7 @@ function showCompareSpec() {
     });
     // set colormap
     const colors = createColormap() ;
-    ws.addPlugin(WaveSurfer.spectrogram.create({
+    ws.registerPlugin(Spectrogram.create({
         //deferInit: false,
         wavesurfer: ws,
         container: "#" + specContainer,
@@ -6071,7 +6081,7 @@ function showCompareSpec() {
         fftSamples: 512,
         height: 250,
         colorMap: colors
-    })).initPlugin('spectrogram')
+    }))
 
 
     ws.on('ready', function () {
