@@ -1235,7 +1235,7 @@ async function loadAudioFile({
         if (file) {
             fetchAudioBuffer({ file, start, end })
             .then(([audio, start]) => {
-                let audioArray = getMonoChannelData(audio);
+                // let audioArray = getMonoChannelData(audio);
                 UI.postMessage({
                     event: 'worker-loaded-audio',
                     location: METADATA[file].locationID,
@@ -1244,13 +1244,13 @@ async function loadAudioFile({
                     windowBegin: start,
                     file: file,
                     position: position,
-                    contents: audioArray,
+                    contents: audio,
                     fileRegion: region,
                     play: play,
                     queued: queued,
                     goToRegion,
                     metadata: METADATA[file].metadata
-                }, [audioArray.buffer]);
+                }, [audio.buffer]);
                 let week;
                 if (STATE.list === 'location'){
                     week = STATE.useWeek ? new Date(METADATA[file].fileStart).getWeekNumber() : -1
@@ -1631,7 +1631,7 @@ const fetchAudioBuffer = async ({ file = '', start = 0, end }) => {
             start,
             end,
             sampleRate: 24000,
-            format: 's16le',
+            format: 'wav',
             channels: 1,
             additionalFilters
         });
