@@ -424,7 +424,13 @@ const initWavesurfer = ({
     DOM.colourmap.value = config.colormap;
     // Set click event that removes all regions
     
-    
+    regions.enableDragSelection({
+        color: 'rgba(255, 255, 0, 0.1)',
+    })
+
+    wavesurfer.on('interaction', (currenttime) =>{
+        regions.clearRegions()
+    })
     // Queue up next audio window while playing
     wavesurfer.on('audioprocess', function () {
         // Ensure the audio file is loaded before proceeding
@@ -2538,13 +2544,8 @@ function onChartData(args) {
     function initRegion() {
         if (regions) regions.destroy();
         regions = RegionsPlugin.create({
-            formatTimeCallback: () => '',
             drag: true,
             maxRegions: 100,
-            enableDragSelection: true,
-            // Region length bug (likely mine) means I don't trust lengths > 60 seconds
-            //maxLength: config[config[config.model].backend].batchSize * 3,
-            slop: null,
             color: "rgba(255, 255, 255, 0.1)"
         })
 
@@ -2557,9 +2558,9 @@ function onChartData(args) {
             }
         });
         // Clear label on modifying region
-        regions.on('region-updated', function (e) {
+        regions.on('region-update', function (e) {
             region = e;
-            region.content = '';
+            region.content.innerText = '';
         });
         return regions
     }
@@ -5303,7 +5304,7 @@ async function createContextMenu(e) {
         }
     }
     if (region === undefined && ! inSummary) return;
-    const createOrEdit = ((region?.content.innerText || target.closest('#summary'))) ? i18n.edit : i18n.create;
+    const createOrEdit = ((region?.content?.innerText || target.closest('#summary'))) ? i18n.edit : i18n.create;
     
     DOM.contextMenu.innerHTML = `
     <div id="${inSummary ? 'inSummary' : 'inResults'}">
@@ -5346,7 +5347,7 @@ async function createContextMenu(e) {
             }
         })
     }
-    if (inSummary ||  region?.content.innerText || hideInSummary) {}
+    if (inSummary ||  region?.content?.innerText || hideInSummary) {}
     else {
         const xc = document.getElementById('context-xc');
         xc.classList.add('d-none');
