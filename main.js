@@ -535,7 +535,7 @@ ipcMain.handle('saveFile', async (event, arg) => {
     // Show file dialog to select audio file
     if (arg.type === 'audacity'){
         let currentFile = arg.currentFile.substr(0, arg.currentFile.lastIndexOf(".")) + ".txt";
-        dialog.showSaveDialog({
+        dialog.showSaveDialog(mainWindow, {
             filters: [{ name: 'Text Files', extensions: ['txt'] }],
             defaultPath: currentFile
         }).then(file => {
@@ -562,7 +562,7 @@ ipcMain.handle('saveFile', async (event, arg) => {
         });
     } else {
         const {file, filename, extension} = arg;
-        dialog.showSaveDialog({
+        dialog.showSaveDialog(mainWindow, {
             title: 'Save File',
             filters: [{ name: 'Audio files', extensions: [extension] }],
             defaultPath: filename
