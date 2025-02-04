@@ -1,5 +1,6 @@
 const { app, Menu, dialog, ipcMain, MessageChannelMain, BrowserWindow, powerSaveBlocker } = require('electron');
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('xdg-portal-required-version', '4');
 // WebGPU flags needed for Linux
 app.commandLine.appendSwitch('enable-unsafe-webgpu');
 app.commandLine.appendSwitch('enable-features','Vulkan');
@@ -436,13 +437,14 @@ app.whenReady().then(async () => {
     });
     
     ipcMain.handle('openFiles', async (_event, _method, config) => {
-        const {type, fileOrFolder, multi, buttonLabel, title} = config;
+        const {type, fileOrFolder, multi, buttonLabel, title, defaultPath} = config;
         let options;
         if (type === 'audio') {
              options = {
                 properties: [fileOrFolder, multi] ,
                 buttonLabel: buttonLabel,
-                title: title
+                title: title,
+                defaultPath: defaultPath || ''
             }
             if (fileOrFolder === 'openFile' ){
                 options.filters = [{ name: 'Audio Files', extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg', 'mp4', 'opus', 'mov'] } ]
@@ -452,22 +454,23 @@ app.whenReady().then(async () => {
                 filters: [
                     { name: 'Text Files', extensions: ['txt'] }
                 ],
-                properties: ['openFile']
+                properties: ['openFile'],
+                defaultPath
             }
         }
         // Show file dialog 
-        return await dialog.showOpenDialog(mainWindow, options);
+        return dialog.showOpenDialog(mainWindow, options);
     })
     
     
-    ipcMain.handle('selectDirectory', async (_e, path) => {
+    ipcMain.handle('selectDirectory', async (_e, {path}) => {
         // Show file dialog to select a directory
         return await dialog.showOpenDialog(mainWindow, {
             // From docs:
             // Note: On Windows and Linux an open dialog can not be both a file selector and a directory selector,
             // so if you set properties to ['openFile', 'openDirectory'] on these platforms,
             // a directory selector will be shown.
-            defaultPath: path,
+            defaultPath: path || '',
             properties: ['openDirectory']
         });
     })

@@ -521,13 +521,15 @@ function zoomSpec(direction) {
 }
 
 async function showOpenDialog(fileOrFolder) {
-    const files = await window.electron.openDialog('showOpenDialog', {type: 'audio', fileOrFolder: fileOrFolder, multi: 'multiSelections'});
+    const defaultPath = localStorage.getItem('lastFolder');
+    const files = await window.electron.openDialog('showOpenDialog', {type: 'audio', fileOrFolder: fileOrFolder, multi: 'multiSelections', defaultPath});
     if (!files.canceled) {
         if (fileOrFolder === 'openFiles'){
             await onOpenFiles({ filePaths: files.filePaths });
         } else {
             filterValidFiles({ filePaths: files.filePaths })
         }
+        localStorage.setItem('lastFolder', files.filePaths[0])
     }
 }
 
@@ -1222,7 +1224,8 @@ const exportRaven = ()  => exportData('Raven', isSpeciesViewFiltered(true), Infi
 const exportAudacity = ()  => exportData('Audacity', isSpeciesViewFiltered(true), Infinity);
 
 async function exportData(format, species, limit, duration){
-    const response = await window.electron.selectDirectory();
+    const defaultPath = localStorage.getItem('lastFolder');
+    const response = await window.electron.selectDirectory({path: defaultPath});
     if (!response.canceled) {
         const directory = response.filePaths[0];
         worker.postMessage({
@@ -1236,6 +1239,7 @@ async function exportData(format, species, limit, duration){
             limit: limit,
             range: isExplore() ? STATE.explore.range : undefined
         })
+        localStorage.setItem('lastFolder', directory);
     } 
 }
 
@@ -2652,7 +2656,8 @@ function onChartData(args) {
     })
     
     DOM.customListSelector.addEventListener('click', async () =>{
-        const files = await window.electron.openDialog('showOpenDialog', {type: 'text'});
+        const defaultPath = localStorage.getItem('lastFolder');
+        const files = await window.electron.openDialog('showOpenDialog', {type: 'text', defaultPath});
         if (! files.canceled) {
             DOM.customListSelector.classList.remove('btn-outline-danger');
             const customListFile = files.filePaths[0];
@@ -2661,6 +2666,7 @@ function onChartData(args) {
             readLabels(customListFile, 'list');
             LIST_MAP = getI18n(i18nLIST_MAP);
             updatePrefs('config.json', config)
+            localStorage.setItem('lastFolder', customListFile);
         }
     })
 
@@ -4772,7 +4778,7 @@ function playRegion(){
 
             case 'archive-location-select': {
                 (async () =>{
-                    const files = await window.electron.selectDirectory(config.archive.location)
+                    const files = await window.electron.selectDirectory({path: config.archive.location})
                     if (! files.canceled) {
                         const archiveFolder = files.filePaths[0];
                         config.archive.location = archiveFolder;

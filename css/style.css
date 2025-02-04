@@ -841,6 +841,6 @@ input[type="range"].vertical {
 }
 
 .chirpity-only-visible, .list-visible {
-    max-height: 5rem; /* Adjust to fit your content's height */
+    max-height: 10rem; /* Adjust to fit your content's height */
     opacity: 1; /* Fully visible */
 }
