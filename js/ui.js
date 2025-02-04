@@ -2549,17 +2549,21 @@ function onChartData(args) {
             color: "rgba(255, 255, 255, 0.1)"
         })
 
+        regions.on('region-clicked', function (_region, e) {
+            // Prevent region being cleared
+            e.stopPropagation()
+        });
             // Enable analyse selection when region created
-        regions.on('region-created', function (e) {
-            region = e;
+        regions.on('region-created', function (r) {
+            region = r;
             enableMenuItem(['export-audio']);
             if (modelReady && !PREDICTING) {
                 enableMenuItem(['analyseSelection']);
             }
         });
         // Clear label on modifying region
-        regions.on('region-update', function (e) {
-            region = e;
+        regions.on('region-update', function (r) {
+            region = r;
             region.content && (region.content.innerText = '');
         });
         return regions
