@@ -2590,8 +2590,7 @@ function onChartData(args) {
             // noverlap: 128, Auto (the default) seems fine
             // gainDB: 50, Adjusts spec brightness without increasing volume
             labels: config.specLabels,
-            labelsColor: '#fff',
-            labelsHzColor: 'gray',
+            labelsColor: wsTextColour(),
             labelsBackground: 'rgba(0,0,0,0)',
             height: height,
             fftSamples: fftSamples, 
