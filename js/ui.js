@@ -2591,7 +2591,7 @@ function onChartData(args) {
             // gainDB: 50, Adjusts spec brightness without increasing volume
             labels: config.specLabels,
             labelsColor: '#fff',
-            labelsHzColor: 'gold',
+            labelsHzColor: 'gray',
             labelsBackground: 'rgba(0,0,0,0)',
             height: height,
             fftSamples: fftSamples, 
@@ -2905,10 +2905,10 @@ function centreSpec(){
             const skip = windowLength / 100;
             if (currentBuffer) {
                 wavesurfer.setTime(wavesurfer.getCurrentTime() - skip);
-                const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
+                let position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
                 if (wavesurfer.getCurrentTime() < skip && bufferBegin > 0) {
                     bufferBegin -= skip;
-                    postBufferUpdate({ begin: bufferBegin, position: position })
+                    postBufferUpdate({ begin: bufferBegin, position: position += skip/windowLength })
                 }
             }
         },
@@ -2916,10 +2916,10 @@ function centreSpec(){
             const skip = windowLength / 100;
             if (wavesurfer) {
                 wavesurfer.setTime(wavesurfer.getCurrentTime() + skip);
-                const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
+                let position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
                 if (wavesurfer.getCurrentTime() > windowLength - skip) {
                     bufferBegin = Math.min(currentFileDuration - windowLength, bufferBegin += skip)
-                    postBufferUpdate({ begin: bufferBegin, position: position })
+                    postBufferUpdate({ begin: bufferBegin, position: position -= skip/windowLength })
                 }
             }
         },
