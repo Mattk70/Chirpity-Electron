@@ -2553,18 +2553,22 @@ function onChartData(args) {
             color: "rgba(255, 255, 255, 0.1)"
         })
 
+        regions.on('region-clicked', function (_region, e) {
+            // Prevent region being cleared
+            e.stopPropagation()
+        });
             // Enable analyse selection when region created
-        regions.on('region-created', function (e) {
-            region = e;
+        regions.on('region-created', function (r) {
+            region = r;
             enableMenuItem(['export-audio']);
             if (modelReady && !PREDICTING) {
                 enableMenuItem(['analyseSelection']);
             }
         });
         // Clear label on modifying region
-        regions.on('region-update', function (e) {
-            region = e;
-            region.content.innerText = '';
+        regions.on('region-update', function (r) {
+            region = r;
+            region.content && (region.content.innerText = '');
         });
         return regions
     }
@@ -2960,7 +2964,7 @@ function centreSpec(){
         return region ? {
             start: region.start,
             end: region.end,
-            label: region.content.innerText
+            label: region.content?.innerText || ''
         } : undefined;
     }
     
@@ -3770,7 +3774,7 @@ function formatDuration(seconds){
     
     const exportAudio = () => {
         let result;
-        if (region.content.innerText) {
+        if (region.content?.innerText) {
             setClickedIndex(activeRow);
             result = predictions[clickedIndex]
         }
@@ -5396,7 +5400,7 @@ function positionMenu(menu, event) {
     let focusBirdList;
     
     async function showRecordEntryForm(mode, batch) {
-        const cname = batch ? document.querySelector('#speciesFilter .text-warning .cname .cname').textContent : region.content.innerText.replace('?', '');
+        const cname = batch ? document.querySelector('#speciesFilter .text-warning .cname .cname').textContent : region.content?.innerText.replace('?', '');
         let callCount = '', typeIndex = '', commentText = '';
         if (cname && activeRow) {
             // Populate the form with existing values
@@ -5434,7 +5438,7 @@ function positionMenu(menu, event) {
         if (region) {
             start = bufferBegin + region.start;
             end = bufferBegin + region.end;
-            region.content.innerText = cname;
+            region.setOptions({content: cname})
         }
         const originalCname = document.getElementById('original-id').value;
         // Update the region label
