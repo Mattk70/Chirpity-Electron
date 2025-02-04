@@ -344,7 +344,8 @@ function createTimeline() {
     return wavesurfer ? wavesurfer.registerPlugin(timeline) : timeline;
 }
 
-const resetRegions = () => {
+const resetRegions = (e) => {
+    if (e?.button === 2) return
     if (wavesurfer) regions.clearRegions(); 
     region = undefined;
     const orphanedRegions = document.querySelectorAll('wave>region');
@@ -398,7 +399,7 @@ const initWavesurfer = ({
 }) => {
     wavesurfer && wavesurfer.destroy();
     const loggedErrors = new Set();
-    regions = initRegion();
+    initRegion();
     spectrogram = initSpectrogram(height);
     timeline = createTimeline();
     // Setup waveform and spec views
@@ -423,20 +424,6 @@ const initWavesurfer = ({
     DOM.colourmap.value = config.colormap;
     // Set click event that removes all regions
     
-
-    // Enable analyse selection when region created
-    wavesurfer.on('region-created', function (e) {
-        region = e;
-        enableMenuItem(['export-audio']);
-        if (modelReady && !PREDICTING) {
-            enableMenuItem(['analyseSelection']);
-        }
-    });
-    // Clear label on modifying region
-    wavesurfer.on('region-updated', function (e) {
-        region = e;
-        region.attributes.label = '';
-    });
     
     // Queue up next audio window while playing
     wavesurfer.on('audioprocess', function () {
@@ -1407,6 +1394,7 @@ function createRegion(start, end, label, goToRegion) {
     // if (region.content.clientWidth <= checkWidth(text)) {
     //     region.content.style.writingMode = 'vertical-rl';
     // }
+
     if (goToRegion) {
         const progress = start / wavesurfer.getDuration();  
         wavesurfer.seekTo(progress);
@@ -2549,7 +2537,7 @@ function onChartData(args) {
     
     function initRegion() {
         if (regions) regions.destroy();
-        const myRegions = RegionsPlugin.create({
+        regions = RegionsPlugin.create({
             formatTimeCallback: () => '',
             drag: true,
             maxRegions: 100,
@@ -2559,11 +2547,21 @@ function onChartData(args) {
             slop: null,
             color: "rgba(255, 255, 255, 0.1)"
         })
-        myRegions.on('region-clicked', (region, e)=>{
 
-            createContextMenu(e)
-        })
-        return myRegions
+            // Enable analyse selection when region created
+        regions.on('region-created', function (e) {
+            region = e;
+            enableMenuItem(['export-audio']);
+            if (modelReady && !PREDICTING) {
+                enableMenuItem(['analyseSelection']);
+            }
+        });
+        // Clear label on modifying region
+        regions.on('region-updated', function (e) {
+            region = e;
+            region.content = '';
+        });
+        return regions
     }
     
     function initSpectrogram(height, fftSamples) {
@@ -2722,7 +2720,7 @@ function onChartData(args) {
         DOM.batchSizeValue.textContent = BATCH_SIZE_LIST[DOM.batchSizeSlider.value].toString();
         updatePrefs('config.json', config)
         // restart wavesurfer regions to set new maxLength
-        initRegion();
+        // initRegion();
         loadModel();
     }
     
@@ -2956,7 +2954,7 @@ function centreSpec(){
         return region ? {
             start: region.start,
             end: region.end,
-            label: region.attributes?.label
+            label: region.content.innerText
         } : undefined;
     }
     
@@ -3766,7 +3764,7 @@ function formatDuration(seconds){
     
     const exportAudio = () => {
         let result;
-        if (region.attributes.label) {
+        if (region.content.innerText) {
             setClickedIndex(activeRow);
             result = predictions[clickedIndex]
         }
@@ -5091,7 +5089,7 @@ function playRegion(){
                     config[config[config.model].backend].batchSize = BATCH_SIZE_LIST[element.value];
                     worker.postMessage({action: 'change-batch-size', batchSize: BATCH_SIZE_LIST[element.value]})
                     // Reset region maxLength
-                    initRegion();
+                    // initRegion();
                     break }
                 case 'colourmap': {
                     config.colormap = element.value;
@@ -5121,7 +5119,7 @@ function playRegion(){
                     }
                     break }
                 case 'gain': {
-                    DOM.gainAdjustment.textContent = element.value + 'dB'; //.toString();
+                    DOM.gainAdjustment.textContent = element.value + 'dB';
                     element.blur();
                     config.audio.gain = element.value;
                     worker.postMessage({action:'update-state', audio: config.audio})
@@ -5305,7 +5303,7 @@ async function createContextMenu(e) {
         }
     }
     if (region === undefined && ! inSummary) return;
-    const createOrEdit = ((region?.attributes.label || target.closest('#summary'))) ? i18n.edit : i18n.create;
+    const createOrEdit = ((region?.content.innerText || target.closest('#summary'))) ? i18n.edit : i18n.create;
     
     DOM.contextMenu.innerHTML = `
     <div id="${inSummary ? 'inSummary' : 'inResults'}">
@@ -5348,7 +5346,7 @@ async function createContextMenu(e) {
             }
         })
     }
-    if (inSummary ||  region?.attributes.label || hideInSummary) {}
+    if (inSummary ||  region?.content.innerText || hideInSummary) {}
     else {
         const xc = document.getElementById('context-xc');
         xc.classList.add('d-none');
@@ -5392,7 +5390,7 @@ function positionMenu(menu, event) {
     let focusBirdList;
     
     async function showRecordEntryForm(mode, batch) {
-        const cname = batch ? document.querySelector('#speciesFilter .text-warning .cname .cname').textContent : region.attributes.label.replace('?', '');
+        const cname = batch ? document.querySelector('#speciesFilter .text-warning .cname .cname').textContent : region.content.innerText.replace('?', '');
         let callCount = '', typeIndex = '', commentText = '';
         if (cname && activeRow) {
             // Populate the form with existing values
@@ -5430,7 +5428,7 @@ function positionMenu(menu, event) {
         if (region) {
             start = bufferBegin + region.start;
             end = bufferBegin + region.end;
-            region.attributes.label = cname;
+            region.content.innerText = cname;
         }
         const originalCname = document.getElementById('original-id').value;
         // Update the region label
