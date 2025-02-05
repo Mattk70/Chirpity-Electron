@@ -303,7 +303,7 @@ DOM.controlsWrapper.addEventListener("mousedown", (e) => {
     // Adjust the spectrogram dimensions accordingly
     debounceTimer = setTimeout(() => {
       adjustSpecDims(true, spectrogram.fftSamples, newHeight);
-    }, 5);
+    }, 10);
   };
 
   // Remove event listeners on mouseup
@@ -458,9 +458,9 @@ const WSPluginPurge = () => {
       (plugin) => plugin.wavesurfer !== null
     ));
 };
-const audioContext = new AudioContext();
-async function loadBuffer(audio = currentBuffer) {
-  // Recreate TypedArray
+
+function makeBlob(audio){
+      // Recreate TypedArray
   const int16Array = new Int16Array(audio.buffer);
   // Convert to Float32Array (Web Audio API uses Float32 samples)
   const float32Array = new Float32Array(int16Array.length);
@@ -478,7 +478,16 @@ async function loadBuffer(audio = currentBuffer) {
   const blob = new Blob([audio], { type: "audio/wav" });
   const peaks = [audioBuffer.getChannelData(0)];
   const duration = audioBuffer.duration;
+  return [blob, peaks, duration]
+}
+const audioContext = new AudioContext();
+async function loadBuffer(audio = currentBuffer) {
+    t0 = Date.now()
+const [blob, peaks, duration] =  STATE.blob || makeBlob(audio);
+
   await wavesurfer.loadBlob(blob, peaks, duration);
+  console.log(`load blob took ${Date.now() - t0}ms`)
+  STATE.blob = null;
 }
 
 const wsTextColour = () =>
@@ -500,8 +509,7 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
     // but keep the playhead
     cursorColor: wsTextColour(),
     cursorWidth: 2,
-    fillParent: true,
-    height: height,
+    height: 'auto',
     plugins: [regions, spectrogram, timeline],
   });
   wavesurfer.bufferRequested = false;
@@ -520,15 +528,9 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
     regions.clearRegions();
   });
   // Queue up next audio window while playing
-  wavesurfer.on("audioprocess", function () {
+  wavesurfer.on("decode", function () {
     // Ensure the audio file is loaded before proceeding
-    //if (!wavesurfer.isReady) return;
     try {
-      const currentTime = wavesurfer.getCurrentTime();
-      const duration = wavesurfer.getDuration();
-      const playedPart = currentTime / duration;
-
-      if (playedPart > 0.5) {
         if (
           !wavesurfer.bufferRequested &&
           currentFileDuration > bufferBegin + windowLength
@@ -537,19 +539,18 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
           postBufferUpdate({ begin: begin, play: false, queued: true });
           wavesurfer.bufferRequested = true;
         }
-      }
     } catch (e) {
       const errorKey = e.message || e.toString();
       if (!loggedErrors.has(errorKey)) {
         // lets find out if it's because wavesurfer isn't ready
-        console.warn("onAudioProcessError", e);
+        console.warn("onDecodeError", e);
         loggedErrors.add(errorKey);
       }
     }
   });
   wavesurfer.on("finish", function () {
     if (currentFileDuration > bufferBegin + windowLength) {
-      wavesurfer.stop();
+      //wavesurfer.stop();
       if (NEXT_BUFFER) {
         onWorkerLoadedAudio(NEXT_BUFFER);
       } else {
@@ -562,7 +563,7 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
   // Show controls
   showElement(["controlsWrapper"]);
   // Resize canvas of spec and labels
-  adjustSpecDims(false);
+  adjustSpecDims(true);
   // remove the tooltip
   DOM.tooltip?.remove();
 
@@ -586,7 +587,7 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
 };
 
 function increaseFFT() {
-  if (spectrogram.fftSamples <= 4096) {
+  if (spectrogram.fftSamples < 2048) {
     spectrogram.fftSamples *= 2;
     const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
     postBufferUpdate({
@@ -1730,11 +1731,9 @@ async function adjustSpecDims(redraw, fftSamples, newHeight) {
       newHeight || Math.min(config.specMaxHeight, specMaxHeight());
     if (newHeight !== 0) {
       config.specMaxHeight = specHeight;
-      scheduler.postTask(() => updatePrefs("config.json", config), {
-        priority: "background",
-      });
+      updatePrefs("config.json", config);
     }
-    if (STATE.currentFile) {
+    if (STATE.currentFile && redraw) {
       // give the wrapper space for the transport controls and element padding/margins
       if (!wavesurfer) {
         initWavesurfer({
@@ -1750,9 +1749,6 @@ async function adjustSpecDims(redraw, fftSamples, newHeight) {
         wavesurfer.registerPlugin(spectrogram);
         await loadBuffer();
       }
-      // DOM.specCanvasElement.style.width = '100%';
-      // DOM.specElement.style.zIndex = 0;
-      //document.querySelector('.spec-labels').style.width = '55px';
     }
     if (wavesurfer && redraw) {
       specOffset = spectrogramWrapper.offsetHeight;
@@ -1762,7 +1758,6 @@ async function adjustSpecDims(redraw, fftSamples, newHeight) {
   }
   DOM.resultTableElement.style.height =
     contentHeight - specOffset - formOffset + "px";
-  // STATE.timelineWidth = DOM.specElement.clientWidth;
 }
 
 ///////////////// Font functions ////////////////
@@ -1866,11 +1861,15 @@ function formatTimeCallback(secs) {
 ////////// Store preferences //////////
 
 function updatePrefs(file, data) {
-  try {
-    fs.writeFileSync(p.join(appPath, file), JSON.stringify(data));
-  } catch (error) {
-    console.log(error);
-  }
+    scheduler.postTask(() =>  {
+        try {
+            fs.writeFileSync(p.join(appPath, file), JSON.stringify(data));
+          } catch (error) {
+            console.log(error);
+          }
+        },{
+        priority: "background",
+      });
 }
 
 function syncConfig(config, defaultConfig) {
@@ -2934,7 +2933,7 @@ const waitForFinalEvent = (function () {
 window.addEventListener("resize", function () {
   waitForFinalEvent(
     function () {
-      adjustSpecDims(true);
+      adjustSpecDims(false);
     },
     100,
     "id1"
@@ -3660,6 +3659,7 @@ async function onWorkerLoadedAudio({
       resetSpec: false,
       queued: false,
     };
+    STATE.blob = makeBlob(contents);
   } else {
     // Dismiss a context menu if it's open
     DOM.contextMenu.classList.add("d-none");

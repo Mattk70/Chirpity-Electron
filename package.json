@@ -113,7 +113,7 @@
     "mac": {
       "target": {
         "target": "pkg",
-        "arch": "universal"
+        "arch": "arm64"
       },
       "icon": "img/icon/icon.icns",
       "category": "public.app-category.utilities",
