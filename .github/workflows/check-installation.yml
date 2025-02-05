@@ -7,6 +7,7 @@ jobs:
     strategy:
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest] 
+        arch: [x64, arm64]
     env: 
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
       CI: true
@@ -42,10 +43,13 @@ jobs:
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             PLATFORM="win32-x64"
             BINARY="ffmpeg.exe"
-          elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            PLATFORM="darwin-arm64"
+            elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            if [[ "$RUNNER_ARCH" == "x64" ]]; then
+              PLATFORM="darwin-x64"
+            else
+              PLATFORM="darwin-arm64"
+              chmod +x ./build/$PLATFORM/ffmpeg
             BINARY="ffmpeg"
-            chmod +x ./build/$PLATFORM/ffmpeg
             echo "Made ffmpeg binary executable for $PLATFORM."
           elif [[ "$RUNNER_OS" == "Linux" ]]; then
             PLATFORM="linux-x64"
@@ -59,7 +63,7 @@ jobs:
           echo "BINARY=$BINARY" >> $GITHUB_ENV
           
       - name: Overwrite FFmpeg binary
-        if: runner.os == 'MacOS'
+        if: runner.os == 'MacOS' && runner.arch == 'arm64'
         run: |
           echo "copying  ./build/$PLATFORM/$BINARY to ./node_modules/@ffmpeg-installer/$PLATFORM/$BINARY"
           cp ./build/$PLATFORM/$BINARY ./node_modules/@ffmpeg-installer/$PLATFORM/$BINARY
@@ -163,7 +167,11 @@ jobs:
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             FILENAME="Chirpity Setup $VERSION.exe"
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            FILENAME="Chirpity-$VERSION-arm64.pkg"
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            if [[ "$RUNNER_ARCH" == "x64" ]]; then
+              FILENAME="Chirpity-$VERSION-x64.pkg"
+            else
+              FILENAME="Chirpity-$VERSION-arm64.pkg"
           else
             FILENAME="Chirpity-$VERSION.AppImage"
           fi
