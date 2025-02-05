@@ -107,7 +107,7 @@ test('Can create/edit a manual record', async () => {
   console.log('starting record creation test')
   await runExampleAnalysis(page,'chirpity');
   await page.locator('#result1').click();
-  await page.locator('region').click({button: 'right'});
+  await page.locator('div::part(region)').click({button: 'right'});
   await page.locator('#create-manual-record').click();
   const birdList = page.locator('#bird-list-all');
   // @ts-ignore
