@@ -49,6 +49,7 @@ jobs:
             else
               PLATFORM="darwin-arm64"
               chmod +x ./build/$PLATFORM/ffmpeg
+            fi
             BINARY="ffmpeg"
             echo "Made ffmpeg binary executable for $PLATFORM."
           elif [[ "$RUNNER_OS" == "Linux" ]]; then
@@ -171,6 +172,7 @@ jobs:
               FILENAME="Chirpity-$VERSION-x64.pkg"
             else
               FILENAME="Chirpity-$VERSION-arm64.pkg"
+            fi
           else
             FILENAME="Chirpity-$VERSION.AppImage"
           fi
