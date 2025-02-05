@@ -369,19 +369,16 @@ const WSPluginPurge = () => {
         // So, this is needed to remove plugins where the `wavesurfer` key is null
         wavesurfer && (wavesurfer.plugins = wavesurfer.plugins.filter(plugin => plugin.wavesurfer !== null))
 }
-
+const audioContext = new AudioContext();
 async function loadBuffer(audio = currentBuffer){
         // Recreate TypedArray
         const int16Array = new Int16Array(audio.buffer);
-
         // Convert to Float32Array (Web Audio API uses Float32 samples)
         const float32Array = new Float32Array(int16Array.length);
         for (let i = 0; i < int16Array.length; i++) {
             float32Array[i] = int16Array[i] / 32768; // Normalize from Int16 to Float32
         }
-
         // Create AudioBuffer using AudioContext
-        const audioContext = new AudioContext();
         const audioBuffer = audioContext.createBuffer(1, float32Array.length, sampleRate); // Mono channel
         // Populate the AudioBuffer with float32Array data
         audioBuffer.copyToChannel(float32Array, 0);
