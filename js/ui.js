@@ -266,7 +266,7 @@ let predictions = {},
   currentFileDuration;
 
 let currentBuffer,
-  bufferBegin = 0,
+  windowOffsetSecs = 0,
   windowLength = 20; // seconds
 // Set content container height
 DOM.contentWrapper.style.height = bodyElement.clientHeight - 80 + "px";
@@ -421,7 +421,7 @@ function createTimeline() {
     timeInterval: timeinterval,
     primaryLabelInterval: primaryLabelInterval,
     secondaryLabelInterval: secondaryLabelInterval,
-    secondaryLabelOpacity: 0.5,
+    // secondaryLabelOpacity: 0.5,
     style: {
       fontSize: "0.75rem",
       color: colour,
@@ -528,36 +528,31 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
     regions.clearRegions();
   });
   // Queue up next audio window while playing
-  wavesurfer.on("decode", function () {
-    // Ensure the audio file is loaded before proceeding
-    try {
-        if (
-          !wavesurfer.bufferRequested &&
-          currentFileDuration > bufferBegin + windowLength
-        ) {
-          const begin = bufferBegin + windowLength;
-          postBufferUpdate({ begin: begin, play: false, queued: true });
-          wavesurfer.bufferRequested = true;
-        }
-    } catch (e) {
-      const errorKey = e.message || e.toString();
-      if (!loggedErrors.has(errorKey)) {
-        // lets find out if it's because wavesurfer isn't ready
-        console.warn("onDecodeError", e);
-        loggedErrors.add(errorKey);
-      }
-    }
-  });
+//   wavesurfer.on("decode", function () {
+//     // Ensure the audio file is loaded before proceeding
+//     try {
+//         if (
+//           !wavesurfer.bufferRequested &&
+//           currentFileDuration > windowOffsetSecs + windowLength
+//         ) {
+//           const begin = windowOffsetSecs + windowLength;
+//           postBufferUpdate({ begin: begin, play: false, queued: true });
+//           wavesurfer.bufferRequested = true;
+//         }
+//     } catch (e) {
+//       const errorKey = e.message || e.toString();
+//       if (!loggedErrors.has(errorKey)) {
+//         // lets find out if it's because wavesurfer isn't ready
+//         console.warn("onDecodeError", e);
+//         loggedErrors.add(errorKey);
+//       }
+//     }
+//   });
   wavesurfer.on("finish", function () {
-    if (currentFileDuration > bufferBegin + windowLength) {
-      //wavesurfer.stop();
-      if (NEXT_BUFFER) {
-        onWorkerLoadedAudio(NEXT_BUFFER);
-      } else {
-        postBufferUpdate({ begin: bufferBegin, play: true });
+    const bufferEnd = windowOffsetSecs + windowLength;
+    if (currentFileDuration > bufferEnd) {
+        postBufferUpdate({ begin: windowOffsetSecs + windowLength, play: true });
       }
-      //bufferBegin += windowLength;
-    }
   });
 
   // Show controls
@@ -591,7 +586,7 @@ function increaseFFT() {
     spectrogram.fftSamples *= 2;
     const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
     postBufferUpdate({
-      begin: bufferBegin,
+      begin: windowOffsetSecs,
       position: position,
       region: getRegion(),
       goToRegion: false,
@@ -606,7 +601,7 @@ function reduceFFT() {
     spectrogram.fftSamples /= 2;
     const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
     postBufferUpdate({
-      begin: bufferBegin,
+      begin: windowOffsetSecs,
       position: position,
       region: getRegion(),
       goToRegion: false,
@@ -627,36 +622,36 @@ function zoomSpec(direction) {
       // then it's an event
       direction = direction.target.closest("button").id;
     }
-    let offsetSeconds = wavesurfer.getCurrentTime();
-    let position = offsetSeconds / windowLength;
-    let timeNow = bufferBegin + offsetSeconds;
-    const oldBufferBegin = bufferBegin;
+    let playedSeconds = wavesurfer.getCurrentTime();
+    let position = playedSeconds / windowLength;
+    let timeNow = windowOffsetSecs + playedSeconds;
+    const oldBufferBegin = windowOffsetSecs;
     if (direction === "zoomIn") {
       //if (windowLength < 1.5) return;
       windowLength /= 2;
-      bufferBegin += windowLength * position;
+      windowOffsetSecs += windowLength * position;
     } else {
       if (windowLength > 100 || windowLength === currentFileDuration) return;
-      bufferBegin -= windowLength * position;
+      windowOffsetSecs -= windowLength * position;
       windowLength = Math.min(currentFileDuration, windowLength * 2);
 
-      if (bufferBegin < 0) {
-        bufferBegin = 0;
-      } else if (bufferBegin + windowLength > currentFileDuration) {
-        bufferBegin = currentFileDuration - windowLength;
+      if (windowOffsetSecs < 0) {
+        windowOffsetSecs = 0;
+      } else if (windowOffsetSecs + windowLength > currentFileDuration) {
+        windowOffsetSecs = currentFileDuration - windowLength;
       }
     }
     // Keep playhead at same time in file
-    position = (timeNow - bufferBegin) / windowLength;
+    position = (timeNow - windowOffsetSecs) / windowLength;
     // adjust region start time to new window start time
     let region = getRegion();
     if (region) {
       const duration = region.end - region.start;
-      region.start = oldBufferBegin + region.start - bufferBegin;
+      region.start = oldBufferBegin + region.start - windowOffsetSecs;
       region.end = region.start + duration;
     }
     postBufferUpdate({
-      begin: bufferBegin,
+      begin: windowOffsetSecs,
       position: position,
       region: region,
       goToRegion: false,
@@ -1228,7 +1223,7 @@ async function onOpenFiles(args) {
   window.electron.unsavedRecords(false);
   document.getElementById("unsaved-icon").classList.add("d-none");
   // Reset the buffer playhead and zoom:
-  bufferBegin = 0;
+  windowOffsetSecs = 0;
   windowLength = 20;
 }
 
@@ -1269,9 +1264,9 @@ function refreshResultsView() {
 // fromDB is requested when circle clicked
 const getSelectionResults = (fromDB) => {
   if (fromDB instanceof PointerEvent) fromDB = false;
-  let start = region.start + bufferBegin;
+  let start = region.start + windowOffsetSecs;
   // Remove small amount of region to avoid pulling in results from 'end'
-  let end = region.end + bufferBegin; // - 0.001;
+  let end = region.end + windowOffsetSecs; // - 0.001;
   STATE.selection = {};
   STATE["selection"]["start"] = start.toFixed(3);
   STATE["selection"]["end"] = end.toFixed(3);
@@ -1657,7 +1652,7 @@ async function resultClick(e) {
 
   const [file, start, end, _, label] = row.getAttribute("name").split("|");
   // if (row.classList.contains('table-active')){
-  //     createRegion(start - bufferBegin, end - bufferBegin, label, true);
+  //     createRegion(start - windowOffsetSecs, end - windowOffsetSecs, label, true);
   //     e.target.classList.contains('circle') && getSelectionResults(true);
   //     return;
   // }
@@ -1693,10 +1688,10 @@ const loadResultRegion = ({
   end = parseFloat(end);
   // ensure region doesn't spread across the whole window
   if (windowLength <= 3.5) windowLength = 6;
-  bufferBegin = Math.max(0, start - windowLength / 2 + 1.5);
+  windowOffsetSecs = Math.max(0, start - windowLength / 2 + 1.5);
   const region = {
-    start: Math.max(start - bufferBegin, 0),
-    end: end - bufferBegin,
+    start: Math.max(start - windowOffsetSecs, 0),
+    end: end - windowOffsetSecs,
     label: label,
   };
   const position = wavesurfer
@@ -1704,7 +1699,7 @@ const loadResultRegion = ({
     : 0;
   postBufferUpdate({
     file: file,
-    begin: bufferBegin,
+    begin: windowOffsetSecs,
     position: position,
     region: region,
   });
@@ -3207,28 +3202,28 @@ const timelineToggle = (fromKeys) => {
   if (fileLoaded) {
     // Reload wavesurfer with the new timeline
     const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
-    postBufferUpdate({ begin: bufferBegin, position: position });
+    postBufferUpdate({ begin: windowOffsetSecs, position: position });
   }
   updatePrefs("config.json", config);
 };
 //document.getElementById('timelineSetting').addEventListener('change', timelineToggle);
 
 function centreSpec() {
-  const saveBufferBegin = bufferBegin;
-  const middle = bufferBegin + wavesurfer.getCurrentTime();
-  bufferBegin = middle - windowLength / 2;
-  bufferBegin = Math.max(0, bufferBegin);
-  bufferBegin = Math.min(bufferBegin, currentFileDuration - windowLength);
+  const saveBufferBegin = windowOffsetSecs;
+  const middle = windowOffsetSecs + wavesurfer.getCurrentTime();
+  windowOffsetSecs = middle - windowLength / 2;
+  windowOffsetSecs = Math.max(0, windowOffsetSecs);
+  windowOffsetSecs = Math.min(windowOffsetSecs, currentFileDuration - windowLength);
   // Move the region if needed
   let region = getRegion();
   if (region) {
-    const shift = saveBufferBegin - bufferBegin;
+    const shift = saveBufferBegin - windowOffsetSecs;
     region.start += shift;
     region.end += shift;
     if (region.start < 0 || region.end > windowLength) region = undefined;
   }
   postBufferUpdate({
-    begin: bufferBegin,
+    begin: windowOffsetSecs,
     position: 0.5,
     region: region,
     goToRegion: false,
@@ -3325,32 +3320,32 @@ const GLOBAL_ACTIONS = {
   },
   Home: function () {
     if (currentBuffer) {
-      bufferBegin = 0;
+      windowOffsetSecs = 0;
       postBufferUpdate({});
     }
   },
   End: function () {
     if (currentBuffer) {
-      bufferBegin = currentFileDuration - windowLength;
-      postBufferUpdate({ begin: bufferBegin, position: 1 });
+      windowOffsetSecs = currentFileDuration - windowLength;
+      postBufferUpdate({ begin: windowOffsetSecs, position: 1 });
     }
   },
   PageUp: function () {
     if (currentBuffer) {
       const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
-      bufferBegin = bufferBegin - windowLength;
+      windowOffsetSecs = windowOffsetSecs - windowLength;
       const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
       let fileToLoad;
-      if (fileIndex > 0 && bufferBegin < 0) {
-        bufferBegin = -windowLength;
+      if (fileIndex > 0 && windowOffsetSecs < 0) {
+        windowOffsetSecs = -windowLength;
         fileToLoad = STATE.openFiles[fileIndex - 1];
       } else {
-        bufferBegin = Math.max(0, bufferBegin);
+        windowOffsetSecs = Math.max(0, windowOffsetSecs);
         fileToLoad = STATE.currentFile;
       }
       postBufferUpdate({
         file: fileToLoad,
-        begin: bufferBegin,
+        begin: windowOffsetSecs,
         position: position,
       });
     }
@@ -3366,23 +3361,23 @@ const GLOBAL_ACTIONS = {
   PageDown: function () {
     if (currentBuffer) {
       const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
-      bufferBegin = bufferBegin + windowLength;
+      windowOffsetSecs = windowOffsetSecs + windowLength;
       const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
       let fileToLoad;
       if (
         fileIndex < STATE.openFiles.length - 1 &&
-        bufferBegin >= currentFileDuration - windowLength
+        windowOffsetSecs >= currentFileDuration - windowLength
       ) {
         // Move to next file
         fileToLoad = STATE.openFiles[fileIndex + 1];
-        bufferBegin = 0;
+        windowOffsetSecs = 0;
       } else {
-        bufferBegin = Math.min(bufferBegin, currentFileDuration - windowLength);
+        windowOffsetSecs = Math.min(windowOffsetSecs, currentFileDuration - windowLength);
         fileToLoad = STATE.currentFile;
       }
       postBufferUpdate({
         file: fileToLoad,
-        begin: bufferBegin,
+        begin: windowOffsetSecs,
         position: position,
       });
     }
@@ -3400,10 +3395,10 @@ const GLOBAL_ACTIONS = {
     if (currentBuffer) {
       wavesurfer.setTime(wavesurfer.getCurrentTime() - skip);
       let position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
-      if (wavesurfer.getCurrentTime() < skip && bufferBegin > 0) {
-        bufferBegin -= skip;
+      if (wavesurfer.getCurrentTime() < skip && windowOffsetSecs > 0) {
+        windowOffsetSecs -= skip;
         postBufferUpdate({
-          begin: bufferBegin,
+          begin: windowOffsetSecs,
           position: (position += skip / windowLength),
         });
       }
@@ -3415,12 +3410,12 @@ const GLOBAL_ACTIONS = {
       wavesurfer.setTime(wavesurfer.getCurrentTime() + skip);
       let position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
       if (wavesurfer.getCurrentTime() > windowLength - skip) {
-        bufferBegin = Math.min(
+        windowOffsetSecs = Math.min(
           currentFileDuration - windowLength,
-          (bufferBegin += skip)
+          (windowOffsetSecs += skip)
         );
         postBufferUpdate({
-          begin: bufferBegin,
+          begin: windowOffsetSecs,
           position: (position -= skip / windowLength),
         });
       }
@@ -3586,9 +3581,9 @@ const gotoTime = (e) => {
     windowLength = 20;
 
     start = Math.min(start, currentFileDuration);
-    bufferBegin = Math.max(start - windowLength / 2, 0);
+    windowOffsetSecs = Math.max(start - windowLength / 2, 0);
     const position = start === 0 ? 0 : 0.5;
-    postBufferUpdate({ begin: bufferBegin, position: position });
+    postBufferUpdate({ begin: windowOffsetSecs, position: position });
     // Close the modal
     goto.hide();
   }
@@ -3614,7 +3609,7 @@ function onModelReady(args) {
  *  Called when a new file or buffer is loaded by the worker
  * @param fileStart  Unix epoch in ms for the start of the file
  * @param sourceDuration a float: number of seconds audio in the file
- * @param bufferBegin a float: the start position of the file in seconds
+ * @param windowOffsetSecs a float: the start position of the file in seconds
  * @param file full path to the audio file
  * @param position the position to place the play head: between  0-1
  * @param contents the audio buffer
@@ -3667,7 +3662,7 @@ async function onWorkerLoadedAudio({
 
     STATE.fileStart = fileStart;
     locationID = location;
-    bufferBegin = windowBegin;
+    windowOffsetSecs = windowBegin;
     NEXT_BUFFER = undefined;
     if (STATE.currentFile !== file) {
       STATE.currentFile = file;
@@ -4351,8 +4346,8 @@ function sendFile(mode, result) {
     filename = `${result.cname}_${datetime}.${config.audio.format}`;
   } else if (start === undefined) {
     if (region.start) {
-      start = region.start + bufferBegin;
-      end = region.end + bufferBegin;
+      start = region.start + windowOffsetSecs;
+      end = region.end + windowOffsetSecs;
     } else {
       start = 0;
       end = currentBuffer.duration;
@@ -5329,7 +5324,7 @@ const showFilterEffect = () => {
   if (fileLoaded) {
     const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
     postBufferUpdate({
-      begin: bufferBegin,
+      begin: windowOffsetSecs,
       position: position,
       region: getRegion(),
     });
@@ -6196,7 +6191,7 @@ document.addEventListener("change", function (e) {
             1
           );
           postBufferUpdate({
-            begin: bufferBegin,
+            begin: windowOffsetSecs,
             position: position,
             region: getRegion(),
             goToRegion: false,
@@ -6248,7 +6243,7 @@ document.addEventListener("change", function (e) {
             1
           );
           postBufferUpdate({
-            begin: bufferBegin,
+            begin: windowOffsetSecs,
             position: position,
             region: getRegion(),
             goToRegion: false,
@@ -6583,8 +6578,8 @@ recordEntryForm.addEventListener("submit", function (e) {
   const cname = document.getElementById("bird-list-all").value;
   let start, end;
   if (region) {
-    start = bufferBegin + region.start;
-    end = bufferBegin + region.end;
+    start = windowOffsetSecs + region.start;
+    end = windowOffsetSecs + region.end;
     region.setOptions({ content: cname });
   }
   const originalCname = document.getElementById("original-id").value;
