@@ -453,7 +453,7 @@ async function handleMessage(e) {
             } else {
                 for (let i = delta; i < 0; i++) {
                     const worker = predictWorkers.pop();
-                    worker.postMessage({message: 'terminate'})
+                    worker.terminate(); //postMessage({message: 'terminate'})
                 }
             }
             break;
@@ -2117,7 +2117,7 @@ function spawnPredictWorkers(model, list, batchSize, threads) {
 
 const terminateWorkers = () => {
         predictWorkers.forEach(worker => {
-        worker.postMessage({message: 'terminate'})
+        worker.terminate(); //postMessage({message: 'terminate'})
     })
         predictWorkers = [];
 }
