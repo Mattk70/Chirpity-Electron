@@ -3458,7 +3458,6 @@ function formatDuration(seconds){
     
     function speciesFilter(e) {
         if (PREDICTING || ['TBODY', 'TH', 'DIV'].includes(e.target.tagName)) return; // on Drag or clicked header
-        clearActive();
         let species, range;
         // Am I trying to unfilter?
         if (e.target.closest('tr').classList.contains('text-warning')) {
@@ -3493,7 +3492,6 @@ function formatDuration(seconds){
 
         let tr = '';
         if (index <= 1) {
-            await adjustSpecDims(true)
             if (selection) {
                 const selectionTable = document.getElementById('selectionResultTableBody');
                 selectionTable.textContent = '';
