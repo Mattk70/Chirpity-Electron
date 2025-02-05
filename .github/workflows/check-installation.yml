@@ -43,7 +43,7 @@ jobs:
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             PLATFORM="win32-x64"
             BINARY="ffmpeg.exe"
-            elif [[ "$RUNNER_OS" == "macOS" ]]; then
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
             if [[ "$RUNNER_ARCH" == "x64" ]]; then
               PLATFORM="darwin-x64"
             else
@@ -166,7 +166,6 @@ jobs:
           # Construct the filename
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             FILENAME="Chirpity Setup $VERSION.exe"
-          elif [[ "$RUNNER_OS" == "macOS" ]]; then
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
             if [[ "$RUNNER_ARCH" == "x64" ]]; then
               FILENAME="Chirpity-$VERSION-x64.pkg"
