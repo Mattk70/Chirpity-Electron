@@ -351,11 +351,17 @@ const DOM = {
     }
     return this._spectrogram;
   },
-  get specLabels() {
+  getlabels() {
     if (!this._specLabels) {
       this._specLabels = document.getElementById("spec-labels");
     }
     return this._specLabels;
+  },
+  get specDetections() {
+    if (!this._specDetections) {
+      this._specDetections = document.getElementById("spec-detections");
+    }
+    return this._specDetections;
   },
   get summaryTable() {
     if (!this._summaryTable) {

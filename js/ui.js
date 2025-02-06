@@ -276,12 +276,7 @@ const specMaxHeight = () => {
   const navPadding = DOM.navPadding.clientHeight;
   const footerHeight = DOM.footer.clientHeight;
   const controlsHeight = DOM.controlsWrapper.clientHeight;
-  return (
-    window.innerHeight -
-    navPadding -
-    footerHeight -
-    controlsHeight 
-  );
+  return window.innerHeight - navPadding - footerHeight - controlsHeight;
 };
 
 // Mouse down event to start dragging
@@ -457,8 +452,8 @@ const WSPluginPurge = () => {
     ));
 };
 
-function makeBlob(audio){
-      // Recreate TypedArray
+function makeBlob(audio) {
+  // Recreate TypedArray
   const int16Array = new Int16Array(audio.buffer);
   // Convert to Float32Array (Web Audio API uses Float32 samples)
   const float32Array = new Float32Array(int16Array.length);
@@ -476,12 +471,12 @@ function makeBlob(audio){
   const blob = new Blob([audio], { type: "audio/wav" });
   const peaks = [audioBuffer.getChannelData(0)];
   const duration = audioBuffer.duration;
-  return [blob, peaks, duration]
+  return [blob, peaks, duration];
 }
 const audioContext = new AudioContext();
 async function loadBuffer(audio = currentBuffer) {
-    t0 = Date.now()
-const [blob, peaks, duration] =  STATE.blob || makeBlob(audio);
+  t0 = Date.now();
+  const [blob, peaks, duration] = STATE.blob || makeBlob(audio);
 
   await wavesurfer.loadBlob(blob, peaks, duration);
   STATE.blob = null;
@@ -506,7 +501,7 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
     // but keep the playhead
     cursorColor: wsTextColour(),
     cursorWidth: 2,
-    height: 'auto',
+    height: "auto",
     plugins: [regions, spectrogram, timeline],
   });
   wavesurfer.bufferRequested = false;
@@ -526,31 +521,31 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
     region = null;
   });
   // Queue up next audio window while playing
-//   wavesurfer.on("decode", function () {
-//     // Ensure the audio file is loaded before proceeding
-//     try {
-//         if (
-//           !wavesurfer.bufferRequested &&
-//           currentFileDuration > windowOffsetSecs + windowLength
-//         ) {
-//           const begin = windowOffsetSecs + windowLength;
-//           postBufferUpdate({ begin: begin, play: false, queued: true });
-//           wavesurfer.bufferRequested = true;
-//         }
-//     } catch (e) {
-//       const errorKey = e.message || e.toString();
-//       if (!loggedErrors.has(errorKey)) {
-//         // lets find out if it's because wavesurfer isn't ready
-//         console.warn("onDecodeError", e);
-//         loggedErrors.add(errorKey);
-//       }
-//     }
-//   });
+  //   wavesurfer.on("decode", function () {
+  //     // Ensure the audio file is loaded before proceeding
+  //     try {
+  //         if (
+  //           !wavesurfer.bufferRequested &&
+  //           currentFileDuration > windowOffsetSecs + windowLength
+  //         ) {
+  //           const begin = windowOffsetSecs + windowLength;
+  //           postBufferUpdate({ begin: begin, play: false, queued: true });
+  //           wavesurfer.bufferRequested = true;
+  //         }
+  //     } catch (e) {
+  //       const errorKey = e.message || e.toString();
+  //       if (!loggedErrors.has(errorKey)) {
+  //         // lets find out if it's because wavesurfer isn't ready
+  //         console.warn("onDecodeError", e);
+  //         loggedErrors.add(errorKey);
+  //       }
+  //     }
+  //   });
   wavesurfer.on("finish", function () {
     const bufferEnd = windowOffsetSecs + windowLength;
     if (currentFileDuration > bufferEnd) {
-        postBufferUpdate({ begin: windowOffsetSecs + windowLength, play: true });
-      }
+      postBufferUpdate({ begin: windowOffsetSecs + windowLength, play: true });
+    }
   });
 
   // Show controls
@@ -935,7 +930,7 @@ function customiseAnalysisMenu(saved) {
   if (saved) {
     analyseMenu.innerHTML = `<span class="material-symbols-outlined">upload_file</span> ${STATE.i18n.retrieve}
         <span class="shortcut float-end">${modifier}+A</span>`;
-        enableMenuItem(["reanalyse", "explore", "charts"]);
+    enableMenuItem(["reanalyse", "explore", "charts"]);
   } else {
     analyseMenu.innerHTML = `<span class="material-symbols-outlined">search</span> ${STATE.i18n.analyse[0]}
         <span class="shortcut float-end">${modifier}+A</span>`;
@@ -1855,18 +1850,21 @@ function formatTimeCallback(secs) {
 ////////// Store preferences //////////
 
 function updatePrefs(file, data) {
-    scheduler.postTask(() =>  {
-        try {
+  scheduler.postTask(
+    () => {
+      try {
         const jsonData = JSON.stringify(data); // Convert object to JSON string
         const hexData = utf8ToHex(jsonData); // Encode to hex
-        
-            fs.writeFileSync(p.join(appPath, file), hexData);
-          } catch (error) {
-            console.log(error);
-          }
-        },{
-        priority: "background",
-      });
+
+        fs.writeFileSync(p.join(appPath, file), hexData);
+      } catch (error) {
+        console.log(error);
+      }
+    },
+    {
+      priority: "background",
+    }
+  );
 }
 
 function syncConfig(config, defaultConfig) {
@@ -1894,8 +1892,8 @@ function syncConfig(config, defaultConfig) {
 /////////////////////////  Window Handlers ////////////////////////////
 // Set config defaults
 const defaultConfig = {
-    newInstallDate: 0,
-    isMember: 0,
+  newInstallDate: 0,
+  isMember: 0,
   archive: { location: undefined, format: "ogg", auto: false, trim: false },
   fontScale: 1,
   seenTour: false,
@@ -1904,7 +1902,7 @@ const defaultConfig = {
   colormap: "inferno",
   specMaxHeight: 260,
   specLabels: true,
-    specDetections: false,
+  specDetections: false,
   customColormap: {
     loud: "#00f5d8",
     mid: "#000000",
@@ -1991,23 +1989,24 @@ window.onload = async () => {
   // Set footer year
   document.getElementById("year").textContent = new Date().getFullYear();
   await appVersionLoaded;
-  const configFile = p.join(appPath, "config.json") 
-    await fs.readFile(configFile, "utf8", (err, hexData) => {
+  const configFile = p.join(appPath, "config.json");
+  await fs.readFile(configFile, "utf8", (err, hexData) => {
     if (err) {
       console.log("Config not loaded, using defaults");
       // Use defaults if no config file
-      if (! fs.existsSync(configFile)) config = defaultConfig;
+      if (!fs.existsSync(configFile)) config = defaultConfig;
     } else {
-            try {
-                const jsonData = hexToUtf8(hexData);
-                config = JSON.parse(jsonData);
-            } catch { //ASCII config or corrupt config
-                try {
-              config = JSON.parse(hexData);
-                } catch {
-                    alert('Config file is corrupt')
-                }
-            }
+      try {
+        const jsonData = hexToUtf8(hexData);
+        config = JSON.parse(jsonData);
+      } catch {
+        //ASCII config or corrupt config
+        try {
+          config = JSON.parse(hexData);
+        } catch {
+          alert("Config file is corrupt");
+        }
+      }
     }
     // One-time reset of hidecoffee
     if (config.forceHideCoffeeReset) {
@@ -2031,8 +2030,8 @@ window.onload = async () => {
     // Show Buy Me a Coffee widget?
     config.hideBuyCoffeeWidget && DOM.buyMeCoffee.classList.add("d-none");
     document.getElementById("buy-coffee").checked = config.hideBuyCoffeeWidget;
-        config.isMember = 0;
-        membershipCheck();
+    config.isMember = 0;
+    membershipCheck();
     // Disable SNR
     config.filters.SNR = 0;
 
@@ -2087,8 +2086,8 @@ window.onload = async () => {
     DOM.colourmap.value = config.colormap;
     // Spectrogram labels
     DOM.specLabels.checked = config.specLabels;
-        // Show all detections
-        DOM.specDetections.checked = config.specDetections;
+    // Show all detections
+    DOM.specDetections.checked = config.specDetections;
     // Spectrogram frequencies
     DOM.fromInput.value = config.audio.minFrequency;
     DOM.fromSlider.value = config.audio.minFrequency;
@@ -2194,7 +2193,7 @@ window.onload = async () => {
       UUID: config.UUID,
       debug: config.debug,
       fileStartMtime: config.fileStartMtime,
-            specDetections: config.specDetections,
+      specDetections: config.specDetections,
     });
     const { model, list } = config;
     t0_warmup = Date.now();
@@ -2463,9 +2462,10 @@ const setUpWorkerMessaging = () => {
           updateSummary(args);
           break;
         }
-                case "window-detections": { showWindwoDetections(args.detections, args.queued)
-                    break
-                }
+        case "window-detections": {
+          showWindwoDetections(args.detections, args.queued);
+          break;
+        }
         case "worker-loaded-audio": {
           onWorkerLoadedAudio(args);
           break;
@@ -3059,35 +3059,42 @@ function hideTooltip() {
   DOM.tooltip.style.visibility = "hidden";
 }
 
-    function specTooltip(event, show = !config.specLabels, region) {
-        if (show){
-            const i18n = getI18n(i18nContext);
-            const waveElement = event.target;
-            const specDimensions = waveElement.getBoundingClientRect();
-            const frequencyRange = Number(config.audio.maxFrequency) - Number(config.audio.minFrequency);
-            const yPosition = Math.round((specDimensions.bottom - event.clientY) * (frequencyRange / specDimensions.height)) + Number(config.audio.minFrequency);
-            
-            // Update the tooltip content
-            const tooltip = DOM.tooltip;
-            tooltip.textContent = `${i18n.frequency}: ${yPosition}Hz`;
-            if (region) {
-                const lineBreak = document.createElement('br');
-                const textNode = document.createTextNode(formatRegionTooltip(i18n.length, region.start, region.end));
-                
-                tooltip.appendChild(lineBreak);  // Add the line break
-                tooltip.appendChild(textNode);   // Add the text node
-            }
-        
-            // Apply styles to the tooltip
-            Object.assign(tooltip.style, {
-                top: `${event.clientY}px`,
-                left: `${event.clientX + 15}px`,
-                display: 'block',
-                visibility: 'visible',
-                opacity: 1
-            });
-        }
+function specTooltip(event, show = !config.specLabels, region) {
+  if (show) {
+    const i18n = getI18n(i18nContext);
+    const waveElement = event.target;
+    const specDimensions = waveElement.getBoundingClientRect();
+    const frequencyRange =
+      Number(config.audio.maxFrequency) - Number(config.audio.minFrequency);
+    const yPosition =
+      Math.round(
+        (specDimensions.bottom - event.clientY) *
+          (frequencyRange / specDimensions.height)
+      ) + Number(config.audio.minFrequency);
+
+    // Update the tooltip content
+    const tooltip = DOM.tooltip;
+    tooltip.textContent = `${i18n.frequency}: ${yPosition}Hz`;
+    if (region) {
+      const lineBreak = document.createElement("br");
+      const textNode = document.createTextNode(
+        formatRegionTooltip(i18n.length, region.start, region.end)
+      );
+
+      tooltip.appendChild(lineBreak); // Add the line break
+      tooltip.appendChild(textNode); // Add the text node
     }
+
+    // Apply styles to the tooltip
+    Object.assign(tooltip.style, {
+      top: `${event.clientY}px`,
+      left: `${event.clientX + 15}px`,
+      display: "block",
+      visibility: "visible",
+      opacity: 1,
+    });
+  }
+}
 
 const updateListIcon = () => {
   LIST_MAP = getI18n(i18nLIST_MAP);
@@ -3230,7 +3237,10 @@ function centreSpec() {
   const middle = windowOffsetSecs + wavesurfer.getCurrentTime();
   windowOffsetSecs = middle - windowLength / 2;
   windowOffsetSecs = Math.max(0, windowOffsetSecs);
-  windowOffsetSecs = Math.min(windowOffsetSecs, currentFileDuration - windowLength);
+  windowOffsetSecs = Math.min(
+    windowOffsetSecs,
+    currentFileDuration - windowLength
+  );
   // Move the region if needed
   let region = getRegion();
   if (region) {
@@ -3389,7 +3399,10 @@ const GLOBAL_ACTIONS = {
         fileToLoad = STATE.openFiles[fileIndex + 1];
         windowOffsetSecs = 0;
       } else {
-        windowOffsetSecs = Math.min(windowOffsetSecs, currentFileDuration - windowLength);
+        windowOffsetSecs = Math.min(
+          windowOffsetSecs,
+          currentFileDuration - windowLength
+        );
         fileToLoad = STATE.currentFile;
       }
       postBufferUpdate({
@@ -3659,90 +3672,109 @@ async function onWorkerLoadedAudio({
   console.log(
     `UI received worker-loaded-audio: ${file}, buffered: ${queued === true}`
   );
-    // Dismiss a context menu if it's open
-    DOM.contextMenu.classList.add("d-none");
-    currentBuffer = contents;
+  // Dismiss a context menu if it's open
+  DOM.contextMenu.classList.add("d-none");
+  currentBuffer = contents;
 
-    STATE.fileStart = fileStart;
-    locationID = location;
-    windowOffsetSecs = windowBegin;
-    NEXT_BUFFER = undefined;
-    if (STATE.currentFile !== file) {
-      STATE.currentFile = file;
-      fileEnd = new Date(fileStart + currentFileDuration * 1000);
-      STATE.metadata[STATE.currentFile] = metadata;
-      renderFilenamePanel();
-    }
+  STATE.fileStart = fileStart;
+  locationID = location;
+  windowOffsetSecs = windowBegin;
+  NEXT_BUFFER = undefined;
+  if (STATE.currentFile !== file) {
+    STATE.currentFile = file;
+    fileEnd = new Date(fileStart + currentFileDuration * 1000);
+    STATE.metadata[STATE.currentFile] = metadata;
+    renderFilenamePanel();
+  }
 
-            const initialTime = config.timeOfDay ? new Date(fileStart) : new Date(0, 0, 0, 0, 0, 0, 0);
-            bufferStartTime = new Date(initialTime.getTime() + (windowBegin * 1000));
-            
-            if (windowLength > currentFileDuration) windowLength = currentFileDuration;
-            
-            updateSpec({ buffer: currentBuffer, position: position, play: play, resetSpec: resetSpec });
-            resetRegions()
-            wavesurfer.bufferRequested = false;
-            if (modelReady) {
-                enableMenuItem(['analyse']);
-                if (STATE.openFiles.length > 1) enableMenuItem(['analyseAll'])
-            }
-            if (fileRegion) {
-                createRegion(fileRegion.start, fileRegion.end, fileRegion.label, goToRegion);
-                if (fileRegion.play) {
-                    region.play()
-                }
-            } 
-            fileLoaded = true;
-            //if (activeRow) activeRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
+  const initialTime = config.timeOfDay
+    ? new Date(fileStart)
+    : new Date(0, 0, 0, 0, 0, 0, 0);
+  bufferStartTime = new Date(initialTime.getTime() + windowBegin * 1000);
+
+  if (windowLength > currentFileDuration) windowLength = currentFileDuration;
+
+  updateSpec({
+    buffer: currentBuffer,
+    position: position,
+    play: play,
+    resetSpec: resetSpec,
+  });
+  resetRegions();
+  wavesurfer.bufferRequested = false;
+  if (modelReady) {
+    enableMenuItem(["analyse"]);
+    if (STATE.openFiles.length > 1) enableMenuItem(["analyseAll"]);
+  }
+  if (fileRegion) {
+    createRegion(
+      fileRegion.start,
+      fileRegion.end,
+      fileRegion.label,
+      goToRegion
+    );
+    if (fileRegion.play) {
+      region.play();
     }
-    const i18nFile = {
-        en: 'File ${count} of ${fileCount}',
-        da: 'Fil ${count} af ${fileCount}',
-        de: 'Datei ${count} von ${fileCount}',
-        es: 'Archivo ${count} de ${fileCount}',
-        fr: 'Fichier ${count} sur ${fileCount}',
-        nl: 'Bestand ${count} van ${fileCount}',
-        pt: 'Arquivo ${count} de ${fileCount}',
-        ru: 'Файл ${count} из ${fileCount}',
-        sv: 'Fil ${count} av ${fileCount}',
-        zh: '文件 ${count} / ${fileCount}'
-    };
-    const awaiting = {
-        en: 'Awaiting detections',
-        da: 'Afventer detektioner',
-        de: 'Warten auf Erkennungen',
-        es: 'Esperando detecciones',
-        fr: 'En attente des détections',
-        nl: 'Wachten op detecties',
-        pt: 'Aguardando detecções',
-        ru: 'Ожидание обнаружений',
-        sv: 'Väntar på detektioner',
-        zh: '等待检测'
-    };
-    function onProgress(args) {
-        DOM.progressDiv.classList.remove('invisible');
-        if (args.text) {
-            DOM.fileNumber.innerHTML = `<span class='loading text-nowrap'>${getI18n(awaiting)}</span>`;
-        } else {
-            const count = STATE.openFiles.indexOf(args.file) + 1;
-            DOM.fileNumber.textContent = interpolate(getI18n(i18nFile), {count: count, fileCount: STATE.openFiles.length});
-        }
-        if (args.progress) {
-            let progress = Math.round(args.progress * 1000) / 10;
-            updateProgress(progress);
-        } 
-    }
-    
-    function updatePagination(total, offset) {
-        //Pagination
-        total > config.limit ? addPagination(total, offset) : pagination.forEach(item => item.classList.add('d-none'));
-        STATE.offset = offset;
-    }
-    
-    const updateSummary = async ( { summary = [], filterSpecies = '' }) => {
-        const i18n = getI18n(i18nHeadings);
-        const showIUCN = config.detect.iucn;
+  }
+  fileLoaded = true;
+  //if (activeRow) activeRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+const i18nFile = {
+  en: "File ${count} of ${fileCount}",
+  da: "Fil ${count} af ${fileCount}",
+  de: "Datei ${count} von ${fileCount}",
+  es: "Archivo ${count} de ${fileCount}",
+  fr: "Fichier ${count} sur ${fileCount}",
+  nl: "Bestand ${count} van ${fileCount}",
+  pt: "Arquivo ${count} de ${fileCount}",
+  ru: "Файл ${count} из ${fileCount}",
+  sv: "Fil ${count} av ${fileCount}",
+  zh: "文件 ${count} / ${fileCount}",
+};
+const awaiting = {
+  en: "Awaiting detections",
+  da: "Afventer detektioner",
+  de: "Warten auf Erkennungen",
+  es: "Esperando detecciones",
+  fr: "En attente des détections",
+  nl: "Wachten op detecties",
+  pt: "Aguardando detecções",
+  ru: "Ожидание обнаружений",
+  sv: "Väntar på detektioner",
+  zh: "等待检测",
+};
+function onProgress(args) {
+  DOM.progressDiv.classList.remove("invisible");
+  if (args.text) {
+    DOM.fileNumber.innerHTML = `<span class='loading text-nowrap'>${getI18n(
+      awaiting
+    )}</span>`;
+  } else {
+    const count = STATE.openFiles.indexOf(args.file) + 1;
+    DOM.fileNumber.textContent = interpolate(getI18n(i18nFile), {
+      count: count,
+      fileCount: STATE.openFiles.length,
+    });
+  }
+  if (args.progress) {
+    let progress = Math.round(args.progress * 1000) / 10;
+    updateProgress(progress);
+  }
+}
+
+function updatePagination(total, offset) {
+  //Pagination
+  total > config.limit
+    ? addPagination(total, offset)
+    : pagination.forEach((item) => item.classList.add("d-none"));
+  STATE.offset = offset;
+}
+
+const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
+  const i18n = getI18n(i18nHeadings);
+  const showIUCN = config.detect.iucn;
 
   // if (summary.length){
   let summaryHTML = `
@@ -4115,8 +4147,10 @@ async function renderResult({
       // DOM.resultHeader.innerHTML = fragment;
     }
     showElement(["resultTableContainer", "resultsHead"], false);
-            // If  we have some results, let's update the view in case any are in the window
-            config.specDetections && !isFromDB && postBufferUpdate({file, begin:bufferBegin})
+    // If  we have some results, let's update the view in case any are in the window
+    config.specDetections &&
+      !isFromDB &&
+      postBufferUpdate({ file, begin: bufferBegin });
   } else if (!isFromDB && index % (config.limit + 1) === 0) {
     addPagination(index, 0);
   }
@@ -7420,37 +7454,36 @@ const IUCNMap = {
 // Make config, LOCATIONS and displayLocationAddress and toasts available to the map script in index.html
 export { config, displayLocationAddress, LOCATIONS, generateToast };
 
-function membershipCheck(){
-    config.newInstallDate = config.newInstallDate || Date.now();
-    const inTrial = Date.now() - config.newInstallDate < 172_800_000;
-    const lockedElements = document.querySelectorAll('.locked, .unlocked')
-    if (config.isMember || inTrial){
-
-        lockedElements.forEach(el =>{
-            el.classList.replace('locked', 'unlocked');
-            el.disabled = false;
-            el.textContent = 'lock_open';
-        })
-    } else {
-        lockedElements.forEach(el =>{
-            el.classList.replace('unlocked', 'locked');
-            config.specDetections = false;
-            el.checked = false;
-            el.disabled = true;
-            el.textContent = 'lock';
-        })
-    }
+function membershipCheck() {
+  config.newInstallDate = config.newInstallDate || Date.now();
+  const inTrial = Date.now() - config.newInstallDate < 172_800_000;
+  const lockedElements = document.querySelectorAll(".locked, .unlocked");
+  if (config.isMember || inTrial) {
+    lockedElements.forEach((el) => {
+      el.classList.replace("locked", "unlocked");
+      el.disabled = false;
+      el.textContent = "lock_open";
+    });
+  } else {
+    lockedElements.forEach((el) => {
+      el.classList.replace("unlocked", "locked");
+      config.specDetections = false;
+      el.checked = false;
+      el.disabled = true;
+      el.textContent = "lock";
+    });
+  }
 }
 
 function utf8ToHex(str) {
-    return Array.from(str)
-        .map(char => char.charCodeAt(0).toString(16).padStart(2, '0')) // Convert each char to hex
-        .join('');
+  return Array.from(str)
+    .map((char) => char.charCodeAt(0).toString(16).padStart(2, "0")) // Convert each char to hex
+    .join("");
 }
 
 function hexToUtf8(hex) {
-    return hex
-        .match(/.{1,2}/g) // Split the hex string into pairs
-        .map(byte => String.fromCharCode(parseInt(byte, 16))) // Convert each pair to a character
-        .join('');
+  return hex
+    .match(/.{1,2}/g) // Split the hex string into pairs
+    .map((byte) => String.fromCharCode(parseInt(byte, 16))) // Convert each pair to a character
+    .join("");
 }
