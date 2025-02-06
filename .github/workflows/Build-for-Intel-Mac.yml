@@ -1,12 +1,12 @@
-name: Test Chirpity Compilation
-run-name: ${{ github.actor }} is building chirpity
-on: [push,  workflow_dispatch]
+name: Build Intel Mac version 
+run-name: ${{ github.actor }} is building Chirpity for Intel Mac
+on: 
+    push:
+        branches:
+            - 'master'
 jobs:
   Build-Chirpity:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest] 
+    runs-on: macos-13
     env: 
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
       CI: true
@@ -39,32 +39,13 @@ jobs:
       - name: Set platform-specific ffmpeg path
         shell: bash
         run: |
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            PLATFORM="win32-x64"
-            BINARY="ffmpeg.exe"
-          elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            PLATFORM="darwin-arm64"
-            chmod +x ./build/$PLATFORM/ffmpeg
-            BINARY="ffmpeg"
-            echo "Made ffmpeg binary executable for $PLATFORM."
-          elif [[ "$RUNNER_OS" == "Linux" ]]; then
-            PLATFORM="linux-x64"
-            BINARY="ffmpeg"
-            chmod +x ./build/$PLATFORM/ffmpeg
-            echo "Made ffmpeg binary executable for $PLATFORM."
-          fi
+          PLATFORM="darwin-x64"
+          BINARY="ffmpeg"
           echo "Platform is $PLATFORM, Binary is $BINARY"
           # Persist environment variables to the GitHub Actions environment
           echo "PLATFORM=$PLATFORM" >> $GITHUB_ENV
           echo "BINARY=$BINARY" >> $GITHUB_ENV
           
-      - name: Overwrite FFmpeg binary
-        if: runner.os == 'MacOS'
-        run: |
-          echo "copying  ./build/$PLATFORM/$BINARY to ./node_modules/@ffmpeg-installer/$PLATFORM/$BINARY"
-          cp ./build/$PLATFORM/$BINARY ./node_modules/@ffmpeg-installer/$PLATFORM/$BINARY
-        shell: bash
-
       - name: Modify fluent-ffmpeg processor.js
         run: |
           sed -i -e '/^\s*setTimeout(function() {/,/}, 20);/c\
@@ -98,20 +79,6 @@ jobs:
 
       # test application here
 
-      - name: Start Xvfb
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb
-          Xvfb :99 -screen 0 1280x1024x24 &
-          # Set DISPLAY environment variable
-          echo "DISPLAY=:99" >> $GITHUB_ENV
-
-      # - name: Fire up Application
-      #   env:
-      #     DISPLAY: :99
-      # run: npm run test -- --disable-gpu --disable-software-rasterizer --disable-audio-output
-      # end test application
       
       # Get the latest tag from origin/master
       - name: Get the latest tag on origin/master
@@ -144,14 +111,10 @@ jobs:
       - name: Build Electron application
         # if: env.skip_build != 'true'  # Only run this if the tag comparison was true
         shell: bash
+        env:
+          ELECTRON_BUILD_ARCH: x64
         run: |
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            npm run build
-          elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            npx electron-builder --mac  -p always
-          else
-            npx electron-builder build --linux --x64  -p always
-          fi
+          npm run build-mac-x64-pkg
       - run: echo "Build status is ${{ job.status }}."
       - name: Check installer exists
         if: env.skip_build != 'true' # Only run this if the tag comparison was true
@@ -160,13 +123,7 @@ jobs:
           # Retrieve the version from package.json
           VERSION=$(jq -r '.version' package.json)
           # Construct the filename
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            FILENAME="Chirpity Setup $VERSION.exe"
-          elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            FILENAME="Chirpity-$VERSION-arm64.pkg"
-          else
-            FILENAME="Chirpity-$VERSION.AppImage"
-          fi
+          FILENAME="Chirpity-$VERSION-x64.pkg"
           # Check if the file exists
           if [ -f "./dist/$FILENAME" ]; then
             echo "Executable $FILENAME found in ./dist"
@@ -180,12 +137,3 @@ jobs:
       - name: Test packaged application
         if: runner.os != 'Linux'
         run: npm test
-
-      # - name: Set locale to de_DE.UTF-8 for Mac, before testing application
-      #   if: runner.os == 'macOS'
-      #   run: |
-      #       export LC_ALL=de_DE.UTF-8
-      #       export LANG=de_DE.UTF-8
-      #       python -c "import locale; locale.setlocale(locale.LC_ALL, locale.getlocale()[0]); print(locale.localeconv())"
-      #       LANG=de_DE.UTF-8 LC_ALL=de_DE.UTF-8 npm test
-

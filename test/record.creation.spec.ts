@@ -106,8 +106,7 @@ test('Can create/edit a manual record', async () => {
   test.slow(); // 3x timeout seconds
   console.log('starting record creation test')
   await runExampleAnalysis(page,'chirpity');
-  await page.locator('#result1').click();
-  await page.locator('region').click({button: 'right'});
+  await page.locator('#result1').click({button: 'right'});
   await page.locator('#create-manual-record').click();
   const birdList = page.locator('#bird-list-all');
   // @ts-ignore

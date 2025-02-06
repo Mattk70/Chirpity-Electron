@@ -1330,8 +1330,9 @@ const i18nTitles = {
         controlsWrapper: "Drag to resize the Spectrogram window.",
         playToggle: "Play / Pause (SpaceBar)",
         zoomIn: "Zoom into the spectrogram (Keyboard Shortcut: + key)",
+        nocmigOn: "Nocmig mode on",
+        nocmigOff: "Nocmig mode off",
         zoomOut: "Zoom out of the spectrogram (Keyboard Shortcut: - key)",
-        nocmigMode: "Nocmig mode on",
         audioFiltersOn: "Audio filters applied",
         audioFiltersOff: "No Audio filters",
         contextModeOn: "Context Mode enabled",
@@ -2945,7 +2946,7 @@ async function localiseUI(locale) {
                 label.textContent = settings[id];
                 // Some nested labels must be skipped
                 if (['tensorflow', 'webgpu', 'webgl', 'colourmap', 'window-function', 'timelineSetting', 'iucn-scope', 'archive-format',
-                     'loud-color', 'mid-color', 'quiet-color', "color-threshold-slider", 'bitrate', 'format', 'quality'].includes(id)) return
+                     'loud-color', 'mid-color', 'quiet-color', "color-threshold-slider", 'bitrate', 'format', 'quality', 'species-week'].includes(id)) return
                 // Set popOver title. It's in the div, or div parent div
                 const el = label.parentNode.querySelector('a') || label.parentNode.parentNode.querySelector('a') || label.parentNode.parentNode.parentNode.querySelector('a');
                 const heading = label.textContent.replace(':', '');

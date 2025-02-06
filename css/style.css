@@ -246,20 +246,13 @@ ul {
     color: #ffae42; /* Change to your desired text color */
 }
 
-region.wavesurfer-region:before {
-    content: attr(data-region-label);
-    position: absolute;
-    color: beige;    
+div::part(region-content)  {
+    color: beige;
+    margin-top: 12px;
     text-shadow: 2px 2px 3px rgb(0, 0, 0);
-    top: 0.75rem;
-    left: 2px;
-    z-index: 5;
 }
 
-region.wavesurfer-region[data-region-highlight] {
-    border: 1px solid rgb(86, 180, 239);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) inset, 2px 0 8px rgba(266, 255, 236, 0.6);
-}
+
 
 .nighttime {
     background-color: rgba(0, 0, 72, 0.2);
@@ -844,6 +837,6 @@ input[type="range"].vertical {
 }
 
 .chirpity-only-visible, .list-visible {
-    max-height: 5rem; /* Adjust to fit your content's height */
+    max-height: 10rem; /* Adjust to fit your content's height */
     opacity: 1; /* Fully visible */
 }

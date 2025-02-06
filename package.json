@@ -1,6 +1,6 @@
 {
   "name": "Chirpity",
-  "version": "2.9.1-alpha2",
+  "version": "2.9.5",
   "description": "Chirpity Nocmig",
   "main": "main.js",
   "scripts": {
@@ -10,6 +10,7 @@
     "preAppImage": "node prebuild.js",
     "minify": "node minify.js",
     "export": "electron-builder build --m ",
+    "build-mac-x64-pkg": "electron-builder --mac pkg --x64 --config.mac.target=pkg",
     "AppImage": "electron-builder build --linux --x64  -p always",
     "build": "electron-builder --win --x64 -p always",
     "testBuild": "electron-builder --win",
@@ -206,7 +207,7 @@
     "suncalc": "^1.9.0",
     "utimes": "^5.2.1",
     "uuid": "^8.3.2",
-    "wavesurfer.js": "6.6.4"
+    "wavesurfer.js": "^7.0.0"
   },
   "optionalDependencies": {
     "ntsuspend": "^1.0.2"

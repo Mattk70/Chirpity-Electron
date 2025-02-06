@@ -58,7 +58,6 @@
             <!-- Spectrogram view -->
             <div class="w-100 d-none" id="spectrogramWrapper">
                 <div>
-                    <div class="bg-dark border border-secondary w-100" id="timeline"></div>
                     <div class="w-100" id="spectrogram">
                     </div>
                     <div class="w-100" id="waveform"></div>
@@ -980,6 +979,7 @@
                             <option value="cdom">CDom</option>
                             <option value="temperature">Temperature</option>
                             <option value="salinity">Salinity</option>
+                            <option value="roseus">Roseus</option>
                             <option value="inferno">Inferno</option>
                             <option value="magma">Magma</option>
                             <option value="plasma">Plasma</option>
@@ -1329,7 +1329,7 @@
                         </ul>
                     </li>
                     <div class="nav-item">
-                        <li class="nav-link"  onclick="placeMap('settingsMap')" id="navbarSettings"
+                        <li class="nav-link text-nowrap"  onclick="placeMap('settingsMap')" id="navbarSettings"
                         data-bs-toggle="offcanvas" data-bs-target="#settings" aria-controls="settings"><span class="material-symbols-outlined fs-5 align-middle">settings</span> Settings</li>
                     </div>
                 </ul>
@@ -1366,10 +1366,10 @@
 <audio id="notification">
     <source src="Help/notification.mp3" type="audio/mpeg">
 </audio>
-<script src="node_modules/wavesurfer.js/dist/wavesurfer.min.js"></script>
-<script  src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.spectrogram.min.js"></script>
-<script  src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.timeline.min.js"></script>
-<script  src="node_modules/wavesurfer.js/dist/plugin/wavesurfer.regions.min.js"></script>
+<!-- <script src="node_modules/wavesurfer.js/dist/wavesurfer.min.js"></script>
+<script  src="node_modules/wavesurfer.js/dist/plugins/spectrogram.min.js"></script>
+<script  src="node_modules/wavesurfer.js/dist/plugins/timeline.min.js"></script>
+<script  src="node_modules/wavesurfer.js/dist/plugins/regions.min.js"></script> -->
 <script src="./js/ui.js" type="module"></script>
 <script type="module" defer>
     import { config, displayLocationAddress, LOCATIONS, generateToast } from './js/ui.js';

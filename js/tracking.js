@@ -4,6 +4,7 @@ function trackEvent(uuid, event, action, name, value){
     // Squash result numbers
     name = typeof name == 'string' ? name.replace(/result\d+/, 'result') : name;
     if (action === ' ') action = 'Spacebar';
+    else if (action === '+') action = 'Plus';
     const t = new Date()
     name = name ? `&e_n=${name}` : '';
     value = value ? `&e_v=${value}` : '';
