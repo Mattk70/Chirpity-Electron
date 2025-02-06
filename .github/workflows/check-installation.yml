@@ -43,9 +43,8 @@ jobs:
             PLATFORM="win32-x64"
             BINARY="ffmpeg.exe"
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
-              PLATFORM="darwin-arm64"
-              chmod +x ./build/$PLATFORM/ffmpeg
-            fi
+            PLATFORM="darwin-arm64"
+            chmod +x ./build/$PLATFORM/ffmpeg
             BINARY="ffmpeg"
             echo "Made ffmpeg binary executable for $PLATFORM."
           elif [[ "$RUNNER_OS" == "Linux" ]]; then

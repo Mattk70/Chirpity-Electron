@@ -3,7 +3,7 @@ run-name: ${{ github.actor }} is building chirpity
 on: 
     push:
         branches:
-            -master
+            - 'master'
 jobs:
   Build-Chirpity:
     runs-on: macos-13
