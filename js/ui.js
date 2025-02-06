@@ -408,7 +408,7 @@ async function updateSpec({
 }
 
 function createTimeline() {
-  const primaryLabelInterval = windowLength / 4;
+  const primaryLabelInterval = Math.ceil(windowLength / 5);
   const secondaryLabelInterval = 0;
   const timeinterval = primaryLabelInterval / 10;
   const colour = wsTextColour();
@@ -419,7 +419,7 @@ function createTimeline() {
     timeInterval: timeinterval,
     primaryLabelInterval: primaryLabelInterval,
     secondaryLabelInterval: secondaryLabelInterval,
-    // secondaryLabelOpacity: 0.5,
+    secondaryLabelOpacity: 1,
     style: {
       fontSize: "0.75rem",
       color: colour,
@@ -484,7 +484,6 @@ async function loadBuffer(audio = currentBuffer) {
 const [blob, peaks, duration] =  STATE.blob || makeBlob(audio);
 
   await wavesurfer.loadBlob(blob, peaks, duration);
-  console.log(`load blob took ${Date.now() - t0}ms`)
   STATE.blob = null;
 }
 
@@ -625,7 +624,7 @@ function zoomSpec(direction) {
     let timeNow = windowOffsetSecs + playedSeconds;
     const oldBufferBegin = windowOffsetSecs;
     if (direction === "zoomIn") {
-      //if (windowLength < 1.5) return;
+      if (windowLength < 1.5) return;
       windowLength /= 2;
       windowOffsetSecs += windowLength * position;
     } else {
