@@ -1,5 +1,5 @@
 name: Build Intel Mac version 
-run-name: ${{ github.actor }} is building chirpity
+run-name: ${{ github.actor }} is building Chirpity for Intel Mac
 on: 
     push:
         branches:
@@ -114,7 +114,7 @@ jobs:
         env:
           ELECTRON_BUILD_ARCH: x64
         run: |
-          npx electron-builder --mac --x64 -p always
+          npx electron-builder --x64 -p always
       - run: echo "Build status is ${{ job.status }}."
       - name: Check installer exists
         if: env.skip_build != 'true' # Only run this if the tag comparison was true
