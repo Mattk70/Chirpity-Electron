@@ -523,6 +523,7 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
 
   wavesurfer.on("interaction", (currenttime) => {
     regions.clearRegions();
+    region = null;
   });
   // Queue up next audio window while playing
 //   wavesurfer.on("decode", function () {
@@ -7197,7 +7198,7 @@ function renderComparisons(lists, cname) {
         creditContainer.classList.add("text-end");
         creditContainer.style.width = "100%";
         const creditText = document.createElement("div");
-        creditText.style.zIndex = 1;
+        creditText.style.zIndex = 5;
         creditText.classList.add(
           "float-end",
           "w-100",
