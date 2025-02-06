@@ -611,6 +611,10 @@ async function handleMessage(e) {
       break;
     }
     case "file-load-request": {
+      if (!args.preserveResults) {
+        // Clear records from the memory db
+        await memoryDB.runAsync("DELETE FROM records; VACUUM");
+      }
       index = 0;
       filesBeingProcessed.length && onAbort(args);
       DEBUG && console.log("Worker received audio " + args.file);

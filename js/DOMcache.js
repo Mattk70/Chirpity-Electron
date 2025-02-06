@@ -375,12 +375,6 @@ const DOM = {
     }
     return this._threadSlider;
   },
-  get timeline() {
-    if (!this._timeline) {
-      this._timeline = document.getElementById("timeline");
-    }
-    return this._timeline;
-  },
   get timelineSetting() {
     if (!this._timelineSetting) {
       this._timelineSetting = document.getElementById("timelineSetting");

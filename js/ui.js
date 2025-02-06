@@ -275,14 +275,12 @@ const specMaxHeight = () => {
   // Get the available viewport height
   const navPadding = DOM.navPadding.clientHeight;
   const footerHeight = DOM.footer.clientHeight;
-  const timelineHeight = DOM.timeline.clientHeight;
   const controlsHeight = DOM.controlsWrapper.clientHeight;
   return (
     window.innerHeight -
     navPadding -
     footerHeight -
-    controlsHeight -
-    timelineHeight
+    controlsHeight 
   );
 };
 
@@ -923,7 +921,7 @@ function customAnalysisAllMenu(saved) {
   if (saved) {
     analyseAllMenu.innerHTML = `<span class="material-symbols-outlined">upload_file</span> ${STATE.i18n.retrieveAll}
         <span class="shortcut float-end">${modifier}+Shift+A</span>`;
-    enableMenuItem(["reanalyseAll"]);
+    enableMenuItem(["reanalyseAll", "explore", "charts"]);
   } else {
     analyseAllMenu.innerHTML = `<span class="material-symbols-outlined">search</span> ${STATE.i18n.analyseAll[0]}
         <span class="shortcut float-end">${modifier}+Shift+A</span>`;
@@ -937,7 +935,7 @@ function customiseAnalysisMenu(saved) {
   if (saved) {
     analyseMenu.innerHTML = `<span class="material-symbols-outlined">upload_file</span> ${STATE.i18n.retrieve}
         <span class="shortcut float-end">${modifier}+A</span>`;
-    enableMenuItem(["reanalyse"]);
+        enableMenuItem(["reanalyse", "explore", "charts"]);
   } else {
     analyseMenu.innerHTML = `<span class="material-symbols-outlined">search</span> ${STATE.i18n.analyse[0]}
         <span class="shortcut float-end">${modifier}+A</span>`;
@@ -1716,10 +1714,11 @@ async function adjustSpecDims(redraw, fftSamples, newHeight) {
   const navHeight = DOM.navPadding.clientHeight;
   newHeight ??= 0;
   DOM.contentWrapper.style.height =
-    bodyElement.clientHeight - footerHeight - navHeight + "px";
+    (bodyElement.clientHeight - footerHeight - navHeight).toString() + "px";
   const contentHeight = contentWrapper.offsetHeight;
   // + 2 for padding
   const formOffset = DOM.exploreWrapper.offsetHeight;
+
   let specOffset;
   if (!DOM.spectrogramWrapper.classList.contains("d-none")) {
     const specHeight =
@@ -1745,7 +1744,7 @@ async function adjustSpecDims(redraw, fftSamples, newHeight) {
         await loadBuffer();
       }
     }
-    if (wavesurfer && redraw) {
+    if (wavesurfer) {
       specOffset = spectrogramWrapper.offsetHeight;
     }
   } else {
@@ -3642,20 +3641,6 @@ async function onWorkerLoadedAudio({
   console.log(
     `UI received worker-loaded-audio: ${file}, buffered: ${queued === true}`
   );
-  if (queued) {
-    // Prepare arguments to call this function with
-    NEXT_BUFFER = {
-      fileStart,
-      fileDuration,
-      windowBegin,
-      file,
-      contents,
-      play: true,
-      resetSpec: false,
-      queued: false,
-    };
-    STATE.blob = makeBlob(contents);
-  } else {
     // Dismiss a context menu if it's open
     DOM.contextMenu.classList.add("d-none");
     currentBuffer = contents;
@@ -3703,8 +3688,7 @@ async function onWorkerLoadedAudio({
       resetRegions();
     }
     fileLoaded = true;
-    //if (activeRow) activeRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
+    adjustSpecDims()
 }
 const i18nFile = {
   en: "File ${count} of ${fileCount}",
