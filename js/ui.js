@@ -1854,8 +1854,8 @@ function updatePrefs(file, data) {
     () => {
       try {
         const jsonData = JSON.stringify(data); // Convert object to JSON string
-        const hexData = utf8ToHex(jsonData); // Encode to hex
-
+        //const hexData = utf8ToHex(jsonData); // Encode to hex
+        const hexData = jsonData
         fs.writeFileSync(p.join(appPath, file), hexData);
       } catch (error) {
         console.log(error);

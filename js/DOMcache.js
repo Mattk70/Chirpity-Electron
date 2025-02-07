@@ -351,7 +351,7 @@ const DOM = {
     }
     return this._spectrogram;
   },
-  getlabels() {
+  get specLabels() {
     if (!this._specLabels) {
       this._specLabels = document.getElementById("spec-labels");
     }
