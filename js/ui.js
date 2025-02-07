@@ -144,7 +144,7 @@ let STATE = {
   IUCNcache: IUCNCache,
   translations: ["da", "de", "es", "fr", "ja", "nl", "pt", "ru", "sv", "zh"],
   regionColour: "rgba(255, 255, 255, 0.1)",
-    regionActiveColour: "rgba(255, 255, 0, 0.1)"
+  regionActiveColour: "rgba(255, 255, 0, 0.1)",
 };
 
 // Batch size map for slider
@@ -254,7 +254,7 @@ let modelReady = false,
   fileLoaded = false;
 let PREDICTING = false,
   t0;
-let region,
+let activeRegion,
   AUDACITY_LABELS = {},
   wavesurfer;
 let bufferStartTime, fileEnd;
@@ -512,9 +512,9 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
     color: STATE.regionActiveColour,
   });
 
-  wavesurfer.on("interaction", (currenttime) => {
+  wavesurfer.on("interaction", (currentTime) => {
     REGIONS.clearRegions();
-    region = null;
+    activeRegion = null;
   });
 
   wavesurfer.on("finish", function () {
@@ -613,15 +613,14 @@ function zoomSpec(direction) {
     // Keep playhead at same time in file
     position = (timeNow - windowOffsetSecs) / windowLength;
     // adjust region start time to new window start time
-    if (region) {
-      const duration = region.end - region.start;
-      region.start = oldBufferBegin + region.start - windowOffsetSecs;
-      region.end = region.start + duration;
+    if (activeRegion) {
+      const duration = activeRegion.end - activeRegion.start;
+      activeRegion.start = oldBufferBegin + activeRegion.start - windowOffsetSecs;
+      activeRegion.end = activeRegion.start + duration;
     }
     postBufferUpdate({
       begin: windowOffsetSecs,
       position: position,
-    //   region: region,
       goToRegion: false,
       play: wavesurfer.isPlaying(),
     });
@@ -1232,9 +1231,9 @@ function refreshResultsView() {
 // fromDB is requested when circle clicked
 const getSelectionResults = (fromDB) => {
   if (fromDB instanceof PointerEvent) fromDB = false;
-  let start = region.start + windowOffsetSecs;
+  let start = activeRegion.start + windowOffsetSecs;
   // Remove small amount of region to avoid pulling in results from 'end'
-  let end = region.end + windowOffsetSecs; // - 0.001;
+  let end = activeRegion.end + windowOffsetSecs; // - 0.001;
   STATE.selection = {};
   STATE["selection"]["start"] = start.toFixed(3);
   STATE["selection"]["end"] = end.toFixed(3);
@@ -1583,8 +1582,6 @@ const checkWidth = (text) => {
   return textWidth + 5;
 };
 
-
-
 function createRegion(start, end, label, goToRegion, colour) {
   colour || wavesurfer.pause(); // colour param only defined when additional detections are loaded
   REGIONS.addRegion({
@@ -1594,16 +1591,14 @@ function createRegion(start, end, label, goToRegion, colour) {
     content: label || "",
   });
   // const regionsPlugin = wavesurfer.plugins.find(plugin => plugin.REGIONS);
-  // const region = regionsPlugin.REGIONS[0]
-  // const text = region.content.innerText;
+  // const activeRegion = regionsPlugin.REGIONS[0]
+  // const text = activeRegion.label;
   // if (region.content.clientWidth <= checkWidth(text)) {
   //     region.content.style.writingMode = 'vertical-rl';
   // }
 
   if (goToRegion) wavesurfer.setTime(start);
-
 }
-
 
 // We add the handler to the whole table as the body gets replaced and the handlers on it would be wiped
 const results = document.getElementById("results");
@@ -1657,10 +1652,10 @@ const loadResultRegion = ({
   // ensure region doesn't spread across the whole window
   if (windowLength <= 3.5) windowLength = 6;
   windowOffsetSecs = Math.max(0, start - windowLength / 2 + 1.5);
-  region = {
+  activeRegion = {
     start: Math.max(start - windowOffsetSecs, 0),
     end: end - windowOffsetSecs,
-    label: label,
+    label,
   };
   const position = wavesurfer
     ? clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1)
@@ -1669,7 +1664,7 @@ const loadResultRegion = ({
     file: file,
     begin: windowOffsetSecs,
     position: position,
-    region: region,
+    region: activeRegion,
   });
 };
 
@@ -1830,7 +1825,7 @@ function updatePrefs(file, data) {
       try {
         const jsonData = JSON.stringify(data); // Convert object to JSON string
         //const hexData = utf8ToHex(jsonData); // Encode to hex
-        const hexData = jsonData
+        const hexData = jsonData;
         fs.writeFileSync(p.join(appPath, file), hexData);
       } catch (error) {
         console.log(error);
@@ -2457,18 +2452,18 @@ const setUpWorkerMessaging = () => {
   });
 };
 
-function showWindowDetections(detectionList){
-    for(const detection of detectionList){
-        const start = detection.start - windowOffsetSecs;
-        if (start < windowLength) {
-            const end = detection.end - windowOffsetSecs;
-            const active = start === region?.start
-            const colour = active ? STATE.regionActiveColour : null;
-            let gotoRegion = active;
-            if (!config.specDetections && !active) continue
-            createRegion(start, end, detection.label, gotoRegion, colour)
-        }
+function showWindowDetections(detectionList) {
+  for (const detection of detectionList) {
+    const start = detection.start - windowOffsetSecs;
+    if (start < windowLength) {
+      const end = detection.end - windowOffsetSecs;
+      const active = start === activeRegion?.start;
+      const colour = active ? STATE.regionActiveColour : null;
+      let gotoRegion = active;
+      if (!config.specDetections && !active) continue;
+      createRegion(start, end, detection.label, gotoRegion, colour);
     }
+  }
 }
 
 function generateBirdList(store, rows) {
@@ -2982,6 +2977,20 @@ function handleKeyDown(e) {
 
 ///////////// Nav bar Option handlers //////////////
 
+function setActiveRegion(region){
+    const {start, end, content} = region;
+    // Clear active regions
+    REGIONS.regions.forEach((r) => r.setOptions({ color: STATE.regionColour }));
+    // Set the playhead to the start of the region
+    wavesurfer.setTime(start);
+    activeRegion = {start, end, label: content?.innerText};
+    region.setOptions({ color: STATE.regionActiveColour });
+    enableMenuItem(["export-audio"]);
+    if (modelReady && !PREDICTING) {
+      enableMenuItem(["analyseSelection"]);
+    }
+}
+
 function initRegion() {
   if (REGIONS) REGIONS.destroy();
   REGIONS = RegionsPlugin.create({
@@ -2991,32 +3000,27 @@ function initRegion() {
   });
 
   REGIONS.on("region-clicked", function (r, e) {
-    // Clear active regions
-    REGIONS.regions.forEach(r => r.setOptions({color: STATE.regionColour}))
     // Prevent region being cleared
     e.stopPropagation();
-    // Set the playhead to the start of the region
-    wavesurfer.setTime(r.start)
-    region = r;
-    region.setOptions({color: STATE.regionActiveColour})
+    // Hide context menu
+    DOM.contextMenu.classList.add("d-none");
+    setActiveRegion(r)
   });
 
   // Enable analyse selection when region created
   REGIONS.on("region-created", function (r) {
-    const activeStart = region ? region.start : null
-    if (r.start === activeStart) {
-        r.setOptions({color: STATE.regionActiveColour})
-    }
-    enableMenuItem(["export-audio"]);
-    if (modelReady && !PREDICTING) {
-      enableMenuItem(["analyseSelection"]);
-    }
+    const {start, content} = r;
+    const activeStart = activeRegion ? activeRegion.start : null;
+    // If a new region is created without a label, it must be user generated
+    if (!content || start === activeStart) setActiveRegion(r);
   });
+
   // Clear label on modifying region
   REGIONS.on("region-update", function (r) {
-    region = r;
-    region.content && (region.content.innerText = "");
+    r.setOptions({content: ""});
+    setActiveRegion(r)
   });
+
   return REGIONS;
 }
 
@@ -3074,10 +3078,11 @@ function specTooltip(event, show = !config.specLabels, region) {
     // Update the tooltip content
     const tooltip = DOM.tooltip;
     tooltip.textContent = `${i18n.frequency}: ${yPosition}Hz`;
-    if (region) {
+    if (activeRegion) {
+        const {start, end} = activeRegion;
       const lineBreak = document.createElement("br");
       const textNode = document.createTextNode(
-        formatRegionTooltip(i18n.length, region.start, region.end)
+        formatRegionTooltip(i18n.length, start, end)
       );
 
       tooltip.appendChild(lineBreak); // Add the line break
@@ -3241,17 +3246,18 @@ function centreSpec() {
     currentFileDuration - windowLength
   );
   // Move the region if needed
-  let region = getRegion();
-  if (region) {
+//   let region = getRegion();
+  if (activeRegion) {
     const shift = saveBufferBegin - windowOffsetSecs;
-    region.start += shift;
-    region.end += shift;
-    if (region.start < 0 || region.end > windowLength) region = undefined;
+    activeRegion.start += shift;
+    activeRegion.end += shift;
+    const {start, end} = activeRegion;
+    if (start < 0 || end > windowLength) activeRegion = null;
   }
   postBufferUpdate({
     begin: windowOffsetSecs,
     position: 0.5,
-    region: region,
+    region: activeRegion,
     goToRegion: false,
   });
 }
@@ -3290,7 +3296,7 @@ const GLOBAL_ACTIONS = {
     if (e.ctrlKey || e.metaKey) await showOpenDialog("openFile");
   },
   p: function () {
-    typeof region !== "undefined"
+    typeof activeRegion !== "undefined"
       ? playRegion()
       : console.log("Region undefined");
   },
@@ -3496,13 +3502,7 @@ const GLOBAL_ACTIONS = {
 
 //returns a region object with the start and end of the region supplied
 function getRegion() {
-  return region
-    ? {
-        start: region.start,
-        end: region.end,
-        label: region.content?.innerText || "",
-      }
-    : undefined;
+  return activeRegion || undefined;
 }
 
 function disableSettingsDuringAnalysis(bool) {
@@ -3538,15 +3538,15 @@ const postBufferUpdate = ({
     end: begin + windowLength,
     play: play,
     resetSpec: resetSpec,
-    region: region,
-    goToRegion: goToRegion
+    region: activeRegion,
+    goToRegion: goToRegion,
   });
   // In case it takes a while:
   loadingTimeout = setTimeout(() => {
-      DOM.loading.querySelector("#loadingText").textContent = "Loading file...";
-      DOM.loading.classList.remove("d-none");
-    }, 500);
-  }
+    DOM.loading.querySelector("#loadingText").textContent = "Loading file...";
+    DOM.loading.classList.remove("d-none");
+  }, 500);
+};
 
 // Go to position
 const goto = new bootstrap.Modal(document.getElementById("gotoModal"));
@@ -3624,7 +3624,7 @@ function onModelReady(args) {
     if (STATE.openFiles.length > 1)
       enableMenuItem(["analyseAll", "reanalyseAll"]);
   }
-  if (region) enableMenuItem(["analyseSelection"]);
+  if (activeRegion) enableMenuItem(["analyseSelection"]);
   t1_warmup = Date.now();
   DIAGNOSTICS["Warm Up"] =
     ((t1_warmup - t0_warmup) / 1000).toFixed(2) + " seconds";
@@ -4126,9 +4126,8 @@ async function renderResult({
     }
     showElement(["resultTableContainer", "resultsHead"], false);
     // If  we have some results, let's update the view in case any are in the window
-    config.specDetections &&
-      !isFromDB &&
-      postBufferUpdate({ file, begin: windowOffsetSecs });
+    if (config.specDetections && !isFromDB && !STATE.selection)
+        postBufferUpdate({ file, begin: windowOffsetSecs });
   } else if (!isFromDB && index % (config.limit + 1) === 0) {
     addPagination(index, 0);
   }
@@ -4342,9 +4341,9 @@ function sendFile(mode, result) {
     const datetime = dateArray.slice(0, 5).join(" ");
     filename = `${result.cname}_${datetime}.${config.audio.format}`;
   } else if (start === undefined) {
-    if (region.start) {
-      start = region.start + windowOffsetSecs;
-      end = region.end + windowOffsetSecs;
+    if (activeRegion.start) {
+      start = activeRegion.start + windowOffsetSecs;
+      end = activeRegion.end + windowOffsetSecs;
     } else {
       start = 0;
       end = currentBuffer.duration;
@@ -4424,7 +4423,7 @@ const iconizeScore = (score) => {
 
 const exportAudio = () => {
   let result;
-  if (region.content?.innerText) {
+  if (activeRegion.label) {
     setClickedIndex(activeRow);
     result = predictions[clickedIndex];
   }
@@ -5429,10 +5428,14 @@ DOM.gain.addEventListener("input", () => {
 function playRegion() {
   // Sanitise region (after zoom, start or end may be outside the windowlength)
   // I don't want to change the actual region length, so make a copy
+  const region = REGIONS.regions.find(region => region.start === activeRegion.start)
   const myRegion = region;
   myRegion.start = Math.max(0, myRegion.start);
   // Have to adjust the windowlength so the finish event isn't fired - causing a page reload)
   myRegion.end = Math.min(myRegion.end, windowLength * 0.995);
+  /* ISSUE if you pause at the end of a region, 
+    when 2 regions abut, the second region won't play*/
+//   REGIONS.once('region-out', () => wavesurfer.pause())
   myRegion.play();
 }
 // Audio preferences:
@@ -6204,10 +6207,14 @@ document.addEventListener("change", function (e) {
         }
         break;
       }
-      case 'spec-detections': {
+      case "spec-detections": {
         config.specDetections = element.checked;
-        worker.postMessage({action: 'update-state', specDetections: config.specDetections});
-        break }
+        worker.postMessage({
+          action: "update-state",
+          specDetections: config.specDetections,
+        });
+        break;
+      }
       case "fromInput":
       case "fromSlider": {
         config.audio.minFrequency = Math.max(element.valueAsNumber, 0);
@@ -6392,8 +6399,17 @@ function getI18n(context) {
   return context[locale] || context["en"];
 }
 
+// Because a right-click only fires the 'contextmenu' event, not the region clicked event
+function checkForRegion(e){
+    const relativePosition = e.clientX / e.currentTarget.clientWidth;
+    const time = relativePosition * windowLength;
+    const region = REGIONS.regions.find(r => r.start < time && r.end > time);
+    region && setActiveRegion(region)
+}
+
 async function createContextMenu(e) {
-  e.stopPropagation();
+    e.stopPropagation();
+    this.closest('#spectrogramWrapper') && checkForRegion(e);
   const i18n = getI18n(i18nContext);
   const target = e.target;
   if (target.classList.contains("circle") || target.closest("thead")) return;
@@ -6421,9 +6437,9 @@ async function createContextMenu(e) {
       await waitFor(() => fileLoaded);
     }
   }
-  if (region === undefined && !inSummary) return;
+  if (!activeRegion && !inSummary) return;
   const createOrEdit =
-    region?.content?.innerText || target.closest("#summary")
+    activeRegion.label || target.closest("#summary")
       ? i18n.edit
       : i18n.create;
 
@@ -6479,7 +6495,7 @@ async function createContextMenu(e) {
         }
       });
   }
-  if (inSummary || region?.content?.innerText || hideInSummary) {
+  if (inSummary || activeRegion.label || hideInSummary) {
   } else {
     const xc = document.getElementById("context-xc");
     xc.classList.add("d-none");
@@ -6528,7 +6544,7 @@ async function showRecordEntryForm(mode, batch) {
   const cname = batch
     ? document.querySelector("#speciesFilter .text-warning .cname .cname")
         .textContent
-    : region.content?.innerText.replace("?", "");
+    : activeRegion.label.replace("?", "");
   let callCount = "",
     typeIndex = "",
     commentText = "";
@@ -6578,9 +6594,10 @@ recordEntryForm.addEventListener("submit", function (e) {
   const batch = document.getElementById("batch-mode").value === "true";
   const cname = document.getElementById("bird-list-all").value;
   let start, end;
-  if (region) {
-    start = windowOffsetSecs + region.start;
-    end = windowOffsetSecs + region.end;
+  if (activeRegion) {
+    start = windowOffsetSecs + activeRegion.start;
+    end = windowOffsetSecs + activeRegion.end;
+    const region = REGIONS.regions.find(region => region.start === activeRegion.start)
     region.setOptions({ content: cname });
   }
   const originalCname = document.getElementById("original-id").value;
