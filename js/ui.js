@@ -2462,7 +2462,7 @@ const setUpWorkerMessaging = () => {
           break;
         }
         case "window-detections": {
-          showWindwoDetections(args.detections, args.queued);
+          showWindowDetections(args.detections);
           break;
         }
         case "worker-loaded-audio": {
@@ -2480,6 +2480,17 @@ const setUpWorkerMessaging = () => {
     });
   });
 };
+
+function showWindowDetections(detectionList){
+    detectionList.forEach(detection =>{
+        const start = detection.start - windowOffsetSecs;
+        if (start < windowLength && start !== region?.start) {
+            const end = detection.end - windowOffsetSecs;
+            const colour =  "rgba(255, 255, 255, 0.1)"
+            createRegion(start, end, detection.label, false, colour)
+        }
+    })
+}
 
 function generateBirdList(store, rows) {
   const chart = document.getElementById("chart-list");
