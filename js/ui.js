@@ -524,6 +524,7 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
   wavesurfer.on("interaction", (currenttime) => {
     regions.clearRegions();
     region = null;
+    disableMenuItem(['analyseSelection'])
   });
   // Queue up next audio window while playing
 //   wavesurfer.on("decode", function () {
@@ -3219,7 +3220,7 @@ function centreSpec() {
     const shift = saveBufferBegin - windowOffsetSecs;
     region.start += shift;
     region.end += shift;
-    if (region.start < 0 || region.end > windowLength) region = undefined;
+    if (region.start < 0 || region.end > windowLength) region = null;
   }
   postBufferUpdate({
     begin: windowOffsetSecs,
