@@ -1624,10 +1624,8 @@ function createRegion(start, end, label, goToRegion) {
   //     region.content.style.writingMode = 'vertical-rl';
   // }
 
-  if (goToRegion) {
-    const progress = start / wavesurfer.getDuration();
-    wavesurfer.seekTo(progress);
-  }
+  if (goToRegion) wavesurfer.setTime(start);
+
 }
 
 // We add the handler to the whole table as the body gets replaced and the handlers on it would be wiped
