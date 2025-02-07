@@ -1456,7 +1456,6 @@ async function loadAudioFile({
   position = 0,
   region = false,
   play = false,
-  queued = false,
   goToRegion = true,
 }) {
   return new Promise((resolve, reject) => {
@@ -1476,7 +1475,6 @@ async function loadAudioFile({
               contents: audio,
               fileRegion: region,
               play: play,
-              queued: queued,
               goToRegion,
               metadata: METADATA[file].metadata,
             },
@@ -1484,7 +1482,7 @@ async function loadAudioFile({
           );
           let week;
 
-          STATE.specDetections && sendDetections(file, start, end, queued);
+          sendDetections(file, start, end);
 
           if (STATE.list === "location") {
             week = STATE.useWeek

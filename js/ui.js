@@ -33,7 +33,7 @@ let LOCATIONS,
   loadingTimeout,
   LIST_MAP;
 
-let regions, spectrogram, timeline;
+let REGIONS, spectrogram, timeline;
 
 let LABELS = [],
   DELETE_HISTORY = [];
@@ -143,6 +143,8 @@ let STATE = {
   },
   IUCNcache: IUCNCache,
   translations: ["da", "de", "es", "fr", "ja", "nl", "pt", "ru", "sv", "zh"],
+  regionColour: "rgba(255, 255, 255, 0.1)",
+    regionActiveColour: "rgba(255, 255, 0, 0.1)"
 };
 
 // Batch size map for slider
@@ -425,12 +427,7 @@ function createTimeline() {
 
 const resetRegions = (e) => {
   if (e?.button === 2) return;
-  if (wavesurfer) regions.clearRegions();
-  region = undefined;
-  const orphanedRegions = document.querySelectorAll("wave>region");
-  // Sometimes, there is a region that is not attached the the wavesurfer regions list
-  orphanedRegions?.length &&
-    orphanedRegions.forEach((region) => region.remove());
+  if (wavesurfer) REGIONS.clearRegions();
   disableMenuItem(["analyseSelection", "export-audio"]);
   if (fileLoaded) enableMenuItem(["analyse"]);
 };
@@ -502,45 +499,24 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
     cursorColor: wsTextColour(),
     cursorWidth: 2,
     height: "auto",
-    plugins: [regions, spectrogram, timeline],
+    plugins: [REGIONS, spectrogram, timeline],
   });
-  wavesurfer.bufferRequested = false;
 
   if (audio) {
     loadBuffer(audio);
   }
   DOM.colourmap.value = config.colormap;
-  // Set click event that removes all regions
+  // Set click event that removes all REGIONS
 
-  regions.enableDragSelection({
-    color: "rgba(255, 255, 0, 0.1)",
+  REGIONS.enableDragSelection({
+    color: STATE.regionActiveColour,
   });
 
   wavesurfer.on("interaction", (currenttime) => {
-    regions.clearRegions();
+    REGIONS.clearRegions();
     region = null;
   });
-  // Queue up next audio window while playing
-  //   wavesurfer.on("decode", function () {
-  //     // Ensure the audio file is loaded before proceeding
-  //     try {
-  //         if (
-  //           !wavesurfer.bufferRequested &&
-  //           currentFileDuration > windowOffsetSecs + windowLength
-  //         ) {
-  //           const begin = windowOffsetSecs + windowLength;
-  //           postBufferUpdate({ begin: begin, play: false, queued: true });
-  //           wavesurfer.bufferRequested = true;
-  //         }
-  //     } catch (e) {
-  //       const errorKey = e.message || e.toString();
-  //       if (!loggedErrors.has(errorKey)) {
-  //         // lets find out if it's because wavesurfer isn't ready
-  //         console.warn("onDecodeError", e);
-  //         loggedErrors.add(errorKey);
-  //       }
-  //     }
-  //   });
+
   wavesurfer.on("finish", function () {
     const bufferEnd = windowOffsetSecs + windowLength;
     if (currentFileDuration > bufferEnd) {
@@ -637,7 +613,6 @@ function zoomSpec(direction) {
     // Keep playhead at same time in file
     position = (timeNow - windowOffsetSecs) / windowLength;
     // adjust region start time to new window start time
-    let region = getRegion();
     if (region) {
       const duration = region.end - region.start;
       region.start = oldBufferBegin + region.start - windowOffsetSecs;
@@ -646,7 +621,7 @@ function zoomSpec(direction) {
     postBufferUpdate({
       begin: windowOffsetSecs,
       position: position,
-      region: region,
+    //   region: region,
       goToRegion: false,
       play: wavesurfer.isPlaying(),
     });
@@ -1608,17 +1583,18 @@ const checkWidth = (text) => {
   return textWidth + 5;
 };
 
+
+
 function createRegion(start, end, label, goToRegion, colour) {
   colour || wavesurfer.pause(); // colour param only defined when additional detections are loaded
-  wavesurfer.pause();
-  regions.addRegion({
+  REGIONS.addRegion({
     start: start,
     end: end,
-    color: "rgba(255, 255, 255, 0.1)",
+    color: colour || STATE.regionColour,
     content: label || "",
   });
-  // const regionsPlugin = wavesurfer.plugins.find(plugin => plugin.regions);
-  // const region = regionsPlugin.regions[0]
+  // const regionsPlugin = wavesurfer.plugins.find(plugin => plugin.REGIONS);
+  // const region = regionsPlugin.REGIONS[0]
   // const text = region.content.innerText;
   // if (region.content.clientWidth <= checkWidth(text)) {
   //     region.content.style.writingMode = 'vertical-rl';
@@ -1681,7 +1657,7 @@ const loadResultRegion = ({
   // ensure region doesn't spread across the whole window
   if (windowLength <= 3.5) windowLength = 6;
   windowOffsetSecs = Math.max(0, start - windowLength / 2 + 1.5);
-  const region = {
+  region = {
     start: Math.max(start - windowOffsetSecs, 0),
     end: end - windowOffsetSecs,
     label: label,
@@ -2482,14 +2458,17 @@ const setUpWorkerMessaging = () => {
 };
 
 function showWindowDetections(detectionList){
-    detectionList.forEach(detection =>{
+    for(const detection of detectionList){
         const start = detection.start - windowOffsetSecs;
-        if (start < windowLength && start !== region?.start) {
+        if (start < windowLength) {
             const end = detection.end - windowOffsetSecs;
-            const colour =  "rgba(255, 255, 255, 0.1)"
-            createRegion(start, end, detection.label, false, colour)
+            const active = start === region?.start
+            const colour = active ? STATE.regionActiveColour : null;
+            let gotoRegion = active;
+            if (!config.specDetections && !active) continue
+            createRegion(start, end, detection.label, gotoRegion, colour)
         }
-    })
+    }
 }
 
 function generateBirdList(store, rows) {
@@ -3004,31 +2983,41 @@ function handleKeyDown(e) {
 ///////////// Nav bar Option handlers //////////////
 
 function initRegion() {
-  if (regions) regions.destroy();
-  regions = RegionsPlugin.create({
+  if (REGIONS) REGIONS.destroy();
+  REGIONS = RegionsPlugin.create({
     drag: true,
     maxRegions: 100,
-    color: "rgba(255, 255, 255, 0.1)",
+    color: STATE.regionColour,
   });
 
-  regions.on("region-clicked", function (_region, e) {
+  REGIONS.on("region-clicked", function (r, e) {
+    // Clear active regions
+    REGIONS.regions.forEach(r => r.setOptions({color: STATE.regionColour}))
     // Prevent region being cleared
     e.stopPropagation();
-  });
-  // Enable analyse selection when region created
-  regions.on("region-created", function (r) {
+    // Set the playhead to the start of the region
+    wavesurfer.setTime(r.start)
     region = r;
+    region.setOptions({color: STATE.regionActiveColour})
+  });
+
+  // Enable analyse selection when region created
+  REGIONS.on("region-created", function (r) {
+    const activeStart = region ? region.start : null
+    if (r.start === activeStart) {
+        r.setOptions({color: STATE.regionActiveColour})
+    }
     enableMenuItem(["export-audio"]);
     if (modelReady && !PREDICTING) {
       enableMenuItem(["analyseSelection"]);
     }
   });
   // Clear label on modifying region
-  regions.on("region-update", function (r) {
+  REGIONS.on("region-update", function (r) {
     region = r;
     region.content && (region.content.innerText = "");
   });
-  return regions;
+  return REGIONS;
 }
 
 function initSpectrogram(height, fftSamples) {
@@ -3539,7 +3528,6 @@ const postBufferUpdate = ({
   resetSpec = false,
   region = undefined,
   goToRegion = true,
-  queued = false,
 }) => {
   fileLoaded = false;
   worker.postMessage({
@@ -3551,17 +3539,14 @@ const postBufferUpdate = ({
     play: play,
     resetSpec: resetSpec,
     region: region,
-    goToRegion: goToRegion,
-    queued: queued,
+    goToRegion: goToRegion
   });
   // In case it takes a while:
-  if (!queued) {
-    loadingTimeout = setTimeout(() => {
+  loadingTimeout = setTimeout(() => {
       DOM.loading.querySelector("#loadingText").textContent = "Loading file...";
       DOM.loading.classList.remove("d-none");
     }, 500);
   }
-};
 
 // Go to position
 const goto = new bootstrap.Modal(document.getElementById("gotoModal"));
@@ -3658,7 +3643,7 @@ function onModelReady(args) {
  * @param play whether to auto-play the audio
  * @returns {Promise<void>}
  */
-let NEXT_BUFFER;
+
 async function onWorkerLoadedAudio({
   location,
   fileStart = 0,
@@ -3667,10 +3652,8 @@ async function onWorkerLoadedAudio({
   file = "",
   position = 0,
   contents = undefined,
-  fileRegion = undefined,
   play = false,
   queued = false,
-  goToRegion = true,
   metadata = undefined,
 }) {
   (fileLoaded = true), clearTimeout(loadingTimeout);
@@ -3689,7 +3672,6 @@ async function onWorkerLoadedAudio({
   STATE.fileStart = fileStart;
   locationID = location;
   windowOffsetSecs = windowBegin;
-  NEXT_BUFFER = undefined;
   if (STATE.currentFile !== file) {
     STATE.currentFile = file;
     fileEnd = new Date(fileStart + currentFileDuration * 1000);
@@ -3704,31 +3686,17 @@ async function onWorkerLoadedAudio({
 
   if (windowLength > currentFileDuration) windowLength = currentFileDuration;
 
-  updateSpec({
+  resetRegions();
+  await updateSpec({
     buffer: currentBuffer,
     position: position,
     play: play,
     resetSpec: resetSpec,
   });
-  resetRegions();
-  wavesurfer.bufferRequested = false;
   if (modelReady) {
     enableMenuItem(["analyse"]);
     if (STATE.openFiles.length > 1) enableMenuItem(["analyseAll"]);
   }
-  if (fileRegion) {
-    createRegion(
-      fileRegion.start,
-      fileRegion.end,
-      fileRegion.label,
-      goToRegion
-    );
-    if (fileRegion.play) {
-      region.play();
-    }
-  }
-  fileLoaded = true;
-  //if (activeRow) activeRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 const i18nFile = {
@@ -4160,7 +4128,7 @@ async function renderResult({
     // If  we have some results, let's update the view in case any are in the window
     config.specDetections &&
       !isFromDB &&
-      postBufferUpdate({ file, begin: bufferBegin });
+      postBufferUpdate({ file, begin: windowOffsetSecs });
   } else if (!isFromDB && index % (config.limit + 1) === 0) {
     addPagination(index, 0);
   }
@@ -6236,6 +6204,10 @@ document.addEventListener("change", function (e) {
         }
         break;
       }
+      case 'spec-detections': {
+        config.specDetections = element.checked;
+        worker.postMessage({action: 'update-state', specDetections: config.specDetections});
+        break }
       case "fromInput":
       case "fromSlider": {
         config.audio.minFrequency = Math.max(element.valueAsNumber, 0);
