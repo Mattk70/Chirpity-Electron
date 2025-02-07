@@ -1483,6 +1483,9 @@ async function loadAudioFile({
             [audio.buffer]
           );
           let week;
+
+          STATE.specDetections && sendDetections(file, start, end, queued);
+
           if (STATE.list === "location") {
             week = STATE.useWeek
               ? new Date(METADATA[file].fileStart).getWeekNumber()
