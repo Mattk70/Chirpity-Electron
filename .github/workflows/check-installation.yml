@@ -1,6 +1,9 @@
 name: Test Chirpity Compilation
 run-name: ${{ github.actor }} is building chirpity
-on: [push,  workflow_dispatch]
+on:
+  push:
+    branches:
+        - 'master'
 jobs:
   Build-Chirpity:
     runs-on: ${{ matrix.os }}

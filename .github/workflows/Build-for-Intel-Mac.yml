@@ -1,9 +1,8 @@
 name: Build Intel Mac version 
 run-name: ${{ github.actor }} is building Chirpity for Intel Mac
 on: 
-    push:
-        branches:
-            - 'master'
+  - push
+
 jobs:
   Build-Chirpity:
     runs-on: macos-13
