@@ -1611,7 +1611,6 @@ const checkWidth = (text) => {
 function createRegion(start, end, label, goToRegion, colour) {
   colour || wavesurfer.pause(); // colour param only defined when additional detections are loaded
   wavesurfer.pause();
-  resetRegions();
   regions.addRegion({
     start: start,
     end: end,
