@@ -1608,7 +1608,8 @@ const checkWidth = (text) => {
   return textWidth + 5;
 };
 
-function createRegion(start, end, label, goToRegion) {
+function createRegion(start, end, label, goToRegion, colour) {
+  colour || wavesurfer.pause(); // colour param only defined when additional detections are loaded
   wavesurfer.pause();
   resetRegions();
   regions.addRegion({
@@ -1627,6 +1628,7 @@ function createRegion(start, end, label, goToRegion) {
   if (goToRegion) wavesurfer.setTime(start);
 
 }
+
 
 // We add the handler to the whole table as the body gets replaced and the handlers on it would be wiped
 const results = document.getElementById("results");
