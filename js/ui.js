@@ -2328,6 +2328,7 @@ const setUpWorkerMessaging = () => {
           const mode = args.mode;
           STATE.mode = mode;
           renderFilenamePanel();
+          adjustSpecDims()
           switch (mode) {
             case "analyse": {
               STATE.diskHasRecords &&
