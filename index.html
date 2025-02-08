@@ -1006,6 +1006,7 @@
                             </div>
                         </div>
                     </fieldset>
+                    <fieldset class="border border-secondary rounded m-2 p-2 d-none" id="window-fieldset"></fieldset>
                     <div class="pe-3 input-group rounded p-2 mb-1">
                         <label for="window-function" class="input-group-text col-5">Window function:</label>
                         <select class="form-select mb-0" id="window-function">
@@ -1021,6 +1022,16 @@
                             <option value="triangular">Triangular</option>
                         </select>
                     </div>
+                    <label for="alpha-slider" class="form-label">
+                        Gauss Alpha:
+                    </label>
+                    <div class="input-group">
+                        <input type="range" class="form-control-range w-75" min="0" max="1" step="0.01" id="alpha-slider">
+                        <div class="input-group-append">
+                            <span class="input-group-text" id="alpha">0.5</span>
+                        </div>
+                    </div>
+                    </fieldset>
                     <div class="pe-3 input-group rounded p-2 mb-1">
                         <label for="timelineSetting" class="input-group-text col-5">Timeline:</label>
                         <select class="form-select mb-0" id="timelineSetting">

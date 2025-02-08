@@ -388,6 +388,10 @@ function loadAudioFileSync({ filePath = "", preserveResults = false }) {
   });
 }
 
+
+// https://developer.chrome.com/blog/play-request-was-interrupted
+let playPromise;
+
 async function updateSpec({
   buffer,
   play = false,
@@ -401,7 +405,8 @@ async function updateSpec({
   }
   refreshTimeline();
   wavesurfer.seekTo(position);
-  play ? wavesurfer.play() : wavesurfer.pause();
+  if (play) playPromise =  wavesurfer.play() 
+    else  wavesurfer.pause();
 }
 
 function createTimeline() {
@@ -428,14 +433,14 @@ function createTimeline() {
 const resetRegions = (e) => {
   if (e?.button === 2) return;
   if (wavesurfer) REGIONS.clearRegions();
+  STATE.selection = false;
+  worker.postMessage({ action: "update-state", selection: false });
   disableMenuItem(["analyseSelection", "export-audio"]);
   if (fileLoaded) enableMenuItem(["analyse"]);
 };
 
 function clearActive() {
   resetRegions();
-  STATE.selection = false;
-  worker.postMessage({ action: "update-state", selection: false });
   activeRow?.classList.remove("table-active");
   activeRow = undefined;
 }
@@ -513,7 +518,7 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
   });
 
   wavesurfer.on("dblclick", (currentTime) => {
-    if (REGIONS.regions.length) REGIONS.clearRegions();
+    if (REGIONS.regions.length) resetRegions();
     else centreSpec();
     activeRegion = null;
   });
@@ -563,6 +568,7 @@ function increaseFFT() {
       play: wavesurfer.isPlaying(),
     });
     console.log(spectrogram.fftSamples);
+    config.FFT = spectrogram.fftSamples
   }
 }
 
@@ -578,6 +584,7 @@ function reduceFFT() {
       play: wavesurfer.isPlaying(),
     });
     console.log(spectrogram.fftSamples);
+    config.FFT = spectrogram.fftSamples
   }
 }
 
@@ -1585,10 +1592,9 @@ const checkWidth = (text) => {
 };
 
 function createRegion(start, end, label, goToRegion, colour) {
-  colour || wavesurfer.pause(); // colour param only defined when additional detections are loaded
   REGIONS.addRegion({
     start: start,
-    end: end,
+    end: Math.min(end, windowLength *0.99),
     color: colour || STATE.regionColour,
     content: label || "",
   });
@@ -1609,6 +1615,7 @@ const selectionTable = document.getElementById("selectionResultTableBody");
 selectionTable.addEventListener("click", resultClick);
 
 async function resultClick(e) {
+    
   let row = e.target.closest("tr");
   if (!row || row.classList.length === 0) {
     // 1. clicked and dragged, 2 no detections in file row
@@ -1639,6 +1646,25 @@ async function resultClick(e) {
   }
 }
 
+function setActiveRow(start) {
+    const rows = DOM.resultTable.querySelectorAll('tr');
+    for (const r of rows) {
+        const [_file, rowStart, _end, _, _label] = r.getAttribute("name").split("|");
+
+        if (Number(rowStart) === start) {
+            // Clear the active row if there's one
+            if (activeRow && activeRow !== r) {
+                activeRow.classList.remove('table-active');
+            }
+            // Add the 'table-active' class to the target row
+            r.classList.add('table-active');
+            activeRow = r;  // Update the active row reference
+            
+            activeRow.scrollIntoView({ behavior: "smooth", block: "center" });
+            break;  // Exit loop once the target row is found
+        }
+    }
+}
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
@@ -2992,6 +3018,7 @@ function setActiveRegion(region) {
   if (modelReady && !PREDICTING) {
     enableMenuItem(["analyseSelection"]);
   }
+  setActiveRow(start + windowOffsetSecs)
 }
 
 function initRegion() {
@@ -3003,8 +3030,6 @@ function initRegion() {
   });
 
   REGIONS.on("region-clicked", function (r, e) {
-    // Prevent region being cleared
-    e.stopPropagation();
     // Hide context menu
     DOM.contextMenu.classList.add("d-none");
     setActiveRegion(r);
@@ -3028,6 +3053,7 @@ function initRegion() {
 }
 
 function initSpectrogram(height, fftSamples) {
+    fftSamples ??= config.FFT;
   config.debug && console.log("initializing spectrogram");
   spectrogram && spectrogram.destroy() && WSPluginPurge();
   if (!fftSamples) {
@@ -3058,6 +3084,7 @@ function initSpectrogram(height, fftSamples) {
     fftSamples: fftSamples,
     scale: "linear",
     colorMap: colors,
+    alpha: config.alpha
   });
 }
 
@@ -3066,7 +3093,7 @@ function hideTooltip() {
 }
 
 function specTooltip(event, showHz = !config.specLabels) {
-  if (config.showTooltip) {
+  if (true || config.showTooltip) {
     const i18n = getI18n(i18nContext);
     const waveElement = event.target;
     // Update the tooltip content
@@ -3476,7 +3503,7 @@ const GLOBAL_ACTIONS = {
     increaseFFT();
   },
   " ": function () {
-    wavesurfer && wavesurfer.playPause();
+    wavesurfer && (async () => await wavesurfer.playPause())();
   },
   Tab: function (e) {
     if ((e.metaKey || e.ctrlKey) && !PREDICTING) {
@@ -5357,6 +5384,13 @@ colorMapSlider.addEventListener("input", () => {
   colorMapThreshold.textContent = colorMapSlider.value;
 });
 
+// Gauss Alpha
+const alphaValue = document.getElementById("alpha");
+const alphaSlider = document.getElementById("alpha-slider");
+alphaSlider.addEventListener("input", () => {
+  alphaValue.textContent = alphaSlider.value;
+});
+
 const handleHPchange = () => {
   config.filters.highPassFrequency = HPSlider.valueAsNumber;
   config.filters.active || toggleFilters();
@@ -5858,16 +5892,16 @@ document.addEventListener("click", function (e) {
     }
     case "cmpZoomIn":
     case "cmpZoomOut": {
-      let minPxPerSec = ws.params.minPxPerSec;
+      let minPxPerSec = ws.options.minPxPerSec;
       minPxPerSec =
         target === "cmpZoomOut"
           ? Math.max((minPxPerSec /= 2), 195)
           : Math.min((minPxPerSec *= 2), 780);
       ws.zoom(minPxPerSec);
-      ws.spectrogram.init();
-      document.querySelector(
-        "#recordings .tab-pane.active .carousel-item.active spectrogram > canvas"
-      ).width = `${ws.drawer.width / ws.params.pixelRatio}px`;
+      //ws.spectrogram.init();
+    //   document.querySelector(
+    //     "#recordings .tab-pane.active .carousel-item.active spectrogram > canvas"
+    //   ).width = `${ws.drawer.width / ws.options.pixelRatio}px`;
       break;
     }
     case "clear-call-cache": {
@@ -6158,11 +6192,14 @@ document.addEventListener("change", function (e) {
         break;
       }
       case "window-function":
+      case "alpha-slider":
       case "loud-color":
       case "mid-color":
       case "quiet-color":
       case "color-threshold-slider": {
         const windowFn = document.getElementById("window-function").value;
+        const alpha = document.getElementById("alpha-slider").valueAsNumber;
+        config.alpha = alpha;
         const loud = document.getElementById("loud-color").value;
         const mid = document.getElementById("mid-color").value;
         const quiet = document.getElementById("quiet-color").value;
@@ -7306,13 +7343,11 @@ function showCompareSpec() {
   // Create an instance of WaveSurfer
   const audioCtx = new AudioContext({
     latencyHint: "interactive",
-    sampleRate: sampleRate,
+    // sampleRate: 44100,
   });
   // Setup waveform and spec views
   ws = WaveSurfer.create({
     container: mediaContainer,
-    audioContext: audioCtx,
-    backend: "WebAudio",
     // make waveform transparent
     backgroundColor: "rgba(0,0,0,0)",
     waveColor: "rgba(109,41,164,0)",
@@ -7320,32 +7355,33 @@ function showCompareSpec() {
     // but keep the playhead
     cursorColor: "#fff",
     cursorWidth: 2,
-    partialRender: false,
-    scrollParent: true,
     fillParent: true,
-    responsive: false,
-    normalize: true,
-    height: 250,
+    height: 256,
     minPxPerSec: 195,
+    sampleRate: 24000
   });
   // set colormap
   const colors = createColormap();
-  ws.registerPlugin(
-    Spectrogram.create({
+  const compareSpec = Spectrogram.create({
       //deferInit: false,
       wavesurfer: ws,
       container: "#" + specContainer,
       windowFunc: "hann",
       frequencyMin: 0,
-      frequencyMax: 11_950,
+      frequencyMax: 12_000,
       hideScrollbar: false,
       labels: true,
+      fillParent: true,
       fftSamples: 512,
-      height: 250,
+      height: 256,
       colorMap: colors,
+      scale: 'linear'
     })
-  );
-
+  ws.registerPlugin(compareSpec);
+ws.on('zoom', (minPxPerSec) =>{
+    specContainer.width = `${ws.renderer.canvasWrapper.clientWidth}px`;
+        console.log('zooming', minPxPerSec)
+    })
   ws.on("ready", function () {
     mediaContainer.removeChild(loading);
   });
@@ -7461,7 +7497,7 @@ const IUCNMap = {
 export { config, displayLocationAddress, LOCATIONS, generateToast };
 
 function membershipCheck() {
-  config.newInstallDate = config.newInstallDate || Date.now();
+  config.newInstallDate ??= Date.now();
   const inTrial = Date.now() - config.newInstallDate < 172_800_000;
   const lockedElements = document.querySelectorAll(".locked, .unlocked");
   if (config.isMember || inTrial) {
