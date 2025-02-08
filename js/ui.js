@@ -145,6 +145,7 @@ let STATE = {
   translations: ["da", "de", "es", "fr", "ja", "nl", "pt", "ru", "sv", "zh"],
   regionColour: "rgba(255, 255, 255, 0.1)",
   regionActiveColour: "rgba(255, 255, 0, 0.1)",
+  regionsCompleted: true
 };
 
 // Batch size map for slider
@@ -1615,7 +1616,7 @@ const selectionTable = document.getElementById("selectionResultTableBody");
 selectionTable.addEventListener("click", resultClick);
 
 async function resultClick(e) {
-    
+   if  (! STATE.regionsCompleted) return
   let row = e.target.closest("tr");
   if (!row || row.classList.length === 0) {
     // 1. clicked and dragged, 2 no detections in file row
@@ -2493,6 +2494,8 @@ function showWindowDetections(detectionList) {
       createRegion(start, end, detection.label, gotoRegion, colour);
     }
   }
+  // Prevent region cluster fest
+  STATE.regionsCompleted = true;
 }
 
 function generateBirdList(store, rows) {
@@ -3414,10 +3417,11 @@ const GLOBAL_ACTIONS = {
     }
   },
   ArrowUp: function () {
-    if (activeRow) {
+    if (activeRow && STATE.regionsCompleted) {
       activeRow.classList.remove("table-active");
       activeRow = activeRow.previousSibling || activeRow;
       if (!activeRow.classList.contains("text-bg-dark")) activeRow.click();
+      STATE.regionsCompleted = false;
       activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   },
@@ -3449,10 +3453,11 @@ const GLOBAL_ACTIONS = {
     }
   },
   ArrowDown: function () {
-    if (activeRow) {
+    if (activeRow && STATE.regionsCompleted) {
       activeRow.classList.remove("table-active");
       activeRow = activeRow.nextSibling || activeRow;
       if (!activeRow.classList.contains("text-bg-dark")) activeRow.click();
+      STATE.regionsCompleted = false
       activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   },
@@ -3511,7 +3516,7 @@ const GLOBAL_ACTIONS = {
       const modeToSet =
         STATE.mode === "explore" ? "active-analysis" : "explore";
       document.getElementById(modeToSet).click();
-    } else if (activeRow) {
+    } else if (activeRow && STATE.regionsCompleted) {
       activeRow.classList.remove("table-active");
       if (e.shiftKey) {
         activeRow = activeRow.previousSibling || activeRow;
@@ -3520,7 +3525,10 @@ const GLOBAL_ACTIONS = {
         activeRow = activeRow.nextSibling || activeRow;
         activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
       }
-      if (!activeRow.classList.contains("text-bg-dark")) activeRow.click();
+      if (!activeRow.classList.contains("text-bg-dark")) {
+        activeRow.click();
+        STATE.regionsCompleted = false
+      }
     }
   },
   Delete: function () {
