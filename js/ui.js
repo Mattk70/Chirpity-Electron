@@ -512,8 +512,9 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
     color: STATE.regionActiveColour,
   });
 
-  wavesurfer.on("interaction", (currentTime) => {
-    REGIONS.clearRegions();
+  wavesurfer.on("dblclick", (currentTime) => {
+    if (REGIONS.regions.length) REGIONS.clearRegions();
+    else centreSpec();
     activeRegion = null;
   });
 
@@ -542,12 +543,12 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
   wave.removeEventListener("mousedown", resetRegions);
   wave.removeEventListener("mousemove", specTooltip);
   wave.removeEventListener("mouseout", hideTooltip);
-  wave.removeEventListener("dblclick", centreSpec);
+
 
   wave.addEventListener("mousemove", specTooltip, { passive: true });
   wave.addEventListener("mousedown", resetRegions);
   wave.addEventListener("mouseout", hideTooltip);
-  wave.addEventListener("dblclick", centreSpec);
+
 };
 
 function increaseFFT() {
@@ -6547,7 +6548,7 @@ async function showRecordEntryForm(mode, batch) {
   const cname = batch
     ? document.querySelector("#speciesFilter .text-warning .cname .cname")
         .textContent
-    : activeRegion.label.replace("?", "");
+    : activeRegion.label?.replace("?", "");
   let callCount = "",
     typeIndex = "",
     commentText = "";
