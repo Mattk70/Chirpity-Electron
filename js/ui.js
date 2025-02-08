@@ -643,7 +643,7 @@ async function showOpenDialog(fileOrFolder) {
     } else {
       filterValidFiles({ filePaths: files.filePaths });
     }
-    localStorage.setItem("lastFolder", files.filePaths[0]);
+    localStorage.setItem("lastFolder", p.dirname(files.filePaths[0]));
   }
 }
 
@@ -1441,7 +1441,7 @@ async function exportData(format, species, limit, duration) {
       limit: limit,
       range: isExplore() ? STATE.explore.range : undefined,
     });
-    localStorage.setItem("lastFolder", directory);
+    localStorage.setItem("lastFolder", p.dirname(directory));
   }
 }
 
@@ -3135,7 +3135,7 @@ DOM.listIcon.addEventListener("click", () => {
 });
 
 DOM.customListSelector.addEventListener("click", async () => {
-  const defaultPath = localStorage.getItem("lastFolder");
+  const defaultPath = localStorage.getItem("customList");
   const files = await window.electron.openDialog("showOpenDialog", {
     type: "text",
     defaultPath,
@@ -3148,7 +3148,7 @@ DOM.customListSelector.addEventListener("click", async () => {
     readLabels(customListFile, "list");
     LIST_MAP = getI18n(i18nLIST_MAP);
     updatePrefs("config.json", config);
-    localStorage.setItem("lastFolder", customListFile);
+    localStorage.setItem("customList", customListFile);
   }
 });
 
