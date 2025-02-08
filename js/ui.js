@@ -615,7 +615,8 @@ function zoomSpec(direction) {
     // adjust region start time to new window start time
     if (activeRegion) {
       const duration = activeRegion.end - activeRegion.start;
-      activeRegion.start = oldBufferBegin + activeRegion.start - windowOffsetSecs;
+      activeRegion.start =
+        oldBufferBegin + activeRegion.start - windowOffsetSecs;
       activeRegion.end = activeRegion.start + duration;
     }
     postBufferUpdate({
@@ -1425,7 +1426,7 @@ const exportAudacity = () =>
 
 async function exportData(format, species, limit, duration) {
   const defaultPath = localStorage.getItem("lastFolder");
-  const response = await window.electron.selectDirectory({ path: defaultPath });
+  const response = await window.electron.selectDirectory(defaultPath);
   if (!response.canceled) {
     const directory = response.filePaths[0];
     worker.postMessage({
@@ -2977,18 +2978,18 @@ function handleKeyDown(e) {
 
 ///////////// Nav bar Option handlers //////////////
 
-function setActiveRegion(region){
-    const {start, end, content} = region;
-    // Clear active regions
-    REGIONS.regions.forEach((r) => r.setOptions({ color: STATE.regionColour }));
-    // Set the playhead to the start of the region
-    wavesurfer.setTime(start);
-    activeRegion = {start, end, label: content?.innerText};
-    region.setOptions({ color: STATE.regionActiveColour });
-    enableMenuItem(["export-audio"]);
-    if (modelReady && !PREDICTING) {
-      enableMenuItem(["analyseSelection"]);
-    }
+function setActiveRegion(region) {
+  const { start, end, content } = region;
+  // Clear active regions
+  REGIONS.regions.forEach((r) => r.setOptions({ color: STATE.regionColour }));
+  // Set the playhead to the start of the region
+  wavesurfer.setTime(start);
+  activeRegion = { start, end, label: content?.innerText };
+  region.setOptions({ color: STATE.regionActiveColour });
+  enableMenuItem(["export-audio"]);
+  if (modelReady && !PREDICTING) {
+    enableMenuItem(["analyseSelection"]);
+  }
 }
 
 function initRegion() {
@@ -3004,12 +3005,12 @@ function initRegion() {
     e.stopPropagation();
     // Hide context menu
     DOM.contextMenu.classList.add("d-none");
-    setActiveRegion(r)
+    setActiveRegion(r);
   });
 
   // Enable analyse selection when region created
   REGIONS.on("region-created", function (r) {
-    const {start, content} = r;
+    const { start, content } = r;
     const activeStart = activeRegion ? activeRegion.start : null;
     // If a new region is created without a label, it must be user generated
     if (!content || start === activeStart) setActiveRegion(r);
@@ -3017,8 +3018,8 @@ function initRegion() {
 
   // Clear label on modifying region
   REGIONS.on("region-update", function (r) {
-    r.setOptions({content: ""});
-    setActiveRegion(r)
+    r.setOptions({ content: "" });
+    setActiveRegion(r);
   });
 
   return REGIONS;
@@ -3062,41 +3063,42 @@ function hideTooltip() {
   DOM.tooltip.style.visibility = "hidden";
 }
 
-function specTooltip(event, show = !config.specLabels, region) {
-  if (show) {
+function specTooltip(event, showHz = !config.specLabels) {
+  if (config.showTooltip) {
     const i18n = getI18n(i18nContext);
     const waveElement = event.target;
-    const specDimensions = waveElement.getBoundingClientRect();
-    const frequencyRange =
-      Number(config.audio.maxFrequency) - Number(config.audio.minFrequency);
-    const yPosition =
-      Math.round(
-        (specDimensions.bottom - event.clientY) *
-          (frequencyRange / specDimensions.height)
-      ) + Number(config.audio.minFrequency);
-
     // Update the tooltip content
     const tooltip = DOM.tooltip;
-    tooltip.textContent = `${i18n.frequency}: ${yPosition}Hz`;
-    if (activeRegion) {
-        const {start, end} = activeRegion;
-      const lineBreak = document.createElement("br");
+    tooltip.style.display = "none";
+    tooltip.replaceChildren();
+    const inRegion = checkForRegion(event, false);
+    if (showHz || inRegion) {
+      const specDimensions = waveElement.getBoundingClientRect();
+      const frequencyRange =
+        Number(config.audio.maxFrequency) - Number(config.audio.minFrequency);
+      const yPosition =
+        Math.round(
+          (specDimensions.bottom - event.clientY) *
+            (frequencyRange / specDimensions.height)
+        ) + Number(config.audio.minFrequency);
+
+      tooltip.textContent = `${i18n.frequency}: ${yPosition}Hz`;
+      const { start, end } = activeRegion;
       const textNode = document.createTextNode(
         formatRegionTooltip(i18n.length, start, end)
       );
-
+      const lineBreak = document.createElement("br");
       tooltip.appendChild(lineBreak); // Add the line break
       tooltip.appendChild(textNode); // Add the text node
+      // Apply styles to the tooltip
+      Object.assign(tooltip.style, {
+        top: `${event.clientY}px`,
+        left: `${event.clientX + 15}px`,
+        display: "block",
+        visibility: "visible",
+        opacity: 1,
+      });
     }
-
-    // Apply styles to the tooltip
-    Object.assign(tooltip.style, {
-      top: `${event.clientY}px`,
-      left: `${event.clientX + 15}px`,
-      display: "block",
-      visibility: "visible",
-      opacity: 1,
-    });
   }
 }
 
@@ -3246,12 +3248,12 @@ function centreSpec() {
     currentFileDuration - windowLength
   );
   // Move the region if needed
-//   let region = getRegion();
+  //   let region = getRegion();
   if (activeRegion) {
     const shift = saveBufferBegin - windowOffsetSecs;
     activeRegion.start += shift;
     activeRegion.end += shift;
-    const {start, end} = activeRegion;
+    const { start, end } = activeRegion;
     if (start < 0 || end > windowLength) activeRegion = null;
   }
   postBufferUpdate({
@@ -4127,7 +4129,7 @@ async function renderResult({
     showElement(["resultTableContainer", "resultsHead"], false);
     // If  we have some results, let's update the view in case any are in the window
     if (config.specDetections && !isFromDB && !STATE.selection)
-        postBufferUpdate({ file, begin: windowOffsetSecs });
+      postBufferUpdate({ file, begin: windowOffsetSecs });
   } else if (!isFromDB && index % (config.limit + 1) === 0) {
     addPagination(index, 0);
   }
@@ -5428,14 +5430,16 @@ DOM.gain.addEventListener("input", () => {
 function playRegion() {
   // Sanitise region (after zoom, start or end may be outside the windowlength)
   // I don't want to change the actual region length, so make a copy
-  const region = REGIONS.regions.find(region => region.start === activeRegion.start)
+  const region = REGIONS.regions.find(
+    (region) => region.start === activeRegion.start
+  );
   const myRegion = region;
   myRegion.start = Math.max(0, myRegion.start);
   // Have to adjust the windowlength so the finish event isn't fired - causing a page reload)
   myRegion.end = Math.min(myRegion.end, windowLength * 0.995);
   /* ISSUE if you pause at the end of a region, 
     when 2 regions abut, the second region won't play*/
-//   REGIONS.once('region-out', () => wavesurfer.pause())
+  //   REGIONS.once('region-out', () => wavesurfer.pause())
   myRegion.play();
 }
 // Audio preferences:
@@ -5682,9 +5686,9 @@ document.addEventListener("click", function (e) {
 
     case "archive-location-select": {
       (async () => {
-        const files = await window.electron.selectDirectory({
-          path: config.archive.location,
-        });
+        const files = await window.electron.selectDirectory(
+            config.archive.location || ''
+        );
         if (!files.canceled) {
           const archiveFolder = files.filePaths[0];
           config.archive.location = archiveFolder;
@@ -6400,16 +6404,17 @@ function getI18n(context) {
 }
 
 // Because a right-click only fires the 'contextmenu' event, not the region clicked event
-function checkForRegion(e){
-    const relativePosition = e.clientX / e.currentTarget.clientWidth;
-    const time = relativePosition * windowLength;
-    const region = REGIONS.regions.find(r => r.start < time && r.end > time);
-    region && setActiveRegion(region)
+function checkForRegion(e, setActive) {
+  const relativePosition = e.clientX / e.currentTarget.clientWidth;
+  const time = relativePosition * windowLength;
+  const region = REGIONS.regions.find((r) => r.start < time && r.end > time);
+  region && setActive && setActiveRegion(region);
+  return region;
 }
 
 async function createContextMenu(e) {
-    e.stopPropagation();
-    this.closest('#spectrogramWrapper') && checkForRegion(e);
+  e.stopPropagation();
+  this.closest("#spectrogramWrapper") && checkForRegion(e, true);
   const i18n = getI18n(i18nContext);
   const target = e.target;
   if (target.classList.contains("circle") || target.closest("thead")) return;
@@ -6439,9 +6444,7 @@ async function createContextMenu(e) {
   }
   if (!activeRegion && !inSummary) return;
   const createOrEdit =
-    activeRegion.label || target.closest("#summary")
-      ? i18n.edit
-      : i18n.create;
+    activeRegion.label || target.closest("#summary") ? i18n.edit : i18n.create;
 
   DOM.contextMenu.innerHTML = `
     <div id="${inSummary ? "inSummary" : "inResults"}">
@@ -6597,7 +6600,9 @@ recordEntryForm.addEventListener("submit", function (e) {
   if (activeRegion) {
     start = windowOffsetSecs + activeRegion.start;
     end = windowOffsetSecs + activeRegion.end;
-    const region = REGIONS.regions.find(region => region.start === activeRegion.start)
+    const region = REGIONS.regions.find(
+      (region) => region.start === activeRegion.start
+    );
     region.setOptions({ content: cname });
   }
   const originalCname = document.getElementById("original-id").value;
