@@ -1594,7 +1594,7 @@ const checkWidth = (text) => {
 function createRegion(start, end, label, goToRegion, colour) {
   REGIONS.addRegion({
     start: start,
-    end: Math.min(end, windowLength *0.99),
+    end: end,
     color: colour || STATE.regionColour,
     content: label || "",
   });
