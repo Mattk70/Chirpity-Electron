@@ -484,7 +484,7 @@ async function loadBuffer(audio = currentBuffer) {
   await wavesurfer.loadBlob(blob, peaks, duration);
   STATE.blob = null;
 }
-
+const nullRender = (peaks, ctx) => {};
 const wsTextColour = () =>
   config.colormap === "custom" ? config.customColormap.loud : "#fff";
 
@@ -499,12 +499,13 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
     container: document.querySelector("#waveform"),
     // make waveform transparent
     backgroundColor: "rgba(0,0,0,0)",
-    waveColor: "rgba(109,41,164,0)",
-    progressColor: "rgba(109,41,16,0)",
+    waveColor: "rgba(0,0,0,0)",
+    progressColor: "rgba(0,0,0,0)",
     // but keep the playhead
     cursorColor: wsTextColour(),
     cursorWidth: 2,
     height: "auto",
+    renderFunction: nullRender, // no need to render a waveform
     plugins: [REGIONS, spectrogram, timeline],
   });
 
@@ -5903,13 +5904,9 @@ document.addEventListener("click", function (e) {
       let minPxPerSec = ws.options.minPxPerSec;
       minPxPerSec =
         target === "cmpZoomOut"
-          ? Math.max((minPxPerSec /= 2), 195)
+          ? Math.max((minPxPerSec /= 2), 10)
           : Math.min((minPxPerSec *= 2), 780);
       ws.zoom(minPxPerSec);
-      //ws.spectrogram.init();
-    //   document.querySelector(
-    //     "#recordings .tab-pane.active .carousel-item.active spectrogram > canvas"
-    //   ).width = `${ws.drawer.width / ws.options.pixelRatio}px`;
       break;
     }
     case "clear-call-cache": {
@@ -7271,6 +7268,12 @@ function renderComparisons(lists, cname) {
         );
         indicatorItem.setAttribute("data-bs-slide-to", `${i}`);
         carouselItem.classList.add("carousel-item");
+        // Need to have waveform and spec in the same container for zoom to work.
+        // This css caps the height, and only shows the spec, at the bottom
+        carouselItem.style.height = '256px';
+        carouselItem.style.display = 'flex';
+        carouselItem.style.flexDirection = 'column';
+        carouselItem.style.justifyContent = 'flex-end';
         i === 0 && carouselItem.classList.add("active");
         i === 0 && indicatorItem.classList.add("active");
         // create div for wavesurfer
@@ -7285,6 +7288,7 @@ function renderComparisons(lists, cname) {
         creditContainer.style.width = "100%";
         const creditText = document.createElement("div");
         creditText.style.zIndex = 5;
+        creditText.style.top = 0;
         creditText.classList.add(
           "float-end",
           "w-100",
@@ -7327,41 +7331,27 @@ function renderComparisons(lists, cname) {
   makeDraggable(header);
   callTypeHeader.addEventListener("click", showCompareSpec);
   const comparisonModal = new bootstrap.Modal(compareDiv);
-  compareDiv.addEventListener("hidden.bs.modal", () => compareDiv.remove());
+  compareDiv.addEventListener("hidden.bs.modal", () => {
+    ws && ws.destroy();
+    ws = null;
+    compareDiv.remove()
+});
   compareDiv.addEventListener("slid.bs.carousel", () => showCompareSpec());
   compareDiv.addEventListener("shown.bs.modal", () => showCompareSpec());
   comparisonModal.show();
 }
 
-let ws;
-
-function showCompareSpec() {
+let ws, compareSpec;
+const createCompareWS = (mediaContainer) => {
   if (ws) ws.destroy();
-  const activeCarouselItem = document.querySelector(
-    "#recordings .tab-pane.active .carousel-item.active"
-  );
-  const mediaContainer = activeCarouselItem.lastChild;
-  // need to prevent accumulation, and find event for show/hide loading
-  const loading = DOM.loading.cloneNode(true);
-  loading.classList.remove("d-none", "text-white");
-  loading.firstElementChild.textContent = "Loading audio from Xeno-Canto...";
-  mediaContainer.appendChild(loading);
-  //console.log("id is ", mediaContainer.id)
-  const [specContainer, file] = mediaContainer.getAttribute("name").split("|");
-  // Create an instance of WaveSurfer
-  const audioCtx = new AudioContext({
-    latencyHint: "interactive",
-    // sampleRate: 44100,
-  });
-  // Setup waveform and spec views
   ws = WaveSurfer.create({
     container: mediaContainer,
-    // make waveform transparent
     backgroundColor: "rgba(0,0,0,0)",
-    waveColor: "rgba(109,41,164,0)",
-    progressColor: "rgba(109,41,16,0)",
+    waveColor: "rgba(0,0,0,0)",
+    progressColor: "rgba(0,0,0,0)",
     // but keep the playhead
     cursorColor: "#fff",
+    hideScrollbar: true,
     cursorWidth: 2,
     fillParent: true,
     height: 256,
@@ -7370,27 +7360,43 @@ function showCompareSpec() {
   });
   // set colormap
   const colors = createColormap();
-  const compareSpec = Spectrogram.create({
+  const createCmpSpec = () => ws.registerPlugin(Spectrogram.create({
       //deferInit: false,
       wavesurfer: ws,
-      container: "#" + specContainer,
+      // container: "#" + specContainer,
       windowFunc: "hann",
       frequencyMin: 0,
       frequencyMax: 12_000,
-      hideScrollbar: false,
       labels: true,
-      fillParent: true,
-      fftSamples: 512,
+      fftSamples: 256,
       height: 256,
       colorMap: colors,
       scale: 'linear'
-    })
-  ws.registerPlugin(compareSpec);
-ws.on('zoom', (minPxPerSec) =>{
-    specContainer.width = `${ws.renderer.canvasWrapper.clientWidth}px`;
-        console.log('zooming', minPxPerSec)
-    })
-  ws.on("ready", function () {
+  }))
+  createCmpSpec()
+}
+
+function showCompareSpec() {
+
+  const activeCarouselItem = document.querySelector(
+    "#recordings .tab-pane.active .carousel-item.active"
+  );
+  // Hide all xc-links
+  document.querySelectorAll('.xc-link').forEach(link => link.classList.add('d-none'));
+  // Show the active one
+  const activeXCLink = activeCarouselItem.querySelector('.xc-link');
+  activeXCLink && activeXCLink.classList.remove('d-none');
+  
+  const mediaContainer = activeCarouselItem.lastChild;
+  // need to prevent accumulation, and find event for show/hide loading
+  const loading = DOM.loading.cloneNode(true);
+  loading.classList.remove("d-none", "text-white");
+  loading.firstElementChild.textContent = "Loading audio from Xeno-Canto...";
+  mediaContainer.appendChild(loading);
+  const [_, file] = mediaContainer.getAttribute("name").split("|");
+  // Create an instance of WaveSurfer
+  createCompareWS(mediaContainer)
+  ws.once("decode", function () {
     mediaContainer.removeChild(loading);
   });
   ws.load(file);
