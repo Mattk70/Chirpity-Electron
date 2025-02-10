@@ -1905,8 +1905,8 @@ const defaultConfig = {
   specLabels: true,
   specDetections: false,
   customColormap: {
-    loud: "#00f5d8",
-    mid: "#000000",
+    loud: "#ff7b00",
+    mid: "#850035",
     quiet: "#000000",
     threshold: 0.5,
     windowFn: "hann",
@@ -1917,7 +1917,7 @@ const defaultConfig = {
   local: true,
   speciesThreshold: 0.03,
   useWeek: false,
-  model: "chirpity",
+  model: "birdnet",
   locale: "en",
   chirpity: { backend: "tensorflow" },
   nocmig: { backend: "tensorflow" },
@@ -2025,8 +2025,9 @@ window.onload = async () => {
     // Show Buy Me a Coffee widget?
     config.hideBuyCoffeeWidget && DOM.buyMeCoffee.classList.add("d-none");
     document.getElementById("buy-coffee").checked = config.hideBuyCoffeeWidget;
-
+    
     membershipCheck();
+ 
     // Disable SNR
     config.filters.SNR = 0;
 
@@ -2093,6 +2094,7 @@ window.onload = async () => {
     // Window function & colormap
     document.getElementById("window-function").value =
       config.customColormap.windowFn;
+    config.customColormap.windowFn === 'gauss' && document.getElementById('alpha').classList.remove('d-none')
     config.colormap === "custom" &&
       document.getElementById("colormap-fieldset").classList.remove("d-none");
     document.getElementById("color-threshold").textContent =
@@ -6200,6 +6202,9 @@ document.addEventListener("change", function (e) {
         const windowFn = document.getElementById("window-function").value;
         const alpha = document.getElementById("alpha-slider").valueAsNumber;
         config.alpha = alpha;
+        windowFn === 'gauss' 
+          ? document.getElementById('alpha').classList.remove('d-none') 
+          : document.getElementById('alpha').classList.add('d-none')
         const loud = document.getElementById("loud-color").value;
         const mid = document.getElementById("mid-color").value;
         const quiet = document.getElementById("quiet-color").value;
@@ -7506,28 +7511,46 @@ const IUCNMap = {
 export { config, displayLocationAddress, LOCATIONS, generateToast };
 
 async function membershipCheck() {
-  config.newInstallDate ??= Date.now();
+  const oneWeek = 7 * 24 * 60 * 60 * 1000; // "It's been one week since you looked at me, cocked your head to the side..."
+  const cachedStatus = Boolean(localStorage.getItem('isMember'));
+  const cachedTimestamp = Number(localStorage.getItem('memberTimestamp'));
+  const now = Date.now()
+  let installDate = Number(localStorage.getItem('installDate'));
+  if (!installDate) {
+    localStorage.setItem('installDate', now);
+    installDate = now
+  }
   const trialPeriod = await window.electron.trialPeriod();
-  const inTrial = Date.now() - config.newInstallDate < trialPeriod;
-  // const inTrial = Date.now() - config.newInstallDate < 28*24*3600*1000; //4 weeks (TODO: put this in main)
+  const inTrial = Date.now() - installDate < trialPeriod;
   const lockedElements = document.querySelectorAll(".locked, .unlocked");
+  const unlockElements = () => {
+    lockedElements.forEach((el) => {
+      el.classList.replace("locked", "unlocked");
+      el.disabled = false;
+      el.textContent = "lock_open";
+    });
+  }
   checkMembership(config.UUID).then(isMember =>{
     if (isMember || inTrial) {
-      lockedElements.forEach((el) => {
-        el.classList.replace("locked", "unlocked");
-        el.disabled = false;
-        el.textContent = "lock_open";
-
-      });
+      unlockElements();
       isMember && (document.getElementById('primaryLogo').src = 'img/logo/chirpity_logo_subscriber.png')
+      localStorage.setItem('isMember', true);
+      localStorage.setItem('memberTimestamp', now);
     } else {
       lockedElements.forEach((el) => {
         el.classList.replace("unlocked", "locked");
-        config.specDetections = false;
+        config.specDetections = false; // will need to update when more elements
         el.checked = false;
         el.disabled = true;
         el.textContent = "lock";
       });
+      localStorage.setItem('isMember', false);
+    }
+  }).catch(error =>{
+    if (cachedStatus === 'true' && cachedTimestamp && now - cachedTimestamp < oneWeek) {
+      console.warn('Using cached membership status during error.', error);
+      unlockElements();
+      document.getElementById('primaryLogo').src = 'img/logo/chirpity_logo_subscriber.png';
     }
   });
 

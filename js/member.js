@@ -19,7 +19,7 @@ async function checkMembership(uuid) {
       return isMember;
     } catch (error) {
       console.error('Error checking membership:', error);
-      return false; // Default to false if there's an error.
+      throw new Error(error); // Default to false if there's an error.
     }
   }
   
