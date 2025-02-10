@@ -7521,6 +7521,7 @@ function membershipCheck() {
       el.disabled = false;
       el.textContent = "lock_open";
     });
+    config.isMember && (document.getElementById('primaryLogo').src = 'img/logo/chirpity_logo_subscriber.png')
   } else {
     lockedElements.forEach((el) => {
       el.classList.replace("unlocked", "locked");

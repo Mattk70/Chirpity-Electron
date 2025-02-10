@@ -185,7 +185,7 @@ test("Amend file start dialog contains date", async () =>{
 
 test("Select inverted greyscale colourmap", async () =>{
   await runExampleAnalysis(page, 'chirpity');
-  await changeSettings(page, 'select', 'colourmap', 'igreys', 50)
+  await changeSettings(page, 'select', 'colourmap', 'igray', 50)
   // await page.locator('#spectrogramWrapper button.btn-secondary').click();
 })
 
