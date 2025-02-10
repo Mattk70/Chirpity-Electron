@@ -1,4 +1,5 @@
 import { trackVisit, trackEvent } from "./tracking.js";
+import {checkMembership} from './member.js';
 import { DOM } from "./DOMcache.js";
 import { IUCNCache, IUCNtaxonomy } from "./IUCNcache.js";
 import WaveSurfer from "../node_modules/wavesurfer.js/dist/wavesurfer.esm.js";
@@ -1894,7 +1895,6 @@ function syncConfig(config, defaultConfig) {
 // Set config defaults
 const defaultConfig = {
   newInstallDate: 0,
-  isMember: 0,
   archive: { location: undefined, format: "ogg", auto: false, trim: false },
   fontScale: 1,
   seenTour: false,
@@ -2031,7 +2031,7 @@ window.onload = async () => {
     // Show Buy Me a Coffee widget?
     config.hideBuyCoffeeWidget && DOM.buyMeCoffee.classList.add("d-none");
     document.getElementById("buy-coffee").checked = config.hideBuyCoffeeWidget;
-    config.isMember = 0;
+
     membershipCheck();
     // Disable SNR
     config.filters.SNR = 0;
@@ -7511,26 +7511,32 @@ const IUCNMap = {
 // Make config, LOCATIONS and displayLocationAddress and toasts available to the map script in index.html
 export { config, displayLocationAddress, LOCATIONS, generateToast };
 
-function membershipCheck() {
+async function membershipCheck() {
   config.newInstallDate ??= Date.now();
-  const inTrial = Date.now() - config.newInstallDate < 172_800_000;
+  const trialPeriod = await window.electron.trialPeriod();
+  const inTrial = Date.now() - config.newInstallDate < trialPeriod;
+  // const inTrial = Date.now() - config.newInstallDate < 28*24*3600*1000; //4 weeks (TODO: put this in main)
   const lockedElements = document.querySelectorAll(".locked, .unlocked");
-  if (config.isMember || inTrial) {
-    lockedElements.forEach((el) => {
-      el.classList.replace("locked", "unlocked");
-      el.disabled = false;
-      el.textContent = "lock_open";
-    });
-    config.isMember && (document.getElementById('primaryLogo').src = 'img/logo/chirpity_logo_subscriber.png')
-  } else {
-    lockedElements.forEach((el) => {
-      el.classList.replace("unlocked", "locked");
-      config.specDetections = false;
-      el.checked = false;
-      el.disabled = true;
-      el.textContent = "lock";
-    });
-  }
+  checkMembership(config.UUID).then(isMember =>{
+    if (isMember || inTrial) {
+      lockedElements.forEach((el) => {
+        el.classList.replace("locked", "unlocked");
+        el.disabled = false;
+        el.textContent = "lock_open";
+
+      });
+      isMember && (document.getElementById('primaryLogo').src = 'img/logo/chirpity_logo_subscriber.png')
+    } else {
+      lockedElements.forEach((el) => {
+        el.classList.replace("unlocked", "locked");
+        config.specDetections = false;
+        el.checked = false;
+        el.disabled = true;
+        el.textContent = "lock";
+      });
+    }
+  });
+
 }
 
 function utf8ToHex(str) {

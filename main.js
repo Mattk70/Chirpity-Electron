@@ -388,6 +388,7 @@ app.whenReady().then(async () => {
   }
 
     ipcMain.handle('getPath', () => app.getPath('userData'));
+    ipcMain.handle('trialPeriod', () => 14*24*3600*1000); // 14 days
     ipcMain.handle('getLocale', () => app.getLocale());
     ipcMain.handle('getTemp', () => app.getPath('temp'));
     ipcMain.handle('isMac', () => process.platform === 'darwin');
