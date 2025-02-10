@@ -174,9 +174,9 @@ function hexToRgb(hex) {
   return [r, g, b];
 }
 function createColormap() {
-  const colormap = config.colormap;
+  const cmap = config.colormap;
   const map =
-    colormap === "custom"
+    cmap === "custom"
       ? [
           { index: 0, rgb: hexToRgb(config.customColormap.quiet) },
           {
@@ -185,10 +185,10 @@ function createColormap() {
           },
           { index: 1, rgb: hexToRgb(config.customColormap.loud) },
         ]
-      : colormap;
+      : cmap;
     
-  return ['roseus', 'gray', 'igray'].includes(colormap)
-    ? colormap
+  return ['roseus', 'gray', 'igray'].includes(cmap)
+    ? cmap
     : colormap({ colormap: map, nshades: 256, format: "float" });
 }
 function interpolate(template, variables) {
@@ -482,7 +482,6 @@ const audioContext = new AudioContext();
 async function loadBuffer(audio = currentBuffer) {
   t0 = Date.now();
   const [blob, peaks, duration] = STATE.blob || makeBlob(audio);
-
   await wavesurfer.loadBlob(blob, peaks, duration);
   STATE.blob = null;
 }
@@ -558,7 +557,6 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
   wave.addEventListener("mousemove", specTooltip, { passive: true });
   wave.addEventListener("mousedown", resetRegions);
   wave.addEventListener("mouseout", hideTooltip);
-
 };
 
 function increaseFFT() {
@@ -1536,7 +1534,7 @@ async function showExplore() {
   const locationFilter = await generateLocationList("explore-locations");
   locationFilter.addEventListener("change", handleLocationFilterChange);
   hideAll();
-  showElement(["exploreWrapper"], false);
+  showElement(["exploreWrapper", "spectrogramWrapper"], false);
   worker.postMessage({ action: "update-state", filesToAnalyse: [] });
   // Analysis is done
   STATE.analysisDone = true;
