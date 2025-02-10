@@ -393,7 +393,7 @@ async function loadDB(path) {
     await diskDB.runAsync(
       "CREATE INDEX IF NOT EXISTS idx_species_cname ON species(cname)"
     );
-    await checkAndApplyUpdates(diskDB);
+    // await checkAndApplyUpdates(diskDB);
     const { count } = await diskDB.getAsync(
       "SELECT COUNT(*) as count FROM records"
     );
