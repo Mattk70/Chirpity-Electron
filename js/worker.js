@@ -393,7 +393,7 @@ async function loadDB(path) {
     await diskDB.runAsync(
       "CREATE INDEX IF NOT EXISTS idx_species_cname ON species(cname)"
     );
-    // await checkAndApplyUpdates(diskDB);
+    await checkAndApplyUpdates(diskDB);
     const { count } = await diskDB.getAsync(
       "SELECT COUNT(*) as count FROM records"
     );
@@ -842,6 +842,7 @@ async function onLaunch({
   STATE.update({ model: model });
   await loadDB(appPath); // load the diskdb
   await createDB(); // now make the memoryDB
+
   STATE.update({ db: memoryDB });
   NUM_WORKERS = threads;
   spawnPredictWorkers(model, list, batchSize, NUM_WORKERS);

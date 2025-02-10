@@ -1963,8 +1963,7 @@ const defaultConfig = {
   VERSION: VERSION,
   powerSaveBlocker: false,
   fileStartMtime: false,
-  hideBuyCoffeeWidget: false,
-  forceHideCoffeeReset: true,
+  hideBuyCoffeeWidget: false
 };
 let appPath, tempPath, systemLocale, isMac;
 window.onload = async () => {
@@ -2009,12 +2008,7 @@ window.onload = async () => {
         }
       }
     }
-    // One-time reset of hidecoffee
-    if (config.forceHideCoffeeReset) {
-      config.hideBuyCoffeeWidget = false;
-      config.forceHideCoffeeReset = false;
-      updatePrefs("config.json", config);
-    }
+
     // Attach an error event listener to the window object
     window.onerror = function (message, file, lineno, colno, error) {
       trackEvent(
@@ -2425,8 +2419,8 @@ const setUpWorkerMessaging = () => {
           // Have we gone from a no-node setting to a node one?
           const changedEnv = config.hasNode !== args.hasNode;
           if (changedEnv && args.hasNode) {
-            // Let's switch to the tensorflow backend because this is generally faster under Node
-            handleBackendChange("tensorflow");
+            // If not using tensorflow, switch to the tensorflow backend because this faster under Node
+            config[config.model].backend !== "tensorflow" && handleBackendChange("tensorflow");
           }
           config.hasNode = args.hasNode;
           if (!config.hasNode && config[config.model].backend !== "webgpu") {
