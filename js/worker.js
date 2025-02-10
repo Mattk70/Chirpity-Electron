@@ -885,7 +885,10 @@ async function spawnListWorker() {
       };
 
       DEBUG && console.log("getting a list from the list worker");
-      dbMutex.lock().then(()=> worker_1.postMessage(message_1)).catch(() =>{}).then(dbMutex.unlock());
+      dbMutex.lock()
+      .then(()=> worker_1.postMessage(message_1))
+      .catch(() =>{})
+      .finally(() =>dbMutex.unlock());
     });
   };
 }
