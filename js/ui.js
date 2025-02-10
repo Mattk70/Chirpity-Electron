@@ -174,8 +174,9 @@ function hexToRgb(hex) {
   return [r, g, b];
 }
 function createColormap() {
+  const colormap = config.colormap;
   const map =
-    config.colormap === "custom"
+    colormap === "custom"
       ? [
           { index: 0, rgb: hexToRgb(config.customColormap.quiet) },
           {
@@ -184,9 +185,10 @@ function createColormap() {
           },
           { index: 1, rgb: hexToRgb(config.customColormap.loud) },
         ]
-      : config.colormap;
-  return config.colormap === "roseus"
-    ? "roseus"
+      : colormap;
+    
+  return ['roseus', 'gray', 'igray'].includes(colormap)
+    ? colormap
     : colormap({ colormap: map, nshades: 256, format: "float" });
 }
 function interpolate(template, variables) {
@@ -486,7 +488,8 @@ async function loadBuffer(audio = currentBuffer) {
 }
 const nullRender = (peaks, ctx) => {};
 const wsTextColour = () =>
-  config.colormap === "custom" ? config.customColormap.loud : "#fff";
+  config.colormap === "custom" ? config.customColormap.loud 
+  : config.colormap === "gray" ? "#000" : "#fff";
 
 const initWavesurfer = ({ audio = undefined, height = 0 }) => {
   wavesurfer && wavesurfer.destroy();
