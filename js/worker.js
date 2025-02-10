@@ -885,7 +885,7 @@ async function spawnListWorker() {
       };
 
       DEBUG && console.log("getting a list from the list worker");
-      worker_1.postMessage(message_1);
+      dbMutex.lock().then(()=> worker_1.postMessage(message_1)).catch(() =>{}).then(dbMutex.unlock());
     });
   };
 }
@@ -1018,8 +1018,8 @@ const prepSummaryStatement = (included) => {
       included = getExcluded(included);
       not = "NOT";
     }
-    DEBUG &&
-      console.log("included", included.length, "# labels", LABELS.length);
+    // DEBUG &&
+    //   console.log("included", included.length, "# labels", LABELS.length);
     const includedParams = prepParams(included);
     summaryStatement += ` AND speciesID ${not} IN (${includedParams}) `;
     params.push(...included);
