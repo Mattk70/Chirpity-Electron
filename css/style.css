@@ -252,8 +252,6 @@ div::part(region-content)  {
     text-shadow: 2px 2px 3px rgb(0, 0, 0);
 }
 
-
-
 .nighttime {
     background-color: rgba(0, 0, 72, 0.2);
 }
@@ -261,7 +259,13 @@ div::part(region-content)  {
 .daytime {
     background-color: rgba(86, 180, 239, 0.2);
 }
+.locked{
+    color: coral;
+}
 
+.unlocked{
+    color: greenyellow;
+}
 
 .table {
     margin-bottom: 0;
@@ -834,3 +838,14 @@ input[type="range"].vertical {
     max-height: 10rem; /* Adjust to fit your content's height */
     opacity: 1; /* Fully visible */
 }
+
+#buy-me-coffee img {
+    float: inline-end;
+    transition: transform 0.3s ease; /* Smooth transition */
+    transform: scale(1); /* Default size */
+  }
+  
+  #buy-me-coffee img:hover {
+    transform: scale(1.1); /* Increase size by 10% on hover */
+  }
+  

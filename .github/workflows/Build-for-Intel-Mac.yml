@@ -1,9 +1,8 @@
 name: Build Intel Mac version 
 run-name: ${{ github.actor }} is building Chirpity for Intel Mac
 on: 
-    push:
-        branches:
-            - 'master'
+  - push
+
 jobs:
   Build-Chirpity:
     runs-on: macos-13
@@ -58,15 +57,6 @@ jobs:
       
           # uncomment to view changed file
           #cat ./node_modules/fluent-ffmpeg/lib/processor.js
-        shell: bash
-      
-      - name: Modify colorScale.js - Add inverted greys colormap
-        run: |
-          # compatibility with sed on macOS 
-          sed -i.bak '/"greys":\[{"index":0,"rgb":\[0,0,0\]},{"index":1,"rgb":\[255,255,255\]}\],/a\
-            "igreys":[{"index":0,"rgb":[255,255,255]},{"index":1,"rgb":[0,0,0]}],' ./node_modules/colormap/colorScale.js \
-            && rm -f ./node_modules/colormap/colorScale.js.bak
-
         shell: bash
 
       - name: Modify tracking code

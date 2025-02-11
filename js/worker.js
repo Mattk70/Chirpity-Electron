@@ -839,9 +839,12 @@ async function onLaunch({
   UI.postMessage({ event: "ready-for-tour" });
   STATE.detect.backend = backend;
   BATCH_SIZE = batchSize;
-  STATE.update({ model: model });
-  await loadDB(appPath); // load the diskdb
-  await createDB(); // now make the memoryDB
+  if (!STATE.model || STATE.model !== model){
+    STATE.update({ model: model });
+    await loadDB(appPath); // load the diskdb
+    await createDB(); // now make the memoryDB
+  }
+
   STATE.update({ db: memoryDB });
   NUM_WORKERS = threads;
   spawnPredictWorkers(model, list, batchSize, NUM_WORKERS);
@@ -885,7 +888,10 @@ async function spawnListWorker() {
       };
 
       DEBUG && console.log("getting a list from the list worker");
-      worker_1.postMessage(message_1);
+      dbMutex.lock()
+      .then(()=> worker_1.postMessage(message_1))
+      .catch(() =>{})
+      .finally(() =>dbMutex.unlock());
     });
   };
 }
@@ -1018,8 +1024,8 @@ const prepSummaryStatement = (included) => {
       included = getExcluded(included);
       not = "NOT";
     }
-    DEBUG &&
-      console.log("included", included.length, "# labels", LABELS.length);
+    // DEBUG &&
+    //   console.log("included", included.length, "# labels", LABELS.length);
     const includedParams = prepParams(included);
     summaryStatement += ` AND speciesID ${not} IN (${includedParams}) `;
     params.push(...included);
@@ -1456,7 +1462,6 @@ async function loadAudioFile({
   position = 0,
   region = false,
   play = false,
-  queued = false,
   goToRegion = true,
 }) {
   return new Promise((resolve, reject) => {
@@ -1476,13 +1481,15 @@ async function loadAudioFile({
               contents: audio,
               fileRegion: region,
               play: play,
-              queued: queued,
               goToRegion,
               metadata: METADATA[file].metadata,
             },
             [audio.buffer]
           );
           let week;
+
+          sendDetections(file, start, end);
+
           if (STATE.list === "location") {
             week = STATE.useWeek
               ? new Date(METADATA[file].fileStart).getWeekNumber()
@@ -1537,6 +1544,39 @@ function addDays(date, days) {
   let result = new Date(date);
   result.setDate(result.getDate() + days);
   return result;
+}
+
+async function sendDetections(file, start, end, queued) {
+    const db = STATE.db;
+    start = METADATA[file].fileStart + (start * 1000)
+    end = METADATA[file].fileStart + (end * 1000)
+    const params = [file, start, end, STATE.detect.confidence];
+    const included = await getIncludedIDs();
+    const includedSQL = filtersApplied(included) ? ` AND speciesID IN (${prepParams(included)})` : '';
+    includedSQL && params.push(...included)
+    const results = await db.allAsync(`
+        WITH RankedRecords AS (
+            SELECT 
+                position AS start, 
+                end, 
+                cname AS label, 
+                RANK() OVER (PARTITION BY fileID, dateTime ORDER BY confidence DESC) AS rank,
+                confidence,
+                name,
+                dateTime,
+                speciesID
+            FROM records
+            JOIN species ON speciesID = species.ID
+            JOIN files ON fileID = files.ID
+        )
+        SELECT start, end, label
+        FROM RankedRecords
+        WHERE name = ? 
+        AND dateTime BETWEEN ? AND ?
+        AND rank = 1
+        AND confidence >= ? ${includedSQL}`, ...params
+    )
+    UI.postMessage({event: 'window-detections', detections: results, queued})
 }
 
 /**

@@ -83,6 +83,7 @@ class Mutex {
   unlock() {
     if (this.queue.length > 0) {
       const nextResolve = this.queue.shift();
+      console.log("mutex queue shifted", this.queue.length);
       nextResolve();
     } else {
       this.locked = false;

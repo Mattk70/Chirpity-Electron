@@ -52,7 +52,7 @@ contextBridge.exposeInMainWorld("electron", {
   onDownloadProgress: (callback) =>
     ipcRenderer.on("download-progress", callback),
   saveFile: (args) => ipcRenderer.invoke("saveFile", args),
-  selectDirectory: (path) => ipcRenderer.invoke("selectDirectory", path),
+  selectDirectory: (path) => ipcRenderer.invoke("selectDirectory", p.dirname(path)),
   openDialog: (method, config) =>
     ipcRenderer.invoke("openFiles", method, config),
   getPath: () => ipcRenderer.invoke("getPath"),
@@ -60,6 +60,7 @@ contextBridge.exposeInMainWorld("electron", {
   getTemp: () => ipcRenderer.invoke("getTemp"),
   getVersion: () => ipcRenderer.invoke("getVersion"),
   getAudio: () => ipcRenderer.invoke("getAudio"),
+  trialPeriod: () => ipcRenderer.invoke("trialPeriod"),
   isMac: () => ipcRenderer.invoke("isMac"),
   exitApplication: () => ipcRenderer.invoke("exitApplication"),
   powerSaveBlocker: (onOff) => ipcRenderer.invoke("powerSaveControl", onOff),

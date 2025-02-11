@@ -76,8 +76,10 @@ export class State {
         auto: false,
         trim: false,
       }),
-      (this.useGUANO = true);
-    (this.debug = false), (this.fileStartMtime = false);
+      (this.useGUANO = true),
+      (this.debug = false),
+      (this.fileStartMtime = false),
+      (this.specDetections = false);
   }
 
   update(updates) {

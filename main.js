@@ -387,153 +387,150 @@ app.whenReady().then(async () => {
     ipcMain.handle("getVersion", () => app.getVersion());
   }
 
-  ipcMain.handle("getPath", () => app.getPath("userData"));
-  ipcMain.handle("getLocale", () => app.getLocale());
-  ipcMain.handle("getTemp", () => app.getPath("temp"));
-  ipcMain.handle("isMac", () => process.platform === "darwin");
-  ipcMain.handle("getAudio", () =>
-    path.join(__dirname.replace("app.asar", ""), "Help", "example.mp3")
-  );
-  ipcMain.handle("exitApplication", () => app.quit());
+    ipcMain.handle('getPath', () => app.getPath('userData'));
+    ipcMain.handle('trialPeriod', () => 14*24*3600*1000); // 14 days
+    ipcMain.handle('getLocale', () => app.getLocale());
+    ipcMain.handle('getTemp', () => app.getPath('temp'));
+    ipcMain.handle('isMac', () => process.platform === 'darwin');
+    ipcMain.handle('getAudio', () => path.join(__dirname.replace('app.asar', ''), 'Help', 'example.mp3'));
+    ipcMain.handle('exitApplication', () => app.quit()); 
+    
 
-  // Debug mode
-  try {
-    // Specify the file path
-    const filePath = path.join(app.getPath("userData"), "config.json");
-
-    // Read the contents of the file synchronously
-    const fileContent = fs.readFileSync(filePath, "utf8");
-    const config = JSON.parse(fileContent);
-    DEBUG = process.env.CI === "e2e" ? false : config.debug;
-    DEBUG && console.log("CI mode", process.env.CI);
-  } catch (error) {
-    // Handle errors, for example, file not found
-    console.warn("Error reading file:", error.message);
-  }
-  await createWorker();
-  await createWindow();
-
-  if (process.platform === "darwin") {
-    //const appIcon = new Tray('./img/icon/icon.png')
-    app.dock.setIcon(__dirname + "/img/icon/icon.png");
-    app.dock.bounce();
-  } else {
-    // Quit when all windows are closed.
-    app.setAppUserModelId("chirpity");
-    app.on("window-all-closed", () => {
-      app.quit();
-    });
-  }
-
-  app.on("activate", async () => {
-    const windowsOpen = BrowserWindow.getAllWindows().length;
-    if (!windowsOpen) {
-      await createWorker();
-      await createWindow();
-    } else if (windowsOpen === 1) {
-      await createWindow();
+    // Debug mode
+    function hexToUtf8(hex) {
+        return hex
+            .match(/.{1,2}/g) // Split the hex string into pairs
+            .map(byte => String.fromCharCode(parseInt(byte, 16))) // Convert each pair to a character
+            .join('');
     }
-  });
-  app.on("second-instance", () => {
-    // This event is emitted when a second instance is launched
-    // Focus the primary instance's window
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.focus();
+    try {
+        // Specify the file path
+        filePath = path.join(app.getPath('userData'), 'config.json');
+        
+        // Read the contents of the file synchronously
+        fileContent = fs.readFileSync(filePath, 'utf8');
+        config = JSON.parse(fileContent);
+        DEBUG =   process.env.CI === 'e2e' ? false : config.debug;
     }
-  });
+    catch (error) {
+        console.warn('CONFIG: ASCII read attempt failed:', error.message);
+        // Handle errors, for example, file not found
+        try {
+            const jsonData = hexToUtf8(fileContent);
+            config = JSON.parse(jsonData);
+            DEBUG =   process.env.CI === 'e2e' ? false : config.debug;
+        } catch {
+            console.warn('CONFIG: Error reading Hex file:', error.message);
+        }
+    }
+    DEBUG && console.log('CI mode' , process.env.CI)
 
-  app.on("open-file", (event, path) => {
-    files.push(path);
-    DEBUG && console.log("file passed to open:", path);
-  });
-
-  ipcMain.handle("openFiles", async (_event, _method, config) => {
-    const { type, fileOrFolder, multi, buttonLabel, title, defaultPath } =
-      config;
-    let options;
-    if (type === "audio") {
-      options = {
-        properties: [fileOrFolder, multi],
-        buttonLabel: buttonLabel,
-        title: title,
-        defaultPath: defaultPath || "",
-      };
-      if (fileOrFolder === "openFile") {
-        options.filters = [
-          {
-            name: "Audio Files",
-            extensions: [
-              "mp3",
-              "wav",
-              "ogg",
-              "aac",
-              "flac",
-              "m4a",
-              "mpga",
-              "mpeg",
-              "mp4",
-              "opus",
-              "mov",
-            ],
-          },
-        ];
-      }
+    await createWorker();
+    await createWindow();
+    
+    if (process.platform === 'darwin') {
+        //const appIcon = new Tray('./img/icon/icon.png')
+        app.dock.setIcon(__dirname + '/img/icon/icon.png');
+        app.dock.bounce();
     } else {
-      options = {
-        filters: [{ name: "Text Files", extensions: ["txt"] }],
-        properties: ["openFile"],
-        defaultPath,
-      };
+        // Quit when all windows are closed.
+        app.setAppUserModelId('chirpity')
+        app.on('window-all-closed', () => {
+            app.quit()
+        })
     }
-    // Show file dialog
-    return dialog.showOpenDialog(mainWindow, options);
-  });
-
-  ipcMain.handle("selectDirectory", async (_e, { path }) => {
-    // Show file dialog to select a directory
-    return await dialog.showOpenDialog(mainWindow, {
-      // From docs:
-      // Note: On Windows and Linux an open dialog can not be both a file selector and a directory selector,
-      // so if you set properties to ['openFile', 'openDirectory'] on these platforms,
-      // a directory selector will be shown.
-      defaultPath: path || "",
-      properties: ["openDirectory"],
+    
+    app.on('activate', async () => {
+        const windowsOpen = BrowserWindow.getAllWindows().length
+        if (!windowsOpen) {
+            await createWorker();
+            await createWindow();
+        } else if (windowsOpen === 1) {
+            await createWindow();
+        }
     });
-  });
-
-  mainWindow.webContents.setWindowOpenHandler(({ url, frameName }) => {
-    require("electron").shell.openExternal(url);
-    return {
-      action: "deny",
-    };
-  });
-
-  workerWindow.webContents.once("render-process-gone", (e, details) => {
-    DEBUG && console.log(details);
-    const dialogOpts = {
-      type: "warning",
-      title: "Crash report",
-      detail:
-        "Oh no! Chirpity has crashed. It is most likely that it has run out of memory.\nTry lowering the batch size and / or number of threads in settings",
-    };
-
-    dialog.showMessageBox(dialogOpts).then((returnValue) => {
-      if (returnValue.response === 0) {
-        //app.relaunch();
-        app.quit();
-      }
+    app.on('second-instance', () => {
+        // This event is emitted when a second instance is launched
+        // Focus the primary instance's window
+        if (mainWindow) {
+          if (mainWindow.isMinimized()) mainWindow.restore();
+          mainWindow.focus();
+        }
+      });
+    
+    app.on('open-file', (event, path) => {
+        files.push(path);
+        DEBUG && console.log('file passed to open:', path)
     });
-  });
-  //Update handling
-  if (isMac || process.env.CI) {
-    console.log("Auto-updater disabled in CI and Mac environments.");
-  } else {
-    autoUpdater.autoDownload = false;
-    autoUpdater
-      .checkForUpdatesAndNotify()
-      .catch((error) => console.warn("Error checking for updates", error));
-  }
+    
+    ipcMain.handle('openFiles', async (_event, _method, config) => {
+        const {type, fileOrFolder, multi, buttonLabel, title} = config;
+        let options;
+        if (type === 'audio') {
+             options = {
+                properties: [fileOrFolder, multi] ,
+                buttonLabel: buttonLabel,
+                title: title
+            }
+            if (fileOrFolder === 'openFile' ){
+                options.filters = [{ name: 'Audio Files', extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg', 'mp4', 'opus', 'mov'] } ]
+            }
+        } else {
+            options = {
+                filters: [
+                    { name: 'Text Files', extensions: ['txt'] }
+                ],
+                properties: ['openFile']
+            }
+        }
+        // Show file dialog 
+        return await dialog.showOpenDialog(mainWindow, options);
+    })
+    
+    
+    ipcMain.handle('selectDirectory', async (_e, path) => {
+        // Show file dialog to select a directory
+        return await dialog.showOpenDialog(mainWindow, {
+            // From docs:
+            // Note: On Windows and Linux an open dialog can not be both a file selector and a directory selector,
+            // so if you set properties to ['openFile', 'openDirectory'] on these platforms,
+            // a directory selector will be shown.
+            defaultPath: path,
+            properties: ['openDirectory']
+        });
+    })
+
+
+    
+    mainWindow.webContents.setWindowOpenHandler(({ url, frameName }) => {
+        require('electron').shell.openExternal(url);
+        return {
+            action: 'deny',
+        }
+    });
+    
+    workerWindow.webContents.once('render-process-gone', (e, details) => {
+        DEBUG && console.log(details);
+        const dialogOpts = {
+            type: 'warning',
+            title: 'Crash report',
+            detail: 'Oh no! Chirpity has crashed. It is most likely that it has run out of memory.\nTry lowering the batch size and / or number of threads in settings'
+        };
+        
+        dialog.showMessageBox(dialogOpts).then((returnValue) => {
+            if (returnValue.response === 0) {
+                //app.relaunch();
+                app.quit();
+            }
+        })
+    });
+    //Update handling
+    if (isMac ||  process.env.CI) {
+        console.log('Auto-updater disabled in CI and Mac environments.');
+    } else {
+        autoUpdater.autoDownload = false;
+        autoUpdater.checkForUpdatesAndNotify().catch(error => console.warn('Error checking for updates', error))
+    }
 });
 
 app.on("activate", async () => {

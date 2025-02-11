@@ -1,4 +1,5 @@
 import { trackVisit, trackEvent } from "./tracking.js";
+import {checkMembership} from './member.js';
 import { DOM } from "./DOMcache.js";
 import { IUCNCache, IUCNtaxonomy } from "./IUCNcache.js";
 import WaveSurfer from "../node_modules/wavesurfer.js/dist/wavesurfer.esm.js";
@@ -33,7 +34,7 @@ let LOCATIONS,
   loadingTimeout,
   LIST_MAP;
 
-let regions, spectrogram, timeline;
+let REGIONS, spectrogram, timeline;
 
 let LABELS = [],
   DELETE_HISTORY = [];
@@ -143,6 +144,9 @@ let STATE = {
   },
   IUCNcache: IUCNCache,
   translations: ["da", "de", "es", "fr", "ja", "nl", "pt", "ru", "sv", "zh"],
+  regionColour: "rgba(255, 255, 255, 0.1)",
+  regionActiveColour: "rgba(255, 255, 0, 0.1)",
+  regionsCompleted: true
 };
 
 // Batch size map for slider
@@ -171,8 +175,9 @@ function hexToRgb(hex) {
   return [r, g, b];
 }
 function createColormap() {
+  const cmap = config.colormap;
   const map =
-    config.colormap === "custom"
+    cmap === "custom"
       ? [
           { index: 0, rgb: hexToRgb(config.customColormap.quiet) },
           {
@@ -181,9 +186,10 @@ function createColormap() {
           },
           { index: 1, rgb: hexToRgb(config.customColormap.loud) },
         ]
-      : config.colormap;
-  return config.colormap === "roseus"
-    ? "roseus"
+      : cmap;
+    
+  return ['roseus', 'gray', 'igray'].includes(cmap)
+    ? cmap
     : colormap({ colormap: map, nshades: 256, format: "float" });
 }
 function interpolate(template, variables) {
@@ -252,7 +258,7 @@ let modelReady = false,
   fileLoaded = false;
 let PREDICTING = false,
   t0;
-let region,
+let activeRegion,
   AUDACITY_LABELS = {},
   wavesurfer;
 let bufferStartTime, fileEnd;
@@ -276,12 +282,7 @@ const specMaxHeight = () => {
   const navPadding = DOM.navPadding.clientHeight;
   const footerHeight = DOM.footer.clientHeight;
   const controlsHeight = DOM.controlsWrapper.clientHeight;
-  return (
-    window.innerHeight -
-    navPadding -
-    footerHeight -
-    controlsHeight 
-  );
+  return window.innerHeight - navPadding - footerHeight - controlsHeight;
 };
 
 // Mouse down event to start dragging
@@ -391,6 +392,10 @@ function loadAudioFileSync({ filePath = "", preserveResults = false }) {
   });
 }
 
+
+// https://developer.chrome.com/blog/play-request-was-interrupted
+let playPromise;
+
 async function updateSpec({
   buffer,
   play = false,
@@ -404,7 +409,8 @@ async function updateSpec({
   }
   refreshTimeline();
   wavesurfer.seekTo(position);
-  play ? wavesurfer.play() : wavesurfer.pause();
+  if (play) playPromise =  wavesurfer.play() 
+    else  wavesurfer.pause();
 }
 
 function createTimeline() {
@@ -413,13 +419,12 @@ function createTimeline() {
   const timeinterval = primaryLabelInterval / 10;
   const colour = wsTextColour();
   const timeline = TimelinePlugin.create({
-    // container: '#timeline',
     insertPosition: "beforebegin",
     formatTimeCallback: formatTimeCallback,
     timeInterval: timeinterval,
     primaryLabelInterval: primaryLabelInterval,
     secondaryLabelInterval: secondaryLabelInterval,
-    secondaryLabelOpacity: 1,
+    secondaryLabelOpacity: 0.35,
     style: {
       fontSize: "0.75rem",
       color: colour,
@@ -430,20 +435,15 @@ function createTimeline() {
 
 const resetRegions = (e) => {
   if (e?.button === 2) return;
-  if (wavesurfer) regions.clearRegions();
-  region = undefined;
-  const orphanedRegions = document.querySelectorAll("wave>region");
-  // Sometimes, there is a region that is not attached the the wavesurfer regions list
-  orphanedRegions?.length &&
-    orphanedRegions.forEach((region) => region.remove());
+  if (wavesurfer) REGIONS.clearRegions();
+  STATE.selection = false;
+  worker.postMessage({ action: "update-state", selection: false });
   disableMenuItem(["analyseSelection", "export-audio"]);
   if (fileLoaded) enableMenuItem(["analyse"]);
 };
 
 function clearActive() {
   resetRegions();
-  STATE.selection = false;
-  worker.postMessage({ action: "update-state", selection: false });
   activeRow?.classList.remove("table-active");
   activeRow = undefined;
 }
@@ -457,8 +457,8 @@ const WSPluginPurge = () => {
     ));
 };
 
-function makeBlob(audio){
-      // Recreate TypedArray
+function makeBlob(audio) {
+  // Recreate TypedArray
   const int16Array = new Int16Array(audio.buffer);
   // Convert to Float32Array (Web Audio API uses Float32 samples)
   const float32Array = new Float32Array(int16Array.length);
@@ -476,19 +476,19 @@ function makeBlob(audio){
   const blob = new Blob([audio], { type: "audio/wav" });
   const peaks = [audioBuffer.getChannelData(0)];
   const duration = audioBuffer.duration;
-  return [blob, peaks, duration]
+  return [blob, peaks, duration];
 }
 const audioContext = new AudioContext();
 async function loadBuffer(audio = currentBuffer) {
-    t0 = Date.now()
-const [blob, peaks, duration] =  STATE.blob || makeBlob(audio);
-
+  t0 = Date.now();
+  const [blob, peaks, duration] = STATE.blob || makeBlob(audio);
   await wavesurfer.loadBlob(blob, peaks, duration);
   STATE.blob = null;
 }
-
+const nullRender = (peaks, ctx) => {};
 const wsTextColour = () =>
-  config.colormap === "custom" ? config.customColormap.loud : "#fff";
+  config.colormap === "custom" ? config.customColormap.loud 
+  : config.colormap === "gray" ? "#000" : "#fff";
 
 const initWavesurfer = ({ audio = undefined, height = 0 }) => {
   wavesurfer && wavesurfer.destroy();
@@ -501,57 +501,34 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
     container: document.querySelector("#waveform"),
     // make waveform transparent
     backgroundColor: "rgba(0,0,0,0)",
-    waveColor: "rgba(109,41,164,0)",
-    progressColor: "rgba(109,41,16,0)",
+    waveColor: "rgba(0,0,0,0)",
+    progressColor: "rgba(0,0,0,0)",
     // but keep the playhead
     cursorColor: wsTextColour(),
     cursorWidth: 2,
-    height: 'auto',
-    plugins: [regions, spectrogram, timeline],
+    height: "auto",
+    renderFunction: nullRender, // no need to render a waveform
+    plugins: [REGIONS, spectrogram, timeline],
   });
-  wavesurfer.bufferRequested = false;
 
   if (audio) {
     loadBuffer(audio);
   }
   DOM.colourmap.value = config.colormap;
-  // Set click event that removes all regions
+  // Set click event that removes all REGIONS
 
-  regions.enableDragSelection({
-    color: "rgba(255, 255, 0, 0.1)",
+  REGIONS.enableDragSelection({
+    color: STATE.regionActiveColour,
   });
 
-  wavesurfer.on("interaction", (currenttime) => {
-    regions.clearRegions();
-    region = null;
-    disableMenuItem(['analyseSelection'])
-  });
-  // Queue up next audio window while playing
-//   wavesurfer.on("decode", function () {
-//     // Ensure the audio file is loaded before proceeding
-//     try {
-//         if (
-//           !wavesurfer.bufferRequested &&
-//           currentFileDuration > windowOffsetSecs + windowLength
-//         ) {
-//           const begin = windowOffsetSecs + windowLength;
-//           postBufferUpdate({ begin: begin, play: false, queued: true });
-//           wavesurfer.bufferRequested = true;
-//         }
-//     } catch (e) {
-//       const errorKey = e.message || e.toString();
-//       if (!loggedErrors.has(errorKey)) {
-//         // lets find out if it's because wavesurfer isn't ready
-//         console.warn("onDecodeError", e);
-//         loggedErrors.add(errorKey);
-//       }
-//     }
-//   });
+  wavesurfer.on("dblclick", centreSpec);
+
+
   wavesurfer.on("finish", function () {
     const bufferEnd = windowOffsetSecs + windowLength;
     if (currentFileDuration > bufferEnd) {
-        postBufferUpdate({ begin: windowOffsetSecs + windowLength, play: true });
-      }
+      postBufferUpdate({ begin: windowOffsetSecs + windowLength, play: true });
+    }
   });
 
   // Show controls
@@ -572,12 +549,11 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
   wave.removeEventListener("mousedown", resetRegions);
   wave.removeEventListener("mousemove", specTooltip);
   wave.removeEventListener("mouseout", hideTooltip);
-  wave.removeEventListener("dblclick", centreSpec);
+
 
   wave.addEventListener("mousemove", specTooltip, { passive: true });
   wave.addEventListener("mousedown", resetRegions);
   wave.addEventListener("mouseout", hideTooltip);
-  wave.addEventListener("dblclick", centreSpec);
 };
 
 function increaseFFT() {
@@ -592,6 +568,7 @@ function increaseFFT() {
       play: wavesurfer.isPlaying(),
     });
     console.log(spectrogram.fftSamples);
+    config.FFT = spectrogram.fftSamples
   }
 }
 
@@ -607,6 +584,7 @@ function reduceFFT() {
       play: wavesurfer.isPlaying(),
     });
     console.log(spectrogram.fftSamples);
+    config.FFT = spectrogram.fftSamples
   }
 }
 
@@ -643,16 +621,15 @@ function zoomSpec(direction) {
     // Keep playhead at same time in file
     position = (timeNow - windowOffsetSecs) / windowLength;
     // adjust region start time to new window start time
-    let region = getRegion();
-    if (region) {
-      const duration = region.end - region.start;
-      region.start = oldBufferBegin + region.start - windowOffsetSecs;
-      region.end = region.start + duration;
+    if (activeRegion) {
+      const duration = activeRegion.end - activeRegion.start;
+      activeRegion.start =
+        oldBufferBegin + activeRegion.start - windowOffsetSecs;
+      activeRegion.end = activeRegion.start + duration;
     }
     postBufferUpdate({
       begin: windowOffsetSecs,
       position: position,
-      region: region,
       goToRegion: false,
       play: wavesurfer.isPlaying(),
     });
@@ -673,7 +650,7 @@ async function showOpenDialog(fileOrFolder) {
     } else {
       filterValidFiles({ filePaths: files.filePaths });
     }
-    localStorage.setItem("lastFolder", files.filePaths[0]);
+    localStorage.setItem("lastFolder", p.dirname(files.filePaths[0]));
   }
 }
 
@@ -936,7 +913,7 @@ function customiseAnalysisMenu(saved) {
   if (saved) {
     analyseMenu.innerHTML = `<span class="material-symbols-outlined">upload_file</span> ${STATE.i18n.retrieve}
         <span class="shortcut float-end">${modifier}+A</span>`;
-        enableMenuItem(["reanalyse", "explore", "charts"]);
+    enableMenuItem(["reanalyse", "explore", "charts"]);
   } else {
     analyseMenu.innerHTML = `<span class="material-symbols-outlined">search</span> ${STATE.i18n.analyse[0]}
         <span class="shortcut float-end">${modifier}+A</span>`;
@@ -1263,9 +1240,9 @@ function refreshResultsView() {
 // fromDB is requested when circle clicked
 const getSelectionResults = (fromDB) => {
   if (fromDB instanceof PointerEvent) fromDB = false;
-  let start = region.start + windowOffsetSecs;
+  let start = activeRegion.start + windowOffsetSecs;
   // Remove small amount of region to avoid pulling in results from 'end'
-  let end = region.end + windowOffsetSecs; // - 0.001;
+  let end = activeRegion.end + windowOffsetSecs; // - 0.001;
   STATE.selection = {};
   STATE["selection"]["start"] = start.toFixed(3);
   STATE["selection"]["end"] = end.toFixed(3);
@@ -1457,7 +1434,7 @@ const exportAudacity = () =>
 
 async function exportData(format, species, limit, duration) {
   const defaultPath = localStorage.getItem("lastFolder");
-  const response = await window.electron.selectDirectory({ path: defaultPath });
+  const response = await window.electron.selectDirectory(defaultPath);
   if (!response.canceled) {
     const directory = response.filePaths[0];
     worker.postMessage({
@@ -1471,7 +1448,7 @@ async function exportData(format, species, limit, duration) {
       limit: limit,
       range: isExplore() ? STATE.explore.range : undefined,
     });
-    localStorage.setItem("lastFolder", directory);
+    localStorage.setItem("lastFolder", p.dirname(directory));
   }
 }
 
@@ -1554,7 +1531,7 @@ async function showExplore() {
   const locationFilter = await generateLocationList("explore-locations");
   locationFilter.addEventListener("change", handleLocationFilterChange);
   hideAll();
-  showElement(["exploreWrapper"], false);
+  showElement(["exploreWrapper", "spectrogramWrapper"], false);
   worker.postMessage({ action: "update-state", filesToAnalyse: [] });
   // Analysis is done
   STATE.analysisDone = true;
@@ -1614,26 +1591,21 @@ const checkWidth = (text) => {
   return textWidth + 5;
 };
 
-function createRegion(start, end, label, goToRegion) {
-  wavesurfer.pause();
-  resetRegions();
-  regions.addRegion({
+function createRegion(start, end, label, goToRegion, colour) {
+  REGIONS.addRegion({
     start: start,
     end: end,
-    color: "rgba(255, 255, 255, 0.1)",
+    color: colour || STATE.regionColour,
     content: label || "",
   });
-  // const regionsPlugin = wavesurfer.plugins.find(plugin => plugin.regions);
-  // const region = regionsPlugin.regions[0]
-  // const text = region.content.innerText;
+  // const regionsPlugin = wavesurfer.plugins.find(plugin => plugin.REGIONS);
+  // const activeRegion = regionsPlugin.REGIONS[0]
+  // const text = activeRegion.label;
   // if (region.content.clientWidth <= checkWidth(text)) {
   //     region.content.style.writingMode = 'vertical-rl';
   // }
 
-  if (goToRegion) {
-    const progress = start / wavesurfer.getDuration();
-    wavesurfer.seekTo(progress);
-  }
+  if (goToRegion) wavesurfer.setTime(start);
 }
 
 // We add the handler to the whole table as the body gets replaced and the handlers on it would be wiped
@@ -1643,6 +1615,7 @@ const selectionTable = document.getElementById("selectionResultTableBody");
 selectionTable.addEventListener("click", resultClick);
 
 async function resultClick(e) {
+   if  (! STATE.regionsCompleted) return
   let row = e.target.closest("tr");
   if (!row || row.classList.length === 0) {
     // 1. clicked and dragged, 2 no detections in file row
@@ -1673,6 +1646,25 @@ async function resultClick(e) {
   }
 }
 
+function setActiveRow(start) {
+    const rows = DOM.resultTable.querySelectorAll('tr');
+    for (const r of rows) {
+        const [_file, rowStart, _end, _, _label] = r.getAttribute("name").split("|");
+
+        if (Number(rowStart) === start) {
+            // Clear the active row if there's one
+            if (activeRow && activeRow !== r) {
+                activeRow.classList.remove('table-active');
+            }
+            // Add the 'table-active' class to the target row
+            r.classList.add('table-active');
+            activeRow = r;  // Update the active row reference
+            
+            activeRow.scrollIntoView({ behavior: "smooth", block: "center" });
+            break;  // Exit loop once the target row is found
+        }
+    }
+}
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
@@ -1688,10 +1680,10 @@ const loadResultRegion = ({
   // ensure region doesn't spread across the whole window
   if (windowLength <= 3.5) windowLength = 6;
   windowOffsetSecs = Math.max(0, start - windowLength / 2 + 1.5);
-  const region = {
+  activeRegion = {
     start: Math.max(start - windowOffsetSecs, 0),
     end: end - windowOffsetSecs,
-    label: label,
+    label,
   };
   const position = wavesurfer
     ? clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1)
@@ -1700,7 +1692,7 @@ const loadResultRegion = ({
     file: file,
     begin: windowOffsetSecs,
     position: position,
-    region: region,
+    region: activeRegion,
   });
 };
 
@@ -1856,15 +1848,21 @@ function formatTimeCallback(secs) {
 ////////// Store preferences //////////
 
 function updatePrefs(file, data) {
-    scheduler.postTask(() =>  {
-        try {
-            fs.writeFileSync(p.join(appPath, file), JSON.stringify(data));
-          } catch (error) {
-            console.log(error);
-          }
-        },{
-        priority: "background",
-      });
+  scheduler.postTask(
+    () => {
+      try {
+        const jsonData = JSON.stringify(data); // Convert object to JSON string
+        //const hexData = utf8ToHex(jsonData); // Encode to hex
+        const hexData = jsonData;
+        fs.writeFileSync(p.join(appPath, file), hexData);
+      } catch (error) {
+        console.log(error);
+      }
+    },
+    {
+      priority: "background",
+    }
+  );
 }
 
 function syncConfig(config, defaultConfig) {
@@ -1892,6 +1890,7 @@ function syncConfig(config, defaultConfig) {
 /////////////////////////  Window Handlers ////////////////////////////
 // Set config defaults
 const defaultConfig = {
+  newInstallDate: 0,
   archive: { location: undefined, format: "ogg", auto: false, trim: false },
   fontScale: 1,
   seenTour: false,
@@ -1900,9 +1899,10 @@ const defaultConfig = {
   colormap: "inferno",
   specMaxHeight: 260,
   specLabels: true,
+  specDetections: true,
   customColormap: {
-    loud: "#00f5d8",
-    mid: "#000000",
+    loud: "#ff7b00",
+    mid: "#850035",
     quiet: "#000000",
     threshold: 0.5,
     windowFn: "hann",
@@ -1913,7 +1913,7 @@ const defaultConfig = {
   local: true,
   speciesThreshold: 0.03,
   useWeek: false,
-  model: "chirpity",
+  model: "birdnet",
   locale: "en",
   chirpity: { backend: "tensorflow" },
   nocmig: { backend: "tensorflow" },
@@ -1958,9 +1958,7 @@ const defaultConfig = {
   debug: false,
   VERSION: VERSION,
   powerSaveBlocker: false,
-  fileStartMtime: false,
-  hideBuyCoffeeWidget: false,
-  forceHideCoffeeReset: true,
+  fileStartMtime: false
 };
 let appPath, tempPath, systemLocale, isMac;
 window.onload = async () => {
@@ -1986,20 +1984,26 @@ window.onload = async () => {
   // Set footer year
   document.getElementById("year").textContent = new Date().getFullYear();
   await appVersionLoaded;
-  await fs.readFile(p.join(appPath, "config.json"), "utf8", (err, data) => {
+  const configFile = p.join(appPath, "config.json");
+  await fs.readFile(configFile, "utf8", (err, hexData) => {
     if (err) {
       console.log("Config not loaded, using defaults");
-      // Use defaults
-      config = defaultConfig;
+      // Use defaults if no config file
+      if (!fs.existsSync(configFile)) config = defaultConfig;
     } else {
-      config = JSON.parse(data);
+      try {
+        const jsonData = hexToUtf8(hexData);
+        config = JSON.parse(jsonData);
+      } catch {
+        //ASCII config or corrupt config
+        try {
+          config = JSON.parse(hexData);
+        } catch {
+          alert("Config file is corrupt");
+        }
+      }
     }
-    // One-time reset of hidecoffee
-    if (config.forceHideCoffeeReset) {
-      config.hideBuyCoffeeWidget = false;
-      config.forceHideCoffeeReset = false;
-      updatePrefs("config.json", config);
-    }
+
     // Attach an error event listener to the window object
     window.onerror = function (message, file, lineno, colno, error) {
       trackEvent(
@@ -2014,9 +2018,13 @@ window.onload = async () => {
     //fill in defaults - after updates add new items
     syncConfig(config, defaultConfig);
     // Show Buy Me a Coffee widget?
-    config.hideBuyCoffeeWidget && DOM.buyMeCoffee.classList.add("d-none");
-    document.getElementById("buy-coffee").checked = config.hideBuyCoffeeWidget;
+  
+    
 
+    membershipCheck().then(isMember  => {
+      isMember || document.getElementById("buy-me-coffee").classList.remove('d-none');
+    });
+ 
     // Disable SNR
     config.filters.SNR = 0;
 
@@ -2071,6 +2079,8 @@ window.onload = async () => {
     DOM.colourmap.value = config.colormap;
     // Spectrogram labels
     DOM.specLabels.checked = config.specLabels;
+    // Show all detections
+    DOM.specDetections.checked = config.specDetections;
     // Spectrogram frequencies
     DOM.fromInput.value = config.audio.minFrequency;
     DOM.fromSlider.value = config.audio.minFrequency;
@@ -2081,6 +2091,7 @@ window.onload = async () => {
     // Window function & colormap
     document.getElementById("window-function").value =
       config.customColormap.windowFn;
+    config.customColormap.windowFn === 'gauss' && document.getElementById('alpha').classList.remove('d-none')
     config.colormap === "custom" &&
       document.getElementById("colormap-fieldset").classList.remove("d-none");
     document.getElementById("color-threshold").textContent =
@@ -2176,6 +2187,7 @@ window.onload = async () => {
       UUID: config.UUID,
       debug: config.debug,
       fileStartMtime: config.fileStartMtime,
+      specDetections: config.specDetections,
     });
     const { model, list } = config;
     t0_warmup = Date.now();
@@ -2338,6 +2350,7 @@ const setUpWorkerMessaging = () => {
           const mode = args.mode;
           STATE.mode = mode;
           renderFilenamePanel();
+          adjustSpecDims()
           switch (mode) {
             case "analyse": {
               STATE.diskHasRecords &&
@@ -2405,8 +2418,8 @@ const setUpWorkerMessaging = () => {
           // Have we gone from a no-node setting to a node one?
           const changedEnv = config.hasNode !== args.hasNode;
           if (changedEnv && args.hasNode) {
-            // Let's switch to the tensorflow backend because this is generally faster under Node
-            handleBackendChange("tensorflow");
+            // If not using tensorflow, switch to the tensorflow backend because this faster under Node
+            config[config.model].backend !== "tensorflow" && handleBackendChange("tensorflow");
           }
           config.hasNode = args.hasNode;
           if (!config.hasNode && config[config.model].backend !== "webgpu") {
@@ -2444,6 +2457,10 @@ const setUpWorkerMessaging = () => {
           updateSummary(args);
           break;
         }
+        case "window-detections": {
+          showWindowDetections(args.detections);
+          break;
+        }
         case "worker-loaded-audio": {
           onWorkerLoadedAudio(args);
           break;
@@ -2459,6 +2476,22 @@ const setUpWorkerMessaging = () => {
     });
   });
 };
+
+function showWindowDetections(detectionList) {
+  for (const detection of detectionList) {
+    const start = detection.start - windowOffsetSecs;
+    if (start < windowLength) {
+      const end = detection.end - windowOffsetSecs;
+      const active = start === activeRegion?.start;
+      const colour = active ? STATE.regionActiveColour : null;
+      let gotoRegion = active;
+      if (!config.specDetections && !active) continue;
+      createRegion(start, end, detection.label, gotoRegion, colour);
+    }
+  }
+  // Prevent region cluster fest
+  STATE.regionsCompleted = true;
+}
 
 function generateBirdList(store, rows) {
   const chart = document.getElementById("chart-list");
@@ -2971,35 +3004,59 @@ function handleKeyDown(e) {
 
 ///////////// Nav bar Option handlers //////////////
 
+function setActiveRegion(region) {
+  const { start, end, content } = region;
+  // Clear active regions
+  REGIONS.regions.forEach((r) => r.setOptions({ color: STATE.regionColour }));
+  // Set the playhead to the start of the region
+  wavesurfer.setTime(start);
+  activeRegion = { start, end, label: content?.innerText };
+  region.setOptions({ color: STATE.regionActiveColour });
+  enableMenuItem(["export-audio"]);
+  if (modelReady && !PREDICTING) {
+    enableMenuItem(["analyseSelection"]);
+  }
+  setActiveRow(start + windowOffsetSecs)
+}
+
 function initRegion() {
-  if (regions) regions.destroy();
-  regions = RegionsPlugin.create({
+  if (REGIONS) REGIONS.destroy();
+  REGIONS = RegionsPlugin.create({
     drag: true,
     maxRegions: 100,
-    color: "rgba(255, 255, 255, 0.1)",
+    color: STATE.regionColour,
   });
 
-  regions.on("region-clicked", function (_region, e) {
-    // Prevent region being cleared
-    e.stopPropagation();
-  });
+  REGIONS.on("region-clicked", function (r, e) {
+    // Hide context menu
+    DOM.contextMenu.classList.add("d-none");
+    setActiveRegion(r);
+    // If shift key held, clear other regions
+    if (e.shiftKey){
+      REGIONS.regions.forEach((r) => r.color === STATE.regionColour && r.remove());
+      // Ctrl / Cmd: remove the current region
+    } else if (e.ctrlKey || e.metaKey) r.remove()
+  })
+
   // Enable analyse selection when region created
-  regions.on("region-created", function (r) {
-    region = r;
-    enableMenuItem(["export-audio"]);
-    if (modelReady && !PREDICTING) {
-      enableMenuItem(["analyseSelection"]);
-    }
+  REGIONS.on("region-created", function (r) {
+    const { start, content } = r;
+    const activeStart = activeRegion ? activeRegion.start : null;
+    // If a new region is created without a label, it must be user generated
+    if (!content || start === activeStart) setActiveRegion(r);
   });
+
   // Clear label on modifying region
-  regions.on("region-update", function (r) {
-    region = r;
-    region.content && (region.content.innerText = "");
+  REGIONS.on("region-update", function (r) {
+    r.setOptions({ content: "" });
+    setActiveRegion(r);
   });
-  return regions;
+
+  return REGIONS;
 }
 
 function initSpectrogram(height, fftSamples) {
+    fftSamples ??= config.FFT;
   config.debug && console.log("initializing spectrogram");
   spectrogram && spectrogram.destroy() && WSPluginPurge();
   if (!fftSamples) {
@@ -3030,6 +3087,7 @@ function initSpectrogram(height, fftSamples) {
     fftSamples: fftSamples,
     scale: "linear",
     colorMap: colors,
+    alpha: config.alpha
   });
 }
 
@@ -3037,39 +3095,45 @@ function hideTooltip() {
   DOM.tooltip.style.visibility = "hidden";
 }
 
-async function specTooltip(event) {
-  const i18n = getI18n(i18nContext);
-  const waveElement = event.target;
-  const specDimensions = waveElement.getBoundingClientRect();
-  const frequencyRange =
-    Number(config.audio.maxFrequency) - Number(config.audio.minFrequency);
-  const yPosition =
-    Math.round(
-      (specDimensions.bottom - event.clientY) *
-        (frequencyRange / specDimensions.height)
-    ) + Number(config.audio.minFrequency);
+function specTooltip(event, showHz = !config.specLabels) {
+  if (true || config.showTooltip) {
+    const i18n = getI18n(i18nContext);
+    const waveElement = event.target;
+    // Update the tooltip content
+    const tooltip = DOM.tooltip;
+    tooltip.style.display = "none";
+    tooltip.replaceChildren();
+    const inRegion = checkForRegion(event, false);
+    if (showHz || inRegion) {
+      const specDimensions = waveElement.getBoundingClientRect();
+      const frequencyRange =
+        Number(config.audio.maxFrequency) - Number(config.audio.minFrequency);
+      const yPosition =
+        Math.round(
+          (specDimensions.bottom - event.clientY) *
+            (frequencyRange / specDimensions.height)
+        ) + Number(config.audio.minFrequency);
 
-  // Update the tooltip content
-  const tooltip = DOM.tooltip;
-  tooltip.textContent = `${i18n.frequency}: ${yPosition}Hz`;
-  if (region) {
-    const lineBreak = document.createElement("br");
-    const textNode = document.createTextNode(
-      formatRegionTooltip(i18n.length, region.start, region.end)
-    );
-
-    tooltip.appendChild(lineBreak); // Add the line break
-    tooltip.appendChild(textNode); // Add the text node
+      tooltip.textContent = `${i18n.frequency}: ${yPosition}Hz`;
+      if (inRegion){
+        const { start, end } = inRegion;
+        const textNode = document.createTextNode(
+          formatRegionTooltip(i18n.length, start, end)
+        );
+        const lineBreak = document.createElement("br");
+        tooltip.appendChild(lineBreak); // Add the line break
+        tooltip.appendChild(textNode); // Add the text node
+      }
+      // Apply styles to the tooltip
+      Object.assign(tooltip.style, {
+        top: `${event.clientY}px`,
+        left: `${event.clientX + 15}px`,
+        display: "block",
+        visibility: "visible",
+        opacity: 1,
+      });
+    }
   }
-
-  // Apply styles to the tooltip
-  Object.assign(tooltip.style, {
-    top: `${event.clientY}px`,
-    left: `${event.clientX + 15}px`,
-    display: "block",
-    visibility: "visible",
-    opacity: 1,
-  });
 }
 
 const updateListIcon = () => {
@@ -3104,7 +3168,7 @@ DOM.listIcon.addEventListener("click", () => {
 });
 
 DOM.customListSelector.addEventListener("click", async () => {
-  const defaultPath = localStorage.getItem("lastFolder");
+  const defaultPath = localStorage.getItem("customList");
   const files = await window.electron.openDialog("showOpenDialog", {
     type: "text",
     defaultPath,
@@ -3117,14 +3181,13 @@ DOM.customListSelector.addEventListener("click", async () => {
     readLabels(customListFile, "list");
     LIST_MAP = getI18n(i18nLIST_MAP);
     updatePrefs("config.json", config);
-    localStorage.setItem("lastFolder", customListFile);
+    localStorage.setItem("customList", customListFile);
   }
 });
 
 const loadModel = () => {
   PREDICTING = false;
   t0_warmup = Date.now();
-  STATE.analysisDone = false;
   worker.postMessage({
     action: "load-model",
     model: config.model,
@@ -3213,19 +3276,23 @@ function centreSpec() {
   const middle = windowOffsetSecs + wavesurfer.getCurrentTime();
   windowOffsetSecs = middle - windowLength / 2;
   windowOffsetSecs = Math.max(0, windowOffsetSecs);
-  windowOffsetSecs = Math.min(windowOffsetSecs, currentFileDuration - windowLength);
+  windowOffsetSecs = Math.min(
+    windowOffsetSecs,
+    currentFileDuration - windowLength
+  );
   // Move the region if needed
-  let region = getRegion();
-  if (region) {
+  //   let region = getRegion();
+  if (activeRegion) {
     const shift = saveBufferBegin - windowOffsetSecs;
-    region.start += shift;
-    region.end += shift;
-    if (region.start < 0 || region.end > windowLength) region = null;
+    activeRegion.start += shift;
+    activeRegion.end += shift;
+    const { start, end } = activeRegion;
+    if (start < 0 || end > windowLength) activeRegion = null;
   }
   postBufferUpdate({
     begin: windowOffsetSecs,
     position: 0.5,
-    region: region,
+    region: activeRegion,
     goToRegion: false,
   });
 }
@@ -3264,7 +3331,7 @@ const GLOBAL_ACTIONS = {
     if (e.ctrlKey || e.metaKey) await showOpenDialog("openFile");
   },
   p: function () {
-    typeof region !== "undefined"
+    typeof activeRegion !== "undefined"
       ? playRegion()
       : console.log("Region undefined");
   },
@@ -3351,10 +3418,11 @@ const GLOBAL_ACTIONS = {
     }
   },
   ArrowUp: function () {
-    if (activeRow) {
+    if (activeRow && STATE.regionsCompleted) {
       activeRow.classList.remove("table-active");
       activeRow = activeRow.previousSibling || activeRow;
       if (!activeRow.classList.contains("text-bg-dark")) activeRow.click();
+      STATE.regionsCompleted = false;
       activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   },
@@ -3372,7 +3440,10 @@ const GLOBAL_ACTIONS = {
         fileToLoad = STATE.openFiles[fileIndex + 1];
         windowOffsetSecs = 0;
       } else {
-        windowOffsetSecs = Math.min(windowOffsetSecs, currentFileDuration - windowLength);
+        windowOffsetSecs = Math.min(
+          windowOffsetSecs,
+          currentFileDuration - windowLength
+        );
         fileToLoad = STATE.currentFile;
       }
       postBufferUpdate({
@@ -3383,10 +3454,11 @@ const GLOBAL_ACTIONS = {
     }
   },
   ArrowDown: function () {
-    if (activeRow) {
+    if (activeRow && STATE.regionsCompleted) {
       activeRow.classList.remove("table-active");
       activeRow = activeRow.nextSibling || activeRow;
       if (!activeRow.classList.contains("text-bg-dark")) activeRow.click();
+      STATE.regionsCompleted = false
       activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   },
@@ -3437,15 +3509,15 @@ const GLOBAL_ACTIONS = {
     increaseFFT();
   },
   " ": function () {
-    wavesurfer && wavesurfer.playPause();
+    wavesurfer && (async () => await wavesurfer.playPause())();
   },
   Tab: function (e) {
-    if ((e.metaKey || e.ctrlKey) && !PREDICTING) {
+    if ((e.metaKey || e.ctrlKey) && !PREDICTING && STATE.diskHasRecords) {
       // If you did this when predicting, your results would go straight to the archive
       const modeToSet =
         STATE.mode === "explore" ? "active-analysis" : "explore";
       document.getElementById(modeToSet).click();
-    } else if (activeRow) {
+    } else if (activeRow && STATE.regionsCompleted) {
       activeRow.classList.remove("table-active");
       if (e.shiftKey) {
         activeRow = activeRow.previousSibling || activeRow;
@@ -3454,7 +3526,10 @@ const GLOBAL_ACTIONS = {
         activeRow = activeRow.nextSibling || activeRow;
         activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
       }
-      if (!activeRow.classList.contains("text-bg-dark")) activeRow.click();
+      if (!activeRow.classList.contains("text-bg-dark")) {
+        activeRow.click();
+        STATE.regionsCompleted = false
+      }
     }
   },
   Delete: function () {
@@ -3467,13 +3542,7 @@ const GLOBAL_ACTIONS = {
 
 //returns a region object with the start and end of the region supplied
 function getRegion() {
-  return region
-    ? {
-        start: region.start,
-        end: region.end,
-        label: region.content?.innerText || "",
-      }
-    : undefined;
+  return activeRegion || undefined;
 }
 
 function disableSettingsDuringAnalysis(bool) {
@@ -3499,7 +3568,6 @@ const postBufferUpdate = ({
   resetSpec = false,
   region = undefined,
   goToRegion = true,
-  queued = false,
 }) => {
   fileLoaded = false;
   worker.postMessage({
@@ -3510,17 +3578,14 @@ const postBufferUpdate = ({
     end: begin + windowLength,
     play: play,
     resetSpec: resetSpec,
-    region: region,
+    region: activeRegion,
     goToRegion: goToRegion,
-    queued: queued,
   });
   // In case it takes a while:
-  if (!queued) {
-    loadingTimeout = setTimeout(() => {
-      DOM.loading.querySelector("#loadingText").textContent = "Loading file...";
-      DOM.loading.classList.remove("d-none");
-    }, 500);
-  }
+  loadingTimeout = setTimeout(() => {
+    DOM.loading.querySelector("#loadingText").textContent = "Loading file...";
+    DOM.loading.classList.remove("d-none");
+  }, 500);
 };
 
 // Go to position
@@ -3599,7 +3664,7 @@ function onModelReady(args) {
     if (STATE.openFiles.length > 1)
       enableMenuItem(["analyseAll", "reanalyseAll"]);
   }
-  if (region) enableMenuItem(["analyseSelection"]);
+  if (activeRegion) enableMenuItem(["analyseSelection"]);
   t1_warmup = Date.now();
   DIAGNOSTICS["Warm Up"] =
     ((t1_warmup - t0_warmup) / 1000).toFixed(2) + " seconds";
@@ -3618,7 +3683,7 @@ function onModelReady(args) {
  * @param play whether to auto-play the audio
  * @returns {Promise<void>}
  */
-let NEXT_BUFFER;
+
 async function onWorkerLoadedAudio({
   location,
   fileStart = 0,
@@ -3627,10 +3692,8 @@ async function onWorkerLoadedAudio({
   file = "",
   position = 0,
   contents = undefined,
-  fileRegion = undefined,
   play = false,
   queued = false,
-  goToRegion = true,
   metadata = undefined,
 }) {
   (fileLoaded = true), clearTimeout(loadingTimeout);
@@ -3642,55 +3705,40 @@ async function onWorkerLoadedAudio({
   console.log(
     `UI received worker-loaded-audio: ${file}, buffered: ${queued === true}`
   );
-    // Dismiss a context menu if it's open
-    DOM.contextMenu.classList.add("d-none");
-    currentBuffer = contents;
+  // Dismiss a context menu if it's open
+  DOM.contextMenu.classList.add("d-none");
+  currentBuffer = contents;
 
-    STATE.fileStart = fileStart;
-    locationID = location;
-    windowOffsetSecs = windowBegin;
-    NEXT_BUFFER = undefined;
-    if (STATE.currentFile !== file) {
-      STATE.currentFile = file;
-      fileEnd = new Date(fileStart + currentFileDuration * 1000);
-      STATE.metadata[STATE.currentFile] = metadata;
-      renderFilenamePanel();
-    }
+  STATE.fileStart = fileStart;
+  locationID = location;
+  windowOffsetSecs = windowBegin;
+  if (STATE.currentFile !== file) {
+    STATE.currentFile = file;
+    fileEnd = new Date(fileStart + currentFileDuration * 1000);
+    STATE.metadata[STATE.currentFile] = metadata;
+    renderFilenamePanel();
+  }
 
-    const initialTime = config.timeOfDay
-      ? new Date(fileStart)
-      : new Date(0, 0, 0, 0, 0, 0, 0);
-    bufferStartTime = new Date(initialTime.getTime() + windowBegin * 1000);
+  const initialTime = config.timeOfDay
+    ? new Date(fileStart)
+    : new Date(0, 0, 0, 0, 0, 0, 0);
+  bufferStartTime = new Date(initialTime.getTime() + windowBegin * 1000);
 
-    if (windowLength > currentFileDuration) windowLength = currentFileDuration;
+  if (windowLength > currentFileDuration) windowLength = currentFileDuration;
 
-    await updateSpec({
-      buffer: currentBuffer,
-      position: position,
-      play: play,
-      resetSpec: resetSpec,
-    });
-    wavesurfer.bufferRequested = false;
-    if (modelReady) {
-      enableMenuItem(["analyse"]);
-      if (STATE.openFiles.length > 1) enableMenuItem(["analyseAll"]);
-    }
-    if (fileRegion) {
-      createRegion(
-        fileRegion.start,
-        fileRegion.end,
-        fileRegion.label,
-        goToRegion
-      );
-      if (fileRegion.play) {
-        region.play();
-      }
-    } else {
-      resetRegions();
-    }
-    fileLoaded = true;
-    adjustSpecDims()
+  resetRegions();
+  await updateSpec({
+    buffer: currentBuffer,
+    position: position,
+    play: play,
+    resetSpec: resetSpec,
+  });
+  if (modelReady) {
+    enableMenuItem(["analyse"]);
+    if (STATE.openFiles.length > 1) enableMenuItem(["analyseAll"]);
+  }
 }
+
 const i18nFile = {
   en: "File ${count} of ${fileCount}",
   da: "Fil ${count} af ${fileCount}",
@@ -4117,6 +4165,9 @@ async function renderResult({
       // DOM.resultHeader.innerHTML = fragment;
     }
     showElement(["resultTableContainer", "resultsHead"], false);
+    // If  we have some results, let's update the view in case any are in the window
+    if (config.specDetections && !isFromDB && !STATE.selection)
+      postBufferUpdate({ file, begin: windowOffsetSecs });
   } else if (!isFromDB && index % (config.limit + 1) === 0) {
     addPagination(index, 0);
   }
@@ -4330,9 +4381,9 @@ function sendFile(mode, result) {
     const datetime = dateArray.slice(0, 5).join(" ");
     filename = `${result.cname}_${datetime}.${config.audio.format}`;
   } else if (start === undefined) {
-    if (region.start) {
-      start = region.start + windowOffsetSecs;
-      end = region.end + windowOffsetSecs;
+    if (activeRegion.start) {
+      start = activeRegion.start + windowOffsetSecs;
+      end = activeRegion.end + windowOffsetSecs;
     } else {
       start = 0;
       end = currentBuffer.duration;
@@ -4412,7 +4463,7 @@ const iconizeScore = (score) => {
 
 const exportAudio = () => {
   let result;
-  if (region.content?.innerText) {
+  if (activeRegion.label) {
     setClickedIndex(activeRow);
     result = predictions[clickedIndex];
   }
@@ -5342,6 +5393,13 @@ colorMapSlider.addEventListener("input", () => {
   colorMapThreshold.textContent = colorMapSlider.value;
 });
 
+// Gauss Alpha
+const alphaValue = document.getElementById("alpha");
+const alphaSlider = document.getElementById("alpha-slider");
+alphaSlider.addEventListener("input", () => {
+  alphaValue.textContent = alphaSlider.value;
+});
+
 const handleHPchange = () => {
   config.filters.highPassFrequency = HPSlider.valueAsNumber;
   config.filters.active || toggleFilters();
@@ -5417,10 +5475,16 @@ DOM.gain.addEventListener("input", () => {
 function playRegion() {
   // Sanitise region (after zoom, start or end may be outside the windowlength)
   // I don't want to change the actual region length, so make a copy
+  const region = REGIONS.regions.find(
+    (region) => region.start === activeRegion.start
+  );
   const myRegion = region;
   myRegion.start = Math.max(0, myRegion.start);
   // Have to adjust the windowlength so the finish event isn't fired - causing a page reload)
   myRegion.end = Math.min(myRegion.end, windowLength * 0.995);
+  /* ISSUE if you pause at the end of a region, 
+    when 2 regions abut, the second region won't play*/
+  //   REGIONS.once('region-out', () => wavesurfer.pause())
   myRegion.play();
 }
 // Audio preferences:
@@ -5588,7 +5652,7 @@ document.addEventListener("click", function (e) {
     case "known-issues": {
       fetchIssuesByLabel(["v" + VERSION, "All versions affected"])
         .then((issues) => renderIssuesInModal(issues, VERSION))
-        .catch((error) => console.error("Error:", error));
+        .catch((error) => console.error("Error getting known issues:", error));
       break;
     }
     case "show-species":
@@ -5667,9 +5731,9 @@ document.addEventListener("click", function (e) {
 
     case "archive-location-select": {
       (async () => {
-        const files = await window.electron.selectDirectory({
-          path: config.archive.location,
-        });
+        const files = await window.electron.selectDirectory(
+            config.archive.location || ''
+        );
         if (!files.canceled) {
           const archiveFolder = files.filePaths[0];
           config.archive.location = archiveFolder;
@@ -5837,16 +5901,12 @@ document.addEventListener("click", function (e) {
     }
     case "cmpZoomIn":
     case "cmpZoomOut": {
-      let minPxPerSec = ws.params.minPxPerSec;
+      let minPxPerSec = ws.options.minPxPerSec;
       minPxPerSec =
         target === "cmpZoomOut"
-          ? Math.max((minPxPerSec /= 2), 195)
+          ? Math.max((minPxPerSec /= 2), 10)
           : Math.min((minPxPerSec *= 2), 780);
       ws.zoom(minPxPerSec);
-      ws.spectrogram.init();
-      document.querySelector(
-        "#recordings .tab-pane.active .carousel-item.active spectrogram > canvas"
-      ).width = `${ws.drawer.width / ws.params.pixelRatio}px`;
       break;
     }
     case "clear-call-cache": {
@@ -6087,6 +6147,7 @@ document.addEventListener("change", function (e) {
       }
       case "model-to-use": {
         config.model = element.value;
+        STATE.analysisDone = false;
         modelSettingsDisplay();
         DOM.customListFile.value = config.customListFile[config.model];
         DOM.customListFile.value
@@ -6137,11 +6198,17 @@ document.addEventListener("change", function (e) {
         break;
       }
       case "window-function":
+      case "alpha-slider":
       case "loud-color":
       case "mid-color":
       case "quiet-color":
       case "color-threshold-slider": {
         const windowFn = document.getElementById("window-function").value;
+        const alpha = document.getElementById("alpha-slider").valueAsNumber;
+        config.alpha = alpha;
+        windowFn === 'gauss' 
+          ? document.getElementById('alpha').classList.remove('d-none') 
+          : document.getElementById('alpha').classList.add('d-none')
         const loud = document.getElementById("loud-color").value;
         const mid = document.getElementById("mid-color").value;
         const quiet = document.getElementById("quiet-color").value;
@@ -6190,6 +6257,14 @@ document.addEventListener("change", function (e) {
           const fftSamples = spectrogram.fftSamples;
           adjustSpecDims(true, fftSamples);
         }
+        break;
+      }
+      case "spec-detections": {
+        config.specDetections = element.checked;
+        worker.postMessage({
+          action: "update-state",
+          specDetections: config.specDetections,
+        });
         break;
       }
       case "fromInput":
@@ -6277,13 +6352,6 @@ document.addEventListener("change", function (e) {
       case "downmix": {
         config.audio.downmix = e.target.checked;
         worker.postMessage({ action: "update-state", audio: config.audio });
-        break;
-      }
-      case "buy-coffee": {
-        config.hideBuyCoffeeWidget = e.target.checked;
-        config.hideBuyCoffeeWidget
-          ? DOM.buyMeCoffee.classList.add("d-none")
-          : DOM.buyMeCoffee.classList.remove("d-none");
         break;
       }
     }
@@ -6376,8 +6444,18 @@ function getI18n(context) {
   return context[locale] || context["en"];
 }
 
+// Because a right-click only fires the 'contextmenu' event, not the region clicked event
+function checkForRegion(e, setActive) {
+  const relativePosition = e.clientX / e.currentTarget.clientWidth;
+  const time = relativePosition * windowLength;
+  const region = REGIONS.regions.find((r) => r.start < time && r.end > time);
+  region && setActive && setActiveRegion(region);
+  return region;
+}
+
 async function createContextMenu(e) {
   e.stopPropagation();
+  this.closest("#spectrogramWrapper") && checkForRegion(e, true);
   const i18n = getI18n(i18nContext);
   const target = e.target;
   if (target.classList.contains("circle") || target.closest("thead")) return;
@@ -6405,11 +6483,9 @@ async function createContextMenu(e) {
       await waitFor(() => fileLoaded);
     }
   }
-  if (region === undefined && !inSummary) return;
+  if (!activeRegion && !inSummary) return;
   const createOrEdit =
-    region?.content?.innerText || target.closest("#summary")
-      ? i18n.edit
-      : i18n.create;
+    activeRegion.label || target.closest("#summary") ? i18n.edit : i18n.create;
 
   DOM.contextMenu.innerHTML = `
     <div id="${inSummary ? "inSummary" : "inResults"}">
@@ -6463,7 +6539,7 @@ async function createContextMenu(e) {
         }
       });
   }
-  if (inSummary || region?.content?.innerText || hideInSummary) {
+  if (inSummary || activeRegion.label || hideInSummary) {
   } else {
     const xc = document.getElementById("context-xc");
     xc.classList.add("d-none");
@@ -6512,7 +6588,7 @@ async function showRecordEntryForm(mode, batch) {
   const cname = batch
     ? document.querySelector("#speciesFilter .text-warning .cname .cname")
         .textContent
-    : region.content?.innerText.replace("?", "");
+    : activeRegion.label?.replace("?", "");
   let callCount = "",
     typeIndex = "",
     commentText = "";
@@ -6562,9 +6638,12 @@ recordEntryForm.addEventListener("submit", function (e) {
   const batch = document.getElementById("batch-mode").value === "true";
   const cname = document.getElementById("bird-list-all").value;
   let start, end;
-  if (region) {
-    start = windowOffsetSecs + region.start;
-    end = windowOffsetSecs + region.end;
+  if (activeRegion) {
+    start = windowOffsetSecs + activeRegion.start;
+    end = windowOffsetSecs + activeRegion.end;
+    const region = REGIONS.regions.find(
+      (region) => region.start === activeRegion.start
+    );
     region.setOptions({ content: cname });
   }
   const originalCname = document.getElementById("original-id").value;
@@ -7186,6 +7265,12 @@ function renderComparisons(lists, cname) {
         );
         indicatorItem.setAttribute("data-bs-slide-to", `${i}`);
         carouselItem.classList.add("carousel-item");
+        // Need to have waveform and spec in the same container for zoom to work.
+        // This css caps the height, and only shows the spec, at the bottom
+        carouselItem.style.height = '256px';
+        carouselItem.style.display = 'flex';
+        carouselItem.style.flexDirection = 'column';
+        carouselItem.style.justifyContent = 'flex-end';
         i === 0 && carouselItem.classList.add("active");
         i === 0 && indicatorItem.classList.add("active");
         // create div for wavesurfer
@@ -7200,6 +7285,7 @@ function renderComparisons(lists, cname) {
         creditContainer.style.width = "100%";
         const creditText = document.createElement("div");
         creditText.style.zIndex = 5;
+        creditText.style.top = 0;
         creditText.classList.add(
           "float-end",
           "w-100",
@@ -7242,71 +7328,72 @@ function renderComparisons(lists, cname) {
   makeDraggable(header);
   callTypeHeader.addEventListener("click", showCompareSpec);
   const comparisonModal = new bootstrap.Modal(compareDiv);
-  compareDiv.addEventListener("hidden.bs.modal", () => compareDiv.remove());
+  compareDiv.addEventListener("hidden.bs.modal", () => {
+    ws && ws.destroy();
+    ws = null;
+    compareDiv.remove()
+});
   compareDiv.addEventListener("slid.bs.carousel", () => showCompareSpec());
   compareDiv.addEventListener("shown.bs.modal", () => showCompareSpec());
   comparisonModal.show();
 }
 
-let ws;
+let ws, compareSpec;
+const createCompareWS = (mediaContainer) => {
+  if (ws) ws.destroy();
+  ws = WaveSurfer.create({
+    container: mediaContainer,
+    backgroundColor: "rgba(0,0,0,0)",
+    waveColor: "rgba(0,0,0,0)",
+    progressColor: "rgba(0,0,0,0)",
+    // but keep the playhead
+    cursorColor: "#fff",
+    hideScrollbar: true,
+    cursorWidth: 2,
+    fillParent: true,
+    height: 256,
+    minPxPerSec: 195,
+    sampleRate: 24000
+  });
+  // set colormap
+  const colors = createColormap();
+  const createCmpSpec = () => ws.registerPlugin(Spectrogram.create({
+      //deferInit: false,
+      wavesurfer: ws,
+      // container: "#" + specContainer,
+      windowFunc: "hann",
+      frequencyMin: 0,
+      frequencyMax: 12_000,
+      labels: true,
+      fftSamples: 256,
+      height: 256,
+      colorMap: colors,
+      scale: 'linear'
+  }))
+  createCmpSpec()
+}
 
 function showCompareSpec() {
-  if (ws) ws.destroy();
+
   const activeCarouselItem = document.querySelector(
     "#recordings .tab-pane.active .carousel-item.active"
   );
+  // Hide all xc-links
+  document.querySelectorAll('.xc-link').forEach(link => link.classList.add('d-none'));
+  // Show the active one
+  const activeXCLink = activeCarouselItem.querySelector('.xc-link');
+  activeXCLink && activeXCLink.classList.remove('d-none');
+  
   const mediaContainer = activeCarouselItem.lastChild;
   // need to prevent accumulation, and find event for show/hide loading
   const loading = DOM.loading.cloneNode(true);
   loading.classList.remove("d-none", "text-white");
   loading.firstElementChild.textContent = "Loading audio from Xeno-Canto...";
   mediaContainer.appendChild(loading);
-  //console.log("id is ", mediaContainer.id)
-  const [specContainer, file] = mediaContainer.getAttribute("name").split("|");
+  const [_, file] = mediaContainer.getAttribute("name").split("|");
   // Create an instance of WaveSurfer
-  const audioCtx = new AudioContext({
-    latencyHint: "interactive",
-    sampleRate: sampleRate,
-  });
-  // Setup waveform and spec views
-  ws = WaveSurfer.create({
-    container: mediaContainer,
-    audioContext: audioCtx,
-    backend: "WebAudio",
-    // make waveform transparent
-    backgroundColor: "rgba(0,0,0,0)",
-    waveColor: "rgba(109,41,164,0)",
-    progressColor: "rgba(109,41,16,0)",
-    // but keep the playhead
-    cursorColor: "#fff",
-    cursorWidth: 2,
-    partialRender: false,
-    scrollParent: true,
-    fillParent: true,
-    responsive: false,
-    normalize: true,
-    height: 250,
-    minPxPerSec: 195,
-  });
-  // set colormap
-  const colors = createColormap();
-  ws.registerPlugin(
-    Spectrogram.create({
-      //deferInit: false,
-      wavesurfer: ws,
-      container: "#" + specContainer,
-      windowFunc: "hann",
-      frequencyMin: 0,
-      frequencyMax: 11_950,
-      hideScrollbar: false,
-      labels: true,
-      fftSamples: 512,
-      height: 250,
-      colorMap: colors,
-    })
-  );
-
-  ws.on("ready", function () {
+  createCompareWS(mediaContainer)
+  ws.once("decode", function () {
     mediaContainer.removeChild(loading);
   });
   ws.load(file);
@@ -7419,3 +7506,67 @@ const IUCNMap = {
 
 // Make config, LOCATIONS and displayLocationAddress and toasts available to the map script in index.html
 export { config, displayLocationAddress, LOCATIONS, generateToast };
+
+async function membershipCheck() {
+  const oneWeek = 7 * 24 * 60 * 60 * 1000; // "It's been one week since you looked at me, cocked your head to the side..."
+  const cachedStatus = Boolean(localStorage.getItem('isMember'));
+  const cachedTimestamp = Number(localStorage.getItem('memberTimestamp'));
+  const now = Date.now()
+  let installDate = Number(localStorage.getItem('installDate'));
+  if (!installDate) {
+    localStorage.setItem('installDate', now);
+    installDate = now
+  }
+  const trialPeriod = await window.electron.trialPeriod();
+  const inTrial = Date.now() - installDate < trialPeriod;
+  const lockedElements = document.querySelectorAll(".locked, .unlocked");
+  const unlockElements = () => {
+    lockedElements.forEach((el) => {
+      el.classList.replace("locked", "unlocked");
+      el.disabled = false;
+      el.textContent = "lock_open";
+    });
+  }
+  return await checkMembership(config.UUID).then(isMember =>{
+    console.warn('In trial period:', inTrial, ' subscriber:', isMember)
+    if (isMember || inTrial) {
+      unlockElements();
+      if (isMember) {
+        document.getElementById('primaryLogo').src = 'img/logo/chirpity_logo_subscriber_bronze.png'; // Silver & Gold available
+      }
+      localStorage.setItem('isMember', true);
+      localStorage.setItem('memberTimestamp', now);
+    } else {
+      lockedElements.forEach((el) => {
+        el.classList.replace("unlocked", "locked");
+        config.specDetections = false; // will need to update when more elements
+        el.checked = false;
+        el.disabled = true;
+        el.textContent = "lock";
+      });
+      localStorage.setItem('isMember', false);
+    }
+    return isMember
+  }).catch(error =>{ // Period of grace
+    if (cachedStatus === 'true' && cachedTimestamp && now - cachedTimestamp < oneWeek) {
+      console.warn('Using cached membership status during error.', error);
+      unlockElements();
+      document.getElementById('primaryLogo').src = 'img/logo/chirpity_logo_subscriber_bronze.png';
+      return true
+    }
+  });
+
+}
+
+function utf8ToHex(str) {
+  return Array.from(str)
+    .map((char) => char.charCodeAt(0).toString(16).padStart(2, "0")) // Convert each char to hex
+    .join("");
+}
+
+function hexToUtf8(hex) {
+  return hex
+    .match(/.{1,2}/g) // Split the hex string into pairs
+    .map((byte) => String.fromCharCode(parseInt(byte, 16))) // Convert each pair to a character
+    .join("");
+}

@@ -123,7 +123,7 @@
                 <div id="summaryTable"></div>
             </div>
                     <!-- Resizable divider -->
-        <div id="divider" style="width: 5px; cursor: col-resize; background-color: #585858;"></div>
+        <div id="divider"></div>
             <!-- Results table -->
             <div class="col ps-1 pe-0 h-100 position-relative overflow-auto" id="resultsDiv">
                 <table id="results" class="text-center table w-100 align-middle">
@@ -958,12 +958,20 @@
                             <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Show frequency labels" id="Show frequency labels-circle-help"  data-bs-content="When enabled, the spectrogram will display the frequency on the left side.">?</a>
                         </div>
                     </div>
+                    <div class="form-group rounded p-2 mb-2">
+                        <div class="col form-check form-switch">
+                            <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" id="Padlock-circle-help" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature."><span class="pointer locked material-symbols-outlined">lock</span></a>
+                            <label class="form-check-label" for="spec-detections">Show all detections</label>
+                            <input class="locked form-check-input" type="checkbox" role="switch" id="spec-detections" disabled>
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Show all detections" id="Show all detections-circle-help"  data-bs-content="When enabled, the spectrogram will highlight all the detections on screen.">?</a>
+                        </div>
+                    </div>
                     <div class="pe-3 input-group rounded p-2 mb-1">
                         <label for="colourmap" class="input-group-text col-5">Colourmap:</label>
                         <select class="form-select mb-0" id="colourmap">
                             <option value="custom">Custom</option>
-                            <option value="greys">Greyscale</option>
-                            <option value="igreys">Inverted Greyscale</option>
+                            <option value="igray">Greyscale</option>
+                            <option value="gray">Inverted Greyscale</option>
                             <option value="bone">Bone</option>
                             <option value="turbidity">Turbidity</option>
                             <option value="chlorophyll">Chlorophyll</option>
@@ -998,6 +1006,7 @@
                             </div>
                         </div>
                     </fieldset>
+                    <fieldset class="border border-secondary rounded m-2 p-2 d-none" id="window-fieldset"></fieldset>
                     <div class="pe-3 input-group rounded p-2 mb-1">
                         <label for="window-function" class="input-group-text col-5">Window function:</label>
                         <select class="form-select mb-0" id="window-function">
@@ -1013,6 +1022,18 @@
                             <option value="triangular">Triangular</option>
                         </select>
                     </div>
+                    <div id="alpha" class="pe-3 input-group rounded p-2 mb-1 d-none">
+                        <label for="alpha-slider" class="form-label">
+                            Gauss Alpha:
+                        </label>
+                        <div class="input-group">
+                            <input type="range" class="form-control-range w-75" min="0" max="1" step="0.01" id="alpha-slider">
+                            <div class="input-group-append">
+                                <span class="input-group-text" id="alpha">0.5</span>
+                            </div>
+                        </div>
+                    </div>
+                    </fieldset>
                     <div class="pe-3 input-group rounded p-2 mb-1">
                         <label for="timelineSetting" class="input-group-text col-5">Timeline:</label>
                         <select class="form-select mb-0" id="timelineSetting">
@@ -1041,7 +1062,7 @@
                             </div>
                         </div>
                     </div> -->
-                    <div class="form-group rounded p-2 mb-2">
+                    <!-- <div class="form-group rounded p-2 mb-2">
                         <div class="form-check form-switch">
                             <input class="form-check-input" type="checkbox" role="switch" id="buy-coffee">
                             <label class="form-check-label" for="buy-coffee">
@@ -1049,7 +1070,7 @@
                             </label>
                         </div>
                     </div>
-                    <hr>
+                    <hr> -->
                     <div class=" col-auto form-group rounded p-2 mb-2">
                         <div class="text-nowrap">   
                             <div class="form-check form-switch">
@@ -1322,11 +1343,11 @@
                     </li>
                     <div class="nav-item">
                         <li class="nav-link text-nowrap"  onclick="placeMap('settingsMap')" id="navbarSettings"
-                        data-bs-toggle="offcanvas" data-bs-target="#settings" aria-controls="settings"><span class="material-symbols-outlined fs-5 align-middle">settings</span> Settings</li>
+                        data-bs-toggle="offcanvas" data-bs-target="#settings" aria-controls="settings">Settings</li>
                     </div>
                 </ul>
             </div>
-            <div id="buy-me-coffee" class="d-none"></div>
+            <div id="buy-me-coffee" class="d-none"><a href="https://www.buymeacoffee.com/matthew_kirkland" target="_blank"><img src="img/bmc.png" alt="Become a Chirpity supporter on Buy-me-a-coffee" title="Support Chirpity's ongoing development and unlock exclusive features"></a></div>
             <!-- navbar-collapse.// -->
             <a href="https://chirpity.mattkirkland.co.uk" title="Visit the Chirpity website" target="_blank"  id="primaryLogoLink"><img id="primaryLogo" src="img/logo/chirpity_logo2.png" alt="Chirpity bird calls: Identifying birds by sound"></a>
         </div>
@@ -1481,7 +1502,6 @@
     window.updateMap = updateMap;
     window.map = map;
 </script>
-<script data-name="BMC-Widget" data-cfasync="false" src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js" data-id="matthew_kirkland" data-description="Support me on Buy me a coffee!" data-message="" data-color="#5F7FFF" data-position="Right" data-x_margin="10" data-y_margin="3"></script>
 </body>
 
 </html>

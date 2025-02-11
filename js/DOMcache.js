@@ -357,6 +357,12 @@ const DOM = {
     }
     return this._specLabels;
   },
+  get specDetections() {
+    if (!this._specDetections) {
+      this._specDetections = document.getElementById("spec-detections");
+    }
+    return this._specDetections;
+  },
   get summaryTable() {
     if (!this._summaryTable) {
       this._summaryTable = document.getElementById("summaryTable");
