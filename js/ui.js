@@ -419,13 +419,12 @@ function createTimeline() {
   const timeinterval = primaryLabelInterval / 10;
   const colour = wsTextColour();
   const timeline = TimelinePlugin.create({
-    // container: '#timeline',
     insertPosition: "beforebegin",
     formatTimeCallback: formatTimeCallback,
     timeInterval: timeinterval,
     primaryLabelInterval: primaryLabelInterval,
     secondaryLabelInterval: secondaryLabelInterval,
-    secondaryLabelOpacity: 1,
+    secondaryLabelOpacity: 0.35,
     style: {
       fontSize: "0.75rem",
       color: colour,
@@ -522,11 +521,8 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
     color: STATE.regionActiveColour,
   });
 
-  wavesurfer.on("dblclick", (currentTime) => {
-    if (REGIONS.regions.length) resetRegions();
-    else centreSpec();
-    activeRegion = null;
-  });
+  wavesurfer.on("dblclick", centreSpec);
+
 
   wavesurfer.on("finish", function () {
     const bufferEnd = windowOffsetSecs + windowLength;
@@ -1903,7 +1899,7 @@ const defaultConfig = {
   colormap: "inferno",
   specMaxHeight: 260,
   specLabels: true,
-  specDetections: false,
+  specDetections: true,
   customColormap: {
     loud: "#ff7b00",
     mid: "#850035",
@@ -1962,8 +1958,7 @@ const defaultConfig = {
   debug: false,
   VERSION: VERSION,
   powerSaveBlocker: false,
-  fileStartMtime: false,
-  hideBuyCoffeeWidget: false
+  fileStartMtime: false
 };
 let appPath, tempPath, systemLocale, isMac;
 window.onload = async () => {
@@ -2026,8 +2021,8 @@ window.onload = async () => {
   
     
 
-    membershipCheck().then(_  => {
-      document.getElementById("buy-coffee").checked = config.hideBuyCoffeeWidget;
+    membershipCheck().then(isMember  => {
+      isMember || document.getElementById("buy-me-coffee").classList.remove('d-none');
     });
  
     // Disable SNR
@@ -3036,7 +3031,12 @@ function initRegion() {
     // Hide context menu
     DOM.contextMenu.classList.add("d-none");
     setActiveRegion(r);
-  });
+    // If shift key held, clear other regions
+    if (e.shiftKey){
+      REGIONS.regions.forEach((r) => r.color === STATE.regionColour && r.remove());
+      // Ctrl / Cmd: remove the current region
+    } else if (e.ctrlKey || e.metaKey) r.remove()
+  })
 
   // Enable analyse selection when region created
   REGIONS.on("region-created", function (r) {
@@ -3115,13 +3115,15 @@ function specTooltip(event, showHz = !config.specLabels) {
         ) + Number(config.audio.minFrequency);
 
       tooltip.textContent = `${i18n.frequency}: ${yPosition}Hz`;
-      const { start, end } = activeRegion;
-      const textNode = document.createTextNode(
-        formatRegionTooltip(i18n.length, start, end)
-      );
-      const lineBreak = document.createElement("br");
-      tooltip.appendChild(lineBreak); // Add the line break
-      tooltip.appendChild(textNode); // Add the text node
+      if (inRegion){
+        const { start, end } = inRegion;
+        const textNode = document.createTextNode(
+          formatRegionTooltip(i18n.length, start, end)
+        );
+        const lineBreak = document.createElement("br");
+        tooltip.appendChild(lineBreak); // Add the line break
+        tooltip.appendChild(textNode); // Add the text node
+      }
       // Apply styles to the tooltip
       Object.assign(tooltip.style, {
         top: `${event.clientY}px`,
@@ -6352,13 +6354,6 @@ document.addEventListener("change", function (e) {
         worker.postMessage({ action: "update-state", audio: config.audio });
         break;
       }
-      case "buy-coffee": {
-        config.hideBuyCoffeeWidget = e.target.checked;
-        config.hideBuyCoffeeWidget
-          ? DOM.buyMeCoffee.classList.add("d-none")
-          : DOM.buyMeCoffee.classList.remove("d-none");
-        break;
-      }
     }
     updatePrefs("config.json", config);
     const value = element.type === "checkbox" ? element.checked : element.value;
@@ -7532,16 +7527,12 @@ async function membershipCheck() {
       el.textContent = "lock_open";
     });
   }
-  checkMembership(config.UUID).then(isMember =>{
-    config.debug 
-      && console.log('User is a subscriber:', isMember)
-      & console.log('User is in trial period:', inTrial)
+  return await checkMembership(config.UUID).then(isMember =>{
+    console.warn('In trial period:', inTrial, ' subscriber:', isMember)
     if (isMember || inTrial) {
       unlockElements();
       if (isMember) {
-        DOM.buyMeCoffee.classList.add("d-none");
         document.getElementById('primaryLogo').src = 'img/logo/chirpity_logo_subscriber_bronze.png'; // Silver & Gold available
-        config.hideBuyCoffeeWidget = true
       }
       localStorage.setItem('isMember', true);
       localStorage.setItem('memberTimestamp', now);
@@ -7555,11 +7546,13 @@ async function membershipCheck() {
       });
       localStorage.setItem('isMember', false);
     }
+    return isMember
   }).catch(error =>{ // Period of grace
     if (cachedStatus === 'true' && cachedTimestamp && now - cachedTimestamp < oneWeek) {
       console.warn('Using cached membership status during error.', error);
       unlockElements();
-      document.getElementById('primaryLogo').src = 'img/logo/chirpity_logo_subscriber.png';
+      document.getElementById('primaryLogo').src = 'img/logo/chirpity_logo_subscriber_bronze.png';
+      return true
     }
   });
 
