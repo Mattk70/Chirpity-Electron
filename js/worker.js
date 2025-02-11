@@ -839,9 +839,11 @@ async function onLaunch({
   UI.postMessage({ event: "ready-for-tour" });
   STATE.detect.backend = backend;
   BATCH_SIZE = batchSize;
-  STATE.update({ model: model });
-  await loadDB(appPath); // load the diskdb
-  await createDB(); // now make the memoryDB
+  if (!STATE.model || STATE.model !== model){
+    STATE.update({ model: model });
+    await loadDB(appPath); // load the diskdb
+    await createDB(); // now make the memoryDB
+  }
 
   STATE.update({ db: memoryDB });
   NUM_WORKERS = threads;

@@ -2023,10 +2023,12 @@ window.onload = async () => {
     //fill in defaults - after updates add new items
     syncConfig(config, defaultConfig);
     // Show Buy Me a Coffee widget?
-    config.hideBuyCoffeeWidget && DOM.buyMeCoffee.classList.add("d-none");
-    document.getElementById("buy-coffee").checked = config.hideBuyCoffeeWidget;
+  
     
-    membershipCheck();
+
+    membershipCheck().then(_  => {
+      document.getElementById("buy-coffee").checked = config.hideBuyCoffeeWidget;
+    });
  
     // Disable SNR
     config.filters.SNR = 0;
@@ -3184,7 +3186,6 @@ DOM.customListSelector.addEventListener("click", async () => {
 const loadModel = () => {
   PREDICTING = false;
   t0_warmup = Date.now();
-  STATE.analysisDone = false;
   worker.postMessage({
     action: "load-model",
     model: config.model,
@@ -3509,7 +3510,7 @@ const GLOBAL_ACTIONS = {
     wavesurfer && (async () => await wavesurfer.playPause())();
   },
   Tab: function (e) {
-    if ((e.metaKey || e.ctrlKey) && !PREDICTING) {
+    if ((e.metaKey || e.ctrlKey) && !PREDICTING && STATE.diskHasRecords) {
       // If you did this when predicting, your results would go straight to the archive
       const modeToSet =
         STATE.mode === "explore" ? "active-analysis" : "explore";
@@ -5649,7 +5650,7 @@ document.addEventListener("click", function (e) {
     case "known-issues": {
       fetchIssuesByLabel(["v" + VERSION, "All versions affected"])
         .then((issues) => renderIssuesInModal(issues, VERSION))
-        .catch((error) => console.error("Error:", error));
+        .catch((error) => console.error("Error getting known issues:", error));
       break;
     }
     case "show-species":
@@ -6144,6 +6145,7 @@ document.addEventListener("change", function (e) {
       }
       case "model-to-use": {
         config.model = element.value;
+        STATE.analysisDone = false;
         modelSettingsDisplay();
         DOM.customListFile.value = config.customListFile[config.model];
         DOM.customListFile.value
@@ -7531,9 +7533,16 @@ async function membershipCheck() {
     });
   }
   checkMembership(config.UUID).then(isMember =>{
+    config.debug 
+      && console.log('User is a subscriber:', isMember)
+      & console.log('User is in trial period:', inTrial)
     if (isMember || inTrial) {
       unlockElements();
-      isMember && (document.getElementById('primaryLogo').src = 'img/logo/chirpity_logo_subscriber.png')
+      if (isMember) {
+        DOM.buyMeCoffee.classList.add("d-none");
+        document.getElementById('primaryLogo').src = 'img/logo/chirpity_logo_subscriber_bronze.png'; // Silver & Gold available
+        config.hideBuyCoffeeWidget = true
+      }
       localStorage.setItem('isMember', true);
       localStorage.setItem('memberTimestamp', now);
     } else {
@@ -7546,7 +7555,7 @@ async function membershipCheck() {
       });
       localStorage.setItem('isMember', false);
     }
-  }).catch(error =>{
+  }).catch(error =>{ // Period of grace
     if (cachedStatus === 'true' && cachedTimestamp && now - cachedTimestamp < oneWeek) {
       console.warn('Using cached membership status during error.', error);
       unlockElements();
