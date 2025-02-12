@@ -39,6 +39,7 @@ let REGIONS, spectrogram, timeline;
 let LABELS = [],
   DELETE_HISTORY = [];
 // Save console.warn and console.error functions
+const originalInfo = console.info;
 const originalWarn = console.warn;
 const originalError = console.error;
 
@@ -50,6 +51,21 @@ function customURLEncode(str) {
     })
     .replace(/%20/g, "+"); // Replace space with '+' instead of '%20'
 }
+
+
+// Override console.warn to intercept and track warnings
+console.info = function () {
+  // Call the original console.warn to maintain default behavior
+  originalInfo.apply(console, arguments);
+
+  // Track the warning message using your tracking function
+  trackEvent(
+    config.UUID,
+    "Information",
+    arguments[0],
+    customURLEncode(arguments[1])
+  );
+};
 
 // Override console.warn to intercept and track warnings
 console.warn = function () {
@@ -2076,7 +2092,9 @@ window.onload = async () => {
     // timeline
     DOM.timelineSetting.value = config.timeOfDay ? "timeOfDay" : "timecode";
     // Spectrogram colour
+    if (config.colourmap === 'igreys') config.colourmap = 'gray';
     DOM.colourmap.value = config.colormap;
+
     // Spectrogram labels
     DOM.specLabels.checked = config.specLabels;
     // Show all detections
@@ -3280,8 +3298,7 @@ function centreSpec() {
     windowOffsetSecs,
     currentFileDuration - windowLength
   );
-  // Move the region if needed
-  //   let region = getRegion();
+
   if (activeRegion) {
     const shift = saveBufferBegin - windowOffsetSecs;
     activeRegion.start += shift;
@@ -3322,7 +3339,7 @@ const GLOBAL_ACTIONS = {
   //     if (( e.ctrlKey || e.metaKey)) worker.postMessage({ action: 'create-dataset' });
   // },
   e: function (e) {
-    if ((e.ctrlKey || e.metaKey) && region) exportAudio();
+    if ((e.ctrlKey || e.metaKey) && activeRegion) exportAudio();
   },
   g: function (e) {
     if (e.ctrlKey || e.metaKey) showGoToPosition();
@@ -6179,8 +6196,6 @@ document.addEventListener("change", function (e) {
           action: "change-batch-size",
           batchSize: BATCH_SIZE_LIST[element.value],
         });
-        // Reset region maxLength
-        // initRegion();
         break;
       }
       case "colourmap": {
@@ -7528,7 +7543,7 @@ async function membershipCheck() {
     });
   }
   return await checkMembership(config.UUID).then(isMember =>{
-    console.warn('In trial period:', inTrial, ' subscriber:', isMember)
+    console.info(`In trial period: ${inTrial} subscriber: ${isMember}`)
     if (isMember || inTrial) {
       unlockElements();
       if (isMember) {
