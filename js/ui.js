@@ -1543,7 +1543,6 @@ async function showExplore() {
     "active-analysis",
   ]);
   disableMenuItem(["explore", "save2db"]);
-  STATE.openFiles = [];
   // Tell the worker we are in Explore mode
   worker.postMessage({ action: "change-mode", mode: "explore" });
   worker.postMessage({
@@ -1562,6 +1561,8 @@ async function showExplore() {
     range: STATE.explore.range,
   });
   resetResults();
+  // Prevent scroll up hiding navbar
+  adjustSpecDims()
 }
 
 async function showAnalyse() {
@@ -7557,7 +7558,7 @@ async function membershipCheck() {
     });
   }
   return await checkMembership(config.UUID).then(isMember =>{
-    console.info(`In trial period: ${inTrial} subscriber: ${isMember}`)
+    console.info(`Version: ${VERSION}. In trial period: ${inTrial} subscriber: ${isMember}`)
     if (isMember || inTrial) {
       unlockElements();
       if (isMember) {
