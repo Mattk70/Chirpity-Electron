@@ -2092,7 +2092,7 @@ window.onload = async () => {
     // timeline
     DOM.timelineSetting.value = config.timeOfDay ? "timeOfDay" : "timecode";
     // Spectrogram colour
-    if (config.colourmap === 'igreys') config.colourmap = 'gray';
+    if (config.colormap === 'igreys') config.colormap = 'gray';
     DOM.colourmap.value = config.colormap;
 
     // Spectrogram labels
