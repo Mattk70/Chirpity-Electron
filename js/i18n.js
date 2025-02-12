@@ -2948,11 +2948,14 @@ async function localiseUI(locale) {
                 if (['tensorflow', 'webgpu', 'webgl', 'colourmap', 'window-function', 'timelineSetting', 'iucn-scope', 'archive-format',
                      'loud-color', 'mid-color', 'quiet-color', "color-threshold-slider", 'bitrate', 'format', 'quality', 'species-week'].includes(id)) return
                 // Set popOver title. It's in the div, or div parent div
-                const el = label.parentNode.querySelector('a') || label.parentNode.parentNode.querySelector('a') || label.parentNode.parentNode.parentNode.querySelector('a');
+                const elements = label.parentNode.querySelectorAll('a') || label.parentNode.parentNode.querySelectorAll('a') || label.parentNode.parentNode.parentNode.querySelectorAll('a');
                 const heading = label.textContent.replace(':', '');
-                el.setAttribute('data-bs-title', heading);
-                const popover = new bootstrap.Popover(el);
-                popover.update();
+                // Support multipe headings (locked items)
+                elements.forEach(el => {
+                    el.setAttribute('data-bs-title', heading);
+                    const popover = new bootstrap.Popover(el);
+                    popover.update();
+                })
             }
         })
         const play = document.querySelector('#playToggle :nth-child(2)');
