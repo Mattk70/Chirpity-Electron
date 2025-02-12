@@ -3001,6 +3001,7 @@ async function processNextFile({
   if (FILE_QUEUE.length) {
     let file = FILE_QUEUE.shift();
     const found = await getWorkingFile(file).catch((error) => {
+      if (error instanceof Event) error = `Event passed ${error.type}, attached to ${error.currentTarget}`;
       const message = error.message || error;
       if (!STATE.notFound.file) {
         STATE.notFound[file] = true;

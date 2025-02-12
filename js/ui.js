@@ -426,7 +426,13 @@ async function updateSpec({
   refreshTimeline();
   wavesurfer.seekTo(position);
   if (play) playPromise =  wavesurfer.play() 
-    else  wavesurfer.pause();
+  // else  {
+  //   if (wavesurfer) {
+  //     wavesurfer.isPlaying() 
+  //       ? playPromise.then(_ =>{wavesurfer.pause()}) 
+  //       : playPromise = wavesurfer.play();
+  //   } 
+  // }
 }
 
 function createTimeline() {
@@ -653,7 +659,7 @@ function zoomSpec(direction) {
 }
 
 async function showOpenDialog(fileOrFolder) {
-  const defaultPath = localStorage.getItem("lastFolder");
+  const defaultPath = localStorage.getItem("lastFolder") || '';
   const files = await window.electron.openDialog("showOpenDialog", {
     type: "audio",
     fileOrFolder: fileOrFolder,
@@ -1449,7 +1455,7 @@ const exportAudacity = () =>
   exportData("Audacity", isSpeciesViewFiltered(true), Infinity);
 
 async function exportData(format, species, limit, duration) {
-  const defaultPath = localStorage.getItem("lastFolder");
+  const defaultPath = localStorage.getItem("lastFolder") || '';
   const response = await window.electron.selectDirectory(defaultPath);
   if (!response.canceled) {
     const directory = response.filePaths[0];
@@ -3186,7 +3192,7 @@ DOM.listIcon.addEventListener("click", () => {
 });
 
 DOM.customListSelector.addEventListener("click", async () => {
-  const defaultPath = localStorage.getItem("customList");
+  const defaultPath = localStorage.getItem("customList") || '';
   const files = await window.electron.openDialog("showOpenDialog", {
     type: "text",
     defaultPath,
@@ -3526,7 +3532,11 @@ const GLOBAL_ACTIONS = {
     increaseFFT();
   },
   " ": function () {
-    wavesurfer && (async () => await wavesurfer.playPause())();
+    if (wavesurfer) {
+      wavesurfer.isPlaying() 
+        ? playPromise.then(_ => {wavesurfer.pause()}) 
+        : playPromise = wavesurfer.play();
+    } 
   },
   Tab: function (e) {
     if ((e.metaKey || e.ctrlKey) && !PREDICTING && STATE.diskHasRecords) {
@@ -5501,8 +5511,8 @@ function playRegion() {
   myRegion.end = Math.min(myRegion.end, windowLength * 0.995);
   /* ISSUE if you pause at the end of a region, 
     when 2 regions abut, the second region won't play*/
-  //   REGIONS.once('region-out', () => wavesurfer.pause())
-  myRegion.play();
+  //   REGIONS.once('region-out', () => wavesurfer.pauseplayPromise = wavesurfer.play();
+  playPromise = myRegion.play();
 }
 // Audio preferences:
 
@@ -5937,7 +5947,11 @@ document.addEventListener("click", function (e) {
       break;
     }
     case "playToggle": {
-      (async () => await wavesurfer.playPause())();
+      if (wavesurfer) {
+        wavesurfer.isPlaying() 
+          ? playPromise.then(_ => {wavesurfer.pause()}) 
+          : playPromise = wavesurfer.play();
+      } 
       break;
     }
     case "setCustomLocation": {
