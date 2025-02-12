@@ -2884,7 +2884,7 @@ async function localiseUI(locale) {
                 return; // Return unmodified HTML if JSON not found
             }
         } catch (error) {
-            console.warn(`Failed to fetch JSON file: index.${locale}.json`, error);
+            console.info(`Failed to fetch JSON file: index.${locale}.json`);
             // go for english
             locale = 'en';
             const jsonResponse = await fetch(`./I18n/index.en.json`)
