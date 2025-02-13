@@ -321,15 +321,14 @@ DOM.controlsWrapper.addEventListener("mousedown", (e) => {
     }, 10);
   };
 
-  // Remove event listeners on mouseup
+  // Remove event listener on mouseup
   const onMouseUp = () => {
     document.removeEventListener("mousemove", onMouseMove);
-    document.removeEventListener("mouseup", onMouseUp);
     trackEvent(config.UUID, "Drag", "Spec Resize", newHeight);
   };
   // Attach event listeners for mousemove and mouseup
   document.addEventListener("mousemove", onMouseMove);
-  document.addEventListener("mouseup", onMouseUp);
+  document.addEventListener("mouseup", onMouseUp, {once: true});
 });
 
 // Set default Options
@@ -425,14 +424,7 @@ async function updateSpec({
   }
   refreshTimeline();
   wavesurfer.seekTo(position);
-  if (play) playPromise =  wavesurfer.play() 
-  // else  {
-  //   if (wavesurfer) {
-  //     wavesurfer.isPlaying() 
-  //       ? playPromise.then(_ =>{wavesurfer.pause()}) 
-  //       : playPromise = wavesurfer.play();
-  //   } 
-  // }
+  if (play) wavesurfer.play() 
 }
 
 function createTimeline() {
@@ -455,9 +447,9 @@ function createTimeline() {
   return wavesurfer ? wavesurfer.registerPlugin(timeline) : timeline;
 }
 
-const resetRegions = (e) => {
-  if (e?.button === 2) return;
+const resetRegions = (clearActive) => {
   if (wavesurfer) REGIONS.clearRegions();
+  clearActive && (activeRegion = null);
   STATE.selection = false;
   worker.postMessage({ action: "update-state", selection: false });
   disableMenuItem(["analyseSelection", "export-audio"]);
@@ -465,7 +457,7 @@ const resetRegions = (e) => {
 };
 
 function clearActive() {
-  resetRegions();
+  resetRegions(true);
   activeRow?.classList.remove("table-active");
   activeRow = undefined;
 }
@@ -545,7 +537,6 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
 
   wavesurfer.on("dblclick", centreSpec);
 
-
   wavesurfer.on("finish", function () {
     const bufferEnd = windowOffsetSecs + windowLength;
     if (currentFileDuration > bufferEnd) {
@@ -568,13 +559,11 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
   wave.removeEventListener("wheel", handleGesture);
   wave.addEventListener("wheel", handleGesture, { passive: true });
 
-  wave.removeEventListener("mousedown", resetRegions);
   wave.removeEventListener("mousemove", specTooltip);
   wave.removeEventListener("mouseout", hideTooltip);
 
 
   wave.addEventListener("mousemove", specTooltip, { passive: true });
-  wave.addEventListener("mousedown", resetRegions);
   wave.addEventListener("mouseout", hideTooltip);
 };
 
@@ -585,8 +574,6 @@ function increaseFFT() {
     postBufferUpdate({
       begin: windowOffsetSecs,
       position: position,
-      region: getRegion(),
-      goToRegion: false,
       play: wavesurfer.isPlaying(),
     });
     console.log(spectrogram.fftSamples);
@@ -601,8 +588,6 @@ function reduceFFT() {
     postBufferUpdate({
       begin: windowOffsetSecs,
       position: position,
-      region: getRegion(),
-      goToRegion: false,
       play: wavesurfer.isPlaying(),
     });
     console.log(spectrogram.fftSamples);
@@ -652,7 +637,6 @@ function zoomSpec(direction) {
     postBufferUpdate({
       begin: windowOffsetSecs,
       position: position,
-      goToRegion: false,
       play: wavesurfer.isPlaying(),
     });
   }
@@ -1619,7 +1603,7 @@ function createRegion(start, end, label, goToRegion, colour) {
     start: start,
     end: end,
     color: colour || STATE.regionColour,
-    content: label || "",
+    content: formatLabel(label, colour),
   });
   // const regionsPlugin = wavesurfer.plugins.find(plugin => plugin.REGIONS);
   // const activeRegion = regionsPlugin.REGIONS[0]
@@ -1708,14 +1692,10 @@ const loadResultRegion = ({
     end: end - windowOffsetSecs,
     label,
   };
-  const position = wavesurfer
-    ? clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1)
-    : 0;
   postBufferUpdate({
     file: file,
     begin: windowOffsetSecs,
-    position: position,
-    region: activeRegion,
+    goToRegion: true
   });
 };
 
@@ -1729,6 +1709,7 @@ async function adjustSpecDims(redraw, fftSamples, newHeight) {
   const footerHeight = DOM.footer.offsetHeight;
   const navHeight = DOM.navPadding.clientHeight;
   newHeight ??= 0;
+  DOM.contentWrapper.style.top = (navHeight).toString() + 'px'; // for padding
   DOM.contentWrapper.style.height =
     (bodyElement.clientHeight - footerHeight - navHeight).toString() + "px";
   const contentHeight = contentWrapper.offsetHeight;
@@ -2483,7 +2464,7 @@ const setUpWorkerMessaging = () => {
           break;
         }
         case "window-detections": {
-          showWindowDetections(args.detections);
+          showWindowDetections(args);
           break;
         }
         case "worker-loaded-audio": {
@@ -2502,16 +2483,16 @@ const setUpWorkerMessaging = () => {
   });
 };
 
-function showWindowDetections(detectionList) {
-  for (const detection of detectionList) {
+function showWindowDetections({detections, goToRegion}) {
+  for (const detection of detections) {
     const start = detection.start - windowOffsetSecs;
     if (start < windowLength) {
       const end = detection.end - windowOffsetSecs;
       const active = start === activeRegion?.start;
-      const colour = active ? STATE.regionActiveColour : null;
-      let gotoRegion = active;
       if (!config.specDetections && !active) continue;
-      createRegion(start, end, detection.label, gotoRegion, colour);
+      const colour = active ? STATE.regionActiveColour : null;
+      const setPosition = active && goToRegion;      
+      createRegion(start, end, detection.label, setPosition, colour);
     }
   }
   // Prevent region cluster fest
@@ -3028,15 +3009,35 @@ function handleKeyDown(e) {
 }
 
 ///////////// Nav bar Option handlers //////////////
+function formatLabel(label, color){
+  if (config.colormap === 'gray') {
+    color = color ? 'purple': '#666'
+  }
+  if (!label) return
+  const labelEl = document.createElement('span');
+  Object.assign(labelEl.style, {
+    position: 'absolute',
+    color: color || 'beige',
+    top: '1rem',
+    left: '0.5rem',
+    textShadow: '2px 2px 3px rgb(0, 0, 0, 0.5)'
+  })
+  labelEl.textContent = label;
+  return labelEl
+}
 
 function setActiveRegion(region) {
   const { start, end, content } = region;
   // Clear active regions
-  REGIONS.regions.forEach((r) => r.setOptions({ color: STATE.regionColour }));
+  REGIONS.regions.forEach((r) => r.setOptions({ 
+    color: STATE.regionColour,
+    content: formatLabel(content?.innerText)
+  }));
   // Set the playhead to the start of the region
-  wavesurfer.setTime(start);
-  activeRegion = { start, end, label: content?.innerText };
-  region.setOptions({ color: STATE.regionActiveColour });
+  const label = content?.innerText || '';
+  const labelEl = formatLabel(label, 'gold')
+  activeRegion = { start, end, label};
+  region.setOptions({ color: STATE.regionActiveColour, content: labelEl});
   enableMenuItem(["export-audio"]);
   if (modelReady && !PREDICTING) {
     enableMenuItem(["analyseSelection"]);
@@ -3053,9 +3054,13 @@ function initRegion() {
   });
 
   REGIONS.on("region-clicked", function (r, e) {
+    // e.stopPropagation()
     // Hide context menu
     DOM.contextMenu.classList.add("d-none");
-    setActiveRegion(r);
+    if (r.start !== activeRegion?.start){
+      setActiveRegion(r);
+      wavesurfer.setTime(r.start);
+    }
     // If shift key held, clear other regions
     if (e.shiftKey){
       REGIONS.regions.forEach((r) => r.color === STATE.regionColour && r.remove());
@@ -3073,7 +3078,7 @@ function initRegion() {
 
   // Clear label on modifying region
   REGIONS.on("region-update", function (r) {
-    r.setOptions({ content: "" });
+    r.setOptions({content: ' '});
     setActiveRegion(r);
   });
 
@@ -3315,9 +3320,7 @@ function centreSpec() {
   }
   postBufferUpdate({
     begin: windowOffsetSecs,
-    position: 0.5,
-    region: activeRegion,
-    goToRegion: false,
+    position: 0.5
   });
 }
 
@@ -3325,52 +3328,30 @@ function centreSpec() {
 
 const GLOBAL_ACTIONS = {
   // eslint-disable-line
-  a: function (e) {
+  a: (e) => {
     if ((e.ctrlKey || e.metaKey) && STATE.currentFile) {
       const element = e.shiftKey ? "analyseAll" : "analyse";
       document.getElementById(element).click();
     }
   },
-  A: function (e) {
+  A: (e) => {
     (e.ctrlKey || e.metaKey) &&
       STATE.currentFile &&
       document.getElementById("analyseAll").click();
   },
-  c: function (e) {
-    // Center window on playhead
-    if ((e.ctrlKey || e.metaKey) && currentBuffer) {
-      centreSpec();
-    }
-  },
-  // D: function (e) {
+  c: (e) => (e.ctrlKey || e.metaKey) && currentBuffer && centreSpec(),
+  // D: (e) => {
   //     if (( e.ctrlKey || e.metaKey)) worker.postMessage({ action: 'create-dataset' });
   // },
-  e: function (e) {
-    if ((e.ctrlKey || e.metaKey) && activeRegion) exportAudio();
-  },
-  g: function (e) {
-    if (e.ctrlKey || e.metaKey) showGoToPosition();
-  },
-  o: async function (e) {
-    if (e.ctrlKey || e.metaKey) await showOpenDialog("openFile");
-  },
-  p: function () {
-    typeof activeRegion !== "undefined"
-      ? playRegion()
-      : console.log("Region undefined");
-  },
-  q: function (e) {
-    e.metaKey && isMac && window.electron.exitApplication();
-  },
-  s: function (e) {
-    if (e.ctrlKey || e.metaKey) {
-      document.getElementById("save2db").click();
-    }
-  },
-  t: function (e) {
-    if (e.ctrlKey || e.metaKey) timelineToggle(true);
-  },
-  v: function (e) {
+  e: (e) => (e.ctrlKey || e.metaKey) && activeRegion && exportAudio(),
+  g: (e) => (e.ctrlKey || e.metaKey) && showGoToPosition(),
+  o: async (e) => (e.ctrlKey || e.metaKey) && await showOpenDialog("openFile"),
+  p: () => activeRegion && playRegion(),
+  q: (e) => e.metaKey && isMac && window.electron.exitApplication(),
+  s: (e) => (e.ctrlKey || e.metaKey) &&
+      document.getElementById("save2db").click(),
+  t: (e) => (e.ctrlKey || e.metaKey) && timelineToggle(true),
+  v: (e) => {
     if (activeRow && (e.ctrlKey || e.metaKey)) {
       const nameAttribute = activeRow.getAttribute("name");
       const [file, start, end, sname, label] = nameAttribute.split("|");
@@ -3388,11 +3369,11 @@ const GLOBAL_ACTIONS = {
       );
     }
   },
-  z: function (e) {
+  z: (e) => {
     if ((e.ctrlKey || e.metaKey) && DELETE_HISTORY.length)
       insertManualRecord(...DELETE_HISTORY.pop());
   },
-  Escape: function () {
+  Escape: () => {
     if (PREDICTING) {
       console.log("Operation aborted");
       PREDICTING = false;
@@ -3409,19 +3390,19 @@ const GLOBAL_ACTIONS = {
       DOM.progressDiv.classList.add("invisible");
     }
   },
-  Home: function () {
+  Home: () => {
     if (currentBuffer) {
       windowOffsetSecs = 0;
       postBufferUpdate({});
     }
   },
-  End: function () {
+  End: () => {
     if (currentBuffer) {
       windowOffsetSecs = currentFileDuration - windowLength;
       postBufferUpdate({ begin: windowOffsetSecs, position: 1 });
     }
   },
-  PageUp: function () {
+  PageUp: () => {
     if (currentBuffer) {
       const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
       windowOffsetSecs = windowOffsetSecs - windowLength;
@@ -3437,11 +3418,11 @@ const GLOBAL_ACTIONS = {
       postBufferUpdate({
         file: fileToLoad,
         begin: windowOffsetSecs,
-        position: position,
+        position: position
       });
     }
   },
-  ArrowUp: function () {
+  ArrowUp: () => {
     if (activeRow && STATE.regionsCompleted) {
       activeRow.classList.remove("table-active");
       activeRow = activeRow.previousSibling || activeRow;
@@ -3450,7 +3431,7 @@ const GLOBAL_ACTIONS = {
       activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   },
-  PageDown: function () {
+  PageDown: () => {
     if (currentBuffer) {
       const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
       windowOffsetSecs = windowOffsetSecs + windowLength;
@@ -3473,11 +3454,11 @@ const GLOBAL_ACTIONS = {
       postBufferUpdate({
         file: fileToLoad,
         begin: windowOffsetSecs,
-        position: position,
+        position: position
       });
     }
   },
-  ArrowDown: function () {
+  ArrowDown: () => {
     if (activeRow && STATE.regionsCompleted) {
       activeRow.classList.remove("table-active");
       activeRow = activeRow.nextSibling || activeRow;
@@ -3486,7 +3467,7 @@ const GLOBAL_ACTIONS = {
       activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   },
-  ArrowLeft: function () {
+  ArrowLeft: () => {
     const skip = windowLength / 100;
     if (currentBuffer) {
       wavesurfer.setTime(wavesurfer.getCurrentTime() - skip);
@@ -3495,12 +3476,12 @@ const GLOBAL_ACTIONS = {
         windowOffsetSecs -= skip;
         postBufferUpdate({
           begin: windowOffsetSecs,
-          position: (position += skip / windowLength),
+          position: (position += skip / windowLength)
         });
       }
     }
   },
-  ArrowRight: function () {
+  ArrowRight: () => {
     const skip = windowLength / 100;
     if (wavesurfer) {
       wavesurfer.setTime(wavesurfer.getCurrentTime() + skip);
@@ -3512,34 +3493,18 @@ const GLOBAL_ACTIONS = {
         );
         postBufferUpdate({
           begin: windowOffsetSecs,
-          position: (position -= skip / windowLength),
+          position: (position -= skip / windowLength)
         });
       }
     }
   },
-  "=": function (e) {
-    e.metaKey || e.ctrlKey ? reduceFFT() : zoomSpec("zoomIn");
-  },
-  "+": function (e) {
-    e.metaKey || e.ctrlKey ? reduceFFT() : zoomSpec("zoomIn");
-  },
-  "-": function (e) {
-    e.metaKey || e.ctrlKey ? increaseFFT() : zoomSpec("zoomOut");
-  },
-  F5: function () {
-    reduceFFT();
-  },
-  F4: function () {
-    increaseFFT();
-  },
-  " ": function () {
-    if (wavesurfer) {
-      wavesurfer.isPlaying() 
-        ? playPromise.then(_ => {wavesurfer.pause()}) 
-        : playPromise = wavesurfer.play();
-    } 
-  },
-  Tab: function (e) {
+  "=": (e) => e.metaKey || e.ctrlKey ? reduceFFT() : zoomSpec("zoomIn"),
+  "+": (e) => e.metaKey || e.ctrlKey ? reduceFFT() : zoomSpec("zoomIn"),
+  "-": (e) => e.metaKey || e.ctrlKey ? increaseFFT() : zoomSpec("zoomOut"),
+  F5:() => reduceFFT(),
+  F4: () => increaseFFT(),
+  " ": () => wavesurfer && wavesurfer.playPause(),
+  Tab: (e) => {
     if ((e.metaKey || e.ctrlKey) && !PREDICTING && STATE.diskHasRecords) {
       // If you did this when predicting, your results would go straight to the archive
       const modeToSet =
@@ -3560,12 +3525,8 @@ const GLOBAL_ACTIONS = {
       }
     }
   },
-  Delete: function () {
-    activeRow && deleteRecord(activeRow);
-  },
-  Backspace: function () {
-    activeRow && deleteRecord(activeRow);
-  },
+  Delete: () => activeRow && deleteRecord(activeRow),
+  Backspace: () => activeRow && deleteRecord(activeRow),
 };
 
 //returns a region object with the start and end of the region supplied
@@ -3594,8 +3555,7 @@ const postBufferUpdate = ({
   position = 0,
   play = false,
   resetSpec = false,
-  region = undefined,
-  goToRegion = true,
+  goToRegion = false,
 }) => {
   fileLoaded = false;
   worker.postMessage({
@@ -3606,7 +3566,7 @@ const postBufferUpdate = ({
     end: begin + windowLength,
     play: play,
     resetSpec: resetSpec,
-    region: activeRegion,
+    // region: activeRegion,
     goToRegion: goToRegion,
   });
   // In case it takes a while:
@@ -5389,8 +5349,7 @@ const showFilterEffect = () => {
     const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
     postBufferUpdate({
       begin: windowOffsetSecs,
-      position: position,
-      region: getRegion(),
+      position: position
     });
   }
 };
@@ -5513,7 +5472,7 @@ function playRegion() {
   /* ISSUE if you pause at the end of a region, 
     when 2 regions abut, the second region won't play*/
   //   REGIONS.once('region-out', () => wavesurfer.pauseplayPromise = wavesurfer.play();
-  playPromise = myRegion.play();
+  myRegion.play();
 }
 // Audio preferences:
 
@@ -5722,7 +5681,18 @@ document.addEventListener("click", function (e) {
         .catch((error) => console.warn(error));
       break;
     }
-
+    // Spectrogram
+    case "waveform": {
+      if (e.shiftKey){
+        e.stopPropagation()
+        const inRegion = checkForRegion(e)
+        if (! inRegion) {
+          REGIONS.clearRegions()
+          activeRegion = null
+        }
+      }
+      break;
+    }
     // Settings
     case "basic":
     case "advanced": {
@@ -5949,11 +5919,9 @@ document.addEventListener("click", function (e) {
     }
     case "playToggle": {
       if (wavesurfer) {
-        wavesurfer.isPlaying() 
-          ? playPromise.then(_ => {wavesurfer.pause()}) 
-          : playPromise = wavesurfer.play();
-      } 
-      break;
+        wavesurfer.playPause() 
+        break;
+      }
     }
     case "setCustomLocation": {
       setCustomLocation();
@@ -6066,13 +6034,13 @@ document.addEventListener("change", function (e) {
       }
       case "iucn": {
         config.detect.iucn = element.checked;
-        resetRegions();
+        // resetRegions();
         refreshSummary();
         break;
       }
       case "iucn-scope": {
         config.detect.iucnScope = element.value;
-        resetRegions();
+        // resetRegions();
         refreshSummary();
         break;
       }
@@ -6224,6 +6192,7 @@ document.addEventListener("change", function (e) {
         if (wavesurfer && STATE.currentFile) {
           const fftSamples = spectrogram.fftSamples;
           adjustSpecDims(true, fftSamples);
+          postBufferUpdate({ begin: windowOffsetSecs, position: wavesurfer.getCurrentTime() / windowLength });
         }
         break;
       }
@@ -6274,9 +6243,7 @@ document.addEventListener("change", function (e) {
           );
           postBufferUpdate({
             begin: windowOffsetSecs,
-            position: position,
-            region: getRegion(),
-            goToRegion: false,
+            position: position
           });
         }
         break;
@@ -6334,9 +6301,7 @@ document.addEventListener("change", function (e) {
           );
           postBufferUpdate({
             begin: windowOffsetSecs,
-            position: position,
-            region: getRegion(),
-            goToRegion: false,
+            position: position
           });
         }
         break;
@@ -6484,6 +6449,8 @@ function checkForRegion(e, setActive) {
 }
 
 async function createContextMenu(e) {
+  // If we let the playback continue, the region may get wiped
+  if (wavesurfer?.isPlaying()) wavesurfer.pause();
   e.stopPropagation();
   this.closest("#spectrogramWrapper") && checkForRegion(e, true);
   const i18n = getI18n(i18nContext);
@@ -7558,7 +7525,7 @@ async function membershipCheck() {
     });
   }
   return await checkMembership(config.UUID).then(isMember =>{
-    console.info(`Version: ${VERSION}. In trial period: ${inTrial} subscriber: ${isMember}`)
+    console.info(`Version: ${VERSION}. Trial: ${inTrial} subscriber: ${isMember}, All detections: ${config.specDetections}`, '')
     if (isMember || inTrial) {
       unlockElements();
       if (isMember) {
