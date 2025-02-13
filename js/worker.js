@@ -1460,7 +1460,7 @@ async function loadAudioFile({
   start = 0,
   end = 20,
   position = 0,
-  region = false,
+  // region = false,
   play = false,
   goToRegion = true,
 }) {
@@ -1479,16 +1479,16 @@ async function loadAudioFile({
               file: file,
               position: position,
               contents: audio,
-              fileRegion: region,
+              // fileRegion: region,
               play: play,
-              goToRegion,
+              // goToRegion,
               metadata: METADATA[file].metadata,
             },
             [audio.buffer]
           );
           let week;
 
-          sendDetections(file, start, end);
+          sendDetections(file, start, end, goToRegion);
 
           if (STATE.list === "location") {
             week = STATE.useWeek
@@ -1546,11 +1546,11 @@ function addDays(date, days) {
   return result;
 }
 
-async function sendDetections(file, start, end, queued) {
+async function sendDetections(file, start, end, goToRegion) {
     const db = STATE.db;
     start = METADATA[file].fileStart + (start * 1000)
     end = METADATA[file].fileStart + (end * 1000)
-    const params = [file, start, end, STATE.detect.confidence];
+    const params = [STATE.detect.confidence, file, start, end];
     const included = await getIncludedIDs();
     const includedSQL = filtersApplied(included) ? ` AND speciesID IN (${prepParams(included)})` : '';
     includedSQL && params.push(...included)
@@ -1568,15 +1568,17 @@ async function sendDetections(file, start, end, queued) {
             FROM records
             JOIN species ON speciesID = species.ID
             JOIN files ON fileID = files.ID
+            WHERE confidence >= ?
+            AND name = ? 
+            AND dateTime BETWEEN ? AND ?
+            ${includedSQL}
         )
         SELECT start, end, label
         FROM RankedRecords
-        WHERE name = ? 
-        AND dateTime BETWEEN ? AND ?
-        AND rank = 1
-        AND confidence >= ? ${includedSQL}`, ...params
+        WHERE rank = 1  
+        `, ...params
     )
-    UI.postMessage({event: 'window-detections', detections: results, queued})
+    UI.postMessage({event: 'window-detections', detections: results, goToRegion})
 }
 
 /**
