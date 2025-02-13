@@ -1455,6 +1455,39 @@ async function notifyMissingFile(file) {
   });
 }
 
+/**
+ * Asynchronously loads an audio file, processes its audio data, and updates the UI with relevant metadata.
+ *
+ * This function fetches the audio buffer from the specified file between the given start and end times,
+ * then posts the audio data along with metadata to the UI. It also triggers detection processing and posts
+ * the current file's week number based on the application's state. If the file does not exist or an error occurs
+ * during processing, an error alert is generated and the promise is rejected.
+ *
+ * @param {Object} options - Configuration options for loading the audio file.
+ * @param {string} [options.file=""] - The path to the audio file to load.
+ * @param {number} [options.start=0] - The starting time (in seconds) of the audio segment to load.
+ * @param {number} [options.end=20] - The ending time (in seconds) of the audio segment to load.
+ * @param {number} [options.position=0] - The playback position offset for the audio file.
+ * @param {boolean} [options.play=false] - Flag indicating whether to automatically play the audio after loading.
+ * @param {boolean} [options.goToRegion=true] - Flag indicating whether the UI should navigate to a specific region.
+ *
+ * @returns {Promise<void>} A promise that resolves when the audio file has been successfully loaded and processed,
+ * or rejects with a generated error alert if the file cannot be found or processed.
+ *
+ * @throws Will reject if the file does not exist or if an error occurs while fetching or processing the audio data.
+ *
+ * @example
+ * loadAudioFile({ 
+ *   file: "/path/to/audio.mp3", 
+ *   start: 10, 
+ *   end: 30, 
+ *   position: 5, 
+ *   play: true, 
+ *   goToRegion: true 
+ * })
+ *   .then(() => console.log("Audio loaded successfully."))
+ *   .catch((error) => console.error("Error loading audio:", error));
+ */
 async function loadAudioFile({
   file = "",
   start = 0,
@@ -1540,12 +1573,37 @@ async function loadAudioFile({
   });
 }
 
+/**
+ * Adds a specified number of days to a given date.
+ *
+ * @param {(Date|string|number)} date - The original date to modify. Accepts a Date object, a date string, or a timestamp.
+ * @param {number} days - The number of days to add. Use a negative value to subtract days.
+ * @returns {Date} A new Date object representing the date after adding the specified number of days.
+ */
 function addDays(date, days) {
   let result = new Date(date);
   result.setDate(result.getDate() + days);
   return result;
 }
 
+/**
+ * Retrieves and sends detection data for an audio file within a specified time range.
+ *
+ * This asynchronous function calculates the absolute start and end times by adding the file's metadata offset 
+ * (in milliseconds) to the provided start and end times (in seconds). It then queries the database for detection 
+ * records that meet the configured minimum confidence level and a specific species name. If additional species 
+ * filters are applied, they are incorporated into the query. The function uses a SQL query with a window ranking 
+ * to select the top-ranked detection per file and datetime grouping, ensuring that only the most confident detection 
+ * is reported for each group. Finally, it posts the retrieved detections to the UI along with a flag indicating 
+ * whether the UI should navigate directly to the corresponding region.
+ *
+ * @async
+ * @param {string} file - The file identifier used to look up metadata and filter detection records.
+ * @param {number} start - The starting time in seconds relative to the file's recording start.
+ * @param {number} end - The ending time in seconds relative to the file's recording start.
+ * @param {boolean} goToRegion - Flag indicating whether the UI should navigate to the detection region.
+ * @returns {Promise<void>} A promise that resolves when the detections have been successfully sent to the UI.
+ */
 async function sendDetections(file, start, end, goToRegion) {
     const db = STATE.db;
     start = METADATA[file].fileStart + (start * 1000)
