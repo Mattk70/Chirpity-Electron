@@ -34,6 +34,7 @@
     "Volume Adjustment-circle-help": ["録音レベルが低い場合にオーディオの音量を調整します。"],
     "File-timestamp-circle-help": ["例えばZoom H1 Essentialのような一部のオーディオレコーダーは、ファイル保存日時を録音の開始時点に設定することができます。このオプションを選択すると、検出の表示時間が修正されます（この設定の変更はChirpityの再起動が必要です）。"],
 
+    "loading-text": ["準備中..."],
     "navBarFile": ["ファイル"],
     "navbarHelp": ["ヘルプ"],
     "navbarRecords": ["記録"],

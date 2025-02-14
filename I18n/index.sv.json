@@ -33,6 +33,8 @@
     "Use Location settings-circle-help": ["När aktiverat, rapporterar filtret för nattliga läten arter baserat på dina platsinställningar."],
     "Volume Adjustment-circle-help": ["Justera ljudvolymen för att kompensera för låga inspelningsnivåer."],
     "File-timestamp-circle-help": ["Vissa ljudinspelningsenheter, till exempel Zoom H1 Essential, kan ställa in filens sparade datum och tid till början av inspelningen, istället för slutet. Om du har en sådan inspelare kommer valet av det här alternativet att korrigera tiderna som visas för dina detektioner (ändringar i denna inställning kräver en omstart av Chirpity för att träda i kraft)."],
+    
+    "loading-text": ["Förbereder saker..."],
     "navBarFile": ["Fil"],
     "navbarHelp": ["Hjälp"],
     "navbarRecords": ["Poster"],

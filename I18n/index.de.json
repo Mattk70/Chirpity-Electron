@@ -33,6 +33,8 @@
     "Use Location settings-circle-help": ["Wenn aktiviert, meldet der Nachtaktive Rufen-Filter die Vögel basierend auf Ihren Standorteinstellungen."],
     "Volume Adjustment-circle-help": ["Passen Sie die Lautstärke des Audios an, um niedrige Aufnahmestufen auszugleichen."],
     "File-timestamp-circle-help": [ "Einige Audio-Recorder, zum Beispiel der Zoom H1 Essential, können das gespeicherte Datum und die Uhrzeit der Datei auf den Beginn der Aufnahme statt auf das Ende setzen. Wenn Sie einen solchen Recorder haben, wird durch die Auswahl dieser Option die angezeigte Zeit für Ihre Erkennungen korrigiert (Änderungen an dieser Einstellung erfordern einen Neustart von Chirpity, um wirksam zu werden)."],
+    
+    "loading-text": ["Alles wird vorbereitet..."],
     "navBarFile": ["Datei"],
     "navbarHelp": ["Hilfe"],
     "navbarRecords": ["Aufzeichnungen"],

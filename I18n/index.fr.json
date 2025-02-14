@@ -33,6 +33,8 @@
     "Use Location settings-circle-help": ["Lorsqu'il est activé, le filtre des cris nocturnes rapporte les oiseaux en fonction de vos paramètres de localisation."],
     "Volume Adjustment-circle-help": ["Ajustez le volume de l'audio pour compenser les niveaux d'enregistrement faibles."],
     "File-timestamp-circle-help": ["Certains enregistreurs audio, par exemple le Zoom H1 Essential, peuvent définir la date et l'heure du fichier enregistré au début de l'enregistrement, plutôt qu'à la fin. Si vous avez un tel enregistreur, sélectionner cette option corrigera les horaires affichés pour vos détections (les modifications de ce paramètre nécessitent un redémarrage de Chirpity pour prendre effet)."],
+    
+    "loading-text": ["Préparation en cours..."],
     "navBarFile": ["Fichier"],
     "navbarHelp": ["Aide"],
     "navbarRecords": ["Enregistrements"],

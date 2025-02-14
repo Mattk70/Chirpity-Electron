@@ -33,6 +33,8 @@
   "Use Location settings-circle-help": ["Quando ativada, o filtro de Chamadas noturnos relata as aves com base nas configurações de localização."],
   "Volume Adjustment-circle-help": ["Ajuste o volume do áudio para compensar os níveis baixos de gravação."],
   "File-timestamp-circle-help": ["Alguns gravadores de áudio, como o Zoom H1 Essential, podem definir a data e hora do arquivo salvo para o início da gravação, em vez de para o final. Se você tiver um gravador desse tipo, selecionar esta opção corrigirá os horários mostrados para suas detecções (as alterações nesta configuração requerem o reinício do Chirpity para ter efeito)."],
+  
+  "loading-text": ["Preparando as coisas..."],
   "navBarFile": ["Arquivo"],
   "navbarHelp": ["Ajuda"],
   "navbarRecords": ["Registros"],

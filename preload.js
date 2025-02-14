@@ -64,7 +64,10 @@ contextBridge.exposeInMainWorld("electron", {
   isMac: () => ipcRenderer.invoke("isMac"),
   exitApplication: () => ipcRenderer.invoke("exitApplication"),
   powerSaveBlocker: (onOff) => ipcRenderer.invoke("powerSaveControl", onOff),
+  onFileOpen: (callback) => ipcRenderer.on('open-file', (event, filePath) => callback(filePath))
 });
+
+
 
 contextBridge.exposeInMainWorld("module", {
   fs: fs,

@@ -34,6 +34,7 @@
     "Volume Adjustment-circle-help": ["Juster lydstyrken for at kompensere for lave optagelsesniveauer."],
     "File-timestamp-circle-help": ["Nogle lydoptagere, for eksempel Zoom H1 Essential, kan indstille den gemte filens dato og tid til begyndelsen af optagelsen i stedet for slutningen. Hvis du har en sådan optager, vil valg af denne indstilling rette tiderne vist for dine detektioner (ændringer i denne indstilling kræver en genstart af Chirpity for at træde i kraft)."],
 
+    "loading-text": ["Gør tingene klar..."],
     "navBarFile": ["Fil"],
     "navbarHelp": ["Hjælp"],
     "navbarRecords": ["Optegnelser"],
