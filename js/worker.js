@@ -823,7 +823,30 @@ const filtersApplied = (list) => {
 };
 
 /**
- * onLaunch called when Application is first opened or when model changed
+ * Initializes and launches the application environment by configuring model settings, databases, and prediction workers.
+ *
+ * This function is invoked when the application is first opened or when the model is changed. It sets global flags,
+ * configures the sample rate based on the model, updates the application state, loads the disk and memory databases,
+ * and spawns prediction workers to process audio data.
+ *
+ * @async
+ * @param {Object} options - Configuration options for launching the application.
+ * @param {string} [options.model="chirpity"] - The name of the model to use; if "birdnet", sets sample rate to 48000 Hz, otherwise 24000 Hz.
+ * @param {number} [options.batchSize=32] - The size of the batch to process audio data.
+ * @param {number} [options.threads=1] - The number of worker threads to spawn for prediction processing.
+ * @param {string} [options.backend="tensorflow"] - The backend to use for predictions.
+ * @param {string} [options.list="everything"] - Specifies the list or category to use for predictions.
+ * @returns {Promise<void>} A promise that resolves when the application environment is initialized and prediction workers are spawned.
+ * @throws {Error} Propagates any error encountered during database loading or worker spawning.
+ *
+ * @example
+ * onLaunch({
+ *   model: "birdnet",
+ *   batchSize: 64,
+ *   threads: 4,
+ *   backend: "tensorflow",
+ *   list: "selected"
+ * });
  */
 
 async function onLaunch({
@@ -964,6 +987,23 @@ const getFilesInDirectory = async (dir) => {
 
 const prepParams = (list) => "?".repeat(list.length).split("").join(",");
 
+/**
+ * Constructs an SQL filter clause and an associated parameters array for retrieving file records.
+ *
+ * Depending on the provided range and the current application mode (accessed via the global STATE),
+ * the function generates conditions to filter files by date/time or by file/archive names.
+ *
+ * - If a range object with a defined `start` property is provided, it generates a clause to select
+ *   records where `dateTime` is between `range.start` (inclusive) and `range.end` (exclusive).
+ * - If the mode is "archive", it creates a condition to filter files by both their name and archiveName,
+ *   processing file paths accordingly.
+ * - In "analyse" mode, a file-based condition is noted but currently commented out.
+ *
+ * @param {Object} [range] - Optional range object to filter records by dateTime.
+ * @param {(number|string)} range.start - The start of the date range.
+ * @param {(number|string)} range.end - The end of the date range.
+ * @returns {[string, any[]]} A tuple where the first element is an SQL fragment (string) and the second is an array of parameters to bind to the query.
+ */
 function getFileSQLAndParams(range) {
   const fileParams = prepParams(STATE.filesToAnalyse);
   const params = [];
@@ -1442,6 +1482,18 @@ async function locateFile(file) {
   return null;
 }
 
+/**
+ * Notifies the UI about a missing file entry in the database.
+ *
+ * This asynchronous function queries the disk database for a file record by its name.
+ * If a record with an associated ID exists, it considers the file as missing and triggers an
+ * error alert with the message "dbFileMissing" along with the file name in the alert variables.
+ *
+ * @async
+ * @param {string} file - The name of the file to search for in the database.
+ * @returns {Promise<void>} A promise that resolves once the alert has been generated.
+ * @throws Propagates any errors encountered during the database query.
+ */
 async function notifyMissingFile(file) {
   let missingFile;
   // Look for the file in the Archive
@@ -1573,11 +1625,19 @@ async function loadAudioFile({
 }
 
 /**
- * Adds a specified number of days to a given date.
+ * Adds a specified number of days to a given date and returns a new Date object.
  *
- * @param {(Date|string|number)} date - The original date to modify. Accepts a Date object, a date string, or a timestamp.
+ * This function accepts a date provided as a Date object, a date string, or a timestamp, and adds the given number of days.
+ * Use negative values for subtracting days. It throws an error if the input date is invalid or if the days parameter is not a valid number.
+ *
+ * @param {(Date|string|number)} date - The original date to modify. Can be a Date object, a valid date string, or a timestamp.
  * @param {number} days - The number of days to add. Use a negative value to subtract days.
  * @returns {Date} A new Date object representing the date after adding the specified number of days.
+ * @throws {TypeError} If the input date is invalid or if days is not a valid number.
+ *
+ * @example
+ * // Add 3 days to the current date
+ * const newDate = addDays(new Date(), 3);
  */
 function addDays(date, days) {
   if (!(date instanceof Date) && isNaN(Date.parse(date))) {
@@ -1592,22 +1652,26 @@ function addDays(date, days) {
 }
 
 /**
- * Retrieves and sends detection data for an audio file within a specified time range.
+ * Retrieves detection records for a given audio file within a specified time range and posts them to the UI.
  *
- * This asynchronous function calculates the absolute start and end times by adding the file's metadata offset 
- * (in milliseconds) to the provided start and end times (in seconds). It then queries the database for detection 
- * records that meet the configured minimum confidence level and a specific species name. If additional species 
- * filters are applied, they are incorporated into the query. The function uses a SQL query with a window ranking 
- * to select the top-ranked detection per file and datetime grouping, ensuring that only the most confident detection 
- * is reported for each group. Finally, it posts the retrieved detections to the UI along with a flag indicating 
- * whether the UI should navigate directly to the corresponding region.
+ * This asynchronous function calculates absolute start and end timestamps by adding the file's metadata offset 
+ * (in milliseconds) to the provided start and end offsets (in seconds). It queries the database for detection 
+ * records that satisfy the following criteria:
+ * - A confidence level greater than or equal to the configured minimum (STATE.detect.confidence).
+ * - A file name matching the provided file parameter.
+ * - A detection timestamp between the calculated start and end times.
+ *
+ * If additional species filters are active, the query further restricts results by species ID. Records are 
+ * ranked using a window function to select the top (most confident) detection per grouping of file and datetime.
+ * The function posts the resulting detections to the UI along with a flag that instructs the UI whether to 
+ * navigate directly to the corresponding region.
  *
  * @async
- * @param {string} file - The file identifier used to look up metadata and filter detection records.
- * @param {number} start - The starting time in seconds relative to the file's recording start.
- * @param {number} end - The ending time in seconds relative to the file's recording start.
- * @param {boolean} goToRegion - Flag indicating whether the UI should navigate to the detection region.
- * @returns {Promise<void>} A promise that resolves when the detections have been successfully sent to the UI.
+ * @param {string} file - The identifier or name of the audio file used for querying metadata and filtering detections.
+ * @param {number} start - The starting offset in seconds from the beginning of the file's recording.
+ * @param {number} end - The ending offset in seconds from the beginning of the file's recording.
+ * @param {boolean} goToRegion - If true, signals the UI to navigate to the detected region.
+ * @returns {Promise<void>} A promise that resolves when detections have been successfully retrieved and sent to the UI.
  */
 async function sendDetections(file, start, end, goToRegion) {
     const db = STATE.db;
@@ -4809,6 +4873,33 @@ async function convertAndOrganiseFiles(threadLimit) {
   });
 }
 
+/**
+ * Converts an audio file using FFmpeg, optionally trimming the audio and updating file metadata.
+ *
+ * This function processes an input audio file by executing FFmpeg commands with parameters based on global state
+ * settings (e.g., STATE.archive.format and STATE.archive.trim). When the target archive format is "ogg", the conversion
+ * uses a bitrate of 128k, mono channels, and a sample rate set to 30000 Hz (for BirdNET compatibility). If trimming is
+ * enabled, the function computes start and end boundaries, adjusts the audio duration accordingly, and emits warnings
+ * if multi-day or all-daylight recordings are detected. Conversion progress is calculated and reported via a progress map.
+ * Upon completion, the file's modification time is updated and the associated database record is updated with the new
+ * archive name.
+ *
+ * @param {string} inputFilePath - The path to the input audio file.
+ * @param {string} fullFilePath - The full destination path for the converted output file.
+ * @param {object} row - An object representing the file's metadata; must include properties such as `id`, `duration`, and `filestart`.
+ *                       The `duration` property may be updated if trimming is applied.
+ * @param {object} db - The database instance used to update the file record after conversion.
+ * @param {string} dbArchiveName - The archive name to be saved in the database for this file.
+ * @param {Object.<string, number>} fileProgressMap - A map tracking the conversion progress for files, keyed by file paths.
+ * @returns {Promise<void>} A promise that resolves when the conversion and database update are successfully completed.
+ *
+ * @throws {Error} Rejects the promise if an error occurs during the FFmpeg conversion process.
+ *
+ * @example
+ * convertFile('/path/to/input.wav', '/path/to/output.ogg', fileRecord, db, 'archive123', progressMap)
+ *   .then(() => console.log('Conversion completed successfully.'))
+ *   .catch(err => console.error('Conversion failed:', err));
+ */
 async function convertFile(
   inputFilePath,
   fullFilePath,
