@@ -14,6 +14,11 @@ body {
     background: #d0d0d0;
     font-size: calc(16px * var(--font-size-scale));
 }
+/* Remove orange highlighting after Tab keypress */
+*:focus {
+    outline: none !important;
+}
+
 
 .overlay {
     position: fixed;

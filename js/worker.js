@@ -971,7 +971,7 @@ function getFileSQLAndParams(range) {
   let SQL = "";
   if (range?.start) {
     // Prioritise range queries
-    SQL += " AND dateTime BETWEEN ? AND ? ";
+    SQL += " AND dateTime >= ? AND dateTime < ? ";
     params.push(range.start, range.end);
     // If you create a record manually before analysis, STATE.filesToAnalyse will be empty
   } else if (["analyse"].includes(STATE.mode) && fileParams) {
