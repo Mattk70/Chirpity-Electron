@@ -33,6 +33,8 @@
   "Use Location settings-circle-help": ["激活后，夜间叫声过滤器将基于您的位置设置报告鸟类。"],
   "Volume Adjustment-circle-help": ["调整音量以补偿低录音电平。"],
   "File-timestamp-circle-help": ["一些音频录音设备，例如Zoom H1 Essential，可以将文件保存的日期和时间设置为录音开始时，而不是结束时。如果您有这样的录音设备，选择此选项将修正检测中显示的时间。（更改此设置需要重新启动 Chirpity 才能生效）。"],
+  
+  "loading-text": ["正在准备..."],
   "navBarFile": ["文件"],
   "navbarHelp": ["帮助"],
   "navbarRecords": ["记录"],

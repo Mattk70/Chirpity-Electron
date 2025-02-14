@@ -34,6 +34,7 @@
     "Volume Adjustment-circle-help": ["Pas het volume van audio aan om lage opnamevolumes te compenseren."],
     "File-timestamp-circle-help": [ "Sommige audiorecorders, bijvoorbeeld de Zoom H1 Essential, kunnen de opgeslagen datum en tijd van het bestand instellen op het begin van de opname, in plaats van het einde. Als je zo'n recorder hebt, zal het selecteren van deze optie de weergegeven tijden voor je detecties corrigeren (wijzigingen in deze instelling vereisen een herstart van Chirpity om effect te hebben)."],
 
+    "loading-text": ["Dingen gereedmaken..."],
     "navBarFile": ["Bestand"],
     "navbarHelp": ["Help"],
     "navbarRecords": ["Registraties"],

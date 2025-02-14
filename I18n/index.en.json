@@ -34,6 +34,8 @@
     "Volume Adjustment-circle-help": ["Adjust the volume of audio to compensate for low recording levels."],
     "File-timestamp-circle-help": ["Some audio recorders, for example the Zoom H1 Essential, can set the file saved date and time to the beginning of the recording, rather than the end. If you have such a recorder selecting this option will fix the times shown for your detections (changes to this setting require a Chirpity relaunch to take effect)"],
 
+
+    "loading-text": ["Getting things ready..."],
     "navBarFile": ["File"],
     "navbarHelp": ["Help"],
     "navbarRecords": ["Records"],

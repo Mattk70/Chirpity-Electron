@@ -836,7 +836,6 @@ async function onLaunch({
   SEEN_MODEL_READY = false;
   LIST_CACHE = {};
   sampleRate = model === "birdnet" ? 48_000 : 24_000;
-  UI.postMessage({ event: "ready-for-tour" });
   STATE.detect.backend = backend;
   BATCH_SIZE = batchSize;
   if (!STATE.model || STATE.model !== model){
@@ -4828,7 +4827,7 @@ async function convertFile(
       command
         .audioBitrate("128k")
         .audioChannels(1) // Set to mono
-        .audioFrequency(26_000); // Set sample rate for BirdNET
+        .audioFrequency(30_000); // Set sample rate for BirdNET
     }
 
     let scaleFactor = 1;

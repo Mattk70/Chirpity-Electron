@@ -33,6 +33,8 @@
     "Use Location settings-circle-help": ["Si se activa, el filtro de 'Reclamos nocturnos' tendrá también en cuenta la ubicación."],
     "Volume Adjustment-circle-help": ["Ajusta el volumen del audio para compensar niveles bajos de grabación."],
     "File-timestamp-circle-help": [ "Algunos grabadores de audio, como el Zoom H1 Essential, pueden establecer la fecha y hora de guardado del archivo al inicio de la grabación, en lugar del final. Si tienes un grabador de este tipo, seleccionar esta opción corregirá las horas mostradas para tus detecciones (los cambios en esta configuración requieren reiniciar Chirpity para que surtan efecto)."],
+    
+    "loading-text": ["Preparando todo..."],
     "navBarFile": ["Archivo"],
     "navbarHelp": ["Ayuda"],
     "navbarRecords": ["Registros"],

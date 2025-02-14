@@ -35,7 +35,7 @@ let LOCATIONS,
   LIST_MAP;
 
 let REGIONS, spectrogram, timeline;
-
+let APPLICATION_LOADED = false;
 let LABELS = [],
   DELETE_HISTORY = [];
 // Save console.warn and console.error functions
@@ -165,6 +165,13 @@ let STATE = {
   regionsCompleted: true
 };
 
+//Open Files from OS "open with"
+const OS_FILE_QUEUE = [];
+window.electron.onFileOpen((filePath) => {
+  if (APPLICATION_LOADED) onOpenFiles({ filePaths: [filePath] });
+  else OS_FILE_QUEUE.push(filePath);
+});
+
 // Batch size map for slider
 const BATCH_SIZE_LIST = [4, 8, 16, 32, 48, 64, 96];
 
@@ -273,7 +280,7 @@ let appVersionLoaded = new Promise((resolve, reject) => {
 let modelReady = false,
   fileLoaded = false;
 let PREDICTING = false,
-  t0;
+  t0, app_t0 = Date.now();
 let activeRegion,
   AUDACITY_LABELS = {},
   wavesurfer;
@@ -2137,9 +2144,6 @@ window.onload = async () => {
     };
     //fill in defaults - after updates add new items
     syncConfig(config, defaultConfig);
-    // Show Buy Me a Coffee widget?
-  
-    
 
     membershipCheck().then(isMember  => {
       isMember || document.getElementById("buy-me-coffee").classList.remove('d-none');
@@ -2519,17 +2523,6 @@ const setUpWorkerMessaging = () => {
         // called when an analysis ends, or when the filesbeingprocessed list is empty
         case "processing-complete": {
           STATE.analysisDone = true;
-          break;
-        }
-        case "ready-for-tour": {
-          // New users - show the tour
-          if (!isTestEnv) {
-            if (!config.seenTour) {
-              config.seenTour = true;
-              const timeOut = 1500;
-              setTimeout(prepTour, timeOut);
-            }
-          }
           break;
         }
         case "seen-species-list": {
@@ -3882,6 +3875,17 @@ function onModelReady(args) {
   t1_warmup = Date.now();
   DIAGNOSTICS["Warm Up"] =
     ((t1_warmup - t0_warmup) / 1000).toFixed(2) + " seconds";
+  APPLICATION_LOADED = true;
+  document.getElementById('loading-screen').classList.add('d-none');
+  // New users - show the tour
+  if (!isTestEnv) {
+    if (!config.seenTour) {
+      config.seenTour = true;
+      prepTour();
+    }
+  }
+  console.info(`App Launched in ${t1_warmup - app_t0}ms`)
+  if (OS_FILE_QUEUE.length) onOpenFiles({filePaths: OS_FILE_QUEUE}) && OS_FILE_QUEUE.shift()
 }
 
 /***

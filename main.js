@@ -26,6 +26,21 @@ let files = [];
 let DEBUG = false;
 let unsavedRecords = false;
 
+// List of supported file for opening:
+const SUPPORTED_FILES = [
+  ".wav",
+  ".flac",
+  ".opus",
+  ".m4a",
+  ".mp3",
+  ".mpga",
+  ".ogg",
+  ".aac",
+  ".mpeg",
+  ".mp4",
+  ".mov",
+];
+
 //-------------------------------------------------------------------
 // Logging
 
@@ -427,7 +442,7 @@ app.whenReady().then(async () => {
 
     await createWorker();
     await createWindow();
-    
+
     if (process.platform === 'darwin') {
         //const appIcon = new Tray('./img/icon/icon.png')
         app.dock.setIcon(__dirname + '/img/icon/icon.png');
@@ -438,6 +453,12 @@ app.whenReady().then(async () => {
         app.on('window-all-closed', () => {
             app.quit()
         })
+        const filePath = getFileFromArgs(process.argv);
+        if (filePath) {
+            mainWindow.webContents.once('did-finish-load', () => {
+                mainWindow.webContents.send('open-file', filePath);
+            });
+        }
     }
     
     app.on('activate', async () => {
@@ -449,12 +470,16 @@ app.whenReady().then(async () => {
             await createWindow();
         }
     });
-    app.on('second-instance', () => {
+    app.on('second-instance', (e, commandLine) => {
         // This event is emitted when a second instance is launched
         // Focus the primary instance's window
         if (mainWindow) {
           if (mainWindow.isMinimized()) mainWindow.restore();
           mainWindow.focus();
+          const filePath = getFileFromArgs(commandLine)
+          if (filePath) {
+              mainWindow.webContents.send('open-file', filePath);
+          }
         }
       });
     
@@ -487,6 +512,9 @@ app.whenReady().then(async () => {
         return await dialog.showOpenDialog(mainWindow, options);
     })
     
+    function getFileFromArgs(args) {
+      return args.find(arg => SUPPORTED_FILES.some(ext => arg.toLowerCase().endsWith(ext)));
+  }
     
     ipcMain.handle('selectDirectory', async (_e, path) => {
         // Show file dialog to select a directory
