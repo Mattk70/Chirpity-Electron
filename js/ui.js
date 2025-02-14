@@ -3198,7 +3198,7 @@ function setActiveRegion(region) {
   // Clear active regions
   REGIONS.regions.forEach((r) => r.setOptions({ 
     color: STATE.regionColour,
-    content: formatLabel(content?.innerText)
+    content: formatLabel(r.content?.innerText)
   }));
   // Set the playhead to the start of the region
   const label = content?.innerText || '';
