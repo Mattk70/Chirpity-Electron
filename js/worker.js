@@ -1581,6 +1581,12 @@ async function loadAudioFile({
  * @returns {Date} A new Date object representing the date after adding the specified number of days.
  */
 function addDays(date, days) {
+  if (!(date instanceof Date) && isNaN(Date.parse(date))) {
+    throw new TypeError('Invalid date parameter');
+  }
+  if (typeof days !== 'number' || isNaN(days)) {
+    throw new TypeError('Days must be a valid number');
+  }
   let result = new Date(date);
   result.setDate(result.getDate() + days);
   return result;

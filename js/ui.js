@@ -1702,18 +1702,18 @@ const checkWidth = (text) => {
  * @returns {void}
  */
 function createRegion(start, end, label, goToRegion, colour) {
+  // Validate input parameters
+  if (typeof start !== 'number' || typeof end !== 'number' || start >= end) {
+    console.error('Invalid region parameters:', { start, end });
+    return;
+  }
+  
   REGIONS.addRegion({
     start: start,
     end: end,
     color: colour || STATE.regionColour,
     content: formatLabel(label, colour),
   });
-  // const regionsPlugin = wavesurfer.plugins.find(plugin => plugin.REGIONS);
-  // const activeRegion = regionsPlugin.REGIONS[0]
-  // const text = activeRegion.label;
-  // if (region.content.clientWidth <= checkWidth(text)) {
-  //     region.content.style.writingMode = 'vertical-rl';
-  // }
 
   if (goToRegion) wavesurfer.setTime(start);
 }
@@ -3194,6 +3194,10 @@ function formatLabel(label, color){
  * setActiveRegion(region);
  */
 function setActiveRegion(region) {
+  if (!region || typeof region.start !== 'number' || typeof region.end !== 'number') {
+    console.error('Invalid region:', region);
+    return;
+  }
   const { start, end, content } = region;
   // Clear active regions
   REGIONS.regions.forEach((r) => r.setOptions({ 
@@ -3772,6 +3776,13 @@ const postBufferUpdate = ({
   resetSpec = false,
   goToRegion = false,
 }) => {
+
+  // Validate input parameters
+  if (begin < 0 || position < 0 || position > 1) {
+    console.error('Invalid buffer update parameters:', { begin, position });
+    return;
+  }
+
   fileLoaded = false;
   worker.postMessage({
     action: "update-buffer",
