@@ -419,20 +419,17 @@ function loadAudioFileSync({ filePath = "", preserveResults = false }) {
 let playPromise;
 
 /**
- * Asynchronously updates the spectrogram visualization and timeline based on the provided audio buffer and options.
+ * Updates the spectrogram visualization and timeline asynchronously.
  *
- * This function ensures that the spectrogram element is visible by removing the "d-none" class, then updates the display.
- * If a spectrogram reset is requested or the wavesurfer instance is not initialized, it adjusts the spectrogram dimensions.
- * Otherwise, it loads the provided audio buffer. After updating the visualization, it refreshes the timeline,
- * seeks to a specified position within the audio, and optionally starts playback.
+ * This function ensures that the spectrogram element is visible by removing the "d-none" class and updates the display based on the provided audio buffer and options. It resets the spectrogram dimensions if a reset is requested or if the wavesurfer instance is uninitialized; otherwise, it loads the new audio buffer. After updating the spectrogram, the timeline is refreshed, the playback position is set using a normalized value, and playback is initiated if specified.
  *
  * @async
- * @param {Object} options - Options for updating the spectrogram.
- * @param {*} options.buffer - The audio buffer to load into the spectrogram.
- * @param {boolean} [options.play=false] - If true, starts playback after the update.
- * @param {number} [options.position=0] - The playback position to seek to (normalized value, e.g., between 0 and 1).
+ * @param {Object} options - Configuration options for updating the spectrogram.
+ * @param {AudioBuffer|*} options.buffer - The audio buffer to be visualized.
+ * @param {boolean} [options.play=false] - If true, starts playback immediately after the update.
+ * @param {number} [options.position=0] - Normalized playback position (between 0 and 1) to seek to.
  * @param {boolean} [options.resetSpec=false] - If true, resets the spectrogram dimensions before loading the buffer.
- * @returns {Promise<void>} A promise that resolves when the spectrogram update process is complete.
+ * @returns {Promise<void>} A promise that resolves once the spectrogram and timeline update process is complete.
  */
 async function updateSpec({
   buffer,
@@ -456,14 +453,18 @@ async function updateSpec({
 /**
  * Creates and registers a timeline plugin for WaveSurfer.js.
  *
- * This function calculates label intervals based on the global `windowLength` to determine the 
- * primary label interval (as the ceiling of windowLength divided by 5) and the corresponding time interval 
- * (one-tenth of the primary label interval). It then configures a timeline instance using the TimelinePlugin
- * with specified options, including label formatting, opacity for secondary labels, and styling for the timeline.
- * If a global WaveSurfer instance is available, the timeline is registered with it; otherwise, the timeline 
- * plugin object is returned.
+ * This function computes the timeline display intervals based on the global variable `windowLength`.
+ * It determines the primary label interval as the ceiling of (`windowLength` divided by 5) and calculates
+ * the time interval as one-tenth of this primary interval. Using these values, it configures a timeline
+ * plugin via the `TimelinePlugin.create` method with customized options, including:
+ * - Label formatting through the global `formatTimeCallback`
+ * - Secondary label opacity set to 0.35
+ * - Styling options such as font size ("0.75rem") and color obtained from `wsTextColour()`
  *
- * @returns {Object} The timeline plugin instance, either as a registered plugin for WaveSurfer or as a standalone object.
+ * If a global WaveSurfer instance exists (referenced by `wavesurfer`), the timeline is automatically
+ * registered with it; otherwise, the standalone timeline plugin object is returned.
+ *
+ * @returns {Object} The timeline plugin instance, either as a registered plugin with WaveSurfer or as a standalone object.
  */
 function createTimeline() {
   const primaryLabelInterval = Math.ceil(windowLength / 5);
@@ -495,12 +496,12 @@ const resetRegions = (clearActive) => {
 };
 
 /**
- * Clears the active audio region and UI table highlight.
+ * Resets the active audio region and clears the corresponding UI selection.
  *
- * This function resets all regions by calling resetRegions with a force update flag,
- * removes the "table-active" class from the currently active table row (if present),
- * and then clears the activeRow reference. It is used to ensure that no region is
- * marked as active and no table row remains highlighted after a selection is cleared.
+ * This function forcefully resets all defined audio regions by calling
+ * `resetRegions(true)`. It then checks if an active table row exists and,
+ * if so, removes the "table-active" class from it to remove any UI highlighting.
+ * Finally, it clears the `activeRow` reference to ensure that no table row remains marked as active.
  *
  * @returns {void}
  */
@@ -616,18 +617,27 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
 };
 
 /**
- * Doubles the FFT sample count for the spectrogram if it is below 2048.
+ * Increases the FFT sample count for the spectrogram if it is below 2048.
  *
- * This function checks whether the current FFT sample size (spectrogram.fftSamples)
- * is less than 2048. If so, it multiplies the sample size by 2, updates the FFT setting
- * in the configuration (config.FFT), and calls the postBufferUpdate function to refresh
- * the audio buffer. The current playback position is recalculated based on the current time
- * provided by wavesurfer, normalized over the window length, and then clamped between 0 and 1.
- * Additionally, the new FFT sample size is logged to the console.
+ * This function checks if the current FFT sample count (spectrogram.fftSamples) is less than 2048.
+ * If so, it doubles the sample count, updates the global FFT configuration (config.FFT), and refreshes
+ * the audio buffer by invoking postBufferUpdate with the current window offset, normalized playback position,
+ * and playback state from wavesurfer. The playback position is calculated by dividing wavesurfer.getCurrentTime()
+ * by windowLength, then clamped between 0 and 1. Finally, the updated FFT sample count is logged to the console.
  *
- * Note: This function has side effects on the global spectrogram and config objects,
- * and depends on external variables and functions such as wavesurfer, windowLength,
- * windowOffsetSecs, clamp, and postBufferUpdate.
+ * Side Effects:
+ * - Modifies spectrogram.fftSamples and config.FFT.
+ * - Calls postBufferUpdate to refresh the audio buffer.
+ * - Logs the new FFT sample count using console.log.
+ *
+ * External Dependencies:
+ * - spectrogram: Object containing FFT settings.
+ * - config: Global configuration object for FFT.
+ * - wavesurfer: Instance controlling audio playback and current time.
+ * - windowLength: Global variable used to normalize the playback position.
+ * - windowOffsetSecs: Global variable indicating the current window offset in seconds.
+ * - clamp: Utility function to restrict a value between a minimum and maximum.
+ * - postBufferUpdate: Function to update the audio buffer after FFT changes.
  */
 function increaseFFT() {
   if (spectrogram.fftSamples < 2048) {
@@ -644,15 +654,27 @@ function increaseFFT() {
 }
 
 /**
- * Reduces the FFT sample count for the spectrogram if it exceeds the minimum threshold.
+ * Halve the FFT sample count for the spectrogram when it exceeds the minimum threshold.
  *
- * If the current FFT sample count (spectrogram.fftSamples) is greater than 64, this function halves its value.
- * It then computes the normalized playback position using the current time from wavesurfer divided by the window length,
- * and calls postBufferUpdate with the updated buffer information (begin offset, normalized position, and play status).
- * The updated FFT sample value is logged to the console, and the global configuration (config.FFT) is synchronized accordingly.
+ * This function checks if `spectrogram.fftSamples` is greater than 64. If so, the FFT sample
+ * count is halved, and the normalized playback position is computed using the ratio of the current
+ * playback time (from `wavesurfer.getCurrentTime()`) to the `windowLength`, clamped between 0 and 1.
+ * It then calls `postBufferUpdate` with an object containing:
+ *   - `begin`: the current window offset in seconds (`windowOffsetSecs`),
+ *   - `position`: the normalized (and clamped) playback position,
+ *   - `play`: a boolean indicating whether audio is currently playing (`wavesurfer.isPlaying()`).
  *
- * Assumes that the globals "spectrogram", "wavesurfer", "windowLength", "windowOffsetSecs", "config", as well as
- * the helper function "clamp" and function "postBufferUpdate" are available in the current scope.
+ * The updated FFT sample count is logged to the console, and the global configuration (`config.FFT`)
+ * is updated accordingly.
+ *
+ * Assumes that the following globals and helper functions are available in the scope:
+ *   - `spectrogram`
+ *   - `wavesurfer`
+ *   - `windowLength`
+ *   - `windowOffsetSecs`
+ *   - `config`
+ *   - `clamp`
+ *   - `postBufferUpdate`
  *
  * @returns {void}
  */
@@ -676,27 +698,25 @@ const refreshTimeline = () => {
 };
 
 /**
- * Adjusts the view of the audio spectrogram by zooming in or out.
+ * Zooms in or out of the audio spectrogram by adjusting the display window
+ * and repositioning the playhead relative to the current audio playback time.
  *
- * This function recalculates the spectrogram display parameters based on the provided
- * zoom direction, either "zoomIn" or "zoomOut". The zoom operation is performed relative
- * to the current audio playback position, ensuring that the playhead remains at the same
- * position within the new window. The function also updates any active audio region to
- * align with the adjusted spectrogram window.
+ * When zooming in, the window length is halved, but not reduced below a 1.5-second threshold.
+ * When zooming out, the window length is doubled, capped at a maximum of 100 seconds or the file's duration.
+ * Active audio regions are updated to align with the new window, ensuring consistency in user selections.
  *
- * When zooming in, the window length is halved (provided it does not fall below a threshold of 1.5 seconds).
- * When zooming out, the window length is doubled (up to a maximum of 100 seconds or the current file duration).
+ * If no audio file is loaded, the function exits without performing any operation.
  *
- * @param {(string|Event)} direction - The zoom command specifying the operation. If a string,
- * it should be either "zoomIn" or "zoomOut". If an event object, the function extracts the button ID
- * from the event's target element.
+ * @param {(string|Event)} direction - Specifies the zoom operation. If a string, it must be either "zoomIn" or "zoomOut".
+ * If an Event, the function extracts the button ID from the event's target element.
+ * @returns {void}
  *
  * @example
- * // Zoom in directly using a string:
+ * // Zoom in directly using a string command:
  * zoomSpec("zoomIn");
  *
  * @example
- * // Use a button click event to trigger zooming out:
+ * // Trigger zooming out via a button click event:
  * buttonElement.addEventListener("click", zoomSpec);
  */
 function zoomSpec(direction) {
@@ -1700,17 +1720,20 @@ const checkWidth = (text) => {
 };
 
 /**
- * Creates a new audio region on the waveform and optionally navigates to it.
+ * Creates and registers a new audio region on the waveform, optionally navigating to its start time.
  *
- * This function adds a new region to the global REGIONS collection with the specified start and end times.
- * It applies a color (or the default from STATE.regionColour) and formats the label using the formatLabel helper.
- * If the goToRegion flag is true, the waveform's current time is set to the start of the newly created region.
+ * This function validates the input parameters and adds a new region to the global REGIONS collection using the
+ * specified start and end times. It applies the provided color or defaults to STATE.regionColour, and formats the label
+ * using the formatLabel helper. If the goToRegion flag is true, the waveform's current time is set to the new region's start time.
+ *
+ * Note: If the start and end parameters are invalid (i.e., non-numeric or if start is not less than end), the function logs
+ * an error and returns early without creating the region.
  *
  * @param {number} start - The start time of the region in seconds.
- * @param {number} end - The end time of the region in seconds.
- * @param {string} label - The label text for the region.
- * @param {boolean} goToRegion - If true, navigates to the region by setting the current time to the start time.
- * @param {string} [colour] - Optional color for the region. Defaults to STATE.regionColour if not provided.
+ * @param {number} end - The end time of the region in seconds (must be greater than start).
+ * @param {string} label - The label for the region.
+ * @param {boolean} goToRegion - If true, navigates the waveform to the region's start time.
+ * @param {string} [colour] - Optional color for the region; defaults to STATE.regionColour if not provided.
  * @returns {void}
  */
 function createRegion(start, end, label, goToRegion, colour) {
@@ -1824,22 +1847,25 @@ const loadResultRegion = ({
 };
 
 /**
- * Adjusts UI dimensions for the spectrogram and related elements based on current window and DOM sizes.
+ * Adjusts the dimensions of the spectrogram and related UI elements based on the current window and DOM sizes.
  *
- * This asynchronous function recalculates and updates the layout of various UI components, including the content wrapper,
- * spectrogram, and result table. It sets the appropriate heights for these elements based on the window size, and, if required,
- * re-initializes or updates the WaveSurfer instance and its spectrogram plugin using the provided FFT sample configuration.
+ * This asynchronous function recalculates the layout of key UI components such as the content wrapper,
+ * spectrogram display, and result table, ensuring they adapt to changes in the window size. When the
+ * `redraw` flag is true and an audio file is loaded, the function computes a new spectrogram height using
+ * either the specified `newHeight` (if non-zero) or the current configuration limits. If a new height is provided,
+ * it updates the configuration preferences accordingly.
  *
- * When the "redraw" flag is true and an audio file is loaded, the function will:
- * - Calculate a new spectrogram height based on either the provided newHeight (if non-zero) or the current configuration and limits.
- * - Update configuration preferences if a new height is specified.
- * - Initialize WaveSurfer if not already initialized, or update its settings to reflect the new height and cursor color.
- * - Re-register the spectrogram plugin and load the audio buffer.
+ * Depending on whether WaveSurfer is already initialized, the function will either:
+ * - Initialize a new WaveSurfer instance with the current audio buffer and updated height.
+ * - Update the existing WaveSurfer instance's options (including height and cursor color), re-register the spectrogram
+ *   plugin with the new settings (using `fftSamples` if provided), and reload the audio buffer.
  *
- * @param {boolean} redraw - Indicates whether the spectrogram should be re-rendered.
- * @param {number} [fftSamples] - Optional. The number of FFT samples to use for rendering; must be a power-of-two.
- * @param {number} [newHeight=0] - Optional. New height for the spectrogram; defaults to 0, allowing dynamic calculation if not provided.
- * @returns {Promise<void>} A promise that resolves once the dimensions and spectrogram rendering have been updated.
+ * Finally, it adjusts the height of the result table to fill the remaining vertical space.
+ *
+ * @param {boolean} redraw - Indicates whether the spectrogram should be re-rendered and WaveSurfer updated.
+ * @param {number} [fftSamples] - Optional. The number of FFT samples to use for rendering; must be a power of two.
+ * @param {number} [newHeight=0] - Optional. Overrides the dynamic height calculation for the spectrogram; a value of 0 triggers dynamic sizing.
+ * @returns {Promise<void>} A promise that resolves once the UI adjustments and spectrogram rendering updates are complete.
  */
 
 async function adjustSpecDims(redraw, fftSamples, newHeight) {
@@ -2607,21 +2633,25 @@ const setUpWorkerMessaging = () => {
 };
 
 /**
- * Processes a list of detection objects by creating corresponding audio regions within the current view window.
+ * Creates audio regions for detections that occur within the current view window.
  *
- * For each detection, the function adjusts the start and end times by subtracting a global offset
- * (windowOffsetSecs). If the adjusted start time is within the current window length, it determines if the
- * detection is "active" by comparing its start time to the start time of the currently active region. Only
- * active detections or those allowed by configuration (config.specDetections) are processed. When a detection
- * is active and the goToRegion flag is true, the newly created region will reposition the view accordingly.
- * Finally, the function marks the region creation process as complete by setting STATE.regionsCompleted to true.
+ * For each detection, the function adjusts its start and end times by subtracting the global offset
+ * `windowOffsetSecs`. Only detections with an adjusted start time less than the current window length are processed.
+ * A detection is considered "active" if its adjusted start time matches the start time of the currently active region
+ * (`activeRegion.start`, if defined). If the detection is active and the `goToRegion` flag is true, the view is repositioned
+ * to focus on that region. Otherwise, the detection is processed only if the configuration flag `config.specDetections` is enabled.
+ *
+ * Audio regions are created by calling `createRegion` with the adjusted start and end times, the detection's label,
+ * a flag indicating whether to reposition the view (only for active detections when `goToRegion` is true), and an optional
+ * colour (set to `STATE.regionActiveColour` for active regions). After processing all detections,
+ * `STATE.regionsCompleted` is set to true to indicate that region creation is complete.
  *
  * @param {Object} options - An options object.
- * @param {Array<Object>} options.detections - An array of detection objects, where each object must include:
- *   @param {number} options.detections[].start - The starting time of the detection (in seconds).
- *   @param {number} options.detections[].end - The ending time of the detection (in seconds).
+ * @param {Array<Object>} options.detections - An array of detection objects. Each object should include:
+ *   @param {number} options.detections[].start - The starting time of the detection in seconds.
+ *   @param {number} options.detections[].end - The ending time of the detection in seconds.
  *   @param {string} options.detections[].label - The label associated with the detection.
- * @param {boolean} options.goToRegion - If true, the view will be repositioned to the created region when the detection is active.
+ * @param {boolean} options.goToRegion - If true, reposition the view to the newly created region when the detection is active.
  *
  * @returns {void}
  */
@@ -3127,6 +3157,17 @@ function handleKeyDownDeBounce(e) {
   );
 }
 
+/**
+ * Handles a key down event by triggering a corresponding global action if available.
+ *
+ * If debugging is enabled, logs the pressed key. The function checks if the pressed key
+ * exists in the GLOBAL_ACTIONS mapping, and if so, it hides the context menu and determines
+ * the active modifier key (Shift, Control, Alt, or none). It then tracks the key press event
+ * using the trackEvent function and invokes the corresponding global action callback with the event.
+ *
+ * @param {KeyboardEvent} e - The keyboard event triggered on key press.
+ * @returns {void}
+ */
 function handleKeyDown(e) {
   let action = e.key;
   config.debug && console.log(`${action} key pressed`);
@@ -3180,17 +3221,20 @@ function formatLabel(label, color){
 }
 
 /**
- * Sets the specified audio region as active.
+ * Activates the specified audio region by updating the global state and UI.
  *
- * This function clears any previously active regions by resetting their color and label to default values,
- * then applies an active style to the provided region. It updates the global state by setting `activeRegion`,
- * moves the playhead to the region's start time, and updates the UI accordingly by enabling menu items based
- * on the application's state.
+ * This function first clears any previously active regions by resetting their colors 
+ * and labels to the default state. It then applies an active style to the provided region,
+ * which includes setting a new color and formatting the label. The function updates the global 
+ * active region, positions the playhead at the region's start time (taking into account any window offset),
+ * and enables UI menu items such as "export-audio" and, when applicable (i.e., if the model is ready and not predicting),
+ * "analyseSelection". If the provided region object is invalid (missing or having non-numeric start or end values),
+ * the function logs an error and exits without modifying the state.
  *
- * @param {Object} region - An object representing the audio region.
+ * @param {Object} region - The audio region to activate.
  * @param {number} region.start - The start time of the region in seconds.
  * @param {number} region.end - The end time of the region in seconds.
- * @param {Object} region.content - A DOM element (or an object with an `innerText` property) for displaying the region's label.
+ * @param {Object} region.content - A DOM element or object with an `innerText` property for displaying the region's label.
  *
  * @example
  * const region = {
@@ -3883,6 +3927,21 @@ const gotoTime = (e) => {
 const gotoForm = document.getElementById("gotoForm");
 gotoForm.addEventListener("submit", gotoTime);
 
+/**
+ * Handles the initialization steps once the audio model is ready.
+ *
+ * This function performs the following actions:
+ * - Sets the flag indicating the model is ready.
+ * - If a file is loaded, enables the "analyse" menu item and, if multiple files are open, enables the "analyseAll" and "reanalyseAll" menu items.
+ * - If an audio region is active, enables the "analyseSelection" menu item.
+ * - Records and logs the warm-up time for diagnostic purposes.
+ * - Marks the application as loaded and hides the loading screen.
+ * - For new users in non-test environments, initiates the tour if it has not been seen.
+ * - Logs the application's launch time.
+ * - Processes any queued files opened via the operating system.
+ *
+ * @param {Object} args - Optional arguments (currently unused).
+ */
 function onModelReady(args) {
   modelReady = true;
   if (fileLoaded) {
@@ -6712,7 +6771,18 @@ function getI18n(context) {
   return context[locale] || context["en"];
 }
 
-// Because a right-click only fires the 'contextmenu' event, not the region clicked event
+/**
+ * Determines if a right-click event occurred within an audio region and optionally sets it as active.
+ *
+ * This function calculates the time position from the event's x-coordinate relative to the target element's width
+ * using the global "windowLength". It then searches the global "REGIONS.regions" array for an audio region that spans
+ * the computed time. If a matching region is found and the setActive flag is true, the region is set as active by calling
+ * the global "setActiveRegion" function.
+ *
+ * @param {MouseEvent} e - The right-click event containing the clientX coordinate and target element dimensions.
+ * @param {boolean} setActive - Flag indicating whether to mark the located region as active.
+ * @returns {Object|undefined} The audio region that contains the computed time, or undefined if none is found.
+ */
 function checkForRegion(e, setActive) {
   const relativePosition = e.clientX / e.currentTarget.clientWidth;
   const time = relativePosition * windowLength;
@@ -7802,28 +7872,33 @@ const IUCNMap = {
 export { config, displayLocationAddress, LOCATIONS, generateToast };
 
 /**
- * Asynchronously checks the membership status of the current user and updates the UI accordingly.
+ * Asynchronously verifies the current user's membership status and updates the UI accordingly.
  *
- * This function retrieves membership information from localStorage and performs a remote membership check
- * using the global configuration UUID. It determines if the user is a subscriber or is within the trial period,
- * and updates the UI elements by unlocking or locking them. The primary logo is updated if the user is a member.
- * Membership and trial status are cached in localStorage along with timestamps, and in the event of an error during
- * the membership check, a cached membership status is used as a fallback if it is less than one week old.
+ * This function checks membership status via a remote call using the global configuration UUID and retrieves the trial period
+ * from the Electron API. It uses localStorage to cache the membership status, its timestamp, and the installation date. The function
+ * determines if the user is either a subscriber or within the trial period based on the installation date and trial duration.
+ * Based on the result, it updates UI elements by toggling "locked" and "unlocked" classes, enabling or disabling controls, and,
+ * if the user is a confirmed member, updating the primary logo image.
  *
  * Side Effects:
- * - Reads and writes membership status, membership timestamp, and install date to localStorage.
- * - Updates DOM elements by replacing "locked" and "unlocked" classes, enabling or disabling elements, and modifying text content.
- * - Updates the primary logo image source for member users.
- * - Logs membership check information and any errors encountered.
+ * - Reads from and writes to localStorage (membership status, membership timestamp, and install date).
+ * - Modifies DOM elements by replacing "locked" and "unlocked" classes, updating button states, and changing text content.
+ * - Changes the primary logo's image source when membership is verified.
+ * - Logs membership check details and error information using console.info and console.warn.
  *
- * @returns {Promise<boolean>} A promise that resolves to a boolean indicating whether the user is a member.
+ * Note:
+ * In case of a remote check error, if a valid cached membership status (cached within the last week) exists, it is used as a
+ * fallback. Otherwise, the promise may resolve to undefined.
+ *
+ * @returns {Promise<boolean|undefined>} A promise that resolves to a boolean indicating whether the user is a member,
+ * or undefined if an error occurs and no valid cached membership status is available.
  *
  * @example
  * membershipCheck().then(isMember => {
  *   if (isMember) {
- *     console.log('User is a member or is within the trial period.');
+ *     console.log('User is a member or within the trial period.');
  *   } else {
- *     console.log('User is not a member.');
+ *     console.log('User is not a member or membership status could not be determined.');
  *   }
  * });
  */

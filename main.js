@@ -512,7 +512,17 @@ app.whenReady().then(async () => {
         return await dialog.showOpenDialog(mainWindow, options);
     })
     
-    function getFileFromArgs(args) {
+    /**
+   * Retrieves the first file path from the given arguments that matches a supported file extension.
+   *
+   * This function iterates over an array of arguments and returns the first element that ends with any
+   * of the file extensions defined in the global `SUPPORTED_FILES` array. The check is performed in a
+   * case-insensitive manner.
+   *
+   * @param {string[]} args - An array of command line arguments potentially containing file paths.
+   * @returns {string|undefined} The first matching file path with a supported extension, or `undefined` if none is found.
+   */
+  function getFileFromArgs(args) {
       return args.find(arg => SUPPORTED_FILES.some(ext => arg.toLowerCase().endsWith(ext)));
   }
     
