@@ -447,7 +447,10 @@ async function updateSpec({
   }
   refreshTimeline();
   wavesurfer.seekTo(position);
-  if (play) wavesurfer.play() 
+  if (play) {
+    try {wavesurfer.play() }
+    catch (e) { console.warn("Wavesurfer error: ", e.message || JSON.stringify(e)) }
+  }
 }
 
 /**
@@ -1614,6 +1617,8 @@ async function showCharts() {
 }
 
 async function showExplore() {
+  // Change fileLoaded this one time, so a file will load!
+  fileLoaded = true;
   saveAnalyseState();
   enableMenuItem([
     "saveCSV",
@@ -1714,7 +1719,16 @@ function createRegion(start, end, label, goToRegion, colour) {
     console.error('Invalid region parameters:', { start, end });
     return;
   }
+    // Check for overlapping regions
+  const hasOverlap = REGIONS.regions.some(region => {
+    return (start < region.end && end > region.start);
+  });
   
+  if (hasOverlap) {
+    console.warn('Region overlap detected');
+    return;
+  }
+
   REGIONS.addRegion({
     start: start,
     end: end,
@@ -1732,7 +1746,7 @@ const selectionTable = document.getElementById("selectionResultTableBody");
 selectionTable.addEventListener("click", resultClick);
 
 async function resultClick(e) {
-   if  (! STATE.regionsCompleted) return
+   if  (! STATE.regionsCompleted || !fileLoaded) return
   let row = e.target.closest("tr");
   if (!row || row.classList.length === 0) {
     // 1. clicked and dragged, 2 no detections in file row
@@ -3707,7 +3721,12 @@ const GLOBAL_ACTIONS = {
   "-": (e) => e.metaKey || e.ctrlKey ? increaseFFT() : zoomSpec("zoomOut"),
   F5:() => reduceFFT(),
   F4: () => increaseFFT(),
-  " ": () => wavesurfer && wavesurfer.playPause(),
+  " ": () => {
+      if (wavesurfer) {
+        try {wavesurfer.playPause() }
+        catch (e) { console.warn("Wavesurfer error", error.message || error) }
+      }
+    }, 
   Tab: (e) => {
     if ((e.metaKey || e.ctrlKey) && !PREDICTING && STATE.diskHasRecords) {
       // If you did this when predicting, your results would go straight to the archive
@@ -3914,7 +3933,7 @@ async function onWorkerLoadedAudio({
   queued = false,
   metadata = undefined,
 }) {
-  (fileLoaded = true), clearTimeout(loadingTimeout);
+  clearTimeout(loadingTimeout);
   // Clear the loading animation
   DOM.loading.classList.add("d-none");
   const resetSpec = !STATE.currentFile;
@@ -3951,6 +3970,8 @@ async function onWorkerLoadedAudio({
     play: play,
     resetSpec: resetSpec,
   });
+  // Doe this after the spec has loaded the file
+  fileLoaded = true;
   if (modelReady) {
     enableMenuItem(["analyse"]);
     if (STATE.openFiles.length > 1) enableMenuItem(["analyseAll"]);
@@ -6170,7 +6191,8 @@ document.addEventListener("click", function (e) {
     }
     case "playToggle": {
       if (wavesurfer) {
-        wavesurfer.playPause() 
+        try {wavesurfer.playPause() }
+        catch (e) { console.warn("Wavesurfer error", e.message || JSON.stringify(e)) }
         break;
       }
     }
