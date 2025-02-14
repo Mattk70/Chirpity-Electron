@@ -32,7 +32,15 @@
 <body background="#ccccc">
     <!-- Content wrapper -->
 
-<div id="loading-screen"><span id="loading-text">Getting things ready...</span><div class="loader"></div></div>
+
+<div 
+    id="loading-screen" 
+    role="progressbar" 
+    aria-busy="true" 
+    aria-label="Loading application">
+    <span id="loading-text" aria-live="polite">Getting things ready...</span>
+    <div class="loader" aria-hidden="true"></div>
+</div>
 
 <div id="contentWrapper">
     <!-- Explore Div -->
