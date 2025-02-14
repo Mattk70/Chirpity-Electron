@@ -3953,6 +3953,7 @@ function onModelReady(args) {
   t1_warmup = Date.now();
   DIAGNOSTICS["Warm Up"] =
     ((t1_warmup - t0_warmup) / 1000).toFixed(2) + " seconds";
+  APPLICATION_LOADED || console.info(`App Launched in ${t1_warmup - app_t0}ms`)
   APPLICATION_LOADED = true;
   document.getElementById('loading-screen').classList.add('d-none');
   // New users - show the tour
@@ -3962,7 +3963,6 @@ function onModelReady(args) {
       prepTour();
     }
   }
-  console.info(`App Launched in ${t1_warmup - app_t0}ms`)
   if (OS_FILE_QUEUE.length) onOpenFiles({filePaths: OS_FILE_QUEUE}) && OS_FILE_QUEUE.shift()
 }
 
