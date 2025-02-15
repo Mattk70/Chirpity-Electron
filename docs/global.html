@@ -104,8 +104,7 @@
 
 
 <div class="description">
-    setIncludedIDs
-Calls list_worker for a new list, checks to see if a pending promise already exists
+    setIncludedIDsCalls list_worker for a new list, checks to see if a pending promise already exists
 </div>
 
 
@@ -215,7 +214,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line362">line 362</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line363">line 363</a>
     </li></ul></dd>
     
 
@@ -344,7 +343,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="metadata.js.html">metadata.js</a>, <a href="metadata.js.html#line139">line 139</a>
+        <a href="metadata.js.html">metadata.js</a>, <a href="metadata.js.html#line145">line 145</a>
     </li></ul></dd>
     
 
@@ -644,10 +643,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Adds a specified number of days to a given date and returns a new Date object.
-
-This function accepts a date provided as a Date object, a date string, or a timestamp, and adds the given number of days.
-Use negative values for subtracting days. It throws an error if the input date is invalid or if the days parameter is not a valid number.
+    Adds a specified number of days to a given date and returns a new Date object.This function accepts a date provided as a Date object, a date string, or a timestamp, and adds the given number of days.Use negative values for subtracting days. It throws an error if the input date is invalid or if the days parameter is not a valid number.
 </div>
 
 
@@ -851,8 +847,7 @@ Use negative values for subtracting days. It throws an error if the input date i
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>// Add 3 days to the current date
-const newDate = addDays(new Date(), 3);</code></pre>
+    <pre class="prettyprint"><code>// Add 3 days to the current dateconst newDate = addDays(new Date(), 3);</code></pre>
 
 
 
@@ -870,20 +865,7 @@ const newDate = addDays(new Date(), 3);</code></pre>
 
 
 <div class="description">
-    Adjusts the dimensions of the spectrogram and related UI elements based on the current window and DOM sizes.
-
-This asynchronous function recalculates the layout of key UI components such as the content wrapper,
-spectrogram display, and result table, ensuring they adapt to changes in the window size. When the
-`redraw` flag is true and an audio file is loaded, the function computes a new spectrogram height using
-either the specified `newHeight` (if non-zero) or the current configuration limits. If a new height is provided,
-it updates the configuration preferences accordingly.
-
-Depending on whether WaveSurfer is already initialized, the function will either:
-- Initialize a new WaveSurfer instance with the current audio buffer and updated height.
-- Update the existing WaveSurfer instance's options (including height and cursor color), re-register the spectrogram
-  plugin with the new settings (using `fftSamples` if provided), and reload the audio buffer.
-
-Finally, it adjusts the height of the result table to fill the remaining vertical space.
+    Adjusts the dimensions of the spectrogram and related UI elements based on the current window and DOM sizes.This asynchronous function recalculates the layout of key UI components such as the content wrapper,spectrogram display, and result table, ensuring they adapt to changes in the window size. When the`redraw` flag is true and an audio file is loaded, the function computes a new spectrogram height usingeither the specified `newHeight` (if non-zero) or the current configuration limits. If a new height is provided,it updates the configuration preferences accordingly.Depending on whether WaveSurfer is already initialized, the function will either:- Initialize a new WaveSurfer instance with the current audio buffer and updated height.- Update the existing WaveSurfer instance's options (including height and cursor color), re-register the spectrogram  plugin with the new settings (using `fftSamples` if provided), and reload the audio buffer.Finally, it adjusts the height of the result table to fill the remaining vertical space.
 </div>
 
 
@@ -1068,7 +1050,7 @@ Finally, it adjusts the height of the result table to fill the remaining vertica
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1875">line 1875</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1883">line 1883</a>
     </li></ul></dd>
     
 
@@ -1134,25 +1116,7 @@ Finally, it adjusts the height of the result table to fill the remaining vertica
 
 
 <div class="description">
-    Centers the spectrogram view around the current playback time.
-
-This function recalculates the starting offset of the audio window so that the
-current time (from the WaveSurfer instance) appears at the center of the display.
-It updates the global variable `windowOffsetSecs` by subtracting half of the
-window's length from the computed midpoint. The offset is clamped between 0 and
-the maximum valid offset determined by `currentFileDuration - windowLength`.
-
-If an active audio region exists (stored in `activeRegion`), the function adjusts
-its start and end times by the same offset shift. Should the region extend beyond the
-valid window boundaries after the shift, it is cleared (set to null).
-
-Finally, the function invokes `postBufferUpdate` to refresh the audio display with 
-the new configuration, positioning the center at 0.5.
-
-Side Effects:
-- Modifies the global variables `windowOffsetSecs` and `activeRegion`.
-- Relies on and interacts with global state including `wavesurfer`, `windowLength`,
-  `currentFileDuration`, and `postBufferUpdate`.
+    Centers the spectrogram view around the current playback time.This function recalculates the starting offset of the audio window so that thecurrent time (from the WaveSurfer instance) appears at the center of the display.It updates the global variable `windowOffsetSecs` by subtracting half of thewindow's length from the computed midpoint. The offset is clamped between 0 andthe maximum valid offset determined by `currentFileDuration - windowLength`.If an active audio region exists (stored in `activeRegion`), the function adjustsits start and end times by the same offset shift. Should the region extend beyond thevalid window boundaries after the shift, it is cleared (set to null).Finally, the function invokes `postBufferUpdate` to refresh the audio display with the new configuration, positioning the center at 0.5.Side Effects:- Modifies the global variables `windowOffsetSecs` and `activeRegion`.- Relies on and interacts with global state including `wavesurfer`, `windowLength`,  `currentFileDuration`, and `postBufferUpdate`.
 </div>
 
 
@@ -1196,7 +1160,7 @@ Side Effects:
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3570">line 3570</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3578">line 3578</a>
     </li></ul></dd>
     
 
@@ -1240,12 +1204,7 @@ Side Effects:
 
 
 <div class="description">
-    Determines if a right-click event occurred within an audio region and optionally sets it as active.
-
-This function calculates the time position from the event's x-coordinate relative to the target element's width
-using the global "windowLength". It then searches the global "REGIONS.regions" array for an audio region that spans
-the computed time. If a matching region is found and the setActive flag is true, the region is set as active by calling
-the global "setActiveRegion" function.
+    Determines if a right-click event occurred within an audio region and optionally sets it as active.This function calculates the time position from the event's x-coordinate relative to the target element's widthusing the global "windowLength". It then searches the global "REGIONS.regions" array for an audio region that spansthe computed time. If a matching region is found and the setActive flag is true, the region is set as active by callingthe global "setActiveRegion" function.
 </div>
 
 
@@ -1361,7 +1320,7 @@ the global "setActiveRegion" function.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line6790">line 6790</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line6798">line 6798</a>
     </li></ul></dd>
     
 
@@ -1430,12 +1389,7 @@ the global "setActiveRegion" function.
 
 
 <div class="description">
-    Resets the active audio region and clears the corresponding UI selection.
-
-This function forcefully resets all defined audio regions by calling
-`resetRegions(true)`. It then checks if an active table row exists and,
-if so, removes the "table-active" class from it to remove any UI highlighting.
-Finally, it clears the `activeRow` reference to ensure that no table row remains marked as active.
+    Resets the active audio region and clears the corresponding UI selection.This function forcefully resets all defined audio regions by calling`resetRegions(true)`. It then checks if an active table row exists and,if so, removes the "table-active" class from it to remove any UI highlighting.Finally, it clears the `activeRow` reference to ensure that no table row remains marked as active.
 </div>
 
 
@@ -1479,7 +1433,7 @@ Finally, it clears the `activeRow` reference to ensure that no table row remains
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line512">line 512</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line513">line 513</a>
     </li></ul></dd>
     
 
@@ -1541,15 +1495,7 @@ Finally, it clears the `activeRow` reference to ensure that no table row remains
 
 
 <div class="description">
-    Converts an audio file using FFmpeg, optionally trimming the audio and updating file metadata.
-
-This function processes an input audio file by executing FFmpeg commands with parameters based on global state
-settings (e.g., STATE.archive.format and STATE.archive.trim). When the target archive format is "ogg", the conversion
-uses a bitrate of 128k, mono channels, and a sample rate set to 30000 Hz (for BirdNET compatibility). If trimming is
-enabled, the function computes start and end boundaries, adjusts the audio duration accordingly, and emits warnings
-if multi-day or all-daylight recordings are detected. Conversion progress is calculated and reported via a progress map.
-Upon completion, the file's modification time is updated and the associated database record is updated with the new
-archive name.
+    Converts an audio file using FFmpeg, optionally trimming the audio and updating file metadata.This function processes an input audio file by executing FFmpeg commands with parameters based on global statesettings (e.g., STATE.archive.format and STATE.archive.trim). When the target archive format is "ogg", the conversionuses a bitrate of 128k, mono channels, and a sample rate set to 30000 Hz (for BirdNET compatibility). If trimming isenabled, the function computes start and end boundaries, adjusts the audio duration accordingly, and emits warningsif multi-day or all-daylight recordings are detected. Conversion progress is calculated and reported via a progress map.Upon completion, the file's modification time is updated and the associated database record is updated with the newarchive name.
 </div>
 
 
@@ -1647,8 +1593,7 @@ archive name.
 
             
 
-            <td class="description last">An object representing the file's metadata; must include properties such as `id`, `duration`, and `filestart`.
-                      The `duration` property may be updated if trimming is applied.</td>
+            <td class="description last">An object representing the file's metadata; must include properties such as `id`, `duration`, and `filestart`.                      The `duration` property may be updated if trimming is applied.</td>
         </tr>
 
     
@@ -1840,9 +1785,7 @@ archive name.
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>convertFile('/path/to/input.wav', '/path/to/output.ogg', fileRecord, db, 'archive123', progressMap)
-  .then(() => console.log('Conversion completed successfully.'))
-  .catch(err => console.error('Conversion failed:', err));</code></pre>
+    <pre class="prettyprint"><code>convertFile('/path/to/input.wav', '/path/to/output.ogg', fileRecord, db, 'archive123', progressMap)  .then(() => console.log('Conversion completed successfully.'))  .catch(err => console.error('Conversion failed:', err));</code></pre>
 
 
 
@@ -1860,24 +1803,7 @@ archive name.
 
 
 <div class="description">
-    Creates and displays a custom context menu based on the event target.
-
-This asynchronous function handles user interactions for generating a context menu
-in the spectrogram interface. It performs the following actions:
-- Pauses any ongoing audio playback via the wavesurfer instance to prevent interference.
-- Stops the propagation of the triggering event.
-- Checks and adjusts for region detection within the spectrogram.
-- Determines the context (e.g., summary, selection, or results) of the click and sets
-  visibility flags for specific menu items.
-- If necessary, triggers a click on the target element to load or update the active row
-  and awaits the file load completion.
-- Constructs the HTML for the context menu with options such as playing a region,
-  analyzing a selection, creating/editing a manual record, exporting a clip, comparing,
-  or deleting records.
-- Sets the modal title based on whether the action is to create or edit a record.
-- Attaches event listeners to handle deletion and record entry actions based on the context.
-- Adjusts certain menu items' visibility depending on the active context.
-- Positions the context menu at the event coordinates.
+    Creates and displays a custom context menu based on the event target.This asynchronous function handles user interactions for generating a context menuin the spectrogram interface. It performs the following actions:- Pauses any ongoing audio playback via the wavesurfer instance to prevent interference.- Stops the propagation of the triggering event.- Checks and adjusts for region detection within the spectrogram.- Determines the context (e.g., summary, selection, or results) of the click and sets  visibility flags for specific menu items.- If necessary, triggers a click on the target element to load or update the active row  and awaits the file load completion.- Constructs the HTML for the context menu with options such as playing a region,  analyzing a selection, creating/editing a manual record, exporting a clip, comparing,  or deleting records.- Sets the modal title based on whether the action is to create or edit a record.- Attaches event listeners to handle deletion and record entry actions based on the context.- Adjusts certain menu items' visibility depending on the active context.- Positions the context menu at the event coordinates.
 </div>
 
 
@@ -1970,7 +1896,7 @@ in the spectrogram interface. It performs the following actions:
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line6822">line 6822</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line6830">line 6830</a>
     </li></ul></dd>
     
 
@@ -2036,14 +1962,7 @@ in the spectrogram interface. It performs the following actions:
 
 
 <div class="description">
-    Creates and registers a new audio region on the waveform, optionally navigating to its start time.
-
-This function validates the input parameters and adds a new region to the global REGIONS collection using the
-specified start and end times. It applies the provided color or defaults to STATE.regionColour, and formats the label
-using the formatLabel helper. If the goToRegion flag is true, the waveform's current time is set to the new region's start time.
-
-Note: If the start and end parameters are invalid (i.e., non-numeric or if start is not less than end), the function logs
-an error and returns early without creating the region.
+    Creates and registers a new audio region on the waveform, optionally navigating to its start time.This function validates the input parameters and adds a new region to the global REGIONS collection using thespecified start and end times. It applies the provided color or defaults to STATE.regionColour, and formats the labelusing the formatLabel helper. If the goToRegion flag is true, the waveform's current time is set to the new region's start time.Note: If the start and end parameters are invalid (i.e., non-numeric or if start is not less than end), the function logsan error and returns early without creating the region.
 </div>
 
 
@@ -2272,7 +2191,7 @@ an error and returns early without creating the region.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1743">line 1743</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1744">line 1744</a>
     </li></ul></dd>
     
 
@@ -2334,18 +2253,7 @@ an error and returns early without creating the region.
 
 
 <div class="description">
-    Creates and registers a timeline plugin for WaveSurfer.js.
-
-This function computes the timeline display intervals based on the global variable `windowLength`.
-It determines the primary label interval as the ceiling of (`windowLength` divided by 5) and calculates
-the time interval as one-tenth of this primary interval. Using these values, it configures a timeline
-plugin via the `TimelinePlugin.create` method with customized options, including:
-- Label formatting through the global `formatTimeCallback`
-- Secondary label opacity set to 0.35
-- Styling options such as font size ("0.75rem") and color obtained from `wsTextColour()`
-
-If a global WaveSurfer instance exists (referenced by `wavesurfer`), the timeline is automatically
-registered with it; otherwise, the standalone timeline plugin object is returned.
+    Creates and registers a timeline plugin for WaveSurfer.js.This function computes the timeline display intervals based on the global variable `windowLength`.It determines the primary label interval as the ceiling of (`windowLength` divided by 5) and calculatesthe time interval as one-tenth of this primary interval. Using these values, it configures a timelineplugin via the `TimelinePlugin.create` method with customized options, including:- Label formatting through the global `formatTimeCallback`- Secondary label opacity set to 0.35- Styling options such as font size ("0.75rem") and color obtained from `wsTextColour()`If a global WaveSurfer instance exists (referenced by `wavesurfer`), the timeline is automaticallyregistered with it; otherwise, the standalone timeline plugin object is returned.
 </div>
 
 
@@ -2389,7 +2297,7 @@ registered with it; otherwise, the standalone timeline plugin object is returned
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line473">line 473</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line474">line 474</a>
     </li></ul></dd>
     
 
@@ -2548,7 +2456,7 @@ registered with it; otherwise, the standalone timeline plugin object is returned
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="metadata.js.html">metadata.js</a>, <a href="metadata.js.html#line10">line 10</a>
+        <a href="metadata.js.html">metadata.js</a>, <a href="metadata.js.html#line16">line 16</a>
     </li></ul></dd>
     
 
@@ -2896,8 +2804,7 @@ registered with it; otherwise, the standalone timeline plugin object is returned
 
 
 <div class="description">
-    We post the list to the worker as it has node and that allows it easier access to the
-required filesystem routines, returns valid audio file list
+    We post the list to the worker as it has node and that allows it easier access to therequired filesystem routines, returns valid audio file list
 </div>
 
 
@@ -2985,7 +2892,7 @@ required filesystem routines, returns valid audio file list
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1262">line 1262</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1263">line 1263</a>
     </li></ul></dd>
     
 
@@ -3122,7 +3029,7 @@ required filesystem routines, returns valid audio file list
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line934">line 934</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line935">line 935</a>
     </li></ul></dd>
     
 
@@ -3188,12 +3095,7 @@ required filesystem routines, returns valid audio file list
 
 
 <div class="description">
-    Creates and returns a styled label element for a navigation option.
-
-This function generates an HTML <span> element with specific styling properties, including absolute positioning,
-a text color, and a text shadow effect. If the global configuration's colormap is set to 'gray', the provided color
-is overridden: a truthy color results in 'purple', whereas a falsy value defaults to '#666'. If no label text is provided,
-the function returns undefined.
+    Creates and returns a styled label element for a navigation option.This function generates an HTML <span> element with specific styling properties, including absolute positioning,a text color, and a text shadow effect. If the global configuration's colormap is set to 'gray', the provided coloris overridden: a truthy color results in 'purple', whereas a falsy value defaults to '#666'. If no label text is provided,the function returns undefined.
 </div>
 
 
@@ -3329,7 +3231,7 @@ the function returns undefined.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3210">line 3210</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3218">line 3218</a>
     </li></ul></dd>
     
 
@@ -3398,15 +3300,7 @@ the function returns undefined.
 
 
 <div class="description">
-    Use formatTimeCallback to style the notch labels as you wish, such
-as with more detail as the number of pixels per second increases.
-
-Here we format as M:SS.frac, with M suppressed for times < 1 minute,
-and frac having 0, 1, or 2 digits as the zoom increases.
-
-Note that if you override the default function, you'll almost
-certainly want to override timeInterval, primaryLabelInterval and/or
-secondaryLabelInterval so they all work together.
+    Use formatTimeCallback to style the notch labels as you wish, suchas with more detail as the number of pixels per second increases.Here we format as M:SS.frac, with M suppressed for times < 1 minute,and frac having 0, 1, or 2 digits as the zoom increases.Note that if you override the default function, you'll almostcertainly want to override timeInterval, primaryLabelInterval and/orsecondaryLabelInterval so they all work together.
 </div>
 
 
@@ -3450,7 +3344,7 @@ secondaryLabelInterval so they all work together.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1956">line 1956</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1964">line 1964</a>
     </li></ul></dd>
     
 
@@ -3494,9 +3388,7 @@ secondaryLabelInterval so they all work together.
 
 
 <div class="description">
-    getDetectedSpecies generates a list of species to use in dropdowns for chart and explore mode filters
-It doesn't really make sense to use location specific filtering here, as there is a location filter in the
-page. For now, I'm just going skip the included IDs filter if location mode is selected
+    getDetectedSpecies generates a list of species to use in dropdowns for chart and explore mode filtersIt doesn't really make sense to use location specific filtering here, as there is a location filter in thepage. For now, I'm just going skip the included IDs filter if location mode is selected
 </div>
 
 
@@ -3584,16 +3476,7 @@ page. For now, I'm just going skip the included IDs filter if location mode is s
 
 
 <div class="description">
-    Constructs an SQL filter clause and an associated parameters array for retrieving file records.
-
-Depending on the provided range and the current application mode (accessed via the global STATE),
-the function generates conditions to filter files by date/time or by file/archive names.
-
-- If a range object with a defined `start` property is provided, it generates a clause to select
-  records where `dateTime` is between `range.start` (inclusive) and `range.end` (exclusive).
-- If the mode is "archive", it creates a condition to filter files by both their name and archiveName,
-  processing file paths accordingly.
-- In "analyse" mode, a file-based condition is noted but currently commented out.
+    Constructs an SQL filter clause and an associated parameters array for retrieving file records.Depending on the provided range and the current application mode (accessed via the global STATE),the function generates conditions to filter files by date/time or by file/archive names.- If a range object with a defined `start` property is provided, it generates a clause to select  records where `dateTime` is between `range.start` (inclusive) and `range.end` (exclusive).- If the mode is "archive", it creates a condition to filter files by both their name and archiveName,  processing file paths accordingly.- In "analyse" mode, a file-based condition is noted but currently commented out.
 </div>
 
 
@@ -3842,8 +3725,7 @@ the function generates conditions to filter files by date/time or by file/archiv
 
 
 <div class="description">
-    Generates a list of supported audio files, recursively searching directories.
-Sends this list to the UI
+    Generates a list of supported audio files, recursively searching directories.Sends this list to the UI
 </div>
 
 
@@ -3980,10 +3862,7 @@ Sends this list to the UI
 
 
 <div class="description">
-    getIncludedIDs
-Helper function to provide a list of valid species for the filter.
-Will look for a list in the STATE.included cache, and if not present,
-will call setIncludedIDs to generate a new list
+    getIncludedIDsHelper function to provide a list of valid species for the filter.Will look for a list in the STATE.included cache, and if not present,will call setIncludedIDs to generate a new list
 </div>
 
 
@@ -4130,11 +4009,7 @@ will call setIncludedIDs to generate a new list
 
 
 <div class="description">
-    Retrieves the currently active region.
-
-This function returns the global active region object, which typically contains
-properties (such as start and end) that define the region. If there is no active region,
-the function returns undefined.
+    Retrieves the currently active region.This function returns the global active region object, which typically containsproperties (such as start and end) that define the region. If there is no active region,the function returns undefined.
 </div>
 
 
@@ -4178,7 +4053,7 @@ the function returns undefined.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3812">line 3812</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3820">line 3820</a>
     </li></ul></dd>
     
 
@@ -4505,8 +4380,7 @@ the function returns undefined.
 
 
 <div class="description">
-    getValidSpecies generates a list of species included/excluded based on settings
- For week specific lists, we need the file
+    getValidSpecies generates a list of species included/excluded based on settings For week specific lists, we need the file
 </div>
 
 
@@ -4754,12 +4628,7 @@ the function returns undefined.
 
 
 <div class="description">
-    Handles a key down event by triggering a corresponding global action if available.
-
-If debugging is enabled, logs the pressed key. The function checks if the pressed key
-exists in the GLOBAL_ACTIONS mapping, and if so, it hides the context menu and determines
-the active modifier key (Shift, Control, Alt, or none). It then tracks the key press event
-using the trackEvent function and invokes the corresponding global action callback with the event.
+    Handles a key down event by triggering a corresponding global action if available.If debugging is enabled, logs the pressed key. The function checks if the pressed keyexists in the GLOBAL_ACTIONS mapping, and if so, it hides the context menu and determinesthe active modifier key (Shift, Control, Alt, or none). It then tracks the key press eventusing the trackEvent function and invokes the corresponding global action callback with the event.
 </div>
 
 
@@ -4852,7 +4721,7 @@ using the trackEvent function and invokes the corresponding global action callba
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3175">line 3175</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3183">line 3183</a>
     </li></ul></dd>
     
 
@@ -4914,27 +4783,7 @@ using the trackEvent function and invokes the corresponding global action callba
 
 
 <div class="description">
-    Increases the FFT sample count for the spectrogram if it is below 2048.
-
-This function checks if the current FFT sample count (spectrogram.fftSamples) is less than 2048.
-If so, it doubles the sample count, updates the global FFT configuration (config.FFT), and refreshes
-the audio buffer by invoking postBufferUpdate with the current window offset, normalized playback position,
-and playback state from wavesurfer. The playback position is calculated by dividing wavesurfer.getCurrentTime()
-by windowLength, then clamped between 0 and 1. Finally, the updated FFT sample count is logged to the console.
-
-Side Effects:
-- Modifies spectrogram.fftSamples and config.FFT.
-- Calls postBufferUpdate to refresh the audio buffer.
-- Logs the new FFT sample count using console.log.
-
-External Dependencies:
-- spectrogram: Object containing FFT settings.
-- config: Global configuration object for FFT.
-- wavesurfer: Instance controlling audio playback and current time.
-- windowLength: Global variable used to normalize the playback position.
-- windowOffsetSecs: Global variable indicating the current window offset in seconds.
-- clamp: Utility function to restrict a value between a minimum and maximum.
-- postBufferUpdate: Function to update the audio buffer after FFT changes.
+    Increases the FFT sample count for the spectrogram if it is below 2048.This function checks if the current FFT sample count (spectrogram.fftSamples) is less than 2048.If so, it doubles the sample count, updates the global FFT configuration (config.FFT), and refreshesthe audio buffer by invoking postBufferUpdate with the current window offset, normalized playback position,and playback state from wavesurfer. The playback position is calculated by dividing wavesurfer.getCurrentTime()by windowLength, then clamped between 0 and 1. Finally, the updated FFT sample count is logged to the console.Side Effects:- Modifies spectrogram.fftSamples and config.FFT.- Calls postBufferUpdate to refresh the audio buffer.- Logs the new FFT sample count using console.log.External Dependencies:- spectrogram: Object containing FFT settings.- config: Global configuration object for FFT.- wavesurfer: Instance controlling audio playback and current time.- windowLength: Global variable used to normalize the playback position.- windowOffsetSecs: Global variable indicating the current window offset in seconds.- clamp: Utility function to restrict a value between a minimum and maximum.- postBufferUpdate: Function to update the audio buffer after FFT changes.
 </div>
 
 
@@ -4978,7 +4827,7 @@ External Dependencies:
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line646">line 646</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line647">line 647</a>
     </li></ul></dd>
     
 
@@ -5022,22 +4871,7 @@ External Dependencies:
 
 
 <div class="description">
-    Initializes and configures the RegionsPlugin for audio region management.
-
-This function destroys any previously initialized RegionsPlugin instance and creates a new one
-with the following configuration:
-- Enables dragging of regions.
-- Limits the maximum number of regions to 100.
-- Uses the default region color from STATE.regionColour.
-
-Additionally, it sets up event listeners for region interactions:
-- "region-clicked": Hides the context menu, updates the active region and audio playback time,
-  and removes regions based on key modifiers:
-  - Shift key: Removes all regions with the default region color.
-  - Ctrl/Cmd key: Removes the clicked region.
-- "region-created": Sets a newly created region as the active region if it lacks a label (content)
-  or if its start time matches that of the current active region.
-- "region-update": Clears the region's label content and updates it as the active region.
+    Initializes and configures the RegionsPlugin for audio region management.This function destroys any previously initialized RegionsPlugin instance and creates a new onewith the following configuration:- Enables dragging of regions.- Limits the maximum number of regions to 100.- Uses the default region color from STATE.regionColour.Additionally, it sets up event listeners for region interactions:- "region-clicked": Hides the context menu, updates the active region and audio playback time,  and removes regions based on key modifiers:  - Shift key: Removes all regions with the default region color.  - Ctrl/Cmd key: Removes the clicked region.- "region-created": Sets a newly created region as the active region if it lacks a label (content)  or if its start time matches that of the current active region.- "region-update": Clears the region's label content and updates it as the active region.
 </div>
 
 
@@ -5081,7 +4915,7 @@ Additionally, it sets up event listeners for region interactions:
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3294">line 3294</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3302">line 3302</a>
     </li></ul></dd>
     
 
@@ -5147,12 +4981,7 @@ Additionally, it sets up event listeners for region interactions:
 
 
 <div class="description">
-    Asynchronously loads an audio file, processes its audio data, and updates the UI with relevant metadata.
-
-This function fetches the audio buffer from the specified file between the given start and end times,
-then posts the audio data along with metadata to the UI. It also triggers detection processing and posts
-the current file's week number based on the application's state. If the file does not exist or an error occurs
-during processing, an error alert is generated and the promise is rejected.
+    Asynchronously loads an audio file, processes its audio data, and updates the UI with relevant metadata.This function fetches the audio buffer from the specified file between the given start and end times,then posts the audio data along with metadata to the UI. It also triggers detection processing and poststhe current file's week number based on the application's state. If the file does not exist or an error occursduring processing, an error alert is generated and the promise is rejected.
 </div>
 
 
@@ -5550,8 +5379,7 @@ during processing, an error alert is generated and the promise is rejected.
 
         
 <div class="param-desc">
-    A promise that resolves when the audio file has been successfully loaded and processed,
-or rejects with a generated error alert if the file cannot be found or processed.
+    A promise that resolves when the audio file has been successfully loaded and processed,or rejects with a generated error alert if the file cannot be found or processed.
 </div>
 
 
@@ -5575,16 +5403,7 @@ or rejects with a generated error alert if the file cannot be found or processed
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>loadAudioFile({ 
-  file: "/path/to/audio.mp3", 
-  start: 10, 
-  end: 30, 
-  position: 5, 
-  play: true, 
-  goToRegion: true 
-})
-  .then(() => console.log("Audio loaded successfully."))
-  .catch((error) => console.error("Error loading audio:", error));</code></pre>
+    <pre class="prettyprint"><code>loadAudioFile({   file: "/path/to/audio.mp3",   start: 10,   end: 30,   position: 5,   play: true,   goToRegion: true })  .then(() => console.log("Audio loaded successfully."))  .catch((error) => console.error("Error loading audio:", error));</code></pre>
 
 
 
@@ -5602,8 +5421,7 @@ or rejects with a generated error alert if the file cannot be found or processed
 
 
 <div class="description">
-    loadAudioFileSync: Called when user opens a file (just opens first file in multiple files)
-and when clicking on filename in list of open files.
+    loadAudioFileSync: Called when user opens a file (just opens first file in multiple files)and when clicking on filename in list of open files.
 </div>
 
 
@@ -5719,7 +5537,7 @@ and when clicking on filename in list of open files.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line408">line 408</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line409">line 409</a>
     </li></ul></dd>
     
 
@@ -5925,23 +5743,7 @@ and when clicking on filename in list of open files.
 
 
 <div class="description">
-    Asynchronously verifies the current user's membership status and updates the UI accordingly.
-
-This function checks membership status via a remote call using the global configuration UUID and retrieves the trial period
-from the Electron API. It uses localStorage to cache the membership status, its timestamp, and the installation date. The function
-determines if the user is either a subscriber or within the trial period based on the installation date and trial duration.
-Based on the result, it updates UI elements by toggling "locked" and "unlocked" classes, enabling or disabling controls, and,
-if the user is a confirmed member, updating the primary logo image.
-
-Side Effects:
-- Reads from and writes to localStorage (membership status, membership timestamp, and install date).
-- Modifies DOM elements by replacing "locked" and "unlocked" classes, updating button states, and changing text content.
-- Changes the primary logo's image source when membership is verified.
-- Logs membership check details and error information using console.info and console.warn.
-
-Note:
-In case of a remote check error, if a valid cached membership status (cached within the last week) exists, it is used as a
-fallback. Otherwise, the promise may resolve to undefined.
+    Asynchronously verifies the current user's membership status and updates the UI accordingly.This function checks membership status via a remote call using the global configuration UUID and retrieves the trial periodfrom the Electron API. It uses localStorage to cache the membership status, its timestamp, and the installation date. The functiondetermines if the user is either a subscriber or within the trial period based on the installation date and trial duration.Based on the result, it updates UI elements by toggling "locked" and "unlocked" classes, enabling or disabling controls, and,if the user is a confirmed member, updating the primary logo image.Side Effects:- Reads from and writes to localStorage (membership status, membership timestamp, and install date).- Modifies DOM elements by replacing "locked" and "unlocked" classes, updating button states, and changing text content.- Changes the primary logo's image source when membership is verified.- Logs membership check details and error information using console.info and console.warn.Note:In case of a remote check error, if a valid cached membership status (cached within the last week) exists, it is used as afallback. Otherwise, the promise may resolve to undefined.
 </div>
 
 
@@ -5985,7 +5787,7 @@ fallback. Otherwise, the promise may resolve to undefined.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line7909">line 7909</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line7917">line 7917</a>
     </li></ul></dd>
     
 
@@ -6014,8 +5816,7 @@ fallback. Otherwise, the promise may resolve to undefined.
 
         
 <div class="param-desc">
-    A promise that resolves to a boolean indicating whether the user is a member,
-or undefined if an error occurs and no valid cached membership status is available.
+    A promise that resolves to a boolean indicating whether the user is a member,or undefined if an error occurs and no valid cached membership status is available.
 </div>
 
 
@@ -6039,13 +5840,7 @@ or undefined if an error occurs and no valid cached membership status is availab
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>membershipCheck().then(isMember => {
-  if (isMember) {
-    console.log('User is a member or within the trial period.');
-  } else {
-    console.log('User is not a member or membership status could not be determined.');
-  }
-});</code></pre>
+    <pre class="prettyprint"><code>membershipCheck().then(isMember => {  if (isMember) {    console.log('User is a member or within the trial period.');  } else {    console.log('User is not a member or membership status could not be determined.');  }});</code></pre>
 
 
 
@@ -6063,11 +5858,7 @@ or undefined if an error occurs and no valid cached membership status is availab
 
 
 <div class="description">
-    Notifies the UI about a missing file entry in the database.
-
-This asynchronous function queries the disk database for a file record by its name.
-If a record with an associated ID exists, it considers the file as missing and triggers an
-error alert with the message "dbFileMissing" along with the file name in the alert variables.
+    Notifies the UI about a missing file entry in the database.This asynchronous function queries the disk database for a file record by its name.If a record with an associated ID exists, it considers the file as missing and triggers anerror alert with the message "dbFileMissing" along with the file name in the alert variables.
 </div>
 
 
@@ -6238,11 +6029,7 @@ error alert with the message "dbFileMissing" along with the file name in the ale
 
 
 <div class="description">
-    Initializes and launches the application environment by configuring model settings, databases, and prediction workers.
-
-This function is invoked when the application is first opened or when the model is changed. It sets global flags,
-configures the sample rate based on the model, updates the application state, loads the disk and memory databases,
-and spawns prediction workers to process audio data.
+    Initializes and launches the application environment by configuring model settings, databases, and prediction workers.This function is invoked when the application is first opened or when the model is changed. It sets global flags,configures the sample rate based on the model, updates the application state, loads the disk and memory databases,and spawns prediction workers to process audio data.
 </div>
 
 
@@ -6642,13 +6429,7 @@ and spawns prediction workers to process audio data.
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>onLaunch({
-  model: "birdnet",
-  batchSize: 64,
-  threads: 4,
-  backend: "tensorflow",
-  list: "selected"
-});</code></pre>
+    <pre class="prettyprint"><code>onLaunch({  model: "birdnet",  batchSize: 64,  threads: 4,  backend: "tensorflow",  list: "selected"});</code></pre>
 
 
 
@@ -6666,17 +6447,7 @@ and spawns prediction workers to process audio data.
 
 
 <div class="description">
-    Handles the initialization steps once the audio model is ready.
-
-This function performs the following actions:
-- Sets the flag indicating the model is ready.
-- If a file is loaded, enables the "analyse" menu item and, if multiple files are open, enables the "analyseAll" and "reanalyseAll" menu items.
-- If an audio region is active, enables the "analyseSelection" menu item.
-- Records and logs the warm-up time for diagnostic purposes.
-- Marks the application as loaded and hides the loading screen.
-- For new users in non-test environments, initiates the tour if it has not been seen.
-- Logs the application's launch time.
-- Processes any queued files opened via the operating system.
+    Handles the initialization steps once the audio model is ready.This function performs the following actions:- Sets the flag indicating the model is ready.- If a file is loaded, enables the "analyse" menu item and, if multiple files are open, enables the "analyseAll" and "reanalyseAll" menu items.- If an audio region is active, enables the "analyseSelection" menu item.- Records and logs the warm-up time for diagnostic purposes.- Marks the application as loaded and hides the loading screen.- For new users in non-test environments, initiates the tour if it has not been seen.- Logs the application's launch time.- Processes any queued files opened via the operating system.
 </div>
 
 
@@ -6769,7 +6540,7 @@ This function performs the following actions:
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3949">line 3949</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3957">line 3957</a>
     </li></ul></dd>
     
 
@@ -6919,23 +6690,7 @@ This function performs the following actions:
 
 
 <div class="description">
-    Plays the active audio region after sanitizing its boundaries.
-
-This function locates the active region from the global REGIONS object by matching the 
-region's start time with the global activeRegion. It then adjusts the region's start and 
-end times to ensure they fall within the valid playback window—ensuring the start is not 
-negative and the end does not exceed 99.5% of the windowLength to avoid triggering a finish 
-event that causes a page reload. Note that if playback is paused at the end of an adjacent region, 
-the subsequent region may not play.
-
-Side Effects:
-- Modifies the region's start and end properties for playback.
-- Initiates playback by calling the region's play() method.
-
-Global Dependencies:
-- REGIONS: An object containing all audio regions.
-- activeRegion: The currently active region used for matching.
-- windowLength: A number representing the maximum playback window length.
+    Plays the active audio region after sanitizing its boundaries.This function locates the active region from the global REGIONS object by matching the region's start time with the global activeRegion. It then adjusts the region's start and end times to ensure they fall within the valid playback window—ensuring the start is not negative and the end does not exceed 99.5% of the windowLength to avoid triggering a finish event that causes a page reload. Note that if playback is paused at the end of an adjacent region, the subsequent region may not play.Side Effects:- Modifies the region's start and end properties for playback.- Initiates playback by calling the region's play() method.Global Dependencies:- REGIONS: An object containing all audio regions.- activeRegion: The currently active region used for matching.- windowLength: A number representing the maximum playback window length.
 </div>
 
 
@@ -6979,7 +6734,7 @@ Global Dependencies:
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line5797">line 5797</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line5805">line 5805</a>
     </li></ul></dd>
     
 
@@ -7041,27 +6796,7 @@ Global Dependencies:
 
 
 <div class="description">
-    Halve the FFT sample count for the spectrogram when it exceeds the minimum threshold.
-
-This function checks if `spectrogram.fftSamples` is greater than 64. If so, the FFT sample
-count is halved, and the normalized playback position is computed using the ratio of the current
-playback time (from `wavesurfer.getCurrentTime()`) to the `windowLength`, clamped between 0 and 1.
-It then calls `postBufferUpdate` with an object containing:
-  - `begin`: the current window offset in seconds (`windowOffsetSecs`),
-  - `position`: the normalized (and clamped) playback position,
-  - `play`: a boolean indicating whether audio is currently playing (`wavesurfer.isPlaying()`).
-
-The updated FFT sample count is logged to the console, and the global configuration (`config.FFT`)
-is updated accordingly.
-
-Assumes that the following globals and helper functions are available in the scope:
-  - `spectrogram`
-  - `wavesurfer`
-  - `windowLength`
-  - `windowOffsetSecs`
-  - `config`
-  - `clamp`
-  - `postBufferUpdate`
+    Halve the FFT sample count for the spectrogram when it exceeds the minimum threshold.This function checks if `spectrogram.fftSamples` is greater than 64. If so, the FFT samplecount is halved, and the normalized playback position is computed using the ratio of the currentplayback time (from `wavesurfer.getCurrentTime()`) to the `windowLength`, clamped between 0 and 1.It then calls `postBufferUpdate` with an object containing:  - `begin`: the current window offset in seconds (`windowOffsetSecs`),  - `position`: the normalized (and clamped) playback position,  - `play`: a boolean indicating whether audio is currently playing (`wavesurfer.isPlaying()`).The updated FFT sample count is logged to the console, and the global configuration (`config.FFT`)is updated accordingly.Assumes that the following globals and helper functions are available in the scope:  - `spectrogram`  - `wavesurfer`  - `windowLength`  - `windowOffsetSecs`  - `config`  - `clamp`  - `postBufferUpdate`
 </div>
 
 
@@ -7105,7 +6840,7 @@ Assumes that the following globals and helper functions are available in the sco
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line685">line 685</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line686">line 686</a>
     </li></ul></dd>
     
 
@@ -7167,19 +6902,7 @@ Assumes that the following globals and helper functions are available in the sco
 
 
 <div class="description">
-    Retrieves detection records for a given audio file within a specified time range and posts them to the UI.
-
-This asynchronous function calculates absolute start and end timestamps by adding the file's metadata offset 
-(in milliseconds) to the provided start and end offsets (in seconds). It queries the database for detection 
-records that satisfy the following criteria:
-- A confidence level greater than or equal to the configured minimum (STATE.detect.confidence).
-- A file name matching the provided file parameter.
-- A detection timestamp between the calculated start and end times.
-
-If additional species filters are active, the query further restricts results by species ID. Records are 
-ranked using a window function to select the top (most confident) detection per grouping of file and datetime.
-The function posts the resulting detections to the UI along with a flag that instructs the UI whether to 
-navigate directly to the corresponding region.
+    Retrieves detection records for a given audio file within a specified time range and posts them to the UI.This asynchronous function calculates absolute start and end timestamps by adding the file's metadata offset (in milliseconds) to the provided start and end offsets (in seconds). It queries the database for detection records that satisfy the following criteria:- A confidence level greater than or equal to the configured minimum (STATE.detect.confidence).- A file name matching the provided file parameter.- A detection timestamp between the calculated start and end times.If additional species filters are active, the query further restricts results by species ID. Records are ranked using a window function to select the top (most confident) detection per grouping of file and datetime.The function posts the resulting detections to the UI along with a flag that instructs the UI whether to navigate directly to the corresponding region.
 </div>
 
 
@@ -7407,15 +7130,7 @@ navigate directly to the corresponding region.
 
 
 <div class="description">
-    Activates the specified audio region by updating the global state and UI.
-
-This function first clears any previously active regions by resetting their colors 
-and labels to the default state. It then applies an active style to the provided region,
-which includes setting a new color and formatting the label. The function updates the global 
-active region, positions the playhead at the region's start time (taking into account any window offset),
-and enables UI menu items such as "export-audio" and, when applicable (i.e., if the model is ready and not predicting),
-"analyseSelection". If the provided region object is invalid (missing or having non-numeric start or end values),
-the function logs an error and exits without modifying the state.
+    Activates the specified audio region by updating the global state and UI.This function first clears any previously active regions by resetting their colors and labels to the default state. It then applies an active style to the provided region,which includes setting a new color and formatting the label. The function updates the global active region, positions the playhead at the region's start time (taking into account any window offset),and enables UI menu items such as "export-audio" and, when applicable (i.e., if the model is ready and not predicting),"analyseSelection". If the provided region object is invalid (missing or having non-numeric start or end values),the function logs an error and exits without modifying the state.
 </div>
 
 
@@ -7603,7 +7318,7 @@ the function logs an error and exits without modifying the state.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3251">line 3251</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3259">line 3259</a>
     </li></ul></dd>
     
 
@@ -7634,12 +7349,7 @@ the function logs an error and exits without modifying the state.
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>const region = {
-  start: 15,
-  end: 30,
-  content: { innerText: 'Bird Call' }
-};
-setActiveRegion(region);</code></pre>
+    <pre class="prettyprint"><code>const region = {  start: 15,  end: 30,  content: { innerText: 'Bird Call' }};setActiveRegion(region);</code></pre>
 
 
 
@@ -7657,8 +7367,7 @@ setActiveRegion(region);</code></pre>
 
 
 <div class="description">
-    Called by getWorkingFile, setCustomLocation
-Assigns file metadata to a metadata cache object. file is the key, and is the source file
+    Called by getWorkingFile, setCustomLocationAssigns file metadata to a metadata cache object. file is the key, and is the source file
 </div>
 
 
@@ -7826,18 +7535,7 @@ Assigns file metadata to a metadata cache object. file is the key, and is the so
 
 
 <div class="description">
-    Creates audio regions for detections that occur within the current view window.
-
-For each detection, the function adjusts its start and end times by subtracting the global offset
-`windowOffsetSecs`. Only detections with an adjusted start time less than the current window length are processed.
-A detection is considered "active" if its adjusted start time matches the start time of the currently active region
-(`activeRegion.start`, if defined). If the detection is active and the `goToRegion` flag is true, the view is repositioned
-to focus on that region. Otherwise, the detection is processed only if the configuration flag `config.specDetections` is enabled.
-
-Audio regions are created by calling `createRegion` with the adjusted start and end times, the detection's label,
-a flag indicating whether to reposition the view (only for active detections when `goToRegion` is true), and an optional
-colour (set to `STATE.regionActiveColour` for active regions). After processing all detections,
-`STATE.regionsCompleted` is set to true to indicate that region creation is complete.
+    Creates audio regions for detections that occur within the current view window.For each detection, the function adjusts its start and end times by subtracting the global offset`windowOffsetSecs`. Only detections with an adjusted start time less than the current window length are processed.A detection is considered "active" if its adjusted start time matches the start time of the currently active region(`activeRegion.start`, if defined). If the detection is active and the `goToRegion` flag is true, the view is repositionedto focus on that region. Otherwise, the detection is processed only if the configuration flag `config.specDetections` is enabled.Audio regions are created by calling `createRegion` with the adjusted start and end times, the detection's label,a flag indicating whether to reposition the view (only for active detections when `goToRegion` is true), and an optionalcolour (set to `STATE.regionActiveColour` for active regions). After processing all detections,`STATE.regionsCompleted` is set to true to indicate that region creation is complete.
 </div>
 
 
@@ -8097,7 +7795,7 @@ colour (set to `STATE.regionActiveColour` for active regions). After processing 
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line2662">line 2662</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line2670">line 2670</a>
     </li></ul></dd>
     
 
@@ -8296,9 +7994,7 @@ colour (set to `STATE.regionActiveColour` for active regions). After processing 
 
 
 <div class="description">
-    Updates the spectrogram visualization and timeline asynchronously.
-
-This function ensures that the spectrogram element is visible by removing the "d-none" class and updates the display based on the provided audio buffer and options. It resets the spectrogram dimensions if a reset is requested or if the wavesurfer instance is uninitialized; otherwise, it loads the new audio buffer. After updating the spectrogram, the timeline is refreshed, the playback position is set using a normalized value, and playback is initiated if specified.
+    Updates the spectrogram visualization and timeline asynchronously.This function ensures that the spectrogram element is visible by removing the "d-none" class and updates the display based on the provided audio buffer and options. It resets the spectrogram dimensions if a reset is requested or if the wavesurfer instance is uninitialized; otherwise, it loads the new audio buffer. After updating the spectrogram, the timeline is refreshed, the playback position is set using a normalized value, and playback is initiated if specified.
 </div>
 
 
@@ -8576,7 +8272,7 @@ This function ensures that the spectrogram element is visible by removing the "d
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line438">line 438</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line439">line 439</a>
     </li></ul></dd>
     
 
@@ -8642,14 +8338,7 @@ This function ensures that the spectrogram element is visible by removing the "d
 
 
 <div class="description">
-    Zooms in or out of the audio spectrogram by adjusting the display window
-and repositioning the playhead relative to the current audio playback time.
-
-When zooming in, the window length is halved, but not reduced below a 1.5-second threshold.
-When zooming out, the window length is doubled, capped at a maximum of 100 seconds or the file's duration.
-Active audio regions are updated to align with the new window, ensuring consistency in user selections.
-
-If no audio file is loaded, the function exits without performing any operation.
+    Zooms in or out of the audio spectrogram by adjusting the display windowand repositioning the playhead relative to the current audio playback time.When zooming in, the window length is halved, but not reduced below a 1.5-second threshold.When zooming out, the window length is doubled, capped at a maximum of 100 seconds or the file's duration.Active audio regions are updated to align with the new window, ensuring consistency in user selections.If no audio file is loaded, the function exits without performing any operation.
 </div>
 
 
@@ -8704,8 +8393,7 @@ If no audio file is loaded, the function exits without performing any operation.
 
             
 
-            <td class="description last">Specifies the zoom operation. If a string, it must be either "zoomIn" or "zoomOut".
-If an Event, the function extracts the button ID from the event's target element.</td>
+            <td class="description last">Specifies the zoom operation. If a string, it must be either "zoomIn" or "zoomOut".If an Event, the function extracts the button ID from the event's target element.</td>
         </tr>
 
     
@@ -8746,7 +8434,7 @@ If an Event, the function extracts the button ID from the event's target element
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line726">line 726</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line727">line 727</a>
     </li></ul></dd>
     
 
@@ -8795,11 +8483,9 @@ If an Event, the function extracts the button ID from the event's target element
 
     <h5>Examples</h5>
     
-    <pre class="prettyprint"><code>// Zoom in directly using a string command:
-zoomSpec("zoomIn");</code></pre>
+    <pre class="prettyprint"><code>// Zoom in directly using a string command:zoomSpec("zoomIn");</code></pre>
 
-    <pre class="prettyprint"><code>// Trigger zooming out via a button click event:
-buttonElement.addEventListener("click", zoomSpec);</code></pre>
+    <pre class="prettyprint"><code>// Trigger zooming out via a button click event:buttonElement.addEventListener("click", zoomSpec);</code></pre>
 
 
 
@@ -8825,7 +8511,7 @@ buttonElement.addEventListener("click", zoomSpec);</code></pre>
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Sat Feb 15 2025 12:40:26 GMT+0000 (Greenwich Mean Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Sat Feb 15 2025 14:11:46 GMT+0000 (Greenwich Mean Time)
 </footer>
 
 <script> prettyPrint(); </script>

@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: getKnownIssues.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: getKnownIssues.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
+ * @file Helper functions for the Github Issues API.
+ */
+
+async function fetchIssuesByLabel(labelList) {
+  const owner = "Mattk70";
+  const repo = "Chirpity-Electron";
+  try {
+    const results = await Promise.all(
+      labelList.map((label) =>
+        fetch(
+          `https://api.github.com/repos/${owner}/${repo}/issues?state=all&amp;labels=${label}`
+        ).then((res) => res.json())
+      )
+    );
+
+    // Merge results and remove duplicates based on issue ID
+    const uniqueIssues = new Map();
+    results.flat().forEach((issue) => uniqueIssues.set(issue.id, issue));
+
+    const issues = Array.from(uniqueIssues.values());
+    // Process issues to return only the required fields
+    const processedIssues = issues.map((issue) => ({
+      title: issue.title,
+      url: issue.html_url,
+      state: issue.state,
+      labels: issue.labels.map((label) => label.name),
+    }));
+
+    return processedIssues;
+  } catch (error) {
+    console.error("Error fetching issues:", error.message);
+    throw error;
+  }
+}
+function renderIssuesInModal(issues, VERSION) {
+  const currentVersion = parseSemVer(VERSION);
+  // Filter issues
+  issues = issues.filter((issue) => {
+    const versionLabel = issue.labels.find((label) =>
+      /^v\d+\.\d+\.\d+$/.test(label)
+    );
+    if (!versionLabel) return true; // Exclude issues without a version label
+    if (issue.state === "closed") {
+      const fixVersion = parseSemVer(versionLabel);
+      const keep = isNewVersion(fixVersion, currentVersion); // Keep issues >= VERSION
+      return keep;
+    } else {
+      return true;
+    }
+  });
+  // Ensure the modal exists in the DOM
+  if (!document.getElementById("issuesModal")) {
+    const modalHtml = `
+            &lt;div class="modal fade" id="issuesModal" tabindex="-1" aria-labelledby="issuesModalLabel" aria-hidden="true">
+                &lt;div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+                    &lt;div class="modal-content">
+                        &lt;div class="modal-header">
+                            &lt;h5 class="modal-title" id="issuesModalLabel">Known Issues in Chirpity ${VERSION}&lt;/h5>
+                            &lt;button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">&lt;/button>
+                        &lt;/div>
+                        &lt;div class="modal-body" id="issuesModalBody">
+                            &lt;!-- Content will be injected here -->
+                        &lt;/div>
+                        &lt;div class="modal-footer">
+                            &lt;button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close&lt;/button>
+                            &lt;a href="https://github.com/Mattk70/Chirpity-Electron/issues" 
+                               target="_blank" 
+                               class="btn btn-primary">
+                               Open a New Issue on GitHub
+                            &lt;/a>
+                        &lt;/div>
+                    &lt;/div>
+                &lt;/div>
+            &lt;/div>
+        `;
+    document.body.insertAdjacentHTML("beforeend", modalHtml);
+  }
+
+  // Populate the modal body
+  const modalBody = document.querySelector("#issuesModalBody");
+
+  if (issues.length === 0) {
+    modalBody.innerHTML = `
+            &lt;p class="text-center text-muted">There are no known issues with Chirpity ${VERSION}.&lt;/p>
+        `;
+  } else {
+    modalBody.innerHTML = `
+            &lt;table class="table table-hover">
+                &lt;thead>
+                    &lt;tr>
+                        &lt;th scope="col">State&lt;/th>
+                        &lt;th scope="col">Title&lt;/th>
+                    &lt;/tr>
+                &lt;/thead>
+                &lt;tbody>
+                    ${issues
+                      .map((issue) => {
+                        const versionLabel =
+                          issue.labels.find((label) =>
+                            /^v\d+\.\d+\.\d+$/.test(label)
+                          ) || null;
+                        const stateClass =
+                          issue.state === "open" ? "bg-purple" : "bg-success";
+                        const stateText =
+                          issue.state === "open"
+                            ? "Open"
+                            : `Fixed ${versionLabel || ""}`;
+                        return `
+                                &lt;tr>
+                                    &lt;td>
+                                        &lt;span class="badge ${stateClass} pb-2 text-light">${stateText}&lt;/span>
+                                    &lt;/td>
+                                    &lt;td>
+                                        &lt;a href="${issue.url}" target="_blank" class="text-decoration-none">${issue.title}&lt;/a>
+                                    &lt;/td>
+                                &lt;/tr>
+                            `;
+                      })
+                      .join("")}
+                &lt;/tbody>
+            &lt;/table>
+        `;
+  }
+
+  // Show the modal
+  const modal = new bootstrap.Modal(document.getElementById("issuesModal"));
+  modal.show();
+}
+
+function parseSemVer(versionString) {
+  const semVerRegex =
+    /^[vV]?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-.]+))?(?:\+([0-9A-Za-z-.]+))?$/;
+  const matches = versionString.match(semVerRegex);
+  if (!matches) {
+    throw new Error("Invalid SemVer version string");
+  }
+
+  const [, major, minor, patch, preRelease, buildMetadata] = matches;
+
+  return {
+    major: parseInt(major),
+    minor: parseInt(minor),
+    patch: parseInt(patch),
+    preRelease: preRelease || null,
+    buildMetadata: buildMetadata || null,
+  };
+}
+
+function isNewVersion(latest, current) {
+  if (latest.major > current.major) {
+    return true;
+  } else if (latest.major === current.major) {
+    if (latest.minor > current.minor) {
+      return true;
+    } else if (latest.minor === current.minor) {
+      if (latest.patch > current.patch) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+export { fetchIssuesByLabel, renderIssuesInModal, parseSemVer, isNewVersion };
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#LIST_CACHE">LIST_CACHE</a></li><li><a href="global.html#_parseMetadataText">_parseMetadataText</a></li><li><a href="global.html#_updateSpeciesLocale">_updateSpeciesLocale</a></li><li><a href="global.html#addDays">addDays</a></li><li><a href="global.html#adjustSpecDims">adjustSpecDims</a></li><li><a href="global.html#centreSpec">centreSpec</a></li><li><a href="global.html#checkForRegion">checkForRegion</a></li><li><a href="global.html#clearActive">clearActive</a></li><li><a href="global.html#convertFile">convertFile</a></li><li><a href="global.html#createContextMenu">createContextMenu</a></li><li><a href="global.html#createRegion">createRegion</a></li><li><a href="global.html#createTimeline">createTimeline</a></li><li><a href="global.html#extractWaveMetadata">extractWaveMetadata</a></li><li><a href="global.html#fetchAudioBuffer">fetchAudioBuffer</a></li><li><a href="global.html#filterValidFiles">filterValidFiles</a></li><li><a href="global.html#formatAsBootstrapTable">formatAsBootstrapTable</a></li><li><a href="global.html#formatLabel">formatLabel</a></li><li><a href="global.html#formatRegionTooltip">formatRegionTooltip</a></li><li><a href="global.html#getDetectedSpecies">getDetectedSpecies</a></li><li><a href="global.html#getFileSQLAndParams">getFileSQLAndParams</a></li><li><a href="global.html#getFiles">getFiles</a></li><li><a href="global.html#getIncludedIDs">getIncludedIDs</a></li><li><a href="global.html#getRegion">getRegion</a></li><li><a href="global.html#getResults">getResults</a></li><li><a href="global.html#getValidSpecies">getValidSpecies</a></li><li><a href="global.html#getWorkingFile">getWorkingFile</a></li><li><a href="global.html#handleKeyDown">handleKeyDown</a></li><li><a href="global.html#increaseFFT">increaseFFT</a></li><li><a href="global.html#initRegion">initRegion</a></li><li><a href="global.html#loadAudioFile">loadAudioFile</a></li><li><a href="global.html#loadAudioFileSync">loadAudioFileSync</a></li><li><a href="global.html#locateFile">locateFile</a></li><li><a href="global.html#membershipCheck">membershipCheck</a></li><li><a href="global.html#notifyMissingFile">notifyMissingFile</a></li><li><a href="global.html#onLaunch">onLaunch</a></li><li><a href="global.html#onModelReady">onModelReady</a></li><li><a href="global.html#onSave2DiskDB">onSave2DiskDB</a></li><li><a href="global.html#playRegion">playRegion</a></li><li><a href="global.html#reduceFFT">reduceFFT</a></li><li><a href="global.html#sendDetections">sendDetections</a></li><li><a href="global.html#setActiveRegion">setActiveRegion</a></li><li><a href="global.html#setMetadata">setMetadata</a></li><li><a href="global.html#showWindowDetections">showWindowDetections</a></li><li><a href="global.html#t0_warmup">t0_warmup</a></li><li><a href="global.html#updateFilesBeingProcessed">updateFilesBeingProcessed</a></li><li><a href="global.html#updateSpec">updateSpec</a></li><li><a href="global.html#zoomSpec">zoomSpec</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Sat Feb 15 2025 14:11:46 GMT+0000 (Greenwich Mean Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

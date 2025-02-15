@@ -1,3 +1,7 @@
+/**
+ * @file Helper functions for membership validation.
+ */
+
 async function checkMembership(uuid) {
     try {
       const response = await fetch('https://subscriber.mattkirkland.co.uk/check-uuid', {

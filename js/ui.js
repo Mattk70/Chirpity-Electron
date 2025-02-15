@@ -1,3 +1,8 @@
+/**
+ * @file User Interface code.
+ * Contains functions for rendering the spectrogram, updating settings, rendering the screen
+ */
+
 import { trackVisit, trackEvent } from "./tracking.js";
 import {checkMembership} from './member.js';
 import { DOM } from "./DOMcache.js";

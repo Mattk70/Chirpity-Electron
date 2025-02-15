@@ -1,3 +1,7 @@
+/**
+ * @file Helper functions for managing Matomo tracking.
+ */
+
 const ID_SITE = 3;
 let VISITOR;
 function trackEvent(uuid, event, action, name, value){

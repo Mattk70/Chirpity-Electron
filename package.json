@@ -1,10 +1,11 @@
 {
   "name": "Chirpity",
-  "version": "3.0.3",
+  "version": "3.0.4",
   "description": "Chirpity Nocmig",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "docs": "jsdoc -c jsdoc.json",
     "prebuild": "node prebuild.js",
     "preexport": "node prebuild.js",
     "preAppImage": "node prebuild.js",

@@ -1,3 +1,7 @@
+/**
+ * @file Helper functions for the Github Issues API.
+ */
+
 async function fetchIssuesByLabel(labelList) {
   const owner = "Mattk70";
   const repo = "Chirpity-Electron";

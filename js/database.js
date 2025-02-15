@@ -1,3 +1,7 @@
+/**
+ * @file Utility functions for database interaction.
+ */
+
 const DEBUG = false;
 
 const sqlite3 = DEBUG ? require("sqlite3").verbose() : require("sqlite3");

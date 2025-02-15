@@ -1,3 +1,7 @@
+/**
+ * @file Backbone of the app. Functions to process audio, manage database interaction
+ * and interact with the AI models
+ */
 
 const { ipcRenderer, ipcMain } = require("electron");
 const fs = require("node:fs");
