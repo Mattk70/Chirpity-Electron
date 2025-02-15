@@ -98,7 +98,7 @@ class Mutex {
 function checkpoint(db) {
   return new Promise((resolve, reject) => {
     if (!db) resolve();
-    else {  diskDB.exec("PRAGMA wal_checkpoint(TRUNCATE);", (err) => {
+    else {  db.exec("PRAGMA wal_checkpoint(TRUNCATE);", (err) => {
           if (err) {
               console.error("Error running WAL checkpoint:", err.message);
               reject(err);
@@ -114,6 +114,7 @@ function checkpoint(db) {
 function closeDatabase(db) {
   return new Promise((resolve, reject) => {
     if (!db) resolve();
+    else {
       db.close((err) => {
           if (err) {
               console.error("Error closing database:", err.message);
@@ -123,6 +124,7 @@ function closeDatabase(db) {
               resolve();
           }
       });
+    }
   });
 }
 export { sqlite3, closeDatabase, checkpoint, Mutex };

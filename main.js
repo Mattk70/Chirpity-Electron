@@ -580,7 +580,7 @@ app.on("activate", async () => {
     await createWorker();
   }
 });
-const DB_CLOSED = false;
+let DB_CLOSED = false;
 app.on('before-quit', async (event) => {
   event.preventDefault(); // Prevent default quit until cleanup is done
   if (!DB_CLOSED) workerWindow.webContents.postMessage("close-database", null);
