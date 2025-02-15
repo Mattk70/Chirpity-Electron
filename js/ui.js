@@ -5727,7 +5727,7 @@ colorMapSlider.addEventListener("input", () => {
 });
 
 // Gauss Alpha
-const alphaValue = document.getElementById("alpha");
+const alphaValue = document.getElementById("alpha-value");
 const alphaSlider = document.getElementById("alpha-slider");
 alphaSlider.addEventListener("input", () => {
   alphaValue.textContent = alphaSlider.value;

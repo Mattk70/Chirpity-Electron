@@ -1801,6 +1801,24 @@ results.addEventListener("click", resultClick);
 const selectionTable = document.getElementById("selectionResultTableBody");
 selectionTable.addEventListener("click", resultClick);
 
+/**
+ * Handles the click event on a result row in the audio analysis UI.
+ *
+ * This function asynchronously processes user clicks on table rows representing audio analysis results.
+ * It first verifies that all audio regions have been fully created and an audio file is loaded. It then extracts
+ * file details, start and end times, and label information from the clicked row's "name" attribute, and makes the row active.
+ * The corresponding audio region is then loaded using these extracted details. If the event target has a "circle" class,
+ * the function waits until the audio file is fully loaded before obtaining the selection results.
+ *
+ * @param {Event} e - The click event object triggered by the user interaction.
+ * @returns {Promise&lt;void>} A promise that resolves when the click event processing is complete.
+ *
+ * @example
+ * // Assuming a table row element with the "name" attribute formatted as "file|start|end|_|label":
+ * // &lt;tr name="audio.mp3|10|20|unused|Speech">...&lt;/tr>
+ * // Attaching the event handler:
+ * document.querySelector('tr').addEventListener('click', resultClick);
+ */
 async function resultClick(e) {
   if (!STATE.regionsCompleted) {
       console.warn('Cannot process click - regions are still being created');
@@ -3968,19 +3986,25 @@ const gotoForm = document.getElementById("gotoForm");
 gotoForm.addEventListener("submit", gotoTime);
 
 /**
- * Handles the initialization steps once the audio model is ready.
+ * Initializes the application once the audio model is ready.
  *
- * This function performs the following actions:
- * - Sets the flag indicating the model is ready.
- * - If a file is loaded, enables the "analyse" menu item and, if multiple files are open, enables the "analyseAll" and "reanalyseAll" menu items.
- * - If an audio region is active, enables the "analyseSelection" menu item.
- * - Records and logs the warm-up time for diagnostic purposes.
+ * Upon invocation, this function performs several startup tasks:
+ * - Sets the flag indicating that the audio model is ready.
+ * - If an audio file is loaded, enables the "analyse" menu item; if multiple files
+ *   are open, also enables "analyseAll" and "reanalyseAll" menu items.
+ * - If there is an active audio region, enables the "analyseSelection" menu item.
+ * - Calculates the warm-up time and logs it in the DIAGNOSTICS object.
+ * - Logs the application's launch time (if this is the first load).
  * - Marks the application as loaded and hides the loading screen.
  * - For new users in non-test environments, initiates the tour if it has not been seen.
- * - Logs the application's launch time.
- * - Processes any queued files opened via the operating system.
+ * - Processes any queued files received via the operating system.
  *
- * @param {Object} args - Optional arguments (currently unused).
+ * **Side Effects:**
+ * Modifies global state, updates the DOM (e.g., hiding the loading screen), logs diagnostic
+ * information, and triggers additional actions (e.g., starting the tour, processing OS file queues).
+ *
+ * @param {Object} [args={}] - Optional parameters (currently unused).
+ * @returns {void}
  */
 function onModelReady(args) {
   modelReady = true;
@@ -8015,13 +8039,13 @@ function hexToUtf8(hex) {
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#LIST_CACHE">LIST_CACHE</a></li><li><a href="global.html#_parseMetadataText">_parseMetadataText</a></li><li><a href="global.html#_updateSpeciesLocale">_updateSpeciesLocale</a></li><li><a href="global.html#addDays">addDays</a></li><li><a href="global.html#adjustSpecDims">adjustSpecDims</a></li><li><a href="global.html#centreSpec">centreSpec</a></li><li><a href="global.html#checkForRegion">checkForRegion</a></li><li><a href="global.html#clearActive">clearActive</a></li><li><a href="global.html#convertFile">convertFile</a></li><li><a href="global.html#createContextMenu">createContextMenu</a></li><li><a href="global.html#createRegion">createRegion</a></li><li><a href="global.html#createTimeline">createTimeline</a></li><li><a href="global.html#extractWaveMetadata">extractWaveMetadata</a></li><li><a href="global.html#fetchAudioBuffer">fetchAudioBuffer</a></li><li><a href="global.html#filterValidFiles">filterValidFiles</a></li><li><a href="global.html#formatAsBootstrapTable">formatAsBootstrapTable</a></li><li><a href="global.html#formatLabel">formatLabel</a></li><li><a href="global.html#formatRegionTooltip">formatRegionTooltip</a></li><li><a href="global.html#getDetectedSpecies">getDetectedSpecies</a></li><li><a href="global.html#getFileSQLAndParams">getFileSQLAndParams</a></li><li><a href="global.html#getFiles">getFiles</a></li><li><a href="global.html#getIncludedIDs">getIncludedIDs</a></li><li><a href="global.html#getRegion">getRegion</a></li><li><a href="global.html#getResults">getResults</a></li><li><a href="global.html#getValidSpecies">getValidSpecies</a></li><li><a href="global.html#getWorkingFile">getWorkingFile</a></li><li><a href="global.html#handleKeyDown">handleKeyDown</a></li><li><a href="global.html#increaseFFT">increaseFFT</a></li><li><a href="global.html#initRegion">initRegion</a></li><li><a href="global.html#loadAudioFile">loadAudioFile</a></li><li><a href="global.html#loadAudioFileSync">loadAudioFileSync</a></li><li><a href="global.html#locateFile">locateFile</a></li><li><a href="global.html#membershipCheck">membershipCheck</a></li><li><a href="global.html#notifyMissingFile">notifyMissingFile</a></li><li><a href="global.html#onLaunch">onLaunch</a></li><li><a href="global.html#onModelReady">onModelReady</a></li><li><a href="global.html#onSave2DiskDB">onSave2DiskDB</a></li><li><a href="global.html#playRegion">playRegion</a></li><li><a href="global.html#reduceFFT">reduceFFT</a></li><li><a href="global.html#sendDetections">sendDetections</a></li><li><a href="global.html#setActiveRegion">setActiveRegion</a></li><li><a href="global.html#setMetadata">setMetadata</a></li><li><a href="global.html#showWindowDetections">showWindowDetections</a></li><li><a href="global.html#t0_warmup">t0_warmup</a></li><li><a href="global.html#updateFilesBeingProcessed">updateFilesBeingProcessed</a></li><li><a href="global.html#updateSpec">updateSpec</a></li><li><a href="global.html#zoomSpec">zoomSpec</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#LIST_CACHE">LIST_CACHE</a></li><li><a href="global.html#_parseMetadataText">_parseMetadataText</a></li><li><a href="global.html#_updateSpeciesLocale">_updateSpeciesLocale</a></li><li><a href="global.html#addDays">addDays</a></li><li><a href="global.html#adjustSpecDims">adjustSpecDims</a></li><li><a href="global.html#centreSpec">centreSpec</a></li><li><a href="global.html#checkForRegion">checkForRegion</a></li><li><a href="global.html#checkMembership">checkMembership</a></li><li><a href="global.html#checkpoint">checkpoint</a></li><li><a href="global.html#clearActive">clearActive</a></li><li><a href="global.html#closeDatabase">closeDatabase</a></li><li><a href="global.html#controlFromInput">controlFromInput</a></li><li><a href="global.html#convertFile">convertFile</a></li><li><a href="global.html#createContextMenu">createContextMenu</a></li><li><a href="global.html#createRegion">createRegion</a></li><li><a href="global.html#createTimeline">createTimeline</a></li><li><a href="global.html#extractWaveMetadata">extractWaveMetadata</a></li><li><a href="global.html#fetchAudioBuffer">fetchAudioBuffer</a></li><li><a href="global.html#fetchIssuesByLabel">fetchIssuesByLabel</a></li><li><a href="global.html#filterValidFiles">filterValidFiles</a></li><li><a href="global.html#formatAsBootstrapTable">formatAsBootstrapTable</a></li><li><a href="global.html#formatLabel">formatLabel</a></li><li><a href="global.html#formatRegionTooltip">formatRegionTooltip</a></li><li><a href="global.html#getDetectedSpecies">getDetectedSpecies</a></li><li><a href="global.html#getFileSQLAndParams">getFileSQLAndParams</a></li><li><a href="global.html#getFiles">getFiles</a></li><li><a href="global.html#getIncludedIDs">getIncludedIDs</a></li><li><a href="global.html#getRegion">getRegion</a></li><li><a href="global.html#getResults">getResults</a></li><li><a href="global.html#getValidSpecies">getValidSpecies</a></li><li><a href="global.html#getWorkingFile">getWorkingFile</a></li><li><a href="global.html#handleKeyDown">handleKeyDown</a></li><li><a href="global.html#increaseFFT">increaseFFT</a></li><li><a href="global.html#initRegion">initRegion</a></li><li><a href="global.html#loadAudioFile">loadAudioFile</a></li><li><a href="global.html#loadAudioFileSync">loadAudioFileSync</a></li><li><a href="global.html#locateFile">locateFile</a></li><li><a href="global.html#membershipCheck">membershipCheck</a></li><li><a href="global.html#notifyMissingFile">notifyMissingFile</a></li><li><a href="global.html#onLaunch">onLaunch</a></li><li><a href="global.html#onModelReady">onModelReady</a></li><li><a href="global.html#onSave2DiskDB">onSave2DiskDB</a></li><li><a href="global.html#onUpdateLocale">onUpdateLocale</a></li><li><a href="global.html#playRegion">playRegion</a></li><li><a href="global.html#reduceFFT">reduceFFT</a></li><li><a href="global.html#resultClick">resultClick</a></li><li><a href="global.html#savedFileCheck">savedFileCheck</a></li><li><a href="global.html#sendDetections">sendDetections</a></li><li><a href="global.html#setActiveRegion">setActiveRegion</a></li><li><a href="global.html#setMetadata">setMetadata</a></li><li><a href="global.html#showWindowDetections">showWindowDetections</a></li><li><a href="global.html#t0_warmup">t0_warmup</a></li><li><a href="global.html#trackEvent">trackEvent</a></li><li><a href="global.html#updateFilesBeingProcessed">updateFilesBeingProcessed</a></li><li><a href="global.html#updateSpec">updateSpec</a></li><li><a href="global.html#zoomSpec">zoomSpec</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Sat Feb 15 2025 14:11:46 GMT+0000 (Greenwich Mean Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Sat Feb 15 2025 14:56:08 GMT+0000 (Greenwich Mean Time)
 </footer>
 
 <script> prettyPrint(); </script>

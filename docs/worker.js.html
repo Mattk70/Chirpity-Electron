@@ -807,6 +807,30 @@ ipcRenderer.on("close-database", async (event) => {
   })
 });
 
+/**
+ * Checks whether all files in the provided list are present in the database.
+ *
+ * This asynchronous function processes the given file list in batches (up to 25,000 files per batch) to accommodate SQLite's parameter limits.
+ * For each batch, it constructs a parameterized SQL query that counts how many of the files exist in the database's "files" table.
+ * If any batch has a count lower than the number of files in that batch, the function immediately posts a failure event to the UI and returns false.
+ * If all batches are successfully verified, it posts a success event to the UI and returns true.
+ * If the database (diskDB) is not loaded, an error alert is generated and the function returns undefined.
+ *
+ * @param {Array.&lt;string>} fileList - An array of file names to verify in the database.
+ * @return {Promise&lt;boolean|undefined>} A promise that resolves to true if every file is found in the database, false if one or more files are missing, or undefined if the database is not loaded.
+ *
+ * @example
+ * const files = ['track1.mp3', 'track2.wav'];
+ * savedFileCheck(files).then(result => {
+ *   if (result === true) {
+ *     console.log('All files exist in the database.');
+ *   } else if (result === false) {
+ *     console.log('Some files are missing in the database.');
+ *   } else {
+ *     console.log('Database not loaded.');
+ *   }
+ * });
+ */
 async function savedFileCheck(fileList) {
   if (diskDB) {
     // Slice the list into a # of params SQLITE can handle
@@ -1032,21 +1056,25 @@ const getFilesInDirectory = async (dir) => {
 const prepParams = (list) => "?".repeat(list.length).split("").join(",");
 
 /**
- * Constructs an SQL filter clause and an associated parameters array for retrieving file records.
+ * Generates an SQL filtering clause along with its corresponding parameters for file record retrieval.
  *
- * Depending on the provided range and the current application mode (accessed via the global STATE),
- * the function generates conditions to filter files by date/time or by file/archive names.
+ * This function constructs an SQL fragment to filter file records based on an optional date range and the
+ * current application mode stored in the global STATE variable. Depending on whether a valid range is provided
+ * or the application mode is set to "archive", it generates the appropriate conditions and parameters:
  *
- * - If a range object with a defined `start` property is provided, it generates a clause to select
- *   records where `dateTime` is between `range.start` (inclusive) and `range.end` (exclusive).
- * - If the mode is "archive", it creates a condition to filter files by both their name and archiveName,
- *   processing file paths accordingly.
- * - In "analyse" mode, a file-based condition is noted but currently commented out.
+ * - When a range object with a defined `start` property is provided, an SQL condition is appended to filter
+ *   records where `dateTime` is between `range.start` (inclusive) and `range.end` (exclusive). The provided range
+ *   values are pushed to the parameters array.
+ * - In "archive" mode, the function creates an SQL condition that filters records by matching either the file's
+ *   name or its archiveName against the list obtained from STATE.filesToAnalyse. It also processes file paths
+ *   by removing the archive path prefix defined in STATE.archive.location.
+ * - In "analyse" mode, a file-based filtering condition exists in the code but is currently commented out.
  *
- * @param {Object} [range] - Optional range object to filter records by dateTime.
- * @param {(number|string)} range.start - The start of the date range.
- * @param {(number|string)} range.end - The end of the date range.
- * @returns {Array.&lt;(string | any[])>} A tuple where the first element is an SQL fragment (string) and the second is an array of parameters to bind to the query.
+ * @param {Object} [range] - Optional object specifying a date range for filtering records.
+ * @param {(number|string)} range.start - The start boundary of the date range (inclusive).
+ * @param {(number|string)} range.end - The end boundary of the date range (exclusive).
+ * @returns {Array.&lt;(string | any[])>} A tuple where the first element is the SQL condition fragment (string)
+ * and the second element is an array of parameters to bind to the SQL query.
  */
 function getFileSQLAndParams(range) {
   const fileParams = prepParams(STATE.filesToAnalyse);
@@ -4473,14 +4501,19 @@ const onFileDelete = async (fileName) => {
 
 const dbMutex = new Mutex();
 /**
- * Updates the locale and species names in the database.
+ * Updates species common names in the database using provided labels.
  *
- * @param {string} locale - The locale to update.
- * @param {Array&lt;string>} labels - The labels containing species names and common names.
- * @param {boolean} refreshResults - Whether to refresh the results after updating.
- * @returns {Promise&lt;void>} - A promise that resolves when the update is complete.
+ * This function processes an array of labels, each formatted as "speciesName_commonName". It updates the
+ * corresponding records in the database based on the current application model (e.g., "birdnet"). For the "birdnet"
+ * model, a direct update query is used, while for other models the function retrieves existing common names and
+ * conditionally updates them based on matching patterns. All database operations are executed within a single
+ * transaction; if any update fails, the transaction is rolled back and the error is propagated.
  *
- * @throws {Error} - Throws an error if the database transactions fail.
+ * @param {object} db - The database connection object supporting asynchronous methods (runAsync, prepare, and finalize).
+ * @param {Array&lt;string>} labels - An array of strings representing species updates, formatted as "speciesName_commonName".
+ * @returns {Promise&lt;void>} A promise that resolves when all updates have been successfully committed.
+ *
+ * @throws {Error} If any of the database operations fail during the transaction.
  */
 async function _updateSpeciesLocale(db, labels) {
   const updatePromises = [];
@@ -4546,6 +4579,21 @@ async function _updateSpeciesLocale(db, labels) {
   }
 }
 
+/**
+ * Updates the application's locale by modifying state and database entries, and optionally refreshes analysis results.
+ *
+ * This asynchronous function updates the global state with the new locale, applies the new locale to both the
+ * disk and memory databases by updating their species labels, and optionally refreshes the application's results
+ * and summary if requested. It ensures that database operations are performed within a locked context for concurrency
+ * safety, and performs a rollback in case of any error during the update process.
+ *
+ * @async
+ * @param {string} locale - The new locale identifier (e.g., "en-US").
+ * @param {Object} labels - An object mapping species IDs to their localized labels.
+ * @param {boolean} refreshResults - Indicates whether to refresh the results and summary following the locale update.
+ * @returns {Promise&lt;void>} A promise that resolves when the locale update process is completed.
+ * @throws {Error} Propagates any error encountered during the update process after rolling back the database transaction.
+ */
 async function onUpdateLocale(locale, labels, refreshResults) {
   if (DEBUG) t0 = Date.now();
   await dbMutex.lock();
@@ -4648,12 +4696,17 @@ async function getLocations({ db = STATE.db, file }) {
 }
 
 /**
- * getIncludedIDs
- * Helper function to provide a list of valid species for the filter.
- * Will look for a list in the STATE.included cache, and if not present,
- * will call setIncludedIDs to generate a new list
- * @param {*} file
- * @returns a list of IDs included in filtered results
+ * Retrieves a list of included species IDs for filtering results based on the current state and file metadata.
+ *
+ * This asynchronous helper function returns a list of valid species IDs from the cache (STATE.included).
+ * If the cache entry is missing:
+ * - For "location" or "nocturnal" listings (when STATE.local is true), it derives the latitude, longitude, and week from the provided file metadata (or from STATE if no file is provided),
+ *   constructs a location key, and calls setIncludedIDs to populate the cache.
+ * - For other list types, it calls setIncludedIDs if the relevant cache object is not defined.
+ *
+ * @async
+ * @param {*} [file] - An optional identifier used to look up file metadata in METADATA. If provided, its metadata will be used to extract location (lat, lon) and week data.
+ * @returns {Promise&lt;Array&lt;number>>} A promise that resolves to an array of species IDs included in the filtered results.
  */
 async function getIncludedIDs(file) {
   let lat, lon, week;
@@ -5058,13 +5111,13 @@ async function convertFile(
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#LIST_CACHE">LIST_CACHE</a></li><li><a href="global.html#_parseMetadataText">_parseMetadataText</a></li><li><a href="global.html#_updateSpeciesLocale">_updateSpeciesLocale</a></li><li><a href="global.html#addDays">addDays</a></li><li><a href="global.html#adjustSpecDims">adjustSpecDims</a></li><li><a href="global.html#centreSpec">centreSpec</a></li><li><a href="global.html#checkForRegion">checkForRegion</a></li><li><a href="global.html#clearActive">clearActive</a></li><li><a href="global.html#convertFile">convertFile</a></li><li><a href="global.html#createContextMenu">createContextMenu</a></li><li><a href="global.html#createRegion">createRegion</a></li><li><a href="global.html#createTimeline">createTimeline</a></li><li><a href="global.html#extractWaveMetadata">extractWaveMetadata</a></li><li><a href="global.html#fetchAudioBuffer">fetchAudioBuffer</a></li><li><a href="global.html#filterValidFiles">filterValidFiles</a></li><li><a href="global.html#formatAsBootstrapTable">formatAsBootstrapTable</a></li><li><a href="global.html#formatLabel">formatLabel</a></li><li><a href="global.html#formatRegionTooltip">formatRegionTooltip</a></li><li><a href="global.html#getDetectedSpecies">getDetectedSpecies</a></li><li><a href="global.html#getFileSQLAndParams">getFileSQLAndParams</a></li><li><a href="global.html#getFiles">getFiles</a></li><li><a href="global.html#getIncludedIDs">getIncludedIDs</a></li><li><a href="global.html#getRegion">getRegion</a></li><li><a href="global.html#getResults">getResults</a></li><li><a href="global.html#getValidSpecies">getValidSpecies</a></li><li><a href="global.html#getWorkingFile">getWorkingFile</a></li><li><a href="global.html#handleKeyDown">handleKeyDown</a></li><li><a href="global.html#increaseFFT">increaseFFT</a></li><li><a href="global.html#initRegion">initRegion</a></li><li><a href="global.html#loadAudioFile">loadAudioFile</a></li><li><a href="global.html#loadAudioFileSync">loadAudioFileSync</a></li><li><a href="global.html#locateFile">locateFile</a></li><li><a href="global.html#membershipCheck">membershipCheck</a></li><li><a href="global.html#notifyMissingFile">notifyMissingFile</a></li><li><a href="global.html#onLaunch">onLaunch</a></li><li><a href="global.html#onModelReady">onModelReady</a></li><li><a href="global.html#onSave2DiskDB">onSave2DiskDB</a></li><li><a href="global.html#playRegion">playRegion</a></li><li><a href="global.html#reduceFFT">reduceFFT</a></li><li><a href="global.html#sendDetections">sendDetections</a></li><li><a href="global.html#setActiveRegion">setActiveRegion</a></li><li><a href="global.html#setMetadata">setMetadata</a></li><li><a href="global.html#showWindowDetections">showWindowDetections</a></li><li><a href="global.html#t0_warmup">t0_warmup</a></li><li><a href="global.html#updateFilesBeingProcessed">updateFilesBeingProcessed</a></li><li><a href="global.html#updateSpec">updateSpec</a></li><li><a href="global.html#zoomSpec">zoomSpec</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#LIST_CACHE">LIST_CACHE</a></li><li><a href="global.html#_parseMetadataText">_parseMetadataText</a></li><li><a href="global.html#_updateSpeciesLocale">_updateSpeciesLocale</a></li><li><a href="global.html#addDays">addDays</a></li><li><a href="global.html#adjustSpecDims">adjustSpecDims</a></li><li><a href="global.html#centreSpec">centreSpec</a></li><li><a href="global.html#checkForRegion">checkForRegion</a></li><li><a href="global.html#checkMembership">checkMembership</a></li><li><a href="global.html#checkpoint">checkpoint</a></li><li><a href="global.html#clearActive">clearActive</a></li><li><a href="global.html#closeDatabase">closeDatabase</a></li><li><a href="global.html#controlFromInput">controlFromInput</a></li><li><a href="global.html#convertFile">convertFile</a></li><li><a href="global.html#createContextMenu">createContextMenu</a></li><li><a href="global.html#createRegion">createRegion</a></li><li><a href="global.html#createTimeline">createTimeline</a></li><li><a href="global.html#extractWaveMetadata">extractWaveMetadata</a></li><li><a href="global.html#fetchAudioBuffer">fetchAudioBuffer</a></li><li><a href="global.html#fetchIssuesByLabel">fetchIssuesByLabel</a></li><li><a href="global.html#filterValidFiles">filterValidFiles</a></li><li><a href="global.html#formatAsBootstrapTable">formatAsBootstrapTable</a></li><li><a href="global.html#formatLabel">formatLabel</a></li><li><a href="global.html#formatRegionTooltip">formatRegionTooltip</a></li><li><a href="global.html#getDetectedSpecies">getDetectedSpecies</a></li><li><a href="global.html#getFileSQLAndParams">getFileSQLAndParams</a></li><li><a href="global.html#getFiles">getFiles</a></li><li><a href="global.html#getIncludedIDs">getIncludedIDs</a></li><li><a href="global.html#getRegion">getRegion</a></li><li><a href="global.html#getResults">getResults</a></li><li><a href="global.html#getValidSpecies">getValidSpecies</a></li><li><a href="global.html#getWorkingFile">getWorkingFile</a></li><li><a href="global.html#handleKeyDown">handleKeyDown</a></li><li><a href="global.html#increaseFFT">increaseFFT</a></li><li><a href="global.html#initRegion">initRegion</a></li><li><a href="global.html#loadAudioFile">loadAudioFile</a></li><li><a href="global.html#loadAudioFileSync">loadAudioFileSync</a></li><li><a href="global.html#locateFile">locateFile</a></li><li><a href="global.html#membershipCheck">membershipCheck</a></li><li><a href="global.html#notifyMissingFile">notifyMissingFile</a></li><li><a href="global.html#onLaunch">onLaunch</a></li><li><a href="global.html#onModelReady">onModelReady</a></li><li><a href="global.html#onSave2DiskDB">onSave2DiskDB</a></li><li><a href="global.html#onUpdateLocale">onUpdateLocale</a></li><li><a href="global.html#playRegion">playRegion</a></li><li><a href="global.html#reduceFFT">reduceFFT</a></li><li><a href="global.html#resultClick">resultClick</a></li><li><a href="global.html#savedFileCheck">savedFileCheck</a></li><li><a href="global.html#sendDetections">sendDetections</a></li><li><a href="global.html#setActiveRegion">setActiveRegion</a></li><li><a href="global.html#setMetadata">setMetadata</a></li><li><a href="global.html#showWindowDetections">showWindowDetections</a></li><li><a href="global.html#t0_warmup">t0_warmup</a></li><li><a href="global.html#trackEvent">trackEvent</a></li><li><a href="global.html#updateFilesBeingProcessed">updateFilesBeingProcessed</a></li><li><a href="global.html#updateSpec">updateSpec</a></li><li><a href="global.html#zoomSpec">zoomSpec</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Sat Feb 15 2025 14:11:46 GMT+0000 (Greenwich Mean Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Sat Feb 15 2025 14:56:08 GMT+0000 (Greenwich Mean Time)
 </footer>
 
 <script> prettyPrint(); </script>
