@@ -7953,9 +7953,14 @@ async function membershipCheck() {
   const lockedElements = document.querySelectorAll(".locked, .unlocked");
   const unlockElements = () => {
     lockedElements.forEach((el) => {
-      el.classList.replace("locked", "unlocked");
-      el.disabled = false;
-      el.textContent = "lock_open";
+      if (el instanceof HTMLSpanElement){
+        el.classList.replace("locked", "unlocked");
+        el.textContent = "lock_open";
+      } else {
+        el.classList.remove('locked')
+        el.disabled = false;
+      }
+      
     });
   }
   return await checkMembership(config.UUID).then(isMember =>{
@@ -7971,9 +7976,15 @@ async function membershipCheck() {
       lockedElements.forEach((el) => {
         el.classList.replace("unlocked", "locked");
         config.specDetections = false; // will need to update when more elements
-        el.checked = false;
-        el.disabled = true;
-        el.textContent = "lock";
+        if (el instanceof HTMLSpanElement){
+          el.checked = false;
+          el.disabled = true;
+          el.textContent = "lock";
+        } else {
+          el.classList.remove('locked')
+          el.disabled = true;
+          el instanceof HTMLSelectElement && (el.value = '')
+        }
       });
       localStorage.setItem('isMember', false);
     }

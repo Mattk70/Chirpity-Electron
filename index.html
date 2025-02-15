@@ -520,7 +520,7 @@
                 <button type="button" id="advanced" class="btn btn-secondary w-50">Advanced</button>
             </div>  
             <!-- Offcanvas -->
-            <form id="settingsForm" class="fs-6">
+            <form id="settingsForm" class="fs-6 form-floating">
                 <fieldset class="border border-secondary rounded m-2 mt-0 mb-0 p-2">
                     
                     <legend style="font-size: large;font-weight:bold">Detections</legend>
@@ -686,6 +686,114 @@
                             </div>
                         </div>
                     </div>
+                    
+                    <fieldset class="advanced border border-secondary rounded m-2 mb-0 p-2">
+                        <span class="pointer locked material-symbols-outlined">lock</span>
+                        <span class="d-inline-flex float-end"><a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Keyboard assignment" id="Assign Keyboard-circle-help"  data-bs-content="Use number keys for rapid result tagging. Assign a species, label or predefined comment to a result">?</a></span>
+                        <legend style="font-size: small; font-weight:bold">
+                            Keyboard Assignment
+                        </legend>
+                        <div class="d-flex align-items-center mb-2">
+                            <kbd class="text-bg-light ps-2 pe-2">1</kbd> 
+                            <select class="locked form-select w-50 ms-2" style="font-size: small" id="Key1-type">
+                                <option value="">Unused</option>
+                                <option value="species">Species</option>
+                                <option value="label">Label</option>
+                                <option value="comment">Comment</option>
+                            </select>
+                            <input type="text" class="locked ms-2 form-control" style="font-size: small" id="key1">
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <kbd class="text-bg-light ps-2 pe-2">2</kbd> 
+                            <select class="locked form-select w-50 ms-2" style="font-size: small" id="Key2-type">
+                                <option value="">Unused</option>
+                                <option value="species">Species</option>
+                                <option value="label">Label</option>
+                                <option value="comment">Comment</option>
+                            </select>
+                            <input type="text" class="locked ms-2 form-control" style="font-size: small" id="key2">
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <kbd class="text-bg-light ps-2 pe-2">3</kbd> 
+                            <select class="locked form-select w-50 ms-2" style="font-size: small" id="Key3-type">
+                                <option value="">Unused</option>
+                                <option value="species">Species</option>
+                                <option value="label">Label</option>
+                                <option value="comment">Comment</option>
+                            </select>
+                            <input type="text" class="locked ms-2 form-control" style="font-size: small" id="key3">
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <kbd class="text-bg-light ps-2 pe-2">4</kbd> 
+                            <select class="locked form-select w-50 ms-2" style="font-size: small" id="Key4-type">
+                                <option value="">Unused</option>
+                                <option value="species">Species</option>
+                                <option value="label">Label</option>
+                                <option value="comment">Comment</option>
+                            </select>
+                            <input type="text" class="locked ms-2 form-control" style="font-size: small" id="key4">
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <kbd class="text-bg-light ps-2 pe-2">5</kbd> 
+                            <select class="locked form-select w-50 ms-2" style="font-size: small" id="Key5-type">
+                                <option value="">Unused</option>
+                                <option value="species">Species</option>
+                                <option value="label">Label</option>
+                                <option value="comment">Comment</option>
+                            </select>
+                            <input type="text" class="locked ms-2 form-control" style="font-size: small" id="key5">
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <kbd class="text-bg-light ps-2 pe-2">6</kbd> 
+                            <select class="locked form-select w-50 ms-2" style="font-size: small" id="Key6-type">
+                                <option value="">Unused</option>
+                                <option value="species">Species</option>
+                                <option value="label">Label</option>
+                                <option value="comment">Comment</option>
+                            </select>
+                            <input type="text" class="locked ms-2 form-control" style="font-size: small" id="key6">
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <kbd class="text-bg-light ps-2 pe-2">7</kbd> 
+                            <select class="locked form-select w-50 ms-2" style="font-size: small" id="Key7-type">
+                                <option value="">Unused</option>
+                                <option value="species">Species</option>
+                                <option value="label">Label</option>
+                                <option value="comment">Comment</option>
+                            </select>
+                            <input type="text" class="locked ms-2 form-control" style="font-size: small" id="key7">
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <kbd class="text-bg-light ps-2 pe-2">8</kbd> 
+                            <select class="locked form-select w-50 ms-2"  style="font-size: small" id="Key8-type">
+                                <option value="">Unused</option>
+                                <option value="species">Species</option>
+                                <option value="label">Label</option>
+                                <option value="comment">Comment</option>
+                            </select>
+                            <input type="text" class="locked ms-2 form-control" style="font-size: small" id="key8">
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <kbd class="text-bg-light ps-2 pe-2">9</kbd> 
+                            <select class="locked form-select w-50 ms-2" style="font-size: small" id="Key9-type">
+                                <option value="">Unused</option>
+                                <option value="species">Species</option>
+                                <option value="label">Label</option>
+                                <option value="comment">Comment</option>
+                            </select>
+                            <input type="text" class="locked ms-2 form-control" style="font-size: small" id="key9">
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <kbd class="text-bg-light ps-2 pe-2">0</kbd> 
+                            <select class="locked form-select w-50 ms-2" style="font-size: small" id="Key0-type">
+                                <option value="">Unused</option>
+                                <option value="species">Species</option>
+                                <option value="label">Label</option>
+                                <option value="comment">Comment</option>
+                            </select>
+                            <input type="text" class="locked ms-2 form-control" style="font-size: small" id="key0">
+                        </div>
+                    </fieldset>    
                 </fieldset>
                 <fieldset class="border border-secondary rounded m-2 mb-0 p-2">
                     <legend style="font-size: large;font-weight:bold">Default Location <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Default Location" id="Default Location-circle-help"  data-bs-content="Chirpity uses location information to determine the dawn and dusk times for recordings">?</a></legend>

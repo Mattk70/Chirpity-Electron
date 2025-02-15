@@ -835,7 +835,7 @@ input[type="range"].vertical {
 
 /* Visible state */
 .advanced-visible {
-    max-height: 20rem; /* Adjust to fit your content's height */
+    max-height: 40rem; /* Adjust to fit your content's height */
     opacity: 1; /* Fully visible */
     color: gold; /* Custom styles for visible state */
 }

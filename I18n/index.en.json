@@ -164,7 +164,7 @@
       "record-add": "Add"
     },
 
-    "headings": ["Settings","Detections",
+    "headings": ["Settings","Detections", "Keyboard Assignments",
       "Default Location",
       "System",
       "Audio Preferences",
