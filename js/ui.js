@@ -3835,7 +3835,7 @@ const postBufferUpdate = ({
 
   // Validate input parameters
   if (begin < 0 || position < 0 || position > 1) {
-    console.error('Invalid buffer update parameters:', { begin, position });
+    console.error('Invalid buffer update parameters:', `Begin: ${begin}, Position: ${position}`);
     return;
   }
 

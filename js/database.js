@@ -91,4 +91,34 @@ class Mutex {
   }
 }
 
-export { sqlite3, Mutex };
+function checkpoint(db) {
+  return new Promise((resolve, reject) => {
+    if (!db) resolve();
+    else {  diskDB.exec("PRAGMA wal_checkpoint(TRUNCATE);", (err) => {
+          if (err) {
+              console.error("Error running WAL checkpoint:", err.message);
+              reject(err);
+          } else {
+              console.log("WAL checkpoint completed.");
+              resolve();
+          }
+      });
+    }
+  });
+}
+
+function closeDatabase(db) {
+  return new Promise((resolve, reject) => {
+    if (!db) resolve();
+      db.close((err) => {
+          if (err) {
+              console.error("Error closing database:", err.message);
+              reject(err);
+          } else {
+              console.log("Database connection closed.");
+              resolve();
+          }
+      });
+  });
+}
+export { sqlite3, closeDatabase, checkpoint, Mutex };

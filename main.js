@@ -580,7 +580,17 @@ app.on("activate", async () => {
     await createWorker();
   }
 });
-
+const DB_CLOSED = false;
+app.on('before-quit', async (event) => {
+  event.preventDefault(); // Prevent default quit until cleanup is done
+  if (!DB_CLOSED) workerWindow.webContents.postMessage("close-database", null);
+  else app.quit()
+});
+  
+ipcMain.on('database-closed', () =>{
+  DB_CLOSED = true;
+  app.quit()
+ })
 ipcMain.handle("request-worker-channel", async (_event) => {
   // Create a new channel ...
   const { port1, port2 } = new MessageChannelMain();

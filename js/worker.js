@@ -1,4 +1,4 @@
-const { ipcRenderer } = require("electron");
+const { ipcRenderer, ipcMain } = require("electron");
 const fs = require("node:fs");
 const p = require("node:path");
 const { writeFile, mkdir, readdir } = require("node:fs/promises");
@@ -9,7 +9,7 @@ const { utimesSync } = require("utimes");
 const { writeToPath } = require("@fast-csv/format");
 const merge = require("lodash.merge");
 import { State } from "./state.js";
-import { sqlite3, Mutex } from "./database.js";
+import { sqlite3, checkpointDatabase, closeDatabase, Mutex } from "./database.js";
 import { trackEvent } from "./tracking.js";
 import { extractWaveMetadata } from "./metadata.js";
 let isWin32 = false;
@@ -761,6 +761,17 @@ async function handleMessage(e) {
 ipcRenderer.on("new-client", async (event) => {
   [UI] = event.ports;
   UI.onmessage = handleMessage;
+});
+
+
+ipcRenderer.on("close-database", async (event) => {
+  checkpointDatabase(diskDB)
+  .then(closeDatabase(diskDB))
+  .catch(error => console.error("Error closing database:", error.message))
+  .finally(_ => {
+    diskDB = null;
+    ipcRenderer.send('database-closed')
+  })
 });
 
 async function savedFileCheck(fileList) {
@@ -3847,8 +3858,10 @@ const getSeasonRecords = async (species, season) => {
         ${seasonMonth[season]}`);
     stmt.get(species, (err, row) => {
       if (err) {
+        stmt.finalize();
         reject(err);
       } else {
+        stmt.finalize();
         resolve(row);
       }
     });
@@ -4493,6 +4506,10 @@ async function _updateSpeciesLocale(db, labels) {
   } catch (error) {
     await db.runAsync("ROLLBACK");
     throw error;
+  } finally {
+    updateStmt.finalize()
+    updateChirpityStmt.finalize()
+    speciesSelectStmt.finalize()
   }
 }
 
