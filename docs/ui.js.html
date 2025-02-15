@@ -1,3 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: ui.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: ui.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
+ * @file The UI handler. Functinos for Spectrogram creation audio navigation and settings.
+ */
+
 import { trackVisit, trackEvent } from "./tracking.js";
 import {checkMembership} from './member.js';
 import { DOM } from "./DOMcache.js";
@@ -184,7 +216,7 @@ const os = window.module.os;
 
 // Is this CI / playwright?
 const isTestEnv = window.env.TEST_ENV === "true";
-isTestEnv && console.log("Running in test environment");
+isTestEnv &amp;&amp; console.log("Running in test environment");
 function hexToRgb(hex) {
   // Remove the '#' character if present
   hex = hex.replace(/^#/, "");
@@ -229,7 +261,7 @@ let worker;
 const establishMessageChannel = new Promise((resolve) => {
   window.onmessage = (event) => {
     // event.source === window means the message is coming from the preload
-    // script, as opposed to from an <iframe> or other source.
+    // script, as opposed to from an &lt;iframe> or other source.
     if (event.source === window) {
       if (event.data === "provide-worker-channel") {
         [worker] = event.ports;
@@ -429,7 +461,7 @@ let playPromise;
  * @param {boolean} [options.play=false] - If true, starts playback immediately after the update.
  * @param {number} [options.position=0] - Normalized playback position (between 0 and 1) to seek to.
  * @param {boolean} [options.resetSpec=false] - If true, resets the spectrogram dimensions before loading the buffer.
- * @returns {Promise<void>} A promise that resolves once the spectrogram and timeline update process is complete.
+ * @returns {Promise&lt;void>} A promise that resolves once the spectrogram and timeline update process is complete.
  */
 async function updateSpec({
   buffer,
@@ -488,7 +520,7 @@ function createTimeline() {
 
 const resetRegions = (clearActive) => {
   if (wavesurfer) REGIONS.clearRegions();
-  clearActive && (activeRegion = null);
+  clearActive &amp;&amp; (activeRegion = null);
   STATE.selection = false;
   worker.postMessage({ action: "update-state", selection: false });
   disableMenuItem(["analyseSelection", "export-audio"]);
@@ -514,7 +546,7 @@ function clearActive() {
 const WSPluginPurge = () => {
   // Destroy leaves the plugins in the plugin list.
   // So, this is needed to remove plugins where the `wavesurfer` key is null
-  wavesurfer &&
+  wavesurfer &amp;&amp;
     (wavesurfer.plugins = wavesurfer.plugins.filter(
       (plugin) => plugin.wavesurfer !== null
     ));
@@ -525,7 +557,7 @@ function makeBlob(audio) {
   const int16Array = new Int16Array(audio.buffer);
   // Convert to Float32Array (Web Audio API uses Float32 samples)
   const float32Array = new Float32Array(int16Array.length);
-  for (let i = 0; i < int16Array.length; i++) {
+  for (let i = 0; i &lt; int16Array.length; i++) {
     float32Array[i] = int16Array[i] / 32768; // Normalize from Int16 to Float32
   }
   // Create AudioBuffer using AudioContext
@@ -554,7 +586,7 @@ const wsTextColour = () =>
   : config.colormap === "gray" ? "#000" : "#fff";
 
 const initWavesurfer = ({ audio = undefined, height = 0 }) => {
-  wavesurfer && wavesurfer.destroy();
+  wavesurfer &amp;&amp; wavesurfer.destroy();
   const loggedErrors = new Set();
   initRegion();
   spectrogram = initSpectrogram(height);
@@ -640,7 +672,7 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
  * - postBufferUpdate: Function to update the audio buffer after FFT changes.
  */
 function increaseFFT() {
-  if (spectrogram.fftSamples < 2048) {
+  if (spectrogram.fftSamples &lt; 2048) {
     spectrogram.fftSamples *= 2;
     const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
     postBufferUpdate({
@@ -730,7 +762,7 @@ function zoomSpec(direction) {
     let timeNow = windowOffsetSecs + playedSeconds;
     const oldBufferBegin = windowOffsetSecs;
     if (direction === "zoomIn") {
-      if (windowLength < 1.5) return;
+      if (windowLength &lt; 1.5) return;
       windowLength /= 2;
       windowOffsetSecs += windowLength * position;
     } else {
@@ -738,7 +770,7 @@ function zoomSpec(direction) {
       windowOffsetSecs -= windowLength * position;
       windowLength = Math.min(currentFileDuration, windowLength * 2);
 
-      if (windowOffsetSecs < 0) {
+      if (windowOffsetSecs &lt; 0) {
         windowOffsetSecs = 0;
       } else if (windowOffsetSecs + windowLength > currentFileDuration) {
         windowOffsetSecs = currentFileDuration - windowLength;
@@ -785,7 +817,7 @@ function powerSave(on) {
 
 const openFileInList = async (e) => {
   const target = e.target;
-  if (!PREDICTING && (target.type === "submit" || target.tagName === "A")) {
+  if (!PREDICTING &amp;&amp; (target.type === "submit" || target.tagName === "A")) {
     loadAudioFileSync({
       filePath: target.id || STATE.currentFile,
       preserveResults: true,
@@ -799,10 +831,10 @@ const buildFileMenu = (e) => {
   const menu = DOM.contextMenu;
   const i18n = getI18n(i18nContext);
   menu.innerHTML = `
-    <a class="dropdown-item" id="setCustomLocation"><span
-    class="material-symbols-outlined align-bottom pointer">edit_location_alt</span> ${i18n.location}</a>
-    <a class="dropdown-item" id="setFileStart"><span
-    class="material-symbols-outlined align-bottom pointer">edit_calendar</span> ${i18n.time}
+    &lt;a class="dropdown-item" id="setCustomLocation">&lt;span
+    class="material-symbols-outlined align-bottom pointer">edit_location_alt&lt;/span> ${i18n.location}&lt;/a>
+    &lt;a class="dropdown-item" id="setFileStart">&lt;span
+    class="material-symbols-outlined align-bottom pointer">edit_calendar&lt;/span> ${i18n.time}
     `;
   positionMenu(menu, e);
 };
@@ -929,28 +961,28 @@ function extractFileNameAndFolder(path) {
  */
 function formatAsBootstrapTable(jsonData) {
   let parsedData = JSON.parse(jsonData);
-  let tableHtml = "<div class='metadata'>";
+  let tableHtml = "&lt;div class='metadata'>";
 
   for (const [heading, keyValuePairs] of Object.entries(parsedData)) {
-    tableHtml += `<h5 class="text-primary">${heading.toUpperCase()}</h5>`;
+    tableHtml += `&lt;h5 class="text-primary">${heading.toUpperCase()}&lt;/h5>`;
     tableHtml +=
-      "<table class='table table-striped table-bordered'><thead class='text-bg-light'><tr><th>Key</th><th>Value</th></tr></thead><tbody>";
+      "&lt;table class='table table-striped table-bordered'>&lt;thead class='text-bg-light'>&lt;tr>&lt;th>Key&lt;/th>&lt;th>Value&lt;/th>&lt;/tr>&lt;/thead>&lt;tbody>";
 
     for (const [key, value] of Object.entries(keyValuePairs)) {
-      tableHtml += "<tr>";
-      tableHtml += `<td><strong>${key}</strong></td>`;
+      tableHtml += "&lt;tr>";
+      tableHtml += `&lt;td>&lt;strong>${key}&lt;/strong>&lt;/td>`;
       if (typeof value === "object") {
-        tableHtml += `<td>${JSON.stringify(value, null, 2)}</td>`;
+        tableHtml += `&lt;td>${JSON.stringify(value, null, 2)}&lt;/td>`;
       } else {
-        tableHtml += `<td>${value}</td>`;
+        tableHtml += `&lt;td>${value}&lt;/td>`;
       }
-      tableHtml += "</tr>";
+      tableHtml += "&lt;/tr>";
     }
 
-    tableHtml += "</tbody></table>";
+    tableHtml += "&lt;/tbody>&lt;/table>";
   }
 
-  tableHtml += "</div>";
+  tableHtml += "&lt;/div>";
   return tableHtml;
 }
 function showMetadata() {
@@ -988,29 +1020,29 @@ function renderFilenamePanel() {
     ? "text-info"
     : "text-warning";
   if (files.length > 1) {
-    appendStr = `<div id="fileContainer" class="btn-group dropup pointer">
-        <span ${title} class="filename ${isSaved}">${label}</span>
-        </button>
-        <button class="btn btn-dark dropdown-toggle dropdown-toggle-split" type="button" 
+    appendStr = `&lt;div id="fileContainer" class="btn-group dropup pointer">
+        &lt;span ${title} class="filename ${isSaved}">${label}&lt;/span>
+        &lt;/button>
+        &lt;button class="btn btn-dark dropdown-toggle dropdown-toggle-split" type="button" 
         data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">+${
           files.length - 1
         }
-        <span class="visually-hidden">Toggle Dropdown</span>
-        </button>
-        <div class="dropdown-menu dropdown-menu-dark" aria-labelledby="dropdownMenuButton">`;
+        &lt;span class="visually-hidden">Toggle Dropdown&lt;/span>
+        &lt;/button>
+        &lt;div class="dropdown-menu dropdown-menu-dark" aria-labelledby="dropdownMenuButton">`;
     files.forEach((item) => {
       if (item !== openFile) {
         const label = item.replace(/^.*[\\/]/, "");
-        appendStr += `<a id="${item}" class="dropdown-item openFiles" href="#">
-                <span class="material-symbols-outlined align-bottom">audio_file</span>${label}</a>`;
+        appendStr += `&lt;a id="${item}" class="dropdown-item openFiles" href="#">
+                &lt;span class="material-symbols-outlined align-bottom">audio_file&lt;/span>${label}&lt;/a>`;
       }
     });
-    appendStr += `</div></div>`;
+    appendStr += `&lt;/div>&lt;/div>`;
   } else {
-    appendStr = `<div id="fileContainer">
-        <button class="btn btn-dark" type="button" id="dropdownMenuButton">
-        <span ${title} class="filename ${isSaved}">${label}</span>
-        </button></div>`;
+    appendStr = `&lt;div id="fileContainer">
+        &lt;button class="btn btn-dark" type="button" id="dropdownMenuButton">
+        &lt;span ${title} class="filename ${isSaved}">${label}&lt;/span>
+        &lt;/button>&lt;/div>`;
   }
 
   filenameElement.innerHTML = appendStr;
@@ -1022,12 +1054,12 @@ function customAnalysisAllMenu(saved) {
   const analyseAllMenu = document.getElementById("analyseAll");
   const modifier = isMac ? "⌘" : "Ctrl";
   if (saved) {
-    analyseAllMenu.innerHTML = `<span class="material-symbols-outlined">upload_file</span> ${STATE.i18n.retrieveAll}
-        <span class="shortcut float-end">${modifier}+Shift+A</span>`;
+    analyseAllMenu.innerHTML = `&lt;span class="material-symbols-outlined">upload_file&lt;/span> ${STATE.i18n.retrieveAll}
+        &lt;span class="shortcut float-end">${modifier}+Shift+A&lt;/span>`;
     enableMenuItem(["reanalyseAll", "explore", "charts"]);
   } else {
-    analyseAllMenu.innerHTML = `<span class="material-symbols-outlined">search</span> ${STATE.i18n.analyseAll[0]}
-        <span class="shortcut float-end">${modifier}+Shift+A</span>`;
+    analyseAllMenu.innerHTML = `&lt;span class="material-symbols-outlined">search&lt;/span> ${STATE.i18n.analyseAll[0]}
+        &lt;span class="shortcut float-end">${modifier}+Shift+A&lt;/span>`;
     disableMenuItem(["reanalyseAll"]);
   }
 }
@@ -1036,12 +1068,12 @@ function customiseAnalysisMenu(saved) {
   const modifier = isMac ? "⌘" : "Ctrl";
   const analyseMenu = document.getElementById("analyse");
   if (saved) {
-    analyseMenu.innerHTML = `<span class="material-symbols-outlined">upload_file</span> ${STATE.i18n.retrieve}
-        <span class="shortcut float-end">${modifier}+A</span>`;
+    analyseMenu.innerHTML = `&lt;span class="material-symbols-outlined">upload_file&lt;/span> ${STATE.i18n.retrieve}
+        &lt;span class="shortcut float-end">${modifier}+A&lt;/span>`;
     enableMenuItem(["reanalyse", "explore", "charts"]);
   } else {
-    analyseMenu.innerHTML = `<span class="material-symbols-outlined">search</span> ${STATE.i18n.analyse[0]}
-        <span class="shortcut float-end">${modifier}+A</span>`;
+    analyseMenu.innerHTML = `&lt;span class="material-symbols-outlined">search&lt;/span> ${STATE.i18n.analyse[0]}
+        &lt;span class="shortcut float-end">${modifier}+A&lt;/span>`;
     disableMenuItem(["reanalyse"]);
   }
 }
@@ -1053,7 +1085,7 @@ async function generateLocationList(id) {
   LOCATIONS = undefined;
   worker.postMessage({ action: "get-locations", file: STATE.currentFile });
   await waitFor(() => LOCATIONS);
-  el.innerHTML = `<option value="">${defaultText}</option>`; // clear options
+  el.innerHTML = `&lt;option value="">${defaultText}&lt;/option>`; // clear options
   LOCATIONS.forEach((loc) => {
     const option = document.createElement("option");
     option.value = loc.id;
@@ -1126,7 +1158,7 @@ const displayLocationAddress = async (where) => {
     address = await fetchLocationAddress(latEl.value, lonEl.value, false);
     if (address === false) return;
     const content =
-      '<span class="material-symbols-outlined">fmd_good</span> ' + address;
+      '&lt;span class="material-symbols-outlined">fmd_good&lt;/span> ' + address;
     placeEl.innerHTML = content;
     const button = document.getElementById("apply-location");
     button.classList.add("btn-danger");
@@ -1141,12 +1173,12 @@ const cancelDefaultLocation = () => {
   latEl.value = config.latitude;
   lonEl.value = config.longitude;
   placeEl.innerHTML =
-    '<span class="material-symbols-outlined">fmd_good</span> ' +
+    '&lt;span class="material-symbols-outlined">fmd_good&lt;/span> ' +
     config.location;
   updateMap(latEl.value, lonEl.value);
   const button = document.getElementById("apply-location");
   button.classList.remove("btn-danger");
-  button.innerHTML = 'Set <span class="material-symbols-outlined">done</span>';
+  button.innerHTML = 'Set &lt;span class="material-symbols-outlined">done&lt;/span>';
 };
 
 const setDefaultLocation = () => {
@@ -1175,7 +1207,7 @@ const setDefaultLocation = () => {
   });
   const button = document.getElementById("apply-location");
   button.classList.remove("btn-danger");
-  button.innerHTML = 'Set <span class="material-symbols-outlined">done</span>';
+  button.innerHTML = 'Set &lt;span class="material-symbols-outlined">done&lt;/span>';
 };
 
 async function setCustomLocation() {
@@ -1211,7 +1243,7 @@ async function setCustomLocation() {
   addOrDelete();
   locationModalDiv.querySelector("h5").textContent = i18n[0];
   const legends = locationModalDiv.querySelectorAll("legend");
-  for (let i = 0; i < legends.length; i++) {
+  for (let i = 0; i &lt; legends.length; i++) {
     legends[i].textContent = i18n[i + 2]; // process each node
   }
   locationModalDiv.querySelector('label[for="batchLocations"]').textContent =
@@ -1414,21 +1446,21 @@ function postAnalyseMessage(args) {
 let openStreetMapTimer,
   currentRequest = null;
 async function fetchLocationAddress(lat, lon, pushLocations) {
-  const isInvalidLatitude = isNaN(lat) || lat === null || lat < -90 || lat > 90;
+  const isInvalidLatitude = isNaN(lat) || lat === null || lat &lt; -90 || lat > 90;
   const isInvalidLongitude =
-    isNaN(lon) || lon === null || lon < -180 || lon > 180;
+    isNaN(lon) || lon === null || lon &lt; -180 || lon > 180;
 
   if (isInvalidLatitude || isInvalidLongitude) {
     generateToast({ type: "warning", message: "placeOutOfBounds" });
     return false;
   }
 
-  currentRequest && clearTimeout(openStreetMapTimer); // Cancel pending request
+  currentRequest &amp;&amp; clearTimeout(openStreetMapTimer); // Cancel pending request
 
   return new Promise((resolve, reject) => {
     currentRequest = { lat, lon }; // Store the current request details
     const storedLocation = LOCATIONS?.find(
-      (obj) => obj.lat === lat && obj.lon === lon
+      (obj) => obj.lat === lat &amp;&amp; obj.lon === lon
     );
     if (storedLocation) {
       return resolve(storedLocation.place);
@@ -1443,7 +1475,7 @@ async function fetchLocationAddress(lat, lon, pushLocations) {
           await waitFor(() => LOCATIONS); // Ensure this is awaited
         }
         const response = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=14`
+          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&amp;lat=${lat}&amp;lon=${lon}&amp;zoom=14`
         );
 
         if (!response.ok) {
@@ -1461,7 +1493,7 @@ async function fetchLocationAddress(lat, lon, pushLocations) {
         } else {
           // Just take the first two elements of the address
           address = data.display_name.split(",").slice(0, 2).join(",").trim();
-          pushLocations &&
+          pushLocations &amp;&amp;
             LOCATIONS.push({
               id: LOCATIONS.length + 1,
               lat: lat,
@@ -1744,7 +1776,7 @@ function createRegion(start, end, label, goToRegion, colour) {
   }
     // Check for overlapping regions
   const hasOverlap = REGIONS.regions.some(region => {
-    return (start < region.end && end > region.start);
+    return (start &lt; region.end &amp;&amp; end > region.start);
   });
   
   if (hasOverlap) {
@@ -1779,7 +1811,7 @@ async function resultClick(e) {
   const [file, start, end, _, label] = row.getAttribute("name").split("|");
   // if (row.classList.contains('table-active')){
   //     createRegion(start - windowOffsetSecs, end - windowOffsetSecs, label, true);
-  //     e.target.classList.contains('circle') && getSelectionResults(true);
+  //     e.target.classList.contains('circle') &amp;&amp; getSelectionResults(true);
   //     return;
   // }
 
@@ -1807,7 +1839,7 @@ function setActiveRow(start) {
 
         if (Number(rowStart) === start) {
             // Clear the active row if there's one
-            if (activeRow && activeRow !== r) {
+            if (activeRow &amp;&amp; activeRow !== r) {
                 activeRow.classList.remove('table-active');
             }
             // Add the 'table-active' class to the target row
@@ -1832,7 +1864,7 @@ const loadResultRegion = ({
   start = parseFloat(start);
   end = parseFloat(end);
   // ensure region doesn't spread across the whole window
-  if (windowLength <= 3.5) windowLength = 6;
+  if (windowLength &lt;= 3.5) windowLength = 6;
   windowOffsetSecs = Math.max(0, start - windowLength / 2 + 1.5);
   activeRegion = {
     start: Math.max(start - windowOffsetSecs, 0),
@@ -1865,7 +1897,7 @@ const loadResultRegion = ({
  * @param {boolean} redraw - Indicates whether the spectrogram should be re-rendered and WaveSurfer updated.
  * @param {number} [fftSamples] - Optional. The number of FFT samples to use for rendering; must be a power of two.
  * @param {number} [newHeight=0] - Optional. Overrides the dynamic height calculation for the spectrogram; a value of 0 triggers dynamic sizing.
- * @returns {Promise<void>} A promise that resolves once the UI adjustments and spectrogram rendering updates are complete.
+ * @returns {Promise&lt;void>} A promise that resolves once the UI adjustments and spectrogram rendering updates are complete.
  */
 
 async function adjustSpecDims(redraw, fftSamples, newHeight) {
@@ -1887,7 +1919,7 @@ async function adjustSpecDims(redraw, fftSamples, newHeight) {
       config.specMaxHeight = specHeight;
       updatePrefs("config.json", config);
     }
-    if (STATE.currentFile && redraw) {
+    if (STATE.currentFile &amp;&amp; redraw) {
       // give the wrapper space for the transport controls and element padding/margins
       if (!wavesurfer) {
         initWavesurfer({
@@ -1938,7 +1970,7 @@ function setFontSizeScale(doNotScroll) {
  * Use formatTimeCallback to style the notch labels as you wish, such
  * as with more detail as the number of pixels per second increases.
  *
- * Here we format as M:SS.frac, with M suppressed for times < 1 minute,
+ * Here we format as M:SS.frac, with M suppressed for times &lt; 1 minute,
  * and frac having 0, 1, or 2 digits as the zoom increases.
  *
  * Note that if you override the default function, you'll almost
@@ -1953,7 +1985,7 @@ function formatRegionTooltip(regionLength, start, end) {
   const length = end - start;
   if (length === 3) {
     return `${formatTimeCallback(start)} -  ${formatTimeCallback(end)}`;
-  } else if (length < 1)
+  } else if (length &lt; 1)
     return `${regionLength}: ${(length * 1000).toFixed(0)}ms`;
   else {
     return `${regionLength}: ${length.toFixed(3)}s`;
@@ -1984,7 +2016,7 @@ function formatTimeCallback(secs) {
       seconds.toString().padStart(2, "0"),
     ].join(":");
   } else {
-    if (hours === 0 && minutes === 0) {
+    if (hours === 0 &amp;&amp; minutes === 0) {
       // Format as ss
       formattedTime = seconds.toString();
     } else if (hours === 0) {
@@ -2002,7 +2034,7 @@ function formatTimeCallback(secs) {
       ].join(":");
     }
   }
-  if (windowLength <= 5) {
+  if (windowLength &lt;= 5) {
     formattedTime += "." + milliseconds.toString();
   } else {
     milliseconds = (milliseconds / 1000).toFixed(1);
@@ -2045,7 +2077,7 @@ function syncConfig(config, defaultConfig) {
     if (!(key in config)) {
       config[key] = defaultConfig[key];
     } else if (
-      typeof config[key] === "object" &&
+      typeof config[key] === "object" &amp;&amp;
       typeof defaultConfig[key] === "object"
     ) {
       // Recursively sync nested objects
@@ -2216,7 +2248,7 @@ window.onload = async () => {
     // Show the list in use
     DOM.listToUse.value = config.list;
     DOM.localSwitch.checked = config.local;
-    config.list === "custom" &&
+    config.list === "custom" &amp;&amp;
       readLabels(config.customListFile[config.model], "list");
     // Show Locale
     DOM.locale.value = config.locale;
@@ -2254,11 +2286,11 @@ window.onload = async () => {
     DOM.toSlider.value = config.audio.maxFrequency;
     fillSlider(DOM.fromInput, DOM.toInput, "#C6C6C6", "#0d6efd", DOM.toSlider);
     checkFilteredFrequency();
-    // Window function & colormap
+    // Window function &amp; colormap
     document.getElementById("window-function").value =
       config.customColormap.windowFn;
-    config.customColormap.windowFn === 'gauss' && document.getElementById('alpha').classList.remove('d-none')
-    config.colormap === "custom" &&
+    config.customColormap.windowFn === 'gauss' &amp;&amp; document.getElementById('alpha').classList.remove('d-none')
+    config.colormap === "custom" &amp;&amp;
       document.getElementById("colormap-fieldset").classList.remove("d-none");
     document.getElementById("color-threshold").textContent =
       config.customColormap.threshold;
@@ -2322,7 +2354,7 @@ window.onload = async () => {
     DOM.defaultLat.value = config.latitude;
     DOM.defaultLon.value = config.longitude;
     place.innerHTML =
-      '<span class="material-symbols-outlined">fmd_good</span>' +
+      '&lt;span class="material-symbols-outlined">fmd_good&lt;/span>' +
       config.location;
     if (config.archive.location) {
       document.getElementById("archive-location").value =
@@ -2367,7 +2399,7 @@ window.onload = async () => {
     });
     // Enable popovers
     const myAllowList = bootstrap.Tooltip.Default.allowList;
-    myAllowList.table = []; // Allow <table> element with no attributes
+    myAllowList.table = []; // Allow &lt;table> element with no attributes
     myAllowList.thead = [];
     myAllowList.tbody = [];
     myAllowList.tr = [];
@@ -2383,9 +2415,9 @@ window.onload = async () => {
 
     // check for new version on mac platform. pkg containers are not an auto-updatable target
     // https://www.electron.build/auto-update#auto-updatable-targets
-    isMac && !isTestEnv && checkForMacUpdates();
+    isMac &amp;&amp; !isTestEnv &amp;&amp; checkForMacUpdates();
 
-    // Add cpu model & memory to config
+    // Add cpu model &amp; memory to config
     config.CPU = DIAGNOSTICS["CPU"];
     config.RAM = DIAGNOSTICS["System Memory"];
     trackVisit(config);
@@ -2427,7 +2459,7 @@ const setUpWorkerMessaging = () => {
         case "diskDB-has-records": {
           DOM.chartsLink.classList.remove("disabled");
           DOM.exploreLink.classList.remove("disabled");
-          config.archive.location &&
+          config.archive.location &amp;&amp;
             document
               .getElementById("compress-and-organise")
               .classList.remove("disabled");
@@ -2455,19 +2487,19 @@ const setUpWorkerMessaging = () => {
             MISSING_FILE = args.file;
             const i18n = getI18n(i18nLocate);
             args.locate = `
-                            <div class="d-flex justify-content-center mt-2">
-                                <button id="locate-missing-file" class="btn btn-primary border-dark text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
+                            &lt;div class="d-flex justify-content-center mt-2">
+                                &lt;button id="locate-missing-file" class="btn btn-primary border-dark text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
                                     ${i18n.locate}
-                                </button>
-                                <button id="purge-from-toast" class="ms-3 btn btn-warning text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
+                                &lt;/button>
+                                &lt;button id="purge-from-toast" class="ms-3 btn btn-warning text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
                                 ${i18n.remove}
-                                </button>
-                            </div>
+                                &lt;/button>
+                            &lt;/div>
                             `;
           }
           generateToast(args);
           // This is how we know the database update has completed
-          if (args.database && config.archive.auto)
+          if (args.database &amp;&amp; config.archive.auto)
             document.getElementById("compress-and-organise").click();
           break;
         }
@@ -2479,11 +2511,11 @@ const setUpWorkerMessaging = () => {
         case "labels": {
           LABELS = args.labels;
           /* Code below to retrieve Red list data
-                        for (let i = 0;i< LABELS.length; i++){
+                        for (let i = 0;i&lt; LABELS.length; i++){
                             const label = LABELS[i];
                             let  sname = label.split('_')[0];
                             sname = IUCNtaxonomy[sname]
-                            if (sname && ! STATE.IUCNcache[sname]) { 
+                            if (sname &amp;&amp; ! STATE.IUCNcache[sname]) { 
                                 await getIUCNStatus(sname)
                                 await new Promise(resolve => setTimeout(resolve, 500))
                             }
@@ -2519,8 +2551,8 @@ const setUpWorkerMessaging = () => {
           adjustSpecDims()
           switch (mode) {
             case "analyse": {
-              STATE.diskHasRecords &&
-                !PREDICTING &&
+              STATE.diskHasRecords &amp;&amp;
+                !PREDICTING &amp;&amp;
                 enableMenuItem(["explore", "charts"]);
               break;
             }
@@ -2529,7 +2561,7 @@ const setUpWorkerMessaging = () => {
               break;
             }
           }
-          config.debug && console.log("Mode changed to: " + mode);
+          config.debug &amp;&amp; console.log("Mode changed to: " + mode);
           if (["archive", "explore"].includes(mode)) {
             enableMenuItem(["purge-file"]);
             // change header to indicate activation
@@ -2572,12 +2604,12 @@ const setUpWorkerMessaging = () => {
         case "tfjs-node": {
           // Have we gone from a no-node setting to a node one?
           const changedEnv = config.hasNode !== args.hasNode;
-          if (changedEnv && args.hasNode) {
+          if (changedEnv &amp;&amp; args.hasNode) {
             // If not using tensorflow, switch to the tensorflow backend because this faster under Node
-            config[config.model].backend !== "tensorflow" && handleBackendChange("tensorflow");
+            config[config.model].backend !== "tensorflow" &amp;&amp; handleBackendChange("tensorflow");
           }
           config.hasNode = args.hasNode;
-          if (!config.hasNode && config[config.model].backend !== "webgpu") {
+          if (!config.hasNode &amp;&amp; config[config.model].backend !== "webgpu") {
             // No node? Not using webgpu? Force webgpu
             handleBackendChange("webgpu");
             generateToast({ type: "warning", message: "noNode" });
@@ -2647,7 +2679,7 @@ const setUpWorkerMessaging = () => {
  * `STATE.regionsCompleted` is set to true to indicate that region creation is complete.
  *
  * @param {Object} options - An options object.
- * @param {Array<Object>} options.detections - An array of detection objects. Each object should include:
+ * @param {Array&lt;Object>} options.detections - An array of detection objects. Each object should include:
  *   @param {number} options.detections[].start - The starting time of the detection in seconds.
  *   @param {number} options.detections[].end - The ending time of the detection in seconds.
  *   @param {string} options.detections[].label - The label associated with the detection.
@@ -2658,12 +2690,12 @@ const setUpWorkerMessaging = () => {
 function showWindowDetections({detections, goToRegion}) {
   for (const detection of detections) {
     const start = detection.start - windowOffsetSecs;
-    if (start < windowLength) {
+    if (start &lt; windowLength) {
       const end = detection.end - windowOffsetSecs;
       const active = start === activeRegion?.start;
-      if (!config.specDetections && !active) continue;
+      if (!config.specDetections &amp;&amp; !active) continue;
       const colour = active ? STATE.regionActiveColour : null;
-      const setPosition = active && goToRegion;      
+      const setPosition = active &amp;&amp; goToRegion;      
       createRegion(start, end, detection.label, setPosition, colour);
     }
   }
@@ -2694,20 +2726,20 @@ function generateBirdOptionList({ store, rows, selected }) {
 
     const lastSelectedSpecies = selected || STATE.birdList.lastSelectedSpecies;
     listHTML +=
-      '<div class="form-floating"><select spellcheck="false" id="bird-list-all" class="input form-select mb-3" aria-label=".form-select" required>';
-    listHTML += `<option value="">${i18nTout[1]}</option>`;
+      '&lt;div class="form-floating">&lt;select spellcheck="false" id="bird-list-all" class="input form-select mb-3" aria-label=".form-select" required>';
+    listHTML += `&lt;option value="">${i18nTout[1]}&lt;/option>`;
     for (const species of sortedList) {
       const isSelected = species === lastSelectedSpecies ? "selected" : "";
-      listHTML += `<option value="${species}" ${isSelected}>${species}</option>`;
+      listHTML += `&lt;option value="${species}" ${isSelected}>${species}&lt;/option>`;
     }
-    listHTML += `</select><label for="bird-list-all">${i18n.species[0]}</label></div>`;
+    listHTML += `&lt;/select>&lt;label for="bird-list-all">${i18n.species[0]}&lt;/label>&lt;/div>`;
   } else {
-    listHTML += `<select id="bird-list-seen" class="form-select"><option value="">${i18nTout[1]}</option>`;
+    listHTML += `&lt;select id="bird-list-seen" class="form-select">&lt;option value="">${i18nTout[1]}&lt;/option>`;
     for (const { cname } of rows) {
       const isSelected = cname === STATE.chart.species ? "selected" : "";
-      listHTML += `<option value="${cname}" ${isSelected}>${cname}</option>`;
+      listHTML += `&lt;option value="${cname}" ${isSelected}>${cname}&lt;/option>`;
     }
-    listHTML += `</select><label for="bird-list-seen">${i18n.species[0]}</label>`;
+    listHTML += `&lt;/select>&lt;label for="bird-list-seen">${i18n.species[0]}&lt;/label>`;
   }
 
   return listHTML;
@@ -2716,7 +2748,7 @@ function generateBirdOptionList({ store, rows, selected }) {
 function generateBirdIDList(rows) {
   let listHTML = "";
   for (const item in rows) {
-    listHTML += `   <tr><td>${rows[item].cname}</td> <td><i>${rows[item].sname}</i></td></tr>\n`;
+    listHTML += `   &lt;tr>&lt;td>${rows[item].cname}&lt;/td> &lt;td>&lt;i>${rows[item].sname}&lt;/i>&lt;/td>&lt;/tr>\n`;
   }
   return listHTML;
 }
@@ -2750,13 +2782,13 @@ function getSpecies(target) {
 
 function handleGesture(e) {
   const currentTime = Date.now();
-  if (currentTime - STATE.lastGestureTime < 1200) {
+  if (currentTime - STATE.lastGestureTime &lt; 1200) {
     return; // Ignore successive events within 1.2 second
   }
   STATE.lastGestureTime = currentTime;
   const moveDirection = e.deltaX || e.deltaY; // If deltaX is 0, use deltaY
   const key = moveDirection > 0 ? "PageDown" : "PageUp";
-  config.debug && console.log(`scrolling x: ${e.deltaX} y: ${e.deltaY}`);
+  config.debug &amp;&amp; console.log(`scrolling x: ${e.deltaX} y: ${e.deltaY}`);
   // waitForFinalEvent(() => {
   GLOBAL_ACTIONS[key](e);
   trackEvent(config.UUID, "Swipe", key, "");
@@ -2820,7 +2852,7 @@ function getDateOfISOWeek(w) {
   const simple = new Date(y, 0, 1 + (w - 1) * 7);
   const dow = simple.getDay();
   const ISOweekStart = simple;
-  if (dow <= 4) ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
+  if (dow &lt;= 4) ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
   else ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
   return ISOweekStart.toLocaleDateString("en-GB", options);
 }
@@ -2962,7 +2994,7 @@ function generateDateLabels(aggregation, datapoints, pointstart) {
   const dateLabels = [];
   const startDate = new Date(pointstart);
 
-  for (let i = 0; i < datapoints; i++) {
+  for (let i = 0; i &lt; datapoints; i++) {
     // Push the formatted date label to the array
     dateLabels.push(formatDate(startDate, aggregation));
 
@@ -3170,7 +3202,7 @@ function handleKeyDownDeBounce(e) {
  */
 function handleKeyDown(e) {
   let action = e.key;
-  config.debug && console.log(`${action} key pressed`);
+  config.debug &amp;&amp; console.log(`${action} key pressed`);
   if (action in GLOBAL_ACTIONS) {
     DOM.contextMenu.classList.add("d-none");
     if (
@@ -3194,14 +3226,14 @@ function handleKeyDown(e) {
 /**
  * Creates and returns a styled label element for a navigation option.
  *
- * This function generates an HTML <span> element with specific styling properties, including absolute positioning,
+ * This function generates an HTML &lt;span> element with specific styling properties, including absolute positioning,
  * a text color, and a text shadow effect. If the global configuration's colormap is set to 'gray', the provided color
  * is overridden: a truthy color results in 'purple', whereas a falsy value defaults to '#666'. If no label text is provided,
  * the function returns undefined.
  *
  * @param {string} label - The text to display in the label. If falsy, the function returns undefined.
  * @param {string} [color] - The desired color for the label text (subject to configuration overrides).
- * @returns {(HTMLElement|undefined)} The styled <span> element containing the label text, or undefined if no label is provided.
+ * @returns {(HTMLElement|undefined)} The styled &lt;span> element containing the label text, or undefined if no label is provided.
  */
 function formatLabel(label, color){
   if (config.colormap === 'gray') {
@@ -3261,7 +3293,7 @@ function setActiveRegion(region) {
   activeRegion = { start, end, label};
   region.setOptions({ color: STATE.regionActiveColour, content: labelEl});
   enableMenuItem(["export-audio"]);
-  if (modelReady && !PREDICTING) {
+  if (modelReady &amp;&amp; !PREDICTING) {
     enableMenuItem(["analyseSelection"]);
   }
   setActiveRow(start + windowOffsetSecs)
@@ -3305,7 +3337,7 @@ function initRegion() {
     }
     // If shift key held, clear other regions
     if (e.shiftKey){
-      REGIONS.regions.forEach((r) => r.color === STATE.regionColour && r.remove());
+      REGIONS.regions.forEach((r) => r.color === STATE.regionColour &amp;&amp; r.remove());
       // Ctrl / Cmd: remove the current region
     } else if (e.ctrlKey || e.metaKey) r.remove()
   })
@@ -3329,12 +3361,12 @@ function initRegion() {
 
 function initSpectrogram(height, fftSamples) {
     fftSamples ??= config.FFT;
-  config.debug && console.log("initializing spectrogram");
-  spectrogram && spectrogram.destroy() && WSPluginPurge();
+  config.debug &amp;&amp; console.log("initializing spectrogram");
+  spectrogram &amp;&amp; spectrogram.destroy() &amp;&amp; WSPluginPurge();
   if (!fftSamples) {
-    if (windowLength < 5) {
+    if (windowLength &lt; 5) {
       fftSamples = 256;
-    } else if (windowLength <= 15) {
+    } else if (windowLength &lt;= 15) {
       fftSamples = 512;
     } else {
       fftSamples = 1024;
@@ -3413,10 +3445,10 @@ const updateListIcon = () => {
   DOM.listIcon.style.visibility = "hidden";
   DOM.listIcon.innerHTML =
     config.list === "custom"
-      ? `<span class="material-symbols-outlined mt-1" title="${
+      ? `&lt;span class="material-symbols-outlined mt-1" title="${
           LIST_MAP[config.list]
-        }" style="width: 30px">fact_check</span>`
-      : `<img class="icon" src="img/${config.list}.png" alt="${
+        }" style="width: 30px">fact_check&lt;/span>`
+      : `&lt;img class="icon" src="img/${config.list}.png" alt="${
           config.list
         }"  title="${LIST_MAP[config.list]}">`;
   DOM.listIcon.style.visibility = "visible";
@@ -3578,7 +3610,7 @@ function centreSpec() {
     activeRegion.start += shift;
     activeRegion.end += shift;
     const { start, end } = activeRegion;
-    if (start < 0 || end > windowLength) activeRegion = null;
+    if (start &lt; 0 || end > windowLength) activeRegion = null;
   }
   postBufferUpdate({
     begin: windowOffsetSecs,
@@ -3591,30 +3623,30 @@ function centreSpec() {
 const GLOBAL_ACTIONS = {
   // eslint-disable-line
   a: (e) => {
-    if ((e.ctrlKey || e.metaKey) && STATE.currentFile) {
+    if ((e.ctrlKey || e.metaKey) &amp;&amp; STATE.currentFile) {
       const element = e.shiftKey ? "analyseAll" : "analyse";
       document.getElementById(element).click();
     }
   },
   A: (e) => {
-    (e.ctrlKey || e.metaKey) &&
-      STATE.currentFile &&
+    (e.ctrlKey || e.metaKey) &amp;&amp;
+      STATE.currentFile &amp;&amp;
       document.getElementById("analyseAll").click();
   },
-  c: (e) => (e.ctrlKey || e.metaKey) && currentBuffer && centreSpec(),
+  c: (e) => (e.ctrlKey || e.metaKey) &amp;&amp; currentBuffer &amp;&amp; centreSpec(),
   // D: (e) => {
   //     if (( e.ctrlKey || e.metaKey)) worker.postMessage({ action: 'create-dataset' });
   // },
-  e: (e) => (e.ctrlKey || e.metaKey) && activeRegion && exportAudio(),
-  g: (e) => (e.ctrlKey || e.metaKey) && showGoToPosition(),
-  o: async (e) => (e.ctrlKey || e.metaKey) && await showOpenDialog("openFile"),
-  p: () => activeRegion && playRegion(),
-  q: (e) => e.metaKey && isMac && window.electron.exitApplication(),
-  s: (e) => (e.ctrlKey || e.metaKey) &&
+  e: (e) => (e.ctrlKey || e.metaKey) &amp;&amp; activeRegion &amp;&amp; exportAudio(),
+  g: (e) => (e.ctrlKey || e.metaKey) &amp;&amp; showGoToPosition(),
+  o: async (e) => (e.ctrlKey || e.metaKey) &amp;&amp; await showOpenDialog("openFile"),
+  p: () => activeRegion &amp;&amp; playRegion(),
+  q: (e) => e.metaKey &amp;&amp; isMac &amp;&amp; window.electron.exitApplication(),
+  s: (e) => (e.ctrlKey || e.metaKey) &amp;&amp;
       document.getElementById("save2db").click(),
-  t: (e) => (e.ctrlKey || e.metaKey) && timelineToggle(true),
+  t: (e) => (e.ctrlKey || e.metaKey) &amp;&amp; timelineToggle(true),
   v: (e) => {
-    if (activeRow && (e.ctrlKey || e.metaKey)) {
+    if (activeRow &amp;&amp; (e.ctrlKey || e.metaKey)) {
       const nameAttribute = activeRow.getAttribute("name");
       const [file, start, end, sname, label] = nameAttribute.split("|");
       const cname = label.replace("?", "");
@@ -3632,7 +3664,7 @@ const GLOBAL_ACTIONS = {
     }
   },
   z: (e) => {
-    if ((e.ctrlKey || e.metaKey) && DELETE_HISTORY.length)
+    if ((e.ctrlKey || e.metaKey) &amp;&amp; DELETE_HISTORY.length)
       insertManualRecord(...DELETE_HISTORY.pop());
   },
   Escape: () => {
@@ -3647,7 +3679,7 @@ const GLOBAL_ACTIONS = {
         threads: config[config[config.model].backend].threads,
         list: config.list,
       });
-      STATE.diskHasRecords && enableMenuItem(["explore", "charts"]);
+      STATE.diskHasRecords &amp;&amp; enableMenuItem(["explore", "charts"]);
       generateToast({ message: "cancelled" });
       DOM.progressDiv.classList.add("invisible");
     }
@@ -3670,7 +3702,7 @@ const GLOBAL_ACTIONS = {
       windowOffsetSecs = windowOffsetSecs - windowLength;
       const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
       let fileToLoad;
-      if (fileIndex > 0 && windowOffsetSecs < 0) {
+      if (fileIndex > 0 &amp;&amp; windowOffsetSecs &lt; 0) {
         windowOffsetSecs = -windowLength;
         fileToLoad = STATE.openFiles[fileIndex - 1];
       } else {
@@ -3685,7 +3717,7 @@ const GLOBAL_ACTIONS = {
     }
   },
   ArrowUp: () => {
-    if (activeRow && STATE.regionsCompleted) {
+    if (activeRow &amp;&amp; STATE.regionsCompleted) {
       activeRow.classList.remove("table-active");
       activeRow = activeRow.previousSibling || activeRow;
       if (!activeRow.classList.contains("text-bg-dark")) activeRow.click();
@@ -3700,7 +3732,7 @@ const GLOBAL_ACTIONS = {
       const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
       let fileToLoad;
       if (
-        fileIndex < STATE.openFiles.length - 1 &&
+        fileIndex &lt; STATE.openFiles.length - 1 &amp;&amp;
         windowOffsetSecs >= currentFileDuration - windowLength
       ) {
         // Move to next file
@@ -3721,7 +3753,7 @@ const GLOBAL_ACTIONS = {
     }
   },
   ArrowDown: () => {
-    if (activeRow && STATE.regionsCompleted) {
+    if (activeRow &amp;&amp; STATE.regionsCompleted) {
       activeRow.classList.remove("table-active");
       activeRow = activeRow.nextSibling || activeRow;
       if (!activeRow.classList.contains("text-bg-dark")) activeRow.click();
@@ -3734,7 +3766,7 @@ const GLOBAL_ACTIONS = {
     if (currentBuffer) {
       wavesurfer.setTime(wavesurfer.getCurrentTime() - skip);
       let position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
-      if (wavesurfer.getCurrentTime() < skip && windowOffsetSecs > 0) {
+      if (wavesurfer.getCurrentTime() &lt; skip &amp;&amp; windowOffsetSecs > 0) {
         windowOffsetSecs -= skip;
         postBufferUpdate({
           begin: windowOffsetSecs,
@@ -3772,12 +3804,12 @@ const GLOBAL_ACTIONS = {
       }
     }, 
   Tab: (e) => {
-    if ((e.metaKey || e.ctrlKey) && !PREDICTING && STATE.diskHasRecords) {
+    if ((e.metaKey || e.ctrlKey) &amp;&amp; !PREDICTING &amp;&amp; STATE.diskHasRecords) {
       // If you did this when predicting, your results would go straight to the archive
       const modeToSet =
         STATE.mode === "explore" ? "active-analysis" : "explore";
       document.getElementById(modeToSet).click();
-    } else if (activeRow && STATE.regionsCompleted) {
+    } else if (activeRow &amp;&amp; STATE.regionsCompleted) {
       activeRow.classList.remove("table-active");
       if (e.shiftKey) {
         activeRow = activeRow.previousSibling || activeRow;
@@ -3792,8 +3824,8 @@ const GLOBAL_ACTIONS = {
       }
     }
   },
-  Delete: () => activeRow && deleteRecord(activeRow),
-  Backspace: () => activeRow && deleteRecord(activeRow),
+  Delete: () => activeRow &amp;&amp; deleteRecord(activeRow),
+  Backspace: () => activeRow &amp;&amp; deleteRecord(activeRow),
 };
 
 /**
@@ -3834,7 +3866,7 @@ const postBufferUpdate = ({
 }) => {
 
   // Validate input parameters
-  if (begin < 0 || position < 0 || position > 1) {
+  if (begin &lt; 0 || position &lt; 0 || position > 1) {
     console.error('Invalid buffer update parameters:', `Begin: ${begin}, Position: ${position}`);
     return;
   }
@@ -3909,7 +3941,7 @@ const gotoTime = (e) => {
       const offsetMillis = inputDate - STATE.fileStart;
       start = offsetMillis / 1000;
       //if we move to a new day... add 24 hours
-      start += start < 0 ? 86400 : 0;
+      start += start &lt; 0 ? 86400 : 0;
     } else {
       start = hours * 3600 + minutes * 60 + seconds;
     }
@@ -3953,7 +3985,7 @@ function onModelReady(args) {
   t1_warmup = Date.now();
   DIAGNOSTICS["Warm Up"] =
     ((t1_warmup - t0_warmup) / 1000).toFixed(2) + " seconds";
-  APPLICATION_LOADED || console.info("App launch time", `${t1_warmup - app_t0} ms`)
+  APPLICATION_LOADED || console.info(`App Launched in ${t1_warmup - app_t0}ms`)
   APPLICATION_LOADED = true;
   document.getElementById('loading-screen').classList.add('d-none');
   // New users - show the tour
@@ -3963,7 +3995,7 @@ function onModelReady(args) {
       prepTour();
     }
   }
-  if (OS_FILE_QUEUE.length) onOpenFiles({filePaths: OS_FILE_QUEUE}) && OS_FILE_QUEUE.shift()
+  if (OS_FILE_QUEUE.length) onOpenFiles({filePaths: OS_FILE_QUEUE}) &amp;&amp; OS_FILE_QUEUE.shift()
 }
 
 /***
@@ -3977,7 +4009,7 @@ function onModelReady(args) {
  * @param fileRegion an object {start, end} with the positions in seconds from the beginning of the buffer
  * @param preserveResults boolean determines whether to clear the result table
  * @param play whether to auto-play the audio
- * @returns {Promise<void>}
+ * @returns {Promise&lt;void>}
  */
 
 async function onWorkerLoadedAudio({
@@ -4064,9 +4096,9 @@ const awaiting = {
 function onProgress(args) {
   DOM.progressDiv.classList.remove("invisible");
   if (args.text) {
-    DOM.fileNumber.innerHTML = `<span class='loading text-nowrap'>${getI18n(
+    DOM.fileNumber.innerHTML = `&lt;span class='loading text-nowrap'>${getI18n(
       awaiting
-    )}</span>`;
+    )}&lt;/span>`;
   } else {
     const count = STATE.openFiles.indexOf(args.file) + 1;
     DOM.fileNumber.textContent = interpolate(getI18n(i18nFile), {
@@ -4094,36 +4126,36 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
 
   // if (summary.length){
   let summaryHTML = `
-            <table id="resultSummary" class="table table-dark p-1"><thead>
-            <tr class="pointer col-auto">
-            <th id="summary-max" scope="col"><span id="summary-max-icon" class="text-muted material-symbols-outlined summary-sort-icon d-none">sort</span>${
+            &lt;table id="resultSummary" class="table table-dark p-1">&lt;thead>
+            &lt;tr class="pointer col-auto">
+            &lt;th id="summary-max" scope="col">&lt;span id="summary-max-icon" class="text-muted material-symbols-outlined summary-sort-icon d-none">sort&lt;/span>${
               i18n.max
-            }</th>
-            <th id="summary-cname" scope="col"><span id="summary-cname-icon" class="text-muted material-symbols-outlined summary-sort-icon d-none">sort</span>${
+            }&lt;/th>
+            &lt;th id="summary-cname" scope="col">&lt;span id="summary-cname-icon" class="text-muted material-symbols-outlined summary-sort-icon d-none">sort&lt;/span>${
               i18n.species[0]
-            }</th>
-            ${showIUCN ? '<th scope="col"></th>' : ""}
-            <th id="summary-count" class="text-end" scope="col"><span id="summary-count-icon" class="text-muted material-symbols-outlined summary-sort-icon d-none">sort</span>${
+            }&lt;/th>
+            ${showIUCN ? '&lt;th scope="col">&lt;/th>' : ""}
+            &lt;th id="summary-count" class="text-end" scope="col">&lt;span id="summary-count-icon" class="text-muted material-symbols-outlined summary-sort-icon d-none">sort&lt;/span>${
               i18n.detections
-            }</th>
-            <th id="summary-calls" class="text-end" scope="col"><span id="summary-calls-icon" class="text-muted material-symbols-outlined summary-sort-icon d-none">sort</span>${
+            }&lt;/th>
+            &lt;th id="summary-calls" class="text-end" scope="col">&lt;span id="summary-calls-icon" class="text-muted material-symbols-outlined summary-sort-icon d-none">sort&lt;/span>${
               i18n.calls
-            }</th>
-            </tr>
-            </thead><tbody id="speciesFilter">`;
+            }&lt;/th>
+            &lt;/tr>
+            &lt;/thead>&lt;tbody id="speciesFilter">`;
   let selectedRow = null;
   const i18nIUCN = getI18n(IUCNLabel);
-  for (let i = 0; i < summary.length; i++) {
+  for (let i = 0; i &lt; summary.length; i++) {
     const item = summary[i];
     const selected = item.cname === filterSpecies ? " text-warning" : "";
     if (selected) selectedRow = i + 1;
-    summaryHTML += `<tr tabindex="-1" class="${selected}">
-                <td class="max">${iconizeScore(item.max)}</td>
-                    <td class="cname">
-                        <span class="cname">${item.cname}</span> <br><i>${
+    summaryHTML += `&lt;tr tabindex="-1" class="${selected}">
+                &lt;td class="max">${iconizeScore(item.max)}&lt;/td>
+                    &lt;td class="cname">
+                        &lt;span class="cname">${item.cname}&lt;/span> &lt;br>&lt;i>${
       item.sname
-    }</i>
-                    </td>`;
+    }&lt;/i>
+                    &lt;/td>`;
 
     if (showIUCN) {
       const species = IUCNtaxonomy[item.sname] || item.sname;
@@ -4136,7 +4168,7 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
       const url = iucn?.url
         ? "https://www.iucnredlist.org/species/" + iucn.url
         : null;
-      summaryHTML += `<td class="text-end"><a id="iucn-link-${
+      summaryHTML += `&lt;td class="text-end">&lt;a id="iucn-link-${
         item.sname
       }" title="${i18nIUCN[status]}" 
                         class="d-inline-block p-1 w-100 rounded text-decoration-none text-center ${
@@ -4144,13 +4176,13 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
                         } ${!url ? "disabled-link" : ""}"
                         href="${
                           url || "#"
-                        }" target="_blank"> ${status}</a></td>`;
+                        }" target="_blank"> ${status}&lt;/a>&lt;/td>`;
     }
-    summaryHTML += `<td class="text-end">${item.count}</td>
-                    <td class="text-end">${item.calls}</td>
-                    </tr>`;
+    summaryHTML += `&lt;td class="text-end">${item.count}&lt;/td>
+                    &lt;td class="text-end">${item.calls}&lt;/td>
+                    &lt;/tr>`;
   }
-  summaryHTML += "</tbody></table>";
+  summaryHTML += "&lt;/tbody>&lt;/table>";
   // Get rid of flicker...
   const old_summary = DOM.summaryTable;
   const fragment = document.createDocumentFragment(); // Create a document fragment
@@ -4223,7 +4255,7 @@ function onResultsComplete({ active = undefined, select = undefined } = {}) {
 }
 
 function getRowFromStart(table, start) {
-  for (var i = 0; i < table.rows.length; i++) {
+  for (var i = 0; i &lt; table.rows.length; i++) {
     const row = table.rows[i];
     // Get the value of the name attribute and split it on '|'
     // Start time is the second value in the name string
@@ -4254,7 +4286,7 @@ function onAnalysisComplete({ quiet }) {
   PREDICTING = false;
   disableSettingsDuringAnalysis(false);
   STATE.analysisDone = true;
-  STATE.diskHasRecords && enableMenuItem(["explore", "charts"]);
+  STATE.diskHasRecords &amp;&amp; enableMenuItem(["explore", "charts"]);
   DOM.progressDiv.classList.add("invisible");
   if (quiet) return;
   // DIAGNOSTICS:
@@ -4310,7 +4342,7 @@ function onSummaryComplete({
   AUDACITY_LABELS = audacityLabels;
   if (summary.length) {
     enableMenuItem(["saveLabels", "saveCSV", "save-eBird", "save-Raven"]);
-    STATE.mode !== "explore" && enableMenuItem(["save2db"]);
+    STATE.mode !== "explore" &amp;&amp; enableMenuItem(["save2db"]);
   } else {
     disableMenuItem([
       "saveLabels",
@@ -4326,7 +4358,7 @@ function onSummaryComplete({
 const pagination = document.querySelectorAll(".pagination");
 pagination.forEach((item) => {
   item.addEventListener("click", (e) => {
-    if (STATE.analysisDone && e.target.tagName === "A") {
+    if (STATE.analysisDone &amp;&amp; e.target.tagName === "A") {
       // Did we click a link in the list?
       let clicked = e.target.textContent;
       let currentPage = pagination[0].querySelector(".active");
@@ -4363,35 +4395,35 @@ const addPagination = (total, offset) => {
   const pages = Math.ceil(total / limit);
   const currentPage = offset / limit + 1;
   let list = "";
-  for (let i = 1; i <= pages; i++) {
+  for (let i = 1; i &lt;= pages; i++) {
     if (i === 1) {
       list +=
         i === currentPage
-          ? '<li class="page-item disabled"><span class="page-link" href="#">Previous</span></li>'
-          : '<li class="page-item"><a class="page-link" href="#">Previous</a></li>';
+          ? '&lt;li class="page-item disabled">&lt;span class="page-link" href="#">Previous&lt;/span>&lt;/li>'
+          : '&lt;li class="page-item">&lt;a class="page-link" href="#">Previous&lt;/a>&lt;/li>';
     }
     if (
-      i <= 2 ||
+      i &lt;= 2 ||
       i > pages - 2 ||
-      (i >= currentPage - 2 && i <= currentPage + 2)
+      (i >= currentPage - 2 &amp;&amp; i &lt;= currentPage + 2)
     ) {
       list +=
         i === currentPage
-          ? '<li class="page-item active" aria-current="page"><span class="page-link" href="#">' +
+          ? '&lt;li class="page-item active" aria-current="page">&lt;span class="page-link" href="#">' +
             i +
-            "</span></li>"
-          : '<li class="page-item"><a class="page-link" href="#">' +
+            "&lt;/span>&lt;/li>"
+          : '&lt;li class="page-item">&lt;a class="page-link" href="#">' +
             i +
-            "</a></li>";
+            "&lt;/a>&lt;/li>";
     } else if (i === 3 || i === pages - 3) {
       list +=
-        '<li class="page-item disabled"><span class="page-link" href="#">...</span></li>';
+        '&lt;li class="page-item disabled">&lt;span class="page-link" href="#">...&lt;/span>&lt;/li>';
     }
     if (i === pages) {
       list +=
         i === currentPage
-          ? '<li class="page-item disabled"><span class="page-link" href="#">Next</span></li>'
-          : '<li class="page-item"><a class="page-link" href="#">Next</a></li>';
+          ? '&lt;li class="page-item disabled">&lt;span class="page-link" href="#">Next&lt;/span>&lt;/li>'
+          : '&lt;li class="page-item">&lt;a class="page-link" href="#">Next&lt;/a>&lt;/li>';
     }
   }
   pagination.forEach((item) => {
@@ -4438,7 +4470,7 @@ async function renderResult({
   selection = false,
 }) {
   let tr = "";
-  if (index <= 1) {
+  if (index &lt;= 1) {
     if (selection) {
       const selectionTable = document.getElementById(
         "selectionResultTableBody"
@@ -4451,25 +4483,25 @@ async function renderResult({
       const i18n = getI18n(i18nHeadings);
       // const fragment = new DocumentFragment();
       DOM.resultHeader.innerHTML = `
-                <tr>
-                    <th id="sort-time" class="time-sort col text-start timeOfDay" title="${i18n.time[1]}"><span class="text-muted material-symbols-outlined time-sort-icon d-none">sort</span> ${i18n.time[0]}</th>
-                    <th id="sort-position" class="time-sort text-start timestamp" title="${i18n.position[1]}"><span class="text-muted material-symbols-outlined time-sort-icon d-none">sort</span> ${i18n.position[0]}</th>
-                    <th id="confidence-sort" class="text-start" title="${i18n.species[1]}"><span class="text-muted material-symbols-outlined species-sort-icon d-none">sort</span> ${i18n.species[0]}</th>
-                    <th class="text-end">${i18n.calls}</th>
-                    <th class="col">${i18n.label}</th>
-                    <th id="notes" class="col text-end">${i18n.notes}</th>
-                </tr>`;
+                &lt;tr>
+                    &lt;th id="sort-time" class="time-sort col text-start timeOfDay" title="${i18n.time[1]}">&lt;span class="text-muted material-symbols-outlined time-sort-icon d-none">sort&lt;/span> ${i18n.time[0]}&lt;/th>
+                    &lt;th id="sort-position" class="time-sort text-start timestamp" title="${i18n.position[1]}">&lt;span class="text-muted material-symbols-outlined time-sort-icon d-none">sort&lt;/span> ${i18n.position[0]}&lt;/th>
+                    &lt;th id="confidence-sort" class="text-start" title="${i18n.species[1]}">&lt;span class="text-muted material-symbols-outlined species-sort-icon d-none">sort&lt;/span> ${i18n.species[0]}&lt;/th>
+                    &lt;th class="text-end">${i18n.calls}&lt;/th>
+                    &lt;th class="col">${i18n.label}&lt;/th>
+                    &lt;th id="notes" class="col text-end">${i18n.notes}&lt;/th>
+                &lt;/tr>`;
       setTimelinePreferences();
       // DOM.resultHeader.innerHTML = fragment;
     }
     showElement(["resultTableContainer", "resultsHead"], false);
     // If  we have some results, let's update the view in case any are in the window
-    if (config.specDetections && !isFromDB && !STATE.selection)
+    if (config.specDetections &amp;&amp; !isFromDB &amp;&amp; !STATE.selection)
       postBufferUpdate({ file, begin: windowOffsetSecs });
-  } else if (!isFromDB && index % (config.limit + 1) === 0) {
+  } else if (!isFromDB &amp;&amp; index % (config.limit + 1) === 0) {
     addPagination(index, 0);
   }
-  if (!isFromDB && index > config.limit) {
+  if (!isFromDB &amp;&amp; index > config.limit) {
     return;
   } else {
     const {
@@ -4488,15 +4520,15 @@ async function renderResult({
     } = result;
     const dayNight = isDaylight ? "daytime" : "nighttime";
     // Todo: move this logic so pre dark sections of file are not even analysed
-    if (config.detect.nocmig && !selection && dayNight === "daytime") return;
+    if (config.detect.nocmig &amp;&amp; !selection &amp;&amp; dayNight === "daytime") return;
 
     const commentHTML = comment
-      ? `<span title="${comment.replaceAll(
+      ? `&lt;span title="${comment.replaceAll(
           '"',
-          "&quot;"
-        )}" class='material-symbols-outlined pointer'>comment</span>`
+          "&amp;quot;"
+        )}" class='material-symbols-outlined pointer'>comment&lt;/span>`
       : "";
-    const isUncertain = score < 65 ? "&#63;" : "";
+    const isUncertain = score &lt; 65 ? "&amp;#63;" : "";
     // store result for feedback function to use
     if (!selection) predictions[index] = result;
     // Format date and position for  UI
@@ -4505,7 +4537,7 @@ async function renderResult({
       undefined,
       STATE.dataFormatOptions
     );
-    const spliceStart = position < 3600 ? 14 : 11;
+    const spliceStart = position &lt; 3600 ? 14 : 11;
     const UI_position = new Date(position * 1000)
       .toISOString()
       .substring(spliceStart, 19);
@@ -4516,24 +4548,24 @@ async function renderResult({
     const hide = selection ? "d-none" : "";
     const countIcon =
       count > 1
-        ? `<span class="circle" title="Click to view the ${count} detections at this timecode">${count}</span>`
+        ? `&lt;span class="circle" title="Click to view the ${count} detections at this timecode">${count}&lt;/span>`
         : "";
-    tr += `<tr tabindex="-1" id="result${index}" name="${file}|${position}|${
+    tr += `&lt;tr tabindex="-1" id="result${index}" name="${file}|${position}|${
       end || position + 3
     }|${sname}|${cname}${isUncertain}" class='${activeTable} border-top border-2 border-secondary ${dayNight}'>
-            <td class='text-start timeOfDay ${showTimeOfDay}'>${UI_timestamp}</td>
-            <td class="text-start timestamp ${showTimestamp}">${UI_position} </td>
-            <td name="${cname}" class='text-start cname'>
-            <span class="cname">${cname}</span> ${countIcon} ${iconizeScore(
+            &lt;td class='text-start timeOfDay ${showTimeOfDay}'>${UI_timestamp}&lt;/td>
+            &lt;td class="text-start timestamp ${showTimestamp}">${UI_position} &lt;/td>
+            &lt;td name="${cname}" class='text-start cname'>
+            &lt;span class="cname">${cname}&lt;/span> ${countIcon} ${iconizeScore(
       score
     )}
-            </td>
-            <td class="text-end call-count ${hide}">${callCount || "1"} </td>
+            &lt;/td>
+            &lt;td class="text-end call-count ${hide}">${callCount || "1"} &lt;/td>
             
-            <td class="label ${hide}">${labelHTML}</td>
-            <td class="comment text-end ${hide}">${commentHTML}</td>
+            &lt;td class="label ${hide}">${labelHTML}&lt;/td>
+            &lt;td class="comment text-end ${hide}">${commentHTML}&lt;/td>
             
-            </tr>`;
+            &lt;/tr>`;
   }
   updateResultTable(tr, isFromDB, selection);
 }
@@ -4550,7 +4582,7 @@ const updateResultTable = (row, isFromDB, isSelection) => {
   const table = isSelection
     ? document.getElementById("selectionResultTableBody")
     : document.getElementById("resultTableBody");
-  if (isFromDB && !isSelection) {
+  if (isFromDB &amp;&amp; !isSelection) {
     resultsBuffer.lastElementChild
       ? resultsBuffer.lastElementChild.insertAdjacentHTML("afterend", row)
       : (resultsBuffer.innerHTML = row);
@@ -4574,8 +4606,8 @@ const isExplore = () => {
 };
 
 const tags = {
-  Local: '<span class="badge bg-success rounded-pill">Local</span>',
-  Nocmig: '<span class="badge bg-dark rounded-pill">Nocmig</span>',
+  Local: '&lt;span class="badge bg-success rounded-pill">Local&lt;/span>',
+  Nocmig: '&lt;span class="badge bg-dark rounded-pill">Nocmig&lt;/span>',
 };
 
 // Results event handlers
@@ -4647,7 +4679,7 @@ const deleteRecord = (target) => {
     // Clear the record in the UI
     const index = row.rowIndex;
     // there may be no records remaining (no index)
-    index > -1 && setting.deleteRow(index);
+    index > -1 &amp;&amp; setting.deleteRow(index);
     setting.rows[index]?.click();
   }
 };
@@ -4739,21 +4771,21 @@ function sendFile(mode, result) {
 
 const iconDict = {
   guess:
-    '<span class="confidence-row"><span class="confidence bar" style="flex-basis: --%; background: grey">--%</span></span>',
-  low: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: --%; background: rgba(255,0,0,0.5)">--%</span></span>',
+    '&lt;span class="confidence-row">&lt;span class="confidence bar" style="flex-basis: --%; background: grey">--%&lt;/span>&lt;/span>',
+  low: '&lt;span class="confidence-row">&lt;span class="confidence bar" style="flex-basis: --%; background: rgba(255,0,0,0.5)">--%&lt;/span>&lt;/span>',
   medium:
-    '<span class="confidence-row"><span class="confidence bar" style="flex-basis: --%; background: #fd7e14">--%</span></span>',
-  high: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: --%; background: #198754">--%</span></span>',
+    '&lt;span class="confidence-row">&lt;span class="confidence bar" style="flex-basis: --%; background: #fd7e14">--%&lt;/span>&lt;/span>',
+  high: '&lt;span class="confidence-row">&lt;span class="confidence bar" style="flex-basis: --%; background: #198754">--%&lt;/span>&lt;/span>',
   confirmed:
-    '<span class="material-symbols-outlined" title="Confirmed Record">verified</span>',
+    '&lt;span class="material-symbols-outlined" title="Confirmed Record">verified&lt;/span>',
 };
 
 const iconizeScore = (score) => {
   const tooltip = score.toString();
-  if (score < 50) return iconDict["guess"].replaceAll("--", tooltip);
-  else if (score < 65) return iconDict["low"].replaceAll("--", tooltip);
-  else if (score < 85) return iconDict["medium"].replaceAll("--", tooltip);
-  else if (score <= 100) return iconDict["high"].replaceAll("--", tooltip);
+  if (score &lt; 50) return iconDict["guess"].replaceAll("--", tooltip);
+  else if (score &lt; 65) return iconDict["low"].replaceAll("--", tooltip);
+  else if (score &lt; 85) return iconDict["medium"].replaceAll("--", tooltip);
+  else if (score &lt;= 100) return iconDict["high"].replaceAll("--", tooltip);
   else return iconDict["confirmed"];
 };
 
@@ -4819,7 +4851,7 @@ async function localiseModal(filename, locale) {
         const element = doc.getElementById(key);
         if (element) {
           element.innerHTML = Array.isArray(localisationData[key])
-            ? localisationData[key].join("<br>")
+            ? localisationData[key].join("&lt;br>")
             : localisationData[key];
         }
       }
@@ -4888,12 +4920,12 @@ function replaceCtrlWithCommand() {
 const populateSpeciesModal = async (included, excluded) => {
   const i18n = getI18n(i18nSpeciesList);
   const current_file_text =
-    STATE.week !== -1 && STATE.week
+    STATE.week !== -1 &amp;&amp; STATE.week
       ? interpolate(i18n.week, { week: STATE.week })
       : "";
   const model = config.model === "birdnet" ? "BirdNET" : "Nocmig";
   const localBirdsOnly =
-    config.local && config.model === "birdnet" && config.list === "nocturnal"
+    config.local &amp;&amp; config.model === "birdnet" &amp;&amp; config.list === "nocturnal"
       ? i18n.localBirds
       : "";
   let species_filter_text = "",
@@ -4912,8 +4944,8 @@ const populateSpeciesModal = async (included, excluded) => {
   }
   const includedList = generateBirdIDList(included);
   const depending =
-    config.useWeek &&
-    config.list === "location" &&
+    config.useWeek &amp;&amp;
+    config.list === "location" &amp;&amp;
     (STATE.week === -1 || !STATE.week)
       ? i18n.depending
       : "";
@@ -4943,18 +4975,18 @@ const populateSpeciesModal = async (included, excluded) => {
     disable = " disabled";
   }
   let modalContent = `
-        <ul class="nav nav-tabs" id="myTab" role="tablist">
-        <li class="nav-item" role="presentation">
-        <button class="nav-link active" id="included-tab" data-bs-toggle="tab" data-bs-target="#included-tab-pane" type="button" role="tab" aria-controls="included-tab-pane" aria-selected="true">${i18n.includedButton}</button>
-        </li>
-        <li class="nav-item" role="presentation">
-        <button class="nav-link" id="excluded-tab" data-bs-toggle="tab" data-bs-target="#excluded-tab-pane" type="button" role="tab" aria-controls="excluded-tab-pane" aria-selected="false" ${disable}>${i18n.excludedButton}</button>
-        </li>
-        </ul>
-        <div class="tab-content" id="myTabContent">
-        <div class="tab-pane fade show active" id="included-tab-pane" role="tabpanel" aria-labelledby="included-tab" tabindex="0" style="max-height: 50vh;overflow: auto">${includedContent}</div>
-        <div class="tab-pane fade" id="excluded-tab-pane" role="tabpanel" aria-labelledby="excluded-tab" tabindex="0" style="max-height: 50vh;overflow: auto">${excludedContent}</div>
-        </div>
+        &lt;ul class="nav nav-tabs" id="myTab" role="tablist">
+        &lt;li class="nav-item" role="presentation">
+        &lt;button class="nav-link active" id="included-tab" data-bs-toggle="tab" data-bs-target="#included-tab-pane" type="button" role="tab" aria-controls="included-tab-pane" aria-selected="true">${i18n.includedButton}&lt;/button>
+        &lt;/li>
+        &lt;li class="nav-item" role="presentation">
+        &lt;button class="nav-link" id="excluded-tab" data-bs-toggle="tab" data-bs-target="#excluded-tab-pane" type="button" role="tab" aria-controls="excluded-tab-pane" aria-selected="false" ${disable}>${i18n.excludedButton}&lt;/button>
+        &lt;/li>
+        &lt;/ul>
+        &lt;div class="tab-content" id="myTabContent">
+        &lt;div class="tab-pane fade show active" id="included-tab-pane" role="tabpanel" aria-labelledby="included-tab" tabindex="0" style="max-height: 50vh;overflow: auto">${includedContent}&lt;/div>
+        &lt;div class="tab-pane fade" id="excluded-tab-pane" role="tabpanel" aria-labelledby="excluded-tab" tabindex="0" style="max-height: 50vh;overflow: auto">${excludedContent}&lt;/div>
+        &lt;/div>
         `;
   document.getElementById("speciesModalBody").innerHTML = modalContent;
   document.getElementById("speciesModalLabel").textContent = i18n.title;
@@ -5022,7 +5054,7 @@ function filterResults({
   limit = 500,
   range = undefined,
 } = {}) {
-  STATE.analysisDone &&
+  STATE.analysisDone &amp;&amp;
     worker.postMessage({
       action: "filter",
       species: species,
@@ -5059,7 +5091,7 @@ const modelSettingsDisplay = () => {
       element.classList.replace("chirpity-only", "chirpity-only-visible");
     });
     // Remove GPU option on Mac
-    isMac && noMac.forEach((element) => element.classList.add("d-none"));
+    isMac &amp;&amp; noMac.forEach((element) => element.classList.add("d-none"));
     DOM.contextAware.checked = config.detect.contextAware;
     DOM.contextAwareIcon.classList.remove("d-none");
     // SNRSlider.disabled = false;
@@ -5105,7 +5137,7 @@ const toggleContextAwareMode = () => {
   // if (config.detect.contextAware) {
   //     SNRSlider.disabled = true;
   //     config.filters.SNR = 0;
-  // } else if (config[config.model].backend !== 'webgl'  && config.model !== 'birdnet') {
+  // } else if (config[config.model].backend !== 'webgl'  &amp;&amp; config.model !== 'birdnet') {
   //     SNRSlider.disabled = false;
   //     config.filters.SNR = parseFloat(SNRSlider.value);
   // }
@@ -5127,21 +5159,21 @@ diagnosticMenu.addEventListener("click", async function () {
   DIAGNOSTICS["Context"] = config.detect.contextAware;
   DIAGNOSTICS["SNR"] = config.filters.SNR;
   DIAGNOSTICS["List"] = config.list;
-  let diagnosticTable = "<table class='table-hover table-striped p-2 w-100'>";
+  let diagnosticTable = "&lt;table class='table-hover table-striped p-2 w-100'>";
   for (let [key, value] of Object.entries(DIAGNOSTICS)) {
     if (key === "Audio Duration") {
       // Format duration as days, hours,minutes, etc.
       value = formatDuration(value);
     }
     if (key === "UUID") {
-      diagnosticTable += `<tr><th scope="row">${key}</th><td id="uuid">${value} 
-                    <span id ="copy-uuid" data-bs-toggle="tooltip" data-bs-placement="right" title="Copy to clipboard" 
-                    class="material-symbols-outlined text-secondary"> content_copy</span></td></tr>`;
+      diagnosticTable += `&lt;tr>&lt;th scope="row">${key}&lt;/th>&lt;td id="uuid">${value} 
+                    &lt;span id ="copy-uuid" data-bs-toggle="tooltip" data-bs-placement="right" title="Copy to clipboard" 
+                    class="material-symbols-outlined text-secondary"> content_copy&lt;/span>&lt;/td>&lt;/tr>`;
     } else {
-      diagnosticTable += `<tr><th scope="row">${key}</th><td>${value}</td></tr>`;
+      diagnosticTable += `&lt;tr>&lt;th scope="row">${key}&lt;/th>&lt;td>${value}&lt;/td>&lt;/tr>`;
     }
   }
-  diagnosticTable += "</table>";
+  diagnosticTable += "&lt;/table>";
   document.getElementById("diagnosticsModalBody").innerHTML = diagnosticTable;
   const testModal = new bootstrap.Modal(
     document.getElementById("diagnosticsModal")
@@ -5169,7 +5201,7 @@ function activateResultFilters() {
   [...speciesHeadings].forEach((heading) => {
     heading.classList.toggle("d-none", !sortOrderScore);
     heading.parentNode.classList.add("pointer");
-    if (sortOrderScore && STATE.resultsSortOrder.includes("ASC")) {
+    if (sortOrderScore &amp;&amp; STATE.resultsSortOrder.includes("ASC")) {
       heading.classList.add("flipped");
     } else {
       heading.classList.remove("flipped");
@@ -5242,7 +5274,7 @@ document.addEventListener("drop", (event) => {
   const filelist = Array.from(event.dataTransfer.files)
     .filter(
       (file) =>
-        !file.name.startsWith(".") &&
+        !file.name.startsWith(".") &amp;&amp;
         (!file.type ||
           file.type.startsWith("audio/") ||
           file.type.startsWith("video/"))
@@ -5472,7 +5504,7 @@ function initialiseDatePicker() {
       const element = document.getElementById(id);
       if (!element.textContent) {
         // It's blank
-        element.innerHTML = `<span class="material-symbols-outlined align-bottom">date_range</span><span>${STATE.i18n["explore-datefilter"]}</span> <span class="material-symbols-outlined float-end">expand_more</span>`;
+        element.innerHTML = `&lt;span class="material-symbols-outlined align-bottom">date_range&lt;/span>&lt;span>${STATE.i18n["explore-datefilter"]}&lt;/span> &lt;span class="material-symbols-outlined float-end">expand_more&lt;/span>`;
       } else if (
         !element.textContent.includes(STATE.i18n["explore-datefilter"])
       ) {
@@ -5492,7 +5524,7 @@ function createDateClearButton(element, picker) {
   span.addEventListener("click", (e) => {
     e.stopImmediatePropagation();
     picker.clear();
-    element.innerHTML = `<span class="material-symbols-outlined align-bottom">date_range</span><span>${STATE.i18n["explore-datefilter"]}</span> <span class="material-symbols-outlined float-end">expand_more</span>`;
+    element.innerHTML = `&lt;span class="material-symbols-outlined align-bottom">date_range&lt;/span>&lt;span>${STATE.i18n["explore-datefilter"]}&lt;/span> &lt;span class="material-symbols-outlined float-end">expand_more&lt;/span>`;
   });
 }
 
@@ -5514,7 +5546,7 @@ document.addEventListener("DOMContentLoaded", function () {
   document.addEventListener("keydown", handleKeyDownDeBounce, true);
   toggleKeyDownForFormInputs();
   // make menu an accordion for smaller screens
-  if (window.innerWidth < 768) {
+  if (window.innerWidth &lt; 768) {
     // close all inner dropdowns when parent is closed
     document
       .querySelectorAll(".navbar .dropdown")
@@ -5563,7 +5595,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const newSummaryWidth = e.clientX - containerRect.left;
     const newResultsWidth = containerRect.right - e.clientX;
 
-    if (newSummaryWidth > 50 && newResultsWidth > 50) {
+    if (newSummaryWidth > 50 &amp;&amp; newResultsWidth > 50) {
       // Minimum width for both divs
       summary.style.width = newSummaryWidth + "px";
       resultsDiv.style.width = newResultsWidth + "px";
@@ -5601,8 +5633,8 @@ const hideConfidenceSlider = () => {
 
 function showThreshold(e) {
   const threshold = e instanceof Event ? e.target.valueAsNumber : e;
-  filterPanelThresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
-  settingsPanelThresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
+  filterPanelThresholdDisplay.innerHTML = `&lt;b>${threshold}%&lt;/b>`;
+  settingsPanelThresholdDisplay.innerHTML = `&lt;b>${threshold}%&lt;/b>`;
   filterPanelRangeInput.value = threshold;
   settingsPanelRangeInput.value = threshold;
 }
@@ -5621,7 +5653,7 @@ const handleThresholdChange = (e) => {
     // Update the seen species list
     worker.postMessage({ action: "get-detected-species-list" });
   }
-  if (!PREDICTING && !DOM.resultTableElement.classList.contains("d-none")) {
+  if (!PREDICTING &amp;&amp; !DOM.resultTableElement.classList.contains("d-none")) {
     worker.postMessage({
       action: "update-state",
       globalOffset: 0,
@@ -5640,9 +5672,9 @@ const handleThresholdChange = (e) => {
 const filterIconDisplay = () => {
   const i18n = getI18n(i18nTitles);
   if (
-    config.filters.active &&
+    config.filters.active &amp;&amp;
     (config.filters.highPassFrequency ||
-      (config.filters.lowShelfAttenuation &&
+      (config.filters.lowShelfAttenuation &amp;&amp;
         config.filters.lowShelfFrequency) ||
       config.filters.normalise)
   ) {
@@ -6241,8 +6273,8 @@ document.addEventListener("click", function (e) {
     case "clear-call-cache": {
       const data = fs.rm(p.join(appPath, "XCcache.json"), (err) => {
         if (err)
-          generateToast({ type: "error", message: "noCallCache" }) &&
-            config.debug &&
+          generateToast({ type: "error", message: "noCallCache" }) &amp;&amp;
+            config.debug &amp;&amp;
             console.log("No XC cache found", err);
         else generateToast({ message: "callCacheCleared" });
       });
@@ -6277,16 +6309,16 @@ document.addEventListener("click", function (e) {
   }
   DOM.contextMenu.classList.add("d-none");
   if (
-    target != "frequency-range" &&
+    target != "frequency-range" &amp;&amp;
     !e.target.closest("#frequency-range-panel")
   ) {
     document.getElementById("frequency-range-panel").classList.add("d-none");
     document.getElementById("frequency-range").classList.remove("active");
   }
   hideConfidenceSlider();
-  config.debug && console.log("clicked", target);
-  target &&
-    target !== "result1" &&
+  config.debug &amp;&amp; console.log("clicked", target);
+  target &amp;&amp;
+    target !== "result1" &amp;&amp;
     trackEvent(config.UUID, "UI", "Click", target);
 });
 
@@ -6341,7 +6373,7 @@ document.addEventListener("change", function (e) {
   const element = e.target.closest("[id]");
   if (element) {
     const target = element.id;
-    config.debug && console.log("Change target:", target);
+    config.debug &amp;&amp; console.log("Change target:", target);
     switch (target) {
       case "species-frequency-threshold": {
         if (isNaN(element.value) || element.value === "") {
@@ -6458,7 +6490,7 @@ document.addEventListener("change", function (e) {
           }
         } else {
           const chirpity =
-            element.value === "en_uk" && config.model !== "birdnet"
+            element.value === "en_uk" &amp;&amp; config.model !== "birdnet"
               ? "chirpity"
               : "";
           labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_${chirpity}Labels_${element.value}.txt`;
@@ -6521,7 +6553,7 @@ document.addEventListener("change", function (e) {
         } else {
           colorMapFieldset.classList.add("d-none");
         }
-        if (wavesurfer && STATE.currentFile) {
+        if (wavesurfer &amp;&amp; STATE.currentFile) {
           const fftSamples = spectrogram.fftSamples;
           adjustSpecDims(true, fftSamples);
           postBufferUpdate({ begin: windowOffsetSecs, position: wavesurfer.getCurrentTime() / windowLength });
@@ -6554,7 +6586,7 @@ document.addEventListener("change", function (e) {
           threshold: threshold,
           windowFn: windowFn,
         };
-        if (wavesurfer && STATE.currentFile) {
+        if (wavesurfer &amp;&amp; STATE.currentFile) {
           const fftSamples = spectrogram.fftSamples;
           adjustSpecDims(true, fftSamples);
           refreshTimeline();
@@ -6582,7 +6614,7 @@ document.addEventListener("change", function (e) {
       }
       case "spec-labels": {
         config.specLabels = element.checked;
-        if (wavesurfer && STATE.currentFile) {
+        if (wavesurfer &amp;&amp; STATE.currentFile) {
           const fftSamples = spectrogram.fftSamples;
           adjustSpecDims(true, fftSamples);
         }
@@ -6622,7 +6654,7 @@ document.addEventListener("change", function (e) {
       }
       case "normalise": {
         config.filters.normalise = element.checked;
-        element.checked && (config.filters.active = true);
+        element.checked &amp;&amp; (config.filters.active = true);
         worker.postMessage({ action: "update-state", filters: config.filters });
         element.blur();
         if (fileLoaded) {
@@ -6740,7 +6772,7 @@ async function readLabels(labelFile, updating) {
     .then((filecontents) => {
       LABELS = filecontents.trim().split(/\r?\n/);
       // Add unknown species
-      !LABELS.includes("Unknown Sp._Unknown Sp.") &&
+      !LABELS.includes("Unknown Sp._Unknown Sp.") &amp;&amp;
         LABELS.push("Unknown Sp._Unknown Sp.");
 
       if (updating === "list") {
@@ -6762,7 +6794,7 @@ async function readLabels(labelFile, updating) {
     })
     .catch((error) => {
       // No need to record the error if it's just that the label file wasn't entered in the form
-      labelFile && console.error(error);
+      labelFile &amp;&amp; console.error(error);
     });
 }
 
@@ -6786,8 +6818,8 @@ function getI18n(context) {
 function checkForRegion(e, setActive) {
   const relativePosition = e.clientX / e.currentTarget.clientWidth;
   const time = relativePosition * windowLength;
-  const region = REGIONS.regions.find((r) => r.start < time && r.end > time);
-  region && setActive && setActiveRegion(region);
+  const region = REGIONS.regions.find((r) => r.start &lt; time &amp;&amp; r.end > time);
+  region &amp;&amp; setActive &amp;&amp; setActiveRegion(region);
   return region;
 }
 
@@ -6813,13 +6845,13 @@ function checkForRegion(e, setActive) {
  *
  * @async
  * @param {Event} e - The event object that triggers the context menu (typically a MouseEvent).
- * @returns {Promise<void>} Resolves once the context menu is setup and positioned.
+ * @returns {Promise&lt;void>} Resolves once the context menu is setup and positioned.
  */
 async function createContextMenu(e) {
   // If we let the playback continue, the region may get wiped
   if (wavesurfer?.isPlaying()) wavesurfer.pause();
   e.stopPropagation();
-  this.closest("#spectrogramWrapper") && checkForRegion(e, true);
+  this.closest("#spectrogramWrapper") &amp;&amp; checkForRegion(e, true);
   const i18n = getI18n(i18nContext);
   const target = e.target;
   if (target.classList.contains("circle") || target.closest("thead")) return;
@@ -6839,47 +6871,47 @@ async function createContextMenu(e) {
   if (resultContext || hideInSelection || hideInSummary) {
     // Lets check if the summary needs to be filtered
     if (
-      (inSummary && !target.closest("tr").classList.contains("text-warning")) ||
-      (target.closest("#resultTableBody") &&
+      (inSummary &amp;&amp; !target.closest("tr").classList.contains("text-warning")) ||
+      (target.closest("#resultTableBody") &amp;&amp;
         !target.closest("tr").classList.contains("table-active"))
     ) {
       target.click(); // Wait for file to load
       await waitFor(() => fileLoaded);
     }
   }
-  if (!activeRegion && !inSummary) return;
+  if (!activeRegion &amp;&amp; !inSummary) return;
   const createOrEdit =
     activeRegion.label || target.closest("#summary") ? i18n.edit : i18n.create;
 
   DOM.contextMenu.innerHTML = `
-    <div id="${inSummary ? "inSummary" : "inResults"}">
-        <a class="dropdown-item ${hideInSummary}" id="play-region"><span class='material-symbols-outlined'>play_circle</span> ${
+    &lt;div id="${inSummary ? "inSummary" : "inResults"}">
+        &lt;a class="dropdown-item ${hideInSummary}" id="play-region">&lt;span class='material-symbols-outlined'>play_circle&lt;/span> ${
     i18n.play
-  }</a>
-        <a class="dropdown-item ${hideInSummary} ${hideInSelection}" href="#" id="context-analyse-selection">
-        <span class="material-symbols-outlined">search</span> ${i18n.analyse}
-        </a>
-        <div class="dropdown-divider ${hideInSummary}"></div>
-        <a class="dropdown-item" id="create-manual-record" href="#">
-        <span class="material-symbols-outlined">edit_document</span> ${createOrEdit} ${
+  }&lt;/a>
+        &lt;a class="dropdown-item ${hideInSummary} ${hideInSelection}" href="#" id="context-analyse-selection">
+        &lt;span class="material-symbols-outlined">search&lt;/span> ${i18n.analyse}
+        &lt;/a>
+        &lt;div class="dropdown-divider ${hideInSummary}">&lt;/div>
+        &lt;a class="dropdown-item" id="create-manual-record" href="#">
+        &lt;span class="material-symbols-outlined">edit_document&lt;/span> ${createOrEdit} ${
     i18n.record
   }
-        </a>
-        <a class="dropdown-item" id="context-create-clip" href="#">
-        <span class="material-symbols-outlined">music_note</span> ${i18n.export}
-        </a>
-        <span class="dropdown-item" id="context-xc" href='#' target="xc">
-        <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> ${
+        &lt;/a>
+        &lt;a class="dropdown-item" id="context-create-clip" href="#">
+        &lt;span class="material-symbols-outlined">music_note&lt;/span> ${i18n.export}
+        &lt;/a>
+        &lt;span class="dropdown-item" id="context-xc" href='#' target="xc">
+        &lt;img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> ${
           i18n.compare
         }
-        </span>
-        <div class="dropdown-divider ${hideInSelection}"></div>
-        <a class="dropdown-item ${hideInSelection}" id="context-delete" href="#">
-        <span class='delete material-symbols-outlined'>delete_forever</span> ${
+        &lt;/span>
+        &lt;div class="dropdown-divider ${hideInSelection}">&lt;/div>
+        &lt;a class="dropdown-item ${hideInSelection}" id="context-delete" href="#">
+        &lt;span class='delete material-symbols-outlined'>delete_forever&lt;/span> ${
           i18n.delete
         }
-        </a>
-    </div>
+        &lt;/a>
+    &lt;/div>
     `;
   const modalTitle = document.getElementById("record-entry-modal-label");
   const contextDelete = document.getElementById("context-delete");
@@ -6956,7 +6988,7 @@ async function showRecordEntryForm(mode, batch) {
   let callCount = "",
     typeIndex = "",
     commentText = "";
-  if (cname && activeRow) {
+  if (cname &amp;&amp; activeRow) {
     // Populate the form with existing values
     commentText = activeRow.querySelector(".comment > span")?.title || "";
     callCount = parseInt(activeRow.querySelector(".call-count").textContent);
@@ -7065,7 +7097,7 @@ const insertManualRecord = (
 
 function checkFilteredFrequency() {
   const resetButton = document.getElementById("reset-spec-frequency");
-  if (config.audio.minFrequency > 0 || config.audio.maxFrequency < 11950) {
+  if (config.audio.minFrequency > 0 || config.audio.maxFrequency &lt; 11950) {
     document.getElementById("frequency-range").classList.add("text-warning");
     resetButton.classList.add("btn-warning");
     resetButton.classList.remove("btn-secondary", "disabled");
@@ -7101,7 +7133,7 @@ async function locateFile(file) {
 
 function deleteFile(file) {
   // EventHandler caller
-  if (typeof file === "object" && file instanceof Event) {
+  if (typeof file === "object" &amp;&amp; file instanceof Event) {
     file = STATE.currentFile;
   }
   if (file) {
@@ -7269,19 +7301,19 @@ function checkForMacUpdates() {
           const alert = (message, type) => {
             const wrapper = document.createElement("div");
             wrapper.innerHTML = [
-              `<div class="alert alert-${type} alert-dismissible" role="alert">`,
-              `   <div>${message}</div>`,
-              '   <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>',
-              "</div>",
+              `&lt;div class="alert alert-${type} alert-dismissible" role="alert">`,
+              `   &lt;div>${message}&lt;/div>`,
+              '   &lt;button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close">&lt;/button>',
+              "&lt;/div>",
             ].join("");
             alertPlaceholder.append(wrapper);
           };
-          const link = `<a href="https://chirpity.mattkirkland.co.uk?fromVersion=${VERSION}" target="_blank">`;
+          const link = `&lt;a href="https://chirpity.mattkirkland.co.uk?fromVersion=${VERSION}" target="_blank">`;
           const message = interpolate(getI18n(i18nUpdateMessage), {
             link: link,
           });
           alert(
-            `<svg class="bi flex-shrink-0 me-2" width="20" height="20" role="img" aria-label="Info:"><use xlink:href="#info-fill"/></svg>${message}`,
+            `&lt;svg class="bi flex-shrink-0 me-2" width="20" height="20" role="img" aria-label="Info:">&lt;use xlink:href="#info-fill"/>&lt;/svg>${message}`,
             "warning"
           );
           trackEvent(
@@ -7300,16 +7332,16 @@ function checkForMacUpdates() {
   }
 }
 const i18nUpdateMessage = {
-  en: "There's a new version of Chirpity available! ${link}Check the website</a> for more information",
-  da: "Der er en ny version af Chirpity tilgængelig! ${link}Besøg hjemmesiden</a> for mere information",
-  de: "Eine neue Version von Chirpity ist verfügbar! ${link}Besuchen Sie die Website</a> für weitere Informationen",
-  es: "¡Hay una nueva versión de Chirpity disponible! ${link}Visita el sitio web</a> para más información",
-  fr: "Une nouvelle version de Chirpity est disponible ! ${link}Consultez le site web</a> pour plus d'informations",
-  nl: "Er is een nieuwe versie van Chirpity beschikbaar! ${link}Bezoek de website</a> voor meer informatie",
-  pt: "Há uma nova versão do Chirpity disponível! ${link}Visite o site</a> para mais informações",
-  ru: "Доступна новая версия Chirpity! ${link}Посетите сайт</a> для получения дополнительной информации",
-  sv: "En ny version av Chirpity är tillgänglig! ${link}Besök webbplatsen</a> för mer information",
-  zh: "Chirpity有新版本可用！${link}访问网站</a>了解更多信息",
+  en: "There's a new version of Chirpity available! ${link}Check the website&lt;/a> for more information",
+  da: "Der er en ny version af Chirpity tilgængelig! ${link}Besøg hjemmesiden&lt;/a> for mere information",
+  de: "Eine neue Version von Chirpity ist verfügbar! ${link}Besuchen Sie die Website&lt;/a> für weitere Informationen",
+  es: "¡Hay una nueva versión de Chirpity disponible! ${link}Visita el sitio web&lt;/a> para más información",
+  fr: "Une nouvelle version de Chirpity est disponible ! ${link}Consultez le site web&lt;/a> pour plus d'informations",
+  nl: "Er is een nieuwe versie van Chirpity beschikbaar! ${link}Bezoek de website&lt;/a> voor meer informatie",
+  pt: "Há uma nova versão do Chirpity disponível! ${link}Visite o site&lt;/a> para mais informações",
+  ru: "Доступна новая версия Chirpity! ${link}Посетите сайт&lt;/a> для получения дополнительной информации",
+  sv: "En ny version av Chirpity är tillgänglig! ${link}Besök webbplatsen&lt;/a> för mer information",
+  zh: "Chirpity有新版本可用！${link}访问网站&lt;/a>了解更多信息",
 };
 
 function generateToast({
@@ -7321,8 +7353,8 @@ function generateToast({
 } = {}) {
   // i18n
   const i18n = getI18n(i18nToasts);
-  message === "noFile" &&
-    clearTimeout(loadingTimeout) &&
+  message === "noFile" &amp;&amp;
+    clearTimeout(loadingTimeout) &amp;&amp;
     DOM.loading.classList.add("d-none");
   message = variables
     ? interpolate(i18n[message], variables)
@@ -7392,7 +7424,7 @@ function generateToast({
     const duration = parseFloat(
       DIAGNOSTICS["Analysis Duration"].replace(" seconds", "")
     );
-    if (config.audio.notification && duration > 30) {
+    if (config.audio.notification &amp;&amp; duration > 30) {
       if (Notification.permission === "granted") {
         // Check whether notification permissions have already been granted;
         // if so, create a notification
@@ -7439,7 +7471,7 @@ async function getXCComparisons() {
     );
     XCcache = JSON.parse(data);
   } catch (err) {
-    config.debug && console.log("No XC cache found", err);
+    config.debug &amp;&amp; console.log("No XC cache found", err);
     XCcache = {}; // Set XCcache as an empty object
   }
 
@@ -7494,27 +7526,27 @@ async function getXCComparisons() {
 
         // Iterate over the recordings array and filter items
         recordings.forEach((record) => {
-          if (record.type === "song" && songCount < 10) {
+          if (record.type === "song" &amp;&amp; songCount &lt; 10) {
             filteredLists.song.push(record);
             songCount++;
           } else if (
-            record.type === "nocturnal flight call" &&
-            nocturnalFlightCallCount < 10
+            record.type === "nocturnal flight call" &amp;&amp;
+            nocturnalFlightCallCount &lt; 10
           ) {
             filteredLists["nocturnal flight call"].push(record);
             nocturnalFlightCallCount++;
-          } else if (record.type === "flight call" && flightCallCount < 10) {
+          } else if (record.type === "flight call" &amp;&amp; flightCallCount &lt; 10) {
             filteredLists["flight call"].push(record);
             flightCallCount++;
-          } else if (record.type === "call" && callCount < 10) {
+          } else if (record.type === "call" &amp;&amp; callCount &lt; 10) {
             filteredLists.call.push(record);
             callCount++;
           }
         });
         if (
-          songCount === 0 &&
-          callCount === 0 &&
-          flightCallCount === 0 &&
+          songCount === 0 &amp;&amp;
+          callCount === 0 &amp;&amp;
+          flightCallCount === 0 &amp;&amp;
           nocturnalFlightCallCount === 0
         ) {
           generateToast({ type: "warning", message: "noComparisons" });
@@ -7551,33 +7583,33 @@ function renderComparisons(lists, cname) {
   compareDiv.setAttribute("aria-modal", "true");
   compareDiv.setAttribute("data-bs-backdrop", "static");
   const compareHTML = `
-        <div class="modal-dialog modal-lg modal-dialog-bottom w-100">
-            <div class="modal-content">
-                <div class="modal-header pt-1 pb-0 bg-dark bg-opacity-25"><h5>${cname}</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
-                    <div class="modal-body pt-0 pb-1">
-                        <ul class="nav nav-tabs navbar navbar-expand p-0 pt-1" id="callTypeHeader" role="tablist"></ul>
-                        <div class="tab-content" id="recordings"></div>
-                        <div class="modal-footer justify-content-center pb-0">
-                            <button id="playComparison" class="p-1 pe-2 btn btn-outline-secondary" title="${i18nTitle.playToggle}">
-                                <span class="material-symbols-outlined ">play_circle</span><span
-                                class="align-middle d-none d-lg-inline"> ${i18n.play} </span>
+        &lt;div class="modal-dialog modal-lg modal-dialog-bottom w-100">
+            &lt;div class="modal-content">
+                &lt;div class="modal-header pt-1 pb-0 bg-dark bg-opacity-25">&lt;h5>${cname}&lt;/h5>&lt;button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">&lt;/button>&lt;/div>
+                    &lt;div class="modal-body pt-0 pb-1">
+                        &lt;ul class="nav nav-tabs navbar navbar-expand p-0 pt-1" id="callTypeHeader" role="tablist">&lt;/ul>
+                        &lt;div class="tab-content" id="recordings">&lt;/div>
+                        &lt;div class="modal-footer justify-content-center pb-0">
+                            &lt;button id="playComparison" class="p-1 pe-2 btn btn-outline-secondary" title="${i18nTitle.playToggle}">
+                                &lt;span class="material-symbols-outlined ">play_circle&lt;/span>&lt;span
+                                class="align-middle d-none d-lg-inline"> ${i18n.play} &lt;/span>
                                 /
-                                <span class="material-symbols-outlined">pause</span><span
-                                class="align-middle d-none d-lg-inline-block">${i18n.pause}</span>
-                            </button>
-                            <div class="btn-group" role="group">
-                                <button id="cmpZoomIn" title="${i18nTitle.zoomIn}" class="btn btn-outline-secondary p-0">
-                                <span class="material-symbols-outlined zoom-xc">zoom_in</span>
-                                </button>
-                                <button id="cmpZoomOut" title="${i18nTitle.zoomOut}" class="btn btn-outline-secondary p-0"
-                                style="max-width: 70px"><span class="material-symbols-outlined zoom-xc align-middle">zoom_out</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+                                &lt;span class="material-symbols-outlined">pause&lt;/span>&lt;span
+                                class="align-middle d-none d-lg-inline-block">${i18n.pause}&lt;/span>
+                            &lt;/button>
+                            &lt;div class="btn-group" role="group">
+                                &lt;button id="cmpZoomIn" title="${i18nTitle.zoomIn}" class="btn btn-outline-secondary p-0">
+                                &lt;span class="material-symbols-outlined zoom-xc">zoom_in&lt;/span>
+                                &lt;/button>
+                                &lt;button id="cmpZoomOut" title="${i18nTitle.zoomOut}" class="btn btn-outline-secondary p-0"
+                                style="max-width: 70px">&lt;span class="material-symbols-outlined zoom-xc align-middle">zoom_out&lt;/span>
+                                &lt;/button>
+                            &lt;/div>
+                        &lt;/div>
+                    &lt;/div>
+                &lt;/div>
+            &lt;/div>
+        &lt;/div>
     `;
   compareDiv.innerHTML = compareHTML;
   //const indicatorList = compareDiv.querySelector('.carousel-indicators');
@@ -7592,16 +7624,16 @@ function renderComparisons(lists, cname) {
       const tabHeading = document.createElement("li");
       tabHeading.classList.add("nav-item");
       tabHeading.setAttribute("role", "presentation");
-      const button = `<button class="nav-link text-nowrap ${active}" id="${callTypePrefix}-tab" data-bs-toggle="tab" data-bs-target="#${callTypePrefix}-tab-pane" type="button" role="tab" aria-controls="${callTypePrefix}-tab-pane" aria-selected="${
+      const button = `&lt;button class="nav-link text-nowrap ${active}" id="${callTypePrefix}-tab" data-bs-toggle="tab" data-bs-target="#${callTypePrefix}-tab-pane" type="button" role="tab" aria-controls="${callTypePrefix}-tab-pane" aria-selected="${
         count === 0
-      }">${i18n[callType]}</button>`;
+      }">${i18n[callType]}&lt;/button>`;
       tabHeading.innerHTML = button;
       callTypeHeader.appendChild(tabHeading);
 
       // Tab pane for each call type
       const tabContentPane = document.createElement("div");
       tabContentPane.classList.add("tab-pane", "fade");
-      count === 0 && tabContentPane.classList.add("show", "active");
+      count === 0 &amp;&amp; tabContentPane.classList.add("show", "active");
       tabContentPane.id = callTypePrefix + "-tab-pane";
       tabContentPane.setAttribute("role", "tabpanel");
       tabContentPane.setAttribute("aria-labelled-by", callTypePrefix + "-tab");
@@ -7613,13 +7645,13 @@ function renderComparisons(lists, cname) {
       carousel.setAttribute("data-bs-ride", "false");
       carousel.setAttribute("data-bs-wrap", "true");
       //carousel indicators
-      carousel.innerHTML = `<div class="carousel-inner"></div><div class="carousel-indicators position-relative mt-3"></div> `;
+      carousel.innerHTML = `&lt;div class="carousel-inner">&lt;/div>&lt;div class="carousel-indicators position-relative mt-3">&lt;/div> `;
       tabContentPane.appendChild(carousel);
       //carousel items for each recording in the list
       const carouselIndicators = carousel.querySelector(".carousel-indicators");
       const examples = lists[callType];
       const carouselInner = carousel.querySelector(".carousel-inner");
-      for (let i = 0; i < examples.length; i++) {
+      for (let i = 0; i &lt; examples.length; i++) {
         const recording = examples[i];
         const carouselItem = document.createElement("div");
         const indicatorItem = document.createElement("button");
@@ -7635,8 +7667,8 @@ function renderComparisons(lists, cname) {
         carouselItem.style.display = 'flex';
         carouselItem.style.flexDirection = 'column';
         carouselItem.style.justifyContent = 'flex-end';
-        i === 0 && carouselItem.classList.add("active");
-        i === 0 && indicatorItem.classList.add("active");
+        i === 0 &amp;&amp; carouselItem.classList.add("active");
+        i === 0 &amp;&amp; indicatorItem.classList.add("active");
         // create div for wavesurfer
         const mediaDiv = document.createElement("div");
         mediaDiv.id = `${callType}-${i}`;
@@ -7664,21 +7696,21 @@ function renderComparisons(lists, cname) {
         carouselItem.appendChild(mediaDiv);
         creditLink.setAttribute("href", "https:" + recording.url);
         creditLink.setAttribute("target", "_blank");
-        creditLink.innerHTML = "Source: Xeno-Canto &copy; " + recording.rec;
+        creditLink.innerHTML = "Source: Xeno-Canto &amp;copy; " + recording.rec;
         carouselInner.appendChild(carouselItem);
 
         carouselIndicators.appendChild(indicatorItem);
       }
       const innerHTML = `
-                <!-- Carousel navigation controls -->
-                <button class="carousel-control-prev" href="#${callTypePrefix}-comparisons" role="button" data-bs-slide="prev">
-                    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                    <span class="visually-hidden">Previous</span>
-                </button>
-                <button class="carousel-control-next" href="#${callTypePrefix}-comparisons" role="button" data-bs-slide="next">
-                    <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                    <span class="visually-hidden">Next</span>
-                </button>
+                &lt;!-- Carousel navigation controls -->
+                &lt;button class="carousel-control-prev" href="#${callTypePrefix}-comparisons" role="button" data-bs-slide="prev">
+                    &lt;span class="carousel-control-prev-icon" aria-hidden="true">&lt;/span>
+                    &lt;span class="visually-hidden">Previous&lt;/span>
+                &lt;/button>
+                &lt;button class="carousel-control-next" href="#${callTypePrefix}-comparisons" role="button" data-bs-slide="next">
+                    &lt;span class="carousel-control-next-icon" aria-hidden="true">&lt;/span>
+                    &lt;span class="visually-hidden">Next&lt;/span>
+                &lt;/button>
             `;
       const controls = document.createElement("div");
       controls.innerHTML = innerHTML;
@@ -7693,7 +7725,7 @@ function renderComparisons(lists, cname) {
   callTypeHeader.addEventListener("click", showCompareSpec);
   const comparisonModal = new bootstrap.Modal(compareDiv);
   compareDiv.addEventListener("hidden.bs.modal", () => {
-    ws && ws.destroy();
+    ws &amp;&amp; ws.destroy();
     ws = null;
     compareDiv.remove()
 });
@@ -7746,7 +7778,7 @@ function showCompareSpec() {
   document.querySelectorAll('.xc-link').forEach(link => link.classList.add('d-none'));
   // Show the active one
   const activeXCLink = activeCarouselItem.querySelector('.xc-link');
-  activeXCLink && activeXCLink.classList.remove('d-none');
+  activeXCLink &amp;&amp; activeXCLink.classList.remove('d-none');
   
   const mediaContainer = activeCarouselItem.lastChild;
   // need to prevent accumulation, and find event for show/hide loading
@@ -7790,7 +7822,7 @@ async function getIUCNStatus(sname = "Anser anser") {
 
   try {
     const response = await fetch(
-      `https://api.iucnredlist.org/api/v4/taxa/scientific_name?genus_name=${genus}&species_name=${species}`,
+      `https://api.iucnredlist.org/api/v4/taxa/scientific_name?genus_name=${genus}&amp;species_name=${species}`,
       { headers }
     );
 
@@ -7890,7 +7922,7 @@ export { config, displayLocationAddress, LOCATIONS, generateToast };
  * In case of a remote check error, if a valid cached membership status (cached within the last week) exists, it is used as a
  * fallback. Otherwise, the promise may resolve to undefined.
  *
- * @returns {Promise<boolean|undefined>} A promise that resolves to a boolean indicating whether the user is a member,
+ * @returns {Promise&lt;boolean|undefined>} A promise that resolves to a boolean indicating whether the user is a member,
  * or undefined if an error occurs and no valid cached membership status is available.
  *
  * @example
@@ -7913,7 +7945,7 @@ async function membershipCheck() {
     installDate = now
   }
   const trialPeriod = await window.electron.trialPeriod();
-  const inTrial = Date.now() - installDate < trialPeriod;
+  const inTrial = Date.now() - installDate &lt; trialPeriod;
   const lockedElements = document.querySelectorAll(".locked, .unlocked");
   const unlockElements = () => {
     lockedElements.forEach((el) => {
@@ -7927,7 +7959,7 @@ async function membershipCheck() {
     if (isMember || inTrial) {
       unlockElements();
       if (isMember) {
-        document.getElementById('primaryLogo').src = 'img/logo/chirpity_logo_subscriber_bronze.png'; // Silver & Gold available
+        document.getElementById('primaryLogo').src = 'img/logo/chirpity_logo_subscriber_bronze.png'; // Silver &amp; Gold available
       }
       localStorage.setItem('isMember', true);
       localStorage.setItem('memberTimestamp', now);
@@ -7943,7 +7975,7 @@ async function membershipCheck() {
     }
     return isMember
   }).catch(error =>{ // Period of grace
-    if (cachedStatus === 'true' && cachedTimestamp && now - cachedTimestamp < oneWeek) {
+    if (cachedStatus === 'true' &amp;&amp; cachedTimestamp &amp;&amp; now - cachedTimestamp &lt; oneWeek) {
       console.warn('Using cached membership status during error.', error);
       unlockElements();
       document.getElementById('primaryLogo').src = 'img/logo/chirpity_logo_subscriber_bronze.png';
@@ -7965,3 +7997,26 @@ function hexToUtf8(hex) {
     .map((byte) => String.fromCharCode(parseInt(byte, 16))) // Convert each pair to a character
     .join("");
 }
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#LIST_CACHE">LIST_CACHE</a></li><li><a href="global.html#_parseMetadataText">_parseMetadataText</a></li><li><a href="global.html#_updateSpeciesLocale">_updateSpeciesLocale</a></li><li><a href="global.html#addDays">addDays</a></li><li><a href="global.html#adjustSpecDims">adjustSpecDims</a></li><li><a href="global.html#centreSpec">centreSpec</a></li><li><a href="global.html#checkForRegion">checkForRegion</a></li><li><a href="global.html#clearActive">clearActive</a></li><li><a href="global.html#convertFile">convertFile</a></li><li><a href="global.html#createContextMenu">createContextMenu</a></li><li><a href="global.html#createRegion">createRegion</a></li><li><a href="global.html#createTimeline">createTimeline</a></li><li><a href="global.html#extractWaveMetadata">extractWaveMetadata</a></li><li><a href="global.html#fetchAudioBuffer">fetchAudioBuffer</a></li><li><a href="global.html#filterValidFiles">filterValidFiles</a></li><li><a href="global.html#formatAsBootstrapTable">formatAsBootstrapTable</a></li><li><a href="global.html#formatLabel">formatLabel</a></li><li><a href="global.html#formatRegionTooltip">formatRegionTooltip</a></li><li><a href="global.html#getDetectedSpecies">getDetectedSpecies</a></li><li><a href="global.html#getFileSQLAndParams">getFileSQLAndParams</a></li><li><a href="global.html#getFiles">getFiles</a></li><li><a href="global.html#getIncludedIDs">getIncludedIDs</a></li><li><a href="global.html#getRegion">getRegion</a></li><li><a href="global.html#getResults">getResults</a></li><li><a href="global.html#getValidSpecies">getValidSpecies</a></li><li><a href="global.html#getWorkingFile">getWorkingFile</a></li><li><a href="global.html#handleKeyDown">handleKeyDown</a></li><li><a href="global.html#increaseFFT">increaseFFT</a></li><li><a href="global.html#initRegion">initRegion</a></li><li><a href="global.html#loadAudioFile">loadAudioFile</a></li><li><a href="global.html#loadAudioFileSync">loadAudioFileSync</a></li><li><a href="global.html#locateFile">locateFile</a></li><li><a href="global.html#membershipCheck">membershipCheck</a></li><li><a href="global.html#notifyMissingFile">notifyMissingFile</a></li><li><a href="global.html#onLaunch">onLaunch</a></li><li><a href="global.html#onModelReady">onModelReady</a></li><li><a href="global.html#onSave2DiskDB">onSave2DiskDB</a></li><li><a href="global.html#playRegion">playRegion</a></li><li><a href="global.html#reduceFFT">reduceFFT</a></li><li><a href="global.html#sendDetections">sendDetections</a></li><li><a href="global.html#setActiveRegion">setActiveRegion</a></li><li><a href="global.html#setMetadata">setMetadata</a></li><li><a href="global.html#showWindowDetections">showWindowDetections</a></li><li><a href="global.html#t0_warmup">t0_warmup</a></li><li><a href="global.html#updateFilesBeingProcessed">updateFilesBeingProcessed</a></li><li><a href="global.html#updateSpec">updateSpec</a></li><li><a href="global.html#zoomSpec">zoomSpec</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Sat Feb 15 2025 12:40:26 GMT+0000 (Greenwich Mean Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

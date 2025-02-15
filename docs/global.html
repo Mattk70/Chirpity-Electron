@@ -1,0 +1,8834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Global</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Global</h1>
+
+    
+
+
+
+
+<section>
+
+<header>
+    
+        <h2></h2>
+        
+    
+</header>
+
+<article>
+    <div class="container-overview">
+    
+        
+
+        
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+        
+    
+    </div>
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+        <h3 class="subsection-title">Members</h3>
+
+        
+            
+<h4 class="name" id="LIST_CACHE"><span class="type-signature"></span>LIST_CACHE<span class="type-signature"></span></h4>
+
+
+
+
+<div class="description">
+    setIncludedIDs
+Calls list_worker for a new list, checks to see if a pending promise already exists
+</div>
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line4675">line 4675</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="t0_warmup"><span class="type-signature"></span>t0_warmup<span class="type-signature"></span></h4>
+
+
+
+
+<div class="description">
+    Collect DIAGNOSTICS Information
+DIAGNOSTICS keys:
+GPUx - name of GPU(s)
+backend: tensorflow backend in use
+warmup: time to warm up model (seconds)
+"Analysis Duration": time on detections (seconds)
+"Audio Duration": length of audio (seconds)
+"Chirpity Version": app version
+"Model": model in use
+"Tensorflow Backend"
+Analysis Rate: x real time performance
+</div>
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line362">line 362</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+    
+
+    
+        <h3 class="subsection-title">Methods</h3>
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="_parseMetadataText"><span class="type-signature"></span>_parseMetadataText<span class="signature">(guanoText)</span><span class="type-signature"> &rarr; {object}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Helper function to parse GUANO text into key-value pairs
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>guanoText</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">GUANO text data</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="metadata.js.html">metadata.js</a>, <a href="metadata.js.html#line139">line 139</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    Parsed GUANO metadata
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">object</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="_updateSpeciesLocale"><span class="type-signature">(async) </span>_updateSpeciesLocale<span class="signature">(locale, labels, refreshResults)</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Updates the locale and species names in the database.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>locale</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The locale to update.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>labels</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Array.&lt;string></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The labels containing species names and common names.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>refreshResults</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Whether to refresh the results after updating.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line4457">line 4457</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Throws:</h5>
+
+        
+
+<dl>
+    <dt>
+        <div class="param-desc">
+        - Throws an error if the database transactions fail.
+        </div>
+    </dt>
+    <dd></dd>
+    <dt>
+        <dl>
+            <dt>
+                Type
+            </dt>
+            <dd>
+                
+<span class="param-type">Error</span>
+
+
+            </dd>
+        </dl>
+    </dt>
+    <dd></dd>
+</dl>
+
+
+    
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    - A promise that resolves when the update is complete.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;void></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="addDays"><span class="type-signature"></span>addDays<span class="signature">(date, days)</span><span class="type-signature"> &rarr; {Date}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Adds a specified number of days to a given date and returns a new Date object.
+
+This function accepts a date provided as a Date object, a date string, or a timestamp, and adds the given number of days.
+Use negative values for subtracting days. It throws an error if the input date is invalid or if the days parameter is not a valid number.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>date</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Date</span>
+|
+
+<span class="param-type">string</span>
+|
+
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The original date to modify. Can be a Date object, a valid date string, or a timestamp.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>days</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The number of days to add. Use a negative value to subtract days.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1658">line 1658</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Throws:</h5>
+
+        
+
+<dl>
+    <dt>
+        <div class="param-desc">
+        If the input date is invalid or if days is not a valid number.
+        </div>
+    </dt>
+    <dd></dd>
+    <dt>
+        <dl>
+            <dt>
+                Type
+            </dt>
+            <dd>
+                
+<span class="param-type">TypeError</span>
+
+
+            </dd>
+        </dl>
+    </dt>
+    <dd></dd>
+</dl>
+
+
+    
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    A new Date object representing the date after adding the specified number of days.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Date</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// Add 3 days to the current date
+const newDate = addDays(new Date(), 3);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="adjustSpecDims"><span class="type-signature">(async) </span>adjustSpecDims<span class="signature">(redraw, fftSamples<span class="signature-attributes">opt</span>, newHeight<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Adjusts the dimensions of the spectrogram and related UI elements based on the current window and DOM sizes.
+
+This asynchronous function recalculates the layout of key UI components such as the content wrapper,
+spectrogram display, and result table, ensuring they adapt to changes in the window size. When the
+`redraw` flag is true and an audio file is loaded, the function computes a new spectrogram height using
+either the specified `newHeight` (if non-zero) or the current configuration limits. If a new height is provided,
+it updates the configuration preferences accordingly.
+
+Depending on whether WaveSurfer is already initialized, the function will either:
+- Initialize a new WaveSurfer instance with the current audio buffer and updated height.
+- Update the existing WaveSurfer instance's options (including height and cursor color), re-register the spectrogram
+  plugin with the new settings (using `fftSamples` if provided), and reload the audio buffer.
+
+Finally, it adjusts the height of the result table to fill the remaining vertical space.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>redraw</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last">Indicates whether the spectrogram should be re-rendered and WaveSurfer updated.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>fftSamples</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last">Optional. The number of FFT samples to use for rendering; must be a power of two.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>newHeight</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    0
+                
+                </td>
+            
+
+            <td class="description last">Optional. Overrides the dynamic height calculation for the spectrogram; a value of 0 triggers dynamic sizing.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1875">line 1875</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    A promise that resolves once the UI adjustments and spectrogram rendering updates are complete.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;void></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="centreSpec"><span class="type-signature"></span>centreSpec<span class="signature">()</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Centers the spectrogram view around the current playback time.
+
+This function recalculates the starting offset of the audio window so that the
+current time (from the WaveSurfer instance) appears at the center of the display.
+It updates the global variable `windowOffsetSecs` by subtracting half of the
+window's length from the computed midpoint. The offset is clamped between 0 and
+the maximum valid offset determined by `currentFileDuration - windowLength`.
+
+If an active audio region exists (stored in `activeRegion`), the function adjusts
+its start and end times by the same offset shift. Should the region extend beyond the
+valid window boundaries after the shift, it is cleared (set to null).
+
+Finally, the function invokes `postBufferUpdate` to refresh the audio display with 
+the new configuration, positioning the center at 0.5.
+
+Side Effects:
+- Modifies the global variables `windowOffsetSecs` and `activeRegion`.
+- Relies on and interacts with global state including `wavesurfer`, `windowLength`,
+  `currentFileDuration`, and `postBufferUpdate`.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3570">line 3570</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="checkForRegion"><span class="type-signature"></span>checkForRegion<span class="signature">(e, setActive)</span><span class="type-signature"> &rarr; {Object|undefined}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Determines if a right-click event occurred within an audio region and optionally sets it as active.
+
+This function calculates the time position from the event's x-coordinate relative to the target element's width
+using the global "windowLength". It then searches the global "REGIONS.regions" array for an audio region that spans
+the computed time. If a matching region is found and the setActive flag is true, the region is set as active by calling
+the global "setActiveRegion" function.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>e</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">MouseEvent</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The right-click event containing the clientX coordinate and target element dimensions.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>setActive</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Flag indicating whether to mark the located region as active.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line6790">line 6790</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    The audio region that contains the computed time, or undefined if none is found.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Object</span>
+|
+
+<span class="param-type">undefined</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="clearActive"><span class="type-signature"></span>clearActive<span class="signature">()</span><span class="type-signature"> &rarr; {void}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Resets the active audio region and clears the corresponding UI selection.
+
+This function forcefully resets all defined audio regions by calling
+`resetRegions(true)`. It then checks if an active table row exists and,
+if so, removes the "table-active" class from it to remove any UI highlighting.
+Finally, it clears the `activeRow` reference to ensure that no table row remains marked as active.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line512">line 512</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">void</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="convertFile"><span class="type-signature">(async) </span>convertFile<span class="signature">(inputFilePath, fullFilePath, row, db, dbArchiveName, fileProgressMap)</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Converts an audio file using FFmpeg, optionally trimming the audio and updating file metadata.
+
+This function processes an input audio file by executing FFmpeg commands with parameters based on global state
+settings (e.g., STATE.archive.format and STATE.archive.trim). When the target archive format is "ogg", the conversion
+uses a bitrate of 128k, mono channels, and a sample rate set to 30000 Hz (for BirdNET compatibility). If trimming is
+enabled, the function computes start and end boundaries, adjusts the audio duration accordingly, and emits warnings
+if multi-day or all-daylight recordings are detected. Conversion progress is calculated and reported via a progress map.
+Upon completion, the file's modification time is updated and the associated database record is updated with the new
+archive name.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>inputFilePath</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The path to the input audio file.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>fullFilePath</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The full destination path for the converted output file.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>row</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">An object representing the file's metadata; must include properties such as `id`, `duration`, and `filestart`.
+                      The `duration` property may be updated if trimming is applied.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>db</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The database instance used to update the file record after conversion.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>dbArchiveName</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The archive name to be saved in the database for this file.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>fileProgressMap</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object.&lt;string, number></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">A map tracking the conversion progress for files, keyed by file paths.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line4925">line 4925</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Throws:</h5>
+
+        
+
+<dl>
+    <dt>
+        <div class="param-desc">
+        Rejects the promise if an error occurs during the FFmpeg conversion process.
+        </div>
+    </dt>
+    <dd></dd>
+    <dt>
+        <dl>
+            <dt>
+                Type
+            </dt>
+            <dd>
+                
+<span class="param-type">Error</span>
+
+
+            </dd>
+        </dl>
+    </dt>
+    <dd></dd>
+</dl>
+
+
+    
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    A promise that resolves when the conversion and database update are successfully completed.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;void></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>convertFile('/path/to/input.wav', '/path/to/output.ogg', fileRecord, db, 'archive123', progressMap)
+  .then(() => console.log('Conversion completed successfully.'))
+  .catch(err => console.error('Conversion failed:', err));</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="createContextMenu"><span class="type-signature">(async) </span>createContextMenu<span class="signature">(e)</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Creates and displays a custom context menu based on the event target.
+
+This asynchronous function handles user interactions for generating a context menu
+in the spectrogram interface. It performs the following actions:
+- Pauses any ongoing audio playback via the wavesurfer instance to prevent interference.
+- Stops the propagation of the triggering event.
+- Checks and adjusts for region detection within the spectrogram.
+- Determines the context (e.g., summary, selection, or results) of the click and sets
+  visibility flags for specific menu items.
+- If necessary, triggers a click on the target element to load or update the active row
+  and awaits the file load completion.
+- Constructs the HTML for the context menu with options such as playing a region,
+  analyzing a selection, creating/editing a manual record, exporting a clip, comparing,
+  or deleting records.
+- Sets the modal title based on whether the action is to create or edit a record.
+- Attaches event listeners to handle deletion and record entry actions based on the context.
+- Adjusts certain menu items' visibility depending on the active context.
+- Positions the context menu at the event coordinates.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>e</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Event</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The event object that triggers the context menu (typically a MouseEvent).</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line6822">line 6822</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    Resolves once the context menu is setup and positioned.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;void></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="createRegion"><span class="type-signature"></span>createRegion<span class="signature">(start, end, label, goToRegion, colour<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {void}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Creates and registers a new audio region on the waveform, optionally navigating to its start time.
+
+This function validates the input parameters and adds a new region to the global REGIONS collection using the
+specified start and end times. It applies the provided color or defaults to STATE.regionColour, and formats the label
+using the formatLabel helper. If the goToRegion flag is true, the waveform's current time is set to the new region's start time.
+
+Note: If the start and end parameters are invalid (i.e., non-numeric or if start is not less than end), the function logs
+an error and returns early without creating the region.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>start</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">The start time of the region in seconds.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>end</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">The end time of the region in seconds (must be greater than start).</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>label</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">The label for the region.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>goToRegion</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">If true, navigates the waveform to the region's start time.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>colour</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Optional color for the region; defaults to STATE.regionColour if not provided.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1743">line 1743</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">void</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="createTimeline"><span class="type-signature"></span>createTimeline<span class="signature">()</span><span class="type-signature"> &rarr; {Object}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Creates and registers a timeline plugin for WaveSurfer.js.
+
+This function computes the timeline display intervals based on the global variable `windowLength`.
+It determines the primary label interval as the ceiling of (`windowLength` divided by 5) and calculates
+the time interval as one-tenth of this primary interval. Using these values, it configures a timeline
+plugin via the `TimelinePlugin.create` method with customized options, including:
+- Label formatting through the global `formatTimeCallback`
+- Secondary label opacity set to 0.35
+- Styling options such as font size ("0.75rem") and color obtained from `wsTextColour()`
+
+If a global WaveSurfer instance exists (referenced by `wavesurfer`), the timeline is automatically
+registered with it; otherwise, the standalone timeline plugin object is returned.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line473">line 473</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    The timeline plugin instance, either as a registered plugin with WaveSurfer or as a standalone object.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Object</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="extractWaveMetadata"><span class="type-signature"></span>extractWaveMetadata<span class="signature">(filePath)</span><span class="type-signature"> &rarr; {Promise.&lt;(object|null)>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Extract metadata from a WAV file, without reading the entire file into memory.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>filePath</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Path to the WAV file.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="metadata.js.html">metadata.js</a>, <a href="metadata.js.html#line10">line 10</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    - The extracted metadata or null if not found.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;(object|null)></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="fetchAudioBuffer"><span class="type-signature">(async) </span>fetchAudioBuffer<span class="signature">(params)</span><span class="type-signature"> &rarr; {Promise.&lt;Array.&lt;Buffer>>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Called when file first loaded, when result clicked and when saving or sending file snippets
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>params</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The parameters for fetching the audio buffer.
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>file</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">The file path.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>start</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">The start time in seconds.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>end</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">The end time in seconds.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line2092">line 2092</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    - The audio buffer and start time.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;Array.&lt;Buffer>></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="filterValidFiles"><span class="type-signature"></span>filterValidFiles<span class="signature">(filePaths)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    We post the list to the worker as it has node and that allows it easier access to the
+required filesystem routines, returns valid audio file list
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>filePaths</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1262">line 1262</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="formatAsBootstrapTable"><span class="type-signature"></span>formatAsBootstrapTable<span class="signature">(jsonData)</span><span class="type-signature"> &rarr; {string}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Formats a JSON object as a Bootstrap table
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>jsonData</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The JSON object to format</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line934">line 934</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    - HTML string of the formatted Bootstrap table
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">string</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="formatLabel"><span class="type-signature"></span>formatLabel<span class="signature">(label, color<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {HTMLElement|undefined}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Creates and returns a styled label element for a navigation option.
+
+This function generates an HTML <span> element with specific styling properties, including absolute positioning,
+a text color, and a text shadow effect. If the global configuration's colormap is set to 'gray', the provided color
+is overridden: a truthy color results in 'purple', whereas a falsy value defaults to '#666'. If no label text is provided,
+the function returns undefined.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>label</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">The text to display in the label. If falsy, the function returns undefined.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>color</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">The desired color for the label text (subject to configuration overrides).</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3210">line 3210</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    The styled <span> element containing the label text, or undefined if no label is provided.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">HTMLElement</span>
+|
+
+<span class="param-type">undefined</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="formatRegionTooltip"><span class="type-signature"></span>formatRegionTooltip<span class="signature">()</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Use formatTimeCallback to style the notch labels as you wish, such
+as with more detail as the number of pixels per second increases.
+
+Here we format as M:SS.frac, with M suppressed for times < 1 minute,
+and frac having 0, 1, or 2 digits as the zoom increases.
+
+Note that if you override the default function, you'll almost
+certainly want to override timeInterval, primaryLabelInterval and/or
+secondaryLabelInterval so they all work together.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1956">line 1956</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="getDetectedSpecies"><span class="type-signature"></span>getDetectedSpecies<span class="signature">()</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    getDetectedSpecies generates a list of species to use in dropdowns for chart and explore mode filters
+It doesn't really make sense to use location specific filtering here, as there is a location filter in the
+page. For now, I'm just going skip the included IDs filter if location mode is selected
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line4029">line 4029</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="getFileSQLAndParams"><span class="type-signature"></span>getFileSQLAndParams<span class="signature">(range<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Array.&lt;(string|Array.&lt;any>)>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Constructs an SQL filter clause and an associated parameters array for retrieving file records.
+
+Depending on the provided range and the current application mode (accessed via the global STATE),
+the function generates conditions to filter files by date/time or by file/archive names.
+
+- If a range object with a defined `start` property is provided, it generates a clause to select
+  records where `dateTime` is between `range.start` (inclusive) and `range.end` (exclusive).
+- If the mode is "archive", it creates a condition to filter files by both their name and archiveName,
+  processing file paths accordingly.
+- In "analyse" mode, a file-based condition is noted but currently commented out.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>range</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Optional range object to filter records by dateTime.
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>start</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+|
+
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The start of the date range.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>end</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+|
+
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The end of the date range.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1023">line 1023</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    A tuple where the first element is an SQL fragment (string) and the second is an array of parameters to bind to the query.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Array.&lt;(string|Array.&lt;any>)></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="getFiles"><span class="type-signature">(async) </span>getFiles<span class="signature">(files)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Generates a list of supported audio files, recursively searching directories.
+Sends this list to the UI
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>files</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">*</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">must be a list of file paths</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line942">line 942</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="getIncludedIDs"><span class="type-signature">(async) </span>getIncludedIDs<span class="signature">(file)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    getIncludedIDs
+Helper function to provide a list of valid species for the filter.
+Will look for a list in the STATE.included cache, and if not present,
+will call setIncludedIDs to generate a new list
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>file</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">*</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line4630">line 4630</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    a list of IDs included in filtered results
+</div>
+
+
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="getRegion"><span class="type-signature"></span>getRegion<span class="signature">()</span><span class="type-signature"> &rarr; {Object|undefined}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Retrieves the currently active region.
+
+This function returns the global active region object, which typically contains
+properties (such as start and end) that define the region. If there is no active region,
+the function returns undefined.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3812">line 3812</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    The active region object with its defined properties, or undefined if not set.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Object</span>
+|
+
+<span class="param-type">undefined</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="getResults"><span class="type-signature">(async) </span>getResults<span class="signature">(files:, species:, limit:, offset:, topRankin:, directory:, format:)</span><span class="type-signature"> &rarr; {Promise.&lt;integer>}</span></h4>
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>files:</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">files to query for detections</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>species:</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">filter for SQL query</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>limit:</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">the pagination limit per page</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>offset:</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">is the SQL query offset to use</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>topRankin:</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">return results >= to this rank for each datetime</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>directory:</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">if set, will export audio of the returned results to this folder</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>format:</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">whether to export audio or text</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line3343">line 3343</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    A count of the records retrieved
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;integer></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="getValidSpecies"><span class="type-signature">(async) </span>getValidSpecies<span class="signature">()</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    getValidSpecies generates a list of species included/excluded based on settings
+ For week specific lists, we need the file
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line4057">line 4057</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    Promise <void>
+</div>
+
+
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="getWorkingFile"><span class="type-signature">(async) </span>getWorkingFile<span class="signature">(file:)</span><span class="type-signature"> &rarr; {Promise.&lt;(boolean|*)>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    getWorkingFile's purpose is to locate a file and set its metadata.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>file:</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">full path to source file</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1422">line 1422</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;(boolean|*)></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="handleKeyDown"><span class="type-signature"></span>handleKeyDown<span class="signature">(e)</span><span class="type-signature"> &rarr; {void}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Handles a key down event by triggering a corresponding global action if available.
+
+If debugging is enabled, logs the pressed key. The function checks if the pressed key
+exists in the GLOBAL_ACTIONS mapping, and if so, it hides the context menu and determines
+the active modifier key (Shift, Control, Alt, or none). It then tracks the key press event
+using the trackEvent function and invokes the corresponding global action callback with the event.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>e</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">KeyboardEvent</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The keyboard event triggered on key press.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3175">line 3175</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">void</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="increaseFFT"><span class="type-signature"></span>increaseFFT<span class="signature">()</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Increases the FFT sample count for the spectrogram if it is below 2048.
+
+This function checks if the current FFT sample count (spectrogram.fftSamples) is less than 2048.
+If so, it doubles the sample count, updates the global FFT configuration (config.FFT), and refreshes
+the audio buffer by invoking postBufferUpdate with the current window offset, normalized playback position,
+and playback state from wavesurfer. The playback position is calculated by dividing wavesurfer.getCurrentTime()
+by windowLength, then clamped between 0 and 1. Finally, the updated FFT sample count is logged to the console.
+
+Side Effects:
+- Modifies spectrogram.fftSamples and config.FFT.
+- Calls postBufferUpdate to refresh the audio buffer.
+- Logs the new FFT sample count using console.log.
+
+External Dependencies:
+- spectrogram: Object containing FFT settings.
+- config: Global configuration object for FFT.
+- wavesurfer: Instance controlling audio playback and current time.
+- windowLength: Global variable used to normalize the playback position.
+- windowOffsetSecs: Global variable indicating the current window offset in seconds.
+- clamp: Utility function to restrict a value between a minimum and maximum.
+- postBufferUpdate: Function to update the audio buffer after FFT changes.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line646">line 646</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="initRegion"><span class="type-signature"></span>initRegion<span class="signature">()</span><span class="type-signature"> &rarr; {Object}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Initializes and configures the RegionsPlugin for audio region management.
+
+This function destroys any previously initialized RegionsPlugin instance and creates a new one
+with the following configuration:
+- Enables dragging of regions.
+- Limits the maximum number of regions to 100.
+- Uses the default region color from STATE.regionColour.
+
+Additionally, it sets up event listeners for region interactions:
+- "region-clicked": Hides the context menu, updates the active region and audio playback time,
+  and removes regions based on key modifiers:
+  - Shift key: Removes all regions with the default region color.
+  - Ctrl/Cmd key: Removes the clicked region.
+- "region-created": Sets a newly created region as the active region if it lacks a label (content)
+  or if its start time matches that of the current active region.
+- "region-update": Clears the region's label content and updates it as the active region.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3294">line 3294</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    The initialized RegionsPlugin instance.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Object</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="loadAudioFile"><span class="type-signature">(async) </span>loadAudioFile<span class="signature">(options)</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Asynchronously loads an audio file, processes its audio data, and updates the UI with relevant metadata.
+
+This function fetches the audio buffer from the specified file between the given start and end times,
+then posts the audio data along with metadata to the UI. It also triggers detection processing and posts
+the current file's week number based on the application's state. If the file does not exist or an error occurs
+during processing, an error alert is generated and the promise is rejected.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Configuration options for loading the audio file.
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>file</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    ""
+                
+                </td>
+            
+
+            <td class="description last">The path to the audio file to load.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>start</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    0
+                
+                </td>
+            
+
+            <td class="description last">The starting time (in seconds) of the audio segment to load.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>end</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    20
+                
+                </td>
+            
+
+            <td class="description last">The ending time (in seconds) of the audio segment to load.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>position</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    0
+                
+                </td>
+            
+
+            <td class="description last">The playback position offset for the audio file.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>play</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    false
+                
+                </td>
+            
+
+            <td class="description last">Flag indicating whether to automatically play the audio after loading.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>goToRegion</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    true
+                
+                </td>
+            
+
+            <td class="description last">Flag indicating whether the UI should navigate to a specific region.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1558">line 1558</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Throws:</h5>
+
+        
+
+    <div class="param-desc">
+    
+        Will reject if the file does not exist or if an error occurs while fetching or processing the audio data.
+    
+    </div>
+
+
+    
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    A promise that resolves when the audio file has been successfully loaded and processed,
+or rejects with a generated error alert if the file cannot be found or processed.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;void></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>loadAudioFile({ 
+  file: "/path/to/audio.mp3", 
+  start: 10, 
+  end: 30, 
+  position: 5, 
+  play: true, 
+  goToRegion: true 
+})
+  .then(() => console.log("Audio loaded successfully."))
+  .catch((error) => console.error("Error loading audio:", error));</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="loadAudioFileSync"><span class="type-signature"></span>loadAudioFileSync<span class="signature">(filePath:, preserveResults:)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    loadAudioFileSync: Called when user opens a file (just opens first file in multiple files)
+and when clicking on filename in list of open files.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>filePath:</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">*</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">full path to file</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>preserveResults:</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">*</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">whether to clear results when opening file (i.e. don't clear results when clicking file in list of open files)</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line408">line 408</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="locateFile"><span class="type-signature">(async) </span>locateFile<span class="signature">(file)</span><span class="type-signature"> &rarr; {string|null}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Function to locate a file either in the archive, or with the same basename but different extension from SUPPORTED_FILES
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>file</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Full path to a file that doesn't exist</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1454">line 1454</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    - Full path to the located file or null if not found
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">string</span>
+|
+
+<span class="param-type">null</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="membershipCheck"><span class="type-signature">(async) </span>membershipCheck<span class="signature">()</span><span class="type-signature"> &rarr; {Promise.&lt;(boolean|undefined)>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Asynchronously verifies the current user's membership status and updates the UI accordingly.
+
+This function checks membership status via a remote call using the global configuration UUID and retrieves the trial period
+from the Electron API. It uses localStorage to cache the membership status, its timestamp, and the installation date. The function
+determines if the user is either a subscriber or within the trial period based on the installation date and trial duration.
+Based on the result, it updates UI elements by toggling "locked" and "unlocked" classes, enabling or disabling controls, and,
+if the user is a confirmed member, updating the primary logo image.
+
+Side Effects:
+- Reads from and writes to localStorage (membership status, membership timestamp, and install date).
+- Modifies DOM elements by replacing "locked" and "unlocked" classes, updating button states, and changing text content.
+- Changes the primary logo's image source when membership is verified.
+- Logs membership check details and error information using console.info and console.warn.
+
+Note:
+In case of a remote check error, if a valid cached membership status (cached within the last week) exists, it is used as a
+fallback. Otherwise, the promise may resolve to undefined.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line7909">line 7909</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    A promise that resolves to a boolean indicating whether the user is a member,
+or undefined if an error occurs and no valid cached membership status is available.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;(boolean|undefined)></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>membershipCheck().then(isMember => {
+  if (isMember) {
+    console.log('User is a member or within the trial period.');
+  } else {
+    console.log('User is not a member or membership status could not be determined.');
+  }
+});</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="notifyMissingFile"><span class="type-signature">(async) </span>notifyMissingFile<span class="signature">(file)</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Notifies the UI about a missing file entry in the database.
+
+This asynchronous function queries the disk database for a file record by its name.
+If a record with an associated ID exists, it considers the file as missing and triggers an
+error alert with the message "dbFileMissing" along with the file name in the alert variables.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>file</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The name of the file to search for in the database.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1513">line 1513</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Throws:</h5>
+
+        
+
+    <div class="param-desc">
+    
+        Propagates any errors encountered during the database query.
+    
+    </div>
+
+
+    
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    A promise that resolves once the alert has been generated.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;void></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="onLaunch"><span class="type-signature">(async) </span>onLaunch<span class="signature">(options)</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Initializes and launches the application environment by configuring model settings, databases, and prediction workers.
+
+This function is invoked when the application is first opened or when the model is changed. It sets global flags,
+configures the sample rate based on the model, updates the application state, loads the disk and memory databases,
+and spawns prediction workers to process audio data.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Configuration options for launching the application.
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>model</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    "chirpity"
+                
+                </td>
+            
+
+            <td class="description last">The name of the model to use; if "birdnet", sets sample rate to 48000 Hz, otherwise 24000 Hz.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>batchSize</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    32
+                
+                </td>
+            
+
+            <td class="description last">The size of the batch to process audio data.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>threads</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    1
+                
+                </td>
+            
+
+            <td class="description last">The number of worker threads to spawn for prediction processing.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>backend</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    "tensorflow"
+                
+                </td>
+            
+
+            <td class="description last">The backend to use for predictions.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>list</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    "everything"
+                
+                </td>
+            
+
+            <td class="description last">Specifies the list or category to use for predictions.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line868">line 868</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Throws:</h5>
+
+        
+
+<dl>
+    <dt>
+        <div class="param-desc">
+        Propagates any error encountered during database loading or worker spawning.
+        </div>
+    </dt>
+    <dd></dd>
+    <dt>
+        <dl>
+            <dt>
+                Type
+            </dt>
+            <dd>
+                
+<span class="param-type">Error</span>
+
+
+            </dd>
+        </dl>
+    </dt>
+    <dd></dd>
+</dl>
+
+
+    
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    A promise that resolves when the application environment is initialized and prediction workers are spawned.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;void></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>onLaunch({
+  model: "birdnet",
+  batchSize: 64,
+  threads: 4,
+  backend: "tensorflow",
+  list: "selected"
+});</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="onModelReady"><span class="type-signature"></span>onModelReady<span class="signature">(args)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Handles the initialization steps once the audio model is ready.
+
+This function performs the following actions:
+- Sets the flag indicating the model is ready.
+- If a file is loaded, enables the "analyse" menu item and, if multiple files are open, enables the "analyseAll" and "reanalyseAll" menu items.
+- If an audio region is active, enables the "analyseSelection" menu item.
+- Records and logs the warm-up time for diagnostic purposes.
+- Marks the application as loaded and hides the loading screen.
+- For new users in non-test environments, initiates the tour if it has not been seen.
+- Logs the application's launch time.
+- Processes any queued files opened via the operating system.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>args</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Optional arguments (currently unused).</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3949">line 3949</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="onSave2DiskDB"><span class="type-signature">(async) </span>onSave2DiskDB<span class="signature">()</span><span class="type-signature"> &rarr; {Promise.&lt;unknown>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Transfers data in memoryDB to diskDB
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line3780">line 3780</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;unknown></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="playRegion"><span class="type-signature"></span>playRegion<span class="signature">()</span><span class="type-signature"> &rarr; {void}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Plays the active audio region after sanitizing its boundaries.
+
+This function locates the active region from the global REGIONS object by matching the 
+region's start time with the global activeRegion. It then adjusts the region's start and 
+end times to ensure they fall within the valid playback window—ensuring the start is not 
+negative and the end does not exceed 99.5% of the windowLength to avoid triggering a finish 
+event that causes a page reload. Note that if playback is paused at the end of an adjacent region, 
+the subsequent region may not play.
+
+Side Effects:
+- Modifies the region's start and end properties for playback.
+- Initiates playback by calling the region's play() method.
+
+Global Dependencies:
+- REGIONS: An object containing all audio regions.
+- activeRegion: The currently active region used for matching.
+- windowLength: A number representing the maximum playback window length.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line5797">line 5797</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">void</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="reduceFFT"><span class="type-signature"></span>reduceFFT<span class="signature">()</span><span class="type-signature"> &rarr; {void}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Halve the FFT sample count for the spectrogram when it exceeds the minimum threshold.
+
+This function checks if `spectrogram.fftSamples` is greater than 64. If so, the FFT sample
+count is halved, and the normalized playback position is computed using the ratio of the current
+playback time (from `wavesurfer.getCurrentTime()`) to the `windowLength`, clamped between 0 and 1.
+It then calls `postBufferUpdate` with an object containing:
+  - `begin`: the current window offset in seconds (`windowOffsetSecs`),
+  - `position`: the normalized (and clamped) playback position,
+  - `play`: a boolean indicating whether audio is currently playing (`wavesurfer.isPlaying()`).
+
+The updated FFT sample count is logged to the console, and the global configuration (`config.FFT`)
+is updated accordingly.
+
+Assumes that the following globals and helper functions are available in the scope:
+  - `spectrogram`
+  - `wavesurfer`
+  - `windowLength`
+  - `windowOffsetSecs`
+  - `config`
+  - `clamp`
+  - `postBufferUpdate`
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line685">line 685</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">void</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="sendDetections"><span class="type-signature">(async) </span>sendDetections<span class="signature">(file, start, end, goToRegion)</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Retrieves detection records for a given audio file within a specified time range and posts them to the UI.
+
+This asynchronous function calculates absolute start and end timestamps by adding the file's metadata offset 
+(in milliseconds) to the provided start and end offsets (in seconds). It queries the database for detection 
+records that satisfy the following criteria:
+- A confidence level greater than or equal to the configured minimum (STATE.detect.confidence).
+- A file name matching the provided file parameter.
+- A detection timestamp between the calculated start and end times.
+
+If additional species filters are active, the query further restricts results by species ID. Records are 
+ranked using a window function to select the top (most confident) detection per grouping of file and datetime.
+The function posts the resulting detections to the UI along with a flag that instructs the UI whether to 
+navigate directly to the corresponding region.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>file</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The identifier or name of the audio file used for querying metadata and filtering detections.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>start</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The starting offset in seconds from the beginning of the file's recording.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>end</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The ending offset in seconds from the beginning of the file's recording.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>goToRegion</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">If true, signals the UI to navigate to the detected region.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1692">line 1692</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    A promise that resolves when detections have been successfully retrieved and sent to the UI.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;void></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="setActiveRegion"><span class="type-signature"></span>setActiveRegion<span class="signature">(region)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Activates the specified audio region by updating the global state and UI.
+
+This function first clears any previously active regions by resetting their colors 
+and labels to the default state. It then applies an active style to the provided region,
+which includes setting a new color and formatting the label. The function updates the global 
+active region, positions the playhead at the region's start time (taking into account any window offset),
+and enables UI menu items such as "export-audio" and, when applicable (i.e., if the model is ready and not predicting),
+"analyseSelection". If the provided region object is invalid (missing or having non-numeric start or end values),
+the function logs an error and exits without modifying the state.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>region</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The audio region to activate.
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>start</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The start time of the region in seconds.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>end</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The end time of the region in seconds.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>content</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">A DOM element or object with an `innerText` property for displaying the region's label.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3251">line 3251</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>const region = {
+  start: 15,
+  end: 30,
+  content: { innerText: 'Bird Call' }
+};
+setActiveRegion(region);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="setMetadata"><span class="type-signature">(async) </span>setMetadata<span class="signature">(file:, source_file:)</span><span class="type-signature"> &rarr; {Promise.&lt;unknown>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Called by getWorkingFile, setCustomLocation
+Assigns file metadata to a metadata cache object. file is the key, and is the source file
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>file:</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">the file name passed to the worker</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>source_file:</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">the file that exists ( will be different after compression)</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1734">line 1734</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;unknown></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="showWindowDetections"><span class="type-signature"></span>showWindowDetections<span class="signature">(options)</span><span class="type-signature"> &rarr; {void}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Creates audio regions for detections that occur within the current view window.
+
+For each detection, the function adjusts its start and end times by subtracting the global offset
+`windowOffsetSecs`. Only detections with an adjusted start time less than the current window length are processed.
+A detection is considered "active" if its adjusted start time matches the start time of the currently active region
+(`activeRegion.start`, if defined). If the detection is active and the `goToRegion` flag is true, the view is repositioned
+to focus on that region. Otherwise, the detection is processed only if the configuration flag `config.specDetections` is enabled.
+
+Audio regions are created by calling `createRegion` with the adjusted start and end times, the detection's label,
+a flag indicating whether to reposition the view (only for active detections when `goToRegion` is true), and an optional
+colour (set to `STATE.regionActiveColour` for active regions). After processing all detections,
+`STATE.regionsCompleted` is set to true to indicate that region creation is complete.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">An options object.
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>detections</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Array.&lt;Object></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">An array of detection objects. Each object should include:
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>start</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The starting time of the detection in seconds.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>end</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The ending time of the detection in seconds.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>label</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The label associated with the detection.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>goToRegion</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">If true, reposition the view to the newly created region when the detection is active.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line2662">line 2662</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">void</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="updateFilesBeingProcessed"><span class="type-signature"></span>updateFilesBeingProcessed<span class="signature">(file)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Called when a files processing is finished
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>file</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">*</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line3122">line 3122</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="updateSpec"><span class="type-signature">(async) </span>updateSpec<span class="signature">(options)</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Updates the spectrogram visualization and timeline asynchronously.
+
+This function ensures that the spectrogram element is visible by removing the "d-none" class and updates the display based on the provided audio buffer and options. It resets the spectrogram dimensions if a reset is requested or if the wavesurfer instance is uninitialized; otherwise, it loads the new audio buffer. After updating the spectrogram, the timeline is refreshed, the playback position is set using a normalized value, and playback is initiated if specified.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Configuration options for updating the spectrogram.
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>buffer</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">AudioBuffer</span>
+|
+
+<span class="param-type">*</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last">The audio buffer to be visualized.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>play</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    false
+                
+                </td>
+            
+
+            <td class="description last">If true, starts playback immediately after the update.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>position</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    0
+                
+                </td>
+            
+
+            <td class="description last">Normalized playback position (between 0 and 1) to seek to.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>resetSpec</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    false
+                
+                </td>
+            
+
+            <td class="description last">If true, resets the spectrogram dimensions before loading the buffer.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line438">line 438</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    A promise that resolves once the spectrogram and timeline update process is complete.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;void></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="zoomSpec"><span class="type-signature"></span>zoomSpec<span class="signature">(direction)</span><span class="type-signature"> &rarr; {void}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Zooms in or out of the audio spectrogram by adjusting the display window
+and repositioning the playhead relative to the current audio playback time.
+
+When zooming in, the window length is halved, but not reduced below a 1.5-second threshold.
+When zooming out, the window length is doubled, capped at a maximum of 100 seconds or the file's duration.
+Active audio regions are updated to align with the new window, ensuring consistency in user selections.
+
+If no audio file is loaded, the function exits without performing any operation.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>direction</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+|
+
+<span class="param-type">Event</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Specifies the zoom operation. If a string, it must be either "zoomIn" or "zoomOut".
+If an Event, the function extracts the button ID from the event's target element.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line726">line 726</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">void</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Examples</h5>
+    
+    <pre class="prettyprint"><code>// Zoom in directly using a string command:
+zoomSpec("zoomIn");</code></pre>
+
+    <pre class="prettyprint"><code>// Trigger zooming out via a button click event:
+buttonElement.addEventListener("click", zoomSpec);</code></pre>
+
+
+
+        
+    
+
+    
+
+    
+</article>
+
+</section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#LIST_CACHE">LIST_CACHE</a></li><li><a href="global.html#_parseMetadataText">_parseMetadataText</a></li><li><a href="global.html#_updateSpeciesLocale">_updateSpeciesLocale</a></li><li><a href="global.html#addDays">addDays</a></li><li><a href="global.html#adjustSpecDims">adjustSpecDims</a></li><li><a href="global.html#centreSpec">centreSpec</a></li><li><a href="global.html#checkForRegion">checkForRegion</a></li><li><a href="global.html#clearActive">clearActive</a></li><li><a href="global.html#convertFile">convertFile</a></li><li><a href="global.html#createContextMenu">createContextMenu</a></li><li><a href="global.html#createRegion">createRegion</a></li><li><a href="global.html#createTimeline">createTimeline</a></li><li><a href="global.html#extractWaveMetadata">extractWaveMetadata</a></li><li><a href="global.html#fetchAudioBuffer">fetchAudioBuffer</a></li><li><a href="global.html#filterValidFiles">filterValidFiles</a></li><li><a href="global.html#formatAsBootstrapTable">formatAsBootstrapTable</a></li><li><a href="global.html#formatLabel">formatLabel</a></li><li><a href="global.html#formatRegionTooltip">formatRegionTooltip</a></li><li><a href="global.html#getDetectedSpecies">getDetectedSpecies</a></li><li><a href="global.html#getFileSQLAndParams">getFileSQLAndParams</a></li><li><a href="global.html#getFiles">getFiles</a></li><li><a href="global.html#getIncludedIDs">getIncludedIDs</a></li><li><a href="global.html#getRegion">getRegion</a></li><li><a href="global.html#getResults">getResults</a></li><li><a href="global.html#getValidSpecies">getValidSpecies</a></li><li><a href="global.html#getWorkingFile">getWorkingFile</a></li><li><a href="global.html#handleKeyDown">handleKeyDown</a></li><li><a href="global.html#increaseFFT">increaseFFT</a></li><li><a href="global.html#initRegion">initRegion</a></li><li><a href="global.html#loadAudioFile">loadAudioFile</a></li><li><a href="global.html#loadAudioFileSync">loadAudioFileSync</a></li><li><a href="global.html#locateFile">locateFile</a></li><li><a href="global.html#membershipCheck">membershipCheck</a></li><li><a href="global.html#notifyMissingFile">notifyMissingFile</a></li><li><a href="global.html#onLaunch">onLaunch</a></li><li><a href="global.html#onModelReady">onModelReady</a></li><li><a href="global.html#onSave2DiskDB">onSave2DiskDB</a></li><li><a href="global.html#playRegion">playRegion</a></li><li><a href="global.html#reduceFFT">reduceFFT</a></li><li><a href="global.html#sendDetections">sendDetections</a></li><li><a href="global.html#setActiveRegion">setActiveRegion</a></li><li><a href="global.html#setMetadata">setMetadata</a></li><li><a href="global.html#showWindowDetections">showWindowDetections</a></li><li><a href="global.html#t0_warmup">t0_warmup</a></li><li><a href="global.html#updateFilesBeingProcessed">updateFilesBeingProcessed</a></li><li><a href="global.html#updateSpec">updateSpec</a></li><li><a href="global.html#zoomSpec">zoomSpec</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Sat Feb 15 2025 12:40:26 GMT+0000 (Greenwich Mean Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
