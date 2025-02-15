@@ -512,7 +512,17 @@ app.whenReady().then(async () => {
         return await dialog.showOpenDialog(mainWindow, options);
     })
     
-    function getFileFromArgs(args) {
+    /**
+   * Retrieves the first file path from the given arguments that matches a supported file extension.
+   *
+   * This function iterates over an array of arguments and returns the first element that ends with any
+   * of the file extensions defined in the global `SUPPORTED_FILES` array. The check is performed in a
+   * case-insensitive manner.
+   *
+   * @param {string[]} args - An array of command line arguments potentially containing file paths.
+   * @returns {string|undefined} The first matching file path with a supported extension, or `undefined` if none is found.
+   */
+  function getFileFromArgs(args) {
       return args.find(arg => SUPPORTED_FILES.some(ext => arg.toLowerCase().endsWith(ext)));
   }
     
@@ -570,7 +580,17 @@ app.on("activate", async () => {
     await createWorker();
   }
 });
-
+const DB_CLOSED = false;
+app.on('before-quit', async (event) => {
+  event.preventDefault(); // Prevent default quit until cleanup is done
+  if (!DB_CLOSED) workerWindow.webContents.postMessage("close-database", null);
+  else app.quit()
+});
+  
+ipcMain.on('database-closed', () =>{
+  DB_CLOSED = true;
+  app.quit()
+ })
 ipcMain.handle("request-worker-channel", async (_event) => {
   // Create a new channel ...
   const { port1, port2 } = new MessageChannelMain();
