@@ -1773,6 +1773,24 @@ results.addEventListener("click", resultClick);
 const selectionTable = document.getElementById("selectionResultTableBody");
 selectionTable.addEventListener("click", resultClick);
 
+/**
+ * Handles the click event on a result row in the audio analysis UI.
+ *
+ * This function asynchronously processes user clicks on table rows representing audio analysis results.
+ * It first verifies that all audio regions have been fully created and an audio file is loaded. It then extracts
+ * file details, start and end times, and label information from the clicked row's "name" attribute, and makes the row active.
+ * The corresponding audio region is then loaded using these extracted details. If the event target has a "circle" class,
+ * the function waits until the audio file is fully loaded before obtaining the selection results.
+ *
+ * @param {Event} e - The click event object triggered by the user interaction.
+ * @returns {Promise<void>} A promise that resolves when the click event processing is complete.
+ *
+ * @example
+ * // Assuming a table row element with the "name" attribute formatted as "file|start|end|_|label":
+ * // <tr name="audio.mp3|10|20|unused|Speech">...</tr>
+ * // Attaching the event handler:
+ * document.querySelector('tr').addEventListener('click', resultClick);
+ */
 async function resultClick(e) {
   if (!STATE.regionsCompleted) {
       console.warn('Cannot process click - regions are still being created');
@@ -3940,19 +3958,25 @@ const gotoForm = document.getElementById("gotoForm");
 gotoForm.addEventListener("submit", gotoTime);
 
 /**
- * Handles the initialization steps once the audio model is ready.
+ * Initializes the application once the audio model is ready.
  *
- * This function performs the following actions:
- * - Sets the flag indicating the model is ready.
- * - If a file is loaded, enables the "analyse" menu item and, if multiple files are open, enables the "analyseAll" and "reanalyseAll" menu items.
- * - If an audio region is active, enables the "analyseSelection" menu item.
- * - Records and logs the warm-up time for diagnostic purposes.
+ * Upon invocation, this function performs several startup tasks:
+ * - Sets the flag indicating that the audio model is ready.
+ * - If an audio file is loaded, enables the "analyse" menu item; if multiple files
+ *   are open, also enables "analyseAll" and "reanalyseAll" menu items.
+ * - If there is an active audio region, enables the "analyseSelection" menu item.
+ * - Calculates the warm-up time and logs it in the DIAGNOSTICS object.
+ * - Logs the application's launch time (if this is the first load).
  * - Marks the application as loaded and hides the loading screen.
  * - For new users in non-test environments, initiates the tour if it has not been seen.
- * - Logs the application's launch time.
- * - Processes any queued files opened via the operating system.
+ * - Processes any queued files received via the operating system.
  *
- * @param {Object} args - Optional arguments (currently unused).
+ * **Side Effects:**
+ * Modifies global state, updates the DOM (e.g., hiding the loading screen), logs diagnostic
+ * information, and triggers additional actions (e.g., starting the tour, processing OS file queues).
+ *
+ * @param {Object} [args={}] - Optional parameters (currently unused).
+ * @returns {void}
  */
 function onModelReady(args) {
   modelReady = true;

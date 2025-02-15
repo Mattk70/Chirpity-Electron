@@ -1,5 +1,17 @@
 /**
- * @file Helper functions for the spectrogram range slider.
+ * Updates the "from" slider and input fields based on parsed numeric values from the "from" and "to" inputs,
+ * and visually refreshes the slider fill.
+ *
+ * This function retrieves the current numeric values from the provided "from" and "to" input elements using
+ * the `getParsed` utility. It then calls `fillSlider` to update the slider's visual fill between a fixed
+ * unselected color ("#C6C6C6") and a selected color ("#0d6efd"). If the parsed "from" value exceeds the "to"
+ * value, it adjusts the "from" slider and input to match the "to" value to maintain a valid range. Otherwise,
+ * it sets the "from" slider to the parsed "from" value.
+ *
+ * @param {HTMLInputElement} fromSlider - The slider element representing the starting ("from") value.
+ * @param {HTMLInputElement} fromInput - The text input element corresponding to the "from" value.
+ * @param {HTMLInputElement} toInput - The text input element corresponding to the ending ("to") value.
+ * @param {Element} controlSlider - The DOM element used by `fillSlider` to update the slider's visual appearance.
  */
 
 function controlFromInput(fromSlider, fromInput, toInput, controlSlider) {
