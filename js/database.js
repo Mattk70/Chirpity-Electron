@@ -95,6 +95,24 @@ class Mutex {
   }
 }
 
+/**
+ * Performs a Write-Ahead Logging (WAL) checkpoint on the provided SQLite database.
+ *
+ * If a valid database instance is supplied, this function executes the SQL command
+ * "PRAGMA wal_checkpoint(TRUNCATE);" to perform a checkpoint, truncating the WAL log.
+ * In the event of an error during execution, the error is logged and the returned Promise
+ * is rejected with the error. If no database instance is provided, the Promise resolves immediately.
+ *
+ * @param {Object|null|undefined} db - The SQLite database instance on which to perform the checkpoint.
+ *   If no database instance is provided (null or undefined), the checkpoint operation is skipped.
+ * @returns {Promise<void>} A Promise that resolves when the checkpoint completes successfully or
+ *   immediately if no database is provided, and rejects with an error if the checkpoint operation fails.
+ *
+ * @example
+ * checkpoint(database)
+ *   .then(() => console.log("WAL checkpoint completed successfully."))
+ *   .catch(err => console.error("Error running WAL checkpoint:", err));
+ */
 function checkpoint(db) {
   return new Promise((resolve, reject) => {
     if (!db) resolve();
@@ -111,6 +129,22 @@ function checkpoint(db) {
   });
 }
 
+/**
+ * Closes a SQLite database connection.
+ *
+ * This function attempts to close the provided database connection. If no database instance
+ * is provided, the promise resolves immediately. In case of an error during the close operation,
+ * the error is logged and the promise is rejected with the encountered error.
+ *
+ * @param {object|null|undefined} db - The SQLite database instance to close. If falsy, no action is taken.
+ * @return {Promise<void>} A promise that resolves when the database is successfully closed or if no
+ * database is provided, and rejects if an error occurs during the close operation.
+ *
+ * @example
+ * closeDatabase(db)
+ *   .then(() => console.log("Database closed successfully."))
+ *   .catch(err => console.error("Error closing database:", err));
+ */
 function closeDatabase(db) {
   return new Promise((resolve, reject) => {
     if (!db) resolve();
