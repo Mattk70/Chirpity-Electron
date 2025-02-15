@@ -1746,7 +1746,14 @@ const selectionTable = document.getElementById("selectionResultTableBody");
 selectionTable.addEventListener("click", resultClick);
 
 async function resultClick(e) {
-   if  (! STATE.regionsCompleted || !fileLoaded) return
+  if (!STATE.regionsCompleted) {
+      console.warn('Cannot process click - regions are still being created');
+      return;
+    }
+  if (!fileLoaded) {
+    console.warn('Cannot process click - no audio file is loaded');
+    return;
+  }
   let row = e.target.closest("tr");
   if (!row || row.classList.length === 0) {
     // 1. clicked and dragged, 2 no detections in file row
