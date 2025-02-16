@@ -1,3 +1,17 @@
+/**
+ * Asynchronously fetches GitHub issues filtered by provided labels.
+ *
+ * This function concurrently retrieves issues from the GitHub API for the repository
+ * "Chirpity-Electron" owned by "Mattk70". It fetches issues (both open and closed) for each label
+ * in the input list, merges the results, and removes duplicate issues based on their unique IDs.
+ * The returned issues are processed to include only the title, URL, state, and an array of label names.
+ *
+ * @param {Array<string>} labelList - An array of label strings to filter issues by.
+ * @returns {Promise<Array<{title: string, url: string, state: string, labels: Array<string>}>>} 
+ *          A promise that resolves to an array of processed issue objects.
+ * @throws Will log an error and rethrow it if any fetch operation fails.
+ */
+
 async function fetchIssuesByLabel(labelList) {
   const owner = "Mattk70";
   const repo = "Chirpity-Electron";

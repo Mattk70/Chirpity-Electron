@@ -1,3 +1,7 @@
+/**
+ * @file Helper functions for managing state.
+ */
+
 const sqlite3 = require("sqlite3");
 
 export class State {
