@@ -3220,6 +3220,8 @@ function handleKeyDown(e) {
       : "no";
     trackEvent(config.UUID, "KeyPress", action, modifier);
     GLOBAL_ACTIONS[action](e);
+  } else {
+    GLOBAL_ACTIONS.handleNumberKeys(e);
   }
 }
 
@@ -3619,9 +3621,48 @@ function centreSpec() {
 }
 
 /////////// Keyboard Shortcuts  ////////////
+function recordUpdate(key){
+  const assignment = config.keyAssignment['key'+ key];
+  if (assignment?.column){
+    const nameAttribute = activeRow.getAttribute("name");
+    const [file, start, end, sname, cname] = nameAttribute.split("|");
+    const commentCell = activeRow.querySelector('.comment > span');
+    const comment = commentCell ? commentCell.title : ''
+    const labelCell = activeRow.querySelector('.label > span');
+    const label = labelCell ? labelCell.textContent : ''
+    const name = cname.replace("?", "");
+
+
+    const newCname = assignment.column === 'species' ?  assignment.value : name;
+    const newLabel = assignment.column === 'label' ?  assignment.value : label || '';
+    const newComment = assignment.column === 'comment' ?  assignment.value : comment;
+
+    insertManualRecord(
+      newCname,
+      parseFloat(start),
+      parseFloat(end),
+      newComment,
+      "", // callCount 
+      newLabel,
+      "Update",
+      false,
+      cname
+    );
+  }
+}
+
 
 const GLOBAL_ACTIONS = {
-  // eslint-disable-line
+
+  // Handle number keys 1-9 dynamically
+  handleNumberKeys: (e) => {
+    if (/^[0-9]$/.test(e.key)) {
+      // number keys here
+      if (activeRow){
+        recordUpdate(e.key)
+      }
+    }
+  },
   a: (e) => {
     if ((e.ctrlKey || e.metaKey) && STATE.currentFile) {
       const element = e.shiftKey ? "analyseAll" : "analyse";
@@ -6380,356 +6421,354 @@ document.addEventListener("change", function (e) {
   if (element) {
     const target = element.id;
     config.debug && console.log("Change target:", target);
-    switch (target) {
-      case "species-frequency-threshold": {
-        if (isNaN(element.value) || element.value === "") {
-          generateToast({ type: "warning", message: "badThreshold" });
-          return false;
-        }
-        config.speciesThreshold = element.value;
-        worker.postMessage({
-          action: "update-state",
-          speciesThreshold: element.value,
-        });
-        updateList();
-        break;
-      }
-      case "timelineSetting": {
-        timelineToggle(e);
-        break;
-      }
-      case "key1": case "key2":case "key3":case "key4":case "key5":case 
-      "key6":case "key6":case "key7":case "key8":case "key9":case "key0": {
-        setKeyAssignment(element, target);
-        break;
-      }
-      case "key1-column": case "key2-column":case "key3-column":case "key4-column":case "key5-column":
-      case "key6-column":case "key6-column":case "key7-column":case "key8-column":case "key9-column":case "key0-column": {
+    // Handle key assignments
+    if (/^key\d/.test(target)) {
+      if (target.length === 4) setKeyAssignment(element, target);
+      else {
         const key = target.slice(0,4);
         const inputElement = document.getElementById(key)
         setKeyAssignment(inputElement, key);
-        break;
       }
-      case "nocmig": {
-        changeNocmigMode(e);
-        break;
-      }
-      case "iucn": {
-        config.detect.iucn = element.checked;
-        // resetRegions();
-        refreshSummary();
-        break;
-      }
-      case "iucn-scope": {
-        config.detect.iucnScope = element.value;
-        // resetRegions();
-        refreshSummary();
-        break;
-      }
-      case "auto-archive": {
-        config.archive.auto = element.checked;
-        worker.postMessage({ action: "update-state", archive: config.archive });
-        break;
-      }
-      case "library-trim": {
-        config.archive.trim = element.checked;
-        worker.postMessage({ action: "update-state", archive: config.archive });
-        break;
-      }
-      case "archive-format": {
-        config.archive.format = document.getElementById("archive-format").value;
-        worker.postMessage({ action: "update-state", archive: config.archive });
-        break;
-      }
-      case "confidenceValue":
-      case "confidence": {
-        handleThresholdChange(e);
-        break;
-      }
-      case "context": {
-        toggleContextAwareMode(e);
-        break;
-      }
-      case "attenuation": {
-        handleAttenuationchange(e);
-        break;
-      }
-      case "lowShelfFrequency": {
-        handleLowShelfchange(e);
-        break;
-      }
-      case "HighPassFrequency": {
-        handleHPchange(e);
-        break;
-      }
-      case "snrValue": {
-        handleSNRchange(e);
-        break;
-      }
-      case "file-timestamp": {
-        config.fileStartMtime = element.checked;
-        worker.postMessage({
-          action: "update-state",
-          fileStartMtime: config.fileStartMtime,
-        });
-        break;
-      }
-      case "audio-notification": {
-        config.audio.notification = element.checked;
-        break;
-      }
-      case "power-save-block": {
-        config.powerSaveBlocker = element.checked;
-        powerSave(config.powerSaveBlocker);
-        break;
-      }
-      case "species-week": {
-        config.useWeek = element.checked;
-
-        if (!config.useWeek) STATE.week = -1;
-        worker.postMessage({ action: "update-state", useWeek: config.useWeek });
-        updateList();
-        break;
-      }
-      case "list-to-use": {
-        setListUIState(element.value);
-        config.list = element.value;
-        updateListIcon();
-        updateList();
-        break;
-      }
-      case "locale": {
-        let labelFile;
-        if (element.value === "custom") {
-          labelFile = config.customListFile[config.model];
-          if (!labelFile) {
-            generateToast({ type: "warning", message: "labelFileNeeded" });
-            return;
+    } else {
+      switch (target) {
+        case "species-frequency-threshold": {
+          if (isNaN(element.value) || element.value === "") {
+            generateToast({ type: "warning", message: "badThreshold" });
+            return false;
           }
-        } else {
-          const chirpity =
-            element.value === "en_uk" && config.model !== "birdnet"
-              ? "chirpity"
-              : "";
-          labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_${chirpity}Labels_${element.value}.txt`;
-          localiseUI(DOM.locale.value).then((result) => (STATE.i18n = result));
+          config.speciesThreshold = element.value;
+          worker.postMessage({
+            action: "update-state",
+            speciesThreshold: element.value,
+          });
+          updateList();
+          break;
+        }
+        case "timelineSetting": {
+          timelineToggle(e);
+          break;
+        }
+        case "nocmig": {
+          changeNocmigMode(e);
+          break;
+        }
+        case "iucn": {
+          config.detect.iucn = element.checked;
+          // resetRegions();
+          refreshSummary();
+          break;
+        }
+        case "iucn-scope": {
+          config.detect.iucnScope = element.value;
+          // resetRegions();
+          refreshSummary();
+          break;
+        }
+        case "auto-archive": {
+          config.archive.auto = element.checked;
+          worker.postMessage({ action: "update-state", archive: config.archive });
+          break;
+        }
+        case "library-trim": {
+          config.archive.trim = element.checked;
+          worker.postMessage({ action: "update-state", archive: config.archive });
+          break;
+        }
+        case "archive-format": {
+          config.archive.format = document.getElementById("archive-format").value;
+          worker.postMessage({ action: "update-state", archive: config.archive });
+          break;
+        }
+        case "confidenceValue":
+        case "confidence": {
+          handleThresholdChange(e);
+          break;
+        }
+        case "context": {
+          toggleContextAwareMode(e);
+          break;
+        }
+        case "attenuation": {
+          handleAttenuationchange(e);
+          break;
+        }
+        case "lowShelfFrequency": {
+          handleLowShelfchange(e);
+          break;
+        }
+        case "HighPassFrequency": {
+          handleHPchange(e);
+          break;
+        }
+        case "snrValue": {
+          handleSNRchange(e);
+          break;
+        }
+        case "file-timestamp": {
+          config.fileStartMtime = element.checked;
+          worker.postMessage({
+            action: "update-state",
+            fileStartMtime: config.fileStartMtime,
+          });
+          break;
+        }
+        case "audio-notification": {
+          config.audio.notification = element.checked;
+          break;
+        }
+        case "power-save-block": {
+          config.powerSaveBlocker = element.checked;
+          powerSave(config.powerSaveBlocker);
+          break;
+        }
+        case "species-week": {
+          config.useWeek = element.checked;
+
+          if (!config.useWeek) STATE.week = -1;
+          worker.postMessage({ action: "update-state", useWeek: config.useWeek });
+          updateList();
+          break;
+        }
+        case "list-to-use": {
+          setListUIState(element.value);
+          config.list = element.value;
+          updateListIcon();
+          updateList();
+          break;
+        }
+        case "locale": {
+          let labelFile;
+          if (element.value === "custom") {
+            labelFile = config.customListFile[config.model];
+            if (!labelFile) {
+              generateToast({ type: "warning", message: "labelFileNeeded" });
+              return;
+            }
+          } else {
+            const chirpity =
+              element.value === "en_uk" && config.model !== "birdnet"
+                ? "chirpity"
+                : "";
+            labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_${chirpity}Labels_${element.value}.txt`;
+            localiseUI(DOM.locale.value).then((result) => (STATE.i18n = result));
+            config.locale = element.value;
+            initialiseDatePicker();
+          }
           config.locale = element.value;
-          initialiseDatePicker();
+          STATE.picker.options.lang = element.value.replace("_uk", "");
+          readLabels(labelFile, "locale");
+          break;
         }
-        config.locale = element.value;
-        STATE.picker.options.lang = element.value.replace("_uk", "");
-        readLabels(labelFile, "locale");
-        break;
-      }
-      case "local": {
-        config.local = element.checked;
-        worker.postMessage({ action: "update-state", local: config.local });
-        updateList();
-        break;
-      }
-      case "model-to-use": {
-        config.model = element.value;
-        STATE.analysisDone = false;
-        modelSettingsDisplay();
-        DOM.customListFile.value = config.customListFile[config.model];
-        DOM.customListFile.value
-          ? (LIST_MAP = getI18n(i18nLIST_MAP))
-          : delete LIST_MAP.custom;
-        document.getElementById("locale").value = config.locale;
-        document.getElementById(config[config.model].backend).checked = true;
-        handleBackendChange(config[config.model].backend);
-        setListUIState(config.list);
-        break;
-      }
-      case "thread-slider": {
-        // change number of threads
-        DOM.numberOfThreads.innerHTML = DOM.threadSlider.value;
-        config[config[config.model].backend].threads =
-          DOM.threadSlider.valueAsNumber;
-        worker.postMessage({
-          action: "change-threads",
-          threads: DOM.threadSlider.valueAsNumber,
-        });
-        break;
-      }
-      case "batch-size": {
-        DOM.batchSizeValue.textContent =
-          BATCH_SIZE_LIST[DOM.batchSizeSlider.value].toString();
-        config[config[config.model].backend].batchSize =
-          BATCH_SIZE_LIST[element.value];
-        worker.postMessage({
-          action: "change-batch-size",
-          batchSize: BATCH_SIZE_LIST[element.value],
-        });
-        break;
-      }
-      case "colourmap": {
-        config.colormap = element.value;
-        const colorMapFieldset = document.getElementById("colormap-fieldset");
-        if (config.colormap === "custom") {
-          colorMapFieldset.classList.remove("d-none");
-        } else {
-          colorMapFieldset.classList.add("d-none");
+        case "local": {
+          config.local = element.checked;
+          worker.postMessage({ action: "update-state", local: config.local });
+          updateList();
+          break;
         }
-        if (wavesurfer && STATE.currentFile) {
-          const fftSamples = spectrogram.fftSamples;
-          adjustSpecDims(true, fftSamples);
-          postBufferUpdate({ begin: windowOffsetSecs, position: wavesurfer.getCurrentTime() / windowLength });
+        case "model-to-use": {
+          config.model = element.value;
+          STATE.analysisDone = false;
+          modelSettingsDisplay();
+          DOM.customListFile.value = config.customListFile[config.model];
+          DOM.customListFile.value
+            ? (LIST_MAP = getI18n(i18nLIST_MAP))
+            : delete LIST_MAP.custom;
+          document.getElementById("locale").value = config.locale;
+          document.getElementById(config[config.model].backend).checked = true;
+          handleBackendChange(config[config.model].backend);
+          setListUIState(config.list);
+          break;
         }
-        break;
-      }
-      case "window-function":
-      case "alpha-slider":
-      case "loud-color":
-      case "mid-color":
-      case "quiet-color":
-      case "color-threshold-slider": {
-        const windowFn = document.getElementById("window-function").value;
-        const alpha = document.getElementById("alpha-slider").valueAsNumber;
-        config.alpha = alpha;
-        windowFn === 'gauss' 
-          ? document.getElementById('alpha').classList.remove('d-none') 
-          : document.getElementById('alpha').classList.add('d-none')
-        const loud = document.getElementById("loud-color").value;
-        const mid = document.getElementById("mid-color").value;
-        const quiet = document.getElementById("quiet-color").value;
-        const threshold = document.getElementById(
-          "color-threshold-slider"
-        ).valueAsNumber;
-        document.getElementById("color-threshold").textContent = threshold;
-        config.customColormap = {
-          loud: loud,
-          mid: mid,
-          quiet: quiet,
-          threshold: threshold,
-          windowFn: windowFn,
-        };
-        if (wavesurfer && STATE.currentFile) {
-          const fftSamples = spectrogram.fftSamples;
-          adjustSpecDims(true, fftSamples);
-          refreshTimeline();
-        }
-        break;
-      }
-      case "gain": {
-        DOM.gainAdjustment.textContent = element.value + "dB";
-        element.blur();
-        config.audio.gain = element.value;
-        worker.postMessage({ action: "update-state", audio: config.audio });
-        config.filters.active || toggleFilters();
-        if (fileLoaded) {
-          const position = clamp(
-            wavesurfer.getCurrentTime() / windowLength,
-            0,
-            1
-          );
-          postBufferUpdate({
-            begin: windowOffsetSecs,
-            position: position
+        case "thread-slider": {
+          // change number of threads
+          DOM.numberOfThreads.innerHTML = DOM.threadSlider.value;
+          config[config[config.model].backend].threads =
+            DOM.threadSlider.valueAsNumber;
+          worker.postMessage({
+            action: "change-threads",
+            threads: DOM.threadSlider.valueAsNumber,
           });
+          break;
         }
-        break;
-      }
-      case "spec-labels": {
-        config.specLabels = element.checked;
-        if (wavesurfer && STATE.currentFile) {
+        case "batch-size": {
+          DOM.batchSizeValue.textContent =
+            BATCH_SIZE_LIST[DOM.batchSizeSlider.value].toString();
+          config[config[config.model].backend].batchSize =
+            BATCH_SIZE_LIST[element.value];
+          worker.postMessage({
+            action: "change-batch-size",
+            batchSize: BATCH_SIZE_LIST[element.value],
+          });
+          break;
+        }
+        case "colourmap": {
+          config.colormap = element.value;
+          const colorMapFieldset = document.getElementById("colormap-fieldset");
+          if (config.colormap === "custom") {
+            colorMapFieldset.classList.remove("d-none");
+          } else {
+            colorMapFieldset.classList.add("d-none");
+          }
+          if (wavesurfer && STATE.currentFile) {
+            const fftSamples = spectrogram.fftSamples;
+            adjustSpecDims(true, fftSamples);
+            postBufferUpdate({ begin: windowOffsetSecs, position: wavesurfer.getCurrentTime() / windowLength });
+          }
+          break;
+        }
+        case "window-function":
+        case "alpha-slider":
+        case "loud-color":
+        case "mid-color":
+        case "quiet-color":
+        case "color-threshold-slider": {
+          const windowFn = document.getElementById("window-function").value;
+          const alpha = document.getElementById("alpha-slider").valueAsNumber;
+          config.alpha = alpha;
+          windowFn === 'gauss' 
+            ? document.getElementById('alpha').classList.remove('d-none') 
+            : document.getElementById('alpha').classList.add('d-none')
+          const loud = document.getElementById("loud-color").value;
+          const mid = document.getElementById("mid-color").value;
+          const quiet = document.getElementById("quiet-color").value;
+          const threshold = document.getElementById(
+            "color-threshold-slider"
+          ).valueAsNumber;
+          document.getElementById("color-threshold").textContent = threshold;
+          config.customColormap = {
+            loud: loud,
+            mid: mid,
+            quiet: quiet,
+            threshold: threshold,
+            windowFn: windowFn,
+          };
+          if (wavesurfer && STATE.currentFile) {
+            const fftSamples = spectrogram.fftSamples;
+            adjustSpecDims(true, fftSamples);
+            refreshTimeline();
+          }
+          break;
+        }
+        case "gain": {
+          DOM.gainAdjustment.textContent = element.value + "dB";
+          element.blur();
+          config.audio.gain = element.value;
+          worker.postMessage({ action: "update-state", audio: config.audio });
+          config.filters.active || toggleFilters();
+          if (fileLoaded) {
+            const position = clamp(
+              wavesurfer.getCurrentTime() / windowLength,
+              0,
+              1
+            );
+            postBufferUpdate({
+              begin: windowOffsetSecs,
+              position: position
+            });
+          }
+          break;
+        }
+        case "spec-labels": {
+          config.specLabels = element.checked;
+          if (wavesurfer && STATE.currentFile) {
+            const fftSamples = spectrogram.fftSamples;
+            adjustSpecDims(true, fftSamples);
+          }
+          break;
+        }
+        case "spec-detections": {
+          config.specDetections = element.checked;
+          worker.postMessage({
+            action: "update-state",
+            specDetections: config.specDetections,
+          });
+          break;
+        }
+        case "fromInput":
+        case "fromSlider": {
+          config.audio.minFrequency = Math.max(element.valueAsNumber, 0);
+          DOM.fromInput.value = config.audio.minFrequency;
+          DOM.fromSlider.value = config.audio.minFrequency;
           const fftSamples = spectrogram.fftSamples;
           adjustSpecDims(true, fftSamples);
+          checkFilteredFrequency();
+          element.blur();
+          worker.postMessage({ action: "update-state", audio: config.audio });
+          break;
         }
-        break;
-      }
-      case "spec-detections": {
-        config.specDetections = element.checked;
-        worker.postMessage({
-          action: "update-state",
-          specDetections: config.specDetections,
-        });
-        break;
-      }
-      case "fromInput":
-      case "fromSlider": {
-        config.audio.minFrequency = Math.max(element.valueAsNumber, 0);
-        DOM.fromInput.value = config.audio.minFrequency;
-        DOM.fromSlider.value = config.audio.minFrequency;
-        const fftSamples = spectrogram.fftSamples;
-        adjustSpecDims(true, fftSamples);
-        checkFilteredFrequency();
-        element.blur();
-        worker.postMessage({ action: "update-state", audio: config.audio });
-        break;
-      }
-      case "toInput":
-      case "toSlider": {
-        config.audio.maxFrequency = Math.min(element.valueAsNumber, 11950);
-        DOM.toInput.value = config.audio.maxFrequency;
-        DOM.toSlider.value = config.audio.maxFrequency;
-        const fftSamples = spectrogram.fftSamples;
-        adjustSpecDims(true, fftSamples);
-        checkFilteredFrequency();
-        element.blur();
-        worker.postMessage({ action: "update-state", audio: config.audio });
-        break;
-      }
-      case "normalise": {
-        config.filters.normalise = element.checked;
-        element.checked && (config.filters.active = true);
-        worker.postMessage({ action: "update-state", filters: config.filters });
-        element.blur();
-        if (fileLoaded) {
-          const position = clamp(
-            wavesurfer.getCurrentTime() / windowLength,
-            0,
-            1
-          );
-          postBufferUpdate({
-            begin: windowOffsetSecs,
-            position: position
-          });
+        case "toInput":
+        case "toSlider": {
+          config.audio.maxFrequency = Math.min(element.valueAsNumber, 11950);
+          DOM.toInput.value = config.audio.maxFrequency;
+          DOM.toSlider.value = config.audio.maxFrequency;
+          const fftSamples = spectrogram.fftSamples;
+          adjustSpecDims(true, fftSamples);
+          checkFilteredFrequency();
+          element.blur();
+          worker.postMessage({ action: "update-state", audio: config.audio });
+          break;
         }
-        break;
-      }
-      case "send-filtered-audio-to-model": {
-        config.filters.sendToModel = element.checked;
-        worker.postMessage({ action: "update-state", filters: config.filters });
-        break;
-      }
+        case "normalise": {
+          config.filters.normalise = element.checked;
+          element.checked && (config.filters.active = true);
+          worker.postMessage({ action: "update-state", filters: config.filters });
+          element.blur();
+          if (fileLoaded) {
+            const position = clamp(
+              wavesurfer.getCurrentTime() / windowLength,
+              0,
+              1
+            );
+            postBufferUpdate({
+              begin: windowOffsetSecs,
+              position: position
+            });
+          }
+          break;
+        }
+        case "send-filtered-audio-to-model": {
+          config.filters.sendToModel = element.checked;
+          worker.postMessage({ action: "update-state", filters: config.filters });
+          break;
+        }
 
-      case "format": {
-        config.audio.format = element.value;
-        showRelevantAudioQuality();
-        worker.postMessage({ action: "update-state", audio: config.audio });
-        break;
-      }
+        case "format": {
+          config.audio.format = element.value;
+          showRelevantAudioQuality();
+          worker.postMessage({ action: "update-state", audio: config.audio });
+          break;
+        }
 
-      case "bitrate": {
-        config.audio.bitrate = e.target.value;
-        worker.postMessage({ action: "update-state", audio: config.audio });
-        break;
-      }
+        case "bitrate": {
+          config.audio.bitrate = e.target.value;
+          worker.postMessage({ action: "update-state", audio: config.audio });
+          break;
+        }
 
-      case "quality": {
-        config.audio.quality = element.value;
-        worker.postMessage({ action: "update-state", audio: config.audio });
-        break;
-      }
+        case "quality": {
+          config.audio.quality = element.value;
+          worker.postMessage({ action: "update-state", audio: config.audio });
+          break;
+        }
 
-      case "fade": {
-        config.audio.fade = element.checked;
-        worker.postMessage({ action: "update-state", audio: config.audio });
-        break;
-      }
+        case "fade": {
+          config.audio.fade = element.checked;
+          worker.postMessage({ action: "update-state", audio: config.audio });
+          break;
+        }
 
-      case "padding": {
-        config.audio.padding = e.target.checked;
-        DOM.audioFade.disabled = !DOM.audioPadding.checked;
-        worker.postMessage({ action: "update-state", audio: config.audio });
-        break;
-      }
+        case "padding": {
+          config.audio.padding = e.target.checked;
+          DOM.audioFade.disabled = !DOM.audioPadding.checked;
+          worker.postMessage({ action: "update-state", audio: config.audio });
+          break;
+        }
 
-      case "downmix": {
-        config.audio.downmix = e.target.checked;
-        worker.postMessage({ action: "update-state", audio: config.audio });
-        break;
+        case "downmix": {
+          config.audio.downmix = e.target.checked;
+          worker.postMessage({ action: "update-state", audio: config.audio });
+          break;
+        }
       }
     }
     updatePrefs("config.json", config);
@@ -7963,7 +8002,7 @@ async function membershipCheck() {
     installDate = now
   }
   const trialPeriod = await window.electron.trialPeriod();
-  const inTrial = false //Date.now() - installDate < trialPeriod;
+  const inTrial = Date.now() - installDate < trialPeriod;
   const lockedElements = document.querySelectorAll(".locked, .unlocked");
   const unlockElements = () => {
     lockedElements.forEach((el) => {

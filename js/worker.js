@@ -17,6 +17,7 @@ import { State } from "./state.js";
 import { sqlite3, checkpoint, closeDatabase, Mutex } from "./database.js";
 import { trackEvent } from "./tracking.js";
 import { extractWaveMetadata } from "./metadata.js";
+
 let isWin32 = false;
 
 const DATASET = false;
@@ -2815,10 +2816,17 @@ const onInsertManualRecord = async ({
     fileID,
     fileStart;
   const db = STATE.db;
-  const { speciesID } = await db.getAsync(
+  const speciesFound = await db.getAsync(
     `SELECT id as speciesID FROM species WHERE cname = ?`,
     cname
   );
+  let speciesID;
+  if (speciesFound) {
+    speciesID = speciesFound.speciesID;
+  } else {
+    generateAlert({message: 'No species found with the name ${cname}', type:'error'})
+    return
+  }
   let res = await db.getAsync(
     `SELECT id,filestart FROM files WHERE name = ?`,
     file
