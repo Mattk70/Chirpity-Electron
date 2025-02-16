@@ -2078,8 +2078,8 @@ function syncConfig(config, defaultConfig) {
       typeof config[key] === "object" &&
       typeof defaultConfig[key] === "object"
     ) {
-      // Recursively sync nested objects
-      syncConfig(config[key], defaultConfig[key]);
+      // Recursively sync nested objects (but allow key assignment to be empty)
+      key === 'keyAssignment' || syncConfig(config[key], defaultConfig[key]);
     }
   });
 }
@@ -2155,7 +2155,8 @@ const defaultConfig = {
   debug: false,
   VERSION: VERSION,
   powerSaveBlocker: false,
-  fileStartMtime: false
+  fileStartMtime: false,
+  keyAssignment: {}
 };
 let appPath, tempPath, systemLocale, isMac;
 window.onload = async () => {
@@ -2363,6 +2364,7 @@ window.onload = async () => {
       autoArchive.checked = config.archive.auto;
     }
     setListUIState(config.list);
+    setKeyAssignmentUI(config.keyAssignment);
     worker.postMessage({
       action: "update-state",
       archive: config.archive,
@@ -6396,6 +6398,18 @@ document.addEventListener("change", function (e) {
         timelineToggle(e);
         break;
       }
+      case "key1": case "key2":case "key3":case "key4":case "key5":case 
+      "key6":case "key6":case "key7":case "key8":case "key9":case "key0": {
+        setKeyAssignment(element, target);
+        break;
+      }
+      case "key1-column": case "key2-column":case "key3-column":case "key4-column":case "key5-column":
+      case "key6-column":case "key6-column":case "key7-column":case "key8-column":case "key9-column":case "key0-column": {
+        const key = target.slice(0,4);
+        const inputElement = document.getElementById(key)
+        setKeyAssignment(inputElement, key);
+        break;
+      }
       case "nocmig": {
         changeNocmigMode(e);
         break;
@@ -7949,7 +7963,7 @@ async function membershipCheck() {
     installDate = now
   }
   const trialPeriod = await window.electron.trialPeriod();
-  const inTrial = Date.now() - installDate < trialPeriod;
+  const inTrial = false //Date.now() - installDate < trialPeriod;
   const lockedElements = document.querySelectorAll(".locked, .unlocked");
   const unlockElements = () => {
     lockedElements.forEach((el) => {
@@ -8011,4 +8025,35 @@ function hexToUtf8(hex) {
     .match(/.{1,2}/g) // Split the hex string into pairs
     .map((byte) => String.fromCharCode(parseInt(byte, 16))) // Convert each pair to a character
     .join("");
+}
+
+function setKeyAssignment(inputEL, key){
+  // Called on change to inputs
+  const columnEl = document.getElementById(key + '-column')
+  const column = columnEl.value;
+  let active = false;
+  const value = inputEL.value;
+  if (column){
+    inputEL.disabled = false; // enable input
+    if (value){
+      active = true;
+      config.keyAssignment[key] = {column, value, active};
+      console.log(`${key} is assigned to update ${column} with ${value}`)
+    } else {
+      config.keyAssignment[key] = {column, value, active};
+    }
+  } else {
+
+    inputEL.disabled = true; // disable input
+    config.keyAssignment[key] = {column, value, active};
+  }
+}
+
+function setKeyAssignmentUI(keyAssignments){
+  Object.entries(keyAssignments).forEach(([k, v]) => {
+    const input = document.getElementById(k);
+    input.value = v.value;
+    document.getElementById(k+'-column').value = v.column;
+    if (v.active) input.disabled = false;
+  }) 
 }

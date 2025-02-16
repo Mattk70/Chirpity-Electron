@@ -580,17 +580,19 @@ app.on("activate", async () => {
     await createWorker();
   }
 });
-let DB_CLOSED = false;
-app.on('before-quit', async (event) => {
-  event.preventDefault(); // Prevent default quit until cleanup is done
-  if (!DB_CLOSED) workerWindow.webContents.postMessage("close-database", null);
-  else app.quit()
-});
+
+/* This is leaving zombie processes */
+
+// app.on('before-quit', async (event) => {
+//   event.preventDefault(); // Prevent default quit until cleanup is done
+//   workerWindow.webContents.postMessage("close-database", null);
+// });
   
-ipcMain.on('database-closed', () =>{
-  DB_CLOSED = true;
-  app.quit()
- })
+// ipcMain.on('database-closed', () =>{
+//   app.quit()
+//  })
+
+
 ipcMain.handle("request-worker-channel", async (_event) => {
   // Create a new channel ...
   const { port1, port2 } = new MessageChannelMain();

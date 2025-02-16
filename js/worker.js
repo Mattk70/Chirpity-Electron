@@ -388,7 +388,7 @@ async function loadDB(path) {
     STATE.update({ db: diskDB });
     await diskDB.runAsync("VACUUM");
     await diskDB.runAsync("PRAGMA foreign_keys = ON");
-    await diskDB.runAsync("PRAGMA journal_mode = WAL");
+    // await diskDB.runAsync("PRAGMA journal_mode = WAL");
     await diskDB.runAsync("PRAGMA busy_timeout = 1000");
     await diskDB
       .runAsync(
@@ -769,14 +769,16 @@ ipcRenderer.on("new-client", async (event) => {
 });
 
 
-ipcRenderer.on("close-database", async (event) => {
-  checkpoint(diskDB)
-  .then(closeDatabase(diskDB))
-  .catch(error => console.error("Error closing database:", error.message))
-  .finally(_ => {
+ipcRenderer.on("close-database", async () => {
+  try {
+    await checkpoint(diskDB)
+    await closeDatabase(diskDB)
+  } catch(error) {
+    console.error("Error closing database:", error.message)
+  } finally {
     diskDB = null;
     ipcRenderer.send('database-closed')
-  })
+  }
 });
 
 /**
