@@ -388,7 +388,7 @@ async function loadDB(path) {
     STATE.update({ db: diskDB });
     await diskDB.runAsync("VACUUM");
     await diskDB.runAsync("PRAGMA foreign_keys = ON");
-    // await diskDB.runAsync("PRAGMA journal_mode = WAL");
+    await diskDB.runAsync("PRAGMA journal_mode = WAL");
     await diskDB.runAsync("PRAGMA busy_timeout = 1000");
     await diskDB
       .runAsync(
