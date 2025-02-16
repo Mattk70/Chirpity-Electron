@@ -269,6 +269,7 @@ const createDB = async (file) => {
   try {
     db.locale = "en";
     await db.runAsync("BEGIN");
+    await diskDB.runAsync("PRAGMA user_version = 1")
     await db.runAsync(
       "CREATE TABLE species(id INTEGER PRIMARY KEY, sname TEXT NOT NULL, cname TEXT NOT NULL)"
     );
@@ -281,7 +282,7 @@ const createDB = async (file) => {
     await db.runAsync(
       "CREATE UNIQUE INDEX idx_unique_place ON locations(lat, lon)"
     );
-    await db.runAsync(`CREATE TABLE records( dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, label  TEXT,  comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER, 
+    await db.runAsync(`CREATE TABLE records( dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, label  TEXT,  comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER, reviewed INTEGER, 
             UNIQUE (dateTime, fileID, speciesID), CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,  FOREIGN KEY (speciesID) REFERENCES species(id))`);
     await db.runAsync(
       `CREATE TABLE duration( day INTEGER, duration INTEGER, fileID INTEGER, UNIQUE (day, fileID), CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE)`
@@ -396,9 +397,18 @@ async function loadDB(path) {
         "CREATE INDEX IF NOT EXISTS idx_species_sname ON species(sname)"
       )
       .catch((error) => console.error(error));
-    await diskDB.runAsync(
-      "CREATE INDEX IF NOT EXISTS idx_species_cname ON species(cname)"
-    );
+    // Add new column if not exists
+    const {user_version} = await diskDB.getAsync("PRAGMA user_version")
+      .catch((error) => console.error(error));
+    if (user_version !== undefined && user_version < 1){ 
+      try{
+        await diskDB.runAsync("ALTER TABLE records ADD COLUMN reviewed INTEGER");
+        await diskDB.runAsync("PRAGMA user_version = 1")
+        console.info("Added 'reviewed' column to ", p.basename(file))
+      } catch (e) {
+        console.error("Error adding column and updating version", e.message, e)
+      }
+    }
     await checkAndApplyUpdates(diskDB);
     const { count } = await diskDB.getAsync(
       "SELECT COUNT(*) as count FROM records"
@@ -1206,6 +1216,7 @@ const prepResultsStatement = (
         records.end,
         records.callCount,
         records.isDaylight,
+        records.reviewed,
         RANK() OVER (PARTITION BY fileID, dateTime ORDER BY records.confidence DESC) AS rank
         FROM records 
         JOIN species ON records.speciesID = species.id 
@@ -1258,6 +1269,7 @@ const prepResultsStatement = (
     end,
     callCount,
     isDaylight,
+    reviewed,
     rank
     FROM 
     ranked_records 
@@ -1269,8 +1281,8 @@ const prepResultsStatement = (
   }
   const limitClause = noLimit ? "" : "LIMIT ?  OFFSET ?";
   noLimit || params.push(STATE.limit, offset);
-
-  resultStatement += ` ORDER BY ${STATE.resultsSortOrder}, timestamp ASC ${limitClause} `;
+  const metaSort = STATE.resultsMetaSortOrder ? `${STATE.resultsMetaSortOrder}, ` : '';
+  resultStatement += ` ORDER BY ${metaSort} ${STATE.resultsSortOrder}, timestamp ASC ${limitClause} `;
 
   return [resultStatement, params];
 };
@@ -2860,32 +2872,41 @@ const onInsertManualRecord = async ({
   const isDaylight = isDuringDaylight(dateTime, STATE.lat, STATE.lon);
   confidence = confidence || 2000;
   // Delete an existing record if it exists
-  const result = await db.getAsync(
-    `SELECT id as originalSpeciesID FROM species WHERE cname = ?`,
-    originalCname
-  );
-  result?.originalSpeciesID &&
-    (await db.runAsync(
-      "DELETE FROM records WHERE datetime = ? AND speciesID = ? AND fileID = ?",
-      dateTime,
-      result.originalSpeciesID,
-      fileID
-    ));
+  // const result = await db.getAsync(
+  //   `SELECT id as originalSpeciesID FROM species WHERE cname = ?`,
+  //   originalCname
+  // );
+  // if (result?.originalSpeciesID){
+  //   await db.runAsync(
+  //     "DELETE FROM records WHERE datetime = ? AND speciesID = ? AND fileID = ?",
+  //     dateTime,
+  //     result.originalSpeciesID,
+  //     fileID
+  //   );
+  //   confidence = confidence || result.confidence;
+  // }
 
-  await db.runAsync(
-    "INSERT OR REPLACE INTO records VALUES ( ?,?,?,?,?,?,?,?,?,?)",
-    dateTime,
-    start,
-    fileID,
-    speciesID,
-    confidence,
-    label,
-    comment,
-    end,
-    parseInt(count),
-    isDaylight
-  );
-};
+    await db.runAsync(
+      `INSERT INTO records (dateTime, position, fileID, speciesID, confidence, label, comment, end, callCount, isDaylight, reviewed)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(dateTime, fileID, speciesID) DO UPDATE SET 
+         label = excluded.label,
+         comment = excluded.comment,
+         reviewed = excluded.reviewed;`,
+      dateTime,
+      start,
+      fileID,
+      speciesID,
+      confidence, // This will only be inserted, not updated
+      label,
+      comment,
+      end,
+      parseInt(count),
+      isDaylight,
+      true
+    );
+    
+  };
 
 const insertDurations = async (file, id) => {
   const durationSQL = Object.entries(METADATA[file].dateDuration)
@@ -3394,10 +3415,7 @@ const getResults = async ({
     //const position = await getPosition({species: species, dateTime: select.dateTime, included: included});
     offset = (position.page - 1) * limit;
     // We want to consistently move to the next record. If results are sorted by time, this will be row + 1.
-    // If by confidence, it wil not change, as the validated record will move to the top
-    active = ["timestamp", "dateTime"].includes(STATE.resultsSortOrder)
-      ? position.row + 1
-      : position.row;
+    active = position.row + 1;
     // update the pagination
     await getTotal({ species: species, offset: offset, included: included });
   }

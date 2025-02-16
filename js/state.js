@@ -9,6 +9,7 @@ export class State {
     (this.db = db),
       (this.mode = "analyse"), // analyse, explore, chart
       (this.resultsSortOrder = "dateTime"),
+      this.resultsMetaSortOrder = null,
       (this.summarySortOrder = "cname ASC"),
       (this.filesToAnalyse = []),
       (this.limit = 500),

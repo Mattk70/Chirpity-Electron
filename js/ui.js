@@ -145,6 +145,7 @@ let STATE = {
   },
   resultsSortOrder: "timestamp",
   summarySortOrder: "cname ASC",
+  resultsMetaSortOrder: null,
   dataFormatOptions: {
     day: "2-digit",
     month: "short",
@@ -1807,11 +1808,6 @@ async function resultClick(e) {
   }
 
   const [file, start, end, _, label] = row.getAttribute("name").split("|");
-  // if (row.classList.contains('table-active')){
-  //     createRegion(start - windowOffsetSecs, end - windowOffsetSecs, label, true);
-  //     e.target.classList.contains('circle') && getSelectionResults(true);
-  //     return;
-  // }
 
   // Search for results rows - Why???
   while (
@@ -3636,7 +3632,18 @@ function recordUpdate(key){
     const newCname = assignment.column === 'species' ?  assignment.value : name;
     const newLabel = assignment.column === 'label' ?  assignment.value : label || '';
     const newComment = assignment.column === 'comment' ?  assignment.value : comment;
-
+    // DELETE_HISTORY.push([
+    //   cname,
+    //   parseFloat(start),
+    //   parseFloat(end),
+    //   comment,
+    //   undefined, // won't restore callCount
+    //   label,
+    //   undefined,
+    //   undefined,
+    //   undefined,
+    //   confidence,
+    // ]);
     insertManualRecord(
       newCname,
       parseFloat(start),
@@ -3689,8 +3696,7 @@ const GLOBAL_ACTIONS = {
   v: (e) => {
     if (activeRow && (e.ctrlKey || e.metaKey)) {
       const nameAttribute = activeRow.getAttribute("name");
-      const [file, start, end, sname, label] = nameAttribute.split("|");
-      const cname = label.replace("?", "");
+      const [file, start, end, sname, cname] = nameAttribute.split("|");
       insertManualRecord(
         cname,
         parseFloat(start),
@@ -4535,8 +4541,9 @@ async function renderResult({
                     <th id="sort-position" class="time-sort text-start timestamp" title="${i18n.position[1]}"><span class="text-muted material-symbols-outlined time-sort-icon d-none">sort</span> ${i18n.position[0]}</th>
                     <th id="confidence-sort" class="text-start" title="${i18n.species[1]}"><span class="text-muted material-symbols-outlined species-sort-icon d-none">sort</span> ${i18n.species[0]}</th>
                     <th class="text-end">${i18n.calls}</th>
-                    <th class="col">${i18n.label}</th>
-                    <th id="notes" class="col text-end">${i18n.notes}</th>
+                    <th id="sort-label" class="col pointer"><span class="text-muted material-symbols-outlined meta-sort-icon d-none">sort</span> ${i18n.label}</th>
+                    <th id="sort-comment" class="col pointer text-end"><span class="text-muted material-symbols-outlined meta-sort-icon d-none">sort</span> ${i18n.notes}</th>
+                    <th id="sort-reviewed" class="col pointer text-end"><span class="text-muted material-symbols-outlined meta-sort-icon d-none">sort</span>${i18n.reviewed}</th>
                 </tr>`;
       setTimelinePreferences();
       // DOM.resultHeader.innerHTML = fragment;
@@ -4564,6 +4571,7 @@ async function renderResult({
       count,
       callCount,
       isDaylight,
+      reviewed
     } = result;
     const dayNight = isDaylight ? "daytime" : "nighttime";
     // Todo: move this logic so pre dark sections of file are not even analysed
@@ -4575,7 +4583,10 @@ async function renderResult({
           "&quot;"
         )}" class='material-symbols-outlined pointer'>comment</span>`
       : "";
-    const isUncertain = score < 65 ? "&#63;" : "";
+
+    const reviewHTML = reviewed 
+        ? `<span class='material-symbols-outlined'>check_small</span>`
+        : '';
     // store result for feedback function to use
     if (!selection) predictions[index] = result;
     // Format date and position for  UI
@@ -4599,7 +4610,7 @@ async function renderResult({
         : "";
     tr += `<tr tabindex="-1" id="result${index}" name="${file}|${position}|${
       end || position + 3
-    }|${sname}|${cname}${isUncertain}" class='${activeTable} border-top border-2 border-secondary ${dayNight}'>
+    }|${sname}|${cname}" class='${activeTable} border-top border-2 border-secondary ${dayNight}'>
             <td class='text-start timeOfDay ${showTimeOfDay}'>${UI_timestamp}</td>
             <td class="text-start timestamp ${showTimestamp}">${UI_position} </td>
             <td name="${cname}" class='text-start cname'>
@@ -4611,7 +4622,7 @@ async function renderResult({
             
             <td class="label ${hide}">${labelHTML}</td>
             <td class="comment text-end ${hide}">${commentHTML}</td>
-            
+            <td class="reviewed text-end ${hide}">${reviewHTML}</td>
             </tr>`;
   }
   updateResultTable(tr, isFromDB, selection);
@@ -5233,7 +5244,18 @@ function activateResultFilters() {
   const speciesHeadings = document.getElementsByClassName("species-sort-icon");
   const sortOrderScore = STATE.resultsSortOrder.includes("score");
   const fragment = document.createDocumentFragment();
-
+  if (STATE.resultsMetaSortOrder){
+    const sortOrderMeta = STATE.resultsMetaSortOrder.replace(' ASC ', '').replace(' DESC ', '')
+    const metaHeadings = document.getElementsByClassName("meta-sort-icon");
+    [...metaHeadings].forEach((heading) => {
+      heading.classList.toggle("d-none", !heading.parentNode.id.includes(sortOrderMeta));
+      if (STATE.resultsMetaSortOrder.includes("ASC")){
+        heading.classList.add("flipped");
+      } else {
+        heading.classList.remove("flipped");
+      }
+    })
+  }
   // Clone the result header and work on it in the fragment
   const resultHeaderClone = DOM.resultHeader.cloneNode(true);
   fragment.appendChild(resultHeaderClone);
@@ -5292,9 +5314,9 @@ function showSummarySortIcon() {
   }
 }
 
-const setSortOrder = (order) => {
-  STATE.resultsSortOrder = order;
-  worker.postMessage({ action: "update-state", resultsSortOrder: order });
+const setSortOrder = (field, order) => {
+  STATE[field] = order;
+  worker.postMessage({ action: "update-state", [field]: order });
   // resetResults({clearSummary: false, clearPagination: false, clearResults: true});
   filterResults();
 };
@@ -6163,11 +6185,24 @@ document.addEventListener("click", function (e) {
       exportSpeciesList();
       break;
     }
+    case "sort-label":
+    case "sort-comment":
+    case "sort-reviewed": {
+      if (!PREDICTING) {
+        const sort = target.slice(5);
+        STATE.resultsMetaSortOrder =
+        STATE.resultsMetaSortOrder === `${sort} DESC `
+        ? `${sort} ASC `
+        : `${sort} DESC `;
+      }
+      setSortOrder("resultsMetaSortOrder", STATE.resultsMetaSortOrder)
+    }
 
     case "sort-position":
+    case "sort-label":
     case "sort-time": {
       if (!PREDICTING) {
-        STATE.resultsSortOrder === "timestamp" || setSortOrder("timestamp");
+        STATE.resultsSortOrder === "timestamp" || setSortOrder("resultsSortOrder", "timestamp");
       }
       break;
     }
@@ -6177,7 +6212,7 @@ document.addEventListener("click", function (e) {
           STATE.resultsSortOrder === "score DESC "
             ? "score ASC "
             : "score DESC ";
-        setSortOrder(sortBy);
+            setSortOrder("resultsSortOrder", sortBy);
       }
       break;
     }
@@ -8071,7 +8106,7 @@ function setKeyAssignment(inputEL, key){
   const columnEl = document.getElementById(key + '-column')
   const column = columnEl.value;
   let active = false;
-  const value = inputEL.value;
+  const value = inputEL.value.trim();
   if (column){
     inputEL.disabled = false; // enable input
     if (value){

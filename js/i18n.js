@@ -705,7 +705,8 @@ const i18nHeadings = {
         notes: 'Notes',
         max: 'Maximum',
         detections: 'Detections',
-        location: 'Location'
+        location: 'Location',
+        reviewed: 'Reviewed'
     },
     da: {
         position: ['Position', "Sorter resultater efter detektionstid"],
@@ -716,7 +717,8 @@ const i18nHeadings = {
         notes: 'Noter',
         max: 'Maksimum',
         detections: 'Detektioner',
-        location: "Placering"
+        location: "Placering",
+        reviewed: 'Reviewed'
     },
     de: {
         position: ['Position', "Ergebnisse nach Erkennungszeit sortieren"],
@@ -727,7 +729,8 @@ const i18nHeadings = {
         notes: 'Notizen',
         max: 'Maximum',
         detections: 'Erkennungen',
-        location: "Standort"
+        location: "Standort",
+        reviewed: 'Reviewed'
     },
     es: {
         position: ['Posición', "Ordenar resultados por la hora de detección"],
@@ -738,7 +741,8 @@ const i18nHeadings = {
         notes: 'Notas',
         max: 'Máximo',
         detections: 'Detecciones',
-        location: "Ubicación"
+        location: "Ubicación",
+        reviewed: 'Reviewed'
     },
     fr: {
         position: ['Position', "Trier les résultats par heure de détection"],
@@ -749,7 +753,8 @@ const i18nHeadings = {
         notes: 'Notes',
         max: 'Maximum',
         detections: 'Détections',
-        location: "Emplacement"
+        location: "Emplacement",
+        reviewed: 'Reviewed'
     },
     ja: {
         position: ['位置', "検出時間で結果を並べ替える"],
@@ -760,7 +765,8 @@ const i18nHeadings = {
         notes: 'ノート',
         max: '最大',
         detections: '検出',
-        location: '場所'
+        location: '場所',
+        reviewed: 'Reviewed'
     },
     nl: {
         position: ['Positie', "Sorteer resultaten op detectietijd"],
@@ -771,7 +777,8 @@ const i18nHeadings = {
         notes: 'Notities',
         max: 'Maximum',
         detections: 'Detecties',
-        location: "Locatie"
+        location: "Locatie",
+        reviewed: 'Reviewed'
     },
     pt: {
         position: ['Posição', "Ordenar resultados por tempo de detecção"],
@@ -782,7 +789,8 @@ const i18nHeadings = {
         notes: 'Notas',
         max: 'Máximo',
         detections: 'Detecções',
-        location: "Localização"
+        location: "Localização",
+        reviewed: 'Reviewed'
     },
     ru: {
         position: ['Позиция', "Сортировать результаты по времени обнаружения"],
@@ -793,7 +801,8 @@ const i18nHeadings = {
         notes: 'Заметки',
         max: 'Максимум',
         detections: 'Обнаружения',
-        location:  "Местоположение"
+        location:  "Местоположение",
+        reviewed: 'Reviewed'
     },
     sv: {
         position: ['Position', "Sortera resultat efter upptäcktstid"],
@@ -804,7 +813,8 @@ const i18nHeadings = {
         notes: 'Anteckningar',
         max: 'Maximum',
         detections: 'Upptäckter',
-        location: "Plats"
+        location: "Plats",
+        reviewed: 'Reviewed'
     },
     zh: {
         position: ['位置', "按检测时间排序结果"],
@@ -815,7 +825,8 @@ const i18nHeadings = {
         notes: '备注',
         max: '最大值',
         detections: '检测',
-        location: "位置"
+        location: "位置",
+        reviewed: 'Reviewed'
     }
 };
 
