@@ -2982,7 +2982,7 @@ const generateInsertQuery = async (latestResult, file) => {
         const speciesID = speciesIDArray[j];
         insertQuery += `(${timestamp}, ${key}, ${fileID}, ${speciesID}, ${confidence}, null, null, ${
           key + 3
-        }, null, ${isDaylight}), `;
+        }, null, ${isDaylight}, 0), `;
       }
     }
     // Remove the trailing comma and space

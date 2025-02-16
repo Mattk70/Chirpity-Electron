@@ -4703,9 +4703,9 @@ const deleteRecord = (target) => {
     const row = target.closest("tr");
     let cname = target.querySelector(".cname").innerText;
     let [species, confidence] = cname.split("\n");
-    // confirmed records don't have a confidence bar
+    // Manual records don't have a confidence bar
     if (!confidence) {
-      species = species.slice(0, -9); // remove ' verified'
+      species = species.slice(0, -11); // remove ' person_add'
       confidence = 2000;
     } else {
       confidence = parseInt(confidence.replace("%", "")) * 10;
@@ -4835,7 +4835,7 @@ const iconDict = {
     '<span class="confidence-row"><span class="confidence bar" style="flex-basis: --%; background: #fd7e14">--%</span></span>',
   high: '<span class="confidence-row"><span class="confidence bar" style="flex-basis: --%; background: #198754">--%</span></span>',
   confirmed:
-    '<span class="material-symbols-outlined" title="Confirmed Record">verified</span>',
+    '<span class="material-symbols-outlined" title="Manual Record">person_add</span>',
 };
 
 const iconizeScore = (score) => {
