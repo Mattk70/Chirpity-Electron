@@ -145,7 +145,7 @@ let STATE = {
   },
   resultsSortOrder: "timestamp",
   summarySortOrder: "cname ASC",
-  resultsMetaSortOrder: null,
+  resultsMetaSortOrder: '',
   dataFormatOptions: {
     day: "2-digit",
     month: "short",
@@ -308,10 +308,11 @@ DOM.contentWrapper.style.height = bodyElement.clientHeight - 80 + "px";
 
 const specMaxHeight = () => {
   // Get the available viewport height
+  const formOffset = DOM.exploreWrapper.offsetHeight
   const navPadding = DOM.navPadding.clientHeight;
   const footerHeight = DOM.footer.clientHeight;
   const controlsHeight = DOM.controlsWrapper.clientHeight;
-  return window.innerHeight - navPadding - footerHeight - controlsHeight;
+  return window.innerHeight - navPadding - footerHeight - controlsHeight - formOffset;
 };
 
 // Mouse down event to start dragging
@@ -2699,6 +2700,42 @@ function showWindowDetections({detections, goToRegion}) {
   STATE.regionsCompleted = true;
 }
 
+document.addEventListener('input', function (e) {
+  const target = e.target;
+  const i18n = getI18n(i18nHeadings);
+  if (target.id === 'bird-search'){
+    const search = target.value.toLowerCase();
+    let count = 0;
+    const birdList = document.getElementById('bird-list-all');
+    if (search.length > 1){
+      birdList.textContent = '';
+      const sortedList = LABELS
+      .filter(bird => bird.toLowerCase().includes(search))
+      .map(item => {
+        const [cname, sname] = item.split('_').reverse(); // Flip sname and cname
+        return { cname, sname }; // Return structured object
+      })
+      .sort((a, b) => new Intl.Collator(config.locale.replace(/_.*$/, "")).compare(a.cname, b.cname));
+    
+    const fragment = document.createDocumentFragment();
+    
+    sortedList.forEach(({ cname, sname }) => {
+      const option = document.createElement("option");
+      option.value = cname;
+      option.textContent = `${cname}~${sname}`;
+      fragment.appendChild(option);
+    });
+    
+    birdList.appendChild(fragment);
+      count = sortedList.length
+    } else {
+      count = LABELS.length;
+      birdList.innerHTML = `<option value="">${i18n.searchPrompt}</option>`
+    }
+    document.getElementById('count').innerText = e.target.value.length > 1 ? count : 0;
+  }
+});
+
 function generateBirdList(store, rows) {
   const chart = document.getElementById("chart-list");
   const explore = document.getElementById("explore-list");
@@ -2711,22 +2748,33 @@ function generateBirdOptionList({ store, rows, selected }) {
   let listHTML = "";
   const i18n = getI18n(i18nHeadings);
   const i18nTout = getI18n(i18nAll);
+  // Species search label and match count
+  document.getElementById('species-search-label').innerHTML = i18n.search;
   if (store === "allSpecies") {
-    let sortedList = LABELS.map((label) => label.split("_")[1]);
+    // let sortedList = LABELS.map((label) => {
+    //   const [sname, cname] = label.split("_")
+    //   return `${cname}~${sname}`
+    // });
 
-    // International language sorting, recommended for large arrays - 'en_uk' not valid, but same as 'en'
-    sortedList.sort(
-      new Intl.Collator(config.locale.replace(/_.*$/, "")).compare
-    );
+    // // International language sorting, recommended for large arrays - 'en_uk' not valid, but same as 'en'
+    // sortedList.sort(
+    //   new Intl.Collator(config.locale.replace(/_.*$/, "")).compare
+    // );
     // Check if we have prepared this before
 
-    const lastSelectedSpecies = selected || STATE.birdList.lastSelectedSpecies;
+    // const lastSelectedSpecies = selected || STATE.birdList.lastSelectedSpecies;
     listHTML +=
-      '<div class="form-floating"><select spellcheck="false" id="bird-list-all" class="input form-select mb-3" aria-label=".form-select" required>';
-    listHTML += `<option value="">${i18nTout[1]}</option>`;
-    for (const species of sortedList) {
-      const isSelected = species === lastSelectedSpecies ? "selected" : "";
-      listHTML += `<option value="${species}" ${isSelected}>${species}</option>`;
+      `<div class="form-floating">
+      <select spellcheck="false" id="bird-list-all" class="form-select mb-3" aria-label=".form-select" required>`;
+    // 
+    // for (const species of sortedList) {
+    if (selected){
+      const species = LABELS.find(sp => sp.split('_')[1] === selected);
+      const [sname, cname] = species.split('_');
+      // const isSelected = cname === lastSelectedSpecies ? "selected" : "";
+      listHTML += `<option value="${cname}" selected>${cname}~${sname}</option>`;
+    } else {
+      listHTML += `<option value="">${i18n.searchPrompt}</option>`
     }
     listHTML += `</select><label for="bird-list-all">${i18n.species[0]}</label></div>`;
   } else {
@@ -3167,7 +3215,7 @@ const waitForFinalEvent = (function () {
 window.addEventListener("resize", function () {
   waitForFinalEvent(
     function () {
-      adjustSpecDims(false);
+      adjustSpecDims(true);
     },
     100,
     "id1"
@@ -3774,7 +3822,7 @@ const GLOBAL_ACTIONS = {
   },
   PageDown: () => {
     if (currentBuffer) {
-      const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
+      let position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, );
       windowOffsetSecs = windowOffsetSecs + windowLength;
       const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
       let fileToLoad;
@@ -3785,6 +3833,7 @@ const GLOBAL_ACTIONS = {
         // Move to next file
         fileToLoad = STATE.openFiles[fileIndex + 1];
         windowOffsetSecs = 0;
+        position = 0;
       } else {
         windowOffsetSecs = Math.min(
           windowOffsetSecs,
@@ -3913,8 +3962,8 @@ const postBufferUpdate = ({
 }) => {
 
   // Validate input parameters
-  if (begin < 0 || position < 0 || position > 1) {
-    console.error('Invalid buffer update parameters:', `Begin: ${begin}, Position: ${position}`);
+  if (position < 0 || position > 1) {
+    console.error('Invalid buffer update position:', `Position: ${position}`);
     return;
   }
 
@@ -4304,7 +4353,7 @@ function onResultsComplete({ active = undefined, select = undefined } = {}) {
   // hide progress div
   DOM.progressDiv.classList.add("invisible");
   renderFilenamePanel();
-  activateResultFilters();
+  // activateResultFilters();
 }
 
 function getRowFromStart(table, start) {
@@ -4377,7 +4426,7 @@ function onAnalysisComplete({ quiet }) {
     DIAGNOSTICS["Analysis Rate"] =
       rate.toFixed(0) + "x faster than real time performance.";
     generateToast({ message: "complete" });
-    activateResultFilters();
+    // activateResultFilters();
   }
 }
 
@@ -5244,18 +5293,20 @@ function activateResultFilters() {
   const speciesHeadings = document.getElementsByClassName("species-sort-icon");
   const sortOrderScore = STATE.resultsSortOrder.includes("score");
   const fragment = document.createDocumentFragment();
-  if (STATE.resultsMetaSortOrder){
-    const sortOrderMeta = STATE.resultsMetaSortOrder.replace(' ASC ', '').replace(' DESC ', '')
-    const metaHeadings = document.getElementsByClassName("meta-sort-icon");
-    [...metaHeadings].forEach((heading) => {
-      heading.classList.toggle("d-none", !heading.parentNode.id.includes(sortOrderMeta));
-      if (STATE.resultsMetaSortOrder.includes("ASC")){
-        heading.classList.add("flipped");
-      } else {
-        heading.classList.remove("flipped");
-      }
-    })
-  }
+  // if (STATE.resultsMetaSortOrder){
+  const state = STATE.resultsMetaSortOrder;
+  const sortOrderMeta = state.replace(' ASC ', '').replace(' DESC ', '');
+  const metaHeadings = document.getElementsByClassName("meta-sort-icon");
+  [...metaHeadings].forEach((heading) => {
+    const hideIcon = state === '' || !heading.parentNode.id.includes(sortOrderMeta);
+    heading.classList.toggle("d-none", hideIcon);
+    if (state.includes("ASC")){
+      heading.classList.add("flipped");
+    } else {
+      heading.classList.remove("flipped");
+    }
+  })
+  // }
   // Clone the result header and work on it in the fragment
   const resultHeaderClone = DOM.resultHeader.cloneNode(true);
   fragment.appendChild(resultHeaderClone);
@@ -6186,17 +6237,25 @@ document.addEventListener("click", function (e) {
       break;
     }
     case "sort-label":
-    case "sort-comment":
-    case "sort-reviewed": {
-      if (!PREDICTING) {
-        const sort = target.slice(5);
-        STATE.resultsMetaSortOrder =
-        STATE.resultsMetaSortOrder === `${sort} DESC `
-        ? `${sort} ASC `
-        : `${sort} DESC `;
+      case "sort-comment":
+      case "sort-reviewed": {
+        if (!PREDICTING) {
+          const sort = target.slice(5);
+          const state = STATE.resultsMetaSortOrder;
+          // If no sort is set or the sort column is different, start with DESC.
+          if (!state || !state.startsWith(sort)) {
+            STATE.resultsMetaSortOrder = `${sort} DESC `;
+          } else if (state === `${sort} DESC `) {
+            // Second click: switch from DESC to ASC.
+            STATE.resultsMetaSortOrder = `${sort} ASC `;
+          } else if (state === `${sort} ASC `) {
+            // Third click: reset sort order.
+            STATE.resultsMetaSortOrder = '';
+          }
+        }
+        setSortOrder("resultsMetaSortOrder", STATE.resultsMetaSortOrder);
+        break;
       }
-      setSortOrder("resultsMetaSortOrder", STATE.resultsMetaSortOrder)
-    }
 
     case "sort-position":
     case "sort-label":
@@ -7091,19 +7150,20 @@ async function showRecordEntryForm(mode, batch) {
   const recordEntryBirdList = recordEntryForm.querySelector(
     "#record-entry-birdlist"
   );
-  focusBirdList = () => {
-    const allBirdList = document.getElementById("bird-list-all");
-    allBirdList.focus();
-  };
+  focusBirdList = () => document.getElementById("bird-search").focus();
+
   recordEntryBirdList.innerHTML = generateBirdOptionList({
     store: "allSpecies",
     rows: undefined,
     selected: cname,
   });
+  // recordEntryBirdList.querySelector('bird-list-all').options[recordEntryBirdList.selectedIndex].scrollIntoView();
   const batchHide = recordEntryForm.querySelectorAll(".hide-in-batch");
   batchHide.forEach((el) =>
     batch ? el.classList.add("d-none") : el.classList.remove("d-none")
   );
+  recordEntryForm.querySelector("#bird-search").value = ''; // reset search input
+  recordEntryForm.querySelector("#count").innerText = '0'; // And match count
   recordEntryForm.querySelector("#call-count").value = callCount;
   recordEntryForm.querySelector("#record-comment").value = commentText;
   recordEntryForm.querySelector("#DBmode").value = mode;

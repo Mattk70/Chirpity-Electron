@@ -181,13 +181,22 @@
                 <form id="record-entry-form">
                     <div id="record-entry-modal-body" class="modal-body">
                         <div class="row">
-                            <div class="col-8" id="record-entry-birdlist"></div>
+                            <div class="col-7">
+                                <div class="form-floating mb-3"> 
+                                    <input type="text" class="form-control mb-3" id="bird-search">
+                                    <label id="species-search-label" for="bird-search">Species Search (<span id="count">0</span> matches)</label>
+                                </div>
+                            </div>
+                            
                             <div class="col hide-in-batch">
                                 <div class="form-floating mb-3">
                                     <input type="number" id="call-count" class="form-control" min="1">
-                                    <label for="call-count">Call Count</label>
+                                    <label class="mb-2" for="call-count">Call Count</label>
                                 </div>
                             </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-12" id="record-entry-birdlist"></div>
                         </div>
                         <fieldset class="border  ps-3 pt-1">
                             <label for="record-label" class="text-muted" style="font-size: .75em">Call Type</label><br>
@@ -205,7 +214,7 @@
                             </div>
                         </fieldset>
                         <div class="form-floating mt-3 hide-in-batch">
-                            <textarea class="form-control" id="record-comment" style="height: 200px"></textarea>
+                            <textarea class="form-control" id="record-comment" style="height: 100px"></textarea>
                             <label for="record-comment">Comments</label>
                             <input type="hidden" id="DBmode">
                             <input type="hidden" id="batch-mode">

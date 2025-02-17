@@ -2836,8 +2836,8 @@ const onInsertManualRecord = async ({
   if (speciesFound) {
     speciesID = speciesFound.speciesID;
   } else {
-    generateAlert({message: 'No species found with the name ${cname}', type:'error'})
-    return
+    generateAlert({message: 'noSpecies', variables: {cname}, type:'error'})
+    return 
   }
   let res = await db.getAsync(
     `SELECT id,filestart FROM files WHERE name = ?`,
@@ -2871,20 +2871,22 @@ const onInsertManualRecord = async ({
   const dateTime = fileStart + startMilliseconds;
   const isDaylight = isDuringDaylight(dateTime, STATE.lat, STATE.lon);
   confidence = confidence || 2000;
-  // Delete an existing record if it exists
-  // const result = await db.getAsync(
-  //   `SELECT id as originalSpeciesID FROM species WHERE cname = ?`,
-  //   originalCname
-  // );
-  // if (result?.originalSpeciesID){
-  //   await db.runAsync(
-  //     "DELETE FROM records WHERE datetime = ? AND speciesID = ? AND fileID = ?",
-  //     dateTime,
-  //     result.originalSpeciesID,
-  //     fileID
-  //   );
-  //   confidence = confidence || result.confidence;
-  // }
+  // Delete an existing record if species was changed
+  if (cname !== originalCname){
+    const result = await db.getAsync(
+      `SELECT id as originalSpeciesID FROM species WHERE cname = ?`,
+      originalCname
+    );
+    if (result?.originalSpeciesID){
+      await db.runAsync(
+        "DELETE FROM records WHERE datetime = ? AND speciesID = ? AND fileID = ?",
+        dateTime,
+        result.originalSpeciesID,
+        fileID
+      );
+      confidence = confidence || result.confidence;
+    }
+  }
 
     await db.runAsync(
       `INSERT INTO records (dateTime, position, fileID, speciesID, confidence, label, comment, end, callCount, isDaylight, reviewed)
@@ -5045,6 +5047,7 @@ async function convertFile(
         command.seekInput(start).duration(end - start);
         scaleFactor = row.duration / (end - start);
         row.duration = end - start;
+        
       }
     }
     command
@@ -5059,8 +5062,8 @@ async function convertFile(
         utimesSync(fullFilePath, { atime: Date.now(), mtime: newfileMtime });
 
         db.run(
-          "UPDATE files SET archiveName = ? WHERE id = ?",
-          [dbArchiveName, row.id],
+          "UPDATE files SET archiveName = ?, duration = ? WHERE id = ?",
+          [dbArchiveName, row.duration, row.id],
           (err) => {
             if (err) {
               console.error("Error updating the database:", err);

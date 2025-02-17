@@ -183,11 +183,11 @@ ul {
 }
 
 
-.bird-list {
+#bird-list-all {
     overflow: auto;
     margin-right: 0;
-    max-height: 250px;
-    max-width: 320px;
+    min-width: 100%;
+    /* max-width: 320px; */
 }
 
 
