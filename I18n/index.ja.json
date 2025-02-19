@@ -148,7 +148,7 @@
 "record-entry":{
   "record-entry-modal-label": "レコードを編集",
   "call-count": "コール数",
-  "record-label": "コールタイプ",
+  "record-label": "ラベル",
   "label-local": "ローカル",
   "label-nocmig": "Nocmig",
   "label-unknown": "指定なし",
@@ -156,7 +156,7 @@
   "record-add": "追加"
 },
 
-"headings": ["設定","検出",
+"headings": ["設定","検出", "キーボード割り当て",
   "デフォルトの場所",
   "システム",
   "オーディオ設定",

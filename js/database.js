@@ -58,6 +58,7 @@ sqlite3.Statement.prototype.getAsync = function (...params) {
 };
 
 sqlite3.Database.prototype.getAsync = function (sql, ...params) {
+  if (DEBUG) console.log("SQL\n", sql, "\nParams\n", params);
   return new Promise((resolve, reject) => {
     this.get(sql, params, (err, row) => {
       if (err) return reject(err, console.log(err, sql));

@@ -169,7 +169,8 @@ let STATE = {
   translations: ["da", "de", "es", "fr", "ja", "nl", "pt", "ru", "sv", "zh"],
   regionColour: "rgba(255, 255, 255, 0.1)",
   regionActiveColour: "rgba(255, 255, 0, 0.1)",
-  regionsCompleted: true
+  regionsCompleted: true,
+  labelColors: ["dark", "success", "warning", "info", "secondary", "danger", "primary"]
 };
 
 //Open Files from OS "open with"
@@ -596,6 +597,7 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
 
   wavesurfer.on("finish", function () {
     const bufferEnd = windowOffsetSecs + windowLength;
+    activeRegion = null;
     if (currentFileDuration > bufferEnd) {
       postBufferUpdate({ begin: windowOffsetSecs + windowLength, play: true });
     }
@@ -4625,6 +4627,7 @@ async function renderResult({
       cname,
       score,
       label,
+      labelID,
       comment,
       end,
       count,
@@ -4661,7 +4664,7 @@ async function renderResult({
     const showTimeOfDay = config.timeOfDay ? "" : "d-none";
     const showTimestamp = config.timeOfDay ? "d-none" : "";
     const activeTable = active ? "table-active" : "";
-    const labelHTML = label ? tags[label] : "";
+    const labelHTML = labelID && label ? `<span class="badge text-bg-${STATE.labelColors[(labelID -1) % STATE.labelColors.length] } rounded-pill">${label}</span>` : "";
     const hide = selection ? "d-none" : "";
     const countIcon =
       count > 1
@@ -4720,11 +4723,6 @@ const updateResultTable = (row, isFromDB, isSelection) => {
 
 const isExplore = () => {
   return STATE.mode === "explore";
-};
-
-const tags = {
-  Local: '<span class="badge bg-success rounded-pill">Local</span>',
-  Nocmig: '<span class="badge bg-dark rounded-pill">Nocmig</span>',
 };
 
 // Results event handlers
@@ -6115,8 +6113,9 @@ document.addEventListener("click", function (e) {
       break;
     }
     case "known-issues": {
-      fetchIssuesByLabel(["v" + VERSION, "All versions affected"])
-        .then((issues) => renderIssuesInModal(issues, VERSION))
+      const version = VERSION.replace(' (Portable)', '')
+      fetchIssuesByLabel(["v" + version, "All versions affected"])
+        .then((issues) => renderIssuesInModal(issues, version))
         .catch((error) => console.error("Error getting known issues:", error));
       break;
     }
@@ -7035,7 +7034,7 @@ async function createContextMenu(e) {
   }
   if (!activeRegion && !inSummary) return;
   const createOrEdit =
-    activeRegion.label || target.closest("#summary") ? i18n.edit : i18n.create;
+    activeRegion?.label || target.closest("#summary") ? i18n.edit : i18n.create;
 
   DOM.contextMenu.innerHTML = `
     <div id="${inSummary ? "inSummary" : "inResults"}">
@@ -7179,15 +7178,11 @@ async function showRecordEntryForm(mode, batch) {
     theme: 'light',
     labels: labels,
     i18n: i18n,
-    preselectedLabel: activeRow.querySelector(".label").textContent
+    preselectedLabel: activeRow?.querySelector(".label").textContent
   });
   const container = document.getElementById('label-container');
   container.textContent = '';
   container.appendChild(select);
-  // if (typeIndex)
-  //   recordEntryForm.querySelectorAll('input[name="record-label"]')[
-  //     typeIndex
-  //   ].checked = true;
   recordEntryModalDiv.addEventListener("shown.bs.modal", focusBirdList);
   recordEntryModal.show();
 }
@@ -7211,8 +7206,8 @@ recordEntryForm.addEventListener("submit", function (e) {
   // Update the region label
   const count = document.getElementById("call-count")?.value;
   const comment = document.getElementById("record-comment")?.value;
+  const select = document.getElementById('label-container').firstChild;
   const label = select.selectedValue;
-    //document.querySelector('input[name="record-label"]:checked')?.value || "";
 
   recordEntryModal.hide();
   insertManualRecord(
@@ -8110,7 +8105,7 @@ async function membershipCheck() {
     installDate = now
   }
   const trialPeriod = await window.electron.trialPeriod();
-  const inTrial = Date.now() - installDate < trialPeriod;
+  const inTrial = false //Date.now() - installDate < trialPeriod;
   const lockedElements = document.querySelectorAll(".locked, .unlocked");
   const unlockElements = () => {
     lockedElements.forEach((el) => {

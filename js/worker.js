@@ -1238,6 +1238,7 @@ const prepResultsStatement = (
         species.sname, 
         species.cname, 
         records.confidence as score, 
+        labelID,
         labels.name as label, 
         records.comment, 
         records.end,
@@ -1291,7 +1292,8 @@ const prepResultsStatement = (
     speciesID,
     sname, 
     cname, 
-    score, 
+    score,
+    labelID,
     label, 
     comment,
     end,
@@ -2777,18 +2779,9 @@ const terminateWorkers = () => {
 
 async function batchInsertRecords(cname, label, files, originalCname) {
   const db = STATE.db;
-  let params = [originalCname, STATE.detect.confidence];
   const t0 = Date.now();
-  let query = `SELECT * FROM records WHERE speciesID = (SELECT id FROM species WHERE cname = ?) AND confidence >= ? `;
-  if (STATE.mode !== "explore") {
-    query += ` AND fileID in (SELECT id FROM files WHERE name IN (${prepParams(
-      files
-    )}))`;
-    params.push(...files);
-  } else if (STATE.explore.range.start) {
-    query += ` AND dateTime BETWEEN ${STATE.explore.range.start} AND ${STATE.explore.range.end}`;
-  }
-  const records = await STATE.db.allAsync(query, ...params);
+  const [sql, params] = prepResultsStatement(originalCname, true, STATE.included, undefined, STATE.topRankin)
+  const records = await STATE.db.allAsync(sql, ...params);
   let count = 0;
 
   await dbMutex.lock();
@@ -2802,23 +2795,17 @@ async function batchInsertRecords(cname, label, files, originalCname) {
         "SELECT name FROM files WHERE id = ?",
         fileID
       );
-      // Delete existing record
-      await db.runAsync(
-        "DELETE FROM records WHERE datetime = ? AND speciesID = ? AND fileID = ?",
-        dateTime,
-        speciesID,
-        fileID
-      );
       count += await onInsertManualRecord({
-        cname: cname,
+        cname,
         start: position,
-        end: end,
-        comment: comment,
+        end,
+        comment,
         count: callCount,
         file: name,
-        label: label,
+        label,
         batch: false,
-        originalCname: undefined,
+        originalCname,
+        calledByBatch: true,
         updateResults: i === records.length - 1, // trigger a UI update after the last item
       });
     }
@@ -2845,11 +2832,12 @@ const onInsertManualRecord = async ({
   batch,
   originalCname,
   confidence,
+  calledByBatch,
   position,
   speciesFiltered,
   updateResults = true,
 }) => {
-  if (batch) return batchInsertRecords(cname, label, file, originalCname);
+  if (batch) return batchInsertRecords(cname, label, file, originalCname, confidence);
   (start = parseFloat(start)), (end = parseFloat(end));
   const startMilliseconds = Math.round(start * 1000);
   let changes = 0,
@@ -2898,7 +2886,7 @@ const onInsertManualRecord = async ({
 
   const dateTime = fileStart + startMilliseconds;
   const isDaylight = isDuringDaylight(dateTime, STATE.lat, STATE.lon);
-  confidence = confidence || 2000;
+
   // Delete an existing record if species was changed
   if (cname !== originalCname){
     const result = await db.getAsync(
@@ -2912,32 +2900,46 @@ const onInsertManualRecord = async ({
         result.originalSpeciesID,
         fileID
       );
-      confidence = confidence || result.confidence;
+      confidence = 2000; // Manual record
     }
+  } 
+  else {
+    const r = await db.getAsync(
+      "SELECT * FROM records WHERE dateTime = ? AND fileID = ? AND speciesID = ?", 
+      dateTime, fileID, speciesID);
+    confidence = r?.confidence; // Save confidence
   }
   const result = await db.getAsync("SELECT id FROM labels WHERE name = ?", label);
   const labelID = result?.id;
+  if (calledByBatch && cname === originalCname){
+   await db.runAsync(
+      `UPDATE records SET labelID = ?, comment = ?, reviewed = 1 
+        WHERE dateTime = ? AND fileID = ? AND speciesID = ?`,
+      labelID, comment, dateTime, fileID, speciesID
+    )
+  } else {
     await db.runAsync(
-      `INSERT INTO records (dateTime, position, fileID, speciesID, confidence, labelID, comment, end, callCount, isDaylight, reviewed)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(dateTime, fileID, speciesID) DO UPDATE SET 
-         labelID = excluded.labelID,
-         comment = excluded.comment,
-         reviewed = excluded.reviewed;`,
-      dateTime,
-      start,
-      fileID,
-      speciesID,
-      confidence, // This will only be inserted, not updated
-      labelID,
-      comment,
-      end,
-      parseInt(count),
-      isDaylight,
-      true
-    );
-    
-  };
+        `INSERT INTO records (dateTime, position, fileID, speciesID, confidence, labelID, comment, end, callCount, isDaylight, reviewed)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(dateTime, fileID, speciesID) DO UPDATE SET 
+          labelID = excluded.labelID,
+          comment = excluded.comment,
+          reviewed = excluded.reviewed;`,
+        dateTime,
+        start,
+        fileID,
+        speciesID,
+        confidence, // This will only be inserted, not updated
+        labelID,
+        comment,
+        end,
+        parseInt(count),
+        isDaylight,
+        true
+      );
+      
+    };
+  }
 
 const insertDurations = async (file, id) => {
   const durationSQL = Object.entries(METADATA[file].dateDuration)

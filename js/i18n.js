@@ -2914,17 +2914,63 @@ const IUCNLabel = {
     // },
 }; 
 const i18nSelect = {
-    en:{
+    en: {
         selectLabel: "Select a label",
         addLabel: "Add Label",
         enterNewLabel: "Enter a new label"
     },
-    fr:{
+    fr: {
         selectLabel: "Sélectionner une étiquette",
         addLabel: "Ajouter une étiquette",
         enterNewLabel: "Entrez une nouvelle étiquette"
-        }
+    },
+    da: {
+        selectLabel: "Vælg en etiket",
+        addLabel: "Tilføj etiket",
+        enterNewLabel: "Indtast en ny etiket"
+    },
+    de: {
+        selectLabel: "Wählen Sie ein Etikett",
+        addLabel: "Etikett hinzufügen",
+        enterNewLabel: "Geben Sie ein neues Etikett ein"
+    },
+    es: {
+        selectLabel: "Seleccionar una etiqueta",
+        addLabel: "Añadir etiqueta",
+        enterNewLabel: "Ingrese una nueva etiqueta"
+    },
+    ja: {
+        selectLabel: "ラベルを選択",
+        addLabel: "ラベルを追加",
+        enterNewLabel: "新しいラベルを入力"
+    },
+    nl: {
+        selectLabel: "Selecteer een label",
+        addLabel: "Label toevoegen",
+        enterNewLabel: "Voer een nieuw label in"
+    },
+    pt: {
+        selectLabel: "Selecionar um rótulo",
+        addLabel: "Adicionar rótulo",
+        enterNewLabel: "Digite um novo rótulo"
+    },
+    ru: {
+        selectLabel: "Выберите метку",
+        addLabel: "Добавить метку",
+        enterNewLabel: "Введите новую метку"
+    },
+    sv: {
+        selectLabel: "Välj en etikett",
+        addLabel: "Lägg till etikett",
+        enterNewLabel: "Ange en ny etikett"
+    },
+    zh: {
+        selectLabel: "选择标签",
+        addLabel: "添加标签",
+        enterNewLabel: "输入新标签"
+    }
 };
+
 
 async function localiseUI(locale) {
     locale = locale.replace(/_.*$/, '');

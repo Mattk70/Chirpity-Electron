@@ -151,14 +151,14 @@
   "record-entry": {
     "record-entry-modal-label": "编辑记录",
     "call-count": "鸟鸣计数",
-    "record-label": "鸟鸣类型",
+    "record-label": "标签",
     "label-local": "本地",
     "label-nocmig": "Nocmig",
     "label-unknown": "未指定",
     "record-comment": "评论",
     "record-add": "添加"
 },
-  "headings": ["设置","检测",
+  "headings": ["设置","检测", "键盘分配",
     "默认位置",
     "系统",
     "音频偏好设置",

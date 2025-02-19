@@ -151,14 +151,14 @@
     "record-entry": {
         "record-entry-modal-label": "Редактировать запись",
         "call-count": "Количество птичьих звуков",
-        "record-label": "Тип птичьего звука",
+        "record-label": "Метка",
         "label-local": "Местный",
         "label-nocmig": "Nocmig",
         "label-unknown": "Не указано",
         "record-comment": "Комментарии",
         "record-add": "Добавить"
     },
-    "headings": ["Настройки","Обнаружения",
+    "headings": ["Настройки","Обнаружения", "Назначения клавиш",
         "Местоположение по умолчанию",
         "Система",
         "Настройки звука",

@@ -8,29 +8,27 @@ class CustomSelect extends HTMLElement {
     constructor({ labels = [], colors = [], preselectedLabel = null, theme = 'dark', i18n = {} } = {}) {
       super();
       this.attachShadow({ mode: "open" });
-        // Internationalisation options with defaults
-        this._i18n = {
-            selectLabel: "Select a label",
-            addLabel: "Add Label",
-            enterNewLabel: "Enter new label",
-            ...i18n // Merge with user-provided i18n options
+      // Internationalisation options with defaults
+      this._i18n = {
+        selectLabel: "Select a label",
+        addLabel: "Add Label",
+        enterNewLabel: "Enter new label",
+        ...i18n // Merge with user-provided i18n options
       };
-      // Initialize shared labels/colors if not already set.
-    if (!CustomSelect.sharedLabels) {
-        CustomSelect.sharedLabels = labels.length ? labels : [
-          "Nocmig", "Local"
-        ];
+      // Initialise shared labels/colors if not already set.
+      if (!CustomSelect.sharedLabels) {
+        CustomSelect.sharedLabels = labels.length ? labels : ["Nocmig", "Local"];
       }
-
+  
       if (!CustomSelect.sharedColors) {
-        CustomSelect.sharedColors = colors.length ? colors : ["dark","success","warning","info","secondary","danger", "primary"]
+        CustomSelect.sharedColors = colors.length ? colors : ["dark", "success", "warning", "info", "secondary", "danger", "primary"];
       }
       this.preselectedLabel = preselectedLabel;
-
+  
       this.theme = theme === 'dark'
-        ? ['dark', 'light', 'white', '#f8d7da', '#ffc107'] 
+        ? ['dark', 'light', 'white', '#f8d7da', '#ffc107']
         : ['light', 'dark', 'black', 'rgb(56, 46, 47)', 'rgb(61, 58, 48)'];
-    
+  
       CustomSelect.instances.push(this);
       // Generate a unique radio group name for this instance.
       this.radioGroup = "label-" + Math.random().toString(36).substr(2, 9);
@@ -49,10 +47,10 @@ class CustomSelect extends HTMLElement {
     }
   
     get selectedValue() {
-        const selectedInput = this.shadowRoot.querySelector("input[type='radio']:checked");
-        return selectedInput ? selectedInput.value : null;
-      }
-
+      const selectedInput = this.shadowRoot.querySelector("input[type='radio']:checked");
+      return selectedInput ? selectedInput.value : null;
+    }
+  
     connectedCallback() {
       // Register instance.
       CustomSelect.instances.push(this);
@@ -73,64 +71,156 @@ class CustomSelect extends HTMLElement {
       }
     }
   
-  // Update the label list on all instances and dispatch a single global event.
-  static updateAllInstances(deleted) {
-    CustomSelect.instances.forEach((instance) => instance.renderLabels());
-    document.dispatchEvent(
-      new CustomEvent("labelsUpdated", {
-        detail: {
-          deleted: deleted,
-          tags: CustomSelect.sharedLabels,
-          colors: CustomSelect.sharedColors,
-        },
-        bubbles: true,
-        composed: true,
-      })
-    );
-  }
-
+    // Update the label list on all instances and dispatch a single global event.
+    static updateAllInstances(deleted) {
+      CustomSelect.instances.forEach((instance) => instance.renderLabels());
+      document.dispatchEvent(
+        new CustomEvent("labelsUpdated", {
+          detail: {
+            deleted: deleted,
+            tags: CustomSelect.sharedLabels,
+            colors: CustomSelect.sharedColors,
+          },
+          bubbles: true,
+          composed: true,
+        })
+      );
+    }
   
     render() {
       // Clear any existing content.
       this.shadowRoot.innerHTML = "";
   
-      // Inject Bootstrap stylesheet from node_modules.
-      const bootstrapLink = document.createElement("link");
-      bootstrapLink.setAttribute("rel", "stylesheet");
-      bootstrapLink.setAttribute(
-        "href",
-        "./node_modules/bootstrap/dist/css/bootstrap.min.css"
-      );
-      this.shadowRoot.appendChild(bootstrapLink);
-  
-      // Component-specific styles.
+      // Create a style element with both our custom styles and minimal bootstrap classes.
       const style = document.createElement("style");
       style.textContent = `
+        /* Minimal Bootstrap-like classes */
+        .btn {
+          display: inline-block;
+          font-weight: 400;
+          color: #212529;
+          text-align: center;
+          text-decoration: none;
+          vertical-align: middle;
+          cursor: pointer;
+          background-color: transparent;
+          border: 1px solid transparent;
+          padding: 0.375rem 0.75rem;
+          font-size: 1rem;
+          line-height: 1.5;
+          border-radius: 0.25rem;
+          transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
+        }
+        .btn:hover {
+          text-decoration: none;
+        }
+        .btn:focus {
+          outline: 0;
+          box-shadow: 0 0 0 0.2rem rgba(0,123,255,0.25);
+        }
+        .btn-sm {
+          padding: 0.25rem 0.5rem;
+          font-size: 0.875rem;
+          line-height: 1.5;
+          border-radius: 0.2rem;
+        }
+        .btn-outline-dark {
+          color: #343a40;
+          border-color: #343a40;
+        }
+        .btn-outline-dark:hover {
+          background-color: #343a40;
+          color: #fff;
+        }
+        .btn-outline-light {
+          color: #f8f9fa;
+          border-color: #f8f9fa;
+        }
+        .btn-outline-light:hover {
+          background-color: #f8f9fa;
+          color: #212529;
+        }
+        .w-100 { width: 100% !important; }
+        .d-none { display: none !important; }
+        .mt-2 { margin-top: 0.5rem !important; }
+        .ms-2 { margin-left: 0.5rem !important; }
+        .badge {
+          display: inline-block;
+          padding: 0.35em 0.65em;
+          font-size: 0.75em;
+          font-weight: 700;
+          line-height: 1;
+          text-align: center;
+          white-space: nowrap;
+          vertical-align: baseline;
+          border-radius: 0.25rem;
+        }
+        .rounded-pill {
+          border-radius: 50rem !important;
+        }
+        .form-control {
+          display: block;
+          width: 100%;
+          padding: 0.375rem 0.75rem;
+          font-size: 1rem;
+          line-height: 1.5;
+          color: #495057;
+          background-color: #fff;
+          background-clip: padding-box;
+          border: 1px solid #ced4da;
+          border-radius: 0.25rem;
+          transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        }
+        .form-control-sm {
+          padding: 0.25rem 0.5rem;
+          font-size: 0.75rem;
+          line-height: 1;
+          border-radius: 0.2rem;
+        }
+        .bg-dark {
+          background-color: #343a40 !important;
+          color: #fff !important;
+        }
+        .bg-light {
+          background-color: #f8f9fa !important;
+          color: #212529 !important;
+        }
+        .bg-white {
+          background-color: #fff !important;
+          color: #212529 !important;
+        }
+        /* Text background classes (for badges) */
+        .text-bg-dark { background-color: #343a40 !important; color: #fff !important; }
+        .text-bg-success { background-color: #198754 !important; color: #fff !important; }
+        .text-bg-warning { background-color: #ffc107 !important; color: #212529 !important; }
+        .text-bg-info { background-color: #0dcaf0 !important; color: #212529 !important; }
+        .text-bg-secondary { background-color: #6c757d !important; color: #fff !important; }
+        .text-bg-danger { background-color: #dc3545 !important; color: #fff !important; }
+        .text-bg-primary { background-color: #0d6efd !important; color: #fff !important; }
+        
+        /* Component-specific styles */
         :host {
           display: inline-block;
           font-family: sans-serif;
         }
-
-        /* Track */
+        
+        /* Scrollbar styling */
         ::-webkit-scrollbar-track {
-            border-radius: 0.25em;
+          border-radius: 0.25em;
         }
-
-        /* Handle */
         ::-webkit-scrollbar-thumb {
-            background: slategray;
-            border-radius: 0.25em;
+          background: slategray;
+          border-radius: 0.25em;
         }
-
-        /* Handle on hover */
         ::-webkit-scrollbar-thumb:hover {
-            background: orangered;
+          background: orangered;
         }
+        
         .dropdown-container {
           position: relative;
-          padding: 0px;
+          padding: 0;
           border-radius: 5px;
-          width: 185px;
+          width: 175px;
         }
         .selected-label {
           width: 100%;
@@ -143,18 +233,22 @@ class CustomSelect extends HTMLElement {
           box-shadow: 0px 4px 6px rgba(0,0,0,0.4);
           display: none;
           z-index: 1000;
-          width: 100%;
+          width: 155px;
           max-height: 300px;
           overflow-y: auto;
           display: flex;
           flex-direction: column;
+        }
+        .label-options {
+          flex-grow: 1;
+          overflow-y: auto;
         }
         .dropdown-list label {
           display: block;
           cursor: pointer;
           margin-bottom: 5px;
         }
-        .dropdown-list input[type="radio"] {
+        .dropdown-list input[type='radio'] {
           display: none;
         }
         .label-item {
@@ -164,20 +258,20 @@ class CustomSelect extends HTMLElement {
           margin-bottom: 5px;
         }
         .add-label-container {
-          position:sticky;
+          position: sticky;
           bottom: 0;
+          background: inherit;
           padding-top: 8px;
           text-align: center;
           width: 100%;
-          background: inherit;
         }
         .add-label-container input {
-          width: 100%;
+          width: 90%;
           padding: 5px;
           border-radius: 5px;
           border: 1px solid #777;
-          background: #222;
-          color: ${this.theme[2]};
+
+
         }
         .remove-btn,
         .rename-btn {
@@ -189,12 +283,6 @@ class CustomSelect extends HTMLElement {
         }
         .remove-btn { color: ${this.theme[3]}; }
         .rename-btn { color: ${this.theme[4]}; }
-
-        
-        .d-none { display: none; }
-        .w-100 { width: 100%; }
-        .mt-2 { margin-top: 0.5rem; }
-        .ms-2 { margin-left: 0.5rem; }
       `;
       this.shadowRoot.appendChild(style);
   
@@ -240,57 +328,57 @@ class CustomSelect extends HTMLElement {
     }
   
     renderLabels() {
-        this.labelOptions.innerHTML = "";
-        CustomSelect.sharedLabels.forEach((label, index) => {
-          const colorClass = `text-bg-${CustomSelect.sharedColors[index % CustomSelect.sharedColors.length]}`;
-          const itemContainer = document.createElement("div");
-          itemContainer.className = "label-item";
-      
-          // Remove button (moved before the label pill)
-          const removeBtn = document.createElement("button");
-          removeBtn.className = "remove-btn";
-          removeBtn.textContent = "x";
-          removeBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            this.removeLabel(index);
-          });
-      
-          // Create the label element with hidden radio input
-          const labelEl = document.createElement("label");
-          labelEl.className = `badge ${colorClass} rounded-pill flex-grow-1`;
-          labelEl.style.cursor = "pointer";
-          const input = document.createElement("input");
-          input.type = "radio";
-          input.name = this.radioGroup;
-          input.value = label;
-      
-          if (this.preselectedLabel === label) {
-            input.checked = true;
-            this.selectedLabelBtn.textContent = label;
-            this.selectedLabelBtn.className = `btn btn-sm ${colorClass} rounded-pill w-100`;
-          }
-      
-          input.addEventListener("change", () => this.selectLabel(label, colorClass));
-          labelEl.appendChild(input);
-          labelEl.appendChild(document.createTextNode(" " + label));
-      
-          // Rename button
-          const renameBtn = document.createElement("button");
-          renameBtn.className = "rename-btn";
-          renameBtn.textContent = "✎";
-          renameBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            this.showRenameInput(index, labelEl);
-          });
-      
-          // Append elements in the new order
-          itemContainer.appendChild(removeBtn);  // Delete icon first
-          itemContainer.appendChild(labelEl);
-          itemContainer.appendChild(renameBtn);
-          
-          this.labelOptions.appendChild(itemContainer);
+      this.labelOptions.innerHTML = "";
+      CustomSelect.sharedLabels.forEach((label, index) => {
+        const colorClass = `text-bg-${CustomSelect.sharedColors[index % CustomSelect.sharedColors.length]}`;
+        const itemContainer = document.createElement("div");
+        itemContainer.className = "label-item";
+  
+        // Remove button (moved before the label pill)
+        const removeBtn = document.createElement("button");
+        removeBtn.className = "remove-btn";
+        removeBtn.textContent = "x";
+        removeBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.removeLabel(index);
         });
-      }
+  
+        // Create the label element with hidden radio input
+        const labelEl = document.createElement("label");
+        labelEl.className = `badge ${colorClass} rounded-pill flex-grow-1`;
+        labelEl.style.cursor = "pointer";
+        const input = document.createElement("input");
+        input.type = "radio";
+        input.name = this.radioGroup;
+        input.value = label;
+  
+        if (this.preselectedLabel === label) {
+          input.checked = true;
+          this.selectedLabelBtn.textContent = label;
+          this.selectedLabelBtn.className = `btn btn-sm ${colorClass} rounded-pill w-100`;
+        }
+  
+        input.addEventListener("change", () => this.selectLabel(label, colorClass));
+        labelEl.appendChild(input);
+        labelEl.appendChild(document.createTextNode(" " + label));
+  
+        // Rename button
+        const renameBtn = document.createElement("button");
+        renameBtn.className = "rename-btn";
+        renameBtn.textContent = "✎";
+        renameBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.showRenameInput(index, labelEl);
+        });
+  
+        // Append elements in the new order
+        itemContainer.appendChild(removeBtn);
+        itemContainer.appendChild(labelEl);
+        itemContainer.appendChild(renameBtn);
+  
+        this.labelOptions.appendChild(itemContainer);
+      });
+    }
   
     toggleDropdown() {
       if (this.dropdownList.style.display === "block") {
@@ -308,8 +396,8 @@ class CustomSelect extends HTMLElement {
       this.dropdownList.style.display = "none";
       this.dispatchEvent(new CustomEvent("change", {
         detail: { value: this.selectedValue },
-        bubbles: true, // Allows the event to propagate
-        composed: true // Allows crossing the shadow DOM boundary
+        bubbles: true,
+        composed: true
       }));
     }
   
@@ -348,9 +436,8 @@ class CustomSelect extends HTMLElement {
       labelEl.innerHTML = "";
       labelEl.appendChild(radioInput);
       const renameInput = document.createElement("input");
-      // Updated styling per your request:
       renameInput.className = "form-control form-control-sm d-inline-block";
-      renameInput.style.width = "90%";
+      renameInput.style.width = "80%";
       renameInput.type = "text";
       renameInput.value = currentLabel;
       labelEl.appendChild(renameInput);
@@ -366,21 +453,22 @@ class CustomSelect extends HTMLElement {
     }
   
     commitRename(index, labelEl, newName) {
-        newName = newName.trim();
-        const selectedIndex = CustomSelect.sharedLabels.indexOf(this.selectedLabelBtn.textContent)
-        if (newName && !CustomSelect.sharedLabels.includes(newName)) {
-          CustomSelect.sharedLabels[index] = newName;
-        }
-        const radioInput = labelEl.querySelector("input[type='radio']");
-        radioInput.value = CustomSelect.sharedLabels[index];
-        labelEl.innerHTML = "";
-        labelEl.appendChild(radioInput);
-        labelEl.appendChild(document.createTextNode(" " + CustomSelect.sharedLabels[index]));
-        if (selectedIndex === index) {
-          this.selectedLabelBtn.textContent = CustomSelect.sharedLabels[index];
-        }
-        CustomSelect.updateAllInstances();
+      newName = newName.trim();
+      const selectedIndex = CustomSelect.sharedLabels.indexOf(this.selectedLabelBtn.textContent);
+      if (newName && !CustomSelect.sharedLabels.includes(newName)) {
+        CustomSelect.sharedLabels[index] = newName;
       }
+      const radioInput = labelEl.querySelector("input[type='radio']");
+      radioInput.value = CustomSelect.sharedLabels[index];
+      labelEl.innerHTML = "";
+      labelEl.appendChild(radioInput);
+      labelEl.appendChild(document.createTextNode(" " + CustomSelect.sharedLabels[index]));
+      if (selectedIndex === index) {
+        this.selectedLabelBtn.textContent = CustomSelect.sharedLabels[index];
+      }
+      CustomSelect.updateAllInstances();
+    }
+  
     hideDropdown() {
       this.dropdownList.style.display = "none";
     }

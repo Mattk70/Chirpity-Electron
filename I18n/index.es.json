@@ -151,14 +151,14 @@
     "record-entry": {
       "record-entry-modal-label": "Editar registro",
       "call-count": "Número de reclamos",
-      "record-label": "Tipo de reclamos",
+      "record-label": "Etiqueta",
       "label-local": "Local",
       "label-nocmig": "Nocmig",
       "label-unknown": "No especificado",
       "record-comment": "Comentarios",
       "record-add": "Agregar"
   },
-    "headings": ["Configuración","Detecciones",
+    "headings": ["Configuración","Detecciones", "Asignaciones de teclado",
       "Ubicación predeterminada",
       "Sistema",
       "Preferencias de audio",

@@ -151,14 +151,14 @@
   "record-entry": {
     "record-entry-modal-label": "Editar registro",
     "call-count": "Contagem de cantos de aves",
-    "record-label": "Tipo de canto de ave",
+    "record-label": "Rótulo",
     "label-local": "Local",
     "label-nocmig": "Nocmig",
     "label-unknown": "Não especificado",
     "record-comment": "Comentários",
     "record-add": "Adicionar"
 },
-  "headings": ["Configurações","Detecções",
+  "headings": ["Configurações","Detecções", "Atribuições de teclado",
     "Localização padrão",
     "Sistema",
     "Preferências de áudio",
