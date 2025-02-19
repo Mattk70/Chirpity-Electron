@@ -12,6 +12,7 @@ app.commandLine.appendSwitch("xdg-portal-required-version", "4");
 // WebGPU flags needed for Linux
 app.commandLine.appendSwitch("enable-unsafe-webgpu");
 app.commandLine.appendSwitch("enable-features", "Vulkan");
+app.commandLine.appendSwitch("profiling-at-start");
 
 const { autoUpdater } = require("electron-updater");
 const log = require("electron-log");

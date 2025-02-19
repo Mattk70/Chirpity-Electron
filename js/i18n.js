@@ -2912,6 +2912,18 @@ const IUCNLabel = {
     //     'EW': 'Estinto in natura',
     //     'EX': 'Estinto'
     // },
+}; 
+const i18nSelect = {
+    en:{
+        selectLabel: "Select a label",
+        addLabel: "Add Label",
+        enterNewLabel: "Enter a new label"
+    },
+    fr:{
+        selectLabel: "Sélectionner une étiquette",
+        addLabel: "Ajouter une étiquette",
+        enterNewLabel: "Entrez une nouvelle étiquette"
+        }
 };
 
 async function localiseUI(locale) {
@@ -3035,4 +3047,4 @@ async function localiseUI(locale) {
     }
 }
 
-export {i18nAll, i18nSpeciesList,i18nHeadings, i18nContext, i18nLocation, i18nForm, i18nHelp, i18nToasts, i18nTitles, i18nLIST_MAP, i18nLists, IUCNLabel, i18nLocate, localiseUI}
+export {i18nAll, i18nSpeciesList,i18nHeadings, i18nContext, i18nLocation, i18nForm, i18nHelp, i18nToasts, i18nTitles, i18nLIST_MAP, i18nLists, IUCNLabel, i18nLocate,i18nSelect, localiseUI}

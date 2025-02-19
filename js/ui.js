@@ -11,7 +11,7 @@ import WaveSurfer from "../node_modules/wavesurfer.js/dist/wavesurfer.esm.js";
 import RegionsPlugin from "../node_modules/wavesurfer.js/dist/plugins/regions.esm.js";
 import Spectrogram from "../node_modules/wavesurfer.js/dist/plugins/spectrogram.esm.js";
 import TimelinePlugin from "../node_modules/wavesurfer.js/dist/plugins/timeline.esm.js";
-
+import { CustomSelect } from './custom-select.js';
 import {
   fetchIssuesByLabel,
   renderIssuesInModal,
@@ -33,6 +33,7 @@ import {
   i18nLists,
   IUCNLabel,
   i18nLocate,
+  i18nSelect
 } from "./i18n.js";
 let LOCATIONS,
   locationID = undefined,
@@ -2213,9 +2214,7 @@ window.onload = async () => {
     //fill in defaults - after updates add new items
     syncConfig(config, defaultConfig);
 
-    membershipCheck().then(isMember  => {
-      isMember || document.getElementById("buy-me-coffee").classList.remove('d-none');
-    });
+    membershipCheck().then(isMember  => STATE.isMember = isMember);
  
     // Disable SNR
     config.filters.SNR = 0;
@@ -2361,7 +2360,6 @@ window.onload = async () => {
       autoArchive.checked = config.archive.auto;
     }
     setListUIState(config.list);
-    setKeyAssignmentUI(config.keyAssignment);
     worker.postMessage({
       action: "update-state",
       archive: config.archive,
@@ -2622,6 +2620,12 @@ const setUpWorkerMessaging = () => {
           populateSpeciesModal(args.included, args.excluded);
 
           break;
+        }
+        case "tags": {
+          STATE.tagsList = args.tags;
+          // Init is passed on launch, so set up the UI
+          args.init && setKeyAssignmentUI(config.keyAssignment)
+          break
         }
         case "total-records": {
           updatePagination(args.total, args.offset);
@@ -3223,14 +3227,18 @@ window.addEventListener("resize", function () {
 });
 
 function handleKeyDownDeBounce(e) {
-  e.preventDefault();
-  waitForFinalEvent(
-    function () {
-      handleKeyDown(e);
-    },
-    100,
-    "keyhandler"
-  );
+  if (!(e.target instanceof HTMLInputElement 
+    || e.target instanceof HTMLTextAreaElement
+    || e.target instanceof CustomSelect)){
+    e.preventDefault();
+    waitForFinalEvent(
+      function () {
+        handleKeyDown(e);
+      },
+      100,
+      "keyhandler"
+    );
+  }
 }
 
 /**
@@ -4087,15 +4095,17 @@ function onModelReady(args) {
   t1_warmup = Date.now();
   DIAGNOSTICS["Warm Up"] =
     ((t1_warmup - t0_warmup) / 1000).toFixed(2) + " seconds";
+
   APPLICATION_LOADED || console.info("App launch time", `${t1_warmup - app_t0} ms`)
   APPLICATION_LOADED = true;
+
   document.getElementById('loading-screen').classList.add('d-none');
+  // Get all the tags from the db
+  worker.postMessage({action: "get-tags", init: true});
   // New users - show the tour
-  if (!isTestEnv) {
-    if (!config.seenTour) {
+  if (!isTestEnv && !config.seenTour) {
       config.seenTour = true;
       prepTour();
-    }
   }
   if (OS_FILE_QUEUE.length) onOpenFiles({filePaths: OS_FILE_QUEUE}) && OS_FILE_QUEUE.shift()
 }
@@ -5648,23 +5658,8 @@ function createDateClearButton(element, picker) {
   });
 }
 
-function toggleKeyDownForFormInputs() {
-  const formFields = document.querySelectorAll("input, textarea, select");
-  // Disable keyboard shortcuts when any form field gets focus
-  formFields.forEach((formField) => {
-    formField.addEventListener("focus", () => {
-      document.removeEventListener("keydown", handleKeyDownDeBounce, true);
-    });
-
-    formField.addEventListener("blur", () => {
-      document.addEventListener("keydown", handleKeyDownDeBounce, true);
-    });
-  });
-}
-
 document.addEventListener("DOMContentLoaded", function () {
   document.addEventListener("keydown", handleKeyDownDeBounce, true);
-  toggleKeyDownForFormInputs();
   // make menu an accordion for smaller screens
   if (window.innerWidth < 768) {
     // close all inner dropdowns when parent is closed
@@ -6517,11 +6512,19 @@ document.addEventListener("change", function (e) {
     config.debug && console.log("Change target:", target);
     // Handle key assignments
     if (/^key\d/.test(target)) {
-      if (target.length === 4) setKeyAssignment(element, target);
+      if (target.length === 4) {
+        // Handle custom-select
+        if (e.detail){
+          config.keyAssignment[target] = {column: 'label', value: e.detail.value, active: true}
+          config.debug && console.log(`${target} is assigned to update 'label' with ${e.detail.value}`)
+        } else { setKeyAssignment(element, target) }
+      }
       else {
         const key = target.slice(0,4);
         const inputElement = document.getElementById(key)
-        setKeyAssignment(inputElement, key);
+        const column = e.target.value;
+        const newElement = changeInputElement(column, inputElement, key)
+        setKeyAssignment(newElement, key);
       }
     } else {
       switch (target) {
@@ -7143,9 +7146,9 @@ async function showRecordEntryForm(mode, batch) {
     // Populate the form with existing values
     commentText = activeRow.querySelector(".comment > span")?.title || "";
     callCount = parseInt(activeRow.querySelector(".call-count").textContent);
-    typeIndex = ["Local", "Nocmig", ""].indexOf(
-      activeRow.querySelector(".label").textContent
-    );
+    // typeIndex = ["Local", "Nocmig", ""].indexOf(
+    //   activeRow.querySelector(".label").textContent
+    // );
   }
   const recordEntryBirdList = recordEntryForm.querySelector(
     "#record-entry-birdlist"
@@ -7170,12 +7173,22 @@ async function showRecordEntryForm(mode, batch) {
   recordEntryForm.querySelector("#batch-mode").value = batch;
   recordEntryForm.querySelector("#original-id").value = cname;
   //recordEntryForm.querySelector('#record-add').textContent = mode;
-  if (typeIndex)
-    recordEntryForm.querySelectorAll('input[name="record-label"]')[
-      typeIndex
-    ].checked = true;
+  const labels = STATE.tagsList.map(item => item.name);
+  const i18n = getI18n(i18nSelect);
+  const select = new CustomSelect({
+    theme: 'light',
+    labels: labels,
+    i18n: i18n,
+    preselectedLabel: activeRow.querySelector(".label").textContent
+  });
+  const container = document.getElementById('label-container');
+  container.textContent = '';
+  container.appendChild(select);
+  // if (typeIndex)
+  //   recordEntryForm.querySelectorAll('input[name="record-label"]')[
+  //     typeIndex
+  //   ].checked = true;
   recordEntryModalDiv.addEventListener("shown.bs.modal", focusBirdList);
-  toggleKeyDownForFormInputs();
   recordEntryModal.show();
 }
 
@@ -7198,8 +7211,8 @@ recordEntryForm.addEventListener("submit", function (e) {
   // Update the region label
   const count = document.getElementById("call-count")?.value;
   const comment = document.getElementById("record-comment")?.value;
-  const label =
-    document.querySelector('input[name="record-label"]:checked')?.value || "";
+  const label = select.selectedValue;
+    //document.querySelector('input[name="record-label"]:checked')?.value || "";
 
   recordEntryModal.hide();
   insertManualRecord(
@@ -8117,6 +8130,8 @@ async function membershipCheck() {
       unlockElements();
       if (isMember) {
         document.getElementById('primaryLogo').src = 'img/logo/chirpity_logo_subscriber_bronze.png'; // Silver & Gold available
+      } else {
+        document.getElementById("buy-me-coffee").classList.remove('d-none')
       }
       localStorage.setItem('isMember', true);
       localStorage.setItem('memberTimestamp', now);
@@ -8136,13 +8151,15 @@ async function membershipCheck() {
       });
       localStorage.setItem('isMember', false);
     }
-    return isMember
+    return isMember || inTrial
   }).catch(error =>{ // Period of grace
     if (cachedStatus === 'true' && cachedTimestamp && now - cachedTimestamp < oneWeek) {
       console.warn('Using cached membership status during error.', error);
       unlockElements();
       document.getElementById('primaryLogo').src = 'img/logo/chirpity_logo_subscriber_bronze.png';
       return true
+    } else {
+      document.getElementById("buy-me-coffee").classList.remove('d-none')
     }
   });
 
@@ -8166,15 +8183,17 @@ function setKeyAssignment(inputEL, key){
   const columnEl = document.getElementById(key + '-column')
   const column = columnEl.value;
   let active = false;
-  const value = inputEL.value.trim();
+  const value = inputEL.value?.trim() || null;
+  // column === 'label' && worker.postMessage({action: "get-tags"})
   if (column){
     inputEL.disabled = false; // enable input
     if (value){
       active = true;
       config.keyAssignment[key] = {column, value, active};
-      console.log(`${key} is assigned to update ${column} with ${value}`)
+      config.debug && console.log(`${key} is assigned to update ${column} with ${value}`)
     } else {
       config.keyAssignment[key] = {column, value, active};
+      config.debug && console.log(`${key} is assigned to update ${column} with ${value}`)
     }
   } else {
 
@@ -8184,10 +8203,61 @@ function setKeyAssignment(inputEL, key){
 }
 
 function setKeyAssignmentUI(keyAssignments){
+  const i18n = getI18n(i18nSelect);
   Object.entries(keyAssignments).forEach(([k, v]) => {
     const input = document.getElementById(k);
     input.value = v.value;
+    v.value === 'unused' || (input.disabled = false);
     document.getElementById(k+'-column').value = v.column;
-    if (v.active) input.disabled = false;
+    if (v.column === 'label') changeInputElement('label', input, k, v.value);
   }) 
 }
+
+function changeInputElement(column, element, key, preSelected = null){
+  if (column === 'label'){
+    const i18n = getI18n(i18nSelect)
+    const container = document.createElement('div')
+    container.id = key;
+    container.className = 'col ms-2';
+    const labels = STATE.tagsList.map(item => item.name);
+    const select = new CustomSelect({
+      theme: 'dark',
+      labels: labels,
+      i18n: i18n,
+      preselectedLabel: preSelected
+    });
+    container.appendChild(select);
+    element.replaceWith(container)
+    return container
+  } else {
+    const input = document.createElement('input');
+    input.className="ms-2 form-control";
+    input.id=key;
+    input.style="font-size: small";
+    element.replaceWith(input);
+    return input
+  }
+  
+}
+
+document.addEventListener("labelsUpdated", (e) => {
+  const tags = e.detail.tags;
+  const deleted = e.detail.deleted;
+  if (deleted){
+    console.log("Tag deleted:", deleted);
+    worker.postMessage({action: "delete-tag", deleted })  
+    STATE.tagsList = STATE.tagsList.filter(item => item.name !== deleted)
+  } else {
+    STATE.tagsList = tags.map((tag, index) => {
+      const existingItem = STATE.tagsList[index];
+      return {
+        id: existingItem ? existingItem.id : null, // Keep existing ID, set null for new
+        name: tag
+      };
+    });
+    console.log("Tags updated:", tags);
+    worker.postMessage({action: "update-tags", tags })
+  }
+  
+  console.log("Tags list:", STATE.tagsList);
+});

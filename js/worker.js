@@ -271,6 +271,10 @@ const createDB = async (file) => {
     await db.runAsync("BEGIN");
     await diskDB.runAsync("PRAGMA user_version = 1")
     await db.runAsync(
+      "CREATE TABLE labels(id INTEGER PRIMARY KEY, name TEXT NOT NULL, UNIQUE(name))"
+    );
+    await db.runAsync("INSERT INTO labels VALUES(null, 'Nocmig'), (null, 'Local')");
+    await db.runAsync(
       "CREATE TABLE species(id INTEGER PRIMARY KEY, sname TEXT NOT NULL, cname TEXT NOT NULL)"
     );
     await db.runAsync(
@@ -282,8 +286,9 @@ const createDB = async (file) => {
     await db.runAsync(
       "CREATE UNIQUE INDEX idx_unique_place ON locations(lat, lon)"
     );
-    await db.runAsync(`CREATE TABLE records( dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, label  TEXT,  comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER, reviewed INTEGER, 
-            UNIQUE (dateTime, fileID, speciesID), CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,  FOREIGN KEY (speciesID) REFERENCES species(id))`);
+    await db.runAsync(`CREATE TABLE records( dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, 
+      comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER, reviewed INTEGER, labelID INTEGER,
+      UNIQUE (dateTime, fileID, speciesID), CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,  FOREIGN KEY (speciesID) REFERENCES species(id))`);
     await db.runAsync(
       `CREATE TABLE duration( day INTEGER, duration INTEGER, fileID INTEGER, UNIQUE (day, fileID), CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE)`
     );
@@ -291,35 +296,15 @@ const createDB = async (file) => {
     await db.runAsync("CREATE INDEX idx_species_cname ON species(cname)");
     if (archiveMode) {
       // Only called when creating a new archive database
+      const stmt = db.prepare("INSERT INTO species VALUES (?, ?, ?)");
       for (let i = 0; i < LABELS.length; i++) {
-        const [sname, cname] = LABELS[i].split("_");
-        await db.runAsync(
-          "INSERT INTO species VALUES (?,?,?)",
-          i,
-          sname,
-          cname
-        );
+          const [sname, cname] = LABELS[i].split("_");
+          await stmt.runAsync(i, sname, cname);
       }
+      stmt.finalize();
     } else {
       const filename = diskDB.filename;
-      let { code } = await db.runAsync("ATTACH ? as disk", filename);
-      const MAX_RETRIES = 100; // Set a maximum number of retries
-      let retries = 0;
-
-      // // If the db is not ready
-      // while (code === "SQLITE_BUSY" && retries < MAX_RETRIES) {
-      //     console.log("Disk DB busy");
-      //     await new Promise(resolve => setTimeout(resolve, 10));
-      // let response =
-      // await db.runAsync('ATTACH ? as disk', filename);
-      //     code = response.code;
-      //     retries++;
-      // }
-
-      // if (retries === MAX_RETRIES) {
-      //     console.error("Exceeded maximum number of retries for attaching the disk database");
-      //     throw new Error("Exceeded maximum number of retries for attaching the disk database");
-      // }
+      await db.runAsync("ATTACH ? as disk", filename);
       let response = await db.runAsync(
         "INSERT INTO files SELECT * FROM disk.files"
       );
@@ -335,6 +320,11 @@ const createDB = async (file) => {
       );
       DEBUG &&
         console.log(response.changes + " species added to memory database");
+      response = await db.runAsync(
+          "INSERT OR IGNORE INTO labels SELECT * FROM disk.labels"
+        );
+      DEBUG &&
+        console.log(response.changes + " labels added to memory database");
     }
     await db.runAsync("END");
   } catch (error) {
@@ -402,9 +392,16 @@ async function loadDB(path) {
       .catch((error) => console.error(error));
     if (user_version !== undefined && user_version < 1){ 
       try{
+        await diskDB.runAsync("CREATE TABLE IF NOT EXISTS labels(id INTEGER PRIMARY KEY, name TEXT NOT NULL, UNIQUE(name))");
+        await diskDB.runAsync("INSERT INTO labels VALUES(null, 'Nocmig'), (null, 'Local')");
+        await diskDB.runAsync("ALTER TABLE records ADD COLUMN labelID INTEGER");
+        await diskDB.runAsync("UPDATE records SET labelID = 1 WHERE label = 'Nocmig'");
+        await diskDB.runAsync("UPDATE records SET labelID = 2 WHERE label = 'Local'");
+        await diskDB.runAsync("ALTER TABLE records DROP COLUMN label");
+        // Change label names to labelIDs
         await diskDB.runAsync("ALTER TABLE records ADD COLUMN reviewed INTEGER");
         await diskDB.runAsync("PRAGMA user_version = 1")
-        console.info("Added 'reviewed' column to ", p.basename(file))
+        console.info("Migrated labels and added 'reviewed' column to ", p.basename(file))
       } catch (e) {
         console.error("Error adding column and updating version", e.message, e)
       }
@@ -661,6 +658,36 @@ async function handleMessage(e) {
     }
     case "get-locations": {
       getLocations({ db: STATE.db, file: args.file });
+      break;
+    }
+    case "get-tags": {
+      const result = await diskDB.allAsync('SELECT id, name FROM labels');
+      UI.postMessage({event: "tags", tags: result, init: true})
+      break;
+    }
+    case "delete-tag": {
+      try {
+        const result = await diskDB.runAsync('DELETE FROM labels where name = ?', args.deleted);
+      } catch (error) {
+        generateAlert({message: `Label deletion failed: ${error.message}`})
+        console.error(error);
+      }
+      break;
+    }
+    case "update-tags": {
+      try {
+        const stmt = diskDB.prepare('INSERT OR REPLACE INTO labels (id, name) VALUES (?, ?)');
+        const tags = args.tags;
+        for (let i=0; i<tags.length;i++){
+          await stmt.runAsync(i+1, tags[i] )
+        }
+        stmt.finalize()
+        const result = await diskDB.allAsync('SELECT id, name FROM labels');
+        UI.postMessage({event: "tags", tags: result, init: false})
+      } catch (error) {
+        generateAlert({message: `Label update failed: ${error.message}`})
+        console.error(error);
+      }
       break;
     }
     case "get-valid-files-list": {
@@ -1211,7 +1238,7 @@ const prepResultsStatement = (
         species.sname, 
         species.cname, 
         records.confidence as score, 
-        records.label, 
+        labels.name as label, 
         records.comment, 
         records.end,
         records.callCount,
@@ -1221,6 +1248,7 @@ const prepResultsStatement = (
         FROM records 
         JOIN species ON records.speciesID = species.id 
         JOIN files ON records.fileID = files.id 
+        LEFT JOIN labels ON records.labelID = labels.id
         WHERE confidence >= ? 
         `;
   // // Prioritise selection ranges
@@ -2401,7 +2429,7 @@ const saveResults2DataSet = ({ species, included }) => {
     species.sname, 
     species.cname, 
     confidence AS score, 
-    label, 
+    labelID, 
     comment
     FROM records
     JOIN species
@@ -2887,12 +2915,13 @@ const onInsertManualRecord = async ({
       confidence = confidence || result.confidence;
     }
   }
-
+  const result = await db.getAsync("SELECT id FROM labels WHERE name = ?", label);
+  const labelID = result?.id;
     await db.runAsync(
-      `INSERT INTO records (dateTime, position, fileID, speciesID, confidence, label, comment, end, callCount, isDaylight, reviewed)
+      `INSERT INTO records (dateTime, position, fileID, speciesID, confidence, labelID, comment, end, callCount, isDaylight, reviewed)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(dateTime, fileID, speciesID) DO UPDATE SET 
-         label = excluded.label,
+         labelID = excluded.labelID,
          comment = excluded.comment,
          reviewed = excluded.reviewed;`,
       dateTime,
@@ -2900,7 +2929,7 @@ const onInsertManualRecord = async ({
       fileID,
       speciesID,
       confidence, // This will only be inserted, not updated
-      label,
+      labelID,
       comment,
       end,
       parseInt(count),
@@ -2982,9 +3011,9 @@ const generateInsertQuery = async (latestResult, file) => {
         const confidence = Math.round(confidenceArray[j] * 1000);
         if (confidence < minConfidence) break;
         const speciesID = speciesIDArray[j];
-        insertQuery += `(${timestamp}, ${key}, ${fileID}, ${speciesID}, ${confidence}, null, null, ${
+        insertQuery += `(${timestamp}, ${key}, ${fileID}, ${speciesID}, ${confidence}, null, ${
           key + 3
-        }, null, ${isDaylight}, 0), `;
+        }, null, ${isDaylight}, 0, null), `;
       }
     }
     // Remove the trailing comma and space
