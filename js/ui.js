@@ -730,7 +730,8 @@ const refreshTimeline = () => {
  * buttonElement.addEventListener("click", zoomSpec);
  */
 function zoomSpec(direction) {
-  if (fileLoaded) {
+  if (fileLoaded && STATE.regionsCompleted) {
+
     if (typeof direction !== "string") {
       // then it's an event
       direction = direction.target.closest("button").id;
@@ -1814,12 +1815,12 @@ async function resultClick(e) {
   const [file, start, end, _, label] = row.getAttribute("name").split("|");
 
   // Search for results rows - Why???
-  while (
-    !(row.classList.contains("nighttime") || row.classList.contains("daytime"))
-  ) {
-    row = row.previousElementSibling;
-    if (!row) return;
-  }
+  // while (
+  //   !(row.classList.contains("nighttime") || row.classList.contains("daytime"))
+  // ) {
+  //   row = row.previousElementSibling;
+  //   if (!row) return;
+  // }
   if (activeRow) activeRow.classList.remove("table-active");
   row.classList.add("table-active");
   activeRow = row;
@@ -1833,9 +1834,9 @@ async function resultClick(e) {
 function setActiveRow(start) {
     const rows = DOM.resultTable.querySelectorAll('tr');
     for (const r of rows) {
-        const [_file, rowStart, _end, _, _label] = r.getAttribute("name").split("|");
+        const [file, rowStart, _end, _, _label] = r.getAttribute("name").split("|");
 
-        if (Number(rowStart) === start) {
+        if ( file === STATE.currentFile && Number(rowStart) === start) {
             // Clear the active row if there's one
             if (activeRow && activeRow !== r) {
                 activeRow.classList.remove('table-active');
@@ -2706,42 +2707,6 @@ function showWindowDetections({detections, goToRegion}) {
   STATE.regionsCompleted = true;
 }
 
-document.addEventListener('input', function (e) {
-  const target = e.target;
-  const i18n = getI18n(i18nHeadings);
-  if (target.id === 'bird-search'){
-    const search = target.value.toLowerCase();
-    let count = 0;
-    const birdList = document.getElementById('bird-list-all');
-    if (search.length > 1){
-      birdList.textContent = '';
-      const sortedList = LABELS
-      .filter(bird => bird.toLowerCase().includes(search))
-      .map(item => {
-        const [cname, sname] = item.split('_').reverse(); // Flip sname and cname
-        return { cname, sname }; // Return structured object
-      })
-      .sort((a, b) => new Intl.Collator(config.locale.replace(/_.*$/, "")).compare(a.cname, b.cname));
-    
-    const fragment = document.createDocumentFragment();
-    
-    sortedList.forEach(({ cname, sname }) => {
-      const option = document.createElement("option");
-      option.value = cname;
-      option.textContent = `${cname}~${sname}`;
-      fragment.appendChild(option);
-    });
-    
-    birdList.appendChild(fragment);
-      count = sortedList.length
-    } else {
-      count = LABELS.length;
-      birdList.innerHTML = `<option value="">${i18n.searchPrompt}</option>`
-    }
-    document.getElementById('count').innerText = e.target.value.length > 1 ? count : 0;
-  }
-});
-
 function generateBirdList(store, rows) {
   const chart = document.getElementById("chart-list");
   const explore = document.getElementById("explore-list");
@@ -3403,7 +3368,9 @@ function initRegion() {
     const { start, content } = r;
     const activeStart = activeRegion ? activeRegion.start : null;
     // If a new region is created without a label, it must be user generated
-    if (!content || start === activeStart) setActiveRegion(r);
+     if (!content || start === activeStart) {
+      setActiveRegion(r);
+     }
   });
 
   // Clear label on modifying region
@@ -3652,26 +3619,28 @@ const timelineToggle = (fromKeys) => {
  */
 
 function centreSpec() {
-  const saveBufferBegin = windowOffsetSecs;
-  const middle = windowOffsetSecs + wavesurfer.getCurrentTime();
-  windowOffsetSecs = middle - windowLength / 2;
-  windowOffsetSecs = Math.max(0, windowOffsetSecs);
-  windowOffsetSecs = Math.min(
-    windowOffsetSecs,
-    currentFileDuration - windowLength
-  );
+  if (STATE.regionsCompleted){
+    const saveBufferBegin = windowOffsetSecs;
+    const middle = windowOffsetSecs + wavesurfer.getCurrentTime();
+    windowOffsetSecs = middle - windowLength / 2;
+    windowOffsetSecs = Math.max(0, windowOffsetSecs);
+    windowOffsetSecs = Math.min(
+      windowOffsetSecs,
+      currentFileDuration - windowLength
+    );
 
-  if (activeRegion) {
-    const shift = saveBufferBegin - windowOffsetSecs;
-    activeRegion.start += shift;
-    activeRegion.end += shift;
-    const { start, end } = activeRegion;
-    if (start < 0 || end > windowLength) activeRegion = null;
+    if (activeRegion) {
+      const shift = saveBufferBegin - windowOffsetSecs;
+      activeRegion.start += shift;
+      activeRegion.end += shift;
+      const { start, end } = activeRegion;
+      if (start < 0 || end > windowLength) activeRegion = null;
+    }
+    postBufferUpdate({
+      begin: windowOffsetSecs,
+      position: 0.5
+    });
   }
-  postBufferUpdate({
-    begin: windowOffsetSecs,
-    position: 0.5
-  });
 }
 
 /////////// Keyboard Shortcuts  ////////////
@@ -3826,8 +3795,7 @@ const GLOBAL_ACTIONS = {
       activeRow.classList.remove("table-active");
       activeRow = activeRow.previousSibling || activeRow;
       if (!activeRow.classList.contains("text-bg-dark")) activeRow.click();
-      STATE.regionsCompleted = false;
-      activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      // activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   },
   PageDown: () => {
@@ -3863,8 +3831,7 @@ const GLOBAL_ACTIONS = {
       activeRow.classList.remove("table-active");
       activeRow = activeRow.nextSibling || activeRow;
       if (!activeRow.classList.contains("text-bg-dark")) activeRow.click();
-      STATE.regionsCompleted = false
-      activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      // activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   },
   ArrowLeft: () => {
@@ -3926,7 +3893,6 @@ const GLOBAL_ACTIONS = {
       }
       if (!activeRow.classList.contains("text-bg-dark")) {
         activeRow.click();
-        STATE.regionsCompleted = false
       }
     }
   },
@@ -3976,7 +3942,7 @@ const postBufferUpdate = ({
     console.error('Invalid buffer update position:', `Position: ${position}`);
     return;
   }
-
+  STATE.regionsCompleted = false;
   fileLoaded = false;
   worker.postMessage({
     action: "update-buffer",
@@ -4547,7 +4513,7 @@ const addPagination = (total, offset) => {
 };
 
 function speciesFilter(e) {
-  if (PREDICTING || ["TBODY", "TH", "DIV"].includes(e.target.tagName)) return; // on Drag or clicked header
+  if (!STATE.regionsCompleted || PREDICTING || ["TBODY", "TH", "DIV"].includes(e.target.tagName)) return; // on Drag or clicked header
   let species, range;
   // Am I trying to unfilter?
   if (e.target.closest("tr").classList.contains("text-warning")) {
@@ -4627,7 +4593,7 @@ async function renderResult({
       cname,
       score,
       label,
-      labelID,
+      tagID,
       comment,
       end,
       count,
@@ -4664,7 +4630,7 @@ async function renderResult({
     const showTimeOfDay = config.timeOfDay ? "" : "d-none";
     const showTimestamp = config.timeOfDay ? "d-none" : "";
     const activeTable = active ? "table-active" : "";
-    const labelHTML = labelID && label ? `<span class="badge text-bg-${STATE.labelColors[(labelID -1) % STATE.labelColors.length] } rounded-pill">${label}</span>` : "";
+    const labelHTML = tagID && label ? `<span class="badge text-bg-${STATE.labelColors[(tagID -1) % STATE.labelColors.length] } rounded-pill">${label}</span>` : "";
     const hide = selection ? "d-none" : "";
     const countIcon =
       count > 1
@@ -6450,6 +6416,9 @@ document.addEventListener("click", function (e) {
     document.getElementById("frequency-range-panel").classList.add("d-none");
     document.getElementById("frequency-range").classList.remove("active");
   }
+  if (!target?.startsWith('bird-')) {
+    DOM.suggestionsList.style.display = 'none';
+  }
   hideConfidenceSlider();
   config.debug && console.log("clicked", target);
   target &&
@@ -6673,6 +6642,9 @@ document.addEventListener("change", function (e) {
           document.getElementById(config[config.model].backend).checked = true;
           handleBackendChange(config[config.model].backend);
           setListUIState(config.list);
+          DOM.chartsLink.classList.add("disabled");
+          DOM.exploreLink.classList.add("disabled");
+          STATE.diskHasRecords = false;
           break;
         }
         case "thread-slider": {
@@ -7134,10 +7106,11 @@ const recordEntryForm = document.getElementById("record-entry-form");
 let focusBirdList;
 
 async function showRecordEntryForm(mode, batch) {
+  const i18n = getI18n(i18nHeadings)
   const cname = batch
     ? document.querySelector("#speciesFilter .text-warning .cname .cname")
         .textContent
-    : activeRegion.label?.replace("?", "");
+    : activeRegion?.label || ''
   let callCount = "",
     typeIndex = "",
     commentText = "";
@@ -7145,27 +7118,28 @@ async function showRecordEntryForm(mode, batch) {
     // Populate the form with existing values
     commentText = activeRow.querySelector(".comment > span")?.title || "";
     callCount = parseInt(activeRow.querySelector(".call-count").textContent);
-    // typeIndex = ["Local", "Nocmig", ""].indexOf(
-    //   activeRow.querySelector(".label").textContent
-    // );
   }
-  const recordEntryBirdList = recordEntryForm.querySelector(
-    "#record-entry-birdlist"
+  document.getElementById('species-search-label').innerHTML = i18n.search;
+  const selectedBird = recordEntryForm.querySelector(
+    "#selected-bird"
   );
-  focusBirdList = () => document.getElementById("bird-search").focus();
+  focusBirdList = () => document.getElementById("bird-autocomplete").focus();
+  const speciesDisplay = document.createElement('div')
+  speciesDisplay.className = 'border rounded w-100';
+  if (cname) {
+    const species = LABELS.find(sp => sp.includes(cname))
+    const styled = species.split('_').reverse().join(' <br/><i>') + '</i>';
+    selectedBird.innerHTML = styled;
+  } else {
 
-  recordEntryBirdList.innerHTML = generateBirdOptionList({
-    store: "allSpecies",
-    rows: undefined,
-    selected: cname,
-  });
-  // recordEntryBirdList.querySelector('bird-list-all').options[recordEntryBirdList.selectedIndex].scrollIntoView();
+    selectedBird.innerHTML = i18n.searchPrompt;
+  }
+
   const batchHide = recordEntryForm.querySelectorAll(".hide-in-batch");
   batchHide.forEach((el) =>
     batch ? el.classList.add("d-none") : el.classList.remove("d-none")
   );
-  recordEntryForm.querySelector("#bird-search").value = ''; // reset search input
-  recordEntryForm.querySelector("#count").innerText = '0'; // And match count
+
   recordEntryForm.querySelector("#call-count").value = callCount;
   recordEntryForm.querySelector("#record-comment").value = commentText;
   recordEntryForm.querySelector("#DBmode").value = mode;
@@ -7173,11 +7147,11 @@ async function showRecordEntryForm(mode, batch) {
   recordEntryForm.querySelector("#original-id").value = cname;
   //recordEntryForm.querySelector('#record-add').textContent = mode;
   const labels = STATE.tagsList.map(item => item.name);
-  const i18n = getI18n(i18nSelect);
+  const i18nOptions = getI18n(i18nSelect);
   const select = new CustomSelect({
     theme: 'light',
     labels: labels,
-    i18n: i18n,
+    i18n: i18nOptions,
     preselectedLabel: activeRow?.querySelector(".label").textContent
   });
   const container = document.getElementById('label-container');
@@ -7192,7 +7166,9 @@ recordEntryForm.addEventListener("submit", function (e) {
   const action = document.getElementById("DBmode").value;
   // cast boolstring to boolean
   const batch = document.getElementById("batch-mode").value === "true";
-  const cname = document.getElementById("bird-list-all").value;
+  const cname = document.getElementById("selected-bird").innerText.split('\n')[0];
+  // Check we selected a species
+  if (!LABELS.some(item => item.includes(cname))) return
   let start, end;
   if (activeRegion) {
     start = windowOffsetSecs + activeRegion.start;
@@ -7202,7 +7178,7 @@ recordEntryForm.addEventListener("submit", function (e) {
     );
     region.setOptions({ content: cname });
   }
-  const originalCname = document.getElementById("original-id").value;
+  const originalCname = document.getElementById("original-id").value || cname;
   // Update the region label
   const count = document.getElementById("call-count")?.value;
   const comment = document.getElementById("record-comment")?.value;
@@ -8204,7 +8180,7 @@ function setKeyAssignmentUI(keyAssignments){
     input.value = v.value;
     v.value === 'unused' || (input.disabled = false);
     document.getElementById(k+'-column').value = v.column;
-    if (v.column === 'label') changeInputElement('label', input, k, v.value);
+    if (['label', 'species'].includes(v.column)) changeInputElement(v.column, input, k, v.value);
   }) 
 }
 
@@ -8213,7 +8189,7 @@ function changeInputElement(column, element, key, preSelected = null){
     const i18n = getI18n(i18nSelect)
     const container = document.createElement('div')
     container.id = key;
-    container.className = 'col ms-2';
+    container.className = 'form-control-sm bg-dark border-0';
     const labels = STATE.tagsList.map(item => item.name);
     const select = new CustomSelect({
       theme: 'dark',
@@ -8228,11 +8204,15 @@ function changeInputElement(column, element, key, preSelected = null){
     const input = document.createElement('input');
     input.className="ms-2 form-control";
     input.id=key;
+    input.value = preSelected;
     input.style="font-size: small";
+    if (column === 'species'){
+      const listContainer = document.getElementById(`bird-list-${key}`)
+      input.addEventListener('input', () => updateSuggestions(input, listContainer, true));
+    }
     element.replaceWith(input);
     return input
   }
-  
 }
 
 document.addEventListener("labelsUpdated", (e) => {
@@ -8256,3 +8236,63 @@ document.addEventListener("labelsUpdated", (e) => {
   
   console.log("Tags list:", STATE.tagsList);
 });
+const input = document.getElementById('bird-autocomplete');
+
+const dropdownCaret = document.querySelector('.input-caret');
+
+// Function to filter and sort the bird labels
+function getFilteredBirds(search) {
+  const sortedList =  LABELS
+    .filter(bird => bird.toLowerCase().includes(search))
+    .map(item => {
+      // Flip sname and cname from "sname_cname"
+      const [cname, sname] = item.split('_').reverse();
+      return { cname, sname, styled: `${cname} <br/><i>${sname}</i>` };
+    })
+    .sort((a, b) => new Intl.Collator(config.locale.replace(/_.*$/, "")).compare(a.cname, b.cname));
+    return sortedList
+}
+
+// Update suggestions and the translucent completion overlay
+function updateSuggestions(input, element, preserveInput) {
+  const search = input.value.toLowerCase();
+  element.textContent = ''; // Clear any existing suggestions
+
+  if (search.length < 2) {
+    element.style.display = 'none';
+    return;
+  }
+  
+  const filtered = getFilteredBirds(search);
+  const fragment = document.createDocumentFragment();
+  // Populate the suggestion list
+  filtered.forEach(item => {
+    const li = document.createElement('li');
+    li.className = 'list-group-item';
+    li.innerHTML = item.styled;
+    li.addEventListener('click', () => {
+      const selectedBird = document.getElementById('selected-bird')
+      selectedBird.innerHTML = li.innerHTML;
+      input.value = preserveInput ? item.cname : ''//+ '~' + item.sname;
+      input.dispatchEvent(new Event('change', { bubbles: true })); // fire the change event
+      element.style.display = 'none';
+    });
+    fragment.appendChild(li);
+  });
+  element.appendChild(fragment);
+  element.style.display = filtered.length ? 'block' : 'none';
+}
+
+// Update suggestions on each input event
+input.addEventListener('input', () => updateSuggestions(input, DOM.suggestionsList));
+
+// Toggle the display of the suggestion list when the caret is clicked
+dropdownCaret.addEventListener('click', () => {
+  if (DOM.suggestionsList.style.display === 'block') {
+    DOM.suggestionsList.style.display = 'none';
+  } else {
+    updateSuggestions(input, DOM.suggestionsList);
+  }
+});
+
+

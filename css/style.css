@@ -898,69 +898,59 @@ transform: scale(1.1); /* Increase size by 10% on hover */
     100% { transform: rotate(360deg); }
 }
 
-.tag-dropdown-container {
+/* Ensure the container is positioned relative */
+
+  
+  /* Adjust input to leave room for the caret */
+  /* #bird-autocomplete {
+    padding-right: 2.5rem;
     position: relative;
-    display: inline-block;
-    background: #343a40; /* bg-dark */
-    padding: 0px;
-    border-radius: 5px;
-    width: 200px; /* fixed width */
-  }
-  .tag-dropdown-list {
-    position: absolute;
-    background: #343a40; /* bg-dark */
-    color: white;
-    border: 1px solid #555;
-    padding: 8px;
-    border-radius: 5px;
-    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
-    display: none;
-    z-index: 1000;
-    width: 100%; /* match container width */
-    max-height: 300px; /* scrollable */
-    overflow-y: auto;
-  }
-  .tag-dropdown-list label {
-    display: block;
-    cursor: pointer;
-    margin-bottom: 5px;
-  }
-  .tag-dropdown-list input[type="radio"] {
-    display: none; /* Hide radio buttons */
-  }
-  .label-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 5px;
-  }
-  .add-label-container {
-    margin-top: 8px;
-    text-align: center;
-  }
-  .add-label-container input {
-    width: 100%;
-    padding: 5px;
-    border-radius: 5px;
-    border: 1px solid #777;
-    background: #222;
-    color: white;
-  }
-  .remove-btn,
-  .rename-btn {
-    border: none;
+    z-index: 2;
     background: transparent;
+    font: inherit;
+    font-size: 1rem;
+  } */
+  
+  /* The caret positioned inside the input using Bootstrap's SVG */
+  .input-caret {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 12px;
+    background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path fill='none' stroke='%236c757d' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/></svg>");
+    background-repeat: no-repeat;
+    background-size: contain;
     cursor: pointer;
-    padding: 0 5px;
-    font-size: 0.9rem;
+    color: #343a40;
+    z-index: 3;
   }
-  .remove-btn {
-    color: #f8d7da;
+  
+  
+  /* Suggestions list styling */
+  .suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    max-height: 300px;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid #ccc;
+    margin-top: 0.25rem;
+    padding: 0;
+    display: none;
+    z-index: 4;
+    color: black;
   }
-  .rename-btn {
-    color: #ffc107;
+  
+  .suggestions li {
+    padding: 0.375rem 0.75rem;
+    cursor: pointer;
   }
-  .rename-btn:focus,
-  .remove-btn:focus {
-    outline: none;
+  
+  .suggestions li:hover {
+    background-color: #f8f9fa;
   }
+  

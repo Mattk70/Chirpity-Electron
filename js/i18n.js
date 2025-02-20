@@ -717,7 +717,7 @@ const i18nHeadings = {
         max: 'Maximum',
         detections: 'Detections',
         location: 'Location',
-        search: "Species Search (<span id='count'>0</span> matches)",
+        search: "Species Search",
         searchPrompt: 'Use Species Search to load species',
         reviewed: 'Reviewed'
     },
@@ -731,7 +731,7 @@ const i18nHeadings = {
         max: 'Maksimum',
         detections: 'Detektioner',
         location: "Placering",
-        "search": "Artsøgning (<span id='count'>0</span> match)",
+        "search": "Artsøgning",
         "searchPrompt": "Brug artsøgning til at indlæse arter",
         "reviewed": "Gennemgået"
     },
@@ -745,7 +745,7 @@ const i18nHeadings = {
         max: 'Maximum',
         detections: 'Erkennungen',
         location: "Standort",
-        "search": "Artensuche (<span id='count'>0</span> Treffer)",
+        "search": "Artensuche",
         "searchPrompt": "Verwenden Sie die Artensuche, um Arten zu laden",
         "reviewed": "Überprüft"
     },
@@ -759,7 +759,7 @@ const i18nHeadings = {
         max: 'Máximo',
         detections: 'Detecciones',
         location: "Ubicación",
-        "search": "Búsqueda de especies (<span id='count'>0</span> coincidencias)",
+        "search": "Búsqueda de especies",
         "searchPrompt": "Usa la búsqueda de especies para cargar especies",
         "reviewed": "Revisado"
     },
@@ -773,7 +773,7 @@ const i18nHeadings = {
         max: 'Maximum',
         detections: 'Détections',
         location: "Emplacement",
-        "search": "Recherche d'espèces (<span id='count'>0</span> correspondances)",
+        "search": "Recherche d'espèces",
         "searchPrompt": "Utilisez la recherche d'espèces pour charger des espèces",
         "reviewed": "Révisé"
     },
@@ -787,7 +787,7 @@ const i18nHeadings = {
         max: '最大',
         detections: '検出',
         location: '場所',
-        "search": "種検索 (<span id='count'>0</span> 件の一致)",
+        "search": "種検索",
         "searchPrompt": "種検索を使用して種を読み込む",
         "reviewed": "確認済み"
     },
@@ -801,7 +801,7 @@ const i18nHeadings = {
         max: 'Maximum',
         detections: 'Detecties',
         location: "Locatie",
-        "search": "Soeken op soort (<span id='count'>0</span> overeenkomsten)",
+        "search": "Soeken op soort",
         "searchPrompt": "Gebruik Soeken op soort om soorten te laden",
         "reviewed": "Beoordeeld"
     },
@@ -815,7 +815,7 @@ const i18nHeadings = {
         max: 'Máximo',
         detections: 'Detecções',
         location: "Localização",
-        "search": "Pesquisa de espécies (<span id='count'>0</span> correspondências)",
+        "search": "Pesquisa de espécies",
         "searchPrompt": "Use a pesquisa de espécies para carregar espécies",
         "reviewed": "Revisado"
     },
@@ -829,7 +829,7 @@ const i18nHeadings = {
         max: 'Максимум',
         detections: 'Обнаружения',
         location:  "Местоположение",
-        "search": "Поиск видов (<span id='count'>0</span> совпадений)",
+        "search": "Поиск видов",
         "searchPrompt": "Используйте поиск видов для загрузки видов",
         "reviewed": "Просмотрено"
     },
@@ -843,7 +843,7 @@ const i18nHeadings = {
         max: 'Maximum',
         detections: 'Upptäckter',
         location: "Plats",
-        "search": "Artersökning (<span id='count'>0</span> träffar)",
+        "search": "Artersökning",
         "searchPrompt": "Använd artersökning för att ladda arter",
         "reviewed": "Granskad"
     },
@@ -857,7 +857,7 @@ const i18nHeadings = {
         max: '最大值',
         detections: '检测',
         location: "位置",
-        "search": "物种搜索（<span id='count'>0</span> 个匹配项）",
+        "search": "物种搜索",
         "searchPrompt": "使用物种搜索加载物种",
         "reviewed": "已审核"
     }

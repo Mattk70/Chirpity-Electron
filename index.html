@@ -182,9 +182,18 @@
                     <div id="record-entry-modal-body" class="modal-body overflow-visible">
                         <div class="row pe-3">
                             <div class="col-7">
-                                <div class="form-floating mb-3"> 
-                                    <input type="text" class="form-control mb-3" id="bird-search">
-                                    <label id="species-search-label" for="bird-search">Species Search (<span id="count">0</span> matches)</label>
+                                <div class="mb-3"> 
+                                    <!-- <input type="text" class="form-control mb-3" id="bird-search"> -->
+                                    <div class="form-floating" id="bird-search">
+                                        <!-- Bootstrap-styled input -->
+                                        <input type="text" class="form-control" id="bird-autocomplete" placeholder="Type to search...">
+                                        <!-- Caret rendered inside the input -->
+                                        <span id="bird-input-caret" class="input-caret"></span>
+                                        <!-- Suggestion list styled as a Bootstrap list group -->
+                                        <label id="species-search-label" for="bird-autocomplete">Species Search</label>
+                                        <ul id="bird-suggestions" class="suggestions list-group"></ul>
+                                    </div>
+                                    
                                 </div>
                             </div>
                             <div class="col-5 border rounded ps-2 mb-3">
@@ -193,9 +202,9 @@
                             </div>
 
                         </div>
-                        <div class="row">
-                            <div class="col-12" id="record-entry-birdlist"></div>
-                        </div>
+
+                        <div class="border bg-light rounded mb-3 p-3" id="selected-bird"></div>
+
                         <div class="col hide-in-batch">
                             <div class="form-floating mb-3">
                                 <input type="number" id="call-count" class="form-control" min="1">
@@ -512,8 +521,8 @@
             <h5 class="offcanvas-title" id="offcanvas">Settings</h5>
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" id="close-settings" aria-label="Close"></button>
         </div>
-        <div class="offcanvas-body pt-1">
-            <div class="btn-group w-100 p-2" role="group" aria-label="Settings mode">
+        <div class="offcanvas-body pt-0">
+            <div class="btn-group w-100 p-2 mt-0 position-sticky top-0 bg-dark" style="z-index: 2000;" role="group" aria-label="Settings mode">
                 <button type="button" id="basic" class="btn btn-primary w-50">Basic</button>
                 <button type="button" id="advanced" class="btn btn-secondary w-50">Advanced</button>
             </div>  
@@ -691,7 +700,7 @@
                         <legend style="font-size: small; font-weight:bold">
                             Keyboard Assignment
                         </legend>
-                        <div class="d-flex align-items-center mb-2">
+                        <div class="d-flex align-items-center mb-2 position-relative">
                             <kbd class="text-bg-light ps-2 pe-2">1</kbd> 
                             <select class="locked form-select w-50 ms-2" style="font-size: small" id="key1-column">
                                 <option value="">Unused</option>
@@ -700,8 +709,9 @@
                                 <option value="comment">Comment</option>
                             </select>
                             <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key1">
+                            <div id="bird-list-key1" class="suggestions list-group"></div>
                         </div>
-                        <div class="d-flex align-items-center mb-2">
+                        <div class="d-flex align-items-center mb-2 position-relative">
                             <kbd class="text-bg-light ps-2 pe-2">2</kbd> 
                             <select class="locked form-select w-50 ms-2" style="font-size: small" id="key2-column">
                                 <option value="">Unused</option>
@@ -710,6 +720,7 @@
                                 <option value="comment">Comment</option>
                             </select>
                             <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key2">
+                            <div id="bird-list-key2" class="suggestions list-group"></div>
                         </div>
                         <div class="d-flex align-items-center mb-2">
                             <kbd class="text-bg-light ps-2 pe-2">3</kbd> 
@@ -720,6 +731,7 @@
                                 <option value="comment">Comment</option>
                             </select>
                             <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key3">
+                            <div id="bird-list-key3" class="suggestions list-group"></div>
                         </div>
                         <div class="d-flex align-items-center mb-2">
                             <kbd class="text-bg-light ps-2 pe-2">4</kbd> 
@@ -730,6 +742,7 @@
                                 <option value="comment">Comment</option>
                             </select>
                             <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key4">
+                            <div id="bird-list-key4" class="suggestions list-group"></div>
                         </div>
                         <div class="d-flex align-items-center mb-2">
                             <kbd class="text-bg-light ps-2 pe-2">5</kbd> 
@@ -740,6 +753,7 @@
                                 <option value="comment">Comment</option>
                             </select>
                             <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key5">
+                            <div id="bird-list-key5" class="suggestions list-group"></div>
                         </div>
                         <div class="d-flex align-items-center mb-2">
                             <kbd class="text-bg-light ps-2 pe-2">6</kbd> 
@@ -750,6 +764,7 @@
                                 <option value="comment">Comment</option>
                             </select>
                             <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key6">
+                            <div id="bird-list-key6" class="suggestions list-group"></div>
                         </div>
                         <div class="d-flex align-items-center mb-2">
                             <kbd class="text-bg-light ps-2 pe-2">7</kbd> 
@@ -760,6 +775,7 @@
                                 <option value="comment">Comment</option>
                             </select>
                             <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key7">
+                            <div id="bird-list-key7" class="suggestions list-group"></div>
                         </div>
                         <div class="d-flex align-items-center mb-2">
                             <kbd class="text-bg-light ps-2 pe-2">8</kbd> 
@@ -770,6 +786,7 @@
                                 <option value="comment">Comment</option>
                             </select>
                             <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key8">
+                            <div id="bird-list-key8" class="suggestions list-group"></div>
                         </div>
                         <div class="d-flex align-items-center mb-2">
                             <kbd class="text-bg-light ps-2 pe-2">9</kbd> 
@@ -780,6 +797,7 @@
                                 <option value="comment">Comment</option>
                             </select>
                             <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key9">
+                            <div id="bird-list-key9" class="suggestions list-group"></div>
                         </div>
                         <div class="d-flex align-items-center mb-2">
                             <kbd class="text-bg-light ps-2 pe-2">0</kbd> 
@@ -790,6 +808,7 @@
                                 <option value="comment">Comment</option>
                             </select>
                             <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key0">
+                            <div id="bird-list-key0" class="suggestions list-group"></div>
                         </div>
                     </fieldset>    
                 </fieldset>

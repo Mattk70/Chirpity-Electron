@@ -122,7 +122,7 @@ class CustomSelect extends HTMLElement {
           padding: 0.25rem 0.5rem;
           font-size: 0.875rem;
           line-height: 1.5;
-          border-radius: 0.2rem;
+          border-radius: 0.35rem;
         }
         .btn-outline-dark {
           color: #343a40;

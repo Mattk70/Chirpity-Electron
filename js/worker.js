@@ -271,9 +271,9 @@ const createDB = async (file) => {
     await db.runAsync("BEGIN");
     await diskDB.runAsync("PRAGMA user_version = 1")
     await db.runAsync(
-      "CREATE TABLE labels(id INTEGER PRIMARY KEY, name TEXT NOT NULL, UNIQUE(name))"
+      "CREATE TABLE tags(id INTEGER PRIMARY KEY, name TEXT NOT NULL, UNIQUE(name))"
     );
-    await db.runAsync("INSERT INTO labels VALUES(null, 'Nocmig'), (null, 'Local')");
+    await db.runAsync("INSERT INTO tags VALUES(null, 'Nocmig'), (null, 'Local')");
     await db.runAsync(
       "CREATE TABLE species(id INTEGER PRIMARY KEY, sname TEXT NOT NULL, cname TEXT NOT NULL)"
     );
@@ -287,7 +287,7 @@ const createDB = async (file) => {
       "CREATE UNIQUE INDEX idx_unique_place ON locations(lat, lon)"
     );
     await db.runAsync(`CREATE TABLE records( dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, 
-      comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER, reviewed INTEGER, labelID INTEGER,
+      comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER, reviewed INTEGER, tagID INTEGER,
       UNIQUE (dateTime, fileID, speciesID), CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,  FOREIGN KEY (speciesID) REFERENCES species(id))`);
     await db.runAsync(
       `CREATE TABLE duration( day INTEGER, duration INTEGER, fileID INTEGER, UNIQUE (day, fileID), CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE)`
@@ -320,11 +320,12 @@ const createDB = async (file) => {
       );
       DEBUG &&
         console.log(response.changes + " species added to memory database");
-      response = await db.runAsync(
-          "INSERT OR IGNORE INTO labels SELECT * FROM disk.labels"
+
+        response = await db.runAsync(
+          "INSERT OR IGNORE INTO tags SELECT * FROM disk.tags"
         );
-      DEBUG &&
-        console.log(response.changes + " labels added to memory database");
+        DEBUG &&
+          console.log(response.changes + " tags added to memory database");
     }
     await db.runAsync("END");
   } catch (error) {
@@ -392,16 +393,16 @@ async function loadDB(path) {
       .catch((error) => console.error(error));
     if (user_version !== undefined && user_version < 1){ 
       try{
-        await diskDB.runAsync("CREATE TABLE IF NOT EXISTS labels(id INTEGER PRIMARY KEY, name TEXT NOT NULL, UNIQUE(name))");
-        await diskDB.runAsync("INSERT INTO labels VALUES(null, 'Nocmig'), (null, 'Local')");
-        await diskDB.runAsync("ALTER TABLE records ADD COLUMN labelID INTEGER");
-        await diskDB.runAsync("UPDATE records SET labelID = 1 WHERE label = 'Nocmig'");
-        await diskDB.runAsync("UPDATE records SET labelID = 2 WHERE label = 'Local'");
+        await diskDB.runAsync("CREATE TABLE IF NOT EXISTS tags(id INTEGER PRIMARY KEY, name TEXT NOT NULL, UNIQUE(name))");
+        await diskDB.runAsync("INSERT INTO tags VALUES(null, 'Nocmig'), (null, 'Local')");
+        await diskDB.runAsync("ALTER TABLE records ADD COLUMN tagID INTEGER");
+        await diskDB.runAsync("UPDATE records SET tagID = 1 WHERE label = 'Nocmig'");
+        await diskDB.runAsync("UPDATE records SET tagID = 2 WHERE label = 'Local'");
         await diskDB.runAsync("ALTER TABLE records DROP COLUMN label");
         // Change label names to labelIDs
         await diskDB.runAsync("ALTER TABLE records ADD COLUMN reviewed INTEGER");
         await diskDB.runAsync("PRAGMA user_version = 1")
-        console.info("Migrated labels and added 'reviewed' column to ", p.basename(file))
+        console.info("Migrated tags and added 'reviewed' column to ", p.basename(file))
       } catch (e) {
         console.error("Error adding column and updating version", e.message, e)
       }
@@ -661,13 +662,13 @@ async function handleMessage(e) {
       break;
     }
     case "get-tags": {
-      const result = await diskDB.allAsync('SELECT id, name FROM labels');
+      const result = await diskDB.allAsync('SELECT id, name FROM tags');
       UI.postMessage({event: "tags", tags: result, init: true})
       break;
     }
     case "delete-tag": {
       try {
-        const result = await diskDB.runAsync('DELETE FROM labels where name = ?', args.deleted);
+        const result = await diskDB.runAsync('DELETE FROM tags where name = ?', args.deleted);
       } catch (error) {
         generateAlert({message: `Label deletion failed: ${error.message}`})
         console.error(error);
@@ -676,13 +677,13 @@ async function handleMessage(e) {
     }
     case "update-tags": {
       try {
-        const stmt = diskDB.prepare('INSERT OR REPLACE INTO labels (id, name) VALUES (?, ?)');
+        const stmt = STATE.db.prepare('INSERT OR REPLACE INTO tags (id, name) VALUES (?, ?)');
         const tags = args.tags;
         for (let i=0; i<tags.length;i++){
           await stmt.runAsync(i+1, tags[i] )
         }
         stmt.finalize()
-        const result = await diskDB.allAsync('SELECT id, name FROM labels');
+        const result = await STATE.db.allAsync('SELECT id, name FROM tags');
         UI.postMessage({event: "tags", tags: result, init: false})
       } catch (error) {
         generateAlert({message: `Label update failed: ${error.message}`})
@@ -1238,8 +1239,8 @@ const prepResultsStatement = (
         species.sname, 
         species.cname, 
         records.confidence as score, 
-        labelID,
-        labels.name as label, 
+        tagID,
+        tags.name as label, 
         records.comment, 
         records.end,
         records.callCount,
@@ -1249,7 +1250,7 @@ const prepResultsStatement = (
         FROM records 
         JOIN species ON records.speciesID = species.id 
         JOIN files ON records.fileID = files.id 
-        LEFT JOIN labels ON records.labelID = labels.id
+        LEFT JOIN tags ON records.tagID = tags.id
         WHERE confidence >= ? 
         `;
   // // Prioritise selection ranges
@@ -1268,7 +1269,7 @@ const prepResultsStatement = (
     params.push(...included);
   }
   if (STATE.selection) {
-    resultStatement += ` AND name = ? `;
+    resultStatement += ` AND files.name = ? `;
     params.push(FILE_QUEUE[0]);
   }
   if (STATE.locationID) {
@@ -1293,7 +1294,7 @@ const prepResultsStatement = (
     sname, 
     cname, 
     score,
-    labelID,
+    tagID,
     label, 
     comment,
     end,
@@ -2431,7 +2432,7 @@ const saveResults2DataSet = ({ species, included }) => {
     species.sname, 
     species.cname, 
     confidence AS score, 
-    labelID, 
+    tagID, 
     comment
     FROM records
     JOIN species
@@ -2907,22 +2908,22 @@ const onInsertManualRecord = async ({
     const r = await db.getAsync(
       "SELECT * FROM records WHERE dateTime = ? AND fileID = ? AND speciesID = ?", 
       dateTime, fileID, speciesID);
-    confidence = r?.confidence; // Save confidence
+    confidence = r?.confidence || 2000; // Save confidence
   }
-  const result = await db.getAsync("SELECT id FROM labels WHERE name = ?", label);
-  const labelID = result?.id;
+  const result = await db.getAsync("SELECT id FROM tags WHERE name = ?", label);
+  const tagID = result?.id;
   if (calledByBatch && cname === originalCname){
    await db.runAsync(
-      `UPDATE records SET labelID = ?, comment = ?, reviewed = 1 
+      `UPDATE records SET tagID = ?, comment = ?, reviewed = 1 
         WHERE dateTime = ? AND fileID = ? AND speciesID = ?`,
-      labelID, comment, dateTime, fileID, speciesID
+      tagID, comment, dateTime, fileID, speciesID
     )
   } else {
     await db.runAsync(
-        `INSERT INTO records (dateTime, position, fileID, speciesID, confidence, labelID, comment, end, callCount, isDaylight, reviewed)
+        `INSERT INTO records (dateTime, position, fileID, speciesID, confidence, tagID, comment, end, callCount, isDaylight, reviewed)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(dateTime, fileID, speciesID) DO UPDATE SET 
-          labelID = excluded.labelID,
+          tagID = excluded.tagID,
           comment = excluded.comment,
           reviewed = excluded.reviewed;`,
         dateTime,
@@ -2930,7 +2931,7 @@ const onInsertManualRecord = async ({
         fileID,
         speciesID,
         confidence, // This will only be inserted, not updated
-        labelID,
+        tagID,
         comment,
         end,
         parseInt(count),
@@ -3884,6 +3885,9 @@ const onSave2DiskDB = async ({ file }) => {
     await memoryDB.runAsync("BEGIN");
     await memoryDB.runAsync(
       `INSERT OR IGNORE INTO disk.files SELECT * FROM files`
+    );
+    await memoryDB.runAsync(
+      `INSERT OR IGNORE INTO disk.tags SELECT * FROM tags`
     );
     await memoryDB.runAsync(
       `INSERT OR IGNORE INTO disk.locations SELECT * FROM locations`
