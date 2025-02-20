@@ -156,7 +156,7 @@
     "record-entry":{
       "record-entry-modal-label": "Edit Record",
       "call-count": "Call Count",
-      "record-label": "Call Type",
+      "record-label": "Label",
       "label-local": "Local",
       "label-nocmig": "Nocmig",
       "label-unknown": "Not specified",
