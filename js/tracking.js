@@ -2,22 +2,27 @@
  * @file Helper functions for managing Matomo tracking.
  */
 
-const ID_SITE = 3;
+const ID_SITE = 2;
 let VISITOR;
 /**
- * Tracks an event for Matomo analytics.
+ * Logs an event to the Matomo analytics system.
  *
- * This function constructs and sends a GET request to the Matomo tracking API to log an event. It
- * normalizes the event name by replacing any occurrence of "result" followed by digits with simply "result".
- * Additionally, it adjusts the action parameter by converting a single space to "Spacebar" and a plus sign
- * to "Plus". The request URL incorporates the current time, site identification, user identifier, and event details.
- * If the fetch response is not OK, an error is thrown and subsequently logged.
+ * Constructs and dispatches an asynchronous GET request to the Matomo tracking API using the provided event details.
+ * The event name is sanitized by replacing any digits following "result" with an empty string, and the action parameter
+ * is adjusted: a single space converts to "Spacebar" and a plus sign converts to "Plus". The request URL embeds the
+ * current time (hours, minutes, seconds), site ID, visitor UUID, event category, action, and optional event name and value.
  *
- * @param {string} uuid - The unique identifier of the visitor.
- * @param {string} event - The event category.
- * @param {string} action - The event action; may be normalized to "Spacebar" or "Plus" for specific inputs.
- * @param {string} [name] - The event name; numerical identifiers in "result" strings are reduced.
- * @param {string|number} [value] - An optional value associated with the event.
+ * The function initiates an asynchronous fetch; if the network response is not OK, an error is thrown internally and
+ * then logged to the console.
+ *
+ * @param {string} uuid - Unique identifier of the visitor.
+ * @param {string} event - Event category for classification.
+ * @param {string} action - Event action; " " becomes "Spacebar" and "+" becomes "Plus".
+ * @param {string} [name] - Optional event name; any digits following "result" are removed.
+ * @param {(string|number)} [value] - Optional event value providing additional context.
+ *
+ * @example
+ * trackEvent('user-123', 'navigation', ' ', 'result45', 100);
  */
 function trackEvent(uuid, event, action, name, value){
     // Squash result numbers

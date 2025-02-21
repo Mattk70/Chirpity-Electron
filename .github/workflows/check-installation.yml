@@ -85,8 +85,7 @@ jobs:
       - name: Modify tracking code
         run: |
           # Replace development with production tracking
-          sed -i.bak '1s/const ID_SITE = 3;/const ID_SITE = 2;/' ./js/tracking.js \
-          && rm -f ./js/tracking.js.bak
+          sed -i.bak 's/\bID_SITE\s*=\s*3;/ID_SITE = 2;/g' ./js/tracking.js && rm -f ./js/tracking.js.bak
           cat ./js/tracking.js
         shell: bash
 

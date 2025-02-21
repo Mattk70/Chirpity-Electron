@@ -39,7 +39,7 @@ import WaveSurfer from "../node_modules/wavesurfer.js/dist/wavesurfer.esm.js";
 import RegionsPlugin from "../node_modules/wavesurfer.js/dist/plugins/regions.esm.js";
 import Spectrogram from "../node_modules/wavesurfer.js/dist/plugins/spectrogram.esm.js";
 import TimelinePlugin from "../node_modules/wavesurfer.js/dist/plugins/timeline.esm.js";
-
+import { CustomSelect } from './custom-select.js';
 import {
   fetchIssuesByLabel,
   renderIssuesInModal,
@@ -61,6 +61,7 @@ import {
   i18nLists,
   IUCNLabel,
   i18nLocate,
+  i18nSelect
 } from "./i18n.js";
 let LOCATIONS,
   locationID = undefined,
@@ -173,6 +174,7 @@ let STATE = {
   },
   resultsSortOrder: "timestamp",
   summarySortOrder: "cname ASC",
+  resultsMetaSortOrder: '',
   dataFormatOptions: {
     day: "2-digit",
     month: "short",
@@ -195,7 +197,8 @@ let STATE = {
   translations: ["da", "de", "es", "fr", "ja", "nl", "pt", "ru", "sv", "zh"],
   regionColour: "rgba(255, 255, 255, 0.1)",
   regionActiveColour: "rgba(255, 255, 0, 0.1)",
-  regionsCompleted: true
+  regionsCompleted: true,
+  labelColors: ["dark", "success", "warning", "info", "secondary", "danger", "primary"]
 };
 
 //Open Files from OS "open with"
@@ -335,10 +338,11 @@ DOM.contentWrapper.style.height = bodyElement.clientHeight - 80 + "px";
 
 const specMaxHeight = () => {
   // Get the available viewport height
+  const formOffset = DOM.exploreWrapper.offsetHeight
   const navPadding = DOM.navPadding.clientHeight;
   const footerHeight = DOM.footer.clientHeight;
   const controlsHeight = DOM.controlsWrapper.clientHeight;
-  return window.innerHeight - navPadding - footerHeight - controlsHeight;
+  return window.innerHeight - navPadding - footerHeight - controlsHeight - formOffset;
 };
 
 // Mouse down event to start dragging
@@ -621,6 +625,7 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
 
   wavesurfer.on("finish", function () {
     const bufferEnd = windowOffsetSecs + windowLength;
+    activeRegion = null;
     if (currentFileDuration > bufferEnd) {
       postBufferUpdate({ begin: windowOffsetSecs + windowLength, play: true });
     }
@@ -731,29 +736,30 @@ const refreshTimeline = () => {
 };
 
 /**
- * Zooms in or out of the audio spectrogram by adjusting the display window
- * and repositioning the playhead relative to the current audio playback time.
+ * Adjusts the spectrogram zoom level and repositions the playhead relative to the audio timeline.
  *
- * When zooming in, the window length is halved, but not reduced below a 1.5-second threshold.
- * When zooming out, the window length is doubled, capped at a maximum of 100 seconds or the file's duration.
- * Active audio regions are updated to align with the new window, ensuring consistency in user selections.
+ * Halves the display window during a "zoomIn" operation—without reducing the window below 1.5 seconds—
+ * and doubles it during a "zoomOut" operation, capped at 100 seconds or the total duration of the file.
+ * The window offset is recalculated to keep the playhead at the same absolute position within the audio,
+ * and any active audio regions are updated to remain consistent with the new window.
  *
- * If no audio file is loaded, the function exits without performing any operation.
+ * No operation is performed if no audio file is loaded or if the audio regions have not been fully initialized.
  *
- * @param {(string|Event)} direction - Specifies the zoom operation. If a string, it must be either "zoomIn" or "zoomOut".
- * If an Event, the function extracts the button ID from the event's target element.
+ * @param {(string|Event)} direction - A zoom command either as a string ("zoomIn" or "zoomOut") for direct calls,
+ * or as an Event from which the command is extracted using the event target's closest button ID.
  * @returns {void}
  *
  * @example
- * // Zoom in directly using a string command:
+ * // Programmatically zoom in:
  * zoomSpec("zoomIn");
  *
  * @example
- * // Trigger zooming out via a button click event:
+ * // Zoom out via a button click:
  * buttonElement.addEventListener("click", zoomSpec);
  */
 function zoomSpec(direction) {
-  if (fileLoaded) {
+  if (fileLoaded &amp;&amp; STATE.regionsCompleted) {
+
     if (typeof direction !== "string") {
       // then it's an event
       direction = direction.target.closest("button").id;
@@ -861,6 +867,16 @@ function getDatetimeLocalFromEpoch(date) {
   return isoDate;
 }
 
+/**
+ * Renders a date and time picker form for updating the start time of the current audio file.
+ *
+ * The form is dynamically created and appended to the filename panel, featuring:
+ * - A label and a datetime-local input, with the input's value initialized from STATE.fileStart and its maximum value set to the current datetime.
+ * - A submit button that, when activated, converts the selected datetime into a millisecond timestamp, sends an update message to the worker, logs the change, resets analysis results, and updates STATE.fileStart.
+ * - A cancel button that removes the form without making any changes.
+ *
+ * @returns {void}
+ */
 function showDatePicker() {
   // Create a form element
   const i18n = getI18n(i18nForm);
@@ -932,7 +948,6 @@ function showDatePicker() {
     // Remove the form from the DOM
     form.remove();
   });
-  toggleKeyDownForFormInputs();
 }
 
 const filename = DOM.filename;
@@ -1802,21 +1817,20 @@ const selectionTable = document.getElementById("selectionResultTableBody");
 selectionTable.addEventListener("click", resultClick);
 
 /**
- * Handles the click event on a result row in the audio analysis UI.
+ * Processes click events on audio analysis result rows.
  *
- * This function asynchronously processes user clicks on table rows representing audio analysis results.
- * It first verifies that all audio regions have been fully created and an audio file is loaded. It then extracts
- * file details, start and end times, and label information from the clicked row's "name" attribute, and makes the row active.
- * The corresponding audio region is then loaded using these extracted details. If the event target has a "circle" class,
- * the function waits until the audio file is fully loaded before obtaining the selection results.
+ * Validates that audio regions are fully established and an audio file is loaded before proceeding. Extracts the file name,
+ * start time, end time, and label from the clicked row's "name" attribute (expected in the format "file|start|end|unused|label"),
+ * sets the row as active by updating its CSS class, and loads the corresponding audio region. If the clicked target has a "circle"
+ * class, waits until the audio file is completely loaded before obtaining selection results.
  *
- * @param {Event} e - The click event object triggered by the user interaction.
- * @returns {Promise&lt;void>} A promise that resolves when the click event processing is complete.
+ * @param {Event} e - The click event triggered by the user.
+ * @returns {Promise&lt;void>} A promise that resolves once the event processing is complete.
  *
  * @example
- * // Assuming a table row element with the "name" attribute formatted as "file|start|end|_|label":
+ * // Assuming a table row element with the following "name" attribute:
  * // &lt;tr name="audio.mp3|10|20|unused|Speech">...&lt;/tr>
- * // Attaching the event handler:
+ * // Attach the event handler as follows:
  * document.querySelector('tr').addEventListener('click', resultClick);
  */
 async function resultClick(e) {
@@ -1835,19 +1849,14 @@ async function resultClick(e) {
   }
 
   const [file, start, end, _, label] = row.getAttribute("name").split("|");
-  // if (row.classList.contains('table-active')){
-  //     createRegion(start - windowOffsetSecs, end - windowOffsetSecs, label, true);
-  //     e.target.classList.contains('circle') &amp;&amp; getSelectionResults(true);
-  //     return;
-  // }
 
   // Search for results rows - Why???
-  while (
-    !(row.classList.contains("nighttime") || row.classList.contains("daytime"))
-  ) {
-    row = row.previousElementSibling;
-    if (!row) return;
-  }
+  // while (
+  //   !(row.classList.contains("nighttime") || row.classList.contains("daytime"))
+  // ) {
+  //   row = row.previousElementSibling;
+  //   if (!row) return;
+  // }
   if (activeRow) activeRow.classList.remove("table-active");
   row.classList.add("table-active");
   activeRow = row;
@@ -1858,12 +1867,23 @@ async function resultClick(e) {
   }
 }
 
+/**
+ * Marks the row corresponding to the specified start time as active in the result table.
+ *
+ * Iterates through all table rows within the result table and checks the "name" attribute, which is expected
+ * to be a pipe-separated string containing file identifier, start time, and additional details. When a row is found
+ * where the file matches the current file (STATE.currentFile) and the start time matches the provided value, any
+ * previously active row (if different) is deactivated, the target row is activated by adding the 'table-active'
+ * class, and the row is smoothly scrolled into view.
+ *
+ * @param {number} start - The start time to match for activating the corresponding table row.
+ */
 function setActiveRow(start) {
     const rows = DOM.resultTable.querySelectorAll('tr');
     for (const r of rows) {
-        const [_file, rowStart, _end, _, _label] = r.getAttribute("name").split("|");
+        const [file, rowStart, _end, _, _label] = r.getAttribute("name").split("|");
 
-        if (Number(rowStart) === start) {
+        if ( file === STATE.currentFile &amp;&amp; Number(rowStart) === start) {
             // Clear the active row if there's one
             if (activeRow &amp;&amp; activeRow !== r) {
                 activeRow.classList.remove('table-active');
@@ -2090,6 +2110,17 @@ function updatePrefs(file, data) {
   );
 }
 
+/**
+ * Synchronizes a configuration object with a default configuration.
+ *
+ * Removes keys from the configuration that are not found in the default configuration,
+ * and adds any missing keys from the default configuration. For keys with values that
+ * are both objects in the configuration and the default configuration, the merge is
+ * performed recursively, except when the key is "keyAssignment", which is left untouched.
+ *
+ * @param {Object} config - The configuration object to be synchronized (modified in place).
+ * @param {Object} defaultConfig - The default configuration serving as the reference.
+ */
 function syncConfig(config, defaultConfig) {
   // First, remove keys from config that are not in defaultConfig
   Object.keys(config).forEach((key) => {
@@ -2106,8 +2137,8 @@ function syncConfig(config, defaultConfig) {
       typeof config[key] === "object" &amp;&amp;
       typeof defaultConfig[key] === "object"
     ) {
-      // Recursively sync nested objects
-      syncConfig(config[key], defaultConfig[key]);
+      // Recursively sync nested objects (but allow key assignment to be empty)
+      key === 'keyAssignment' || syncConfig(config[key], defaultConfig[key]);
     }
   });
 }
@@ -2183,7 +2214,8 @@ const defaultConfig = {
   debug: false,
   VERSION: VERSION,
   powerSaveBlocker: false,
-  fileStartMtime: false
+  fileStartMtime: false,
+  keyAssignment: {}
 };
 let appPath, tempPath, systemLocale, isMac;
 window.onload = async () => {
@@ -2243,9 +2275,7 @@ window.onload = async () => {
     //fill in defaults - after updates add new items
     syncConfig(config, defaultConfig);
 
-    membershipCheck().then(isMember  => {
-      isMember || document.getElementById("buy-me-coffee").classList.remove('d-none');
-    });
+    membershipCheck().then(isMember  => STATE.isMember = isMember);
  
     // Disable SNR
     config.filters.SNR = 0;
@@ -2652,6 +2682,12 @@ const setUpWorkerMessaging = () => {
 
           break;
         }
+        case "tags": {
+          STATE.tagsList = args.tags;
+          // Init is passed on launch, so set up the UI
+          args.init &amp;&amp; setKeyAssignmentUI(config.keyAssignment)
+          break
+        }
         case "total-records": {
           updatePagination(args.total, args.offset);
           break;
@@ -2737,26 +2773,52 @@ function generateBirdList(store, rows) {
   explore.innerHTML = listHTML;
 }
 
+/**
+ * Generates an HTML string for a bird species selection dropdown.
+ *
+ * Constructs a select element based on the provided options. When options.store is "allSpecies", a floating form-select is created with either a search prompt or a preselected species from the global LABELS. Otherwise, a basic select element is built using the species data from options.rows, with the currently active species (from STATE.chart.species) marked as selected.
+ *
+ * Also updates the inner HTML of the element with ID "species-search-label" using localized text.
+ *
+ * @param {Object} options - Options to configure the species option list.
+ * @param {string} options.store - Determines the type of select element to generate. Use "allSpecies" to render all species with an optional preselection.
+ * @param {Array&lt;Object>} options.rows - Array of species objects; each must contain a "cname" property used for option values.
+ * @param {string} [options.selected] - Optionally, the species name to preselect when options.store is "allSpecies".
+ * @returns {string} HTML string representing the constructed select element with bird species options.
+ *
+ * @remark Relies on external globals such as LABELS, STATE, i18nHeadings, and i18nAll for data retrieval and localization.
+ */
 function generateBirdOptionList({ store, rows, selected }) {
   let listHTML = "";
   const i18n = getI18n(i18nHeadings);
   const i18nTout = getI18n(i18nAll);
+  // Species search label and match count
+  document.getElementById('species-search-label').innerHTML = i18n.search;
   if (store === "allSpecies") {
-    let sortedList = LABELS.map((label) => label.split("_")[1]);
+    // let sortedList = LABELS.map((label) => {
+    //   const [sname, cname] = label.split("_")
+    //   return `${cname}~${sname}`
+    // });
 
-    // International language sorting, recommended for large arrays - 'en_uk' not valid, but same as 'en'
-    sortedList.sort(
-      new Intl.Collator(config.locale.replace(/_.*$/, "")).compare
-    );
+    // // International language sorting, recommended for large arrays - 'en_uk' not valid, but same as 'en'
+    // sortedList.sort(
+    //   new Intl.Collator(config.locale.replace(/_.*$/, "")).compare
+    // );
     // Check if we have prepared this before
 
-    const lastSelectedSpecies = selected || STATE.birdList.lastSelectedSpecies;
+    // const lastSelectedSpecies = selected || STATE.birdList.lastSelectedSpecies;
     listHTML +=
-      '&lt;div class="form-floating">&lt;select spellcheck="false" id="bird-list-all" class="input form-select mb-3" aria-label=".form-select" required>';
-    listHTML += `&lt;option value="">${i18nTout[1]}&lt;/option>`;
-    for (const species of sortedList) {
-      const isSelected = species === lastSelectedSpecies ? "selected" : "";
-      listHTML += `&lt;option value="${species}" ${isSelected}>${species}&lt;/option>`;
+      `&lt;div class="form-floating">
+      &lt;select spellcheck="false" id="bird-list-all" class="form-select mb-3" aria-label=".form-select" required>`;
+    // 
+    // for (const species of sortedList) {
+    if (selected){
+      const species = LABELS.find(sp => sp.split('_')[1] === selected);
+      const [sname, cname] = species.split('_');
+      // const isSelected = cname === lastSelectedSpecies ? "selected" : "";
+      listHTML += `&lt;option value="${cname}" selected>${cname}~${sname}&lt;/option>`;
+    } else {
+      listHTML += `&lt;option value="">${i18n.searchPrompt}&lt;/option>`
     }
     listHTML += `&lt;/select>&lt;label for="bird-list-all">${i18n.species[0]}&lt;/label>&lt;/div>`;
   } else {
@@ -3197,31 +3259,44 @@ const waitForFinalEvent = (function () {
 window.addEventListener("resize", function () {
   waitForFinalEvent(
     function () {
-      adjustSpecDims(false);
+      adjustSpecDims(true);
     },
     100,
     "id1"
   );
 });
 
+/**
+ * Debounces keydown event processing for non-interactive elements.
+ *
+ * Prevents the default behavior of keydown events when they do not originate from
+ * an HTMLInputElement, HTMLTextAreaElement, or CustomSelect. The debounced call delays
+ * the execution of the keydown handler by 100 milliseconds using a unique identifier ("keyhandler").
+ *
+ * @param {KeyboardEvent} e - The keydown event triggered by the user.
+ */
 function handleKeyDownDeBounce(e) {
-  e.preventDefault();
-  waitForFinalEvent(
-    function () {
-      handleKeyDown(e);
-    },
-    100,
-    "keyhandler"
-  );
+  if (!(e.target instanceof HTMLInputElement 
+    || e.target instanceof HTMLTextAreaElement
+    || e.target instanceof CustomSelect)){
+    e.preventDefault();
+    waitForFinalEvent(
+      function () {
+        handleKeyDown(e);
+      },
+      100,
+      "keyhandler"
+    );
+  }
 }
 
 /**
- * Handles a key down event by triggering a corresponding global action if available.
+ * Responds to keydown events by dispatching configured global actions.
  *
- * If debugging is enabled, logs the pressed key. The function checks if the pressed key
- * exists in the GLOBAL_ACTIONS mapping, and if so, it hides the context menu and determines
- * the active modifier key (Shift, Control, Alt, or none). It then tracks the key press event
- * using the trackEvent function and invokes the corresponding global action callback with the event.
+ * Logs the pressed key when debugging is enabled. If the pressed key exists in the global actions mapping,
+ * hides the context menu, determines the active modifier key (Shift, Control, or Alt; defaults to "no"),
+ * tracks the key press event with its modifier via a tracking function, and executes the corresponding action callback.
+ * If the key is not mapped, invokes the fallback handler for number keys.
  *
  * @param {KeyboardEvent} e - The keyboard event triggered on key press.
  * @returns {void}
@@ -3246,6 +3321,8 @@ function handleKeyDown(e) {
       : "no";
     trackEvent(config.UUID, "KeyPress", action, modifier);
     GLOBAL_ACTIONS[action](e);
+  } else {
+    GLOBAL_ACTIONS.handleNumberKeys(e);
   }
 }
 
@@ -3326,24 +3403,19 @@ function setActiveRegion(region) {
 }
 
 /**
- * Initializes and configures the RegionsPlugin for audio region management.
+ * Initializes and configures audio region management using the RegionsPlugin.
  *
- * This function destroys any previously initialized RegionsPlugin instance and creates a new one
- * with the following configuration:
- * - Enables dragging of regions.
- * - Limits the maximum number of regions to 100.
- * - Uses the default region color from STATE.regionColour.
+ * Destroys any existing RegionsPlugin instance and creates a new instance with regions that are draggable,
+ * a maximum limit of 100 regions, and a default color defined by STATE.regionColour.
  *
- * Additionally, it sets up event listeners for region interactions:
- * - "region-clicked": Hides the context menu, updates the active region and audio playback time,
- *   and removes regions based on key modifiers:
- *   - Shift key: Removes all regions with the default region color.
- *   - Ctrl/Cmd key: Removes the clicked region.
- * - "region-created": Sets a newly created region as the active region if it lacks a label (content)
- *   or if its start time matches that of the current active region.
- * - "region-update": Clears the region's label content and updates it as the active region.
+ * Registers event listeners for region interactions:
+ * - "region-clicked": Hides the context menu, updates the active region, and seeks playback to the region's start.
+ *   If the Shift key is pressed, all regions with the default color are removed; if the Ctrl/Cmd key is pressed,
+ *   the clicked region is removed.
+ * - "region-created": Marks a new region as active if it has no label (content) or its start time matches the current active region.
+ * - "region-update": Clears the region's label and sets the updated region as active.
  *
- * @returns {Object} The initialized RegionsPlugin instance.
+ * @returns {Object} The new RegionsPlugin instance.
  */
 function initRegion() {
   if (REGIONS) REGIONS.destroy();
@@ -3373,7 +3445,9 @@ function initRegion() {
     const { start, content } = r;
     const activeStart = activeRegion ? activeRegion.start : null;
     // If a new region is created without a label, it must be user generated
-    if (!content || start === activeStart) setActiveRegion(r);
+     if (!content || start === activeStart) {
+      setActiveRegion(r);
+     }
   });
 
   // Clear label on modifying region
@@ -3622,32 +3696,101 @@ const timelineToggle = (fromKeys) => {
  */
 
 function centreSpec() {
-  const saveBufferBegin = windowOffsetSecs;
-  const middle = windowOffsetSecs + wavesurfer.getCurrentTime();
-  windowOffsetSecs = middle - windowLength / 2;
-  windowOffsetSecs = Math.max(0, windowOffsetSecs);
-  windowOffsetSecs = Math.min(
-    windowOffsetSecs,
-    currentFileDuration - windowLength
-  );
+  if (STATE.regionsCompleted){
+    const saveBufferBegin = windowOffsetSecs;
+    const middle = windowOffsetSecs + wavesurfer.getCurrentTime();
+    windowOffsetSecs = middle - windowLength / 2;
+    windowOffsetSecs = Math.max(0, windowOffsetSecs);
+    windowOffsetSecs = Math.min(
+      windowOffsetSecs,
+      currentFileDuration - windowLength
+    );
 
-  if (activeRegion) {
-    const shift = saveBufferBegin - windowOffsetSecs;
-    activeRegion.start += shift;
-    activeRegion.end += shift;
-    const { start, end } = activeRegion;
-    if (start &lt; 0 || end > windowLength) activeRegion = null;
+    if (activeRegion) {
+      const shift = saveBufferBegin - windowOffsetSecs;
+      activeRegion.start += shift;
+      activeRegion.end += shift;
+      const { start, end } = activeRegion;
+      if (start &lt; 0 || end > windowLength) activeRegion = null;
+    }
+    postBufferUpdate({
+      begin: windowOffsetSecs,
+      position: 0.5
+    });
   }
-  postBufferUpdate({
-    begin: windowOffsetSecs,
-    position: 0.5
-  });
 }
 
-/////////// Keyboard Shortcuts  ////////////
+/**
+ * Updates the active record based on the key assignment configuration.
+ *
+ * When an assignment exists for the provided key, extracts record details from the currently
+ * selected row, modifies the appropriate field (species, label, or comment) based on the assignment,
+ * and calls the record insertion routine with the updated values. If no active row is selected,
+ * logs an informational message and aborts the update.
+ *
+ * @param {number|string} key - Identifier used to retrieve the key assignment (appended to "key" for lookup) from the configuration.
+ *
+ * @example
+ * // Assuming a key assignment exists for key "1" in config.keyAssignment:
+ * recordUpdate(1);
+ */
+function recordUpdate(key){
+  if (!activeRow) {
+    console.info('No active row selected for key assignment', key);
+    return;
+  }
+  const assignment = config.keyAssignment['key'+ key];
+  if (assignment?.column){
+    const nameAttribute = activeRow.getAttribute("name");
+    const [file, start, end, sname, cname] = nameAttribute.split("|");
+    const commentCell = activeRow.querySelector('.comment > span');
+    const comment = commentCell ? commentCell.title : ''
+    const labelCell = activeRow.querySelector('.label > span');
+    const label = labelCell ? labelCell.textContent : ''
+    const name = cname.replace("?", "");
+
+
+    const newCname = assignment.column === 'species' ?  assignment.value : name;
+    const newLabel = assignment.column === 'label' ?  assignment.value : label || '';
+    const newComment = assignment.column === 'comment' ?  assignment.value : comment;
+    // DELETE_HISTORY.push([
+    //   cname,
+    //   parseFloat(start),
+    //   parseFloat(end),
+    //   comment,
+    //   undefined, // won't restore callCount
+    //   label,
+    //   undefined,
+    //   undefined,
+    //   undefined,
+    //   confidence,
+    // ]);
+    insertManualRecord(
+      newCname,
+      parseFloat(start),
+      parseFloat(end),
+      newComment,
+      "", // callCount 
+      newLabel,
+      "Update",
+      false,
+      cname
+    );
+  }
+}
+
 
 const GLOBAL_ACTIONS = {
-  // eslint-disable-line
+
+  // Handle number keys 1-9 dynamically
+  handleNumberKeys: (e) => {
+    if (/^[0-9]$/.test(e.key)) {
+      // number keys here
+      if (activeRow){
+        recordUpdate(e.key)
+      }
+    }
+  },
   a: (e) => {
     if ((e.ctrlKey || e.metaKey) &amp;&amp; STATE.currentFile) {
       const element = e.shiftKey ? "analyseAll" : "analyse";
@@ -3674,8 +3817,7 @@ const GLOBAL_ACTIONS = {
   v: (e) => {
     if (activeRow &amp;&amp; (e.ctrlKey || e.metaKey)) {
       const nameAttribute = activeRow.getAttribute("name");
-      const [file, start, end, sname, label] = nameAttribute.split("|");
-      const cname = label.replace("?", "");
+      const [file, start, end, sname, cname] = nameAttribute.split("|");
       insertManualRecord(
         cname,
         parseFloat(start),
@@ -3747,13 +3889,12 @@ const GLOBAL_ACTIONS = {
       activeRow.classList.remove("table-active");
       activeRow = activeRow.previousSibling || activeRow;
       if (!activeRow.classList.contains("text-bg-dark")) activeRow.click();
-      STATE.regionsCompleted = false;
-      activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      // activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   },
   PageDown: () => {
     if (currentBuffer) {
-      const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
+      let position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, );
       windowOffsetSecs = windowOffsetSecs + windowLength;
       const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
       let fileToLoad;
@@ -3764,6 +3905,7 @@ const GLOBAL_ACTIONS = {
         // Move to next file
         fileToLoad = STATE.openFiles[fileIndex + 1];
         windowOffsetSecs = 0;
+        position = 0;
       } else {
         windowOffsetSecs = Math.min(
           windowOffsetSecs,
@@ -3783,8 +3925,7 @@ const GLOBAL_ACTIONS = {
       activeRow.classList.remove("table-active");
       activeRow = activeRow.nextSibling || activeRow;
       if (!activeRow.classList.contains("text-bg-dark")) activeRow.click();
-      STATE.regionsCompleted = false
-      activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      // activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   },
   ArrowLeft: () => {
@@ -3846,7 +3987,6 @@ const GLOBAL_ACTIONS = {
       }
       if (!activeRow.classList.contains("text-bg-dark")) {
         activeRow.click();
-        STATE.regionsCompleted = false
       }
     }
   },
@@ -3892,11 +4032,11 @@ const postBufferUpdate = ({
 }) => {
 
   // Validate input parameters
-  if (begin &lt; 0 || position &lt; 0 || position > 1) {
-    console.error('Invalid buffer update parameters:', `Begin: ${begin}, Position: ${position}`);
+  if (position &lt; 0 || position > 1) {
+    console.error('Invalid buffer update position:', `Position: ${position}`);
     return;
   }
-
+  STATE.regionsCompleted = false;
   fileLoaded = false;
   worker.postMessage({
     action: "update-buffer",
@@ -3986,22 +4126,17 @@ const gotoForm = document.getElementById("gotoForm");
 gotoForm.addEventListener("submit", gotoTime);
 
 /**
- * Initializes the application once the audio model is ready.
+ * Initializes application state after the audio model becomes ready.
  *
- * Upon invocation, this function performs several startup tasks:
- * - Sets the flag indicating that the audio model is ready.
- * - If an audio file is loaded, enables the "analyse" menu item; if multiple files
- *   are open, also enables "analyseAll" and "reanalyseAll" menu items.
- * - If there is an active audio region, enables the "analyseSelection" menu item.
+ * Sets the model ready flag and updates UI elements based on current audio assets:
+ * - Enables the "analyse" menu item if an audio file is loaded, and additionally "analyseAll" and "reanalyseAll" if multiple files are open.
+ * - Enables the "analyseSelection" menu item when an active audio region exists.
  * - Calculates the warm-up time and logs it in the DIAGNOSTICS object.
- * - Logs the application's launch time (if this is the first load).
+ * - Logs the application launch time if this is the first load.
  * - Marks the application as loaded and hides the loading screen.
- * - For new users in non-test environments, initiates the tour if it has not been seen.
- * - Processes any queued files received via the operating system.
- *
- * **Side Effects:**
- * Modifies global state, updates the DOM (e.g., hiding the loading screen), logs diagnostic
- * information, and triggers additional actions (e.g., starting the tour, processing OS file queues).
+ * - Requests tag data from the worker.
+ * - Initiates the user tour for new users in non-testing environments.
+ * - Processes any queued operating system file inputs.
  *
  * @param {Object} [args={}] - Optional parameters (currently unused).
  * @returns {void}
@@ -4017,15 +4152,17 @@ function onModelReady(args) {
   t1_warmup = Date.now();
   DIAGNOSTICS["Warm Up"] =
     ((t1_warmup - t0_warmup) / 1000).toFixed(2) + " seconds";
+
   APPLICATION_LOADED || console.info("App launch time", `${t1_warmup - app_t0} ms`)
   APPLICATION_LOADED = true;
+
   document.getElementById('loading-screen').classList.add('d-none');
+  // Get all the tags from the db
+  worker.postMessage({action: "get-tags", init: true});
   // New users - show the tour
-  if (!isTestEnv) {
-    if (!config.seenTour) {
+  if (!isTestEnv &amp;&amp; !config.seenTour) {
       config.seenTour = true;
       prepTour();
-    }
   }
   if (OS_FILE_QUEUE.length) onOpenFiles({filePaths: OS_FILE_QUEUE}) &amp;&amp; OS_FILE_QUEUE.shift()
 }
@@ -4243,9 +4380,26 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
   // }
 };
 
-/*
-    onResultsComplete is called when the last result is sent from the database
-    */
+/**
+ * Finalizes result processing after the database has sent the last result.
+ *
+ * Updates analysis state by disabling the predicting flag and re-enabling settings, replaces the result table
+ * with the latest content cloned from a buffer, resets the buffer's content, and ensures that the designated row
+ * in the results table is activated. The active row is selected based on the following priority:
+ * - If an `active` index is provided, uses that row; if not found (which can occur after an edit), selects the last row
+ *   matching daytime or nighttime criteria.
+ * - If a `select` value is provided, determines the row index via a helper function and activates that row.
+ * - Otherwise, attempts to activate a row marked with the "table-active" class, or defaults to the first table row.
+ *
+ * Once the active row is determined, it simulates a click on that row and scrolls it into view, hides the progress indicator,
+ * and updates the filename panel.
+ *
+ * @param {Object} [options={}] - Options for handling result activation.
+ * @param {number} [options.active] - Specific row index to activate in the result table.
+ * @param {*} [options.select] - Value used by a helper function to determine which row to activate.
+ *
+ * @returns {void}
+ */
 function onResultsComplete({ active = undefined, select = undefined } = {}) {
   PREDICTING = false;
   disableSettingsDuringAnalysis(false);
@@ -4283,9 +4437,20 @@ function onResultsComplete({ active = undefined, select = undefined } = {}) {
   // hide progress div
   DOM.progressDiv.classList.add("invisible");
   renderFilenamePanel();
-  activateResultFilters();
+  // activateResultFilters();
 }
 
+/**
+ * Retrieves the index of a table row whose associated start time matches a specified value.
+ *
+ * Iterates over the rows of an HTML table, extracting the start time from each row's "name" attribute.
+ * The "name" attribute is expected to be a string with values separated by a "|" character, where the
+ * second element represents the start time. If the "name" attribute is absent, a default value of 0 is used.
+ *
+ * @param {HTMLTableElement} table - The table element containing rows to search.
+ * @param {number} start - The target start time to match against the row's parsed start time.
+ * @returns {number|undefined} The index of the first row with a matching start time, or undefined if no match is found.
+ */
 function getRowFromStart(table, start) {
   for (var i = 0; i &lt; table.rows.length; i++) {
     const row = table.rows[i];
@@ -4314,6 +4479,20 @@ function formatDuration(seconds) {
   return duration;
 }
 
+/**
+ * Finalizes audio analysis by updating application state, re-enabling UI settings,
+ * and logging diagnostic metrics and tracking events.
+ *
+ * Resets the prediction flag, restores settings, updates analysis state,
+ * and conditionally enables menu items based on available disk records.
+ * Hides the progress indicator and, when not in quiet mode, calculates
+ * the analysis duration and rate for telemetry. In non-quiet mode, records
+ * these metrics through event tracking and displays a completion notification.
+ *
+ * @param {Object} options - Options for analysis completion.
+ * @param {boolean} options.quiet - Suppresses diagnostic tracking and notifications if true.
+ *
+ */
 function onAnalysisComplete({ quiet }) {
   PREDICTING = false;
   disableSettingsDuringAnalysis(false);
@@ -4356,7 +4535,7 @@ function onAnalysisComplete({ quiet }) {
     DIAGNOSTICS["Analysis Rate"] =
       rate.toFixed(0) + "x faster than real time performance.";
     generateToast({ message: "complete" });
-    activateResultFilters();
+    // activateResultFilters();
   }
 }
 
@@ -4464,8 +4643,24 @@ const addPagination = (total, offset) => {
   });
 };
 
+/**
+ * Toggles the species filter based on user interaction with the summary table.
+ *
+ * Validates the event against non-interactive elements and current analysis state before proceeding.
+ * If the selected row is already highlighted (indicating an active filter), the highlight is removed;
+ * otherwise, all highlighted rows are cleared, the current row is marked, and the corresponding species
+ * is extracted from the clicked element. In explore mode, the species value is set in the bird list display.
+ * Subsequently, the function refreshes the results filtering and resets the UI components without clearing
+ * the summary, pagination, or result listings.
+ *
+ * @param {Event} e - The DOM event triggered by the user's click on a table row.
+ *
+ * @example
+ * // Apply species filtering when a table row is clicked.
+ * speciesFilter(event);
+ */
 function speciesFilter(e) {
-  if (PREDICTING || ["TBODY", "TH", "DIV"].includes(e.target.tagName)) return; // on Drag or clicked header
+  if (!STATE.regionsCompleted || PREDICTING || ["TBODY", "TH", "DIV"].includes(e.target.tagName)) return; // on Drag or clicked header
   let species, range;
   // Am I trying to unfilter?
   if (e.target.closest("tr").classList.contains("text-warning")) {
@@ -4492,7 +4687,27 @@ function speciesFilter(e) {
   });
 }
 
-// TODO: show every detection in the spec window as a region on the spectrogram
+/**
+ * Renders a detection result into the results table while managing table headers, pagination, and UI updates.
+ *
+ * For the first result (index ≤ 1), clears or resets the results table based on the selection mode and sets up table headers
+ * with localized labels. When handling non-database results beyond the configured limit, the function adds pagination or
+ * aborts further processing. For valid detection results, it formats timestamps and positions for display, constructs the
+ * corresponding table row including species details, call counts, labels, comments, and review status, and schedules UI
+ * updates to incorporate the new entry.
+ *
+ * @param {Object} options - Options for rendering the result.
+ * @param {number} [options.index=1] - Sequential index of the detection result.
+ * @param {Object} [options.result={}] - Detection result data containing properties such as timestamp, position, active,
+ *   sname, cname, score, label, tagID, comment, end, count, callCount, isDaylight, and reviewed.
+ * @param {*} [options.file=undefined] - The audio file reference associated with the detection.
+ * @param {boolean} [options.isFromDB=false] - Flag indicating whether the result originates from the database.
+ * @param {boolean} [options.selection=false] - Flag indicating if the rendering is for a selection-specific view.
+ *
+ * @returns {Promise&lt;void>} A promise that resolves once the result has been rendered and the UI updated.
+ *
+ * @todo Display each detection as a distinct region on the spectrogram.
+ */
 
 async function renderResult({
   index = 1,
@@ -4520,8 +4735,9 @@ async function renderResult({
                     &lt;th id="sort-position" class="time-sort text-start timestamp" title="${i18n.position[1]}">&lt;span class="text-muted material-symbols-outlined time-sort-icon d-none">sort&lt;/span> ${i18n.position[0]}&lt;/th>
                     &lt;th id="confidence-sort" class="text-start" title="${i18n.species[1]}">&lt;span class="text-muted material-symbols-outlined species-sort-icon d-none">sort&lt;/span> ${i18n.species[0]}&lt;/th>
                     &lt;th class="text-end">${i18n.calls}&lt;/th>
-                    &lt;th class="col">${i18n.label}&lt;/th>
-                    &lt;th id="notes" class="col text-end">${i18n.notes}&lt;/th>
+                    &lt;th id="sort-label" class="col pointer">&lt;span class="text-muted material-symbols-outlined meta-sort-icon d-none">sort&lt;/span> ${i18n.label}&lt;/th>
+                    &lt;th id="sort-comment" class="col pointer text-end">&lt;span class="text-muted material-symbols-outlined meta-sort-icon d-none">sort&lt;/span> ${i18n.notes}&lt;/th>
+                    &lt;th id="sort-reviewed" class="col pointer text-end">&lt;span class="text-muted material-symbols-outlined meta-sort-icon d-none">sort&lt;/span>${i18n.reviewed}&lt;/th>
                 &lt;/tr>`;
       setTimelinePreferences();
       // DOM.resultHeader.innerHTML = fragment;
@@ -4544,11 +4760,13 @@ async function renderResult({
       cname,
       score,
       label,
+      tagID,
       comment,
       end,
       count,
       callCount,
       isDaylight,
+      reviewed
     } = result;
     const dayNight = isDaylight ? "daytime" : "nighttime";
     // Todo: move this logic so pre dark sections of file are not even analysed
@@ -4560,7 +4778,10 @@ async function renderResult({
           "&amp;quot;"
         )}" class='material-symbols-outlined pointer'>comment&lt;/span>`
       : "";
-    const isUncertain = score &lt; 65 ? "&amp;#63;" : "";
+
+    const reviewHTML = reviewed 
+        ? `&lt;span class='material-symbols-outlined'>check_small&lt;/span>`
+        : '';
     // store result for feedback function to use
     if (!selection) predictions[index] = result;
     // Format date and position for  UI
@@ -4576,7 +4797,7 @@ async function renderResult({
     const showTimeOfDay = config.timeOfDay ? "" : "d-none";
     const showTimestamp = config.timeOfDay ? "d-none" : "";
     const activeTable = active ? "table-active" : "";
-    const labelHTML = label ? tags[label] : "";
+    const labelHTML = tagID &amp;&amp; label ? `&lt;span class="badge text-bg-${STATE.labelColors[(tagID -1) % STATE.labelColors.length] } rounded-pill">${label}&lt;/span>` : "";
     const hide = selection ? "d-none" : "";
     const countIcon =
       count > 1
@@ -4584,7 +4805,7 @@ async function renderResult({
         : "";
     tr += `&lt;tr tabindex="-1" id="result${index}" name="${file}|${position}|${
       end || position + 3
-    }|${sname}|${cname}${isUncertain}" class='${activeTable} border-top border-2 border-secondary ${dayNight}'>
+    }|${sname}|${cname}" class='${activeTable} border-top border-2 border-secondary ${dayNight}'>
             &lt;td class='text-start timeOfDay ${showTimeOfDay}'>${UI_timestamp}&lt;/td>
             &lt;td class="text-start timestamp ${showTimestamp}">${UI_position} &lt;/td>
             &lt;td name="${cname}" class='text-start cname'>
@@ -4596,7 +4817,7 @@ async function renderResult({
             
             &lt;td class="label ${hide}">${labelHTML}&lt;/td>
             &lt;td class="comment text-end ${hide}">${commentHTML}&lt;/td>
-            
+            &lt;td class="reviewed text-end ${hide}">${reviewHTML}&lt;/td>
             &lt;/tr>`;
   }
   updateResultTable(tr, isFromDB, selection);
@@ -4637,12 +4858,15 @@ const isExplore = () => {
   return STATE.mode === "explore";
 };
 
-const tags = {
-  Local: '&lt;span class="badge bg-success rounded-pill">Local&lt;/span>',
-  Nocmig: '&lt;span class="badge bg-dark rounded-pill">Nocmig&lt;/span>',
-};
-
-// Results event handlers
+/**
+ * Stores the row index of the table row associated with the clicked element.
+ *
+ * Traverses upward from the provided element to locate the nearest ancestor &lt;tr> element,
+ * then assigns its rowIndex to the global variable clickedIndex. It is assumed that the
+ * target element is within a table row; otherwise, the function may produce errors.
+ *
+ * @param {HTMLElement} target - The DOM element that triggered the event.
+ */
 
 function setClickedIndex(target) {
   const clickedNode = target.closest("tr");
@@ -4677,9 +4901,9 @@ const deleteRecord = (target) => {
     const row = target.closest("tr");
     let cname = target.querySelector(".cname").innerText;
     let [species, confidence] = cname.split("\n");
-    // confirmed records don't have a confidence bar
+    // Manual records don't have a confidence bar
     if (!confidence) {
-      species = species.slice(0, -9); // remove ' verified'
+      species = species.slice(0, -11); // remove ' person_add'
       confidence = 2000;
     } else {
       confidence = parseInt(confidence.replace("%", "")) * 10;
@@ -4809,7 +5033,7 @@ const iconDict = {
     '&lt;span class="confidence-row">&lt;span class="confidence bar" style="flex-basis: --%; background: #fd7e14">--%&lt;/span>&lt;/span>',
   high: '&lt;span class="confidence-row">&lt;span class="confidence bar" style="flex-basis: --%; background: #198754">--%&lt;/span>&lt;/span>',
   confirmed:
-    '&lt;span class="material-symbols-outlined" title="Confirmed Record">verified&lt;/span>',
+    '&lt;span class="material-symbols-outlined" title="Manual Record">person_add&lt;/span>',
 };
 
 const iconizeScore = (score) => {
@@ -5213,12 +5437,41 @@ diagnosticMenu.addEventListener("click", async function () {
   testModal.show();
 });
 
+/**
+ * Updates the sorting indicators and UI elements for the result filters based on the current global state.
+ *
+ * Clones and replaces header elements to reflect active sort orders: toggles visibility of time-related sort icons
+ * when the score-based sort is active, applies pointer styles to sort elements, and manages the flipped state based on
+ * ascending or descending order for species and metadata sorting. Also, clones and updates summary elements with hover
+ * effects to enhance interactivity.
+ *
+ * Global State Dependencies:
+ * - STATE.resultsSortOrder: Determines if results are sorted by score and whether the sort is in ascending order.
+ * - STATE.resultsMetaSortOrder: Specifies the currently active metadata sort and direction.
+ * - DOM.resultHeader: The header element that is cloned and replaced for visual update.
+ * - DOM.summaryTable: The table whose species summary elements receive pointer styling.
+ *
+ * @returns {void}
+ */
 function activateResultFilters() {
   const timeHeadings = document.getElementsByClassName("time-sort-icon");
   const speciesHeadings = document.getElementsByClassName("species-sort-icon");
   const sortOrderScore = STATE.resultsSortOrder.includes("score");
   const fragment = document.createDocumentFragment();
-
+  // if (STATE.resultsMetaSortOrder){
+  const state = STATE.resultsMetaSortOrder;
+  const sortOrderMeta = state.replace(' ASC ', '').replace(' DESC ', '');
+  const metaHeadings = document.getElementsByClassName("meta-sort-icon");
+  [...metaHeadings].forEach((heading) => {
+    const hideIcon = state === '' || !heading.parentNode.id.includes(sortOrderMeta);
+    heading.classList.toggle("d-none", hideIcon);
+    if (state.includes("ASC")){
+      heading.classList.add("flipped");
+    } else {
+      heading.classList.remove("flipped");
+    }
+  })
+  // }
   // Clone the result header and work on it in the fragment
   const resultHeaderClone = DOM.resultHeader.cloneNode(true);
   fragment.appendChild(resultHeaderClone);
@@ -5261,6 +5514,18 @@ function activateResultFilters() {
   showSummarySortIcon();
 }
 
+/**
+ * Update the sort icon in the summary table to reflect the current sort order.
+ *
+ * Extracts the sort column and direction from the STATE.summarySortOrder string (formatted as "column direction"),
+ * determines the corresponding icon element by constructing its ID ("summary-{column}-icon"),
+ * and then hides all sort icons in the summary table before displaying the relevant icon.
+ * The icon is styled with the "flipped" class when the sort direction is "ASC", and without it for other directions.
+ *
+ * @example
+ * // If STATE.summarySortOrder is "duration ASC", then the sort icon for "duration" will be shown with the "flipped" class.
+ * showSummarySortIcon();
+ */
 function showSummarySortIcon() {
   const [column, direction] = STATE.summarySortOrder.split(" ");
   const iconId = `summary-${column}-icon`;
@@ -5277,9 +5542,9 @@ function showSummarySortIcon() {
   }
 }
 
-const setSortOrder = (order) => {
-  STATE.resultsSortOrder = order;
-  worker.postMessage({ action: "update-state", resultsSortOrder: order });
+const setSortOrder = (field, order) => {
+  STATE[field] = order;
+  worker.postMessage({ action: "update-state", [field]: order });
   // resetResults({clearSummary: false, clearPagination: false, clearResults: true});
   filterResults();
 };
@@ -5546,6 +5811,20 @@ function initialiseDatePicker() {
   });
 }
 
+/**
+ * Appends a clear date filter button to the specified UI element.
+ *
+ * The function creates a clickable span styled as a "cancel" icon that, when activated,
+ * clears the date selection using the provided picker instance. Upon clicking the button,
+ * the date picker is cleared and the original date filter UI is restored in the element.
+ *
+ * @param {HTMLElement} element - The container element that displays the date filter.
+ * @param {Object} picker - The date picker instance with a clear() method to remove the active date filter.
+ *
+ * @example
+ * // Assuming dateFilterElement is a valid HTMLElement and datePicker is a date picker instance:
+ * createDateClearButton(dateFilterElement, datePicker);
+ */
 function createDateClearButton(element, picker) {
   const span = document.createElement("span");
   span.classList.add("material-symbols-outlined", "text-secondary", "ps-2");
@@ -5560,23 +5839,8 @@ function createDateClearButton(element, picker) {
   });
 }
 
-function toggleKeyDownForFormInputs() {
-  const formFields = document.querySelectorAll("input, textarea, select");
-  // Disable keyboard shortcuts when any form field gets focus
-  formFields.forEach((formField) => {
-    formField.addEventListener("focus", () => {
-      document.removeEventListener("keydown", handleKeyDownDeBounce, true);
-    });
-
-    formField.addEventListener("blur", () => {
-      document.addEventListener("keydown", handleKeyDownDeBounce, true);
-    });
-  });
-}
-
 document.addEventListener("DOMContentLoaded", function () {
   document.addEventListener("keydown", handleKeyDownDeBounce, true);
-  toggleKeyDownForFormInputs();
   // make menu an accordion for smaller screens
   if (window.innerWidth &lt; 768) {
     // close all inner dropdowns when parent is closed
@@ -5755,7 +6019,7 @@ colorMapSlider.addEventListener("input", () => {
 });
 
 // Gauss Alpha
-const alphaValue = document.getElementById("alpha");
+const alphaValue = document.getElementById("alpha-value");
 const alphaSlider = document.getElementById("alpha-slider");
 alphaSlider.addEventListener("input", () => {
   alphaValue.textContent = alphaSlider.value;
@@ -6032,8 +6296,9 @@ document.addEventListener("click", function (e) {
       break;
     }
     case "known-issues": {
-      fetchIssuesByLabel(["v" + VERSION, "All versions affected"])
-        .then((issues) => renderIssuesInModal(issues, VERSION))
+      const version = VERSION.replace(' (Portable)', '')
+      fetchIssuesByLabel(["v" + version, "All versions affected"])
+        .then((issues) => renderIssuesInModal(issues, version))
         .catch((error) => console.error("Error getting known issues:", error));
       break;
     }
@@ -6148,11 +6413,31 @@ document.addEventListener("click", function (e) {
       exportSpeciesList();
       break;
     }
+    case "sort-label":
+    case "sort-comment":
+    case "sort-reviewed": {
+      if (!PREDICTING) {
+        const sort = target.slice(5);
+        const state = STATE.resultsMetaSortOrder;
+        // If no sort is set or the sort column is different, start with DESC.
+        if (!state || !state.startsWith(sort)) {
+          STATE.resultsMetaSortOrder = `${sort} DESC `;
+        } else if (state === `${sort} DESC `) {
+          // Second click: switch from DESC to ASC.
+          STATE.resultsMetaSortOrder = `${sort} ASC `;
+        } else if (state === `${sort} ASC `) {
+          // Third click: reset sort order.
+          STATE.resultsMetaSortOrder = '';
+        }
+      }
+      setSortOrder("resultsMetaSortOrder", STATE.resultsMetaSortOrder);
+      break;
+    }
 
     case "sort-position":
     case "sort-time": {
       if (!PREDICTING) {
-        STATE.resultsSortOrder === "timestamp" || setSortOrder("timestamp");
+        STATE.resultsSortOrder === "timestamp" || setSortOrder("resultsSortOrder", "timestamp");
       }
       break;
     }
@@ -6162,7 +6447,7 @@ document.addEventListener("click", function (e) {
           STATE.resultsSortOrder === "score DESC "
             ? "score ASC "
             : "score DESC ";
-        setSortOrder(sortBy);
+            setSortOrder("resultsSortOrder", sortBy);
       }
       break;
     }
@@ -6347,6 +6632,9 @@ document.addEventListener("click", function (e) {
     document.getElementById("frequency-range-panel").classList.add("d-none");
     document.getElementById("frequency-range").classList.remove("active");
   }
+  if (!target?.startsWith('bird-')) {
+    DOM.suggestionsList.style.display = 'none';
+  }
   hideConfidenceSlider();
   config.debug &amp;&amp; console.log("clicked", target);
   target &amp;&amp;
@@ -6406,344 +6694,365 @@ document.addEventListener("change", function (e) {
   if (element) {
     const target = element.id;
     config.debug &amp;&amp; console.log("Change target:", target);
-    switch (target) {
-      case "species-frequency-threshold": {
-        if (isNaN(element.value) || element.value === "") {
-          generateToast({ type: "warning", message: "badThreshold" });
-          return false;
-        }
-        config.speciesThreshold = element.value;
-        worker.postMessage({
-          action: "update-state",
-          speciesThreshold: element.value,
-        });
-        updateList();
-        break;
+    // Handle key assignments
+    if (/^key\d/.test(target)) {
+      if (target.length === 4) {
+        // Handle custom-select
+        if (e.detail){
+          config.keyAssignment[target] = {column: 'label', value: e.detail.value, active: true}
+          config.debug &amp;&amp; console.log(`${target} is assigned to update 'label' with ${e.detail.value}`)
+        } else { setKeyAssignment(element, target) }
       }
-      case "timelineSetting": {
-        timelineToggle(e);
-        break;
+      else {
+        const key = target.slice(0,4);
+        const inputElement = document.getElementById(key)
+        const column = e.target.value;
+        const newElement = changeInputElement(column, inputElement, key)
+        setKeyAssignment(newElement, key);
       }
-      case "nocmig": {
-        changeNocmigMode(e);
-        break;
-      }
-      case "iucn": {
-        config.detect.iucn = element.checked;
-        // resetRegions();
-        refreshSummary();
-        break;
-      }
-      case "iucn-scope": {
-        config.detect.iucnScope = element.value;
-        // resetRegions();
-        refreshSummary();
-        break;
-      }
-      case "auto-archive": {
-        config.archive.auto = element.checked;
-        worker.postMessage({ action: "update-state", archive: config.archive });
-        break;
-      }
-      case "library-trim": {
-        config.archive.trim = element.checked;
-        worker.postMessage({ action: "update-state", archive: config.archive });
-        break;
-      }
-      case "archive-format": {
-        config.archive.format = document.getElementById("archive-format").value;
-        worker.postMessage({ action: "update-state", archive: config.archive });
-        break;
-      }
-      case "confidenceValue":
-      case "confidence": {
-        handleThresholdChange(e);
-        break;
-      }
-      case "context": {
-        toggleContextAwareMode(e);
-        break;
-      }
-      case "attenuation": {
-        handleAttenuationchange(e);
-        break;
-      }
-      case "lowShelfFrequency": {
-        handleLowShelfchange(e);
-        break;
-      }
-      case "HighPassFrequency": {
-        handleHPchange(e);
-        break;
-      }
-      case "snrValue": {
-        handleSNRchange(e);
-        break;
-      }
-      case "file-timestamp": {
-        config.fileStartMtime = element.checked;
-        worker.postMessage({
-          action: "update-state",
-          fileStartMtime: config.fileStartMtime,
-        });
-        break;
-      }
-      case "audio-notification": {
-        config.audio.notification = element.checked;
-        break;
-      }
-      case "power-save-block": {
-        config.powerSaveBlocker = element.checked;
-        powerSave(config.powerSaveBlocker);
-        break;
-      }
-      case "species-week": {
-        config.useWeek = element.checked;
-
-        if (!config.useWeek) STATE.week = -1;
-        worker.postMessage({ action: "update-state", useWeek: config.useWeek });
-        updateList();
-        break;
-      }
-      case "list-to-use": {
-        setListUIState(element.value);
-        config.list = element.value;
-        updateListIcon();
-        updateList();
-        break;
-      }
-      case "locale": {
-        let labelFile;
-        if (element.value === "custom") {
-          labelFile = config.customListFile[config.model];
-          if (!labelFile) {
-            generateToast({ type: "warning", message: "labelFileNeeded" });
-            return;
+    } else {
+      switch (target) {
+        case "species-frequency-threshold": {
+          if (isNaN(element.value) || element.value === "") {
+            generateToast({ type: "warning", message: "badThreshold" });
+            return false;
           }
-        } else {
-          const chirpity =
-            element.value === "en_uk" &amp;&amp; config.model !== "birdnet"
-              ? "chirpity"
-              : "";
-          labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_${chirpity}Labels_${element.value}.txt`;
-          localiseUI(DOM.locale.value).then((result) => (STATE.i18n = result));
+          config.speciesThreshold = element.value;
+          worker.postMessage({
+            action: "update-state",
+            speciesThreshold: element.value,
+          });
+          updateList();
+          break;
+        }
+        case "timelineSetting": {
+          timelineToggle(e);
+          break;
+        }
+        case "nocmig": {
+          changeNocmigMode(e);
+          break;
+        }
+        case "iucn": {
+          config.detect.iucn = element.checked;
+          // resetRegions();
+          refreshSummary();
+          break;
+        }
+        case "iucn-scope": {
+          config.detect.iucnScope = element.value;
+          // resetRegions();
+          refreshSummary();
+          break;
+        }
+        case "auto-archive": {
+          config.archive.auto = element.checked;
+          worker.postMessage({ action: "update-state", archive: config.archive });
+          break;
+        }
+        case "library-trim": {
+          config.archive.trim = element.checked;
+          worker.postMessage({ action: "update-state", archive: config.archive });
+          break;
+        }
+        case "archive-format": {
+          config.archive.format = document.getElementById("archive-format").value;
+          worker.postMessage({ action: "update-state", archive: config.archive });
+          break;
+        }
+        case "confidenceValue":
+        case "confidence": {
+          handleThresholdChange(e);
+          break;
+        }
+        case "context": {
+          toggleContextAwareMode(e);
+          break;
+        }
+        case "attenuation": {
+          handleAttenuationchange(e);
+          break;
+        }
+        case "lowShelfFrequency": {
+          handleLowShelfchange(e);
+          break;
+        }
+        case "HighPassFrequency": {
+          handleHPchange(e);
+          break;
+        }
+        case "snrValue": {
+          handleSNRchange(e);
+          break;
+        }
+        case "file-timestamp": {
+          config.fileStartMtime = element.checked;
+          worker.postMessage({
+            action: "update-state",
+            fileStartMtime: config.fileStartMtime,
+          });
+          break;
+        }
+        case "audio-notification": {
+          config.audio.notification = element.checked;
+          break;
+        }
+        case "power-save-block": {
+          config.powerSaveBlocker = element.checked;
+          powerSave(config.powerSaveBlocker);
+          break;
+        }
+        case "species-week": {
+          config.useWeek = element.checked;
+
+          if (!config.useWeek) STATE.week = -1;
+          worker.postMessage({ action: "update-state", useWeek: config.useWeek });
+          updateList();
+          break;
+        }
+        case "list-to-use": {
+          setListUIState(element.value);
+          config.list = element.value;
+          updateListIcon();
+          updateList();
+          break;
+        }
+        case "locale": {
+          let labelFile;
+          if (element.value === "custom") {
+            labelFile = config.customListFile[config.model];
+            if (!labelFile) {
+              generateToast({ type: "warning", message: "labelFileNeeded" });
+              return;
+            }
+          } else {
+            const chirpity =
+              element.value === "en_uk" &amp;&amp; config.model !== "birdnet"
+                ? "chirpity"
+                : "";
+            labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_${chirpity}Labels_${element.value}.txt`;
+            localiseUI(DOM.locale.value).then((result) => (STATE.i18n = result));
+            config.locale = element.value;
+            initialiseDatePicker();
+          }
           config.locale = element.value;
-          initialiseDatePicker();
+          STATE.picker.options.lang = element.value.replace("_uk", "");
+          readLabels(labelFile, "locale");
+          break;
         }
-        config.locale = element.value;
-        STATE.picker.options.lang = element.value.replace("_uk", "");
-        readLabels(labelFile, "locale");
-        break;
-      }
-      case "local": {
-        config.local = element.checked;
-        worker.postMessage({ action: "update-state", local: config.local });
-        updateList();
-        break;
-      }
-      case "model-to-use": {
-        config.model = element.value;
-        STATE.analysisDone = false;
-        modelSettingsDisplay();
-        DOM.customListFile.value = config.customListFile[config.model];
-        DOM.customListFile.value
-          ? (LIST_MAP = getI18n(i18nLIST_MAP))
-          : delete LIST_MAP.custom;
-        document.getElementById("locale").value = config.locale;
-        document.getElementById(config[config.model].backend).checked = true;
-        handleBackendChange(config[config.model].backend);
-        setListUIState(config.list);
-        break;
-      }
-      case "thread-slider": {
-        // change number of threads
-        DOM.numberOfThreads.innerHTML = DOM.threadSlider.value;
-        config[config[config.model].backend].threads =
-          DOM.threadSlider.valueAsNumber;
-        worker.postMessage({
-          action: "change-threads",
-          threads: DOM.threadSlider.valueAsNumber,
-        });
-        break;
-      }
-      case "batch-size": {
-        DOM.batchSizeValue.textContent =
-          BATCH_SIZE_LIST[DOM.batchSizeSlider.value].toString();
-        config[config[config.model].backend].batchSize =
-          BATCH_SIZE_LIST[element.value];
-        worker.postMessage({
-          action: "change-batch-size",
-          batchSize: BATCH_SIZE_LIST[element.value],
-        });
-        break;
-      }
-      case "colourmap": {
-        config.colormap = element.value;
-        const colorMapFieldset = document.getElementById("colormap-fieldset");
-        if (config.colormap === "custom") {
-          colorMapFieldset.classList.remove("d-none");
-        } else {
-          colorMapFieldset.classList.add("d-none");
+        case "local": {
+          config.local = element.checked;
+          worker.postMessage({ action: "update-state", local: config.local });
+          updateList();
+          break;
         }
-        if (wavesurfer &amp;&amp; STATE.currentFile) {
-          const fftSamples = spectrogram.fftSamples;
-          adjustSpecDims(true, fftSamples);
-          postBufferUpdate({ begin: windowOffsetSecs, position: wavesurfer.getCurrentTime() / windowLength });
+        case "model-to-use": {
+          config.model = element.value;
+          STATE.analysisDone = false;
+          modelSettingsDisplay();
+          DOM.customListFile.value = config.customListFile[config.model];
+          DOM.customListFile.value
+            ? (LIST_MAP = getI18n(i18nLIST_MAP))
+            : delete LIST_MAP.custom;
+          document.getElementById("locale").value = config.locale;
+          document.getElementById(config[config.model].backend).checked = true;
+          handleBackendChange(config[config.model].backend);
+          setListUIState(config.list);
+          DOM.chartsLink.classList.add("disabled");
+          DOM.exploreLink.classList.add("disabled");
+          STATE.diskHasRecords = false;
+          break;
         }
-        break;
-      }
-      case "window-function":
-      case "alpha-slider":
-      case "loud-color":
-      case "mid-color":
-      case "quiet-color":
-      case "color-threshold-slider": {
-        const windowFn = document.getElementById("window-function").value;
-        const alpha = document.getElementById("alpha-slider").valueAsNumber;
-        config.alpha = alpha;
-        windowFn === 'gauss' 
-          ? document.getElementById('alpha').classList.remove('d-none') 
-          : document.getElementById('alpha').classList.add('d-none')
-        const loud = document.getElementById("loud-color").value;
-        const mid = document.getElementById("mid-color").value;
-        const quiet = document.getElementById("quiet-color").value;
-        const threshold = document.getElementById(
-          "color-threshold-slider"
-        ).valueAsNumber;
-        document.getElementById("color-threshold").textContent = threshold;
-        config.customColormap = {
-          loud: loud,
-          mid: mid,
-          quiet: quiet,
-          threshold: threshold,
-          windowFn: windowFn,
-        };
-        if (wavesurfer &amp;&amp; STATE.currentFile) {
-          const fftSamples = spectrogram.fftSamples;
-          adjustSpecDims(true, fftSamples);
-          refreshTimeline();
-        }
-        break;
-      }
-      case "gain": {
-        DOM.gainAdjustment.textContent = element.value + "dB";
-        element.blur();
-        config.audio.gain = element.value;
-        worker.postMessage({ action: "update-state", audio: config.audio });
-        config.filters.active || toggleFilters();
-        if (fileLoaded) {
-          const position = clamp(
-            wavesurfer.getCurrentTime() / windowLength,
-            0,
-            1
-          );
-          postBufferUpdate({
-            begin: windowOffsetSecs,
-            position: position
+        case "thread-slider": {
+          // change number of threads
+          DOM.numberOfThreads.textContent = DOM.threadSlider.value;
+          config[config[config.model].backend].threads =
+            DOM.threadSlider.valueAsNumber;
+          worker.postMessage({
+            action: "change-threads",
+            threads: DOM.threadSlider.valueAsNumber,
           });
+          break;
         }
-        break;
-      }
-      case "spec-labels": {
-        config.specLabels = element.checked;
-        if (wavesurfer &amp;&amp; STATE.currentFile) {
+        case "batch-size": {
+          DOM.batchSizeValue.textContent =
+            BATCH_SIZE_LIST[DOM.batchSizeSlider.value].toString();
+          config[config[config.model].backend].batchSize =
+            BATCH_SIZE_LIST[element.value];
+          worker.postMessage({
+            action: "change-batch-size",
+            batchSize: BATCH_SIZE_LIST[element.value],
+          });
+          break;
+        }
+        case "colourmap": {
+          config.colormap = element.value;
+          const colorMapFieldset = document.getElementById("colormap-fieldset");
+          if (config.colormap === "custom") {
+            colorMapFieldset.classList.remove("d-none");
+          } else {
+            colorMapFieldset.classList.add("d-none");
+          }
+          if (wavesurfer &amp;&amp; STATE.currentFile) {
+            const fftSamples = spectrogram.fftSamples;
+            adjustSpecDims(true, fftSamples);
+            postBufferUpdate({ begin: windowOffsetSecs, position: wavesurfer.getCurrentTime() / windowLength });
+          }
+          break;
+        }
+        case "window-function":
+        case "alpha-slider":
+        case "loud-color":
+        case "mid-color":
+        case "quiet-color":
+        case "color-threshold-slider": {
+          const windowFn = document.getElementById("window-function").value;
+          const alpha = document.getElementById("alpha-slider").valueAsNumber;
+          config.alpha = alpha;
+          windowFn === 'gauss' 
+            ? document.getElementById('alpha').classList.remove('d-none') 
+            : document.getElementById('alpha').classList.add('d-none')
+          const loud = document.getElementById("loud-color").value;
+          const mid = document.getElementById("mid-color").value;
+          const quiet = document.getElementById("quiet-color").value;
+          const threshold = document.getElementById(
+            "color-threshold-slider"
+          ).valueAsNumber;
+          document.getElementById("color-threshold").textContent = threshold;
+          config.customColormap = {
+            loud: loud,
+            mid: mid,
+            quiet: quiet,
+            threshold: threshold,
+            windowFn: windowFn,
+          };
+          if (wavesurfer &amp;&amp; STATE.currentFile) {
+            const fftSamples = spectrogram.fftSamples;
+            adjustSpecDims(true, fftSamples);
+            refreshTimeline();
+          }
+          break;
+        }
+        case "gain": {
+          DOM.gainAdjustment.textContent = element.value + "dB";
+          element.blur();
+          config.audio.gain = element.value;
+          worker.postMessage({ action: "update-state", audio: config.audio });
+          config.filters.active || toggleFilters();
+          if (fileLoaded) {
+            const position = clamp(
+              wavesurfer.getCurrentTime() / windowLength,
+              0,
+              1
+            );
+            postBufferUpdate({
+              begin: windowOffsetSecs,
+              position: position
+            });
+          }
+          break;
+        }
+        case "spec-labels": {
+          config.specLabels = element.checked;
+          if (wavesurfer &amp;&amp; STATE.currentFile) {
+            const fftSamples = spectrogram.fftSamples;
+            adjustSpecDims(true, fftSamples);
+          }
+          break;
+        }
+        case "spec-detections": {
+          config.specDetections = element.checked;
+          worker.postMessage({
+            action: "update-state",
+            specDetections: config.specDetections,
+          });
+          break;
+        }
+        case "fromInput":
+        case "fromSlider": {
+          config.audio.minFrequency = Math.max(element.valueAsNumber, 0);
+          DOM.fromInput.value = config.audio.minFrequency;
+          DOM.fromSlider.value = config.audio.minFrequency;
           const fftSamples = spectrogram.fftSamples;
           adjustSpecDims(true, fftSamples);
+          checkFilteredFrequency();
+          element.blur();
+          worker.postMessage({ action: "update-state", audio: config.audio });
+          break;
         }
-        break;
-      }
-      case "spec-detections": {
-        config.specDetections = element.checked;
-        worker.postMessage({
-          action: "update-state",
-          specDetections: config.specDetections,
-        });
-        break;
-      }
-      case "fromInput":
-      case "fromSlider": {
-        config.audio.minFrequency = Math.max(element.valueAsNumber, 0);
-        DOM.fromInput.value = config.audio.minFrequency;
-        DOM.fromSlider.value = config.audio.minFrequency;
-        const fftSamples = spectrogram.fftSamples;
-        adjustSpecDims(true, fftSamples);
-        checkFilteredFrequency();
-        element.blur();
-        worker.postMessage({ action: "update-state", audio: config.audio });
-        break;
-      }
-      case "toInput":
-      case "toSlider": {
-        config.audio.maxFrequency = Math.min(element.valueAsNumber, 11950);
-        DOM.toInput.value = config.audio.maxFrequency;
-        DOM.toSlider.value = config.audio.maxFrequency;
-        const fftSamples = spectrogram.fftSamples;
-        adjustSpecDims(true, fftSamples);
-        checkFilteredFrequency();
-        element.blur();
-        worker.postMessage({ action: "update-state", audio: config.audio });
-        break;
-      }
-      case "normalise": {
-        config.filters.normalise = element.checked;
-        element.checked &amp;&amp; (config.filters.active = true);
-        worker.postMessage({ action: "update-state", filters: config.filters });
-        element.blur();
-        if (fileLoaded) {
-          const position = clamp(
-            wavesurfer.getCurrentTime() / windowLength,
-            0,
-            1
-          );
-          postBufferUpdate({
-            begin: windowOffsetSecs,
-            position: position
-          });
+        case "toInput":
+        case "toSlider": {
+          config.audio.maxFrequency = Math.min(element.valueAsNumber, 11950);
+          DOM.toInput.value = config.audio.maxFrequency;
+          DOM.toSlider.value = config.audio.maxFrequency;
+          const fftSamples = spectrogram.fftSamples;
+          adjustSpecDims(true, fftSamples);
+          checkFilteredFrequency();
+          element.blur();
+          worker.postMessage({ action: "update-state", audio: config.audio });
+          break;
         }
-        break;
-      }
-      case "send-filtered-audio-to-model": {
-        config.filters.sendToModel = element.checked;
-        worker.postMessage({ action: "update-state", filters: config.filters });
-        break;
-      }
+        case "normalise": {
+          config.filters.normalise = element.checked;
+          element.checked &amp;&amp; (config.filters.active = true);
+          worker.postMessage({ action: "update-state", filters: config.filters });
+          element.blur();
+          if (fileLoaded) {
+            const position = clamp(
+              wavesurfer.getCurrentTime() / windowLength,
+              0,
+              1
+            );
+            postBufferUpdate({
+              begin: windowOffsetSecs,
+              position: position
+            });
+          }
+          break;
+        }
+        case "send-filtered-audio-to-model": {
+          config.filters.sendToModel = element.checked;
+          worker.postMessage({ action: "update-state", filters: config.filters });
+          break;
+        }
 
-      case "format": {
-        config.audio.format = element.value;
-        showRelevantAudioQuality();
-        worker.postMessage({ action: "update-state", audio: config.audio });
-        break;
-      }
+        case "format": {
+          config.audio.format = element.value;
+          showRelevantAudioQuality();
+          worker.postMessage({ action: "update-state", audio: config.audio });
+          break;
+        }
 
-      case "bitrate": {
-        config.audio.bitrate = e.target.value;
-        worker.postMessage({ action: "update-state", audio: config.audio });
-        break;
-      }
+        case "bitrate": {
+          config.audio.bitrate = e.target.value;
+          worker.postMessage({ action: "update-state", audio: config.audio });
+          break;
+        }
 
-      case "quality": {
-        config.audio.quality = element.value;
-        worker.postMessage({ action: "update-state", audio: config.audio });
-        break;
-      }
+        case "quality": {
+          config.audio.quality = element.value;
+          worker.postMessage({ action: "update-state", audio: config.audio });
+          break;
+        }
 
-      case "fade": {
-        config.audio.fade = element.checked;
-        worker.postMessage({ action: "update-state", audio: config.audio });
-        break;
-      }
+        case "fade": {
+          config.audio.fade = element.checked;
+          worker.postMessage({ action: "update-state", audio: config.audio });
+          break;
+        }
 
-      case "padding": {
-        config.audio.padding = e.target.checked;
-        DOM.audioFade.disabled = !DOM.audioPadding.checked;
-        worker.postMessage({ action: "update-state", audio: config.audio });
-        break;
-      }
+        case "padding": {
+          config.audio.padding = e.target.checked;
+          DOM.audioFade.disabled = !DOM.audioPadding.checked;
+          worker.postMessage({ action: "update-state", audio: config.audio });
+          break;
+        }
 
-      case "downmix": {
-        config.audio.downmix = e.target.checked;
-        worker.postMessage({ action: "update-state", audio: config.audio });
-        break;
+        case "downmix": {
+          config.audio.downmix = e.target.checked;
+          worker.postMessage({ action: "update-state", audio: config.audio });
+          break;
+        }
       }
     }
     updatePrefs("config.json", config);
@@ -6913,7 +7222,7 @@ async function createContextMenu(e) {
   }
   if (!activeRegion &amp;&amp; !inSummary) return;
   const createOrEdit =
-    activeRegion.label || target.closest("#summary") ? i18n.edit : i18n.create;
+    activeRegion?.label || target.closest("#summary") ? i18n.edit : i18n.create;
 
   DOM.contextMenu.innerHTML = `
     &lt;div id="${inSummary ? "inSummary" : "inResults"}">
@@ -7012,11 +7321,33 @@ const recordEntryModal = new bootstrap.Modal(recordEntryModalDiv, {
 const recordEntryForm = document.getElementById("record-entry-form");
 let focusBirdList;
 
+/**
+ * Populates and displays the record entry modal for updating or adding audio record details.
+ *
+ * Retrieves species information from either the batch selector or the active audio region and auto-populates
+ * related fields such as call count and comment when an active record exists. Adjusts the UI based on batch mode
+ * by toggling visibility of certain elements, updates labels based on localization settings, and initializes a 
+ * custom label selector with available tags from the application state. Focus is set to the bird autocomplete input 
+ * when the modal is shown.
+ *
+ * @param {string} mode - Identifier for the record update mode, used to set the DB mode field.
+ * @param {boolean} batch - If true, applies batch mode settings by using batch-specific species selection and hiding certain form elements.
+ * @returns {Promise&lt;void>} Resolves once the record entry form is fully populated and the modal is displayed.
+ *
+ * @example
+ * // Open the record entry form for a single record update
+ * showRecordEntryForm('update', false);
+ *
+ * @example
+ * // Open the record entry form in batch mode for multiple records
+ * showRecordEntryForm('add', true);
+ */
 async function showRecordEntryForm(mode, batch) {
+  const i18n = getI18n(i18nHeadings)
   const cname = batch
     ? document.querySelector("#speciesFilter .text-warning .cname .cname")
         .textContent
-    : activeRegion.label?.replace("?", "");
+    : activeRegion?.label || ''
   let callCount = "",
     typeIndex = "",
     commentText = "";
@@ -7024,38 +7355,46 @@ async function showRecordEntryForm(mode, batch) {
     // Populate the form with existing values
     commentText = activeRow.querySelector(".comment > span")?.title || "";
     callCount = parseInt(activeRow.querySelector(".call-count").textContent);
-    typeIndex = ["Local", "Nocmig", ""].indexOf(
-      activeRow.querySelector(".label").textContent
-    );
   }
-  const recordEntryBirdList = recordEntryForm.querySelector(
-    "#record-entry-birdlist"
+  document.getElementById('species-search-label').innerHTML = i18n.search;
+  const selectedBird = recordEntryForm.querySelector(
+    "#selected-bird"
   );
-  focusBirdList = () => {
-    const allBirdList = document.getElementById("bird-list-all");
-    allBirdList.focus();
-  };
-  recordEntryBirdList.innerHTML = generateBirdOptionList({
-    store: "allSpecies",
-    rows: undefined,
-    selected: cname,
-  });
+  focusBirdList = () => document.getElementById("bird-autocomplete").focus();
+  const speciesDisplay = document.createElement('div')
+  speciesDisplay.className = 'border rounded w-100';
+  if (cname) {
+    const species = LABELS.find(sp => sp.includes(cname))
+    const styled = species.split('_').reverse().join(' &lt;br/>&lt;i>') + '&lt;/i>';
+    selectedBird.innerHTML = styled;
+  } else {
+
+    selectedBird.innerHTML = i18n.searchPrompt;
+  }
+
   const batchHide = recordEntryForm.querySelectorAll(".hide-in-batch");
   batchHide.forEach((el) =>
     batch ? el.classList.add("d-none") : el.classList.remove("d-none")
   );
+
   recordEntryForm.querySelector("#call-count").value = callCount;
   recordEntryForm.querySelector("#record-comment").value = commentText;
   recordEntryForm.querySelector("#DBmode").value = mode;
   recordEntryForm.querySelector("#batch-mode").value = batch;
   recordEntryForm.querySelector("#original-id").value = cname;
   //recordEntryForm.querySelector('#record-add').textContent = mode;
-  if (typeIndex)
-    recordEntryForm.querySelectorAll('input[name="record-label"]')[
-      typeIndex
-    ].checked = true;
+  const labels = STATE.tagsList.map(item => item.name);
+  const i18nOptions = getI18n(i18nSelect);
+  const select = new CustomSelect({
+    theme: 'light',
+    labels: labels,
+    i18n: i18nOptions,
+    preselectedLabel: activeRow?.querySelector(".label").textContent
+  });
+  const container = document.getElementById('label-container');
+  container.textContent = '';
+  container.appendChild(select);
   recordEntryModalDiv.addEventListener("shown.bs.modal", focusBirdList);
-  toggleKeyDownForFormInputs();
   recordEntryModal.show();
 }
 
@@ -7064,7 +7403,9 @@ recordEntryForm.addEventListener("submit", function (e) {
   const action = document.getElementById("DBmode").value;
   // cast boolstring to boolean
   const batch = document.getElementById("batch-mode").value === "true";
-  const cname = document.getElementById("bird-list-all").value;
+  const cname = document.getElementById("selected-bird").innerText.split('\n')[0];
+  // Check we selected a species
+  if (!LABELS.some(item => item.includes(cname))) return
   let start, end;
   if (activeRegion) {
     start = windowOffsetSecs + activeRegion.start;
@@ -7074,12 +7415,12 @@ recordEntryForm.addEventListener("submit", function (e) {
     );
     region.setOptions({ content: cname });
   }
-  const originalCname = document.getElementById("original-id").value;
+  const originalCname = document.getElementById("original-id").value || cname;
   // Update the region label
   const count = document.getElementById("call-count")?.value;
   const comment = document.getElementById("record-comment")?.value;
-  const label =
-    document.querySelector('input[name="record-label"]:checked')?.value || "";
+  const select = document.getElementById('label-container').firstChild;
+  const label = select.selectedValue;
 
   recordEntryModal.hide();
   insertManualRecord(
@@ -7981,17 +8322,25 @@ async function membershipCheck() {
   const lockedElements = document.querySelectorAll(".locked, .unlocked");
   const unlockElements = () => {
     lockedElements.forEach((el) => {
-      el.classList.replace("locked", "unlocked");
-      el.disabled = false;
-      el.textContent = "lock_open";
+      if (el instanceof HTMLSpanElement){
+        el.classList.replace("locked", "unlocked");
+        el.textContent = "lock_open";
+      } else {
+        el.classList.remove('locked')
+        el.disabled = false;
+      }
+      
     });
   }
-  return await checkMembership(config.UUID).then(isMember =>{
+  const MEMBERSHIP_API_ENDPOINT = await window.electron.MEMBERSHIP_API_ENDPOINT();
+  return await checkMembership(config.UUID, MEMBERSHIP_API_ENDPOINT).then(isMember =>{
     console.info(`Version: ${VERSION}. Trial: ${inTrial} subscriber: ${isMember}, All detections: ${config.specDetections}`, '')
     if (isMember || inTrial) {
       unlockElements();
       if (isMember) {
         document.getElementById('primaryLogo').src = 'img/logo/chirpity_logo_subscriber_bronze.png'; // Silver &amp; Gold available
+      } else {
+        document.getElementById("buy-me-coffee").classList.remove('d-none')
       }
       localStorage.setItem('isMember', true);
       localStorage.setItem('memberTimestamp', now);
@@ -7999,19 +8348,27 @@ async function membershipCheck() {
       lockedElements.forEach((el) => {
         el.classList.replace("unlocked", "locked");
         config.specDetections = false; // will need to update when more elements
-        el.checked = false;
-        el.disabled = true;
-        el.textContent = "lock";
+        if (el instanceof HTMLSpanElement){
+          el.checked = false;
+          el.disabled = true;
+          el.textContent = "lock";
+        } else {
+          el.classList.remove('locked')
+          el.disabled = true;
+          el instanceof HTMLSelectElement &amp;&amp; (el.value = '')
+        }
       });
       localStorage.setItem('isMember', false);
     }
-    return isMember
+    return isMember || inTrial
   }).catch(error =>{ // Period of grace
     if (cachedStatus === 'true' &amp;&amp; cachedTimestamp &amp;&amp; now - cachedTimestamp &lt; oneWeek) {
       console.warn('Using cached membership status during error.', error);
       unlockElements();
       document.getElementById('primaryLogo').src = 'img/logo/chirpity_logo_subscriber_bronze.png';
       return true
+    } else {
+      document.getElementById("buy-me-coffee").classList.remove('d-none')
     }
   });
 
@@ -8023,12 +8380,256 @@ function utf8ToHex(str) {
     .join("");
 }
 
+/**
+ * Converts a hexadecimal string into a UTF-8 string.
+ *
+ * Splits the hex string into two-character segments, converts each segment to its corresponding character,
+ * and concatenates the characters to form the decoded string.
+ *
+ * @param {string} hex - The hexadecimal string to convert. Must consist of an even number of hexadecimal digits.
+ * @returns {string} The resulting string after decoding the hexadecimal input.
+ *
+ * @example
+ * hexToUtf8("48656c6c6f") // returns "Hello"
+ */
 function hexToUtf8(hex) {
   return hex
     .match(/.{1,2}/g) // Split the hex string into pairs
     .map((byte) => String.fromCharCode(parseInt(byte, 16))) // Convert each pair to a character
     .join("");
 }
+
+/**
+ * Assigns a key binding configuration based on user input.
+ *
+ * Retrieves the column identifier from the DOM element with the ID matching `${key}-column` and uses it to update the global key assignment stored in `config.keyAssignment`. The function trims the value from the input element and sets it to `null` if empty. It marks the assignment as active when a non-empty value is provided and dynamically enables or disables the input element based on the presence of a valid column.
+ *
+ * @param {HTMLInputElement} inputEL - The input element that triggered the change event.
+ * @param {string} key - The identifier used to locate the corresponding column element and update the key assignment configuration.
+ * @returns {void}
+ */
+function setKeyAssignment(inputEL, key){
+  // Called on change to inputs
+  const columnEl = document.getElementById(key + '-column')
+  const column = columnEl.value;
+  let active = false;
+  const value = inputEL.value?.trim() || null;
+  // column === 'label' &amp;&amp; worker.postMessage({action: "get-tags"})
+  if (column){
+    inputEL.disabled = false; // enable input
+    if (value){
+      active = true;
+      config.keyAssignment[key] = {column, value, active};
+      config.debug &amp;&amp; console.log(`${key} is assigned to update ${column} with ${value}`)
+    } else {
+      config.keyAssignment[key] = {column, value, active};
+      config.debug &amp;&amp; console.log(`${key} is assigned to update ${column} with ${value}`)
+    }
+  } else {
+
+    inputEL.disabled = true; // disable input
+    config.keyAssignment[key] = {column, value, active};
+  }
+}
+
+/**
+ * Update key assignment UI elements based on the provided configuration.
+ *
+ * Iterates over each key in the {@code keyAssignments} object, updating the corresponding
+ * DOM input elements with their assigned value and column information. If the key's value
+ * is not "unused", the input is enabled. Additionally, for key assignments with a column of
+ * "label" or "species", the input element is further processed for specialized handling.
+ *
+ * @param {Object.&lt;string, {value: string, column: string}>} keyAssignments - 
+ *   An object mapping element IDs to their key assignment configurations. Each configuration object
+ *   should contain:
+ *   - {@code value}: The assigned key value. Use "unused" to indicate no assignment.
+ *   - {@code column}: The column type, typically "label" or "species", affecting further UI processing.
+ *
+ * @example
+ * const keyAssignments = {
+ *   "key1": { value: "A", column: "label" },
+ *   "key2": { value: "unused", column: "species" }
+ * };
+ * setKeyAssignmentUI(keyAssignments);
+ *
+ * @remarks
+ * Assumes that DOM elements exist with IDs matching each key in {@code keyAssignments} and their associated
+ * column elements using the format {@code key + '-column'}. Relies on a global {@code getI18n} function and
+ * an {@code i18nSelect} parameter to initialize internationalization context.
+ */
+function setKeyAssignmentUI(keyAssignments){
+  const i18n = getI18n(i18nSelect);
+  Object.entries(keyAssignments).forEach(([k, v]) => {
+    const input = document.getElementById(k);
+    input.value = v.value;
+    v.value === 'unused' || (input.disabled = false);
+    document.getElementById(k+'-column').value = v.column;
+    if (['label', 'species'].includes(v.column)) changeInputElement(v.column, input, k, v.value);
+  }) 
+}
+
+/**
+ * Replaces a target DOM element with a custom input component based on the specified column.
+ *
+ * For a column value of "label", creates a dark-themed custom select populated with labels obtained from STATE.tagsList.
+ * Otherwise, creates an input element with a prefilled value; if the column is "species", adds an event listener to update suggestion lists.
+ *
+ * @param {string} column - Determines the type of input element to generate ("label" for a custom select, "species" for an input with suggestions, or any other value for a generic input).
+ * @param {HTMLElement} element - The DOM element to be replaced by the new input component.
+ * @param {string} key - A unique identifier used as the new element's ID.
+ * @param {string|null} [preSelected=null] - The preselected value to populate the input component.
+ * @returns {HTMLElement} The newly created DOM element, either a container with a custom select (for "label") or an input element.
+ */
+function changeInputElement(column, element, key, preSelected = null){
+  if (column === 'label'){
+    const i18n = getI18n(i18nSelect)
+    const container = document.createElement('div')
+    container.id = key;
+    container.className = 'form-control-sm bg-dark border-0';
+    const labels = STATE.tagsList.map(item => item.name);
+    const select = new CustomSelect({
+      theme: 'dark',
+      labels: labels,
+      i18n: i18n,
+      preselectedLabel: preSelected
+    });
+    container.appendChild(select);
+    element.replaceWith(container)
+    return container
+  } else {
+    const input = document.createElement('input');
+    input.className="ms-2 form-control";
+    input.id=key;
+    input.value = preSelected;
+    input.style="font-size: small";
+    if (column === 'species'){
+      const listContainer = document.getElementById(`bird-list-${key}`)
+      input.addEventListener('input', () => updateSuggestions(input, listContainer, true));
+    }
+    element.replaceWith(input);
+    return input
+  }
+}
+
+document.addEventListener("labelsUpdated", (e) => {
+  const tags = e.detail.tags;
+  const deleted = e.detail.deleted;
+  if (deleted){
+    console.log("Tag deleted:", deleted);
+    worker.postMessage({action: "delete-tag", deleted })  
+    STATE.tagsList = STATE.tagsList.filter(item => item.name !== deleted)
+  } else {
+    STATE.tagsList = tags.map((tag, index) => {
+      const existingItem = STATE.tagsList[index];
+      return {
+        id: existingItem ? existingItem.id : null, // Keep existing ID, set null for new
+        name: tag
+      };
+    });
+    console.log("Tags updated:", tags);
+    worker.postMessage({action: "update-tags", tags })
+  }
+  
+  console.log("Tags list:", STATE.tagsList);
+});
+const input = document.getElementById('bird-autocomplete');
+
+const dropdownCaret = document.querySelector('.input-caret');
+
+/**
+ * Filters and sorts bird labels based on a search query.
+ *
+ * This function processes a global collection of bird labels by performing a case-insensitive filter based on the provided search string.
+ * Each matching label, originally in the format "sname_cname", is split and reversed to yield the common name (`cname`) and the scientific name (`sname`).
+ * The returned object includes a `styled` property that formats these names into an HTML string with `&lt;br/>` and `&lt;i>` tags.
+ * The resulting list is sorted alphabetically by the common name using locale comparison based on the configuration.
+ *
+ * @param {string} search - A substring used to filter bird labels; if invalid, an empty array is returned.
+ * @returns {Array&lt;{cname: string, sname: string, styled: string}>} An array of objects representing filtered and sorted birds.
+ */
+function getFilteredBirds(search) {
+  if (!search || typeof search !== 'string') return [];
+  
+  const sortedList =  LABELS
+    .filter(bird => bird.toLowerCase().includes(search))
+    .map(item => {
+      // Flip sname and cname from "sname_cname"
+      const [cname, sname] = item.split('_').reverse();
+      return { cname, sname, styled: `${cname} &lt;br/>&lt;i>${sname}&lt;/i>` };
+    })
+    .sort((a, b) => new Intl.Collator(config.locale.replace(/_.*$/, "")).compare(a.cname, b.cname));
+    return sortedList
+}
+
+/**
+ * Updates the suggestions list and translucent completion overlay based on the input search query.
+ *
+ * Uses the lowercase value of the provided input element to filter bird suggestions via the global
+ * getFilteredBirds function. If the search query is shorter than 2 characters, the suggestion element
+ * is hidden. Otherwise, a list of matching suggestions is created where each suggestion, when clicked,
+ * updates the selected bird display (the element with ID "selected-bird"), conditionally modifies the
+ * input value based on the preserveInput flag, dispatches a change event on the input, and hides the
+ * suggestion element.
+ *
+ * @param {HTMLInputElement} input - The input element containing the current search query.
+ * @param {HTMLElement} element - The DOM element that displays the list of filtered suggestions.
+ * @param {boolean} preserveInput - Determines whether to keep the input’s value after a suggestion is selected.
+ */
+function updateSuggestions(input, element, preserveInput) {
+  const search = input.value.toLowerCase();
+  element.textContent = ''; // Clear any existing suggestions
+
+  if (search.length &lt; 2) {
+    element.style.display = 'none';
+    return;
+  }
+  
+  const filtered = getFilteredBirds(search);
+  const fragment = document.createDocumentFragment();
+  // Populate the suggestion list
+  filtered.forEach(item => {
+    const li = document.createElement('li');
+    li.className = 'list-group-item';
+
+    const text = document.createElement('span');
+    text.textContent = item.cname;
+    const italic = document.createElement('i');
+    italic.textContent = item.sname;
+    li.appendChild(text);
+    li.appendChild(document.createElement('br'));
+    li.appendChild(italic);
+
+    li.addEventListener('click', () => {
+      const selectedBird = document.getElementById('selected-bird');
+      selectedBird.replaceChildren(
+        text.cloneNode(true),
+        document.createElement('br'),
+        italic.cloneNode(true)
+      );
+      input.value = preserveInput ? item.cname : '';
+      input.dispatchEvent(new Event('change', { bubbles: true })); // fire the change event
+      element.style.display = 'none';
+    });
+    fragment.appendChild(li);
+  });
+  element.appendChild(fragment);
+  element.style.display = filtered.length ? 'block' : 'none';
+}
+
+// Update suggestions on each input event
+input.addEventListener('input', () => updateSuggestions(input, DOM.suggestionsList));
+
+// Toggle the display of the suggestion list when the caret is clicked
+dropdownCaret.addEventListener('click', () => {
+  if (DOM.suggestionsList.style.display === 'block') {
+    DOM.suggestionsList.style.display = 'none';
+  } else {
+    updateSuggestions(input, DOM.suggestionsList);
+  }
+});
+
+
 </code></pre>
         </article>
     </section>
@@ -8039,13 +8640,13 @@ function hexToUtf8(hex) {
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#LIST_CACHE">LIST_CACHE</a></li><li><a href="global.html#_parseMetadataText">_parseMetadataText</a></li><li><a href="global.html#_updateSpeciesLocale">_updateSpeciesLocale</a></li><li><a href="global.html#addDays">addDays</a></li><li><a href="global.html#adjustSpecDims">adjustSpecDims</a></li><li><a href="global.html#centreSpec">centreSpec</a></li><li><a href="global.html#checkForRegion">checkForRegion</a></li><li><a href="global.html#checkMembership">checkMembership</a></li><li><a href="global.html#checkpoint">checkpoint</a></li><li><a href="global.html#clearActive">clearActive</a></li><li><a href="global.html#closeDatabase">closeDatabase</a></li><li><a href="global.html#controlFromInput">controlFromInput</a></li><li><a href="global.html#convertFile">convertFile</a></li><li><a href="global.html#createContextMenu">createContextMenu</a></li><li><a href="global.html#createRegion">createRegion</a></li><li><a href="global.html#createTimeline">createTimeline</a></li><li><a href="global.html#extractWaveMetadata">extractWaveMetadata</a></li><li><a href="global.html#fetchAudioBuffer">fetchAudioBuffer</a></li><li><a href="global.html#fetchIssuesByLabel">fetchIssuesByLabel</a></li><li><a href="global.html#filterValidFiles">filterValidFiles</a></li><li><a href="global.html#formatAsBootstrapTable">formatAsBootstrapTable</a></li><li><a href="global.html#formatLabel">formatLabel</a></li><li><a href="global.html#formatRegionTooltip">formatRegionTooltip</a></li><li><a href="global.html#getDetectedSpecies">getDetectedSpecies</a></li><li><a href="global.html#getFileSQLAndParams">getFileSQLAndParams</a></li><li><a href="global.html#getFiles">getFiles</a></li><li><a href="global.html#getIncludedIDs">getIncludedIDs</a></li><li><a href="global.html#getRegion">getRegion</a></li><li><a href="global.html#getResults">getResults</a></li><li><a href="global.html#getValidSpecies">getValidSpecies</a></li><li><a href="global.html#getWorkingFile">getWorkingFile</a></li><li><a href="global.html#handleKeyDown">handleKeyDown</a></li><li><a href="global.html#increaseFFT">increaseFFT</a></li><li><a href="global.html#initRegion">initRegion</a></li><li><a href="global.html#loadAudioFile">loadAudioFile</a></li><li><a href="global.html#loadAudioFileSync">loadAudioFileSync</a></li><li><a href="global.html#locateFile">locateFile</a></li><li><a href="global.html#membershipCheck">membershipCheck</a></li><li><a href="global.html#notifyMissingFile">notifyMissingFile</a></li><li><a href="global.html#onLaunch">onLaunch</a></li><li><a href="global.html#onModelReady">onModelReady</a></li><li><a href="global.html#onSave2DiskDB">onSave2DiskDB</a></li><li><a href="global.html#onUpdateLocale">onUpdateLocale</a></li><li><a href="global.html#playRegion">playRegion</a></li><li><a href="global.html#reduceFFT">reduceFFT</a></li><li><a href="global.html#resultClick">resultClick</a></li><li><a href="global.html#savedFileCheck">savedFileCheck</a></li><li><a href="global.html#sendDetections">sendDetections</a></li><li><a href="global.html#setActiveRegion">setActiveRegion</a></li><li><a href="global.html#setMetadata">setMetadata</a></li><li><a href="global.html#showWindowDetections">showWindowDetections</a></li><li><a href="global.html#t0_warmup">t0_warmup</a></li><li><a href="global.html#trackEvent">trackEvent</a></li><li><a href="global.html#updateFilesBeingProcessed">updateFilesBeingProcessed</a></li><li><a href="global.html#updateSpec">updateSpec</a></li><li><a href="global.html#zoomSpec">zoomSpec</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#LIST_CACHE">LIST_CACHE</a></li><li><a href="global.html#REQUEST_TIMEOUT_MS">REQUEST_TIMEOUT_MS</a></li><li><a href="global.html#_parseMetadataText">_parseMetadataText</a></li><li><a href="global.html#_updateSpeciesLocale">_updateSpeciesLocale</a></li><li><a href="global.html#activateResultFilters">activateResultFilters</a></li><li><a href="global.html#addDays">addDays</a></li><li><a href="global.html#adjustSpecDims">adjustSpecDims</a></li><li><a href="global.html#batchInsertRecords">batchInsertRecords</a></li><li><a href="global.html#centreSpec">centreSpec</a></li><li><a href="global.html#changeInputElement">changeInputElement</a></li><li><a href="global.html#checkForRegion">checkForRegion</a></li><li><a href="global.html#checkMembership">checkMembership</a></li><li><a href="global.html#checkpoint">checkpoint</a></li><li><a href="global.html#clearActive">clearActive</a></li><li><a href="global.html#closeDatabase">closeDatabase</a></li><li><a href="global.html#controlFromInput">controlFromInput</a></li><li><a href="global.html#convertFile">convertFile</a></li><li><a href="global.html#createContextMenu">createContextMenu</a></li><li><a href="global.html#createDateClearButton">createDateClearButton</a></li><li><a href="global.html#createRegion">createRegion</a></li><li><a href="global.html#createTimeline">createTimeline</a></li><li><a href="global.html#extractWaveMetadata">extractWaveMetadata</a></li><li><a href="global.html#fetchAudioBuffer">fetchAudioBuffer</a></li><li><a href="global.html#fetchIssuesByLabel">fetchIssuesByLabel</a></li><li><a href="global.html#filterValidFiles">filterValidFiles</a></li><li><a href="global.html#formatAsBootstrapTable">formatAsBootstrapTable</a></li><li><a href="global.html#formatLabel">formatLabel</a></li><li><a href="global.html#formatRegionTooltip">formatRegionTooltip</a></li><li><a href="global.html#generateBirdOptionList">generateBirdOptionList</a></li><li><a href="global.html#getDetectedSpecies">getDetectedSpecies</a></li><li><a href="global.html#getFileSQLAndParams">getFileSQLAndParams</a></li><li><a href="global.html#getFiles">getFiles</a></li><li><a href="global.html#getFilteredBirds">getFilteredBirds</a></li><li><a href="global.html#getIncludedIDs">getIncludedIDs</a></li><li><a href="global.html#getRegion">getRegion</a></li><li><a href="global.html#getResults">getResults</a></li><li><a href="global.html#getRowFromStart">getRowFromStart</a></li><li><a href="global.html#getValidSpecies">getValidSpecies</a></li><li><a href="global.html#getWorkingFile">getWorkingFile</a></li><li><a href="global.html#handleKeyDown">handleKeyDown</a></li><li><a href="global.html#handleKeyDownDeBounce">handleKeyDownDeBounce</a></li><li><a href="global.html#handleMessage">handleMessage</a></li><li><a href="global.html#hexToUtf8">hexToUtf8</a></li><li><a href="global.html#increaseFFT">increaseFFT</a></li><li><a href="global.html#initRegion">initRegion</a></li><li><a href="global.html#isValidUUID">isValidUUID</a></li><li><a href="global.html#loadAudioFile">loadAudioFile</a></li><li><a href="global.html#loadAudioFileSync">loadAudioFileSync</a></li><li><a href="global.html#loadDB">loadDB</a></li><li><a href="global.html#localiseUI">localiseUI</a></li><li><a href="global.html#locateFile">locateFile</a></li><li><a href="global.html#membershipCheck">membershipCheck</a></li><li><a href="global.html#notifyMissingFile">notifyMissingFile</a></li><li><a href="global.html#onAnalysisComplete">onAnalysisComplete</a></li><li><a href="global.html#onLaunch">onLaunch</a></li><li><a href="global.html#onModelReady">onModelReady</a></li><li><a href="global.html#onResultsComplete">onResultsComplete</a></li><li><a href="global.html#onSave2DiskDB">onSave2DiskDB</a></li><li><a href="global.html#onUpdateLocale">onUpdateLocale</a></li><li><a href="global.html#playRegion">playRegion</a></li><li><a href="global.html#recordUpdate">recordUpdate</a></li><li><a href="global.html#reduceFFT">reduceFFT</a></li><li><a href="global.html#renderResult">renderResult</a></li><li><a href="global.html#resultClick">resultClick</a></li><li><a href="global.html#savedFileCheck">savedFileCheck</a></li><li><a href="global.html#sendDetections">sendDetections</a></li><li><a href="global.html#setActiveRegion">setActiveRegion</a></li><li><a href="global.html#setActiveRow">setActiveRow</a></li><li><a href="global.html#setClickedIndex">setClickedIndex</a></li><li><a href="global.html#setKeyAssignment">setKeyAssignment</a></li><li><a href="global.html#setKeyAssignmentUI">setKeyAssignmentUI</a></li><li><a href="global.html#setMetadata">setMetadata</a></li><li><a href="global.html#showDatePicker">showDatePicker</a></li><li><a href="global.html#showRecordEntryForm">showRecordEntryForm</a></li><li><a href="global.html#showSummarySortIcon">showSummarySortIcon</a></li><li><a href="global.html#showWindowDetections">showWindowDetections</a></li><li><a href="global.html#speciesFilter">speciesFilter</a></li><li><a href="global.html#syncConfig">syncConfig</a></li><li><a href="global.html#t0_warmup">t0_warmup</a></li><li><a href="global.html#trackEvent">trackEvent</a></li><li><a href="global.html#updateFilesBeingProcessed">updateFilesBeingProcessed</a></li><li><a href="global.html#updateSpec">updateSpec</a></li><li><a href="global.html#updateSuggestions">updateSuggestions</a></li><li><a href="global.html#zoomSpec">zoomSpec</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Sat Feb 15 2025 14:56:08 GMT+0000 (Greenwich Mean Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Fri Feb 21 2025 14:32:13 GMT+0000 (Greenwich Mean Time)
 </footer>
 
 <script> prettyPrint(); </script>

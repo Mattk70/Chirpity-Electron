@@ -45,6 +45,7 @@ import { State } from "./state.js";
 import { sqlite3, checkpoint, closeDatabase, Mutex } from "./database.js";
 import { trackEvent } from "./tracking.js";
 import { extractWaveMetadata } from "./metadata.js";
+
 let isWin32 = false;
 
 const DATASET = false;
@@ -296,6 +297,11 @@ const createDB = async (file) => {
   try {
     db.locale = "en";
     await db.runAsync("BEGIN");
+    await diskDB.runAsync("PRAGMA user_version = 1")
+    await db.runAsync(
+      "CREATE TABLE tags(id INTEGER PRIMARY KEY, name TEXT NOT NULL, UNIQUE(name))"
+    );
+    await db.runAsync("INSERT INTO tags VALUES(null, 'Nocmig'), (null, 'Local')");
     await db.runAsync(
       "CREATE TABLE species(id INTEGER PRIMARY KEY, sname TEXT NOT NULL, cname TEXT NOT NULL)"
     );
@@ -308,8 +314,9 @@ const createDB = async (file) => {
     await db.runAsync(
       "CREATE UNIQUE INDEX idx_unique_place ON locations(lat, lon)"
     );
-    await db.runAsync(`CREATE TABLE records( dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, label  TEXT,  comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER, 
-            UNIQUE (dateTime, fileID, speciesID), CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,  FOREIGN KEY (speciesID) REFERENCES species(id))`);
+    await db.runAsync(`CREATE TABLE records( dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, 
+      comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER, reviewed INTEGER, tagID INTEGER,
+      UNIQUE (dateTime, fileID, speciesID), CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,  FOREIGN KEY (speciesID) REFERENCES species(id))`);
     await db.runAsync(
       `CREATE TABLE duration( day INTEGER, duration INTEGER, fileID INTEGER, UNIQUE (day, fileID), CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE)`
     );
@@ -317,35 +324,15 @@ const createDB = async (file) => {
     await db.runAsync("CREATE INDEX idx_species_cname ON species(cname)");
     if (archiveMode) {
       // Only called when creating a new archive database
+      const stmt = db.prepare("INSERT INTO species VALUES (?, ?, ?)");
       for (let i = 0; i &lt; LABELS.length; i++) {
-        const [sname, cname] = LABELS[i].split("_");
-        await db.runAsync(
-          "INSERT INTO species VALUES (?,?,?)",
-          i,
-          sname,
-          cname
-        );
+          const [sname, cname] = LABELS[i].split("_");
+          await stmt.runAsync(i, sname, cname);
       }
+      stmt.finalize();
     } else {
       const filename = diskDB.filename;
-      let { code } = await db.runAsync("ATTACH ? as disk", filename);
-      const MAX_RETRIES = 100; // Set a maximum number of retries
-      let retries = 0;
-
-      // // If the db is not ready
-      // while (code === "SQLITE_BUSY" &amp;&amp; retries &lt; MAX_RETRIES) {
-      //     console.log("Disk DB busy");
-      //     await new Promise(resolve => setTimeout(resolve, 10));
-      // let response =
-      // await db.runAsync('ATTACH ? as disk', filename);
-      //     code = response.code;
-      //     retries++;
-      // }
-
-      // if (retries === MAX_RETRIES) {
-      //     console.error("Exceeded maximum number of retries for attaching the disk database");
-      //     throw new Error("Exceeded maximum number of retries for attaching the disk database");
-      // }
+      await db.runAsync("ATTACH ? as disk", filename);
       let response = await db.runAsync(
         "INSERT INTO files SELECT * FROM disk.files"
       );
@@ -361,6 +348,12 @@ const createDB = async (file) => {
       );
       DEBUG &amp;&amp;
         console.log(response.changes + " species added to memory database");
+
+        response = await db.runAsync(
+          "INSERT OR IGNORE INTO tags SELECT * FROM disk.tags"
+        );
+        DEBUG &amp;&amp;
+          console.log(response.changes + " tags added to memory database");
     }
     await db.runAsync("END");
   } catch (error) {
@@ -373,6 +366,29 @@ const createDB = async (file) => {
   return db;
 };
 
+/**
+ * Loads and configures the SQLite database for managing audio records and metadata.
+ *
+ * Retrieves default model labels either from a remote file (if the model is "birdnet") or from a local config file,
+ * appends a default "Unknown Sp." label, and determines the number of labels to construct the database filename.
+ * If the database file does not exist, a new database is created via `createDB`. Otherwise, an existing database is opened,
+ * and various PRAGMA settings (e.g., foreign keys, journal mode, busy timeout) are enforced. The function also ensures that
+ * necessary indices are created and pending database schema migrations (e.g., for tags and reviewed columns) are applied.
+ * Finally, it updates the global LABELS variable by fetching labels in the preferred locale from the database and sends a UI
+ * message if records are present.
+ *
+ * @param {string} path - The directory path where the database file resides or will be created.
+ * @returns {Promise&lt;boolean>} A promise that resolves to true when the database is successfully loaded and configured.
+ *
+ * @example
+ * loadDB('/data/db')
+ *   .then(success => console.log('Database loaded:', success))
+ *   .catch(error => console.error('Error loading database:', error));
+ *
+ * @remarks
+ * This function relies on global state (e.g., STATE, DATASET, LABELS, diskDB, UI) and integrates with several auxiliary functions
+ * such as `createDB` and `checkAndApplyUpdates`. Ensure these globals and functions are initialized before calling `loadDB`.
+ */
 async function loadDB(path) {
   // We need to get the default labels from the config file
   DEBUG &amp;&amp; console.log("Loading db " + path);
@@ -423,9 +439,25 @@ async function loadDB(path) {
         "CREATE INDEX IF NOT EXISTS idx_species_sname ON species(sname)"
       )
       .catch((error) => console.error(error));
-    await diskDB.runAsync(
-      "CREATE INDEX IF NOT EXISTS idx_species_cname ON species(cname)"
-    );
+    // Add new column if not exists
+    const {user_version} = await diskDB.getAsync("PRAGMA user_version")
+      .catch((error) => console.error(error));
+    if (user_version !== undefined &amp;&amp; user_version &lt; 1){ 
+      try{
+        await diskDB.runAsync("CREATE TABLE IF NOT EXISTS tags(id INTEGER PRIMARY KEY, name TEXT NOT NULL, UNIQUE(name))");
+        await diskDB.runAsync("INSERT INTO tags VALUES(null, 'Nocmig'), (null, 'Local')");
+        await diskDB.runAsync("ALTER TABLE records ADD COLUMN tagID INTEGER");
+        await diskDB.runAsync("UPDATE records SET tagID = 1 WHERE label = 'Nocmig'");
+        await diskDB.runAsync("UPDATE records SET tagID = 2 WHERE label = 'Local'");
+        await diskDB.runAsync("ALTER TABLE records DROP COLUMN label");
+        // Change label names to labelIDs
+        await diskDB.runAsync("ALTER TABLE records ADD COLUMN reviewed INTEGER");
+        await diskDB.runAsync("PRAGMA user_version = 1")
+        console.info("Migrated tags and added 'reviewed' column to ", p.basename(file))
+      } catch (e) {
+        console.error("Error adding column and updating version", e.message, e)
+      }
+    }
     await checkAndApplyUpdates(diskDB);
     const { count } = await diskDB.getAsync(
       "SELECT COUNT(*) as count FROM records"
@@ -540,6 +572,68 @@ async function checkAndApplyUpdates(db) {
   }
 }
 
+/**
+ * Dispatches worker messages based on the provided action in the event data.
+ *
+ * Processes an event whose data payload includes an `action` field and associated parameters.
+ * If the action is not "_init_" and initialization is pending, waits for the initialization to complete.
+ * Depending on the action, the function handles tasks such as initializing models, processing audio files,
+ * managing thread pools, updating database records, handling tag operations, and more. Specific actions include:
+ * 
+ * - "_init_": Initializes the environment by setting up the list worker, launching the model, and updating state.
+ * - "abort": Aborts ongoing processes.
+ * - "analyse": Initiates audio analysis; validates prediction workers and handles alerts if not ready.
+ * - "change-batch-size": Adjusts the batch size used by prediction workers.
+ * - "change-threads": Modifies the number of active prediction worker threads.
+ * - "change-mode": Switches the operational mode.
+ * - "chart": Processes a chart data request.
+ * - "check-all-files-saved": Verifies that files are correctly saved in the database.
+ * - "convert-dataset": Converts dataset specifications from existing formats.
+ * - "create-dataset": Creates a dataset with inclusion identifiers.
+ * - "delete": Handles deletion operations.
+ * - "delete-species": Removes specified species records.
+ * - "export-results": Exports the detection results.
+ * - "file-load-request": Loads an audio file, clears memory records if necessary, and switches modes based on file state.
+ * - "filter": Applies filters to the result set, refreshes summaries, and updates inclusion identifiers.
+ * - "get-detected-species-list": Retrieves a list of detected species.
+ * - "get-valid-species": Fetches valid species for a given file.
+ * - "get-locations": Retrieves location details from the database for a specific file.
+ * - "get-tags": Retrieves a list of tags from the disk database.
+ * - "delete-tag": Deletes a tag, handling any errors by generating an alert.
+ * - "update-tags": Updates the tag list in the database and refreshes the UI with the new set of tags.
+ * - "get-valid-files-list": Scans and returns a list of valid files.
+ * - "insert-manual-record": Inserts a record manually and updates summaries and results accordingly.
+ * - "load-model": Loads a new predictive model, aborting current processing if necessary.
+ * - "post": Uploads processed audio data.
+ * - "purge-file": Deletes a specified file.
+ * - "compress-and-organise": Compresses and reorganises audio files.
+ * - "relocated-file": Updates file paths after relocation.
+ * - "save": Saves audio processing data along with associated metadata.
+ * - "save2db": Persists in-memory database changes to disk.
+ * - "set-custom-file-location": Sets a custom location for file storage.
+ * - "update-buffer": Reloads an audio file to update its buffer.
+ * - "update-file-start": Adjusts the starting point for audio file processing.
+ * - "update-list": Updates the internal list and custom labels, optionally refreshing summaries and results.
+ * - "update-locale": Updates locale settings and labels.
+ * - "update-summary": Refreshes the summary data.
+ * - "update-state": Updates the overall application state including paths and thresholds.
+ *
+ * @example
+ * // Example message event for initiating analysis on an audio file:
+ * const msgEvent = {
+ *   data: {
+ *     action: "analyse",
+ *     file: "audio_sample.mp3",
+ *     // ...other parameters required for analysis
+ *   }
+ * };
+ * handleMessage(msgEvent);
+ *
+ * @param {Object} e - The message event object.
+ * @param {Object} e.data - The payload containing the action and additional parameters.
+ * @param {string} e.data.action - The command indicating which action to execute.
+ * @returns {Promise&lt;void>} Resolves once the message has been processed.
+ */
 async function handleMessage(e) {
   const args = e.data;
   const action = args.action;
@@ -680,6 +774,36 @@ async function handleMessage(e) {
       getLocations({ db: STATE.db, file: args.file });
       break;
     }
+    case "get-tags": {
+      const result = await diskDB.allAsync('SELECT id, name FROM tags');
+      UI.postMessage({event: "tags", tags: result, init: true})
+      break;
+    }
+    case "delete-tag": {
+      try {
+        const result = await diskDB.runAsync('DELETE FROM tags where name = ?', args.deleted);
+      } catch (error) {
+        generateAlert({message: `Label deletion failed: ${error.message}`})
+        console.error(error);
+      }
+      break;
+    }
+    case "update-tags": {
+      try {
+        const stmt = STATE.db.prepare('INSERT OR REPLACE INTO tags (id, name) VALUES (?, ?)');
+        const tags = args.tags;
+        for (let i=0; i&lt;tags.length;i++){
+          await stmt.runAsync(i+1, tags[i] )
+        }
+        stmt.finalize()
+        const result = await STATE.db.allAsync('SELECT id, name FROM tags');
+        UI.postMessage({event: "tags", tags: result, init: false})
+      } catch (error) {
+        generateAlert({message: `Label update failed: ${error.message}`})
+        console.error(error);
+      }
+      break;
+    }
     case "get-valid-files-list": {
       await getFiles(args.files);
       break;
@@ -797,14 +921,16 @@ ipcRenderer.on("new-client", async (event) => {
 });
 
 
-ipcRenderer.on("close-database", async (event) => {
-  checkpoint(diskDB)
-  .then(closeDatabase(diskDB))
-  .catch(error => console.error("Error closing database:", error.message))
-  .finally(_ => {
+ipcRenderer.on("close-database", async () => {
+  try {
+    await checkpoint(diskDB)
+    await closeDatabase(diskDB)
+  } catch(error) {
+    console.error("Error closing database:", error.message)
+  } finally {
     diskDB = null;
     ipcRenderer.send('database-closed')
-  })
+  }
 });
 
 /**
@@ -1226,15 +1352,18 @@ const prepResultsStatement = (
         species.sname, 
         species.cname, 
         records.confidence as score, 
-        records.label, 
+        tagID,
+        tags.name as label, 
         records.comment, 
         records.end,
         records.callCount,
         records.isDaylight,
+        records.reviewed,
         RANK() OVER (PARTITION BY fileID, dateTime ORDER BY records.confidence DESC) AS rank
         FROM records 
         JOIN species ON records.speciesID = species.id 
         JOIN files ON records.fileID = files.id 
+        LEFT JOIN tags ON records.tagID = tags.id
         WHERE confidence >= ? 
         `;
   // // Prioritise selection ranges
@@ -1253,7 +1382,7 @@ const prepResultsStatement = (
     params.push(...included);
   }
   if (STATE.selection) {
-    resultStatement += ` AND name = ? `;
+    resultStatement += ` AND files.name = ? `;
     params.push(FILE_QUEUE[0]);
   }
   if (STATE.locationID) {
@@ -1277,12 +1406,14 @@ const prepResultsStatement = (
     speciesID,
     sname, 
     cname, 
-    score, 
+    score,
+    tagID,
     label, 
     comment,
     end,
     callCount,
     isDaylight,
+    reviewed,
     rank
     FROM 
     ranked_records 
@@ -1294,8 +1425,8 @@ const prepResultsStatement = (
   }
   const limitClause = noLimit ? "" : "LIMIT ?  OFFSET ?";
   noLimit || params.push(STATE.limit, offset);
-
-  resultStatement += ` ORDER BY ${STATE.resultsSortOrder}, timestamp ASC ${limitClause} `;
+  const metaSort = STATE.resultsMetaSortOrder ? `${STATE.resultsMetaSortOrder}, ` : '';
+  resultStatement += ` ORDER BY ${metaSort} ${STATE.resultsSortOrder}, timestamp ASC ${limitClause} `;
 
   return [resultStatement, params];
 };
@@ -2414,7 +2545,7 @@ const saveResults2DataSet = ({ species, included }) => {
     species.sname, 
     species.cname, 
     confidence AS score, 
-    label, 
+    tagID, 
     comment
     FROM records
     JOIN species
@@ -2760,20 +2891,32 @@ const terminateWorkers = () => {
   predictWorkers = [];
 };
 
+/**
+ * Performs batch insertion of audio records into the database.
+ *
+ * Retrieves records using a prepared statement based on the original identifier,
+ * then iterates through each record to insert it individually via onInsertManualRecord.
+ * The operation is performed within a mutex lock and a database transaction to
+ * guarantee atomicity. A UI update is triggered after the final record is processed,
+ * and debug timing information is logged if enabled.
+ *
+ * @param {string} cname - Identifier used for the new records.
+ * @param {string} label - Label to associate with each inserted record.
+ * @param {Array} files - List of files; currently reserved and not utilized by the function.
+ * @param {string} originalCname - Original identifier used in the prepared statement query.
+ * @returns {Promise&lt;void>} A promise that resolves when the batch insertion completes.
+ *
+ * @throws {Error} Propagates any error encountered during the database transaction,
+ *                 ensuring a rollback to avoid partial insertions.
+ *
+ * @example
+ * await batchInsertRecords("newCampaign", "approved", fileList, "origCampaign");
+ */
 async function batchInsertRecords(cname, label, files, originalCname) {
   const db = STATE.db;
-  let params = [originalCname, STATE.detect.confidence];
   const t0 = Date.now();
-  let query = `SELECT * FROM records WHERE speciesID = (SELECT id FROM species WHERE cname = ?) AND confidence >= ? `;
-  if (STATE.mode !== "explore") {
-    query += ` AND fileID in (SELECT id FROM files WHERE name IN (${prepParams(
-      files
-    )}))`;
-    params.push(...files);
-  } else if (STATE.explore.range.start) {
-    query += ` AND dateTime BETWEEN ${STATE.explore.range.start} AND ${STATE.explore.range.end}`;
-  }
-  const records = await STATE.db.allAsync(query, ...params);
+  const [sql, params] = prepResultsStatement(originalCname, true, STATE.included, undefined, STATE.topRankin)
+  const records = await STATE.db.allAsync(sql, ...params);
   let count = 0;
 
   await dbMutex.lock();
@@ -2787,23 +2930,17 @@ async function batchInsertRecords(cname, label, files, originalCname) {
         "SELECT name FROM files WHERE id = ?",
         fileID
       );
-      // Delete existing record
-      await db.runAsync(
-        "DELETE FROM records WHERE datetime = ? AND speciesID = ? AND fileID = ?",
-        dateTime,
-        speciesID,
-        fileID
-      );
       count += await onInsertManualRecord({
-        cname: cname,
+        cname,
         start: position,
-        end: end,
-        comment: comment,
+        end,
+        comment,
         count: callCount,
         file: name,
-        label: label,
+        label,
         batch: false,
-        originalCname: undefined,
+        originalCname,
+        calledByBatch: true,
         updateResults: i === records.length - 1, // trigger a UI update after the last item
       });
     }
@@ -2830,21 +2967,29 @@ const onInsertManualRecord = async ({
   batch,
   originalCname,
   confidence,
+  calledByBatch,
   position,
   speciesFiltered,
   updateResults = true,
 }) => {
-  if (batch) return batchInsertRecords(cname, label, file, originalCname);
+  if (batch) return batchInsertRecords(cname, label, file, originalCname, confidence);
   (start = parseFloat(start)), (end = parseFloat(end));
   const startMilliseconds = Math.round(start * 1000);
   let changes = 0,
     fileID,
     fileStart;
   const db = STATE.db;
-  const { speciesID } = await db.getAsync(
+  const speciesFound = await db.getAsync(
     `SELECT id as speciesID FROM species WHERE cname = ?`,
     cname
   );
+  let speciesID;
+  if (speciesFound) {
+    speciesID = speciesFound.speciesID;
+  } else {
+    generateAlert({message: 'noSpecies', variables: {cname}, type:'error'})
+    return 
+  }
   let res = await db.getAsync(
     `SELECT id,filestart FROM files WHERE name = ?`,
     file
@@ -2876,34 +3021,60 @@ const onInsertManualRecord = async ({
 
   const dateTime = fileStart + startMilliseconds;
   const isDaylight = isDuringDaylight(dateTime, STATE.lat, STATE.lon);
-  confidence = confidence || 2000;
-  // Delete an existing record if it exists
-  const result = await db.getAsync(
-    `SELECT id as originalSpeciesID FROM species WHERE cname = ?`,
-    originalCname
-  );
-  result?.originalSpeciesID &amp;&amp;
-    (await db.runAsync(
-      "DELETE FROM records WHERE datetime = ? AND speciesID = ? AND fileID = ?",
-      dateTime,
-      result.originalSpeciesID,
-      fileID
-    ));
 
-  await db.runAsync(
-    "INSERT OR REPLACE INTO records VALUES ( ?,?,?,?,?,?,?,?,?,?)",
-    dateTime,
-    start,
-    fileID,
-    speciesID,
-    confidence,
-    label,
-    comment,
-    end,
-    parseInt(count),
-    isDaylight
-  );
-};
+  // Delete an existing record if species was changed
+  if (cname !== originalCname){
+    const result = await db.getAsync(
+      `SELECT id as originalSpeciesID FROM species WHERE cname = ?`,
+      originalCname
+    );
+    if (result?.originalSpeciesID){
+      await db.runAsync(
+        "DELETE FROM records WHERE datetime = ? AND speciesID = ? AND fileID = ?",
+        dateTime,
+        result.originalSpeciesID,
+        fileID
+      );
+      confidence = 2000; // Manual record
+    }
+  } 
+  else {
+    const r = await db.getAsync(
+      "SELECT * FROM records WHERE dateTime = ? AND fileID = ? AND speciesID = ?", 
+      dateTime, fileID, speciesID);
+    confidence = r?.confidence || 2000; // Save confidence
+  }
+  const result = await db.getAsync("SELECT id FROM tags WHERE name = ?", label);
+  const tagID = result?.id;
+  if (calledByBatch &amp;&amp; cname === originalCname){
+   await db.runAsync(
+      `UPDATE records SET tagID = ?, comment = ?, reviewed = 1 
+        WHERE dateTime = ? AND fileID = ? AND speciesID = ?`,
+      tagID, comment, dateTime, fileID, speciesID
+    )
+  } else {
+    await db.runAsync(
+        `INSERT INTO records (dateTime, position, fileID, speciesID, confidence, tagID, comment, end, callCount, isDaylight, reviewed)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(dateTime, fileID, speciesID) DO UPDATE SET 
+          tagID = excluded.tagID,
+          comment = excluded.comment,
+          reviewed = excluded.reviewed;`,
+        dateTime,
+        start,
+        fileID,
+        speciesID,
+        confidence, // This will only be inserted, not updated
+        tagID,
+        comment,
+        end,
+        parseInt(count),
+        isDaylight,
+        true
+      );
+      
+    };
+  }
 
 const insertDurations = async (file, id) => {
   const durationSQL = Object.entries(METADATA[file].dateDuration)
@@ -2977,9 +3148,9 @@ const generateInsertQuery = async (latestResult, file) => {
         const confidence = Math.round(confidenceArray[j] * 1000);
         if (confidence &lt; minConfidence) break;
         const speciesID = speciesIDArray[j];
-        insertQuery += `(${timestamp}, ${key}, ${fileID}, ${speciesID}, ${confidence}, null, null, ${
+        insertQuery += `(${timestamp}, ${key}, ${fileID}, ${speciesID}, ${confidence}, null, ${
           key + 3
-        }, null, ${isDaylight}), `;
+        }, null, ${isDaylight}, 0, null), `;
       }
     }
     // Remove the trailing comma and space
@@ -3412,10 +3583,7 @@ const getResults = async ({
     //const position = await getPosition({species: species, dateTime: select.dateTime, included: included});
     offset = (position.page - 1) * limit;
     // We want to consistently move to the next record. If results are sorted by time, this will be row + 1.
-    // If by confidence, it wil not change, as the validated record will move to the top
-    active = ["timestamp", "dateTime"].includes(STATE.resultsSortOrder)
-      ? position.row + 1
-      : position.row;
+    active = position.row + 1;
     // update the pagination
     await getTotal({ species: species, offset: offset, included: included });
   }
@@ -3851,6 +4019,9 @@ const onSave2DiskDB = async ({ file }) => {
     await memoryDB.runAsync("BEGIN");
     await memoryDB.runAsync(
       `INSERT OR IGNORE INTO disk.files SELECT * FROM files`
+    );
+    await memoryDB.runAsync(
+      `INSERT OR IGNORE INTO disk.tags SELECT * FROM tags`
     );
     await memoryDB.runAsync(
       `INSERT OR IGNORE INTO disk.locations SELECT * FROM locations`
@@ -4501,19 +4672,23 @@ const onFileDelete = async (fileName) => {
 
 const dbMutex = new Mutex();
 /**
- * Updates species common names in the database using provided labels.
+ * Update species common names in the database using provided label mappings.
  *
- * This function processes an array of labels, each formatted as "speciesName_commonName". It updates the
- * corresponding records in the database based on the current application model (e.g., "birdnet"). For the "birdnet"
- * model, a direct update query is used, while for other models the function retrieves existing common names and
- * conditionally updates them based on matching patterns. All database operations are executed within a single
- * transaction; if any update fails, the transaction is rolled back and the error is propagated.
+ * Parses an array of label strings formatted as "speciesName_commonName" and updates the corresponding
+ * entries in the species table. For the "birdnet" model, a direct update query is executed; for other models,
+ * existing common names are retrieved and conditionally updated based on matching parenthesized tokens.
+ * All operations are executed within a single transaction to ensure atomicity. If any update fails, the
+ * transaction is rolled back and the error is propagated.
  *
- * @param {object} db - The database connection object supporting asynchronous methods (runAsync, prepare, and finalize).
- * @param {Array&lt;string>} labels - An array of strings representing species updates, formatted as "speciesName_commonName".
- * @returns {Promise&lt;void>} A promise that resolves when all updates have been successfully committed.
+ * @param {object} db - A database connection object that supports asynchronous methods (runAsync, prepare, and finalize).
+ * @param {Array&lt;string>} labels - An array of label strings in the format "speciesName_commonName".
+ * @returns {Promise&lt;void>} A promise that resolves when all updates are successfully committed.
  *
- * @throws {Error} If any of the database operations fail during the transaction.
+ * @throws {Error} If any database operation fails during the transaction.
+ *
+ * @example
+ * // For a 'birdnet' model, updating a species 'sparrow' to a common name 'House Sparrow'
+ * await _updateSpeciesLocale(db, ["sparrow_House Sparrow"]);
  */
 async function _updateSpeciesLocale(db, labels) {
   const updatePromises = [];
@@ -4696,17 +4871,16 @@ async function getLocations({ db = STATE.db, file }) {
 }
 
 /**
- * Retrieves a list of included species IDs for filtering results based on the current state and file metadata.
+ * Retrieves a filtered list of species IDs based on the current state and file metadata.
  *
- * This asynchronous helper function returns a list of valid species IDs from the cache (STATE.included).
- * If the cache entry is missing:
- * - For "location" or "nocturnal" listings (when STATE.local is true), it derives the latitude, longitude, and week from the provided file metadata (or from STATE if no file is provided),
- *   constructs a location key, and calls setIncludedIDs to populate the cache.
- * - For other list types, it calls setIncludedIDs if the relevant cache object is not defined.
+ * For "location" or "nocturnal" lists when local mode is enabled, if a file identifier is provided, the function uses
+ * its metadata to extract latitude (lat), longitude (lon), and week information (derived from fileStart if STATE.useWeek is true).
+ * The latitude and longitude are concatenated to form a location key. If the corresponding cache entry in STATE.included is missing,
+ * setIncludedIDs is invoked to populate it. For other list types, if the cache is absent, setIncludedIDs is called without parameters.
  *
  * @async
- * @param {*} [file] - An optional identifier used to look up file metadata in METADATA. If provided, its metadata will be used to extract location (lat, lon) and week data.
- * @returns {Promise&lt;Array&lt;number>>} A promise that resolves to an array of species IDs included in the filtered results.
+ * @param {*} [file] - Optional key for retrieving file metadata from METADATA. Expected metadata should include properties like `fileStart`, `lat`, and `lon`.
+ * @returns {Promise&lt;number[]>} Promise resolving to an array of species IDs included in the current filtered results.
  */
 async function getIncludedIDs(file) {
   let lat, lon, week;
@@ -5045,6 +5219,7 @@ async function convertFile(
         command.seekInput(start).duration(end - start);
         scaleFactor = row.duration / (end - start);
         row.duration = end - start;
+        
       }
     }
     command
@@ -5059,8 +5234,8 @@ async function convertFile(
         utimesSync(fullFilePath, { atime: Date.now(), mtime: newfileMtime });
 
         db.run(
-          "UPDATE files SET archiveName = ? WHERE id = ?",
-          [dbArchiveName, row.id],
+          "UPDATE files SET archiveName = ?, duration = ? WHERE id = ?",
+          [dbArchiveName, row.duration, row.id],
           (err) => {
             if (err) {
               console.error("Error updating the database:", err);
@@ -5111,13 +5286,13 @@ async function convertFile(
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#LIST_CACHE">LIST_CACHE</a></li><li><a href="global.html#_parseMetadataText">_parseMetadataText</a></li><li><a href="global.html#_updateSpeciesLocale">_updateSpeciesLocale</a></li><li><a href="global.html#addDays">addDays</a></li><li><a href="global.html#adjustSpecDims">adjustSpecDims</a></li><li><a href="global.html#centreSpec">centreSpec</a></li><li><a href="global.html#checkForRegion">checkForRegion</a></li><li><a href="global.html#checkMembership">checkMembership</a></li><li><a href="global.html#checkpoint">checkpoint</a></li><li><a href="global.html#clearActive">clearActive</a></li><li><a href="global.html#closeDatabase">closeDatabase</a></li><li><a href="global.html#controlFromInput">controlFromInput</a></li><li><a href="global.html#convertFile">convertFile</a></li><li><a href="global.html#createContextMenu">createContextMenu</a></li><li><a href="global.html#createRegion">createRegion</a></li><li><a href="global.html#createTimeline">createTimeline</a></li><li><a href="global.html#extractWaveMetadata">extractWaveMetadata</a></li><li><a href="global.html#fetchAudioBuffer">fetchAudioBuffer</a></li><li><a href="global.html#fetchIssuesByLabel">fetchIssuesByLabel</a></li><li><a href="global.html#filterValidFiles">filterValidFiles</a></li><li><a href="global.html#formatAsBootstrapTable">formatAsBootstrapTable</a></li><li><a href="global.html#formatLabel">formatLabel</a></li><li><a href="global.html#formatRegionTooltip">formatRegionTooltip</a></li><li><a href="global.html#getDetectedSpecies">getDetectedSpecies</a></li><li><a href="global.html#getFileSQLAndParams">getFileSQLAndParams</a></li><li><a href="global.html#getFiles">getFiles</a></li><li><a href="global.html#getIncludedIDs">getIncludedIDs</a></li><li><a href="global.html#getRegion">getRegion</a></li><li><a href="global.html#getResults">getResults</a></li><li><a href="global.html#getValidSpecies">getValidSpecies</a></li><li><a href="global.html#getWorkingFile">getWorkingFile</a></li><li><a href="global.html#handleKeyDown">handleKeyDown</a></li><li><a href="global.html#increaseFFT">increaseFFT</a></li><li><a href="global.html#initRegion">initRegion</a></li><li><a href="global.html#loadAudioFile">loadAudioFile</a></li><li><a href="global.html#loadAudioFileSync">loadAudioFileSync</a></li><li><a href="global.html#locateFile">locateFile</a></li><li><a href="global.html#membershipCheck">membershipCheck</a></li><li><a href="global.html#notifyMissingFile">notifyMissingFile</a></li><li><a href="global.html#onLaunch">onLaunch</a></li><li><a href="global.html#onModelReady">onModelReady</a></li><li><a href="global.html#onSave2DiskDB">onSave2DiskDB</a></li><li><a href="global.html#onUpdateLocale">onUpdateLocale</a></li><li><a href="global.html#playRegion">playRegion</a></li><li><a href="global.html#reduceFFT">reduceFFT</a></li><li><a href="global.html#resultClick">resultClick</a></li><li><a href="global.html#savedFileCheck">savedFileCheck</a></li><li><a href="global.html#sendDetections">sendDetections</a></li><li><a href="global.html#setActiveRegion">setActiveRegion</a></li><li><a href="global.html#setMetadata">setMetadata</a></li><li><a href="global.html#showWindowDetections">showWindowDetections</a></li><li><a href="global.html#t0_warmup">t0_warmup</a></li><li><a href="global.html#trackEvent">trackEvent</a></li><li><a href="global.html#updateFilesBeingProcessed">updateFilesBeingProcessed</a></li><li><a href="global.html#updateSpec">updateSpec</a></li><li><a href="global.html#zoomSpec">zoomSpec</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#LIST_CACHE">LIST_CACHE</a></li><li><a href="global.html#REQUEST_TIMEOUT_MS">REQUEST_TIMEOUT_MS</a></li><li><a href="global.html#_parseMetadataText">_parseMetadataText</a></li><li><a href="global.html#_updateSpeciesLocale">_updateSpeciesLocale</a></li><li><a href="global.html#activateResultFilters">activateResultFilters</a></li><li><a href="global.html#addDays">addDays</a></li><li><a href="global.html#adjustSpecDims">adjustSpecDims</a></li><li><a href="global.html#batchInsertRecords">batchInsertRecords</a></li><li><a href="global.html#centreSpec">centreSpec</a></li><li><a href="global.html#changeInputElement">changeInputElement</a></li><li><a href="global.html#checkForRegion">checkForRegion</a></li><li><a href="global.html#checkMembership">checkMembership</a></li><li><a href="global.html#checkpoint">checkpoint</a></li><li><a href="global.html#clearActive">clearActive</a></li><li><a href="global.html#closeDatabase">closeDatabase</a></li><li><a href="global.html#controlFromInput">controlFromInput</a></li><li><a href="global.html#convertFile">convertFile</a></li><li><a href="global.html#createContextMenu">createContextMenu</a></li><li><a href="global.html#createDateClearButton">createDateClearButton</a></li><li><a href="global.html#createRegion">createRegion</a></li><li><a href="global.html#createTimeline">createTimeline</a></li><li><a href="global.html#extractWaveMetadata">extractWaveMetadata</a></li><li><a href="global.html#fetchAudioBuffer">fetchAudioBuffer</a></li><li><a href="global.html#fetchIssuesByLabel">fetchIssuesByLabel</a></li><li><a href="global.html#filterValidFiles">filterValidFiles</a></li><li><a href="global.html#formatAsBootstrapTable">formatAsBootstrapTable</a></li><li><a href="global.html#formatLabel">formatLabel</a></li><li><a href="global.html#formatRegionTooltip">formatRegionTooltip</a></li><li><a href="global.html#generateBirdOptionList">generateBirdOptionList</a></li><li><a href="global.html#getDetectedSpecies">getDetectedSpecies</a></li><li><a href="global.html#getFileSQLAndParams">getFileSQLAndParams</a></li><li><a href="global.html#getFiles">getFiles</a></li><li><a href="global.html#getFilteredBirds">getFilteredBirds</a></li><li><a href="global.html#getIncludedIDs">getIncludedIDs</a></li><li><a href="global.html#getRegion">getRegion</a></li><li><a href="global.html#getResults">getResults</a></li><li><a href="global.html#getRowFromStart">getRowFromStart</a></li><li><a href="global.html#getValidSpecies">getValidSpecies</a></li><li><a href="global.html#getWorkingFile">getWorkingFile</a></li><li><a href="global.html#handleKeyDown">handleKeyDown</a></li><li><a href="global.html#handleKeyDownDeBounce">handleKeyDownDeBounce</a></li><li><a href="global.html#handleMessage">handleMessage</a></li><li><a href="global.html#hexToUtf8">hexToUtf8</a></li><li><a href="global.html#increaseFFT">increaseFFT</a></li><li><a href="global.html#initRegion">initRegion</a></li><li><a href="global.html#isValidUUID">isValidUUID</a></li><li><a href="global.html#loadAudioFile">loadAudioFile</a></li><li><a href="global.html#loadAudioFileSync">loadAudioFileSync</a></li><li><a href="global.html#loadDB">loadDB</a></li><li><a href="global.html#localiseUI">localiseUI</a></li><li><a href="global.html#locateFile">locateFile</a></li><li><a href="global.html#membershipCheck">membershipCheck</a></li><li><a href="global.html#notifyMissingFile">notifyMissingFile</a></li><li><a href="global.html#onAnalysisComplete">onAnalysisComplete</a></li><li><a href="global.html#onLaunch">onLaunch</a></li><li><a href="global.html#onModelReady">onModelReady</a></li><li><a href="global.html#onResultsComplete">onResultsComplete</a></li><li><a href="global.html#onSave2DiskDB">onSave2DiskDB</a></li><li><a href="global.html#onUpdateLocale">onUpdateLocale</a></li><li><a href="global.html#playRegion">playRegion</a></li><li><a href="global.html#recordUpdate">recordUpdate</a></li><li><a href="global.html#reduceFFT">reduceFFT</a></li><li><a href="global.html#renderResult">renderResult</a></li><li><a href="global.html#resultClick">resultClick</a></li><li><a href="global.html#savedFileCheck">savedFileCheck</a></li><li><a href="global.html#sendDetections">sendDetections</a></li><li><a href="global.html#setActiveRegion">setActiveRegion</a></li><li><a href="global.html#setActiveRow">setActiveRow</a></li><li><a href="global.html#setClickedIndex">setClickedIndex</a></li><li><a href="global.html#setKeyAssignment">setKeyAssignment</a></li><li><a href="global.html#setKeyAssignmentUI">setKeyAssignmentUI</a></li><li><a href="global.html#setMetadata">setMetadata</a></li><li><a href="global.html#showDatePicker">showDatePicker</a></li><li><a href="global.html#showRecordEntryForm">showRecordEntryForm</a></li><li><a href="global.html#showSummarySortIcon">showSummarySortIcon</a></li><li><a href="global.html#showWindowDetections">showWindowDetections</a></li><li><a href="global.html#speciesFilter">speciesFilter</a></li><li><a href="global.html#syncConfig">syncConfig</a></li><li><a href="global.html#t0_warmup">t0_warmup</a></li><li><a href="global.html#trackEvent">trackEvent</a></li><li><a href="global.html#updateFilesBeingProcessed">updateFilesBeingProcessed</a></li><li><a href="global.html#updateSpec">updateSpec</a></li><li><a href="global.html#updateSuggestions">updateSuggestions</a></li><li><a href="global.html#zoomSpec">zoomSpec</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Sat Feb 15 2025 14:56:08 GMT+0000 (Greenwich Mean Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Fri Feb 21 2025 14:32:13 GMT+0000 (Greenwich Mean Time)
 </footer>
 
 <script> prettyPrint(); </script>
