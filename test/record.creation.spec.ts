@@ -106,7 +106,7 @@ test('Can create/edit a manual record', async () => {
   test.slow(); // 3x timeout seconds
   console.log('starting record creation test')
   await runExampleAnalysis(page,'chirpity');
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(500);
 
   await page.locator('#result1').click({button: 'right'});
   const editRecord = await page.locator('#create-manual-record');
@@ -127,6 +127,7 @@ test('Can create/edit a manual record', async () => {
   await page.locator('#call-count').fill('3');
   await page.locator('#record-comment').fill('a test comment');
   await page.locator('#record-add').click();
+  await page.waitForTimeout(500);
   const confidence = await page.locator('#result1 span.confidence-row > span')
 
 
