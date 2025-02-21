@@ -142,7 +142,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line4728">line 4728</a>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line4902">line 4902</a>
     </li></ul></dd>
     
 
@@ -155,6 +155,73 @@
 
 
 
+
+
+
+        
+            
+<h4 class="name" id="REQUEST_TIMEOUT_MS"><span class="type-signature">(constant) </span>REQUEST_TIMEOUT_MS<span class="type-signature"></span></h4>
+
+
+
+
+<div class="description">
+    Validates membership status for the provided UUID.This asynchronous function sends a POST request to the membership validation endpoint at "https://subscriber.mattkirkland.co.uk/check-uuid" with the given UUID in the request body. It expects a JSON response containing a boolean property "result" that indicates membership status.If the HTTP response status is not successful (i.e., not in the 200-299 range) or if an error occurs during the fetch or response parsing, the function logs the error and throws a new Error.
+</div>
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="member.js.html">member.js</a>, <a href="member.js.html#line27">line 27</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>checkMembership('123e4567-e89b-12d3-a456-426614174000')  .then(isMember => {    if (isMember) {      console.log('User is a member');    } else {      console.log('User is not a member');    }  })  .catch(error => console.error('Error checking membership:', error));</code></pre>
 
 
 
@@ -214,7 +281,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line363">line 363</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line367">line 367</a>
     </li></ul></dd>
     
 
@@ -409,7 +476,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Updates species common names in the database using provided labels.This function processes an array of labels, each formatted as "speciesName_commonName". It updates thecorresponding records in the database based on the current application model (e.g., "birdnet"). For the "birdnet"model, a direct update query is used, while for other models the function retrieves existing common names andconditionally updates them based on matching patterns. All database operations are executed within a singletransaction; if any update fails, the transaction is rolled back and the error is propagated.
+    Update species common names in the database using provided label mappings.Parses an array of label strings formatted as "speciesName_commonName" and updates the correspondingentries in the species table. For the "birdnet" model, a direct update query is executed; for other models,existing common names are retrieved and conditionally updated based on matching parenthesized tokens.All operations are executed within a single transaction to ensure atomicity. If any update fails, thetransaction is rolled back and the error is propagated.
 </div>
 
 
@@ -461,7 +528,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">The database connection object supporting asynchronous methods (runAsync, prepare, and finalize).</td>
+            <td class="description last">A database connection object that supports asynchronous methods (runAsync, prepare, and finalize).</td>
         </tr>
 
     
@@ -484,7 +551,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">An array of strings representing species updates, formatted as "speciesName_commonName".</td>
+            <td class="description last">An array of label strings in the format "speciesName_commonName".</td>
         </tr>
 
     
@@ -525,7 +592,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line4490">line 4490</a>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line4665">line 4665</a>
     </li></ul></dd>
     
 
@@ -555,7 +622,7 @@ Analysis Rate: x real time performance
 <dl>
     <dt>
         <div class="param-desc">
-        If any of the database operations fail during the transaction.
+        If any database operation fails during the transaction.
         </div>
     </dt>
     <dd></dd>
@@ -583,7 +650,7 @@ Analysis Rate: x real time performance
 
         
 <div class="param-desc">
-    A promise that resolves when all updates have been successfully committed.
+    A promise that resolves when all updates are successfully committed.
 </div>
 
 
@@ -595,6 +662,117 @@ Analysis Rate: x real time performance
     <dd>
         
 <span class="param-type">Promise.&lt;void></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// For a 'birdnet' model, updating a species 'sparrow' to a common name 'House Sparrow'await _updateSpeciesLocale(db, ["sparrow_House Sparrow"]);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="activateResultFilters"><span class="type-signature"></span>activateResultFilters<span class="signature">()</span><span class="type-signature"> &rarr; {void}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Updates the sorting indicators and UI elements for the result filters based on the current global state.Clones and replaces header elements to reflect active sort orders: toggles visibility of time-related sort iconswhen the score-based sort is active, applies pointer styles to sort elements, and manages the flipped state based onascending or descending order for species and metadata sorting. Also, clones and updates summary elements with hovereffects to enhance interactivity.Global State Dependencies:- STATE.resultsSortOrder: Determines if results are sorted by score and whether the sort is in ascending order.- STATE.resultsMetaSortOrder: Specifies the currently active metadata sort and direction.- DOM.resultHeader: The header element that is cloned and replaced for visual update.- DOM.summaryTable: The table whose species summary elements receive pointer styling.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line5428">line 5428</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">void</span>
 
 
     </dd>
@@ -742,7 +920,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1686">line 1686</a>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1817">line 1817</a>
     </li></ul></dd>
     
 
@@ -1027,7 +1205,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1901">line 1901</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1921">line 1921</a>
     </li></ul></dd>
     
 
@@ -1076,6 +1254,268 @@ Analysis Rate: x real time performance
     
 
 
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="batchInsertRecords"><span class="type-signature">(async) </span>batchInsertRecords<span class="signature">(cname, label, files, originalCname)</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Performs batch insertion of audio records into the database.Retrieves records using a prepared statement based on the original identifier,then iterates through each record to insert it individually via onInsertManualRecord.The operation is performed within a mutex lock and a database transaction toguarantee atomicity. A UI update is triggered after the final record is processed,and debug timing information is logged if enabled.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>cname</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Identifier used for the new records.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>label</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Label to associate with each inserted record.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>files</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Array</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">List of files; currently reserved and not utilized by the function.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>originalCname</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Original identifier used in the prepared statement query.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line2887">line 2887</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Throws:</h5>
+
+        
+
+<dl>
+    <dt>
+        <div class="param-desc">
+        Propagates any error encountered during the database transaction,                ensuring a rollback to avoid partial insertions.
+        </div>
+    </dt>
+    <dd></dd>
+    <dt>
+        <dl>
+            <dt>
+                Type
+            </dt>
+            <dd>
+                
+<span class="param-type">Error</span>
+
+
+            </dd>
+        </dl>
+    </dt>
+    <dd></dd>
+</dl>
+
+
+    
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    A promise that resolves when the batch insertion completes.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;void></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>await batchInsertRecords("newCampaign", "approved", fileList, "origCampaign");</code></pre>
 
 
 
@@ -1137,7 +1577,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3596">line 3596</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3670">line 3670</a>
     </li></ul></dd>
     
 
@@ -1162,6 +1602,293 @@ Analysis Rate: x real time performance
 
 
 
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="changeInputElement"><span class="type-signature"></span>changeInputElement<span class="signature">(column, element, key, preSelected<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {HTMLElement}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Replaces a target DOM element with a custom input component based on the specified column.For a column value of "label", creates a dark-themed custom select populated with labels obtained from STATE.tagsList.Otherwise, creates an input element with a prefilled value; if the column is "species", adds an event listener to update suggestion lists.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>column</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last">Determines the type of input element to generate ("label" for a custom select, "species" for an input with suggestions, or any other value for a generic input).</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>element</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">HTMLElement</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last">The DOM element to be replaced by the new input component.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>key</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last">A unique identifier used as the new element's ID.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>preSelected</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+|
+
+<span class="param-type">null</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    null
+                
+                </td>
+            
+
+            <td class="description last">The preselected value to populate the input component.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line8456">line 8456</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    The newly created DOM element, either a container with a custom select (for "label") or an input element.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">HTMLElement</span>
+
+
+    </dd>
+</dl>
+
+    
 
 
 
@@ -1297,7 +2024,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line6822">line 6822</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line7131">line 7131</a>
     </li></ul></dd>
     
 
@@ -1358,7 +2085,7 @@ Analysis Rate: x real time performance
     
 
     
-    <h4 class="name" id="checkMembership"><span class="type-signature">(async) </span>checkMembership<span class="signature">(uuid)</span><span class="type-signature"> &rarr; {Promise.&lt;boolean>}</span></h4>
+    <h4 class="name" id="checkMembership"><span class="type-signature"></span>checkMembership<span class="signature">(uuid, MEMBERSHIP_API_ENDPOINT)</span><span class="type-signature"> &rarr; {Promise.&lt;boolean>}</span></h4>
     
 
     
@@ -1366,7 +2093,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Validates membership status for the provided UUID.This asynchronous function sends a POST request to the membership validation endpoint at "https://subscriber.mattkirkland.co.uk/check-uuid" with the given UUID in the request body. It expects a JSON response containing a boolean property "result" that indicates membership status.If the HTTP response status is not successful (i.e., not in the 200-299 range) or if an error occurs during the fetch or response parsing, the function logs the error and throws a new Error.
+    Validates the UUID format and checks membership status by posting to a membership API.The function verifies that the provided `uuid` is in a valid format using an auxiliary check. It theninitiates a POST request to the specified `MEMBERSHIP_API_ENDPOINT` with the UUID in the JSON-formatted request body.An `AbortController` enforces a timeout (using `REQUEST_TIMEOUT_MS`) to cancel the request if it takes too long.If the HTTP response is not successful, an error detailing the response status is thrown.On a successful response, the JSON payload is parsed to determine membership status, returning `true` if the`result` is `true` and `false` otherwise.
 </div>
 
 
@@ -1418,7 +2145,30 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">The UUID to validate against the membership database.</td>
+            <td class="description last">The user's UUID string. Must conform to a valid UUID format.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>MEMBERSHIP_API_ENDPOINT</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The URL of the membership validation API endpoint.</td>
         </tr>
 
     
@@ -1459,7 +2209,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="member.js.html">member.js</a>, <a href="member.js.html#line26">line 26</a>
+        <a href="member.js.html">member.js</a>, <a href="member.js.html#line65">line 65</a>
     </li></ul></dd>
     
 
@@ -1489,7 +2239,7 @@ Analysis Rate: x real time performance
 <dl>
     <dt>
         <div class="param-desc">
-        If the HTTP request fails or an error occurs during response handling.
+        If the UUID format is invalid, the HTTP request fails, or the response status is not OK.
         </div>
     </dt>
     <dd></dd>
@@ -1517,7 +2267,7 @@ Analysis Rate: x real time performance
 
         
 <div class="param-desc">
-    A promise that resolves to true if the membership is confirmed, otherwise false.
+    Promise resolving to `true` if the user is a member, `false` otherwise.
 </div>
 
 
@@ -1541,7 +2291,7 @@ Analysis Rate: x real time performance
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>checkMembership('123e4567-e89b-12d3-a456-426614174000')  .then(isMember => {    if (isMember) {      console.log('User is a member');    } else {      console.log('User is not a member');    }  })  .catch(error => console.error('Error checking membership:', error));</code></pre>
+    <pre class="prettyprint"><code>// Example usage:checkMembership("123e4567-e89b-12d3-a456-426614174000", "https://api.example.com/membership")  .then(isMember => console.log("Membership status:", isMember))  .catch(error => console.error("Error:", error));</code></pre>
 
 
 
@@ -1658,7 +2408,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="database.js.html">database.js</a>, <a href="database.js.html#line116">line 116</a>
+        <a href="database.js.html">database.js</a>, <a href="database.js.html#line117">line 117</a>
     </li></ul></dd>
     
 
@@ -1773,7 +2523,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line513">line 513</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line517">line 517</a>
     </li></ul></dd>
     
 
@@ -1934,7 +2684,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="database.js.html">database.js</a>, <a href="database.js.html#line148">line 148</a>
+        <a href="database.js.html">database.js</a>, <a href="database.js.html#line149">line 149</a>
     </li></ul></dd>
     
 
@@ -2419,7 +3169,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line4978">line 4978</a>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line5152">line 5152</a>
     </li></ul></dd>
     
 
@@ -2612,7 +3362,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line6854">line 6854</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line7163">line 7163</a>
     </li></ul></dd>
     
 
@@ -2661,6 +3411,171 @@ Analysis Rate: x real time performance
     
 
 
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="createDateClearButton"><span class="type-signature"></span>createDateClearButton<span class="signature">(element, picker)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Appends a clear date filter button to the specified UI element.The function creates a clickable span styled as a "cancel" icon that, when activated,clears the date selection using the provided picker instance. Upon clicking the button,the date picker is cleared and the original date filter UI is restored in the element.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>element</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">HTMLElement</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The container element that displays the date filter.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>picker</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The date picker instance with a clear() method to remove the active date filter.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line5800">line 5800</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// Assuming dateFilterElement is a valid HTMLElement and datePicker is a date picker instance:createDateClearButton(dateFilterElement, datePicker);</code></pre>
 
 
 
@@ -2907,7 +3822,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1744">line 1744</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1759">line 1759</a>
     </li></ul></dd>
     
 
@@ -3013,7 +3928,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line474">line 474</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line478">line 478</a>
     </li></ul></dd>
     
 
@@ -3454,7 +4369,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line2120">line 2120</a>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line2251">line 2251</a>
     </li></ul></dd>
     
 
@@ -3779,7 +4694,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1263">line 1263</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1278">line 1278</a>
     </li></ul></dd>
     
 
@@ -3916,7 +4831,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line935">line 935</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line950">line 950</a>
     </li></ul></dd>
     
 
@@ -4118,7 +5033,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3236">line 3236</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3313">line 3313</a>
     </li></ul></dd>
     
 
@@ -4231,7 +5146,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1982">line 1982</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line2002">line 2002</a>
     </li></ul></dd>
     
 
@@ -4256,6 +5171,288 @@ Analysis Rate: x real time performance
 
 
 
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="generateBirdOptionList"><span class="type-signature"></span>generateBirdOptionList<span class="signature">(options)</span><span class="type-signature"> &rarr; {string}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Generates an HTML string for a bird species selection dropdown.Constructs a select element based on the provided options. When options.store is "allSpecies", a floating form-select is created with either a search prompt or a preselected species from the global LABELS. Otherwise, a basic select element is built using the species data from options.rows, with the currently active species (from STATE.chart.species) marked as selected.Also updates the inner HTML of the element with ID "species-search-label" using localized text.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Options to configure the species option list.
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>store</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Determines the type of select element to generate. Use "allSpecies" to render all species with an optional preselection.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>rows</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Array.&lt;Object></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Array of species objects; each must contain a "cname" property used for option values.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>selected</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Optionally, the species name to preselect when options.store is "allSpecies".</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line2763">line 2763</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    HTML string representing the constructed select element with bird species options.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">string</span>
+
+
+    </dd>
+</dl>
+
+    
 
 
 
@@ -4319,7 +5516,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line4057">line 4057</a>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line4228">line 4228</a>
     </li></ul></dd>
     
 
@@ -4546,7 +5743,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1051">line 1051</a>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1177">line 1177</a>
     </li></ul></dd>
     
 
@@ -4705,7 +5902,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line966">line 966</a>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1092">line 1092</a>
     </li></ul></dd>
     
 
@@ -4741,6 +5938,165 @@ Analysis Rate: x real time performance
     
 
     
+    <h4 class="name" id="getFilteredBirds"><span class="type-signature"></span>getFilteredBirds<span class="signature">(search)</span><span class="type-signature"> &rarr; {Array.&lt;{cname: string, sname: string, styled: string}>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Filters and sorts bird labels based on a search query.This function processes a global collection of bird labels by performing a case-insensitive filter based on the provided search string.Each matching label, originally in the format "sname_cname", is split and reversed to yield the common name (`cname`) and the scientific name (`sname`).The returned object includes a `styled` property that formats these names into an HTML string with `<br/>` and `<i>` tags.The resulting list is sorted alphabetically by the common name using locale comparison based on the configuration.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>search</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">A substring used to filter bird labels; if invalid, an empty array is returned.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line8523">line 8523</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    An array of objects representing filtered and sorted birds.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Array.&lt;{cname: string, sname: string, styled: string}></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
     <h4 class="name" id="getIncludedIDs"><span class="type-signature">(async) </span>getIncludedIDs<span class="signature">(file<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise.&lt;Array.&lt;number>>}</span></h4>
     
 
@@ -4749,7 +6105,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Retrieves a list of included species IDs for filtering results based on the current state and file metadata.This asynchronous helper function returns a list of valid species IDs from the cache (STATE.included).If the cache entry is missing:- For "location" or "nocturnal" listings (when STATE.local is true), it derives the latitude, longitude, and week from the provided file metadata (or from STATE if no file is provided),  constructs a location key, and calls setIncludedIDs to populate the cache.- For other list types, it calls setIncludedIDs if the relevant cache object is not defined.
+    Retrieves a filtered list of species IDs based on the current state and file metadata.For "location" or "nocturnal" lists when local mode is enabled, if a file identifier is provided, the function usesits metadata to extract latitude (lat), longitude (lon), and week information (derived from fileStart if STATE.useWeek is true).The latitude and longitude are concatenated to form a location key. If the corresponding cache entry in STATE.included is missing,setIncludedIDs is invoked to populate it. For other list types, if the cache is absent, setIncludedIDs is called without parameters.
 </div>
 
 
@@ -4813,7 +6169,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">An optional identifier used to look up file metadata in METADATA. If provided, its metadata will be used to extract location (lat, lon) and week data.</td>
+            <td class="description last">Optional key for retrieving file metadata from METADATA. Expected metadata should include properties like `fileStart`, `lat`, and `lon`.</td>
         </tr>
 
     
@@ -4854,7 +6210,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line4683">line 4683</a>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line4857">line 4857</a>
     </li></ul></dd>
     
 
@@ -4883,7 +6239,7 @@ Analysis Rate: x real time performance
 
         
 <div class="param-desc">
-    A promise that resolves to an array of species IDs included in the filtered results.
+    Promise resolving to an array of species IDs included in the current filtered results.
 </div>
 
 
@@ -4964,7 +6320,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3838">line 3838</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3978">line 3978</a>
     </li></ul></dd>
     
 
@@ -5225,7 +6581,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line3371">line 3371</a>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line3542">line 3542</a>
     </li></ul></dd>
     
 
@@ -5266,6 +6622,191 @@ Analysis Rate: x real time performance
     <dd>
         
 <span class="param-type">Promise.&lt;integer></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="getRowFromStart"><span class="type-signature"></span>getRowFromStart<span class="signature">(table, start)</span><span class="type-signature"> &rarr; {number|undefined}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Retrieves the index of a table row whose associated start time matches a specified value.Iterates over the rows of an HTML table, extracting the start time from each row's "name" attribute.The "name" attribute is expected to be a string with values separated by a "|" character, where thesecond element represents the start time. If the "name" attribute is absent, a default value of 0 is used.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>table</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">HTMLTableElement</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The table element containing rows to search.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>start</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The target start time to match against the row's parsed start time.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line4426">line 4426</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    The index of the first row with a matching start time, or undefined if no match is found.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">number</span>
+|
+
+<span class="param-type">undefined</span>
 
 
     </dd>
@@ -5335,7 +6876,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line4085">line 4085</a>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line4256">line 4256</a>
     </li></ul></dd>
     
 
@@ -5477,7 +7018,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1450">line 1450</a>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1581">line 1581</a>
     </li></ul></dd>
     
 
@@ -5539,7 +7080,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Handles a key down event by triggering a corresponding global action if available.If debugging is enabled, logs the pressed key. The function checks if the pressed keyexists in the GLOBAL_ACTIONS mapping, and if so, it hides the context menu and determinesthe active modifier key (Shift, Control, Alt, or none). It then tracks the key press eventusing the trackEvent function and invokes the corresponding global action callback with the event.
+    Responds to keydown events by dispatching configured global actions.Logs the pressed key when debugging is enabled. If the pressed key exists in the global actions mapping,hides the context menu, determines the active modifier key (Shift, Control, or Alt; defaults to "no"),tracks the key press event with its modifier via a tracking function, and executes the corresponding action callback.If the key is not mapped, invokes the fallback handler for number keys.
 </div>
 
 
@@ -5632,7 +7173,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3201">line 3201</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3276">line 3276</a>
     </li></ul></dd>
     
 
@@ -5677,6 +7218,569 @@ Analysis Rate: x real time performance
     
 
 
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="handleKeyDownDeBounce"><span class="type-signature"></span>handleKeyDownDeBounce<span class="signature">(e)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Debounces keydown event processing for non-interactive elements.Prevents the default behavior of keydown events when they do not originate froman HTMLInputElement, HTMLTextAreaElement, or CustomSelect. The debounced call delaysthe execution of the keydown handler by 100 milliseconds using a unique identifier ("keyhandler").
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>e</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">KeyboardEvent</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The keydown event triggered by the user.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3250">line 3250</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="handleMessage"><span class="type-signature">(async) </span>handleMessage<span class="signature">(e)</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Dispatches worker messages based on the provided action in the event data.Processes an event whose data payload includes an `action` field and associated parameters.If the action is not "_init_" and initialization is pending, waits for the initialization to complete.Depending on the action, the function handles tasks such as initializing models, processing audio files,managing thread pools, updating database records, handling tag operations, and more. Specific actions include:- "_init_": Initializes the environment by setting up the list worker, launching the model, and updating state.- "abort": Aborts ongoing processes.- "analyse": Initiates audio analysis; validates prediction workers and handles alerts if not ready.- "change-batch-size": Adjusts the batch size used by prediction workers.- "change-threads": Modifies the number of active prediction worker threads.- "change-mode": Switches the operational mode.- "chart": Processes a chart data request.- "check-all-files-saved": Verifies that files are correctly saved in the database.- "convert-dataset": Converts dataset specifications from existing formats.- "create-dataset": Creates a dataset with inclusion identifiers.- "delete": Handles deletion operations.- "delete-species": Removes specified species records.- "export-results": Exports the detection results.- "file-load-request": Loads an audio file, clears memory records if necessary, and switches modes based on file state.- "filter": Applies filters to the result set, refreshes summaries, and updates inclusion identifiers.- "get-detected-species-list": Retrieves a list of detected species.- "get-valid-species": Fetches valid species for a given file.- "get-locations": Retrieves location details from the database for a specific file.- "get-tags": Retrieves a list of tags from the disk database.- "delete-tag": Deletes a tag, handling any errors by generating an alert.- "update-tags": Updates the tag list in the database and refreshes the UI with the new set of tags.- "get-valid-files-list": Scans and returns a list of valid files.- "insert-manual-record": Inserts a record manually and updates summaries and results accordingly.- "load-model": Loads a new predictive model, aborting current processing if necessary.- "post": Uploads processed audio data.- "purge-file": Deletes a specified file.- "compress-and-organise": Compresses and reorganises audio files.- "relocated-file": Updates file paths after relocation.- "save": Saves audio processing data along with associated metadata.- "save2db": Persists in-memory database changes to disk.- "set-custom-file-location": Sets a custom location for file storage.- "update-buffer": Reloads an audio file to update its buffer.- "update-file-start": Adjusts the starting point for audio file processing.- "update-list": Updates the internal list and custom labels, optionally refreshing summaries and results.- "update-locale": Updates locale settings and labels.- "update-summary": Refreshes the summary data.- "update-state": Updates the overall application state including paths and thresholds.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>e</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The message event object.
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>data</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The payload containing the action and additional parameters.
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>action</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The command indicating which action to execute.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line609">line 609</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    Resolves once the message has been processed.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;void></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// Example message event for initiating analysis on an audio file:const msgEvent = {  data: {    action: "analyse",    file: "audio_sample.mp3",    // ...other parameters required for analysis  }};handleMessage(msgEvent);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="hexToUtf8"><span class="type-signature"></span>hexToUtf8<span class="signature">(hex)</span><span class="type-signature"> &rarr; {string}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Converts a hexadecimal string into a UTF-8 string.Splits the hex string into two-character segments, converts each segment to its corresponding character,and concatenates the characters to form the decoded string.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>hex</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The hexadecimal string to convert. Must consist of an even number of hexadecimal digits.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line8367">line 8367</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    The resulting string after decoding the hexadecimal input.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">string</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>hexToUtf8("48656c6c6f") // returns "Hello"</code></pre>
 
 
 
@@ -5738,7 +7842,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line647">line 647</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line652">line 652</a>
     </li></ul></dd>
     
 
@@ -5782,7 +7886,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Initializes and configures the RegionsPlugin for audio region management.This function destroys any previously initialized RegionsPlugin instance and creates a new onewith the following configuration:- Enables dragging of regions.- Limits the maximum number of regions to 100.- Uses the default region color from STATE.regionColour.Additionally, it sets up event listeners for region interactions:- "region-clicked": Hides the context menu, updates the active region and audio playback time,  and removes regions based on key modifiers:  - Shift key: Removes all regions with the default region color.  - Ctrl/Cmd key: Removes the clicked region.- "region-created": Sets a newly created region as the active region if it lacks a label (content)  or if its start time matches that of the current active region.- "region-update": Clears the region's label content and updates it as the active region.
+    Initializes and configures audio region management using the RegionsPlugin.Destroys any existing RegionsPlugin instance and creates a new instance with regions that are draggable,a maximum limit of 100 regions, and a default color defined by STATE.regionColour.Registers event listeners for region interactions:- "region-clicked": Hides the context menu, updates the active region, and seeks playback to the region's start.  If the Shift key is pressed, all regions with the default color are removed; if the Ctrl/Cmd key is pressed,  the clicked region is removed.- "region-created": Marks a new region as active if it has no label (content) or its start time matches the current active region.- "region-update": Clears the region's label and sets the updated region as active.
 </div>
 
 
@@ -5826,7 +7930,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3320">line 3320</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3392">line 3392</a>
     </li></ul></dd>
     
 
@@ -5855,7 +7959,7 @@ Analysis Rate: x real time performance
 
         
 <div class="param-desc">
-    The initialized RegionsPlugin instance.
+    The new RegionsPlugin instance.
 </div>
 
 
@@ -5867,6 +7971,165 @@ Analysis Rate: x real time performance
     <dd>
         
 <span class="param-type">Object</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="isValidUUID"><span class="type-signature"></span>isValidUUID<span class="signature">(uuid)</span><span class="type-signature"> &rarr; {boolean}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Validates that a given string conforms to the version 4 UUID format.Checks the string against the pattern: xxxxxxxx-xxxx-4xxx-[89ab]xxx-xxxxxxxxxxxx,where the UUID is case-insensitive.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>uuid</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The UUID string to validate.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="member.js.html">member.js</a>, <a href="member.js.html#line38">line 38</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    True if the string is a valid version 4 UUID; otherwise, false.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">boolean</span>
 
 
     </dd>
@@ -6249,7 +8512,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1586">line 1586</a>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1717">line 1717</a>
     </li></ul></dd>
     
 
@@ -6448,7 +8711,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line409">line 409</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line413">line 413</a>
     </li></ul></dd>
     
 
@@ -6475,6 +8738,334 @@ Analysis Rate: x real time performance
 
 
 
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="loadDB"><span class="type-signature">(async) </span>loadDB<span class="signature">(path)</span><span class="type-signature"> &rarr; {Promise.&lt;boolean>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Loads and configures the SQLite database for managing audio records and metadata.Retrieves default model labels either from a remote file (if the model is "birdnet") or from a local config file,appends a default "Unknown Sp." label, and determines the number of labels to construct the database filename.If the database file does not exist, a new database is created via `createDB`. Otherwise, an existing database is opened,and various PRAGMA settings (e.g., foreign keys, journal mode, busy timeout) are enforced. The function also ensures thatnecessary indices are created and pending database schema migrations (e.g., for tags and reviewed columns) are applied.Finally, it updates the global LABELS variable by fetching labels in the preferred locale from the database and sends a UImessage if records are present.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>path</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The directory path where the database file resides or will be created.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line364">line 364</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    A promise that resolves to true when the database is successfully loaded and configured.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;boolean></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>loadDB('/data/db')  .then(success => console.log('Database loaded:', success))  .catch(error => console.error('Error loading database:', error));</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="localiseUI"><span class="type-signature">(async) </span>localiseUI<span class="signature">(locale)</span><span class="type-signature"> &rarr; {Promise.&lt;(Object|undefined)>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Updates UI elements with localized text based on the provided locale.Asynchronously fetches a localization JSON file corresponding to the given locale, falling back to English if necessary. Updates DOM elements—including text content, data attributes, popover titles, form labels, button text, option values, and carousel items—with the localized strings retrieved from the JSON file and other i18n objects. If the JSON file for the specified locale is not available, the function logs a warning and returns without modifying the UI.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>locale</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Locale code (e.g., "en", "de_CA"). Any substring following an underscore is removed before fetching the JSON file.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="i18n.js.html">i18n.js</a>, <a href="i18n.js.html#line2995">line 2995</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    A promise that resolves to the localization data object if successfully fetched and applied, or undefined if the localization file is not found.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;(Object|undefined)></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>localiseUI('es_MX')  .then((localisationData) => {    if (localisationData) {      console.log('UI updated with localized strings.');    } else {      console.log('Localization file not found; UI remains unmodified.');    }  })  .catch(error => console.error('Localization error:', error));</code></pre>
 
 
 
@@ -6585,7 +9176,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1482">line 1482</a>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1613">line 1613</a>
     </li></ul></dd>
     
 
@@ -6698,7 +9289,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line7941">line 7941</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line8282">line 8282</a>
     </li></ul></dd>
     
 
@@ -6862,7 +9453,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1541">line 1541</a>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1672">line 1672</a>
     </li></ul></dd>
     
 
@@ -6921,6 +9512,192 @@ Analysis Rate: x real time performance
 </dl>
 
     
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="onAnalysisComplete"><span class="type-signature"></span>onAnalysisComplete<span class="signature">(options)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Finalizes audio analysis by updating application state, re-enabling UI settings,and logging diagnostic metrics and tracking events.Resets the prediction flag, restores settings, updates analysis state,and conditionally enables menu items based on available disk records.Hides the progress indicator and, when not in quiet mode, calculatesthe analysis duration and rate for telemetry. In non-quiet mode, recordsthese metrics through event tracking and displays a completion notification.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Options for analysis completion.
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>quiet</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Suppresses diagnostic tracking and notifications if true.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line4468">line 4468</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -7258,7 +10035,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line892">line 892</a>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1018">line 1018</a>
     </li></ul></dd>
     
 
@@ -7358,7 +10135,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Initializes the application once the audio model is ready.Upon invocation, this function performs several startup tasks:- Sets the flag indicating that the audio model is ready.- If an audio file is loaded, enables the "analyse" menu item; if multiple files  are open, also enables "analyseAll" and "reanalyseAll" menu items.- If there is an active audio region, enables the "analyseSelection" menu item.- Calculates the warm-up time and logs it in the DIAGNOSTICS object.- Logs the application's launch time (if this is the first load).- Marks the application as loaded and hides the loading screen.- For new users in non-test environments, initiates the tour if it has not been seen.- Processes any queued files received via the operating system.**Side Effects:**Modifies global state, updates the DOM (e.g., hiding the loading screen), logs diagnosticinformation, and triggers additional actions (e.g., starting the tour, processing OS file queues).
+    Initializes application state after the audio model becomes ready.Sets the model ready flag and updates UI elements based on current audio assets:- Enables the "analyse" menu item if an audio file is loaded, and additionally "analyseAll" and "reanalyseAll" if multiple files are open.- Enables the "analyseSelection" menu item when an active audio region exists.- Calculates the warm-up time and logs it in the DIAGNOSTICS object.- Logs the application launch time if this is the first load.- Marks the application as loaded and hides the loading screen.- Requests tag data from the worker.- Initiates the user tour for new users in non-testing environments.- Processes any queued operating system file inputs.
 </div>
 
 
@@ -7471,7 +10248,276 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3981">line 3981</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line4116">line 4116</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">void</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="onResultsComplete"><span class="type-signature"></span>onResultsComplete<span class="signature">(options<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {void}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Finalizes result processing after the database has sent the last result.Updates analysis state by disabling the predicting flag and re-enabling settings, replaces the result tablewith the latest content cloned from a buffer, resets the buffer's content, and ensures that the designated rowin the results table is activated. The active row is selected based on the following priority:- If an `active` index is provided, uses that row; if not found (which can occur after an edit), selects the last row  matching daytime or nighttime criteria.- If a `select` value is provided, determines the row index via a helper function and activates that row.- Otherwise, attempts to activate a row marked with the "table-active" class, or defaults to the first table row.Once the active row is determined, it simulates a click on that row and scrolls it into view, hides the progress indicator,and updates the filename panel.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    {}
+                
+                </td>
+            
+
+            <td class="description last">Options for handling result activation.
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>active</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Specific row index to activate in the result table.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>select</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">*</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Value used by a helper function to determine which row to activate.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line4375">line 4375</a>
     </li></ul></dd>
     
 
@@ -7577,7 +10623,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line3808">line 3808</a>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line3976">line 3976</a>
     </li></ul></dd>
     
 
@@ -7778,7 +10824,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line4569">line 4569</a>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line4744">line 4744</a>
     </li></ul></dd>
     
 
@@ -7917,7 +10963,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line5829">line 5829</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line6093">line 6093</a>
     </li></ul></dd>
     
 
@@ -7962,6 +11008,151 @@ Analysis Rate: x real time performance
     
 
 
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="recordUpdate"><span class="type-signature"></span>recordUpdate<span class="signature">(key)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Updates the active record based on the key assignment configuration.When an assignment exists for the provided key, extracts record details from the currentlyselected row, modifies the appropriate field (species, label, or comment) based on the assignment,and calls the record insertion routine with the updated values. If no active row is selected,logs an informational message and aborts the update.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>key</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+|
+
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Identifier used to retrieve the key assignment (appended to "key" for lookup) from the configuration.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3709">line 3709</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// Assuming a key assignment exists for key "1" in config.keyAssignment:recordUpdate(1);</code></pre>
 
 
 
@@ -8023,7 +11214,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line686">line 686</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line691">line 691</a>
     </li></ul></dd>
     
 
@@ -8077,6 +11268,395 @@ Analysis Rate: x real time performance
     
 
     
+    <h4 class="name" id="renderResult"><span class="type-signature">(async) </span>renderResult<span class="signature">(options)</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Renders a detection result into the results table while managing table headers, pagination, and UI updates.For the first result (index ≤ 1), clears or resets the results table based on the selection mode and sets up table headerswith localized labels. When handling non-database results beyond the configured limit, the function adds pagination oraborts further processing. For valid detection results, it formats timestamps and positions for display, constructs thecorresponding table row including species details, call counts, labels, comments, and review status, and schedules UIupdates to incorporate the new entry.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>options</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Options for rendering the result.
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>index</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    1
+                
+                </td>
+            
+
+            <td class="description last">Sequential index of the detection result.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>result</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    {}
+                
+                </td>
+            
+
+            <td class="description last">Detection result data containing properties such as timestamp, position, active,  sname, cname, score, label, tagID, comment, end, count, callCount, isDaylight, and reviewed.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>file</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">*</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last">The audio file reference associated with the detection.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>isFromDB</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    false
+                
+                </td>
+            
+
+            <td class="description last">Flag indicating whether the result originates from the database.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>selection</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    false
+                
+                </td>
+            
+
+            <td class="description last">Flag indicating if the rendering is for a selection-specific view.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line4684">line 4684</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+    <dt class="tag-todo">To Do:</dt>
+    <dd class="tag-todo">
+        <ul>
+            <li>Display each detection as a distinct region on the spectrogram.</li>
+        </ul>
+    </dd>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    A promise that resolves once the result has been rendered and the UI updated.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;void></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
     <h4 class="name" id="resultClick"><span class="type-signature">(async) </span>resultClick<span class="signature">(e)</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
     
 
@@ -8085,7 +11665,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Handles the click event on a result row in the audio analysis UI.This function asynchronously processes user clicks on table rows representing audio analysis results.It first verifies that all audio regions have been fully created and an audio file is loaded. It then extractsfile details, start and end times, and label information from the clicked row's "name" attribute, and makes the row active.The corresponding audio region is then loaded using these extracted details. If the event target has a "circle" class,the function waits until the audio file is fully loaded before obtaining the selection results.
+    Processes click events on audio analysis result rows.Validates that audio regions are fully established and an audio file is loaded before proceeding. Extracts the file name,start time, end time, and label from the clicked row's "name" attribute (expected in the format "file|start|end|unused|label"),sets the row as active by updating its CSS class, and loads the corresponding audio region. If the clicked target has a "circle"class, waits until the audio file is completely loaded before obtaining selection results.
 </div>
 
 
@@ -8137,7 +11717,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">The click event object triggered by the user interaction.</td>
+            <td class="description last">The click event triggered by the user.</td>
         </tr>
 
     
@@ -8178,7 +11758,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1794">line 1794</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1808">line 1808</a>
     </li></ul></dd>
     
 
@@ -8207,7 +11787,7 @@ Analysis Rate: x real time performance
 
         
 <div class="param-desc">
-    A promise that resolves when the click event processing is complete.
+    A promise that resolves once the event processing is complete.
 </div>
 
 
@@ -8231,7 +11811,7 @@ Analysis Rate: x real time performance
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>// Assuming a table row element with the "name" attribute formatted as "file|start|end|_|label":// &lt;tr name="audio.mp3|10|20|unused|Speech">...&lt;/tr>// Attaching the event handler:document.querySelector('tr').addEventListener('click', resultClick);</code></pre>
+    <pre class="prettyprint"><code>// Assuming a table row element with the following "name" attribute:// &lt;tr name="audio.mp3|10|20|unused|Speech">...&lt;/tr>// Attach the event handler as follows:document.querySelector('tr').addEventListener('click', resultClick);</code></pre>
 
 
 
@@ -8342,7 +11922,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line806">line 806</a>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line932">line 932</a>
     </li></ul></dd>
     
 
@@ -8575,7 +12155,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1720">line 1720</a>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1851">line 1851</a>
     </li></ul></dd>
     
 
@@ -8829,7 +12409,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3277">line 3277</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3354">line 3354</a>
     </li></ul></dd>
     
 
@@ -8861,6 +12441,600 @@ Analysis Rate: x real time performance
     <h5>Example</h5>
     
     <pre class="prettyprint"><code>const region = {  start: 15,  end: 30,  content: { innerText: 'Bird Call' }};setActiveRegion(region);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="setActiveRow"><span class="type-signature"></span>setActiveRow<span class="signature">(start)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Marks the row corresponding to the specified start time as active in the result table.Iterates through all table rows within the result table and checks the "name" attribute, which is expectedto be a pipe-separated string containing file identifier, start time, and additional details. When a row is foundwhere the file matches the current file (STATE.currentFile) and the start time matches the provided value, anypreviously active row (if different) is deactivated, the target row is activated by adding the 'table-active'class, and the row is smoothly scrolled into view.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>start</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The start time to match for activating the corresponding table row.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1853">line 1853</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="setClickedIndex"><span class="type-signature"></span>setClickedIndex<span class="signature">(target)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Stores the row index of the table row associated with the clicked element.Traverses upward from the provided element to locate the nearest ancestor <tr> element,then assigns its rowIndex to the global variable clickedIndex. It is assumed that thetarget element is within a table row; otherwise, the function may produce errors.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>target</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">HTMLElement</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The DOM element that triggered the event.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line4843">line 4843</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="setKeyAssignment"><span class="type-signature"></span>setKeyAssignment<span class="signature">(inputEL, key)</span><span class="type-signature"> &rarr; {void}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Assigns a key binding configuration based on user input.Retrieves the column identifier from the DOM element with the ID matching `${key}-column` and uses it to update the global key assignment stored in `config.keyAssignment`. The function trims the value from the input element and sets it to `null` if empty. It marks the assignment as active when a non-empty value is provided and dynamically enables or disables the input element based on the presence of a valid column.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>inputEL</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">HTMLInputElement</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The input element that triggered the change event.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>key</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The identifier used to locate the corresponding column element and update the key assignment configuration.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line8383">line 8383</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">void</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="setKeyAssignmentUI"><span class="type-signature"></span>setKeyAssignmentUI<span class="signature">(keyAssignments)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Update key assignment UI elements based on the provided configuration.Iterates over each key in the {@code keyAssignments} object, updating the correspondingDOM input elements with their assigned value and column information. If the key's valueis not "unused", the input is enabled. Additionally, for key assignments with a column of"label" or "species", the input element is further processed for specialized handling.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>keyAssignments</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object.&lt;string, {value: string, column: string}></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">An object mapping element IDs to their key assignment configurations. Each configuration object  should contain:  - {@code value}: The assigned key value. Use "unused" to indicate no assignment.  - {@code column}: The column type, typically "label" or "species", affecting further UI processing.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line8433">line 8433</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>const keyAssignments = {  "key1": { value: "A", column: "label" },  "key2": { value: "unused", column: "species" }};setKeyAssignmentUI(keyAssignments);</code></pre>
 
 
 
@@ -8984,7 +13158,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1762">line 1762</a>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1893">line 1893</a>
     </li></ul></dd>
     
 
@@ -9029,6 +13203,394 @@ Analysis Rate: x real time performance
     
 
 
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="showDatePicker"><span class="type-signature"></span>showDatePicker<span class="signature">()</span><span class="type-signature"> &rarr; {void}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Renders a date and time picker form for updating the start time of the current audio file.The form is dynamically created and appended to the filename panel, featuring:- A label and a datetime-local input, with the input's value initialized from STATE.fileStart and its maximum value set to the current datetime.- A submit button that, when activated, converts the selected datetime into a millisecond timestamp, sends an update message to the worker, logs the change, resets analysis results, and updates STATE.fileStart.- A cancel button that removes the form without making any changes.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line852">line 852</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">void</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="showRecordEntryForm"><span class="type-signature">(async) </span>showRecordEntryForm<span class="signature">(mode, batch)</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Populates and displays the record entry modal for updating or adding audio record details.Retrieves species information from either the batch selector or the active audio region and auto-populatesrelated fields such as call count and comment when an active record exists. Adjusts the UI based on batch modeby toggling visibility of certain elements, updates labels based on localization settings, and initializes a custom label selector with available tags from the application state. Focus is set to the bird autocomplete input when the modal is shown.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>mode</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Identifier for the record update mode, used to set the DB mode field.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>batch</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">If true, applies batch mode settings by using batch-specific species selection and hiding certain form elements.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line7317">line 7317</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    Resolves once the record entry form is fully populated and the modal is displayed.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;void></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Examples</h5>
+    
+    <pre class="prettyprint"><code>// Open the record entry form for a single record updateshowRecordEntryForm('update', false);</code></pre>
+
+    <pre class="prettyprint"><code>// Open the record entry form in batch mode for multiple recordsshowRecordEntryForm('add', true);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="showSummarySortIcon"><span class="type-signature"></span>showSummarySortIcon<span class="signature">()</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Update the sort icon in the summary table to reflect the current sort order.Extracts the sort column and direction from the STATE.summarySortOrder string (formatted as "column direction"),determines the corresponding icon element by constructing its ID ("summary-{column}-icon"),and then hides all sort icons in the summary table before displaying the relevant icon.The icon is styled with the "flipped" class when the sort direction is "ASC", and without it for other directions.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line5501">line 5501</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// If STATE.summarySortOrder is "duration ASC", then the sort icon for "duration" will be shown with the "flipped" class.showSummarySortIcon();</code></pre>
 
 
 
@@ -9306,7 +13868,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line2688">line 2688</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line2724">line 2724</a>
     </li></ul></dd>
     
 
@@ -9360,6 +13922,308 @@ Analysis Rate: x real time performance
     
 
     
+    <h4 class="name" id="speciesFilter"><span class="type-signature"></span>speciesFilter<span class="signature">(e)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Toggles the species filter based on user interaction with the summary table.Validates the event against non-interactive elements and current analysis state before proceeding.If the selected row is already highlighted (indicating an active filter), the highlight is removed;otherwise, all highlighted rows are cleared, the current row is marked, and the corresponding speciesis extracted from the clicked element. In explore mode, the species value is set in the bird list display.Subsequently, the function refreshes the results filtering and resets the UI components without clearingthe summary, pagination, or result listings.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>e</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Event</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The DOM event triggered by the user's click on a table row.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line4634">line 4634</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// Apply species filtering when a table row is clicked.speciesFilter(event);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="syncConfig"><span class="type-signature"></span>syncConfig<span class="signature">(config, defaultConfig)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Synchronizes a configuration object with a default configuration.Removes keys from the configuration that are not found in the default configuration,and adds any missing keys from the default configuration. For keys with values thatare both objects in the configuration and the default configuration, the merge isperformed recursively, except when the key is "keyAssignment", which is left untouched.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>config</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The configuration object to be synchronized (modified in place).</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>defaultConfig</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The default configuration serving as the reference.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line2096">line 2096</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
     <h4 class="name" id="trackEvent"><span class="type-signature"></span>trackEvent<span class="signature">(uuid, event, action, name<span class="signature-attributes">opt</span>, value<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h4>
     
 
@@ -9368,7 +14232,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Tracks an event for Matomo analytics.This function constructs and sends a GET request to the Matomo tracking API to log an event. Itnormalizes the event name by replacing any occurrence of "result" followed by digits with simply "result".Additionally, it adjusts the action parameter by converting a single space to "Spacebar" and a plus signto "Plus". The request URL incorporates the current time, site identification, user identifier, and event details.If the fetch response is not OK, an error is thrown and subsequently logged.
+    Logs an event to the Matomo analytics system.Constructs and dispatches an asynchronous GET request to the Matomo tracking API using the provided event details.The event name is sanitized by replacing any digits following "result" with an empty string, and the action parameteris adjusted: a single space converts to "Spacebar" and a plus sign converts to "Plus". The request URL embeds thecurrent time (hours, minutes, seconds), site ID, visitor UUID, event category, action, and optional event name and value.The function initiates an asynchronous fetch; if the network response is not OK, an error is thrown internally andthen logged to the console.
 </div>
 
 
@@ -9430,7 +14294,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">The unique identifier of the visitor.</td>
+            <td class="description last">Unique identifier of the visitor.</td>
         </tr>
 
     
@@ -9461,7 +14325,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">The event category.</td>
+            <td class="description last">Event category for classification.</td>
         </tr>
 
     
@@ -9492,7 +14356,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">The event action; may be normalized to "Spacebar" or "Plus" for specific inputs.</td>
+            <td class="description last">Event action; " " becomes "Spacebar" and "+" becomes "Plus".</td>
         </tr>
 
     
@@ -9525,7 +14389,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">The event name; numerical identifiers in "result" strings are reduced.</td>
+            <td class="description last">Optional event name; any digits following "result" are removed.</td>
         </tr>
 
     
@@ -9561,7 +14425,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">An optional value associated with the event.</td>
+            <td class="description last">Optional event value providing additional context.</td>
         </tr>
 
     
@@ -9602,7 +14466,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="tracking.js.html">tracking.js</a>, <a href="tracking.js.html#line22">line 22</a>
+        <a href="tracking.js.html">tracking.js</a>, <a href="tracking.js.html#line27">line 27</a>
     </li></ul></dd>
     
 
@@ -9629,6 +14493,11 @@ Analysis Rate: x real time performance
 
 
 
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>trackEvent('user-123', 'navigation', ' ', 'result45', 100);</code></pre>
 
 
 
@@ -9739,7 +14608,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line3150">line 3150</a>
+        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line3321">line 3321</a>
     </li></ul></dd>
     
 
@@ -10061,7 +14930,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line439">line 439</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line443">line 443</a>
     </li></ul></dd>
     
 
@@ -10119,6 +14988,189 @@ Analysis Rate: x real time performance
     
 
     
+    <h4 class="name" id="updateSuggestions"><span class="type-signature"></span>updateSuggestions<span class="signature">(input, element, preserveInput)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Updates the suggestions list and translucent completion overlay based on the input search query.Uses the lowercase value of the provided input element to filter bird suggestions via the globalgetFilteredBirds function. If the search query is shorter than 2 characters, the suggestion elementis hidden. Otherwise, a list of matching suggestions is created where each suggestion, when clicked,updates the selected bird display (the element with ID "selected-bird"), conditionally modifies theinput value based on the preserveInput flag, dispatches a change event on the input, and hides thesuggestion element.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>input</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">HTMLInputElement</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The input element containing the current search query.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>element</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">HTMLElement</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The DOM element that displays the list of filtered suggestions.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>preserveInput</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Determines whether to keep the input’s value after a suggestion is selected.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line8551">line 8551</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
     <h4 class="name" id="zoomSpec"><span class="type-signature"></span>zoomSpec<span class="signature">(direction)</span><span class="type-signature"> &rarr; {void}</span></h4>
     
 
@@ -10127,7 +15179,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Zooms in or out of the audio spectrogram by adjusting the display windowand repositioning the playhead relative to the current audio playback time.When zooming in, the window length is halved, but not reduced below a 1.5-second threshold.When zooming out, the window length is doubled, capped at a maximum of 100 seconds or the file's duration.Active audio regions are updated to align with the new window, ensuring consistency in user selections.If no audio file is loaded, the function exits without performing any operation.
+    Adjusts the spectrogram zoom level and repositions the playhead relative to the audio timeline.Halves the display window during a "zoomIn" operation—without reducing the window below 1.5 seconds—and doubles it during a "zoomOut" operation, capped at 100 seconds or the total duration of the file.The window offset is recalculated to keep the playhead at the same absolute position within the audio,and any active audio regions are updated to remain consistent with the new window.No operation is performed if no audio file is loaded or if the audio regions have not been fully initialized.
 </div>
 
 
@@ -10182,7 +15234,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">Specifies the zoom operation. If a string, it must be either "zoomIn" or "zoomOut".If an Event, the function extracts the button ID from the event's target element.</td>
+            <td class="description last">A zoom command either as a string ("zoomIn" or "zoomOut") for direct calls,or as an Event from which the command is extracted using the event target's closest button ID.</td>
         </tr>
 
     
@@ -10223,7 +15275,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line727">line 727</a>
+        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line732">line 732</a>
     </li></ul></dd>
     
 
@@ -10272,9 +15324,9 @@ Analysis Rate: x real time performance
 
     <h5>Examples</h5>
     
-    <pre class="prettyprint"><code>// Zoom in directly using a string command:zoomSpec("zoomIn");</code></pre>
+    <pre class="prettyprint"><code>// Programmatically zoom in:zoomSpec("zoomIn");</code></pre>
 
-    <pre class="prettyprint"><code>// Trigger zooming out via a button click event:buttonElement.addEventListener("click", zoomSpec);</code></pre>
+    <pre class="prettyprint"><code>// Zoom out via a button click:buttonElement.addEventListener("click", zoomSpec);</code></pre>
 
 
 
@@ -10294,13 +15346,13 @@ Analysis Rate: x real time performance
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#LIST_CACHE">LIST_CACHE</a></li><li><a href="global.html#_parseMetadataText">_parseMetadataText</a></li><li><a href="global.html#_updateSpeciesLocale">_updateSpeciesLocale</a></li><li><a href="global.html#addDays">addDays</a></li><li><a href="global.html#adjustSpecDims">adjustSpecDims</a></li><li><a href="global.html#centreSpec">centreSpec</a></li><li><a href="global.html#checkForRegion">checkForRegion</a></li><li><a href="global.html#checkMembership">checkMembership</a></li><li><a href="global.html#checkpoint">checkpoint</a></li><li><a href="global.html#clearActive">clearActive</a></li><li><a href="global.html#closeDatabase">closeDatabase</a></li><li><a href="global.html#controlFromInput">controlFromInput</a></li><li><a href="global.html#convertFile">convertFile</a></li><li><a href="global.html#createContextMenu">createContextMenu</a></li><li><a href="global.html#createRegion">createRegion</a></li><li><a href="global.html#createTimeline">createTimeline</a></li><li><a href="global.html#extractWaveMetadata">extractWaveMetadata</a></li><li><a href="global.html#fetchAudioBuffer">fetchAudioBuffer</a></li><li><a href="global.html#fetchIssuesByLabel">fetchIssuesByLabel</a></li><li><a href="global.html#filterValidFiles">filterValidFiles</a></li><li><a href="global.html#formatAsBootstrapTable">formatAsBootstrapTable</a></li><li><a href="global.html#formatLabel">formatLabel</a></li><li><a href="global.html#formatRegionTooltip">formatRegionTooltip</a></li><li><a href="global.html#getDetectedSpecies">getDetectedSpecies</a></li><li><a href="global.html#getFileSQLAndParams">getFileSQLAndParams</a></li><li><a href="global.html#getFiles">getFiles</a></li><li><a href="global.html#getIncludedIDs">getIncludedIDs</a></li><li><a href="global.html#getRegion">getRegion</a></li><li><a href="global.html#getResults">getResults</a></li><li><a href="global.html#getValidSpecies">getValidSpecies</a></li><li><a href="global.html#getWorkingFile">getWorkingFile</a></li><li><a href="global.html#handleKeyDown">handleKeyDown</a></li><li><a href="global.html#increaseFFT">increaseFFT</a></li><li><a href="global.html#initRegion">initRegion</a></li><li><a href="global.html#loadAudioFile">loadAudioFile</a></li><li><a href="global.html#loadAudioFileSync">loadAudioFileSync</a></li><li><a href="global.html#locateFile">locateFile</a></li><li><a href="global.html#membershipCheck">membershipCheck</a></li><li><a href="global.html#notifyMissingFile">notifyMissingFile</a></li><li><a href="global.html#onLaunch">onLaunch</a></li><li><a href="global.html#onModelReady">onModelReady</a></li><li><a href="global.html#onSave2DiskDB">onSave2DiskDB</a></li><li><a href="global.html#onUpdateLocale">onUpdateLocale</a></li><li><a href="global.html#playRegion">playRegion</a></li><li><a href="global.html#reduceFFT">reduceFFT</a></li><li><a href="global.html#resultClick">resultClick</a></li><li><a href="global.html#savedFileCheck">savedFileCheck</a></li><li><a href="global.html#sendDetections">sendDetections</a></li><li><a href="global.html#setActiveRegion">setActiveRegion</a></li><li><a href="global.html#setMetadata">setMetadata</a></li><li><a href="global.html#showWindowDetections">showWindowDetections</a></li><li><a href="global.html#t0_warmup">t0_warmup</a></li><li><a href="global.html#trackEvent">trackEvent</a></li><li><a href="global.html#updateFilesBeingProcessed">updateFilesBeingProcessed</a></li><li><a href="global.html#updateSpec">updateSpec</a></li><li><a href="global.html#zoomSpec">zoomSpec</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#LIST_CACHE">LIST_CACHE</a></li><li><a href="global.html#REQUEST_TIMEOUT_MS">REQUEST_TIMEOUT_MS</a></li><li><a href="global.html#_parseMetadataText">_parseMetadataText</a></li><li><a href="global.html#_updateSpeciesLocale">_updateSpeciesLocale</a></li><li><a href="global.html#activateResultFilters">activateResultFilters</a></li><li><a href="global.html#addDays">addDays</a></li><li><a href="global.html#adjustSpecDims">adjustSpecDims</a></li><li><a href="global.html#batchInsertRecords">batchInsertRecords</a></li><li><a href="global.html#centreSpec">centreSpec</a></li><li><a href="global.html#changeInputElement">changeInputElement</a></li><li><a href="global.html#checkForRegion">checkForRegion</a></li><li><a href="global.html#checkMembership">checkMembership</a></li><li><a href="global.html#checkpoint">checkpoint</a></li><li><a href="global.html#clearActive">clearActive</a></li><li><a href="global.html#closeDatabase">closeDatabase</a></li><li><a href="global.html#controlFromInput">controlFromInput</a></li><li><a href="global.html#convertFile">convertFile</a></li><li><a href="global.html#createContextMenu">createContextMenu</a></li><li><a href="global.html#createDateClearButton">createDateClearButton</a></li><li><a href="global.html#createRegion">createRegion</a></li><li><a href="global.html#createTimeline">createTimeline</a></li><li><a href="global.html#extractWaveMetadata">extractWaveMetadata</a></li><li><a href="global.html#fetchAudioBuffer">fetchAudioBuffer</a></li><li><a href="global.html#fetchIssuesByLabel">fetchIssuesByLabel</a></li><li><a href="global.html#filterValidFiles">filterValidFiles</a></li><li><a href="global.html#formatAsBootstrapTable">formatAsBootstrapTable</a></li><li><a href="global.html#formatLabel">formatLabel</a></li><li><a href="global.html#formatRegionTooltip">formatRegionTooltip</a></li><li><a href="global.html#generateBirdOptionList">generateBirdOptionList</a></li><li><a href="global.html#getDetectedSpecies">getDetectedSpecies</a></li><li><a href="global.html#getFileSQLAndParams">getFileSQLAndParams</a></li><li><a href="global.html#getFiles">getFiles</a></li><li><a href="global.html#getFilteredBirds">getFilteredBirds</a></li><li><a href="global.html#getIncludedIDs">getIncludedIDs</a></li><li><a href="global.html#getRegion">getRegion</a></li><li><a href="global.html#getResults">getResults</a></li><li><a href="global.html#getRowFromStart">getRowFromStart</a></li><li><a href="global.html#getValidSpecies">getValidSpecies</a></li><li><a href="global.html#getWorkingFile">getWorkingFile</a></li><li><a href="global.html#handleKeyDown">handleKeyDown</a></li><li><a href="global.html#handleKeyDownDeBounce">handleKeyDownDeBounce</a></li><li><a href="global.html#handleMessage">handleMessage</a></li><li><a href="global.html#hexToUtf8">hexToUtf8</a></li><li><a href="global.html#increaseFFT">increaseFFT</a></li><li><a href="global.html#initRegion">initRegion</a></li><li><a href="global.html#isValidUUID">isValidUUID</a></li><li><a href="global.html#loadAudioFile">loadAudioFile</a></li><li><a href="global.html#loadAudioFileSync">loadAudioFileSync</a></li><li><a href="global.html#loadDB">loadDB</a></li><li><a href="global.html#localiseUI">localiseUI</a></li><li><a href="global.html#locateFile">locateFile</a></li><li><a href="global.html#membershipCheck">membershipCheck</a></li><li><a href="global.html#notifyMissingFile">notifyMissingFile</a></li><li><a href="global.html#onAnalysisComplete">onAnalysisComplete</a></li><li><a href="global.html#onLaunch">onLaunch</a></li><li><a href="global.html#onModelReady">onModelReady</a></li><li><a href="global.html#onResultsComplete">onResultsComplete</a></li><li><a href="global.html#onSave2DiskDB">onSave2DiskDB</a></li><li><a href="global.html#onUpdateLocale">onUpdateLocale</a></li><li><a href="global.html#playRegion">playRegion</a></li><li><a href="global.html#recordUpdate">recordUpdate</a></li><li><a href="global.html#reduceFFT">reduceFFT</a></li><li><a href="global.html#renderResult">renderResult</a></li><li><a href="global.html#resultClick">resultClick</a></li><li><a href="global.html#savedFileCheck">savedFileCheck</a></li><li><a href="global.html#sendDetections">sendDetections</a></li><li><a href="global.html#setActiveRegion">setActiveRegion</a></li><li><a href="global.html#setActiveRow">setActiveRow</a></li><li><a href="global.html#setClickedIndex">setClickedIndex</a></li><li><a href="global.html#setKeyAssignment">setKeyAssignment</a></li><li><a href="global.html#setKeyAssignmentUI">setKeyAssignmentUI</a></li><li><a href="global.html#setMetadata">setMetadata</a></li><li><a href="global.html#showDatePicker">showDatePicker</a></li><li><a href="global.html#showRecordEntryForm">showRecordEntryForm</a></li><li><a href="global.html#showSummarySortIcon">showSummarySortIcon</a></li><li><a href="global.html#showWindowDetections">showWindowDetections</a></li><li><a href="global.html#speciesFilter">speciesFilter</a></li><li><a href="global.html#syncConfig">syncConfig</a></li><li><a href="global.html#t0_warmup">t0_warmup</a></li><li><a href="global.html#trackEvent">trackEvent</a></li><li><a href="global.html#updateFilesBeingProcessed">updateFilesBeingProcessed</a></li><li><a href="global.html#updateSpec">updateSpec</a></li><li><a href="global.html#updateSuggestions">updateSuggestions</a></li><li><a href="global.html#zoomSpec">zoomSpec</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Sat Feb 15 2025 14:56:08 GMT+0000 (Greenwich Mean Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Fri Feb 21 2025 14:32:13 GMT+0000 (Greenwich Mean Time)
 </footer>
 
 <script> prettyPrint(); </script>
