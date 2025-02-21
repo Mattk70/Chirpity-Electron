@@ -708,25 +708,25 @@ const refreshTimeline = () => {
 };
 
 /**
- * Zooms in or out of the audio spectrogram by adjusting the display window
- * and repositioning the playhead relative to the current audio playback time.
+ * Adjusts the spectrogram zoom level and repositions the playhead relative to the audio timeline.
  *
- * When zooming in, the window length is halved, but not reduced below a 1.5-second threshold.
- * When zooming out, the window length is doubled, capped at a maximum of 100 seconds or the file's duration.
- * Active audio regions are updated to align with the new window, ensuring consistency in user selections.
+ * Halves the display window during a "zoomIn" operation—without reducing the window below 1.5 seconds—
+ * and doubles it during a "zoomOut" operation, capped at 100 seconds or the total duration of the file.
+ * The window offset is recalculated to keep the playhead at the same absolute position within the audio,
+ * and any active audio regions are updated to remain consistent with the new window.
  *
- * If no audio file is loaded, the function exits without performing any operation.
+ * No operation is performed if no audio file is loaded or if the audio regions have not been fully initialized.
  *
- * @param {(string|Event)} direction - Specifies the zoom operation. If a string, it must be either "zoomIn" or "zoomOut".
- * If an Event, the function extracts the button ID from the event's target element.
+ * @param {(string|Event)} direction - A zoom command either as a string ("zoomIn" or "zoomOut") for direct calls,
+ * or as an Event from which the command is extracted using the event target's closest button ID.
  * @returns {void}
  *
  * @example
- * // Zoom in directly using a string command:
+ * // Programmatically zoom in:
  * zoomSpec("zoomIn");
  *
  * @example
- * // Trigger zooming out via a button click event:
+ * // Zoom out via a button click:
  * buttonElement.addEventListener("click", zoomSpec);
  */
 function zoomSpec(direction) {
@@ -839,6 +839,16 @@ function getDatetimeLocalFromEpoch(date) {
   return isoDate;
 }
 
+/**
+ * Renders a date and time picker form for updating the start time of the current audio file.
+ *
+ * The form is dynamically created and appended to the filename panel, featuring:
+ * - A label and a datetime-local input, with the input's value initialized from STATE.fileStart and its maximum value set to the current datetime.
+ * - A submit button that, when activated, converts the selected datetime into a millisecond timestamp, sends an update message to the worker, logs the change, resets analysis results, and updates STATE.fileStart.
+ * - A cancel button that removes the form without making any changes.
+ *
+ * @returns {void}
+ */
 function showDatePicker() {
   // Create a form element
   const i18n = getI18n(i18nForm);
@@ -1779,21 +1789,20 @@ const selectionTable = document.getElementById("selectionResultTableBody");
 selectionTable.addEventListener("click", resultClick);
 
 /**
- * Handles the click event on a result row in the audio analysis UI.
+ * Processes click events on audio analysis result rows.
  *
- * This function asynchronously processes user clicks on table rows representing audio analysis results.
- * It first verifies that all audio regions have been fully created and an audio file is loaded. It then extracts
- * file details, start and end times, and label information from the clicked row's "name" attribute, and makes the row active.
- * The corresponding audio region is then loaded using these extracted details. If the event target has a "circle" class,
- * the function waits until the audio file is fully loaded before obtaining the selection results.
+ * Validates that audio regions are fully established and an audio file is loaded before proceeding. Extracts the file name,
+ * start time, end time, and label from the clicked row's "name" attribute (expected in the format "file|start|end|unused|label"),
+ * sets the row as active by updating its CSS class, and loads the corresponding audio region. If the clicked target has a "circle"
+ * class, waits until the audio file is completely loaded before obtaining selection results.
  *
- * @param {Event} e - The click event object triggered by the user interaction.
- * @returns {Promise<void>} A promise that resolves when the click event processing is complete.
+ * @param {Event} e - The click event triggered by the user.
+ * @returns {Promise<void>} A promise that resolves once the event processing is complete.
  *
  * @example
- * // Assuming a table row element with the "name" attribute formatted as "file|start|end|_|label":
+ * // Assuming a table row element with the following "name" attribute:
  * // <tr name="audio.mp3|10|20|unused|Speech">...</tr>
- * // Attaching the event handler:
+ * // Attach the event handler as follows:
  * document.querySelector('tr').addEventListener('click', resultClick);
  */
 async function resultClick(e) {
@@ -1830,6 +1839,17 @@ async function resultClick(e) {
   }
 }
 
+/**
+ * Marks the row corresponding to the specified start time as active in the result table.
+ *
+ * Iterates through all table rows within the result table and checks the "name" attribute, which is expected
+ * to be a pipe-separated string containing file identifier, start time, and additional details. When a row is found
+ * where the file matches the current file (STATE.currentFile) and the start time matches the provided value, any
+ * previously active row (if different) is deactivated, the target row is activated by adding the 'table-active'
+ * class, and the row is smoothly scrolled into view.
+ *
+ * @param {number} start - The start time to match for activating the corresponding table row.
+ */
 function setActiveRow(start) {
     const rows = DOM.resultTable.querySelectorAll('tr');
     for (const r of rows) {
@@ -2062,6 +2082,17 @@ function updatePrefs(file, data) {
   );
 }
 
+/**
+ * Synchronizes a configuration object with a default configuration.
+ *
+ * Removes keys from the configuration that are not found in the default configuration,
+ * and adds any missing keys from the default configuration. For keys with values that
+ * are both objects in the configuration and the default configuration, the merge is
+ * performed recursively, except when the key is "keyAssignment", which is left untouched.
+ *
+ * @param {Object} config - The configuration object to be synchronized (modified in place).
+ * @param {Object} defaultConfig - The default configuration serving as the reference.
+ */
 function syncConfig(config, defaultConfig) {
   // First, remove keys from config that are not in defaultConfig
   Object.keys(config).forEach((key) => {
@@ -2714,6 +2745,21 @@ function generateBirdList(store, rows) {
   explore.innerHTML = listHTML;
 }
 
+/**
+ * Generates an HTML string for a bird species selection dropdown.
+ *
+ * Constructs a select element based on the provided options. When options.store is "allSpecies", a floating form-select is created with either a search prompt or a preselected species from the global LABELS. Otherwise, a basic select element is built using the species data from options.rows, with the currently active species (from STATE.chart.species) marked as selected.
+ *
+ * Also updates the inner HTML of the element with ID "species-search-label" using localized text.
+ *
+ * @param {Object} options - Options to configure the species option list.
+ * @param {string} options.store - Determines the type of select element to generate. Use "allSpecies" to render all species with an optional preselection.
+ * @param {Array<Object>} options.rows - Array of species objects; each must contain a "cname" property used for option values.
+ * @param {string} [options.selected] - Optionally, the species name to preselect when options.store is "allSpecies".
+ * @returns {string} HTML string representing the constructed select element with bird species options.
+ *
+ * @remark Relies on external globals such as LABELS, STATE, i18nHeadings, and i18nAll for data retrieval and localization.
+ */
 function generateBirdOptionList({ store, rows, selected }) {
   let listHTML = "";
   const i18n = getI18n(i18nHeadings);
@@ -3192,6 +3238,15 @@ window.addEventListener("resize", function () {
   );
 });
 
+/**
+ * Debounces keydown event processing for non-interactive elements.
+ *
+ * Prevents the default behavior of keydown events when they do not originate from
+ * an HTMLInputElement, HTMLTextAreaElement, or CustomSelect. The debounced call delays
+ * the execution of the keydown handler by 100 milliseconds using a unique identifier ("keyhandler").
+ *
+ * @param {KeyboardEvent} e - The keydown event triggered by the user.
+ */
 function handleKeyDownDeBounce(e) {
   if (!(e.target instanceof HTMLInputElement 
     || e.target instanceof HTMLTextAreaElement
@@ -3208,12 +3263,12 @@ function handleKeyDownDeBounce(e) {
 }
 
 /**
- * Handles a key down event by triggering a corresponding global action if available.
+ * Responds to keydown events by dispatching configured global actions.
  *
- * If debugging is enabled, logs the pressed key. The function checks if the pressed key
- * exists in the GLOBAL_ACTIONS mapping, and if so, it hides the context menu and determines
- * the active modifier key (Shift, Control, Alt, or none). It then tracks the key press event
- * using the trackEvent function and invokes the corresponding global action callback with the event.
+ * Logs the pressed key when debugging is enabled. If the pressed key exists in the global actions mapping,
+ * hides the context menu, determines the active modifier key (Shift, Control, or Alt; defaults to "no"),
+ * tracks the key press event with its modifier via a tracking function, and executes the corresponding action callback.
+ * If the key is not mapped, invokes the fallback handler for number keys.
  *
  * @param {KeyboardEvent} e - The keyboard event triggered on key press.
  * @returns {void}
@@ -3320,24 +3375,19 @@ function setActiveRegion(region) {
 }
 
 /**
- * Initializes and configures the RegionsPlugin for audio region management.
+ * Initializes and configures audio region management using the RegionsPlugin.
  *
- * This function destroys any previously initialized RegionsPlugin instance and creates a new one
- * with the following configuration:
- * - Enables dragging of regions.
- * - Limits the maximum number of regions to 100.
- * - Uses the default region color from STATE.regionColour.
+ * Destroys any existing RegionsPlugin instance and creates a new instance with regions that are draggable,
+ * a maximum limit of 100 regions, and a default color defined by STATE.regionColour.
  *
- * Additionally, it sets up event listeners for region interactions:
- * - "region-clicked": Hides the context menu, updates the active region and audio playback time,
- *   and removes regions based on key modifiers:
- *   - Shift key: Removes all regions with the default region color.
- *   - Ctrl/Cmd key: Removes the clicked region.
- * - "region-created": Sets a newly created region as the active region if it lacks a label (content)
- *   or if its start time matches that of the current active region.
- * - "region-update": Clears the region's label content and updates it as the active region.
+ * Registers event listeners for region interactions:
+ * - "region-clicked": Hides the context menu, updates the active region, and seeks playback to the region's start.
+ *   If the Shift key is pressed, all regions with the default color are removed; if the Ctrl/Cmd key is pressed,
+ *   the clicked region is removed.
+ * - "region-created": Marks a new region as active if it has no label (content) or its start time matches the current active region.
+ * - "region-update": Clears the region's label and sets the updated region as active.
  *
- * @returns {Object} The initialized RegionsPlugin instance.
+ * @returns {Object} The new RegionsPlugin instance.
  */
 function initRegion() {
   if (REGIONS) REGIONS.destroy();
@@ -3642,7 +3692,20 @@ function centreSpec() {
   }
 }
 
-/////////// Keyboard Shortcuts  ////////////
+/**
+ * Updates the active record based on the key assignment configuration.
+ *
+ * When an assignment exists for the provided key, extracts record details from the currently
+ * selected row, modifies the appropriate field (species, label, or comment) based on the assignment,
+ * and calls the record insertion routine with the updated values. If no active row is selected,
+ * logs an informational message and aborts the update.
+ *
+ * @param {number|string} key - Identifier used to retrieve the key assignment (appended to "key" for lookup) from the configuration.
+ *
+ * @example
+ * // Assuming a key assignment exists for key "1" in config.keyAssignment:
+ * recordUpdate(1);
+ */
 function recordUpdate(key){
   if (!activeRow) {
     console.info('No active row selected for key assignment', key);
@@ -4035,22 +4098,17 @@ const gotoForm = document.getElementById("gotoForm");
 gotoForm.addEventListener("submit", gotoTime);
 
 /**
- * Initializes the application once the audio model is ready.
+ * Initializes application state after the audio model becomes ready.
  *
- * Upon invocation, this function performs several startup tasks:
- * - Sets the flag indicating that the audio model is ready.
- * - If an audio file is loaded, enables the "analyse" menu item; if multiple files
- *   are open, also enables "analyseAll" and "reanalyseAll" menu items.
- * - If there is an active audio region, enables the "analyseSelection" menu item.
+ * Sets the model ready flag and updates UI elements based on current audio assets:
+ * - Enables the "analyse" menu item if an audio file is loaded, and additionally "analyseAll" and "reanalyseAll" if multiple files are open.
+ * - Enables the "analyseSelection" menu item when an active audio region exists.
  * - Calculates the warm-up time and logs it in the DIAGNOSTICS object.
- * - Logs the application's launch time (if this is the first load).
+ * - Logs the application launch time if this is the first load.
  * - Marks the application as loaded and hides the loading screen.
- * - For new users in non-test environments, initiates the tour if it has not been seen.
- * - Processes any queued files received via the operating system.
- *
- * **Side Effects:**
- * Modifies global state, updates the DOM (e.g., hiding the loading screen), logs diagnostic
- * information, and triggers additional actions (e.g., starting the tour, processing OS file queues).
+ * - Requests tag data from the worker.
+ * - Initiates the user tour for new users in non-testing environments.
+ * - Processes any queued operating system file inputs.
  *
  * @param {Object} [args={}] - Optional parameters (currently unused).
  * @returns {void}
@@ -4294,9 +4352,26 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
   // }
 };
 
-/*
-    onResultsComplete is called when the last result is sent from the database
-    */
+/**
+ * Finalizes result processing after the database has sent the last result.
+ *
+ * Updates analysis state by disabling the predicting flag and re-enabling settings, replaces the result table
+ * with the latest content cloned from a buffer, resets the buffer's content, and ensures that the designated row
+ * in the results table is activated. The active row is selected based on the following priority:
+ * - If an `active` index is provided, uses that row; if not found (which can occur after an edit), selects the last row
+ *   matching daytime or nighttime criteria.
+ * - If a `select` value is provided, determines the row index via a helper function and activates that row.
+ * - Otherwise, attempts to activate a row marked with the "table-active" class, or defaults to the first table row.
+ *
+ * Once the active row is determined, it simulates a click on that row and scrolls it into view, hides the progress indicator,
+ * and updates the filename panel.
+ *
+ * @param {Object} [options={}] - Options for handling result activation.
+ * @param {number} [options.active] - Specific row index to activate in the result table.
+ * @param {*} [options.select] - Value used by a helper function to determine which row to activate.
+ *
+ * @returns {void}
+ */
 function onResultsComplete({ active = undefined, select = undefined } = {}) {
   PREDICTING = false;
   disableSettingsDuringAnalysis(false);
@@ -4337,6 +4412,17 @@ function onResultsComplete({ active = undefined, select = undefined } = {}) {
   // activateResultFilters();
 }
 
+/**
+ * Retrieves the index of a table row whose associated start time matches a specified value.
+ *
+ * Iterates over the rows of an HTML table, extracting the start time from each row's "name" attribute.
+ * The "name" attribute is expected to be a string with values separated by a "|" character, where the
+ * second element represents the start time. If the "name" attribute is absent, a default value of 0 is used.
+ *
+ * @param {HTMLTableElement} table - The table element containing rows to search.
+ * @param {number} start - The target start time to match against the row's parsed start time.
+ * @returns {number|undefined} The index of the first row with a matching start time, or undefined if no match is found.
+ */
 function getRowFromStart(table, start) {
   for (var i = 0; i < table.rows.length; i++) {
     const row = table.rows[i];
@@ -4365,6 +4451,20 @@ function formatDuration(seconds) {
   return duration;
 }
 
+/**
+ * Finalizes audio analysis by updating application state, re-enabling UI settings,
+ * and logging diagnostic metrics and tracking events.
+ *
+ * Resets the prediction flag, restores settings, updates analysis state,
+ * and conditionally enables menu items based on available disk records.
+ * Hides the progress indicator and, when not in quiet mode, calculates
+ * the analysis duration and rate for telemetry. In non-quiet mode, records
+ * these metrics through event tracking and displays a completion notification.
+ *
+ * @param {Object} options - Options for analysis completion.
+ * @param {boolean} options.quiet - Suppresses diagnostic tracking and notifications if true.
+ *
+ */
 function onAnalysisComplete({ quiet }) {
   PREDICTING = false;
   disableSettingsDuringAnalysis(false);
@@ -4515,6 +4615,22 @@ const addPagination = (total, offset) => {
   });
 };
 
+/**
+ * Toggles the species filter based on user interaction with the summary table.
+ *
+ * Validates the event against non-interactive elements and current analysis state before proceeding.
+ * If the selected row is already highlighted (indicating an active filter), the highlight is removed;
+ * otherwise, all highlighted rows are cleared, the current row is marked, and the corresponding species
+ * is extracted from the clicked element. In explore mode, the species value is set in the bird list display.
+ * Subsequently, the function refreshes the results filtering and resets the UI components without clearing
+ * the summary, pagination, or result listings.
+ *
+ * @param {Event} e - The DOM event triggered by the user's click on a table row.
+ *
+ * @example
+ * // Apply species filtering when a table row is clicked.
+ * speciesFilter(event);
+ */
 function speciesFilter(e) {
   if (!STATE.regionsCompleted || PREDICTING || ["TBODY", "TH", "DIV"].includes(e.target.tagName)) return; // on Drag or clicked header
   let species, range;
@@ -4543,7 +4659,27 @@ function speciesFilter(e) {
   });
 }
 
-// TODO: show every detection in the spec window as a region on the spectrogram
+/**
+ * Renders a detection result into the results table while managing table headers, pagination, and UI updates.
+ *
+ * For the first result (index ≤ 1), clears or resets the results table based on the selection mode and sets up table headers
+ * with localized labels. When handling non-database results beyond the configured limit, the function adds pagination or
+ * aborts further processing. For valid detection results, it formats timestamps and positions for display, constructs the
+ * corresponding table row including species details, call counts, labels, comments, and review status, and schedules UI
+ * updates to incorporate the new entry.
+ *
+ * @param {Object} options - Options for rendering the result.
+ * @param {number} [options.index=1] - Sequential index of the detection result.
+ * @param {Object} [options.result={}] - Detection result data containing properties such as timestamp, position, active,
+ *   sname, cname, score, label, tagID, comment, end, count, callCount, isDaylight, and reviewed.
+ * @param {*} [options.file=undefined] - The audio file reference associated with the detection.
+ * @param {boolean} [options.isFromDB=false] - Flag indicating whether the result originates from the database.
+ * @param {boolean} [options.selection=false] - Flag indicating if the rendering is for a selection-specific view.
+ *
+ * @returns {Promise<void>} A promise that resolves once the result has been rendered and the UI updated.
+ *
+ * @todo Display each detection as a distinct region on the spectrogram.
+ */
 
 async function renderResult({
   index = 1,
@@ -4694,7 +4830,15 @@ const isExplore = () => {
   return STATE.mode === "explore";
 };
 
-// Results event handlers
+/**
+ * Stores the row index of the table row associated with the clicked element.
+ *
+ * Traverses upward from the provided element to locate the nearest ancestor <tr> element,
+ * then assigns its rowIndex to the global variable clickedIndex. It is assumed that the
+ * target element is within a table row; otherwise, the function may produce errors.
+ *
+ * @param {HTMLElement} target - The DOM element that triggered the event.
+ */
 
 function setClickedIndex(target) {
   const clickedNode = target.closest("tr");
@@ -5265,6 +5409,22 @@ diagnosticMenu.addEventListener("click", async function () {
   testModal.show();
 });
 
+/**
+ * Updates the sorting indicators and UI elements for the result filters based on the current global state.
+ *
+ * Clones and replaces header elements to reflect active sort orders: toggles visibility of time-related sort icons
+ * when the score-based sort is active, applies pointer styles to sort elements, and manages the flipped state based on
+ * ascending or descending order for species and metadata sorting. Also, clones and updates summary elements with hover
+ * effects to enhance interactivity.
+ *
+ * Global State Dependencies:
+ * - STATE.resultsSortOrder: Determines if results are sorted by score and whether the sort is in ascending order.
+ * - STATE.resultsMetaSortOrder: Specifies the currently active metadata sort and direction.
+ * - DOM.resultHeader: The header element that is cloned and replaced for visual update.
+ * - DOM.summaryTable: The table whose species summary elements receive pointer styling.
+ *
+ * @returns {void}
+ */
 function activateResultFilters() {
   const timeHeadings = document.getElementsByClassName("time-sort-icon");
   const speciesHeadings = document.getElementsByClassName("species-sort-icon");
@@ -5326,6 +5486,18 @@ function activateResultFilters() {
   showSummarySortIcon();
 }
 
+/**
+ * Update the sort icon in the summary table to reflect the current sort order.
+ *
+ * Extracts the sort column and direction from the STATE.summarySortOrder string (formatted as "column direction"),
+ * determines the corresponding icon element by constructing its ID ("summary-{column}-icon"),
+ * and then hides all sort icons in the summary table before displaying the relevant icon.
+ * The icon is styled with the "flipped" class when the sort direction is "ASC", and without it for other directions.
+ *
+ * @example
+ * // If STATE.summarySortOrder is "duration ASC", then the sort icon for "duration" will be shown with the "flipped" class.
+ * showSummarySortIcon();
+ */
 function showSummarySortIcon() {
   const [column, direction] = STATE.summarySortOrder.split(" ");
   const iconId = `summary-${column}-icon`;
@@ -5611,6 +5783,20 @@ function initialiseDatePicker() {
   });
 }
 
+/**
+ * Appends a clear date filter button to the specified UI element.
+ *
+ * The function creates a clickable span styled as a "cancel" icon that, when activated,
+ * clears the date selection using the provided picker instance. Upon clicking the button,
+ * the date picker is cleared and the original date filter UI is restored in the element.
+ *
+ * @param {HTMLElement} element - The container element that displays the date filter.
+ * @param {Object} picker - The date picker instance with a clear() method to remove the active date filter.
+ *
+ * @example
+ * // Assuming dateFilterElement is a valid HTMLElement and datePicker is a date picker instance:
+ * createDateClearButton(dateFilterElement, datePicker);
+ */
 function createDateClearButton(element, picker) {
   const span = document.createElement("span");
   span.classList.add("material-symbols-outlined", "text-secondary", "ps-2");
@@ -7107,6 +7293,27 @@ const recordEntryModal = new bootstrap.Modal(recordEntryModalDiv, {
 const recordEntryForm = document.getElementById("record-entry-form");
 let focusBirdList;
 
+/**
+ * Populates and displays the record entry modal for updating or adding audio record details.
+ *
+ * Retrieves species information from either the batch selector or the active audio region and auto-populates
+ * related fields such as call count and comment when an active record exists. Adjusts the UI based on batch mode
+ * by toggling visibility of certain elements, updates labels based on localization settings, and initializes a 
+ * custom label selector with available tags from the application state. Focus is set to the bird autocomplete input 
+ * when the modal is shown.
+ *
+ * @param {string} mode - Identifier for the record update mode, used to set the DB mode field.
+ * @param {boolean} batch - If true, applies batch mode settings by using batch-specific species selection and hiding certain form elements.
+ * @returns {Promise<void>} Resolves once the record entry form is fully populated and the modal is displayed.
+ *
+ * @example
+ * // Open the record entry form for a single record update
+ * showRecordEntryForm('update', false);
+ *
+ * @example
+ * // Open the record entry form in batch mode for multiple records
+ * showRecordEntryForm('add', true);
+ */
 async function showRecordEntryForm(mode, batch) {
   const i18n = getI18n(i18nHeadings)
   const cname = batch
@@ -8145,6 +8352,18 @@ function utf8ToHex(str) {
     .join("");
 }
 
+/**
+ * Converts a hexadecimal string into a UTF-8 string.
+ *
+ * Splits the hex string into two-character segments, converts each segment to its corresponding character,
+ * and concatenates the characters to form the decoded string.
+ *
+ * @param {string} hex - The hexadecimal string to convert. Must consist of an even number of hexadecimal digits.
+ * @returns {string} The resulting string after decoding the hexadecimal input.
+ *
+ * @example
+ * hexToUtf8("48656c6c6f") // returns "Hello"
+ */
 function hexToUtf8(hex) {
   return hex
     .match(/.{1,2}/g) // Split the hex string into pairs
@@ -8152,6 +8371,15 @@ function hexToUtf8(hex) {
     .join("");
 }
 
+/**
+ * Assigns a key binding configuration based on user input.
+ *
+ * Retrieves the column identifier from the DOM element with the ID matching `${key}-column` and uses it to update the global key assignment stored in `config.keyAssignment`. The function trims the value from the input element and sets it to `null` if empty. It marks the assignment as active when a non-empty value is provided and dynamically enables or disables the input element based on the presence of a valid column.
+ *
+ * @param {HTMLInputElement} inputEL - The input element that triggered the change event.
+ * @param {string} key - The identifier used to locate the corresponding column element and update the key assignment configuration.
+ * @returns {void}
+ */
 function setKeyAssignment(inputEL, key){
   // Called on change to inputs
   const columnEl = document.getElementById(key + '-column')
@@ -8176,6 +8404,32 @@ function setKeyAssignment(inputEL, key){
   }
 }
 
+/**
+ * Update key assignment UI elements based on the provided configuration.
+ *
+ * Iterates over each key in the {@code keyAssignments} object, updating the corresponding
+ * DOM input elements with their assigned value and column information. If the key's value
+ * is not "unused", the input is enabled. Additionally, for key assignments with a column of
+ * "label" or "species", the input element is further processed for specialized handling.
+ *
+ * @param {Object.<string, {value: string, column: string}>} keyAssignments - 
+ *   An object mapping element IDs to their key assignment configurations. Each configuration object
+ *   should contain:
+ *   - {@code value}: The assigned key value. Use "unused" to indicate no assignment.
+ *   - {@code column}: The column type, typically "label" or "species", affecting further UI processing.
+ *
+ * @example
+ * const keyAssignments = {
+ *   "key1": { value: "A", column: "label" },
+ *   "key2": { value: "unused", column: "species" }
+ * };
+ * setKeyAssignmentUI(keyAssignments);
+ *
+ * @remarks
+ * Assumes that DOM elements exist with IDs matching each key in {@code keyAssignments} and their associated
+ * column elements using the format {@code key + '-column'}. Relies on a global {@code getI18n} function and
+ * an {@code i18nSelect} parameter to initialize internationalization context.
+ */
 function setKeyAssignmentUI(keyAssignments){
   const i18n = getI18n(i18nSelect);
   Object.entries(keyAssignments).forEach(([k, v]) => {
@@ -8187,6 +8441,18 @@ function setKeyAssignmentUI(keyAssignments){
   }) 
 }
 
+/**
+ * Replaces a target DOM element with a custom input component based on the specified column.
+ *
+ * For a column value of "label", creates a dark-themed custom select populated with labels obtained from STATE.tagsList.
+ * Otherwise, creates an input element with a prefilled value; if the column is "species", adds an event listener to update suggestion lists.
+ *
+ * @param {string} column - Determines the type of input element to generate ("label" for a custom select, "species" for an input with suggestions, or any other value for a generic input).
+ * @param {HTMLElement} element - The DOM element to be replaced by the new input component.
+ * @param {string} key - A unique identifier used as the new element's ID.
+ * @param {string|null} [preSelected=null] - The preselected value to populate the input component.
+ * @returns {HTMLElement} The newly created DOM element, either a container with a custom select (for "label") or an input element.
+ */
 function changeInputElement(column, element, key, preSelected = null){
   if (column === 'label'){
     const i18n = getI18n(i18nSelect)
@@ -8243,10 +8509,20 @@ const input = document.getElementById('bird-autocomplete');
 
 const dropdownCaret = document.querySelector('.input-caret');
 
-// Function to filter and sort the bird labels
+/**
+ * Filters and sorts bird labels based on a search query.
+ *
+ * This function processes a global collection of bird labels by performing a case-insensitive filter based on the provided search string.
+ * Each matching label, originally in the format "sname_cname", is split and reversed to yield the common name (`cname`) and the scientific name (`sname`).
+ * The returned object includes a `styled` property that formats these names into an HTML string with `<br/>` and `<i>` tags.
+ * The resulting list is sorted alphabetically by the common name using locale comparison based on the configuration.
+ *
+ * @param {string} search - A substring used to filter bird labels; if invalid, an empty array is returned.
+ * @returns {Array<{cname: string, sname: string, styled: string}>} An array of objects representing filtered and sorted birds.
+ */
 function getFilteredBirds(search) {
   if (!search || typeof search !== 'string') return [];
-
+  
   const sortedList =  LABELS
     .filter(bird => bird.toLowerCase().includes(search))
     .map(item => {
@@ -8258,7 +8534,20 @@ function getFilteredBirds(search) {
     return sortedList
 }
 
-// Update suggestions and the translucent completion overlay
+/**
+ * Updates the suggestions list and translucent completion overlay based on the input search query.
+ *
+ * Uses the lowercase value of the provided input element to filter bird suggestions via the global
+ * getFilteredBirds function. If the search query is shorter than 2 characters, the suggestion element
+ * is hidden. Otherwise, a list of matching suggestions is created where each suggestion, when clicked,
+ * updates the selected bird display (the element with ID "selected-bird"), conditionally modifies the
+ * input value based on the preserveInput flag, dispatches a change event on the input, and hides the
+ * suggestion element.
+ *
+ * @param {HTMLInputElement} input - The input element containing the current search query.
+ * @param {HTMLElement} element - The DOM element that displays the list of filtered suggestions.
+ * @param {boolean} preserveInput - Determines whether to keep the input’s value after a suggestion is selected.
+ */
 function updateSuggestions(input, element, preserveInput) {
   const search = input.value.toLowerCase();
   element.textContent = ''; // Clear any existing suggestions
