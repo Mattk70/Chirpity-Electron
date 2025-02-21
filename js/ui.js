@@ -6649,7 +6649,7 @@ document.addEventListener("change", function (e) {
         }
         case "thread-slider": {
           // change number of threads
-          DOM.numberOfThreads.innerHTML = DOM.threadSlider.value;
+          DOM.numberOfThreads.textContent = DOM.threadSlider.value;
           config[config[config.model].backend].threads =
             DOM.threadSlider.valueAsNumber;
           worker.postMessage({
