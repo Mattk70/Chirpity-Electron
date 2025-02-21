@@ -127,10 +127,11 @@ test('Can create/edit a manual record', async () => {
   await page.locator('#call-count').fill('3');
   await page.locator('#record-comment').fill('a test comment');
   await page.locator('#record-add').click();
-  const cname = await page.locator('#result1 span.confidence-row > span')
-  const confidence = await cname.textContent();
-  // Confidence has a checkmark
+  const confidence = await page.locator('#result1 span.confidence-row > span')
 
+
+
+  // Confidence has not been changed
   console.log('record creation test: before second expect')
   expect(confidence).toBe('96%');
   const comment =  await (await page.locator('#result1  td.comment  span')).getAttribute('title');

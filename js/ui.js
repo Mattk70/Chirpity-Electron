@@ -8246,7 +8246,7 @@ const dropdownCaret = document.querySelector('.input-caret');
 // Function to filter and sort the bird labels
 function getFilteredBirds(search) {
   if (!search || typeof search !== 'string') return [];
-  
+
   const sortedList =  LABELS
     .filter(bird => bird.toLowerCase().includes(search))
     .map(item => {
