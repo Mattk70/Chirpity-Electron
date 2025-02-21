@@ -338,6 +338,29 @@ const createDB = async (file) => {
   return db;
 };
 
+/**
+ * Loads and configures the SQLite database for managing audio records and metadata.
+ *
+ * Retrieves default model labels either from a remote file (if the model is "birdnet") or from a local config file,
+ * appends a default "Unknown Sp." label, and determines the number of labels to construct the database filename.
+ * If the database file does not exist, a new database is created via `createDB`. Otherwise, an existing database is opened,
+ * and various PRAGMA settings (e.g., foreign keys, journal mode, busy timeout) are enforced. The function also ensures that
+ * necessary indices are created and pending database schema migrations (e.g., for tags and reviewed columns) are applied.
+ * Finally, it updates the global LABELS variable by fetching labels in the preferred locale from the database and sends a UI
+ * message if records are present.
+ *
+ * @param {string} path - The directory path where the database file resides or will be created.
+ * @returns {Promise<boolean>} A promise that resolves to true when the database is successfully loaded and configured.
+ *
+ * @example
+ * loadDB('/data/db')
+ *   .then(success => console.log('Database loaded:', success))
+ *   .catch(error => console.error('Error loading database:', error));
+ *
+ * @remarks
+ * This function relies on global state (e.g., STATE, DATASET, LABELS, diskDB, UI) and integrates with several auxiliary functions
+ * such as `createDB` and `checkAndApplyUpdates`. Ensure these globals and functions are initialized before calling `loadDB`.
+ */
 async function loadDB(path) {
   // We need to get the default labels from the config file
   DEBUG && console.log("Loading db " + path);
@@ -521,6 +544,68 @@ async function checkAndApplyUpdates(db) {
   }
 }
 
+/**
+ * Dispatches worker messages based on the provided action in the event data.
+ *
+ * Processes an event whose data payload includes an `action` field and associated parameters.
+ * If the action is not "_init_" and initialization is pending, waits for the initialization to complete.
+ * Depending on the action, the function handles tasks such as initializing models, processing audio files,
+ * managing thread pools, updating database records, handling tag operations, and more. Specific actions include:
+ * 
+ * - "_init_": Initializes the environment by setting up the list worker, launching the model, and updating state.
+ * - "abort": Aborts ongoing processes.
+ * - "analyse": Initiates audio analysis; validates prediction workers and handles alerts if not ready.
+ * - "change-batch-size": Adjusts the batch size used by prediction workers.
+ * - "change-threads": Modifies the number of active prediction worker threads.
+ * - "change-mode": Switches the operational mode.
+ * - "chart": Processes a chart data request.
+ * - "check-all-files-saved": Verifies that files are correctly saved in the database.
+ * - "convert-dataset": Converts dataset specifications from existing formats.
+ * - "create-dataset": Creates a dataset with inclusion identifiers.
+ * - "delete": Handles deletion operations.
+ * - "delete-species": Removes specified species records.
+ * - "export-results": Exports the detection results.
+ * - "file-load-request": Loads an audio file, clears memory records if necessary, and switches modes based on file state.
+ * - "filter": Applies filters to the result set, refreshes summaries, and updates inclusion identifiers.
+ * - "get-detected-species-list": Retrieves a list of detected species.
+ * - "get-valid-species": Fetches valid species for a given file.
+ * - "get-locations": Retrieves location details from the database for a specific file.
+ * - "get-tags": Retrieves a list of tags from the disk database.
+ * - "delete-tag": Deletes a tag, handling any errors by generating an alert.
+ * - "update-tags": Updates the tag list in the database and refreshes the UI with the new set of tags.
+ * - "get-valid-files-list": Scans and returns a list of valid files.
+ * - "insert-manual-record": Inserts a record manually and updates summaries and results accordingly.
+ * - "load-model": Loads a new predictive model, aborting current processing if necessary.
+ * - "post": Uploads processed audio data.
+ * - "purge-file": Deletes a specified file.
+ * - "compress-and-organise": Compresses and reorganises audio files.
+ * - "relocated-file": Updates file paths after relocation.
+ * - "save": Saves audio processing data along with associated metadata.
+ * - "save2db": Persists in-memory database changes to disk.
+ * - "set-custom-file-location": Sets a custom location for file storage.
+ * - "update-buffer": Reloads an audio file to update its buffer.
+ * - "update-file-start": Adjusts the starting point for audio file processing.
+ * - "update-list": Updates the internal list and custom labels, optionally refreshing summaries and results.
+ * - "update-locale": Updates locale settings and labels.
+ * - "update-summary": Refreshes the summary data.
+ * - "update-state": Updates the overall application state including paths and thresholds.
+ *
+ * @example
+ * // Example message event for initiating analysis on an audio file:
+ * const msgEvent = {
+ *   data: {
+ *     action: "analyse",
+ *     file: "audio_sample.mp3",
+ *     // ...other parameters required for analysis
+ *   }
+ * };
+ * handleMessage(msgEvent);
+ *
+ * @param {Object} e - The message event object.
+ * @param {Object} e.data - The payload containing the action and additional parameters.
+ * @param {string} e.data.action - The command indicating which action to execute.
+ * @returns {Promise<void>} Resolves once the message has been processed.
+ */
 async function handleMessage(e) {
   const args = e.data;
   const action = args.action;
@@ -2778,6 +2863,27 @@ const terminateWorkers = () => {
   predictWorkers = [];
 };
 
+/**
+ * Performs batch insertion of audio records into the database.
+ *
+ * Retrieves records using a prepared statement based on the original identifier,
+ * then iterates through each record to insert it individually via onInsertManualRecord.
+ * The operation is performed within a mutex lock and a database transaction to
+ * guarantee atomicity. A UI update is triggered after the final record is processed,
+ * and debug timing information is logged if enabled.
+ *
+ * @param {string} cname - Identifier used for the new records.
+ * @param {string} label - Label to associate with each inserted record.
+ * @param {Array} files - List of files; currently reserved and not utilized by the function.
+ * @param {string} originalCname - Original identifier used in the prepared statement query.
+ * @returns {Promise<void>} A promise that resolves when the batch insertion completes.
+ *
+ * @throws {Error} Propagates any error encountered during the database transaction,
+ *                 ensuring a rollback to avoid partial insertions.
+ *
+ * @example
+ * await batchInsertRecords("newCampaign", "approved", fileList, "origCampaign");
+ */
 async function batchInsertRecords(cname, label, files, originalCname) {
   const db = STATE.db;
   const t0 = Date.now();
@@ -4538,19 +4644,23 @@ const onFileDelete = async (fileName) => {
 
 const dbMutex = new Mutex();
 /**
- * Updates species common names in the database using provided labels.
+ * Update species common names in the database using provided label mappings.
  *
- * This function processes an array of labels, each formatted as "speciesName_commonName". It updates the
- * corresponding records in the database based on the current application model (e.g., "birdnet"). For the "birdnet"
- * model, a direct update query is used, while for other models the function retrieves existing common names and
- * conditionally updates them based on matching patterns. All database operations are executed within a single
- * transaction; if any update fails, the transaction is rolled back and the error is propagated.
+ * Parses an array of label strings formatted as "speciesName_commonName" and updates the corresponding
+ * entries in the species table. For the "birdnet" model, a direct update query is executed; for other models,
+ * existing common names are retrieved and conditionally updated based on matching parenthesized tokens.
+ * All operations are executed within a single transaction to ensure atomicity. If any update fails, the
+ * transaction is rolled back and the error is propagated.
  *
- * @param {object} db - The database connection object supporting asynchronous methods (runAsync, prepare, and finalize).
- * @param {Array<string>} labels - An array of strings representing species updates, formatted as "speciesName_commonName".
- * @returns {Promise<void>} A promise that resolves when all updates have been successfully committed.
+ * @param {object} db - A database connection object that supports asynchronous methods (runAsync, prepare, and finalize).
+ * @param {Array<string>} labels - An array of label strings in the format "speciesName_commonName".
+ * @returns {Promise<void>} A promise that resolves when all updates are successfully committed.
  *
- * @throws {Error} If any of the database operations fail during the transaction.
+ * @throws {Error} If any database operation fails during the transaction.
+ *
+ * @example
+ * // For a 'birdnet' model, updating a species 'sparrow' to a common name 'House Sparrow'
+ * await _updateSpeciesLocale(db, ["sparrow_House Sparrow"]);
  */
 async function _updateSpeciesLocale(db, labels) {
   const updatePromises = [];
@@ -4733,17 +4843,16 @@ async function getLocations({ db = STATE.db, file }) {
 }
 
 /**
- * Retrieves a list of included species IDs for filtering results based on the current state and file metadata.
+ * Retrieves a filtered list of species IDs based on the current state and file metadata.
  *
- * This asynchronous helper function returns a list of valid species IDs from the cache (STATE.included).
- * If the cache entry is missing:
- * - For "location" or "nocturnal" listings (when STATE.local is true), it derives the latitude, longitude, and week from the provided file metadata (or from STATE if no file is provided),
- *   constructs a location key, and calls setIncludedIDs to populate the cache.
- * - For other list types, it calls setIncludedIDs if the relevant cache object is not defined.
+ * For "location" or "nocturnal" lists when local mode is enabled, if a file identifier is provided, the function uses
+ * its metadata to extract latitude (lat), longitude (lon), and week information (derived from fileStart if STATE.useWeek is true).
+ * The latitude and longitude are concatenated to form a location key. If the corresponding cache entry in STATE.included is missing,
+ * setIncludedIDs is invoked to populate it. For other list types, if the cache is absent, setIncludedIDs is called without parameters.
  *
  * @async
- * @param {*} [file] - An optional identifier used to look up file metadata in METADATA. If provided, its metadata will be used to extract location (lat, lon) and week data.
- * @returns {Promise<Array<number>>} A promise that resolves to an array of species IDs included in the filtered results.
+ * @param {*} [file] - Optional key for retrieving file metadata from METADATA. Expected metadata should include properties like `fileStart`, `lat`, and `lon`.
+ * @returns {Promise<number[]>} Promise resolving to an array of species IDs included in the current filtered results.
  */
 async function getIncludedIDs(file) {
   let lat, lon, week;
