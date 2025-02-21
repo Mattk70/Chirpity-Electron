@@ -31,6 +31,8 @@ class CustomSelect extends HTMLElement {
 
       // Generate a unique radio group name for this instance.
       this.radioGroup = "label-" + Math.random().toString(36).substr(2, 9);
+      // Register instance.
+      CustomSelect.instances.push(this);
     }
   
     // Allow getting/setting a custom list of labels.
@@ -51,8 +53,7 @@ class CustomSelect extends HTMLElement {
     }
   
     connectedCallback() {
-      // Register instance.
-      CustomSelect.instances.push(this);
+
       this.render();
       // Hide dropdown if clicking outside.
       this._documentClickHandler = (e) => {
@@ -467,7 +468,8 @@ class CustomSelect extends HTMLElement {
       labelEl.appendChild(radioInput);
       labelEl.appendChild(document.createTextNode(" " + CustomSelect.sharedLabels[index]));
       if (selectedIndex === index) {
-        this.selectedLabelBtn.textContent = CustomSelect.sharedLabels[index];
+        this.selectedLabelBtn.textContent = this._i18n.selectLabel
+        this.selectedLabelBtn.className = `btn btn-outline-${this.theme[1]} w-100 selected-label`
       }
       CustomSelect.updateAllInstances();
     }

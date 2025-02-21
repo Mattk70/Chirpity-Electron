@@ -4769,7 +4769,7 @@ async function renderResult({
     const showTimeOfDay = config.timeOfDay ? "" : "d-none";
     const showTimestamp = config.timeOfDay ? "d-none" : "";
     const activeTable = active ? "table-active" : "";
-    const labelHTML = tagID && label ? `<span class="badge text-bg-${STATE.labelColors[(tagID -1) % STATE.labelColors.length] } rounded-pill">${label}</span>` : "";
+    const labelHTML = Number.isInteger(tagID) && label ? `<span class="badge text-bg-${STATE.labelColors[tagID % STATE.labelColors.length] } rounded-pill">${label}</span>` : "";
     const hide = selection ? "d-none" : "";
     const countIcon =
       count > 1
@@ -8486,21 +8486,18 @@ function changeInputElement(column, element, key, preSelected = null){
 
 document.addEventListener("labelsUpdated", (e) => {
   const tags = e.detail.tags;
+  const tagObjects = tags.map((name, index) => ({ id: index, name }));
   const deleted = e.detail.deleted;
   if (deleted){
     console.log("Tag deleted:", deleted);
-    worker.postMessage({action: "delete-tag", deleted })  
+    worker.postMessage({action: "delete-tag", deleted });
     STATE.tagsList = STATE.tagsList.filter(item => item.name !== deleted)
   } else {
-    STATE.tagsList = tags.map((tag, index) => {
-      const existingItem = STATE.tagsList[index];
-      return {
-        id: existingItem ? existingItem.id : null, // Keep existing ID, set null for new
-        name: tag
-      };
-    });
-    console.log("Tags updated:", tags);
-    worker.postMessage({action: "update-tags", tags })
+    // Find the new or renamed tag
+    const alteredOrNew = tagObjects.find(tag => !STATE.tagsList.find(t => t.name === tag.name));
+    STATE.tagsList = tags;
+    console.log("Tag updated:", alteredOrNew);
+    worker.postMessage({action: "update-tag", alteredOrNew })
   }
   
   console.log("Tags list:", STATE.tagsList);

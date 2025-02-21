@@ -273,7 +273,7 @@ const createDB = async (file) => {
     await db.runAsync(
       "CREATE TABLE tags(id INTEGER PRIMARY KEY, name TEXT NOT NULL, UNIQUE(name))"
     );
-    await db.runAsync("INSERT INTO tags VALUES(null, 'Nocmig'), (null, 'Local')");
+    await db.runAsync("INSERT INTO tags VALUES(0, 'Nocmig'), (1, 'Local')");
     await db.runAsync(
       "CREATE TABLE species(id INTEGER PRIMARY KEY, sname TEXT NOT NULL, cname TEXT NOT NULL)"
     );
@@ -288,7 +288,10 @@ const createDB = async (file) => {
     );
     await db.runAsync(`CREATE TABLE records( dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, 
       comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER, reviewed INTEGER, tagID INTEGER,
-      UNIQUE (dateTime, fileID, speciesID), CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,  FOREIGN KEY (speciesID) REFERENCES species(id))`);
+      UNIQUE (dateTime, fileID, speciesID), 
+      CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,
+      CONSTRAINT fk_species FOREIGN KEY (speciesID) REFERENCES species(id),
+      CONSTRAINT fk_tags FOREIGN KEY (tagID) REFERENCES tags(id) ON DELETE SET NULL)`);
     await db.runAsync(
       `CREATE TABLE duration( day INTEGER, duration INTEGER, fileID INTEGER, UNIQUE (day, fileID), CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE)`
     );
@@ -406,31 +409,69 @@ async function loadDB(path) {
     await diskDB.runAsync("PRAGMA foreign_keys = ON");
     await diskDB.runAsync("PRAGMA journal_mode = WAL");
     await diskDB.runAsync("PRAGMA busy_timeout = 1000");
-    await diskDB
-      .runAsync(
-        "CREATE INDEX IF NOT EXISTS idx_species_sname ON species(sname)"
-      )
-      .catch((error) => console.error(error));
+
     // Add new column if not exists
     const {user_version} = await diskDB.getAsync("PRAGMA user_version")
       .catch((error) => console.error(error));
-    if (user_version !== undefined && user_version < 1){ 
+    if (user_version === undefined || user_version < 1){ 
       try{
+        t0 = Date.now()
+        await dbMutex.lock();
+        await diskDB.runAsync("CREATE INDEX IF NOT EXISTS idx_species_sname ON species(sname)")
+        await diskDB.runAsync("PRAGMA writable_schema=ON");
+        await diskDB.runAsync("PRAGMA foreign_keys = OFF");
+        await diskDB.runAsync('BEGIN');
         await diskDB.runAsync("CREATE TABLE IF NOT EXISTS tags(id INTEGER PRIMARY KEY, name TEXT NOT NULL, UNIQUE(name))");
-        await diskDB.runAsync("INSERT INTO tags VALUES(null, 'Nocmig'), (null, 'Local')");
+        await diskDB.runAsync("INSERT INTO tags VALUES(0, 'Nocmig'), (1, 'Local')");
         await diskDB.runAsync("ALTER TABLE records ADD COLUMN tagID INTEGER");
-        await diskDB.runAsync("UPDATE records SET tagID = 1 WHERE label = 'Nocmig'");
-        await diskDB.runAsync("UPDATE records SET tagID = 2 WHERE label = 'Local'");
+        await diskDB.runAsync("UPDATE records SET tagID = 0 WHERE label = 'Nocmig'");
+        await diskDB.runAsync("UPDATE records SET tagID = 1 WHERE label = 'Local'");
         await diskDB.runAsync("ALTER TABLE records DROP COLUMN label");
         // Change label names to labelIDs
         await diskDB.runAsync("ALTER TABLE records ADD COLUMN reviewed INTEGER");
-        await diskDB.runAsync("PRAGMA user_version = 1")
+
+        await diskDB.runAsync(`CREATE TABLE records_temp( dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, 
+          comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER, reviewed INTEGER, tagID INTEGER,
+          UNIQUE (dateTime, fileID, speciesID), 
+          CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,
+          CONSTRAINT fk_species FOREIGN KEY (speciesID) REFERENCES species(id),
+          CONSTRAINT fk_tags FOREIGN KEY (tagID) REFERENCES tags(id) ON DELETE SET NULL)`);
+        await diskDB.runAsync("INSERT INTO records_temp SELECT * from records");
+        await diskDB.runAsync("DROP TABLE records");
+        await diskDB.runAsync(`ALTER TABLE records_temp RENAME TO records`);
+        // Add old files table update
+        await diskDB.runAsync(`
+          CREATE TABLE files_new (
+              id INTEGER PRIMARY KEY, 
+              name TEXT NOT NULL, 
+              duration REAL,
+              filestart INTEGER, 
+              locationID INTEGER, 
+              archiveName TEXT, 
+              metadata TEXT, 
+              UNIQUE (name),
+              CONSTRAINT fk_locations FOREIGN KEY (locationID) REFERENCES locations(id) ON DELETE SET NULL
+          )`);
+        await diskDB.runAsync(`INSERT INTO files_new SELECT * FROM files`);
+        await diskDB.runAsync(`DROP TABLE files;`);
+        await diskDB.runAsync(`ALTER TABLE files_new RENAME TO files;`);
+        await diskDB.runAsync("DROP table db_upgrade");
+        await diskDB.runAsync('END');
+        await diskDB.runAsync("PRAGMA writable_schema=OFF");
+        await diskDB.runAsync("PRAGMA foreign_keys = ON");
+        await diskDB.runAsync("PRAGMA integrity_check");
+        await diskDB.runAsync("PRAGMA foreign_key_check");
+        await diskDB.runAsync("PRAGMA user_version = 1");
         console.info("Migrated tags and added 'reviewed' column to ", p.basename(file))
       } catch (e) {
+        await diskDB.runAsync('ROLLBACK');
         console.error("Error adding column and updating version", e.message, e)
+      } finally{
+        await checkpoint(diskDB)
+        dbMutex.unlock();
+        console.info(`DB migration took ${Date.now() - t0}ms`)
       }
     }
-    await checkAndApplyUpdates(diskDB);
     const { count } = await diskDB.getAsync(
       "SELECT COUNT(*) as count FROM records"
     );
@@ -495,54 +536,7 @@ const DB_updates = [
   },
 ];
 
-// Function to check and apply Updates
-async function checkAndApplyUpdates(db) {
-  // Ensure the system_info table exists
-  await db.runAsync(`
-        CREATE TABLE IF NOT EXISTS db_upgrade (
-            key TEXT PRIMARY KEY,
-            value TEXT
-        );
-    `);
 
-  // Get the last Update applied
-  let lastUpdate = await db.getAsync(
-    `SELECT value FROM db_upgrade WHERE key = 'last_update'`
-  );
-
-  if (!lastUpdate) {
-    // Insert default if not present for older databases
-    lastUpdate = { value: "__" };
-    await db.runAsync(`
-            INSERT INTO db_upgrade (key, value) VALUES ('last_update', '__')
-        `);
-  }
-
-  // Apply updates that come after the last update applied
-  let updateIndex = DB_updates.findIndex((m) => m.name === lastUpdate.value);
-  // Start from the next Update
-  updateIndex = updateIndex >= 0 ? updateIndex + 1 : 0;
-
-  for (let i = updateIndex; i < DB_updates.length; i++) {
-    const update = DB_updates[i];
-    try {
-      trackEvent(STATE.UUID, "DB", "UPDATE", updateIndex);
-      console.log(`Applying Update: ${update.name}`);
-      await update.query(db);
-
-      // Update the last Update applied
-      await db.runAsync(
-        `UPDATE db_upgrade SET value = ? WHERE key = 'last_update'`,
-        update.name
-      );
-
-      console.log(`Update '${update.name}' applied successfully.`);
-    } catch (err) {
-      console.error(`Error applying Database update '${update.name}':`, err);
-      throw err; // Stop the process if an Update fails
-    }
-  }
-}
 
 /**
  * Dispatches worker messages based on the provided action in the event data.
@@ -760,18 +754,19 @@ async function handleMessage(e) {
       }
       break;
     }
-    case "update-tags": {
+    case "update-tag": {
       try {
-        const stmt = STATE.db.prepare('INSERT OR REPLACE INTO tags (id, name) VALUES (?, ?)');
-        const tags = args.tags;
-        for (let i=0; i<tags.length;i++){
-          await stmt.runAsync(i+1, tags[i] )
-        }
+        const stmt = STATE.db.prepare(`
+          INSERT OR REPLACE INTO tags (id, name) VALUES (?, ?)
+          ON CONFLICT(id) DO UPDATE SET name = excluded.name
+          `);
+        const tag = args.alteredOrNew;
+        await stmt.runAsync(tag.id, tag.name )
         stmt.finalize()
         const result = await STATE.db.allAsync('SELECT id, name FROM tags');
         UI.postMessage({event: "tags", tags: result, init: false})
       } catch (error) {
-        generateAlert({message: `Label update failed: ${error.message}`})
+        generateAlert({message: `Tag update failed: ${error.message}`})
         console.error(error);
       }
       break;
