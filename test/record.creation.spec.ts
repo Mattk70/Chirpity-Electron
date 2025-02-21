@@ -109,6 +109,7 @@ test('Can create/edit a manual record', async () => {
   await page.waitForTimeout(500);
 
   await page.locator('#result1').click({button: 'right'});
+  await page.locator('#result1').click({button: 'right'});
   const editRecord = await page.locator('#create-manual-record');
   await editRecord.click();
   // Check that div#selected-bird innerText starts with "Redwing (call)"
@@ -127,14 +128,11 @@ test('Can create/edit a manual record', async () => {
   await page.locator('#call-count').fill('3');
   await page.locator('#record-comment').fill('a test comment');
   await page.locator('#record-add').click();
-  await page.waitForTimeout(500);
-  const confidence = await page.locator('#result1 span.confidence-row > span')
+  const confidence = await page.locator('#result1 td.cname');
 
-
-
-  // Confidence has not been changed
+  // Confidence has been changed to Person_add icon
   console.log('record creation test: before second expect')
-  expect(confidence).toHaveText('96%');
+  expect(confidence).toHaveText(/Ring Ouzel \(call\)\s+person_add/);
   const comment =  await (await page.locator('#result1  td.comment  span')).getAttribute('title');
   // Comment saved
 
