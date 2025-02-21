@@ -2,7 +2,7 @@
  * @file Helper functions for managing Matomo tracking.
  */
 
-const ID_SITE = 3;
+const ID_SITE = 2;
 let VISITOR;
 /**
  * Logs an event to the Matomo analytics system.
