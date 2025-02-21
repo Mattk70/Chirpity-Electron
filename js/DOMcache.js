@@ -343,7 +343,7 @@ const DOM = {
     if (!this._settingsForm) {
       this._settingsForm = document.getElementById("settingsForm");
     }
-    return this._settingsPanel;
+    return this._settingsForm;
   },
   get spectrogramWrapper() {
     if (!this._spectrogramWrapper) {

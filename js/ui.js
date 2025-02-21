@@ -910,7 +910,6 @@ function showDatePicker() {
     // Remove the form from the DOM
     form.remove();
   });
-  toggleKeyDownForFormInputs();
 }
 
 const filename = DOM.filename;
@@ -3645,6 +3644,10 @@ function centreSpec() {
 
 /////////// Keyboard Shortcuts  ////////////
 function recordUpdate(key){
+  if (!activeRow) {
+    console.info('No active row selected for key assignment', key);
+    return;
+  }
   const assignment = config.keyAssignment['key'+ key];
   if (assignment?.column){
     const nameAttribute = activeRow.getAttribute("name");
@@ -6197,28 +6200,27 @@ document.addEventListener("click", function (e) {
       break;
     }
     case "sort-label":
-      case "sort-comment":
-      case "sort-reviewed": {
-        if (!PREDICTING) {
-          const sort = target.slice(5);
-          const state = STATE.resultsMetaSortOrder;
-          // If no sort is set or the sort column is different, start with DESC.
-          if (!state || !state.startsWith(sort)) {
-            STATE.resultsMetaSortOrder = `${sort} DESC `;
-          } else if (state === `${sort} DESC `) {
-            // Second click: switch from DESC to ASC.
-            STATE.resultsMetaSortOrder = `${sort} ASC `;
-          } else if (state === `${sort} ASC `) {
-            // Third click: reset sort order.
-            STATE.resultsMetaSortOrder = '';
-          }
+    case "sort-comment":
+    case "sort-reviewed": {
+      if (!PREDICTING) {
+        const sort = target.slice(5);
+        const state = STATE.resultsMetaSortOrder;
+        // If no sort is set or the sort column is different, start with DESC.
+        if (!state || !state.startsWith(sort)) {
+          STATE.resultsMetaSortOrder = `${sort} DESC `;
+        } else if (state === `${sort} DESC `) {
+          // Second click: switch from DESC to ASC.
+          STATE.resultsMetaSortOrder = `${sort} ASC `;
+        } else if (state === `${sort} ASC `) {
+          // Third click: reset sort order.
+          STATE.resultsMetaSortOrder = '';
         }
-        setSortOrder("resultsMetaSortOrder", STATE.resultsMetaSortOrder);
-        break;
       }
+      setSortOrder("resultsMetaSortOrder", STATE.resultsMetaSortOrder);
+      break;
+    }
 
     case "sort-position":
-    case "sort-label":
     case "sort-time": {
       if (!PREDICTING) {
         STATE.resultsSortOrder === "timestamp" || setSortOrder("resultsSortOrder", "timestamp");

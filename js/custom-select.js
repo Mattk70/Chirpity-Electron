@@ -28,8 +28,7 @@ class CustomSelect extends HTMLElement {
       this.theme = theme === 'dark'
         ? ['dark', 'light', 'white', '#f8d7da', '#ffc107']
         : ['light', 'dark', 'black', 'rgb(56, 46, 47)', 'rgb(61, 58, 48)'];
-  
-      CustomSelect.instances.push(this);
+
       // Generate a unique radio group name for this instance.
       this.radioGroup = "label-" + Math.random().toString(36).substr(2, 9);
     }
@@ -56,11 +55,12 @@ class CustomSelect extends HTMLElement {
       CustomSelect.instances.push(this);
       this.render();
       // Hide dropdown if clicking outside.
-      document.addEventListener("click", (e) => {
+      this._documentClickHandler = (e) => {
         if (!this.contains(e.target)) {
           this.hideDropdown();
         }
-      });
+      };
+      document.addEventListener("click", this._documentClickHandler);
     }
   
     disconnectedCallback() {
@@ -68,6 +68,9 @@ class CustomSelect extends HTMLElement {
       const index = CustomSelect.instances.indexOf(this);
       if (index !== -1) {
         CustomSelect.instances.splice(index, 1);
+      }
+      if (this._documentClickHandler) {
+        document.removeEventListener("click", this._documentClickHandler);
       }
     }
   
