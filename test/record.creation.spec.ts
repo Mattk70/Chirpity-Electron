@@ -133,7 +133,7 @@ test('Can create/edit a manual record', async () => {
 
   // Confidence has not been changed
   console.log('record creation test: before second expect')
-  expect(confidence).toBe('96%');
+  expect(confidence).toHaveText('96%');
   const comment =  await (await page.locator('#result1  td.comment  span')).getAttribute('title');
   // Comment saved
 
