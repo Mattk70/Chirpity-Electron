@@ -106,6 +106,8 @@ test('Can create/edit a manual record', async () => {
   test.slow(); // 3x timeout seconds
   console.log('starting record creation test')
   await runExampleAnalysis(page,'chirpity');
+  await page.waitForTimeout(1000);
+
   await page.locator('#result1').click({button: 'right'});
   const editRecord = await page.locator('#create-manual-record');
   await editRecord.click();
@@ -114,8 +116,8 @@ test('Can create/edit a manual record', async () => {
   await expect(selectedBird).toHaveText(/^Redwing \(call\)/);
 
   // Click on the bird search input and type 'ring o'
-  await page.locator('#bird-search').click();
-  await page.locator('#bird-search').fill('ring o');
+  // await page.locator('#bird-autocomplete').click();
+  await page.locator('#bird-autocomplete').fill('ring o');
 
   // Locate and click the first suggestion in the list
   await page.locator('#contentWrapper li:nth-of-type(1)').click();

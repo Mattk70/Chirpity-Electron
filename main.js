@@ -12,7 +12,6 @@ app.commandLine.appendSwitch("xdg-portal-required-version", "4");
 // WebGPU flags needed for Linux
 app.commandLine.appendSwitch("enable-unsafe-webgpu");
 app.commandLine.appendSwitch("enable-features", "Vulkan");
-app.commandLine.appendSwitch("profiling-at-start");
 
 const { autoUpdater } = require("electron-updater");
 const log = require("electron-log");
@@ -56,6 +55,8 @@ autoUpdater.logger = log;
 autoUpdater.logger.transports.file.level = "info";
 // Define the menu template
 const isMac = process.platform === "darwin"; // macOS check
+// Set membership URL here
+process.env.MEMBERSHIP_API_ENDPOINT = 'https://subscriber.mattkirkland.co.uk/check-uuid';
 const template = [
   ...(isMac
     ? [
@@ -587,6 +588,14 @@ app.on('before-quit', async (event) => {
   event.preventDefault(); // Prevent default quit until cleanup is done
   QUITTING = true
   workerWindow.webContents.postMessage("close-database", null);
+  // Add timeout to force quit after 5 seconds
+  setTimeout(() => {
+    if (!DB_CLOSED) {
+      console.warn('Database closure timed out after 5 seconds, forcing quit...');
+      DB_CLOSED = true;
+      app.quit();
+    }
+  }, 5000);
 });
   
 ipcMain.on('database-closed', () =>{

@@ -23,27 +23,42 @@
    *   .catch(error => console.error('Error checking membership:', error));
    */
 
-async function checkMembership(uuid) {
-    try {
-      const response = await fetch('https://subscriber.mattkirkland.co.uk/check-uuid', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ uuid }),
-      });
-  
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-  
-      const {result} = await response.json();
-      const isMember = result === true; // Assuming the API sends true/false as a boolean.
-      return isMember;
-    } catch (error) {
-      console.error('Error checking membership:', error);
-      throw new Error(error); // Default to false if there's an error.
+
+const REQUEST_TIMEOUT_MS = 5000;
+
+function isValidUUID(uuid) {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(uuid);
+}
+
+ export async function checkMembership(uuid, MEMBERSHIP_API_ENDPOINT) {
+   try {
+    if (!isValidUUID(uuid)) {
+      throw new Error('Invalid UUID format');
     }
-  }
-  
-  export {checkMembership}
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    const response = await fetch(MEMBERSHIP_API_ENDPOINT, {
+       method: 'POST',
+       headers: {
+         'Content-Type': 'application/json',
+       },
+       body: JSON.stringify({ uuid }),
+      signal: controller.signal,
+     });
+    clearTimeout(timeoutId);
+ 
+     if (!response.ok) {
+       throw new Error(`HTTP error! status: ${response.status}`);
+     }
+ 
+     const {result} = await response.json();
+     const isMember = result === true; // Assuming the API sends true/false as a boolean.
+     return isMember;
+   } catch (error) {
+    console.error('Error checking membership:', error);
+    throw error; // Preserve original error stack trace
+   }
+ }

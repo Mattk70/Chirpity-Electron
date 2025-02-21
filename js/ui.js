@@ -8097,7 +8097,8 @@ async function membershipCheck() {
       
     });
   }
-  return await checkMembership(config.UUID).then(isMember =>{
+  const MEMBERSHIP_API_ENDPOINT = await window.electron.MEMBERSHIP_API_ENDPOINT();
+  return await checkMembership(config.UUID, MEMBERSHIP_API_ENDPOINT).then(isMember =>{
     console.info(`Version: ${VERSION}. Trial: ${inTrial} subscriber: ${isMember}, All detections: ${config.specDetections}`, '')
     if (isMember || inTrial) {
       unlockElements();
@@ -8244,6 +8245,8 @@ const dropdownCaret = document.querySelector('.input-caret');
 
 // Function to filter and sort the bird labels
 function getFilteredBirds(search) {
+  if (!search || typeof search !== 'string') return [];
+  
   const sortedList =  LABELS
     .filter(bird => bird.toLowerCase().includes(search))
     .map(item => {
