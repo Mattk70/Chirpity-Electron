@@ -38,8 +38,13 @@
     role="progressbar" 
     aria-busy="true" 
     aria-label="Loading application">
-    <span id="loading-text" aria-live="polite">Getting things ready...</span>
-    <div class="loader" aria-hidden="true"></div>
+    <div id="loading-panel" class="border border-success">
+        <img src="img/icon/chirpity_logo2.png" height="40px" alt="Chirpity Logo">
+        <span id="loading-text" aria-live="polite">Getting things ready...</span>
+        <div class="spinner-border text-success m-3" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
 </div>
 
 <div id="contentWrapper">
@@ -168,39 +173,46 @@
     <!-- Record Entry Modal -->
     <div class="modal fade" id="record-entry-modal" tabindex="-1" aria-labelledby="record-entry-modal-label" aria-modal="true">
         <div class="modal-dialog  modal-dialog-centered modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header justify-content-center">
+            <div class="modal-content  overflow-visible">
+                <div class="modal-header">
                     <h5 class="modal-title" id="record-entry-modal-label">Edit Record</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form id="record-entry-form">
-                    <div id="record-entry-modal-body" class="modal-body">
-                        <div class="row">
-                            <div class="col-8" id="record-entry-birdlist"></div>
-                            <div class="col hide-in-batch">
-                                <div class="form-floating mb-3">
-                                    <input type="number" id="call-count" class="form-control" min="1">
-                                    <label for="call-count">Call Count</label>
+                    <div id="record-entry-modal-body" class="modal-body overflow-visible">
+                        <div class="row pe-3">
+                            <div class="col-7">
+                                <div class="mb-3"> 
+                                    <!-- <input type="text" class="form-control mb-3" id="bird-search"> -->
+                                    <div class="form-floating" id="bird-search">
+                                        <!-- Bootstrap-styled input -->
+                                        <input type="text" class="form-control" id="bird-autocomplete" placeholder="Type to search...">
+                                        <!-- Caret rendered inside the input -->
+                                        <span id="bird-input-caret" class="input-caret"></span>
+                                        <!-- Suggestion list styled as a Bootstrap list group -->
+                                        <label id="species-search-label" for="bird-autocomplete">Species Search</label>
+                                        <ul id="bird-suggestions" class="suggestions list-group"></ul>
+                                    </div>
+                                    
                                 </div>
                             </div>
+                            <div class="col-5 border rounded ps-2 mb-3">
+                                <label for="record-label" class="text-muted" style="font-size: .75em">Call Type</label><br>
+                                <div id="label-container"></div>
+                            </div>
+
                         </div>
-                        <fieldset class="border  ps-3 pt-1">
-                            <label for="record-label" class="text-muted" style="font-size: .75em">Call Type</label><br>
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="radio" name="record-label" id="label-local" value="Local">
-                                <label class="form-check-label" for="label-local">Local</label>
+
+                        <div class="border bg-light rounded mb-3 p-3" id="selected-bird"></div>
+
+                        <div class="col hide-in-batch">
+                            <div class="form-floating mb-3">
+                                <input type="number" id="call-count" class="form-control" min="1">
+                                <label class="mb-2" for="call-count">Call Count</label>
                             </div>
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="radio" name="record-label" id="label-nocmig" value="Nocmig">
-                                <label class="form-check-label" for="label-nocmig">Nocmig</label>
-                            </div>
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="radio" name="record-label" id="label-unknown" value="">
-                                <label class="form-check-label" for="label-unknown">Not specified</label>
-                            </div>
-                        </fieldset>
+                        </div>
                         <div class="form-floating mt-3 hide-in-batch">
-                            <textarea class="form-control" id="record-comment" style="height: 200px"></textarea>
+                            <textarea class="form-control" id="record-comment" style="height: 100px"></textarea>
                             <label for="record-comment">Comments</label>
                             <input type="hidden" id="DBmode">
                             <input type="hidden" id="batch-mode">
@@ -509,13 +521,13 @@
             <h5 class="offcanvas-title" id="offcanvas">Settings</h5>
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" id="close-settings" aria-label="Close"></button>
         </div>
-        <div class="offcanvas-body pt-1">
-            <div class="btn-group w-100 p-2" role="group" aria-label="Settings mode">
+        <div class="offcanvas-body pt-0">
+            <div class="btn-group w-100 p-2 mt-0 position-sticky top-0 bg-dark" style="z-index: 2000;" role="group" aria-label="Settings mode">
                 <button type="button" id="basic" class="btn btn-primary w-50">Basic</button>
                 <button type="button" id="advanced" class="btn btn-secondary w-50">Advanced</button>
             </div>  
             <!-- Offcanvas -->
-            <form id="settingsForm" class="fs-6">
+            <form id="settingsForm" class="fs-6 form-floating">
                 <fieldset class="border border-secondary rounded m-2 mt-0 mb-0 p-2">
                     
                     <legend style="font-size: large;font-weight:bold">Detections</legend>
@@ -681,6 +693,124 @@
                             </div>
                         </div>
                     </div>
+                    
+                    <fieldset class="advanced border border-secondary rounded m-2 mb-0 p-2 overflow-visible"> 
+                        <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" id="Lock-circle-help" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature."><span class="pointer locked material-symbols-outlined">lock</span></a>
+                        <span class="d-inline-flex float-end"><a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Keyboard assignment" id="Assign Keyboard-circle-help"  data-bs-content="Use number keys for rapid result tagging. Assign a species, label or predefined comment to a result">?</a></span>
+                        <legend style="font-size: small; font-weight:bold">
+                            Keyboard Assignment
+                        </legend>
+                        <div class="d-flex align-items-center mb-2 position-relative">
+                            <kbd class="text-bg-light ps-2 pe-2">1</kbd> 
+                            <select class="locked form-select w-50 ms-2" style="font-size: small" id="key1-column">
+                                <option value="">Unused</option>
+                                <option value="species">Species</option>
+                                <option value="label">Label</option>
+                                <option value="comment">Comment</option>
+                            </select>
+                            <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key1">
+                            <div id="bird-list-key1" class="suggestions list-group"></div>
+                        </div>
+                        <div class="d-flex align-items-center mb-2 position-relative">
+                            <kbd class="text-bg-light ps-2 pe-2">2</kbd> 
+                            <select class="locked form-select w-50 ms-2" style="font-size: small" id="key2-column">
+                                <option value="">Unused</option>
+                                <option value="species">Species</option>
+                                <option value="label">Label</option>
+                                <option value="comment">Comment</option>
+                            </select>
+                            <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key2">
+                            <div id="bird-list-key2" class="suggestions list-group"></div>
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <kbd class="text-bg-light ps-2 pe-2">3</kbd> 
+                            <select class="locked form-select w-50 ms-2" style="font-size: small" id="key3-column">
+                                <option value="">Unused</option>
+                                <option value="species">Species</option>
+                                <option value="label">Label</option>
+                                <option value="comment">Comment</option>
+                            </select>
+                            <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key3">
+                            <div id="bird-list-key3" class="suggestions list-group"></div>
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <kbd class="text-bg-light ps-2 pe-2">4</kbd> 
+                            <select class="locked form-select w-50 ms-2" style="font-size: small" id="key4-column">
+                                <option value="">Unused</option>
+                                <option value="species">Species</option>
+                                <option value="label">Label</option>
+                                <option value="comment">Comment</option>
+                            </select>
+                            <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key4">
+                            <div id="bird-list-key4" class="suggestions list-group"></div>
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <kbd class="text-bg-light ps-2 pe-2">5</kbd> 
+                            <select class="locked form-select w-50 ms-2" style="font-size: small" id="key5-column">
+                                <option value="">Unused</option>
+                                <option value="species">Species</option>
+                                <option value="label">Label</option>
+                                <option value="comment">Comment</option>
+                            </select>
+                            <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key5">
+                            <div id="bird-list-key5" class="suggestions list-group"></div>
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <kbd class="text-bg-light ps-2 pe-2">6</kbd> 
+                            <select class="locked form-select w-50 ms-2" style="font-size: small" id="key6-column">
+                                <option value="">Unused</option>
+                                <option value="species">Species</option>
+                                <option value="label">Label</option>
+                                <option value="comment">Comment</option>
+                            </select>
+                            <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key6">
+                            <div id="bird-list-key6" class="suggestions list-group"></div>
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <kbd class="text-bg-light ps-2 pe-2">7</kbd> 
+                            <select class="locked form-select w-50 ms-2" style="font-size: small" id="key7-column">
+                                <option value="">Unused</option>
+                                <option value="species">Species</option>
+                                <option value="label">Label</option>
+                                <option value="comment">Comment</option>
+                            </select>
+                            <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key7">
+                            <div id="bird-list-key7" class="suggestions list-group"></div>
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <kbd class="text-bg-light ps-2 pe-2">8</kbd> 
+                            <select class="locked form-select w-50 ms-2"  style="font-size: small" id="key8-column">
+                                <option value="">Unused</option>
+                                <option value="species">Species</option>
+                                <option value="label">Label</option>
+                                <option value="comment">Comment</option>
+                            </select>
+                            <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key8">
+                            <div id="bird-list-key8" class="suggestions list-group"></div>
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <kbd class="text-bg-light ps-2 pe-2">9</kbd> 
+                            <select class="locked form-select w-50 ms-2" style="font-size: small" id="key9-column">
+                                <option value="">Unused</option>
+                                <option value="species">Species</option>
+                                <option value="label">Label</option>
+                                <option value="comment">Comment</option>
+                            </select>
+                            <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key9">
+                            <div id="bird-list-key9" class="suggestions list-group"></div>
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <kbd class="text-bg-light ps-2 pe-2">0</kbd> 
+                            <select class="locked form-select w-50 ms-2" style="font-size: small" id="key0-column">
+                                <option value="">Unused</option>
+                                <option value="species">Species</option>
+                                <option value="label">Label</option>
+                                <option value="comment">Comment</option>
+                            </select>
+                            <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key0">
+                            <div id="bird-list-key0" class="suggestions list-group"></div>
+                        </div>
+                    </fieldset>    
                 </fieldset>
                 <fieldset class="border border-secondary rounded m-2 mb-0 p-2">
                     <legend style="font-size: large;font-weight:bold">Default Location <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Default Location" id="Default Location-circle-help"  data-bs-content="Chirpity uses location information to determine the dawn and dusk times for recordings">?</a></legend>
@@ -1017,41 +1147,42 @@
                             </div>
                         </div>
                     </fieldset>
-                    <fieldset class="border border-secondary rounded m-2 p-2 d-none" id="window-fieldset"></fieldset>
-                    <div class="pe-3 input-group rounded p-2 mb-1">
-                        <label for="window-function" class="input-group-text col-5">Window function:</label>
-                        <select class="form-select mb-0" id="window-function">
-                            <option value="bartlett">Bartlett</option>
-                            <option value="bartlettHann">BartlettHann</option>
-                            <option value="blackman">Blackman</option>
-                            <option value="cosine">Cosine</option>
-                            <option value="gauss">Gauss</option>
-                            <option value="hamming">Hamming</option>
-                            <option value="hann">Hann</option>
-                            <option value="lanczoz">Lanczoz</option>
-                            <option value="rectangular">Rectangular</option>
-                            <option value="triangular">Triangular</option>
-                        </select>
-                    </div>
-                    <div id="alpha" class="pe-3 input-group rounded p-2 mb-1 d-none">
-                        <label for="alpha-slider" class="form-label">
-                            Gauss Alpha:
-                        </label>
-                        <div class="input-group">
-                            <input type="range" class="form-control-range w-75" min="0" max="1" step="0.01" id="alpha-slider">
-                            <div class="input-group-append">
-                                <span class="input-group-text" id="alpha">0.5</span>
+                    <fieldset class="border border-secondary rounded m-2 p-2" id="window-fieldset">
+                        <div class="pe-3 input-group rounded p-2 mb-1">
+                            <label for="window-function" class="input-group-text col-5">Window function:</label>
+                            <select class="form-select mb-0" id="window-function">
+                                <option value="bartlett">Bartlett</option>
+                                <option value="bartlettHann">BartlettHann</option>
+                                <option value="blackman">Blackman</option>
+                                <option value="cosine">Cosine</option>
+                                <option value="gauss">Gauss</option>
+                                <option value="hamming">Hamming</option>
+                                <option value="hann">Hann</option>
+                                <option value="lanczoz">Lanczoz</option>
+                                <option value="rectangular">Rectangular</option>
+                                <option value="triangular">Triangular</option>
+                            </select>
+                        </div>
+                        <div id="alpha" class="pe-3 input-group rounded p-2 mb-1 d-none">
+                            <label for="alpha-slider" class="form-label">
+                                Gauss Alpha:
+                            </label>
+                            <div class="input-group">
+                                <input type="range" class="form-control-range w-75" min="0" max="1" step="0.01" id="alpha-slider">
+                                <div class="input-group-append">
+                                    <span class="input-group-text" id="alpha-value">0.5</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    
+                        <div class="pe-3 input-group rounded p-2 mb-1">
+                            <label for="timelineSetting" class="input-group-text col-5">Timeline:</label>
+                            <select class="form-select mb-0" id="timelineSetting">
+                                <option value="timecode">Timecode</option>
+                                <option value="timeOfDay">Time of day</option>
+                            </select>
+                        </div>
                     </fieldset>
-                    <div class="pe-3 input-group rounded p-2 mb-1">
-                        <label for="timelineSetting" class="input-group-text col-5">Timeline:</label>
-                        <select class="form-select mb-0" id="timelineSetting">
-                            <option value="timecode">Timecode</option>
-                            <option value="timeOfDay">Time of day</option>
-                        </select>
-                    </div>
                 </fieldset>
                 <fieldset class="advanced border border-secondary rounded m-2 p-2">
                     <legend class="pb-2" style="font-size: large;font-weight:bold;color: white">Advanced</legend>

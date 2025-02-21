@@ -1,5 +1,24 @@
+/**
+ * @file Helper functions for managing Matomo tracking.
+ */
+
 const ID_SITE = 3;
 let VISITOR;
+/**
+ * Tracks an event for Matomo analytics.
+ *
+ * This function constructs and sends a GET request to the Matomo tracking API to log an event. It
+ * normalizes the event name by replacing any occurrence of "result" followed by digits with simply "result".
+ * Additionally, it adjusts the action parameter by converting a single space to "Spacebar" and a plus sign
+ * to "Plus". The request URL incorporates the current time, site identification, user identifier, and event details.
+ * If the fetch response is not OK, an error is thrown and subsequently logged.
+ *
+ * @param {string} uuid - The unique identifier of the visitor.
+ * @param {string} event - The event category.
+ * @param {string} action - The event action; may be normalized to "Spacebar" or "Plus" for specific inputs.
+ * @param {string} [name] - The event name; numerical identifiers in "result" strings are reduced.
+ * @param {string|number} [value] - An optional value associated with the event.
+ */
 function trackEvent(uuid, event, action, name, value){
     // Squash result numbers
     name = typeof name == 'string' ? name.replace(/result\d+/, 'result') : name;

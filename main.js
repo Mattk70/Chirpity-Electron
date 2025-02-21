@@ -55,6 +55,8 @@ autoUpdater.logger = log;
 autoUpdater.logger.transports.file.level = "info";
 // Define the menu template
 const isMac = process.platform === "darwin"; // macOS check
+// Set membership URL here
+process.env.MEMBERSHIP_API_ENDPOINT = 'https://subscriber.mattkirkland.co.uk/check-uuid';
 const template = [
   ...(isMac
     ? [
@@ -580,7 +582,26 @@ app.on("activate", async () => {
     await createWorker();
   }
 });
-
+let DB_CLOSED = false, QUITTING = false;
+app.on('before-quit', async (event) => {
+  if (DB_CLOSED || QUITTING) return
+  event.preventDefault(); // Prevent default quit until cleanup is done
+  QUITTING = true
+  workerWindow.webContents.postMessage("close-database", null);
+  // Add timeout to force quit after 5 seconds
+  setTimeout(() => {
+    if (!DB_CLOSED) {
+      console.warn('Database closure timed out after 5 seconds, forcing quit...');
+      DB_CLOSED = true;
+      app.quit();
+    }
+  }, 5000);
+});
+  
+ipcMain.on('database-closed', () =>{
+  DB_CLOSED = true;
+  app.quit()
+ })
 ipcMain.handle("request-worker-channel", async (_event) => {
   // Create a new channel ...
   const { port1, port2 } = new MessageChannelMain();

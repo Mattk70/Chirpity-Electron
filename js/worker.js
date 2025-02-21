@@ -1,4 +1,9 @@
-const { ipcRenderer } = require("electron");
+/**
+ * @file Backbone of the app. Functions to process audio, manage database interaction
+ * and interact with the AI models
+ */
+
+const { ipcRenderer, ipcMain } = require("electron");
 const fs = require("node:fs");
 const p = require("node:path");
 const { writeFile, mkdir, readdir } = require("node:fs/promises");
@@ -9,9 +14,10 @@ const { utimesSync } = require("utimes");
 const { writeToPath } = require("@fast-csv/format");
 const merge = require("lodash.merge");
 import { State } from "./state.js";
-import { sqlite3, Mutex } from "./database.js";
+import { sqlite3, checkpoint, closeDatabase, Mutex } from "./database.js";
 import { trackEvent } from "./tracking.js";
 import { extractWaveMetadata } from "./metadata.js";
+
 let isWin32 = false;
 
 const DATASET = false;
@@ -263,6 +269,11 @@ const createDB = async (file) => {
   try {
     db.locale = "en";
     await db.runAsync("BEGIN");
+    await diskDB.runAsync("PRAGMA user_version = 1")
+    await db.runAsync(
+      "CREATE TABLE tags(id INTEGER PRIMARY KEY, name TEXT NOT NULL, UNIQUE(name))"
+    );
+    await db.runAsync("INSERT INTO tags VALUES(null, 'Nocmig'), (null, 'Local')");
     await db.runAsync(
       "CREATE TABLE species(id INTEGER PRIMARY KEY, sname TEXT NOT NULL, cname TEXT NOT NULL)"
     );
@@ -275,8 +286,9 @@ const createDB = async (file) => {
     await db.runAsync(
       "CREATE UNIQUE INDEX idx_unique_place ON locations(lat, lon)"
     );
-    await db.runAsync(`CREATE TABLE records( dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, label  TEXT,  comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER, 
-            UNIQUE (dateTime, fileID, speciesID), CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,  FOREIGN KEY (speciesID) REFERENCES species(id))`);
+    await db.runAsync(`CREATE TABLE records( dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, 
+      comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER, reviewed INTEGER, tagID INTEGER,
+      UNIQUE (dateTime, fileID, speciesID), CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,  FOREIGN KEY (speciesID) REFERENCES species(id))`);
     await db.runAsync(
       `CREATE TABLE duration( day INTEGER, duration INTEGER, fileID INTEGER, UNIQUE (day, fileID), CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE)`
     );
@@ -284,35 +296,15 @@ const createDB = async (file) => {
     await db.runAsync("CREATE INDEX idx_species_cname ON species(cname)");
     if (archiveMode) {
       // Only called when creating a new archive database
+      const stmt = db.prepare("INSERT INTO species VALUES (?, ?, ?)");
       for (let i = 0; i < LABELS.length; i++) {
-        const [sname, cname] = LABELS[i].split("_");
-        await db.runAsync(
-          "INSERT INTO species VALUES (?,?,?)",
-          i,
-          sname,
-          cname
-        );
+          const [sname, cname] = LABELS[i].split("_");
+          await stmt.runAsync(i, sname, cname);
       }
+      stmt.finalize();
     } else {
       const filename = diskDB.filename;
-      let { code } = await db.runAsync("ATTACH ? as disk", filename);
-      const MAX_RETRIES = 100; // Set a maximum number of retries
-      let retries = 0;
-
-      // // If the db is not ready
-      // while (code === "SQLITE_BUSY" && retries < MAX_RETRIES) {
-      //     console.log("Disk DB busy");
-      //     await new Promise(resolve => setTimeout(resolve, 10));
-      // let response =
-      // await db.runAsync('ATTACH ? as disk', filename);
-      //     code = response.code;
-      //     retries++;
-      // }
-
-      // if (retries === MAX_RETRIES) {
-      //     console.error("Exceeded maximum number of retries for attaching the disk database");
-      //     throw new Error("Exceeded maximum number of retries for attaching the disk database");
-      // }
+      await db.runAsync("ATTACH ? as disk", filename);
       let response = await db.runAsync(
         "INSERT INTO files SELECT * FROM disk.files"
       );
@@ -328,6 +320,12 @@ const createDB = async (file) => {
       );
       DEBUG &&
         console.log(response.changes + " species added to memory database");
+
+        response = await db.runAsync(
+          "INSERT OR IGNORE INTO tags SELECT * FROM disk.tags"
+        );
+        DEBUG &&
+          console.log(response.changes + " tags added to memory database");
     }
     await db.runAsync("END");
   } catch (error) {
@@ -390,9 +388,25 @@ async function loadDB(path) {
         "CREATE INDEX IF NOT EXISTS idx_species_sname ON species(sname)"
       )
       .catch((error) => console.error(error));
-    await diskDB.runAsync(
-      "CREATE INDEX IF NOT EXISTS idx_species_cname ON species(cname)"
-    );
+    // Add new column if not exists
+    const {user_version} = await diskDB.getAsync("PRAGMA user_version")
+      .catch((error) => console.error(error));
+    if (user_version !== undefined && user_version < 1){ 
+      try{
+        await diskDB.runAsync("CREATE TABLE IF NOT EXISTS tags(id INTEGER PRIMARY KEY, name TEXT NOT NULL, UNIQUE(name))");
+        await diskDB.runAsync("INSERT INTO tags VALUES(null, 'Nocmig'), (null, 'Local')");
+        await diskDB.runAsync("ALTER TABLE records ADD COLUMN tagID INTEGER");
+        await diskDB.runAsync("UPDATE records SET tagID = 1 WHERE label = 'Nocmig'");
+        await diskDB.runAsync("UPDATE records SET tagID = 2 WHERE label = 'Local'");
+        await diskDB.runAsync("ALTER TABLE records DROP COLUMN label");
+        // Change label names to labelIDs
+        await diskDB.runAsync("ALTER TABLE records ADD COLUMN reviewed INTEGER");
+        await diskDB.runAsync("PRAGMA user_version = 1")
+        console.info("Migrated tags and added 'reviewed' column to ", p.basename(file))
+      } catch (e) {
+        console.error("Error adding column and updating version", e.message, e)
+      }
+    }
     await checkAndApplyUpdates(diskDB);
     const { count } = await diskDB.getAsync(
       "SELECT COUNT(*) as count FROM records"
@@ -647,6 +661,36 @@ async function handleMessage(e) {
       getLocations({ db: STATE.db, file: args.file });
       break;
     }
+    case "get-tags": {
+      const result = await diskDB.allAsync('SELECT id, name FROM tags');
+      UI.postMessage({event: "tags", tags: result, init: true})
+      break;
+    }
+    case "delete-tag": {
+      try {
+        const result = await diskDB.runAsync('DELETE FROM tags where name = ?', args.deleted);
+      } catch (error) {
+        generateAlert({message: `Label deletion failed: ${error.message}`})
+        console.error(error);
+      }
+      break;
+    }
+    case "update-tags": {
+      try {
+        const stmt = STATE.db.prepare('INSERT OR REPLACE INTO tags (id, name) VALUES (?, ?)');
+        const tags = args.tags;
+        for (let i=0; i<tags.length;i++){
+          await stmt.runAsync(i+1, tags[i] )
+        }
+        stmt.finalize()
+        const result = await STATE.db.allAsync('SELECT id, name FROM tags');
+        UI.postMessage({event: "tags", tags: result, init: false})
+      } catch (error) {
+        generateAlert({message: `Label update failed: ${error.message}`})
+        console.error(error);
+      }
+      break;
+    }
     case "get-valid-files-list": {
       await getFiles(args.files);
       break;
@@ -763,6 +807,43 @@ ipcRenderer.on("new-client", async (event) => {
   UI.onmessage = handleMessage;
 });
 
+
+ipcRenderer.on("close-database", async () => {
+  try {
+    await checkpoint(diskDB)
+    await closeDatabase(diskDB)
+  } catch(error) {
+    console.error("Error closing database:", error.message)
+  } finally {
+    diskDB = null;
+    ipcRenderer.send('database-closed')
+  }
+});
+
+/**
+ * Checks whether all files in the provided list are present in the database.
+ *
+ * This asynchronous function processes the given file list in batches (up to 25,000 files per batch) to accommodate SQLite's parameter limits.
+ * For each batch, it constructs a parameterized SQL query that counts how many of the files exist in the database's "files" table.
+ * If any batch has a count lower than the number of files in that batch, the function immediately posts a failure event to the UI and returns false.
+ * If all batches are successfully verified, it posts a success event to the UI and returns true.
+ * If the database (diskDB) is not loaded, an error alert is generated and the function returns undefined.
+ *
+ * @param {Array.<string>} fileList - An array of file names to verify in the database.
+ * @return {Promise<boolean|undefined>} A promise that resolves to true if every file is found in the database, false if one or more files are missing, or undefined if the database is not loaded.
+ *
+ * @example
+ * const files = ['track1.mp3', 'track2.wav'];
+ * savedFileCheck(files).then(result => {
+ *   if (result === true) {
+ *     console.log('All files exist in the database.');
+ *   } else if (result === false) {
+ *     console.log('Some files are missing in the database.');
+ *   } else {
+ *     console.log('Database not loaded.');
+ *   }
+ * });
+ */
 async function savedFileCheck(fileList) {
   if (diskDB) {
     // Slice the list into a # of params SQLITE can handle
@@ -988,21 +1069,25 @@ const getFilesInDirectory = async (dir) => {
 const prepParams = (list) => "?".repeat(list.length).split("").join(",");
 
 /**
- * Constructs an SQL filter clause and an associated parameters array for retrieving file records.
+ * Generates an SQL filtering clause along with its corresponding parameters for file record retrieval.
  *
- * Depending on the provided range and the current application mode (accessed via the global STATE),
- * the function generates conditions to filter files by date/time or by file/archive names.
+ * This function constructs an SQL fragment to filter file records based on an optional date range and the
+ * current application mode stored in the global STATE variable. Depending on whether a valid range is provided
+ * or the application mode is set to "archive", it generates the appropriate conditions and parameters:
  *
- * - If a range object with a defined `start` property is provided, it generates a clause to select
- *   records where `dateTime` is between `range.start` (inclusive) and `range.end` (exclusive).
- * - If the mode is "archive", it creates a condition to filter files by both their name and archiveName,
- *   processing file paths accordingly.
- * - In "analyse" mode, a file-based condition is noted but currently commented out.
+ * - When a range object with a defined `start` property is provided, an SQL condition is appended to filter
+ *   records where `dateTime` is between `range.start` (inclusive) and `range.end` (exclusive). The provided range
+ *   values are pushed to the parameters array.
+ * - In "archive" mode, the function creates an SQL condition that filters records by matching either the file's
+ *   name or its archiveName against the list obtained from STATE.filesToAnalyse. It also processes file paths
+ *   by removing the archive path prefix defined in STATE.archive.location.
+ * - In "analyse" mode, a file-based filtering condition exists in the code but is currently commented out.
  *
- * @param {Object} [range] - Optional range object to filter records by dateTime.
- * @param {(number|string)} range.start - The start of the date range.
- * @param {(number|string)} range.end - The end of the date range.
- * @returns {[string, any[]]} A tuple where the first element is an SQL fragment (string) and the second is an array of parameters to bind to the query.
+ * @param {Object} [range] - Optional object specifying a date range for filtering records.
+ * @param {(number|string)} range.start - The start boundary of the date range (inclusive).
+ * @param {(number|string)} range.end - The end boundary of the date range (exclusive).
+ * @returns {Array.<(string | any[])>} A tuple where the first element is the SQL condition fragment (string)
+ * and the second element is an array of parameters to bind to the SQL query.
  */
 function getFileSQLAndParams(range) {
   const fileParams = prepParams(STATE.filesToAnalyse);
@@ -1154,15 +1239,18 @@ const prepResultsStatement = (
         species.sname, 
         species.cname, 
         records.confidence as score, 
-        records.label, 
+        tagID,
+        tags.name as label, 
         records.comment, 
         records.end,
         records.callCount,
         records.isDaylight,
+        records.reviewed,
         RANK() OVER (PARTITION BY fileID, dateTime ORDER BY records.confidence DESC) AS rank
         FROM records 
         JOIN species ON records.speciesID = species.id 
         JOIN files ON records.fileID = files.id 
+        LEFT JOIN tags ON records.tagID = tags.id
         WHERE confidence >= ? 
         `;
   // // Prioritise selection ranges
@@ -1181,7 +1269,7 @@ const prepResultsStatement = (
     params.push(...included);
   }
   if (STATE.selection) {
-    resultStatement += ` AND name = ? `;
+    resultStatement += ` AND files.name = ? `;
     params.push(FILE_QUEUE[0]);
   }
   if (STATE.locationID) {
@@ -1205,12 +1293,14 @@ const prepResultsStatement = (
     speciesID,
     sname, 
     cname, 
-    score, 
+    score,
+    tagID,
     label, 
     comment,
     end,
     callCount,
     isDaylight,
+    reviewed,
     rank
     FROM 
     ranked_records 
@@ -1222,8 +1312,8 @@ const prepResultsStatement = (
   }
   const limitClause = noLimit ? "" : "LIMIT ?  OFFSET ?";
   noLimit || params.push(STATE.limit, offset);
-
-  resultStatement += ` ORDER BY ${STATE.resultsSortOrder}, timestamp ASC ${limitClause} `;
+  const metaSort = STATE.resultsMetaSortOrder ? `${STATE.resultsMetaSortOrder}, ` : '';
+  resultStatement += ` ORDER BY ${metaSort} ${STATE.resultsSortOrder}, timestamp ASC ${limitClause} `;
 
   return [resultStatement, params];
 };
@@ -2342,7 +2432,7 @@ const saveResults2DataSet = ({ species, included }) => {
     species.sname, 
     species.cname, 
     confidence AS score, 
-    label, 
+    tagID, 
     comment
     FROM records
     JOIN species
@@ -2690,18 +2780,9 @@ const terminateWorkers = () => {
 
 async function batchInsertRecords(cname, label, files, originalCname) {
   const db = STATE.db;
-  let params = [originalCname, STATE.detect.confidence];
   const t0 = Date.now();
-  let query = `SELECT * FROM records WHERE speciesID = (SELECT id FROM species WHERE cname = ?) AND confidence >= ? `;
-  if (STATE.mode !== "explore") {
-    query += ` AND fileID in (SELECT id FROM files WHERE name IN (${prepParams(
-      files
-    )}))`;
-    params.push(...files);
-  } else if (STATE.explore.range.start) {
-    query += ` AND dateTime BETWEEN ${STATE.explore.range.start} AND ${STATE.explore.range.end}`;
-  }
-  const records = await STATE.db.allAsync(query, ...params);
+  const [sql, params] = prepResultsStatement(originalCname, true, STATE.included, undefined, STATE.topRankin)
+  const records = await STATE.db.allAsync(sql, ...params);
   let count = 0;
 
   await dbMutex.lock();
@@ -2715,23 +2796,17 @@ async function batchInsertRecords(cname, label, files, originalCname) {
         "SELECT name FROM files WHERE id = ?",
         fileID
       );
-      // Delete existing record
-      await db.runAsync(
-        "DELETE FROM records WHERE datetime = ? AND speciesID = ? AND fileID = ?",
-        dateTime,
-        speciesID,
-        fileID
-      );
       count += await onInsertManualRecord({
-        cname: cname,
+        cname,
         start: position,
-        end: end,
-        comment: comment,
+        end,
+        comment,
         count: callCount,
         file: name,
-        label: label,
+        label,
         batch: false,
-        originalCname: undefined,
+        originalCname,
+        calledByBatch: true,
         updateResults: i === records.length - 1, // trigger a UI update after the last item
       });
     }
@@ -2758,21 +2833,29 @@ const onInsertManualRecord = async ({
   batch,
   originalCname,
   confidence,
+  calledByBatch,
   position,
   speciesFiltered,
   updateResults = true,
 }) => {
-  if (batch) return batchInsertRecords(cname, label, file, originalCname);
+  if (batch) return batchInsertRecords(cname, label, file, originalCname, confidence);
   (start = parseFloat(start)), (end = parseFloat(end));
   const startMilliseconds = Math.round(start * 1000);
   let changes = 0,
     fileID,
     fileStart;
   const db = STATE.db;
-  const { speciesID } = await db.getAsync(
+  const speciesFound = await db.getAsync(
     `SELECT id as speciesID FROM species WHERE cname = ?`,
     cname
   );
+  let speciesID;
+  if (speciesFound) {
+    speciesID = speciesFound.speciesID;
+  } else {
+    generateAlert({message: 'noSpecies', variables: {cname}, type:'error'})
+    return 
+  }
   let res = await db.getAsync(
     `SELECT id,filestart FROM files WHERE name = ?`,
     file
@@ -2804,34 +2887,60 @@ const onInsertManualRecord = async ({
 
   const dateTime = fileStart + startMilliseconds;
   const isDaylight = isDuringDaylight(dateTime, STATE.lat, STATE.lon);
-  confidence = confidence || 2000;
-  // Delete an existing record if it exists
-  const result = await db.getAsync(
-    `SELECT id as originalSpeciesID FROM species WHERE cname = ?`,
-    originalCname
-  );
-  result?.originalSpeciesID &&
-    (await db.runAsync(
-      "DELETE FROM records WHERE datetime = ? AND speciesID = ? AND fileID = ?",
-      dateTime,
-      result.originalSpeciesID,
-      fileID
-    ));
 
-  await db.runAsync(
-    "INSERT OR REPLACE INTO records VALUES ( ?,?,?,?,?,?,?,?,?,?)",
-    dateTime,
-    start,
-    fileID,
-    speciesID,
-    confidence,
-    label,
-    comment,
-    end,
-    parseInt(count),
-    isDaylight
-  );
-};
+  // Delete an existing record if species was changed
+  if (cname !== originalCname){
+    const result = await db.getAsync(
+      `SELECT id as originalSpeciesID FROM species WHERE cname = ?`,
+      originalCname
+    );
+    if (result?.originalSpeciesID){
+      await db.runAsync(
+        "DELETE FROM records WHERE datetime = ? AND speciesID = ? AND fileID = ?",
+        dateTime,
+        result.originalSpeciesID,
+        fileID
+      );
+      confidence = 2000; // Manual record
+    }
+  } 
+  else {
+    const r = await db.getAsync(
+      "SELECT * FROM records WHERE dateTime = ? AND fileID = ? AND speciesID = ?", 
+      dateTime, fileID, speciesID);
+    confidence = r?.confidence || 2000; // Save confidence
+  }
+  const result = await db.getAsync("SELECT id FROM tags WHERE name = ?", label);
+  const tagID = result?.id;
+  if (calledByBatch && cname === originalCname){
+   await db.runAsync(
+      `UPDATE records SET tagID = ?, comment = ?, reviewed = 1 
+        WHERE dateTime = ? AND fileID = ? AND speciesID = ?`,
+      tagID, comment, dateTime, fileID, speciesID
+    )
+  } else {
+    await db.runAsync(
+        `INSERT INTO records (dateTime, position, fileID, speciesID, confidence, tagID, comment, end, callCount, isDaylight, reviewed)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(dateTime, fileID, speciesID) DO UPDATE SET 
+          tagID = excluded.tagID,
+          comment = excluded.comment,
+          reviewed = excluded.reviewed;`,
+        dateTime,
+        start,
+        fileID,
+        speciesID,
+        confidence, // This will only be inserted, not updated
+        tagID,
+        comment,
+        end,
+        parseInt(count),
+        isDaylight,
+        true
+      );
+      
+    };
+  }
 
 const insertDurations = async (file, id) => {
   const durationSQL = Object.entries(METADATA[file].dateDuration)
@@ -2905,9 +3014,9 @@ const generateInsertQuery = async (latestResult, file) => {
         const confidence = Math.round(confidenceArray[j] * 1000);
         if (confidence < minConfidence) break;
         const speciesID = speciesIDArray[j];
-        insertQuery += `(${timestamp}, ${key}, ${fileID}, ${speciesID}, ${confidence}, null, null, ${
+        insertQuery += `(${timestamp}, ${key}, ${fileID}, ${speciesID}, ${confidence}, null, ${
           key + 3
-        }, null, ${isDaylight}), `;
+        }, null, ${isDaylight}, 0, null), `;
       }
     }
     // Remove the trailing comma and space
@@ -3340,10 +3449,7 @@ const getResults = async ({
     //const position = await getPosition({species: species, dateTime: select.dateTime, included: included});
     offset = (position.page - 1) * limit;
     // We want to consistently move to the next record. If results are sorted by time, this will be row + 1.
-    // If by confidence, it wil not change, as the validated record will move to the top
-    active = ["timestamp", "dateTime"].includes(STATE.resultsSortOrder)
-      ? position.row + 1
-      : position.row;
+    active = position.row + 1;
     // update the pagination
     await getTotal({ species: species, offset: offset, included: included });
   }
@@ -3781,6 +3887,9 @@ const onSave2DiskDB = async ({ file }) => {
       `INSERT OR IGNORE INTO disk.files SELECT * FROM files`
     );
     await memoryDB.runAsync(
+      `INSERT OR IGNORE INTO disk.tags SELECT * FROM tags`
+    );
+    await memoryDB.runAsync(
       `INSERT OR IGNORE INTO disk.locations SELECT * FROM locations`
     );
     // Update the duration table
@@ -3847,8 +3956,10 @@ const getSeasonRecords = async (species, season) => {
         ${seasonMonth[season]}`);
     stmt.get(species, (err, row) => {
       if (err) {
+        stmt.finalize();
         reject(err);
       } else {
+        stmt.finalize();
         resolve(row);
       }
     });
@@ -4427,14 +4538,19 @@ const onFileDelete = async (fileName) => {
 
 const dbMutex = new Mutex();
 /**
- * Updates the locale and species names in the database.
+ * Updates species common names in the database using provided labels.
  *
- * @param {string} locale - The locale to update.
- * @param {Array<string>} labels - The labels containing species names and common names.
- * @param {boolean} refreshResults - Whether to refresh the results after updating.
- * @returns {Promise<void>} - A promise that resolves when the update is complete.
+ * This function processes an array of labels, each formatted as "speciesName_commonName". It updates the
+ * corresponding records in the database based on the current application model (e.g., "birdnet"). For the "birdnet"
+ * model, a direct update query is used, while for other models the function retrieves existing common names and
+ * conditionally updates them based on matching patterns. All database operations are executed within a single
+ * transaction; if any update fails, the transaction is rolled back and the error is propagated.
  *
- * @throws {Error} - Throws an error if the database transactions fail.
+ * @param {object} db - The database connection object supporting asynchronous methods (runAsync, prepare, and finalize).
+ * @param {Array<string>} labels - An array of strings representing species updates, formatted as "speciesName_commonName".
+ * @returns {Promise<void>} A promise that resolves when all updates have been successfully committed.
+ *
+ * @throws {Error} If any of the database operations fail during the transaction.
  */
 async function _updateSpeciesLocale(db, labels) {
   const updatePromises = [];
@@ -4493,9 +4609,28 @@ async function _updateSpeciesLocale(db, labels) {
   } catch (error) {
     await db.runAsync("ROLLBACK");
     throw error;
+  } finally {
+    updateStmt.finalize()
+    updateChirpityStmt.finalize()
+    speciesSelectStmt.finalize()
   }
 }
 
+/**
+ * Updates the application's locale by modifying state and database entries, and optionally refreshes analysis results.
+ *
+ * This asynchronous function updates the global state with the new locale, applies the new locale to both the
+ * disk and memory databases by updating their species labels, and optionally refreshes the application's results
+ * and summary if requested. It ensures that database operations are performed within a locked context for concurrency
+ * safety, and performs a rollback in case of any error during the update process.
+ *
+ * @async
+ * @param {string} locale - The new locale identifier (e.g., "en-US").
+ * @param {Object} labels - An object mapping species IDs to their localized labels.
+ * @param {boolean} refreshResults - Indicates whether to refresh the results and summary following the locale update.
+ * @returns {Promise<void>} A promise that resolves when the locale update process is completed.
+ * @throws {Error} Propagates any error encountered during the update process after rolling back the database transaction.
+ */
 async function onUpdateLocale(locale, labels, refreshResults) {
   if (DEBUG) t0 = Date.now();
   await dbMutex.lock();
@@ -4598,12 +4733,17 @@ async function getLocations({ db = STATE.db, file }) {
 }
 
 /**
- * getIncludedIDs
- * Helper function to provide a list of valid species for the filter.
- * Will look for a list in the STATE.included cache, and if not present,
- * will call setIncludedIDs to generate a new list
- * @param {*} file
- * @returns a list of IDs included in filtered results
+ * Retrieves a list of included species IDs for filtering results based on the current state and file metadata.
+ *
+ * This asynchronous helper function returns a list of valid species IDs from the cache (STATE.included).
+ * If the cache entry is missing:
+ * - For "location" or "nocturnal" listings (when STATE.local is true), it derives the latitude, longitude, and week from the provided file metadata (or from STATE if no file is provided),
+ *   constructs a location key, and calls setIncludedIDs to populate the cache.
+ * - For other list types, it calls setIncludedIDs if the relevant cache object is not defined.
+ *
+ * @async
+ * @param {*} [file] - An optional identifier used to look up file metadata in METADATA. If provided, its metadata will be used to extract location (lat, lon) and week data.
+ * @returns {Promise<Array<number>>} A promise that resolves to an array of species IDs included in the filtered results.
  */
 async function getIncludedIDs(file) {
   let lat, lon, week;
@@ -4640,14 +4780,14 @@ async function getIncludedIDs(file) {
     return STATE.included[STATE.model][STATE.list];
   }
 }
-
 /**
+
  * setIncludedIDs
  * Calls list_worker for a new list, checks to see if a pending promise already exists
  * @param {*} lat
  * @param {*} lon
  * @param {*} week
- * @returns
+ * @returns {Array.<(Number[])>}
  */
 
 let LIST_CACHE = {};
@@ -4942,6 +5082,7 @@ async function convertFile(
         command.seekInput(start).duration(end - start);
         scaleFactor = row.duration / (end - start);
         row.duration = end - start;
+        
       }
     }
     command
@@ -4956,8 +5097,8 @@ async function convertFile(
         utimesSync(fullFilePath, { atime: Date.now(), mtime: newfileMtime });
 
         db.run(
-          "UPDATE files SET archiveName = ? WHERE id = ?",
-          [dbArchiveName, row.id],
+          "UPDATE files SET archiveName = ?, duration = ? WHERE id = ?",
+          [dbArchiveName, row.duration, row.id],
           (err) => {
             if (err) {
               console.error("Error updating the database:", err);

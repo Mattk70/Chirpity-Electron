@@ -151,14 +151,14 @@
     "record-entry": {
       "record-entry-modal-label": "Datensatz bearbeiten",
       "call-count": "Rufanzahl",
-      "record-label": "Ruftyp",
+      "record-label": "Etikett",
       "label-local": "Lokal",
       "label-nocmig": "Nocmig",
       "label-unknown": "Nicht angegeben",
       "record-comment": "Kommentare",
       "record-add": "Hinzufügen"
   },
-    "headings": ["Einstellungen","Erkennungen",
+    "headings": ["Einstellungen","Erkennungen", "Tastaturzuweisungen",
       "Standardstandort",
       "System",
       "Audioeinstellungen",

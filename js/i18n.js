@@ -38,6 +38,7 @@ const i18nToasts = { // UI.js
         noDetectionsDetailed2: 'No detections found in ${file}. Searched for records using the ${list} list and having a minimum confidence of ${confidence}%',
         dbNotLoaded: "The database has not finished loading. The check for the presence of the file in the archive has been skipped",
         noSnameFound: "Cannot find '${sname}' (at line ${line} of the custom list) in the <strong>${model}</strong> model list. <strong>Tips:</strong> <ol><li>Is your list for the <strong>${model}</strong> model? If not, change the model in settings</li><li>Check for a typo in your species name</li></ol>",
+        noSpecies: "No species found with the name ${cname}",
         noArchive: "Cannot access archive location: ${location}. <br> Operation aborted",
         noWriteArchive: "Cannot write to archive location: ${location}. <br> Operation aborted",
         multiDay: "Multi-day operations are not yet supported: ${file} will not be trimmed",
@@ -100,6 +101,7 @@ const i18nToasts = { // UI.js
         noDetectionsDetailed2: 'Ingen detektioner fundet i ${file}. Søgte efter poster ved hjælp af ${list}-listen og med en minimumskonfidens på ${confidence}%',
         dbNotLoaded: "Databasen er ikke færdig med at indlæse. Tjekket for filens tilstedeværelse i arkivet er blevet sprunget over",
         noSnameFound: "Kan ikke finde '${sname}' (på linje ${line} i den brugerdefinerede liste) i <strong>${model}</strong>-listen. <strong>Tips:</strong> <ol><li>Er din liste til <strong>${model}</strong>-modellen? Hvis ikke, skal du ændre modellen i indstillingerne</li><li>Kontroller for en stavefejl i dit artsnavn</li></ol>",
+        noSpecies: "Ingen arter fundet med navnet ${cname}",
         noArchive: "Kan ikke få adgang til arkivplaceringen: ${location}. <br> Operationen blev afbrudt",
         noWriteArchive: "Kan ikke skrive til arkivplaceringen: ${location}. <br> Operationen blev afbrudt",
         multiDay: "Flere dages operationer understøttes endnu ikke: ${file} vil ikke blive beskåret",
@@ -162,6 +164,7 @@ const i18nToasts = { // UI.js
         noDetectionsDetailed2: 'Keine Detektionen in ${file} gefunden. Es wurde nach Einträgen mit der ${list}-Liste und einer Mindestkonfidenz von ${confidence}% gesucht.',
         dbNotLoaded: "Die Datenbank ist noch nicht vollständig geladen. Die Überprüfung auf das Vorhandensein der Datei im Archiv wurde übersprungen.",
         noSnameFound: "Kann '${sname}' (in Zeile ${line} der benutzerdefinierten Liste) nicht in der <strong>${model}</strong>-Liste finden. <strong>Tipps:</strong> <ol><li>Ist Ihre Liste für das <strong>${model}</strong>-Modell? Wenn nicht, ändern Sie das Modell in den Einstellungen</li><li>Überprüfen Sie auf Tippfehler im Artbegriff</li></ol>",
+        noSpecies: "Keine Arten mit dem Namen ${cname} gefunden",
         noArchive: "Kann auf Archivstandort ${location} nicht zugreifen. <br> Vorgang abgebrochen",
         noWriteArchive: "Kann nicht in Archivstandort ${location} schreiben. <br> Vorgang abgebrochen",
         multiDay: "Mehrtägige Operationen werden noch nicht unterstützt: ${file} wird nicht beschnitten",
@@ -224,6 +227,7 @@ const i18nToasts = { // UI.js
         noDetectionsDetailed2: 'No se han encontrado detecciones en ${file}. Se han buscado registros usando la lista ${list} con una confianza mínima de ${confidence}%',
         dbNotLoaded: "La base de datos no ha terminado de cargarse. Se ha omitido la comprobación de la presencia de la grabación en el archivo",
         noSnameFound: "No se puede encontrar '${sname}' (en la línea ${line} de la lista personalizada) en la lista <strong>${model}</strong>. <strong>Consejos:</strong> <ol><li>¿Está su lista para el modelo <strong>${model}</strong>? Si no es así, cambie el modelo en la configuración</li><li>Mire si hay algún error ortográfico en el nombre de la especie</li></ol>",
+        noSpecies: "No se encontraron especies con el nombre ${cname}",
         noArchive: "No se puede acceder a la ubicación del archivo: ${location}. <br> Operación interrumpida",
         noWriteArchive: "No se puede escribir en la ubicación del archivo: ${location}. <br> Operación abortada",
         multiDay: "Las operaciones de varios días no son compatibles todavía: ${file} no se recortará",
@@ -286,6 +290,7 @@ const i18nToasts = { // UI.js
         noDetectionsDetailed2: 'Aucune détection trouvée dans ${file}. Recherche de dossiers utilisant la liste ${list} avec une confiance minimale de ${confidence}%',
         dbNotLoaded: "La base de données n'a pas encore fini de se charger. La vérification de la présence du fichier dans l'archive a été ignorée",
         noSnameFound: "Impossible de trouver '${sname}' (à la ligne ${line} de la liste personnalisée) dans la liste <strong>${model}</strong>. <strong>Conseils :</strong> <ol><li>Votre liste est-elle pour le modèle <strong>${model}</strong> ? Si ce n'est pas le cas, changez le modèle dans les paramètres</li><li>Vérifiez s'il y a une faute de frappe dans le nom de votre espèce</li></ol>",
+        noSpecies: "Aucune espèce trouvée avec le nom ${cname}",
         noArchive: "Impossible d'accéder à l'emplacement de l'archive : ${location}. <br> Opération abandonnée",
         noWriteArchive: "Impossible d'écrire dans l'emplacement de l'archive : ${location}. <br> Opération abandonnée",
         multiDay: "Les opérations multi-jours ne sont pas encore supportées : ${file} ne sera pas recadré",
@@ -347,6 +352,7 @@ const i18nToasts = { // UI.js
         noDetectionsDetailed2: '${file}に検出が見つかりませんでした。${list}リストを使用して、最小信頼度${confidence}%のレコードを検索しました。',
         dbNotLoaded: "データベースの読み込みが完了していません。アーカイブ内のファイルの存在確認はスキップされました",
         noSnameFound: "カスタムリストの${line}行目にある'${sname}'が<strong>${model}</strong>モデルリストに見つかりません。<strong>ヒント:</strong> <ol><li>リストは<strong>${model}</strong>モデル用ですか？そうでない場合は、設定でモデルを変更してください</li><li>種名にタイプミスがないか確認してください</li></ol>",
+        noSpecies: "名前が ${cname} の種は見つかりませんでした",
         noArchive: "アーカイブ場所にアクセスできません: ${location}. <br> 操作が中止されました",
         noWriteArchive: "アーカイブ場所に書き込めません: ${location}. <br> 操作が中止されました",
         multiDay: "マルチデイ操作はまだサポートされていません: ${file}はトリミングされません",
@@ -408,6 +414,7 @@ const i18nToasts = { // UI.js
         noDetectionsDetailed2: 'Geen detecties gevonden in ${file}. Zocht naar records met de ${list} lijst en een minimale betrouwbaarheid van ${confidence}%',
         dbNotLoaded: "De database is nog niet volledig geladen. De controle op de aanwezigheid van het bestand in het archief is overgeslagen",
         noSnameFound: "Kan '${sname}' niet vinden (op regel ${line} van de aangepaste lijst) in de <strong>${model}</strong> lijst. <strong>Tips:</strong> <ol><li>Is je lijst voor het <strong>${model}</strong> model? Zo niet, wijzig het model in de instellingen</li><li>Controleer op typfouten in de naam van je soort</li></ol>",
+        noSpecies: "Geen soorten gevonden met de naam ${cname}",
         noArchive: "Kan archieflocatie niet openen: ${location}. <br> Operatie afgebroken",
         noWriteArchive: "Kan niet schrijven naar archieflocatie: ${location}. <br> Operatie afgebroken",
         multiDay: "Meerdaagse operaties worden nog niet ondersteund: ${file} zal niet worden bijgesneden",
@@ -470,6 +477,7 @@ const i18nToasts = { // UI.js
         noDetectionsDetailed2: 'Nenhuma detecção encontrada em ${file}. Buscou por registros usando a lista ${list} com uma confiança mínima de ${confidence}%',
         dbNotLoaded: "O banco de dados não terminou de carregar. A verificação da presença do arquivo no arquivo foi ignorada",
         noSnameFound: "Não foi possível encontrar '${sname}' (na linha ${line} da lista personalizada) na lista <strong>${model}</strong>. <strong>Dicas:</strong> <ol><li>Sua lista é para o modelo <strong>${model}</strong>? Se não, altere o modelo nas configurações</li><li>Verifique se há erros de digitação no nome da espécie</li></ol>",
+        noSpecies: "Nenhuma espécie encontrada com o nome ${cname}",
         noArchive: "Não foi possível acessar a localização do arquivo: ${location}. <br> Operação abortada",
         noWriteArchive: "Não foi possível gravar na localização do arquivo: ${location}. <br> Operação abortada",
         multiDay: "Operações multi-dia ainda não são suportadas: ${file} não será cortado",
@@ -532,6 +540,7 @@ const i18nToasts = { // UI.js
         noDetectionsDetailed2: 'Не найдено обнаружеий в ${file}.  Поиск записей производился с использованием списка  ${list} с минимальной достоверностью ${confidence}%',
         dbNotLoaded: "Загрузка базы данных не завершена. Проверка наличия файла в архиве была пропущена",
         noSnameFound: "Не удалось найти '${sname}' (в строке ${line} пользовательского списка) в списке <strong>${model}</strong>. <strong>Советы:</strong> <ol><li>Подходит ли ваш список для модели <strong>${model}</strong>? Если нет, измените модель в настройках</li><li>Проверьте, нет ли опечатки в названии вашего вида</li></ol>",
+        noSpecies: "Не найдено видов с именем ${cname}",
         noArchive: "Не удается получить доступ к архиву: ${location}. <br> Операция прервана",
         noWriteArchive: "Не удается записать в архив по адресу: ${location}. <br> Операция прервана",
         multiDay: "Многодневные операции еще не поддерживаются: ${file} не будет обрезан",
@@ -594,6 +603,7 @@ const i18nToasts = { // UI.js
         noDetectionsDetailed2: 'Inga detektioner hittades i ${file}. Sökta efter poster med hjälp av ${list} listan och med en minimi-konfidens på ${confidence}%',
         dbNotLoaded: "Databasen har inte laddats klart. Kontroll av filens närvaro i arkivet har hoppats över",
         noSnameFound: "Kunde inte hitta '${sname}' (på rad ${line} i den anpassade listan) i <strong>${model}</strong> listan. <strong>Tips:</strong> <ol><li>Är din lista för modellen <strong>${model}</strong>? Om inte, ändra modellen i inställningarna</li><li>Kontrollera om det finns ett stavfel i artnamnet</li></ol>",
+        noSpecies: "Inga arter hittades med namnet ${cname}",
         noArchive: "Kunde inte komma åt arkivplats: ${location}. <br> Åtgärden avbröts",
         noWriteArchive: "Kunde inte skriva till arkivplats: ${location}. <br> Åtgärden avbröts",
         multiDay: "Flerdagsoperationer stöds inte än: ${file} kommer inte att trimmas",
@@ -656,6 +666,7 @@ const i18nToasts = { // UI.js
         noDetectionsDetailed2: '在 ${file} 中没有找到检测结果。搜索了 ${list} 列表中符合最低置信度 ${confidence}% 的记录。',
         dbNotLoaded: "数据库尚未加载完成。跳过了检查文件是否存在于档案中的步骤",
         noSnameFound: "无法在 <strong>${model}</strong> 列表中找到 '${sname}'（位于自定义列表的第 ${line} 行）。<strong>提示：</strong><ol><li>您的列表是针对 <strong>${model}</strong> 模型的吗？如果不是，请在设置中更改模型。</li><li>检查物种名称是否有拼写错误。</li></ol>",
+        noSpecies: "未找到名称为 ${cname} 的物种",
         noArchive: "无法访问档案位置: ${location}. <br> 操作已中止",
         noWriteArchive: "无法写入档案位置: ${location}. <br> 操作已中止",
         multiDay: "暂不支持多日操作: ${file} 将不会被修剪",
@@ -705,7 +716,10 @@ const i18nHeadings = {
         notes: 'Notes',
         max: 'Maximum',
         detections: 'Detections',
-        location: 'Location'
+        location: 'Location',
+        search: "Species Search",
+        searchPrompt: 'Use Species Search to load species',
+        reviewed: 'Reviewed'
     },
     da: {
         position: ['Position', "Sorter resultater efter detektionstid"],
@@ -716,7 +730,10 @@ const i18nHeadings = {
         notes: 'Noter',
         max: 'Maksimum',
         detections: 'Detektioner',
-        location: "Placering"
+        location: "Placering",
+        "search": "Artsøgning",
+        "searchPrompt": "Brug artsøgning til at indlæse arter",
+        "reviewed": "Gennemgået"
     },
     de: {
         position: ['Position', "Ergebnisse nach Erkennungszeit sortieren"],
@@ -727,7 +744,10 @@ const i18nHeadings = {
         notes: 'Notizen',
         max: 'Maximum',
         detections: 'Erkennungen',
-        location: "Standort"
+        location: "Standort",
+        "search": "Artensuche",
+        "searchPrompt": "Verwenden Sie die Artensuche, um Arten zu laden",
+        "reviewed": "Überprüft"
     },
     es: {
         position: ['Posición', "Ordenar resultados por la hora de detección"],
@@ -738,7 +758,10 @@ const i18nHeadings = {
         notes: 'Notas',
         max: 'Máximo',
         detections: 'Detecciones',
-        location: "Ubicación"
+        location: "Ubicación",
+        "search": "Búsqueda de especies",
+        "searchPrompt": "Usa la búsqueda de especies para cargar especies",
+        "reviewed": "Revisado"
     },
     fr: {
         position: ['Position', "Trier les résultats par heure de détection"],
@@ -749,7 +772,10 @@ const i18nHeadings = {
         notes: 'Notes',
         max: 'Maximum',
         detections: 'Détections',
-        location: "Emplacement"
+        location: "Emplacement",
+        "search": "Recherche d'espèces",
+        "searchPrompt": "Utilisez la recherche d'espèces pour charger des espèces",
+        "reviewed": "Révisé"
     },
     ja: {
         position: ['位置', "検出時間で結果を並べ替える"],
@@ -760,7 +786,10 @@ const i18nHeadings = {
         notes: 'ノート',
         max: '最大',
         detections: '検出',
-        location: '場所'
+        location: '場所',
+        "search": "種検索",
+        "searchPrompt": "種検索を使用して種を読み込む",
+        "reviewed": "確認済み"
     },
     nl: {
         position: ['Positie', "Sorteer resultaten op detectietijd"],
@@ -771,7 +800,10 @@ const i18nHeadings = {
         notes: 'Notities',
         max: 'Maximum',
         detections: 'Detecties',
-        location: "Locatie"
+        location: "Locatie",
+        "search": "Soeken op soort",
+        "searchPrompt": "Gebruik Soeken op soort om soorten te laden",
+        "reviewed": "Beoordeeld"
     },
     pt: {
         position: ['Posição', "Ordenar resultados por tempo de detecção"],
@@ -782,7 +814,10 @@ const i18nHeadings = {
         notes: 'Notas',
         max: 'Máximo',
         detections: 'Detecções',
-        location: "Localização"
+        location: "Localização",
+        "search": "Pesquisa de espécies",
+        "searchPrompt": "Use a pesquisa de espécies para carregar espécies",
+        "reviewed": "Revisado"
     },
     ru: {
         position: ['Позиция', "Сортировать результаты по времени обнаружения"],
@@ -793,7 +828,10 @@ const i18nHeadings = {
         notes: 'Заметки',
         max: 'Максимум',
         detections: 'Обнаружения',
-        location:  "Местоположение"
+        location:  "Местоположение",
+        "search": "Поиск видов",
+        "searchPrompt": "Используйте поиск видов для загрузки видов",
+        "reviewed": "Просмотрено"
     },
     sv: {
         position: ['Position', "Sortera resultat efter upptäcktstid"],
@@ -804,7 +842,10 @@ const i18nHeadings = {
         notes: 'Anteckningar',
         max: 'Maximum',
         detections: 'Upptäckter',
-        location: "Plats"
+        location: "Plats",
+        "search": "Artersökning",
+        "searchPrompt": "Använd artersökning för att ladda arter",
+        "reviewed": "Granskad"
     },
     zh: {
         position: ['位置', "按检测时间排序结果"],
@@ -815,7 +856,10 @@ const i18nHeadings = {
         notes: '备注',
         max: '最大值',
         detections: '检测',
-        location: "位置"
+        location: "位置",
+        "search": "物种搜索",
+        "searchPrompt": "使用物种搜索加载物种",
+        "reviewed": "已审核"
     }
 };
 
@@ -2868,7 +2912,66 @@ const IUCNLabel = {
     //     'EW': 'Estinto in natura',
     //     'EX': 'Estinto'
     // },
-};
+}; 
+
+const i18nSelect = {
+    en: {
+      selectLabel: "Select a label",
+      addLabel: "Create new label", 
+      enterNewLabel: "Enter a new label"
+    },
+    da: {
+      selectLabel: "Vælg en etiket",
+      addLabel: "Opret ny etiket",
+      enterNewLabel: "Indtast en ny etiket"
+    },
+    de: {
+      selectLabel: "Wähle ein Etikett",
+      addLabel: "Erstelle ein neues Etikett",
+      enterNewLabel: "Gib ein neues Etikett ein"
+    },
+    es: {
+      selectLabel: "Selecciona una etiqueta",
+      addLabel: "Crea una nueva etiqueta",
+      enterNewLabel: "Introduce una nueva etiqueta"
+    },
+    fr: {
+      selectLabel: "Sélectionne une étiquette",
+      addLabel: "Crée une nouvelle étiquette",
+      enterNewLabel: "Entre une nouvelle étiquette"
+    },
+    ja: {
+      selectLabel: "ラベルを選択",
+      addLabel: "新しいラベルを作成",
+      enterNewLabel: "新しいラベルを入力"
+    },
+    nl: {
+      selectLabel: "Selecteer een label",
+      addLabel: "Maak een nieuw label",
+      enterNewLabel: "Voer een nieuw label in"
+    },
+    pt: {
+      selectLabel: "Seleciona uma etiqueta",
+      addLabel: "Cria nova etiqueta",
+      enterNewLabel: "Introduz uma nova etiqueta"
+    },
+    ru: {
+      selectLabel: "Выбери метку",
+      addLabel: "Создай новую метку",
+      enterNewLabel: "Введи новую метку"
+    },
+    sv: {
+      selectLabel: "Välj en etikett",
+      addLabel: "Skapa ny etikett",
+      enterNewLabel: "Ange en ny etikett"
+    },
+    zh: {
+      selectLabel: "选择一个标签",
+      addLabel: "创建新标签",
+      enterNewLabel: "输入新标签"
+    }
+  };
+  
 
 async function localiseUI(locale) {
     locale = locale.replace(/_.*$/, '');
@@ -2991,4 +3094,4 @@ async function localiseUI(locale) {
     }
 }
 
-export {i18nAll, i18nSpeciesList,i18nHeadings, i18nContext, i18nLocation, i18nForm, i18nHelp, i18nToasts, i18nTitles, i18nLIST_MAP, i18nLists, IUCNLabel, i18nLocate, localiseUI}
+export {i18nAll, i18nSpeciesList,i18nHeadings, i18nContext, i18nLocation, i18nForm, i18nHelp, i18nToasts, i18nTitles, i18nLIST_MAP, i18nLists, IUCNLabel, i18nLocate,i18nSelect, localiseUI}

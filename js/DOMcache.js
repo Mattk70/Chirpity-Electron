@@ -339,6 +339,12 @@ const DOM = {
     }
     return this._resultTableElement;
   },
+  get settingsForm() {
+    if (!this._settingsForm) {
+      this._settingsForm = document.getElementById("settingsForm");
+    }
+    return this._settingsForm;
+  },
   get spectrogramWrapper() {
     if (!this._spectrogramWrapper) {
       this._spectrogramWrapper = document.getElementById("spectrogramWrapper");
@@ -363,17 +369,17 @@ const DOM = {
     }
     return this._specDetections;
   },
+  get suggestionsList() {
+    if (!this._suggestionsList) {
+      this._suggestionsList = document.getElementById('bird-suggestions');
+    }
+    return this._suggestionsList;
+  },
   get summaryTable() {
     if (!this._summaryTable) {
       this._summaryTable = document.getElementById("summaryTable");
     }
     return this._summaryTable;
-  },
-  get resultHeader() {
-    if (!this._resultHeader) {
-      this._resultHeader = document.getElementById("resultsHead");
-    }
-    return this._resultHeader;
   },
   get threadSlider() {
     if (!this._threadSlider) {
@@ -409,6 +415,9 @@ const DOM = {
   },
   get filename() {
     return document.getElementById("filename");
+  },
+  get resultHeader() {
+    return document.getElementById("resultsHead");
   },
   get resultTable() {
     return document.getElementById("resultTableBody");

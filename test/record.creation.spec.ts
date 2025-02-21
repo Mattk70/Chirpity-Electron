@@ -106,24 +106,33 @@ test('Can create/edit a manual record', async () => {
   test.slow(); // 3x timeout seconds
   console.log('starting record creation test')
   await runExampleAnalysis(page,'chirpity');
+  await page.waitForTimeout(500);
+
   await page.locator('#result1').click({button: 'right'});
-  await page.locator('#create-manual-record').click();
-  const birdList = page.locator('#bird-list-all');
-  // @ts-ignore
-  const selectedValue = await birdList.evaluate(select => select.value);
-  // The edit form has the current species selected
-  console.log('record creation test: before first expect')
-  expect(selectedValue === 'Redwing (call)' )
-  await birdList.selectOption('Ring Ouzel (call)');
+  await page.locator('#result1').click({button: 'right'});
+  const editRecord = await page.locator('#create-manual-record');
+  await editRecord.click();
+  // Check that div#selected-bird innerText starts with "Redwing (call)"
+  const selectedBird = page.locator('div#selected-bird');
+  await expect(selectedBird).toHaveText(/^Redwing \(call\)/);
+
+  // Click on the bird search input and type 'ring o'
+  // await page.locator('#bird-autocomplete').click();
+  await page.locator('#bird-autocomplete').fill('ring o');
+
+  // Locate and click the first suggestion in the list
+  await page.locator('#contentWrapper li:nth-of-type(1)').click();
+
+  // Check that div#selected-bird innerText starts with "Ring Ouzel (call)"
+  await expect(selectedBird).toHaveText(/^Ring Ouzel \(call\)/);
   await page.locator('#call-count').fill('3');
   await page.locator('#record-comment').fill('a test comment');
   await page.locator('#record-add').click();
-  const cname = await page.locator('#result1 td.cname > span.material-symbols-outlined')
-  const confidence = await cname.textContent();
-  // Confidence has a checkmark
+  const confidence = await page.locator('#result1 td.cname');
 
+  // Confidence has been changed to Person_add icon
   console.log('record creation test: before second expect')
-  expect(confidence).toBe('verified');
+  expect(confidence).toHaveText(/Ring Ouzel \(call\)\s+person_add/);
   const comment =  await (await page.locator('#result1  td.comment  span')).getAttribute('title');
   // Comment saved
 

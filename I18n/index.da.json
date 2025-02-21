@@ -151,14 +151,14 @@
       "record-entry": {
         "record-entry-modal-label": "Rediger post",
         "call-count": "Antal fuglestemmer",
-        "record-label": "Fuglekaldtype",
+        "record-label": "Etiket",
         "label-local": "Lokalt",
         "label-nocmig": "Nocmig",
         "label-unknown": "Ikke angivet",
         "record-comment": "Kommentarer",
         "record-add": "Tilføj"
     },
-      "headings": ["Indstillinger","Detektioner",
+      "headings": ["Indstillinger","Detektioner", "Tastaturtildelinger",
         "Standardplacering",
         "System",
         "Lydindstillinger",

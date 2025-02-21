@@ -1,10 +1,11 @@
 {
   "name": "Chirpity",
-  "version": "3.0.3",
+  "version": "3.1.0",
   "description": "Chirpity Nocmig",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "docs": "jsdoc -c jsdoc.json",
     "prebuild": "node prebuild.js",
     "preexport": "node prebuild.js",
     "preAppImage": "node prebuild.js",
@@ -43,6 +44,7 @@
       "**/*",
       "!test*${/*}",
       "!build*${/*}",
+      "!docs*${/*}",
       "!custom*{/*}",
       "!.github${/*}",
       "!.vscode${/*}",
@@ -59,6 +61,8 @@
       "!custom_tfjs${/*}",
       "!*git*${/*}",
       "!package-lock.json",
+      "!jsdoc.json",
+      "!prebuild.js",
       "!yarn.lock",
       "!pyproject.toml",
       "!README.md",
@@ -170,9 +174,9 @@
   },
   "homepage": "https://chirpity.mattkirkland.co.uk",
   "devDependencies": {
-
     "@playwright/test": "^1.48.2",
     "@types/node": "^22.9.0",
+    "docdash": "^2.0.2",
     "electron": "27.3.11",
     "electron-builder": "^25.0.5",
     "electron-builder-squirrel-windows": "^25.0.5",
@@ -180,6 +184,7 @@
     "jest": "^29.7.0",
     "jest-playwright-preset": "^4.0.0",
     "jimp": "^1.6.0",
+    "jsdoc": "^4.0.4",
     "playwright": "^1.48.2",
     "terser": "5.22.0"
   },

@@ -151,14 +151,14 @@
     "record-entry": {
       "record-entry-modal-label": "Modifier l'enregistrement",
       "call-count": "Nombre de cris",
-      "record-label": "Type de cri",
+      "record-label": "Étiquette",
       "label-local": "Local",
       "label-nocmig": "Nocmig",
       "label-unknown": "Non spécifié",
       "record-comment": "Commentaires",
       "record-add": "Ajouter"
   },
-    "headings": ["Paramètres","Détections",
+    "headings": ["Paramètres","Détections", "Assignations de clavier",
       "Emplacement par défaut",
       "Système",
       "Préférences audio",

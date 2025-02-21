@@ -1,3 +1,7 @@
+/**
+ * @file Helper functions for managing state.
+ */
+
 const sqlite3 = require("sqlite3");
 
 export class State {
@@ -5,12 +9,13 @@ export class State {
     (this.db = db),
       (this.mode = "analyse"), // analyse, explore, chart
       (this.resultsSortOrder = "dateTime"),
+      this.resultsMetaSortOrder = '',
       (this.summarySortOrder = "cname ASC"),
       (this.filesToAnalyse = []),
       (this.limit = 500),
       (this.saved = new Set()), // list of files requested that are in the disk database
       (this.globalOffset = 0), // Current start number for unfiltered results
-      // filteredOffset is the only propoerty that is updated directly
+      // filteredOffset is the only property that is updated directly
       (this.filteredOffset = {}), // Current species start number for filtered results
       (this.selection = false),
       (this.blocked = []),
