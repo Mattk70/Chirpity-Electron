@@ -8269,11 +8269,23 @@ function updateSuggestions(input, element, preserveInput) {
   filtered.forEach(item => {
     const li = document.createElement('li');
     li.className = 'list-group-item';
-    li.innerHTML = item.styled;
+
+    const text = document.createElement('span');
+    text.textContent = item.cname;
+    const italic = document.createElement('i');
+    italic.textContent = item.sname;
+    li.appendChild(text);
+    li.appendChild(document.createElement('br'));
+    li.appendChild(italic);
+
     li.addEventListener('click', () => {
-      const selectedBird = document.getElementById('selected-bird')
-      selectedBird.innerHTML = li.innerHTML;
-      input.value = preserveInput ? item.cname : ''//+ '~' + item.sname;
+      const selectedBird = document.getElementById('selected-bird');
+      selectedBird.replaceChildren(
+        text.cloneNode(true),
+        document.createElement('br'),
+        italic.cloneNode(true)
+      );
+      input.value = preserveInput ? item.cname : '';
       input.dispatchEvent(new Event('change', { bubbles: true })); // fire the change event
       element.style.display = 'none';
     });
