@@ -42,7 +42,7 @@ jobs:
 
       - name: Minify JavaScript files
         run: |
-          npm minify
+          npm run minify
         shell: bash
 
       - name: Set platform-specific ffmpeg path
