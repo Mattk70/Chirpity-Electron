@@ -3866,7 +3866,7 @@ const GLOBAL_ACTIONS = {
   },
   PageDown: () => {
     if (currentBuffer) {
-      let position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, );
+      let position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
       windowOffsetSecs = windowOffsetSecs + windowLength;
       const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
       let fileToLoad;
@@ -5426,14 +5426,17 @@ diagnosticMenu.addEventListener("click", async function () {
  * @returns {void}
  */
 function activateResultFilters() {
-  const timeHeadings = document.getElementsByClassName("time-sort-icon");
-  const speciesHeadings = document.getElementsByClassName("species-sort-icon");
+  // Clone the result header and work on it in the fragment
+  const resultHeaderClone = DOM.resultHeader.cloneNode(true);
+
+  const timeHeadings = resultHeaderClone.getElementsByClassName("time-sort-icon");
+  const speciesHeadings = resultHeaderClone.getElementsByClassName("species-sort-icon");
   const sortOrderScore = STATE.resultsSortOrder.includes("score");
   const fragment = document.createDocumentFragment();
   // if (STATE.resultsMetaSortOrder){
   const state = STATE.resultsMetaSortOrder;
   const sortOrderMeta = state.replace(' ASC ', '').replace(' DESC ', '');
-  const metaHeadings = document.getElementsByClassName("meta-sort-icon");
+  const metaHeadings = resultHeaderClone.getElementsByClassName("meta-sort-icon");
   [...metaHeadings].forEach((heading) => {
     const hideIcon = state === '' || !heading.parentNode.id.includes(sortOrderMeta);
     heading.classList.toggle("d-none", hideIcon);
@@ -5442,11 +5445,9 @@ function activateResultFilters() {
     } else {
       heading.classList.remove("flipped");
     }
-  })
+  });
   // }
-  // Clone the result header and work on it in the fragment
-  const resultHeaderClone = DOM.resultHeader.cloneNode(true);
-  fragment.appendChild(resultHeaderClone);
+
 
   // Update time sort icons
   [...timeHeadings].forEach((heading) => {
@@ -5464,6 +5465,8 @@ function activateResultFilters() {
       heading.classList.remove("flipped");
     }
   });
+
+  fragment.appendChild(resultHeaderClone);
 
   // Add pointer icon to species summaries
   const summarySpecies = DOM.summaryTable.querySelectorAll(".cname");
