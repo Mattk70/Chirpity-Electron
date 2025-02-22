@@ -142,23 +142,28 @@ const BIRDNET_NOT_BIRDS = [
 ];
 
 const birdnetlabelFile = `../labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_en.txt`;
-const BIRDNET_LABELS = await fetch(birdnetlabelFile)
-  .then((response) => {
-    if (!response.ok) throw new Error("Network response was not ok");
-    return response.text();
-  })
-  .then((filecontents) => {
-    return filecontents.trim().split(/\r?\n/);
-  })
-  .catch((error) => {
-    console.error("There was a problem fetching the label file:", error);
-  });
+
+async function loadLabels(){
+  return  fetch(birdnetlabelFile)
+    .then((response) => {
+      if (!response.ok) throw new Error("Network response was not ok");
+      return response.text();
+    })
+    .then((filecontents) => {
+      return filecontents.trim().split(/\r?\n/);
+    })
+    .catch((error) => {
+      console.error("There was a problem fetching the label file:", error);
+    });
+}
 const ACTIVITY_INDEX = JSON.parse(
   fs.readFileSync(
     path.join(__dirname, "../nocturnal_activity_index.json"),
     "utf8"
   )
 );
+
+const BIRDNET_LABELS = await loadLabels();
 
 /* USAGE EXAMPLES:
 listWorker.postMessage({message: 'load'})
