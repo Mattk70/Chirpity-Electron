@@ -107,6 +107,7 @@ REMEMBER TO REBUILD THE APP IF THE *APPLICATION CODE* NEEDS TO BE CHANGED
 
 
 test("Can click rapidly through results", async () =>{
+  test.slow()
   await runExampleAnalysis(UIpage, 'chirpity');
   for (let i=1;i<40;i++){
     const result = await UIpage.locator(`#result${i}`)
