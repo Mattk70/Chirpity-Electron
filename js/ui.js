@@ -3866,7 +3866,7 @@ const GLOBAL_ACTIONS = {
   },
   PageDown: () => {
     if (currentBuffer) {
-      let position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, );
+      let position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
       windowOffsetSecs = windowOffsetSecs + windowLength;
       const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
       let fileToLoad;
