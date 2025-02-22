@@ -35,9 +35,9 @@ jobs:
           npm install
           echo "Install's status is ${{ job.status }}."
           
-      - name: Install Terser (for minification)
+      - name: Install esBuild (for minification)
         run: |
-          npm install terser --save-dev
+          npm install --save-exact --save-dev esbuild
         shell: bash
 
       - name: Minify JavaScript files
