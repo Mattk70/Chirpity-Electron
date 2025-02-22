@@ -7257,7 +7257,7 @@ async function createContextMenu(e) {
     xc.classList.add("d-none");
     contextDelete.classList.add("d-none");
   }
-  positionMenu(DOM.contextMenu, e);
+  setTimeout(() => positionMenu(DOM.contextMenu, e), 100);
 }
 
 function positionMenu(menu, event) {
