@@ -313,13 +313,17 @@ const createDB = async (file) => {
     await db.runAsync("CREATE INDEX idx_species_sname ON species(sname)");
     await db.runAsync("CREATE INDEX idx_species_cname ON species(cname)");
     if (archiveMode) {
-      // Only called when creating a new archive database
       const stmt = db.prepare("INSERT INTO species VALUES (?, ?, ?)");
-      for (let i = 0; i < LABELS.length; i++) {
-          const [sname, cname] = LABELS[i].split("_");
-          await stmt.runAsync(i, sname, cname);
+      try {
+        // Only called when creating a new archive database
+        for (let i = 0; i < LABELS.length; i++) {
+            const [sname, cname] = LABELS[i].split("_");
+            await stmt.runAsync(i, sname, cname);
+        }
+      } finally {
+        // Ensure stmt is finalized
+        stmt.finalize();
       }
-      stmt.finalize();
     } else {
       const filename = diskDB.filename;
       await db.runAsync("ATTACH ? as disk", filename);
@@ -771,13 +775,13 @@ async function handleMessage(e) {
     }
     case "update-tag": {
       try {
-        const stmt = STATE.db.prepare(`
-          INSERT OR REPLACE INTO tags (id, name) VALUES (?, ?)
-          ON CONFLICT(id) DO UPDATE SET name = excluded.name
-          `);
         const tag = args.alteredOrNew;
-        await stmt.runAsync(tag.id, tag.name )
-        stmt.finalize()
+        if (tag.id && tag.name){
+          const query  = STATE.db.runAsync(`
+            INSERT OR REPLACE INTO tags (id, name) VALUES (?, ?)
+            ON CONFLICT(id) DO UPDATE SET name = excluded.name
+            `, tag.id, tag.name);
+        }
         const result = await STATE.db.allAsync('SELECT id, name FROM tags');
         UI.postMessage({event: "tags", tags: result, init: false})
       } catch (error) {

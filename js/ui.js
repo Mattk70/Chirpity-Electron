@@ -4003,11 +4003,12 @@ const postBufferUpdate = ({
   goToRegion = false,
 }) => {
 
-  // Validate input parameters
+  /* Validate input parameters - removed as position is clamped before use
   if (position < 0 || position > 1) {
     console.error('Invalid buffer update position:', `Position: ${position}`);
     return;
-  }
+  } */
+ 
   STATE.regionsCompleted = false;
   fileLoaded = false;
   worker.postMessage({

@@ -35,6 +35,16 @@ jobs:
           npm install
           echo "Install's status is ${{ job.status }}."
           
+      - name: Install Terser (for minification)
+        run: |
+          npm install terser --save-dev
+        shell: bash
+
+      - name: Minify JavaScript files
+        run: |
+          npx terser ./js/*.js --compress --mangle --output ./js/
+        shell: bash
+
       - name: Set platform-specific ffmpeg path
         shell: bash
         run: |
@@ -54,9 +64,6 @@ jobs:
                         ffmpegProc.kill();\
                       }\
                     }, 5000);' ./node_modules/fluent-ffmpeg/lib/processor.js
-      
-          # uncomment to view changed file
-          #cat ./node_modules/fluent-ffmpeg/lib/processor.js
         shell: bash
 
       - name: Modify tracking code
@@ -68,7 +75,6 @@ jobs:
 
       # test application here
 
-      
       # Get the latest tag from origin/master
       - name: Get the latest tag on origin/master
         id: get_latest_tag
@@ -94,7 +100,6 @@ jobs:
             echo "New tag is not greater than the latest tag on origin/master. Skipping build."
             echo "skip_build=true" >> $GITHUB_ENV
           fi
-
 
       # Conditional build command for each OS
       - name: Build Electron application
