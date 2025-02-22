@@ -1182,7 +1182,7 @@ function getFileSQLAndParams(range) {
     // SQL += ` AND name IN  (${fileParams}) `;
     // params.push(...STATE.filesToAnalyse);
   } else if (["archive"].includes(STATE.mode)) {
-    SQL += ` AND ( name IN  (${fileParams}) `;
+    SQL += ` AND ( file IN  (${fileParams}) `;
     params.push(...STATE.filesToAnalyse);
     SQL += ` OR archiveName IN  (${fileParams}) ) `;
     const archivePath = STATE.archive.location + p.sep;
@@ -1213,7 +1213,7 @@ const prepSummaryStatement = (included) => {
   const params = [STATE.detect.confidence];
   let summaryStatement = `
     WITH ranked_records AS (
-        SELECT records.dateTime, records.confidence, files.name, files.archiveName, cname, sname, COALESCE(callCount, 1) as callCount, speciesID, isDaylight,
+        SELECT records.dateTime, records.confidence, files.name as file, files.archiveName, cname, sname, COALESCE(callCount, 1) as callCount, speciesID, isDaylight,
         RANK() OVER (PARTITION BY fileID, dateTime ORDER BY records.confidence DESC) AS rank
         FROM records
         JOIN files ON files.id = records.fileID
@@ -1269,7 +1269,7 @@ const getTotal = async ({
       : STATE.globalOffset);
   let SQL = ` WITH MaxConfidencePerDateTime AS (
         SELECT confidence,
-        speciesID,
+        speciesID, files.name as file,
         RANK() OVER (PARTITION BY fileID, dateTime ORDER BY records.confidence DESC) AS rank
         FROM records 
         JOIN files ON records.fileID = files.id 
@@ -1311,7 +1311,7 @@ const prepResultsStatement = (
         files.duration, 
         files.filestart, 
         fileID,
-        files.name,
+        files.name as file,
         files.archiveName,
         files.locationID,
         records.position, 
@@ -1349,7 +1349,7 @@ const prepResultsStatement = (
     params.push(...included);
   }
   if (STATE.selection) {
-    resultStatement += ` AND files.name = ? `;
+    resultStatement += ` AND file = ? `;
     params.push(FILE_QUEUE[0]);
   }
   if (STATE.locationID) {
@@ -1366,7 +1366,7 @@ const prepResultsStatement = (
     score,
     duration, 
     filestart, 
-    name as file, 
+    file, 
     archiveName,
     fileID,
     position, 
