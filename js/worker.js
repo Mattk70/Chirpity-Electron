@@ -43,6 +43,7 @@ let UI;
 let FILE_QUEUE = [];
 let INITIALISED = null;
 // Save console.warn and console.error functions
+const originalInfo = console.info;
 const originalWarn = console.warn;
 const originalError = console.error;
 
@@ -72,6 +73,20 @@ function customURLEncode(str) {
     })
     .replace(/%20/g, "+"); // Replace space with '+' instead of '%20'
 }
+
+// Override console.info to intercept and track information
+console.info = function () {
+  // Call the original console.warn to maintain default behavior
+  originalInfo.apply(console, arguments);
+
+  // Track the warning message using your tracking function
+  trackEvent(
+    STATE.UUID,
+    "Information",
+    arguments[0],
+    customURLEncode(arguments[1])
+  );
+};
 
 // Override console.warn to intercept and track warnings
 console.warn = function () {

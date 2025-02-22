@@ -32,6 +32,7 @@ async function openExampleFile(page: Page){
   
     await  page.locator('#navbarAnalysis').click()
     await page.locator('#analyse').click()
+    await page.locator('div.show > div.toast-header').waitFor({state: 'visible'})
     await  page.locator('#resultTableContainer').waitFor({state: 'visible'})
   }
 

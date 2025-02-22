@@ -174,6 +174,7 @@ test(`Nocmig analyse works and second result is 61%`, async () => {
 
 test("Amend file start dialog contains date", async () =>{
   await runExampleAnalysis(page, 'chirpity');
+  await page.waitForTimeout(500);
   await page.locator('#dropdownMenuButton').click({button: 'right'});
   await page.locator('#setFileStart').click();
   const fileStart = page.locator('#fileStart');
