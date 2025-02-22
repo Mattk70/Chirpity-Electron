@@ -3219,7 +3219,8 @@ const parsePredictions = async (response) => {
               sname: sname,
               score: confidence,
             };
-            sendResult(++index, result, false);
+            // sendResult(++index, result, false);
+            getResults()
             if (index > 499) {
               setGetSummaryQueryInterval(NUM_WORKERS);
               DEBUG &&
