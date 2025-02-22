@@ -20405,8 +20405,6 @@ const IUCNCache = {
 
 const IUCNtaxonomy = {
   // Form: "Clements": "BirdLife International"
-  "Actinodura cyanouroptera": "Siva cyanouroptera",
-  "Actinodura nipalensis": "Sibia nipalensis",
   "Acanthis cabaret": "Acanthis flammea",
   "Acanthis hornemanni": "Acanthis flammea", // Lumped redpolls
   "Actinodura cyanouroptera": "Siva cyanouroptera",

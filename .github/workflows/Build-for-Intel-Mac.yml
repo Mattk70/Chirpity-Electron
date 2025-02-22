@@ -42,7 +42,7 @@ jobs:
 
       - name: Minify JavaScript files
         run: |
-          npx terser ./js/*.js --compress --mangle --output ./js/ --ecma 2017 --keep_infinity true
+          npm minify
         shell: bash
 
       - name: Set platform-specific ffmpeg path
