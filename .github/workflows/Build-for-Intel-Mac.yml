@@ -122,7 +122,7 @@ jobs:
       - name: Modify tracking code
         run: |
           # Replace development tracking ID with production ID
-          sed -i.bak 's/ID_SITE\s*=\s*3;/ID_SITE = 2;/g' ./js/tracking.js && rm -f ./js/tracking.js.bak
+          sed -i.bak 's/\bID_SITE\s*=\s*3;/ID_SITE = 2;/g' ./js/tracking.js && rm -f ./js/tracking.js.bak
           cat ./js/tracking.js
       
         shell: bash
