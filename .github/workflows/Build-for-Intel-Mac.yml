@@ -18,6 +18,55 @@ jobs:
       - run: echo "💡 The ${{ github.repository }} repository has been cloned to the runner."
       - run: echo "🖥️ The workflow is now ready to test your code on the runner."
 
+      # Get the latest tag from origin/master
+      - name: Get the latest tag on origin/master
+        id: get_latest_tag
+        shell: bash
+        run: |
+          LATEST_TAG=$(gh api repos/${{ github.repository }}/tags --jq '.[0].name') 
+          echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
+
+      # Get the current pushed tag
+      - name: Get the current pushed tag
+        id: get_current_tag
+        shell: bash
+        run: |
+          current_tag="${GITHUB_REF##*/}"
+          echo "CURRENT_TAG=$current_tag" >> $GITHUB_ENV
+
+      # Check if the latest tag is a published release
+      - name: Check if latest tag is a published release
+        id: check_published
+        shell: bash
+        run: |
+          # Fetch release details for the latest tag
+          RELEASE_INFO=$(gh api repos/${{ github.repository }}/releases/tags/$LATEST_TAG || echo "not_found")
+
+          if [[ "$RELEASE_INFO" == "not_found" ]]; then
+            echo "LATEST_TAG_PUBLISHED=false" >> $GITHUB_ENV
+          else
+            IS_DRAFT=$(echo "$RELEASE_INFO" | jq -r '.draft')
+            if [[ "$IS_DRAFT" == "true" ]]; then
+              echo "LATEST_TAG_PUBLISHED=false" >> $GITHUB_ENV
+            else
+              echo "LATEST_TAG_PUBLISHED=true" >> $GITHUB_ENV
+            fi
+          fi
+
+      # Compare tags and decide if build should proceed
+      - name: Check if current tag is greater or if latest tag is a draft
+        id: check_tag
+        shell: bash
+        run: |
+          if [[ "$LATEST_TAG" == "$CURRENT_TAG" && "$LATEST_TAG_PUBLISHED" == "true" ]]; then
+            echo "New tag is the same as the latest published tag. Aborting build."
+            exit 1
+          fi
+
+          echo "Proceeding with build."
+
+
+
       - name: Setup node
         uses: actions/setup-node@v3
         with:
@@ -35,16 +84,6 @@ jobs:
           npm install
           echo "Install's status is ${{ job.status }}."
           
-      - name: Install esBuild (for minification)
-        run: |
-          npm install --save-exact --save-dev esbuild
-        shell: bash
-
-      - name: Minify JavaScript files
-        run: |
-          npm run minify
-        shell: bash
-
       - name: Set platform-specific ffmpeg path
         shell: bash
         run: |
@@ -73,37 +112,18 @@ jobs:
           cat ./js/tracking.js
         shell: bash
 
-      # test application here
+      # - name: Install esBuild (for minification)
+      #   run: |
+      #     npm install --save-exact --save-dev esbuild
+      #   shell: bash
 
-      # Get the latest tag from origin/master
-      - name: Get the latest tag on origin/master
-        id: get_latest_tag
-        shell: bash
-        run: |
-          LATEST_TAG=$(gh api repos/${{ github.repository }}/tags --jq '.[0].name') 
-          echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
-
-      # Get the current pushed tag
-      - name: Get the current pushed tag
-        id: get_current_tag
-        shell: bash
-        run: |
-          current_tag="${GITHUB_REF##*/}"
-          echo "CURRENT_TAG=$current_tag" >> $GITHUB_ENV
-
-      # Compare tags to decide if build should proceed
-      - name: Check if current tag is greater than the latest tag
-        id: check_tag
-        shell: bash
-        run: |
-          if [ "$(printf "%s\n%s" "$LATEST_TAG" "$CURRENT_TAG" | sort -V | tail -n 1)" != "$CURRENT_TAG" ]; then
-            echo "New tag is not greater than the latest tag on origin/master. Skipping build."
-            echo "skip_build=true" >> $GITHUB_ENV
-          fi
+      # - name: Minify JavaScript files
+      #   run: |
+      #     npm run minify
+      #   shell: bash
 
       # Conditional build command for each OS
       - name: Build Electron application
-        # if: env.skip_build != 'true'  # Only run this if the tag comparison was true
         shell: bash
         env:
           ELECTRON_BUILD_ARCH: x64
@@ -111,7 +131,6 @@ jobs:
           npm run build-mac-x64-pkg
       - run: echo "Build status is ${{ job.status }}."
       - name: Check installer exists
-        if: env.skip_build != 'true' # Only run this if the tag comparison was true
         shell: bash
         run: |
           # Retrieve the version from package.json
