@@ -24,38 +24,57 @@ jobs:
         shell: bash
         run: |
           LATEST_TAG=$(gh api repos/${{ github.repository }}/tags --jq '.[0].name') 
-          echo "LATEST_TAG=$LATEST_TAG" 
+          echo "LATEST_TAG=$LATEST_TAG"
           echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
 
-          # Get the current pushed tag
-          current_tag="${GITHUB_REF##*/}"
-          echo "CURRENT_TAG=$current_tag" >> $GITHUB_ENV
-          echo "CURRENT_TAG=$current_tag"
+      # Get the version from package.json
+      - name: Get the package version
+        id: get_package_version
+        shell: bash
+        run: |
+          PACKAGE_VERSION=$(jq -r .version package.json)
+          echo "PACKAGE_VERSION=$PACKAGE_VERSION"
+          echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> $GITHUB_ENV
 
-        
-          # Fetch release details for the latest tag
+      # Check if latest tag is a published release
+      - name: Check if latest tag is a published release
+        id: check_published
+        shell: bash
+        run: |
+          echo "Checking if the latest tag ($LATEST_TAG) is a published release..."
+          
           RELEASE_INFO=$(gh api repos/${{ github.repository }}/releases/tags/$LATEST_TAG || echo "not_found")
-
+          
           if [[ "$RELEASE_INFO" == "not_found" ]]; then
+            echo "No release found for $LATEST_TAG. Assuming it is not published."
             echo "LATEST_TAG_PUBLISHED=false" >> $GITHUB_ENV
           else
             IS_DRAFT=$(echo "$RELEASE_INFO" | jq -r '.draft')
             if [[ "$IS_DRAFT" == "true" ]]; then
+              echo "Latest tag ($LATEST_TAG) is a draft."
               echo "LATEST_TAG_PUBLISHED=false" >> $GITHUB_ENV
             else
+              echo "Latest tag ($LATEST_TAG) is published."
               echo "LATEST_TAG_PUBLISHED=true" >> $GITHUB_ENV
             fi
-              echo "LATEST_TAG_PUBLISHED=$LATEST_TAG_PUBLISHED"
           fi
 
-          # Compare tags and decide if build should proceed
-    
-          if [[ "$LATEST_TAG" == "$CURRENT_TAG" && "$LATEST_TAG_PUBLISHED" == "true" ]]; then
-            echo "New tag is the same as the latest published tag. Aborting build."
+          echo "LATEST_TAG_PUBLISHED=$LATEST_TAG_PUBLISHED"
+
+      # Compare package version with latest tag and decide if build should proceed
+      - name: Compare package version with latest tag
+        id: check_tag
+        shell: bash
+        run: |
+          echo "Comparing package.json version ($PACKAGE_VERSION) with latest tag ($LATEST_TAG)..."
+
+          if [[ "v$PACKAGE_VERSION" == "$LATEST_TAG" && "$LATEST_TAG_PUBLISHED" == "true" ]]; then
+            echo "Package version ($PACKAGE_VERSION) matches latest published tag ($LATEST_TAG). Aborting build."
             exit 1
+          else
+            echo "Package version ($PACKAGE_VERSION) does not match latest published tag ($LATEST_TAG) or the latest tag is a draft. Proceeding with build."
           fi
 
-          echo "Proceeding with build."
 
 
 
