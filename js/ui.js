@@ -192,7 +192,12 @@ const os = window.module.os;
 
 // Is this CI / playwright?
 const isTestEnv = window.env.TEST_ENV === "true";
-isTestEnv && console.log("Running in test environment");
+if (isTestEnv) {
+  // Make tracking no-op
+  tracking.trackVisit = () => {};
+  tracking.trackEvent = () => {}; 
+  console.log("Running in test environment");
+}  
 function hexToRgb(hex) {
   // Remove the '#' character if present
   hex = hex.replace(/^#/, "");

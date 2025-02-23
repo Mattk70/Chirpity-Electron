@@ -30,6 +30,13 @@ if (process.platform === "win32") {
   ntsuspend = require("ntsuspend");
   isWin32 = true;
 }
+// Is this CI / playwright?
+if (process.env.TEST_ENV) {
+  // Make tracking no-op
+  tracking.trackVisit = () => {};
+  tracking.trackEvent = () => {}; 
+  console.log("Worker in test environment");
+}  
 let DEBUG;
 
 let METADATA = {};
