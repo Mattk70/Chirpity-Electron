@@ -474,7 +474,7 @@ async function loadDB(path) {
         await diskDB.runAsync(`INSERT INTO files_new SELECT * FROM files`);
         await diskDB.runAsync(`DROP TABLE files;`);
         await diskDB.runAsync(`ALTER TABLE files_new RENAME TO files;`);
-        await diskDB.runAsync("DROP table db_upgrade");
+        await diskDB.runAsync("DROP table IF EXISTS db_upgrade");
         await diskDB.runAsync('END');
         await diskDB.runAsync("PRAGMA writable_schema=OFF");
         await diskDB.runAsync("PRAGMA foreign_keys = ON");
