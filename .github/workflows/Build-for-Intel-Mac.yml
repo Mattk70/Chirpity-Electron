@@ -76,7 +76,10 @@ jobs:
           fi
 
 
-
+      - name: Create and push a Git tag
+        run: |
+          git tag v${{ steps.get_current_tag.outputs.version }}
+          git push origin v${{ steps.get_current_tag.outputs.version }}
 
       - name: Setup node
         uses: actions/setup-node@v3
@@ -118,9 +121,10 @@ jobs:
 
       - name: Modify tracking code
         run: |
-          # Replace development with production tracking
-          sed -i.bak 's/\bID_SITE\s*=\s*3;/ID_SITE = 2;/g' ./js/tracking.js && rm -f ./js/tracking.js.bak
+          # Replace development tracking ID with production ID
+          sed -i.bak 's/ID_SITE\s*=\s*3;/ID_SITE = 2;/g' ./js/tracking.js && rm -f ./js/tracking.js.bak
           cat ./js/tracking.js
+      
         shell: bash
 
       # - name: Install esBuild (for minification)
