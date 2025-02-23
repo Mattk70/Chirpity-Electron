@@ -32,6 +32,10 @@ async function openExampleFile(page: Page){
   
     await  page.locator('#navbarAnalysis').click()
     await page.locator('#analyse').click()
+    await page.locator('div.show > div.toast-header').waitFor({
+      state: 'visible',
+      timeout: 60000 // Wait up to 60 seconds for the toast header to become visible
+    });
     await  page.locator('#resultTableContainer').waitFor({state: 'visible'})
   }
 

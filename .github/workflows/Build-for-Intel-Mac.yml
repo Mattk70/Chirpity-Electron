@@ -18,6 +18,69 @@ jobs:
       - run: echo "💡 The ${{ github.repository }} repository has been cloned to the runner."
       - run: echo "🖥️ The workflow is now ready to test your code on the runner."
 
+      # Get the latest tag from origin/master
+      - name: Get the latest tag on origin/master
+        id: get_latest_tag
+        shell: bash
+        run: |
+          LATEST_TAG=$(gh api repos/${{ github.repository }}/tags --jq '.[0].name') 
+          echo "LATEST_TAG=$LATEST_TAG"
+          echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
+
+      # Get the version from package.json
+      - name: Get the package version
+        id: get_package_version
+        shell: bash
+        run: |
+          PACKAGE_VERSION=$(jq -r .version package.json)
+          echo "PACKAGE_VERSION=$PACKAGE_VERSION"
+          echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> $GITHUB_ENV
+
+      # Check if latest tag is a published release
+      - name: Check if latest tag is a published release
+        id: check_published
+        shell: bash
+        run: |
+          echo "Checking if the latest tag ($LATEST_TAG) is a published release..."
+          
+          RELEASE_INFO=$(gh api repos/${{ github.repository }}/releases/tags/$LATEST_TAG || echo "not_found")
+          
+          if [[ "$RELEASE_INFO" == "not_found" ]]; then
+            echo "No release found for $LATEST_TAG. Assuming it is not published."
+            echo "LATEST_TAG_PUBLISHED=false" >> $GITHUB_ENV
+          else
+            IS_DRAFT=$(echo "$RELEASE_INFO" | jq -r '.draft')
+            if [[ "$IS_DRAFT" == "true" ]]; then
+              echo "Latest tag ($LATEST_TAG) is a draft."
+              echo "LATEST_TAG_PUBLISHED=false" >> $GITHUB_ENV
+            else
+              echo "Latest tag ($LATEST_TAG) is published."
+              echo "LATEST_TAG_PUBLISHED=true" >> $GITHUB_ENV
+            fi
+          fi
+
+          echo "LATEST_TAG_PUBLISHED=$LATEST_TAG_PUBLISHED"
+
+      # Compare package version with latest tag and decide if build should proceed
+      - name: Compare package version with latest tag
+        id: check_tag
+        shell: bash
+        run: |
+          echo "Comparing package.json version ($PACKAGE_VERSION) with latest tag ($LATEST_TAG)..."
+
+          if [[ "v$PACKAGE_VERSION" == "$LATEST_TAG" && "$LATEST_TAG_PUBLISHED" == "true" ]]; then
+            echo "Package version ($PACKAGE_VERSION) matches latest published tag ($LATEST_TAG). Aborting build."
+            exit 1
+          else
+            echo "Package version ($PACKAGE_VERSION) does not match latest published tag ($LATEST_TAG) or the latest tag is a draft. Proceeding with build."
+          fi
+
+
+      # - name: Create and push a Git tag
+      #   run: |
+      #     git tag v$PACKAGE_VERSION
+      #     git push origin v$PACKAGE_VERSION
+
       - name: Setup node
         uses: actions/setup-node@v3
         with:
@@ -54,51 +117,28 @@ jobs:
                         ffmpegProc.kill();\
                       }\
                     }, 5000);' ./node_modules/fluent-ffmpeg/lib/processor.js
-      
-          # uncomment to view changed file
-          #cat ./node_modules/fluent-ffmpeg/lib/processor.js
         shell: bash
 
       - name: Modify tracking code
         run: |
-          # Replace development with production tracking
-          sed -i.bak 's/\bID_SITE\s*=\s*3;/ID_SITE = 2;/g' ./js/tracking.js && rm -f ./js/tracking.js.bak
+          # Replace development tracking ID with production ID
+          sed -i.bak 's/ID_SITE\s*=\s*3;/ID_SITE = 2;/g' ./js/tracking.js && rm -f ./js/tracking.js.bak
           cat ./js/tracking.js
-        shell: bash
-
-      # test application here
-
       
-      # Get the latest tag from origin/master
-      - name: Get the latest tag on origin/master
-        id: get_latest_tag
         shell: bash
-        run: |
-          LATEST_TAG=$(gh api repos/${{ github.repository }}/tags --jq '.[0].name') 
-          echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
 
-      # Get the current pushed tag
-      - name: Get the current pushed tag
-        id: get_current_tag
-        shell: bash
-        run: |
-          current_tag="${GITHUB_REF##*/}"
-          echo "CURRENT_TAG=$current_tag" >> $GITHUB_ENV
+      # - name: Install esBuild (for minification)
+      #   run: |
+      #     npm install --save-exact --save-dev esbuild
+      #   shell: bash
 
-      # Compare tags to decide if build should proceed
-      - name: Check if current tag is greater than the latest tag
-        id: check_tag
-        shell: bash
-        run: |
-          if [ "$(printf "%s\n%s" "$LATEST_TAG" "$CURRENT_TAG" | sort -V | tail -n 1)" != "$CURRENT_TAG" ]; then
-            echo "New tag is not greater than the latest tag on origin/master. Skipping build."
-            echo "skip_build=true" >> $GITHUB_ENV
-          fi
-
+      # - name: Minify JavaScript files
+      #   run: |
+      #     npm run minify
+      #   shell: bash
 
       # Conditional build command for each OS
       - name: Build Electron application
-        # if: env.skip_build != 'true'  # Only run this if the tag comparison was true
         shell: bash
         env:
           ELECTRON_BUILD_ARCH: x64
@@ -106,13 +146,12 @@ jobs:
           npm run build-mac-x64-pkg
       - run: echo "Build status is ${{ job.status }}."
       - name: Check installer exists
-        if: env.skip_build != 'true' # Only run this if the tag comparison was true
         shell: bash
         run: |
           # Retrieve the version from package.json
           VERSION=$(jq -r '.version' package.json)
           # Construct the filename
-          FILENAME="Chirpity-$VERSION-x64.pkg"
+          FILENAME="Chirpity-$VERSION.pkg"
           # Check if the file exists
           if [ -f "./dist/$FILENAME" ]; then
             echo "Executable $FILENAME found in ./dist"

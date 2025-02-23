@@ -2,7 +2,7 @@
  * @file Helper functions for managing Matomo tracking.
  */
 
-const ID_SITE = 2;
+const ID_SITE = 3;
 let VISITOR;
 /**
  * Logs an event to the Matomo analytics system.
@@ -38,7 +38,7 @@ function trackEvent(uuid, event, action, name, value){
         .then(response => {
             if (! response.ok) throw new Error('Network response was not ok', response);
                     })
-        .catch(error => console.log('Error posting tracking:', error))  
+        .catch(error => console.log('Error posting tracking:', error))
 }
 
 function trackVisit(config){
@@ -72,7 +72,7 @@ function sendHeartbeat() {
         idsite: ID_SITE,         //  Matomo site ID
         rec: '1',            // Required to record the request
         ping: '1',           // Indicates this is a heartbeat request
-        visitorId: VISITOR // Replace with the actual visitor ID
+        visitorId: VISITOR 
     });
 
     fetch(`${url}?${params.toString()}`, {

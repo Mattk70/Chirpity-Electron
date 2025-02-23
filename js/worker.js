@@ -15,7 +15,7 @@ const { writeToPath } = require("@fast-csv/format");
 const merge = require("lodash.merge");
 import { State } from "./state.js";
 import { sqlite3, checkpoint, closeDatabase, Mutex } from "./database.js";
-import { trackEvent } from "./tracking.js";
+import { trackEvent as _trackEvent} from "./tracking.js";
 import { extractWaveMetadata } from "./metadata.js";
 
 let isWin32 = false;
@@ -30,6 +30,10 @@ if (process.platform === "win32") {
   ntsuspend = require("ntsuspend");
   isWin32 = true;
 }
+// Is this CI / playwright? Disable tracking
+const isTestEnv = process.env.TEST_ENV;
+const trackEvent = isTestEnv ? () => {} : _trackEvent;
+
 let DEBUG;
 
 let METADATA = {};
@@ -43,6 +47,7 @@ let UI;
 let FILE_QUEUE = [];
 let INITIALISED = null;
 // Save console.warn and console.error functions
+const originalInfo = console.info;
 const originalWarn = console.warn;
 const originalError = console.error;
 
@@ -72,6 +77,20 @@ function customURLEncode(str) {
     })
     .replace(/%20/g, "+"); // Replace space with '+' instead of '%20'
 }
+
+// Override console.info to intercept and track information
+console.info = function () {
+  // Call the original console.warn to maintain default behavior
+  originalInfo.apply(console, arguments);
+
+  // Track the warning message using your tracking function
+  trackEvent(
+    STATE.UUID,
+    "Information",
+    arguments[0],
+    customURLEncode(arguments[1])
+  );
+};
 
 // Override console.warn to intercept and track warnings
 console.warn = function () {
@@ -298,13 +317,17 @@ const createDB = async (file) => {
     await db.runAsync("CREATE INDEX idx_species_sname ON species(sname)");
     await db.runAsync("CREATE INDEX idx_species_cname ON species(cname)");
     if (archiveMode) {
-      // Only called when creating a new archive database
       const stmt = db.prepare("INSERT INTO species VALUES (?, ?, ?)");
-      for (let i = 0; i < LABELS.length; i++) {
-          const [sname, cname] = LABELS[i].split("_");
-          await stmt.runAsync(i, sname, cname);
+      try {
+        // Only called when creating a new archive database
+        for (let i = 0; i < LABELS.length; i++) {
+            const [sname, cname] = LABELS[i].split("_");
+            await stmt.runAsync(i, sname, cname);
+        }
+      } finally {
+        // Ensure stmt is finalized
+        stmt.finalize();
       }
-      stmt.finalize();
     } else {
       const filename = diskDB.filename;
       await db.runAsync("ATTACH ? as disk", filename);
@@ -455,7 +478,7 @@ async function loadDB(path) {
         await diskDB.runAsync(`INSERT INTO files_new SELECT * FROM files`);
         await diskDB.runAsync(`DROP TABLE files;`);
         await diskDB.runAsync(`ALTER TABLE files_new RENAME TO files;`);
-        await diskDB.runAsync("DROP table db_upgrade");
+        await diskDB.runAsync("DROP table IF EXISTS db_upgrade");
         await diskDB.runAsync('END');
         await diskDB.runAsync("PRAGMA writable_schema=OFF");
         await diskDB.runAsync("PRAGMA foreign_keys = ON");
@@ -756,13 +779,13 @@ async function handleMessage(e) {
     }
     case "update-tag": {
       try {
-        const stmt = STATE.db.prepare(`
-          INSERT OR REPLACE INTO tags (id, name) VALUES (?, ?)
-          ON CONFLICT(id) DO UPDATE SET name = excluded.name
-          `);
         const tag = args.alteredOrNew;
-        await stmt.runAsync(tag.id, tag.name )
-        stmt.finalize()
+        if (tag.id && tag.name){
+          const query  = STATE.db.runAsync(`
+            INSERT OR REPLACE INTO tags (id, name) VALUES (?, ?)
+            ON CONFLICT(id) DO UPDATE SET name = excluded.name
+            `, tag.id, tag.name);
+        }
         const result = await STATE.db.allAsync('SELECT id, name FROM tags');
         UI.postMessage({event: "tags", tags: result, init: false})
       } catch (error) {
@@ -3201,6 +3224,7 @@ const parsePredictions = async (response) => {
               score: confidence,
             };
             sendResult(++index, result, false);
+            //getResults()
             if (index > 499) {
               setGetSummaryQueryInterval(NUM_WORKERS);
               DEBUG &&
@@ -4828,7 +4852,7 @@ async function onSetCustomLocation({ lat, lon, place, files, db = STATE.db }) {
 }
 
 async function getLocations({ db = STATE.db, file }) {
-  const locations = await db.allAsync("SELECT * FROM locations ORDER BY place");
+  let locations = await db.allAsync("SELECT * FROM locations ORDER BY place");
   locations ??= [];
   UI.postMessage({
     event: "location-list",

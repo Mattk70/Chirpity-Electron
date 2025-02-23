@@ -3,7 +3,7 @@
  * Contains functions for rendering the spectrogram, updating settings, rendering the screen
  */
 
-import { trackVisit, trackEvent } from "./tracking.js";
+import { trackVisit as _trackVisit, trackEvent as _trackEvent} from "./tracking.js";
 import {checkMembership} from './member.js';
 import { DOM } from "./DOMcache.js";
 import { IUCNCache, IUCNtaxonomy } from "./IUCNcache.js";
@@ -192,7 +192,10 @@ const os = window.module.os;
 
 // Is this CI / playwright?
 const isTestEnv = window.env.TEST_ENV === "true";
-isTestEnv && console.log("Running in test environment");
+const trackVisit = isTestEnv ? () => {} : _trackVisit;
+const trackEvent = isTestEnv ? () => {} : _trackEvent;
+isTestEnv &&  console.log("Running in test environment");
+
 function hexToRgb(hex) {
   // Remove the '#' character if present
   hex = hex.replace(/^#/, "");
@@ -594,6 +597,7 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
   });
 
   wavesurfer.on("dblclick", centreSpec);
+  wavesurfer.on("click", () => REGIONS.clearRegions());
 
   wavesurfer.on("finish", function () {
     const bufferEnd = windowOffsetSecs + windowLength;
@@ -1763,14 +1767,14 @@ function createRegion(start, end, label, goToRegion, colour) {
     return;
   }
     // Check for overlapping regions
-  const hasOverlap = REGIONS.regions.some(region => {
-    return (start < region.end && end > region.start);
-  });
+  // const hasOverlap = REGIONS.regions.some(region => {
+  //   return (start < region.end && end > region.start);
+  // });
   
-  if (hasOverlap) {
-    console.warn('Region overlap detected');
-    return;
-  }
+  // if (hasOverlap) {
+  //   console.warn('Region overlap detected');
+  //   return;
+  // }
 
   REGIONS.addRegion({
     start: start,
@@ -2553,11 +2557,12 @@ const setUpWorkerMessaging = () => {
         }
         case "label-translation-needed": {
           // Called when the initial system locale isn't english
-          const locale = args.locale;
+          let locale = args.locale;
           let labelFile;
           if (config.list === "custom") {
             labelFile = config.customListFile[config.model];
           } else {
+            locale === 'pt' && (locale ='pt_PT')
             labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_${locale}.txt`;
           }
           readLabels(labelFile);
@@ -3398,7 +3403,7 @@ function initRegion() {
   });
 
   REGIONS.on("region-clicked", function (r, e) {
-    // e.stopPropagation()
+    e.stopPropagation()
     // Hide context menu
     DOM.contextMenu.classList.add("d-none");
     if (r.start !== activeRegion?.start){
@@ -4003,11 +4008,12 @@ const postBufferUpdate = ({
   goToRegion = false,
 }) => {
 
-  // Validate input parameters
+  /* Validate input parameters - removed as position is clamped before use
   if (position < 0 || position > 1) {
     console.error('Invalid buffer update position:', `Position: ${position}`);
     return;
-  }
+  } */
+ 
   STATE.regionsCompleted = false;
   fileLoaded = false;
   worker.postMessage({
@@ -6096,17 +6102,19 @@ DOM.gain.addEventListener("input", () => {
 function playRegion() {
   // Sanitise region (after zoom, start or end may be outside the windowlength)
   // I don't want to change the actual region length, so make a copy
-  const region = REGIONS.regions.find(
+  const region = REGIONS.regions?.find(
     (region) => region.start === activeRegion.start
   );
-  const myRegion = region;
-  myRegion.start = Math.max(0, myRegion.start);
-  // Have to adjust the windowlength so the finish event isn't fired - causing a page reload)
-  myRegion.end = Math.min(myRegion.end, windowLength * 0.995);
-  /* ISSUE if you pause at the end of a region, 
-    when 2 regions abut, the second region won't play*/
-  //   REGIONS.once('region-out', () => wavesurfer.pauseplayPromise = wavesurfer.play();
-  myRegion.play();
+  if (region){
+    const myRegion = region;
+    myRegion.start = Math.max(0, myRegion.start);
+    // Have to adjust the windowlength so the finish event isn't fired - causing a page reload)
+    myRegion.end = Math.min(myRegion.end, windowLength * 0.995);
+    /* ISSUE if you pause at the end of a region, 
+      when 2 regions abut, the second region won't play*/
+      REGIONS.once('region-out', () => wavesurfer.pause());
+    myRegion.play();
+  }
 }
 // Audio preferences:
 
@@ -6316,18 +6324,7 @@ document.addEventListener("click", function (e) {
         .catch((error) => console.warn(error));
       break;
     }
-    // Spectrogram
-    case "waveform": {
-      if (e.shiftKey){
-        e.stopPropagation()
-        const inRegion = checkForRegion(e)
-        if (! inRegion) {
-          REGIONS.clearRegions()
-          activeRegion = null
-        }
-      }
-      break;
-    }
+
     // Settings
     case "basic":
     case "advanced": {
@@ -7701,9 +7698,13 @@ function generateToast({
 } = {}) {
   // i18n
   const i18n = getI18n(i18nToasts);
-  message === "noFile" &&
-    clearTimeout(loadingTimeout) &&
-    DOM.loading.classList.add("d-none");
+  if (message === "noFile") {
+      clearTimeout(loadingTimeout) &&
+      DOM.loading.classList.add("d-none");
+      // Alow further interactions!!
+      STATE.regionsCompleted = true;
+      STATE.currentFile && (fileLoaded = true);
+  }
   message = variables
     ? interpolate(i18n[message], variables)
     : i18n[message] || message;
