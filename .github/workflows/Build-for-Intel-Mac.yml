@@ -143,7 +143,7 @@ jobs:
         env:
           ELECTRON_BUILD_ARCH: x64
         run: |
-          npm run build-mac-x64-pkg -p "always"
+          npm run build-mac-x64-pkg
       - run: echo "Build status is ${{ job.status }}."
       - name: Check installer exists
         shell: bash
