@@ -35,15 +35,15 @@ jobs:
           npm install
           echo "Install's status is ${{ job.status }}."
           
-      - name: Install esBuild (for minification)
-        run: |
-          npm install --save-exact --save-dev esbuild
-        shell: bash
+      # - name: Install esBuild (for minification)
+      #   run: |
+      #     npm install --save-exact --save-dev esbuild
+      #   shell: bash
 
-      - name: Minify JavaScript files
-        run: |
-          npm run minify
-        shell: bash
+      # - name: Minify JavaScript files
+      #   run: |
+      #     npm run minify
+      #   shell: bash
 
       - name: Set platform-specific ffmpeg path
         shell: bash
