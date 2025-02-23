@@ -78,8 +78,8 @@ jobs:
 
       - name: Create and push a Git tag
         run: |
-          git tag v${{ steps.get_current_tag.outputs.version }}
-          git push origin v${{ steps.get_current_tag.outputs.version }}
+          git tag v$PACKAGE_VERSION
+          git push origin v$PACKAGE_VERSION
 
       - name: Setup node
         uses: actions/setup-node@v3
