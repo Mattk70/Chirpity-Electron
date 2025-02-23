@@ -33,8 +33,8 @@ if (process.platform === "win32") {
 // Is this CI / playwright?
 if (process.env.TEST_ENV) {
   // Make tracking no-op
-  tracking.trackVisit = () => {};
-  tracking.trackEvent = () => {}; 
+  trackVisit = () => {};
+  trackEvent = () => {}; 
   console.log("Worker in test environment");
 }  
 let DEBUG;

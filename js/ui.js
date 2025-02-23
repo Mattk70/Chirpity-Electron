@@ -194,8 +194,8 @@ const os = window.module.os;
 const isTestEnv = window.env.TEST_ENV === "true";
 if (isTestEnv) {
   // Make tracking no-op
-  tracking.trackVisit = () => {};
-  tracking.trackEvent = () => {}; 
+  trackVisit = () => {};
+  trackEvent = () => {}; 
   console.log("Running in test environment");
 }  
 function hexToRgb(hex) {
