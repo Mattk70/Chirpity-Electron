@@ -194,7 +194,7 @@ const os = window.module.os;
 const isTestEnv = window.env.TEST_ENV === "true";
 const trackVisit = isTestEnv ? () => {} : _trackVisit;
 const trackEvent = isTestEnv ? () => {} : _trackEvent;
-isTestEnv &&  console.log("Running in test environment");
+isTestEnv &&  console.lo("Running in test environment");
 
 function hexToRgb(hex) {
   // Remove the '#' character if present
