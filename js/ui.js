@@ -192,7 +192,7 @@ const os = window.module.os;
 
 // Is this CI / playwright?
 const isTestEnv = window.env.TEST_ENV === "true";
-const trackVisit = isTestEnv ? () => {} : _trackVisit;
+const trackVisit = isTestEnv ? () => {} : _trackVisi;
 const trackEvent = isTestEnv ? () => {} : _trackEvent;
 isTestEnv &&  console.log("Running in test environment");
 
@@ -2556,11 +2556,12 @@ const setUpWorkerMessaging = () => {
         }
         case "label-translation-needed": {
           // Called when the initial system locale isn't english
-          const locale = args.locale;
+          let locale = args.locale;
           let labelFile;
           if (config.list === "custom") {
             labelFile = config.customListFile[config.model];
           } else {
+            locale === 'pt' && (locale ='pt_PT')
             labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_${locale}.txt`;
           }
           readLabels(labelFile);
