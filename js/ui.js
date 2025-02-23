@@ -192,7 +192,7 @@ const os = window.module.os;
 
 // Is this CI / playwright?
 const isTestEnv = window.env.TEST_ENV === "true";
-const trackVisit = isTestEnv ? () => {} : _trackVisi;
+const trackVisit = isTestEnv ? () => {} : _trackVisit;
 const trackEvent = isTestEnv ? () => {} : _trackEvent;
 isTestEnv &&  console.log("Running in test environment");
 
