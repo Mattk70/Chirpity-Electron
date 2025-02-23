@@ -3,7 +3,7 @@
  * Contains functions for rendering the spectrogram, updating settings, rendering the screen
  */
 
-import { trackVisit, trackEvent } from "./tracking.js";
+import { trackVisit as _trackVisit, trackEvent as _trackEvent} from "./tracking.js";
 import {checkMembership} from './member.js';
 import { DOM } from "./DOMcache.js";
 import { IUCNCache, IUCNtaxonomy } from "./IUCNcache.js";
@@ -192,12 +192,10 @@ const os = window.module.os;
 
 // Is this CI / playwright?
 const isTestEnv = window.env.TEST_ENV === "true";
-if (isTestEnv) {
-  // Make tracking no-op
-  trackVisit = () => {};
-  trackEvent = () => {}; 
-  console.log("Running in test environment");
-}  
+const trackVisit = isTestEnv ? () => {} : _trackVisit;
+const trackEvent = isTestEnv ? () => {} : _trackEvent;
+isTestEnv &&  console.log("Running in test environment");
+
 function hexToRgb(hex) {
   // Remove the '#' character if present
   hex = hex.replace(/^#/, "");

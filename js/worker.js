@@ -15,7 +15,7 @@ const { writeToPath } = require("@fast-csv/format");
 const merge = require("lodash.merge");
 import { State } from "./state.js";
 import { sqlite3, checkpoint, closeDatabase, Mutex } from "./database.js";
-import { trackEvent } from "./tracking.js";
+import { trackEvent as _trackEvent} from "./tracking.js";
 import { extractWaveMetadata } from "./metadata.js";
 
 let isWin32 = false;
@@ -30,13 +30,10 @@ if (process.platform === "win32") {
   ntsuspend = require("ntsuspend");
   isWin32 = true;
 }
-// Is this CI / playwright?
-if (process.env.TEST_ENV) {
-  // Make tracking no-op
-  trackVisit = () => {};
-  trackEvent = () => {}; 
-  console.log("Worker in test environment");
-}  
+// Is this CI / playwright? Disable tracking
+const isTestEnv = process.env.TEST_ENV;
+const trackEvent = isTestEnv ? () => {} : _trackEvent;
+
 let DEBUG;
 
 let METADATA = {};
