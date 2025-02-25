@@ -4278,7 +4278,9 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
             <th id="summary-max" scope="col"><span id="summary-max-icon" class="text-muted material-symbols-outlined summary-sort-icon d-none">sort</span>${
               i18n.max
             }</th>
-            <th id="summary-cname" scope="col"><span id="summary-cname-icon" class="text-muted material-symbols-outlined summary-sort-icon d-none">sort</span>${
+            <th id="summary-cname" scope="col">
+            <span id="summary-sname-icon" class="text-muted material-symbols-outlined summary-sort-icon">filter_list</span>
+            <span id="summary-cname-icon" class="text-muted material-symbols-outlined summary-sort-icon d-none">sort</span>${
               i18n.species[0]
             }</th>
             ${showIUCN ? '<th scope="col"></th>' : ""}
@@ -5508,7 +5510,8 @@ function activateResultFilters() {
  * showSummarySortIcon();
  */
 function showSummarySortIcon() {
-  const [column, direction] = STATE.summarySortOrder.split(" ");
+  let [column, direction] = STATE.summarySortOrder.split(" ");
+  // column = column === "sname" ? "cname" : column;
   const iconId = `summary-${column}-icon`;
   const targetIcon = document.getElementById(iconId);
   if (targetIcon) {
@@ -6430,8 +6433,10 @@ document.addEventListener("click", function (e) {
       break;
     }
     case "summary-cname": {
-      const sortBy =
-        STATE.summarySortOrder === "cname ASC " ? "cname DESC " : "cname ASC ";
+      const sortOptions = ["cname ASC", "cname DESC", "sname ASC", "sname DESC"];
+      const currentIndex = sortOptions.indexOf(STATE.summarySortOrder);
+      const nextIndex = (currentIndex + 1) % sortOptions.length;
+      const sortBy = sortOptions[nextIndex];
       setSummarySortOrder(sortBy);
       break;
     }
@@ -8309,9 +8314,12 @@ async function membershipCheck() {
     });
   }
   const MEMBERSHIP_API_ENDPOINT = await window.electron.MEMBERSHIP_API_ENDPOINT();
-  return await checkMembership(config.UUID, MEMBERSHIP_API_ENDPOINT).then(isMember =>{
-    console.info(`Version: ${VERSION}. Trial: ${inTrial} subscriber: ${isMember}, All detections: ${config.specDetections}`, '')
+  return await checkMembership(config.UUID, MEMBERSHIP_API_ENDPOINT).then(([isMember, expiresIn])  =>{
+    console.info(`Version: ${VERSION}. Trial: ${inTrial} subscriber: ${isMember}, All detections: ${config.specDetections}`, expiresIn)
     if (isMember || inTrial) {
+      if (expiresIn && expiresIn < 35){ // two weeks 
+        generateToast({message:"membershipExpiry", type:"warning", variables: {expiresIn}})
+      }
       unlockElements();
       if (isMember) {
         document.getElementById('primaryLogo').src = 'img/logo/chirpity_logo_subscriber_bronze.png'; // Silver & Gold available

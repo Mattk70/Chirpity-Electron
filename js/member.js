@@ -85,9 +85,10 @@ function isValidUUID(uuid) {
        throw new Error(`HTTP error! status: ${response.status}`);
      }
  
-     const {result} = await response.json();
-     const isMember = result === true; // Assuming the API sends true/false as a boolean.
-     return isMember;
+     const { result: isMember, ExpiresIn: expiresInDays } = await response.json();
+    //  const isMember = result === true; // Assuming the API sends true/false as a boolean.
+
+     return [isMember, expiresInDays];
    } catch (error) {
     console.error('Error checking membership:', error);
     throw error; // Preserve original error stack trace
