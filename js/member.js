@@ -1,8 +1,8 @@
 /**
    * Validates membership status for the provided UUID.
    *
-   * This asynchronous function sends a POST request to the membership validation endpoint at 
-   * "https://subscriber.mattkirkland.co.uk/check-uuid" with the given UUID in the request body. It 
+   * This asynchronous function sends a POST request to the membership validation endpoint 
+   * with the given UUID in the request body. It 
    * expects a JSON response containing a boolean property "result" that indicates membership status.
    * If the HTTP response status is not successful (i.e., not in the 200-299 range) or if an error 
    * occurs during the fetch or response parsing, the function logs the error and throws a new Error.

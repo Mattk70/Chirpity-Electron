@@ -104,7 +104,8 @@
 
 
 <div class="description">
-    setIncludedIDsCalls list_worker for a new list, checks to see if a pending promise already exists
+    setIncludedIDs
+Calls list_worker for a new list, checks to see if a pending promise already exists
 </div>
 
 
@@ -166,7 +167,12 @@
 
 
 <div class="description">
-    Validates membership status for the provided UUID.This asynchronous function sends a POST request to the membership validation endpoint at "https://subscriber.mattkirkland.co.uk/check-uuid" with the given UUID in the request body. It expects a JSON response containing a boolean property "result" that indicates membership status.If the HTTP response status is not successful (i.e., not in the 200-299 range) or if an error occurs during the fetch or response parsing, the function logs the error and throws a new Error.
+    Validates membership status for the provided UUID.
+
+This asynchronous function sends a POST request to the membership validation endpoint  with the given UUID in the request body. It 
+expects a JSON response containing a boolean property "result" that indicates membership status.
+If the HTTP response status is not successful (i.e., not in the 200-299 range) or if an error 
+occurs during the fetch or response parsing, the function logs the error and throws a new Error.
 </div>
 
 
@@ -221,7 +227,15 @@
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>checkMembership('123e4567-e89b-12d3-a456-426614174000')  .then(isMember => {    if (isMember) {      console.log('User is a member');    } else {      console.log('User is not a member');    }  })  .catch(error => console.error('Error checking membership:', error));</code></pre>
+    <pre class="prettyprint"><code>checkMembership('123e4567-e89b-12d3-a456-426614174000')
+  .then(isMember => {
+    if (isMember) {
+      console.log('User is a member');
+    } else {
+      console.log('User is not a member');
+    }
+  })
+  .catch(error => console.error('Error checking membership:', error));</code></pre>
 
 
 
@@ -476,7 +490,13 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Update species common names in the database using provided label mappings.Parses an array of label strings formatted as "speciesName_commonName" and updates the correspondingentries in the species table. For the "birdnet" model, a direct update query is executed; for other models,existing common names are retrieved and conditionally updated based on matching parenthesized tokens.All operations are executed within a single transaction to ensure atomicity. If any update fails, thetransaction is rolled back and the error is propagated.
+    Update species common names in the database using provided label mappings.
+
+Parses an array of label strings formatted as "speciesName_commonName" and updates the corresponding
+entries in the species table. For the "birdnet" model, a direct update query is executed; for other models,
+existing common names are retrieved and conditionally updated based on matching parenthesized tokens.
+All operations are executed within a single transaction to ensure atomicity. If any update fails, the
+transaction is rolled back and the error is propagated.
 </div>
 
 
@@ -674,7 +694,8 @@ Analysis Rate: x real time performance
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>// For a 'birdnet' model, updating a species 'sparrow' to a common name 'House Sparrow'await _updateSpeciesLocale(db, ["sparrow_House Sparrow"]);</code></pre>
+    <pre class="prettyprint"><code>// For a 'birdnet' model, updating a species 'sparrow' to a common name 'House Sparrow'
+await _updateSpeciesLocale(db, ["sparrow_House Sparrow"]);</code></pre>
 
 
 
@@ -692,7 +713,18 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Updates the sorting indicators and UI elements for the result filters based on the current global state.Clones and replaces header elements to reflect active sort orders: toggles visibility of time-related sort iconswhen the score-based sort is active, applies pointer styles to sort elements, and manages the flipped state based onascending or descending order for species and metadata sorting. Also, clones and updates summary elements with hovereffects to enhance interactivity.Global State Dependencies:- STATE.resultsSortOrder: Determines if results are sorted by score and whether the sort is in ascending order.- STATE.resultsMetaSortOrder: Specifies the currently active metadata sort and direction.- DOM.resultHeader: The header element that is cloned and replaced for visual update.- DOM.summaryTable: The table whose species summary elements receive pointer styling.
+    Updates the sorting indicators and UI elements for the result filters based on the current global state.
+
+Clones and replaces header elements to reflect active sort orders: toggles visibility of time-related sort icons
+when the score-based sort is active, applies pointer styles to sort elements, and manages the flipped state based on
+ascending or descending order for species and metadata sorting. Also, clones and updates summary elements with hover
+effects to enhance interactivity.
+
+Global State Dependencies:
+- STATE.resultsSortOrder: Determines if results are sorted by score and whether the sort is in ascending order.
+- STATE.resultsMetaSortOrder: Specifies the currently active metadata sort and direction.
+- DOM.resultHeader: The header element that is cloned and replaced for visual update.
+- DOM.summaryTable: The table whose species summary elements receive pointer styling.
 </div>
 
 
@@ -798,7 +830,10 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Adds a specified number of days to a given date and returns a new Date object.This function accepts a date provided as a Date object, a date string, or a timestamp, and adds the given number of days.Use negative values for subtracting days. It throws an error if the input date is invalid or if the days parameter is not a valid number.
+    Adds a specified number of days to a given date and returns a new Date object.
+
+This function accepts a date provided as a Date object, a date string, or a timestamp, and adds the given number of days.
+Use negative values for subtracting days. It throws an error if the input date is invalid or if the days parameter is not a valid number.
 </div>
 
 
@@ -1002,7 +1037,8 @@ Analysis Rate: x real time performance
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>// Add 3 days to the current dateconst newDate = addDays(new Date(), 3);</code></pre>
+    <pre class="prettyprint"><code>// Add 3 days to the current date
+const newDate = addDays(new Date(), 3);</code></pre>
 
 
 
@@ -1020,7 +1056,20 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Adjusts the dimensions of the spectrogram and related UI elements based on the current window and DOM sizes.This asynchronous function recalculates the layout of key UI components such as the content wrapper,spectrogram display, and result table, ensuring they adapt to changes in the window size. When the`redraw` flag is true and an audio file is loaded, the function computes a new spectrogram height usingeither the specified `newHeight` (if non-zero) or the current configuration limits. If a new height is provided,it updates the configuration preferences accordingly.Depending on whether WaveSurfer is already initialized, the function will either:- Initialize a new WaveSurfer instance with the current audio buffer and updated height.- Update the existing WaveSurfer instance's options (including height and cursor color), re-register the spectrogram  plugin with the new settings (using `fftSamples` if provided), and reload the audio buffer.Finally, it adjusts the height of the result table to fill the remaining vertical space.
+    Adjusts the dimensions of the spectrogram and related UI elements based on the current window and DOM sizes.
+
+This asynchronous function recalculates the layout of key UI components such as the content wrapper,
+spectrogram display, and result table, ensuring they adapt to changes in the window size. When the
+`redraw` flag is true and an audio file is loaded, the function computes a new spectrogram height using
+either the specified `newHeight` (if non-zero) or the current configuration limits. If a new height is provided,
+it updates the configuration preferences accordingly.
+
+Depending on whether WaveSurfer is already initialized, the function will either:
+- Initialize a new WaveSurfer instance with the current audio buffer and updated height.
+- Update the existing WaveSurfer instance's options (including height and cursor color), re-register the spectrogram
+  plugin with the new settings (using `fftSamples` if provided), and reload the audio buffer.
+
+Finally, it adjusts the height of the result table to fill the remaining vertical space.
 </div>
 
 
@@ -1271,7 +1320,13 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Performs batch insertion of audio records into the database.Retrieves records using a prepared statement based on the original identifier,then iterates through each record to insert it individually via onInsertManualRecord.The operation is performed within a mutex lock and a database transaction toguarantee atomicity. A UI update is triggered after the final record is processed,and debug timing information is logged if enabled.
+    Performs batch insertion of audio records into the database.
+
+Retrieves records using a prepared statement based on the original identifier,
+then iterates through each record to insert it individually via onInsertManualRecord.
+The operation is performed within a mutex lock and a database transaction to
+guarantee atomicity. A UI update is triggered after the final record is processed,
+and debug timing information is logged if enabled.
 </div>
 
 
@@ -1463,7 +1518,8 @@ Analysis Rate: x real time performance
 <dl>
     <dt>
         <div class="param-desc">
-        Propagates any error encountered during the database transaction,                ensuring a rollback to avoid partial insertions.
+        Propagates any error encountered during the database transaction,
+                ensuring a rollback to avoid partial insertions.
         </div>
     </dt>
     <dd></dd>
@@ -1533,7 +1589,25 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Centers the spectrogram view around the current playback time.This function recalculates the starting offset of the audio window so that thecurrent time (from the WaveSurfer instance) appears at the center of the display.It updates the global variable `windowOffsetSecs` by subtracting half of thewindow's length from the computed midpoint. The offset is clamped between 0 andthe maximum valid offset determined by `currentFileDuration - windowLength`.If an active audio region exists (stored in `activeRegion`), the function adjustsits start and end times by the same offset shift. Should the region extend beyond thevalid window boundaries after the shift, it is cleared (set to null).Finally, the function invokes `postBufferUpdate` to refresh the audio display with the new configuration, positioning the center at 0.5.Side Effects:- Modifies the global variables `windowOffsetSecs` and `activeRegion`.- Relies on and interacts with global state including `wavesurfer`, `windowLength`,  `currentFileDuration`, and `postBufferUpdate`.
+    Centers the spectrogram view around the current playback time.
+
+This function recalculates the starting offset of the audio window so that the
+current time (from the WaveSurfer instance) appears at the center of the display.
+It updates the global variable `windowOffsetSecs` by subtracting half of the
+window's length from the computed midpoint. The offset is clamped between 0 and
+the maximum valid offset determined by `currentFileDuration - windowLength`.
+
+If an active audio region exists (stored in `activeRegion`), the function adjusts
+its start and end times by the same offset shift. Should the region extend beyond the
+valid window boundaries after the shift, it is cleared (set to null).
+
+Finally, the function invokes `postBufferUpdate` to refresh the audio display with 
+the new configuration, positioning the center at 0.5.
+
+Side Effects:
+- Modifies the global variables `windowOffsetSecs` and `activeRegion`.
+- Relies on and interacts with global state including `wavesurfer`, `windowLength`,
+  `currentFileDuration`, and `postBufferUpdate`.
 </div>
 
 
@@ -1621,7 +1695,10 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Replaces a target DOM element with a custom input component based on the specified column.For a column value of "label", creates a dark-themed custom select populated with labels obtained from STATE.tagsList.Otherwise, creates an input element with a prefilled value; if the column is "species", adds an event listener to update suggestion lists.
+    Replaces a target DOM element with a custom input component based on the specified column.
+
+For a column value of "label", creates a dark-themed custom select populated with labels obtained from STATE.tagsList.
+Otherwise, creates an input element with a prefilled value; if the column is "species", adds an event listener to update suggestion lists.
 </div>
 
 
@@ -1908,7 +1985,12 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Determines if a right-click event occurred within an audio region and optionally sets it as active.This function calculates the time position from the event's x-coordinate relative to the target element's widthusing the global "windowLength". It then searches the global "REGIONS.regions" array for an audio region that spansthe computed time. If a matching region is found and the setActive flag is true, the region is set as active by callingthe global "setActiveRegion" function.
+    Determines if a right-click event occurred within an audio region and optionally sets it as active.
+
+This function calculates the time position from the event's x-coordinate relative to the target element's width
+using the global "windowLength". It then searches the global "REGIONS.regions" array for an audio region that spans
+the computed time. If a matching region is found and the setActive flag is true, the region is set as active by calling
+the global "setActiveRegion" function.
 </div>
 
 
@@ -2093,7 +2175,14 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Validates the UUID format and checks membership status by posting to a membership API.The function verifies that the provided `uuid` is in a valid format using an auxiliary check. It theninitiates a POST request to the specified `MEMBERSHIP_API_ENDPOINT` with the UUID in the JSON-formatted request body.An `AbortController` enforces a timeout (using `REQUEST_TIMEOUT_MS`) to cancel the request if it takes too long.If the HTTP response is not successful, an error detailing the response status is thrown.On a successful response, the JSON payload is parsed to determine membership status, returning `true` if the`result` is `true` and `false` otherwise.
+    Validates the UUID format and checks membership status by posting to a membership API.
+
+The function verifies that the provided `uuid` is in a valid format using an auxiliary check. It then
+initiates a POST request to the specified `MEMBERSHIP_API_ENDPOINT` with the UUID in the JSON-formatted request body.
+An `AbortController` enforces a timeout (using `REQUEST_TIMEOUT_MS`) to cancel the request if it takes too long.
+If the HTTP response is not successful, an error detailing the response status is thrown.
+On a successful response, the JSON payload is parsed to determine membership status, returning `true` if the
+`result` is `true` and `false` otherwise.
 </div>
 
 
@@ -2291,7 +2380,10 @@ Analysis Rate: x real time performance
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>// Example usage:checkMembership("123e4567-e89b-12d3-a456-426614174000", "https://api.example.com/membership")  .then(isMember => console.log("Membership status:", isMember))  .catch(error => console.error("Error:", error));</code></pre>
+    <pre class="prettyprint"><code>// Example usage:
+checkMembership("123e4567-e89b-12d3-a456-426614174000", "https://api.example.com/membership")
+  .then(isMember => console.log("Membership status:", isMember))
+  .catch(error => console.error("Error:", error));</code></pre>
 
 
 
@@ -2309,7 +2401,12 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Performs a Write-Ahead Logging (WAL) checkpoint on the provided SQLite database.If a valid database instance is supplied, this function executes the SQL command"PRAGMA wal_checkpoint(TRUNCATE);" to perform a checkpoint, truncating the WAL log.In the event of an error during execution, the error is logged and the returned Promiseis rejected with the error. If no database instance is provided, the Promise resolves immediately.
+    Performs a Write-Ahead Logging (WAL) checkpoint on the provided SQLite database.
+
+If a valid database instance is supplied, this function executes the SQL command
+"PRAGMA wal_checkpoint(TRUNCATE);" to perform a checkpoint, truncating the WAL log.
+In the event of an error during execution, the error is logged and the returned Promise
+is rejected with the error. If no database instance is provided, the Promise resolves immediately.
 </div>
 
 
@@ -2367,7 +2464,8 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">The SQLite database instance on which to perform the checkpoint.  If no database instance is provided (null or undefined), the checkpoint operation is skipped.</td>
+            <td class="description last">The SQLite database instance on which to perform the checkpoint.
+  If no database instance is provided (null or undefined), the checkpoint operation is skipped.</td>
         </tr>
 
     
@@ -2437,7 +2535,8 @@ Analysis Rate: x real time performance
 
         
 <div class="param-desc">
-    A Promise that resolves when the checkpoint completes successfully or  immediately if no database is provided, and rejects with an error if the checkpoint operation fails.
+    A Promise that resolves when the checkpoint completes successfully or
+  immediately if no database is provided, and rejects with an error if the checkpoint operation fails.
 </div>
 
 
@@ -2461,7 +2560,9 @@ Analysis Rate: x real time performance
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>checkpoint(database)  .then(() => console.log("WAL checkpoint completed successfully."))  .catch(err => console.error("Error running WAL checkpoint:", err));</code></pre>
+    <pre class="prettyprint"><code>checkpoint(database)
+  .then(() => console.log("WAL checkpoint completed successfully."))
+  .catch(err => console.error("Error running WAL checkpoint:", err));</code></pre>
 
 
 
@@ -2479,7 +2580,12 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Resets the active audio region and clears the corresponding UI selection.This function forcefully resets all defined audio regions by calling`resetRegions(true)`. It then checks if an active table row exists and,if so, removes the "table-active" class from it to remove any UI highlighting.Finally, it clears the `activeRow` reference to ensure that no table row remains marked as active.
+    Resets the active audio region and clears the corresponding UI selection.
+
+This function forcefully resets all defined audio regions by calling
+`resetRegions(true)`. It then checks if an active table row exists and,
+if so, removes the "table-active" class from it to remove any UI highlighting.
+Finally, it clears the `activeRow` reference to ensure that no table row remains marked as active.
 </div>
 
 
@@ -2585,7 +2691,11 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Closes a SQLite database connection.This function attempts to close the provided database connection. If no database instanceis provided, the promise resolves immediately. In case of an error during the close operation,the error is logged and the promise is rejected with the encountered error.
+    Closes a SQLite database connection.
+
+This function attempts to close the provided database connection. If no database instance
+is provided, the promise resolves immediately. In case of an error during the close operation,
+the error is logged and the promise is rejected with the encountered error.
 </div>
 
 
@@ -2713,7 +2823,8 @@ Analysis Rate: x real time performance
 
         
 <div class="param-desc">
-    A promise that resolves when the database is successfully closed or if nodatabase is provided, and rejects if an error occurs during the close operation.
+    A promise that resolves when the database is successfully closed or if no
+database is provided, and rejects if an error occurs during the close operation.
 </div>
 
 
@@ -2737,7 +2848,9 @@ Analysis Rate: x real time performance
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>closeDatabase(db)  .then(() => console.log("Database closed successfully."))  .catch(err => console.error("Error closing database:", err));</code></pre>
+    <pre class="prettyprint"><code>closeDatabase(db)
+  .then(() => console.log("Database closed successfully."))
+  .catch(err => console.error("Error closing database:", err));</code></pre>
 
 
 
@@ -2755,7 +2868,14 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Updates the "from" slider and input fields based on parsed numeric values from the "from" and "to" inputs,and visually refreshes the slider fill.This function retrieves the current numeric values from the provided "from" and "to" input elements usingthe `getParsed` utility. It then calls `fillSlider` to update the slider's visual fill between a fixedunselected color ("#C6C6C6") and a selected color ("#0d6efd"). If the parsed "from" value exceeds the "to"value, it adjusts the "from" slider and input to match the "to" value to maintain a valid range. Otherwise,it sets the "from" slider to the parsed "from" value.
+    Updates the "from" slider and input fields based on parsed numeric values from the "from" and "to" inputs,
+and visually refreshes the slider fill.
+
+This function retrieves the current numeric values from the provided "from" and "to" input elements using
+the `getParsed` utility. It then calls `fillSlider` to update the slider's visual fill between a fixed
+unselected color ("#C6C6C6") and a selected color ("#0d6efd"). If the parsed "from" value exceeds the "to"
+value, it adjusts the "from" slider and input to match the "to" value to maintain a valid range. Otherwise,
+it sets the "from" slider to the parsed "from" value.
 </div>
 
 
@@ -2961,7 +3081,15 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Converts an audio file using FFmpeg, optionally trimming the audio and updating file metadata.This function processes an input audio file by executing FFmpeg commands with parameters based on global statesettings (e.g., STATE.archive.format and STATE.archive.trim). When the target archive format is "ogg", the conversionuses a bitrate of 128k, mono channels, and a sample rate set to 30000 Hz (for BirdNET compatibility). If trimming isenabled, the function computes start and end boundaries, adjusts the audio duration accordingly, and emits warningsif multi-day or all-daylight recordings are detected. Conversion progress is calculated and reported via a progress map.Upon completion, the file's modification time is updated and the associated database record is updated with the newarchive name.
+    Converts an audio file using FFmpeg, optionally trimming the audio and updating file metadata.
+
+This function processes an input audio file by executing FFmpeg commands with parameters based on global state
+settings (e.g., STATE.archive.format and STATE.archive.trim). When the target archive format is "ogg", the conversion
+uses a bitrate of 128k, mono channels, and a sample rate set to 30000 Hz (for BirdNET compatibility). If trimming is
+enabled, the function computes start and end boundaries, adjusts the audio duration accordingly, and emits warnings
+if multi-day or all-daylight recordings are detected. Conversion progress is calculated and reported via a progress map.
+Upon completion, the file's modification time is updated and the associated database record is updated with the new
+archive name.
 </div>
 
 
@@ -3059,7 +3187,8 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">An object representing the file's metadata; must include properties such as `id`, `duration`, and `filestart`.                      The `duration` property may be updated if trimming is applied.</td>
+            <td class="description last">An object representing the file's metadata; must include properties such as `id`, `duration`, and `filestart`.
+                      The `duration` property may be updated if trimming is applied.</td>
         </tr>
 
     
@@ -3251,7 +3380,9 @@ Analysis Rate: x real time performance
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>convertFile('/path/to/input.wav', '/path/to/output.ogg', fileRecord, db, 'archive123', progressMap)  .then(() => console.log('Conversion completed successfully.'))  .catch(err => console.error('Conversion failed:', err));</code></pre>
+    <pre class="prettyprint"><code>convertFile('/path/to/input.wav', '/path/to/output.ogg', fileRecord, db, 'archive123', progressMap)
+  .then(() => console.log('Conversion completed successfully.'))
+  .catch(err => console.error('Conversion failed:', err));</code></pre>
 
 
 
@@ -3269,7 +3400,24 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Creates and displays a custom context menu based on the event target.This asynchronous function handles user interactions for generating a context menuin the spectrogram interface. It performs the following actions:- Pauses any ongoing audio playback via the wavesurfer instance to prevent interference.- Stops the propagation of the triggering event.- Checks and adjusts for region detection within the spectrogram.- Determines the context (e.g., summary, selection, or results) of the click and sets  visibility flags for specific menu items.- If necessary, triggers a click on the target element to load or update the active row  and awaits the file load completion.- Constructs the HTML for the context menu with options such as playing a region,  analyzing a selection, creating/editing a manual record, exporting a clip, comparing,  or deleting records.- Sets the modal title based on whether the action is to create or edit a record.- Attaches event listeners to handle deletion and record entry actions based on the context.- Adjusts certain menu items' visibility depending on the active context.- Positions the context menu at the event coordinates.
+    Creates and displays a custom context menu based on the event target.
+
+This asynchronous function handles user interactions for generating a context menu
+in the spectrogram interface. It performs the following actions:
+- Pauses any ongoing audio playback via the wavesurfer instance to prevent interference.
+- Stops the propagation of the triggering event.
+- Checks and adjusts for region detection within the spectrogram.
+- Determines the context (e.g., summary, selection, or results) of the click and sets
+  visibility flags for specific menu items.
+- If necessary, triggers a click on the target element to load or update the active row
+  and awaits the file load completion.
+- Constructs the HTML for the context menu with options such as playing a region,
+  analyzing a selection, creating/editing a manual record, exporting a clip, comparing,
+  or deleting records.
+- Sets the modal title based on whether the action is to create or edit a record.
+- Attaches event listeners to handle deletion and record entry actions based on the context.
+- Adjusts certain menu items' visibility depending on the active context.
+- Positions the context menu at the event coordinates.
 </div>
 
 
@@ -3428,7 +3576,11 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Appends a clear date filter button to the specified UI element.The function creates a clickable span styled as a "cancel" icon that, when activated,clears the date selection using the provided picker instance. Upon clicking the button,the date picker is cleared and the original date filter UI is restored in the element.
+    Appends a clear date filter button to the specified UI element.
+
+The function creates a clickable span styled as a "cancel" icon that, when activated,
+clears the date selection using the provided picker instance. Upon clicking the button,
+the date picker is cleared and the original date filter UI is restored in the element.
 </div>
 
 
@@ -3575,7 +3727,8 @@ Analysis Rate: x real time performance
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>// Assuming dateFilterElement is a valid HTMLElement and datePicker is a date picker instance:createDateClearButton(dateFilterElement, datePicker);</code></pre>
+    <pre class="prettyprint"><code>// Assuming dateFilterElement is a valid HTMLElement and datePicker is a date picker instance:
+createDateClearButton(dateFilterElement, datePicker);</code></pre>
 
 
 
@@ -3593,7 +3746,14 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Creates and registers a new audio region on the waveform, optionally navigating to its start time.This function validates the input parameters and adds a new region to the global REGIONS collection using thespecified start and end times. It applies the provided color or defaults to STATE.regionColour, and formats the labelusing the formatLabel helper. If the goToRegion flag is true, the waveform's current time is set to the new region's start time.Note: If the start and end parameters are invalid (i.e., non-numeric or if start is not less than end), the function logsan error and returns early without creating the region.
+    Creates and registers a new audio region on the waveform, optionally navigating to its start time.
+
+This function validates the input parameters and adds a new region to the global REGIONS collection using the
+specified start and end times. It applies the provided color or defaults to STATE.regionColour, and formats the label
+using the formatLabel helper. If the goToRegion flag is true, the waveform's current time is set to the new region's start time.
+
+Note: If the start and end parameters are invalid (i.e., non-numeric or if start is not less than end), the function logs
+an error and returns early without creating the region.
 </div>
 
 
@@ -3884,7 +4044,18 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Creates and registers a timeline plugin for WaveSurfer.js.This function computes the timeline display intervals based on the global variable `windowLength`.It determines the primary label interval as the ceiling of (`windowLength` divided by 5) and calculatesthe time interval as one-tenth of this primary interval. Using these values, it configures a timelineplugin via the `TimelinePlugin.create` method with customized options, including:- Label formatting through the global `formatTimeCallback`- Secondary label opacity set to 0.35- Styling options such as font size ("0.75rem") and color obtained from `wsTextColour()`If a global WaveSurfer instance exists (referenced by `wavesurfer`), the timeline is automaticallyregistered with it; otherwise, the standalone timeline plugin object is returned.
+    Creates and registers a timeline plugin for WaveSurfer.js.
+
+This function computes the timeline display intervals based on the global variable `windowLength`.
+It determines the primary label interval as the ceiling of (`windowLength` divided by 5) and calculates
+the time interval as one-tenth of this primary interval. Using these values, it configures a timeline
+plugin via the `TimelinePlugin.create` method with customized options, including:
+- Label formatting through the global `formatTimeCallback`
+- Secondary label opacity set to 0.35
+- Styling options such as font size ("0.75rem") and color obtained from `wsTextColour()`
+
+If a global WaveSurfer instance exists (referenced by `wavesurfer`), the timeline is automatically
+registered with it; otherwise, the standalone timeline plugin object is returned.
 </div>
 
 
@@ -4435,7 +4606,12 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Asynchronously fetches GitHub issues filtered by provided labels.This function concurrently retrieves issues from the GitHub API for the repository"Chirpity-Electron" owned by "Mattk70". It fetches issues (both open and closed) for each labelin the input list, merges the results, and removes duplicate issues based on their unique IDs.The returned issues are processed to include only the title, URL, state, and an array of label names.
+    Asynchronously fetches GitHub issues filtered by provided labels.
+
+This function concurrently retrieves issues from the GitHub API for the repository
+"Chirpity-Electron" owned by "Mattk70". It fetches issues (both open and closed) for each label
+in the input list, merges the results, and removes duplicate issues based on their unique IDs.
+The returned issues are processed to include only the title, URL, state, and an array of label names.
 </div>
 
 
@@ -4606,7 +4782,8 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    We post the list to the worker as it has node and that allows it easier access to therequired filesystem routines, returns valid audio file list
+    We post the list to the worker as it has node and that allows it easier access to the
+required filesystem routines, returns valid audio file list
 </div>
 
 
@@ -4897,7 +5074,12 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Creates and returns a styled label element for a navigation option.This function generates an HTML <span> element with specific styling properties, including absolute positioning,a text color, and a text shadow effect. If the global configuration's colormap is set to 'gray', the provided coloris overridden: a truthy color results in 'purple', whereas a falsy value defaults to '#666'. If no label text is provided,the function returns undefined.
+    Creates and returns a styled label element for a navigation option.
+
+This function generates an HTML <span> element with specific styling properties, including absolute positioning,
+a text color, and a text shadow effect. If the global configuration's colormap is set to 'gray', the provided color
+is overridden: a truthy color results in 'purple', whereas a falsy value defaults to '#666'. If no label text is provided,
+the function returns undefined.
 </div>
 
 
@@ -5102,7 +5284,15 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Use formatTimeCallback to style the notch labels as you wish, suchas with more detail as the number of pixels per second increases.Here we format as M:SS.frac, with M suppressed for times < 1 minute,and frac having 0, 1, or 2 digits as the zoom increases.Note that if you override the default function, you'll almostcertainly want to override timeInterval, primaryLabelInterval and/orsecondaryLabelInterval so they all work together.
+    Use formatTimeCallback to style the notch labels as you wish, such
+as with more detail as the number of pixels per second increases.
+
+Here we format as M:SS.frac, with M suppressed for times < 1 minute,
+and frac having 0, 1, or 2 digits as the zoom increases.
+
+Note that if you override the default function, you'll almost
+certainly want to override timeInterval, primaryLabelInterval and/or
+secondaryLabelInterval so they all work together.
 </div>
 
 
@@ -5190,7 +5380,11 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Generates an HTML string for a bird species selection dropdown.Constructs a select element based on the provided options. When options.store is "allSpecies", a floating form-select is created with either a search prompt or a preselected species from the global LABELS. Otherwise, a basic select element is built using the species data from options.rows, with the currently active species (from STATE.chart.species) marked as selected.Also updates the inner HTML of the element with ID "species-search-label" using localized text.
+    Generates an HTML string for a bird species selection dropdown.
+
+Constructs a select element based on the provided options. When options.store is "allSpecies", a floating form-select is created with either a search prompt or a preselected species from the global LABELS. Otherwise, a basic select element is built using the species data from options.rows, with the currently active species (from STATE.chart.species) marked as selected.
+
+Also updates the inner HTML of the element with ID "species-search-label" using localized text.
 </div>
 
 
@@ -5472,7 +5666,9 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    getDetectedSpecies generates a list of species to use in dropdowns for chart and explore mode filtersIt doesn't really make sense to use location specific filtering here, as there is a location filter in thepage. For now, I'm just going skip the included IDs filter if location mode is selected
+    getDetectedSpecies generates a list of species to use in dropdowns for chart and explore mode filters
+It doesn't really make sense to use location specific filtering here, as there is a location filter in the
+page. For now, I'm just going skip the included IDs filter if location mode is selected
 </div>
 
 
@@ -5560,7 +5756,19 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Generates an SQL filtering clause along with its corresponding parameters for file record retrieval.This function constructs an SQL fragment to filter file records based on an optional date range and thecurrent application mode stored in the global STATE variable. Depending on whether a valid range is providedor the application mode is set to "archive", it generates the appropriate conditions and parameters:- When a range object with a defined `start` property is provided, an SQL condition is appended to filter  records where `dateTime` is between `range.start` (inclusive) and `range.end` (exclusive). The provided range  values are pushed to the parameters array.- In "archive" mode, the function creates an SQL condition that filters records by matching either the file's  name or its archiveName against the list obtained from STATE.filesToAnalyse. It also processes file paths  by removing the archive path prefix defined in STATE.archive.location.- In "analyse" mode, a file-based filtering condition exists in the code but is currently commented out.
+    Generates an SQL filtering clause along with its corresponding parameters for file record retrieval.
+
+This function constructs an SQL fragment to filter file records based on an optional date range and the
+current application mode stored in the global STATE variable. Depending on whether a valid range is provided
+or the application mode is set to "archive", it generates the appropriate conditions and parameters:
+
+- When a range object with a defined `start` property is provided, an SQL condition is appended to filter
+  records where `dateTime` is between `range.start` (inclusive) and `range.end` (exclusive). The provided range
+  values are pushed to the parameters array.
+- In "archive" mode, the function creates an SQL condition that filters records by matching either the file's
+  name or its archiveName against the list obtained from STATE.filesToAnalyse. It also processes file paths
+  by removing the archive path prefix defined in STATE.archive.location.
+- In "analyse" mode, a file-based filtering condition exists in the code but is currently commented out.
 </div>
 
 
@@ -5772,7 +5980,8 @@ Analysis Rate: x real time performance
 
         
 <div class="param-desc">
-    A tuple where the first element is the SQL condition fragment (string)and the second element is an array of parameters to bind to the SQL query.
+    A tuple where the first element is the SQL condition fragment (string)
+and the second element is an array of parameters to bind to the SQL query.
 </div>
 
 
@@ -5809,7 +6018,8 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Generates a list of supported audio files, recursively searching directories.Sends this list to the UI
+    Generates a list of supported audio files, recursively searching directories.
+Sends this list to the UI
 </div>
 
 
@@ -5946,7 +6156,12 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Filters and sorts bird labels based on a search query.This function processes a global collection of bird labels by performing a case-insensitive filter based on the provided search string.Each matching label, originally in the format "sname_cname", is split and reversed to yield the common name (`cname`) and the scientific name (`sname`).The returned object includes a `styled` property that formats these names into an HTML string with `<br/>` and `<i>` tags.The resulting list is sorted alphabetically by the common name using locale comparison based on the configuration.
+    Filters and sorts bird labels based on a search query.
+
+This function processes a global collection of bird labels by performing a case-insensitive filter based on the provided search string.
+Each matching label, originally in the format "sname_cname", is split and reversed to yield the common name (`cname`) and the scientific name (`sname`).
+The returned object includes a `styled` property that formats these names into an HTML string with `<br/>` and `<i>` tags.
+The resulting list is sorted alphabetically by the common name using locale comparison based on the configuration.
 </div>
 
 
@@ -6105,7 +6320,12 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Retrieves a filtered list of species IDs based on the current state and file metadata.For "location" or "nocturnal" lists when local mode is enabled, if a file identifier is provided, the function usesits metadata to extract latitude (lat), longitude (lon), and week information (derived from fileStart if STATE.useWeek is true).The latitude and longitude are concatenated to form a location key. If the corresponding cache entry in STATE.included is missing,setIncludedIDs is invoked to populate it. For other list types, if the cache is absent, setIncludedIDs is called without parameters.
+    Retrieves a filtered list of species IDs based on the current state and file metadata.
+
+For "location" or "nocturnal" lists when local mode is enabled, if a file identifier is provided, the function uses
+its metadata to extract latitude (lat), longitude (lon), and week information (derived from fileStart if STATE.useWeek is true).
+The latitude and longitude are concatenated to form a location key. If the corresponding cache entry in STATE.included is missing,
+setIncludedIDs is invoked to populate it. For other list types, if the cache is absent, setIncludedIDs is called without parameters.
 </div>
 
 
@@ -6276,7 +6496,11 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Retrieves the currently active region.This function returns the global active region object, which typically containsproperties (such as start and end) that define the region. If there is no active region,the function returns undefined.
+    Retrieves the currently active region.
+
+This function returns the global active region object, which typically contains
+properties (such as start and end) that define the region. If there is no active region,
+the function returns undefined.
 </div>
 
 
@@ -6647,7 +6871,11 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Retrieves the index of a table row whose associated start time matches a specified value.Iterates over the rows of an HTML table, extracting the start time from each row's "name" attribute.The "name" attribute is expected to be a string with values separated by a "|" character, where thesecond element represents the start time. If the "name" attribute is absent, a default value of 0 is used.
+    Retrieves the index of a table row whose associated start time matches a specified value.
+
+Iterates over the rows of an HTML table, extracting the start time from each row's "name" attribute.
+The "name" attribute is expected to be a string with values separated by a "|" character, where the
+second element represents the start time. If the "name" attribute is absent, a default value of 0 is used.
 </div>
 
 
@@ -6832,7 +7060,8 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    getValidSpecies generates a list of species included/excluded based on settings For week specific lists, we need the file
+    getValidSpecies generates a list of species included/excluded based on settings
+ For week specific lists, we need the file
 </div>
 
 
@@ -7080,7 +7309,12 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Responds to keydown events by dispatching configured global actions.Logs the pressed key when debugging is enabled. If the pressed key exists in the global actions mapping,hides the context menu, determines the active modifier key (Shift, Control, or Alt; defaults to "no"),tracks the key press event with its modifier via a tracking function, and executes the corresponding action callback.If the key is not mapped, invokes the fallback handler for number keys.
+    Responds to keydown events by dispatching configured global actions.
+
+Logs the pressed key when debugging is enabled. If the pressed key exists in the global actions mapping,
+hides the context menu, determines the active modifier key (Shift, Control, or Alt; defaults to "no"),
+tracks the key press event with its modifier via a tracking function, and executes the corresponding action callback.
+If the key is not mapped, invokes the fallback handler for number keys.
 </div>
 
 
@@ -7235,7 +7469,11 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Debounces keydown event processing for non-interactive elements.Prevents the default behavior of keydown events when they do not originate froman HTMLInputElement, HTMLTextAreaElement, or CustomSelect. The debounced call delaysthe execution of the keydown handler by 100 milliseconds using a unique identifier ("keyhandler").
+    Debounces keydown event processing for non-interactive elements.
+
+Prevents the default behavior of keydown events when they do not originate from
+an HTMLInputElement, HTMLTextAreaElement, or CustomSelect. The debounced call delays
+the execution of the keydown handler by 100 milliseconds using a unique identifier ("keyhandler").
 </div>
 
 
@@ -7372,7 +7610,50 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Dispatches worker messages based on the provided action in the event data.Processes an event whose data payload includes an `action` field and associated parameters.If the action is not "_init_" and initialization is pending, waits for the initialization to complete.Depending on the action, the function handles tasks such as initializing models, processing audio files,managing thread pools, updating database records, handling tag operations, and more. Specific actions include:- "_init_": Initializes the environment by setting up the list worker, launching the model, and updating state.- "abort": Aborts ongoing processes.- "analyse": Initiates audio analysis; validates prediction workers and handles alerts if not ready.- "change-batch-size": Adjusts the batch size used by prediction workers.- "change-threads": Modifies the number of active prediction worker threads.- "change-mode": Switches the operational mode.- "chart": Processes a chart data request.- "check-all-files-saved": Verifies that files are correctly saved in the database.- "convert-dataset": Converts dataset specifications from existing formats.- "create-dataset": Creates a dataset with inclusion identifiers.- "delete": Handles deletion operations.- "delete-species": Removes specified species records.- "export-results": Exports the detection results.- "file-load-request": Loads an audio file, clears memory records if necessary, and switches modes based on file state.- "filter": Applies filters to the result set, refreshes summaries, and updates inclusion identifiers.- "get-detected-species-list": Retrieves a list of detected species.- "get-valid-species": Fetches valid species for a given file.- "get-locations": Retrieves location details from the database for a specific file.- "get-tags": Retrieves a list of tags from the disk database.- "delete-tag": Deletes a tag, handling any errors by generating an alert.- "update-tags": Updates the tag list in the database and refreshes the UI with the new set of tags.- "get-valid-files-list": Scans and returns a list of valid files.- "insert-manual-record": Inserts a record manually and updates summaries and results accordingly.- "load-model": Loads a new predictive model, aborting current processing if necessary.- "post": Uploads processed audio data.- "purge-file": Deletes a specified file.- "compress-and-organise": Compresses and reorganises audio files.- "relocated-file": Updates file paths after relocation.- "save": Saves audio processing data along with associated metadata.- "save2db": Persists in-memory database changes to disk.- "set-custom-file-location": Sets a custom location for file storage.- "update-buffer": Reloads an audio file to update its buffer.- "update-file-start": Adjusts the starting point for audio file processing.- "update-list": Updates the internal list and custom labels, optionally refreshing summaries and results.- "update-locale": Updates locale settings and labels.- "update-summary": Refreshes the summary data.- "update-state": Updates the overall application state including paths and thresholds.
+    Dispatches worker messages based on the provided action in the event data.
+
+Processes an event whose data payload includes an `action` field and associated parameters.
+If the action is not "_init_" and initialization is pending, waits for the initialization to complete.
+Depending on the action, the function handles tasks such as initializing models, processing audio files,
+managing thread pools, updating database records, handling tag operations, and more. Specific actions include:
+
+- "_init_": Initializes the environment by setting up the list worker, launching the model, and updating state.
+- "abort": Aborts ongoing processes.
+- "analyse": Initiates audio analysis; validates prediction workers and handles alerts if not ready.
+- "change-batch-size": Adjusts the batch size used by prediction workers.
+- "change-threads": Modifies the number of active prediction worker threads.
+- "change-mode": Switches the operational mode.
+- "chart": Processes a chart data request.
+- "check-all-files-saved": Verifies that files are correctly saved in the database.
+- "convert-dataset": Converts dataset specifications from existing formats.
+- "create-dataset": Creates a dataset with inclusion identifiers.
+- "delete": Handles deletion operations.
+- "delete-species": Removes specified species records.
+- "export-results": Exports the detection results.
+- "file-load-request": Loads an audio file, clears memory records if necessary, and switches modes based on file state.
+- "filter": Applies filters to the result set, refreshes summaries, and updates inclusion identifiers.
+- "get-detected-species-list": Retrieves a list of detected species.
+- "get-valid-species": Fetches valid species for a given file.
+- "get-locations": Retrieves location details from the database for a specific file.
+- "get-tags": Retrieves a list of tags from the disk database.
+- "delete-tag": Deletes a tag, handling any errors by generating an alert.
+- "update-tags": Updates the tag list in the database and refreshes the UI with the new set of tags.
+- "get-valid-files-list": Scans and returns a list of valid files.
+- "insert-manual-record": Inserts a record manually and updates summaries and results accordingly.
+- "load-model": Loads a new predictive model, aborting current processing if necessary.
+- "post": Uploads processed audio data.
+- "purge-file": Deletes a specified file.
+- "compress-and-organise": Compresses and reorganises audio files.
+- "relocated-file": Updates file paths after relocation.
+- "save": Saves audio processing data along with associated metadata.
+- "save2db": Persists in-memory database changes to disk.
+- "set-custom-file-location": Sets a custom location for file storage.
+- "update-buffer": Reloads an audio file to update its buffer.
+- "update-file-start": Adjusts the starting point for audio file processing.
+- "update-list": Updates the internal list and custom labels, optionally refreshing summaries and results.
+- "update-locale": Updates locale settings and labels.
+- "update-summary": Refreshes the summary data.
+- "update-state": Updates the overall application state including paths and thresholds.
 </div>
 
 
@@ -7616,7 +7897,15 @@ Analysis Rate: x real time performance
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>// Example message event for initiating analysis on an audio file:const msgEvent = {  data: {    action: "analyse",    file: "audio_sample.mp3",    // ...other parameters required for analysis  }};handleMessage(msgEvent);</code></pre>
+    <pre class="prettyprint"><code>// Example message event for initiating analysis on an audio file:
+const msgEvent = {
+  data: {
+    action: "analyse",
+    file: "audio_sample.mp3",
+    // ...other parameters required for analysis
+  }
+};
+handleMessage(msgEvent);</code></pre>
 
 
 
@@ -7634,7 +7923,10 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Converts a hexadecimal string into a UTF-8 string.Splits the hex string into two-character segments, converts each segment to its corresponding character,and concatenates the characters to form the decoded string.
+    Converts a hexadecimal string into a UTF-8 string.
+
+Splits the hex string into two-character segments, converts each segment to its corresponding character,
+and concatenates the characters to form the decoded string.
 </div>
 
 
@@ -7798,7 +8090,27 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Increases the FFT sample count for the spectrogram if it is below 2048.This function checks if the current FFT sample count (spectrogram.fftSamples) is less than 2048.If so, it doubles the sample count, updates the global FFT configuration (config.FFT), and refreshesthe audio buffer by invoking postBufferUpdate with the current window offset, normalized playback position,and playback state from wavesurfer. The playback position is calculated by dividing wavesurfer.getCurrentTime()by windowLength, then clamped between 0 and 1. Finally, the updated FFT sample count is logged to the console.Side Effects:- Modifies spectrogram.fftSamples and config.FFT.- Calls postBufferUpdate to refresh the audio buffer.- Logs the new FFT sample count using console.log.External Dependencies:- spectrogram: Object containing FFT settings.- config: Global configuration object for FFT.- wavesurfer: Instance controlling audio playback and current time.- windowLength: Global variable used to normalize the playback position.- windowOffsetSecs: Global variable indicating the current window offset in seconds.- clamp: Utility function to restrict a value between a minimum and maximum.- postBufferUpdate: Function to update the audio buffer after FFT changes.
+    Increases the FFT sample count for the spectrogram if it is below 2048.
+
+This function checks if the current FFT sample count (spectrogram.fftSamples) is less than 2048.
+If so, it doubles the sample count, updates the global FFT configuration (config.FFT), and refreshes
+the audio buffer by invoking postBufferUpdate with the current window offset, normalized playback position,
+and playback state from wavesurfer. The playback position is calculated by dividing wavesurfer.getCurrentTime()
+by windowLength, then clamped between 0 and 1. Finally, the updated FFT sample count is logged to the console.
+
+Side Effects:
+- Modifies spectrogram.fftSamples and config.FFT.
+- Calls postBufferUpdate to refresh the audio buffer.
+- Logs the new FFT sample count using console.log.
+
+External Dependencies:
+- spectrogram: Object containing FFT settings.
+- config: Global configuration object for FFT.
+- wavesurfer: Instance controlling audio playback and current time.
+- windowLength: Global variable used to normalize the playback position.
+- windowOffsetSecs: Global variable indicating the current window offset in seconds.
+- clamp: Utility function to restrict a value between a minimum and maximum.
+- postBufferUpdate: Function to update the audio buffer after FFT changes.
 </div>
 
 
@@ -7886,7 +8198,17 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Initializes and configures audio region management using the RegionsPlugin.Destroys any existing RegionsPlugin instance and creates a new instance with regions that are draggable,a maximum limit of 100 regions, and a default color defined by STATE.regionColour.Registers event listeners for region interactions:- "region-clicked": Hides the context menu, updates the active region, and seeks playback to the region's start.  If the Shift key is pressed, all regions with the default color are removed; if the Ctrl/Cmd key is pressed,  the clicked region is removed.- "region-created": Marks a new region as active if it has no label (content) or its start time matches the current active region.- "region-update": Clears the region's label and sets the updated region as active.
+    Initializes and configures audio region management using the RegionsPlugin.
+
+Destroys any existing RegionsPlugin instance and creates a new instance with regions that are draggable,
+a maximum limit of 100 regions, and a default color defined by STATE.regionColour.
+
+Registers event listeners for region interactions:
+- "region-clicked": Hides the context menu, updates the active region, and seeks playback to the region's start.
+  If the Shift key is pressed, all regions with the default color are removed; if the Ctrl/Cmd key is pressed,
+  the clicked region is removed.
+- "region-created": Marks a new region as active if it has no label (content) or its start time matches the current active region.
+- "region-update": Clears the region's label and sets the updated region as active.
 </div>
 
 
@@ -7996,7 +8318,10 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Validates that a given string conforms to the version 4 UUID format.Checks the string against the pattern: xxxxxxxx-xxxx-4xxx-[89ab]xxx-xxxxxxxxxxxx,where the UUID is case-insensitive.
+    Validates that a given string conforms to the version 4 UUID format.
+
+Checks the string against the pattern: xxxxxxxx-xxxx-4xxx-[89ab]xxx-xxxxxxxxxxxx,
+where the UUID is case-insensitive.
 </div>
 
 
@@ -8155,7 +8480,12 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Asynchronously loads an audio file, processes its audio data, and updates the UI with relevant metadata.This function fetches the audio buffer from the specified file between the given start and end times,then posts the audio data along with metadata to the UI. It also triggers detection processing and poststhe current file's week number based on the application's state. If the file does not exist or an error occursduring processing, an error alert is generated and the promise is rejected.
+    Asynchronously loads an audio file, processes its audio data, and updates the UI with relevant metadata.
+
+This function fetches the audio buffer from the specified file between the given start and end times,
+then posts the audio data along with metadata to the UI. It also triggers detection processing and posts
+the current file's week number based on the application's state. If the file does not exist or an error occurs
+during processing, an error alert is generated and the promise is rejected.
 </div>
 
 
@@ -8553,7 +8883,8 @@ Analysis Rate: x real time performance
 
         
 <div class="param-desc">
-    A promise that resolves when the audio file has been successfully loaded and processed,or rejects with a generated error alert if the file cannot be found or processed.
+    A promise that resolves when the audio file has been successfully loaded and processed,
+or rejects with a generated error alert if the file cannot be found or processed.
 </div>
 
 
@@ -8577,7 +8908,16 @@ Analysis Rate: x real time performance
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>loadAudioFile({   file: "/path/to/audio.mp3",   start: 10,   end: 30,   position: 5,   play: true,   goToRegion: true })  .then(() => console.log("Audio loaded successfully."))  .catch((error) => console.error("Error loading audio:", error));</code></pre>
+    <pre class="prettyprint"><code>loadAudioFile({ 
+  file: "/path/to/audio.mp3", 
+  start: 10, 
+  end: 30, 
+  position: 5, 
+  play: true, 
+  goToRegion: true 
+})
+  .then(() => console.log("Audio loaded successfully."))
+  .catch((error) => console.error("Error loading audio:", error));</code></pre>
 
 
 
@@ -8595,7 +8935,8 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    loadAudioFileSync: Called when user opens a file (just opens first file in multiple files)and when clicking on filename in list of open files.
+    loadAudioFileSync: Called when user opens a file (just opens first file in multiple files)
+and when clicking on filename in list of open files.
 </div>
 
 
@@ -8755,7 +9096,15 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Loads and configures the SQLite database for managing audio records and metadata.Retrieves default model labels either from a remote file (if the model is "birdnet") or from a local config file,appends a default "Unknown Sp." label, and determines the number of labels to construct the database filename.If the database file does not exist, a new database is created via `createDB`. Otherwise, an existing database is opened,and various PRAGMA settings (e.g., foreign keys, journal mode, busy timeout) are enforced. The function also ensures thatnecessary indices are created and pending database schema migrations (e.g., for tags and reviewed columns) are applied.Finally, it updates the global LABELS variable by fetching labels in the preferred locale from the database and sends a UImessage if records are present.
+    Loads and configures the SQLite database for managing audio records and metadata.
+
+Retrieves default model labels either from a remote file (if the model is "birdnet") or from a local config file,
+appends a default "Unknown Sp." label, and determines the number of labels to construct the database filename.
+If the database file does not exist, a new database is created via `createDB`. Otherwise, an existing database is opened,
+and various PRAGMA settings (e.g., foreign keys, journal mode, busy timeout) are enforced. The function also ensures that
+necessary indices are created and pending database schema migrations (e.g., for tags and reviewed columns) are applied.
+Finally, it updates the global LABELS variable by fetching labels in the preferred locale from the database and sends a UI
+message if records are present.
 </div>
 
 
@@ -8901,7 +9250,9 @@ Analysis Rate: x real time performance
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>loadDB('/data/db')  .then(success => console.log('Database loaded:', success))  .catch(error => console.error('Error loading database:', error));</code></pre>
+    <pre class="prettyprint"><code>loadDB('/data/db')
+  .then(success => console.log('Database loaded:', success))
+  .catch(error => console.error('Error loading database:', error));</code></pre>
 
 
 
@@ -8919,7 +9270,9 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Updates UI elements with localized text based on the provided locale.Asynchronously fetches a localization JSON file corresponding to the given locale, falling back to English if necessary. Updates DOM elements—including text content, data attributes, popover titles, form labels, button text, option values, and carousel items—with the localized strings retrieved from the JSON file and other i18n objects. If the JSON file for the specified locale is not available, the function logs a warning and returns without modifying the UI.
+    Updates UI elements with localized text based on the provided locale.
+
+Asynchronously fetches a localization JSON file corresponding to the given locale, falling back to English if necessary. Updates DOM elements—including text content, data attributes, popover titles, form labels, button text, option values, and carousel items—with the localized strings retrieved from the JSON file and other i18n objects. If the JSON file for the specified locale is not available, the function logs a warning and returns without modifying the UI.
 </div>
 
 
@@ -9065,7 +9418,15 @@ Analysis Rate: x real time performance
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>localiseUI('es_MX')  .then((localisationData) => {    if (localisationData) {      console.log('UI updated with localized strings.');    } else {      console.log('Localization file not found; UI remains unmodified.');    }  })  .catch(error => console.error('Localization error:', error));</code></pre>
+    <pre class="prettyprint"><code>localiseUI('es_MX')
+  .then((localisationData) => {
+    if (localisationData) {
+      console.log('UI updated with localized strings.');
+    } else {
+      console.log('Localization file not found; UI remains unmodified.');
+    }
+  })
+  .catch(error => console.error('Localization error:', error));</code></pre>
 
 
 
@@ -9245,7 +9606,23 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Asynchronously verifies the current user's membership status and updates the UI accordingly.This function checks membership status via a remote call using the global configuration UUID and retrieves the trial periodfrom the Electron API. It uses localStorage to cache the membership status, its timestamp, and the installation date. The functiondetermines if the user is either a subscriber or within the trial period based on the installation date and trial duration.Based on the result, it updates UI elements by toggling "locked" and "unlocked" classes, enabling or disabling controls, and,if the user is a confirmed member, updating the primary logo image.Side Effects:- Reads from and writes to localStorage (membership status, membership timestamp, and install date).- Modifies DOM elements by replacing "locked" and "unlocked" classes, updating button states, and changing text content.- Changes the primary logo's image source when membership is verified.- Logs membership check details and error information using console.info and console.warn.Note:In case of a remote check error, if a valid cached membership status (cached within the last week) exists, it is used as afallback. Otherwise, the promise may resolve to undefined.
+    Asynchronously verifies the current user's membership status and updates the UI accordingly.
+
+This function checks membership status via a remote call using the global configuration UUID and retrieves the trial period
+from the Electron API. It uses localStorage to cache the membership status, its timestamp, and the installation date. The function
+determines if the user is either a subscriber or within the trial period based on the installation date and trial duration.
+Based on the result, it updates UI elements by toggling "locked" and "unlocked" classes, enabling or disabling controls, and,
+if the user is a confirmed member, updating the primary logo image.
+
+Side Effects:
+- Reads from and writes to localStorage (membership status, membership timestamp, and install date).
+- Modifies DOM elements by replacing "locked" and "unlocked" classes, updating button states, and changing text content.
+- Changes the primary logo's image source when membership is verified.
+- Logs membership check details and error information using console.info and console.warn.
+
+Note:
+In case of a remote check error, if a valid cached membership status (cached within the last week) exists, it is used as a
+fallback. Otherwise, the promise may resolve to undefined.
 </div>
 
 
@@ -9318,7 +9695,8 @@ Analysis Rate: x real time performance
 
         
 <div class="param-desc">
-    A promise that resolves to a boolean indicating whether the user is a member,or undefined if an error occurs and no valid cached membership status is available.
+    A promise that resolves to a boolean indicating whether the user is a member,
+or undefined if an error occurs and no valid cached membership status is available.
 </div>
 
 
@@ -9342,7 +9720,13 @@ Analysis Rate: x real time performance
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>membershipCheck().then(isMember => {  if (isMember) {    console.log('User is a member or within the trial period.');  } else {    console.log('User is not a member or membership status could not be determined.');  }});</code></pre>
+    <pre class="prettyprint"><code>membershipCheck().then(isMember => {
+  if (isMember) {
+    console.log('User is a member or within the trial period.');
+  } else {
+    console.log('User is not a member or membership status could not be determined.');
+  }
+});</code></pre>
 
 
 
@@ -9360,7 +9744,11 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Notifies the UI about a missing file entry in the database.This asynchronous function queries the disk database for a file record by its name.If a record with an associated ID exists, it considers the file as missing and triggers anerror alert with the message "dbFileMissing" along with the file name in the alert variables.
+    Notifies the UI about a missing file entry in the database.
+
+This asynchronous function queries the disk database for a file record by its name.
+If a record with an associated ID exists, it considers the file as missing and triggers an
+error alert with the message "dbFileMissing" along with the file name in the alert variables.
 </div>
 
 
@@ -9531,7 +9919,14 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Finalizes audio analysis by updating application state, re-enabling UI settings,and logging diagnostic metrics and tracking events.Resets the prediction flag, restores settings, updates analysis state,and conditionally enables menu items based on available disk records.Hides the progress indicator and, when not in quiet mode, calculatesthe analysis duration and rate for telemetry. In non-quiet mode, recordsthese metrics through event tracking and displays a completion notification.
+    Finalizes audio analysis by updating application state, re-enabling UI settings,
+and logging diagnostic metrics and tracking events.
+
+Resets the prediction flag, restores settings, updates analysis state,
+and conditionally enables menu items based on available disk records.
+Hides the progress indicator and, when not in quiet mode, calculates
+the analysis duration and rate for telemetry. In non-quiet mode, records
+these metrics through event tracking and displays a completion notification.
 </div>
 
 
@@ -9717,7 +10112,11 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Initializes and launches the application environment by configuring model settings, databases, and prediction workers.This function is invoked when the application is first opened or when the model is changed. It sets global flags,configures the sample rate based on the model, updates the application state, loads the disk and memory databases,and spawns prediction workers to process audio data.
+    Initializes and launches the application environment by configuring model settings, databases, and prediction workers.
+
+This function is invoked when the application is first opened or when the model is changed. It sets global flags,
+configures the sample rate based on the model, updates the application state, loads the disk and memory databases,
+and spawns prediction workers to process audio data.
 </div>
 
 
@@ -10117,7 +10516,13 @@ Analysis Rate: x real time performance
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>onLaunch({  model: "birdnet",  batchSize: 64,  threads: 4,  backend: "tensorflow",  list: "selected"});</code></pre>
+    <pre class="prettyprint"><code>onLaunch({
+  model: "birdnet",
+  batchSize: 64,
+  threads: 4,
+  backend: "tensorflow",
+  list: "selected"
+});</code></pre>
 
 
 
@@ -10135,7 +10540,17 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Initializes application state after the audio model becomes ready.Sets the model ready flag and updates UI elements based on current audio assets:- Enables the "analyse" menu item if an audio file is loaded, and additionally "analyseAll" and "reanalyseAll" if multiple files are open.- Enables the "analyseSelection" menu item when an active audio region exists.- Calculates the warm-up time and logs it in the DIAGNOSTICS object.- Logs the application launch time if this is the first load.- Marks the application as loaded and hides the loading screen.- Requests tag data from the worker.- Initiates the user tour for new users in non-testing environments.- Processes any queued operating system file inputs.
+    Initializes application state after the audio model becomes ready.
+
+Sets the model ready flag and updates UI elements based on current audio assets:
+- Enables the "analyse" menu item if an audio file is loaded, and additionally "analyseAll" and "reanalyseAll" if multiple files are open.
+- Enables the "analyseSelection" menu item when an active audio region exists.
+- Calculates the warm-up time and logs it in the DIAGNOSTICS object.
+- Logs the application launch time if this is the first load.
+- Marks the application as loaded and hides the loading screen.
+- Requests tag data from the worker.
+- Initiates the user tour for new users in non-testing environments.
+- Processes any queued operating system file inputs.
 </div>
 
 
@@ -10310,7 +10725,18 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Finalizes result processing after the database has sent the last result.Updates analysis state by disabling the predicting flag and re-enabling settings, replaces the result tablewith the latest content cloned from a buffer, resets the buffer's content, and ensures that the designated rowin the results table is activated. The active row is selected based on the following priority:- If an `active` index is provided, uses that row; if not found (which can occur after an edit), selects the last row  matching daytime or nighttime criteria.- If a `select` value is provided, determines the row index via a helper function and activates that row.- Otherwise, attempts to activate a row marked with the "table-active" class, or defaults to the first table row.Once the active row is determined, it simulates a click on that row and scrolls it into view, hides the progress indicator,and updates the filename panel.
+    Finalizes result processing after the database has sent the last result.
+
+Updates analysis state by disabling the predicting flag and re-enabling settings, replaces the result table
+with the latest content cloned from a buffer, resets the buffer's content, and ensures that the designated row
+in the results table is activated. The active row is selected based on the following priority:
+- If an `active` index is provided, uses that row; if not found (which can occur after an edit), selects the last row
+  matching daytime or nighttime criteria.
+- If a `select` value is provided, determines the row index via a helper function and activates that row.
+- Otherwise, attempts to activate a row marked with the "table-active" class, or defaults to the first table row.
+
+Once the active row is determined, it simulates a click on that row and scrolls it into view, hides the progress indicator,
+and updates the filename panel.
 </div>
 
 
@@ -10685,7 +11111,12 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Updates the application's locale by modifying state and database entries, and optionally refreshes analysis results.This asynchronous function updates the global state with the new locale, applies the new locale to both thedisk and memory databases by updating their species labels, and optionally refreshes the application's resultsand summary if requested. It ensures that database operations are performed within a locked context for concurrencysafety, and performs a rollback in case of any error during the update process.
+    Updates the application's locale by modifying state and database entries, and optionally refreshes analysis results.
+
+This asynchronous function updates the global state with the new locale, applies the new locale to both the
+disk and memory databases by updating their species labels, and optionally refreshes the application's results
+and summary if requested. It ensures that database operations are performed within a locked context for concurrency
+safety, and performs a rollback in case of any error during the update process.
 </div>
 
 
@@ -10919,7 +11350,23 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Plays the active audio region after sanitizing its boundaries.This function locates the active region from the global REGIONS object by matching the region's start time with the global activeRegion. It then adjusts the region's start and end times to ensure they fall within the valid playback window—ensuring the start is not negative and the end does not exceed 99.5% of the windowLength to avoid triggering a finish event that causes a page reload. Note that if playback is paused at the end of an adjacent region, the subsequent region may not play.Side Effects:- Modifies the region's start and end properties for playback.- Initiates playback by calling the region's play() method.Global Dependencies:- REGIONS: An object containing all audio regions.- activeRegion: The currently active region used for matching.- windowLength: A number representing the maximum playback window length.
+    Plays the active audio region after sanitizing its boundaries.
+
+This function locates the active region from the global REGIONS object by matching the 
+region's start time with the global activeRegion. It then adjusts the region's start and 
+end times to ensure they fall within the valid playback window—ensuring the start is not 
+negative and the end does not exceed 99.5% of the windowLength to avoid triggering a finish 
+event that causes a page reload. Note that if playback is paused at the end of an adjacent region, 
+the subsequent region may not play.
+
+Side Effects:
+- Modifies the region's start and end properties for playback.
+- Initiates playback by calling the region's play() method.
+
+Global Dependencies:
+- REGIONS: An object containing all audio regions.
+- activeRegion: The currently active region used for matching.
+- windowLength: A number representing the maximum playback window length.
 </div>
 
 
@@ -11025,7 +11472,12 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Updates the active record based on the key assignment configuration.When an assignment exists for the provided key, extracts record details from the currentlyselected row, modifies the appropriate field (species, label, or comment) based on the assignment,and calls the record insertion routine with the updated values. If no active row is selected,logs an informational message and aborts the update.
+    Updates the active record based on the key assignment configuration.
+
+When an assignment exists for the provided key, extracts record details from the currently
+selected row, modifies the appropriate field (species, label, or comment) based on the assignment,
+and calls the record insertion routine with the updated values. If no active row is selected,
+logs an informational message and aborts the update.
 </div>
 
 
@@ -11152,7 +11604,8 @@ Analysis Rate: x real time performance
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>// Assuming a key assignment exists for key "1" in config.keyAssignment:recordUpdate(1);</code></pre>
+    <pre class="prettyprint"><code>// Assuming a key assignment exists for key "1" in config.keyAssignment:
+recordUpdate(1);</code></pre>
 
 
 
@@ -11170,7 +11623,27 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Halve the FFT sample count for the spectrogram when it exceeds the minimum threshold.This function checks if `spectrogram.fftSamples` is greater than 64. If so, the FFT samplecount is halved, and the normalized playback position is computed using the ratio of the currentplayback time (from `wavesurfer.getCurrentTime()`) to the `windowLength`, clamped between 0 and 1.It then calls `postBufferUpdate` with an object containing:  - `begin`: the current window offset in seconds (`windowOffsetSecs`),  - `position`: the normalized (and clamped) playback position,  - `play`: a boolean indicating whether audio is currently playing (`wavesurfer.isPlaying()`).The updated FFT sample count is logged to the console, and the global configuration (`config.FFT`)is updated accordingly.Assumes that the following globals and helper functions are available in the scope:  - `spectrogram`  - `wavesurfer`  - `windowLength`  - `windowOffsetSecs`  - `config`  - `clamp`  - `postBufferUpdate`
+    Halve the FFT sample count for the spectrogram when it exceeds the minimum threshold.
+
+This function checks if `spectrogram.fftSamples` is greater than 64. If so, the FFT sample
+count is halved, and the normalized playback position is computed using the ratio of the current
+playback time (from `wavesurfer.getCurrentTime()`) to the `windowLength`, clamped between 0 and 1.
+It then calls `postBufferUpdate` with an object containing:
+  - `begin`: the current window offset in seconds (`windowOffsetSecs`),
+  - `position`: the normalized (and clamped) playback position,
+  - `play`: a boolean indicating whether audio is currently playing (`wavesurfer.isPlaying()`).
+
+The updated FFT sample count is logged to the console, and the global configuration (`config.FFT`)
+is updated accordingly.
+
+Assumes that the following globals and helper functions are available in the scope:
+  - `spectrogram`
+  - `wavesurfer`
+  - `windowLength`
+  - `windowOffsetSecs`
+  - `config`
+  - `clamp`
+  - `postBufferUpdate`
 </div>
 
 
@@ -11276,7 +11749,13 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Renders a detection result into the results table while managing table headers, pagination, and UI updates.For the first result (index ≤ 1), clears or resets the results table based on the selection mode and sets up table headerswith localized labels. When handling non-database results beyond the configured limit, the function adds pagination oraborts further processing. For valid detection results, it formats timestamps and positions for display, constructs thecorresponding table row including species details, call counts, labels, comments, and review status, and schedules UIupdates to incorporate the new entry.
+    Renders a detection result into the results table while managing table headers, pagination, and UI updates.
+
+For the first result (index ≤ 1), clears or resets the results table based on the selection mode and sets up table headers
+with localized labels. When handling non-database results beyond the configured limit, the function adds pagination or
+aborts further processing. For valid detection results, it formats timestamps and positions for display, constructs the
+corresponding table row including species details, call counts, labels, comments, and review status, and schedules UI
+updates to incorporate the new entry.
 </div>
 
 
@@ -11429,7 +11908,8 @@ Analysis Rate: x real time performance
                 </td>
             
 
-            <td class="description last">Detection result data containing properties such as timestamp, position, active,  sname, cname, score, label, tagID, comment, end, count, callCount, isDaylight, and reviewed.</td>
+            <td class="description last">Detection result data containing properties such as timestamp, position, active,
+  sname, cname, score, label, tagID, comment, end, count, callCount, isDaylight, and reviewed.</td>
         </tr>
 
     
@@ -11665,7 +12145,12 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Processes click events on audio analysis result rows.Validates that audio regions are fully established and an audio file is loaded before proceeding. Extracts the file name,start time, end time, and label from the clicked row's "name" attribute (expected in the format "file|start|end|unused|label"),sets the row as active by updating its CSS class, and loads the corresponding audio region. If the clicked target has a "circle"class, waits until the audio file is completely loaded before obtaining selection results.
+    Processes click events on audio analysis result rows.
+
+Validates that audio regions are fully established and an audio file is loaded before proceeding. Extracts the file name,
+start time, end time, and label from the clicked row's "name" attribute (expected in the format "file|start|end|unused|label"),
+sets the row as active by updating its CSS class, and loads the corresponding audio region. If the clicked target has a "circle"
+class, waits until the audio file is completely loaded before obtaining selection results.
 </div>
 
 
@@ -11811,7 +12296,10 @@ Analysis Rate: x real time performance
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>// Assuming a table row element with the following "name" attribute:// &lt;tr name="audio.mp3|10|20|unused|Speech">...&lt;/tr>// Attach the event handler as follows:document.querySelector('tr').addEventListener('click', resultClick);</code></pre>
+    <pre class="prettyprint"><code>// Assuming a table row element with the following "name" attribute:
+// &lt;tr name="audio.mp3|10|20|unused|Speech">...&lt;/tr>
+// Attach the event handler as follows:
+document.querySelector('tr').addEventListener('click', resultClick);</code></pre>
 
 
 
@@ -11829,7 +12317,13 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Checks whether all files in the provided list are present in the database.This asynchronous function processes the given file list in batches (up to 25,000 files per batch) to accommodate SQLite's parameter limits.For each batch, it constructs a parameterized SQL query that counts how many of the files exist in the database's "files" table.If any batch has a count lower than the number of files in that batch, the function immediately posts a failure event to the UI and returns false.If all batches are successfully verified, it posts a success event to the UI and returns true.If the database (diskDB) is not loaded, an error alert is generated and the function returns undefined.
+    Checks whether all files in the provided list are present in the database.
+
+This asynchronous function processes the given file list in batches (up to 25,000 files per batch) to accommodate SQLite's parameter limits.
+For each batch, it constructs a parameterized SQL query that counts how many of the files exist in the database's "files" table.
+If any batch has a count lower than the number of files in that batch, the function immediately posts a failure event to the UI and returns false.
+If all batches are successfully verified, it posts a success event to the UI and returns true.
+If the database (diskDB) is not loaded, an error alert is generated and the function returns undefined.
 </div>
 
 
@@ -11975,7 +12469,16 @@ Analysis Rate: x real time performance
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>const files = ['track1.mp3', 'track2.wav'];savedFileCheck(files).then(result => {  if (result === true) {    console.log('All files exist in the database.');  } else if (result === false) {    console.log('Some files are missing in the database.');  } else {    console.log('Database not loaded.');  }});</code></pre>
+    <pre class="prettyprint"><code>const files = ['track1.mp3', 'track2.wav'];
+savedFileCheck(files).then(result => {
+  if (result === true) {
+    console.log('All files exist in the database.');
+  } else if (result === false) {
+    console.log('Some files are missing in the database.');
+  } else {
+    console.log('Database not loaded.');
+  }
+});</code></pre>
 
 
 
@@ -11993,7 +12496,19 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Retrieves detection records for a given audio file within a specified time range and posts them to the UI.This asynchronous function calculates absolute start and end timestamps by adding the file's metadata offset (in milliseconds) to the provided start and end offsets (in seconds). It queries the database for detection records that satisfy the following criteria:- A confidence level greater than or equal to the configured minimum (STATE.detect.confidence).- A file name matching the provided file parameter.- A detection timestamp between the calculated start and end times.If additional species filters are active, the query further restricts results by species ID. Records are ranked using a window function to select the top (most confident) detection per grouping of file and datetime.The function posts the resulting detections to the UI along with a flag that instructs the UI whether to navigate directly to the corresponding region.
+    Retrieves detection records for a given audio file within a specified time range and posts them to the UI.
+
+This asynchronous function calculates absolute start and end timestamps by adding the file's metadata offset 
+(in milliseconds) to the provided start and end offsets (in seconds). It queries the database for detection 
+records that satisfy the following criteria:
+- A confidence level greater than or equal to the configured minimum (STATE.detect.confidence).
+- A file name matching the provided file parameter.
+- A detection timestamp between the calculated start and end times.
+
+If additional species filters are active, the query further restricts results by species ID. Records are 
+ranked using a window function to select the top (most confident) detection per grouping of file and datetime.
+The function posts the resulting detections to the UI along with a flag that instructs the UI whether to 
+navigate directly to the corresponding region.
 </div>
 
 
@@ -12221,7 +12736,15 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Activates the specified audio region by updating the global state and UI.This function first clears any previously active regions by resetting their colors and labels to the default state. It then applies an active style to the provided region,which includes setting a new color and formatting the label. The function updates the global active region, positions the playhead at the region's start time (taking into account any window offset),and enables UI menu items such as "export-audio" and, when applicable (i.e., if the model is ready and not predicting),"analyseSelection". If the provided region object is invalid (missing or having non-numeric start or end values),the function logs an error and exits without modifying the state.
+    Activates the specified audio region by updating the global state and UI.
+
+This function first clears any previously active regions by resetting their colors 
+and labels to the default state. It then applies an active style to the provided region,
+which includes setting a new color and formatting the label. The function updates the global 
+active region, positions the playhead at the region's start time (taking into account any window offset),
+and enables UI menu items such as "export-audio" and, when applicable (i.e., if the model is ready and not predicting),
+"analyseSelection". If the provided region object is invalid (missing or having non-numeric start or end values),
+the function logs an error and exits without modifying the state.
 </div>
 
 
@@ -12440,7 +12963,12 @@ Analysis Rate: x real time performance
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>const region = {  start: 15,  end: 30,  content: { innerText: 'Bird Call' }};setActiveRegion(region);</code></pre>
+    <pre class="prettyprint"><code>const region = {
+  start: 15,
+  end: 30,
+  content: { innerText: 'Bird Call' }
+};
+setActiveRegion(region);</code></pre>
 
 
 
@@ -12458,7 +12986,13 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Marks the row corresponding to the specified start time as active in the result table.Iterates through all table rows within the result table and checks the "name" attribute, which is expectedto be a pipe-separated string containing file identifier, start time, and additional details. When a row is foundwhere the file matches the current file (STATE.currentFile) and the start time matches the provided value, anypreviously active row (if different) is deactivated, the target row is activated by adding the 'table-active'class, and the row is smoothly scrolled into view.
+    Marks the row corresponding to the specified start time as active in the result table.
+
+Iterates through all table rows within the result table and checks the "name" attribute, which is expected
+to be a pipe-separated string containing file identifier, start time, and additional details. When a row is found
+where the file matches the current file (STATE.currentFile) and the start time matches the provided value, any
+previously active row (if different) is deactivated, the target row is activated by adding the 'table-active'
+class, and the row is smoothly scrolled into view.
 </div>
 
 
@@ -12595,7 +13129,11 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Stores the row index of the table row associated with the clicked element.Traverses upward from the provided element to locate the nearest ancestor <tr> element,then assigns its rowIndex to the global variable clickedIndex. It is assumed that thetarget element is within a table row; otherwise, the function may produce errors.
+    Stores the row index of the table row associated with the clicked element.
+
+Traverses upward from the provided element to locate the nearest ancestor <tr> element,
+then assigns its rowIndex to the global variable clickedIndex. It is assumed that the
+target element is within a table row; otherwise, the function may produce errors.
 </div>
 
 
@@ -12732,7 +13270,9 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Assigns a key binding configuration based on user input.Retrieves the column identifier from the DOM element with the ID matching `${key}-column` and uses it to update the global key assignment stored in `config.keyAssignment`. The function trims the value from the input element and sets it to `null` if empty. It marks the assignment as active when a non-empty value is provided and dynamically enables or disables the input element based on the presence of a valid column.
+    Assigns a key binding configuration based on user input.
+
+Retrieves the column identifier from the DOM element with the ID matching `${key}-column` and uses it to update the global key assignment stored in `config.keyAssignment`. The function trims the value from the input element and sets it to `null` if empty. It marks the assignment as active when a non-empty value is provided and dynamically enables or disables the input element based on the presence of a valid column.
 </div>
 
 
@@ -12910,7 +13450,12 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Update key assignment UI elements based on the provided configuration.Iterates over each key in the {@code keyAssignments} object, updating the correspondingDOM input elements with their assigned value and column information. If the key's valueis not "unused", the input is enabled. Additionally, for key assignments with a column of"label" or "species", the input element is further processed for specialized handling.
+    Update key assignment UI elements based on the provided configuration.
+
+Iterates over each key in the {@code keyAssignments} object, updating the corresponding
+DOM input elements with their assigned value and column information. If the key's value
+is not "unused", the input is enabled. Additionally, for key assignments with a column of
+"label" or "species", the input element is further processed for specialized handling.
 </div>
 
 
@@ -12962,7 +13507,10 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">An object mapping element IDs to their key assignment configurations. Each configuration object  should contain:  - {@code value}: The assigned key value. Use "unused" to indicate no assignment.  - {@code column}: The column type, typically "label" or "species", affecting further UI processing.</td>
+            <td class="description last">An object mapping element IDs to their key assignment configurations. Each configuration object
+  should contain:
+  - {@code value}: The assigned key value. Use "unused" to indicate no assignment.
+  - {@code column}: The column type, typically "label" or "species", affecting further UI processing.</td>
         </tr>
 
     
@@ -13034,7 +13582,11 @@ Analysis Rate: x real time performance
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>const keyAssignments = {  "key1": { value: "A", column: "label" },  "key2": { value: "unused", column: "species" }};setKeyAssignmentUI(keyAssignments);</code></pre>
+    <pre class="prettyprint"><code>const keyAssignments = {
+  "key1": { value: "A", column: "label" },
+  "key2": { value: "unused", column: "species" }
+};
+setKeyAssignmentUI(keyAssignments);</code></pre>
 
 
 
@@ -13052,7 +13604,8 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Called by getWorkingFile, setCustomLocationAssigns file metadata to a metadata cache object. file is the key, and is the source file
+    Called by getWorkingFile, setCustomLocation
+Assigns file metadata to a metadata cache object. file is the key, and is the source file
 </div>
 
 
@@ -13220,7 +13773,12 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Renders a date and time picker form for updating the start time of the current audio file.The form is dynamically created and appended to the filename panel, featuring:- A label and a datetime-local input, with the input's value initialized from STATE.fileStart and its maximum value set to the current datetime.- A submit button that, when activated, converts the selected datetime into a millisecond timestamp, sends an update message to the worker, logs the change, resets analysis results, and updates STATE.fileStart.- A cancel button that removes the form without making any changes.
+    Renders a date and time picker form for updating the start time of the current audio file.
+
+The form is dynamically created and appended to the filename panel, featuring:
+- A label and a datetime-local input, with the input's value initialized from STATE.fileStart and its maximum value set to the current datetime.
+- A submit button that, when activated, converts the selected datetime into a millisecond timestamp, sends an update message to the worker, logs the change, resets analysis results, and updates STATE.fileStart.
+- A cancel button that removes the form without making any changes.
 </div>
 
 
@@ -13326,7 +13884,13 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Populates and displays the record entry modal for updating or adding audio record details.Retrieves species information from either the batch selector or the active audio region and auto-populatesrelated fields such as call count and comment when an active record exists. Adjusts the UI based on batch modeby toggling visibility of certain elements, updates labels based on localization settings, and initializes a custom label selector with available tags from the application state. Focus is set to the bird autocomplete input when the modal is shown.
+    Populates and displays the record entry modal for updating or adding audio record details.
+
+Retrieves species information from either the batch selector or the active audio region and auto-populates
+related fields such as call count and comment when an active record exists. Adjusts the UI based on batch mode
+by toggling visibility of certain elements, updates labels based on localization settings, and initializes a 
+custom label selector with available tags from the application state. Focus is set to the bird autocomplete input 
+when the modal is shown.
 </div>
 
 
@@ -13495,9 +14059,11 @@ Analysis Rate: x real time performance
 
     <h5>Examples</h5>
     
-    <pre class="prettyprint"><code>// Open the record entry form for a single record updateshowRecordEntryForm('update', false);</code></pre>
+    <pre class="prettyprint"><code>// Open the record entry form for a single record update
+showRecordEntryForm('update', false);</code></pre>
 
-    <pre class="prettyprint"><code>// Open the record entry form in batch mode for multiple recordsshowRecordEntryForm('add', true);</code></pre>
+    <pre class="prettyprint"><code>// Open the record entry form in batch mode for multiple records
+showRecordEntryForm('add', true);</code></pre>
 
 
 
@@ -13515,7 +14081,12 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Update the sort icon in the summary table to reflect the current sort order.Extracts the sort column and direction from the STATE.summarySortOrder string (formatted as "column direction"),determines the corresponding icon element by constructing its ID ("summary-{column}-icon"),and then hides all sort icons in the summary table before displaying the relevant icon.The icon is styled with the "flipped" class when the sort direction is "ASC", and without it for other directions.
+    Update the sort icon in the summary table to reflect the current sort order.
+
+Extracts the sort column and direction from the STATE.summarySortOrder string (formatted as "column direction"),
+determines the corresponding icon element by constructing its ID ("summary-{column}-icon"),
+and then hides all sort icons in the summary table before displaying the relevant icon.
+The icon is styled with the "flipped" class when the sort direction is "ASC", and without it for other directions.
 </div>
 
 
@@ -13590,7 +14161,8 @@ Analysis Rate: x real time performance
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>// If STATE.summarySortOrder is "duration ASC", then the sort icon for "duration" will be shown with the "flipped" class.showSummarySortIcon();</code></pre>
+    <pre class="prettyprint"><code>// If STATE.summarySortOrder is "duration ASC", then the sort icon for "duration" will be shown with the "flipped" class.
+showSummarySortIcon();</code></pre>
 
 
 
@@ -13608,7 +14180,18 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Creates audio regions for detections that occur within the current view window.For each detection, the function adjusts its start and end times by subtracting the global offset`windowOffsetSecs`. Only detections with an adjusted start time less than the current window length are processed.A detection is considered "active" if its adjusted start time matches the start time of the currently active region(`activeRegion.start`, if defined). If the detection is active and the `goToRegion` flag is true, the view is repositionedto focus on that region. Otherwise, the detection is processed only if the configuration flag `config.specDetections` is enabled.Audio regions are created by calling `createRegion` with the adjusted start and end times, the detection's label,a flag indicating whether to reposition the view (only for active detections when `goToRegion` is true), and an optionalcolour (set to `STATE.regionActiveColour` for active regions). After processing all detections,`STATE.regionsCompleted` is set to true to indicate that region creation is complete.
+    Creates audio regions for detections that occur within the current view window.
+
+For each detection, the function adjusts its start and end times by subtracting the global offset
+`windowOffsetSecs`. Only detections with an adjusted start time less than the current window length are processed.
+A detection is considered "active" if its adjusted start time matches the start time of the currently active region
+(`activeRegion.start`, if defined). If the detection is active and the `goToRegion` flag is true, the view is repositioned
+to focus on that region. Otherwise, the detection is processed only if the configuration flag `config.specDetections` is enabled.
+
+Audio regions are created by calling `createRegion` with the adjusted start and end times, the detection's label,
+a flag indicating whether to reposition the view (only for active detections when `goToRegion` is true), and an optional
+colour (set to `STATE.regionActiveColour` for active regions). After processing all detections,
+`STATE.regionsCompleted` is set to true to indicate that region creation is complete.
 </div>
 
 
@@ -13930,7 +14513,14 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Toggles the species filter based on user interaction with the summary table.Validates the event against non-interactive elements and current analysis state before proceeding.If the selected row is already highlighted (indicating an active filter), the highlight is removed;otherwise, all highlighted rows are cleared, the current row is marked, and the corresponding speciesis extracted from the clicked element. In explore mode, the species value is set in the bird list display.Subsequently, the function refreshes the results filtering and resets the UI components without clearingthe summary, pagination, or result listings.
+    Toggles the species filter based on user interaction with the summary table.
+
+Validates the event against non-interactive elements and current analysis state before proceeding.
+If the selected row is already highlighted (indicating an active filter), the highlight is removed;
+otherwise, all highlighted rows are cleared, the current row is marked, and the corresponding species
+is extracted from the clicked element. In explore mode, the species value is set in the bird list display.
+Subsequently, the function refreshes the results filtering and resets the UI components without clearing
+the summary, pagination, or result listings.
 </div>
 
 
@@ -14054,7 +14644,8 @@ Analysis Rate: x real time performance
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>// Apply species filtering when a table row is clicked.speciesFilter(event);</code></pre>
+    <pre class="prettyprint"><code>// Apply species filtering when a table row is clicked.
+speciesFilter(event);</code></pre>
 
 
 
@@ -14072,7 +14663,12 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Synchronizes a configuration object with a default configuration.Removes keys from the configuration that are not found in the default configuration,and adds any missing keys from the default configuration. For keys with values thatare both objects in the configuration and the default configuration, the merge isperformed recursively, except when the key is "keyAssignment", which is left untouched.
+    Synchronizes a configuration object with a default configuration.
+
+Removes keys from the configuration that are not found in the default configuration,
+and adds any missing keys from the default configuration. For keys with values that
+are both objects in the configuration and the default configuration, the merge is
+performed recursively, except when the key is "keyAssignment", which is left untouched.
 </div>
 
 
@@ -14232,7 +14828,15 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Logs an event to the Matomo analytics system.Constructs and dispatches an asynchronous GET request to the Matomo tracking API using the provided event details.The event name is sanitized by replacing any digits following "result" with an empty string, and the action parameteris adjusted: a single space converts to "Spacebar" and a plus sign converts to "Plus". The request URL embeds thecurrent time (hours, minutes, seconds), site ID, visitor UUID, event category, action, and optional event name and value.The function initiates an asynchronous fetch; if the network response is not OK, an error is thrown internally andthen logged to the console.
+    Logs an event to the Matomo analytics system.
+
+Constructs and dispatches an asynchronous GET request to the Matomo tracking API using the provided event details.
+The event name is sanitized by replacing any digits following "result" with an empty string, and the action parameter
+is adjusted: a single space converts to "Spacebar" and a plus sign converts to "Plus". The request URL embeds the
+current time (hours, minutes, seconds), site ID, visitor UUID, event category, action, and optional event name and value.
+
+The function initiates an asynchronous fetch; if the network response is not OK, an error is thrown internally and
+then logged to the console.
 </div>
 
 
@@ -14652,7 +15256,9 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Updates the spectrogram visualization and timeline asynchronously.This function ensures that the spectrogram element is visible by removing the "d-none" class and updates the display based on the provided audio buffer and options. It resets the spectrogram dimensions if a reset is requested or if the wavesurfer instance is uninitialized; otherwise, it loads the new audio buffer. After updating the spectrogram, the timeline is refreshed, the playback position is set using a normalized value, and playback is initiated if specified.
+    Updates the spectrogram visualization and timeline asynchronously.
+
+This function ensures that the spectrogram element is visible by removing the "d-none" class and updates the display based on the provided audio buffer and options. It resets the spectrogram dimensions if a reset is requested or if the wavesurfer instance is uninitialized; otherwise, it loads the new audio buffer. After updating the spectrogram, the timeline is refreshed, the playback position is set using a normalized value, and playback is initiated if specified.
 </div>
 
 
@@ -14996,7 +15602,14 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Updates the suggestions list and translucent completion overlay based on the input search query.Uses the lowercase value of the provided input element to filter bird suggestions via the globalgetFilteredBirds function. If the search query is shorter than 2 characters, the suggestion elementis hidden. Otherwise, a list of matching suggestions is created where each suggestion, when clicked,updates the selected bird display (the element with ID "selected-bird"), conditionally modifies theinput value based on the preserveInput flag, dispatches a change event on the input, and hides thesuggestion element.
+    Updates the suggestions list and translucent completion overlay based on the input search query.
+
+Uses the lowercase value of the provided input element to filter bird suggestions via the global
+getFilteredBirds function. If the search query is shorter than 2 characters, the suggestion element
+is hidden. Otherwise, a list of matching suggestions is created where each suggestion, when clicked,
+updates the selected bird display (the element with ID "selected-bird"), conditionally modifies the
+input value based on the preserveInput flag, dispatches a change event on the input, and hides the
+suggestion element.
 </div>
 
 
@@ -15179,7 +15792,14 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Adjusts the spectrogram zoom level and repositions the playhead relative to the audio timeline.Halves the display window during a "zoomIn" operation—without reducing the window below 1.5 seconds—and doubles it during a "zoomOut" operation, capped at 100 seconds or the total duration of the file.The window offset is recalculated to keep the playhead at the same absolute position within the audio,and any active audio regions are updated to remain consistent with the new window.No operation is performed if no audio file is loaded or if the audio regions have not been fully initialized.
+    Adjusts the spectrogram zoom level and repositions the playhead relative to the audio timeline.
+
+Halves the display window during a "zoomIn" operation—without reducing the window below 1.5 seconds—
+and doubles it during a "zoomOut" operation, capped at 100 seconds or the total duration of the file.
+The window offset is recalculated to keep the playhead at the same absolute position within the audio,
+and any active audio regions are updated to remain consistent with the new window.
+
+No operation is performed if no audio file is loaded or if the audio regions have not been fully initialized.
 </div>
 
 
@@ -15234,7 +15854,8 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">A zoom command either as a string ("zoomIn" or "zoomOut") for direct calls,or as an Event from which the command is extracted using the event target's closest button ID.</td>
+            <td class="description last">A zoom command either as a string ("zoomIn" or "zoomOut") for direct calls,
+or as an Event from which the command is extracted using the event target's closest button ID.</td>
         </tr>
 
     
@@ -15324,9 +15945,11 @@ Analysis Rate: x real time performance
 
     <h5>Examples</h5>
     
-    <pre class="prettyprint"><code>// Programmatically zoom in:zoomSpec("zoomIn");</code></pre>
+    <pre class="prettyprint"><code>// Programmatically zoom in:
+zoomSpec("zoomIn");</code></pre>
 
-    <pre class="prettyprint"><code>// Zoom out via a button click:buttonElement.addEventListener("click", zoomSpec);</code></pre>
+    <pre class="prettyprint"><code>// Zoom out via a button click:
+buttonElement.addEventListener("click", zoomSpec);</code></pre>
 
 
 

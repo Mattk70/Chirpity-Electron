@@ -2739,74 +2739,6 @@ function showWindowDetections({detections, goToRegion}) {
   STATE.regionsCompleted = true;
 }
 
-// function generateBirdList(store, rows) {
-//   const chart = document.getElementById("chart-list");
-//   const explore = document.getElementById("explore-list");
-//   const listHTML = generateBirdOptionList({ store, rows });
-//   chart.innerHTML = listHTML;
-//   explore.innerHTML = listHTML;
-// }
-
-// /**
-//  * Generates an HTML string for a bird species selection dropdown.
-//  *
-//  * Constructs a select element based on the provided options. When options.store is "allSpecies", a floating form-select is created with either a search prompt or a preselected species from the global LABELS. Otherwise, a basic select element is built using the species data from options.rows, with the currently active species (from STATE.chart.species) marked as selected.
-//  *
-//  * Also updates the inner HTML of the element with ID "species-search-label" using localized text.
-//  *
-//  * @param {Object} options - Options to configure the species option list.
-//  * @param {string} options.store - Determines the type of select element to generate. Use "allSpecies" to render all species with an optional preselection.
-//  * @param {Array<Object>} options.rows - Array of species objects; each must contain a "cname" property used for option values.
-//  * @param {string} [options.selected] - Optionally, the species name to preselect when options.store is "allSpecies".
-//  * @returns {string} HTML string representing the constructed select element with bird species options.
-//  *
-//  * @remark Relies on external globals such as LABELS, STATE, i18nHeadings, and i18nAll for data retrieval and localization.
-//  */
-// function generateBirdOptionList({ store, rows, selected }) {
-//   let listHTML = "";
-//   const i18n = getI18n(i18nHeadings);
-//   const i18nTout = getI18n(i18nAll);
-//   // Species search label and match count
-//   document.getElementById('species-search-label').innerHTML = i18n.search;
-//   if (store === "allSpecies") {
-//     // let sortedList = LABELS.map((label) => {
-//     //   const [sname, cname] = label.split("_")
-//     //   return `${cname}~${sname}`
-//     // });
-
-//     // // International language sorting, recommended for large arrays - 'en_uk' not valid, but same as 'en'
-//     // sortedList.sort(
-//     //   new Intl.Collator(config.locale.replace(/_.*$/, "")).compare
-//     // );
-//     // Check if we have prepared this before
-
-//     // const lastSelectedSpecies = selected || STATE.birdList.lastSelectedSpecies;
-//     listHTML +=
-//       `<div class="form-floating">
-//       <select spellcheck="false" id="bird-list-all" class="form-select mb-3" aria-label=".form-select" required>`;
-//     // 
-//     // for (const species of sortedList) {
-//     if (selected){
-//       const species = LABELS.find(sp => sp.split('_')[1] === selected);
-//       const [sname, cname] = species.split('_');
-//       // const isSelected = cname === lastSelectedSpecies ? "selected" : "";
-//       listHTML += `<option value="${cname}" selected>${cname}~${sname}</option>`;
-//     } else {
-//       listHTML += `<option value="">${i18n.searchPrompt}</option>`
-//     }
-//     listHTML += `</select><label for="bird-list-all">${i18n.species[0]}</label></div>`;
-//   } else {
-//     listHTML += `<select id="bird-list-seen" class="form-select"><option value="">${i18nTout[1]}</option>`;
-//     for (const { cname } of rows) {
-//       const isSelected = cname === STATE.chart.species ? "selected" : "";
-//       listHTML += `<option value="${cname}" ${isSelected}>${cname}</option>`;
-//     }
-//     listHTML += `</select><label for="bird-list-seen">${i18n.species[0]}</label>`;
-//   }
-
-//   return listHTML;
-// }
-
 function generateBirdIDList(rows) {
   let listHTML = "";
   for (const item in rows) {
@@ -2857,46 +2789,6 @@ function handleGesture(e) {
   // }, 200, 'swipe');
 }
 
-// document.addEventListener("change", function (e) {
-//   const target = e.target;
-//   const context = target.parentNode.classList.contains("chart")
-//     ? "chart"
-//     : "explore";
-//   if (target.closest("#bird-list-seen")) {
-//     // Clear the results table
-//     // const resultTable = document.getElementById('resultTableBody');
-//     // resultTable.textContent = '';
-//     const cname = target.value;
-//     let pickerEl = context + "Range";
-//     t0 = Date.now();
-//     let action, explore;
-//     if (context === "chart") {
-//       STATE.chart.species = cname;
-//       action = "chart";
-//     } else {
-//       action = "filter";
-//       resetResults({
-//         clearSummary: false,
-//         clearPagination: true,
-//         clearResults: false,
-//       });
-//     }
-//     worker.postMessage({
-//       action: action,
-//       species: cname,
-//       range: STATE[context].range,
-//       updateSummary: true,
-//     });
-//   } else if (target.closest("#chart-aggregation")) {
-//     STATE.chart.aggregation = target.value;
-//     worker.postMessage({
-//       action: "chart",
-//       aggregation: STATE.chart.aggregation,
-//       species: STATE.chart.species,
-//       range: STATE[context].range,
-//     });
-//   }
-// });
 
 // Save audio clip
 async function onSaveAudio({ file, filename, extension }) {
