@@ -43,7 +43,7 @@ let LOCATIONS,
 let REGIONS, spectrogram, timeline;
 let APPLICATION_LOADED = false;
 let LABELS = [],
-  DELETE_HISTORY = [];
+  HISTORY = [];
 // Save console.warn and console.error functions
 const originalInfo = console.info;
 const originalWarn = console.warn;
@@ -1352,15 +1352,27 @@ async function onOpenFiles(args) {
   windowLength = 20;
 }
 
+/**
+ * Resets diagnostic metrics and clears the history log.
+ *
+ * Deletes diagnostic entries for "Audio Duration", "Analysis Rate", and "Analysis Duration" from the DIAGNOSTICS object,
+ * and resets the HISTORY array to an empty state.
+ */
 function resetDiagnostics() {
   delete DIAGNOSTICS["Audio Duration"];
   delete DIAGNOSTICS["Analysis Rate"];
   delete DIAGNOSTICS["Analysis Duration"];
   //reset delete history too
-  DELETE_HISTORY = [];
+  HISTORY = [];
 }
 
-// Worker listeners
+/**
+ * Resets the analysis state for a new operation.
+ *
+ * This function clears any active selections, resets the file number display,
+ * clears diagnostic information, and empties the Audacity labels. It also ensures
+ * that the progress indicator is visible.
+ */
 function analyseReset() {
   clearActive();
   DOM.fileNumber.textContent = "";
@@ -1554,8 +1566,15 @@ function hideElement(id_list) {
   });
 }
 
+/**
+ * Hides key UI components related to audio analysis.
+ *
+ * This function hides the primary display elements, including the waveform/timeline (exploreWrapper),
+ * spectrogram (spectrogramWrapper), results table (resultTableContainer), and records sections (recordsContainer,
+ * resultsHead), by delegating to the hideElement utility.
+ */
 function hideAll() {
-  // File hint div,  Waveform, timeline and spec, controls and result table
+  //  Waveform, timeline and spec, controls and result table
   hideElement([
     "exploreWrapper",
     "spectrogramWrapper",
@@ -1810,14 +1829,14 @@ selectionTable.addEventListener("click", resultClick);
  * document.querySelector('tr').addEventListener('click', resultClick);
  */
 async function resultClick(e) {
-  if (!STATE.regionsCompleted) {
-      console.warn('Cannot process click - regions are still being created');
-      return;
-    }
   if (!fileLoaded) {
     console.warn('Cannot process click - no audio file is loaded');
     return;
   }
+  if (!STATE.regionsCompleted) {
+      console.warn('Cannot process click - regions are still being created');
+      return;
+    }
   let row = e.target.closest("tr");
   if (!row || row.classList.length === 0) {
     // 1. clicked and dragged, 2 no detections in file row
@@ -1826,13 +1845,6 @@ async function resultClick(e) {
 
   const [file, start, end, _, label] = row.getAttribute("name").split("|");
 
-  // Search for results rows - Why???
-  // while (
-  //   !(row.classList.contains("nighttime") || row.classList.contains("daytime"))
-  // ) {
-  //   row = row.previousElementSibling;
-  //   if (!row) return;
-  // }
   if (activeRow) activeRow.classList.remove("table-active");
   row.classList.add("table-active");
   activeRow = row;
@@ -2260,11 +2272,14 @@ window.onload = async () => {
     config.VERSION = VERSION;
     DIAGNOSTICS["UUID"] = config.UUID;
 
-    // Initialize Spectrogram
-    //initWavesurfer({});
     // Set UI option state
     // Fontsize
     config.fontScale === 1 || setFontSizeScale(true);
+    // Ensure config.model is valid (v1.10.x management)
+    if (! ['birdnet', 'chirpity', 'nocmig'].includes(config.model)){
+      config.model = 'birdnet';
+    }
+
     // Map slider value to batch size
     DOM.batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(
       config[config[config.model].backend].batchSize
@@ -2631,7 +2646,8 @@ const setUpWorkerMessaging = () => {
           break;
         }
         case "seen-species-list": {
-          generateBirdList("seenSpecies", args.list);
+          STATE.seenSpecies = args.list.map(item => item.label)
+          // generateBirdList("seenSpecies", args.list);
           break;
         }
         case "tfjs-node": {
@@ -2742,74 +2758,15 @@ function showWindowDetections({detections, goToRegion}) {
   STATE.regionsCompleted = true;
 }
 
-function generateBirdList(store, rows) {
-  const chart = document.getElementById("chart-list");
-  const explore = document.getElementById("explore-list");
-  const listHTML = generateBirdOptionList({ store, rows });
-  chart.innerHTML = listHTML;
-  explore.innerHTML = listHTML;
-}
-
 /**
- * Generates an HTML string for a bird species selection dropdown.
+ * Constructs an HTML string of table rows for bird identification data.
  *
- * Constructs a select element based on the provided options. When options.store is "allSpecies", a floating form-select is created with either a search prompt or a preselected species from the global LABELS. Otherwise, a basic select element is built using the species data from options.rows, with the currently active species (from STATE.chart.species) marked as selected.
+ * Iterates through the provided collection of bird records, where each record contains a common name ("cname")
+ * and a scientific name ("sname"), and generates a corresponding HTML table row for each.
  *
- * Also updates the inner HTML of the element with ID "species-search-label" using localized text.
- *
- * @param {Object} options - Options to configure the species option list.
- * @param {string} options.store - Determines the type of select element to generate. Use "allSpecies" to render all species with an optional preselection.
- * @param {Array<Object>} options.rows - Array of species objects; each must contain a "cname" property used for option values.
- * @param {string} [options.selected] - Optionally, the species name to preselect when options.store is "allSpecies".
- * @returns {string} HTML string representing the constructed select element with bird species options.
- *
- * @remark Relies on external globals such as LABELS, STATE, i18nHeadings, and i18nAll for data retrieval and localization.
+ * @param {Object[]} rows - Collection of bird records with properties "cname" (common name) and "sname" (scientific name).
+ * @returns {string} A string containing HTML table rows for each bird record.
  */
-function generateBirdOptionList({ store, rows, selected }) {
-  let listHTML = "";
-  const i18n = getI18n(i18nHeadings);
-  const i18nTout = getI18n(i18nAll);
-  // Species search label and match count
-  document.getElementById('species-search-label').innerHTML = i18n.search;
-  if (store === "allSpecies") {
-    // let sortedList = LABELS.map((label) => {
-    //   const [sname, cname] = label.split("_")
-    //   return `${cname}~${sname}`
-    // });
-
-    // // International language sorting, recommended for large arrays - 'en_uk' not valid, but same as 'en'
-    // sortedList.sort(
-    //   new Intl.Collator(config.locale.replace(/_.*$/, "")).compare
-    // );
-    // Check if we have prepared this before
-
-    // const lastSelectedSpecies = selected || STATE.birdList.lastSelectedSpecies;
-    listHTML +=
-      `<div class="form-floating">
-      <select spellcheck="false" id="bird-list-all" class="form-select mb-3" aria-label=".form-select" required>`;
-    // 
-    // for (const species of sortedList) {
-    if (selected){
-      const species = LABELS.find(sp => sp.split('_')[1] === selected);
-      const [sname, cname] = species.split('_');
-      // const isSelected = cname === lastSelectedSpecies ? "selected" : "";
-      listHTML += `<option value="${cname}" selected>${cname}~${sname}</option>`;
-    } else {
-      listHTML += `<option value="">${i18n.searchPrompt}</option>`
-    }
-    listHTML += `</select><label for="bird-list-all">${i18n.species[0]}</label></div>`;
-  } else {
-    listHTML += `<select id="bird-list-seen" class="form-select"><option value="">${i18nTout[1]}</option>`;
-    for (const { cname } of rows) {
-      const isSelected = cname === STATE.chart.species ? "selected" : "";
-      listHTML += `<option value="${cname}" ${isSelected}>${cname}</option>`;
-    }
-    listHTML += `</select><label for="bird-list-seen">${i18n.species[0]}</label>`;
-  }
-
-  return listHTML;
-}
-
 function generateBirdIDList(rows) {
   let listHTML = "";
   for (const item in rows) {
@@ -2845,6 +2802,18 @@ function getSpecies(target) {
   return species;
 }
 
+/**
+ * Handles a swipe gesture event to trigger page navigation actions.
+ *
+ * This function throttles gesture events by ignoring any that occur within 1.2 seconds of the previous event.
+ * It determines the direction of the gesture by evaluating the horizontal (deltaX) or, if absent, vertical (deltaY) movement.
+ * A positive movement results in a "PageDown" action, while a negative movement triggers a "PageUp" action.
+ * If debugging is enabled, the gesture details are logged, and each action is tracked via a tracking event.
+ *
+ * @param {Object} e - The gesture event object.
+ * @param {number} [e.deltaX] - The horizontal movement delta.
+ * @param {number} [e.deltaY] - The vertical movement delta used if horizontal movement is zero.
+ */
 function handleGesture(e) {
   const currentTime = Date.now();
   if (currentTime - STATE.lastGestureTime < 1200) {
@@ -2860,48 +2829,15 @@ function handleGesture(e) {
   // }, 200, 'swipe');
 }
 
-document.addEventListener("change", function (e) {
-  const target = e.target;
-  const context = target.parentNode.classList.contains("chart")
-    ? "chart"
-    : "explore";
-  if (target.closest("#bird-list-seen")) {
-    // Clear the results table
-    // const resultTable = document.getElementById('resultTableBody');
-    // resultTable.textContent = '';
-    const cname = target.value;
-    let pickerEl = context + "Range";
-    t0 = Date.now();
-    let action, explore;
-    if (context === "chart") {
-      STATE.chart.species = cname;
-      action = "chart";
-    } else {
-      action = "filter";
-      resetResults({
-        clearSummary: false,
-        clearPagination: true,
-        clearResults: false,
-      });
-    }
-    worker.postMessage({
-      action: action,
-      species: cname,
-      range: STATE[context].range,
-      updateSummary: true,
-    });
-  } else if (target.closest("#chart-aggregation")) {
-    STATE.chart.aggregation = target.value;
-    worker.postMessage({
-      action: "chart",
-      aggregation: STATE.chart.aggregation,
-      species: STATE.chart.species,
-      range: STATE[context].range,
-    });
-  }
-});
 
-// Save audio clip
+/**
+ * Asynchronously saves an audio clip using Electron's file system API.
+ *
+ * @param {Object} options - Parameters for saving the audio clip.
+ * @param {*} options.file - The audio file data to be saved.
+ * @param {string} options.filename - The name under which to save the audio file.
+ * @param {string} options.extension - The file extension to use for the saved file.
+ */
 async function onSaveAudio({ file, filename, extension }) {
   await window.electron.saveFile({
     file: file,
@@ -2922,10 +2858,28 @@ function getDateOfISOWeek(w) {
   return ISOweekStart.toLocaleDateString("en-GB", options);
 }
 
+/**
+ * Processes chart data to update the UI and render a new Chart.js chart.
+ *
+ * This function updates UI elements based on the provided chart data. If a species name is given,
+ * it displays the species title and toggles visibility of the associated records table; otherwise,
+ * the records table is hidden. It then updates individual record elements with formatted dates or
+ * "N/A"/"No Records" messages. Any existing Chart.js instances are destroyed before constructing a new
+ * chart on the canvas element with the id "chart-week". The chart configuration includes bar datasets
+ * for each year (with an adjustment for hourly data) and, if provided, a line dataset displaying total
+ * hours recorded. A custom plugin is used to set the background color of the canvas.
+ *
+ * @param {Object} args - An object containing chart configuration and data.
+ * @param {string} [args.species] - The species name to display; its presence toggles the records table.
+ * @param {Object} args.records - A mapping of DOM element IDs to record values (arrays or timestamps) used to update record displays.
+ * @param {string} args.aggregation - The aggregation level (e.g., "Hour") which determines chart label generation.
+ * @param {number} args.pointStart - The starting timestamp for the data points; may be adjusted for hourly charts.
+ * @param {Object} args.results - An object where each key is a year and each value is an array of data points for that year.
+ * @param {number[]} [args.total] - Optional dataset representing total hours recorded, rendered as a line chart if provided.
+ * @param {number} args.dataPoints - The number of data points to generate date labels for the x-axis.
+ * @param {number} args.rate - A data rate value included in the arguments (currently unused in chart rendering).
+ */
 function onChartData(args) {
-  const genTime = Date.now() - t0;
-  const genTimeElement = document.getElementById("genTime");
-  genTimeElement.textContent = (genTime / 1000).toFixed(1) + " seconds";
   if (args.species) {
     showElement(["recordsTableBody"], false);
     const title = document.getElementById("speciesName");
@@ -3717,7 +3671,7 @@ function recordUpdate(key){
     return;
   }
   const assignment = config.keyAssignment['key'+ key];
-  if (assignment?.column){
+  if (assignment?.column && assignment?.value){
     const nameAttribute = activeRow.getAttribute("name");
     const [file, start, end, sname, cname] = nameAttribute.split("|");
     const commentCell = activeRow.querySelector('.comment > span');
@@ -3730,24 +3684,14 @@ function recordUpdate(key){
     const newCname = assignment.column === 'species' ?  assignment.value : name;
     const newLabel = assignment.column === 'label' ?  assignment.value : label || '';
     const newComment = assignment.column === 'comment' ?  assignment.value : comment;
-    // DELETE_HISTORY.push([
-    //   cname,
-    //   parseFloat(start),
-    //   parseFloat(end),
-    //   comment,
-    //   undefined, // won't restore callCount
-    //   label,
-    //   undefined,
-    //   undefined,
-    //   undefined,
-    //   confidence,
-    // ]);
+    // Save record for undo
+    const {callCount} = addToHistory(activeRow, newCname);
     insertManualRecord(
       newCname,
       parseFloat(start),
       parseFloat(end),
       newComment,
-      "", // callCount 
+      callCount ,
       newLabel,
       "Update",
       false,
@@ -3809,8 +3753,8 @@ const GLOBAL_ACTIONS = {
     }
   },
   z: (e) => {
-    if ((e.ctrlKey || e.metaKey) && DELETE_HISTORY.length)
-      insertManualRecord(...DELETE_HISTORY.pop());
+    if ((e.ctrlKey || e.metaKey) && HISTORY.length)
+      insertManualRecord(...HISTORY.pop());
   },
   Escape: () => {
     if (PREDICTING) {
@@ -4131,7 +4075,7 @@ function onModelReady(args) {
   DIAGNOSTICS["Warm Up"] =
     ((t1_warmup - t0_warmup) / 1000).toFixed(2) + " seconds";
 
-  APPLICATION_LOADED || console.info("App launch time", `${t1_warmup - app_t0} ms`)
+  APPLICATION_LOADED || console.info("App launch time", `${ Math.round((t1_warmup - app_t0) / 1000)} seconds`)
   APPLICATION_LOADED = true;
 
   document.getElementById('loading-screen').classList.add('d-none');
@@ -4240,6 +4184,19 @@ const awaiting = {
   sv: "Väntar på detektioner",
   zh: "等待检测",
 };
+/**
+ * Updates the UI progress elements during file loading.
+ *
+ * Removes the "invisible" class from the progress indicator, then either displays a localized
+ * loading message (when the "text" flag is provided) or shows the current file's position within the
+ * queue of open files. If a progress value is provided, it calculates the percentage (with one-decimal
+ * precision) and updates the progress bar accordingly.
+ *
+ * @param {Object} args - Object containing details for the progress update.
+ * @param {boolean} [args.text] - When truthy, displays a localized "awaiting" message instead of file count.
+ * @param {File} [args.file] - The file whose loading progress is being updated.
+ * @param {number} [args.progress] - A value between 0 and 1 representing the load progress.
+ */
 function onProgress(args) {
   DOM.progressDiv.classList.remove("invisible");
   if (args.text) {
@@ -4259,12 +4216,20 @@ function onProgress(args) {
   }
 }
 
-function updatePagination(total, offset) {
+/**
+ * Updates the pagination controls based on the total number of items.
+ *
+ * If the total exceeds the configured limit, pagination controls are rendered using the given offset.
+ * Otherwise, all pagination elements are hidden.
+ *
+ * @param {number} total - The total number of items.
+ * @param {number} [offset=STATE.offset] - The starting offset for pagination.
+ */
+function updatePagination(total, offset = STATE.offset) {
   //Pagination
   total > config.limit
     ? addPagination(total, offset)
     : pagination.forEach((item) => item.classList.add("d-none"));
-  STATE.offset = offset;
 }
 
 const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
@@ -4278,7 +4243,9 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
             <th id="summary-max" scope="col"><span id="summary-max-icon" class="text-muted material-symbols-outlined summary-sort-icon d-none">sort</span>${
               i18n.max
             }</th>
-            <th id="summary-cname" scope="col"><span id="summary-cname-icon" class="text-muted material-symbols-outlined summary-sort-icon d-none">sort</span>${
+            <th id="summary-cname" scope="col">
+            <span id="summary-sname-icon" class="text-muted material-symbols-outlined summary-sort-icon">filter_list</span>
+            <span id="summary-cname-icon" class="text-muted material-symbols-outlined summary-sort-icon d-none">sort</span>${
               i18n.species[0]
             }</th>
             ${showIUCN ? '<th scope="col"></th>' : ""}
@@ -4351,8 +4318,8 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
   if (selectedRow) {
     const table = document.getElementById("resultSummary");
     table.rows[selectedRow].scrollIntoView({
-      behavior: "smooth",
-      block: "center",
+      behavior: "instant",
+      block: "center"
     });
   }
   // }
@@ -4415,7 +4382,7 @@ function onResultsComplete({ active = undefined, select = undefined } = {}) {
   // hide progress div
   DOM.progressDiv.classList.add("invisible");
   renderFilenamePanel();
-  // activateResultFilters();
+  activateResultSort();
 }
 
 /**
@@ -4513,20 +4480,39 @@ function onAnalysisComplete({ quiet }) {
     DIAGNOSTICS["Analysis Rate"] =
       rate.toFixed(0) + "x faster than real time performance.";
     generateToast({ message: "complete" });
-    // activateResultFilters();
+    // activateResultSort();
   }
 }
 
-/* 
-    onSummaryComplete is called when getSummary finishes.
-    */
+/**
+ * Finalizes UI updates after summary data retrieval.
+ *
+ * This function updates the summary view with new data and applies filters if specified.
+ * It enhances the summary table by adding pointer and hover effects to species rows, triggers
+ * result sorting when appropriate, assigns provided Audacity labels globally, and toggles
+ * menu item availability based on the summary content and current application state.
+ *
+ * @param {Object} options - An object containing update parameters.
+ * @param {*} [options.filterSpecies] - Optional criteria to filter species in the summary.
+ * @param {Object} [options.audacityLabels={}] - A mapping of labels from Audacity to be applied globally.
+ * @param {Array} [options.summary=[]] - An array of summary records to be used for updating the UI.
+ */
 function onSummaryComplete({
   filterSpecies = undefined,
   audacityLabels = {},
   summary = [],
 }) {
   updateSummary({ summary: summary, filterSpecies: filterSpecies });
-  if (!PREDICTING || STATE.mode !== "analyse") activateResultFilters();
+  // Add pointer icon to species summaries
+  const summarySpecies = DOM.summaryTable.querySelectorAll(".cname");
+  summarySpecies.forEach((row) => row.classList.add("pointer"));
+
+  // Add hover to the summary
+  const summaryNode = document.getElementById("resultSummary");
+  if (summaryNode) {
+    summaryNode.classList.add("table-hover");
+  }
+  if (!PREDICTING || STATE.mode !== "analyse") activateResultSort();
   // Why do we do audacity labels here?
   AUDACITY_LABELS = audacityLabels;
   if (summary.length) {
@@ -4654,8 +4640,8 @@ function speciesFilter(e) {
   }
   if (isExplore()) {
     range = STATE.explore.range;
-    const list = document.getElementById("bird-list-seen");
-    list.value = species || "";
+    const autoComplete = document.getElementById('bird-autocomplete-explore')
+    autoComplete.value = species || "";
   }
   filterResults({ updateSummary: false });
   resetResults({
@@ -4852,8 +4838,7 @@ function setClickedIndex(target) {
 }
 
 const deleteRecord = (target) => {
-  if (target === activeRow) {
-  } else if (target instanceof PointerEvent) target = activeRow;
+  if (target instanceof PointerEvent) target = activeRow;
   else {
     //I'm not sure what triggers this
     target.forEach((position) => {
@@ -4869,45 +4854,16 @@ const deleteRecord = (target) => {
     activeRow = undefined;
     return;
   }
-  if (target.childElementCount === 2) return; // No detections found in selection
 
   setClickedIndex(target);
-  // prepare the undelete record
-  const [file, start, end] = unpackNameAttr(target);
-  const setting = target.closest("table");
-  if (setting) {
-    const row = target.closest("tr");
-    let cname = target.querySelector(".cname").innerText;
-    let [species, confidence] = cname.split("\n");
-    // Manual records don't have a confidence bar
-    if (!confidence) {
-      species = species.slice(0, -11); // remove ' person_add'
-      confidence = 2000;
-    } else {
-      confidence = parseInt(confidence.replace("%", "")) * 10;
-    }
-    const comment = target.querySelector(".comment").innerText;
-    const label = target.querySelector(".label").innerText;
-    let callCount = target.querySelector(".call-count").innerText;
-    DELETE_HISTORY.push([
-      species,
-      start,
-      end,
-      comment,
-      callCount,
-      label,
-      undefined,
-      undefined,
-      undefined,
-      confidence,
-    ]);
+  const {species, start, end, file, row, setting} = addToHistory(target)
 
     worker.postMessage({
       action: "delete",
-      file: file,
-      start: start,
-      end: end,
-      species: getSpecies(target),
+      file,
+      start,
+      end,
+      species,
       speciesFiltered: isSpeciesViewFiltered(),
     });
     // Clear the record in the UI
@@ -4915,7 +4871,6 @@ const deleteRecord = (target) => {
     // there may be no records remaining (no index)
     index > -1 && setting.deleteRow(index);
     setting.rows[index]?.click();
-  }
 };
 
 const deleteSpecies = (target) => {
@@ -5281,6 +5236,20 @@ const changeNocmigMode = () => {
   }
 };
 
+/**
+ * Sends a filter request to the worker to process analysis results if the analysis is complete.
+ *
+ * This function posts a "filter" action message to the worker using the provided filtering options,
+ * which include species filtering criteria, a flag to update the results summary, and optional pagination
+ * and range parameters. The filtering is applied only if the analysis has been completed.
+ *
+ * @param {Object} [options={}] - Filter configuration options.
+ * @param {*} [options.species=isSpeciesViewFiltered(true)] - Criteria for filtering by species.
+ * @param {boolean} [options.updateSummary=true] - Flag indicating whether to update the summary after filtering.
+ * @param {number} [options.offset] - Optional starting index for pagination.
+ * @param {number} [options.limit=500] - Maximum number of results to process.
+ * @param {Object} [options.range] - Optional constraints to limit the range of filtered results.
+ */
 function filterResults({
   species = isSpeciesViewFiltered(true),
   updateSummary = true,
@@ -5291,13 +5260,14 @@ function filterResults({
   STATE.analysisDone &&
     worker.postMessage({
       action: "filter",
-      species: species,
-      updateSummary: updateSummary,
-      offset: offset,
-      limit: limit,
-      range: range,
+      species,
+      updateSummary,
+      offset,
+      limit,
+      range
     });
 }
+
 const modelSettingsDisplay = () => {
   // Sets system options according to model or machine cababilities
   // cf. setListUIState
@@ -5416,44 +5386,43 @@ diagnosticMenu.addEventListener("click", async function () {
 });
 
 /**
- * Updates the sorting indicators and UI elements for the result filters based on the current global state.
+ * Updates the UI sort indicators based on the current sort configuration.
  *
- * Clones and replaces header elements to reflect active sort orders: toggles visibility of time-related sort icons
- * when the score-based sort is active, applies pointer styles to sort elements, and manages the flipped state based on
- * ascending or descending order for species and metadata sorting. Also, clones and updates summary elements with hover
- * effects to enhance interactivity.
+ * Adjusts the visibility and styling of time, species, and metadata sort icons within the header element
+ * according to the global sort settings. When score-based sorting is active, time icons are hidden while species
+ * icons reflect the sort order by toggling the "flipped" class for ascending order. Metadata sort icons are similarly
+ * updated based on the active metadata sort field and direction. Additionally, the header's background style is
+ * updated, and the summary sort indicator is refreshed via showSummarySortIcon().
  *
  * Global State Dependencies:
- * - STATE.resultsSortOrder: Determines if results are sorted by score and whether the sort is in ascending order.
- * - STATE.resultsMetaSortOrder: Specifies the currently active metadata sort and direction.
- * - DOM.resultHeader: The header element that is cloned and replaced for visual update.
- * - DOM.summaryTable: The table whose species summary elements receive pointer styling.
+ * - STATE.resultsSortOrder: Determines if results are sorted by score and the sort direction.
+ * - STATE.resultsMetaSortOrder: Specifies the active metadata sort field and sort direction.
+ * - DOM.resultHeader: The header element containing sort icons.
  *
  * @returns {void}
  */
-function activateResultFilters() {
-  // Clone the result header and work on it in the fragment
-  const resultHeaderClone = DOM.resultHeader.cloneNode(true);
+function activateResultSort() {
+  // Work with the existing header directly.
+  const header = DOM.resultHeader;
 
-  const timeHeadings = resultHeaderClone.getElementsByClassName("time-sort-icon");
-  const speciesHeadings = resultHeaderClone.getElementsByClassName("species-sort-icon");
+  const timeHeadings = header.getElementsByClassName("time-sort-icon");
+  const speciesHeadings = header.getElementsByClassName("species-sort-icon");
+  const metaHeadings = header.getElementsByClassName("meta-sort-icon");
+  
   const sortOrderScore = STATE.resultsSortOrder.includes("score");
-  const fragment = document.createDocumentFragment();
-  // if (STATE.resultsMetaSortOrder){
   const state = STATE.resultsMetaSortOrder;
   const sortOrderMeta = state.replace(' ASC ', '').replace(' DESC ', '');
-  const metaHeadings = resultHeaderClone.getElementsByClassName("meta-sort-icon");
+
+  // Update meta headings
   [...metaHeadings].forEach((heading) => {
     const hideIcon = state === '' || !heading.parentNode.id.includes(sortOrderMeta);
     heading.classList.toggle("d-none", hideIcon);
-    if (state.includes("ASC")){
+    if (state.includes("ASC")) {
       heading.classList.add("flipped");
     } else {
       heading.classList.remove("flipped");
     }
   });
-  // }
-
 
   // Update time sort icons
   [...timeHeadings].forEach((heading) => {
@@ -5463,35 +5432,19 @@ function activateResultFilters() {
 
   // Update species sort icons
   [...speciesHeadings].forEach((heading) => {
-    heading.classList.toggle("d-none", !sortOrderScore);
     heading.parentNode.classList.add("pointer");
     if (sortOrderScore && STATE.resultsSortOrder.includes("ASC")) {
       heading.classList.add("flipped");
     } else {
       heading.classList.remove("flipped");
     }
+    heading.classList.toggle("d-none", !sortOrderScore);
   });
 
-  fragment.appendChild(resultHeaderClone);
+  // Update the header's background classes
+  header.classList.replace("text-bg-secondary", "text-bg-dark");
 
-  // Add pointer icon to species summaries
-  const summarySpecies = DOM.summaryTable.querySelectorAll(".cname");
-  summarySpecies.forEach((row) => row.classList.add("pointer"));
-
-  // Update the cloned result header's classes
-  resultHeaderClone.classList.replace("text-bg-secondary", "text-bg-dark");
-
-  // Add hover to the summary
-  const summary = document.getElementById("resultSummary");
-  if (summary) {
-    const summaryClone = summary.cloneNode(true);
-    summaryClone.classList.add("table-hover");
-    fragment.appendChild(summaryClone);
-  }
-
-  // Replace the old header with the updated one
-  DOM.resultHeader.replaceWith(resultHeaderClone);
-
+  // Optionally update the summary icon as needed
   showSummarySortIcon();
 }
 
@@ -5508,7 +5461,8 @@ function activateResultFilters() {
  * showSummarySortIcon();
  */
 function showSummarySortIcon() {
-  const [column, direction] = STATE.summarySortOrder.split(" ");
+  let [column, direction] = STATE.summarySortOrder.split(" ");
+  // column = column === "sname" ? "cname" : column;
   const iconId = `summary-${column}-icon`;
   const targetIcon = document.getElementById(iconId);
   if (targetIcon) {
@@ -5533,17 +5487,13 @@ const setSortOrder = (field, order) => {
 const setSummarySortOrder = (order) => {
   STATE.summarySortOrder = order;
   worker.postMessage({ action: "update-state", summarySortOrder: order });
-  resetResults({
-    clearSummary: false,
-    clearPagination: false,
-    clearResults: false,
-  });
-  filterResults();
+  refreshSummary()
 };
+
+
 // Drag file to app window to open
 document.addEventListener("dragover", (event) => {
   event.preventDefault();
-  //event.stopPropagation();
 });
 
 document.addEventListener("drop", (event) => {
@@ -5602,7 +5552,18 @@ function makeDraggable(header) {
     draggable.closest(".modal").addEventListener("hide.bs.modal", stopDrag);
   });
 }
-////////// Date Picker ///////////////
+/**
+ * Initializes and configures the date picker elements for selecting date ranges.
+ *
+ * This function first removes any existing date picker instance stored in the global state,
+ * then defines several preset date ranges (e.g., last night, this week, last month, etc.) based on the
+ * current date. It creates new date pickers for the 'chartRange' and 'exploreRange' DOM elements using the easepick
+ * library with Range, Preset, and Time plugins. Event listeners are attached to handle date selection,
+ * clearing of the selection, button clicks, and visibility changes, updating the global state and communicating
+ * with the worker as needed.
+ *
+ * @remark Relies on global variables (STATE, config, worker) and internationalization via getI18n.
+ */
 
 function initialiseDatePicker() {
   if (STATE.picker) {
@@ -5696,7 +5657,7 @@ function initialiseDatePicker() {
           [i18n.thisMonth]: thisMonth(),
           [i18n.lastMonth]: lastMonth(),
           [i18n.thisYear]: thisYear(),
-          [i18n.lastYear]: lastYear(),
+          [i18n.lastYear]: lastYear()
         },
       },
       TimePlugin: {
@@ -6430,8 +6391,10 @@ document.addEventListener("click", function (e) {
       break;
     }
     case "summary-cname": {
-      const sortBy =
-        STATE.summarySortOrder === "cname ASC " ? "cname DESC " : "cname ASC ";
+      const sortOptions = ["cname ASC", "cname DESC", "sname ASC", "sname DESC"];
+      const currentIndex = sortOptions.indexOf(STATE.summarySortOrder);
+      const nextIndex = (currentIndex + 1) % sortOptions.length;
+      const sortBy = sortOptions[nextIndex];
       setSummarySortOrder(sortBy);
       break;
     }
@@ -6605,7 +6568,7 @@ document.addEventListener("click", function (e) {
     document.getElementById("frequency-range").classList.remove("active");
   }
   if (!target?.startsWith('bird-')) {
-    DOM.suggestionsList.style.display = 'none';
+    document.querySelectorAll('.suggestions').forEach(list => list.style.display = 'none');
   }
   hideConfidenceSlider();
   config.debug && console.log("clicked", target);
@@ -6652,10 +6615,17 @@ function updateList() {
   }
 }
 
+/**
+ * Refreshes the summary display by sending an update request to the worker.
+ *
+ * If audio analysis has completed, this function retrieves the filtered species view and dispatches
+ * an "update-summary" message to the worker with the current species filter.
+ */
 function refreshSummary() {
+  const species = isSpeciesViewFiltered(true)
   if (STATE.analysisDone) {
     // resetResults({});
-    worker.postMessage({ action: "update-summary" });
+    worker.postMessage({ action: "update-summary", species });
   }
 }
 
@@ -7328,7 +7298,7 @@ async function showRecordEntryForm(mode, batch) {
     commentText = activeRow.querySelector(".comment > span")?.title || "";
     callCount = parseInt(activeRow.querySelector(".call-count").textContent);
   }
-  document.getElementById('species-search-label').innerHTML = i18n.search;
+  document.querySelectorAll('.species-search-label').forEach(label => label.textContent = i18n.search);
   const selectedBird = recordEntryForm.querySelector(
     "#selected-bird"
   );
@@ -7385,7 +7355,8 @@ recordEntryForm.addEventListener("submit", function (e) {
     const region = REGIONS.regions.find(
       (region) => region.start === activeRegion.start
     );
-    region.setOptions({ content: cname });
+    // You can still add a record if you cleared the regions
+    region?.setOptions({ content: cname });
   }
   const originalCname = document.getElementById("original-id").value || cname;
   // Update the region label
@@ -7418,7 +7389,8 @@ const insertManualRecord = (
   action,
   batch,
   originalCname,
-  confidence
+  confidence,
+  reviewed
 ) => {
   const files = batch ? STATE.openFiles : STATE.currentFile;
   worker.postMessage({
@@ -7436,10 +7408,17 @@ const insertManualRecord = (
     confidence: confidence,
     position: { row: activeRow?.rowIndex - 1, page: getCurrentPage() }, //  have to account for the header row
     speciesFiltered: isSpeciesViewFiltered(true),
+    reviewed
   });
-  //resetResults({clearPagination: false})
 };
 
+/**
+ * Updates the UI to reflect whether a custom frequency filter is active.
+ *
+ * Checks the audio configuration to determine if the frequency range has been altered from its default
+ * (minFrequency > 0 or maxFrequency < 11950). If so, it applies warning styles to the frequency range display
+ * and enables the reset button. Otherwise, it restores the default styling.
+ */
 function checkFilteredFrequency() {
   const resetButton = document.getElementById("reset-spec-frequency");
   if (config.audio.minFrequency > 0 || config.audio.maxFrequency < 11950) {
@@ -8309,9 +8288,12 @@ async function membershipCheck() {
     });
   }
   const MEMBERSHIP_API_ENDPOINT = await window.electron.MEMBERSHIP_API_ENDPOINT();
-  return await checkMembership(config.UUID, MEMBERSHIP_API_ENDPOINT).then(isMember =>{
-    console.info(`Version: ${VERSION}. Trial: ${inTrial} subscriber: ${isMember}, All detections: ${config.specDetections}`, '')
+  return await checkMembership(config.UUID, MEMBERSHIP_API_ENDPOINT).then(([isMember, expiresIn])  =>{
+    console.info(`Version: ${VERSION}. Trial: ${inTrial} subscriber: ${isMember}, All detections: ${config.specDetections}`, expiresIn)
     if (isMember || inTrial) {
+      if (expiresIn && expiresIn < 35){ // two weeks 
+        generateToast({message:"membershipExpiry", type:"warning", variables: {expiresIn}})
+      }
       unlockElements();
       if (isMember) {
         document.getElementById('primaryLogo').src = 'img/logo/chirpity_logo_subscriber_bronze.png'; // Silver & Gold available
@@ -8506,25 +8488,27 @@ document.addEventListener("labelsUpdated", (e) => {
   
   console.log("Tags list:", STATE.tagsList);
 });
-const input = document.getElementById('bird-autocomplete');
 
-const dropdownCaret = document.querySelector('.input-caret');
 
 /**
  * Filters and sorts bird labels based on a search query.
  *
- * This function processes a global collection of bird labels by performing a case-insensitive filter based on the provided search string.
- * Each matching label, originally in the format "sname_cname", is split and reversed to yield the common name (`cname`) and the scientific name (`sname`).
- * The returned object includes a `styled` property that formats these names into an HTML string with `<br/>` and `<i>` tags.
- * The resulting list is sorted alphabetically by the common name using locale comparison based on the configuration.
+ * This function filters a list of bird labels—each expected to be in the format "sname_cname"—by performing
+ * a case-insensitive match with the provided search string. For each label that contains the search term, it splits
+ * the label by the underscore, reverses the parts to assign the common name (cname) and scientific name (sname), and
+ * creates a `styled` HTML string that formats the names with a line break and italicized scientific name. The resulting
+ * array is then sorted alphabetically by the common name using locale comparison based on the application's locale
+ * configuration.
  *
- * @param {string} search - A substring used to filter bird labels; if invalid, an empty array is returned.
- * @returns {Array<{cname: string, sname: string, styled: string}>} An array of objects representing filtered and sorted birds.
+ * If the search is empty or not a string, the function returns an empty array.
+ *
+ * @param {string} search - Substring used to filter bird labels.
+ * @param {Array<string>} [list=LABELS] - Optional array of bird labels to filter; each label should be formatted as "sname_cname".
+ * @returns {Array<{cname: string, sname: string, styled: string}>} Array of objects representing filtered and sorted birds.
  */
-function getFilteredBirds(search) {
+function getFilteredBirds(search, list = LABELS) {
   if (!search || typeof search !== 'string') return [];
-  
-  const sortedList =  LABELS
+  const sortedList =  list
     .filter(bird => bird.toLowerCase().includes(search))
     .map(item => {
       // Flip sname and cname from "sname_cname"
@@ -8536,7 +8520,7 @@ function getFilteredBirds(search) {
 }
 
 /**
- * Updates the suggestions list and translucent completion overlay based on the input search query.
+ * Updates the suggestions list  based on the input search query.
  *
  * Uses the lowercase value of the provided input element to filter bird suggestions via the global
  * getFilteredBirds function. If the search query is shorter than 2 characters, the suggestion element
@@ -8552,13 +8536,29 @@ function getFilteredBirds(search) {
 function updateSuggestions(input, element, preserveInput) {
   const search = input.value.toLowerCase();
   element.textContent = ''; // Clear any existing suggestions
-
+  // Close any open lists
+  const suggestionLists = document.querySelectorAll('.suggestions')
+  suggestionLists.forEach(list => list.style.display = 'none');
+  const label = document.querySelector(`label[for="${input.id}"]`);
+  const list = ['bird-autocomplete-explore', 'bird-autocomplete-chart'].includes(input.id) ? STATE.seenSpecies : LABELS;
+  let span;
+  if (label) {
+      span = label.querySelector('span'); // Check if a span already exists
+  
+      if (!span) {
+          span = document.createElement('span');
+          label.appendChild(span); // Append to label
+      }
+      span.textContent = ` (${list.length})`; // Update existing span
+  }
   if (search.length < 2) {
     element.style.display = 'none';
     return;
   }
-  
-  const filtered = getFilteredBirds(search);
+
+
+  const filtered = getFilteredBirds(search, list);
+  if (span) span.textContent = ` (${filtered.length})`
   const fragment = document.createDocumentFragment();
   // Populate the suggestion list
   filtered.forEach(item => {
@@ -8581,6 +8581,24 @@ function updateSuggestions(input, element, preserveInput) {
         italic.cloneNode(true)
       );
       input.value = preserveInput ? item.cname : '';
+      const label = document.querySelector(`label[for="${input.id}"]`);
+      if (label) {
+          const span = label.querySelector('span');
+          if (span) {
+              span.remove(); // Removes the span if it exists
+          }
+      }
+
+      if (input.id === 'bird-autocomplete-explore'){
+        filterResults({ species: item.cname, updateSummary: true });
+        resetResults({
+          clearSummary: false,
+          clearPagination: false,
+          clearResults: false,
+        });
+      } else if  (input.id === 'bird-autocomplete-chart'){
+        worker.postMessage({action: "chart", species: item.cname, range: STATE.chart.range})
+      }
       input.dispatchEvent(new Event('change', { bubbles: true })); // fire the change event
       element.style.display = 'none';
     });
@@ -8588,18 +8606,77 @@ function updateSuggestions(input, element, preserveInput) {
   });
   element.appendChild(fragment);
   element.style.display = filtered.length ? 'block' : 'none';
+  // Make sure the dropdown is visble
+  element.getBoundingClientRect().bottom > window.innerHeight &&
+    element.scrollIntoView({behavior: 'smooth', block:'end'})
 }
 
 // Update suggestions on each input event
-input.addEventListener('input', () => updateSuggestions(input, DOM.suggestionsList));
+const autocomplete = document.querySelectorAll('.autocomplete');
+autocomplete.forEach(input => {
+  const listContainer = input.closest('.bird-search').querySelector('.suggestions');
+  input.addEventListener('input', () => updateSuggestions(input, listContainer, true));
+})
+
 
 // Toggle the display of the suggestion list when the caret is clicked
-dropdownCaret.addEventListener('click', () => {
-  if (DOM.suggestionsList.style.display === 'block') {
-    DOM.suggestionsList.style.display = 'none';
+const dropdownCaret = document.querySelectorAll('.input-caret');
+dropdownCaret.forEach(caret => caret.addEventListener('click', (e) => {
+  const suggestionsList = e.target.closest('.bird-search').querySelector('.suggestions');
+  if (suggestionsList.style.display === 'block') {
+    suggestionsList.style.display = 'none';
   } else {
-    updateSuggestions(input, DOM.suggestionsList);
+    const inputField = e.target.closest('.bird-search').querySelector('input');
+    updateSuggestions(inputField, suggestionsList);
   }
-});
+}));
 
 
+/**
+ * Extracts metadata from a DOM record representing an audio detection and adds it to the global history.
+ *
+ * The function parses details from the record's child elements—such as species information, confidence (or a default value for records lacking a confidence bar), comment, label, and call count—while also determining the record's associated file, row, and table (setting). If a new canonical name is provided via the second argument, it will override the extracted species name in the history entry. The constructed data array is pushed to the global HISTORY. If the record is not part of a table, no history entry is added and undefined is returned.
+ *
+ * @param {HTMLElement} record - The DOM element containing record details.
+ * @param {string} [newCname] - Optional name to override the extracted species name.
+ * @returns {Object|undefined} An object containing properties: species, start, end, confidence, label, callCount, comment, file, row, and setting if the record is within a table; otherwise, undefined.
+ */
+function addToHistory (record, newCname) {
+    // prepare the undelete record
+    const [file, start, end] = unpackNameAttr(record);
+    const setting = record.closest("table");
+    if (setting) {
+      const row = record.closest("tr");
+      let cname = record.querySelector(".cname").innerText;
+      let [species, confidence] = cname.split("\n");
+      // Manual records don't have a confidence bar
+      if (!confidence) {
+        species = species.slice(0, -11); // remove ' person_add'
+        confidence = 2000;
+      } else {
+        confidence = parseInt(confidence.replace("%", "")) * 10;
+      }
+      const comment = record.querySelector(".comment").innerText;
+      const label = record.querySelector(".label").innerText;
+      let callCount = record.querySelector(".call-count").innerText;
+      let reviewed = !!record.querySelector(".reviewed").innerText;
+      HISTORY.push([
+        species,
+        start,
+        end,
+        comment,
+        callCount,
+        label,
+        undefined,
+        undefined,
+        newCname || species,
+        confidence,
+        reviewed
+      ]);
+    return {species, start, end, confidence, label, callCount, comment, file, row, setting}
+  }
+}
+
+// const exploreList = document.getElementById('bird-autocomplete-explore');
+// const listContainer = document.getElementById('bird-suggestions-explore');
+// exploreList.addEventListener('input', function () {updateSuggestions(this, listContainer, true)});

@@ -56,8 +56,21 @@
                 <span id="explore-datefilter">Apply a date filter</span> <span class="material-symbols-outlined float-end">expand_more</span>
             </div>
         </div>
-        <div class="species-selector col" id="exploreSpeciesSearch">
+        <!-- <div class="species-selector col" id="exploreSpeciesSearch">
             <div id="explore-list" class="explore bird-list-wrapper form-floating"></div>
+        </div> -->
+        <div class="mb-3 col"> 
+            <!-- <input type="text" class="form-control mb-3" id="bird-search"> -->
+            <div class="form-floating bird-search">
+                <!-- Bootstrap-styled input -->
+                <input type="text" class="form-control autocomplete" id="bird-autocomplete-explore" placeholder="Type to search...">
+                <!-- Caret rendered inside the input -->
+                <span class="input-caret"></span>
+                <!-- Suggestion list styled as a Bootstrap list group -->
+                <label class="species-search-label" for="bird-autocomplete-explore">Species Search</label>
+                <ul id="bird-suggestions-explore" class="suggestions list-group"></ul>
+            </div>
+            
         </div>
         <div class="col">
             <div id="explore-location-list" class="form-floating">
@@ -67,9 +80,6 @@
             </div>
         </div>
     </div>
-    <!-- DIV to Hold the bird list  -->
-    <div id="allSpecies" class="d-none"></div>
-    <div id="seenSpecies" class="d-none"></div>
     
             <!-- Spectrogram view -->
             <div class="w-100 d-none" id="spectrogramWrapper">
@@ -184,13 +194,13 @@
                             <div class="col-7">
                                 <div class="mb-3"> 
                                     <!-- <input type="text" class="form-control mb-3" id="bird-search"> -->
-                                    <div class="form-floating" id="bird-search">
+                                    <div class="form-floating bird-search">
                                         <!-- Bootstrap-styled input -->
-                                        <input type="text" class="form-control" id="bird-autocomplete" placeholder="Type to search...">
+                                        <input type="text" class="form-control autocomplete" id="bird-autocomplete" placeholder="Type to search...">
                                         <!-- Caret rendered inside the input -->
-                                        <span id="bird-input-caret" class="input-caret"></span>
+                                        <span class="input-caret"></span>
                                         <!-- Suggestion list styled as a Bootstrap list group -->
-                                        <label id="species-search-label" for="bird-autocomplete">Species Search</label>
+                                        <label class="species-search-label" for="bird-autocomplete">Species Search</label>
                                         <ul id="bird-suggestions" class="suggestions list-group"></ul>
                                     </div>
                                     
@@ -388,9 +398,16 @@
                             class="material-symbols-outlined  align-bottom">expand_more</span>
                         </div>
                     </div>
-                    <div class="col mb-2">
-                        <div id="speciesSearch" class="species-selector">
-                            <div id="chart-list" class="chart bird-list-wrapper form-floating"></div>
+                    <div class="mb-2 col"> 
+                        <!-- <input type="text" class="form-control mb-3" id="bird-search"> -->
+                        <div class="form-floating bird-search">
+                            <!-- Bootstrap-styled input -->
+                            <input type="text" class="form-control autocomplete" id="bird-autocomplete-chart" placeholder="Type to search...">
+                            <!-- Caret rendered inside the input -->
+                            <span class="input-caret"></span>
+                            <!-- Suggestion list styled as a Bootstrap list group -->
+                            <label class="species-search-label" for="bird-autocomplete-chart">Species Search</label>
+                            <ul id="bird-suggestions-chart" class="suggestions list-group"></ul>
                         </div>
                     </div>
                     <div class="col d-none">
@@ -462,7 +479,6 @@
                                 <th>Earliest Autumn Record</th>
                                 <th>Latest Autumn Record</th>
                                 <th>Most Calls in 24 hours</th>
-                                <th class="fst-italic text-sm-start">Chart generated in:</th>
                             </tr>
                             <tr>
                                 <td id="earliestSpring"></td>
@@ -470,7 +486,6 @@
                                 <td id="earliestAutumn"></td>
                                 <td id="latestAutumn"></td>
                                 <td id="mostDetections"></td>
-                                <td id="genTime"></td>
                             </tr>
                         </tbody>
                     </table>
@@ -722,7 +737,7 @@
                             <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key2">
                             <div id="bird-list-key2" class="suggestions list-group"></div>
                         </div>
-                        <div class="d-flex align-items-center mb-2">
+                        <div class="d-flex align-items-center mb-2 position-relative">
                             <kbd class="text-bg-light ps-2 pe-2">3</kbd> 
                             <select class="locked form-select w-50 ms-2" style="font-size: small" id="key3-column">
                                 <option value="">Unused</option>
@@ -733,7 +748,7 @@
                             <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key3">
                             <div id="bird-list-key3" class="suggestions list-group"></div>
                         </div>
-                        <div class="d-flex align-items-center mb-2">
+                        <div class="d-flex align-items-center mb-2 position-relative">
                             <kbd class="text-bg-light ps-2 pe-2">4</kbd> 
                             <select class="locked form-select w-50 ms-2" style="font-size: small" id="key4-column">
                                 <option value="">Unused</option>
@@ -744,7 +759,7 @@
                             <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key4">
                             <div id="bird-list-key4" class="suggestions list-group"></div>
                         </div>
-                        <div class="d-flex align-items-center mb-2">
+                        <div class="d-flex align-items-center mb-2 position-relative">
                             <kbd class="text-bg-light ps-2 pe-2">5</kbd> 
                             <select class="locked form-select w-50 ms-2" style="font-size: small" id="key5-column">
                                 <option value="">Unused</option>
@@ -755,7 +770,7 @@
                             <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key5">
                             <div id="bird-list-key5" class="suggestions list-group"></div>
                         </div>
-                        <div class="d-flex align-items-center mb-2">
+                        <div class="d-flex align-items-center mb-2 position-relative">
                             <kbd class="text-bg-light ps-2 pe-2">6</kbd> 
                             <select class="locked form-select w-50 ms-2" style="font-size: small" id="key6-column">
                                 <option value="">Unused</option>
@@ -766,7 +781,7 @@
                             <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key6">
                             <div id="bird-list-key6" class="suggestions list-group"></div>
                         </div>
-                        <div class="d-flex align-items-center mb-2">
+                        <div class="d-flex align-items-center mb-2 position-relative">
                             <kbd class="text-bg-light ps-2 pe-2">7</kbd> 
                             <select class="locked form-select w-50 ms-2" style="font-size: small" id="key7-column">
                                 <option value="">Unused</option>
@@ -777,7 +792,7 @@
                             <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key7">
                             <div id="bird-list-key7" class="suggestions list-group"></div>
                         </div>
-                        <div class="d-flex align-items-center mb-2">
+                        <div class="d-flex align-items-center mb-2 position-relative">
                             <kbd class="text-bg-light ps-2 pe-2">8</kbd> 
                             <select class="locked form-select w-50 ms-2"  style="font-size: small" id="key8-column">
                                 <option value="">Unused</option>
@@ -788,7 +803,7 @@
                             <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key8">
                             <div id="bird-list-key8" class="suggestions list-group"></div>
                         </div>
-                        <div class="d-flex align-items-center mb-2">
+                        <div class="d-flex align-items-center mb-2 position-relative">
                             <kbd class="text-bg-light ps-2 pe-2">9</kbd> 
                             <select class="locked form-select w-50 ms-2" style="font-size: small" id="key9-column">
                                 <option value="">Unused</option>
@@ -799,7 +814,7 @@
                             <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key9">
                             <div id="bird-list-key9" class="suggestions list-group"></div>
                         </div>
-                        <div class="d-flex align-items-center mb-2">
+                        <div class="d-flex align-items-center mb-2 position-relative">
                             <kbd class="text-bg-light ps-2 pe-2">0</kbd> 
                             <select class="locked form-select w-50 ms-2" style="font-size: small" id="key0-column">
                                 <option value="">Unused</option>

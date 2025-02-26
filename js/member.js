@@ -1,8 +1,8 @@
 /**
    * Validates membership status for the provided UUID.
    *
-   * This asynchronous function sends a POST request to the membership validation endpoint at 
-   * "https://subscriber.mattkirkland.co.uk/check-uuid" with the given UUID in the request body. It 
+   * This asynchronous function sends a POST request to the membership validation endpoint 
+   * with the given UUID in the request body. It 
    * expects a JSON response containing a boolean property "result" that indicates membership status.
    * If the HTTP response status is not successful (i.e., not in the 200-299 range) or if an error 
    * occurs during the fetch or response parsing, the function logs the error and throws a new Error.
@@ -41,26 +41,31 @@ function isValidUUID(uuid) {
 }
 
  /**
-  * Validates the UUID format and checks membership status by posting to a membership API.
+  * Checks the membership status for a given UUID by sending a POST request to the membership API.
   *
-  * The function verifies that the provided `uuid` is in a valid format using an auxiliary check. It then
-  * initiates a POST request to the specified `MEMBERSHIP_API_ENDPOINT` with the UUID in the JSON-formatted request body.
-  * An `AbortController` enforces a timeout (using `REQUEST_TIMEOUT_MS`) to cancel the request if it takes too long.
-  * If the HTTP response is not successful, an error detailing the response status is thrown.
-  * On a successful response, the JSON payload is parsed to determine membership status, returning `true` if the
-  * `result` is `true` and `false` otherwise.
+  * The function first validates the UUID format. If the UUID is invalid, it throws an error.
+  * It then sends a POST request to the specified API endpoint with the UUID in a JSON payload.
+  * An AbortController enforces a timeout (REQUEST_TIMEOUT_MS) to cancel the request if it takes too long.
+  * On a successful response, the JSON payload is parsed to extract:
+  * - A boolean indicating membership status (mapped from the "result" property).
+  * - A number representing the expiration days (mapped from the "ExpiresIn" property).
+  * These values are returned as an array.
   *
   * @example
   * // Example usage:
   * checkMembership("123e4567-e89b-12d3-a456-426614174000", "https://api.example.com/membership")
-  *   .then(isMember => console.log("Membership status:", isMember))
+  *   .then(([isMember, expiresInDays]) => {
+  *     console.log("Membership status:", isMember);
+  *     console.log("Expires in days:", expiresInDays);
+  *   })
   *   .catch(error => console.error("Error:", error));
   *
-  * @param {string} uuid - The user's UUID string. Must conform to a valid UUID format.
-  * @param {string} MEMBERSHIP_API_ENDPOINT - The URL of the membership validation API endpoint.
-  * @returns {Promise<boolean>} Promise resolving to `true` if the user is a member, `false` otherwise.
+  * @param {string} uuid - The user's UUID string to validate.
+  * @param {string} MEMBERSHIP_API_ENDPOINT - The URL of the membership API endpoint.
+  * @returns {Promise<[boolean, number]>} Promise resolving to an array where the first element is the membership status
+  * and the second element is the number of days until expiration.
   *
-  * @throws {Error} If the UUID format is invalid, the HTTP request fails, or the response status is not OK.
+  * @throws {Error} If the UUID is invalid, the HTTP request fails, or the response status is not successful.
   */
  export async function checkMembership(uuid, MEMBERSHIP_API_ENDPOINT) {
    try {
@@ -85,9 +90,10 @@ function isValidUUID(uuid) {
        throw new Error(`HTTP error! status: ${response.status}`);
      }
  
-     const {result} = await response.json();
-     const isMember = result === true; // Assuming the API sends true/false as a boolean.
-     return isMember;
+     const { result: isMember, ExpiresIn: expiresInDays } = await response.json();
+    //  const isMember = result === true; // Assuming the API sends true/false as a boolean.
+
+     return [isMember, expiresInDays];
    } catch (error) {
     console.error('Error checking membership:', error);
     throw error; // Preserve original error stack trace

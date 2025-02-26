@@ -365,18 +365,22 @@ const createDB = async (file) => {
 };
 
 /**
- * Loads and configures the SQLite database for managing audio records and metadata.
+ * Loads, configures, and migrates the SQLite database used for audio records and metadata.
  *
- * Retrieves default model labels either from a remote file (if the model is "birdnet") or from a local config file,
- * appends a default "Unknown Sp." label, and determines the number of labels to construct the database filename.
- * If the database file does not exist, a new database is created via `createDB`. Otherwise, an existing database is opened,
- * and various PRAGMA settings (e.g., foreign keys, journal mode, busy timeout) are enforced. The function also ensures that
- * necessary indices are created and pending database schema migrations (e.g., for tags and reviewed columns) are applied.
- * Finally, it updates the global LABELS variable by fetching labels in the preferred locale from the database and sends a UI
- * message if records are present.
+ * This asynchronous function initializes the database by:
+ * - Fetching default model labels from a remote file (for the "birdnet" model) or a local configuration file,
+ *   then appending a default "Unknown Sp." label.
+ * - Constructing a unique database filename based on the total number of labels and either creating a new database (via createDB)
+ *   or opening an existing one.
+ * - Enforcing PRAGMA settings (foreign keys, journal mode, and busy timeout) for reliable operation.
+ * - Performing schema migrations on an existing database when necessary, such as:
+ *   - Creating indices on species(sname) and species(cname).
+ *   - Adding missing columns ("archiveName" and "metadata") to the files table.
+ *   - Updating the tags and records tables (including adding a 'reviewed' column and migrating existing records).
+ * - Refreshing the global LABELS variable with the preferred locale labels from the species table and notifying the UI if records exist.
  *
- * @param {string} path - The directory path where the database file resides or will be created.
- * @returns {Promise<boolean>} A promise that resolves to true when the database is successfully loaded and configured.
+ * @param {string} path - The directory path where the database file is or will be located.
+ * @returns {Promise<boolean>} Resolves to true when the database is successfully loaded and configured.
  *
  * @example
  * loadDB('/data/db')
@@ -384,8 +388,7 @@ const createDB = async (file) => {
  *   .catch(error => console.error('Error loading database:', error));
  *
  * @remarks
- * This function relies on global state (e.g., STATE, DATASET, LABELS, diskDB, UI) and integrates with several auxiliary functions
- * such as `createDB` and `checkAndApplyUpdates`. Ensure these globals and functions are initialized before calling `loadDB`.
+ * This function depends on global variables (e.g., STATE, DATASET, LABELS, diskDB, UI) and auxiliary functions such as createDB, checkpoint, and dbMutex.
  */
 async function loadDB(path) {
   // We need to get the default labels from the config file
@@ -440,10 +443,20 @@ async function loadDB(path) {
       try{
         t0 = Date.now()
         await dbMutex.lock();
-        await diskDB.runAsync("CREATE INDEX IF NOT EXISTS idx_species_sname ON species(sname)")
         await diskDB.runAsync("PRAGMA writable_schema=ON");
         await diskDB.runAsync("PRAGMA foreign_keys = OFF");
         await diskDB.runAsync('BEGIN');
+        //1.10.x update
+        await diskDB.runAsync("CREATE INDEX IF NOT EXISTS idx_species_sname ON species(sname)");
+        await diskDB.runAsync("CREATE INDEX IF NOT EXISTS idx_species_cname ON species(cname)");
+        const fileColumns = (await diskDB.allAsync("PRAGMA table_info(files)")).map(row => row.name);
+        if (!fileColumns.includes('archiveName')){
+          await diskDB.runAsync("ALTER TABLE files ADD COLUMN archiveName TEXT");  
+        }
+        if (!fileColumns.includes('metadata')){
+          await diskDB.runAsync("ALTER TABLE files ADD COLUMN metadata TEXT");  
+        }
+
         await diskDB.runAsync("CREATE TABLE IF NOT EXISTS tags(id INTEGER PRIMARY KEY, name TEXT NOT NULL, UNIQUE(name))");
         await diskDB.runAsync("INSERT INTO tags VALUES(0, 'Nocmig'), (1, 'Local')");
         await diskDB.runAsync("ALTER TABLE records ADD COLUMN tagID INTEGER");
@@ -478,7 +491,7 @@ async function loadDB(path) {
         await diskDB.runAsync(`INSERT INTO files_new SELECT * FROM files`);
         await diskDB.runAsync(`DROP TABLE files;`);
         await diskDB.runAsync(`ALTER TABLE files_new RENAME TO files;`);
-        await diskDB.runAsync("DROP table IF EXISTS db_upgrade");
+        await diskDB.runAsync("DROP TABLE IF EXISTS db_upgrade");
         await diskDB.runAsync('END');
         await diskDB.runAsync("PRAGMA writable_schema=OFF");
         await diskDB.runAsync("PRAGMA foreign_keys = ON");
@@ -562,66 +575,64 @@ const DB_updates = [
 
 
 /**
- * Dispatches worker messages based on the provided action in the event data.
+ * Dispatches incoming worker messages by executing actions specified in the event's data payload.
  *
- * Processes an event whose data payload includes an `action` field and associated parameters.
- * If the action is not "_init_" and initialization is pending, waits for the initialization to complete.
- * Depending on the action, the function handles tasks such as initializing models, processing audio files,
- * managing thread pools, updating database records, handling tag operations, and more. Specific actions include:
- * 
- * - "_init_": Initializes the environment by setting up the list worker, launching the model, and updating state.
- * - "abort": Aborts ongoing processes.
- * - "analyse": Initiates audio analysis; validates prediction workers and handles alerts if not ready.
+ * This asynchronous function processes event messages that include an `action` field alongside associated parameters.
+ * For any action other than "_init_", it waits for any pending initialization to complete before proceeding.
+ * Depending on the action, the function delegates tasks such as initializing environments, processing audio files,
+ * managing prediction worker threads, updating database records, handling file operations, and more.
+ * Supported actions include:
+ *
+ * - "_init_": Sets up the environment by initializing the list worker, launching the predictive model, and updating state.
+ * - "abort": Aborts currently ongoing processes.
+ * - "analyse": Initiates audio analysis by validating prediction workers and sending alerts if they are not ready.
  * - "change-batch-size": Adjusts the batch size used by prediction workers.
  * - "change-threads": Modifies the number of active prediction worker threads.
  * - "change-mode": Switches the operational mode.
- * - "chart": Processes a chart data request.
- * - "check-all-files-saved": Verifies that files are correctly saved in the database.
+ * - "chart": Processes chart data requests.
+ * - "check-all-files-saved": Verifies that specified files have been saved in the database.
  * - "convert-dataset": Converts dataset specifications from existing formats.
  * - "create-dataset": Creates a dataset with inclusion identifiers.
- * - "delete": Handles deletion operations.
+ * - "delete": Performs deletion operations.
  * - "delete-species": Removes specified species records.
- * - "export-results": Exports the detection results.
- * - "file-load-request": Loads an audio file, clears memory records if necessary, and switches modes based on file state.
- * - "filter": Applies filters to the result set, refreshes summaries, and updates inclusion identifiers.
+ * - "export-results": Exports detection results.
+ * - "file-load-request": Loads an audio file, optionally clearing in-memory records, and switches modes based on file state.
+ * - "filter": Applies filters to results, refreshes summaries, and updates inclusion identifiers.
  * - "get-detected-species-list": Retrieves a list of detected species.
- * - "get-valid-species": Fetches valid species for a given file.
- * - "get-locations": Retrieves location details from the database for a specific file.
+ * - "get-valid-species": Fetches valid species associated with a file.
+ * - "get-locations": Retrieves location details for a specified file from the database.
  * - "get-tags": Retrieves a list of tags from the disk database.
- * - "delete-tag": Deletes a tag, handling any errors by generating an alert.
- * - "update-tags": Updates the tag list in the database and refreshes the UI with the new set of tags.
- * - "get-valid-files-list": Scans and returns a list of valid files.
- * - "insert-manual-record": Inserts a record manually and updates summaries and results accordingly.
- * - "load-model": Loads a new predictive model, aborting current processing if necessary.
+ * - "delete-tag": Deletes a tag and generates an alert if an error occurs.
+ * - "update-tag": Updates a tag in the database and refreshes the UI with the updated tag list.
+ * - "get-valid-files-list": Returns a list of valid files after scanning.
+ * - "insert-manual-record": Manually inserts a record and updates summaries and results accordingly.
+ * - "load-model": Loads a new predictive model, aborting ongoing processing if necessary.
  * - "post": Uploads processed audio data.
- * - "purge-file": Deletes a specified file.
+ * - "purge-file": Deletes the specified file.
  * - "compress-and-organise": Compresses and reorganises audio files.
  * - "relocated-file": Updates file paths after relocation.
  * - "save": Saves audio processing data along with associated metadata.
- * - "save2db": Persists in-memory database changes to disk.
- * - "set-custom-file-location": Sets a custom location for file storage.
+ * - "save2db": Persists changes from the in-memory database to disk.
+ * - "set-custom-file-location": Specifies a custom location for file storage.
  * - "update-buffer": Reloads an audio file to update its buffer.
  * - "update-file-start": Adjusts the starting point for audio file processing.
- * - "update-list": Updates the internal list and custom labels, optionally refreshing summaries and results.
- * - "update-locale": Updates locale settings and labels.
- * - "update-summary": Refreshes the summary data.
- * - "update-state": Updates the overall application state including paths and thresholds.
+ * - "update-list": Updates internal lists and custom labels, optionally refreshing summaries and results.
+ * - "update-locale": Updates locale settings and associated labels.
+ * - "update-summary": Refreshes summary data.
+ * - "update-state": Updates overall application state, including paths and processing thresholds.
  *
  * @example
- * // Example message event for initiating analysis on an audio file:
  * const msgEvent = {
  *   data: {
  *     action: "analyse",
  *     file: "audio_sample.mp3",
- *     // ...other parameters required for analysis
+ *     // ...additional parameters for analysis
  *   }
  * };
  * handleMessage(msgEvent);
  *
- * @param {Object} e - The message event object.
- * @param {Object} e.data - The payload containing the action and additional parameters.
- * @param {string} e.data.action - The command indicating which action to execute.
- * @returns {Promise<void>} Resolves once the message has been processed.
+ * @param {Object} e - The message event object containing the action and related parameters.
+ * @returns {Promise<void>} Resolves once the message is processed.
  */
 async function handleMessage(e) {
   const args = e.data;
@@ -877,7 +888,7 @@ async function handleMessage(e) {
       break;
     }
     case "update-summary": {
-      await getSummary();
+      await getSummary(args);
       break;
     }
     case "update-state": {
@@ -2957,6 +2968,7 @@ const onInsertManualRecord = async ({
   batch,
   originalCname,
   confidence,
+  reviewed = true,
   calledByBatch,
   position,
   speciesFiltered,
@@ -3025,14 +3037,15 @@ const onInsertManualRecord = async ({
         result.originalSpeciesID,
         fileID
       );
-      confidence = 2000; // Manual record
+      confidence ??= 2000; // Manual record
     }
   } 
   else {
-    const r = await db.getAsync(
-      "SELECT * FROM records WHERE dateTime = ? AND fileID = ? AND speciesID = ?", 
-      dateTime, fileID, speciesID);
-    confidence = r?.confidence || 2000; // Save confidence
+    // const r = await db.getAsync(
+    //   "SELECT * FROM records WHERE dateTime = ? AND fileID = ? AND speciesID = ?", 
+    //   dateTime, fileID, speciesID);
+    // confidence = r?.confidence || 2000; // Save confidence
+    confidence ??= 2000
   }
   const result = await db.getAsync("SELECT id FROM tags WHERE name = ?", label);
   const tagID = result?.id;
@@ -3047,6 +3060,7 @@ const onInsertManualRecord = async ({
         `INSERT INTO records (dateTime, position, fileID, speciesID, confidence, tagID, comment, end, callCount, isDaylight, reviewed)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(dateTime, fileID, speciesID) DO UPDATE SET 
+          confidence = excluded.confidence, 
           tagID = excluded.tagID,
           comment = excluded.comment,
           reviewed = excluded.reviewed;`,
@@ -3054,13 +3068,13 @@ const onInsertManualRecord = async ({
         start,
         fileID,
         speciesID,
-        confidence, // This will only be inserted, not updated
+        confidence,
         tagID,
         comment,
         end,
         parseInt(count),
         isDaylight,
-        true
+        reviewed
       );
       
     };
@@ -3270,7 +3284,7 @@ const parsePredictions = async (response) => {
   }
 
   if (!STATE.selection && STATE.increment() === 0) {
-    getSummary({ interim: true });
+    if (fileProgress < 1) getSummary({ interim: true });
     getTotal({ file });
   }
 
@@ -3574,7 +3588,7 @@ const getResults = async ({
     //const position = await getPosition({species: species, dateTime: select.dateTime, included: included});
     offset = (position.page - 1) * limit;
     // We want to consistently move to the next record. If results are sorted by time, this will be row + 1.
-    active = position.row + 1;
+    active = position.row //+ 1;
     // update the pagination
     await getTotal({ species: species, offset: offset, included: included });
   }
@@ -3780,7 +3794,7 @@ const getResults = async ({
     (STATE.selection && topRankin !== STATE.topRankin) ||
       UI.postMessage({
         event: "database-results-complete",
-        active: active,
+        active,
         select: position?.start,
       });
   }
@@ -4247,7 +4261,7 @@ const getRate = (species) => {
 const getDetectedSpecies = () => {
   const range = STATE.explore.range;
   const confidence = STATE.detect.confidence;
-  let sql = `SELECT cname, locationID
+  let sql = `SELECT sname || '_' || cname as label, locationID
     FROM records
     JOIN species ON species.id = records.speciesID 
     JOIN files on records.fileID = files.id`;

@@ -56,7 +56,7 @@ autoUpdater.logger.transports.file.level = "info";
 // Define the menu template
 const isMac = process.platform === "darwin"; // macOS check
 // Set membership URL here
-process.env.MEMBERSHIP_API_ENDPOINT = 'https://subscriber.mattkirkland.co.uk/check-uuid';
+process.env.MEMBERSHIP_API_ENDPOINT = 'https://subscriber.mattkirkland.co.uk/check-uuid_v2';
 const template = [
   ...(isMac
     ? [
