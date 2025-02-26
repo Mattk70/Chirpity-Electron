@@ -1555,7 +1555,7 @@ function hideElement(id_list) {
 }
 
 function hideAll() {
-  // File hint div,  Waveform, timeline and spec, controls and result table
+  //  Waveform, timeline and spec, controls and result table
   hideElement([
     "exploreWrapper",
     "spectrogramWrapper",
@@ -1810,14 +1810,14 @@ selectionTable.addEventListener("click", resultClick);
  * document.querySelector('tr').addEventListener('click', resultClick);
  */
 async function resultClick(e) {
-  if (!STATE.regionsCompleted) {
-      console.warn('Cannot process click - regions are still being created');
-      return;
-    }
   if (!fileLoaded) {
     console.warn('Cannot process click - no audio file is loaded');
     return;
   }
+  if (!STATE.regionsCompleted) {
+      console.warn('Cannot process click - regions are still being created');
+      return;
+    }
   let row = e.target.closest("tr");
   if (!row || row.classList.length === 0) {
     // 1. clicked and dragged, 2 no detections in file row
@@ -1826,13 +1826,6 @@ async function resultClick(e) {
 
   const [file, start, end, _, label] = row.getAttribute("name").split("|");
 
-  // Search for results rows - Why???
-  // while (
-  //   !(row.classList.contains("nighttime") || row.classList.contains("daytime"))
-  // ) {
-  //   row = row.previousElementSibling;
-  //   if (!row) return;
-  // }
   if (activeRow) activeRow.classList.remove("table-active");
   row.classList.add("table-active");
   activeRow = row;
@@ -2260,8 +2253,6 @@ window.onload = async () => {
     config.VERSION = VERSION;
     DIAGNOSTICS["UUID"] = config.UUID;
 
-    // Initialize Spectrogram
-    //initWavesurfer({});
     // Set UI option state
     // Fontsize
     config.fontScale === 1 || setFontSizeScale(true);
@@ -5405,28 +5396,27 @@ diagnosticMenu.addEventListener("click", async function () {
  * @returns {void}
  */
 function activateResultSort() {
-  // Clone the result header and work on it in the fragment
-  const resultHeaderClone = DOM.resultHeader.cloneNode(true);
+  // Work with the existing header directly.
+  const header = DOM.resultHeader;
 
-  const timeHeadings = resultHeaderClone.getElementsByClassName("time-sort-icon");
-  const speciesHeadings = resultHeaderClone.getElementsByClassName("species-sort-icon");
+  const timeHeadings = header.getElementsByClassName("time-sort-icon");
+  const speciesHeadings = header.getElementsByClassName("species-sort-icon");
+  const metaHeadings = header.getElementsByClassName("meta-sort-icon");
+  
   const sortOrderScore = STATE.resultsSortOrder.includes("score");
-  const fragment = document.createDocumentFragment();
-  // if (STATE.resultsMetaSortOrder){
   const state = STATE.resultsMetaSortOrder;
   const sortOrderMeta = state.replace(' ASC ', '').replace(' DESC ', '');
-  const metaHeadings = resultHeaderClone.getElementsByClassName("meta-sort-icon");
+
+  // Update meta headings
   [...metaHeadings].forEach((heading) => {
     const hideIcon = state === '' || !heading.parentNode.id.includes(sortOrderMeta);
     heading.classList.toggle("d-none", hideIcon);
-    if (state.includes("ASC")){
+    if (state.includes("ASC")) {
       heading.classList.add("flipped");
     } else {
       heading.classList.remove("flipped");
     }
   });
-  // }
-
 
   // Update time sort icons
   [...timeHeadings].forEach((heading) => {
@@ -5436,24 +5426,19 @@ function activateResultSort() {
 
   // Update species sort icons
   [...speciesHeadings].forEach((heading) => {
-    heading.classList.toggle("d-none", !sortOrderScore);
     heading.parentNode.classList.add("pointer");
     if (sortOrderScore && STATE.resultsSortOrder.includes("ASC")) {
       heading.classList.add("flipped");
     } else {
       heading.classList.remove("flipped");
     }
+    heading.classList.toggle("d-none", !sortOrderScore);
   });
 
-  // Update the cloned result header's classes
-  resultHeaderClone.classList.replace("text-bg-secondary", "text-bg-dark");
-  fragment.appendChild(resultHeaderClone);
+  // Update the header's background classes
+  header.classList.replace("text-bg-secondary", "text-bg-dark");
 
-
-
-  // Replace the old header with the updated one
-  DOM.resultHeader.replaceWith(resultHeaderClone);
-
+  // Optionally update the summary icon as needed
   showSummarySortIcon();
 }
 
@@ -6614,9 +6599,10 @@ function updateList() {
 }
 
 function refreshSummary() {
+  const species = isSpeciesViewFiltered(true)
   if (STATE.analysisDone) {
     // resetResults({});
-    worker.postMessage({ action: "update-summary" });
+    worker.postMessage({ action: "update-summary", species });
   }
 }
 
@@ -7346,7 +7332,8 @@ recordEntryForm.addEventListener("submit", function (e) {
     const region = REGIONS.regions.find(
       (region) => region.start === activeRegion.start
     );
-    region.setOptions({ content: cname });
+    // You can still add a record if you cleared the regions
+    region?.setOptions({ content: cname });
   }
   const originalCname = document.getElementById("original-id").value || cname;
   // Update the region label
@@ -8514,15 +8501,29 @@ function getFilteredBirds(search, list = LABELS) {
 function updateSuggestions(input, element, preserveInput) {
   const search = input.value.toLowerCase();
   element.textContent = ''; // Clear any existing suggestions
-    // Close any open lists
-    const suggestionLists = document.querySelectorAll('.suggestions')
-    suggestionLists.forEach(list => list.style.display = 'none');
+  // Close any open lists
+  const suggestionLists = document.querySelectorAll('.suggestions')
+  suggestionLists.forEach(list => list.style.display = 'none');
+  const label = document.querySelector(`label[for="${input.id}"]`);
+  const list = ['bird-autocomplete-explore', 'bird-autocomplete-chart'].includes(input.id) ? STATE.seenSpecies : LABELS;
+  let span;
+  if (label) {
+      span = label.querySelector('span'); // Check if a span already exists
+  
+      if (!span) {
+          span = document.createElement('span');
+          label.appendChild(span); // Append to label
+      }
+      span.textContent = ` (${list.length})`; // Update existing span
+  }
   if (search.length < 2) {
     element.style.display = 'none';
     return;
   }
-  const list = input.id === 'bird-autocomplete-explore' || input.id === 'bird-autocomplete-chart'? STATE.seenSpecies : LABELS;
+
+
   const filtered = getFilteredBirds(search, list);
+  if (span) span.textContent = ` (${filtered.length})`
   const fragment = document.createDocumentFragment();
   // Populate the suggestion list
   filtered.forEach(item => {
@@ -8545,6 +8546,14 @@ function updateSuggestions(input, element, preserveInput) {
         italic.cloneNode(true)
       );
       input.value = preserveInput ? item.cname : '';
+      const label = document.querySelector(`label[for="${input.id}"]`);
+      if (label) {
+          const span = label.querySelector('span');
+          if (span) {
+              span.remove(); // Removes the span if it exists
+          }
+      }
+
       if (input.id === 'bird-autocomplete-explore'){
         filterResults({ species: item.cname, updateSummary: true });
         resetResults({

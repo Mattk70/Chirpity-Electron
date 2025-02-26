@@ -887,7 +887,7 @@ async function handleMessage(e) {
       break;
     }
     case "update-summary": {
-      await getSummary();
+      await getSummary(args);
       break;
     }
     case "update-state": {
@@ -3283,7 +3283,7 @@ const parsePredictions = async (response) => {
   }
 
   if (!STATE.selection && STATE.increment() === 0) {
-    getSummary({ interim: true });
+    if (fileProgress < 1) getSummary({ interim: true });
     getTotal({ file });
   }
 
