@@ -3115,7 +3115,8 @@ async function localiseUI(locale) {
         // //Explore location header
         document.querySelector("label[for='explore-locations']").textContent = i18nHeadings[locale].location;
         document.getElementById('exploreRange').innerHTML = `<span class="material-symbols-outlined align-bottom">date_range</span><span>${localisationData['explore-datefilter']}</span> <span class="material-symbols-outlined float-end">expand_more</span>`;
-
+        // Species search labels
+        document.querySelectorAll('.species-search-label').forEach(label => label.textContent = i18nHeadings[locale].search);
         // Tour Carousel items:
         const tour = document.querySelector('.carousel-inner');
         tour.innerHTML = i18nTour[locale];

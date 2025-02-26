@@ -440,10 +440,20 @@ async function loadDB(path) {
       try{
         t0 = Date.now()
         await dbMutex.lock();
-        await diskDB.runAsync("CREATE INDEX IF NOT EXISTS idx_species_sname ON species(sname)")
         await diskDB.runAsync("PRAGMA writable_schema=ON");
         await diskDB.runAsync("PRAGMA foreign_keys = OFF");
         await diskDB.runAsync('BEGIN');
+        //1.10.x update
+        await diskDB.runAsync("CREATE INDEX IF NOT EXISTS idx_species_sname ON species(sname)");
+        await diskDB.runAsync("CREATE INDEX IF NOT EXISTS idx_species_cname ON species(cname)");
+        const fileColumns = (await diskDB.allAsync("PRAGMA table_info(files)")).map(row => row.name);
+        if (!fileColumns.includes('archiveName')){
+          await diskDB.runAsync("ALTER TABLE files ADD COLUMN archiveName TEXT");  
+        }
+        if (!fileColumns.includes('metadata')){
+          await diskDB.runAsync("ALTER TABLE files ADD COLUMN metadata TEXT");  
+        }
+
         await diskDB.runAsync("CREATE TABLE IF NOT EXISTS tags(id INTEGER PRIMARY KEY, name TEXT NOT NULL, UNIQUE(name))");
         await diskDB.runAsync("INSERT INTO tags VALUES(0, 'Nocmig'), (1, 'Local')");
         await diskDB.runAsync("ALTER TABLE records ADD COLUMN tagID INTEGER");
@@ -2957,6 +2967,7 @@ const onInsertManualRecord = async ({
   batch,
   originalCname,
   confidence,
+  reviewed = true,
   calledByBatch,
   position,
   speciesFiltered,
@@ -3025,14 +3036,15 @@ const onInsertManualRecord = async ({
         result.originalSpeciesID,
         fileID
       );
-      confidence = 2000; // Manual record
+      confidence ??= 2000; // Manual record
     }
   } 
   else {
-    const r = await db.getAsync(
-      "SELECT * FROM records WHERE dateTime = ? AND fileID = ? AND speciesID = ?", 
-      dateTime, fileID, speciesID);
-    confidence = r?.confidence || 2000; // Save confidence
+    // const r = await db.getAsync(
+    //   "SELECT * FROM records WHERE dateTime = ? AND fileID = ? AND speciesID = ?", 
+    //   dateTime, fileID, speciesID);
+    // confidence = r?.confidence || 2000; // Save confidence
+    confidence ??= 2000
   }
   const result = await db.getAsync("SELECT id FROM tags WHERE name = ?", label);
   const tagID = result?.id;
@@ -3047,6 +3059,7 @@ const onInsertManualRecord = async ({
         `INSERT INTO records (dateTime, position, fileID, speciesID, confidence, tagID, comment, end, callCount, isDaylight, reviewed)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(dateTime, fileID, speciesID) DO UPDATE SET 
+          confidence = excluded.confidence, 
           tagID = excluded.tagID,
           comment = excluded.comment,
           reviewed = excluded.reviewed;`,
@@ -3054,13 +3067,13 @@ const onInsertManualRecord = async ({
         start,
         fileID,
         speciesID,
-        confidence, // This will only be inserted, not updated
+        confidence,
         tagID,
         comment,
         end,
         parseInt(count),
         isDaylight,
-        true
+        reviewed
       );
       
     };
@@ -3574,7 +3587,7 @@ const getResults = async ({
     //const position = await getPosition({species: species, dateTime: select.dateTime, included: included});
     offset = (position.page - 1) * limit;
     // We want to consistently move to the next record. If results are sorted by time, this will be row + 1.
-    active = position.row + 1;
+    active = position.row //+ 1;
     // update the pagination
     await getTotal({ species: species, offset: offset, included: included });
   }
@@ -3780,7 +3793,7 @@ const getResults = async ({
     (STATE.selection && topRankin !== STATE.topRankin) ||
       UI.postMessage({
         event: "database-results-complete",
-        active: active,
+        active,
         select: position?.start,
       });
   }
@@ -4247,7 +4260,7 @@ const getRate = (species) => {
 const getDetectedSpecies = () => {
   const range = STATE.explore.range;
   const confidence = STATE.detect.confidence;
-  let sql = `SELECT cname, locationID
+  let sql = `SELECT sname || '_' || cname as label, locationID
     FROM records
     JOIN species ON species.id = records.speciesID 
     JOIN files on records.fileID = files.id`;

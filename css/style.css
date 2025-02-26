@@ -941,7 +941,7 @@ transform: scale(1.1); /* Increase size by 10% on hover */
     margin-top: 0.25rem;
     padding: 0;
     display: none;
-    z-index: 4;
+    z-index: 1001;
     color: black;
   }
   

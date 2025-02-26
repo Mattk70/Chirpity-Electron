@@ -43,7 +43,7 @@ let LOCATIONS,
 let REGIONS, spectrogram, timeline;
 let APPLICATION_LOADED = false;
 let LABELS = [],
-  DELETE_HISTORY = [];
+  HISTORY = [];
 // Save console.warn and console.error functions
 const originalInfo = console.info;
 const originalWarn = console.warn;
@@ -1357,7 +1357,7 @@ function resetDiagnostics() {
   delete DIAGNOSTICS["Analysis Rate"];
   delete DIAGNOSTICS["Analysis Duration"];
   //reset delete history too
-  DELETE_HISTORY = [];
+  HISTORY = [];
 }
 
 // Worker listeners
@@ -2265,6 +2265,11 @@ window.onload = async () => {
     // Set UI option state
     // Fontsize
     config.fontScale === 1 || setFontSizeScale(true);
+    // Ensure config.model is valid (v1.10.x management)
+    if (! ['birdnet', 'chirpity', 'nocmig'].includes(config.model)){
+      config.model = 'birdnet';
+    }
+
     // Map slider value to batch size
     DOM.batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(
       config[config[config.model].backend].batchSize
@@ -2631,7 +2636,8 @@ const setUpWorkerMessaging = () => {
           break;
         }
         case "seen-species-list": {
-          generateBirdList("seenSpecies", args.list);
+          STATE.seenSpecies = args.list.map(item => item.label)
+          // generateBirdList("seenSpecies", args.list);
           break;
         }
         case "tfjs-node": {
@@ -2742,73 +2748,73 @@ function showWindowDetections({detections, goToRegion}) {
   STATE.regionsCompleted = true;
 }
 
-function generateBirdList(store, rows) {
-  const chart = document.getElementById("chart-list");
-  const explore = document.getElementById("explore-list");
-  const listHTML = generateBirdOptionList({ store, rows });
-  chart.innerHTML = listHTML;
-  explore.innerHTML = listHTML;
-}
+// function generateBirdList(store, rows) {
+//   const chart = document.getElementById("chart-list");
+//   const explore = document.getElementById("explore-list");
+//   const listHTML = generateBirdOptionList({ store, rows });
+//   chart.innerHTML = listHTML;
+//   explore.innerHTML = listHTML;
+// }
 
-/**
- * Generates an HTML string for a bird species selection dropdown.
- *
- * Constructs a select element based on the provided options. When options.store is "allSpecies", a floating form-select is created with either a search prompt or a preselected species from the global LABELS. Otherwise, a basic select element is built using the species data from options.rows, with the currently active species (from STATE.chart.species) marked as selected.
- *
- * Also updates the inner HTML of the element with ID "species-search-label" using localized text.
- *
- * @param {Object} options - Options to configure the species option list.
- * @param {string} options.store - Determines the type of select element to generate. Use "allSpecies" to render all species with an optional preselection.
- * @param {Array<Object>} options.rows - Array of species objects; each must contain a "cname" property used for option values.
- * @param {string} [options.selected] - Optionally, the species name to preselect when options.store is "allSpecies".
- * @returns {string} HTML string representing the constructed select element with bird species options.
- *
- * @remark Relies on external globals such as LABELS, STATE, i18nHeadings, and i18nAll for data retrieval and localization.
- */
-function generateBirdOptionList({ store, rows, selected }) {
-  let listHTML = "";
-  const i18n = getI18n(i18nHeadings);
-  const i18nTout = getI18n(i18nAll);
-  // Species search label and match count
-  document.getElementById('species-search-label').innerHTML = i18n.search;
-  if (store === "allSpecies") {
-    // let sortedList = LABELS.map((label) => {
-    //   const [sname, cname] = label.split("_")
-    //   return `${cname}~${sname}`
-    // });
+// /**
+//  * Generates an HTML string for a bird species selection dropdown.
+//  *
+//  * Constructs a select element based on the provided options. When options.store is "allSpecies", a floating form-select is created with either a search prompt or a preselected species from the global LABELS. Otherwise, a basic select element is built using the species data from options.rows, with the currently active species (from STATE.chart.species) marked as selected.
+//  *
+//  * Also updates the inner HTML of the element with ID "species-search-label" using localized text.
+//  *
+//  * @param {Object} options - Options to configure the species option list.
+//  * @param {string} options.store - Determines the type of select element to generate. Use "allSpecies" to render all species with an optional preselection.
+//  * @param {Array<Object>} options.rows - Array of species objects; each must contain a "cname" property used for option values.
+//  * @param {string} [options.selected] - Optionally, the species name to preselect when options.store is "allSpecies".
+//  * @returns {string} HTML string representing the constructed select element with bird species options.
+//  *
+//  * @remark Relies on external globals such as LABELS, STATE, i18nHeadings, and i18nAll for data retrieval and localization.
+//  */
+// function generateBirdOptionList({ store, rows, selected }) {
+//   let listHTML = "";
+//   const i18n = getI18n(i18nHeadings);
+//   const i18nTout = getI18n(i18nAll);
+//   // Species search label and match count
+//   document.getElementById('species-search-label').innerHTML = i18n.search;
+//   if (store === "allSpecies") {
+//     // let sortedList = LABELS.map((label) => {
+//     //   const [sname, cname] = label.split("_")
+//     //   return `${cname}~${sname}`
+//     // });
 
-    // // International language sorting, recommended for large arrays - 'en_uk' not valid, but same as 'en'
-    // sortedList.sort(
-    //   new Intl.Collator(config.locale.replace(/_.*$/, "")).compare
-    // );
-    // Check if we have prepared this before
+//     // // International language sorting, recommended for large arrays - 'en_uk' not valid, but same as 'en'
+//     // sortedList.sort(
+//     //   new Intl.Collator(config.locale.replace(/_.*$/, "")).compare
+//     // );
+//     // Check if we have prepared this before
 
-    // const lastSelectedSpecies = selected || STATE.birdList.lastSelectedSpecies;
-    listHTML +=
-      `<div class="form-floating">
-      <select spellcheck="false" id="bird-list-all" class="form-select mb-3" aria-label=".form-select" required>`;
-    // 
-    // for (const species of sortedList) {
-    if (selected){
-      const species = LABELS.find(sp => sp.split('_')[1] === selected);
-      const [sname, cname] = species.split('_');
-      // const isSelected = cname === lastSelectedSpecies ? "selected" : "";
-      listHTML += `<option value="${cname}" selected>${cname}~${sname}</option>`;
-    } else {
-      listHTML += `<option value="">${i18n.searchPrompt}</option>`
-    }
-    listHTML += `</select><label for="bird-list-all">${i18n.species[0]}</label></div>`;
-  } else {
-    listHTML += `<select id="bird-list-seen" class="form-select"><option value="">${i18nTout[1]}</option>`;
-    for (const { cname } of rows) {
-      const isSelected = cname === STATE.chart.species ? "selected" : "";
-      listHTML += `<option value="${cname}" ${isSelected}>${cname}</option>`;
-    }
-    listHTML += `</select><label for="bird-list-seen">${i18n.species[0]}</label>`;
-  }
+//     // const lastSelectedSpecies = selected || STATE.birdList.lastSelectedSpecies;
+//     listHTML +=
+//       `<div class="form-floating">
+//       <select spellcheck="false" id="bird-list-all" class="form-select mb-3" aria-label=".form-select" required>`;
+//     // 
+//     // for (const species of sortedList) {
+//     if (selected){
+//       const species = LABELS.find(sp => sp.split('_')[1] === selected);
+//       const [sname, cname] = species.split('_');
+//       // const isSelected = cname === lastSelectedSpecies ? "selected" : "";
+//       listHTML += `<option value="${cname}" selected>${cname}~${sname}</option>`;
+//     } else {
+//       listHTML += `<option value="">${i18n.searchPrompt}</option>`
+//     }
+//     listHTML += `</select><label for="bird-list-all">${i18n.species[0]}</label></div>`;
+//   } else {
+//     listHTML += `<select id="bird-list-seen" class="form-select"><option value="">${i18nTout[1]}</option>`;
+//     for (const { cname } of rows) {
+//       const isSelected = cname === STATE.chart.species ? "selected" : "";
+//       listHTML += `<option value="${cname}" ${isSelected}>${cname}</option>`;
+//     }
+//     listHTML += `</select><label for="bird-list-seen">${i18n.species[0]}</label>`;
+//   }
 
-  return listHTML;
-}
+//   return listHTML;
+// }
 
 function generateBirdIDList(rows) {
   let listHTML = "";
@@ -2860,46 +2866,46 @@ function handleGesture(e) {
   // }, 200, 'swipe');
 }
 
-document.addEventListener("change", function (e) {
-  const target = e.target;
-  const context = target.parentNode.classList.contains("chart")
-    ? "chart"
-    : "explore";
-  if (target.closest("#bird-list-seen")) {
-    // Clear the results table
-    // const resultTable = document.getElementById('resultTableBody');
-    // resultTable.textContent = '';
-    const cname = target.value;
-    let pickerEl = context + "Range";
-    t0 = Date.now();
-    let action, explore;
-    if (context === "chart") {
-      STATE.chart.species = cname;
-      action = "chart";
-    } else {
-      action = "filter";
-      resetResults({
-        clearSummary: false,
-        clearPagination: true,
-        clearResults: false,
-      });
-    }
-    worker.postMessage({
-      action: action,
-      species: cname,
-      range: STATE[context].range,
-      updateSummary: true,
-    });
-  } else if (target.closest("#chart-aggregation")) {
-    STATE.chart.aggregation = target.value;
-    worker.postMessage({
-      action: "chart",
-      aggregation: STATE.chart.aggregation,
-      species: STATE.chart.species,
-      range: STATE[context].range,
-    });
-  }
-});
+// document.addEventListener("change", function (e) {
+//   const target = e.target;
+//   const context = target.parentNode.classList.contains("chart")
+//     ? "chart"
+//     : "explore";
+//   if (target.closest("#bird-list-seen")) {
+//     // Clear the results table
+//     // const resultTable = document.getElementById('resultTableBody');
+//     // resultTable.textContent = '';
+//     const cname = target.value;
+//     let pickerEl = context + "Range";
+//     t0 = Date.now();
+//     let action, explore;
+//     if (context === "chart") {
+//       STATE.chart.species = cname;
+//       action = "chart";
+//     } else {
+//       action = "filter";
+//       resetResults({
+//         clearSummary: false,
+//         clearPagination: true,
+//         clearResults: false,
+//       });
+//     }
+//     worker.postMessage({
+//       action: action,
+//       species: cname,
+//       range: STATE[context].range,
+//       updateSummary: true,
+//     });
+//   } else if (target.closest("#chart-aggregation")) {
+//     STATE.chart.aggregation = target.value;
+//     worker.postMessage({
+//       action: "chart",
+//       aggregation: STATE.chart.aggregation,
+//       species: STATE.chart.species,
+//       range: STATE[context].range,
+//     });
+//   }
+// });
 
 // Save audio clip
 async function onSaveAudio({ file, filename, extension }) {
@@ -2923,9 +2929,6 @@ function getDateOfISOWeek(w) {
 }
 
 function onChartData(args) {
-  const genTime = Date.now() - t0;
-  const genTimeElement = document.getElementById("genTime");
-  genTimeElement.textContent = (genTime / 1000).toFixed(1) + " seconds";
   if (args.species) {
     showElement(["recordsTableBody"], false);
     const title = document.getElementById("speciesName");
@@ -3717,7 +3720,7 @@ function recordUpdate(key){
     return;
   }
   const assignment = config.keyAssignment['key'+ key];
-  if (assignment?.column){
+  if (assignment?.column && assignment?.value){
     const nameAttribute = activeRow.getAttribute("name");
     const [file, start, end, sname, cname] = nameAttribute.split("|");
     const commentCell = activeRow.querySelector('.comment > span');
@@ -3730,24 +3733,14 @@ function recordUpdate(key){
     const newCname = assignment.column === 'species' ?  assignment.value : name;
     const newLabel = assignment.column === 'label' ?  assignment.value : label || '';
     const newComment = assignment.column === 'comment' ?  assignment.value : comment;
-    // DELETE_HISTORY.push([
-    //   cname,
-    //   parseFloat(start),
-    //   parseFloat(end),
-    //   comment,
-    //   undefined, // won't restore callCount
-    //   label,
-    //   undefined,
-    //   undefined,
-    //   undefined,
-    //   confidence,
-    // ]);
+    // Save record for undo
+    const {callCount} = addToHistory(activeRow, newCname);
     insertManualRecord(
       newCname,
       parseFloat(start),
       parseFloat(end),
       newComment,
-      "", // callCount 
+      callCount ,
       newLabel,
       "Update",
       false,
@@ -3809,8 +3802,8 @@ const GLOBAL_ACTIONS = {
     }
   },
   z: (e) => {
-    if ((e.ctrlKey || e.metaKey) && DELETE_HISTORY.length)
-      insertManualRecord(...DELETE_HISTORY.pop());
+    if ((e.ctrlKey || e.metaKey) && HISTORY.length)
+      insertManualRecord(...HISTORY.pop());
   },
   Escape: () => {
     if (PREDICTING) {
@@ -4131,7 +4124,7 @@ function onModelReady(args) {
   DIAGNOSTICS["Warm Up"] =
     ((t1_warmup - t0_warmup) / 1000).toFixed(2) + " seconds";
 
-  APPLICATION_LOADED || console.info("App launch time", `${t1_warmup - app_t0} ms`)
+  APPLICATION_LOADED || console.info("App launch time", `${ Math.round((t1_warmup - app_t0) / 1000)} seconds`)
   APPLICATION_LOADED = true;
 
   document.getElementById('loading-screen').classList.add('d-none');
@@ -4259,12 +4252,11 @@ function onProgress(args) {
   }
 }
 
-function updatePagination(total, offset) {
+function updatePagination(total, offset = STATE.offset) {
   //Pagination
   total > config.limit
     ? addPagination(total, offset)
     : pagination.forEach((item) => item.classList.add("d-none"));
-  STATE.offset = offset;
 }
 
 const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
@@ -4353,8 +4345,8 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
   if (selectedRow) {
     const table = document.getElementById("resultSummary");
     table.rows[selectedRow].scrollIntoView({
-      behavior: "smooth",
-      block: "center",
+      behavior: "instant",
+      block: "center"
     });
   }
   // }
@@ -4417,7 +4409,7 @@ function onResultsComplete({ active = undefined, select = undefined } = {}) {
   // hide progress div
   DOM.progressDiv.classList.add("invisible");
   renderFilenamePanel();
-  // activateResultFilters();
+  activateResultSort();
 }
 
 /**
@@ -4515,7 +4507,7 @@ function onAnalysisComplete({ quiet }) {
     DIAGNOSTICS["Analysis Rate"] =
       rate.toFixed(0) + "x faster than real time performance.";
     generateToast({ message: "complete" });
-    // activateResultFilters();
+    // activateResultSort();
   }
 }
 
@@ -4528,7 +4520,16 @@ function onSummaryComplete({
   summary = [],
 }) {
   updateSummary({ summary: summary, filterSpecies: filterSpecies });
-  if (!PREDICTING || STATE.mode !== "analyse") activateResultFilters();
+  // Add pointer icon to species summaries
+  const summarySpecies = DOM.summaryTable.querySelectorAll(".cname");
+  summarySpecies.forEach((row) => row.classList.add("pointer"));
+
+  // Add hover to the summary
+  const summaryNode = document.getElementById("resultSummary");
+  if (summaryNode) {
+    summaryNode.classList.add("table-hover");
+  }
+  if (!PREDICTING || STATE.mode !== "analyse") activateResultSort();
   // Why do we do audacity labels here?
   AUDACITY_LABELS = audacityLabels;
   if (summary.length) {
@@ -4656,8 +4657,8 @@ function speciesFilter(e) {
   }
   if (isExplore()) {
     range = STATE.explore.range;
-    const list = document.getElementById("bird-list-seen");
-    list.value = species || "";
+    const autoComplete = document.getElementById('bird-autocomplete-explore')
+    autoComplete.value = species || "";
   }
   filterResults({ updateSummary: false });
   resetResults({
@@ -4854,8 +4855,7 @@ function setClickedIndex(target) {
 }
 
 const deleteRecord = (target) => {
-  if (target === activeRow) {
-  } else if (target instanceof PointerEvent) target = activeRow;
+  if (target instanceof PointerEvent) target = activeRow;
   else {
     //I'm not sure what triggers this
     target.forEach((position) => {
@@ -4871,45 +4871,16 @@ const deleteRecord = (target) => {
     activeRow = undefined;
     return;
   }
-  if (target.childElementCount === 2) return; // No detections found in selection
 
   setClickedIndex(target);
-  // prepare the undelete record
-  const [file, start, end] = unpackNameAttr(target);
-  const setting = target.closest("table");
-  if (setting) {
-    const row = target.closest("tr");
-    let cname = target.querySelector(".cname").innerText;
-    let [species, confidence] = cname.split("\n");
-    // Manual records don't have a confidence bar
-    if (!confidence) {
-      species = species.slice(0, -11); // remove ' person_add'
-      confidence = 2000;
-    } else {
-      confidence = parseInt(confidence.replace("%", "")) * 10;
-    }
-    const comment = target.querySelector(".comment").innerText;
-    const label = target.querySelector(".label").innerText;
-    let callCount = target.querySelector(".call-count").innerText;
-    DELETE_HISTORY.push([
-      species,
-      start,
-      end,
-      comment,
-      callCount,
-      label,
-      undefined,
-      undefined,
-      undefined,
-      confidence,
-    ]);
+  const {species, start, end, file, row, setting} = addToHistory(target)
 
     worker.postMessage({
       action: "delete",
-      file: file,
-      start: start,
-      end: end,
-      species: getSpecies(target),
+      file,
+      start,
+      end,
+      species,
       speciesFiltered: isSpeciesViewFiltered(),
     });
     // Clear the record in the UI
@@ -4917,7 +4888,6 @@ const deleteRecord = (target) => {
     // there may be no records remaining (no index)
     index > -1 && setting.deleteRow(index);
     setting.rows[index]?.click();
-  }
 };
 
 const deleteSpecies = (target) => {
@@ -5293,13 +5263,14 @@ function filterResults({
   STATE.analysisDone &&
     worker.postMessage({
       action: "filter",
-      species: species,
-      updateSummary: updateSummary,
-      offset: offset,
-      limit: limit,
-      range: range,
+      species,
+      updateSummary,
+      offset,
+      limit,
+      range
     });
 }
+
 const modelSettingsDisplay = () => {
   // Sets system options according to model or machine cababilities
   // cf. setListUIState
@@ -5433,7 +5404,7 @@ diagnosticMenu.addEventListener("click", async function () {
  *
  * @returns {void}
  */
-function activateResultFilters() {
+function activateResultSort() {
   // Clone the result header and work on it in the fragment
   const resultHeaderClone = DOM.resultHeader.cloneNode(true);
 
@@ -5474,22 +5445,11 @@ function activateResultFilters() {
     }
   });
 
-  fragment.appendChild(resultHeaderClone);
-
-  // Add pointer icon to species summaries
-  const summarySpecies = DOM.summaryTable.querySelectorAll(".cname");
-  summarySpecies.forEach((row) => row.classList.add("pointer"));
-
   // Update the cloned result header's classes
   resultHeaderClone.classList.replace("text-bg-secondary", "text-bg-dark");
+  fragment.appendChild(resultHeaderClone);
 
-  // Add hover to the summary
-  const summary = document.getElementById("resultSummary");
-  if (summary) {
-    const summaryClone = summary.cloneNode(true);
-    summaryClone.classList.add("table-hover");
-    fragment.appendChild(summaryClone);
-  }
+
 
   // Replace the old header with the updated one
   DOM.resultHeader.replaceWith(resultHeaderClone);
@@ -5536,17 +5496,13 @@ const setSortOrder = (field, order) => {
 const setSummarySortOrder = (order) => {
   STATE.summarySortOrder = order;
   worker.postMessage({ action: "update-state", summarySortOrder: order });
-  resetResults({
-    clearSummary: false,
-    clearPagination: false,
-    clearResults: false,
-  });
-  filterResults();
+  refreshSummary()
 };
+
+
 // Drag file to app window to open
 document.addEventListener("dragover", (event) => {
   event.preventDefault();
-  //event.stopPropagation();
 });
 
 document.addEventListener("drop", (event) => {
@@ -5699,7 +5655,7 @@ function initialiseDatePicker() {
           [i18n.thisMonth]: thisMonth(),
           [i18n.lastMonth]: lastMonth(),
           [i18n.thisYear]: thisYear(),
-          [i18n.lastYear]: lastYear(),
+          [i18n.lastYear]: lastYear()
         },
       },
       TimePlugin: {
@@ -6610,7 +6566,7 @@ document.addEventListener("click", function (e) {
     document.getElementById("frequency-range").classList.remove("active");
   }
   if (!target?.startsWith('bird-')) {
-    DOM.suggestionsList.style.display = 'none';
+    document.querySelectorAll('.suggestions').forEach(list => list.style.display = 'none');
   }
   hideConfidenceSlider();
   config.debug && console.log("clicked", target);
@@ -7333,7 +7289,7 @@ async function showRecordEntryForm(mode, batch) {
     commentText = activeRow.querySelector(".comment > span")?.title || "";
     callCount = parseInt(activeRow.querySelector(".call-count").textContent);
   }
-  document.getElementById('species-search-label').innerHTML = i18n.search;
+  document.querySelectorAll('.species-search-label').forEach(label => label.textContent = i18n.search);
   const selectedBird = recordEntryForm.querySelector(
     "#selected-bird"
   );
@@ -7423,7 +7379,8 @@ const insertManualRecord = (
   action,
   batch,
   originalCname,
-  confidence
+  confidence,
+  reviewed
 ) => {
   const files = batch ? STATE.openFiles : STATE.currentFile;
   worker.postMessage({
@@ -7441,8 +7398,8 @@ const insertManualRecord = (
     confidence: confidence,
     position: { row: activeRow?.rowIndex - 1, page: getCurrentPage() }, //  have to account for the header row
     speciesFiltered: isSpeciesViewFiltered(true),
+    reviewed
   });
-  //resetResults({clearPagination: false})
 };
 
 function checkFilteredFrequency() {
@@ -8514,9 +8471,7 @@ document.addEventListener("labelsUpdated", (e) => {
   
   console.log("Tags list:", STATE.tagsList);
 });
-const input = document.getElementById('bird-autocomplete');
 
-const dropdownCaret = document.querySelector('.input-caret');
 
 /**
  * Filters and sorts bird labels based on a search query.
@@ -8529,10 +8484,9 @@ const dropdownCaret = document.querySelector('.input-caret');
  * @param {string} search - A substring used to filter bird labels; if invalid, an empty array is returned.
  * @returns {Array<{cname: string, sname: string, styled: string}>} An array of objects representing filtered and sorted birds.
  */
-function getFilteredBirds(search) {
+function getFilteredBirds(search, list = LABELS) {
   if (!search || typeof search !== 'string') return [];
-  
-  const sortedList =  LABELS
+  const sortedList =  list
     .filter(bird => bird.toLowerCase().includes(search))
     .map(item => {
       // Flip sname and cname from "sname_cname"
@@ -8544,7 +8498,7 @@ function getFilteredBirds(search) {
 }
 
 /**
- * Updates the suggestions list and translucent completion overlay based on the input search query.
+ * Updates the suggestions list  based on the input search query.
  *
  * Uses the lowercase value of the provided input element to filter bird suggestions via the global
  * getFilteredBirds function. If the search query is shorter than 2 characters, the suggestion element
@@ -8560,13 +8514,15 @@ function getFilteredBirds(search) {
 function updateSuggestions(input, element, preserveInput) {
   const search = input.value.toLowerCase();
   element.textContent = ''; // Clear any existing suggestions
-
+    // Close any open lists
+    const suggestionLists = document.querySelectorAll('.suggestions')
+    suggestionLists.forEach(list => list.style.display = 'none');
   if (search.length < 2) {
     element.style.display = 'none';
     return;
   }
-  
-  const filtered = getFilteredBirds(search);
+  const list = input.id === 'bird-autocomplete-explore' || input.id === 'bird-autocomplete-chart'? STATE.seenSpecies : LABELS;
+  const filtered = getFilteredBirds(search, list);
   const fragment = document.createDocumentFragment();
   // Populate the suggestion list
   filtered.forEach(item => {
@@ -8589,6 +8545,16 @@ function updateSuggestions(input, element, preserveInput) {
         italic.cloneNode(true)
       );
       input.value = preserveInput ? item.cname : '';
+      if (input.id === 'bird-autocomplete-explore'){
+        filterResults({ species: item.cname, updateSummary: true });
+        resetResults({
+          clearSummary: false,
+          clearPagination: false,
+          clearResults: false,
+        });
+      } else if  (input.id === 'bird-autocomplete-chart'){
+        worker.postMessage({action: "chart", species: item.cname, range: STATE.chart.range})
+      }
       input.dispatchEvent(new Event('change', { bubbles: true })); // fire the change event
       element.style.display = 'none';
     });
@@ -8596,18 +8562,68 @@ function updateSuggestions(input, element, preserveInput) {
   });
   element.appendChild(fragment);
   element.style.display = filtered.length ? 'block' : 'none';
+  // Make sure the dropdown is visble
+  element.getBoundingClientRect().bottom > window.innerHeight &&
+    element.scrollIntoView({behavior: 'smooth', block:'end'})
 }
 
 // Update suggestions on each input event
-input.addEventListener('input', () => updateSuggestions(input, DOM.suggestionsList));
+const autocomplete = document.querySelectorAll('.autocomplete');
+autocomplete.forEach(input => {
+  const listContainer = input.closest('.bird-search').querySelector('.suggestions');
+  input.addEventListener('input', () => updateSuggestions(input, listContainer, true));
+})
+
 
 // Toggle the display of the suggestion list when the caret is clicked
-dropdownCaret.addEventListener('click', () => {
-  if (DOM.suggestionsList.style.display === 'block') {
-    DOM.suggestionsList.style.display = 'none';
+const dropdownCaret = document.querySelectorAll('.input-caret');
+dropdownCaret.forEach(caret => caret.addEventListener('click', (e) => {
+  const suggestionsList = e.target.closest('.bird-search').querySelector('.suggestions');
+  if (suggestionsList.style.display === 'block') {
+    suggestionsList.style.display = 'none';
   } else {
-    updateSuggestions(input, DOM.suggestionsList);
+    const inputField = e.target.closest('.bird-search').querySelector('input');
+    updateSuggestions(inputField, suggestionsList);
   }
-});
+}));
 
 
+function addToHistory (record, newCname) {
+    // prepare the undelete record
+    const [file, start, end] = unpackNameAttr(record);
+    const setting = record.closest("table");
+    if (setting) {
+      const row = record.closest("tr");
+      let cname = record.querySelector(".cname").innerText;
+      let [species, confidence] = cname.split("\n");
+      // Manual records don't have a confidence bar
+      if (!confidence) {
+        species = species.slice(0, -11); // remove ' person_add'
+        confidence = 2000;
+      } else {
+        confidence = parseInt(confidence.replace("%", "")) * 10;
+      }
+      const comment = record.querySelector(".comment").innerText;
+      const label = record.querySelector(".label").innerText;
+      let callCount = record.querySelector(".call-count").innerText;
+      let reviewed = !!record.querySelector(".reviewed").innerText;
+      HISTORY.push([
+        species,
+        start,
+        end,
+        comment,
+        callCount,
+        label,
+        undefined,
+        undefined,
+        newCname || species,
+        confidence,
+        reviewed
+      ]);
+    return {species, start, end, confidence, label, callCount, comment, file, row, setting}
+  }
+}
+
+// const exploreList = document.getElementById('bird-autocomplete-explore');
+// const listContainer = document.getElementById('bird-suggestions-explore');
+// exploreList.addEventListener('input', function () {updateSuggestions(this, listContainer, true)});
