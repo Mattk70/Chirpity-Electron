@@ -1352,6 +1352,12 @@ async function onOpenFiles(args) {
   windowLength = 20;
 }
 
+/**
+ * Resets diagnostic metrics and clears the history log.
+ *
+ * Deletes diagnostic entries for "Audio Duration", "Analysis Rate", and "Analysis Duration" from the DIAGNOSTICS object,
+ * and resets the HISTORY array to an empty state.
+ */
 function resetDiagnostics() {
   delete DIAGNOSTICS["Audio Duration"];
   delete DIAGNOSTICS["Analysis Rate"];
@@ -1360,7 +1366,13 @@ function resetDiagnostics() {
   HISTORY = [];
 }
 
-// Worker listeners
+/**
+ * Resets the analysis state for a new operation.
+ *
+ * This function clears any active selections, resets the file number display,
+ * clears diagnostic information, and empties the Audacity labels. It also ensures
+ * that the progress indicator is visible.
+ */
 function analyseReset() {
   clearActive();
   DOM.fileNumber.textContent = "";
@@ -1554,6 +1566,13 @@ function hideElement(id_list) {
   });
 }
 
+/**
+ * Hides key UI components related to audio analysis.
+ *
+ * This function hides the primary display elements, including the waveform/timeline (exploreWrapper),
+ * spectrogram (spectrogramWrapper), results table (resultTableContainer), and records sections (recordsContainer,
+ * resultsHead), by delegating to the hideElement utility.
+ */
 function hideAll() {
   //  Waveform, timeline and spec, controls and result table
   hideElement([
@@ -2739,6 +2758,15 @@ function showWindowDetections({detections, goToRegion}) {
   STATE.regionsCompleted = true;
 }
 
+/**
+ * Constructs an HTML string of table rows for bird identification data.
+ *
+ * Iterates through the provided collection of bird records, where each record contains a common name ("cname")
+ * and a scientific name ("sname"), and generates a corresponding HTML table row for each.
+ *
+ * @param {Object[]} rows - Collection of bird records with properties "cname" (common name) and "sname" (scientific name).
+ * @returns {string} A string containing HTML table rows for each bird record.
+ */
 function generateBirdIDList(rows) {
   let listHTML = "";
   for (const item in rows) {
@@ -2774,6 +2802,18 @@ function getSpecies(target) {
   return species;
 }
 
+/**
+ * Handles a swipe gesture event to trigger page navigation actions.
+ *
+ * This function throttles gesture events by ignoring any that occur within 1.2 seconds of the previous event.
+ * It determines the direction of the gesture by evaluating the horizontal (deltaX) or, if absent, vertical (deltaY) movement.
+ * A positive movement results in a "PageDown" action, while a negative movement triggers a "PageUp" action.
+ * If debugging is enabled, the gesture details are logged, and each action is tracked via a tracking event.
+ *
+ * @param {Object} e - The gesture event object.
+ * @param {number} [e.deltaX] - The horizontal movement delta.
+ * @param {number} [e.deltaY] - The vertical movement delta used if horizontal movement is zero.
+ */
 function handleGesture(e) {
   const currentTime = Date.now();
   if (currentTime - STATE.lastGestureTime < 1200) {
@@ -2790,7 +2830,14 @@ function handleGesture(e) {
 }
 
 
-// Save audio clip
+/**
+ * Asynchronously saves an audio clip using Electron's file system API.
+ *
+ * @param {Object} options - Parameters for saving the audio clip.
+ * @param {*} options.file - The audio file data to be saved.
+ * @param {string} options.filename - The name under which to save the audio file.
+ * @param {string} options.extension - The file extension to use for the saved file.
+ */
 async function onSaveAudio({ file, filename, extension }) {
   await window.electron.saveFile({
     file: file,
@@ -2811,6 +2858,27 @@ function getDateOfISOWeek(w) {
   return ISOweekStart.toLocaleDateString("en-GB", options);
 }
 
+/**
+ * Processes chart data to update the UI and render a new Chart.js chart.
+ *
+ * This function updates UI elements based on the provided chart data. If a species name is given,
+ * it displays the species title and toggles visibility of the associated records table; otherwise,
+ * the records table is hidden. It then updates individual record elements with formatted dates or
+ * "N/A"/"No Records" messages. Any existing Chart.js instances are destroyed before constructing a new
+ * chart on the canvas element with the id "chart-week". The chart configuration includes bar datasets
+ * for each year (with an adjustment for hourly data) and, if provided, a line dataset displaying total
+ * hours recorded. A custom plugin is used to set the background color of the canvas.
+ *
+ * @param {Object} args - An object containing chart configuration and data.
+ * @param {string} [args.species] - The species name to display; its presence toggles the records table.
+ * @param {Object} args.records - A mapping of DOM element IDs to record values (arrays or timestamps) used to update record displays.
+ * @param {string} args.aggregation - The aggregation level (e.g., "Hour") which determines chart label generation.
+ * @param {number} args.pointStart - The starting timestamp for the data points; may be adjusted for hourly charts.
+ * @param {Object} args.results - An object where each key is a year and each value is an array of data points for that year.
+ * @param {number[]} [args.total] - Optional dataset representing total hours recorded, rendered as a line chart if provided.
+ * @param {number} args.dataPoints - The number of data points to generate date labels for the x-axis.
+ * @param {number} args.rate - A data rate value included in the arguments (currently unused in chart rendering).
+ */
 function onChartData(args) {
   if (args.species) {
     showElement(["recordsTableBody"], false);
@@ -4116,6 +4184,19 @@ const awaiting = {
   sv: "Väntar på detektioner",
   zh: "等待检测",
 };
+/**
+ * Updates the UI progress elements during file loading.
+ *
+ * Removes the "invisible" class from the progress indicator, then either displays a localized
+ * loading message (when the "text" flag is provided) or shows the current file's position within the
+ * queue of open files. If a progress value is provided, it calculates the percentage (with one-decimal
+ * precision) and updates the progress bar accordingly.
+ *
+ * @param {Object} args - Object containing details for the progress update.
+ * @param {boolean} [args.text] - When truthy, displays a localized "awaiting" message instead of file count.
+ * @param {File} [args.file] - The file whose loading progress is being updated.
+ * @param {number} [args.progress] - A value between 0 and 1 representing the load progress.
+ */
 function onProgress(args) {
   DOM.progressDiv.classList.remove("invisible");
   if (args.text) {
@@ -4135,6 +4216,15 @@ function onProgress(args) {
   }
 }
 
+/**
+ * Updates the pagination controls based on the total number of items.
+ *
+ * If the total exceeds the configured limit, pagination controls are rendered using the given offset.
+ * Otherwise, all pagination elements are hidden.
+ *
+ * @param {number} total - The total number of items.
+ * @param {number} [offset=STATE.offset] - The starting offset for pagination.
+ */
 function updatePagination(total, offset = STATE.offset) {
   //Pagination
   total > config.limit
@@ -4394,9 +4484,19 @@ function onAnalysisComplete({ quiet }) {
   }
 }
 
-/* 
-    onSummaryComplete is called when getSummary finishes.
-    */
+/**
+ * Finalizes UI updates after summary data retrieval.
+ *
+ * This function updates the summary view with new data and applies filters if specified.
+ * It enhances the summary table by adding pointer and hover effects to species rows, triggers
+ * result sorting when appropriate, assigns provided Audacity labels globally, and toggles
+ * menu item availability based on the summary content and current application state.
+ *
+ * @param {Object} options - An object containing update parameters.
+ * @param {*} [options.filterSpecies] - Optional criteria to filter species in the summary.
+ * @param {Object} [options.audacityLabels={}] - A mapping of labels from Audacity to be applied globally.
+ * @param {Array} [options.summary=[]] - An array of summary records to be used for updating the UI.
+ */
 function onSummaryComplete({
   filterSpecies = undefined,
   audacityLabels = {},
@@ -5136,6 +5236,20 @@ const changeNocmigMode = () => {
   }
 };
 
+/**
+ * Sends a filter request to the worker to process analysis results if the analysis is complete.
+ *
+ * This function posts a "filter" action message to the worker using the provided filtering options,
+ * which include species filtering criteria, a flag to update the results summary, and optional pagination
+ * and range parameters. The filtering is applied only if the analysis has been completed.
+ *
+ * @param {Object} [options={}] - Filter configuration options.
+ * @param {*} [options.species=isSpeciesViewFiltered(true)] - Criteria for filtering by species.
+ * @param {boolean} [options.updateSummary=true] - Flag indicating whether to update the summary after filtering.
+ * @param {number} [options.offset] - Optional starting index for pagination.
+ * @param {number} [options.limit=500] - Maximum number of results to process.
+ * @param {Object} [options.range] - Optional constraints to limit the range of filtered results.
+ */
 function filterResults({
   species = isSpeciesViewFiltered(true),
   updateSummary = true,
@@ -5272,18 +5386,18 @@ diagnosticMenu.addEventListener("click", async function () {
 });
 
 /**
- * Updates the sorting indicators and UI elements for the result filters based on the current global state.
+ * Updates the UI sort indicators based on the current sort configuration.
  *
- * Clones and replaces header elements to reflect active sort orders: toggles visibility of time-related sort icons
- * when the score-based sort is active, applies pointer styles to sort elements, and manages the flipped state based on
- * ascending or descending order for species and metadata sorting. Also, clones and updates summary elements with hover
- * effects to enhance interactivity.
+ * Adjusts the visibility and styling of time, species, and metadata sort icons within the header element
+ * according to the global sort settings. When score-based sorting is active, time icons are hidden while species
+ * icons reflect the sort order by toggling the "flipped" class for ascending order. Metadata sort icons are similarly
+ * updated based on the active metadata sort field and direction. Additionally, the header's background style is
+ * updated, and the summary sort indicator is refreshed via showSummarySortIcon().
  *
  * Global State Dependencies:
- * - STATE.resultsSortOrder: Determines if results are sorted by score and whether the sort is in ascending order.
- * - STATE.resultsMetaSortOrder: Specifies the currently active metadata sort and direction.
- * - DOM.resultHeader: The header element that is cloned and replaced for visual update.
- * - DOM.summaryTable: The table whose species summary elements receive pointer styling.
+ * - STATE.resultsSortOrder: Determines if results are sorted by score and the sort direction.
+ * - STATE.resultsMetaSortOrder: Specifies the active metadata sort field and sort direction.
+ * - DOM.resultHeader: The header element containing sort icons.
  *
  * @returns {void}
  */
@@ -5438,7 +5552,18 @@ function makeDraggable(header) {
     draggable.closest(".modal").addEventListener("hide.bs.modal", stopDrag);
   });
 }
-////////// Date Picker ///////////////
+/**
+ * Initializes and configures the date picker elements for selecting date ranges.
+ *
+ * This function first removes any existing date picker instance stored in the global state,
+ * then defines several preset date ranges (e.g., last night, this week, last month, etc.) based on the
+ * current date. It creates new date pickers for the 'chartRange' and 'exploreRange' DOM elements using the easepick
+ * library with Range, Preset, and Time plugins. Event listeners are attached to handle date selection,
+ * clearing of the selection, button clicks, and visibility changes, updating the global state and communicating
+ * with the worker as needed.
+ *
+ * @remark Relies on global variables (STATE, config, worker) and internationalization via getI18n.
+ */
 
 function initialiseDatePicker() {
   if (STATE.picker) {
@@ -6490,6 +6615,12 @@ function updateList() {
   }
 }
 
+/**
+ * Refreshes the summary display by sending an update request to the worker.
+ *
+ * If audio analysis has completed, this function retrieves the filtered species view and dispatches
+ * an "update-summary" message to the worker with the current species filter.
+ */
 function refreshSummary() {
   const species = isSpeciesViewFiltered(true)
   if (STATE.analysisDone) {
@@ -7281,6 +7412,13 @@ const insertManualRecord = (
   });
 };
 
+/**
+ * Updates the UI to reflect whether a custom frequency filter is active.
+ *
+ * Checks the audio configuration to determine if the frequency range has been altered from its default
+ * (minFrequency > 0 or maxFrequency < 11950). If so, it applies warning styles to the frequency range display
+ * and enables the reset button. Otherwise, it restores the default styling.
+ */
 function checkFilteredFrequency() {
   const resetButton = document.getElementById("reset-spec-frequency");
   if (config.audio.minFrequency > 0 || config.audio.maxFrequency < 11950) {
@@ -8355,13 +8493,18 @@ document.addEventListener("labelsUpdated", (e) => {
 /**
  * Filters and sorts bird labels based on a search query.
  *
- * This function processes a global collection of bird labels by performing a case-insensitive filter based on the provided search string.
- * Each matching label, originally in the format "sname_cname", is split and reversed to yield the common name (`cname`) and the scientific name (`sname`).
- * The returned object includes a `styled` property that formats these names into an HTML string with `<br/>` and `<i>` tags.
- * The resulting list is sorted alphabetically by the common name using locale comparison based on the configuration.
+ * This function filters a list of bird labels—each expected to be in the format "sname_cname"—by performing
+ * a case-insensitive match with the provided search string. For each label that contains the search term, it splits
+ * the label by the underscore, reverses the parts to assign the common name (cname) and scientific name (sname), and
+ * creates a `styled` HTML string that formats the names with a line break and italicized scientific name. The resulting
+ * array is then sorted alphabetically by the common name using locale comparison based on the application's locale
+ * configuration.
  *
- * @param {string} search - A substring used to filter bird labels; if invalid, an empty array is returned.
- * @returns {Array<{cname: string, sname: string, styled: string}>} An array of objects representing filtered and sorted birds.
+ * If the search is empty or not a string, the function returns an empty array.
+ *
+ * @param {string} search - Substring used to filter bird labels.
+ * @param {Array<string>} [list=LABELS] - Optional array of bird labels to filter; each label should be formatted as "sname_cname".
+ * @returns {Array<{cname: string, sname: string, styled: string}>} Array of objects representing filtered and sorted birds.
  */
 function getFilteredBirds(search, list = LABELS) {
   if (!search || typeof search !== 'string') return [];
@@ -8489,6 +8632,15 @@ dropdownCaret.forEach(caret => caret.addEventListener('click', (e) => {
 }));
 
 
+/**
+ * Extracts metadata from a DOM record representing an audio detection and adds it to the global history.
+ *
+ * The function parses details from the record's child elements—such as species information, confidence (or a default value for records lacking a confidence bar), comment, label, and call count—while also determining the record's associated file, row, and table (setting). If a new canonical name is provided via the second argument, it will override the extracted species name in the history entry. The constructed data array is pushed to the global HISTORY. If the record is not part of a table, no history entry is added and undefined is returned.
+ *
+ * @param {HTMLElement} record - The DOM element containing record details.
+ * @param {string} [newCname] - Optional name to override the extracted species name.
+ * @returns {Object|undefined} An object containing properties: species, start, end, confidence, label, callCount, comment, file, row, and setting if the record is within a table; otherwise, undefined.
+ */
 function addToHistory (record, newCname) {
     // prepare the undelete record
     const [file, start, end] = unpackNameAttr(record);
