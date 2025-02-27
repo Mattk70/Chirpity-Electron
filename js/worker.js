@@ -967,12 +967,10 @@ async function savedFileCheck(fileList) {
       const fileSlice = fileList.slice(i, i + batchSize);
 
       // Construct a parameterized query to count matching files in the database
-      const query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${prepParams(
-        fileSlice
-      )})`;
+      const query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${prepParams(fileSlice)})`;
 
       // Execute the query with the slice as parameters
-      const countResult = await diskDB.getAsync(query, fileSlice);
+      const countResult = await diskDB.getAsync(query, ...fileSlice);
       const count = countResult?.count || 0;
 
       if (count < fileSlice.length) {

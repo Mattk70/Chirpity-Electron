@@ -5511,7 +5511,7 @@ document.addEventListener("drop", (event) => {
 
   // For electron 32+
   // const filelist = audioFiles.map(file => window.electron.showFilePath(file));
-  if (filelist.length) filterValidFiles({ filePaths: filelist });
+  if (filelist.length) onOpenFiles({ filePaths: filelist });
 });
 
 // Prevent drag for UI elements
