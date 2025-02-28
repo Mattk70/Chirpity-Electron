@@ -3061,6 +3061,7 @@ const onInsertManualRecord = async ({
           confidence = excluded.confidence, 
           tagID = excluded.tagID,
           comment = excluded.comment,
+          callCount = excluded.callCount,
           reviewed = excluded.reviewed;`,
         dateTime,
         start,
@@ -3070,7 +3071,7 @@ const onInsertManualRecord = async ({
         tagID,
         comment,
         end,
-        parseInt(count),
+        count,
         isDaylight,
         reviewed
       );

@@ -421,14 +421,11 @@ function loadAudioFileSync({ filePath = "", preserveResults = false }) {
     file: filePath,
     preserveResults: preserveResults,
     position: 0,
-    list: config.list, // list and warmup are passed to enable abort if file loaderd during predictions
+    list: config.list, // list and warmup are passed to enable abort if file loaded during predictions
     warmup: config.warmup,
   });
 }
 
-
-// https://developer.chrome.com/blog/play-request-was-interrupted
-let playPromise;
 
 /**
  * Updates the spectrogram visualization and timeline asynchronously.
@@ -456,10 +453,7 @@ async function updateSpec({
   }
   refreshTimeline();
   wavesurfer.seekTo(position);
-  if (play) {
-    try {wavesurfer.play() }
-    catch (e) { console.warn("Wavesurfer error: ", e.message || JSON.stringify(e)) }
-  }
+  if (play) await wavesurfer.play() 
 }
 
 /**
@@ -598,14 +592,27 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
 
   wavesurfer.on("dblclick", centreSpec);
   wavesurfer.on("click", () => REGIONS.clearRegions());
+  wavesurfer.on('ready', () => wavesurfer.isReady = true)
+  wavesurfer.on('pause', () => {
+    const position = wavesurfer.getCurrentTime() / wavesurfer.decodedData.duration;
+    // Pause event fired right before 'finish' event, so 
+    // this is set=== to signal whether it was playing up to that point
+    if (position < 0.998)  wavesurfer.isPaused = true
+})
+
+  wavesurfer.on('play', () => wavesurfer.isPaused = false)
+
 
   wavesurfer.on("finish", function () {
+    console.log('Finish: wavesurfer paused:', wavesurfer.isPaused)
     const bufferEnd = windowOffsetSecs + windowLength;
     activeRegion = null;
     if (currentFileDuration > bufferEnd) {
-      postBufferUpdate({ begin: windowOffsetSecs + windowLength, play: true });
+      wavesurfer.isReady = false
+      postBufferUpdate({ begin: windowOffsetSecs + windowLength, play: !wavesurfer.isPaused });
     }
   });
+
 
   // Show controls
   showElement(["controlsWrapper"]);
@@ -1048,7 +1055,8 @@ function customAnalysisAllMenu(saved) {
   if (saved) {
     analyseAllMenu.innerHTML = `<span class="material-symbols-outlined">upload_file</span> ${STATE.i18n.retrieveAll}
         <span class="shortcut float-end">${modifier}+Shift+A</span>`;
-    enableMenuItem(["reanalyseAll", "explore", "charts"]);
+    enableMenuItem(["reanalyseAll", "charts"]);
+    STATE.mode === "explore" || enableMenuItem(["explore"]);
   } else {
     analyseAllMenu.innerHTML = `<span class="material-symbols-outlined">search</span> ${STATE.i18n.analyseAll[0]}
         <span class="shortcut float-end">${modifier}+Shift+A</span>`;
@@ -1062,7 +1070,8 @@ function customiseAnalysisMenu(saved) {
   if (saved) {
     analyseMenu.innerHTML = `<span class="material-symbols-outlined">upload_file</span> ${STATE.i18n.retrieve}
         <span class="shortcut float-end">${modifier}+A</span>`;
-    enableMenuItem(["reanalyse", "explore", "charts"]);
+    enableMenuItem(["reanalyse", "charts"]);
+    STATE.mode === "explore" || enableMenuItem(["explore"]);
   } else {
     analyseMenu.innerHTML = `<span class="material-symbols-outlined">search</span> ${STATE.i18n.analyse[0]}
         <span class="shortcut float-end">${modifier}+A</span>`;
@@ -1382,7 +1391,7 @@ function analyseReset() {
 }
 
 function isEmptyObject(obj) {
-  for (const i in obj) return false;
+  for (const _ in obj) return false;
   return true;
 }
 
@@ -1670,6 +1679,9 @@ async function showCharts() {
   });
   const locationFilter = await generateLocationList("chart-locations");
   locationFilter.addEventListener("change", handleLocationFilterChange);
+    // Prevent the wavesurfer error
+    spectrogram && spectrogram.destroy();
+    spectrogram = null;
   hideAll();
   showElement(["recordsContainer"]);
   worker.postMessage({
@@ -1679,6 +1691,12 @@ async function showCharts() {
   });
 }
 
+function reInitSpec(){
+  if (wavesurfer && !spectrogram){
+    spectrogram = initSpectrogram(config.specMaxHeight);
+    wavesurfer.registerPlugin(spectrogram);
+  }
+}
 async function showExplore() {
   // Change fileLoaded this one time, so a file will load!
   fileLoaded = true;
@@ -1701,6 +1719,7 @@ async function showExplore() {
   locationFilter.addEventListener("change", handleLocationFilterChange);
   hideAll();
   showElement(["exploreWrapper", "spectrogramWrapper"], false);
+  reInitSpec();
   worker.postMessage({ action: "update-state", filesToAnalyse: [] });
   // Analysis is done
   STATE.analysisDone = true;
@@ -1710,7 +1729,7 @@ async function showExplore() {
   });
   resetResults();
   // Prevent scroll up hiding navbar
-  adjustSpecDims()
+  adjustSpecDims();
 }
 
 async function showAnalyse() {
@@ -1718,9 +1737,13 @@ async function showAnalyse() {
   //Restore STATE
   STATE = { ...STATE, ...STATE.currentAnalysis };
   worker.postMessage({ action: "change-mode", mode: STATE.mode });
+      // Prevent the wavesurfer error
+      spectrogram && spectrogram.destroy();
+      spectrogram = null;
   hideAll();
   if (STATE.currentFile) {
     showElement(["spectrogramWrapper"], false);
+    reInitSpec();
     worker.postMessage({
       action: "update-state",
       filesToAnalyse: STATE.openFiles,
@@ -1905,9 +1928,11 @@ const loadResultRegion = ({
     end: end - windowOffsetSecs,
     label,
   };
+  const position = wavesurfer ? clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1) : 0;
   postBufferUpdate({
-    file: file,
+    file,
     begin: windowOffsetSecs,
+    position,
     goToRegion: true
   });
 };
@@ -2647,7 +2672,6 @@ const setUpWorkerMessaging = () => {
         }
         case "seen-species-list": {
           STATE.seenSpecies = args.list.map(item => item.label)
-          // generateBirdList("seenSpecies", args.list);
           break;
         }
         case "tfjs-node": {
@@ -3391,7 +3415,6 @@ function initRegion() {
 }
 
 function initSpectrogram(height, fftSamples) {
-    fftSamples ??= config.FFT;
   config.debug && console.log("initializing spectrogram");
   spectrogram && spectrogram.destroy() && WSPluginPurge();
   if (!fftSamples) {
@@ -3685,7 +3708,10 @@ function recordUpdate(key){
     const newLabel = assignment.column === 'label' ?  assignment.value : label || '';
     const newComment = assignment.column === 'comment' ?  assignment.value : comment;
     // Save record for undo
-    const {callCount} = addToHistory(activeRow, newCname);
+    const {callCount, confidence} = addToHistory(activeRow, newCname);
+    // If we set a new species, we want to give the record a 2000 confidence
+    // However, if we just add a label or, leave the confidence alone
+    const certainty = assignment.column === 'species' ? 2000 : confidence;
     insertManualRecord(
       newCname,
       parseFloat(start),
@@ -3695,7 +3721,8 @@ function recordUpdate(key){
       newLabel,
       "Update",
       false,
-      cname
+      cname,
+      certainty
     );
   }
 }
@@ -3858,7 +3885,8 @@ const GLOBAL_ACTIONS = {
         windowOffsetSecs -= skip;
         postBufferUpdate({
           begin: windowOffsetSecs,
-          position: (position += skip / windowLength)
+          position: (position += skip / windowLength),
+          play: wavesurfer.isPlaying()
         });
       }
     }
@@ -3866,18 +3894,12 @@ const GLOBAL_ACTIONS = {
   ArrowRight: () => {
     const skip = windowLength / 100;
     if (wavesurfer) {
-      wavesurfer.setTime(wavesurfer.getCurrentTime() + skip);
-      let position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
-      if (wavesurfer.getCurrentTime() > windowLength - skip) {
-        windowOffsetSecs = Math.min(
-          currentFileDuration - windowLength,
-          (windowOffsetSecs += skip)
-        );
-        postBufferUpdate({
-          begin: windowOffsetSecs,
-          position: (position -= skip / windowLength)
-        });
+      const now = wavesurfer.getCurrentTime();
+      if (wavesurfer.isReady){
+        // This will trigger the finish event if at the end of the window
+        wavesurfer.setTime(now + skip);
       }
+      // }
     }
   },
   "=": (e) => e.metaKey || e.ctrlKey ? reduceFFT() : zoomSpec("zoomIn"),
@@ -3885,9 +3907,9 @@ const GLOBAL_ACTIONS = {
   "-": (e) => e.metaKey || e.ctrlKey ? increaseFFT() : zoomSpec("zoomOut"),
   F5:() => reduceFFT(),
   F4: () => increaseFFT(),
-  " ": () => {
+  " ": async () => {
       if (wavesurfer) {
-        try {wavesurfer.playPause() }
+        try {await wavesurfer.playPause() }
         catch (e) { console.warn("Wavesurfer error", error.message || error) }
       }
     }, 
@@ -4121,8 +4143,8 @@ async function onWorkerLoadedAudio({
   const resetSpec = !STATE.currentFile;
   currentFileDuration = fileDuration;
   //if (preserveResults) completeDiv.hide();
-  console.log(
-    `UI received worker-loaded-audio: ${file}, buffered: ${queued === true}`
+  config.debug  && console.log(
+    `UI received worker-loaded-audio: ${file}, buffered: ${queued === true}, play: ${play}`
   );
   // Dismiss a context menu if it's open
   DOM.contextMenu.classList.add("d-none");
@@ -6534,7 +6556,7 @@ document.addEventListener("click", function (e) {
     }
     case "playToggle": {
       if (wavesurfer) {
-        try {wavesurfer.playPause() }
+        try {(async () => {await wavesurfer.playPause()})() }
         catch (e) { console.warn("Wavesurfer error", e.message || JSON.stringify(e)) }
         break;
       }
@@ -7360,7 +7382,7 @@ recordEntryForm.addEventListener("submit", function (e) {
   }
   const originalCname = document.getElementById("original-id").value || cname;
   // Update the region label
-  const count = document.getElementById("call-count")?.value;
+  const count = document.getElementById("call-count")?.valueAsNumber;
   const comment = document.getElementById("record-comment")?.value;
   const select = document.getElementById('label-container').firstChild;
   const label = select.selectedValue;
