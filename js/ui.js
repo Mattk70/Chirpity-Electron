@@ -4860,9 +4860,10 @@ function setClickedIndex(target) {
 }
 
 const deleteRecord = (target) => {
-  if (target instanceof PointerEvent) target = activeRow;
+  if (target === activeRow) {
+  } else if (target instanceof PointerEvent) target = activeRow;
   else {
-    //I'm not sure what triggers this
+    // A batch delete?
     target.forEach((position) => {
       const [start, end] = position;
       worker.postMessage({

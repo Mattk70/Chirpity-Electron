@@ -5033,9 +5033,12 @@ async function convertAndOrganiseFiles(threadLimit) {
   const fileProgressMap = {};
   const conversions = []; // Array to hold the conversion promises
 
-  // Query the files table to get the necessary data
+  // Query the files & records table to get the necessary data
   const rows = await db.allAsync(
-    "SELECT f.id, f.name, f.duration, f.filestart, l.place FROM files f LEFT JOIN locations l ON f.locationID = l.id"
+    `SELECT f.id, f.name, f.duration, f.filestart, l.place FROM files f LEFT JOIN locations l ON f.locationID = l.id
+    WHERE EXISTS (
+      SELECT 1 FROM records r WHERE r.fileID = f.id
+    )`
   );
 
   for (const row of rows) {
