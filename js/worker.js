@@ -5006,6 +5006,21 @@ async function setIncludedIDs(lat, lon, week) {
 
 const pLimit = require("p-limit");
 
+/**
+ * Organizes and converts audio files.
+ *
+ * This asynchronous function verifies that the archive directory exists and is writable before proceeding.
+ * It retrieves file records from the database—optionally filtering to include only those with associated detection
+ * records when library clips mode is active—and computes target output directories based on each file's recording date
+ * and sanitized location. For files that exist and have not already been converted, the function schedules conversion
+ * tasks with a configurable concurrency limit (defaulting to 4), while generating alerts for any encountered issues.
+ * Upon completion of all tasks, it updates the UI with final progress and a summary alert detailing the counts of
+ * successful and failed conversions.
+ *
+ * @param {number} [threadLimit=4] - Maximum number of concurrent file conversion tasks.
+ * @returns {Promise<boolean|undefined>} Resolves to false if the archive directory is missing or unwritable; otherwise,
+ * the promise resolves when all conversion tasks have been processed.
+ */
 async function convertAndOrganiseFiles(threadLimit) {
   // SANITY checks: archive location exists and is writeable?
   if (!fs.existsSync(STATE.archive.location)) {
@@ -5034,7 +5049,7 @@ async function convertAndOrganiseFiles(threadLimit) {
   const conversions = []; // Array to hold the conversion promises
 
   // Query the files & records table to get the necessary data
-  let query = "SELECT f.id, f.name, f.duration, f.filestart, l.place FROM files f LEFT JOIN locations l ON f.locationID = l.id";
+  const query = "SELECT f.id, f.name, f.duration, f.filestart, l.place FROM files f LEFT JOIN locations l ON f.locationID = l.id";
   // If jsut saving files with records
   if (STATE.libraryClips) query += " WHERE EXISTS (SELECT 1 FROM records r WHERE r.fileID = f.id)"
   const rows = await db.allAsync(query);
@@ -5156,26 +5171,22 @@ async function convertAndOrganiseFiles(threadLimit) {
 }
 
 /**
- * Converts an audio file using FFmpeg, optionally trimming the audio and updating file metadata.
+ * Converts an audio file to the target archive format using FFmpeg, with optional trimming.
  *
- * This function processes an input audio file by executing FFmpeg commands with parameters based on global state
- * settings (e.g., STATE.archive.format and STATE.archive.trim). When the target archive format is "ogg", the conversion
- * uses a bitrate of 128k, mono channels, and a sample rate set to 30000 Hz (for BirdNET compatibility). If trimming is
- * enabled, the function computes start and end boundaries, adjusts the audio duration accordingly, and emits warnings
- * if multi-day or all-daylight recordings are detected. Conversion progress is calculated and reported via a progress map.
- * Upon completion, the file's modification time is updated and the associated database record is updated with the new
- * archive name.
+ * The function configures FFmpeg’s encoding parameters based on global settings. When converting to "ogg", it applies
+ * preset audio settings (128k bitrate, mono channel, 30000 Hz sample rate). If trimming is enabled, the function adjusts
+ * the audio duration according to computed start and end boundaries and issues alerts for atypical recording lengths.
+ * Progress is tracked via a provided map, and upon successful conversion, the file’s modification timestamp and
+ * corresponding database record are updated.
  *
- * @param {string} inputFilePath - The path to the input audio file.
- * @param {string} fullFilePath - The full destination path for the converted output file.
- * @param {object} row - An object representing the file's metadata; must include properties such as `id`, `duration`, and `filestart`.
- *                       The `duration` property may be updated if trimming is applied.
- * @param {object} db - The database instance used to update the file record after conversion.
- * @param {string} dbArchiveName - The archive name to be saved in the database for this file.
- * @param {Object.<string, number>} fileProgressMap - A map tracking the conversion progress for files, keyed by file paths.
- * @returns {Promise<void>} A promise that resolves when the conversion and database update are successfully completed.
+ * @param {string} inputFilePath - Path to the input audio file.
+ * @param {string} fullFilePath - Destination path for the converted file.
+ * @param {object} row - File metadata including properties such as `id`, `duration`, and `filestart`; the duration may be updated if trimming is applied.
+ * @param {string} dbArchiveName - Archive name to record in the database.
+ * @param {Object.<string, number>} fileProgressMap - Map tracking conversion progress, keyed by file paths.
+ * @returns {Promise<void>} Resolves when conversion and database updates complete.
  *
- * @throws {Error} Rejects the promise if an error occurs during the FFmpeg conversion process.
+ * @throws {Error} If an error occurs during the FFmpeg conversion process.
  *
  * @example
  * convertFile('/path/to/input.wav', '/path/to/output.ogg', fileRecord, db, 'archive123', progressMap)
