@@ -117,14 +117,15 @@ dist/
 .idea/
 
 # git
-.gitingnore
+.gitignore
 .dockerignore
 Dockerfile
 poetry.lock
 pyproject.toml
 
 scratchpad.txt
-js/animation.html
+js/custom-filter.js
+js/custom-label-filter.html
 /test-results/
 /playwright-report/
 /blob-report/

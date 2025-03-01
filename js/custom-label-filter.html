@@ -22,7 +22,7 @@
       padding: 0.5rem;
     }
     .filter-dropdown label:hover {
-      background-color: #111111;
+      background-color: #dddddd;
       cursor: pointer;
     }
     .label-pill {
@@ -48,7 +48,7 @@
 <div class="container mt-4">
   <h3 id="filter-heading" class="text-primary">Filter by Label</h3>
   <div class="filter-dropdown" id="dropdown">
-    <div class="list-container text-bg-dark">
+    <div class="list-container">
       <label class="d-block">
         <input type="checkbox" id="select-all" class="me-2"> Select All
       </label>
@@ -108,11 +108,11 @@
 
   selectAll.addEventListener("change", () => {
     const checkboxes = labelsContainer.querySelectorAll("input[type='checkbox']");
-    checkboxes.forEach(cb => {
-      cb.checked = selectAll.checked;
-      updateSelection(cb, cb.value);
-    });
-    clearAll.checked = false;
+    if (selectAll.checked) {
+      checkboxes.forEach(cb => cb.checked = selectAll.checked);
+      checkboxes.forEach(cb => updateSelection(cb, cb.value));
+      clearAll.checked = false;
+    }
   });
 
   clearAll.addEventListener("change", () => {
@@ -122,7 +122,6 @@
         cb.checked = false;
         updateSelection(cb, cb.value);
       });
-      clearAll.checked = false;
       selectAll.checked = false;
       selectAll.indeterminate = false;
     }

@@ -3381,13 +3381,13 @@ function initRegion() {
   });
 
   REGIONS.on("region-clicked", function (r, e) {
-    e.stopPropagation()
+    e.stopPropagation();
     // Hide context menu
     DOM.contextMenu.classList.add("d-none");
     if (r.start !== activeRegion?.start){
       setActiveRegion(r);
-      wavesurfer.setTime(r.start);
     }
+    wavesurfer.seekTo(e.clientX / window.innerWidth);
     // If shift key held, clear other regions
     if (e.shiftKey){
       REGIONS.regions.forEach((r) => r.color === STATE.regionColour && r.remove());
