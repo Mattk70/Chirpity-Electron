@@ -604,7 +604,6 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
 
 
   wavesurfer.on("finish", function () {
-    console.log('Finish: wavesurfer paused:', wavesurfer.isPaused)
     const bufferEnd = windowOffsetSecs + windowLength;
     activeRegion = null;
     if (currentFileDuration > bufferEnd) {

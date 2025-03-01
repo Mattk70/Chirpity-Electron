@@ -5034,7 +5034,7 @@ async function convertAndOrganiseFiles(threadLimit) {
   const conversions = []; // Array to hold the conversion promises
 
   // Query the files & records table to get the necessary data
-  const query = "SELECT f.id, f.name, f.duration, f.filestart, l.place FROM files f LEFT JOIN locations l ON f.locationID = l.id";
+  let query = "SELECT f.id, f.name, f.duration, f.filestart, l.place FROM files f LEFT JOIN locations l ON f.locationID = l.id";
   // If jsut saving files with records
   if (STATE.libraryClips) query += " WHERE EXISTS (SELECT 1 FROM records r WHERE r.fileID = f.id)"
   const rows = await db.allAsync(query);
