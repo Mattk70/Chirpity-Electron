@@ -406,12 +406,13 @@ function updateProgress(val) {
 }
 
 /**
- * loadAudioFileSync: Called when user opens a file (just opens first file in multiple files)
- * and when clicking on filename in list of open files.
+ * Loads an audio file by dispatching a file-load request to the worker.
  *
- * @param {*} filePath: full path to file
- * @param {*} preserveResults: whether to clear results when opening file (i.e. don't clear results when clicking file in list of open files)
+ * This function resets the file status and signals the worker to start processing the file.
+ * It is triggered when a user opens a new file or selects a file from the list of open files.
  *
+ * @param {string} filePath - The full filesystem path of the audio file.
+ * @param {boolean} preserveResults - If true, existing analysis results are retained; otherwise, they are cleared.
  */
 function loadAudioFileSync({ filePath = "", preserveResults = false }) {
   fileLoaded = false;
@@ -604,6 +605,7 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
 
 
   wavesurfer.on("finish", function () {
+    console.log('Finish: wavesurfer paused:', wavesurfer.isPaused)
     const bufferEnd = windowOffsetSecs + windowLength;
     activeRegion = null;
     if (currentFileDuration > bufferEnd) {
@@ -1048,6 +1050,13 @@ function renderFilenamePanel() {
   customiseAnalysisMenu(isSaved === "text-info");
 }
 
+/**
+ * Updates the "Analyse All" menu UI based on whether analysis results are saved.
+ *
+ * Sets the menu's icon, label, and shortcut text using a platform-specific modifier (⌘ for Mac, Ctrl otherwise). When results are saved, displays an upload icon with a label to retrieve all analyses, enables the "reanalyseAll" and "charts" menu items, and conditionally enables "explore" if not already active. When not saved, displays a search icon with the appropriate label and disables the "reanalyseAll" menu item.
+ *
+ * @param {boolean} saved - Indicates if the analysis results are saved.
+ */
 function customAnalysisAllMenu(saved) {
   const analyseAllMenu = document.getElementById("analyseAll");
   const modifier = isMac ? "⌘" : "Ctrl";
@@ -1063,6 +1072,13 @@ function customAnalysisAllMenu(saved) {
   }
 }
 
+/**
+ * Customizes the analysis menu based on whether an analysis is saved.
+ *
+ * When the analysis is saved (saved === true), this function updates the menu to display an upload icon and a retrieval label, and it enables the "reanalyse", "charts", and conditionally the "explore" menu items. When the analysis is not saved, it displays a search icon with an analysis label and disables the "reanalyse" menu item.
+ *
+ * @param {boolean} saved - Indicates if the analysis has been saved, determining the menu's appearance and available options.
+ */
 function customiseAnalysisMenu(saved) {
   const modifier = isMac ? "⌘" : "Ctrl";
   const analyseMenu = document.getElementById("analyse");
@@ -1389,11 +1405,24 @@ function analyseReset() {
   DOM.progressDiv.classList.remove("invisible");
 }
 
+/**
+ * Checks if the provided object has no enumerable properties.
+ *
+ * @param {Object} obj - The object to evaluate.
+ * @returns {boolean} True if the object is empty, otherwise false.
+ */
 function isEmptyObject(obj) {
   for (const _ in obj) return false;
   return true;
 }
 
+/**
+ * Refreshes the results view in the UI based on the current file loading state and available predictions.
+ *
+ * When a file is loaded, this function hides all UI elements and then displays the spectrogram wrapper.
+ * If there are prediction results available, it additionally reveals the results table container and results header.
+ * If no file is loaded and there are no open files, all UI elements are hidden.
+ */
 function refreshResultsView() {
   if (fileLoaded) {
     hideAll();
@@ -1658,6 +1687,17 @@ function saveAnalyseState() {
   }
 }
 
+/**
+ * Activates chart visualization mode in the UI.
+ *
+ * This asynchronous function transitions the application into chart mode by saving the current
+ * analysis state, updating menu items to reflect the mode change, and instructing the worker to
+ * adjust its mode and fetch detected species. It sets up a location filter with an associated event
+ * handler, destroys any existing spectrogram to prevent conflicts, and updates the display to show
+ * the records container for chart visualization.
+ *
+ * @async
+ */
 async function showCharts() {
   saveAnalyseState();
   enableMenuItem(["active-analysis", "explore"]);
@@ -1690,12 +1730,27 @@ async function showCharts() {
   });
 }
 
+/**
+ * Reinitializes the spectrogram plugin if it has not been initialized.
+ *
+ * Checks if a global wavesurfer instance exists and the spectrogram is not already set up.
+ * If both conditions are met, it initializes the spectrogram using the configured maximum height
+ * and registers it as a plugin with wavesurfer.
+ */
 function reInitSpec(){
   if (wavesurfer && !spectrogram){
     spectrogram = initSpectrogram(config.specMaxHeight);
     wavesurfer.registerPlugin(spectrogram);
   }
 }
+/**
+ * Prepares the interface for Explore mode by updating UI elements, state flags, and worker messages.
+ *
+ * This asynchronous function sets the file load flag and analysis state, enables and disables appropriate menu items,
+ * and sends corresponding messages to the worker to switch to Explore mode and fetch the detected species list for the current range.
+ * It also awaits the generation of a location filter, attaches a change event listener to it, reinitializes the spectrogram,
+ * resets analysis results, and adjusts the UI layout to prevent scroll issues.
+ */
 async function showExplore() {
   // Change fileLoaded this one time, so a file will load!
   fileLoaded = true;
@@ -1731,6 +1786,18 @@ async function showExplore() {
   adjustSpecDims();
 }
 
+/**
+ * Initiates the audio analysis workflow.
+ *
+ * This asynchronous function restores the previously saved analysis state and configures the UI and worker
+ * process for a new analysis cycle. It disables the active analysis menu item, updates the worker mode,
+ * and destroys any existing spectrogram instance to avoid conflicts. If an audio file is loaded, it
+ * reveals the spectrogram UI, reinitializes the spectrogram, and updates the worker with the current state.
+ * Depending on whether analysis was already completed, it either filters the results or reloads the audio file for analysis.
+ * Finally, it resets the displayed results.
+ *
+ * @async
+ */
 async function showAnalyse() {
   disableMenuItem(["active-analysis"]);
   //Restore STATE
@@ -3413,6 +3480,22 @@ function initRegion() {
   return REGIONS;
 }
 
+/**
+ * Initializes and returns a new spectrogram visualization instance.
+ *
+ * This function destroys any existing spectrogram instance and purges related plugins before creating a new one.
+ * The FFT sample count defaults to the value from configuration (config.FFT) if not provided.
+ * If FFT samples remain unset, they are determined heuristically based on a global window length:
+ *  - 256 samples if the window length is less than 5,
+ *  - 512 samples if the window length is 5 to 15 (inclusive),
+ *  - 1024 samples if the window length is greater than 15.
+ * Likewise, the spectrogram height defaults to half of the FFT sample count if not specified.
+ * A custom colormap is generated and applied along with configured frequency ranges and label settings.
+ *
+ * @param {number} [height] - The height of the spectrogram in pixels. Defaults to fftSamples/2 if not provided.
+ * @param {number} [fftSamples] - The number of FFT samples used for analysis. Defaults to config.FFT or is computed based on window length.
+ * @returns {Object} The initialized spectrogram instance.
+ */
 function initSpectrogram(height, fftSamples) {
   fftSamples ??= config.FFT;
   config.debug && console.log("initializing spectrogram");
@@ -4111,17 +4194,24 @@ function onModelReady(args) {
   if (OS_FILE_QUEUE.length) onOpenFiles({filePaths: OS_FILE_QUEUE}) && OS_FILE_QUEUE.shift()
 }
 
-/***
- *  Called when a new file or buffer is loaded by the worker
- * @param fileStart  Unix epoch in ms for the start of the file
- * @param sourceDuration a float: number of seconds audio in the file
- * @param windowOffsetSecs a float: the start position of the file in seconds
- * @param file full path to the audio file
- * @param position the position to place the play head: between  0-1
- * @param contents the audio buffer
- * @param fileRegion an object {start, end} with the positions in seconds from the beginning of the buffer
- * @param preserveResults boolean determines whether to clear the result table
- * @param play whether to auto-play the audio
+/**
+ * Handles audio data loaded by the worker and updates the UI and application state.
+ *
+ * This function clears loading indicators and any open context menus, assigns the loaded audio buffer
+ * along with its timing and metadata to global state, resets any existing audio regions, and updates
+ * the spectrogram with the new audio data. It also updates the filename display and enables analysis-related
+ * menu options when applicable.
+ *
+ * @param {*} location - Identifier for the source location of the audio.
+ * @param {number} fileStart - Unix epoch time in milliseconds marking the start time of the audio file.
+ * @param {number} fileDuration - Duration of the audio file in seconds.
+ * @param {number} windowBegin - Offset in seconds from the start of the file indicating the beginning of the audio window.
+ * @param {string} file - Full path to the audio file.
+ * @param {number} position - Normalized playhead position (0 to 1) within the audio file.
+ * @param {*} contents - Audio buffer containing the loaded audio data.
+ * @param {boolean} play - Flag indicating whether to automatically play the audio after loading.
+ * @param {boolean} queued - Flag indicating if the audio load was queued.
+ * @param {Object} [metadata] - Optional metadata associated with the audio file.
  * @returns {Promise<void>}
  */
 
