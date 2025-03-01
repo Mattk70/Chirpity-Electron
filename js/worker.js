@@ -5246,7 +5246,7 @@ async function convertFile(
           (err) => {
             if (err) {
               console.error("Error updating the database:", err);
-            } else {
+            } else if (DEBUG) {
               generateAlert({
                 message: "conversionDone",
                 variables: { file: inputFilePath },

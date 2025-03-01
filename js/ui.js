@@ -3415,6 +3415,7 @@ function initRegion() {
 }
 
 function initSpectrogram(height, fftSamples) {
+  fftSamples ??= config.FFT;
   config.debug && console.log("initializing spectrogram");
   spectrogram && spectrogram.destroy() && WSPluginPurge();
   if (!fftSamples) {
@@ -4879,6 +4880,8 @@ const deleteRecord = (target) => {
   }
 
   setClickedIndex(target);
+  // If therre is no row (deleted last record and hit delete again):
+  if (clickedIndex === -1) return
   const {species, start, end, file, row, setting} = addToHistory(target)
 
     worker.postMessage({
