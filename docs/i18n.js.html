@@ -3127,7 +3127,7 @@ async function localiseUI(locale) {
         });
         // placeholholders
         document.getElementById("custom-list-location").setAttribute('placeholder', options['customListPH'])
-        document.getElementById("archive-location").setAttribute('placeholder', options['libraryLocationPH'])
+        document.getElementById("library-location").setAttribute('placeholder', options['libraryLocationPH'])
         // //Explore location header
         document.querySelector("label[for='explore-locations']").textContent = i18nHeadings[locale].location;
         document.getElementById('exploreRange').innerHTML = `&lt;span class="material-symbols-outlined align-bottom">date_range&lt;/span>&lt;span>${localisationData['explore-datefilter']}&lt;/span> &lt;span class="material-symbols-outlined float-end">expand_more&lt;/span>`;

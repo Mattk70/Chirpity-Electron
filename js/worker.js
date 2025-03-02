@@ -5049,11 +5049,13 @@ async function convertAndOrganiseFiles(threadLimit) {
   const conversions = []; // Array to hold the conversion promises
 
   // Query the files & records table to get the necessary data
-  const query = "SELECT f.id, f.name, f.duration, f.filestart, l.place FROM files f LEFT JOIN locations l ON f.locationID = l.id";
-  // If jsut saving files with records
-  if (STATE.libraryClips) query += " WHERE EXISTS (SELECT 1 FROM records r WHERE r.fileID = f.id)"
+  let query = "SELECT DISTINCT f.id, f.name, f.archiveName, f.duration, f.filestart, l.place FROM files f LEFT JOIN locations l ON f.locationID = l.id";
+  // If just saving files with records
+  if (STATE.library.clips) query += " INNER JOIN records r WHERE r.fileID = f.id"
+  t0 = Date.now()
   const rows = await db.allAsync(query);
-
+  console.log(`db query took ${Date.now() - t0}ms`)
+  const ext = "." + STATE.archive.format;
   for (const row of rows) {
     row.place ??= STATE.place;
     const fileDate = new Date(row.filestart);
@@ -5064,27 +5066,13 @@ async function convertAndOrganiseFiles(threadLimit) {
     const inputFilePath = row.name;
     const outputDir = p.join(place, year, month);
     const outputFileName =
-      p.basename(inputFilePath, p.extname(inputFilePath)) +
-      "." +
-      STATE.archive.format;
+      p.basename(inputFilePath, p.extname(inputFilePath)) + ext;
+      
     const fullPath = p.join(STATE.archive.location, outputDir);
     const fullFilePath = p.join(fullPath, outputFileName);
     const dbArchiveName = p.join(outputDir, outputFileName);
 
-    // Does the file we want to convert exist?
-    if (!fs.existsSync(inputFilePath)) {
-      generateAlert({
-        type: "warning",
-        variables: { file: inputFilePath },
-        message: `fileToConvertNotFound`,
-      });
-      continue;
-    }
-
-    const { archiveName } = await db.getAsync(
-      "SELECT archiveName FROM files WHERE name = ?",
-      inputFilePath
-    );
+    const archiveName = row.archiveName;
     if (archiveName === dbArchiveName && fs.existsSync(fullFilePath)) {
       // TODO: just check for the file, if archvive name is null, add archive name to the db (if it is complete)
       DEBUG &&
@@ -5107,6 +5095,15 @@ async function convertAndOrganiseFiles(threadLimit) {
       }
     }
 
+    // Does the file we want to convert exist?
+    if (!fs.existsSync(inputFilePath)) {
+      generateAlert({
+        type: "warning",
+        variables: { file: inputFilePath },
+        message: `fileToConvertNotFound`,
+      });
+      continue;
+    }
     // Add the file conversion to the pool
     fileProgressMap[inputFilePath] = 0;
     conversions.push(

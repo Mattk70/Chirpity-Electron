@@ -1931,13 +1931,14 @@ async function resultClick(e) {
     // 1. clicked and dragged, 2 no detections in file row
     return;
   }
-
   const [file, start, end, _, label] = row.getAttribute("name").split("|");
 
   if (activeRow) activeRow.classList.remove("table-active");
   row.classList.add("table-active");
   activeRow = row;
-  loadResultRegion({ file, start, end, label });
+  if (this.closest('#results')){ // Don't do this after "analyse selection"
+    loadResultRegion({ file, start, end, label });
+  }
   if (e.target.classList.contains("circle")) {
     await waitFor(() => fileLoaded);
     getSelectionResults(true);
@@ -2226,7 +2227,7 @@ function syncConfig(config, defaultConfig) {
 // Set config defaults
 const defaultConfig = {
   newInstallDate: 0,
-  archive: { location: undefined, format: "ogg", auto: false, trim: false },
+  library: { location: undefined, format: "ogg", auto: false, trim: false, clips: false },
   fontScale: 1,
   seenTour: false,
   lastUpdateCheck: 0,
@@ -2494,18 +2495,18 @@ window.onload = async () => {
     place.innerHTML =
       '<span class="material-symbols-outlined">fmd_good</span>' +
       config.location;
-    if (config.archive.location) {
-      document.getElementById("archive-location").value =
-        config.archive.location;
-      document.getElementById("archive-format").value = config.archive.format;
-      document.getElementById("library-trim").checked = config.archive.trim;
-      const autoArchive = document.getElementById("auto-archive");
-      autoArchive.checked = config.archive.auto;
+    if (config.library.location) {
+      document.getElementById("library-location").value =
+        config.library.location;
+      document.getElementById("library-format").value = config.library.format;
+      document.getElementById("library-trim").checked = config.library.trim;
+      const autoArchive = document.getElementById("auto-library");
+      autoArchive.checked = config.library.auto;
     }
     setListUIState(config.list);
     worker.postMessage({
       action: "update-state",
-      archive: config.archive,
+      library: config.library,
       path: appPath,
       temp: tempPath,
       lat: config.latitude,
@@ -2597,7 +2598,7 @@ const setUpWorkerMessaging = () => {
         case "diskDB-has-records": {
           DOM.chartsLink.classList.remove("disabled");
           DOM.exploreLink.classList.remove("disabled");
-          config.archive.location &&
+          config.library.location &&
             document
               .getElementById("compress-and-organise")
               .classList.remove("disabled");
@@ -2637,7 +2638,7 @@ const setUpWorkerMessaging = () => {
           }
           generateToast(args);
           // This is how we know the database update has completed
-          if (args.database && config.archive.auto)
+          if (args.database && config.library.auto)
             document.getElementById("compress-and-organise").click();
           break;
         }
@@ -6257,7 +6258,7 @@ document.addEventListener("click", function (e) {
     // Records menu
     case "save2db": {
       worker.postMessage({ action: "save2db", file: STATE.currentFile });
-      if (config.archive.auto)
+      if (config.library.auto)
         document.getElementById("compress-and-organise").click();
       break;
     }
@@ -6435,23 +6436,23 @@ document.addEventListener("click", function (e) {
       break;
     }
 
-    case "archive-location-select": {
+    case "library-location-select": {
       (async () => {
         const files = await window.electron.selectDirectory(
-            config.archive.location || ''
+            config.library.location || ''
         );
         if (!files.canceled) {
           const archiveFolder = files.filePaths[0];
-          config.archive.location = archiveFolder;
+          config.library.location = archiveFolder;
           DOM.exploreLink.classList.contains("disabled") ||
             document
               .getElementById("compress-and-organise")
               .classList.remove("disabled");
-          document.getElementById("archive-location").value = archiveFolder;
+          document.getElementById("library-location").value = archiveFolder;
           updatePrefs("config.json", config);
           worker.postMessage({
             action: "update-state",
-            archive: config.archive,
+            library: config.library,
           });
         }
       })();
@@ -6798,23 +6799,27 @@ document.addEventListener("change", function (e) {
         }
         case "iucn-scope": {
           config.detect.iucnScope = element.value;
-          // resetRegions();
           refreshSummary();
           break;
         }
-        case "auto-archive": {
-          config.archive.auto = element.checked;
-          worker.postMessage({ action: "update-state", archive: config.archive });
+        case "auto-library": {
+          config.library.auto = element.checked;
+          worker.postMessage({ action: "update-state", library: config.library });
           break;
         }
         case "library-trim": {
-          config.archive.trim = element.checked;
-          worker.postMessage({ action: "update-state", archive: config.archive });
+          config.library.trim = element.checked;
+          worker.postMessage({ action: "update-state", library: config.library });
           break;
         }
-        case "archive-format": {
-          config.archive.format = document.getElementById("archive-format").value;
-          worker.postMessage({ action: "update-state", archive: config.archive });
+        case "library-format": {
+          config.library.format = document.getElementById("library-format").value;
+          worker.postMessage({ action: "update-state", library: config.library });
+          break;
+        }
+        case "library-clips": {
+          config.library.clips = element.checked;
+          worker.postMessage({ action: "update-state", library: config.library });
           break;
         }
         case "confidenceValue":
@@ -7333,8 +7338,7 @@ async function createContextMenu(e) {
         }
       });
   }
-  if (inSummary || activeRegion.label || hideInSummary) {
-  } else {
+  if (! (inSummary || activeRegion.label || hideInSelection || hideInSummary)) {
     const xc = document.getElementById("context-xc");
     xc.classList.add("d-none");
     contextDelete.classList.add("d-none");
@@ -8418,17 +8422,19 @@ async function membershipCheck() {
       localStorage.setItem('isMember', true);
       localStorage.setItem('memberTimestamp', now);
     } else {
+      config.keyAssignment = {};
       lockedElements.forEach((el) => {
         el.classList.replace("unlocked", "locked");
-        config.specDetections = false; // will need to update when more elements
+        config.specDetections = false; 
         if (el instanceof HTMLSpanElement){
           el.checked = false;
           el.disabled = true;
           el.textContent = "lock";
-        } else {
-          el.classList.remove('locked')
-          el.disabled = true;
-          el instanceof HTMLSelectElement && (el.value = '')
+        } 
+        else {
+          el.classList.remove('locked');
+          if (el instanceof HTMLSelectElement) el.selectedIndex = 0;
+          el.disabled = true;         
         }
       });
       localStorage.setItem('isMember', false);

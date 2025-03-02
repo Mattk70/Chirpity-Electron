@@ -3049,7 +3049,7 @@ async function localiseUI(locale) {
                     spans.length && element.insertBefore(spans[0], element.firstChild);
                     spans.length > 1 && element.appendChild(spans[1])
                 };
-            }
+            } 
         }
         // Update buttons without ID
         const buttons = document.querySelectorAll('button:not([id])')
@@ -3070,6 +3070,14 @@ async function localiseUI(locale) {
                 label.textContent = settings[id]
             }
         })
+        // Padlock items
+        const padlocks = document.querySelectorAll('.padlock')
+        padlocks.forEach(lock => {
+            lock.setAttribute('data-bs-title', localisationData['padlock'][0]);
+            lock.setAttribute('data-bs-content', localisationData['padlock'][1]);
+            const popover = new bootstrap.Popover(lock);
+            popover.update();
+        })
         // Translate settings labels
         const form = document.getElementById('settings');
         const labels = form.querySelectorAll('label, button');
@@ -3086,9 +3094,11 @@ async function localiseUI(locale) {
                 const heading = label.textContent.replace(':', '');
                 // Support multipe headings (locked items)
                 elements.forEach(el => {
-                    el.setAttribute('data-bs-title', heading);
-                    const popover = new bootstrap.Popover(el);
-                    popover.update();
+                    if (el.id){
+                        el.setAttribute('data-bs-title', heading);
+                        const popover = new bootstrap.Popover(el);
+                        popover.update();
+                    }
                 })
             }
         })
@@ -3111,7 +3121,7 @@ async function localiseUI(locale) {
         });
         // placeholholders
         document.getElementById("custom-list-location").setAttribute('placeholder', options['customListPH'])
-        document.getElementById("archive-location").setAttribute('placeholder', options['libraryLocationPH'])
+        document.getElementById("library-location").setAttribute('placeholder', options['libraryLocationPH'])
         // //Explore location header
         document.querySelector("label[for='explore-locations']").textContent = i18nHeadings[locale].location;
         document.getElementById('exploreRange').innerHTML = `<span class="material-symbols-outlined align-bottom">date_range</span><span>${localisationData['explore-datefilter']}</span> <span class="material-symbols-outlined float-end">expand_more</span>`;
