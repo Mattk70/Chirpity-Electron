@@ -124,8 +124,6 @@ poetry.lock
 pyproject.toml
 
 scratchpad.txt
-js/custom-filter.js
-js/custom-label-filter.html
 /test-results/
 /playwright-report/
 /blob-report/

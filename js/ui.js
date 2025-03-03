@@ -12,6 +12,7 @@ import RegionsPlugin from "../node_modules/wavesurfer.js/dist/plugins/regions.es
 import Spectrogram from "../node_modules/wavesurfer.js/dist/plugins/spectrogram.esm.js";
 import TimelinePlugin from "../node_modules/wavesurfer.js/dist/plugins/timeline.esm.js";
 import { CustomSelect } from './custom-select.js';
+import createFilterDropdown from './custom-filter.js';
 import {
   fetchIssuesByLabel,
   renderIssuesInModal,
@@ -61,9 +62,8 @@ function customURLEncode(str) {
 
 // Override console.warn to intercept and track warnings
 console.info = function () {
-  // Call the original console.warn to maintain default behavior
+  // Call the original console.info to maintain default behavior
   originalInfo.apply(console, arguments);
-
   // Track the warning message using your tracking function
   trackEvent(
     config.UUID,
@@ -75,10 +75,7 @@ console.info = function () {
 
 // Override console.warn to intercept and track warnings
 console.warn = function () {
-  // Call the original console.warn to maintain default behavior
   originalWarn.apply(console, arguments);
-
-  // Track the warning message using your tracking function
   trackEvent(
     config.UUID,
     "Warnings",
@@ -89,10 +86,7 @@ console.warn = function () {
 
 // Override console.error to intercept and track errors
 console.error = function () {
-  // Call the original console.error to maintain default behavior
   originalError.apply(console, arguments);
-
-  // Track the error message using your tracking function
   trackEvent(
     config.UUID,
     "Errors",
@@ -4465,6 +4459,8 @@ function onResultsComplete({ active = undefined, select = undefined } = {}) {
   resultsBuffer.textContent = "";
   const table = DOM.resultTable;
   showElement(["resultTableContainer", "resultsHead"], false);
+  document.getElementById('sort-label')
+    .classList.toggle('text-warning', STATE.labelFilters?.length > 0);
   // Set active Row
   if (active) {
     // Refresh node and scroll to active row:
@@ -5542,6 +5538,7 @@ function activateResultSort() {
 
   // Update time sort icons
   [...timeHeadings].forEach((heading) => {
+    heading.classList.toggle("flipped", !sortOrderScore && STATE.resultsSortOrder.includes("ASC"));
     heading.classList.toggle("d-none", sortOrderScore);
     heading.parentNode.classList.add("pointer");
   });
@@ -5549,11 +5546,7 @@ function activateResultSort() {
   // Update species sort icons
   [...speciesHeadings].forEach((heading) => {
     heading.parentNode.classList.add("pointer");
-    if (sortOrderScore && STATE.resultsSortOrder.includes("ASC")) {
-      heading.classList.add("flipped");
-    } else {
-      heading.classList.remove("flipped");
-    }
+    heading.classList.toggle("flipped", sortOrderScore && STATE.resultsSortOrder.includes("ASC"));
     heading.classList.toggle("d-none", !sortOrderScore);
   });
 
@@ -6486,7 +6479,11 @@ document.addEventListener("click", function (e) {
     case "sort-position":
     case "sort-time": {
       if (!PREDICTING) {
-        STATE.resultsSortOrder === "timestamp" || setSortOrder("resultsSortOrder", "timestamp");
+        const sortBy =
+          STATE.resultsSortOrder === "timestamp ASC" 
+          ? "timestamp DESC" 
+          : "timestamp ASC";
+          setSortOrder("resultsSortOrder", sortBy);
       }
       break;
     }
@@ -6685,6 +6682,10 @@ document.addEventListener("click", function (e) {
   }
   if (!target?.startsWith('bird-')) {
     document.querySelectorAll('.suggestions').forEach(list => list.style.display = 'none');
+  }
+  if (!element?.closest('#filter-dropdown')){
+    const dropdown = document.getElementById("filter-dropdown")
+    dropdown?.classList.add("d-none");
   }
   hideConfidenceSlider();
   config.debug && console.log("clicked", target);
@@ -7226,6 +7227,13 @@ function checkForRegion(e, setActive) {
   return region;
 }
 
+
+function filterLabels(e){
+  DOM.contextMenu.classList.add('d-none');
+  const i18n = getI18n(i18nContext)
+  createFilterDropdown(e, STATE.tagsList, STATE.labelColors, STATE.labelFilters, i18n);
+}
+
 /**
  * Creates and displays a custom context menu based on the event target.
  *
@@ -7257,7 +7265,10 @@ async function createContextMenu(e) {
   this.closest("#spectrogramWrapper") && checkForRegion(e, true);
   const i18n = getI18n(i18nContext);
   const target = e.target;
-  if (target.classList.contains("circle") || target.closest("thead")) return;
+  if (target.closest('#sort-label') ) {
+    if (STATE.isMember) filterLabels(e)
+    return 
+  } else if (target.classList.contains("circle") || target.closest("thead")) return;
   let hideInSummary = "",
     hideInSelection = "",
     plural = "";
@@ -7410,7 +7421,6 @@ async function showRecordEntryForm(mode, batch) {
         .textContent
     : activeRegion?.label || ''
   let callCount = "",
-    typeIndex = "",
     commentText = "";
   if (cname && activeRow) {
     // Populate the form with existing values
@@ -7443,20 +7453,21 @@ async function showRecordEntryForm(mode, batch) {
   recordEntryForm.querySelector("#DBmode").value = mode;
   recordEntryForm.querySelector("#batch-mode").value = batch;
   recordEntryForm.querySelector("#original-id").value = cname;
-  //recordEntryForm.querySelector('#record-add').textContent = mode;
+  const labelText = activeRow?.querySelector(".label").textContent
+
   const labels = STATE.tagsList.map(item => item.name);
   const i18nOptions = getI18n(i18nSelect);
   const select = new CustomSelect({
     theme: 'light',
     labels: labels,
     i18n: i18nOptions,
-    preselectedLabel: activeRow?.querySelector(".label").textContent
+    preselectedLabel: labelText
   });
   const container = document.getElementById('label-container');
   container.textContent = '';
   container.appendChild(select);
   recordEntryModalDiv.addEventListener("shown.bs.modal", focusBirdList);
-  recordEntryModal.show();
+  recordEntryModal.show()
 }
 
 recordEntryForm.addEventListener("submit", function (e) {
@@ -8408,7 +8419,6 @@ async function membershipCheck() {
   }
   const MEMBERSHIP_API_ENDPOINT = await window.electron.MEMBERSHIP_API_ENDPOINT();
   return await checkMembership(config.UUID, MEMBERSHIP_API_ENDPOINT).then(([isMember, expiresIn])  =>{
-    console.info(`Version: ${VERSION}. Trial: ${inTrial} subscriber: ${isMember}, All detections: ${config.specDetections}`, expiresIn)
     if (isMember || inTrial) {
       if (expiresIn && expiresIn < 35){ // two weeks 
         generateToast({message:"membershipExpiry", type:"warning", variables: {expiresIn}})
@@ -8439,6 +8449,8 @@ async function membershipCheck() {
       });
       localStorage.setItem('isMember', false);
     }
+    
+    console.info(`Version: ${VERSION}. Trial: ${inTrial} subscriber: ${isMember}, All detections: ${config.specDetections}`, expiresIn)
     return isMember || inTrial
   }).catch(error =>{ // Period of grace
     if (cachedStatus === 'true' && cachedTimestamp && now - cachedTimestamp < oneWeek) {
@@ -8798,6 +8810,7 @@ function addToHistory (record, newCname) {
   }
 }
 
-// const exploreList = document.getElementById('bird-autocomplete-explore');
-// const listContainer = document.getElementById('bird-suggestions-explore');
-// exploreList.addEventListener('input', function () {updateSuggestions(this, listContainer, true)});
+document.addEventListener('filter-labels', (e) => {
+  STATE.labelFilters = e.detail.filters;
+  worker.postMessage({ action: "update-state", labelFilters: STATE.labelFilters }); 
+})

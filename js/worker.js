@@ -907,6 +907,9 @@ async function handleMessage(e) {
           delete STATE.included.birdnet.nocturnal;
       }
       STATE.update(args);
+      if (args.labelFilters) {
+        await Promise.all([getResults(), getSummary(), getTotal()])
+      }
       DEBUG = STATE.debug;
       break;
     }
@@ -1192,7 +1195,7 @@ const prepParams = (list) => "?".repeat(list.length).split("").join(",");
  *   values are pushed to the parameters array.
  * - In "archive" mode, the function creates an SQL condition that filters records by matching either the file's
  *   name or its archiveName against the list obtained from STATE.filesToAnalyse. It also processes file paths
- *   by removing the archive path prefix defined in STATE.archive.location.
+ *   by removing the archive path prefix defined in STATE.library.location.
  * - In "analyse" mode, a file-based filtering condition exists in the code but is currently commented out.
  *
  * @param {Object} [range] - Optional object specifying a date range for filtering records.
@@ -1217,7 +1220,7 @@ function getFileSQLAndParams(range) {
     SQL += ` AND ( file IN  (${fileParams}) `;
     params.push(...STATE.filesToAnalyse);
     SQL += ` OR archiveName IN  (${fileParams}) ) `;
-    const archivePath = STATE.archive.location + p.sep;
+    const archivePath = STATE.library.location + p.sep;
     const archive_names = STATE.filesToAnalyse.map((item) =>
       item.replace(archivePath, "")
     );
@@ -1245,7 +1248,7 @@ const prepSummaryStatement = (included) => {
   const params = [STATE.detect.confidence];
   let summaryStatement = `
     WITH ranked_records AS (
-        SELECT records.dateTime, records.confidence, files.name as file, files.archiveName, cname, sname, COALESCE(callCount, 1) as callCount, speciesID, isDaylight,
+        SELECT records.dateTime, records.confidence, files.name as file, files.archiveName, cname, sname, COALESCE(callCount, 1) as callCount, speciesID, isDaylight, tagID,
         RANK() OVER (PARTITION BY fileID, dateTime ORDER BY records.confidence DESC) AS rank
         FROM records
         JOIN files ON files.id = records.fileID
@@ -1254,6 +1257,10 @@ const prepSummaryStatement = (included) => {
 
   const [SQLtext, fileParams] = getFileSQLAndParams(range);
   (summaryStatement += SQLtext), params.push(...fileParams);
+  if (STATE.labelFilters.length){
+    summaryStatement += ` AND tagID in (${prepParams(STATE.labelFilters)}) `;
+    params.push(...STATE.labelFilters)
+  }
   let not = "";
   if (filtersApplied(included)) {
     if (STATE.list === "birds") {
@@ -1301,13 +1308,17 @@ const getTotal = async ({
       : STATE.globalOffset);
   let SQL = ` WITH MaxConfidencePerDateTime AS (
         SELECT confidence,
-        speciesID, files.name as file,
+        speciesID, files.name as file, tagID,
         RANK() OVER (PARTITION BY fileID, dateTime ORDER BY records.confidence DESC) AS rank
         FROM records 
         JOIN files ON records.fileID = files.id 
         WHERE confidence >= ${STATE.detect.confidence} `;
 
   if (filtersApplied(included)) SQL += ` AND speciesID IN (${included}) `;
+  if (STATE.labelFilters.length){
+    SQL += ` AND tagID in (${prepParams(STATE.labelFilters)}) `;
+    params.push(...STATE.labelFilters)
+  }
   if (STATE.detect.nocmig) SQL += " AND NOT isDaylight";
   if (STATE.locationID) SQL += ` AND locationID =  ${STATE.locationID}`;
   const [SQLtext, fileParams] = getFileSQLAndParams(range);
@@ -1375,7 +1386,10 @@ const prepResultsStatement = (
   // If you're using the memory db, you're either analysing one,  or all of the files
   const [SQLtext, fileParams] = getFileSQLAndParams(range);
   (resultStatement += SQLtext), params.push(...fileParams);
-
+  if (STATE.labelFilters.length){
+    resultStatement += ` AND tagID in (${prepParams(STATE.labelFilters)}) `;
+    params.push(...STATE.labelFilters)
+  }
   if (filtersApplied(included)) {
     resultStatement += ` AND speciesID IN (${prepParams(included)}) `;
     params.push(...included);
@@ -1425,7 +1439,7 @@ const prepResultsStatement = (
   const limitClause = noLimit ? "" : "LIMIT ?  OFFSET ?";
   noLimit || params.push(STATE.limit, offset);
   const metaSort = STATE.resultsMetaSortOrder ? `${STATE.resultsMetaSortOrder}, ` : '';
-  resultStatement += ` ORDER BY ${metaSort} ${STATE.resultsSortOrder}, timestamp ASC ${limitClause} `;
+  resultStatement += ` ORDER BY ${metaSort} ${STATE.resultsSortOrder} ${limitClause} `;
 
   return [resultStatement, params];
 };
@@ -1644,7 +1658,7 @@ async function locateFile(file) {
     file
   );
   if (row?.archiveName) {
-    const fullPathToFile = p.join(STATE.archive.location, row.archiveName);
+    const fullPathToFile = p.join(STATE.library.location, row.archiveName);
     if (fs.existsSync(fullPathToFile)) {
       return fullPathToFile;
     }
@@ -2114,7 +2128,7 @@ async function processAudio(
       remainingTrim = sampleRate * 2 * adjustment;
       start -= adjustment;
     }
-    let currentIndex = 0;
+    let currentIndex = 0, duration = 0, bytesPerSecond = 48_000;
     const audioBuffer = Buffer.allocUnsafe(highWaterMark);
     const additionalFilters = STATE.filters.sendToModel
       ? setAudioFilters()
@@ -2137,12 +2151,10 @@ async function processAudio(
     });
 
     const STREAM = command.pipe();
-    // const test = command.output('d:/test.wav').run()
-    // return
 
     STREAM.on("data", (chunk) => {
       const pid = command.ffmpegProc?.pid;
-
+      duration += chunk.length / bytesPerSecond;
       if (!STATE.processingPaused[pid] && AUDIO_BACKLOG >= MAX_CHUNKS) {
         //console.log(`Backlog for pid: ${pid}`, AUDIO_BACKLOG)
         pauseFfmpeg(command, pid);
@@ -2203,6 +2215,17 @@ async function processAudio(
       }
     });
     STREAM.on("end", () => {
+      const metaDuration = METADATA[file].duration;
+      if (end === metaDuration && duration < metaDuration){
+        // If we have a short file (header duration > processed duration) 
+        // *and* were looking for the whole file, we'll fix # of expected chunks here
+        batchChunksToSend[file] = Math.ceil(duration / (BATCH_SIZE * WINDOW_SIZE));
+        
+        const diff = Math.abs(metaDuration - duration);
+        if (diff > 3) console.warn("File duration mismatch", diff)
+
+        METADATA[file].duration = duration
+      }
       // Handle any remaining data in the buffer
       if (currentIndex > 0) {
         // Check if there's any data left in the buffer
@@ -3965,7 +3988,7 @@ const sendResult = (index, result, fromDBQuery) => {
 const getSavedFileInfo = async (file) => {
   if (diskDB) {
     await dbMutex.lock();
-    const prefix = STATE.archive.location + p.sep;
+    const prefix = STATE.library.location + p.sep;
     // Get rid of archive (library) location prefix
     const archiveFile = file.replace(prefix, "");
     let row = await diskDB
@@ -5023,21 +5046,21 @@ const pLimit = require("p-limit");
  */
 async function convertAndOrganiseFiles(threadLimit) {
   // SANITY checks: archive location exists and is writeable?
-  if (!fs.existsSync(STATE.archive.location)) {
+  if (!fs.existsSync(STATE.library.location)) {
     generateAlert({
       type: "error",
       message: "noArchive",
-      variables: { location: STATE.archive.location },
+      variables: { location: STATE.library.location },
     });
     return false;
   }
   try {
-    fs.accessSync(STATE.archive.location, fs.constants.W_OK);
+    fs.accessSync(STATE.library.location, fs.constants.W_OK);
   } catch {
     generateAlert({
       type: "error",
       message: "noWriteArchive",
-      variables: { location: STATE.archive.location },
+      variables: { location: STATE.library.location },
     });
     return false;
   }
@@ -5055,7 +5078,7 @@ async function convertAndOrganiseFiles(threadLimit) {
   t0 = Date.now()
   const rows = await db.allAsync(query);
   console.log(`db query took ${Date.now() - t0}ms`)
-  const ext = "." + STATE.archive.format;
+  const ext = "." + STATE.library.format;
   for (const row of rows) {
     row.place ??= STATE.place;
     const fileDate = new Date(row.filestart);
@@ -5068,7 +5091,7 @@ async function convertAndOrganiseFiles(threadLimit) {
     const outputFileName =
       p.basename(inputFilePath, p.extname(inputFilePath)) + ext;
       
-    const fullPath = p.join(STATE.archive.location, outputDir);
+    const fullPath = p.join(STATE.library.location, outputDir);
     const fullFilePath = p.join(fullPath, outputFileName);
     const dbArchiveName = p.join(outputDir, outputFileName);
 
@@ -5204,7 +5227,7 @@ async function convertFile(
   return new Promise((resolve, reject) => {
     let command = ffmpeg("file:" + inputFilePath);
 
-    if (STATE.archive.format === "ogg") {
+    if (STATE.library.format === "ogg") {
       command
         .audioBitrate("128k")
         .audioChannels(1) // Set to mono
@@ -5212,7 +5235,7 @@ async function convertFile(
     }
 
     let scaleFactor = 1;
-    if (STATE.archive.trim) {
+    if (STATE.library.trim) {
       if (boundaries.length > 1) {
         generateAlert({
           type: "warning",

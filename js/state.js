@@ -85,7 +85,8 @@ export class State {
       (this.useGUANO = true),
       (this.debug = false),
       (this.fileStartMtime = false),
-      (this.specDetections = false);
+      (this.specDetections = false),
+      (this.labelFilters = []);
   }
 
   update(updates) {
