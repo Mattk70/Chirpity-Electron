@@ -13,6 +13,7 @@ class CustomSelect extends HTMLElement {
         selectLabel: "Select a label",
         addLabel: "Add Label",
         enterNewLabel: "Enter new label",
+        removeLabel: "Remove Label",
         ...i18n // Merge with user-provided i18n options
       };
       // Initialise shared labels/colors if not already set.

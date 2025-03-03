@@ -7349,7 +7349,7 @@ async function createContextMenu(e) {
         }
       });
   }
-  if (! (inSummary || activeRegion.label || hideInSelection || hideInSummary)) {
+  if (! (inSummary || activeRegion?.label || hideInSelection || hideInSummary)) {
     const xc = document.getElementById("context-xc");
     xc.classList.add("d-none");
     contextDelete.classList.add("d-none");
