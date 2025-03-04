@@ -3,6 +3,10 @@ run-name: ${{ github.actor }} is building Chirpity for Intel Mac
 on: 
   - push
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   Build-Chirpity:
     runs-on: macos-13
@@ -117,6 +121,7 @@ jobs:
                         ffmpegProc.kill();\
                       }\
                     }, 5000);' ./node_modules/fluent-ffmpeg/lib/processor.js
+          cat ./node_modules/fluent-ffmpeg/lib/processor.js
         shell: bash
 
       - name: Modify tracking code
@@ -127,17 +132,6 @@ jobs:
       
         shell: bash
 
-      # - name: Install esBuild (for minification)
-      #   run: |
-      #     npm install --save-exact --save-dev esbuild
-      #   shell: bash
-
-      # - name: Minify JavaScript files
-      #   run: |
-      #     npm run minify
-      #   shell: bash
-
-      # Conditional build command for each OS
       - name: Build Electron application
         shell: bash
         env:
