@@ -17,7 +17,7 @@ import { State } from "./state.js";
 import { sqlite3, checkpoint, closeDatabase, Mutex } from "./database.js";
 import { trackEvent as _trackEvent} from "./tracking.js";
 import { extractWaveMetadata } from "./metadata.js";
-
+import ExportFormatter from "./exportFormatter.js";
 let isWin32 = false;
 
 const DATASET = false;
@@ -908,7 +908,8 @@ async function handleMessage(e) {
       }
       STATE.update(args);
       if (args.labelFilters) {
-        await Promise.all([getResults(), getSummary(), getTotal()])
+        const species = args.species;
+        await Promise.all([getResults({species, offset: 0}), getSummary({species}), getTotal({species, offset: 0})])
       }
       DEBUG = STATE.debug;
       break;
@@ -3637,12 +3638,13 @@ const getResults = async ({
     cumulativeOffset = 0;
 
   const formatFunctions = {
-    text: formatCSVValues,
-    eBird: formateBirdValues,
-    Raven: formatRavenValues,
+    text: "formatCSVValues",
+    eBird: "formateBirdValues",
+    Raven: "formatRavenValues",
   };
 
   if (format in formatFunctions) {
+    const formatter = new ExportFormatter(STATE);
     // CSV export. Format the values
     formattedValues = await Promise.all(
       result.map(async (item, index) => {
@@ -3659,7 +3661,7 @@ const getResults = async ({
           }
           item.offset = cumulativeOffset;
         }
-        return await formatFunctions[format](item);
+        return formatter[formatFunctions[format]](item);
       })
     );
 
@@ -3822,155 +3824,6 @@ const getResults = async ({
   }
 };
 
-// Function to format the CSV export
-async function formatCSVValues(obj) {
-  // Create a copy of the original object to avoid modifying it directly
-  const modifiedObj = { ...obj };
-  // Get lat and lon
-  const result = await STATE.db.getAsync(
-    `
-        SELECT lat, lon, place 
-        FROM files JOIN locations on locations.id = files.locationID 
-        WHERE files.name = ? `,
-    modifiedObj.file
-  );
-  const latitude = result?.lat || STATE.lat;
-  const longitude = result?.lon || STATE.lon;
-  const place = result?.place || STATE.place;
-  modifiedObj.score /= 1000;
-  modifiedObj.score = modifiedObj.score.toString().replace(/^2$/, "confirmed");
-  // Step 2: Multiply 'end' by 1000 and add 'timestamp'
-  modifiedObj.end =
-    (modifiedObj.end - modifiedObj.position) * 1000 + modifiedObj.timestamp;
-
-  // Step 3: Convert 'timestamp' and 'end' to a formatted string
-  modifiedObj.timestamp = formatDate(modifiedObj.timestamp);
-  modifiedObj.end = formatDate(modifiedObj.end);
-  // Create a new object with the right headers
-  const newObj = {};
-  newObj["File"] = modifiedObj.file;
-  newObj["Detection start"] = modifiedObj.timestamp;
-  newObj["Detection end"] = modifiedObj.end;
-  newObj["Common name"] = modifiedObj.cname;
-  newObj["Latin name"] = modifiedObj.sname;
-  newObj["Confidence"] = modifiedObj.score;
-  newObj["Label"] = modifiedObj.label;
-  newObj["Comment"] = modifiedObj.comment;
-  newObj["Call count"] = modifiedObj.callCount;
-  newObj["File offset"] = secondsToHHMMSS(modifiedObj.position);
-  newObj["Start (s)"] = modifiedObj.position;
-  newObj["Latitude"] = latitude;
-  newObj["Longitude"] = longitude;
-  newObj["Place"] = place;
-  return newObj;
-}
-
-// Function to format the eBird export
-async function formateBirdValues(obj) {
-  // Create a copy of the original object to avoid modifying it directly
-  const modifiedObj = { ...obj };
-  // Get lat and lon
-  const result = await STATE.db.getAsync(
-    `
-        SELECT lat, lon, place 
-        FROM files JOIN locations on locations.id = files.locationID 
-        WHERE files.name = ? `,
-    modifiedObj.file
-  );
-  const latitude = result?.lat || STATE.lat;
-  const longitude = result?.lon || STATE.lon;
-  const place = result?.place || STATE.place;
-  modifiedObj.timestamp = formatDate(modifiedObj.filestart);
-  let [date, time] = modifiedObj.timestamp.split(" ");
-  const [year, month, day] = date.split("-");
-  date = `${month}/${day}/${year}`;
-  const [hours, minutes] = time.split(":");
-  time = `${hours}:${minutes}`;
-  if (STATE.model === "chirpity") {
-    // Regular expression to match the words inside parentheses
-    const regex = /\(([^)]+)\)/;
-    const matches = modifiedObj.cname.match(regex);
-    // Splitting the input string based on the regular expression match
-    const [name, calltype] = modifiedObj.cname.split(regex);
-    modifiedObj.cname = name.trim(); // Output: "words words"
-    modifiedObj.comment ??= calltype;
-  }
-  const [genus, species] = modifiedObj.sname.split(" ");
-  // Create a new object with the right keys
-  const newObj = {};
-  newObj["Common name"] = modifiedObj.cname;
-  newObj["Genus"] = genus;
-  newObj["Species"] = species;
-  newObj["Species Count"] = modifiedObj.callCount || 1;
-  newObj["Species Comments"] = modifiedObj.comment?.replace(/\r?\n/g, " ");
-  newObj["Location Name"] = place;
-  newObj["Latitude"] = latitude;
-  newObj["Longitude"] = longitude;
-  newObj["Date"] = date;
-  newObj["Start Time"] = time;
-  newObj["State/Province"] = "";
-  newObj["Country"] = "";
-  newObj["Protocol"] = "Stationary";
-  newObj["Number of observers"] = "1";
-  newObj["Duration"] = Math.ceil(modifiedObj.duration / 60);
-  newObj["All observations reported?"] = "N";
-  newObj["Distance covered"] = "";
-  newObj["Area covered"] = "";
-  newObj["Submission Comments"] =
-    "Submission initially generated from Chirpity";
-  return newObj;
-}
-
-function formatRavenValues(obj) {
-  // Create a copy of the original object to avoid modifying it directly
-  const modifiedObj = { ...obj };
-
-  if (STATE.model === "chirpity") {
-    // Regular expression to match the words inside parentheses
-    const regex = /\(([^)]+)\)/;
-    const matches = modifiedObj.cname.match(regex);
-    // Splitting the input string based on the regular expression match
-    const [name, _calltype] = modifiedObj.cname.split(regex);
-    modifiedObj.cname = name.trim(); // Output: "words words"
-  }
-  // Create a new object with the right keys
-  const newObj = {};
-  newObj["Selection"] = modifiedObj.selection;
-  newObj["View"] = "Spectrogram 1";
-  newObj["Channel"] = 1;
-  newObj["Begin Time (s)"] = modifiedObj.position + modifiedObj.offset;
-  newObj["End Time (s)"] = modifiedObj.end + modifiedObj.offset;
-  newObj["Low Freq (Hz)"] = 0;
-  newObj["High Freq (Hz)"] = 15000;
-  newObj["Common Name"] = modifiedObj.cname;
-  newObj["Confidence"] = modifiedObj.score / 1000;
-  newObj["Begin Path"] = modifiedObj.file;
-  newObj["File Offset (s)"] = modifiedObj.position;
-  return newObj;
-}
-
-function secondsToHHMMSS(seconds) {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const remainingSeconds = seconds % 60;
-
-  const HH = String(hours).padStart(2, "0");
-  const MM = String(minutes).padStart(2, "0");
-  const SS = String(remainingSeconds).padStart(2, "0");
-
-  return `${HH}:${MM}:${SS}`;
-}
-
-const formatDate = (timestamp) => {
-  const date = new Date(timestamp);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  const seconds = String(date.getSeconds()).padStart(2, "0");
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-};
 
 const sendResult = (index, result, fromDBQuery) => {
   // Convert confidence back to % value

@@ -1554,10 +1554,6 @@ async function fetchLocationAddress(lat, lon, pushLocations) {
 
 // Menu bar functions
 
-function exitApplication() {
-  window.close();
-}
-
 function enableMenuItem(id_list) {
   id_list.forEach((id) => {
     document.getElementById(id).classList.remove("disabled");
@@ -1622,16 +1618,7 @@ async function batchExportAudio() {
     : generateToast({ type: "warning", message: "mustFilterSpecies" });
 }
 
-const export2CSV = () =>
-  exportData("text", isSpeciesViewFiltered(true), Infinity);
-const exporteBird = () =>
-  exportData("eBird", isSpeciesViewFiltered(true), Infinity);
-const exportRaven = () =>
-  exportData("Raven", isSpeciesViewFiltered(true), Infinity);
-const exportAudacity = () =>
-  exportData("Audacity", isSpeciesViewFiltered(true), Infinity);
-
-async function exportData(format, species, limit, duration) {
+async function exportData(format, species = isSpeciesViewFiltered(true), limit = Infinity, duration) {
   const defaultPath = localStorage.getItem("lastFolder") || '';
   const response = await window.electron.selectDirectory(defaultPath);
   if (!response.canceled) {
@@ -1647,7 +1634,7 @@ async function exportData(format, species, limit, duration) {
       limit: limit,
       range: isExplore() ? STATE.explore.range : undefined,
     });
-    localStorage.setItem("lastFolder", p.dirname(directory));
+    localStorage.setItem("lastFolder", directory);
   }
 }
 
@@ -4421,6 +4408,7 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
   old_summary.appendChild(fragment);
 
   showSummarySortIcon();
+  setAutocomplete(selectedRow ? filterSpecies : '')
   // scroll to the selected species
   if (selectedRow) {
     const table = document.getElementById("resultSummary");
@@ -4461,11 +4449,13 @@ function onResultsComplete({ active = undefined, select = undefined } = {}) {
   showElement(["resultTableContainer", "resultsHead"], false);
   const labelSort = document.getElementById('sort-label')
   labelSort.classList.toggle('text-warning', STATE.labelFilters?.length > 0);
-  const span = document.createElement('span');
-  span.className = "material-symbols-outlined fs-6";
-  span.textContent = "menu_open";
-  labelSort.appendChild(span)
-  span.classList.add(`${STATE.isMember?'text-muted': 'locked'}`)
+  if (!labelSort.querySelector('span.fs-6')){
+    const span = document.createElement('span');
+    span.className = "material-symbols-outlined fs-6";
+    span.textContent = "menu_open";
+    labelSort.appendChild(span)
+    span.classList.add(`${STATE.isMember?'text-muted': 'locked'}`)
+  }
   // Set active Row
   if (active) {
     // Refresh node and scroll to active row:
@@ -4669,7 +4659,7 @@ pagination.forEach((item) => {
             filteredOffset: { [species]: offset },
           })
         : worker.postMessage({ action: "update-state", globalOffset: offset });
-      filterResults({ offset: offset, limit: limit });
+      filterResults({ offset: offset, limit: limit, updateSummary: false });
       resetResults({
         clearSummary: false,
         clearPagination: false,
@@ -4688,7 +4678,7 @@ const addPagination = (total, offset) => {
     if (i === 1) {
       list +=
         i === currentPage
-          ? '<li class="page-item disabled"><span class="page-link" href="#">Previous</span></li>'
+          ? '<li class="page-item disabled"><a class="page-link" href="#">Previous</a></li>'
           : '<li class="page-item"><a class="page-link" href="#">Previous</a></li>';
     }
     if (
@@ -4698,20 +4688,20 @@ const addPagination = (total, offset) => {
     ) {
       list +=
         i === currentPage
-          ? '<li class="page-item active" aria-current="page"><span class="page-link" href="#">' +
+          ? '<li class="page-item active" aria-current="page"><a class="page-link" href="#">' +
             i +
-            "</span></li>"
+            "</a></li>"
           : '<li class="page-item"><a class="page-link" href="#">' +
             i +
             "</a></li>";
     } else if (i === 3 || i === pages - 3) {
       list +=
-        '<li class="page-item disabled"><span class="page-link" href="#">...</span></li>';
+        '<li class="page-item disabled"><a class="page-link" href="#">...</a></li>';
     }
     if (i === pages) {
       list +=
         i === currentPage
-          ? '<li class="page-item disabled"><span class="page-link" href="#">Next</span></li>'
+          ? '<li class="page-item disabled"><a class="page-link" href="#">Next</a></li>'
           : '<li class="page-item"><a class="page-link" href="#">Next</a></li>';
     }
   }
@@ -4739,7 +4729,7 @@ const addPagination = (total, offset) => {
  */
 function speciesFilter(e) {
   if (!STATE.regionsCompleted || PREDICTING || ["TBODY", "TH", "DIV"].includes(e.target.tagName)) return; // on Drag or clicked header
-  let species, range;
+  let species;
   // Am I trying to unfilter?
   if (e.target.closest("tr").classList.contains("text-warning")) {
     e.target.closest("tr").classList.remove("text-warning");
@@ -4752,11 +4742,7 @@ function speciesFilter(e) {
     // Clicked on unfiltered species
     species = getSpecies(e.target);
   }
-  if (isExplore()) {
-    range = STATE.explore.range;
-    const autoComplete = document.getElementById('bird-autocomplete-explore')
-    autoComplete.value = species || "";
-  }
+  setAutocomplete(species)
   filterResults({ updateSummary: false });
   resetResults({
     clearSummary: false,
@@ -4764,6 +4750,14 @@ function speciesFilter(e) {
     clearResults: false,
   });
 }
+
+function setAutocomplete(species){
+  if (isExplore()) {
+    const autoComplete = document.getElementById('bird-autocomplete-explore')
+    autoComplete.value = species || "";
+  }
+}
+
 
 /**
  * Renders a detection result into the results table while managing table headers, pagination, and UI updates.
@@ -6194,16 +6188,9 @@ function playRegion() {
 // Audio preferences:
 
 const showRelevantAudioQuality = () => {
-  if (["mp3", "opus", "aac"].includes(config.audio.format)) {
-    DOM.audioBitrateContainer.classList.remove("d-none");
-    DOM.audioQualityContainer.classList.add("d-none");
-  } else if (config.audio.format === "flac") {
-    DOM.audioQualityContainer.classList.remove("d-none");
-    DOM.audioBitrateContainer.classList.add("d-none");
-  } else {
-    DOM.audioQualityContainer.classList.add("d-none");
-    DOM.audioBitrateContainer.classList.add("d-none");
-  }
+  const { format } = config.audio;
+  DOM.audioBitrateContainer.classList.toggle("d-none", !["mp3", "opus", "aac"].includes(format));
+  DOM.audioQualityContainer.classList.toggle("d-none", format !== "flac");
 };
 
 document.addEventListener("click", function (e) {
@@ -6221,19 +6208,19 @@ document.addEventListener("click", function (e) {
       break;
     }
     case "saveLabels": {
-      exportAudacity();
+      exportData('Audacity');
       break;
     }
     case "saveCSV": {
-      export2CSV();
+      exportData("text");
       break;
     }
     case "save-eBird": {
-      exporteBird();
+      exportData('eBird');
       break;
     }
     case "save-Raven": {
-      exportRaven();
+      exportData('Raven');
       break;
     }
     case "export-audio": {
@@ -6241,7 +6228,7 @@ document.addEventListener("click", function (e) {
       break;
     }
     case "exit": {
-      exitApplication();
+      window.close();
       break;
     }
 
@@ -8817,5 +8804,5 @@ function addToHistory (record, newCname) {
 
 document.addEventListener('filter-labels', (e) => {
   STATE.labelFilters = e.detail.filters;
-  worker.postMessage({ action: "update-state", labelFilters: STATE.labelFilters }); 
+  worker.postMessage({ action: "update-state", labelFilters: STATE.labelFilters, species: isSpeciesViewFiltered(true) }); 
 })
