@@ -4,6 +4,11 @@ on:
   push:
     branches:
         - 'master'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   Build-Chirpity:
     runs-on: ${{ matrix.os }}
@@ -62,7 +67,7 @@ jobs:
           echo "BINARY=$BINARY" >> $GITHUB_ENV
           
       - name: Overwrite FFmpeg binary
-        if: runner.os == 'MacOS'
+        if: runner.os == 'macOS'
         run: |
           echo "copying  ./build/$PLATFORM/$BINARY to ./node_modules/@ffmpeg-installer/$PLATFORM/$BINARY"
           cp ./build/$PLATFORM/$BINARY ./node_modules/@ffmpeg-installer/$PLATFORM/$BINARY
@@ -70,16 +75,9 @@ jobs:
 
       - name: Modify fluent-ffmpeg processor.js
         run: |
-          sed -i -e '/^\s*setTimeout(function() {/,/}, 20);/c\
-                    setTimeout(function() {\
-                      if (ffmpegProc.exitCode === null){\
-                        emitEnd(new Error('\''Output stream closed'\''));\
-                        ffmpegProc.kill();\
-                      }\
-                    }, 5000);' ./node_modules/fluent-ffmpeg/lib/processor.js
-      
-          # uncomment to view changed file
-          #cat ./node_modules/fluent-ffmpeg/lib/processor.js
+          sed -i.bak 's/, 20);/, 5000);/' ./node_modules/fluent-ffmpeg/lib/processor.js && rm -f ./node_modules/fluent-ffmpeg/lib/processor.js.bak
+          # uncomment below to view changed file
+          cat ./node_modules/fluent-ffmpeg/lib/processor.js
         shell: bash
 
       - name: Modify tracking code
@@ -141,7 +139,7 @@ jobs:
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             npm run build
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            npx electron-builder --mac  -p always
+            npm run export
           else
             npx electron-builder build --linux --x64  -p always
           fi

@@ -17,7 +17,7 @@ import { State } from "./state.js";
 import { sqlite3, checkpoint, closeDatabase, Mutex } from "./database.js";
 import { trackEvent as _trackEvent} from "./tracking.js";
 import { extractWaveMetadata } from "./metadata.js";
-
+import ExportFormatter from "./exportFormatter.js";
 let isWin32 = false;
 
 const DATASET = false;
@@ -907,6 +907,10 @@ async function handleMessage(e) {
           delete STATE.included.birdnet.nocturnal;
       }
       STATE.update(args);
+      if (args.labelFilters) {
+        const species = args.species;
+        await Promise.all([getResults({species, offset: 0}), getSummary({species}), getTotal({species, offset: 0})])
+      }
       DEBUG = STATE.debug;
       break;
     }
@@ -1192,7 +1196,7 @@ const prepParams = (list) => "?".repeat(list.length).split("").join(",");
  *   values are pushed to the parameters array.
  * - In "archive" mode, the function creates an SQL condition that filters records by matching either the file's
  *   name or its archiveName against the list obtained from STATE.filesToAnalyse. It also processes file paths
- *   by removing the archive path prefix defined in STATE.archive.location.
+ *   by removing the archive path prefix defined in STATE.library.location.
  * - In "analyse" mode, a file-based filtering condition exists in the code but is currently commented out.
  *
  * @param {Object} [range] - Optional object specifying a date range for filtering records.
@@ -1217,7 +1221,7 @@ function getFileSQLAndParams(range) {
     SQL += ` AND ( file IN  (${fileParams}) `;
     params.push(...STATE.filesToAnalyse);
     SQL += ` OR archiveName IN  (${fileParams}) ) `;
-    const archivePath = STATE.archive.location + p.sep;
+    const archivePath = STATE.library.location + p.sep;
     const archive_names = STATE.filesToAnalyse.map((item) =>
       item.replace(archivePath, "")
     );
@@ -1245,7 +1249,7 @@ const prepSummaryStatement = (included) => {
   const params = [STATE.detect.confidence];
   let summaryStatement = `
     WITH ranked_records AS (
-        SELECT records.dateTime, records.confidence, files.name as file, files.archiveName, cname, sname, COALESCE(callCount, 1) as callCount, speciesID, isDaylight,
+        SELECT records.dateTime, records.confidence, files.name as file, files.archiveName, cname, sname, COALESCE(callCount, 1) as callCount, speciesID, isDaylight, tagID,
         RANK() OVER (PARTITION BY fileID, dateTime ORDER BY records.confidence DESC) AS rank
         FROM records
         JOIN files ON files.id = records.fileID
@@ -1254,6 +1258,10 @@ const prepSummaryStatement = (included) => {
 
   const [SQLtext, fileParams] = getFileSQLAndParams(range);
   (summaryStatement += SQLtext), params.push(...fileParams);
+  if (STATE.labelFilters.length){
+    summaryStatement += ` AND tagID in (${prepParams(STATE.labelFilters)}) `;
+    params.push(...STATE.labelFilters)
+  }
   let not = "";
   if (filtersApplied(included)) {
     if (STATE.list === "birds") {
@@ -1301,13 +1309,17 @@ const getTotal = async ({
       : STATE.globalOffset);
   let SQL = ` WITH MaxConfidencePerDateTime AS (
         SELECT confidence,
-        speciesID, files.name as file,
+        speciesID, files.name as file, tagID,
         RANK() OVER (PARTITION BY fileID, dateTime ORDER BY records.confidence DESC) AS rank
         FROM records 
         JOIN files ON records.fileID = files.id 
         WHERE confidence >= ${STATE.detect.confidence} `;
 
   if (filtersApplied(included)) SQL += ` AND speciesID IN (${included}) `;
+  if (STATE.labelFilters.length){
+    SQL += ` AND tagID in (${prepParams(STATE.labelFilters)}) `;
+    params.push(...STATE.labelFilters)
+  }
   if (STATE.detect.nocmig) SQL += " AND NOT isDaylight";
   if (STATE.locationID) SQL += ` AND locationID =  ${STATE.locationID}`;
   const [SQLtext, fileParams] = getFileSQLAndParams(range);
@@ -1375,7 +1387,10 @@ const prepResultsStatement = (
   // If you're using the memory db, you're either analysing one,  or all of the files
   const [SQLtext, fileParams] = getFileSQLAndParams(range);
   (resultStatement += SQLtext), params.push(...fileParams);
-
+  if (STATE.labelFilters.length){
+    resultStatement += ` AND tagID in (${prepParams(STATE.labelFilters)}) `;
+    params.push(...STATE.labelFilters)
+  }
   if (filtersApplied(included)) {
     resultStatement += ` AND speciesID IN (${prepParams(included)}) `;
     params.push(...included);
@@ -1425,7 +1440,7 @@ const prepResultsStatement = (
   const limitClause = noLimit ? "" : "LIMIT ?  OFFSET ?";
   noLimit || params.push(STATE.limit, offset);
   const metaSort = STATE.resultsMetaSortOrder ? `${STATE.resultsMetaSortOrder}, ` : '';
-  resultStatement += ` ORDER BY ${metaSort} ${STATE.resultsSortOrder}, timestamp ASC ${limitClause} `;
+  resultStatement += ` ORDER BY ${metaSort} ${STATE.resultsSortOrder} ${limitClause} `;
 
   return [resultStatement, params];
 };
@@ -1644,7 +1659,7 @@ async function locateFile(file) {
     file
   );
   if (row?.archiveName) {
-    const fullPathToFile = p.join(STATE.archive.location, row.archiveName);
+    const fullPathToFile = p.join(STATE.library.location, row.archiveName);
     if (fs.existsSync(fullPathToFile)) {
       return fullPathToFile;
     }
@@ -2114,7 +2129,7 @@ async function processAudio(
       remainingTrim = sampleRate * 2 * adjustment;
       start -= adjustment;
     }
-    let currentIndex = 0;
+    let currentIndex = 0, duration = 0, bytesPerSecond = 48_000;
     const audioBuffer = Buffer.allocUnsafe(highWaterMark);
     const additionalFilters = STATE.filters.sendToModel
       ? setAudioFilters()
@@ -2137,12 +2152,10 @@ async function processAudio(
     });
 
     const STREAM = command.pipe();
-    // const test = command.output('d:/test.wav').run()
-    // return
 
     STREAM.on("data", (chunk) => {
       const pid = command.ffmpegProc?.pid;
-
+      duration += chunk.length / bytesPerSecond;
       if (!STATE.processingPaused[pid] && AUDIO_BACKLOG >= MAX_CHUNKS) {
         //console.log(`Backlog for pid: ${pid}`, AUDIO_BACKLOG)
         pauseFfmpeg(command, pid);
@@ -2203,6 +2216,17 @@ async function processAudio(
       }
     });
     STREAM.on("end", () => {
+      const metaDuration = METADATA[file].duration;
+      if (end === metaDuration && duration < metaDuration){
+        // If we have a short file (header duration > processed duration) 
+        // *and* were looking for the whole file, we'll fix # of expected chunks here
+        batchChunksToSend[file] = Math.ceil(duration / (BATCH_SIZE * WINDOW_SIZE));
+        
+        const diff = Math.abs(metaDuration - duration);
+        if (diff > 3) console.warn("File duration mismatch", diff)
+
+        METADATA[file].duration = duration
+      }
       // Handle any remaining data in the buffer
       if (currentIndex > 0) {
         // Check if there's any data left in the buffer
@@ -3614,12 +3638,13 @@ const getResults = async ({
     cumulativeOffset = 0;
 
   const formatFunctions = {
-    text: formatCSVValues,
-    eBird: formateBirdValues,
-    Raven: formatRavenValues,
+    text: "formatCSVValues",
+    eBird: "formateBirdValues",
+    Raven: "formatRavenValues",
   };
 
   if (format in formatFunctions) {
+    const formatter = new ExportFormatter(STATE);
     // CSV export. Format the values
     formattedValues = await Promise.all(
       result.map(async (item, index) => {
@@ -3636,7 +3661,7 @@ const getResults = async ({
           }
           item.offset = cumulativeOffset;
         }
-        return await formatFunctions[format](item);
+        return formatter[formatFunctions[format]](item);
       })
     );
 
@@ -3799,155 +3824,6 @@ const getResults = async ({
   }
 };
 
-// Function to format the CSV export
-async function formatCSVValues(obj) {
-  // Create a copy of the original object to avoid modifying it directly
-  const modifiedObj = { ...obj };
-  // Get lat and lon
-  const result = await STATE.db.getAsync(
-    `
-        SELECT lat, lon, place 
-        FROM files JOIN locations on locations.id = files.locationID 
-        WHERE files.name = ? `,
-    modifiedObj.file
-  );
-  const latitude = result?.lat || STATE.lat;
-  const longitude = result?.lon || STATE.lon;
-  const place = result?.place || STATE.place;
-  modifiedObj.score /= 1000;
-  modifiedObj.score = modifiedObj.score.toString().replace(/^2$/, "confirmed");
-  // Step 2: Multiply 'end' by 1000 and add 'timestamp'
-  modifiedObj.end =
-    (modifiedObj.end - modifiedObj.position) * 1000 + modifiedObj.timestamp;
-
-  // Step 3: Convert 'timestamp' and 'end' to a formatted string
-  modifiedObj.timestamp = formatDate(modifiedObj.timestamp);
-  modifiedObj.end = formatDate(modifiedObj.end);
-  // Create a new object with the right headers
-  const newObj = {};
-  newObj["File"] = modifiedObj.file;
-  newObj["Detection start"] = modifiedObj.timestamp;
-  newObj["Detection end"] = modifiedObj.end;
-  newObj["Common name"] = modifiedObj.cname;
-  newObj["Latin name"] = modifiedObj.sname;
-  newObj["Confidence"] = modifiedObj.score;
-  newObj["Label"] = modifiedObj.label;
-  newObj["Comment"] = modifiedObj.comment;
-  newObj["Call count"] = modifiedObj.callCount;
-  newObj["File offset"] = secondsToHHMMSS(modifiedObj.position);
-  newObj["Start (s)"] = modifiedObj.position;
-  newObj["Latitude"] = latitude;
-  newObj["Longitude"] = longitude;
-  newObj["Place"] = place;
-  return newObj;
-}
-
-// Function to format the eBird export
-async function formateBirdValues(obj) {
-  // Create a copy of the original object to avoid modifying it directly
-  const modifiedObj = { ...obj };
-  // Get lat and lon
-  const result = await STATE.db.getAsync(
-    `
-        SELECT lat, lon, place 
-        FROM files JOIN locations on locations.id = files.locationID 
-        WHERE files.name = ? `,
-    modifiedObj.file
-  );
-  const latitude = result?.lat || STATE.lat;
-  const longitude = result?.lon || STATE.lon;
-  const place = result?.place || STATE.place;
-  modifiedObj.timestamp = formatDate(modifiedObj.filestart);
-  let [date, time] = modifiedObj.timestamp.split(" ");
-  const [year, month, day] = date.split("-");
-  date = `${month}/${day}/${year}`;
-  const [hours, minutes] = time.split(":");
-  time = `${hours}:${minutes}`;
-  if (STATE.model === "chirpity") {
-    // Regular expression to match the words inside parentheses
-    const regex = /\(([^)]+)\)/;
-    const matches = modifiedObj.cname.match(regex);
-    // Splitting the input string based on the regular expression match
-    const [name, calltype] = modifiedObj.cname.split(regex);
-    modifiedObj.cname = name.trim(); // Output: "words words"
-    modifiedObj.comment ??= calltype;
-  }
-  const [genus, species] = modifiedObj.sname.split(" ");
-  // Create a new object with the right keys
-  const newObj = {};
-  newObj["Common name"] = modifiedObj.cname;
-  newObj["Genus"] = genus;
-  newObj["Species"] = species;
-  newObj["Species Count"] = modifiedObj.callCount || 1;
-  newObj["Species Comments"] = modifiedObj.comment?.replace(/\r?\n/g, " ");
-  newObj["Location Name"] = place;
-  newObj["Latitude"] = latitude;
-  newObj["Longitude"] = longitude;
-  newObj["Date"] = date;
-  newObj["Start Time"] = time;
-  newObj["State/Province"] = "";
-  newObj["Country"] = "";
-  newObj["Protocol"] = "Stationary";
-  newObj["Number of observers"] = "1";
-  newObj["Duration"] = Math.ceil(modifiedObj.duration / 60);
-  newObj["All observations reported?"] = "N";
-  newObj["Distance covered"] = "";
-  newObj["Area covered"] = "";
-  newObj["Submission Comments"] =
-    "Submission initially generated from Chirpity";
-  return newObj;
-}
-
-function formatRavenValues(obj) {
-  // Create a copy of the original object to avoid modifying it directly
-  const modifiedObj = { ...obj };
-
-  if (STATE.model === "chirpity") {
-    // Regular expression to match the words inside parentheses
-    const regex = /\(([^)]+)\)/;
-    const matches = modifiedObj.cname.match(regex);
-    // Splitting the input string based on the regular expression match
-    const [name, _calltype] = modifiedObj.cname.split(regex);
-    modifiedObj.cname = name.trim(); // Output: "words words"
-  }
-  // Create a new object with the right keys
-  const newObj = {};
-  newObj["Selection"] = modifiedObj.selection;
-  newObj["View"] = "Spectrogram 1";
-  newObj["Channel"] = 1;
-  newObj["Begin Time (s)"] = modifiedObj.position + modifiedObj.offset;
-  newObj["End Time (s)"] = modifiedObj.end + modifiedObj.offset;
-  newObj["Low Freq (Hz)"] = 0;
-  newObj["High Freq (Hz)"] = 15000;
-  newObj["Common Name"] = modifiedObj.cname;
-  newObj["Confidence"] = modifiedObj.score / 1000;
-  newObj["Begin Path"] = modifiedObj.file;
-  newObj["File Offset (s)"] = modifiedObj.position;
-  return newObj;
-}
-
-function secondsToHHMMSS(seconds) {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const remainingSeconds = seconds % 60;
-
-  const HH = String(hours).padStart(2, "0");
-  const MM = String(minutes).padStart(2, "0");
-  const SS = String(remainingSeconds).padStart(2, "0");
-
-  return `${HH}:${MM}:${SS}`;
-}
-
-const formatDate = (timestamp) => {
-  const date = new Date(timestamp);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  const seconds = String(date.getSeconds()).padStart(2, "0");
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-};
 
 const sendResult = (index, result, fromDBQuery) => {
   // Convert confidence back to % value
@@ -3965,7 +3841,7 @@ const sendResult = (index, result, fromDBQuery) => {
 const getSavedFileInfo = async (file) => {
   if (diskDB) {
     await dbMutex.lock();
-    const prefix = STATE.archive.location + p.sep;
+    const prefix = STATE.library.location + p.sep;
     // Get rid of archive (library) location prefix
     const archiveFile = file.replace(prefix, "");
     let row = await diskDB
@@ -5023,21 +4899,21 @@ const pLimit = require("p-limit");
  */
 async function convertAndOrganiseFiles(threadLimit) {
   // SANITY checks: archive location exists and is writeable?
-  if (!fs.existsSync(STATE.archive.location)) {
+  if (!fs.existsSync(STATE.library.location)) {
     generateAlert({
       type: "error",
       message: "noArchive",
-      variables: { location: STATE.archive.location },
+      variables: { location: STATE.library.location },
     });
     return false;
   }
   try {
-    fs.accessSync(STATE.archive.location, fs.constants.W_OK);
+    fs.accessSync(STATE.library.location, fs.constants.W_OK);
   } catch {
     generateAlert({
       type: "error",
       message: "noWriteArchive",
-      variables: { location: STATE.archive.location },
+      variables: { location: STATE.library.location },
     });
     return false;
   }
@@ -5049,11 +4925,13 @@ async function convertAndOrganiseFiles(threadLimit) {
   const conversions = []; // Array to hold the conversion promises
 
   // Query the files & records table to get the necessary data
-  const query = "SELECT f.id, f.name, f.duration, f.filestart, l.place FROM files f LEFT JOIN locations l ON f.locationID = l.id";
-  // If jsut saving files with records
-  if (STATE.libraryClips) query += " WHERE EXISTS (SELECT 1 FROM records r WHERE r.fileID = f.id)"
+  let query = "SELECT DISTINCT f.id, f.name, f.archiveName, f.duration, f.filestart, l.place FROM files f LEFT JOIN locations l ON f.locationID = l.id";
+  // If just saving files with records
+  if (STATE.library.clips) query += " INNER JOIN records r WHERE r.fileID = f.id"
+  t0 = Date.now()
   const rows = await db.allAsync(query);
-
+  console.log(`db query took ${Date.now() - t0}ms`)
+  const ext = "." + STATE.library.format;
   for (const row of rows) {
     row.place ??= STATE.place;
     const fileDate = new Date(row.filestart);
@@ -5064,27 +4942,13 @@ async function convertAndOrganiseFiles(threadLimit) {
     const inputFilePath = row.name;
     const outputDir = p.join(place, year, month);
     const outputFileName =
-      p.basename(inputFilePath, p.extname(inputFilePath)) +
-      "." +
-      STATE.archive.format;
-    const fullPath = p.join(STATE.archive.location, outputDir);
+      p.basename(inputFilePath, p.extname(inputFilePath)) + ext;
+      
+    const fullPath = p.join(STATE.library.location, outputDir);
     const fullFilePath = p.join(fullPath, outputFileName);
     const dbArchiveName = p.join(outputDir, outputFileName);
 
-    // Does the file we want to convert exist?
-    if (!fs.existsSync(inputFilePath)) {
-      generateAlert({
-        type: "warning",
-        variables: { file: inputFilePath },
-        message: `fileToConvertNotFound`,
-      });
-      continue;
-    }
-
-    const { archiveName } = await db.getAsync(
-      "SELECT archiveName FROM files WHERE name = ?",
-      inputFilePath
-    );
+    const archiveName = row.archiveName;
     if (archiveName === dbArchiveName && fs.existsSync(fullFilePath)) {
       // TODO: just check for the file, if archvive name is null, add archive name to the db (if it is complete)
       DEBUG &&
@@ -5107,6 +4971,15 @@ async function convertAndOrganiseFiles(threadLimit) {
       }
     }
 
+    // Does the file we want to convert exist?
+    if (!fs.existsSync(inputFilePath)) {
+      generateAlert({
+        type: "warning",
+        variables: { file: inputFilePath },
+        message: `fileToConvertNotFound`,
+      });
+      continue;
+    }
     // Add the file conversion to the pool
     fileProgressMap[inputFilePath] = 0;
     conversions.push(
@@ -5207,7 +5080,7 @@ async function convertFile(
   return new Promise((resolve, reject) => {
     let command = ffmpeg("file:" + inputFilePath);
 
-    if (STATE.archive.format === "ogg") {
+    if (STATE.library.format === "ogg") {
       command
         .audioBitrate("128k")
         .audioChannels(1) // Set to mono
@@ -5215,7 +5088,7 @@ async function convertFile(
     }
 
     let scaleFactor = 1;
-    if (STATE.archive.trim) {
+    if (STATE.library.trim) {
       if (boundaries.length > 1) {
         generateAlert({
           type: "warning",

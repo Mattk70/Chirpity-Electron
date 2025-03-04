@@ -1052,7 +1052,9 @@ const i18nContext = {
         frequency: 'Frequency',
         length: "Region Length",
         plural: 's',
-        gotoTimeOfDay: 'Go to Time', gotoPosition: 'Go to Timecode'
+        gotoTimeOfDay: 'Go to Time', gotoPosition: 'Go to Timecode',
+        selectAll: 'Select all',
+        clearAll: 'Clear all'
     },
     da: {
         lastNight: 'I går nat', thisWeek: 'Denne uge', lastWeek: 'Sidste uge', thisMonth: 'Denne måned', lastMonth: 'Sidste måned', thisYear: 'Dette år', lastYear: 'Sidste år',
@@ -1070,7 +1072,8 @@ const i18nContext = {
         plural: 'er',
         frequency: "Frekvens",
         length: "Regionslængde",
-        gotoTimeOfDay: 'Gå til tid', gotoPosition: 'Gå til tidskode' 
+        gotoTimeOfDay: 'Gå til tid', gotoPosition: 'Gå til tidskode',
+        selectAll: 'Vælg alle', clearAll: 'Ryd alle'
     },
     de: {
         lastNight: 'Letzte Nacht', thisWeek: 'Diese Woche', lastWeek: 'Letzte Woche', thisMonth: 'Dieser Monat', lastMonth: 'Letzter Monat', thisYear: 'Dieses Jahr', lastYear: 'Letztes Jahr',
@@ -1088,7 +1091,9 @@ const i18nContext = {
         plural: 'e',
         frequency: "Frequenz",
         length: "Regionlänge",
-        gotoTimeOfDay: 'Gehe zur Zeit', gotoPosition: 'Gehe zur Zeitcode' 
+        gotoTimeOfDay: 'Gehe zur Zeit', gotoPosition: 'Gehe zur Zeitcode',
+        selectAll: 'Alle auswählen',
+        clearAll: 'Alles löschen'
     },
     es: {
         lastNight: 'Anoche', thisWeek: 'Esta semana', lastWeek: 'La semana pasada', thisMonth: 'Este mes', lastMonth: 'El mes pasado', thisYear: 'Este año', lastYear: 'El año pasado',
@@ -1106,7 +1111,9 @@ const i18nContext = {
         plural: 's',
         frequency: "Frecuencia",
         length: "Longitud de la región",
-        gotoTimeOfDay: 'Ir a la hora', gotoPosition: 'Ir al código de tiempo'
+        gotoTimeOfDay: 'Ir a la hora', gotoPosition: 'Ir al código de tiempo',
+        selectAll: 'Seleccionar todo',
+        clearAll: 'Borrar todo'
     },
     fr: {
         lastNight: 'La nuit dernière', thisWeek: 'Cette semaine', lastWeek: 'La semaine dernière', thisMonth: 'Ce mois-ci', lastMonth: 'Le mois dernier', thisYear: 'Cette année', lastYear: 'L’année dernière',
@@ -1124,7 +1131,9 @@ const i18nContext = {
         plural: 's',
         frequency: "Fréquence",
         length: "Longueur de la région",
-        gotoTimeOfDay: 'Aller à l’heure', gotoPosition: 'Aller au code temporel'
+        gotoTimeOfDay: 'Aller à l’heure', gotoPosition: 'Aller au code temporel',
+        selectAll: 'Tout sélectionner',
+        clearAll: 'Tout effacer'
     },
     ja: {
         lastNight: '昨夜', thisWeek: '今週', lastWeek: '先週', thisMonth: '今月', lastMonth: '先月', thisYear: '今年', lastYear: '昨年',
@@ -1142,7 +1151,9 @@ const i18nContext = {
         plural: '',
         frequency: "周波数",
         length: "領域の長さ",
-        gotoTimeOfDay: '時刻に移動', gotoPosition: 'タイムコードに移動'
+        gotoTimeOfDay: '時刻に移動', gotoPosition: 'タイムコードに移動',
+        selectAll: 'すべて選択',
+        clearAll: 'すべてクリア'
     },
     nl: {
         lastNight: 'Gisteravond', thisWeek: 'Deze week', lastWeek: 'Vorige week', thisMonth: 'Deze maand', lastMonth: 'Vorige maand', thisYear: 'Dit jaar', lastYear: 'Vorig jaar',
@@ -1160,7 +1171,9 @@ const i18nContext = {
         plural: 'en',
         frequency: "Frequentie",
         length: "Regiolengte",
-        gotoTimeOfDay: 'Ga naar tijd', gotoPosition: 'Ga naar tijdcode'
+        gotoTimeOfDay: 'Ga naar tijd', gotoPosition: 'Ga naar tijdcode',
+        selectAll: 'Alles selecteren',
+        clearAll: 'Alles wissen'
     },
     pt: {
         lastNight: 'Ontem à noite', thisWeek: 'Esta semana', lastWeek: 'Semana passada', thisMonth: 'Este mês', lastMonth: 'Mês passado', thisYear: 'Este ano', lastYear: 'Ano passado',
@@ -1178,7 +1191,9 @@ const i18nContext = {
         plural: 's',
         frequency: "Frequência",
         length: "Comprimento da região",
-        gotoTimeOfDay: 'Ir para a hora', gotoPosition: 'Ir para o código de tempo'
+        gotoTimeOfDay: 'Ir para a hora', gotoPosition: 'Ir para o código de tempo',
+        selectAll: 'Selecionar tudo',
+        clearAll: 'Limpar tudo'
     },
     ru: {
         lastNight: 'Прошлой ночью', thisWeek: 'На этой неделе', lastWeek: 'На прошлой неделе', thisMonth: 'В этом месяце', lastMonth: 'В прошлом месяце', thisYear: 'В этом году', lastYear: 'В прошлом году',
@@ -1196,7 +1211,9 @@ const i18nContext = {
         plural: '',
         frequency: "Частота",
         length: "Длина региона",
-        gotoTimeOfDay: 'Перейти ко времени', gotoPosition: 'Перейти к таймкоду'
+        gotoTimeOfDay: 'Перейти ко времени', gotoPosition: 'Перейти к таймкоду',
+        selectAll: 'Выбрать все',
+        clearAll: 'Очистить все'
     },
     sv: {
         lastNight: 'I går kväll', thisWeek: 'Denna vecka', lastWeek: 'Förra veckan', thisMonth: 'Denna månad', lastMonth: 'Förra månaden', thisYear: 'Det här året', lastYear: 'Förra året',
@@ -1214,7 +1231,9 @@ const i18nContext = {
         plural: 'er',
         frequency: "Frekvens",
         length: "Regionlängd",
-        gotoTimeOfDay: 'Gå till tid', gotoPosition: 'Gå till tidkod'
+        gotoTimeOfDay: 'Gå till tid', gotoPosition: 'Gå till tidkod',
+        selectAll: 'Välj alla',
+        clearAll: 'Rensa allt'
     },
     zh: {
         lastNight: '昨晚', thisWeek: '本周', lastWeek: '上周', thisMonth: '本月', lastMonth: '上月', thisYear: '今年', lastYear: '去年',
@@ -1232,7 +1251,9 @@ const i18nContext = {
         plural: '',
         frequency: "频率",
         length: "区域长度",
-        gotoTimeOfDay: '跳转到时间', gotoPosition: '跳转到时间码'
+        gotoTimeOfDay: '跳转到时间', gotoPosition: '跳转到时间码',
+        selectAll: '全选',
+        clearAll: '清除全部'
     }
 };
 
@@ -2929,60 +2950,72 @@ const IUCNLabel = {
 const i18nSelect = {
     en: {
       selectLabel: "Select a label",
-      addLabel: "Create new label", 
-      enterNewLabel: "Enter a new label"
+      addLabel: "Create new label",
+      enterNewLabel: "Enter a new label",
+      removeLabel: "Remove label",
     },
     da: {
       selectLabel: "Vælg en etiket",
       addLabel: "Opret ny etiket",
-      enterNewLabel: "Indtast en ny etiket"
+      enterNewLabel: "Indtast en ny etiket",
+      removeLabel: "Fjern etiket"
     },
     de: {
       selectLabel: "Wähle ein Etikett",
       addLabel: "Erstelle ein neues Etikett",
-      enterNewLabel: "Gib ein neues Etikett ein"
+      enterNewLabel: "Gib ein neues Etikett ein",
+      removeLabel: "Etikett entfernen"
     },
     es: {
       selectLabel: "Selecciona una etiqueta",
       addLabel: "Crea una nueva etiqueta",
-      enterNewLabel: "Introduce una nueva etiqueta"
+      enterNewLabel: "Introduce una nueva etiqueta",
+      removeLabel: "Eliminar etiqueta"
     },
     fr: {
       selectLabel: "Sélectionne une étiquette",
       addLabel: "Crée une nouvelle étiquette",
-      enterNewLabel: "Entre une nouvelle étiquette"
+      enterNewLabel: "Entre une nouvelle étiquette",
+      removeLabel: "Supprimer l'étiquette"
     },
     ja: {
       selectLabel: "ラベルを選択",
       addLabel: "新しいラベルを作成",
-      enterNewLabel: "新しいラベルを入力"
+      enterNewLabel: "新しいラベルを入力",
+      removeLabel: "ラベルを削除"
     },
     nl: {
       selectLabel: "Selecteer een label",
       addLabel: "Maak een nieuw label",
-      enterNewLabel: "Voer een nieuw label in"
+      enterNewLabel: "Voer een nieuw label in",
+      removeLabel: "Label verwijderen"
     },
     pt: {
       selectLabel: "Seleciona uma etiqueta",
       addLabel: "Cria nova etiqueta",
-      enterNewLabel: "Introduz uma nova etiqueta"
+      enterNewLabel: "Introduz uma nova etiqueta",
+      removeLabel: "Remover etiqueta"
     },
     ru: {
       selectLabel: "Выбери метку",
       addLabel: "Создай новую метку",
-      enterNewLabel: "Введи новую метку"
+      enterNewLabel: "Введи новую метку",
+      removeLabel: "Удалить метку"
     },
     sv: {
       selectLabel: "Välj en etikett",
       addLabel: "Skapa ny etikett",
-      enterNewLabel: "Ange en ny etikett"
+      enterNewLabel: "Ange en ny etikett",
+      removeLabel: "Ta bort etikett"
     },
     zh: {
       selectLabel: "选择一个标签",
       addLabel: "创建新标签",
-      enterNewLabel: "输入新标签"
+      enterNewLabel: "输入新标签",
+      removeLabel: "删除标签"
     }
   };
+  
   
 
 /**
@@ -3049,7 +3082,7 @@ async function localiseUI(locale) {
                     spans.length && element.insertBefore(spans[0], element.firstChild);
                     spans.length > 1 && element.appendChild(spans[1])
                 };
-            }
+            } 
         }
         // Update buttons without ID
         const buttons = document.querySelectorAll('button:not([id])')
@@ -3070,6 +3103,14 @@ async function localiseUI(locale) {
                 label.textContent = settings[id]
             }
         })
+        // Padlock items
+        const padlocks = document.querySelectorAll('.padlock')
+        padlocks.forEach(lock => {
+            lock.setAttribute('data-bs-title', localisationData['padlock'][0]);
+            lock.setAttribute('data-bs-content', localisationData['padlock'][1]);
+            const popover = new bootstrap.Popover(lock);
+            popover.update();
+        })
         // Translate settings labels
         const form = document.getElementById('settings');
         const labels = form.querySelectorAll('label, button');
@@ -3086,9 +3127,11 @@ async function localiseUI(locale) {
                 const heading = label.textContent.replace(':', '');
                 // Support multipe headings (locked items)
                 elements.forEach(el => {
-                    el.setAttribute('data-bs-title', heading);
-                    const popover = new bootstrap.Popover(el);
-                    popover.update();
+                    if (el.id){
+                        el.setAttribute('data-bs-title', heading);
+                        const popover = new bootstrap.Popover(el);
+                        popover.update();
+                    }
                 })
             }
         })
@@ -3111,7 +3154,7 @@ async function localiseUI(locale) {
         });
         // placeholholders
         document.getElementById("custom-list-location").setAttribute('placeholder', options['customListPH'])
-        document.getElementById("archive-location").setAttribute('placeholder', options['libraryLocationPH'])
+        document.getElementById("library-location").setAttribute('placeholder', options['libraryLocationPH'])
         // //Explore location header
         document.querySelector("label[for='explore-locations']").textContent = i18nHeadings[locale].location;
         document.getElementById('exploreRange').innerHTML = `<span class="material-symbols-outlined align-bottom">date_range</span><span>${localisationData['explore-datefilter']}</span> <span class="material-symbols-outlined float-end">expand_more</span>`;

@@ -12,6 +12,8 @@ import RegionsPlugin from "../node_modules/wavesurfer.js/dist/plugins/regions.es
 import Spectrogram from "../node_modules/wavesurfer.js/dist/plugins/spectrogram.esm.js";
 import TimelinePlugin from "../node_modules/wavesurfer.js/dist/plugins/timeline.esm.js";
 import { CustomSelect } from './custom-select.js';
+import createFilterDropdown from './custom-filter.js';
+import { Pagination } from "./pagination.js";
 import {
   fetchIssuesByLabel,
   renderIssuesInModal,
@@ -61,9 +63,8 @@ function customURLEncode(str) {
 
 // Override console.warn to intercept and track warnings
 console.info = function () {
-  // Call the original console.warn to maintain default behavior
+  // Call the original console.info to maintain default behavior
   originalInfo.apply(console, arguments);
-
   // Track the warning message using your tracking function
   trackEvent(
     config.UUID,
@@ -75,10 +76,7 @@ console.info = function () {
 
 // Override console.warn to intercept and track warnings
 console.warn = function () {
-  // Call the original console.warn to maintain default behavior
   originalWarn.apply(console, arguments);
-
-  // Track the warning message using your tracking function
   trackEvent(
     config.UUID,
     "Warnings",
@@ -89,10 +87,7 @@ console.warn = function () {
 
 // Override console.error to intercept and track errors
 console.error = function () {
-  // Call the original console.error to maintain default behavior
   originalError.apply(console, arguments);
-
-  // Track the error message using your tracking function
   trackEvent(
     config.UUID,
     "Errors",
@@ -379,8 +374,7 @@ function resetResults({
   clearResults = true,
 } = {}) {
   if (clearSummary) DOM.summaryTable.textContent = "";
-  if (clearPagination)
-    pagination.forEach((item) => item.classList.add("d-none"));
+  if (clearPagination) pagination.hide();
   resultsBuffer = DOM.resultTable.cloneNode(false);
   if (clearResults) {
     DOM.resultTable.textContent = "";
@@ -1095,7 +1089,7 @@ function customiseAnalysisMenu(saved) {
 }
 
 async function generateLocationList(id) {
-  const i18n = i18nAll[config.locale] || i18nAll["en"];
+  const i18n = getI18n(i18nAll);
   const defaultText = id === "savedLocations" ? i18n[0] : i18n[1];
   const el = document.getElementById(id);
   LOCATIONS = undefined;
@@ -1560,10 +1554,6 @@ async function fetchLocationAddress(lat, lon, pushLocations) {
 
 // Menu bar functions
 
-function exitApplication() {
-  window.close();
-}
-
 function enableMenuItem(id_list) {
   id_list.forEach((id) => {
     document.getElementById(id).classList.remove("disabled");
@@ -1628,16 +1618,7 @@ async function batchExportAudio() {
     : generateToast({ type: "warning", message: "mustFilterSpecies" });
 }
 
-const export2CSV = () =>
-  exportData("text", isSpeciesViewFiltered(true), Infinity);
-const exporteBird = () =>
-  exportData("eBird", isSpeciesViewFiltered(true), Infinity);
-const exportRaven = () =>
-  exportData("Raven", isSpeciesViewFiltered(true), Infinity);
-const exportAudacity = () =>
-  exportData("Audacity", isSpeciesViewFiltered(true), Infinity);
-
-async function exportData(format, species, limit, duration) {
+async function exportData(format, species = isSpeciesViewFiltered(true), limit = Infinity, duration) {
   const defaultPath = localStorage.getItem("lastFolder") || '';
   const response = await window.electron.selectDirectory(defaultPath);
   if (!response.canceled) {
@@ -1653,7 +1634,7 @@ async function exportData(format, species, limit, duration) {
       limit: limit,
       range: isExplore() ? STATE.explore.range : undefined,
     });
-    localStorage.setItem("lastFolder", p.dirname(directory));
+    localStorage.setItem("lastFolder", directory);
   }
 }
 
@@ -1927,17 +1908,18 @@ async function resultClick(e) {
       return;
     }
   let row = e.target.closest("tr");
-  if (!row || row.classList.length === 0) {
-    // 1. clicked and dragged, 2 no detections in file row
+  if (!row || row.classList.length === 0 || row.closest('#resultsHead')) {
+    // 1. clicked and dragged, 2 no detections in file row 3. clicked a header
     return;
   }
-
   const [file, start, end, _, label] = row.getAttribute("name").split("|");
 
   if (activeRow) activeRow.classList.remove("table-active");
   row.classList.add("table-active");
   activeRow = row;
-  loadResultRegion({ file, start, end, label });
+  if (this.closest('#results')){ // Don't do this after "analyse selection"
+    loadResultRegion({ file, start, end, label });
+  }
   if (e.target.classList.contains("circle")) {
     await waitFor(() => fileLoaded);
     getSelectionResults(true);
@@ -2226,7 +2208,7 @@ function syncConfig(config, defaultConfig) {
 // Set config defaults
 const defaultConfig = {
   newInstallDate: 0,
-  archive: { location: undefined, format: "ogg", auto: false, trim: false },
+  library: { location: undefined, format: "ogg", auto: false, trim: false, clips: false },
   fontScale: 1,
   seenTour: false,
   lastUpdateCheck: 0,
@@ -2494,18 +2476,18 @@ window.onload = async () => {
     place.innerHTML =
       '<span class="material-symbols-outlined">fmd_good</span>' +
       config.location;
-    if (config.archive.location) {
-      document.getElementById("archive-location").value =
-        config.archive.location;
-      document.getElementById("archive-format").value = config.archive.format;
-      document.getElementById("library-trim").checked = config.archive.trim;
-      const autoArchive = document.getElementById("auto-archive");
-      autoArchive.checked = config.archive.auto;
+    if (config.library.location) {
+      document.getElementById("library-location").value =
+        config.library.location;
+      document.getElementById("library-format").value = config.library.format;
+      document.getElementById("library-trim").checked = config.library.trim;
+      const autoArchive = document.getElementById("auto-library");
+      autoArchive.checked = config.library.auto;
     }
     setListUIState(config.list);
     worker.postMessage({
       action: "update-state",
-      archive: config.archive,
+      library: config.library,
       path: appPath,
       temp: tempPath,
       lat: config.latitude,
@@ -2597,7 +2579,7 @@ const setUpWorkerMessaging = () => {
         case "diskDB-has-records": {
           DOM.chartsLink.classList.remove("disabled");
           DOM.exploreLink.classList.remove("disabled");
-          config.archive.location &&
+          config.library.location &&
             document
               .getElementById("compress-and-organise")
               .classList.remove("disabled");
@@ -2637,7 +2619,7 @@ const setUpWorkerMessaging = () => {
           }
           generateToast(args);
           // This is how we know the database update has completed
-          if (args.database && config.archive.auto)
+          if (args.database && config.library.auto)
             document.getElementById("compress-and-organise").click();
           break;
         }
@@ -4338,10 +4320,9 @@ function onProgress(args) {
  * @param {number} [offset=STATE.offset] - The starting offset for pagination.
  */
 function updatePagination(total, offset = STATE.offset) {
-  //Pagination
   total > config.limit
-    ? addPagination(total, offset)
-    : pagination.forEach((item) => item.classList.add("d-none"));
+    ? pagination.add(total, offset)
+    : pagination.hide();
 }
 
 const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
@@ -4351,7 +4332,7 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
   // if (summary.length){
   let summaryHTML = `
             <table id="resultSummary" class="table table-dark p-1"><thead>
-            <tr class="pointer col-auto">
+            <tr class="pointer col-auto text-nowrap">
             <th id="summary-max" scope="col"><span id="summary-max-icon" class="text-muted material-symbols-outlined summary-sort-icon d-none">sort</span>${
               i18n.max
             }</th>
@@ -4426,6 +4407,7 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
   old_summary.appendChild(fragment);
 
   showSummarySortIcon();
+  setAutocomplete(selectedRow ? filterSpecies : '')
   // scroll to the selected species
   if (selectedRow) {
     const table = document.getElementById("resultSummary");
@@ -4464,6 +4446,15 @@ function onResultsComplete({ active = undefined, select = undefined } = {}) {
   resultsBuffer.textContent = "";
   const table = DOM.resultTable;
   showElement(["resultTableContainer", "resultsHead"], false);
+  const labelSort = document.getElementById('sort-label')
+  labelSort.classList.toggle('text-warning', STATE.labelFilters?.length > 0);
+  if (!labelSort.querySelector('span.fs-6')){
+    const span = document.createElement('span');
+    span.className = "material-symbols-outlined fs-6";
+    span.textContent = "menu_open";
+    labelSort.appendChild(span)
+    span.classList.add(`${STATE.isMember?'text-muted': 'locked'}`)
+  }
   // Set active Row
   if (active) {
     // Refresh node and scroll to active row:
@@ -4642,82 +4633,22 @@ function onSummaryComplete({
   if (STATE.currentFile) enableMenuItem(["analyse"]);
 }
 
-const pagination = document.querySelectorAll(".pagination");
-pagination.forEach((item) => {
-  item.addEventListener("click", (e) => {
-    if (STATE.analysisDone && e.target.tagName === "A") {
-      // Did we click a link in the list?
-      let clicked = e.target.textContent;
-      let currentPage = pagination[0].querySelector(".active");
-      currentPage = parseInt(currentPage.textContent);
-      if (clicked === "Previous") {
-        clicked = currentPage - 1;
-      } else if (clicked === "Next") {
-        clicked = currentPage + 1;
-      } else {
-        clicked = parseInt(clicked);
-      }
-      const limit = config.limit;
-      const offset = (clicked - 1) * limit;
-      // Tell the worker about the new offset
-      const species = isSpeciesViewFiltered(true);
-      species
-        ? worker.postMessage({
-            action: "update-state",
-            filteredOffset: { [species]: offset },
-          })
-        : worker.postMessage({ action: "update-state", globalOffset: offset });
-      filterResults({ offset: offset, limit: limit });
-      resetResults({
-        clearSummary: false,
-        clearPagination: false,
-        clearResults: false,
-      });
-    }
-  });
-});
 
-const addPagination = (total, offset) => {
-  const limit = config.limit;
-  const pages = Math.ceil(total / limit);
-  const currentPage = offset / limit + 1;
-  let list = "";
-  for (let i = 1; i <= pages; i++) {
-    if (i === 1) {
-      list +=
-        i === currentPage
-          ? '<li class="page-item disabled"><span class="page-link" href="#">Previous</span></li>'
-          : '<li class="page-item"><a class="page-link" href="#">Previous</a></li>';
-    }
-    if (
-      i <= 2 ||
-      i > pages - 2 ||
-      (i >= currentPage - 2 && i <= currentPage + 2)
-    ) {
-      list +=
-        i === currentPage
-          ? '<li class="page-item active" aria-current="page"><span class="page-link" href="#">' +
-            i +
-            "</span></li>"
-          : '<li class="page-item"><a class="page-link" href="#">' +
-            i +
-            "</a></li>";
-    } else if (i === 3 || i === pages - 3) {
-      list +=
-        '<li class="page-item disabled"><span class="page-link" href="#">...</span></li>';
-    }
-    if (i === pages) {
-      list +=
-        i === currentPage
-          ? '<li class="page-item disabled"><span class="page-link" href="#">Next</span></li>'
-          : '<li class="page-item"><a class="page-link" href="#">Next</a></li>';
-    }
+
+// Set up pagination
+const pagination = new Pagination(
+  document.querySelector(".pagination"),
+  () => STATE, // Returns the current state
+  () => config, // Returns the current config
+  () => worker,
+  {
+    isSpeciesViewFiltered,
+    filterResults,
+    resetResults
   }
-  pagination.forEach((item) => {
-    item.classList.remove("d-none");
-    item.innerHTML = list;
-  });
-};
+);
+pagination.init();
+
 
 /**
  * Toggles the species filter based on user interaction with the summary table.
@@ -4737,7 +4668,7 @@ const addPagination = (total, offset) => {
  */
 function speciesFilter(e) {
   if (!STATE.regionsCompleted || PREDICTING || ["TBODY", "TH", "DIV"].includes(e.target.tagName)) return; // on Drag or clicked header
-  let species, range;
+  let species;
   // Am I trying to unfilter?
   if (e.target.closest("tr").classList.contains("text-warning")) {
     e.target.closest("tr").classList.remove("text-warning");
@@ -4750,11 +4681,7 @@ function speciesFilter(e) {
     // Clicked on unfiltered species
     species = getSpecies(e.target);
   }
-  if (isExplore()) {
-    range = STATE.explore.range;
-    const autoComplete = document.getElementById('bird-autocomplete-explore')
-    autoComplete.value = species || "";
-  }
+  setAutocomplete(species)
   filterResults({ updateSummary: false });
   resetResults({
     clearSummary: false,
@@ -4762,6 +4689,14 @@ function speciesFilter(e) {
     clearResults: false,
   });
 }
+
+function setAutocomplete(species){
+  if (isExplore()) {
+    const autoComplete = document.getElementById('bird-autocomplete-explore')
+    autoComplete.value = species || "";
+  }
+}
+
 
 /**
  * Renders a detection result into the results table while managing table headers, pagination, and UI updates.
@@ -4806,7 +4741,7 @@ async function renderResult({
       const i18n = getI18n(i18nHeadings);
       // const fragment = new DocumentFragment();
       DOM.resultHeader.innerHTML = `
-                <tr>
+                <tr class="text-nowrap">
                     <th id="sort-time" class="time-sort col text-start timeOfDay" title="${i18n.time[1]}"><span class="text-muted material-symbols-outlined time-sort-icon d-none">sort</span> ${i18n.time[0]}</th>
                     <th id="sort-position" class="time-sort text-start timestamp" title="${i18n.position[1]}"><span class="text-muted material-symbols-outlined time-sort-icon d-none">sort</span> ${i18n.position[0]}</th>
                     <th id="confidence-sort" class="text-start" title="${i18n.species[1]}"><span class="text-muted material-symbols-outlined species-sort-icon d-none">sort</span> ${i18n.species[0]}</th>
@@ -4823,7 +4758,7 @@ async function renderResult({
     if (config.specDetections && !isFromDB && !STATE.selection)
       postBufferUpdate({ file, begin: windowOffsetSecs });
   } else if (!isFromDB && index % (config.limit + 1) === 0) {
-    addPagination(index, 0);
+    pagination.add(index, 0);
   }
   if (!isFromDB && index > config.limit) {
     return;
@@ -4969,7 +4904,7 @@ const deleteRecord = (target) => {
   }
 
   setClickedIndex(target);
-  // If therre is no row (deleted last record and hit delete again):
+  // If there is no row (deleted last record and hit delete again):
   if (clickedIndex === -1) return
   const {species, start, end, file, row, setting} = addToHistory(target)
 
@@ -5541,6 +5476,7 @@ function activateResultSort() {
 
   // Update time sort icons
   [...timeHeadings].forEach((heading) => {
+    heading.classList.toggle("flipped", !sortOrderScore && STATE.resultsSortOrder.includes("ASC"));
     heading.classList.toggle("d-none", sortOrderScore);
     heading.parentNode.classList.add("pointer");
   });
@@ -5548,11 +5484,7 @@ function activateResultSort() {
   // Update species sort icons
   [...speciesHeadings].forEach((heading) => {
     heading.parentNode.classList.add("pointer");
-    if (sortOrderScore && STATE.resultsSortOrder.includes("ASC")) {
-      heading.classList.add("flipped");
-    } else {
-      heading.classList.remove("flipped");
-    }
+    heading.classList.toggle("flipped", sortOrderScore && STATE.resultsSortOrder.includes("ASC"));
     heading.classList.toggle("d-none", !sortOrderScore);
   });
 
@@ -6195,16 +6127,9 @@ function playRegion() {
 // Audio preferences:
 
 const showRelevantAudioQuality = () => {
-  if (["mp3", "opus", "aac"].includes(config.audio.format)) {
-    DOM.audioBitrateContainer.classList.remove("d-none");
-    DOM.audioQualityContainer.classList.add("d-none");
-  } else if (config.audio.format === "flac") {
-    DOM.audioQualityContainer.classList.remove("d-none");
-    DOM.audioBitrateContainer.classList.add("d-none");
-  } else {
-    DOM.audioQualityContainer.classList.add("d-none");
-    DOM.audioBitrateContainer.classList.add("d-none");
-  }
+  const { format } = config.audio;
+  DOM.audioBitrateContainer.classList.toggle("d-none", !["mp3", "opus", "aac"].includes(format));
+  DOM.audioQualityContainer.classList.toggle("d-none", format !== "flac");
 };
 
 document.addEventListener("click", function (e) {
@@ -6222,19 +6147,19 @@ document.addEventListener("click", function (e) {
       break;
     }
     case "saveLabels": {
-      exportAudacity();
+      exportData('Audacity');
       break;
     }
     case "saveCSV": {
-      export2CSV();
+      exportData("text");
       break;
     }
     case "save-eBird": {
-      exporteBird();
+      exportData('eBird');
       break;
     }
     case "save-Raven": {
-      exportRaven();
+      exportData('Raven');
       break;
     }
     case "export-audio": {
@@ -6242,7 +6167,7 @@ document.addEventListener("click", function (e) {
       break;
     }
     case "exit": {
-      exitApplication();
+      window.close();
       break;
     }
 
@@ -6257,7 +6182,7 @@ document.addEventListener("click", function (e) {
     // Records menu
     case "save2db": {
       worker.postMessage({ action: "save2db", file: STATE.currentFile });
-      if (config.archive.auto)
+      if (config.library.auto)
         document.getElementById("compress-and-organise").click();
       break;
     }
@@ -6435,23 +6360,23 @@ document.addEventListener("click", function (e) {
       break;
     }
 
-    case "archive-location-select": {
+    case "library-location-select": {
       (async () => {
         const files = await window.electron.selectDirectory(
-            config.archive.location || ''
+            config.library.location || ''
         );
         if (!files.canceled) {
           const archiveFolder = files.filePaths[0];
-          config.archive.location = archiveFolder;
+          config.library.location = archiveFolder;
           DOM.exploreLink.classList.contains("disabled") ||
             document
               .getElementById("compress-and-organise")
               .classList.remove("disabled");
-          document.getElementById("archive-location").value = archiveFolder;
+          document.getElementById("library-location").value = archiveFolder;
           updatePrefs("config.json", config);
           worker.postMessage({
             action: "update-state",
-            archive: config.archive,
+            library: config.library,
           });
         }
       })();
@@ -6485,7 +6410,11 @@ document.addEventListener("click", function (e) {
     case "sort-position":
     case "sort-time": {
       if (!PREDICTING) {
-        STATE.resultsSortOrder === "timestamp" || setSortOrder("resultsSortOrder", "timestamp");
+        const sortBy =
+          STATE.resultsSortOrder === "timestamp ASC" 
+          ? "timestamp DESC" 
+          : "timestamp ASC";
+          setSortOrder("resultsSortOrder", sortBy);
       }
       break;
     }
@@ -6541,7 +6470,7 @@ document.addEventListener("click", function (e) {
       };
 
       const locale = config.locale;
-      const message = i18n[locale] || i18n["en"];
+      const message = getI18n(i18n);
       if (confirm(message)) {
         const uuid = config.UUID;
         config = defaultConfig;
@@ -6798,23 +6727,27 @@ document.addEventListener("change", function (e) {
         }
         case "iucn-scope": {
           config.detect.iucnScope = element.value;
-          // resetRegions();
           refreshSummary();
           break;
         }
-        case "auto-archive": {
-          config.archive.auto = element.checked;
-          worker.postMessage({ action: "update-state", archive: config.archive });
+        case "auto-library": {
+          config.library.auto = element.checked;
+          worker.postMessage({ action: "update-state", library: config.library });
           break;
         }
         case "library-trim": {
-          config.archive.trim = element.checked;
-          worker.postMessage({ action: "update-state", archive: config.archive });
+          config.library.trim = element.checked;
+          worker.postMessage({ action: "update-state", library: config.library });
           break;
         }
-        case "archive-format": {
-          config.archive.format = document.getElementById("archive-format").value;
-          worker.postMessage({ action: "update-state", archive: config.archive });
+        case "library-format": {
+          config.library.format = document.getElementById("library-format").value;
+          worker.postMessage({ action: "update-state", library: config.library });
+          break;
+        }
+        case "library-clips": {
+          config.library.clips = element.checked;
+          worker.postMessage({ action: "update-state", library: config.library });
           break;
         }
         case "confidenceValue":
@@ -7221,6 +7154,13 @@ function checkForRegion(e, setActive) {
   return region;
 }
 
+
+function filterLabels(e){
+  DOM.contextMenu.classList.add('d-none');
+  const i18n = getI18n(i18nContext)
+  createFilterDropdown(e, STATE.tagsList, STATE.labelColors, STATE.labelFilters, i18n);
+}
+
 /**
  * Creates and displays a custom context menu based on the event target.
  *
@@ -7252,7 +7192,10 @@ async function createContextMenu(e) {
   this.closest("#spectrogramWrapper") && checkForRegion(e, true);
   const i18n = getI18n(i18nContext);
   const target = e.target;
-  if (target.classList.contains("circle") || target.closest("thead")) return;
+  if (target.closest('#sort-label') ) {
+    if (STATE.isMember) filterLabels(e)
+    return 
+  } else if (target.classList.contains("circle") || target.closest("thead")) return;
   let hideInSummary = "",
     hideInSelection = "",
     plural = "";
@@ -7333,8 +7276,7 @@ async function createContextMenu(e) {
         }
       });
   }
-  if (inSummary || activeRegion.label || hideInSummary) {
-  } else {
+  if (! (inSummary || activeRegion?.label || hideInSelection || hideInSummary)) {
     const xc = document.getElementById("context-xc");
     xc.classList.add("d-none");
     contextDelete.classList.add("d-none");
@@ -7406,7 +7348,6 @@ async function showRecordEntryForm(mode, batch) {
         .textContent
     : activeRegion?.label || ''
   let callCount = "",
-    typeIndex = "",
     commentText = "";
   if (cname && activeRow) {
     // Populate the form with existing values
@@ -7439,20 +7380,21 @@ async function showRecordEntryForm(mode, batch) {
   recordEntryForm.querySelector("#DBmode").value = mode;
   recordEntryForm.querySelector("#batch-mode").value = batch;
   recordEntryForm.querySelector("#original-id").value = cname;
-  //recordEntryForm.querySelector('#record-add').textContent = mode;
+  const labelText = activeRow?.querySelector(".label").textContent
+
   const labels = STATE.tagsList.map(item => item.name);
   const i18nOptions = getI18n(i18nSelect);
   const select = new CustomSelect({
     theme: 'light',
     labels: labels,
     i18n: i18nOptions,
-    preselectedLabel: activeRow?.querySelector(".label").textContent
+    preselectedLabel: labelText
   });
   const container = document.getElementById('label-container');
   container.textContent = '';
   container.appendChild(select);
   recordEntryModalDiv.addEventListener("shown.bs.modal", focusBirdList);
-  recordEntryModal.show();
+  recordEntryModal.show()
 }
 
 recordEntryForm.addEventListener("submit", function (e) {
@@ -7521,7 +7463,7 @@ const insertManualRecord = (
     DBaction: action,
     batch: batch,
     confidence: confidence,
-    position: { row: activeRow?.rowIndex - 1, page: getCurrentPage() }, //  have to account for the header row
+    position: { row: activeRow?.rowIndex - 1, page: pagination.getCurrentPage() }, //  have to account for the header row
     speciesFiltered: isSpeciesViewFiltered(true),
     reviewed
   });
@@ -7545,12 +7487,6 @@ function checkFilteredFrequency() {
     resetButton.classList.remove("btn-warning");
     resetButton.classList.add("btn-secondary", "disabled");
   }
-}
-
-function getCurrentPage() {
-  let currentPage = pagination[0].querySelector(".active");
-  currentPage = currentPage ? parseInt(currentPage.textContent) : 1;
-  return currentPage;
 }
 
 async function locateFile(file) {
@@ -8404,7 +8340,6 @@ async function membershipCheck() {
   }
   const MEMBERSHIP_API_ENDPOINT = await window.electron.MEMBERSHIP_API_ENDPOINT();
   return await checkMembership(config.UUID, MEMBERSHIP_API_ENDPOINT).then(([isMember, expiresIn])  =>{
-    console.info(`Version: ${VERSION}. Trial: ${inTrial} subscriber: ${isMember}, All detections: ${config.specDetections}`, expiresIn)
     if (isMember || inTrial) {
       if (expiresIn && expiresIn < 35){ // two weeks 
         generateToast({message:"membershipExpiry", type:"warning", variables: {expiresIn}})
@@ -8418,21 +8353,25 @@ async function membershipCheck() {
       localStorage.setItem('isMember', true);
       localStorage.setItem('memberTimestamp', now);
     } else {
+      config.keyAssignment = {};
       lockedElements.forEach((el) => {
         el.classList.replace("unlocked", "locked");
-        config.specDetections = false; // will need to update when more elements
+        config.specDetections = false; 
         if (el instanceof HTMLSpanElement){
           el.checked = false;
           el.disabled = true;
           el.textContent = "lock";
-        } else {
-          el.classList.remove('locked')
-          el.disabled = true;
-          el instanceof HTMLSelectElement && (el.value = '')
+        } 
+        else {
+          el.classList.remove('locked');
+          if (el instanceof HTMLSelectElement) el.selectedIndex = 0;
+          el.disabled = true;         
         }
       });
       localStorage.setItem('isMember', false);
     }
+    
+    console.info(`Version: ${VERSION}. Trial: ${inTrial} subscriber: ${isMember}, All detections: ${config.specDetections}`, expiresIn)
     return isMember || inTrial
   }).catch(error =>{ // Period of grace
     if (cachedStatus === 'true' && cachedTimestamp && now - cachedTimestamp < oneWeek) {
@@ -8792,6 +8731,7 @@ function addToHistory (record, newCname) {
   }
 }
 
-// const exploreList = document.getElementById('bird-autocomplete-explore');
-// const listContainer = document.getElementById('bird-suggestions-explore');
-// exploreList.addEventListener('input', function () {updateSuggestions(this, listContainer, true)});
+document.addEventListener('filter-labels', (e) => {
+  STATE.labelFilters = e.detail.filters;
+  worker.postMessage({ action: "update-state", labelFilters: STATE.labelFilters, species: isSpeciesViewFiltered(true) }); 
+})

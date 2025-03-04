@@ -75,16 +75,18 @@ export class State {
       (this.UUID = 0),
       (this.track = true),
       (this.powerSaveBlocker = false),
-      (this.archive = {
+      (this.library = {
         location: undefined,
         format: "ogg",
         auto: false,
         trim: false,
+        clips: false,
       }),
       (this.useGUANO = true),
       (this.debug = false),
       (this.fileStartMtime = false),
-      (this.specDetections = false);
+      (this.specDetections = false),
+      (this.labelFilters = []);
   }
 
   update(updates) {

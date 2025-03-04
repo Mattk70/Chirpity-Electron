@@ -13,6 +13,7 @@ class CustomSelect extends HTMLElement {
         selectLabel: "Select a label",
         addLabel: "Add Label",
         enterNewLabel: "Enter new label",
+        removeLabel: "Remove Label",
         ...i18n // Merge with user-provided i18n options
       };
       // Initialise shared labels/colors if not already set.
@@ -331,8 +332,24 @@ class CustomSelect extends HTMLElement {
       this.renderLabels();
     }
   
+    addRemoveButton(){
+        // Clear selection option
+        const clearOption = document.createElement("label");
+        clearOption.textContent = this._i18n.removeLabel;
+        clearOption.className = `btn btn-sm btn-outline-${this.theme[1]} add-label-btn w-75`;
+        clearOption.style.cursor = "pointer";
+        this.labelOptions.insertBefore(clearOption, this.labelOptions.firstChild);
+        clearOption.onclick = () => {
+          this.preselectedLabel = null;
+          this.render()
+        };
+    }
     renderLabels() {
       this.labelOptions.innerHTML = "";
+      if (this.preselectedLabel){
+        this.addRemoveButton()
+      }
+
       CustomSelect.sharedLabels.forEach((label, index) => {
         const colorClass = `text-bg-${CustomSelect.sharedColors[index % CustomSelect.sharedColors.length]}`;
         const itemContainer = document.createElement("div");
@@ -397,6 +414,7 @@ class CustomSelect extends HTMLElement {
     selectLabel(label, colorClass) {
       this.selectedLabelBtn.textContent = label;
       this.selectedLabelBtn.className = `btn btn-sm ${colorClass} rounded-pill w-100 selected-label`;
+      this.addRemoveButton()
       this.dropdownList.style.display = "none";
       this.dispatchEvent(new CustomEvent("change", {
         detail: { value: this.selectedValue },
