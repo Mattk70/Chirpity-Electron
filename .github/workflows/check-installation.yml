@@ -141,7 +141,7 @@ jobs:
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             npm run build
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            npx electron-builder --mac  -p always
+            npm run export
           else
             npx electron-builder build --linux --x64  -p always
           fi

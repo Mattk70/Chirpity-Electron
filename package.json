@@ -11,7 +11,7 @@
     "preAppImage": "node prebuild.js",
     "prebuild-mac-x64-pkg": "node prebuild.js",
     "minify": "esbuild ./js/*.js --minify --sourcemap --outdir=./js --allow-overwrite",
-    "export": "electron-builder build --m ",
+    "export": "electron-builder build --m -p always",
     "build-mac-x64-pkg": "electron-builder --mac pkg --x64 --config.mac.target=pkg -p always",
     "AppImage": "electron-builder build --linux --x64  -p always",
     "build": "electron-builder --win --x64 -p always",
