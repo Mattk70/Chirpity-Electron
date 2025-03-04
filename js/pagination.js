@@ -18,9 +18,8 @@ export class Pagination {
     if (!state.analysisDone || e.target.tagName !== "A") return;
 
     let clicked = e.target.textContent;
-    let currentPage = parseInt(
-      this.container.querySelector(".active").textContent
-    );
+    const activeElement = this.container.querySelector(".active");
+    let currentPage = activeElement ? parseInt(activeElement.textContent) : 1;
 
     if (clicked === "Previous") {
       clicked = currentPage - 1;
