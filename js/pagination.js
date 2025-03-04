@@ -96,4 +96,8 @@ export class Pagination {
       this.container.classList.add("d-none");
     }
   }
+  getCurrentPage(){
+    let currentPage = this.container.querySelector('.active');
+    return currentPage ? parseInt(currentPage.textContent) : 1;
+  }
 }

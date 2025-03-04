@@ -4320,7 +4320,6 @@ function onProgress(args) {
  * @param {number} [offset=STATE.offset] - The starting offset for pagination.
  */
 function updatePagination(total, offset = STATE.offset) {
-  //Pagination
   total > config.limit
     ? pagination.add(total, offset)
     : pagination.hide();
@@ -7464,7 +7463,7 @@ const insertManualRecord = (
     DBaction: action,
     batch: batch,
     confidence: confidence,
-    position: { row: activeRow?.rowIndex - 1, page: getCurrentPage() }, //  have to account for the header row
+    position: { row: activeRow?.rowIndex - 1, page: pagination.getCurrentPage() }, //  have to account for the header row
     speciesFiltered: isSpeciesViewFiltered(true),
     reviewed
   });
@@ -7488,12 +7487,6 @@ function checkFilteredFrequency() {
     resetButton.classList.remove("btn-warning");
     resetButton.classList.add("btn-secondary", "disabled");
   }
-}
-
-function getCurrentPage() {
-  let currentPage = pagination[0].querySelector(".active");
-  currentPage = currentPage ? parseInt(currentPage.textContent) : 1;
-  return currentPage;
 }
 
 async function locateFile(file) {
