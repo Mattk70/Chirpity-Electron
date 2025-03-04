@@ -13,6 +13,7 @@ import Spectrogram from "../node_modules/wavesurfer.js/dist/plugins/spectrogram.
 import TimelinePlugin from "../node_modules/wavesurfer.js/dist/plugins/timeline.esm.js";
 import { CustomSelect } from './custom-select.js';
 import createFilterDropdown from './custom-filter.js';
+import { Pagination } from "./pagination.js";
 import {
   fetchIssuesByLabel,
   renderIssuesInModal,
@@ -373,8 +374,7 @@ function resetResults({
   clearResults = true,
 } = {}) {
   if (clearSummary) DOM.summaryTable.textContent = "";
-  if (clearPagination)
-    pagination.forEach((item) => item.classList.add("d-none"));
+  if (clearPagination) pagination.hide();
   resultsBuffer = DOM.resultTable.cloneNode(false);
   if (clearResults) {
     DOM.resultTable.textContent = "";
@@ -4322,8 +4322,8 @@ function onProgress(args) {
 function updatePagination(total, offset = STATE.offset) {
   //Pagination
   total > config.limit
-    ? addPagination(total, offset)
-    : pagination.forEach((item) => item.classList.add("d-none"));
+    ? pagination.add(total, offset)
+    : pagination.hide();
 }
 
 const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
@@ -4634,82 +4634,22 @@ function onSummaryComplete({
   if (STATE.currentFile) enableMenuItem(["analyse"]);
 }
 
-const pagination = document.querySelectorAll(".pagination");
-pagination.forEach((item) => {
-  item.addEventListener("click", (e) => {
-    if (STATE.analysisDone && e.target.tagName === "A") {
-      // Did we click a link in the list?
-      let clicked = e.target.textContent;
-      let currentPage = pagination[0].querySelector(".active");
-      currentPage = parseInt(currentPage.textContent);
-      if (clicked === "Previous") {
-        clicked = currentPage - 1;
-      } else if (clicked === "Next") {
-        clicked = currentPage + 1;
-      } else {
-        clicked = parseInt(clicked);
-      }
-      const limit = config.limit;
-      const offset = (clicked - 1) * limit;
-      // Tell the worker about the new offset
-      const species = isSpeciesViewFiltered(true);
-      species
-        ? worker.postMessage({
-            action: "update-state",
-            filteredOffset: { [species]: offset },
-          })
-        : worker.postMessage({ action: "update-state", globalOffset: offset });
-      filterResults({ offset: offset, limit: limit, updateSummary: false });
-      resetResults({
-        clearSummary: false,
-        clearPagination: false,
-        clearResults: false,
-      });
-    }
-  });
-});
 
-const addPagination = (total, offset) => {
-  const limit = config.limit;
-  const pages = Math.ceil(total / limit);
-  const currentPage = offset / limit + 1;
-  let list = "";
-  for (let i = 1; i <= pages; i++) {
-    if (i === 1) {
-      list +=
-        i === currentPage
-          ? '<li class="page-item disabled"><a class="page-link" href="#">Previous</a></li>'
-          : '<li class="page-item"><a class="page-link" href="#">Previous</a></li>';
-    }
-    if (
-      i <= 2 ||
-      i > pages - 2 ||
-      (i >= currentPage - 2 && i <= currentPage + 2)
-    ) {
-      list +=
-        i === currentPage
-          ? '<li class="page-item active" aria-current="page"><a class="page-link" href="#">' +
-            i +
-            "</a></li>"
-          : '<li class="page-item"><a class="page-link" href="#">' +
-            i +
-            "</a></li>";
-    } else if (i === 3 || i === pages - 3) {
-      list +=
-        '<li class="page-item disabled"><a class="page-link" href="#">...</a></li>';
-    }
-    if (i === pages) {
-      list +=
-        i === currentPage
-          ? '<li class="page-item disabled"><a class="page-link" href="#">Next</a></li>'
-          : '<li class="page-item"><a class="page-link" href="#">Next</a></li>';
-    }
+
+// Set up pagination
+const pagination = new Pagination(
+  document.querySelector(".pagination"),
+  () => STATE, // Returns the current state
+  () => config, // Returns the current config
+  () => worker,
+  {
+    isSpeciesViewFiltered,
+    filterResults,
+    resetResults
   }
-  pagination.forEach((item) => {
-    item.classList.remove("d-none");
-    item.innerHTML = list;
-  });
-};
+);
+pagination.init();
+
 
 /**
  * Toggles the species filter based on user interaction with the summary table.
@@ -4819,7 +4759,7 @@ async function renderResult({
     if (config.specDetections && !isFromDB && !STATE.selection)
       postBufferUpdate({ file, begin: windowOffsetSecs });
   } else if (!isFromDB && index % (config.limit + 1) === 0) {
-    addPagination(index, 0);
+    pagination.add(index, 0);
   }
   if (!isFromDB && index > config.limit) {
     return;
@@ -4965,7 +4905,7 @@ const deleteRecord = (target) => {
   }
 
   setClickedIndex(target);
-  // If therre is no row (deleted last record and hit delete again):
+  // If there is no row (deleted last record and hit delete again):
   if (clickedIndex === -1) return
   const {species, start, end, file, row, setting} = addToHistory(target)
 
@@ -6674,10 +6614,6 @@ document.addEventListener("click", function (e) {
   }
   if (!target?.startsWith('bird-')) {
     document.querySelectorAll('.suggestions').forEach(list => list.style.display = 'none');
-  }
-  if (!element?.closest('#filter-dropdown')){
-    const dropdown = document.getElementById("filter-dropdown")
-    dropdown?.classList.add("d-none");
   }
   hideConfidenceSlider();
   config.debug && console.log("clicked", target);
