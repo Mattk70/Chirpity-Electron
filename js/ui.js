@@ -1089,7 +1089,7 @@ function customiseAnalysisMenu(saved) {
 }
 
 async function generateLocationList(id) {
-  const i18n = i18nAll[config.locale] || i18nAll["en"];
+  const i18n = getI18n(i18nAll);
   const defaultText = id === "savedLocations" ? i18n[0] : i18n[1];
   const el = document.getElementById(id);
   LOCATIONS = undefined;
@@ -1921,8 +1921,8 @@ async function resultClick(e) {
       return;
     }
   let row = e.target.closest("tr");
-  if (!row || row.classList.length === 0) {
-    // 1. clicked and dragged, 2 no detections in file row
+  if (!row || row.classList.length === 0 || row.closest('#resultsHead')) {
+    // 1. clicked and dragged, 2 no detections in file row 3. clicked a header
     return;
   }
   const [file, start, end, _, label] = row.getAttribute("name").split("|");
@@ -4346,7 +4346,7 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
   // if (summary.length){
   let summaryHTML = `
             <table id="resultSummary" class="table table-dark p-1"><thead>
-            <tr class="pointer col-auto">
+            <tr class="pointer col-auto text-nowrap">
             <th id="summary-max" scope="col"><span id="summary-max-icon" class="text-muted material-symbols-outlined summary-sort-icon d-none">sort</span>${
               i18n.max
             }</th>
@@ -4459,8 +4459,13 @@ function onResultsComplete({ active = undefined, select = undefined } = {}) {
   resultsBuffer.textContent = "";
   const table = DOM.resultTable;
   showElement(["resultTableContainer", "resultsHead"], false);
-  document.getElementById('sort-label')
-    .classList.toggle('text-warning', STATE.labelFilters?.length > 0);
+  const labelSort = document.getElementById('sort-label')
+  labelSort.classList.toggle('text-warning', STATE.labelFilters?.length > 0);
+  const span = document.createElement('span');
+  span.className = "material-symbols-outlined fs-6";
+  span.textContent = "menu_open";
+  labelSort.appendChild(span)
+  span.classList.add(`${STATE.isMember?'text-muted': 'locked'}`)
   // Set active Row
   if (active) {
     // Refresh node and scroll to active row:
@@ -4803,7 +4808,7 @@ async function renderResult({
       const i18n = getI18n(i18nHeadings);
       // const fragment = new DocumentFragment();
       DOM.resultHeader.innerHTML = `
-                <tr>
+                <tr class="text-nowrap">
                     <th id="sort-time" class="time-sort col text-start timeOfDay" title="${i18n.time[1]}"><span class="text-muted material-symbols-outlined time-sort-icon d-none">sort</span> ${i18n.time[0]}</th>
                     <th id="sort-position" class="time-sort text-start timestamp" title="${i18n.position[1]}"><span class="text-muted material-symbols-outlined time-sort-icon d-none">sort</span> ${i18n.position[0]}</th>
                     <th id="confidence-sort" class="text-start" title="${i18n.species[1]}"><span class="text-muted material-symbols-outlined species-sort-icon d-none">sort</span> ${i18n.species[0]}</th>
@@ -6539,7 +6544,7 @@ document.addEventListener("click", function (e) {
       };
 
       const locale = config.locale;
-      const message = i18n[locale] || i18n["en"];
+      const message = getI18n(i18n);
       if (confirm(message)) {
         const uuid = config.UUID;
         config = defaultConfig;

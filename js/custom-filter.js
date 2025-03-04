@@ -1,7 +1,7 @@
 
 
   export default function createFilterDropdown(e, labels, colors, currentFilters = [], i18n) {
-    const element = e.target;
+    const element = e.target.closest('#sort-label');
     const old = document.getElementById("filter-dropdown");
     old?.remove()
     const fragment = document.createDocumentFragment();
