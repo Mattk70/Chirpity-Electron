@@ -75,16 +75,17 @@ jobs:
 
       - name: Modify fluent-ffmpeg processor.js
         run: |
-          sed -i -e '/^\s*setTimeout(function() {/,/}, 20);/c\
+          sed -i.bak -e '/^\s*setTimeout(function() {/,/}, 20);/c\
                     setTimeout(function() {\
                       if (ffmpegProc.exitCode === null){\
                         emitEnd(new Error('\''Output stream closed'\''));\
                         ffmpegProc.kill();\
                       }\
-                    }, 5000);' ./node_modules/fluent-ffmpeg/lib/processor.js
+                    }, 5000);' ./node_modules/fluent-ffmpeg/lib/processor.js && rm -f ./node_modules/fluent-ffmpeg/lib/processor.js.bak
+
       
           # uncomment to view changed file
-          #cat ./node_modules/fluent-ffmpeg/lib/processor.js
+          cat ./node_modules/fluent-ffmpeg/lib/processor.js
         shell: bash
 
       - name: Modify tracking code
