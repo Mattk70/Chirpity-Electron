@@ -612,7 +612,7 @@ input[type="range"].vertical {
     float: inline-end;
     text-decoration: none; /* Remove underline from <a> tags */
     transition: transform 0.2s; /* Add transition for smooth scaling */
-    cursor: pointer;
+    cursor: help;
 }
 
 .new-circle {

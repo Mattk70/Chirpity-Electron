@@ -601,7 +601,6 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
   wavesurfer.on("finish", function () {
     console.log('Finish: wavesurfer paused:', wavesurfer.isPaused)
     const bufferEnd = windowOffsetSecs + windowLength;
-    activeRegion = null;
     if (currentFileDuration > bufferEnd) {
       wavesurfer.isReady = false
       postBufferUpdate({ begin: windowOffsetSecs + windowLength, play: !wavesurfer.isPaused });
@@ -4239,7 +4238,7 @@ async function onWorkerLoadedAudio({
 
   if (windowLength > currentFileDuration) windowLength = currentFileDuration;
 
-  resetRegions();
+  resetRegions(true);
   await updateSpec({
     buffer: currentBuffer,
     position: position,
@@ -4447,13 +4446,15 @@ function onResultsComplete({ active = undefined, select = undefined } = {}) {
   const table = DOM.resultTable;
   showElement(["resultTableContainer", "resultsHead"], false);
   const labelSort = document.getElementById('sort-label')
-  labelSort.classList.toggle('text-warning', STATE.labelFilters?.length > 0);
-  if (!labelSort.querySelector('span.fs-6')){
-    const span = document.createElement('span');
-    span.className = "material-symbols-outlined fs-6";
-    span.textContent = "menu_open";
-    labelSort.appendChild(span)
-    span.classList.add(`${STATE.isMember?'text-muted': 'locked'}`)
+  if (labelSort){
+    labelSort.classList.toggle('text-warning', STATE.labelFilters?.length > 0);
+    if (!labelSort.querySelector('span.fs-6')){
+      const span = document.createElement('span');
+      span.className = "material-symbols-outlined fs-6";
+      span.textContent = "menu_open";
+      labelSort.appendChild(span)
+      span.classList.add(`${STATE.isMember?'text-muted': 'locked'}`)
+    }
   }
   // Set active Row
   if (active) {
