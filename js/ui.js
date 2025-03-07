@@ -1302,7 +1302,6 @@ function filterFilePaths(filePaths) {
   filePaths.forEach((filePath) => {
     const baseName = p.basename(filePath);
     const isHiddenFile = baseName.startsWith(".");
-    // Only add the path if it’s not hidden and doesn’t contain '?'
     if (!isHiddenFile) {
       filteredPaths.push(filePath);
     }
