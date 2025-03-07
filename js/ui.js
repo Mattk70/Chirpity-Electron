@@ -287,9 +287,7 @@ let modelReady = false,
   fileLoaded = false;
 let PREDICTING = false,
   t0, app_t0 = Date.now();
-let activeRegion,
-  AUDACITY_LABELS = {},
-  wavesurfer;
+let activeRegion, wavesurfer;
 let bufferStartTime, fileEnd;
 
 // set up some DOM element handles
@@ -1393,7 +1391,6 @@ function analyseReset() {
   clearActive();
   DOM.fileNumber.textContent = "";
   resetDiagnostics();
-  AUDACITY_LABELS = {};
   DOM.progressDiv.classList.remove("invisible");
 }
 
@@ -1622,7 +1619,7 @@ async function exportData(format, species = isSpeciesViewFiltered(true), limit =
   if (['Audacity', 'audio'].includes(format)){
     // Audacity exports one label file per file in results
     const response = await window.electron.selectDirectory(defaultPath);
-    if (response.cancelled) return
+    if (response.canceled) return
     location = response.filePaths[0]
     lastSaveFolder = location;
   } else {
@@ -4603,17 +4600,15 @@ function onAnalysisComplete({ quiet }) {
  *
  * This function updates the summary view with new data and applies filters if specified.
  * It enhances the summary table by adding pointer and hover effects to species rows, triggers
- * result sorting when appropriate, assigns provided Audacity labels globally, and toggles
+ * result sorting when appropriate,  and toggles
  * menu item availability based on the summary content and current application state.
  *
  * @param {Object} options - An object containing update parameters.
  * @param {*} [options.filterSpecies] - Optional criteria to filter species in the summary.
- * @param {Object} [options.audacityLabels={}] - A mapping of labels from Audacity to be applied globally.
  * @param {Array} [options.summary=[]] - An array of summary records to be used for updating the UI.
  */
 function onSummaryComplete({
   filterSpecies = undefined,
-  audacityLabels = {},
   summary = [],
 }) {
   updateSummary({ summary: summary, filterSpecies: filterSpecies });
@@ -4627,8 +4622,6 @@ function onSummaryComplete({
     summaryNode.classList.add("table-hover");
   }
   if (!PREDICTING || STATE.mode !== "analyse") activateResultSort();
-  // Why do we do audacity labels here?
-  AUDACITY_LABELS = audacityLabels;
   if (summary.length) {
     enableMenuItem(["saveLabels", "saveCSV", "save-eBird", "save-Raven"]);
     STATE.mode !== "explore" && enableMenuItem(["save2db"]);
@@ -7663,10 +7656,6 @@ window.electron.onDownloadProgress((_event, progressObj) =>
   displayProgress(progressObj, "Downloading the latest update: ")
 );
 
-// CI functions
-const getFileLoaded = () => fileLoaded;
-const donePredicting = () => !PREDICTING;
-const getAudacityLabels = () => AUDACITY_LABELS[STATE.currentFile];
 
 // Update checking for Mac
 

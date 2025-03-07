@@ -33,9 +33,7 @@ const trackEvent = isTestEnv ? () => {} : _trackEvent;
 let DEBUG;
 
 let METADATA = {};
-let index = 0,
-  AUDACITY = {},
-  predictionStart;
+let index = 0, predictionStart;
 let sampleRate; // Should really make this a property of the model
 let predictWorkers = [],
   aborted = false;
@@ -1355,7 +1353,6 @@ async function onAnalyse({
     );
   //Reset GLOBAL variables
   index = 0;
-  AUDACITY = {};
   batchChunksToSend = {};
   FILE_QUEUE = filesInScope;
   AUDIO_BACKLOG = 0;
@@ -3467,7 +3464,6 @@ const getSummary = async ({
     event: event,
     summary: summary,
     offset: offset,
-    audacityLabels: AUDACITY,
     filterSpecies: species,
     active: active,
     action: action,
@@ -3514,7 +3510,6 @@ const getResults = async ({
   else STATE.update({ globalOffset: offset });
 
   let index = offset;
-  AUDACITY = {};
 
   const [sql, params] = prepResultsStatement(
     species,
@@ -3527,14 +3522,8 @@ const getResults = async ({
   const result = await STATE.db.allAsync(sql, ...params);
 
 
-  const formatFunctions = {
-    text: "formatCSVValues",
-    eBird: "formateBirdValues",
-    Raven: "formatRavenValues",
-  };
-
-  if (format in formatFunctions) {
-    await exportData(result, path, format, formatFunctions)
+  if (['text', 'eBird', 'Raven'].includes(format)) {
+    await exportData(result, path, format)
   } else if (format === "Audacity") {
     exportAudacity(result, path)
   } else {
@@ -3548,7 +3537,6 @@ const getResults = async ({
             .slice(0, 5)
             .join(" ")
             .replaceAll(":", "_");
-          //const dateString = new Date(r.timestamp).toISOString().replace(/[TZ]/g, ' ').replace(/\.\d{3}/, '').replace(/[-:]/g, '-').trim();
           const filename = `${r.cname}_${dateString}.${STATE.audio.format}`;
           DEBUG &&
             console.log(
@@ -3645,7 +3633,12 @@ function exportAudacity(result, directory){
       });
   });
 }
-async function exportData(result, filename, format, formatFunctions){
+async function exportData(result, filename, format){
+  const formatFunctions = {
+    text: "formatCSVValues",
+    eBird: "formateBirdValues",
+    Raven: "formatRavenValues",
+  };
   let formattedValues;
     let previousFile = null,
       cumulativeOffset = 0;
