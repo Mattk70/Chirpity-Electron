@@ -14,7 +14,7 @@ const { utimesSync } = require("utimes");
 const { writeToPath } = require("@fast-csv/format");
 const merge = require("lodash.merge");
 import { State } from "./state.js";
-import { sqlite3, checkpoint, closeDatabase, Mutex } from "./database.js";
+import { sqlite3, checkpoint, closeDatabase, upgrade_to_v1, upgrade_to_v2, Mutex } from "./database.js";
 import { trackEvent as _trackEvent} from "./tracking.js";
 import { extractWaveMetadata } from "./metadata.js";
 import ExportFormatter from "./exportFormatter.js";
@@ -294,7 +294,7 @@ const createDB = async (file) => {
     );
     await db.runAsync("INSERT INTO tags VALUES(0, 'Nocmig'), (1, 'Local')");
     await db.runAsync(
-      "CREATE TABLE species(id INTEGER PRIMARY KEY, sname TEXT NOT NULL, cname TEXT NOT NULL)"
+      "CREATE TABLE species(id INTEGER PRIMARY KEY, sname TEXT NOT NULL, cname TEXT NOT NULL, UNIQUE(cname, sname))"
     );
     await db.runAsync(
       `CREATE TABLE locations( id INTEGER PRIMARY KEY, lat REAL NOT NULL, lon  REAL NOT NULL, place TEXT NOT NULL, UNIQUE (lat, lon))`
@@ -439,74 +439,10 @@ async function loadDB(path) {
     // Add new column if not exists
     const {user_version} = await diskDB.getAsync("PRAGMA user_version")
       .catch((error) => console.error(error));
-    if (user_version === undefined || user_version < 1){ 
-      try{
-        t0 = Date.now()
-        await dbMutex.lock();
-        await diskDB.runAsync("PRAGMA writable_schema=ON");
-        await diskDB.runAsync("PRAGMA foreign_keys = OFF");
-        await diskDB.runAsync('BEGIN');
-        //1.10.x update
-        await diskDB.runAsync("CREATE INDEX IF NOT EXISTS idx_species_sname ON species(sname)");
-        await diskDB.runAsync("CREATE INDEX IF NOT EXISTS idx_species_cname ON species(cname)");
-        const fileColumns = (await diskDB.allAsync("PRAGMA table_info(files)")).map(row => row.name);
-        if (!fileColumns.includes('archiveName')){
-          await diskDB.runAsync("ALTER TABLE files ADD COLUMN archiveName TEXT");  
-        }
-        if (!fileColumns.includes('metadata')){
-          await diskDB.runAsync("ALTER TABLE files ADD COLUMN metadata TEXT");  
-        }
-
-        await diskDB.runAsync("CREATE TABLE IF NOT EXISTS tags(id INTEGER PRIMARY KEY, name TEXT NOT NULL, UNIQUE(name))");
-        await diskDB.runAsync("INSERT INTO tags VALUES(0, 'Nocmig'), (1, 'Local')");
-        await diskDB.runAsync("ALTER TABLE records ADD COLUMN tagID INTEGER");
-        await diskDB.runAsync("UPDATE records SET tagID = 0 WHERE label = 'Nocmig'");
-        await diskDB.runAsync("UPDATE records SET tagID = 1 WHERE label = 'Local'");
-        await diskDB.runAsync("ALTER TABLE records DROP COLUMN label");
-        // Change label names to labelIDs
-        await diskDB.runAsync("ALTER TABLE records ADD COLUMN reviewed INTEGER");
-
-        await diskDB.runAsync(`CREATE TABLE records_temp( dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, 
-          comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER, reviewed INTEGER, tagID INTEGER,
-          UNIQUE (dateTime, fileID, speciesID), 
-          CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,
-          CONSTRAINT fk_species FOREIGN KEY (speciesID) REFERENCES species(id),
-          CONSTRAINT fk_tags FOREIGN KEY (tagID) REFERENCES tags(id) ON DELETE SET NULL)`);
-        await diskDB.runAsync("INSERT INTO records_temp SELECT * from records");
-        await diskDB.runAsync("DROP TABLE records");
-        await diskDB.runAsync(`ALTER TABLE records_temp RENAME TO records`);
-        // Add old files table update
-        await diskDB.runAsync(`
-          CREATE TABLE files_new (
-              id INTEGER PRIMARY KEY, 
-              name TEXT NOT NULL, 
-              duration REAL,
-              filestart INTEGER, 
-              locationID INTEGER, 
-              archiveName TEXT, 
-              metadata TEXT, 
-              UNIQUE (name),
-              CONSTRAINT fk_locations FOREIGN KEY (locationID) REFERENCES locations(id) ON DELETE SET NULL
-          )`);
-        await diskDB.runAsync(`INSERT INTO files_new SELECT * FROM files`);
-        await diskDB.runAsync(`DROP TABLE files;`);
-        await diskDB.runAsync(`ALTER TABLE files_new RENAME TO files;`);
-        await diskDB.runAsync("DROP TABLE IF EXISTS db_upgrade");
-        await diskDB.runAsync('END');
-        await diskDB.runAsync("PRAGMA writable_schema=OFF");
-        await diskDB.runAsync("PRAGMA foreign_keys = ON");
-        await diskDB.runAsync("PRAGMA integrity_check");
-        await diskDB.runAsync("PRAGMA foreign_key_check");
-        await diskDB.runAsync("PRAGMA user_version = 1");
-        console.info("Migrated tags and added 'reviewed' column to ", p.basename(file))
-      } catch (e) {
-        await diskDB.runAsync('ROLLBACK');
-        console.error("Error adding column and updating version", e.message, e)
-      } finally{
-        await checkpoint(diskDB)
-        dbMutex.unlock();
-        console.info(`DB migration took ${Date.now() - t0}ms`)
-      }
+    if (user_version === undefined || user_version < 1){
+      await upgrade_to_v1(diskDB, dbMutex)
+    } else if (user_version < 2){
+      await upgrade_to_v2(diskDB, dbMutex)
     }
     const { count } = await diskDB.getAsync(
       "SELECT COUNT(*) as count FROM records"
@@ -524,53 +460,6 @@ async function loadDB(path) {
   }
   return true;
 }
-
-// Define the list of updates (always add new updates at the end. ORDER IS IMPORTANT!)
-const DB_updates = [
-  {
-    name: "add_columns_archiveName_and_metadata_and_foreign_key_to_files",
-    query: async (db) => {
-      try {
-        await dbMutex.lock();
-        // Disable foreign key checks (or dropping files will drop records too!!!)
-        await db.runAsync("PRAGMA foreign_keys = OFF");
-        // Update: Adding foreign key to files
-        await db.runAsync("BEGIN TRANSACTION;");
-        await db.runAsync(`
-                    CREATE TABLE files_new (
-                        id INTEGER PRIMARY KEY, 
-                        name TEXT NOT NULL, 
-                        duration REAL,
-                        filestart INTEGER, 
-                        locationID INTEGER, 
-                        archiveName TEXT, 
-                        metadata TEXT, 
-                        UNIQUE (name),
-                        CONSTRAINT fk_locations FOREIGN KEY (locationID) REFERENCES locations(id) ON DELETE SET NULL
-                    );
-                `);
-        await db.runAsync(`
-                    INSERT INTO files_new (id, name, duration, filestart, locationID)
-                    SELECT id, name, duration, filestart, locationID
-                    FROM files;
-                `);
-        await db.runAsync(`DROP TABLE files;`);
-        await db.runAsync(`ALTER TABLE files_new RENAME TO files;`);
-
-        // If we get to here, it's all good: Commit the transaction
-        await db.runAsync("COMMIT;");
-      } catch (error) {
-        // If any error occurs, rollback the transaction
-        await db.runAsync("ROLLBACK;");
-        throw new Error(`Migration failed: ${error.message}`);
-      } finally {
-        // Disable foreign key checks
-        await db.runAsync("PRAGMA foreign_keys = ON");
-        dbMutex.unlock();
-      }
-    },
-  },
-];
 
 
 
@@ -4312,8 +4201,8 @@ const onUpdateFileStart = async (args) => {
       );
     } catch (error) {
       // Rollback in case of error
-      await db.runAsync("ROLLBACK");
       console.error(`Transaction failed: ${error.message}`);
+      await db.runAsync("ROLLBACK");
     }
   }
 };
@@ -4572,6 +4461,7 @@ const dbMutex = new Mutex();
  */
 async function _updateSpeciesLocale(db, labels) {
   const updatePromises = [];
+  await dbMutex.lock()
   const updateStmt = db.prepare("UPDATE species SET cname = ? WHERE sname = ?");
   const updateChirpityStmt = db.prepare(
     "UPDATE species SET cname = ? WHERE sname = ? AND cname LIKE ?"
@@ -4625,12 +4515,14 @@ async function _updateSpeciesLocale(db, labels) {
     await Promise.all(updatePromises);
     await db.runAsync("END");
   } catch (error) {
+    console.error(`_updateSpeciesLocale Transaction failed: ${error.message}`);
     await db.runAsync("ROLLBACK");
     throw error;
   } finally {
-    updateStmt.finalize()
-    updateChirpityStmt.finalize()
-    speciesSelectStmt.finalize()
+    dbMutex.unlock();
+    updateStmt.finalize();
+    updateChirpityStmt.finalize();
+    speciesSelectStmt.finalize();
   }
 }
 
@@ -4651,7 +4543,6 @@ async function _updateSpeciesLocale(db, labels) {
  */
 async function onUpdateLocale(locale, labels, refreshResults) {
   if (DEBUG) t0 = Date.now();
-  await dbMutex.lock();
   let db;
   try {
     STATE.update({ locale: locale });
@@ -4663,10 +4554,8 @@ async function onUpdateLocale(locale, labels, refreshResults) {
     }
     if (refreshResults) await Promise.all([getResults(), getSummary()]);
   } catch (error) {
-    await db.runAsync("ROLLBACK");
     throw error;
   } finally {
-    dbMutex.unlock();
     DEBUG &&
       console.log(`Locale update took ${(Date.now() - t0) / 1000} seconds`);
     updateSpeciesLabelLocale();

@@ -4238,7 +4238,7 @@ async function onWorkerLoadedAudio({
 
   if (windowLength > currentFileDuration) windowLength = currentFileDuration;
 
-  resetRegions(true);
+  resetRegions();
   await updateSpec({
     buffer: currentBuffer,
     position: position,
