@@ -619,6 +619,17 @@ ipcMain.handle("unsaved-records", (_event, data) => {
   unsavedRecords = data.newValue; // Update the variable with the new value
 });
 
+ipcMain.handle("exportData", async (event, arg) => {
+  const {defaultPath} = arg;
+  return await dialog
+    .showSaveDialog(mainWindow, {
+      filters: [{ name: "Text Files", extensions: ["txt", "csv"] }],
+      defaultPath
+    })
+    .then((file) => file.filePath)
+})
+
+
 ipcMain.handle("saveFile", async (event, arg) => {
   // Show file dialog to select audio file
   if (arg.type === "audacity") {

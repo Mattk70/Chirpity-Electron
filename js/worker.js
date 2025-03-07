@@ -1791,7 +1791,7 @@ async function sendDetections(file, start, end, goToRegion) {
                 position AS start, 
                 end, 
                 cname AS label, 
-                RANK() OVER (PARTITION BY fileID, dateTime ORDER BY confidence DESC) AS rank,
+                ROW_NUMBER() OVER (PARTITION BY fileID, dateTime ORDER BY confidence DESC) AS rank,
                 confidence,
                 name,
                 dateTime,
@@ -2654,6 +2654,8 @@ const bufferToAudio = async ({
 
   if (padding) {
     start = Math.max(0, start - 1);
+    METADATA[file] ??= await setMetadata({file});
+
     end = Math.min(METADATA[file].duration, end + 1);
   }
 
@@ -3490,7 +3492,7 @@ const getResults = async ({
   limit = STATE.limit,
   offset = undefined,
   topRankin = STATE.topRankin,
-  directory = undefined,
+  path = undefined,
   format = undefined,
   active = undefined,
   position = undefined,
@@ -3523,9 +3525,7 @@ const getResults = async ({
   );
 
   const result = await STATE.db.allAsync(sql, ...params);
-  let formattedValues;
-  let previousFile = null,
-    cumulativeOffset = 0;
+
 
   const formatFunctions = {
     text: "formatCSVValues",
@@ -3534,6 +3534,121 @@ const getResults = async ({
   };
 
   if (format in formatFunctions) {
+    await exportData(result, path, format, formatFunctions)
+  } else if (format === "Audacity") {
+    exportAudacity(result, path)
+  } else {
+    for (let i = 0; i < result.length; i++) {
+      const r = result[i];
+      if (format === "audio") {
+        if (limit) {
+          // Audio export. Format date to YYYY-MM-DD-HH-MM-ss
+          const dateArray = new Date(r.timestamp).toString().split(" ");
+          const dateString = dateArray
+            .slice(0, 5)
+            .join(" ")
+            .replaceAll(":", "_");
+          //const dateString = new Date(r.timestamp).toISOString().replace(/[TZ]/g, ' ').replace(/\.\d{3}/, '').replace(/[-:]/g, '-').trim();
+          const filename = `${r.cname}_${dateString}.${STATE.audio.format}`;
+          DEBUG &&
+            console.log(
+              `Exporting from ${r.file}, position ${r.position}, into folder ${path}`
+            );
+          saveAudio(
+            r.file,
+            r.position,
+            r.end,
+            filename,
+            { Artist: "Chirpity" },
+            path
+          );
+          i === result.length - 1 &&
+            generateAlert({
+              message: "goodResultSave",
+              variables: { number: result.length },
+            });
+        }
+      } else if (species && STATE.mode !== "explore") {
+        // get a number for the circle
+        const { count } = await STATE.db.getAsync(
+          `SELECT COUNT(*) as count FROM records WHERE dateTime = ?
+                AND confidence >= ? and fileID = ?`,
+          r.timestamp,
+          confidence,
+          r.fileID
+        );
+        r.count = count;
+        sendResult(++index, r, true);
+      } else {
+        sendResult(++index, r, true);
+      }
+      if (i === result.length - 1)
+        UI.postMessage({ event: "processing-complete" });
+    }
+    if (!result.length) {
+      if (STATE.selection) {
+        // No more detections in the selection
+        generateAlert({ message: "noDetections" });
+      } else {
+        species = species || "";
+        const nocmig = STATE.detect.nocmig ? "<b>nocturnal</b>" : "";
+        const archive = STATE.mode === "explore" ? "in the Archive" : "";
+        generateAlert({
+          message: `noDetectionsDetailed`,
+          variables: { nocmig, archive, species, list: STATE.list },
+        });
+      }
+    }
+    (STATE.selection && topRankin !== STATE.topRankin) ||
+      UI.postMessage({
+        event: "database-results-complete",
+        active,
+        select: position?.start,
+      });
+  }
+};
+
+function exportAudacity(result, directory){
+  const { writeToPath } = require("@fast-csv/format");
+  const groupedResult = result.reduce((acc, item) => {
+    // Check if the file already exists as a key in acc
+    const filteredItem = {
+      start: item.position,
+      end: item.end,
+      cname: `${item.cname} ${item.score / 10}%`,
+    };
+    if (!acc[item.file]) {
+      // If it doesn't, create an array for that file
+      acc[item.file] = [];
+    }
+    // Push the item into the array for the matching file key
+    acc[item.file].push(filteredItem);
+    return acc;
+  }, {});
+  Object.keys(groupedResult).forEach((file) => {
+    const suffix = p.extname(file);
+    const filename = p.basename(file, suffix) + ".txt";
+    const filePath = p.join(directory, filename);
+    writeToPath(filePath, groupedResult[file], {
+      headers: false,
+      delimiter: "\t",
+    })
+      .on("error", (_err) =>
+        generateAlert({
+          type: "warning",
+          message: "saveBlocked",
+          variables: { filePath },
+        })
+      )
+      .on("finish", () => {
+        generateAlert({ message: "goodSave", variables: { filePath } });
+      });
+  });
+}
+async function exportData(result, filename, format, formatFunctions){
+  let formattedValues;
+    let previousFile = null,
+      cumulativeOffset = 0;
     const { writeToPath } = require("@fast-csv/format");
     const {ExportFormatter} = require("./js/exportFormatter.js");
     const formatter = new ExportFormatter(STATE);
@@ -3592,11 +3707,9 @@ const getResults = async ({
       // Convert summary object into an array of objects
       formattedValues = Object.values(summary);
     }
+    const filePath = filename;
     // Create a write stream for the CSV file
-    let filename = species || "All";
-    filename += format == "Raven" ? `_selections.txt` : "_detections.csv";
-    const filePath = p.join(directory, filename);
-    writeToPath(filePath, formattedValues, {
+    writeToPath(filename, formattedValues, {
       headers: true,
       delimiter: format === "Raven" ? "\t" : ",",
     })
@@ -3608,114 +3721,10 @@ const getResults = async ({
         })
       )
       .on("finish", () => {
+        const filePath = filename;
         generateAlert({ message: "goodSave", variables: { filePath } });
       });
-  } else if (format === "Audacity") {
-    const groupedResult = result.reduce((acc, item) => {
-      // Check if the file already exists as a key in acc
-      const filteredItem = {
-        start: item.position,
-        end: item.end,
-        cname: `${item.cname} ${item.score / 10}%`,
-      };
-      if (!acc[item.file]) {
-        // If it doesn't, create an array for that file
-        acc[item.file] = [];
-      }
-      // Push the item into the array for the matching file key
-      acc[item.file].push(filteredItem);
-      return acc;
-    }, {});
-    Object.keys(groupedResult).forEach((file) => {
-      const suffix = p.extname(file);
-      const filename = p.basename(file, suffix) + ".txt";
-      const filePath = p.join(directory, filename);
-      writeToPath(filePath, groupedResult[file], {
-        headers: false,
-        delimiter: "\t",
-      })
-        .on("error", (_err) =>
-          generateAlert({
-            type: "warning",
-            message: "saveBlocked",
-            variables: { filePath },
-          })
-        )
-        .on("finish", () => {
-          generateAlert({ message: "goodSave", variables: { filePath } });
-        });
-    });
-  } else {
-    for (let i = 0; i < result.length; i++) {
-      const r = result[i];
-      if (format === "audio") {
-        if (limit) {
-          // Audio export. Format date to YYYY-MM-DD-HH-MM-ss
-          const dateArray = new Date(r.timestamp).toString().split(" ");
-          const dateString = dateArray
-            .slice(0, 5)
-            .join(" ")
-            .replaceAll(":", "_");
-          //const dateString = new Date(r.timestamp).toISOString().replace(/[TZ]/g, ' ').replace(/\.\d{3}/, '').replace(/[-:]/g, '-').trim();
-          const filename = `${r.cname}_${dateString}.${STATE.audio.format}`;
-          DEBUG &&
-            console.log(
-              `Exporting from ${r.file}, position ${r.position}, into folder ${directory}`
-            );
-          saveAudio(
-            r.file,
-            r.position,
-            r.end,
-            filename,
-            { Artist: "Chirpity" },
-            directory
-          );
-          i === result.length - 1 &&
-            generateAlert({
-              message: "goodResultSave",
-              variables: { number: result.length },
-            });
-        }
-      } else if (species && STATE.mode !== "explore") {
-        // get a number for the circle
-        const { count } = await STATE.db.getAsync(
-          `SELECT COUNT(*) as count FROM records WHERE dateTime = ?
-                AND confidence >= ? and fileID = ?`,
-          r.timestamp,
-          confidence,
-          r.fileID
-        );
-        r.count = count;
-        sendResult(++index, r, true);
-      } else {
-        sendResult(++index, r, true);
-      }
-      if (i === result.length - 1)
-        UI.postMessage({ event: "processing-complete" });
-    }
-    if (!result.length) {
-      if (STATE.selection) {
-        // No more detections in the selection
-        generateAlert({ message: "noDetections" });
-      } else {
-        species = species || "";
-        const nocmig = STATE.detect.nocmig ? "<b>nocturnal</b>" : "";
-        const archive = STATE.mode === "explore" ? "in the Archive" : "";
-        generateAlert({
-          message: `noDetectionsDetailed`,
-          variables: { nocmig, archive, species, list: STATE.list },
-        });
-      }
-    }
-    (STATE.selection && topRankin !== STATE.topRankin) ||
-      UI.postMessage({
-        event: "database-results-complete",
-        active,
-        select: position?.start,
-      });
-  }
-};
-
+}
 
 const sendResult = (index, result, fromDBQuery) => {
   // Convert confidence back to % value
@@ -3732,36 +3741,31 @@ const sendResult = (index, result, fromDBQuery) => {
 
 const getSavedFileInfo = async (file) => {
   if (diskDB) {
-    await dbMutex.lock();
-    const prefix = STATE.library.location + p.sep;
-    // Get rid of archive (library) location prefix
-    const archiveFile = file.replace(prefix, "");
-    let row = await diskDB
-      .getAsync(
-        `
-            SELECT duration, filestart AS fileStart, metadata, locationID
-            FROM files LEFT JOIN locations ON files.locationID = locations.id 
-            WHERE name = ? OR archiveName = ?`,
-        file,
-        archiveFile
-      )
-      .catch((error) => {
-        console.warn(error);
-        dbMutex.unlock();
-      });
-    if (!row) {
-      const baseName = file.replace(/^(.*)\..*$/g, "$1%");
+    let row;
+    try {
+      const prefix = STATE.library.location + p.sep;
+      // Get rid of archive (library) location prefix
+      const archiveFile = file.replace(prefix, "");
       row = await diskDB
         .getAsync(
-          "SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name LIKE  (?)",
-          baseName
+          `
+              SELECT duration, filestart AS fileStart, metadata, locationID
+              FROM files LEFT JOIN locations ON files.locationID = locations.id 
+              WHERE name = ? OR archiveName = ?`,
+          file,
+          archiveFile
         )
-        .catch((error) => {
-          console.warn(error);
-          dbMutex.unlock();
-        });
+      if (!row) {
+        const baseName = file.replace(/^(.*)\..*$/g, "$1%");
+        row = await diskDB
+          .getAsync(
+            "SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name LIKE  (?)",
+            baseName
+          )
+      }
+    } catch (error){
+      console.warn(error);
     }
-    dbMutex.unlock();
     return row;
   } else {
     generateAlert({ type: "error", message: "dbNotLoaded" });

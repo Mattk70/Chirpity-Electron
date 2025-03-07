@@ -599,7 +599,6 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
 
 
   wavesurfer.on("finish", function () {
-    console.log('Finish: wavesurfer paused:', wavesurfer.isPaused)
     const bufferEnd = windowOffsetSecs + windowLength;
     if (currentFileDuration > bufferEnd) {
       wavesurfer.isReady = false
@@ -655,7 +654,7 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
  * - postBufferUpdate: Function to update the audio buffer after FFT changes.
  */
 function increaseFFT() {
-  if (spectrogram.fftSamples < 2048) {
+  if (spectrogram.fftSamples < 2048 && STATE.regionsCompleted) {
     spectrogram.fftSamples *= 2;
     const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
     postBufferUpdate({
@@ -694,7 +693,7 @@ function increaseFFT() {
  * @returns {void}
  */
 function reduceFFT() {
-  if (spectrogram.fftSamples > 64) {
+  if (spectrogram.fftSamples > 64 && STATE.regionsCompleted) {
     spectrogram.fftSamples /= 2;
     const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
     postBufferUpdate({
@@ -1618,23 +1617,34 @@ async function batchExportAudio() {
 }
 
 async function exportData(format, species = isSpeciesViewFiltered(true), limit = Infinity, duration) {
-  const defaultPath = localStorage.getItem("lastFolder") || '';
-  const response = await window.electron.selectDirectory(defaultPath);
-  if (!response.canceled) {
-    const directory = response.filePaths[0];
-    worker.postMessage({
-      action: "export-results",
-      directory: directory,
-      format: format,
-      duration: duration,
-      species: species,
-      files: isExplore() ? [] : STATE.openFiles,
-      explore: isExplore(),
-      limit: limit,
-      range: isExplore() ? STATE.explore.range : undefined,
-    });
-    localStorage.setItem("lastFolder", directory);
+  const defaultPath = localStorage.getItem("lastSaveFolder") || '';
+  let location, lastSaveFolder;
+  if (['Audacity', 'audio'].includes(format)){
+    // Audacity exports one label file per file in results
+    const response = await window.electron.selectDirectory(defaultPath);
+    if (response.cancelled) return
+    location = response.filePaths[0]
+    lastSaveFolder = location;
+  } else {
+    let filename = species || "All";
+    filename += format == "Raven" ? `_selections.txt` : "_detections.csv";
+    const filePath = p.join(defaultPath, filename);
+    location = await window.electron.exportData({defaultPath: filePath});
+    if (! location) return
+    lastSaveFolder = p.dirname(location)
   }
+  worker.postMessage({
+    action: "export-results",
+    path: location,
+    format,
+    duration,
+    species,
+    files: isExplore() ? [] : STATE.openFiles,
+    explore: isExplore(),
+    limit,
+    range: isExplore() ? STATE.explore.range : undefined,
+  });
+  localStorage.setItem("lastSaveFolder", lastSaveFolder);
 }
 
 const handleLocationFilterChange = (e) => {
@@ -3684,7 +3694,7 @@ const timelineToggle = (fromKeys) => {
   }
   config.timeOfDay = DOM.timelineSetting.value === "timeOfDay"; //toggle setting
   setTimelinePreferences();
-  if (fileLoaded) {
+  if (fileLoaded && STATE.regionsCompleted) {
     // Reload wavesurfer with the new timeline
     const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
     postBufferUpdate({ begin: windowOffsetSecs, position: position });
@@ -3865,19 +3875,19 @@ const GLOBAL_ACTIONS = {
     }
   },
   Home: () => {
-    if (currentBuffer) {
+    if (currentBuffer && STATE.regionsCompleted) {
       windowOffsetSecs = 0;
       postBufferUpdate({});
     }
   },
   End: () => {
-    if (currentBuffer) {
+    if (currentBuffer && STATE.regionsCompleted) {
       windowOffsetSecs = currentFileDuration - windowLength;
       postBufferUpdate({ begin: windowOffsetSecs, position: 1 });
     }
   },
   PageUp: () => {
-    if (currentBuffer) {
+    if (currentBuffer && STATE.regionsCompleted) {
       const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
       windowOffsetSecs = windowOffsetSecs - windowLength;
       const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
@@ -3905,7 +3915,7 @@ const GLOBAL_ACTIONS = {
     }
   },
   PageDown: () => {
-    if (currentBuffer) {
+    if (currentBuffer && STATE.regionsCompleted) {
       let position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
       windowOffsetSecs = windowOffsetSecs + windowLength;
       const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
@@ -3942,7 +3952,7 @@ const GLOBAL_ACTIONS = {
   },
   ArrowLeft: () => {
     const skip = windowLength / 100;
-    if (currentBuffer) {
+    if (currentBuffer && STATE.regionsCompleted) {
       wavesurfer.setTime(wavesurfer.getCurrentTime() - skip);
       let position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
       if (wavesurfer.getCurrentTime() < skip && windowOffsetSecs > 0) {
@@ -3957,7 +3967,7 @@ const GLOBAL_ACTIONS = {
   },
   ArrowRight: () => {
     const skip = windowLength / 100;
-    if (wavesurfer) {
+    if (currentBuffer && STATE.regionsCompleted) {
       const now = wavesurfer.getCurrentTime();
       if (wavesurfer.isReady){
         // This will trigger the finish event if at the end of the window
@@ -4087,7 +4097,7 @@ gotoModal.addEventListener("shown.bs.modal", () => {
 });
 
 const gotoTime = (e) => {
-  if (STATE.currentFile) {
+  if (STATE.currentFile && STATE.regionsCompleted) {
     e.preventDefault();
     const time = document.getElementById("timeInput").value;
     // Nothing entered?
@@ -4756,7 +4766,7 @@ async function renderResult({
     }
     showElement(["resultTableContainer", "resultsHead"], false);
     // If  we have some results, let's update the view in case any are in the window
-    if (config.specDetections && !isFromDB && !STATE.selection)
+    if (config.specDetections && !isFromDB && !STATE.selection && STATE.regionsCompleted)
       postBufferUpdate({ file, begin: windowOffsetSecs });
   } else if (!isFromDB && index % (config.limit + 1) === 0) {
     pagination.add(index, 0);
@@ -5973,7 +5983,7 @@ const filterIconDisplay = () => {
 };
 // High pass threshold
 const showFilterEffect = () => {
-  if (fileLoaded) {
+  if (fileLoaded  && STATE.regionsCompleted) {
     const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
     postBufferUpdate({
       begin: windowOffsetSecs,
@@ -6111,18 +6121,20 @@ DOM.gain.addEventListener("input", () => {
 function playRegion() {
   // Sanitise region (after zoom, start or end may be outside the windowlength)
   // I don't want to change the actual region length, so make a copy
-  const region = REGIONS.regions?.find(
-    (region) => region.start === activeRegion.start
-  );
-  if (region){
-    const myRegion = region;
-    myRegion.start = Math.max(0, myRegion.start);
-    // Have to adjust the windowlength so the finish event isn't fired - causing a page reload)
-    myRegion.end = Math.min(myRegion.end, windowLength * 0.995);
-    /* ISSUE if you pause at the end of a region, 
-      when 2 regions abut, the second region won't play*/
-      REGIONS.once('region-out', () => wavesurfer.pause());
-    myRegion.play();
+  if (STATE.regionsCompleted){
+    const region = REGIONS.regions?.find(
+      (region) => region.start === activeRegion.start
+    );
+    if (region){
+      const myRegion = region;
+      myRegion.start = Math.max(0, myRegion.start);
+      // Have to adjust the windowlength so the finish event isn't fired - causing a page reload)
+      myRegion.end = Math.min(myRegion.end, windowLength * 0.995);
+      /* ISSUE if you pause at the end of a region, 
+        when 2 regions abut, the second region won't play*/
+        REGIONS.once('region-out', () => wavesurfer.pause());
+      myRegion.play();
+    }
   }
 }
 // Audio preferences:
@@ -6884,7 +6896,7 @@ document.addEventListener("change", function (e) {
           } else {
             colorMapFieldset.classList.add("d-none");
           }
-          if (wavesurfer && STATE.currentFile) {
+          if (wavesurfer && STATE.currentFile && STATE.regionsCompleted) {
             const fftSamples = spectrogram.fftSamples;
             adjustSpecDims(true, fftSamples);
             postBufferUpdate({ begin: windowOffsetSecs, position: wavesurfer.getCurrentTime() / windowLength });
@@ -6930,7 +6942,7 @@ document.addEventListener("change", function (e) {
           config.audio.gain = element.value;
           worker.postMessage({ action: "update-state", audio: config.audio });
           config.filters.active || toggleFilters();
-          if (fileLoaded) {
+          if (fileLoaded  && STATE.regionsCompleted) {
             const position = clamp(
               wavesurfer.getCurrentTime() / windowLength,
               0,
@@ -6988,7 +7000,7 @@ document.addEventListener("change", function (e) {
           element.checked && (config.filters.active = true);
           worker.postMessage({ action: "update-state", filters: config.filters });
           element.blur();
-          if (fileLoaded) {
+          if (fileLoaded && STATE.regionsCompleted) {
             const position = clamp(
               wavesurfer.getCurrentTime() / windowLength,
               0,

@@ -52,6 +52,7 @@ contextBridge.exposeInMainWorld("electron", {
   onDownloadProgress: (callback) =>
     ipcRenderer.on("download-progress", callback),
   saveFile: (args) => ipcRenderer.invoke("saveFile", args),
+  exportData: (args) => ipcRenderer.invoke("exportData", args),
   selectDirectory: (path) => ipcRenderer.invoke("selectDirectory", path),
   openDialog: (method, config) =>
     ipcRenderer.invoke("openFiles", method, config),
