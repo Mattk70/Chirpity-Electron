@@ -4008,32 +4008,26 @@ const GLOBAL_ACTIONS = {
   Backspace: () => activeRow && deleteRecord(activeRow),
 };
 
-/**
- * Retrieves the currently active region.
- *
- * This function returns the global active region object, which typically contains
- * properties (such as start and end) that define the region. If there is no active region,
- * the function returns undefined.
- *
- * @return {Object|undefined} The active region object with its defined properties, or undefined if not set.
- */
-function getRegion() {
-  return activeRegion || undefined;
-}
 
 function disableSettingsDuringAnalysis(bool) {
-  DOM.modelToUse.disabled = bool;
-  DOM.threadSlider.disabled = bool;
-  DOM.batchSizeSlider.disabled = bool;
-  DOM.locale.disabled = bool;
-  DOM.listToUse.disabled = bool;
-  DOM.customListContainer.disabled = bool;
-  DOM.localSwitchContainer.disabled = bool;
-  DOM.speciesThreshold.disabled = bool;
-  DOM.speciesWeek.disabled = bool;
-  DOM.backendOptions.forEach((backend) => (backend.disabled = bool));
-  DOM.contextAware.disabled = bool;
-  DOM.sendFilteredAudio.disabled = bool;
+  const elements = [
+    "modelToUse",
+    "threadSlider",
+    "batchSizeSlider",
+    "locale",
+    "listToUse",
+    "customListContainer",
+    "localSwitchContainer",
+    "speciesThreshold",
+    "speciesWeek",
+    "contextAware",
+    "sendFilteredAudio",
+  ];
+  elements.forEach((el) => {
+    if (DOM[el]) DOM[el].disabled = bool;
+    else throw new Error(`${el} is not in the DOM cache`)
+  });
+  DOM.backendOptions?.forEach((backend) => (backend.disabled = bool));
 }
 
 const postBufferUpdate = ({
@@ -4045,12 +4039,6 @@ const postBufferUpdate = ({
   goToRegion = false,
 }) => {
 
-  /* Validate input parameters - removed as position is clamped before use
-  if (position < 0 || position > 1) {
-    console.error('Invalid buffer update position:', `Position: ${position}`);
-    return;
-  } */
- 
   STATE.regionsCompleted = false;
   fileLoaded = false;
   worker.postMessage({
