@@ -1970,9 +1970,9 @@ const getPredictBuffers = async ({ file = "", start = 0, end = undefined }) => {
     return;
   }
 
-  const MINIMUM_AUDIO_LENGTH = 0.05; // below this value doesn't generate another chunk
+  const duration = end - start;
   batchChunksToSend[file] = Math.ceil(
-    (end - start - MINIMUM_AUDIO_LENGTH) / (BATCH_SIZE * WINDOW_SIZE)
+    duration / (BATCH_SIZE * WINDOW_SIZE)
   );
   predictionsReceived[file] = 0;
   predictionsRequested[file] = 0;

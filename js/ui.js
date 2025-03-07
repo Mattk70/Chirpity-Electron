@@ -5547,7 +5547,7 @@ document.addEventListener("dragover", (event) => {
 document.addEventListener("drop", (event) => {
   event.preventDefault();
   event.stopPropagation();
-  const filelist = Array.from(event.dataTransfer.files)
+  const fileList = Array.from(event.dataTransfer.files)
     .filter(
       (file) =>
         !file.name.startsWith(".") &&
@@ -5557,9 +5557,10 @@ document.addEventListener("drop", (event) => {
     )
     .map((file) => file.path);
 
+  worker.postMessage({action: "get-valid-files-list", files: fileList})
   // For electron 32+
   // const filelist = audioFiles.map(file => window.electron.showFilePath(file));
-  if (filelist.length) onOpenFiles({ filePaths: filelist });
+  // if (filelist.length) onOpenFiles({ filePaths: filelist });
 });
 
 // Prevent drag for UI elements
