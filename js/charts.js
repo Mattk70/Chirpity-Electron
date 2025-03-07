@@ -285,6 +285,4 @@ const getSeasonRecords = async (diskDB, state, species, season) => {
       aggregation,
     });
   }
-  module.exports = {
-    onChartRequest
-  };
+  module.exports = { onChartRequest };

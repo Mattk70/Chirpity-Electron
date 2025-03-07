@@ -3,21 +3,17 @@
  * and interact with the AI models
  */
 
-const { ipcRenderer, ipcMain } = require("electron");
+const { ipcRenderer } = require("electron");
 const fs = require("node:fs");
 const p = require("node:path");
-const { writeFile, mkdir, readdir } = require("node:fs/promises");
 const SunCalc = require("suncalc");
 const ffmpeg = require("fluent-ffmpeg");
-const png = require("fast-png");
-const { utimesSync } = require("utimes");
-const { writeToPath } = require("@fast-csv/format");
+
 const merge = require("lodash.merge");
 import { State } from "./state.js";
 import { sqlite3, checkpoint, closeDatabase, upgrade_to_v1, upgrade_to_v2, Mutex } from "./database.js";
 import { trackEvent as _trackEvent} from "./tracking.js";
-import { extractWaveMetadata } from "./metadata.js";
-import ExportFormatter from "./exportFormatter.js";
+
 let isWin32 = false;
 
 const DATASET = false;
@@ -1055,7 +1051,7 @@ const getFiles = async (files, image) => {
 const getFilesInDirectory = async (dir) => {
   const files = [];
   const stack = [dir];
-
+  const { readdir } = require("node:fs/promises");
   while (stack.length) {
     const currentDir = stack.pop();
     const dirents = await readdir(currentDir, { withFileTypes: true });
@@ -1842,6 +1838,7 @@ const setMetadata = async ({ file, source_file = file }) => {
   if (!savedMeta?.duration) {
     METADATA[file].duration = await getDuration(file);
     if (file.toLowerCase().endsWith("wav")) {
+      const { extractWaveMetadata } = require("./js/metadata.js");
       const t0 = Date.now();
       const wavMetadata = await extractWaveMetadata(file); //.catch(error => console.warn("Error extracting GUANO", error));
       if (Object.keys(wavMetadata).includes("guano")) {
@@ -2583,8 +2580,10 @@ const saveResults2DataSet = ({ species, included }) => {
 };
 
 const onSpectrogram = async (filepath, file, width, height, data, channels) => {
+  const { writeFile, mkdir } = require("node:fs/promises");
+  const png = require("fast-png");
   await mkdir(filepath, { recursive: true });
-  let image = await png.encode({
+  let image = png.encode({
     width: 384,
     height: 256,
     data: data,
@@ -3535,6 +3534,8 @@ const getResults = async ({
   };
 
   if (format in formatFunctions) {
+    const { writeToPath } = require("@fast-csv/format");
+    const {ExportFormatter} = require("./js/exportFormatter.js");
     const formatter = new ExportFormatter(STATE);
     // CSV export. Format the values
     formattedValues = await Promise.all(
@@ -3905,6 +3906,8 @@ const onUpdateFileStart = async (args) => {
   const newfileMtime = new Date(
     Math.round(args.start + METADATA[file].duration * 1000)
   );
+  
+  const { utimesSync } = require("utimes");
   utimesSync(file, { atime: Date.now(), mtime: newfileMtime });
 
   METADATA[file].fileStart = args.start;
@@ -4732,6 +4735,8 @@ async function convertFile(
         const newfileMtime = new Date(
           Math.round(row.filestart + row.duration * 1000)
         );
+        
+        const { utimesSync } = require("utimes");
         utimesSync(fullFilePath, { atime: Date.now(), mtime: newfileMtime });
 
         db.run(
