@@ -3702,7 +3702,7 @@ async function exportData(result, filename, format){
     }
     const filePath = filename;
     // Create a write stream for the CSV file
-    writeToPath(filename, formattedValues, {
+    writeToPath(filePath, formattedValues, {
       headers: true,
       delimiter: format === "Raven" ? "\t" : ",",
     })
@@ -3714,7 +3714,6 @@ async function exportData(result, filename, format){
         })
       )
       .on("finish", () => {
-        const filePath = filename;
         generateAlert({ message: "goodSave", variables: { filePath } });
       });
 }

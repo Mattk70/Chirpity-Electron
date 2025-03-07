@@ -190,7 +190,6 @@ const getSeasonRecords = async (diskDB, state, species, season) => {
       dataRecords = {};
     // Escape apostrophes
     if (species) {
-      t0 = Date.now();
       await getSeasonRecords(diskDB, state, species, "spring")
         .then((result) => {
           dataRecords.earliestSpring = result["minDate"];
@@ -208,12 +207,7 @@ const getSeasonRecords = async (diskDB, state, species, season) => {
         .catch((error) => {
           console.log(error);
         });
-  
-      DEBUG &&
-        console.log(
-          `Season chart generation took ${(Date.now() - t0) / 1000} seconds`
-        );
-      t0 = Date.now();
+
       await getMostCalls(diskDB, state, species)
         .then((row) => {
           row
@@ -223,12 +217,6 @@ const getSeasonRecords = async (diskDB, state, species, season) => {
         .catch((error) => {
           console.log(error);
         });
-  
-      DEBUG &&
-        console.log(
-          `Most calls  chart generation took ${(Date.now() - t0) / 1000} seconds`
-        );
-      t0 = Date.now();
     }
 
     const [dataPoints, aggregation] = await getChartTotals(args)
@@ -259,19 +247,10 @@ const getSeasonRecords = async (diskDB, state, species, season) => {
       .catch((error) => {
         console.log(error);
       });
-  
-    DEBUG &&
-      console.log(
-        `Chart series generation took ${(Date.now() - t0) / 1000} seconds`
-      );
-    t0 = Date.now();
+
     // If we have a years worth of data add total recording duration and rate
     let total, rate;
     if (dataPoints === 52) [total, rate] = await getRate(diskDB, state, species);
-    DEBUG &&
-      console.log(
-        `Chart rate generation took ${(Date.now() - t0) / 1000} seconds`
-      );
     const pointStart = (dateRange.start ??= Date.UTC(2020, 0, 0, 0, 0, 0));
     UI.postMessage({
       event: "chart-data", // Restore species name
