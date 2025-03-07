@@ -178,4 +178,4 @@ function _parseMetadataText(text) {
   return metadata;
 }
 
-export { extractWaveMetadata };
+module.exports = { extractWaveMetadata };

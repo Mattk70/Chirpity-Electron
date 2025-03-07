@@ -3,21 +3,17 @@
  * and interact with the AI models
  */
 
-const { ipcRenderer, ipcMain } = require("electron");
+const { ipcRenderer } = require("electron");
 const fs = require("node:fs");
 const p = require("node:path");
-const { writeFile, mkdir, readdir } = require("node:fs/promises");
 const SunCalc = require("suncalc");
 const ffmpeg = require("fluent-ffmpeg");
-const png = require("fast-png");
-const { utimesSync } = require("utimes");
-const { writeToPath } = require("@fast-csv/format");
+
 const merge = require("lodash.merge");
 import { State } from "./state.js";
-import { sqlite3, checkpoint, closeDatabase, Mutex } from "./database.js";
+import { sqlite3, checkpoint, closeDatabase, upgrade_to_v1, upgrade_to_v2, Mutex } from "./database.js";
 import { trackEvent as _trackEvent} from "./tracking.js";
-import { extractWaveMetadata } from "./metadata.js";
-import ExportFormatter from "./exportFormatter.js";
+
 let isWin32 = false;
 
 const DATASET = false;
@@ -37,9 +33,7 @@ const trackEvent = isTestEnv ? () => {} : _trackEvent;
 let DEBUG;
 
 let METADATA = {};
-let index = 0,
-  AUDACITY = {},
-  predictionStart;
+let index = 0, predictionStart;
 let sampleRate; // Should really make this a property of the model
 let predictWorkers = [],
   aborted = false;
@@ -294,7 +288,7 @@ const createDB = async (file) => {
     );
     await db.runAsync("INSERT INTO tags VALUES(0, 'Nocmig'), (1, 'Local')");
     await db.runAsync(
-      "CREATE TABLE species(id INTEGER PRIMARY KEY, sname TEXT NOT NULL, cname TEXT NOT NULL)"
+      "CREATE TABLE species(id INTEGER PRIMARY KEY, sname TEXT NOT NULL, cname TEXT NOT NULL, UNIQUE(cname, sname))"
     );
     await db.runAsync(
       `CREATE TABLE locations( id INTEGER PRIMARY KEY, lat REAL NOT NULL, lon  REAL NOT NULL, place TEXT NOT NULL, UNIQUE (lat, lon))`
@@ -439,74 +433,10 @@ async function loadDB(path) {
     // Add new column if not exists
     const {user_version} = await diskDB.getAsync("PRAGMA user_version")
       .catch((error) => console.error(error));
-    if (user_version === undefined || user_version < 1){ 
-      try{
-        t0 = Date.now()
-        await dbMutex.lock();
-        await diskDB.runAsync("PRAGMA writable_schema=ON");
-        await diskDB.runAsync("PRAGMA foreign_keys = OFF");
-        await diskDB.runAsync('BEGIN');
-        //1.10.x update
-        await diskDB.runAsync("CREATE INDEX IF NOT EXISTS idx_species_sname ON species(sname)");
-        await diskDB.runAsync("CREATE INDEX IF NOT EXISTS idx_species_cname ON species(cname)");
-        const fileColumns = (await diskDB.allAsync("PRAGMA table_info(files)")).map(row => row.name);
-        if (!fileColumns.includes('archiveName')){
-          await diskDB.runAsync("ALTER TABLE files ADD COLUMN archiveName TEXT");  
-        }
-        if (!fileColumns.includes('metadata')){
-          await diskDB.runAsync("ALTER TABLE files ADD COLUMN metadata TEXT");  
-        }
-
-        await diskDB.runAsync("CREATE TABLE IF NOT EXISTS tags(id INTEGER PRIMARY KEY, name TEXT NOT NULL, UNIQUE(name))");
-        await diskDB.runAsync("INSERT INTO tags VALUES(0, 'Nocmig'), (1, 'Local')");
-        await diskDB.runAsync("ALTER TABLE records ADD COLUMN tagID INTEGER");
-        await diskDB.runAsync("UPDATE records SET tagID = 0 WHERE label = 'Nocmig'");
-        await diskDB.runAsync("UPDATE records SET tagID = 1 WHERE label = 'Local'");
-        await diskDB.runAsync("ALTER TABLE records DROP COLUMN label");
-        // Change label names to labelIDs
-        await diskDB.runAsync("ALTER TABLE records ADD COLUMN reviewed INTEGER");
-
-        await diskDB.runAsync(`CREATE TABLE records_temp( dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, 
-          comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER, reviewed INTEGER, tagID INTEGER,
-          UNIQUE (dateTime, fileID, speciesID), 
-          CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,
-          CONSTRAINT fk_species FOREIGN KEY (speciesID) REFERENCES species(id),
-          CONSTRAINT fk_tags FOREIGN KEY (tagID) REFERENCES tags(id) ON DELETE SET NULL)`);
-        await diskDB.runAsync("INSERT INTO records_temp SELECT * from records");
-        await diskDB.runAsync("DROP TABLE records");
-        await diskDB.runAsync(`ALTER TABLE records_temp RENAME TO records`);
-        // Add old files table update
-        await diskDB.runAsync(`
-          CREATE TABLE files_new (
-              id INTEGER PRIMARY KEY, 
-              name TEXT NOT NULL, 
-              duration REAL,
-              filestart INTEGER, 
-              locationID INTEGER, 
-              archiveName TEXT, 
-              metadata TEXT, 
-              UNIQUE (name),
-              CONSTRAINT fk_locations FOREIGN KEY (locationID) REFERENCES locations(id) ON DELETE SET NULL
-          )`);
-        await diskDB.runAsync(`INSERT INTO files_new SELECT * FROM files`);
-        await diskDB.runAsync(`DROP TABLE files;`);
-        await diskDB.runAsync(`ALTER TABLE files_new RENAME TO files;`);
-        await diskDB.runAsync("DROP TABLE IF EXISTS db_upgrade");
-        await diskDB.runAsync('END');
-        await diskDB.runAsync("PRAGMA writable_schema=OFF");
-        await diskDB.runAsync("PRAGMA foreign_keys = ON");
-        await diskDB.runAsync("PRAGMA integrity_check");
-        await diskDB.runAsync("PRAGMA foreign_key_check");
-        await diskDB.runAsync("PRAGMA user_version = 1");
-        console.info("Migrated tags and added 'reviewed' column to ", p.basename(file))
-      } catch (e) {
-        await diskDB.runAsync('ROLLBACK');
-        console.error("Error adding column and updating version", e.message, e)
-      } finally{
-        await checkpoint(diskDB)
-        dbMutex.unlock();
-        console.info(`DB migration took ${Date.now() - t0}ms`)
-      }
+    if (user_version === undefined || user_version < 1){
+      await upgrade_to_v1(diskDB, dbMutex)
+    } else if (user_version < 2){
+      await upgrade_to_v2(diskDB, dbMutex)
     }
     const { count } = await diskDB.getAsync(
       "SELECT COUNT(*) as count FROM records"
@@ -524,53 +454,6 @@ async function loadDB(path) {
   }
   return true;
 }
-
-// Define the list of updates (always add new updates at the end. ORDER IS IMPORTANT!)
-const DB_updates = [
-  {
-    name: "add_columns_archiveName_and_metadata_and_foreign_key_to_files",
-    query: async (db) => {
-      try {
-        await dbMutex.lock();
-        // Disable foreign key checks (or dropping files will drop records too!!!)
-        await db.runAsync("PRAGMA foreign_keys = OFF");
-        // Update: Adding foreign key to files
-        await db.runAsync("BEGIN TRANSACTION;");
-        await db.runAsync(`
-                    CREATE TABLE files_new (
-                        id INTEGER PRIMARY KEY, 
-                        name TEXT NOT NULL, 
-                        duration REAL,
-                        filestart INTEGER, 
-                        locationID INTEGER, 
-                        archiveName TEXT, 
-                        metadata TEXT, 
-                        UNIQUE (name),
-                        CONSTRAINT fk_locations FOREIGN KEY (locationID) REFERENCES locations(id) ON DELETE SET NULL
-                    );
-                `);
-        await db.runAsync(`
-                    INSERT INTO files_new (id, name, duration, filestart, locationID)
-                    SELECT id, name, duration, filestart, locationID
-                    FROM files;
-                `);
-        await db.runAsync(`DROP TABLE files;`);
-        await db.runAsync(`ALTER TABLE files_new RENAME TO files;`);
-
-        // If we get to here, it's all good: Commit the transaction
-        await db.runAsync("COMMIT;");
-      } catch (error) {
-        // If any error occurs, rollback the transaction
-        await db.runAsync("ROLLBACK;");
-        throw new Error(`Migration failed: ${error.message}`);
-      } finally {
-        // Disable foreign key checks
-        await db.runAsync("PRAGMA foreign_keys = ON");
-        dbMutex.unlock();
-      }
-    },
-  },
-];
 
 
 
@@ -709,6 +592,8 @@ async function handleMessage(e) {
       break;
     }
     case "chart": {
+      Object.assign(args, { diskDB, state: STATE, UI });
+      const {onChartRequest} = require('./js/charts.js');
       await onChartRequest(args);
       break;
     }
@@ -1164,7 +1049,7 @@ const getFiles = async (files, image) => {
 const getFilesInDirectory = async (dir) => {
   const files = [];
   const stack = [dir];
-
+  const { readdir } = require("node:fs/promises");
   while (stack.length) {
     const currentDir = stack.pop();
     const dirents = await readdir(currentDir, { withFileTypes: true });
@@ -1468,7 +1353,6 @@ async function onAnalyse({
     );
   //Reset GLOBAL variables
   index = 0;
-  AUDACITY = {};
   batchChunksToSend = {};
   FILE_QUEUE = filesInScope;
   AUDIO_BACKLOG = 0;
@@ -1904,7 +1788,7 @@ async function sendDetections(file, start, end, goToRegion) {
                 position AS start, 
                 end, 
                 cname AS label, 
-                RANK() OVER (PARTITION BY fileID, dateTime ORDER BY confidence DESC) AS rank,
+                ROW_NUMBER() OVER (PARTITION BY fileID, dateTime ORDER BY confidence DESC) AS rank,
                 confidence,
                 name,
                 dateTime,
@@ -1951,6 +1835,7 @@ const setMetadata = async ({ file, source_file = file }) => {
   if (!savedMeta?.duration) {
     METADATA[file].duration = await getDuration(file);
     if (file.toLowerCase().endsWith("wav")) {
+      const { extractWaveMetadata } = require("./js/metadata.js");
       const t0 = Date.now();
       const wavMetadata = await extractWaveMetadata(file); //.catch(error => console.warn("Error extracting GUANO", error));
       if (Object.keys(wavMetadata).includes("guano")) {
@@ -2081,9 +1966,9 @@ const getPredictBuffers = async ({ file = "", start = 0, end = undefined }) => {
     return;
   }
 
-  const MINIMUM_AUDIO_LENGTH = 0.05; // below this value doesn't generate another chunk
+  const duration = end - start;
   batchChunksToSend[file] = Math.ceil(
-    (end - start - MINIMUM_AUDIO_LENGTH) / (BATCH_SIZE * WINDOW_SIZE)
+    duration / (BATCH_SIZE * WINDOW_SIZE)
   );
   predictionsReceived[file] = 0;
   predictionsRequested[file] = 0;
@@ -2692,8 +2577,10 @@ const saveResults2DataSet = ({ species, included }) => {
 };
 
 const onSpectrogram = async (filepath, file, width, height, data, channels) => {
+  const { writeFile, mkdir } = require("node:fs/promises");
+  const png = require("fast-png");
   await mkdir(filepath, { recursive: true });
-  let image = await png.encode({
+  let image = png.encode({
     width: 384,
     height: 256,
     data: data,
@@ -2764,6 +2651,8 @@ const bufferToAudio = async ({
 
   if (padding) {
     start = Math.max(0, start - 1);
+    METADATA[file] ??= await setMetadata({file});
+
     end = Math.min(METADATA[file].duration, end + 1);
   }
 
@@ -3575,7 +3464,6 @@ const getSummary = async ({
     event: event,
     summary: summary,
     offset: offset,
-    audacityLabels: AUDACITY,
     filterSpecies: species,
     active: active,
     action: action,
@@ -3600,7 +3488,7 @@ const getResults = async ({
   limit = STATE.limit,
   offset = undefined,
   topRankin = STATE.topRankin,
-  directory = undefined,
+  path = undefined,
   format = undefined,
   active = undefined,
   position = undefined,
@@ -3622,7 +3510,6 @@ const getResults = async ({
   else STATE.update({ globalOffset: offset });
 
   let index = offset;
-  AUDACITY = {};
 
   const [sql, params] = prepResultsStatement(
     species,
@@ -3633,17 +3520,130 @@ const getResults = async ({
   );
 
   const result = await STATE.db.allAsync(sql, ...params);
-  let formattedValues;
-  let previousFile = null,
-    cumulativeOffset = 0;
 
+
+  if (['text', 'eBird', 'Raven'].includes(format)) {
+    await exportData(result, path, format)
+  } else if (format === "Audacity") {
+    exportAudacity(result, path)
+  } else {
+    for (let i = 0; i < result.length; i++) {
+      const r = result[i];
+      if (format === "audio") {
+        if (limit) {
+          // Audio export. Format date to YYYY-MM-DD-HH-MM-ss
+          const dateArray = new Date(r.timestamp).toString().split(" ");
+          const dateString = dateArray
+            .slice(0, 5)
+            .join(" ")
+            .replaceAll(":", "_");
+          const filename = `${r.cname}_${dateString}.${STATE.audio.format}`;
+          DEBUG &&
+            console.log(
+              `Exporting from ${r.file}, position ${r.position}, into folder ${path}`
+            );
+          saveAudio(
+            r.file,
+            r.position,
+            r.end,
+            filename,
+            { Artist: "Chirpity" },
+            path
+          );
+          i === result.length - 1 &&
+            generateAlert({
+              message: "goodResultSave",
+              variables: { number: result.length },
+            });
+        }
+      } else if (species && STATE.mode !== "explore") {
+        // get a number for the circle
+        const { count } = await STATE.db.getAsync(
+          `SELECT COUNT(*) as count FROM records WHERE dateTime = ?
+                AND confidence >= ? and fileID = ?`,
+          r.timestamp,
+          confidence,
+          r.fileID
+        );
+        r.count = count;
+        sendResult(++index, r, true);
+      } else {
+        sendResult(++index, r, true);
+      }
+      if (i === result.length - 1)
+        UI.postMessage({ event: "processing-complete" });
+    }
+    if (!result.length) {
+      if (STATE.selection) {
+        // No more detections in the selection
+        generateAlert({ message: "noDetections" });
+      } else {
+        species = species || "";
+        const nocmig = STATE.detect.nocmig ? "<b>nocturnal</b>" : "";
+        const archive = STATE.mode === "explore" ? "in the Archive" : "";
+        generateAlert({
+          message: `noDetectionsDetailed`,
+          variables: { nocmig, archive, species, list: STATE.list },
+        });
+      }
+    }
+    (STATE.selection && topRankin !== STATE.topRankin) ||
+      UI.postMessage({
+        event: "database-results-complete",
+        active,
+        select: position?.start,
+      });
+  }
+};
+
+function exportAudacity(result, directory){
+  const { writeToPath } = require("@fast-csv/format");
+  const groupedResult = result.reduce((acc, item) => {
+    // Check if the file already exists as a key in acc
+    const filteredItem = {
+      start: item.position,
+      end: item.end,
+      cname: `${item.cname} ${item.score / 10}%`,
+    };
+    if (!acc[item.file]) {
+      // If it doesn't, create an array for that file
+      acc[item.file] = [];
+    }
+    // Push the item into the array for the matching file key
+    acc[item.file].push(filteredItem);
+    return acc;
+  }, {});
+  Object.keys(groupedResult).forEach((file) => {
+    const suffix = p.extname(file);
+    const filename = p.basename(file, suffix) + ".txt";
+    const filePath = p.join(directory, filename);
+    writeToPath(filePath, groupedResult[file], {
+      headers: false,
+      delimiter: "\t",
+    })
+      .on("error", (_err) =>
+        generateAlert({
+          type: "warning",
+          message: "saveBlocked",
+          variables: { filePath },
+        })
+      )
+      .on("finish", () => {
+        generateAlert({ message: "goodSave", variables: { filePath } });
+      });
+  });
+}
+async function exportData(result, filename, format){
   const formatFunctions = {
     text: "formatCSVValues",
     eBird: "formateBirdValues",
     Raven: "formatRavenValues",
   };
-
-  if (format in formatFunctions) {
+  let formattedValues;
+    let previousFile = null,
+      cumulativeOffset = 0;
+    const { writeToPath } = require("@fast-csv/format");
+    const {ExportFormatter} = require("./js/exportFormatter.js");
     const formatter = new ExportFormatter(STATE);
     // CSV export. Format the values
     formattedValues = await Promise.all(
@@ -3700,10 +3700,8 @@ const getResults = async ({
       // Convert summary object into an array of objects
       formattedValues = Object.values(summary);
     }
+    const filePath = filename;
     // Create a write stream for the CSV file
-    let filename = species || "All";
-    filename += format == "Raven" ? `_selections.txt` : "_detections.csv";
-    const filePath = p.join(directory, filename);
     writeToPath(filePath, formattedValues, {
       headers: true,
       delimiter: format === "Raven" ? "\t" : ",",
@@ -3718,112 +3716,7 @@ const getResults = async ({
       .on("finish", () => {
         generateAlert({ message: "goodSave", variables: { filePath } });
       });
-  } else if (format === "Audacity") {
-    const groupedResult = result.reduce((acc, item) => {
-      // Check if the file already exists as a key in acc
-      const filteredItem = {
-        start: item.position,
-        end: item.end,
-        cname: `${item.cname} ${item.score / 10}%`,
-      };
-      if (!acc[item.file]) {
-        // If it doesn't, create an array for that file
-        acc[item.file] = [];
-      }
-      // Push the item into the array for the matching file key
-      acc[item.file].push(filteredItem);
-      return acc;
-    }, {});
-    Object.keys(groupedResult).forEach((file) => {
-      const suffix = p.extname(file);
-      const filename = p.basename(file, suffix) + ".txt";
-      const filePath = p.join(directory, filename);
-      writeToPath(filePath, groupedResult[file], {
-        headers: false,
-        delimiter: "\t",
-      })
-        .on("error", (_err) =>
-          generateAlert({
-            type: "warning",
-            message: "saveBlocked",
-            variables: { filePath },
-          })
-        )
-        .on("finish", () => {
-          generateAlert({ message: "goodSave", variables: { filePath } });
-        });
-    });
-  } else {
-    for (let i = 0; i < result.length; i++) {
-      const r = result[i];
-      if (format === "audio") {
-        if (limit) {
-          // Audio export. Format date to YYYY-MM-DD-HH-MM-ss
-          const dateArray = new Date(r.timestamp).toString().split(" ");
-          const dateString = dateArray
-            .slice(0, 5)
-            .join(" ")
-            .replaceAll(":", "_");
-          //const dateString = new Date(r.timestamp).toISOString().replace(/[TZ]/g, ' ').replace(/\.\d{3}/, '').replace(/[-:]/g, '-').trim();
-          const filename = `${r.cname}_${dateString}.${STATE.audio.format}`;
-          DEBUG &&
-            console.log(
-              `Exporting from ${r.file}, position ${r.position}, into folder ${directory}`
-            );
-          saveAudio(
-            r.file,
-            r.position,
-            r.end,
-            filename,
-            { Artist: "Chirpity" },
-            directory
-          );
-          i === result.length - 1 &&
-            generateAlert({
-              message: "goodResultSave",
-              variables: { number: result.length },
-            });
-        }
-      } else if (species && STATE.mode !== "explore") {
-        // get a number for the circle
-        const { count } = await STATE.db.getAsync(
-          `SELECT COUNT(*) as count FROM records WHERE dateTime = ?
-                AND confidence >= ? and fileID = ?`,
-          r.timestamp,
-          confidence,
-          r.fileID
-        );
-        r.count = count;
-        sendResult(++index, r, true);
-      } else {
-        sendResult(++index, r, true);
-      }
-      if (i === result.length - 1)
-        UI.postMessage({ event: "processing-complete" });
-    }
-    if (!result.length) {
-      if (STATE.selection) {
-        // No more detections in the selection
-        generateAlert({ message: "noDetections" });
-      } else {
-        species = species || "";
-        const nocmig = STATE.detect.nocmig ? "<b>nocturnal</b>" : "";
-        const archive = STATE.mode === "explore" ? "in the Archive" : "";
-        generateAlert({
-          message: `noDetectionsDetailed`,
-          variables: { nocmig, archive, species, list: STATE.list },
-        });
-      }
-    }
-    (STATE.selection && topRankin !== STATE.topRankin) ||
-      UI.postMessage({
-        event: "database-results-complete",
-        active,
-        select: position?.start,
-      });
-  }
-};
-
+}
 
 const sendResult = (index, result, fromDBQuery) => {
   // Convert confidence back to % value
@@ -3840,36 +3733,31 @@ const sendResult = (index, result, fromDBQuery) => {
 
 const getSavedFileInfo = async (file) => {
   if (diskDB) {
-    await dbMutex.lock();
-    const prefix = STATE.library.location + p.sep;
-    // Get rid of archive (library) location prefix
-    const archiveFile = file.replace(prefix, "");
-    let row = await diskDB
-      .getAsync(
-        `
-            SELECT duration, filestart AS fileStart, metadata, locationID
-            FROM files LEFT JOIN locations ON files.locationID = locations.id 
-            WHERE name = ? OR archiveName = ?`,
-        file,
-        archiveFile
-      )
-      .catch((error) => {
-        console.warn(error);
-        dbMutex.unlock();
-      });
-    if (!row) {
-      const baseName = file.replace(/^(.*)\..*$/g, "$1%");
+    let row;
+    try {
+      const prefix = STATE.library.location + p.sep;
+      // Get rid of archive (library) location prefix
+      const archiveFile = file.replace(prefix, "");
       row = await diskDB
         .getAsync(
-          "SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name LIKE  (?)",
-          baseName
+          `
+              SELECT duration, filestart AS fileStart, metadata, locationID
+              FROM files LEFT JOIN locations ON files.locationID = locations.id 
+              WHERE name = ? OR archiveName = ?`,
+          file,
+          archiveFile
         )
-        .catch((error) => {
-          console.warn(error);
-          dbMutex.unlock();
-        });
+      if (!row) {
+        const baseName = file.replace(/^(.*)\..*$/g, "$1%");
+        row = await diskDB
+          .getAsync(
+            "SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name LIKE  (?)",
+            baseName
+          )
+      }
+    } catch (error){
+      console.warn(error);
     }
-    dbMutex.unlock();
     return row;
   } else {
     generateAlert({ type: "error", message: "dbNotLoaded" });
@@ -3952,181 +3840,6 @@ const onSave2DiskDB = async ({ file }) => {
 const filterLocation = () =>
   STATE.locationID ? ` AND files.locationID = ${STATE.locationID}` : "";
 
-const getSeasonRecords = async (species, season) => {
-  // Add Location filter
-  const locationFilter = filterLocation();
-  // Because we're using stmt.prepare, we need to unescape quotes
-  const seasonMonth = { spring: "< '07'", autumn: " > '06'" };
-  return new Promise(function (resolve, reject) {
-    const stmt = diskDB.prepare(`
-        SELECT MAX(SUBSTR(DATE(records.dateTime/1000, 'unixepoch', 'localtime'), 6)) AS maxDate,
-        MIN(SUBSTR(DATE(records.dateTime/1000, 'unixepoch', 'localtime'), 6)) AS minDate
-        FROM records
-        JOIN species ON species.id = records.speciesID
-        JOIN files ON files.id = records.fileID
-        WHERE species.cname = (?) ${locationFilter}
-        AND STRFTIME('%m',
-        DATETIME(records.dateTime / 1000, 'unixepoch', 'localtime'))
-        ${seasonMonth[season]}`);
-    stmt.get(species, (err, row) => {
-      if (err) {
-        stmt.finalize();
-        reject(err);
-      } else {
-        stmt.finalize();
-        resolve(row);
-      }
-    });
-  });
-};
-
-const getMostCalls = (species) => {
-  return new Promise(function (resolve, reject) {
-    // Add Location filter
-    const locationFilter = filterLocation();
-    diskDB.get(
-      `
-        SELECT COUNT(*) as count, 
-        DATE(dateTime/1000, 'unixepoch', 'localtime') as date
-        FROM records 
-        JOIN species on species.id = records.speciesID
-        JOIN files ON files.id = records.fileID
-        WHERE species.cname = ? ${locationFilter}
-        GROUP BY STRFTIME('%Y', DATETIME(dateTime/1000, 'unixepoch', 'localtime')),
-        STRFTIME('%W', DATETIME(dateTime/1000, 'unixepoch', 'localtime')),
-        STRFTIME('%d', DATETIME(dateTime/1000, 'unixepoch', 'localtime'))
-        ORDER BY count DESC LIMIT 1`,
-      species,
-      (err, row) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(row);
-        }
-      }
-    );
-  });
-};
-
-const getChartTotals = ({
-  species = undefined,
-  range = {},
-  aggregation = "Week",
-}) => {
-  // Add Location filter
-  const locationFilter = filterLocation();
-  const dateRange = range;
-
-  // Work out sensible aggregations from hours difference in date range
-  const hours_diff = dateRange.start
-    ? Math.round((dateRange.end - dateRange.start) / (1000 * 60 * 60))
-    : 745;
-  DEBUG && console.log(hours_diff, "difference in hours");
-
-  const dateFilter = dateRange.start
-    ? ` AND dateTime BETWEEN ${dateRange.start} AND ${dateRange.end} `
-    : "";
-
-  // Default values for grouping
-  let groupBy = "Year, Week";
-  let orderBy = "Year";
-  let dataPoints = Math.max(52, Math.round(hours_diff / 24 / 7));
-  let startDay = 0;
-
-  // Update grouping based on aggregation parameter
-  if (aggregation === "Day") {
-    groupBy += ", Day";
-    orderBy = "Year, Week";
-    dataPoints = Math.round(hours_diff / 24);
-    const date =
-      dateRange.start !== undefined
-        ? new Date(dateRange.start)
-        : new Date(Date.UTC(2020, 0, 0, 0, 0, 0));
-    startDay = Math.floor(
-      (date - new Date(date.getFullYear(), 0, 0, 0, 0, 0)) / 1000 / 60 / 60 / 24
-    );
-  } else if (aggregation === "Hour") {
-    groupBy = "Hour";
-    orderBy = "CASE WHEN Hour >= 12 THEN Hour - 12 ELSE Hour + 12 END";
-    dataPoints = 24;
-    const date =
-      dateRange.start !== undefined
-        ? new Date(dateRange.start)
-        : new Date(Date.UTC(2020, 0, 0, 0, 0, 0));
-    startDay = Math.floor(
-      (date - new Date(date.getFullYear(), 0, 0, 0, 0, 0)) / 1000 / 60 / 60 / 24
-    );
-  }
-
-  return new Promise(function (resolve, reject) {
-    diskDB.all(
-      `SELECT CAST(STRFTIME('%Y', DATETIME(dateTime / 1000, 'unixepoch', 'localtime')) AS INTEGER) AS Year, 
-        CAST(STRFTIME('%W', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS INTEGER) AS Week,
-        CAST(STRFTIME('%j', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS INTEGER) AS Day, 
-        CAST(STRFTIME('%H', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS INTEGER) AS Hour,    
-        COUNT(*) as count
-        FROM records
-        JOIN species ON species.id = speciesID
-        JOIN files ON files.id = fileID
-        WHERE species.cname = ? ${dateFilter} ${locationFilter}
-        GROUP BY ${groupBy}
-        ORDER BY ${orderBy}`,
-      species,
-      (err, rows) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve([rows, dataPoints, aggregation, startDay]);
-        }
-      }
-    );
-  });
-};
-
-const getRate = (species) => {
-  return new Promise(function (resolve, reject) {
-    const calls = Array.from({ length: 52 }).fill(0);
-    const total = Array.from({ length: 52 }).fill(0);
-    // Add Location filter
-    const locationFilter = filterLocation();
-
-    diskDB.all(
-      `select STRFTIME('%W', DATE(dateTime / 1000, 'unixepoch', 'localtime')) as week, COUNT(*) as calls
-        from records
-        JOIN species ON species.id = records.speciesID
-        JOIN files ON files.id = records.fileID
-        WHERE species.cname = ? ${locationFilter}
-        group by week;`,
-      species,
-      (err, rows) => {
-        for (let i = 0; i < rows.length; i++) {
-          calls[parseInt(rows[i].week) - 1] = rows[i].calls;
-        }
-        diskDB.all(
-          "select STRFTIME('%W', DATE(duration.day / 1000, 'unixepoch', 'localtime')) as week, cast(sum(duration) as real)/3600  as total from duration group by week;",
-          (err, rows) => {
-            for (let i = 0; i < rows.length; i++) {
-              // Round the total to 2 dp
-              total[parseInt(rows[i].week) - 1] =
-                Math.round(rows[i].total * 100) / 100;
-            }
-            let rate = [];
-            for (let i = 0; i < calls.length; i++) {
-              total[i] > 0
-                ? (rate[i] = Math.round((calls[i] / total[i]) * 100) / 100)
-                : (rate[i] = 0);
-            }
-            if (err) {
-              reject(err);
-            } else {
-              resolve([total, rate]);
-            }
-          }
-        );
-      }
-    );
-  });
-};
 
 /**
  * getDetectedSpecies generates a list of species to use in dropdowns for chart and explore mode filters
@@ -4189,6 +3902,8 @@ const onUpdateFileStart = async (args) => {
   const newfileMtime = new Date(
     Math.round(args.start + METADATA[file].duration * 1000)
   );
+  
+  const { utimesSync } = require("utimes");
   utimesSync(file, { atime: Date.now(), mtime: newfileMtime });
 
   METADATA[file].fileStart = args.start;
@@ -4312,8 +4027,8 @@ const onUpdateFileStart = async (args) => {
       );
     } catch (error) {
       // Rollback in case of error
-      await db.runAsync("ROLLBACK");
       console.error(`Transaction failed: ${error.message}`);
+      await db.runAsync("ROLLBACK");
     }
   }
 };
@@ -4393,110 +4108,6 @@ async function onDeleteSpecies({
   }
 }
 
-async function onChartRequest(args) {
-  DEBUG &&
-    console.log(
-      `Getting chart for ${args.species} starting ${args.range.start}`
-    );
-  const dateRange = args.range,
-    results = {},
-    dataRecords = {};
-  // Escape apostrophes
-  if (args.species) {
-    t0 = Date.now();
-    await getSeasonRecords(args.species, "spring")
-      .then((result) => {
-        dataRecords.earliestSpring = result["minDate"];
-        dataRecords.latestSpring = result["maxDate"];
-      })
-      .catch((error) => {
-        console.log(error);
-      });
-
-    await getSeasonRecords(args.species, "autumn")
-      .then((result) => {
-        dataRecords.earliestAutumn = result["minDate"];
-        dataRecords.latestAutumn = result["maxDate"];
-      })
-      .catch((error) => {
-        console.log(error);
-      });
-
-    DEBUG &&
-      console.log(
-        `Season chart generation took ${(Date.now() - t0) / 1000} seconds`
-      );
-    t0 = Date.now();
-    await getMostCalls(args.species)
-      .then((row) => {
-        row
-          ? (dataRecords.mostDetections = [row.count, row.date])
-          : (dataRecords.mostDetections = ["N/A", "Not detected"]);
-      })
-      .catch((error) => {
-        console.log(error);
-      });
-
-    DEBUG &&
-      console.log(
-        `Most calls  chart generation took ${(Date.now() - t0) / 1000} seconds`
-      );
-    t0 = Date.now();
-  }
-  const [dataPoints, aggregation] = await getChartTotals(args)
-    .then(([rows, dataPoints, aggregation, startDay]) => {
-      for (let i = 0; i < rows.length; i++) {
-        const year = rows[i].Year;
-        const week = rows[i].Week;
-        const day = rows[i].Day;
-        const hour = rows[i].Hour;
-        const count = rows[i].count;
-        // stack years
-        if (!(year in results)) {
-          results[year] = Array.from({ length: dataPoints }).fill(0);
-        }
-        if (aggregation === "Week") {
-          results[year][parseInt(week) - 1] = count;
-        } else if (aggregation === "Day") {
-          results[year][parseInt(day) - startDay] = count;
-        } else {
-          // const d = new Date(dateRange.start);
-          // const hoursOffset = d.getHours();
-          // const index = ((parseInt(day) - startDay) * 24) + (parseInt(hour) - hoursOffset);
-          results[year][hour] = count;
-        }
-      }
-      return [dataPoints, aggregation];
-    })
-    .catch((error) => {
-      console.log(error);
-    });
-
-  DEBUG &&
-    console.log(
-      `Chart series generation took ${(Date.now() - t0) / 1000} seconds`
-    );
-  t0 = Date.now();
-  // If we have a years worth of data add total recording duration and rate
-  let total, rate;
-  if (dataPoints === 52) [total, rate] = await getRate(args.species);
-  DEBUG &&
-    console.log(
-      `Chart rate generation took ${(Date.now() - t0) / 1000} seconds`
-    );
-  const pointStart = (dateRange.start ??= Date.UTC(2020, 0, 0, 0, 0, 0));
-  UI.postMessage({
-    event: "chart-data", // Restore species name
-    species: args.species ? args.species : undefined,
-    results: results,
-    rate: rate,
-    total: total,
-    records: dataRecords,
-    dataPoints: dataPoints,
-    pointStart: pointStart,
-    aggregation: aggregation,
-  });
-}
 async function onFileUpdated(oldName, newName) {
   const newDuration = Math.round(await getDuration(newName));
   try {
@@ -4572,6 +4183,7 @@ const dbMutex = new Mutex();
  */
 async function _updateSpeciesLocale(db, labels) {
   const updatePromises = [];
+  await dbMutex.lock()
   const updateStmt = db.prepare("UPDATE species SET cname = ? WHERE sname = ?");
   const updateChirpityStmt = db.prepare(
     "UPDATE species SET cname = ? WHERE sname = ? AND cname LIKE ?"
@@ -4625,12 +4237,14 @@ async function _updateSpeciesLocale(db, labels) {
     await Promise.all(updatePromises);
     await db.runAsync("END");
   } catch (error) {
+    console.error(`_updateSpeciesLocale Transaction failed: ${error.message}`);
     await db.runAsync("ROLLBACK");
     throw error;
   } finally {
-    updateStmt.finalize()
-    updateChirpityStmt.finalize()
-    speciesSelectStmt.finalize()
+    dbMutex.unlock();
+    updateStmt.finalize();
+    updateChirpityStmt.finalize();
+    speciesSelectStmt.finalize();
   }
 }
 
@@ -4651,7 +4265,6 @@ async function _updateSpeciesLocale(db, labels) {
  */
 async function onUpdateLocale(locale, labels, refreshResults) {
   if (DEBUG) t0 = Date.now();
-  await dbMutex.lock();
   let db;
   try {
     STATE.update({ locale: locale });
@@ -4663,10 +4276,8 @@ async function onUpdateLocale(locale, labels, refreshResults) {
     }
     if (refreshResults) await Promise.all([getResults(), getSummary()]);
   } catch (error) {
-    await db.runAsync("ROLLBACK");
     throw error;
   } finally {
-    dbMutex.unlock();
     DEBUG &&
       console.log(`Locale update took ${(Date.now() - t0) / 1000} seconds`);
     updateSpeciesLabelLocale();
@@ -5120,6 +4731,8 @@ async function convertFile(
         const newfileMtime = new Date(
           Math.round(row.filestart + row.duration * 1000)
         );
+        
+        const { utimesSync } = require("utimes");
         utimesSync(fullFilePath, { atime: Date.now(), mtime: newfileMtime });
 
         db.run(

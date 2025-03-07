@@ -150,5 +150,5 @@ class ExportFormatter {
     }
   }
 
-  export default ExportFormatter;
+  module.exports = { ExportFormatter };
   

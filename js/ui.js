@@ -287,9 +287,7 @@ let modelReady = false,
   fileLoaded = false;
 let PREDICTING = false,
   t0, app_t0 = Date.now();
-let activeRegion,
-  AUDACITY_LABELS = {},
-  wavesurfer;
+let activeRegion, wavesurfer;
 let bufferStartTime, fileEnd;
 
 // set up some DOM element handles
@@ -599,9 +597,7 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
 
 
   wavesurfer.on("finish", function () {
-    console.log('Finish: wavesurfer paused:', wavesurfer.isPaused)
     const bufferEnd = windowOffsetSecs + windowLength;
-    activeRegion = null;
     if (currentFileDuration > bufferEnd) {
       wavesurfer.isReady = false
       postBufferUpdate({ begin: windowOffsetSecs + windowLength, play: !wavesurfer.isPaused });
@@ -656,7 +652,7 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
  * - postBufferUpdate: Function to update the audio buffer after FFT changes.
  */
 function increaseFFT() {
-  if (spectrogram.fftSamples < 2048) {
+  if (spectrogram.fftSamples < 2048 && STATE.regionsCompleted) {
     spectrogram.fftSamples *= 2;
     const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
     postBufferUpdate({
@@ -695,7 +691,7 @@ function increaseFFT() {
  * @returns {void}
  */
 function reduceFFT() {
-  if (spectrogram.fftSamples > 64) {
+  if (spectrogram.fftSamples > 64 && STATE.regionsCompleted) {
     spectrogram.fftSamples /= 2;
     const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
     postBufferUpdate({
@@ -1306,7 +1302,6 @@ function filterFilePaths(filePaths) {
   filePaths.forEach((filePath) => {
     const baseName = p.basename(filePath);
     const isHiddenFile = baseName.startsWith(".");
-    // Only add the path if it’s not hidden and doesn’t contain '?'
     if (!isHiddenFile) {
       filteredPaths.push(filePath);
     }
@@ -1395,7 +1390,6 @@ function analyseReset() {
   clearActive();
   DOM.fileNumber.textContent = "";
   resetDiagnostics();
-  AUDACITY_LABELS = {};
   DOM.progressDiv.classList.remove("invisible");
 }
 
@@ -1619,23 +1613,34 @@ async function batchExportAudio() {
 }
 
 async function exportData(format, species = isSpeciesViewFiltered(true), limit = Infinity, duration) {
-  const defaultPath = localStorage.getItem("lastFolder") || '';
-  const response = await window.electron.selectDirectory(defaultPath);
-  if (!response.canceled) {
-    const directory = response.filePaths[0];
-    worker.postMessage({
-      action: "export-results",
-      directory: directory,
-      format: format,
-      duration: duration,
-      species: species,
-      files: isExplore() ? [] : STATE.openFiles,
-      explore: isExplore(),
-      limit: limit,
-      range: isExplore() ? STATE.explore.range : undefined,
-    });
-    localStorage.setItem("lastFolder", directory);
+  const defaultPath = localStorage.getItem("lastSaveFolder") || '';
+  let location, lastSaveFolder;
+  if (['Audacity', 'audio'].includes(format)){
+    // Audacity exports one label file per file in results
+    const response = await window.electron.selectDirectory(defaultPath);
+    if (response.canceled) return
+    location = response.filePaths[0]
+    lastSaveFolder = location;
+  } else {
+    let filename = species || "All";
+    filename += format == "Raven" ? `_selections.txt` : "_detections.csv";
+    const filePath = p.join(defaultPath, filename);
+    location = await window.electron.exportData({defaultPath: filePath});
+    if (! location) return
+    lastSaveFolder = p.dirname(location)
   }
+  worker.postMessage({
+    action: "export-results",
+    path: location,
+    format,
+    duration,
+    species,
+    files: isExplore() ? [] : STATE.openFiles,
+    explore: isExplore(),
+    limit,
+    range: isExplore() ? STATE.explore.range : undefined,
+  });
+  localStorage.setItem("lastSaveFolder", lastSaveFolder);
 }
 
 const handleLocationFilterChange = (e) => {
@@ -3685,7 +3690,7 @@ const timelineToggle = (fromKeys) => {
   }
   config.timeOfDay = DOM.timelineSetting.value === "timeOfDay"; //toggle setting
   setTimelinePreferences();
-  if (fileLoaded) {
+  if (fileLoaded && STATE.regionsCompleted) {
     // Reload wavesurfer with the new timeline
     const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
     postBufferUpdate({ begin: windowOffsetSecs, position: position });
@@ -3866,19 +3871,19 @@ const GLOBAL_ACTIONS = {
     }
   },
   Home: () => {
-    if (currentBuffer) {
+    if (currentBuffer && STATE.regionsCompleted) {
       windowOffsetSecs = 0;
       postBufferUpdate({});
     }
   },
   End: () => {
-    if (currentBuffer) {
+    if (currentBuffer && STATE.regionsCompleted) {
       windowOffsetSecs = currentFileDuration - windowLength;
       postBufferUpdate({ begin: windowOffsetSecs, position: 1 });
     }
   },
   PageUp: () => {
-    if (currentBuffer) {
+    if (currentBuffer && STATE.regionsCompleted) {
       const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
       windowOffsetSecs = windowOffsetSecs - windowLength;
       const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
@@ -3906,7 +3911,7 @@ const GLOBAL_ACTIONS = {
     }
   },
   PageDown: () => {
-    if (currentBuffer) {
+    if (currentBuffer && STATE.regionsCompleted) {
       let position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
       windowOffsetSecs = windowOffsetSecs + windowLength;
       const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
@@ -3943,7 +3948,7 @@ const GLOBAL_ACTIONS = {
   },
   ArrowLeft: () => {
     const skip = windowLength / 100;
-    if (currentBuffer) {
+    if (currentBuffer && STATE.regionsCompleted) {
       wavesurfer.setTime(wavesurfer.getCurrentTime() - skip);
       let position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
       if (wavesurfer.getCurrentTime() < skip && windowOffsetSecs > 0) {
@@ -3958,7 +3963,7 @@ const GLOBAL_ACTIONS = {
   },
   ArrowRight: () => {
     const skip = windowLength / 100;
-    if (wavesurfer) {
+    if (currentBuffer && STATE.regionsCompleted) {
       const now = wavesurfer.getCurrentTime();
       if (wavesurfer.isReady){
         // This will trigger the finish event if at the end of the window
@@ -4002,32 +4007,26 @@ const GLOBAL_ACTIONS = {
   Backspace: () => activeRow && deleteRecord(activeRow),
 };
 
-/**
- * Retrieves the currently active region.
- *
- * This function returns the global active region object, which typically contains
- * properties (such as start and end) that define the region. If there is no active region,
- * the function returns undefined.
- *
- * @return {Object|undefined} The active region object with its defined properties, or undefined if not set.
- */
-function getRegion() {
-  return activeRegion || undefined;
-}
 
 function disableSettingsDuringAnalysis(bool) {
-  DOM.modelToUse.disabled = bool;
-  DOM.threadSlider.disabled = bool;
-  DOM.batchSizeSlider.disabled = bool;
-  DOM.locale.disabled = bool;
-  DOM.listToUse.disabled = bool;
-  DOM.customListContainer.disabled = bool;
-  DOM.localSwitchContainer.disabled = bool;
-  DOM.speciesThreshold.disabled = bool;
-  DOM.speciesWeek.disabled = bool;
-  DOM.backendOptions.forEach((backend) => (backend.disabled = bool));
-  DOM.contextAware.disabled = bool;
-  DOM.sendFilteredAudio.disabled = bool;
+  const elements = [
+    "modelToUse",
+    "threadSlider",
+    "batchSizeSlider",
+    "locale",
+    "listToUse",
+    "customListContainer",
+    "localSwitchContainer",
+    "speciesThreshold",
+    "speciesWeek",
+    "contextAware",
+    "sendFilteredAudio",
+  ];
+  elements.forEach((el) => {
+    if (DOM[el]) DOM[el].disabled = bool;
+    else throw new Error(`${el} is not in the DOM cache`)
+  });
+  DOM.backendOptions?.forEach((backend) => (backend.disabled = bool));
 }
 
 const postBufferUpdate = ({
@@ -4039,12 +4038,6 @@ const postBufferUpdate = ({
   goToRegion = false,
 }) => {
 
-  /* Validate input parameters - removed as position is clamped before use
-  if (position < 0 || position > 1) {
-    console.error('Invalid buffer update position:', `Position: ${position}`);
-    return;
-  } */
- 
   STATE.regionsCompleted = false;
   fileLoaded = false;
   worker.postMessage({
@@ -4088,7 +4081,7 @@ gotoModal.addEventListener("shown.bs.modal", () => {
 });
 
 const gotoTime = (e) => {
-  if (STATE.currentFile) {
+  if (STATE.currentFile && STATE.regionsCompleted) {
     e.preventDefault();
     const time = document.getElementById("timeInput").value;
     // Nothing entered?
@@ -4447,13 +4440,15 @@ function onResultsComplete({ active = undefined, select = undefined } = {}) {
   const table = DOM.resultTable;
   showElement(["resultTableContainer", "resultsHead"], false);
   const labelSort = document.getElementById('sort-label')
-  labelSort.classList.toggle('text-warning', STATE.labelFilters?.length > 0);
-  if (!labelSort.querySelector('span.fs-6')){
-    const span = document.createElement('span');
-    span.className = "material-symbols-outlined fs-6";
-    span.textContent = "menu_open";
-    labelSort.appendChild(span)
-    span.classList.add(`${STATE.isMember?'text-muted': 'locked'}`)
+  if (labelSort){
+    labelSort.classList.toggle('text-warning', STATE.labelFilters?.length > 0);
+    if (!labelSort.querySelector('span.fs-6')){
+      const span = document.createElement('span');
+      span.className = "material-symbols-outlined fs-6";
+      span.textContent = "menu_open";
+      labelSort.appendChild(span)
+      span.classList.add(`${STATE.isMember?'text-muted': 'locked'}`)
+    }
   }
   // Set active Row
   if (active) {
@@ -4592,17 +4587,15 @@ function onAnalysisComplete({ quiet }) {
  *
  * This function updates the summary view with new data and applies filters if specified.
  * It enhances the summary table by adding pointer and hover effects to species rows, triggers
- * result sorting when appropriate, assigns provided Audacity labels globally, and toggles
+ * result sorting when appropriate,  and toggles
  * menu item availability based on the summary content and current application state.
  *
  * @param {Object} options - An object containing update parameters.
  * @param {*} [options.filterSpecies] - Optional criteria to filter species in the summary.
- * @param {Object} [options.audacityLabels={}] - A mapping of labels from Audacity to be applied globally.
  * @param {Array} [options.summary=[]] - An array of summary records to be used for updating the UI.
  */
 function onSummaryComplete({
   filterSpecies = undefined,
-  audacityLabels = {},
   summary = [],
 }) {
   updateSummary({ summary: summary, filterSpecies: filterSpecies });
@@ -4616,8 +4609,6 @@ function onSummaryComplete({
     summaryNode.classList.add("table-hover");
   }
   if (!PREDICTING || STATE.mode !== "analyse") activateResultSort();
-  // Why do we do audacity labels here?
-  AUDACITY_LABELS = audacityLabels;
   if (summary.length) {
     enableMenuItem(["saveLabels", "saveCSV", "save-eBird", "save-Raven"]);
     STATE.mode !== "explore" && enableMenuItem(["save2db"]);
@@ -4755,7 +4746,7 @@ async function renderResult({
     }
     showElement(["resultTableContainer", "resultsHead"], false);
     // If  we have some results, let's update the view in case any are in the window
-    if (config.specDetections && !isFromDB && !STATE.selection)
+    if (config.specDetections && !isFromDB && !STATE.selection && STATE.regionsCompleted)
       postBufferUpdate({ file, begin: windowOffsetSecs });
   } else if (!isFromDB && index % (config.limit + 1) === 0) {
     pagination.add(index, 0);
@@ -5546,7 +5537,7 @@ document.addEventListener("dragover", (event) => {
 document.addEventListener("drop", (event) => {
   event.preventDefault();
   event.stopPropagation();
-  const filelist = Array.from(event.dataTransfer.files)
+  const fileList = Array.from(event.dataTransfer.files)
     .filter(
       (file) =>
         !file.name.startsWith(".") &&
@@ -5556,9 +5547,9 @@ document.addEventListener("drop", (event) => {
     )
     .map((file) => file.path);
 
+  worker.postMessage({action: "get-valid-files-list", files: fileList})
   // For electron 32+
   // const filelist = audioFiles.map(file => window.electron.showFilePath(file));
-  if (filelist.length) onOpenFiles({ filePaths: filelist });
 });
 
 // Prevent drag for UI elements
@@ -5972,7 +5963,7 @@ const filterIconDisplay = () => {
 };
 // High pass threshold
 const showFilterEffect = () => {
-  if (fileLoaded) {
+  if (fileLoaded  && STATE.regionsCompleted) {
     const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
     postBufferUpdate({
       begin: windowOffsetSecs,
@@ -6110,18 +6101,20 @@ DOM.gain.addEventListener("input", () => {
 function playRegion() {
   // Sanitise region (after zoom, start or end may be outside the windowlength)
   // I don't want to change the actual region length, so make a copy
-  const region = REGIONS.regions?.find(
-    (region) => region.start === activeRegion.start
-  );
-  if (region){
-    const myRegion = region;
-    myRegion.start = Math.max(0, myRegion.start);
-    // Have to adjust the windowlength so the finish event isn't fired - causing a page reload)
-    myRegion.end = Math.min(myRegion.end, windowLength * 0.995);
-    /* ISSUE if you pause at the end of a region, 
-      when 2 regions abut, the second region won't play*/
-      REGIONS.once('region-out', () => wavesurfer.pause());
-    myRegion.play();
+  if (STATE.regionsCompleted){
+    const region = REGIONS.regions?.find(
+      (region) => region.start === activeRegion.start
+    );
+    if (region){
+      const myRegion = region;
+      myRegion.start = Math.max(0, myRegion.start);
+      // Have to adjust the windowlength so the finish event isn't fired - causing a page reload)
+      myRegion.end = Math.min(myRegion.end, windowLength * 0.995);
+      /* ISSUE if you pause at the end of a region, 
+        when 2 regions abut, the second region won't play*/
+        REGIONS.once('region-out', () => wavesurfer.pause());
+      myRegion.play();
+    }
   }
 }
 // Audio preferences:
@@ -6883,7 +6876,7 @@ document.addEventListener("change", function (e) {
           } else {
             colorMapFieldset.classList.add("d-none");
           }
-          if (wavesurfer && STATE.currentFile) {
+          if (wavesurfer && STATE.currentFile && STATE.regionsCompleted) {
             const fftSamples = spectrogram.fftSamples;
             adjustSpecDims(true, fftSamples);
             postBufferUpdate({ begin: windowOffsetSecs, position: wavesurfer.getCurrentTime() / windowLength });
@@ -6929,7 +6922,7 @@ document.addEventListener("change", function (e) {
           config.audio.gain = element.value;
           worker.postMessage({ action: "update-state", audio: config.audio });
           config.filters.active || toggleFilters();
-          if (fileLoaded) {
+          if (fileLoaded  && STATE.regionsCompleted) {
             const position = clamp(
               wavesurfer.getCurrentTime() / windowLength,
               0,
@@ -6987,7 +6980,7 @@ document.addEventListener("change", function (e) {
           element.checked && (config.filters.active = true);
           worker.postMessage({ action: "update-state", filters: config.filters });
           element.blur();
-          if (fileLoaded) {
+          if (fileLoaded && STATE.regionsCompleted) {
             const position = clamp(
               wavesurfer.getCurrentTime() / windowLength,
               0,
@@ -7650,10 +7643,6 @@ window.electron.onDownloadProgress((_event, progressObj) =>
   displayProgress(progressObj, "Downloading the latest update: ")
 );
 
-// CI functions
-const getFileLoaded = () => fileLoaded;
-const donePredicting = () => !PREDICTING;
-const getAudacityLabels = () => AUDACITY_LABELS[STATE.currentFile];
 
 // Update checking for Mac
 

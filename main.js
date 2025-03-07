@@ -619,42 +619,19 @@ ipcMain.handle("unsaved-records", (_event, data) => {
   unsavedRecords = data.newValue; // Update the variable with the new value
 });
 
+ipcMain.handle("exportData", async (event, arg) => {
+  const {defaultPath} = arg;
+  return await dialog
+    .showSaveDialog(mainWindow, {
+      filters: [{ name: "Text Files", extensions: ["txt", "csv"] }],
+      defaultPath
+    })
+    .then((file) => file.filePath)
+})
+
+
 ipcMain.handle("saveFile", async (event, arg) => {
   // Show file dialog to select audio file
-  if (arg.type === "audacity") {
-    let currentFile =
-      arg.currentFile.substr(0, arg.currentFile.lastIndexOf(".")) + ".txt";
-    dialog
-      .showSaveDialog(mainWindow, {
-        filters: [{ name: "Text Files", extensions: ["txt"] }],
-        defaultPath: currentFile,
-      })
-      .then((file) => {
-        // Stating whether dialog operation was cancelled or not.
-        //DEBUG && console.log(file.canceled);
-        if (!file.canceled) {
-          const AUDACITY_LABELS = arg.labels;
-          let str = "";
-          // Format results
-          for (let i = 0; i < AUDACITY_LABELS.length; i++) {
-            str += AUDACITY_LABELS[i].timestamp + "\t";
-            str += " " + AUDACITY_LABELS[i].cname;
-            // str += " " + AUDACITY_LABELS[i].sname ;
-            str +=
-              " " +
-              (parseFloat(AUDACITY_LABELS[i].score) * 100).toFixed(0) +
-              "%\r\n";
-          }
-          fs.writeFile(file.filePath.toString(), str, function (err) {
-            if (err) throw err;
-            DEBUG && console.log("Saved!");
-          });
-        }
-      })
-      .catch((error) => {
-        console.warn(error);
-      });
-  } else {
     const { file, filename, extension } = arg;
     dialog
       .showSaveDialog(mainWindow, {
@@ -681,7 +658,6 @@ ipcMain.handle("saveFile", async (event, arg) => {
           console.error(`Error moving file: ${error}`);
         }
       });
-  }
 });
 
 let powerSaveID = powerSaveBlocker.start("prevent-app-suspension");
