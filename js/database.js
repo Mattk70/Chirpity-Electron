@@ -164,7 +164,7 @@ function closeDatabase(db) {
 }
 
 
-async function upgrade_to_v1(diskDB, dbMutex){
+async function upgrade_to_v1(model, diskDB, dbMutex){
   let t0 = Date.now()
   try{
     await dbMutex.lock();
@@ -182,7 +182,7 @@ async function upgrade_to_v1(diskDB, dbMutex){
     }
 
     await diskDB.runAsync("CREATE TABLE IF NOT EXISTS tags(id INTEGER PRIMARY KEY, name TEXT NOT NULL, UNIQUE(name))");
-    await diskDB.runAsync("INSERT INTO tags VALUES(0, 'Nocmig'), (1, 'Local')");
+    await diskDB.runAsync("INSERT OR IGNORE INTO tags VALUES(0, 'Nocmig'), (1, 'Local')");
     await diskDB.runAsync("ALTER TABLE records ADD COLUMN tagID INTEGER");
     await diskDB.runAsync("UPDATE records SET tagID = 0 WHERE label = 'Nocmig'");
     await diskDB.runAsync("UPDATE records SET tagID = 1 WHERE label = 'Local'");
@@ -214,13 +214,12 @@ async function upgrade_to_v1(diskDB, dbMutex){
       )`);
     await diskDB.runAsync("INSERT INTO files_new SELECT * FROM files");
     await diskDB.runAsync("DROP TABLE files");
-    await diskDB.runAsync("ALTER TABLE files_new RENAME TO files");
-    await diskDB.runAsync("DROP TABLE IF EXISTS db_upgrade");
+    await diskDB.runAsync("ALTER TABLE files_new RENAME TO files");    
     await diskDB.runAsync("END");
     await diskDB.runAsync("PRAGMA foreign_keys=ON");
     await diskDB.runAsync("PRAGMA integrity_check");
     await diskDB.runAsync("PRAGMA foreign_key_check");
-    await diskDB.runAsync("PRAGMA user_version = 1");
+    localStorage.setItem(`${model}-dbVersion`, '1')
     console.info("Migrated tags and added 'reviewed' column to ", diskDB.filename)
   } catch (e) {
     console.error("Error adding column and updating version", e.message, e)
@@ -232,7 +231,7 @@ async function upgrade_to_v1(diskDB, dbMutex){
   }
 }
 
-async function upgrade_to_v2(diskDB, dbMutex){
+async function upgrade_to_v2(model, diskDB, dbMutex){
   let t0 = Date.now();
   try{
     await dbMutex.lock();
@@ -246,7 +245,7 @@ async function upgrade_to_v2(diskDB, dbMutex){
     await diskDB.runAsync("PRAGMA foreign_keys=ON");
     await diskDB.runAsync("PRAGMA integrity_check");
     await diskDB.runAsync("PRAGMA foreign_key_check");
-    await diskDB.runAsync("PRAGMA user_version = 2");
+    localStorage.setItem(`${model}-dbVersion`, '2')
     console.info(`Adding species unique constraint took ${Date.now() - t0}ms`)
   } catch (e) {
     console.error("Error adding unique constraint ", e.message, e)
