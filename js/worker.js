@@ -310,6 +310,8 @@ const createDB = async (file) => {
     await db.runAsync("CREATE INDEX idx_species_sname ON species(sname)");
     await db.runAsync("CREATE INDEX idx_species_cname ON species(cname)");
     if (archiveMode) {
+      await diskDB.runAsync("CREATE TABLE schema_version (version INTEGER NOT NULL)");  
+      await diskDB.runAsync("INSERT INTO schema_version (version) VALUES (2)");
       const stmt = db.prepare("INSERT INTO species VALUES (?, ?, ?)");
       try {
         // Only called when creating a new archive database
@@ -347,7 +349,6 @@ const createDB = async (file) => {
           console.log(response.changes + " tags added to memory database");
     }
     await db.runAsync("END");
-    if (archiveMode) localStorage.setItem(`${STATE.model}-dbVersion`, "2");
   } catch (error) {
     console.error("Error during DB transaction:", error);
     await db.runAsync("ROLLBACK"); // Rollback the transaction in case of error
@@ -431,14 +432,21 @@ async function loadDB(path) {
     await diskDB.runAsync("PRAGMA journal_mode = WAL");
     await diskDB.runAsync("PRAGMA busy_timeout = 1000");
 
-    // Add new column if not exists
-    const pragmaVersion = (await diskDB.getAsync("PRAGMA user_version")).user_version;
-    const dbVersion = localStorage.getItem(`${model}-dbVersion`);
-    const user_version = parseInt(dbVersion) || pragmaVersion;
+    // Add empty version table if not exists
+    await diskDB.runAsync("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)");  
+    const row = await diskDB.getAsync(`SELECT version FROM schema_version`);
+    let user_version;
+    if (!row) {
+        const {pragma_version} = await diskDB.getAsync("PRAGMA user_version")
+        user_version = pragma_version || 0;
+        await diskDB.runAsync("INSERT INTO schema_version (version) VALUES (?)", user_version);
+    } else {
+      user_version  = row.version
+    }
     if (user_version < 1){
-      await upgrade_to_v1(model, diskDB, dbMutex)
-    } else if (user_version < 2){
-      await upgrade_to_v2(model, diskDB, dbMutex)
+      await upgrade_to_v1(diskDB, dbMutex)
+    } if (user_version < 2){
+      await upgrade_to_v2(diskDB, dbMutex)
     }
     const { count } = await diskDB.getAsync(
       "SELECT COUNT(*) as count FROM records"
