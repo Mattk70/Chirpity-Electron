@@ -407,11 +407,6 @@ if (!gotTheLock) {
 
   // This method will be called when Electron has finished loading
   app.whenReady().then(async () => {
-    // First thing - are we the only CHirpity running?
-    const gotLock = app.requestSingleInstanceLock();
-    console.log("lock obtained:", gotLock);
-    if (!gotLock) app.quit();
-
     // Update the userData path for portable app
     if (process.env.PORTABLE_EXECUTABLE_DIR) {
       app.setPath(
