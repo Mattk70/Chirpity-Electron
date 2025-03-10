@@ -30,7 +30,7 @@ jobs:
   stale:
     runs-on: ubuntu-latest
     steps:
-    - uses: 'actions/stale@v7'
+    - uses: 'actions/stale@v9.1.0'
       with:
         # Comma separated list of labels that can be assigned to issues to exclude them from being marked as stale.
         exempt-issue-labels: 'override-stale'
@@ -40,7 +40,7 @@ jobs:
         operations-per-run: 30
         # Prevent to remove stale label when PRs or issues are updated.
         remove-stale-when-updated: true
-        # List of labels to remove when issues/PRs unstale. 
+        # List of labels to remove when issues/PRs unstale.
         labels-to-remove-when-unstale: 'stat:awaiting response'
         # comment on issue if not active for more then 7 days.
         stale-issue-message: 'This issue has been marked stale because it has had no activity for 7 days. It will be closed if no further activity occurs. Thank you.'
