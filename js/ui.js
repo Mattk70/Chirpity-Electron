@@ -601,6 +601,19 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
     if (currentFileDuration > bufferEnd) {
       wavesurfer.isReady = false
       postBufferUpdate({ begin: windowOffsetSecs + windowLength, play: !wavesurfer.isPaused });
+    } else if (!wavesurfer.isPaused){
+      const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
+      if (fileIndex < STATE.openFiles.length - 1) {
+        // Move to next file
+        const fileToLoad = STATE.openFiles[fileIndex + 1];
+        wavesurfer.isReady = false
+        postBufferUpdate({
+          file: fileToLoad,
+          begin: 0,
+          position: 0,
+          play: !wavesurfer.isPaused
+        });
+      }
     }
   });
 
@@ -6110,10 +6123,7 @@ function playRegion() {
       myRegion.start = Math.max(0, myRegion.start);
       // Have to adjust the windowlength so the finish event isn't fired - causing a page reload)
       myRegion.end = Math.min(myRegion.end, windowLength * 0.995);
-      /* ISSUE if you pause at the end of a region, 
-        when 2 regions abut, the second region won't play*/
-        REGIONS.once('region-out', () => wavesurfer.pause());
-      myRegion.play();
+      myRegion.play(true);
     }
   }
 }

@@ -24,7 +24,7 @@
    */
 
 
-const REQUEST_TIMEOUT_MS = 5000;
+const REQUEST_TIMEOUT_MS = 10000;
 
 /**
  * Validates that a given string conforms to the version 4 UUID format.

@@ -41,6 +41,8 @@ const SUPPORTED_FILES = [
   ".mov",
 ];
 
+
+
 //-------------------------------------------------------------------
 // Logging
 
@@ -386,134 +388,135 @@ async function createWorker() {
   DEBUG && console.log("worker created");
 }
 
-// This method will be called when Electron has finished loading
-app.whenReady().then(async () => {
-  // First thing - are we the only CHirpity running?
-  const gotLock = app.requestSingleInstanceLock();
-  console.log("lock obtained:", gotLock);
-  if (!gotLock) app.quit();
-
-  // Update the userData path for portable app
-  if (process.env.PORTABLE_EXECUTABLE_DIR) {
-    app.setPath(
-      "userData",
-      path.join(process.env.PORTABLE_EXECUTABLE_DIR, "chirpity-data")
-    );
-    ipcMain.handle("getVersion", () => app.getVersion() + " (Portable)");
-  } else {
-    ipcMain.handle("getVersion", () => app.getVersion());
-  }
-
-    ipcMain.handle('getPath', () => app.getPath('userData'));
-    ipcMain.handle('trialPeriod', () => 14*24*3600*1000); // 14 days
-    ipcMain.handle('getLocale', () => app.getLocale());
-    ipcMain.handle('getTemp', () => app.getPath('temp'));
-    ipcMain.handle('isMac', () => process.platform === 'darwin');
-    ipcMain.handle('getAudio', () => path.join(__dirname.replace('app.asar', ''), 'Help', 'example.mp3'));
-    ipcMain.handle('exitApplication', () => app.quit()); 
-    
-
-    // Debug mode
-    function hexToUtf8(hex) {
-        return hex
-            .match(/.{1,2}/g) // Split the hex string into pairs
-            .map(byte => String.fromCharCode(parseInt(byte, 16))) // Convert each pair to a character
-            .join('');
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit()
+} else {
+  app.on('second-instance', (e, commandLine) => {
+    // This event is emitted when a second instance is launched
+    // Focus the primary instance's window
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+      const filePath = getFileFromArgs(commandLine)
+      if (filePath) {
+          mainWindow.webContents.send('open-file', filePath);
+      }
     }
-    try {
-        // Specify the file path
-        filePath = path.join(app.getPath('userData'), 'config.json');
-        
-        // Read the contents of the file synchronously
-        fileContent = fs.readFileSync(filePath, 'utf8');
-        config = JSON.parse(fileContent);
-        DEBUG =   process.env.CI === 'e2e' ? false : config.debug;
-    }
-    catch (error) {
-        console.warn('CONFIG: ASCII read attempt failed:', error.message);
-        // Handle errors, for example, file not found
-        try {
-            const jsonData = hexToUtf8(fileContent);
-            config = JSON.parse(jsonData);
-            DEBUG =   process.env.CI === 'e2e' ? false : config.debug;
-        } catch {
-            console.warn('CONFIG: Error reading Hex file:', error.message);
-        }
-    }
-    DEBUG && console.log('CI mode' , process.env.CI)
+  });
 
-    await createWorker();
-    await createWindow();
-
-    if (process.platform === 'darwin') {
-        //const appIcon = new Tray('./img/icon/icon.png')
-        app.dock.setIcon(__dirname + '/img/icon/icon.png');
-        app.dock.bounce();
+  // This method will be called when Electron has finished loading
+  app.whenReady().then(async () => {
+    // Update the userData path for portable app
+    if (process.env.PORTABLE_EXECUTABLE_DIR) {
+      app.setPath(
+        "userData",
+        path.join(process.env.PORTABLE_EXECUTABLE_DIR, "chirpity-data")
+      );
+      ipcMain.handle("getVersion", () => app.getVersion() + " (Portable)");
     } else {
-        // Quit when all windows are closed.
-        app.setAppUserModelId('chirpity')
-        app.on('window-all-closed', () => {
-            app.quit()
-        })
-        const filePath = getFileFromArgs(process.argv);
-        if (filePath) {
-            mainWindow.webContents.once('did-finish-load', () => {
-                mainWindow.webContents.send('open-file', filePath);
-            });
-        }
+      ipcMain.handle("getVersion", () => app.getVersion());
     }
-    
-    app.on('activate', async () => {
-        const windowsOpen = BrowserWindow.getAllWindows().length
-        if (!windowsOpen) {
-            await createWorker();
-            await createWindow();
-        } else if (windowsOpen === 1) {
-            await createWindow();
-        }
-    });
-    app.on('second-instance', (e, commandLine) => {
-        // This event is emitted when a second instance is launched
-        // Focus the primary instance's window
-        if (mainWindow) {
-          if (mainWindow.isMinimized()) mainWindow.restore();
-          mainWindow.focus();
-          const filePath = getFileFromArgs(commandLine)
-          if (filePath) {
-              mainWindow.webContents.send('open-file', filePath);
+
+      ipcMain.handle('getPath', () => app.getPath('userData'));
+      ipcMain.handle('trialPeriod', () => 14*24*3600*1000); // 14 days
+      ipcMain.handle('getLocale', () => app.getLocale());
+      ipcMain.handle('getTemp', () => app.getPath('temp'));
+      ipcMain.handle('isMac', () => process.platform === 'darwin');
+      ipcMain.handle('getAudio', () => path.join(__dirname.replace('app.asar', ''), 'Help', 'example.mp3'));
+      ipcMain.handle('exitApplication', () => app.quit()); 
+      
+
+      // Debug mode
+      function hexToUtf8(hex) {
+          return hex
+              .match(/.{1,2}/g) // Split the hex string into pairs
+              .map(byte => String.fromCharCode(parseInt(byte, 16))) // Convert each pair to a character
+              .join('');
+      }
+      try {
+          // Specify the file path
+          filePath = path.join(app.getPath('userData'), 'config.json');
+          
+          // Read the contents of the file synchronously
+          fileContent = fs.readFileSync(filePath, 'utf8');
+          config = JSON.parse(fileContent);
+          DEBUG =   process.env.CI === 'e2e' ? false : config.debug;
+      }
+      catch (error) {
+          console.warn('CONFIG: ASCII read attempt failed:', error.message);
+          // Handle errors, for example, file not found
+          try {
+              const jsonData = hexToUtf8(fileContent);
+              config = JSON.parse(jsonData);
+              DEBUG =   process.env.CI === 'e2e' ? false : config.debug;
+          } catch {
+              console.warn('CONFIG: Error reading Hex file:', error.message);
           }
-        }
+      }
+      DEBUG && console.log('CI mode' , process.env.CI)
+
+      await createWorker();
+      await createWindow();
+
+      if (process.platform === 'darwin') {
+          //const appIcon = new Tray('./img/icon/icon.png')
+          app.dock.setIcon(__dirname + '/img/icon/icon.png');
+          app.dock.bounce();
+      } else {
+          // Quit when all windows are closed.
+          app.setAppUserModelId('chirpity')
+          app.on('window-all-closed', () => {
+              app.quit()
+          })
+          const filePath = getFileFromArgs(process.argv);
+          if (filePath) {
+              mainWindow.webContents.once('did-finish-load', () => {
+                  mainWindow.webContents.send('open-file', filePath);
+              });
+          }
+      }
+      
+      app.on('activate', async () => {
+          const windowsOpen = BrowserWindow.getAllWindows().length
+          if (!windowsOpen) {
+              await createWorker();
+              await createWindow();
+          } else if (windowsOpen === 1) {
+              await createWindow();
+          }
       });
-    
-    app.on('open-file', (event, path) => {
-        files.push(path);
-        DEBUG && console.log('file passed to open:', path)
-    });
-    
-    ipcMain.handle('openFiles', async (_event, _method, config) => {
-        const {type, fileOrFolder, multi, buttonLabel, title} = config;
-        let options;
-        if (type === 'audio') {
-             options = {
-                properties: [fileOrFolder, multi] ,
-                buttonLabel: buttonLabel,
-                title: title
-            }
-            if (fileOrFolder === 'openFile' ){
-                options.filters = [{ name: 'Audio Files', extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg', 'mp4', 'opus', 'mov'] } ]
-            }
-        } else {
-            options = {
-                filters: [
-                    { name: 'Text Files', extensions: ['txt'] }
-                ],
-                properties: ['openFile']
-            }
-        }
-        // Show file dialog 
-        return await dialog.showOpenDialog(mainWindow, options);
-    })
-    
+
+      
+      app.on('open-file', (event, path) => {
+          files.push(path);
+          DEBUG && console.log('file passed to open:', path)
+      });
+      
+      ipcMain.handle('openFiles', async (_event, _method, config) => {
+          const {type, fileOrFolder, multi, buttonLabel, title} = config;
+          let options;
+          if (type === 'audio') {
+              options = {
+                  properties: [fileOrFolder, multi] ,
+                  buttonLabel: buttonLabel,
+                  title: title
+              }
+              if (fileOrFolder === 'openFile' ){
+                  options.filters = [{ name: 'Audio Files', extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg', 'mp4', 'opus', 'mov'] } ]
+              }
+          } else {
+              options = {
+                  filters: [
+                      { name: 'Text Files', extensions: ['txt'] }
+                  ],
+                  properties: ['openFile']
+              }
+          }
+          // Show file dialog 
+          return await dialog.showOpenDialog(mainWindow, options);
+      })
+        
     /**
    * Retrieves the first file path from the given arguments that matches a supported file extension.
    *
@@ -572,6 +575,7 @@ app.whenReady().then(async () => {
         autoUpdater.checkForUpdatesAndNotify().catch(error => console.warn('Error checking for updates', error))
     }
 });
+}
 
 app.on("activate", async () => {
   if (mainWindow === null) {
