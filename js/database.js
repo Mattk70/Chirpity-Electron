@@ -175,14 +175,14 @@ async function upgrade_to_v1(diskDB, dbMutex){
     await diskDB.runAsync("CREATE INDEX IF NOT EXISTS idx_species_cname ON species(cname)");
     const fileColumns = (await diskDB.allAsync("PRAGMA table_info(files)")).map(row => row.name);
     if (!fileColumns.includes("archiveName")){
-      await diskDB.runAsync("ALTER TABLE files ADD COLUMN archiveName TEXT");  
+      await diskDB.runAsync("ALTER TABLE files ADD COLUMN archiveName TEXT");
     }
     if (!fileColumns.includes("metadata")){
-      await diskDB.runAsync("ALTER TABLE files ADD COLUMN metadata TEXT");  
+      await diskDB.runAsync("ALTER TABLE files ADD COLUMN metadata TEXT");
     }
 
     await diskDB.runAsync("CREATE TABLE IF NOT EXISTS tags(id INTEGER PRIMARY KEY, name TEXT NOT NULL, UNIQUE(name))");
-    await diskDB.runAsync("INSERT INTO tags VALUES(0, 'Nocmig'), (1, 'Local')");
+    await diskDB.runAsync("INSERT OR IGNORE INTO tags VALUES(0, 'Nocmig'), (1, 'Local')");
     await diskDB.runAsync("ALTER TABLE records ADD COLUMN tagID INTEGER");
     await diskDB.runAsync("UPDATE records SET tagID = 0 WHERE label = 'Nocmig'");
     await diskDB.runAsync("UPDATE records SET tagID = 1 WHERE label = 'Local'");
@@ -214,13 +214,12 @@ async function upgrade_to_v1(diskDB, dbMutex){
       )`);
     await diskDB.runAsync("INSERT INTO files_new SELECT * FROM files");
     await diskDB.runAsync("DROP TABLE files");
-    await diskDB.runAsync("ALTER TABLE files_new RENAME TO files");
-    await diskDB.runAsync("DROP TABLE IF EXISTS db_upgrade");
+    await diskDB.runAsync("ALTER TABLE files_new RENAME TO files");    
+    await diskDB.runAsync("UPDATE schema_version SET version = 1")
     await diskDB.runAsync("END");
     await diskDB.runAsync("PRAGMA foreign_keys=ON");
     await diskDB.runAsync("PRAGMA integrity_check");
     await diskDB.runAsync("PRAGMA foreign_key_check");
-    await diskDB.runAsync("PRAGMA user_version = 1");
     console.info("Migrated tags and added 'reviewed' column to ", diskDB.filename)
   } catch (e) {
     console.error("Error adding column and updating version", e.message, e)
@@ -242,11 +241,12 @@ async function upgrade_to_v2(diskDB, dbMutex){
     await diskDB.runAsync("INSERT INTO species_new SELECT * FROM species");
     await diskDB.runAsync("DROP TABLE species");
     await diskDB.runAsync("ALTER TABLE species_new RENAME TO species");
+
+    await diskDB.runAsync("UPDATE schema_version SET version = 2")
     await diskDB.runAsync("END");
     await diskDB.runAsync("PRAGMA foreign_keys=ON");
     await diskDB.runAsync("PRAGMA integrity_check");
     await diskDB.runAsync("PRAGMA foreign_key_check");
-    await diskDB.runAsync("PRAGMA user_version = 2");
     console.info(`Adding species unique constraint took ${Date.now() - t0}ms`)
   } catch (e) {
     console.error("Error adding unique constraint ", e.message, e)

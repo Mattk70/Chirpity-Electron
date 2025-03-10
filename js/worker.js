@@ -282,7 +282,6 @@ const createDB = async (file) => {
   try {
     db.locale = "en";
     await db.runAsync("BEGIN");
-    await diskDB.runAsync("PRAGMA user_version = 1")
     await db.runAsync(
       "CREATE TABLE tags(id INTEGER PRIMARY KEY, name TEXT NOT NULL, UNIQUE(name))"
     );
@@ -311,6 +310,8 @@ const createDB = async (file) => {
     await db.runAsync("CREATE INDEX idx_species_sname ON species(sname)");
     await db.runAsync("CREATE INDEX idx_species_cname ON species(cname)");
     if (archiveMode) {
+      await diskDB.runAsync("CREATE TABLE schema_version (version INTEGER NOT NULL)");  
+      await diskDB.runAsync("INSERT INTO schema_version (version) VALUES (2)");
       const stmt = db.prepare("INSERT INTO species VALUES (?, ?, ?)");
       try {
         // Only called when creating a new archive database
@@ -388,7 +389,8 @@ async function loadDB(path) {
   // We need to get the default labels from the config file
   DEBUG && console.log("Loading db " + path);
   let modelLabels;
-  if (STATE.model === "birdnet") {
+  const model = STATE.model;
+  if (model === "birdnet") {
     const labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_en.txt`;
     await fetch(labelFile)
       .then((response) => {
@@ -404,7 +406,7 @@ async function loadDB(path) {
   } else {
     const { labels } = JSON.parse(
       fs.readFileSync(
-        p.join(__dirname, `${STATE.model}_model_config.json`),
+        p.join(__dirname, `${model}_model_config.json`),
         "utf8"
       )
     );
@@ -430,12 +432,20 @@ async function loadDB(path) {
     await diskDB.runAsync("PRAGMA journal_mode = WAL");
     await diskDB.runAsync("PRAGMA busy_timeout = 1000");
 
-    // Add new column if not exists
-    const {user_version} = await diskDB.getAsync("PRAGMA user_version")
-      .catch((error) => console.error(error));
-    if (user_version === undefined || user_version < 1){
+    // Add empty version table if not exists
+    await diskDB.runAsync("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)");  
+    const row = await diskDB.getAsync(`SELECT version FROM schema_version`);
+    let user_version;
+    if (!row) {
+        const {pragma_version} = await diskDB.getAsync("PRAGMA user_version")
+        user_version = pragma_version || 0;
+        await diskDB.runAsync("INSERT INTO schema_version (version) VALUES (?)", user_version);
+    } else {
+      user_version  = row.version
+    }
+    if (user_version < 1){
       await upgrade_to_v1(diskDB, dbMutex)
-    } else if (user_version < 2){
+    } if (user_version < 2){
       await upgrade_to_v2(diskDB, dbMutex)
     }
     const { count } = await diskDB.getAsync(
