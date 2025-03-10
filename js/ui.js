@@ -6120,17 +6120,10 @@ function playRegion() {
     );
     if (region){
       const myRegion = region;
-      // If a region is dragged out, rounding errros cause play to fail
-      // As region-out is called
-      myRegion.start = Math.max(0, Math.round(myRegion.start * 1000) / 1000);
+      myRegion.start = Math.max(0, myRegion.start);
       // Have to adjust the windowlength so the finish event isn't fired - causing a page reload)
       myRegion.end = Math.min(myRegion.end, windowLength * 0.995);
-      /* ISSUE if you pause at the end of a region, 
-        when 2 regions abut, the second region won't play*/
-        REGIONS.once('region-out', () => {
-          wavesurfer.pause()
-    });
-      myRegion.play();
+      myRegion.play(true);
     }
   }
 }
