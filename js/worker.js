@@ -4513,6 +4513,9 @@ const pLimit = require("p-limit");
  * tasks with a configurable concurrency limit (defaulting to 4), while generating alerts for any encountered issues.
  * Upon completion of all tasks, it updates the UI with final progress and a summary alert detailing the counts of
  * successful and failed conversions.
+ * 
+ * 1. Pull files from db that do not have archiveName 
+ * 2. 
  *
  * @param {number} [threadLimit=4] - Maximum number of concurrent file conversion tasks.
  * @returns {Promise<boolean|undefined>} Resolves to false if the archive directory is missing or unwritable; otherwise,
@@ -4549,6 +4552,7 @@ async function convertAndOrganiseFiles(threadLimit) {
   let query = "SELECT DISTINCT f.id, f.name, f.archiveName, f.duration, f.filestart, l.place FROM files f LEFT JOIN locations l ON f.locationID = l.id";
   // If just saving files with records
   if (STATE.library.clips) query += " INNER JOIN records r WHERE r.fileID = f.id"
+  if (!STATE.library.backfill) query += " WHERE f.archiveName is NULL"
   t0 = Date.now()
   const rows = await db.allAsync(query);
   console.log(`db query took ${Date.now() - t0}ms`)
