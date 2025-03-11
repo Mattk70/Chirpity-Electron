@@ -61,7 +61,7 @@ jobs:
         # Number of days of inactivity before an PR Request becomes stale
         days-before-pr-stale: 14
         # Check for label to stale or close the issue/PR
-        any-of-labels: 'stat:awaiting response'
+        any-of-labels: 'awaiting response'
         # override stale to stalled for PR
         stale-pr-label: 'stale'
         # override stale to stalled for Issue
