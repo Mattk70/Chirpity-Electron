@@ -332,11 +332,6 @@ const createDB = async (file) => {
       DEBUG &&
         console.log(response.changes + " files added to memory database");
       response = await db.runAsync(
-        "INSERT INTO locations SELECT * FROM disk.locations"
-      );
-      DEBUG &&
-        console.log(response.changes + " locations added to memory database");
-      response = await db.runAsync(
         "INSERT INTO species SELECT * FROM disk.species"
       );
       DEBUG &&
@@ -3030,14 +3025,15 @@ const generateInsertQuery = async (latestResult, file) => {
         if (guano && guano["Loc Position"]) {
           const [lat, lon] = guano["Loc Position"].split(" ");
           const place = guano["Site Name"] || guano["Loc Position"];
-          const row = await db.getAsync(
+          // Note diskDB used here
+          const row = await diskDB.getAsync(
             "SELECT id FROM locations WHERE lat = ? AND lon = ?",
             parseFloat(lat),
             parseFloat(lon)
           );
           if (!row) {
-            const result = await db.runAsync(
-              "INSERT OR IGNORE INTO locations VALUES ( ?, ?,?,? )",
+            const result = await diskDB.runAsync(
+              "INSERT OR IGNORE INTO locations VALUES ( ?,?,?,? )",
               undefined,
               parseFloat(lat),
               parseFloat(lon),
@@ -3440,7 +3436,8 @@ async function setStartEnd(file) {
   //let start, end;
   if (STATE.detect.nocmig) {
     const fileEnd = meta.fileStart + meta.duration * 1000;
-    const result = await STATE.db.getAsync(
+    // Note diskDB used here
+    const result = await diskDB.getAsync(
       "SELECT * FROM locations WHERE id = ?",
       meta.locationID
     );
@@ -3802,9 +3799,7 @@ const onSave2DiskDB = async ({ file }) => {
     await memoryDB.runAsync(
       `INSERT OR IGNORE INTO disk.tags SELECT * FROM tags`
     );
-    await memoryDB.runAsync(
-      `INSERT OR IGNORE INTO disk.locations SELECT * FROM locations`
-    );
+
     // Update the duration table
     response = await memoryDB.runAsync(
       "INSERT OR IGNORE INTO disk.duration SELECT * FROM duration"
@@ -3991,7 +3986,7 @@ const onUpdateFileStart = async (args) => {
       // Update the daylight flag if necessary
       let lat, lon;
       if (locationID) {
-        const location = await db.getAsync(
+        const location = await diskDB.getAsync(
           "SELECT lat, lon FROM locations WHERE id = ?",
           locationID
         );
@@ -4309,7 +4304,8 @@ async function updateSpeciesLabelLocale() {
   UI.postMessage({ event: "labels", labels: labels });
 }
 
-async function onSetCustomLocation({ lat, lon, place, files, db = diskDB, overwritePlaceName = true }) {
+async function onSetCustomLocation({ lat, lon, place, files, overwritePlaceName = true }) {
+  const db = diskDB;
   if (!place) {
     // Delete the location
     const row = await db.getAsync("SELECT id FROM locations WHERE lat = ? AND lon = ?", lat, lon);
@@ -4336,7 +4332,8 @@ async function onSetCustomLocation({ lat, lon, place, files, db = diskDB, overwr
   await getLocations({ file: files[0] });
 }
 
-async function getLocations({ db = diskDB, file }) {
+async function getLocations({ file }) {
+  const db = diskDB;
   let locations = await db.allAsync("SELECT * FROM locations ORDER BY place");
   locations ??= [];
   UI.postMessage({
