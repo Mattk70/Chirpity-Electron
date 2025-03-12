@@ -7861,19 +7861,21 @@ async function getXCComparisons() {
     DOM.loading.classList.remove("d-none");
     const quality = "+q:%22>C%22";
     const length = "+len:3-15";
-    fetch(
-      `https://xeno-canto.org/api/2/recordings?query=${sname}${quality}${length}`
-    )
+    let query = `https://xeno-canto.org/api/3/recordings?key=d5e2d2775c7f2b2fb8325ffacc41b9e6aa94679e&query=sp:"${sname}"${quality}${length}`
+    fetch(query)
       .then((response) => {
+        const payload = response.json();
         if (!response.ok) {
           DOM.loading.classList.add("d-none");
-          return generateToast({ type: "error", message: "noXC" });
+          return generateToast({ type: "error", message: payload.message || "noXC" });
         }
-        return response.json();
+        return payload
       })
       .then((data) => {
         // Hide loading
         DOM.loading.classList.add("d-none");
+
+        if (!payload.recordings) return
         // Extract the first 10 items from the recordings array
         const recordings = data.recordings
           .map((record) => ({
