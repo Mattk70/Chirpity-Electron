@@ -7361,7 +7361,9 @@ async function showRecordEntryForm(mode, batch) {
   const selectedBird = recordEntryForm.querySelector(
     "#selected-bird"
   );
-  focusBirdList = () => document.getElementById("bird-autocomplete").focus();
+  const autoComplete = document.getElementById("bird-autocomplete")
+  autoComplete.value = '';
+  focusBirdList = () => autoComplete.focus();
   const speciesDisplay = document.createElement('div')
   speciesDisplay.className = 'border rounded w-100';
   if (cname) {
@@ -7369,7 +7371,6 @@ async function showRecordEntryForm(mode, batch) {
     const styled = species.split('_').reverse().join(' <br/><i>') + '</i>';
     selectedBird.innerHTML = styled;
   } else {
-
     selectedBird.innerHTML = i18n.searchPrompt;
   }
 

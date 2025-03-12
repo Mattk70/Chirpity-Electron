@@ -666,7 +666,7 @@ async function handleMessage(e) {
       break;
     }
     case "get-locations": {
-      getLocations({ db: STATE.db, file: args.file });
+      getLocations({ file: args.file });
       break;
     }
     case "get-tags": {
@@ -1860,6 +1860,7 @@ const setMetadata = async ({ file, source_file = file }) => {
             lon: roundedFloat(lon),
             place: location,
             files: [file],
+            overwritePlaceName: false
           });
           METADATA[file].lat = roundedFloat(lat);
           METADATA[file].lon = roundedFloat(lon);
@@ -3828,7 +3829,7 @@ const onSave2DiskDB = async ({ file }) => {
         if (!DATASET) {
           // Now we have saved the records, set state to DiskDB
           await onChangeMode("archive");
-          await getLocations({ db: STATE.db, file: file });
+          await getLocations({ file: file });
         }
         // Set the saved flag on files' METADATA
         Object.values(METADATA).forEach((file) => (file.isSaved = true));
@@ -4308,66 +4309,40 @@ async function updateSpeciesLabelLocale() {
   UI.postMessage({ event: "labels", labels: labels });
 }
 
-async function onSetCustomLocation({ lat, lon, place, files, db = STATE.db }) {
+async function onSetCustomLocation({ lat, lon, place, files, db = diskDB, overwritePlaceName = true }) {
   if (!place) {
-    const { id } = await db.getAsync(
-      `SELECT id FROM locations WHERE lat = ? AND lon = ?`,
-      lat,
-      lon
-    );
-    const result = await db.runAsync(
-      `DELETE FROM locations WHERE lat = ? AND lon = ?`,
-      lat,
-      lon
-    );
-    if (result.changes) {
-      await db.runAsync(
-        `UPDATE files SET locationID = null WHERE locationID = ?`,
-        id
-      );
+    // Delete the location
+    const row = await db.getAsync("SELECT id FROM locations WHERE lat = ? AND lon = ?", lat, lon);
+    if (row) {
+      await db.runAsync("DELETE FROM locations WHERE id = ?", row.id);
     }
   } else {
-    const result = await db.runAsync(
-      `
-        INSERT INTO locations VALUES (?, ?, ?, ?)
-        ON CONFLICT(lat,lon) DO UPDATE SET place = excluded.place`,
-      undefined,
-      lat,
-      lon,
-      place
-    );
-    const { id } = await db.getAsync(
-      `SELECT ID FROM locations WHERE lat = ? AND lon = ?`,
-      lat,
-      lon
-    );
+    const SQL = overwritePlaceName
+      ? `INSERT INTO locations VALUES (?, ?, ?, ?)
+         ON CONFLICT(lat, lon) DO UPDATE SET place = excluded.place`
+      : `INSERT OR IGNORE INTO locations VALUES (?, ?, ?, ?)`;
+
+    const result = await db.runAsync(SQL, undefined, lat, lon, place);
+    const { id } = await db.getAsync("SELECT ID FROM locations WHERE lat = ? AND lon = ?", lat, lon);
+
     for (const file of files) {
-      await db.runAsync(
-        "UPDATE files SET locationID = ? WHERE name = ?",
-        id,
-        file
-      );
+      await db.runAsync("UPDATE files SET locationID = ? WHERE name = ?", id, file);
       // we may not have set the METADATA for the file
-      if (METADATA[file]) {
-        METADATA[file].locationID = id;
-      } else {
-        METADATA[file] = {};
-        METADATA[file].locationID = id;
-      }
+      METADATA[file] = { ...(METADATA[file] || {}), locationID: id };
       // tell the UI the file has a location id
-      UI.postMessage({ event: "file-location-id", file: file, id: id });
+      UI.postMessage({ event: "file-location-id", file, id });
     }
   }
-  await getLocations({ db: db, file: files[0] });
+  await getLocations({ file: files[0] });
 }
 
-async function getLocations({ db = STATE.db, file }) {
+async function getLocations({ db = diskDB, file }) {
   let locations = await db.allAsync("SELECT * FROM locations ORDER BY place");
   locations ??= [];
   UI.postMessage({
     event: "location-list",
     locations: locations,
-    currentLocation: METADATA[file]?.locationID,
+    currentLocation: METADATA[file]?.locationID
   });
 }
 
