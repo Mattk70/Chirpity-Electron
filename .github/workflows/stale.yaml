@@ -41,7 +41,7 @@ jobs:
         # Prevent to remove stale label when PRs or issues are updated.
         remove-stale-when-updated: true
         # List of labels to remove when issues/PRs unstale.
-        labels-to-remove-when-unstale: 'stat:awaiting response'
+        labels-to-remove-when-unstale: 'awaiting response'
         # comment on issue if not active for more then 7 days.
         stale-issue-message: 'This issue has been marked stale because it has had no activity for 7 days. It will be closed if no further activity occurs. Thank you.'
         # comment on PR if not active for more then 14 days.
