@@ -7,6 +7,7 @@ import { trackVisit as _trackVisit, trackEvent as _trackEvent} from "./tracking.
 import {checkMembership} from './member.js';
 import { DOM } from "./DOMcache.js";
 import { IUCNCache, IUCNtaxonomy } from "./IUCNcache.js";
+import { XCtaxonomy as XCtaxon } from './XCtaxonomy.js';
 import WaveSurfer from "../node_modules/wavesurfer.js/dist/wavesurfer.esm.js";
 import RegionsPlugin from "../node_modules/wavesurfer.js/dist/plugins/regions.esm.js";
 import Spectrogram from "../node_modules/wavesurfer.js/dist/plugins/spectrogram.esm.js";
@@ -2258,6 +2259,7 @@ const defaultConfig = {
   location: "Great Snoring, North Norfolk",
   detect: {
     nocmig: false,
+    autoLoad: false,
     contextAware: false,
     confidence: 45,
     iucn: true,
@@ -2450,6 +2452,7 @@ window.onload = async () => {
     DOM.audioFade.disabled = !DOM.audioPadding.checked;
     DOM.audioDownmix.checked = config.audio.downmix;
     setNocmig(config.detect.nocmig);
+    document.getElementById("auto-load").checked = config.detect.autoLoad;
     document.getElementById("iucn").checked = config.detect.iucn;
     document.getElementById("iucn-scope").selected = config.detect.iucnScope;
     modelSettingsDisplay();
@@ -4336,8 +4339,8 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
   const showIUCN = config.detect.iucn;
 
   // if (summary.length){
-  let summaryHTML = `
-            <table id="resultSummary" class="table table-dark p-1"><thead>
+  let summaryHTML = summary.length 
+            ? `<table id="resultSummary" class="table table-dark p-1"><thead>
             <tr class="pointer col-auto text-nowrap">
             <th id="summary-max" scope="col"><span id="summary-max-icon" class="text-muted material-symbols-outlined summary-sort-icon d-none">sort</span>${
               i18n.max
@@ -4355,7 +4358,8 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
               i18n.calls
             }</th>
             </tr>
-            </thead><tbody id="speciesFilter">`;
+            </thead><tbody id="speciesFilter">`
+            : '';
   let selectedRow = null;
   const i18nIUCN = getI18n(IUCNLabel);
   for (let i = 0; i < summary.length; i++) {
@@ -6722,6 +6726,14 @@ document.addEventListener("change", function (e) {
           changeNocmigMode(e);
           break;
         }
+        case "auto-load": {
+          config.detect.autoLoad = element.checked;
+          worker.postMessage({
+            action: "update-state",
+            detect: config.detect
+          });
+          break;
+        }
         case "iucn": {
           config.detect.iucn = element.checked;
           // resetRegions();
@@ -7840,6 +7852,7 @@ function shuffle(array) {
 }
 
 async function getXCComparisons() {
+
   let [, , , sname, cname] = activeRow.getAttribute("name").split("|");
   cname.includes("call)") ? "call" : "";
   let XCcache;
@@ -7861,6 +7874,7 @@ async function getXCComparisons() {
     DOM.loading.classList.remove("d-none");
     const quality = "+q:%22>C%22";
     const length = "+len:3-15";
+    sname = XCtaxon[sname] || sname;
     fetch(
       `https://xeno-canto.org/api/2/recordings?query=${sname}${quality}${length}`
     )
@@ -8341,7 +8355,7 @@ async function membershipCheck() {
   const MEMBERSHIP_API_ENDPOINT = await window.electron.MEMBERSHIP_API_ENDPOINT();
   return await checkMembership(config.UUID, MEMBERSHIP_API_ENDPOINT).then(([isMember, expiresIn])  =>{
     if (isMember || inTrial) {
-      if (expiresIn && expiresIn < 35){ // two weeks 
+      if (expiresIn && expiresIn < 30){  
         generateToast({message:"membershipExpiry", type:"warning", variables: {expiresIn}})
       }
       unlockElements();
@@ -8354,18 +8368,20 @@ async function membershipCheck() {
       localStorage.setItem('memberTimestamp', now);
     } else {
       config.keyAssignment = {};
+      config.specDetections = false; 
+      config.detect.autoLoad = false;
+      config.library.clips = false;
       lockedElements.forEach((el) => {
         el.classList.replace("unlocked", "locked");
-        config.specDetections = false; 
+
         if (el instanceof HTMLSpanElement){
-          el.checked = false;
-          el.disabled = true;
           el.textContent = "lock";
         } 
         else {
-          el.classList.remove('locked');
+          el.classList.remove('locked'); // remove coral color 
           if (el instanceof HTMLSelectElement) el.selectedIndex = 0;
-          el.disabled = true;         
+          el.checked = false;
+          el.disabled = true;
         }
       });
       localStorage.setItem('isMember', false);
@@ -8374,7 +8390,7 @@ async function membershipCheck() {
     console.info(`Version: ${VERSION}. Trial: ${inTrial} subscriber: ${isMember}, All detections: ${config.specDetections}`, expiresIn)
     return isMember || inTrial
   }).catch(error =>{ // Period of grace
-    if (cachedStatus === 'true' && cachedTimestamp && now - cachedTimestamp < oneWeek) {
+    if (cachedStatus === true && cachedTimestamp && now - cachedTimestamp < oneWeek) {
       console.warn('Using cached membership status during error.', error);
       unlockElements();
       document.getElementById('primaryLogo').src = 'img/logo/chirpity_logo_subscriber_bronze.png';

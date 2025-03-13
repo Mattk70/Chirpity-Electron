@@ -329,6 +329,11 @@ const createDB = async (file) => {
       let response = await db.runAsync(
         "INSERT INTO files SELECT * FROM disk.files"
       );
+      response = await db.runAsync(
+        "INSERT INTO locations SELECT * FROM disk.locations"
+      );
+      DEBUG &&
+        console.log(response.changes + " locations added to memory database");
       DEBUG &&
         console.log(response.changes + " files added to memory database");
       response = await db.runAsync(
@@ -425,7 +430,7 @@ async function loadDB(path) {
     await diskDB.runAsync("VACUUM");
     await diskDB.runAsync("PRAGMA foreign_keys = ON");
     await diskDB.runAsync("PRAGMA journal_mode = WAL");
-    await diskDB.runAsync("PRAGMA busy_timeout = 1000");
+    await diskDB.runAsync("PRAGMA busy_timeout = 5000");
 
     // Add empty version table if not exists
     await diskDB.runAsync("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)");  
@@ -603,7 +608,12 @@ async function handleMessage(e) {
       break;
     }
     case "check-all-files-saved": {
-      savedFileCheck(args.files);
+      const allSaved = await savedFileCheck(args.files);
+      if (STATE.detect.autoLoad && allSaved) {
+        STATE.filesToAnalyse = args.files;
+        await onChangeMode('archive');
+        await Promise.all([getResults(), getSummary()])
+      } 
       break;
     }
     case "convert-dataset": {
@@ -878,9 +888,9 @@ async function savedFileCheck(fileList) {
       totalFilesChecked += count;
     }
 
-    const result = totalFilesChecked === fileList.length;
-    UI.postMessage({ event: "all-files-saved-check-result", result: result });
-    return result;
+    const allSaved = totalFilesChecked === fileList.length;
+    UI.postMessage({ event: "all-files-saved-check-result", result: allSaved });
+    return allSaved;
   } else {
     generateAlert({ type: "error", message: "dbNotLoaded" });
     return undefined;
@@ -1814,6 +1824,9 @@ async function sendDetections(file, start, end, goToRegion) {
     UI.postMessage({event: 'window-detections', detections: results, goToRegion})
 }
 
+const roundedFloat = (string) =>
+  Math.round(parseFloat(string) * 10000) / 10000;
+
 /**
  * Called by getWorkingFile, setCustomLocation
  * Assigns file metadata to a metadata cache object. file is the key, and is the source file
@@ -1830,6 +1843,7 @@ const setMetadata = async ({ file, source_file = file }) => {
   );
   if (savedMeta) {
     METADATA[file] = savedMeta;
+    if (savedMeta.locationID) UI.postMessage({ event: "file-location-id", file, id: savedMeta.locationID });
     METADATA[file].isSaved = true; // Queried by UI to establish saved state of file.
   } else {
     METADATA[file] = {};
@@ -1848,8 +1862,6 @@ const setMetadata = async ({ file, source_file = file }) => {
         const location = guano["Loc Position"];
         if (location) {
           const [lat, lon] = location.split(" ");
-          const roundedFloat = (string) =>
-            Math.round(parseFloat(string) * 10000) / 10000;
           await onSetCustomLocation({
             lat: roundedFloat(lat),
             lon: roundedFloat(lon),
@@ -3026,17 +3038,17 @@ const generateInsertQuery = async (latestResult, file) => {
           const [lat, lon] = guano["Loc Position"].split(" ");
           const place = guano["Site Name"] || guano["Loc Position"];
           // Note diskDB used here
-          const row = await diskDB.getAsync(
+          const row = await db.getAsync(
             "SELECT id FROM locations WHERE lat = ? AND lon = ?",
-            parseFloat(lat),
-            parseFloat(lon)
+            roundedFloat(lat),
+            roundedFloat(lon)
           );
           if (!row) {
-            const result = await diskDB.runAsync(
+            const result = await db.runAsync(
               "INSERT OR IGNORE INTO locations VALUES ( ?,?,?,? )",
               undefined,
-              parseFloat(lat),
-              parseFloat(lon),
+              roundedFloat(lat),
+              roundedFloat(lon),
               place
             );
             id = result.lastID;
@@ -3124,7 +3136,7 @@ const parsePredictions = async (response) => {
         confidence *= 1000;
         let speciesID = speciesIDArray[j];
         updateUI =
-          confidence > STATE.detect.confidence &&
+          confidence >= STATE.detect.confidence &&
           (!included.length || included.includes(speciesID));
         if (STATE.selection || updateUI) {
           let end, confidenceRequired;
@@ -3437,7 +3449,7 @@ async function setStartEnd(file) {
   if (STATE.detect.nocmig) {
     const fileEnd = meta.fileStart + meta.duration * 1000;
     // Note diskDB used here
-    const result = await diskDB.getAsync(
+    const result = await STATE.db.getAsync(
       "SELECT * FROM locations WHERE id = ?",
       meta.locationID
     );
@@ -3793,6 +3805,10 @@ const onSave2DiskDB = async ({ file }) => {
   await dbMutex.lock();
   try {
     await memoryDB.runAsync("BEGIN");
+    await memoryDB.runAsync(`
+      INSERT OR REPLACE INTO disk.locations (id, lat, lon, place)
+      SELECT id, lat, lon, place FROM locations;
+    `);
     await memoryDB.runAsync(
       `INSERT OR IGNORE INTO disk.files SELECT * FROM files`
     );
@@ -3986,7 +4002,7 @@ const onUpdateFileStart = async (args) => {
       // Update the daylight flag if necessary
       let lat, lon;
       if (locationID) {
-        const location = await diskDB.getAsync(
+        const location = await STATE.db.getAsync(
           "SELECT lat, lon FROM locations WHERE id = ?",
           locationID
         );
@@ -4304,8 +4320,7 @@ async function updateSpeciesLabelLocale() {
   UI.postMessage({ event: "labels", labels: labels });
 }
 
-async function onSetCustomLocation({ lat, lon, place, files, overwritePlaceName = true }) {
-  const db = diskDB;
+async function onSetCustomLocation({ lat, lon, place, files, db = STATE.db, overwritePlaceName = true }) {
   if (!place) {
     // Delete the location
     const row = await db.getAsync("SELECT id FROM locations WHERE lat = ? AND lon = ?", lat, lon);
@@ -4322,7 +4337,16 @@ async function onSetCustomLocation({ lat, lon, place, files, overwritePlaceName 
     const { id } = await db.getAsync("SELECT ID FROM locations WHERE lat = ? AND lon = ?", lat, lon);
 
     for (const file of files) {
-      await db.runAsync("UPDATE files SET locationID = ? WHERE name = ?", id, file);
+      const result = await db.runAsync(
+        `INSERT INTO files (id, name, duration, filestart, locationID) values (?, ?, ?, ?, ?)
+        ON CONFLICT(name) DO UPDATE SET locationID = EXCLUDED.locationID`,
+        undefined,
+        file,
+        METADATA[file].duration,
+        METADATA[file].fileStart,
+        id
+      );
+      const test = await db.getAsync('select * from files'); // file not in db yet
       // we may not have set the METADATA for the file
       METADATA[file] = { ...(METADATA[file] || {}), locationID: id };
       // tell the UI the file has a location id
@@ -4523,7 +4547,7 @@ async function convertAndOrganiseFiles(threadLimit) {
   // Query the files & records table to get the necessary data
   let query = "SELECT DISTINCT f.id, f.name, f.archiveName, f.duration, f.filestart, l.place FROM files f LEFT JOIN locations l ON f.locationID = l.id";
   // If just saving files with records
-  if (STATE.library.clips) query += " INNER JOIN records r WHERE r.fileID = f.id"
+  if (STATE.library.clips) query += " INNER JOIN records r ON r.fileID = f.id"
   if (!STATE.library.backfill) query += " WHERE f.archiveName is NULL"
   t0 = Date.now()
   const rows = await db.allAsync(query);
