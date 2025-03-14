@@ -43,6 +43,7 @@ export class State {
       (this.detect = {
         backend: "webgpu",
         nocmig: false,
+        autoLoad: false,
         contextAware: false,
         confidence: 450,
         iucn: false,

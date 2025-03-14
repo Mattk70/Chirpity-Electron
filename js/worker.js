@@ -11,8 +11,15 @@ const ffmpeg = require("fluent-ffmpeg");
 
 const merge = require("lodash.merge");
 import { State } from "./state.js";
-import { sqlite3, checkpoint, closeDatabase, upgrade_to_v1, upgrade_to_v2, Mutex } from "./database.js";
-import { trackEvent as _trackEvent} from "./tracking.js";
+import {
+  sqlite3,
+  checkpoint,
+  closeDatabase,
+  upgrade_to_v1,
+  upgrade_to_v2,
+  Mutex,
+} from "./database.js";
+import { trackEvent as _trackEvent } from "./tracking.js";
 
 let isWin32 = false;
 
@@ -33,7 +40,8 @@ const trackEvent = isTestEnv ? () => {} : _trackEvent;
 let DEBUG;
 
 let METADATA = {};
-let index = 0, predictionStart;
+let index = 0,
+  predictionStart;
 let sampleRate; // Should really make this a property of the model
 let predictWorkers = [],
   aborted = false;
@@ -310,14 +318,16 @@ const createDB = async (file) => {
     await db.runAsync("CREATE INDEX idx_species_sname ON species(sname)");
     await db.runAsync("CREATE INDEX idx_species_cname ON species(cname)");
     if (archiveMode) {
-      await diskDB.runAsync("CREATE TABLE schema_version (version INTEGER NOT NULL)");  
+      await diskDB.runAsync(
+        "CREATE TABLE schema_version (version INTEGER NOT NULL)"
+      );
       await diskDB.runAsync("INSERT INTO schema_version (version) VALUES (2)");
       const stmt = db.prepare("INSERT INTO species VALUES (?, ?, ?)");
       try {
         // Only called when creating a new archive database
         for (let i = 0; i < LABELS.length; i++) {
-            const [sname, cname] = LABELS[i].split("_");
-            await stmt.runAsync(i, sname, cname);
+          const [sname, cname] = LABELS[i].split("_");
+          await stmt.runAsync(i, sname, cname);
         }
       } finally {
         // Ensure stmt is finalized
@@ -329,24 +339,23 @@ const createDB = async (file) => {
       let response = await db.runAsync(
         "INSERT INTO files SELECT * FROM disk.files"
       );
-      DEBUG &&
-        console.log(response.changes + " files added to memory database");
       response = await db.runAsync(
         "INSERT INTO locations SELECT * FROM disk.locations"
       );
       DEBUG &&
         console.log(response.changes + " locations added to memory database");
+      DEBUG &&
+        console.log(response.changes + " files added to memory database");
       response = await db.runAsync(
         "INSERT INTO species SELECT * FROM disk.species"
       );
       DEBUG &&
         console.log(response.changes + " species added to memory database");
 
-        response = await db.runAsync(
-          "INSERT OR IGNORE INTO tags SELECT * FROM disk.tags"
-        );
-        DEBUG &&
-          console.log(response.changes + " tags added to memory database");
+      response = await db.runAsync(
+        "INSERT OR IGNORE INTO tags SELECT * FROM disk.tags"
+      );
+      DEBUG && console.log(response.changes + " tags added to memory database");
     }
     await db.runAsync("END");
   } catch (error) {
@@ -405,10 +414,7 @@ async function loadDB(path) {
       });
   } else {
     const { labels } = JSON.parse(
-      fs.readFileSync(
-        p.join(__dirname, `${model}_model_config.json`),
-        "utf8"
-      )
+      fs.readFileSync(p.join(__dirname, `${model}_model_config.json`), "utf8")
     );
     modelLabels = labels;
   }
@@ -430,23 +436,29 @@ async function loadDB(path) {
     await diskDB.runAsync("VACUUM");
     await diskDB.runAsync("PRAGMA foreign_keys = ON");
     await diskDB.runAsync("PRAGMA journal_mode = WAL");
-    await diskDB.runAsync("PRAGMA busy_timeout = 1000");
+    await diskDB.runAsync("PRAGMA busy_timeout = 5000");
 
     // Add empty version table if not exists
-    await diskDB.runAsync("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)");  
+    await diskDB.runAsync(
+      "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)"
+    );
     const row = await diskDB.getAsync(`SELECT version FROM schema_version`);
     let user_version;
     if (!row) {
-        const {pragma_version} = await diskDB.getAsync("PRAGMA user_version")
-        user_version = pragma_version || 0;
-        await diskDB.runAsync("INSERT INTO schema_version (version) VALUES (?)", user_version);
+      const { pragma_version } = await diskDB.getAsync("PRAGMA user_version");
+      user_version = pragma_version || 0;
+      await diskDB.runAsync(
+        "INSERT INTO schema_version (version) VALUES (?)",
+        user_version
+      );
     } else {
-      user_version  = row.version
+      user_version = row.version;
     }
-    if (user_version < 1){
-      await upgrade_to_v1(diskDB, dbMutex)
-    } if (user_version < 2){
-      await upgrade_to_v2(diskDB, dbMutex)
+    if (user_version < 1) {
+      await upgrade_to_v1(diskDB, dbMutex);
+    }
+    if (user_version < 2) {
+      await upgrade_to_v2(diskDB, dbMutex);
     }
     const { count } = await diskDB.getAsync(
       "SELECT COUNT(*) as count FROM records"
@@ -464,8 +476,6 @@ async function loadDB(path) {
   }
   return true;
 }
-
-
 
 /**
  * Dispatches incoming worker messages by executing actions specified in the event's data payload.
@@ -603,12 +613,17 @@ async function handleMessage(e) {
     }
     case "chart": {
       Object.assign(args, { diskDB, state: STATE, UI });
-      const {onChartRequest} = require('./js/charts.js');
+      const { onChartRequest } = require("./js/charts.js");
       await onChartRequest(args);
       break;
     }
     case "check-all-files-saved": {
-      savedFileCheck(args.files);
+      const allSaved = await savedFileCheck(args.files);
+      if (STATE.detect.autoLoad && allSaved) {
+        STATE.filesToAnalyse = args.files;
+        await onChangeMode("archive");
+        await Promise.all([getResults(), getSummary()]);
+      }
       break;
     }
     case "convert-dataset": {
@@ -666,19 +681,22 @@ async function handleMessage(e) {
       break;
     }
     case "get-locations": {
-      getLocations({ db: STATE.db, file: args.file });
+      getLocations({ file: args.file });
       break;
     }
     case "get-tags": {
-      const result = await diskDB.allAsync('SELECT id, name FROM tags');
-      UI.postMessage({event: "tags", tags: result, init: true})
+      const result = await diskDB.allAsync("SELECT id, name FROM tags");
+      UI.postMessage({ event: "tags", tags: result, init: true });
       break;
     }
     case "delete-tag": {
       try {
-        const result = await diskDB.runAsync('DELETE FROM tags where name = ?', args.deleted);
+        const result = await diskDB.runAsync(
+          "DELETE FROM tags where name = ?",
+          args.deleted
+        );
       } catch (error) {
-        generateAlert({message: `Label deletion failed: ${error.message}`})
+        generateAlert({ message: `Label deletion failed: ${error.message}` });
         console.error(error);
       }
       break;
@@ -686,16 +704,20 @@ async function handleMessage(e) {
     case "update-tag": {
       try {
         const tag = args.alteredOrNew;
-        if (tag.id && tag.name){
-          const query  = STATE.db.runAsync(`
+        if (tag.id && tag.name) {
+          const query = STATE.db.runAsync(
+            `
             INSERT OR REPLACE INTO tags (id, name) VALUES (?, ?)
             ON CONFLICT(id) DO UPDATE SET name = excluded.name
-            `, tag.id, tag.name);
+            `,
+            tag.id,
+            tag.name
+          );
         }
-        const result = await STATE.db.allAsync('SELECT id, name FROM tags');
-        UI.postMessage({event: "tags", tags: result, init: false})
+        const result = await STATE.db.allAsync("SELECT id, name FROM tags");
+        UI.postMessage({ event: "tags", tags: result, init: false });
       } catch (error) {
-        generateAlert({message: `Tag update failed: ${error.message}`})
+        generateAlert({ message: `Tag update failed: ${error.message}` });
         console.error(error);
       }
       break;
@@ -804,7 +826,11 @@ async function handleMessage(e) {
       STATE.update(args);
       if (args.labelFilters) {
         const species = args.species;
-        await Promise.all([getResults({species, offset: 0}), getSummary({species}), getTotal({species, offset: 0})])
+        await Promise.all([
+          getResults({ species, offset: 0 }),
+          getSummary({ species }),
+          getTotal({ species, offset: 0 }),
+        ]);
       }
       DEBUG = STATE.debug;
       break;
@@ -820,16 +846,15 @@ ipcRenderer.on("new-client", async (event) => {
   UI.onmessage = handleMessage;
 });
 
-
 ipcRenderer.on("close-database", async () => {
   try {
-    await checkpoint(diskDB)
-    await closeDatabase(diskDB)
-  } catch(error) {
-    console.error("Error closing database:", error.message)
+    await checkpoint(diskDB);
+    await closeDatabase(diskDB);
+  } catch (error) {
+    console.error("Error closing database:", error.message);
   } finally {
     diskDB = null;
-    ipcRenderer.send('database-closed')
+    ipcRenderer.send("database-closed");
   }
 });
 
@@ -866,7 +891,9 @@ async function savedFileCheck(fileList) {
       const fileSlice = fileList.slice(i, i + batchSize);
 
       // Construct a parameterized query to count matching files in the database
-      const query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${prepParams(fileSlice)})`;
+      const query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${prepParams(
+        fileSlice
+      )})`;
 
       // Execute the query with the slice as parameters
       const countResult = await diskDB.getAsync(query, ...fileSlice);
@@ -883,9 +910,9 @@ async function savedFileCheck(fileList) {
       totalFilesChecked += count;
     }
 
-    const result = totalFilesChecked === fileList.length;
-    UI.postMessage({ event: "all-files-saved-check-result", result: result });
-    return result;
+    const allSaved = totalFilesChecked === fileList.length;
+    UI.postMessage({ event: "all-files-saved-check-result", result: allSaved });
+    return allSaved;
   } else {
     generateAlert({ type: "error", message: "dbNotLoaded" });
     return undefined;
@@ -953,7 +980,7 @@ async function onLaunch({
   sampleRate = model === "birdnet" ? 48_000 : 24_000;
   STATE.detect.backend = backend;
   BATCH_SIZE = batchSize;
-  if (!STATE.model || STATE.model !== model){
+  if (!STATE.model || STATE.model !== model) {
     STATE.update({ model: model });
     await loadDB(appPath); // load the diskdb
     await createDB(); // now make the memoryDB
@@ -1002,10 +1029,11 @@ async function spawnListWorker() {
       };
 
       DEBUG && console.log("getting a list from the list worker");
-      dbMutex.lock()
-      .then(()=> worker_1.postMessage(message_1))
-      .catch(() =>{})
-      .finally(() =>dbMutex.unlock());
+      dbMutex
+        .lock()
+        .then(() => worker_1.postMessage(message_1))
+        .catch(() => {})
+        .finally(() => dbMutex.unlock());
     });
   };
 }
@@ -1153,9 +1181,9 @@ const prepSummaryStatement = (included) => {
 
   const [SQLtext, fileParams] = getFileSQLAndParams(range);
   (summaryStatement += SQLtext), params.push(...fileParams);
-  if (STATE.labelFilters.length){
+  if (STATE.labelFilters.length) {
     summaryStatement += ` AND tagID in (${prepParams(STATE.labelFilters)}) `;
-    params.push(...STATE.labelFilters)
+    params.push(...STATE.labelFilters);
   }
   let not = "";
   if (filtersApplied(included)) {
@@ -1211,9 +1239,9 @@ const getTotal = async ({
         WHERE confidence >= ${STATE.detect.confidence} `;
 
   if (filtersApplied(included)) SQL += ` AND speciesID IN (${included}) `;
-  if (STATE.labelFilters.length){
+  if (STATE.labelFilters.length) {
     SQL += ` AND tagID in (${prepParams(STATE.labelFilters)}) `;
-    params.push(...STATE.labelFilters)
+    params.push(...STATE.labelFilters);
   }
   if (STATE.detect.nocmig) SQL += " AND NOT isDaylight";
   if (STATE.locationID) SQL += ` AND locationID =  ${STATE.locationID}`;
@@ -1282,9 +1310,9 @@ const prepResultsStatement = (
   // If you're using the memory db, you're either analysing one,  or all of the files
   const [SQLtext, fileParams] = getFileSQLAndParams(range);
   (resultStatement += SQLtext), params.push(...fileParams);
-  if (STATE.labelFilters.length){
+  if (STATE.labelFilters.length) {
     resultStatement += ` AND tagID in (${prepParams(STATE.labelFilters)}) `;
-    params.push(...STATE.labelFilters)
+    params.push(...STATE.labelFilters);
   }
   if (filtersApplied(included)) {
     resultStatement += ` AND speciesID IN (${prepParams(included)}) `;
@@ -1334,7 +1362,9 @@ const prepResultsStatement = (
   }
   const limitClause = noLimit ? "" : "LIMIT ?  OFFSET ?";
   noLimit || params.push(STATE.limit, offset);
-  const metaSort = STATE.resultsMetaSortOrder ? `${STATE.resultsMetaSortOrder}, ` : '';
+  const metaSort = STATE.resultsMetaSortOrder
+    ? `${STATE.resultsMetaSortOrder}, `
+    : "";
   resultStatement += ` ORDER BY ${metaSort} ${STATE.resultsSortOrder} ${limitClause} `;
 
   return [resultStatement, params];
@@ -1639,13 +1669,13 @@ async function notifyMissingFile(file) {
  * @throws Will reject if the file does not exist or if an error occurs while fetching or processing the audio data.
  *
  * @example
- * loadAudioFile({ 
- *   file: "/path/to/audio.mp3", 
- *   start: 10, 
- *   end: 30, 
- *   position: 5, 
- *   play: true, 
- *   goToRegion: true 
+ * loadAudioFile({
+ *   file: "/path/to/audio.mp3",
+ *   start: 10,
+ *   end: 30,
+ *   position: 5,
+ *   play: true,
+ *   goToRegion: true
  * })
  *   .then(() => console.log("Audio loaded successfully."))
  *   .catch((error) => console.error("Error loading audio:", error));
@@ -1752,10 +1782,10 @@ async function loadAudioFile({
  */
 function addDays(date, days) {
   if (!(date instanceof Date) && isNaN(Date.parse(date))) {
-    throw new TypeError('Invalid date parameter');
+    throw new TypeError("Invalid date parameter");
   }
-  if (typeof days !== 'number' || isNaN(days)) {
-    throw new TypeError('Days must be a valid number');
+  if (typeof days !== "number" || isNaN(days)) {
+    throw new TypeError("Days must be a valid number");
   }
   let result = new Date(date);
   result.setDate(result.getDate() + days);
@@ -1765,16 +1795,16 @@ function addDays(date, days) {
 /**
  * Retrieves detection records for a given audio file within a specified time range and posts them to the UI.
  *
- * This asynchronous function calculates absolute start and end timestamps by adding the file's metadata offset 
- * (in milliseconds) to the provided start and end offsets (in seconds). It queries the database for detection 
+ * This asynchronous function calculates absolute start and end timestamps by adding the file's metadata offset
+ * (in milliseconds) to the provided start and end offsets (in seconds). It queries the database for detection
  * records that satisfy the following criteria:
  * - A confidence level greater than or equal to the configured minimum (STATE.detect.confidence).
  * - A file name matching the provided file parameter.
  * - A detection timestamp between the calculated start and end times.
  *
- * If additional species filters are active, the query further restricts results by species ID. Records are 
+ * If additional species filters are active, the query further restricts results by species ID. Records are
  * ranked using a window function to select the top (most confident) detection per grouping of file and datetime.
- * The function posts the resulting detections to the UI along with a flag that instructs the UI whether to 
+ * The function posts the resulting detections to the UI along with a flag that instructs the UI whether to
  * navigate directly to the corresponding region.
  *
  * @async
@@ -1785,14 +1815,17 @@ function addDays(date, days) {
  * @returns {Promise<void>} A promise that resolves when detections have been successfully retrieved and sent to the UI.
  */
 async function sendDetections(file, start, end, goToRegion) {
-    const db = STATE.db;
-    start = METADATA[file].fileStart + (start * 1000)
-    end = METADATA[file].fileStart + (end * 1000)
-    const params = [STATE.detect.confidence, file, start, end];
-    const included = await getIncludedIDs();
-    const includedSQL = filtersApplied(included) ? ` AND speciesID IN (${prepParams(included)})` : '';
-    includedSQL && params.push(...included)
-    const results = await db.allAsync(`
+  const db = STATE.db;
+  start = METADATA[file].fileStart + start * 1000;
+  end = METADATA[file].fileStart + end * 1000;
+  const params = [STATE.detect.confidence, file, start, end];
+  const included = await getIncludedIDs();
+  const includedSQL = filtersApplied(included)
+    ? ` AND speciesID IN (${prepParams(included)})`
+    : "";
+  includedSQL && params.push(...included);
+  const results = await db.allAsync(
+    `
         WITH RankedRecords AS (
             SELECT 
                 position AS start, 
@@ -1814,10 +1847,17 @@ async function sendDetections(file, start, end, goToRegion) {
         SELECT start, end, label
         FROM RankedRecords
         WHERE rank = 1  
-        `, ...params
-    )
-    UI.postMessage({event: 'window-detections', detections: results, goToRegion})
+        `,
+    ...params
+  );
+  UI.postMessage({
+    event: "window-detections",
+    detections: results,
+    goToRegion,
+  });
 }
+
+const roundedFloat = (string) => Math.round(parseFloat(string) * 10000) / 10000;
 
 /**
  * Called by getWorkingFile, setCustomLocation
@@ -1835,6 +1875,12 @@ const setMetadata = async ({ file, source_file = file }) => {
   );
   if (savedMeta) {
     METADATA[file] = savedMeta;
+    if (savedMeta.locationID)
+      UI.postMessage({
+        event: "file-location-id",
+        file,
+        id: savedMeta.locationID,
+      });
     METADATA[file].isSaved = true; // Queried by UI to establish saved state of file.
   } else {
     METADATA[file] = {};
@@ -1853,13 +1899,12 @@ const setMetadata = async ({ file, source_file = file }) => {
         const location = guano["Loc Position"];
         if (location) {
           const [lat, lon] = location.split(" ");
-          const roundedFloat = (string) =>
-            Math.round(parseFloat(string) * 10000) / 10000;
           await onSetCustomLocation({
             lat: roundedFloat(lat),
             lon: roundedFloat(lon),
             place: location,
             files: [file],
+            overwritePlaceName: false,
           });
           METADATA[file].lat = roundedFloat(lat);
           METADATA[file].lon = roundedFloat(lon);
@@ -1977,9 +2022,7 @@ const getPredictBuffers = async ({ file = "", start = 0, end = undefined }) => {
   }
 
   const duration = end - start;
-  batchChunksToSend[file] = Math.ceil(
-    duration / (BATCH_SIZE * WINDOW_SIZE)
-  );
+  batchChunksToSend[file] = Math.ceil(duration / (BATCH_SIZE * WINDOW_SIZE));
   predictionsReceived[file] = 0;
   predictionsRequested[file] = 0;
 
@@ -2024,7 +2067,9 @@ async function processAudio(
       remainingTrim = sampleRate * 2 * adjustment;
       start -= adjustment;
     }
-    let currentIndex = 0, duration = 0, bytesPerSecond = 48_000;
+    let currentIndex = 0,
+      duration = 0,
+      bytesPerSecond = 48_000;
     const audioBuffer = Buffer.allocUnsafe(highWaterMark);
     const additionalFilters = STATE.filters.sendToModel
       ? setAudioFilters()
@@ -2112,15 +2157,17 @@ async function processAudio(
     });
     STREAM.on("end", () => {
       const metaDuration = METADATA[file].duration;
-      if (end === metaDuration && duration < metaDuration){
-        // If we have a short file (header duration > processed duration) 
+      if (end === metaDuration && duration < metaDuration) {
+        // If we have a short file (header duration > processed duration)
         // *and* were looking for the whole file, we'll fix # of expected chunks here
-        batchChunksToSend[file] = Math.ceil(duration / (BATCH_SIZE * WINDOW_SIZE));
-        
-        const diff = Math.abs(metaDuration - duration);
-        if (diff > 3) console.warn("File duration mismatch", diff)
+        batchChunksToSend[file] = Math.ceil(
+          duration / (BATCH_SIZE * WINDOW_SIZE)
+        );
 
-        METADATA[file].duration = duration
+        const diff = Math.abs(metaDuration - duration);
+        if (diff > 3) console.warn("File duration mismatch", diff);
+
+        METADATA[file].duration = duration;
       }
       // Handle any remaining data in the buffer
       if (currentIndex > 0) {
@@ -2661,7 +2708,7 @@ const bufferToAudio = async ({
 
   if (padding) {
     start = Math.max(0, start - 1);
-    METADATA[file] ??= await setMetadata({file});
+    METADATA[file] ??= await setMetadata({ file });
 
     end = Math.min(METADATA[file].duration, end + 1);
   }
@@ -2686,13 +2733,13 @@ const bufferToAudio = async ({
     }
 
     let command = setupFfmpegCommand({
-      file: file,
-      start: start,
-      end: end,
+      file,
+      start,
+      end,
       sampleRate: undefined,
       audioBitrate: bitrate,
       audioQuality: quality,
-      audioCodec: audioCodec,
+      audioCodec,
       format: soundFormat,
       channels: downmix ? 1 : -1,
       metadata: meta,
@@ -2718,12 +2765,12 @@ const bufferToAudio = async ({
 async function saveAudio(file, start, end, filename, metadata, folder) {
   filename = filename.replaceAll(":", "-");
   const convertedFilePath = await bufferToAudio({
-    file: file,
-    start: start,
-    end: end,
+    file,
+    start,
+    end,
     meta: metadata,
-    folder: folder,
-    filename: filename,
+    folder,
+    filename,
   });
   if (folder) {
     DEBUG && console.log("Audio file saved: ", convertedFilePath);
@@ -2837,7 +2884,13 @@ const terminateWorkers = () => {
 async function batchInsertRecords(cname, label, files, originalCname) {
   const db = STATE.db;
   const t0 = Date.now();
-  const [sql, params] = prepResultsStatement(originalCname, true, STATE.included, undefined, STATE.topRankin)
+  const [sql, params] = prepResultsStatement(
+    originalCname,
+    true,
+    STATE.included,
+    undefined,
+    STATE.topRankin
+  );
   const records = await STATE.db.allAsync(sql, ...params);
   let count = 0;
 
@@ -2895,7 +2948,8 @@ const onInsertManualRecord = async ({
   speciesFiltered,
   updateResults = true,
 }) => {
-  if (batch) return batchInsertRecords(cname, label, file, originalCname, confidence);
+  if (batch)
+    return batchInsertRecords(cname, label, file, originalCname, confidence);
   (start = parseFloat(start)), (end = parseFloat(end));
   const startMilliseconds = Math.round(start * 1000);
   let changes = 0,
@@ -2910,8 +2964,12 @@ const onInsertManualRecord = async ({
   if (speciesFound) {
     speciesID = speciesFound.speciesID;
   } else {
-    generateAlert({message: 'noSpecies', variables: {cname}, type:'error'})
-    return 
+    generateAlert({
+      message: "noSpecies",
+      variables: { cname },
+      type: "error",
+    });
+    return;
   }
   let res = await db.getAsync(
     `SELECT id,filestart FROM files WHERE name = ?`,
@@ -2946,12 +3004,12 @@ const onInsertManualRecord = async ({
   const isDaylight = isDuringDaylight(dateTime, STATE.lat, STATE.lon);
 
   // Delete an existing record if species was changed
-  if (cname !== originalCname){
+  if (cname !== originalCname) {
     const result = await db.getAsync(
       `SELECT id as originalSpeciesID FROM species WHERE cname = ?`,
       originalCname
     );
-    if (result?.originalSpeciesID){
+    if (result?.originalSpeciesID) {
       await db.runAsync(
         "DELETE FROM records WHERE datetime = ? AND speciesID = ? AND fileID = ?",
         dateTime,
@@ -2960,25 +3018,28 @@ const onInsertManualRecord = async ({
       );
       confidence ??= 2000; // Manual record
     }
-  } 
-  else {
+  } else {
     // const r = await db.getAsync(
-    //   "SELECT * FROM records WHERE dateTime = ? AND fileID = ? AND speciesID = ?", 
+    //   "SELECT * FROM records WHERE dateTime = ? AND fileID = ? AND speciesID = ?",
     //   dateTime, fileID, speciesID);
     // confidence = r?.confidence || 2000; // Save confidence
-    confidence ??= 2000
+    confidence ??= 2000;
   }
   const result = await db.getAsync("SELECT id FROM tags WHERE name = ?", label);
   const tagID = result?.id;
-  if (calledByBatch && cname === originalCname){
-   await db.runAsync(
+  if (calledByBatch && cname === originalCname) {
+    await db.runAsync(
       `UPDATE records SET tagID = ?, comment = ?, reviewed = 1 
         WHERE dateTime = ? AND fileID = ? AND speciesID = ?`,
-      tagID, comment, dateTime, fileID, speciesID
-    )
+      tagID,
+      comment,
+      dateTime,
+      fileID,
+      speciesID
+    );
   } else {
     await db.runAsync(
-        `INSERT INTO records (dateTime, position, fileID, speciesID, confidence, tagID, comment, end, callCount, isDaylight, reviewed)
+      `INSERT INTO records (dateTime, position, fileID, speciesID, confidence, tagID, comment, end, callCount, isDaylight, reviewed)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(dateTime, fileID, speciesID) DO UPDATE SET 
           confidence = excluded.confidence, 
@@ -2986,21 +3047,20 @@ const onInsertManualRecord = async ({
           comment = excluded.comment,
           callCount = excluded.callCount,
           reviewed = excluded.reviewed;`,
-        dateTime,
-        start,
-        fileID,
-        speciesID,
-        confidence,
-        tagID,
-        comment,
-        end,
-        count,
-        isDaylight,
-        reviewed
-      );
-      
-    };
+      dateTime,
+      start,
+      fileID,
+      speciesID,
+      confidence,
+      tagID,
+      comment,
+      end,
+      count,
+      isDaylight,
+      reviewed
+    );
   }
+};
 
 const insertDurations = async (file, id) => {
   const durationSQL = Object.entries(METADATA[file].dateDuration)
@@ -3029,17 +3089,18 @@ const generateInsertQuery = async (latestResult, file) => {
         if (guano && guano["Loc Position"]) {
           const [lat, lon] = guano["Loc Position"].split(" ");
           const place = guano["Site Name"] || guano["Loc Position"];
+          // Note diskDB used here
           const row = await db.getAsync(
             "SELECT id FROM locations WHERE lat = ? AND lon = ?",
-            parseFloat(lat),
-            parseFloat(lon)
+            roundedFloat(lat),
+            roundedFloat(lon)
           );
           if (!row) {
             const result = await db.runAsync(
-              "INSERT OR IGNORE INTO locations VALUES ( ?, ?,?,? )",
+              "INSERT OR IGNORE INTO locations VALUES ( ?,?,?,? )",
               undefined,
-              parseFloat(lat),
-              parseFloat(lon),
+              roundedFloat(lat),
+              roundedFloat(lon),
               place
             );
             id = result.lastID;
@@ -3127,7 +3188,7 @@ const parsePredictions = async (response) => {
         confidence *= 1000;
         let speciesID = speciesIDArray[j];
         updateUI =
-          confidence > STATE.detect.confidence &&
+          confidence >= STATE.detect.confidence &&
           (!included.length || included.includes(speciesID));
         if (STATE.selection || updateUI) {
           let end, confidenceRequired;
@@ -3300,7 +3361,8 @@ async function processNextFile({
   if (FILE_QUEUE.length) {
     let file = FILE_QUEUE.shift();
     const found = await getWorkingFile(file).catch((error) => {
-      if (error instanceof Event) error = `Event passed ${error.type}, attached to ${error.currentTarget}`;
+      if (error instanceof Event)
+        error = `Event passed ${error.type}, attached to ${error.currentTarget}`;
       const message = error.message || error;
       if (!STATE.notFound.file) {
         STATE.notFound[file] = true;
@@ -3439,6 +3501,7 @@ async function setStartEnd(file) {
   //let start, end;
   if (STATE.detect.nocmig) {
     const fileEnd = meta.fileStart + meta.duration * 1000;
+    // Note diskDB used here
     const result = await STATE.db.getAsync(
       "SELECT * FROM locations WHERE id = ?",
       meta.locationID
@@ -3509,7 +3572,7 @@ const getResults = async ({
     //const position = await getPosition({species: species, dateTime: select.dateTime, included: included});
     offset = (position.page - 1) * limit;
     // We want to consistently move to the next record. If results are sorted by time, this will be row + 1.
-    active = position.row //+ 1;
+    active = position.row; //+ 1;
     // update the pagination
     await getTotal({ species: species, offset: offset, included: included });
   }
@@ -3531,11 +3594,10 @@ const getResults = async ({
 
   const result = await STATE.db.allAsync(sql, ...params);
 
-
-  if (['text', 'eBird', 'Raven'].includes(format)) {
-    await exportData(result, path, format)
+  if (["text", "eBird", "Raven"].includes(format)) {
+    await exportData(result, path, format);
   } else if (format === "Audacity") {
-    exportAudacity(result, path)
+    exportAudacity(result, path);
   } else {
     for (let i = 0; i < result.length; i++) {
       const r = result[i];
@@ -3606,7 +3668,7 @@ const getResults = async ({
   }
 };
 
-function exportAudacity(result, directory){
+function exportAudacity(result, directory) {
   const { writeToPath } = require("@fast-csv/format");
   const groupedResult = result.reduce((acc, item) => {
     // Check if the file already exists as a key in acc
@@ -3643,21 +3705,27 @@ function exportAudacity(result, directory){
       });
   });
 }
-async function exportData(result, filename, format){
+async function exportData(result, filename, format) {
   const formatFunctions = {
     text: "formatCSVValues",
     eBird: "formateBirdValues",
     Raven: "formatRavenValues",
   };
-  let formattedValues;
-    let previousFile = null,
-      cumulativeOffset = 0;
-    const { writeToPath } = require("@fast-csv/format");
-    const {ExportFormatter} = require("./js/exportFormatter.js");
-    const formatter = new ExportFormatter(STATE);
-    // CSV export. Format the values
-    formattedValues = await Promise.all(
-      result.map(async (item, index) => {
+  let formattedValues = [];
+  const BATCH_SIZE = 10_000;
+  // For Raven
+  let previousFile = null,
+    cumulativeOffset = 0,
+    fileDurations = {};
+  const { writeToPath } = require("@fast-csv/format");
+  const { ExportFormatter } = require("./js/exportFormatter.js");
+  const formatter = new ExportFormatter(STATE);
+  const locationMap = await formatter.getAllLocations();
+  // CSV export. Format the values
+  for (let i = 0; i < result.length; i += BATCH_SIZE) {
+    const batch = result.slice(i, i + BATCH_SIZE);
+    const processedBatch = await Promise.all(
+      batch.map(async (item, index) => {
         if (format === "Raven") {
           item = { ...item, selection: index + 1 }; // Add a selection number for Raven
           if (item.file !== previousFile) {
@@ -3671,61 +3739,63 @@ async function exportData(result, filename, format){
           }
           item.offset = cumulativeOffset;
         }
-        return formatter[formatFunctions[format]](item);
+        return formatter[formatFunctions[format]](item, locationMap);
       })
     );
+    formattedValues.push(...processedBatch);
+  }
 
-    if (format === "eBird") {
-      // Group the data by "Start Time", "Common name", and "Species" and calculate total species count for each group
-      const summary = formattedValues.reduce((acc, curr) => {
-        const key = `${curr["Start Time"]}_${curr["Common name"]}_${curr["Species"]}`;
-        if (!acc[key]) {
-          acc[key] = {
-            "Common name": curr["Common name"],
-            // Include other fields from the original data
-            Genus: curr["Genus"],
-            Species: curr["Species"],
-            "Species Count": 0,
-            "Species Comments": curr["Species Comments"],
-            "Location Name": curr["Location Name"],
-            Latitude: curr["Latitude"],
-            Longitude: curr["Longitude"],
-            Date: curr["Date"],
-            "Start Time": curr["Start Time"],
-            "State/Province": curr["State/Province"],
-            Country: curr["Country"],
-            Protocol: curr["Protocol"],
-            "Number of observers": curr["Number of observers"],
-            Duration: curr["Duration"],
-            "All observations reported?": curr["All observations reported?"],
-            "Distance covered": curr["Distance covered"],
-            "Area covered": curr["Area covered"],
-            "Submission Comments": curr["Submission Comments"],
-          };
-        }
-        // Increment total species count for the group
-        acc[key]["Species Count"] += curr["Species Count"];
-        return acc;
-      }, {});
-      // Convert summary object into an array of objects
-      formattedValues = Object.values(summary);
-    }
-    const filePath = filename;
-    // Create a write stream for the CSV file
-    writeToPath(filePath, formattedValues, {
-      headers: true,
-      delimiter: format === "Raven" ? "\t" : ",",
-    })
-      .on("error", (_err) =>
-        generateAlert({
-          type: "warning",
-          message: "saveBlocked",
-          variables: { filePath },
-        })
-      )
-      .on("finish", () => {
-        generateAlert({ message: "goodSave", variables: { filePath } });
-      });
+  if (format === "eBird") {
+    // Group the data by "Start Time", "Common name", and "Species" and calculate total species count for each group
+    const summary = formattedValues.reduce((acc, curr) => {
+      const key = `${curr["Start Time"]}_${curr["Common name"]}_${curr["Species"]}`;
+      if (!acc[key]) {
+        acc[key] = {
+          "Common name": curr["Common name"],
+          // Include other fields from the original data
+          Genus: curr["Genus"],
+          Species: curr["Species"],
+          "Species Count": 0,
+          "Species Comments": curr["Species Comments"],
+          "Location Name": curr["Location Name"],
+          Latitude: curr["Latitude"],
+          Longitude: curr["Longitude"],
+          Date: curr["Date"],
+          "Start Time": curr["Start Time"],
+          "State/Province": curr["State/Province"],
+          Country: curr["Country"],
+          Protocol: curr["Protocol"],
+          "Number of observers": curr["Number of observers"],
+          Duration: curr["Duration"],
+          "All observations reported?": curr["All observations reported?"],
+          "Distance covered": curr["Distance covered"],
+          "Area covered": curr["Area covered"],
+          "Submission Comments": curr["Submission Comments"],
+        };
+      }
+      // Increment total species count for the group
+      acc[key]["Species Count"] += curr["Species Count"];
+      return acc;
+    }, {});
+    // Convert summary object into an array of objects
+    formattedValues = Object.values(summary);
+  }
+  const filePath = filename;
+  // Create a write stream for the CSV file
+  writeToPath(filePath, formattedValues, {
+    headers: true,
+    delimiter: format === "Raven" ? "\t" : ",",
+  })
+    .on("error", (_err) =>
+      generateAlert({
+        type: "warning",
+        message: "saveBlocked",
+        variables: { filePath },
+      })
+    )
+    .on("finish", () => {
+      generateAlert({ message: "goodSave", variables: { filePath } });
+    });
 }
 
 const sendResult = (index, result, fromDBQuery) => {
@@ -3748,24 +3818,22 @@ const getSavedFileInfo = async (file) => {
       const prefix = STATE.library.location + p.sep;
       // Get rid of archive (library) location prefix
       const archiveFile = file.replace(prefix, "");
-      row = await diskDB
-        .getAsync(
-          `
+      row = await diskDB.getAsync(
+        `
               SELECT duration, filestart AS fileStart, metadata, locationID
               FROM files LEFT JOIN locations ON files.locationID = locations.id 
               WHERE name = ? OR archiveName = ?`,
-          file,
-          archiveFile
-        )
+        file,
+        archiveFile
+      );
       if (!row) {
         const baseName = file.replace(/^(.*)\..*$/g, "$1%");
-        row = await diskDB
-          .getAsync(
-            "SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name LIKE  (?)",
-            baseName
-          )
+        row = await diskDB.getAsync(
+          "SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name LIKE  (?)",
+          baseName
+        );
       }
-    } catch (error){
+    } catch (error) {
       console.warn(error);
     }
     return row;
@@ -3795,15 +3863,17 @@ const onSave2DiskDB = async ({ file }) => {
   await dbMutex.lock();
   try {
     await memoryDB.runAsync("BEGIN");
+    await memoryDB.runAsync(`
+      INSERT OR REPLACE INTO disk.locations (id, lat, lon, place)
+      SELECT id, lat, lon, place FROM locations;
+    `);
     await memoryDB.runAsync(
       `INSERT OR IGNORE INTO disk.files SELECT * FROM files`
     );
     await memoryDB.runAsync(
       `INSERT OR IGNORE INTO disk.tags SELECT * FROM tags`
     );
-    await memoryDB.runAsync(
-      `INSERT OR IGNORE INTO disk.locations SELECT * FROM locations`
-    );
+
     // Update the duration table
     response = await memoryDB.runAsync(
       "INSERT OR IGNORE INTO disk.duration SELECT * FROM duration"
@@ -3828,7 +3898,7 @@ const onSave2DiskDB = async ({ file }) => {
         if (!DATASET) {
           // Now we have saved the records, set state to DiskDB
           await onChangeMode("archive");
-          await getLocations({ db: STATE.db, file: file });
+          await getLocations({ file: file });
         }
         // Set the saved flag on files' METADATA
         Object.values(METADATA).forEach((file) => (file.isSaved = true));
@@ -3849,7 +3919,6 @@ const onSave2DiskDB = async ({ file }) => {
 
 const filterLocation = () =>
   STATE.locationID ? ` AND files.locationID = ${STATE.locationID}` : "";
-
 
 /**
  * getDetectedSpecies generates a list of species to use in dropdowns for chart and explore mode filters
@@ -3912,7 +3981,7 @@ const onUpdateFileStart = async (args) => {
   const newfileMtime = new Date(
     Math.round(args.start + METADATA[file].duration * 1000)
   );
-  
+
   const { utimesSync } = require("utimes");
   utimesSync(file, { atime: Date.now(), mtime: newfileMtime });
 
@@ -3990,7 +4059,7 @@ const onUpdateFileStart = async (args) => {
       // Update the daylight flag if necessary
       let lat, lon;
       if (locationID) {
-        const location = await db.getAsync(
+        const location = await STATE.db.getAsync(
           "SELECT lat, lon FROM locations WHERE id = ?",
           locationID
         );
@@ -4193,7 +4262,7 @@ const dbMutex = new Mutex();
  */
 async function _updateSpeciesLocale(db, labels) {
   const updatePromises = [];
-  await dbMutex.lock()
+  await dbMutex.lock();
   const updateStmt = db.prepare("UPDATE species SET cname = ? WHERE sname = ?");
   const updateChirpityStmt = db.prepare(
     "UPDATE species SET cname = ? WHERE sname = ? AND cname LIKE ?"
@@ -4308,60 +4377,58 @@ async function updateSpeciesLabelLocale() {
   UI.postMessage({ event: "labels", labels: labels });
 }
 
-async function onSetCustomLocation({ lat, lon, place, files, db = STATE.db }) {
+async function onSetCustomLocation({
+  lat,
+  lon,
+  place,
+  files,
+  db = STATE.db,
+  overwritePlaceName = true,
+}) {
   if (!place) {
-    const { id } = await db.getAsync(
-      `SELECT id FROM locations WHERE lat = ? AND lon = ?`,
+    // Delete the location
+    const row = await db.getAsync(
+      "SELECT id FROM locations WHERE lat = ? AND lon = ?",
       lat,
       lon
     );
-    const result = await db.runAsync(
-      `DELETE FROM locations WHERE lat = ? AND lon = ?`,
-      lat,
-      lon
-    );
-    if (result.changes) {
-      await db.runAsync(
-        `UPDATE files SET locationID = null WHERE locationID = ?`,
-        id
-      );
+    if (row) {
+      await db.runAsync("DELETE FROM locations WHERE id = ?", row.id);
     }
   } else {
-    const result = await db.runAsync(
-      `
-        INSERT INTO locations VALUES (?, ?, ?, ?)
-        ON CONFLICT(lat,lon) DO UPDATE SET place = excluded.place`,
-      undefined,
-      lat,
-      lon,
-      place
-    );
+    const SQL = overwritePlaceName
+      ? `INSERT INTO locations VALUES (?, ?, ?, ?)
+         ON CONFLICT(lat, lon) DO UPDATE SET place = excluded.place`
+      : `INSERT OR IGNORE INTO locations VALUES (?, ?, ?, ?)`;
+
+    const result = await db.runAsync(SQL, undefined, lat, lon, place);
     const { id } = await db.getAsync(
-      `SELECT ID FROM locations WHERE lat = ? AND lon = ?`,
+      "SELECT ID FROM locations WHERE lat = ? AND lon = ?",
       lat,
       lon
     );
+
     for (const file of files) {
-      await db.runAsync(
-        "UPDATE files SET locationID = ? WHERE name = ?",
-        id,
-        file
+      const result = await db.runAsync(
+        `INSERT INTO files (id, name, duration, filestart, locationID) values (?, ?, ?, ?, ?)
+        ON CONFLICT(name) DO UPDATE SET locationID = EXCLUDED.locationID`,
+        undefined,
+        file,
+        METADATA[file].duration,
+        METADATA[file].fileStart,
+        id
       );
+      const test = await db.getAsync("select * from files"); // file not in db yet
       // we may not have set the METADATA for the file
-      if (METADATA[file]) {
-        METADATA[file].locationID = id;
-      } else {
-        METADATA[file] = {};
-        METADATA[file].locationID = id;
-      }
+      METADATA[file] = { ...(METADATA[file] || {}), locationID: id };
       // tell the UI the file has a location id
-      UI.postMessage({ event: "file-location-id", file: file, id: id });
+      UI.postMessage({ event: "file-location-id", file, id });
     }
   }
-  await getLocations({ db: db, file: files[0] });
+  await getLocations({ file: files[0] });
 }
 
-async function getLocations({ db = STATE.db, file }) {
+async function getLocations({ file, db = STATE.db }) {
   let locations = await db.allAsync("SELECT * FROM locations ORDER BY place");
   locations ??= [];
   UI.postMessage({
@@ -4514,6 +4581,9 @@ const pLimit = require("p-limit");
  * Upon completion of all tasks, it updates the UI with final progress and a summary alert detailing the counts of
  * successful and failed conversions.
  *
+ * 1. Pull files from db that do not have archiveName
+ * 2.
+ *
  * @param {number} [threadLimit=4] - Maximum number of concurrent file conversion tasks.
  * @returns {Promise<boolean|undefined>} Resolves to false if the archive directory is missing or unwritable; otherwise,
  * the promise resolves when all conversion tasks have been processed.
@@ -4546,12 +4616,14 @@ async function convertAndOrganiseFiles(threadLimit) {
   const conversions = []; // Array to hold the conversion promises
 
   // Query the files & records table to get the necessary data
-  let query = "SELECT DISTINCT f.id, f.name, f.archiveName, f.duration, f.filestart, l.place FROM files f LEFT JOIN locations l ON f.locationID = l.id";
+  let query =
+    "SELECT DISTINCT f.id, f.name, f.archiveName, f.duration, f.filestart, l.place FROM files f LEFT JOIN locations l ON f.locationID = l.id";
   // If just saving files with records
-  if (STATE.library.clips) query += " INNER JOIN records r WHERE r.fileID = f.id"
-  t0 = Date.now()
+  if (STATE.library.clips) query += " INNER JOIN records r ON r.fileID = f.id";
+  if (!STATE.library.backfill) query += " WHERE f.archiveName is NULL";
+  t0 = Date.now();
   const rows = await db.allAsync(query);
-  console.log(`db query took ${Date.now() - t0}ms`)
+  console.log(`db query took ${Date.now() - t0}ms`);
   const ext = "." + STATE.library.format;
   for (const row of rows) {
     row.place ??= STATE.place;
@@ -4564,7 +4636,7 @@ async function convertAndOrganiseFiles(threadLimit) {
     const outputDir = p.join(place, year, month);
     const outputFileName =
       p.basename(inputFilePath, p.extname(inputFilePath)) + ext;
-      
+
     const fullPath = p.join(STATE.library.location, outputDir);
     const fullFilePath = p.join(fullPath, outputFileName);
     const dbArchiveName = p.join(outputDir, outputFileName);
@@ -4729,7 +4801,6 @@ async function convertFile(
         command.seekInput(start).duration(end - start);
         scaleFactor = row.duration / (end - start);
         row.duration = end - start;
-        
       }
     }
     command
@@ -4741,7 +4812,7 @@ async function convertFile(
         const newfileMtime = new Date(
           Math.round(row.filestart + row.duration * 1000)
         );
-        
+
         const { utimesSync } = require("utimes");
         utimesSync(fullFilePath, { atime: Date.now(), mtime: newfileMtime });
 
