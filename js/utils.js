@@ -110,13 +110,23 @@ function isEmptyObject(obj) {
 
 function enableMenuItem(id_list) {
   id_list.forEach((id) => {
-    document.getElementById(id).classList.remove("disabled");
+    const element = document.getElementById(id);
+    if (element) {
+      element.classList.remove("disabled");
+    } else {
+      console.warn(`Element with ID '${id}' not found for enableMenuItem`);
+    }
   });
 }
 
 function disableMenuItem(id_list) {
   id_list.forEach((id) => {
-    document.getElementById(id).classList.add("disabled");
+    const element = document.getElementById(id);
+    if (element) {
+      element.classList.add("disabled");
+    } else {
+      console.warn(`Element with ID '${id}' not found for disableMenuItem`);
+    }
   });
 }
 
@@ -129,6 +139,10 @@ function _setHeight(el, val) {
 function showElement(id_list, makeFlex = true, empty = false) {
   id_list.forEach((id) => {
     const thisElement = document.getElementById(id);
+    if (!thisElement) {
+      console.warn(`Element with ID '${id}' not found for showElement`);
+      return;
+    }
     thisElement.classList.remove("d-none");
     if (makeFlex) thisElement.classList.add("d-flex");
     if (empty) {
@@ -141,6 +155,10 @@ function showElement(id_list, makeFlex = true, empty = false) {
 function hideElement(id_list) {
   id_list.forEach((id) => {
     const thisElement = document.getElementById(id);
+    if (!thisElement) {
+      console.warn(`Element with ID '${id}' not found for hideElement`);
+      return;
+    }
     // Don't use replace as d-flex may be absent
     thisElement.classList.remove("d-flex");
     thisElement.classList.add("d-none");

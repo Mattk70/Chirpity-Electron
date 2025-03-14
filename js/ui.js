@@ -3,17 +3,20 @@
  * Contains functions for rendering the spectrogram, updating settings, rendering the screen
  */
 
-import { trackVisit as _trackVisit, trackEvent as _trackEvent} from "./tracking.js";
-import {checkMembership} from './member.js';
+import {
+  trackVisit as _trackVisit,
+  trackEvent as _trackEvent,
+} from "./tracking.js";
+import { checkMembership } from "./member.js";
 import { DOM } from "./DOMcache.js";
 import { IUCNCache, IUCNtaxonomy } from "./IUCNcache.js";
-import { XCtaxonomy as XCtaxon } from './XCtaxonomy.js';
+import { XCtaxonomy as XCtaxon } from "./XCtaxonomy.js";
 import WaveSurfer from "../node_modules/wavesurfer.js/dist/wavesurfer.esm.js";
 import RegionsPlugin from "../node_modules/wavesurfer.js/dist/plugins/regions.esm.js";
 import Spectrogram from "../node_modules/wavesurfer.js/dist/plugins/spectrogram.esm.js";
 import TimelinePlugin from "../node_modules/wavesurfer.js/dist/plugins/timeline.esm.js";
-import { CustomSelect } from './custom-select.js';
-import createFilterDropdown from './custom-filter.js';
+import { CustomSelect } from "./custom-select.js";
+import createFilterDropdown from "./custom-filter.js";
 import { Pagination } from "./pagination.js";
 import {
   fetchIssuesByLabel,
@@ -22,8 +25,7 @@ import {
   isNewVersion,
 } from "./getKnownIssues.js";
 import * as i18n from "./i18n.js";
-import * as utils from './utils.js';
-
+import * as utils from "./utils.js";
 
 let LOCATIONS,
   locationID = undefined,
@@ -38,8 +40,6 @@ let LABELS = [],
 const originalInfo = console.info;
 const originalWarn = console.warn;
 const originalError = console.error;
-
-
 
 // Override console.warn to intercept and track warnings
 console.info = function () {
@@ -121,7 +121,7 @@ let STATE = {
   },
   resultsSortOrder: "timestamp",
   summarySortOrder: "cname ASC",
-  resultsMetaSortOrder: '',
+  resultsMetaSortOrder: "",
   dataFormatOptions: {
     day: "2-digit",
     month: "short",
@@ -145,7 +145,15 @@ let STATE = {
   regionColour: "rgba(255, 255, 255, 0.1)",
   regionActiveColour: "rgba(255, 255, 0, 0.1)",
   regionsCompleted: true,
-  labelColors: ["dark", "success", "warning", "info", "secondary", "danger", "primary"]
+  labelColors: [
+    "dark",
+    "success",
+    "warning",
+    "info",
+    "secondary",
+    "danger",
+    "primary",
+  ],
 };
 
 //Open Files from OS "open with"
@@ -169,8 +177,7 @@ const os = window.module.os;
 const isTestEnv = window.env.TEST_ENV === "true";
 const trackVisit = isTestEnv ? () => {} : _trackVisit;
 const trackEvent = isTestEnv ? () => {} : _trackEvent;
-isTestEnv &&  console.log("Running in test environment");
-
+isTestEnv && console.log("Running in test environment");
 
 function createColormap() {
   const cmap = config.colormap;
@@ -185,8 +192,8 @@ function createColormap() {
           { index: 1, rgb: utils.hexToRgb(config.customColormap.loud) },
         ]
       : cmap;
-    
-  return ['roseus', 'gray', 'igray'].includes(cmap)
+
+  return ["roseus", "gray", "igray"].includes(cmap)
     ? cmap
     : colormap({ colormap: map, nshades: 256, format: "float" });
 }
@@ -248,7 +255,8 @@ let appVersionLoaded = new Promise((resolve, reject) => {
 let modelReady = false,
   fileLoaded = false;
 let PREDICTING = false,
-  t0, app_t0 = Date.now();
+  t0,
+  app_t0 = Date.now();
 let activeRegion, wavesurfer;
 let bufferStartTime, fileEnd;
 
@@ -268,11 +276,13 @@ DOM.contentWrapper.style.height = bodyElement.clientHeight - 80 + "px";
 
 const specMaxHeight = () => {
   // Get the available viewport height
-  const formOffset = DOM.exploreWrapper.offsetHeight
+  const formOffset = DOM.exploreWrapper.offsetHeight;
   const navPadding = DOM.navPadding.clientHeight;
   const footerHeight = DOM.footer.clientHeight;
   const controlsHeight = DOM.controlsWrapper.clientHeight;
-  return window.innerHeight - navPadding - footerHeight - controlsHeight - formOffset;
+  return (
+    window.innerHeight - navPadding - footerHeight - controlsHeight - formOffset
+  );
 };
 
 // Mouse down event to start dragging
@@ -302,7 +312,7 @@ DOM.controlsWrapper.addEventListener("mousedown", (e) => {
   };
   // Attach event listeners for mousemove and mouseup
   document.addEventListener("mousemove", onMouseMove);
-  document.addEventListener("mouseup", onMouseUp, {once: true});
+  document.addEventListener("mouseup", onMouseUp, { once: true });
 });
 
 // Set default Options
@@ -381,7 +391,6 @@ function loadAudioFileSync({ filePath = "", preserveResults = false }) {
   });
 }
 
-
 /**
  * Updates the spectrogram visualization and timeline asynchronously.
  *
@@ -408,7 +417,7 @@ async function updateSpec({
   }
   refreshTimeline();
   wavesurfer.seekTo(position);
-  if (play) await wavesurfer.play() 
+  if (play) await wavesurfer.play();
 }
 
 /**
@@ -511,8 +520,11 @@ async function loadBuffer(audio = currentBuffer) {
 }
 const nullRender = (peaks, ctx) => {};
 const wsTextColour = () =>
-  config.colormap === "custom" ? config.customColormap.loud 
-  : config.colormap === "gray" ? "#000" : "#fff";
+  config.colormap === "custom"
+    ? config.customColormap.loud
+    : config.colormap === "gray"
+    ? "#000"
+    : "#fff";
 
 const initWavesurfer = ({ audio = undefined, height = 0 }) => {
   wavesurfer && wavesurfer.destroy();
@@ -547,38 +559,40 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
 
   wavesurfer.on("dblclick", centreSpec);
   wavesurfer.on("click", () => REGIONS.clearRegions());
-  wavesurfer.on('ready', () => wavesurfer.isReady = true)
-  wavesurfer.on('pause', () => {
-    const position = wavesurfer.getCurrentTime() / wavesurfer.decodedData.duration;
-    // Pause event fired right before 'finish' event, so 
+  wavesurfer.on("ready", () => (wavesurfer.isReady = true));
+  wavesurfer.on("pause", () => {
+    const position =
+      wavesurfer.getCurrentTime() / wavesurfer.decodedData.duration;
+    // Pause event fired right before 'finish' event, so
     // this is set=== to signal whether it was playing up to that point
-    if (position < 0.998)  wavesurfer.isPaused = true
-})
+    if (position < 0.998) wavesurfer.isPaused = true;
+  });
 
-  wavesurfer.on('play', () => wavesurfer.isPaused = false)
-
+  wavesurfer.on("play", () => (wavesurfer.isPaused = false));
 
   wavesurfer.on("finish", function () {
     const bufferEnd = windowOffsetSecs + windowLength;
     if (currentFileDuration > bufferEnd) {
-      wavesurfer.isReady = false
-      postBufferUpdate({ begin: windowOffsetSecs + windowLength, play: !wavesurfer.isPaused });
-    } else if (!wavesurfer.isPaused){
+      wavesurfer.isReady = false;
+      postBufferUpdate({
+        begin: windowOffsetSecs + windowLength,
+        play: !wavesurfer.isPaused,
+      });
+    } else if (!wavesurfer.isPaused) {
       const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
       if (fileIndex < STATE.openFiles.length - 1) {
         // Move to next file
         const fileToLoad = STATE.openFiles[fileIndex + 1];
-        wavesurfer.isReady = false
+        wavesurfer.isReady = false;
         postBufferUpdate({
           file: fileToLoad,
           begin: 0,
           position: 0,
-          play: !wavesurfer.isPaused
+          play: !wavesurfer.isPaused,
         });
       }
     }
   });
-
 
   // Show controls
   utils.showElement(["controlsWrapper"]);
@@ -597,7 +611,6 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
 
   wave.removeEventListener("mousemove", specTooltip);
   wave.removeEventListener("mouseout", hideTooltip);
-
 
   wave.addEventListener("mousemove", specTooltip, { passive: true });
   wave.addEventListener("mouseout", hideTooltip);
@@ -629,14 +642,18 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
 function increaseFFT() {
   if (spectrogram.fftSamples < 2048 && STATE.regionsCompleted) {
     spectrogram.fftSamples *= 2;
-    const position = utils.clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
+    const position = utils.clamp(
+      wavesurfer.getCurrentTime() / windowLength,
+      0,
+      1
+    );
     postBufferUpdate({
       begin: windowOffsetSecs,
       position: position,
       play: wavesurfer.isPlaying(),
     });
     console.log(spectrogram.fftSamples);
-    config.FFT = spectrogram.fftSamples
+    config.FFT = spectrogram.fftSamples;
   }
 }
 
@@ -668,14 +685,18 @@ function increaseFFT() {
 function reduceFFT() {
   if (spectrogram.fftSamples > 64 && STATE.regionsCompleted) {
     spectrogram.fftSamples /= 2;
-    const position = utils.clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
+    const position = utils.clamp(
+      wavesurfer.getCurrentTime() / windowLength,
+      0,
+      1
+    );
     postBufferUpdate({
       begin: windowOffsetSecs,
       position: position,
       play: wavesurfer.isPlaying(),
     });
     console.log(spectrogram.fftSamples);
-    config.FFT = spectrogram.fftSamples
+    config.FFT = spectrogram.fftSamples;
   }
 }
 
@@ -708,7 +729,6 @@ const refreshTimeline = () => {
  */
 function zoomSpec(direction) {
   if (fileLoaded && STATE.regionsCompleted) {
-
     if (typeof direction !== "string") {
       // then it's an event
       direction = direction.target.closest("button").id;
@@ -750,7 +770,7 @@ function zoomSpec(direction) {
 }
 
 async function showOpenDialog(fileOrFolder) {
-  const defaultPath = localStorage.getItem("lastFolder") || '';
+  const defaultPath = localStorage.getItem("lastFolder") || "";
   const files = await window.electron.openDialog("showOpenDialog", {
     type: "audio",
     fileOrFolder: fileOrFolder,
@@ -791,7 +811,6 @@ const buildFileMenu = (e) => {
   positionMenu(menu, e);
 };
 
-
 /**
  * Renders a date and time picker form for updating the start time of the current audio file.
  *
@@ -829,7 +848,10 @@ function showDatePicker() {
     "value",
     utils.getDatetimeLocalFromEpoch(STATE.fileStart)
   );
-  datetimeInput.setAttribute("max", utils.getDatetimeLocalFromEpoch(new Date()));
+  datetimeInput.setAttribute(
+    "max",
+    utils.getDatetimeLocalFromEpoch(new Date())
+  );
   datetimeInput.classList.add("form-control");
   form.appendChild(datetimeInput);
 
@@ -1233,8 +1255,6 @@ const filterValidFiles = ({ filePaths }) => {
   worker.postMessage({ action: "get-valid-files-list", files: filePaths });
 };
 
-
-
 async function sortFilesByTime(fileNames) {
   const fileData = await Promise.all(
     fileNames.map(async (fileName) => {
@@ -1317,8 +1337,6 @@ function analyseReset() {
   resetDiagnostics();
   DOM.progressDiv.classList.remove("invisible");
 }
-
-
 
 /**
  * Refreshes the results view in the UI based on the current file loading state and available predictions.
@@ -1464,9 +1482,6 @@ async function fetchLocationAddress(lat, lon, pushLocations) {
 
 // Menu bar functions
 
-
-
-
 async function batchExportAudio() {
   const species = isSpeciesViewFiltered(true);
   species
@@ -1474,22 +1489,27 @@ async function batchExportAudio() {
     : generateToast({ type: "warning", message: "mustFilterSpecies" });
 }
 
-async function exportData(format, species = isSpeciesViewFiltered(true), limit = Infinity, duration) {
-  const defaultPath = localStorage.getItem("lastSaveFolder") || '';
+async function exportData(
+  format,
+  species = isSpeciesViewFiltered(true),
+  limit = Infinity,
+  duration
+) {
+  const defaultPath = localStorage.getItem("lastSaveFolder") || "";
   let location, lastSaveFolder;
-  if (['Audacity', 'audio'].includes(format)){
+  if (["Audacity", "audio"].includes(format)) {
     // Audacity exports one label file per file in results
     const response = await window.electron.selectDirectory(defaultPath);
-    if (response.canceled) return
-    location = response.filePaths[0]
+    if (response.canceled) return;
+    location = response.filePaths[0];
     lastSaveFolder = location;
   } else {
     let filename = species || "All";
     filename += format == "Raven" ? `_selections.txt` : "_detections.csv";
     const filePath = p.join(defaultPath, filename);
-    location = await window.electron.exportData({defaultPath: filePath});
-    if (! location) return
-    lastSaveFolder = p.dirname(location)
+    location = await window.electron.exportData({ defaultPath: filePath });
+    if (!location) return;
+    lastSaveFolder = p.dirname(location);
   }
   worker.postMessage({
     action: "export-results",
@@ -1566,9 +1586,9 @@ async function showCharts() {
   });
   const locationFilter = await generateLocationList("chart-locations");
   locationFilter.addEventListener("change", handleLocationFilterChange);
-    // Prevent the wavesurfer error
-    spectrogram && spectrogram.destroy();
-    spectrogram = null;
+  // Prevent the wavesurfer error
+  spectrogram && spectrogram.destroy();
+  spectrogram = null;
   utils.hideAll();
   utils.showElement(["recordsContainer"]);
   worker.postMessage({
@@ -1585,8 +1605,8 @@ async function showCharts() {
  * If both conditions are met, it initializes the spectrogram using the configured maximum height
  * and registers it as a plugin with wavesurfer.
  */
-function reInitSpec(){
-  if (wavesurfer && !spectrogram){
+function reInitSpec() {
+  if (wavesurfer && !spectrogram) {
     spectrogram = initSpectrogram(config.specMaxHeight);
     wavesurfer.registerPlugin(spectrogram);
   }
@@ -1651,9 +1671,9 @@ async function showAnalyse() {
   //Restore STATE
   STATE = { ...STATE, ...STATE.currentAnalysis };
   worker.postMessage({ action: "change-mode", mode: STATE.mode });
-      // Prevent the wavesurfer error
-      spectrogram && spectrogram.destroy();
-      spectrogram = null;
+  // Prevent the wavesurfer error
+  spectrogram && spectrogram.destroy();
+  spectrogram = null;
   utils.hideAll();
   if (STATE.currentFile) {
     utils.showElement(["spectrogramWrapper"], false);
@@ -1702,8 +1722,8 @@ async function showAnalyse() {
  */
 function createRegion(start, end, label, goToRegion, colour) {
   // Validate input parameters
-  if (typeof start !== 'number' || typeof end !== 'number' || start >= end) {
-    console.error('Invalid region parameters:', { start, end });
+  if (typeof start !== "number" || typeof end !== "number" || start >= end) {
+    console.error("Invalid region parameters:", { start, end });
     return;
   }
   REGIONS.addRegion({
@@ -1741,15 +1761,15 @@ selectionTable.addEventListener("click", resultClick);
  */
 async function resultClick(e) {
   if (!fileLoaded) {
-    console.warn('Cannot process click - no audio file is loaded');
+    console.warn("Cannot process click - no audio file is loaded");
     return;
   }
   if (!STATE.regionsCompleted) {
-      console.warn('Cannot process click - regions are still being created');
-      return;
-    }
+    console.warn("Cannot process click - regions are still being created");
+    return;
+  }
   let row = e.target.closest("tr");
-  if (!row || row.classList.length === 0 || row.closest('#resultsHead')) {
+  if (!row || row.classList.length === 0 || row.closest("#resultsHead")) {
     // 1. clicked and dragged, 2 no detections in file row 3. clicked a header
     return;
   }
@@ -1758,7 +1778,8 @@ async function resultClick(e) {
   if (activeRow) activeRow.classList.remove("table-active");
   row.classList.add("table-active");
   activeRow = row;
-  if (this.closest('#results')){ // Don't do this after "analyse selection"
+  if (this.closest("#results")) {
+    // Don't do this after "analyse selection"
     loadResultRegion({ file, start, end, label });
   }
   if (e.target.classList.contains("circle")) {
@@ -1779,23 +1800,23 @@ async function resultClick(e) {
  * @param {number} start - The start time to match for activating the corresponding table row.
  */
 function setActiveRow(start) {
-    const rows = DOM.resultTable.querySelectorAll('tr');
-    for (const r of rows) {
-        const [file, rowStart, _end, _, _label] = r.getAttribute("name").split("|");
+  const rows = DOM.resultTable.querySelectorAll("tr");
+  for (const r of rows) {
+    const [file, rowStart, _end, _, _label] = r.getAttribute("name").split("|");
 
-        if ( file === STATE.currentFile && Number(rowStart) === start) {
-            // Clear the active row if there's one
-            if (activeRow && activeRow !== r) {
-                activeRow.classList.remove('table-active');
-            }
-            // Add the 'table-active' class to the target row
-            r.classList.add('table-active');
-            activeRow = r;  // Update the active row reference
-            
-            activeRow.scrollIntoView({ behavior: "smooth", block: "center" });
-            break;  // Exit loop once the target row is found
-        }
+    if (file === STATE.currentFile && Number(rowStart) === start) {
+      // Clear the active row if there's one
+      if (activeRow && activeRow !== r) {
+        activeRow.classList.remove("table-active");
+      }
+      // Add the 'table-active' class to the target row
+      r.classList.add("table-active");
+      activeRow = r; // Update the active row reference
+
+      activeRow.scrollIntoView({ behavior: "smooth", block: "center" });
+      break; // Exit loop once the target row is found
     }
+  }
 }
 
 const loadResultRegion = ({
@@ -1814,12 +1835,14 @@ const loadResultRegion = ({
     end: end - windowOffsetSecs,
     label,
   };
-  const position = wavesurfer ? utils.clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1) : 0;
+  const position = wavesurfer
+    ? utils.clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1)
+    : 0;
   postBufferUpdate({
     file,
     begin: windowOffsetSecs,
     position,
-    goToRegion: true
+    goToRegion: true,
   });
 };
 
@@ -1849,7 +1872,7 @@ async function adjustSpecDims(redraw, fftSamples, newHeight) {
   const footerHeight = DOM.footer.offsetHeight;
   const navHeight = DOM.navPadding.clientHeight;
   newHeight ??= 0;
-  DOM.contentWrapper.style.top = (navHeight).toString() + 'px'; // for padding
+  DOM.contentWrapper.style.top = navHeight.toString() + "px"; // for padding
   DOM.contentWrapper.style.height =
     (bodyElement.clientHeight - footerHeight - navHeight).toString() + "px";
   const contentHeight = contentWrapper.offsetHeight;
@@ -2009,12 +2032,17 @@ function updatePrefs(file, data) {
   );
 }
 
-
 /////////////////////////  Window Handlers ////////////////////////////
 // Set config defaults
 const defaultConfig = {
   newInstallDate: 0,
-  library: { location: undefined, format: "ogg", auto: false, trim: false, clips: false },
+  library: {
+    location: undefined,
+    format: "ogg",
+    auto: false,
+    trim: false,
+    clips: false,
+  },
   fontScale: 1,
   seenTour: false,
   lastUpdateCheck: 0,
@@ -2083,7 +2111,7 @@ const defaultConfig = {
   VERSION: VERSION,
   powerSaveBlocker: false,
   fileStartMtime: false,
-  keyAssignment: {}
+  keyAssignment: {},
 };
 let appPath, tempPath, systemLocale, isMac;
 window.onload = async () => {
@@ -2123,7 +2151,6 @@ window.onload = async () => {
       config = JSON.parse(data);
     }
 
-
     // Attach an error event listener to the window object
     window.onerror = function (message, file, lineno, colno, error) {
       trackEvent(
@@ -2138,8 +2165,8 @@ window.onload = async () => {
     //fill in defaults - after updates add new items
     utils.syncConfig(config, defaultConfig);
 
-    membershipCheck().then(isMember  => STATE.isMember = isMember);
- 
+    membershipCheck().then((isMember) => (STATE.isMember = isMember));
+
     // Disable SNR
     config.filters.SNR = 0;
 
@@ -2151,8 +2178,8 @@ window.onload = async () => {
     // Fontsize
     config.fontScale === 1 || setFontSizeScale(true);
     // Ensure config.model is valid (v1.10.x management)
-    if (! ['birdnet', 'chirpity', 'nocmig'].includes(config.model)){
-      config.model = 'birdnet';
+    if (!["birdnet", "chirpity", "nocmig"].includes(config.model)) {
+      config.model = "birdnet";
     }
 
     // Map slider value to batch size
@@ -2194,7 +2221,7 @@ window.onload = async () => {
     // timeline
     DOM.timelineSetting.value = config.timeOfDay ? "timeOfDay" : "timecode";
     // Spectrogram colour
-    if (config.colormap === 'igreys') config.colormap = 'gray';
+    if (config.colormap === "igreys") config.colormap = "gray";
     DOM.colourmap.value = config.colormap;
 
     // Spectrogram labels
@@ -2211,7 +2238,8 @@ window.onload = async () => {
     // Window function & colormap
     document.getElementById("window-function").value =
       config.customColormap.windowFn;
-    config.customColormap.windowFn === 'gauss' && document.getElementById('alpha').classList.remove('d-none')
+    config.customColormap.windowFn === "gauss" &&
+      document.getElementById("alpha").classList.remove("d-none");
     config.colormap === "custom" &&
       document.getElementById("colormap-fieldset").classList.remove("d-none");
     document.getElementById("color-threshold").textContent =
@@ -2453,7 +2481,7 @@ const setUpWorkerMessaging = () => {
           if (config.list === "custom") {
             labelFile = config.customListFile[config.model];
           } else {
-            locale === 'pt' && (locale ='pt_PT')
+            locale === "pt" && (locale = "pt_PT");
             labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_${locale}.txt`;
           }
           readLabels(labelFile);
@@ -2472,7 +2500,7 @@ const setUpWorkerMessaging = () => {
           const mode = args.mode;
           STATE.mode = mode;
           renderFilenamePanel();
-          adjustSpecDims()
+          adjustSpecDims();
           switch (mode) {
             case "analyse": {
               STATE.diskHasRecords &&
@@ -2522,7 +2550,7 @@ const setUpWorkerMessaging = () => {
           break;
         }
         case "seen-species-list": {
-          STATE.seenSpecies = args.list.map(item => item.label)
+          STATE.seenSpecies = args.list.map((item) => item.label);
           break;
         }
         case "tfjs-node": {
@@ -2530,7 +2558,8 @@ const setUpWorkerMessaging = () => {
           const changedEnv = config.hasNode !== args.hasNode;
           if (changedEnv && args.hasNode) {
             // If not using tensorflow, switch to the tensorflow backend because this faster under Node
-            config[config.model].backend !== "tensorflow" && handleBackendChange("tensorflow");
+            config[config.model].backend !== "tensorflow" &&
+              handleBackendChange("tensorflow");
           }
           config.hasNode = args.hasNode;
           if (!config.hasNode && config[config.model].backend !== "webgpu") {
@@ -2553,8 +2582,8 @@ const setUpWorkerMessaging = () => {
         case "tags": {
           STATE.tagsList = args.tags;
           // Init is passed on launch, so set up the UI
-          args.init && setKeyAssignmentUI(config.keyAssignment)
-          break
+          args.init && setKeyAssignmentUI(config.keyAssignment);
+          break;
         }
         case "total-records": {
           updatePagination(args.total, args.offset);
@@ -2617,7 +2646,7 @@ const setUpWorkerMessaging = () => {
  *
  * @returns {void}
  */
-function showWindowDetections({detections, goToRegion}) {
+function showWindowDetections({ detections, goToRegion }) {
   for (const detection of detections) {
     const start = detection.start - windowOffsetSecs;
     if (start < windowLength) {
@@ -2625,7 +2654,7 @@ function showWindowDetections({detections, goToRegion}) {
       const active = start === activeRegion?.start;
       if (!config.specDetections && !active) continue;
       const colour = active ? STATE.regionActiveColour : null;
-      const setPosition = active && goToRegion;      
+      const setPosition = active && goToRegion;
       createRegion(start, end, detection.label, setPosition, colour);
     }
   }
@@ -2703,7 +2732,6 @@ function handleGesture(e) {
   trackEvent(config.UUID, "Swipe", key, "");
   // }, 200, 'swipe');
 }
-
 
 /**
  * Asynchronously saves an audio clip using Electron's file system API.
@@ -3049,7 +3077,6 @@ function getTooltipTitle(date, aggregation) {
   }
 }
 
-
 window.addEventListener("resize", function () {
   utils.waitForFinalEvent(
     function () {
@@ -3070,9 +3097,13 @@ window.addEventListener("resize", function () {
  * @param {KeyboardEvent} e - The keydown event triggered by the user.
  */
 function handleKeyDownDeBounce(e) {
-  if (!(e.target instanceof HTMLInputElement 
-    || e.target instanceof HTMLTextAreaElement
-    || e.target instanceof CustomSelect)){
+  if (
+    !(
+      e.target instanceof HTMLInputElement ||
+      e.target instanceof HTMLTextAreaElement ||
+      e.target instanceof CustomSelect
+    )
+  ) {
     e.preventDefault();
     utils.waitForFinalEvent(
       function () {
@@ -3132,29 +3163,29 @@ function handleKeyDown(e) {
  * @param {string} [color] - The desired color for the label text (subject to configuration overrides).
  * @returns {(HTMLElement|undefined)} The styled <span> element containing the label text, or undefined if no label is provided.
  */
-function formatLabel(label, color){
-  if (config.colormap === 'gray') {
-    color = color ? 'purple': '#666'
+function formatLabel(label, color) {
+  if (config.colormap === "gray") {
+    color = color ? "purple" : "#666";
   }
-  if (!label) return
-  const labelEl = document.createElement('span');
+  if (!label) return;
+  const labelEl = document.createElement("span");
   Object.assign(labelEl.style, {
-    position: 'absolute',
-    color: color || 'beige',
-    top: '1rem',
-    left: '0.5rem',
-    textShadow: '2px 2px 3px rgb(0, 0, 0, 0.5)'
-  })
+    position: "absolute",
+    color: color || "beige",
+    top: "1rem",
+    left: "0.5rem",
+    textShadow: "2px 2px 3px rgb(0, 0, 0, 0.5)",
+  });
   labelEl.textContent = label;
-  return labelEl
+  return labelEl;
 }
 
 /**
  * Activates the specified audio region by updating the global state and UI.
  *
- * This function first clears any previously active regions by resetting their colors 
+ * This function first clears any previously active regions by resetting their colors
  * and labels to the default state. It then applies an active style to the provided region,
- * which includes setting a new color and formatting the label. The function updates the global 
+ * which includes setting a new color and formatting the label. The function updates the global
  * active region, positions the playhead at the region's start time (taking into account any window offset),
  * and enables UI menu items such as "export-audio" and, when applicable (i.e., if the model is ready and not predicting),
  * "analyseSelection". If the provided region object is invalid (missing or having non-numeric start or end values),
@@ -3174,26 +3205,32 @@ function formatLabel(label, color){
  * setActiveRegion(region);
  */
 function setActiveRegion(region) {
-  if (!region || typeof region.start !== 'number' || typeof region.end !== 'number') {
-    console.error('Invalid region:', region);
+  if (
+    !region ||
+    typeof region.start !== "number" ||
+    typeof region.end !== "number"
+  ) {
+    console.error("Invalid region:", region);
     return;
   }
   const { start, end, content } = region;
   // Clear active regions
-  REGIONS.regions.forEach((r) => r.setOptions({ 
-    color: STATE.regionColour,
-    content: formatLabel(r.content?.innerText)
-  }));
+  REGIONS.regions.forEach((r) =>
+    r.setOptions({
+      color: STATE.regionColour,
+      content: formatLabel(r.content?.innerText),
+    })
+  );
   // Set the playhead to the start of the region
-  const label = content?.innerText || '';
-  const labelEl = formatLabel(label, 'gold')
-  activeRegion = { start, end, label};
-  region.setOptions({ color: STATE.regionActiveColour, content: labelEl});
+  const label = content?.innerText || "";
+  const labelEl = formatLabel(label, "gold");
+  activeRegion = { start, end, label };
+  region.setOptions({ color: STATE.regionActiveColour, content: labelEl });
   utils.enableMenuItem(["export-audio"]);
   if (modelReady && !PREDICTING) {
     utils.enableMenuItem(["analyseSelection"]);
   }
-  setActiveRow(start + windowOffsetSecs)
+  setActiveRow(start + windowOffsetSecs);
 }
 
 /**
@@ -3223,30 +3260,32 @@ function initRegion() {
     e.stopPropagation();
     // Hide context menu
     DOM.contextMenu.classList.add("d-none");
-    if (r.start !== activeRegion?.start){
+    if (r.start !== activeRegion?.start) {
       setActiveRegion(r);
     }
     wavesurfer.seekTo(e.clientX / window.innerWidth);
     // If shift key held, clear other regions
-    if (e.shiftKey){
-      REGIONS.regions.forEach((r) => r.color === STATE.regionColour && r.remove());
+    if (e.shiftKey) {
+      REGIONS.regions.forEach(
+        (r) => r.color === STATE.regionColour && r.remove()
+      );
       // Ctrl / Cmd: remove the current region
-    } else if (e.ctrlKey || e.metaKey) r.remove()
-  })
+    } else if (e.ctrlKey || e.metaKey) r.remove();
+  });
 
   // Enable analyse selection when region created
   REGIONS.on("region-created", function (r) {
     const { start, content } = r;
     const activeStart = activeRegion ? activeRegion.start : null;
     // If a new region is created without a label, it must be user generated
-     if (!content || start === activeStart) {
+    if (!content || start === activeStart) {
       setActiveRegion(r);
-     }
+    }
   });
 
   // Clear label on modifying region
   REGIONS.on("region-update", function (r) {
-    r.setOptions({content: ' '});
+    r.setOptions({ content: " " });
     setActiveRegion(r);
   });
 
@@ -3301,7 +3340,7 @@ function initSpectrogram(height, fftSamples) {
     fftSamples: fftSamples,
     scale: "linear",
     colorMap: colors,
-    alpha: config.alpha
+    alpha: config.alpha,
   });
 }
 
@@ -3310,43 +3349,41 @@ function hideTooltip() {
 }
 
 function specTooltip(event, showHz = !config.specLabels) {
-  if (true || config.showTooltip) {
-    const i18 = getI18n(i18n.Context);
-    const waveElement = event.target;
-    // Update the tooltip content
-    const tooltip = DOM.tooltip;
-    tooltip.style.display = "none";
-    tooltip.replaceChildren();
-    const inRegion = checkForRegion(event, false);
-    if (showHz || inRegion) {
-      const specDimensions = waveElement.getBoundingClientRect();
-      const frequencyRange =
-        Number(config.audio.maxFrequency) - Number(config.audio.minFrequency);
-      const yPosition =
-        Math.round(
-          (specDimensions.bottom - event.clientY) *
-            (frequencyRange / specDimensions.height)
-        ) + Number(config.audio.minFrequency);
+  const i18 = getI18n(i18n.Context);
+  const waveElement = event.target;
+  // Update the tooltip content
+  const tooltip = DOM.tooltip;
+  tooltip.style.display = "none";
+  tooltip.replaceChildren();
+  const inRegion = checkForRegion(event, false);
+  if (showHz || inRegion) {
+    const specDimensions = waveElement.getBoundingClientRect();
+    const frequencyRange =
+      Number(config.audio.maxFrequency) - Number(config.audio.minFrequency);
+    const yPosition =
+      Math.round(
+        (specDimensions.bottom - event.clientY) *
+          (frequencyRange / specDimensions.height)
+      ) + Number(config.audio.minFrequency);
 
-      tooltip.textContent = `${i18.frequency}: ${yPosition}Hz`;
-      if (inRegion){
-        const { start, end } = inRegion;
-        const textNode = document.createTextNode(
-          formatRegionTooltip(i18.length, start, end)
-        );
-        const lineBreak = document.createElement("br");
-        tooltip.appendChild(lineBreak); // Add the line break
-        tooltip.appendChild(textNode); // Add the text node
-      }
-      // Apply styles to the tooltip
-      Object.assign(tooltip.style, {
-        top: `${event.clientY}px`,
-        left: `${event.clientX + 15}px`,
-        display: "block",
-        visibility: "visible",
-        opacity: 1,
-      });
+    tooltip.textContent = `${i18.frequency}: ${yPosition}Hz`;
+    if (inRegion) {
+      const { start, end } = inRegion;
+      const textNode = document.createTextNode(
+        formatRegionTooltip(i18.length, start, end)
+      );
+      const lineBreak = document.createElement("br");
+      tooltip.appendChild(lineBreak); // Add the line break
+      tooltip.appendChild(textNode); // Add the text node
     }
+    // Apply styles to the tooltip
+    Object.assign(tooltip.style, {
+      top: `${event.clientY}px`,
+      left: `${event.clientX + 15}px`,
+      display: "block",
+      visibility: "visible",
+      opacity: 1,
+    });
   }
 }
 
@@ -3382,7 +3419,7 @@ DOM.listIcon.addEventListener("click", () => {
 });
 
 DOM.customListSelector.addEventListener("click", async () => {
-  const defaultPath = localStorage.getItem("customList") || '';
+  const defaultPath = localStorage.getItem("customList") || "";
   const files = await window.electron.openDialog("showOpenDialog", {
     type: "text",
     defaultPath,
@@ -3478,7 +3515,11 @@ const timelineToggle = (fromKeys) => {
   setTimelinePreferences();
   if (fileLoaded && STATE.regionsCompleted) {
     // Reload wavesurfer with the new timeline
-    const position = utils.clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
+    const position = utils.clamp(
+      wavesurfer.getCurrentTime() / windowLength,
+      0,
+      1
+    );
     postBufferUpdate({ begin: windowOffsetSecs, position: position });
   }
   updatePrefs("config.json", config);
@@ -3496,7 +3537,7 @@ const timelineToggle = (fromKeys) => {
  * its start and end times by the same offset shift. Should the region extend beyond the
  * valid window boundaries after the shift, it is cleared (set to null).
  *
- * Finally, the function invokes `postBufferUpdate` to refresh the audio display with 
+ * Finally, the function invokes `postBufferUpdate` to refresh the audio display with
  * the new configuration, positioning the center at 0.5.
  *
  * Side Effects:
@@ -3506,7 +3547,7 @@ const timelineToggle = (fromKeys) => {
  */
 
 function centreSpec() {
-  if (STATE.regionsCompleted){
+  if (STATE.regionsCompleted) {
     const saveBufferBegin = windowOffsetSecs;
     const middle = windowOffsetSecs + wavesurfer.getCurrentTime();
     windowOffsetSecs = middle - windowLength / 2;
@@ -3525,7 +3566,7 @@ function centreSpec() {
     }
     postBufferUpdate({
       begin: windowOffsetSecs,
-      position: 0.5
+      position: 0.5,
     });
   }
 }
@@ -3544,36 +3585,37 @@ function centreSpec() {
  * // Assuming a key assignment exists for key "1" in config.keyAssignment:
  * recordUpdate(1);
  */
-function recordUpdate(key){
+function recordUpdate(key) {
   if (!activeRow) {
-    console.info('No active row selected for key assignment', key);
+    console.info("No active row selected for key assignment", key);
     return;
   }
-  const assignment = config.keyAssignment['key'+ key];
-  if (assignment?.column && assignment?.value){
+  const assignment = config.keyAssignment["key" + key];
+  if (assignment?.column && assignment?.value) {
     const nameAttribute = activeRow.getAttribute("name");
     const [file, start, end, sname, cname] = nameAttribute.split("|");
-    const commentCell = activeRow.querySelector('.comment > span');
-    const comment = commentCell ? commentCell.title : ''
-    const labelCell = activeRow.querySelector('.label > span');
-    const label = labelCell ? labelCell.textContent : ''
+    const commentCell = activeRow.querySelector(".comment > span");
+    const comment = commentCell ? commentCell.title : "";
+    const labelCell = activeRow.querySelector(".label > span");
+    const label = labelCell ? labelCell.textContent : "";
     const name = cname.replace("?", "");
 
-
-    const newCname = assignment.column === 'species' ?  assignment.value : name;
-    const newLabel = assignment.column === 'label' ?  assignment.value : label || '';
-    const newComment = assignment.column === 'comment' ?  assignment.value : comment;
+    const newCname = assignment.column === "species" ? assignment.value : name;
+    const newLabel =
+      assignment.column === "label" ? assignment.value : label || "";
+    const newComment =
+      assignment.column === "comment" ? assignment.value : comment;
     // Save record for undo
-    const {callCount, confidence} = addToHistory(activeRow, newCname);
+    const { callCount, confidence } = addToHistory(activeRow, newCname);
     // If we set a new species, we want to give the record a 2000 confidence
     // However, if we just add a label or, leave the confidence alone
-    const certainty = assignment.column === 'species' ? 2000 : confidence;
+    const certainty = assignment.column === "species" ? 2000 : confidence;
     insertManualRecord(
       newCname,
       parseFloat(start),
       parseFloat(end),
       newComment,
-      callCount ,
+      callCount,
       newLabel,
       "Update",
       false,
@@ -3583,15 +3625,13 @@ function recordUpdate(key){
   }
 }
 
-
 const GLOBAL_ACTIONS = {
-
   // Handle number keys 1-9 dynamically
   handleNumberKeys: (e) => {
     if (/^[0-9]$/.test(e.key)) {
       // number keys here
-      if (activeRow){
-        recordUpdate(e.key)
+      if (activeRow) {
+        recordUpdate(e.key);
       }
     }
   },
@@ -3612,11 +3652,12 @@ const GLOBAL_ACTIONS = {
   // },
   e: (e) => (e.ctrlKey || e.metaKey) && activeRegion && exportAudio(),
   g: (e) => (e.ctrlKey || e.metaKey) && showGoToPosition(),
-  o: async (e) => (e.ctrlKey || e.metaKey) && await showOpenDialog("openFile"),
+  o: async (e) =>
+    (e.ctrlKey || e.metaKey) && (await showOpenDialog("openFile")),
   p: () => activeRegion && playRegion(),
   q: (e) => e.metaKey && isMac && window.electron.exitApplication(),
-  s: (e) => (e.ctrlKey || e.metaKey) &&
-      document.getElementById("save2db").click(),
+  s: (e) =>
+    (e.ctrlKey || e.metaKey) && document.getElementById("save2db").click(),
   t: (e) => (e.ctrlKey || e.metaKey) && timelineToggle(true),
   v: (e) => {
     if (activeRow && (e.ctrlKey || e.metaKey)) {
@@ -3670,7 +3711,11 @@ const GLOBAL_ACTIONS = {
   },
   PageUp: () => {
     if (currentBuffer && STATE.regionsCompleted) {
-      const position = utils.clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
+      const position = utils.clamp(
+        wavesurfer.getCurrentTime() / windowLength,
+        0,
+        1
+      );
       windowOffsetSecs = windowOffsetSecs - windowLength;
       const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
       let fileToLoad;
@@ -3684,7 +3729,7 @@ const GLOBAL_ACTIONS = {
       postBufferUpdate({
         file: fileToLoad,
         begin: windowOffsetSecs,
-        position: position
+        position: position,
       });
     }
   },
@@ -3698,7 +3743,11 @@ const GLOBAL_ACTIONS = {
   },
   PageDown: () => {
     if (currentBuffer && STATE.regionsCompleted) {
-      let position = utils.clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
+      let position = utils.clamp(
+        wavesurfer.getCurrentTime() / windowLength,
+        0,
+        1
+      );
       windowOffsetSecs = windowOffsetSecs + windowLength;
       const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
       let fileToLoad;
@@ -3720,7 +3769,7 @@ const GLOBAL_ACTIONS = {
       postBufferUpdate({
         file: fileToLoad,
         begin: windowOffsetSecs,
-        position: position
+        position: position,
       });
     }
   },
@@ -3736,13 +3785,17 @@ const GLOBAL_ACTIONS = {
     const skip = windowLength / 100;
     if (currentBuffer && STATE.regionsCompleted) {
       wavesurfer.setTime(wavesurfer.getCurrentTime() - skip);
-      let position = utils.clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
+      let position = utils.clamp(
+        wavesurfer.getCurrentTime() / windowLength,
+        0,
+        1
+      );
       if (wavesurfer.getCurrentTime() < skip && windowOffsetSecs > 0) {
         windowOffsetSecs -= skip;
         postBufferUpdate({
           begin: windowOffsetSecs,
           position: (position += skip / windowLength),
-          play: wavesurfer.isPlaying()
+          play: wavesurfer.isPlaying(),
         });
       }
     }
@@ -3751,24 +3804,27 @@ const GLOBAL_ACTIONS = {
     const skip = windowLength / 100;
     if (currentBuffer && STATE.regionsCompleted) {
       const now = wavesurfer.getCurrentTime();
-      if (wavesurfer.isReady){
+      if (wavesurfer.isReady) {
         // This will trigger the finish event if at the end of the window
         wavesurfer.setTime(now + skip);
       }
       // }
     }
   },
-  "=": (e) => e.metaKey || e.ctrlKey ? reduceFFT() : zoomSpec("zoomIn"),
-  "+": (e) => e.metaKey || e.ctrlKey ? reduceFFT() : zoomSpec("zoomIn"),
-  "-": (e) => e.metaKey || e.ctrlKey ? increaseFFT() : zoomSpec("zoomOut"),
-  F5:() => reduceFFT(),
+  "=": (e) => (e.metaKey || e.ctrlKey ? reduceFFT() : zoomSpec("zoomIn")),
+  "+": (e) => (e.metaKey || e.ctrlKey ? reduceFFT() : zoomSpec("zoomIn")),
+  "-": (e) => (e.metaKey || e.ctrlKey ? increaseFFT() : zoomSpec("zoomOut")),
+  F5: () => reduceFFT(),
   F4: () => increaseFFT(),
   " ": async () => {
-      if (wavesurfer) {
-        try {await wavesurfer.playPause() }
-        catch (e) { console.warn("Wavesurfer error", error.message || error) }
+    if (wavesurfer) {
+      try {
+        await wavesurfer.playPause();
+      } catch (e) {
+        console.warn("Wavesurfer error", error.message || error);
       }
-    }, 
+    }
+  },
   Tab: (e) => {
     if ((e.metaKey || e.ctrlKey) && !PREDICTING && STATE.diskHasRecords) {
       // If you did this when predicting, your results would go straight to the archive
@@ -3793,7 +3849,6 @@ const GLOBAL_ACTIONS = {
   Backspace: () => activeRow && deleteRecord(activeRow),
 };
 
-
 function disableSettingsDuringAnalysis(bool) {
   const elements = [
     "modelToUse",
@@ -3810,7 +3865,7 @@ function disableSettingsDuringAnalysis(bool) {
   ];
   elements.forEach((el) => {
     if (DOM[el]) DOM[el].disabled = bool;
-    else throw new Error(`${el} is not in the DOM cache`)
+    else throw new Error(`${el} is not in the DOM cache`);
   });
   DOM.backendOptions?.forEach((backend) => (backend.disabled = bool));
 }
@@ -3823,7 +3878,6 @@ const postBufferUpdate = ({
   resetSpec = false,
   goToRegion = false,
 }) => {
-
   STATE.regionsCompleted = false;
   fileLoaded = false;
   worker.postMessage({
@@ -3941,18 +3995,23 @@ function onModelReady(args) {
   DIAGNOSTICS["Warm Up"] =
     ((t1_warmup - t0_warmup) / 1000).toFixed(2) + " seconds";
 
-  APPLICATION_LOADED || console.info("App launch time", `${ Math.round((t1_warmup - app_t0) / 1000)} seconds`)
+  APPLICATION_LOADED ||
+    console.info(
+      "App launch time",
+      `${Math.round((t1_warmup - app_t0) / 1000)} seconds`
+    );
   APPLICATION_LOADED = true;
 
-  document.getElementById('loading-screen').classList.add('d-none');
+  document.getElementById("loading-screen").classList.add("d-none");
   // Get all the tags from the db
-  worker.postMessage({action: "get-tags", init: true});
+  worker.postMessage({ action: "get-tags", init: true });
   // New users - show the tour
   if (!isTestEnv && !config.seenTour) {
-      config.seenTour = true;
-      prepTour();
+    config.seenTour = true;
+    prepTour();
   }
-  if (OS_FILE_QUEUE.length) onOpenFiles({filePaths: OS_FILE_QUEUE}) && OS_FILE_QUEUE.shift()
+  if (OS_FILE_QUEUE.length)
+    onOpenFiles({ filePaths: OS_FILE_QUEUE }) && OS_FILE_QUEUE.shift();
 }
 
 /**
@@ -3994,9 +4053,12 @@ async function onWorkerLoadedAudio({
   const resetSpec = !STATE.currentFile;
   currentFileDuration = fileDuration;
   //if (preserveResults) completeDiv.hide();
-  config.debug  && console.log(
-    `UI received worker-loaded-audio: ${file}, buffered: ${queued === true}, play: ${play}`
-  );
+  config.debug &&
+    console.log(
+      `UI received worker-loaded-audio: ${file}, buffered: ${
+        queued === true
+      }, play: ${play}`
+    );
   // Dismiss a context menu if it's open
   DOM.contextMenu.classList.add("d-none");
   currentBuffer = contents;
@@ -4099,9 +4161,7 @@ function onProgress(args) {
  * @param {number} [offset=STATE.offset] - The starting offset for pagination.
  */
 function updatePagination(total, offset = STATE.offset) {
-  total > config.limit
-    ? pagination.add(total, offset)
-    : pagination.hide();
+  total > config.limit ? pagination.add(total, offset) : pagination.hide();
 }
 
 const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
@@ -4109,8 +4169,8 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
   const showIUCN = config.detect.iucn;
 
   // if (summary.length){
-  let summaryHTML = summary.length 
-            ? `<table id="resultSummary" class="table table-dark p-1"><thead>
+  let summaryHTML = summary.length
+    ? `<table id="resultSummary" class="table table-dark p-1"><thead>
             <tr class="pointer col-auto text-nowrap">
             <th id="summary-max" scope="col"><span id="summary-max-icon" class="text-muted material-symbols-outlined summary-sort-icon d-none">sort</span>${
               i18.max
@@ -4129,7 +4189,7 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
             }</th>
             </tr>
             </thead><tbody id="speciesFilter">`
-            : '';
+    : "";
   let selectedRow = null;
   const i18nIUCN = getI18n(i18n.IUCNLabel);
   for (let i = 0; i < summary.length; i++) {
@@ -4187,13 +4247,13 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
   old_summary.appendChild(fragment);
 
   showSummarySortIcon();
-  setAutocomplete(selectedRow ? filterSpecies : '')
+  setAutocomplete(selectedRow ? filterSpecies : "");
   // scroll to the selected species
   if (selectedRow) {
     const table = document.getElementById("resultSummary");
     table.rows[selectedRow].scrollIntoView({
       behavior: "instant",
-      block: "center"
+      block: "center",
     });
   }
   // }
@@ -4226,15 +4286,15 @@ function onResultsComplete({ active = undefined, select = undefined } = {}) {
   resultsBuffer.textContent = "";
   const table = DOM.resultTable;
   utils.showElement(["resultTableContainer", "resultsHead"], false);
-  const labelSort = document.getElementById('sort-label')
-  if (labelSort){
-    labelSort.classList.toggle('text-warning', STATE.labelFilters?.length > 0);
-    if (!labelSort.querySelector('span.fs-6')){
-      const span = document.createElement('span');
+  const labelSort = document.getElementById("sort-label");
+  if (labelSort) {
+    labelSort.classList.toggle("text-warning", STATE.labelFilters?.length > 0);
+    if (!labelSort.querySelector("span.fs-6")) {
+      const span = document.createElement("span");
       span.className = "material-symbols-outlined fs-6";
       span.textContent = "menu_open";
-      labelSort.appendChild(span)
-      span.classList.add(`${STATE.isMember?'text-muted': 'locked'}`)
+      labelSort.appendChild(span);
+      span.classList.add(`${STATE.isMember ? "text-muted" : "locked"}`);
     }
   }
   // Set active Row
@@ -4296,7 +4356,6 @@ function getRowFromStart(table, start) {
     }
   }
 }
-
 
 /**
  * Finalizes audio analysis by updating application state, re-enabling UI settings,
@@ -4370,10 +4429,7 @@ function onAnalysisComplete({ quiet }) {
  * @param {*} [options.filterSpecies] - Optional criteria to filter species in the summary.
  * @param {Array} [options.summary=[]] - An array of summary records to be used for updating the UI.
  */
-function onSummaryComplete({
-  filterSpecies = undefined,
-  summary = [],
-}) {
+function onSummaryComplete({ filterSpecies = undefined, summary = [] }) {
   updateSummary({ summary: summary, filterSpecies: filterSpecies });
   // Add pointer icon to species summaries
   const summarySpecies = DOM.summaryTable.querySelectorAll(".cname");
@@ -4400,8 +4456,6 @@ function onSummaryComplete({
   if (STATE.currentFile) utils.enableMenuItem(["analyse"]);
 }
 
-
-
 // Set up pagination
 const pagination = new Pagination(
   document.querySelector(".pagination"),
@@ -4411,11 +4465,10 @@ const pagination = new Pagination(
   {
     isSpeciesViewFiltered,
     filterResults,
-    resetResults
+    resetResults,
   }
 );
 pagination.init();
-
 
 /**
  * Toggles the species filter based on user interaction with the summary table.
@@ -4434,7 +4487,12 @@ pagination.init();
  * speciesFilter(event);
  */
 function speciesFilter(e) {
-  if (!STATE.regionsCompleted || PREDICTING || ["TBODY", "TH", "DIV"].includes(e.target.tagName)) return; // on Drag or clicked header
+  if (
+    !STATE.regionsCompleted ||
+    PREDICTING ||
+    ["TBODY", "TH", "DIV"].includes(e.target.tagName)
+  )
+    return; // on Drag or clicked header
   let species;
   // Am I trying to unfilter?
   if (e.target.closest("tr").classList.contains("text-warning")) {
@@ -4448,7 +4506,7 @@ function speciesFilter(e) {
     // Clicked on unfiltered species
     species = getSpecies(e.target);
   }
-  setAutocomplete(species)
+  setAutocomplete(species);
   filterResults({ updateSummary: false });
   resetResults({
     clearSummary: false,
@@ -4457,13 +4515,12 @@ function speciesFilter(e) {
   });
 }
 
-function setAutocomplete(species){
+function setAutocomplete(species) {
   if (isExplore()) {
-    const autoComplete = document.getElementById('bird-autocomplete-explore')
+    const autoComplete = document.getElementById("bird-autocomplete-explore");
     autoComplete.value = species || "";
   }
 }
-
 
 /**
  * Renders a detection result into the results table while managing table headers, pagination, and UI updates.
@@ -4522,7 +4579,12 @@ async function renderResult({
     }
     utils.showElement(["resultTableContainer", "resultsHead"], false);
     // If  we have some results, let's update the view in case any are in the window
-    if (config.specDetections && !isFromDB && !STATE.selection && STATE.regionsCompleted)
+    if (
+      config.specDetections &&
+      !isFromDB &&
+      !STATE.selection &&
+      STATE.regionsCompleted
+    )
       postBufferUpdate({ file, begin: windowOffsetSecs });
   } else if (!isFromDB && index % (config.limit + 1) === 0) {
     pagination.add(index, 0);
@@ -4544,7 +4606,7 @@ async function renderResult({
       count,
       callCount,
       isDaylight,
-      reviewed
+      reviewed,
     } = result;
     const dayNight = isDaylight ? "daytime" : "nighttime";
     // Todo: move this logic so pre dark sections of file are not even analysed
@@ -4557,9 +4619,9 @@ async function renderResult({
         )}" class='material-symbols-outlined pointer'>comment</span>`
       : "";
 
-    const reviewHTML = reviewed 
-        ? `<span class='material-symbols-outlined'>check_small</span>`
-        : '';
+    const reviewHTML = reviewed
+      ? `<span class='material-symbols-outlined'>check_small</span>`
+      : "";
     // store result for feedback function to use
     if (!selection) predictions[index] = result;
     // Format date and position for  UI
@@ -4575,7 +4637,12 @@ async function renderResult({
     const showTimeOfDay = config.timeOfDay ? "" : "d-none";
     const showTimestamp = config.timeOfDay ? "d-none" : "";
     const activeTable = active ? "table-active" : "";
-    const labelHTML = Number.isInteger(tagID) && label ? `<span class="badge text-bg-${STATE.labelColors[tagID % STATE.labelColors.length] } rounded-pill">${label}</span>` : "";
+    const labelHTML =
+      Number.isInteger(tagID) && label
+        ? `<span class="badge text-bg-${
+            STATE.labelColors[tagID % STATE.labelColors.length]
+          } rounded-pill">${label}</span>`
+        : "";
     const hide = selection ? "d-none" : "";
     const countIcon =
       count > 1
@@ -4672,22 +4739,22 @@ const deleteRecord = (target) => {
 
   setClickedIndex(target);
   // If there is no row (deleted last record and hit delete again):
-  if (clickedIndex === -1) return
-  const {species, start, end, file, row, setting} = addToHistory(target)
+  if (clickedIndex === -1) return;
+  const { species, start, end, file, row, setting } = addToHistory(target);
 
-    worker.postMessage({
-      action: "delete",
-      file,
-      start,
-      end,
-      species,
-      speciesFiltered: isSpeciesViewFiltered(),
-    });
-    // Clear the record in the UI
-    const index = row.rowIndex;
-    // there may be no records remaining (no index)
-    index > -1 && setting.deleteRow(index);
-    setting.rows[index]?.click();
+  worker.postMessage({
+    action: "delete",
+    file,
+    start,
+    end,
+    species,
+    speciesFiltered: isSpeciesViewFiltered(),
+  });
+  // Clear the record in the UI
+  const index = row.rowIndex;
+  // there may be no records remaining (no index)
+  index > -1 && setting.deleteRow(index);
+  setting.rows[index]?.click();
 };
 
 const deleteSpecies = (target) => {
@@ -5081,7 +5148,7 @@ function filterResults({
       updateSummary,
       offset,
       limit,
-      range
+      range,
     });
 }
 
@@ -5225,14 +5292,15 @@ function activateResultSort() {
   const timeHeadings = header.getElementsByClassName("time-sort-icon");
   const speciesHeadings = header.getElementsByClassName("species-sort-icon");
   const metaHeadings = header.getElementsByClassName("meta-sort-icon");
-  
+
   const sortOrderScore = STATE.resultsSortOrder.includes("score");
   const state = STATE.resultsMetaSortOrder;
-  const sortOrderMeta = state.replace(' ASC ', '').replace(' DESC ', '');
+  const sortOrderMeta = state.replace(" ASC ", "").replace(" DESC ", "");
 
   // Update meta headings
   [...metaHeadings].forEach((heading) => {
-    const hideIcon = state === '' || !heading.parentNode.id.includes(sortOrderMeta);
+    const hideIcon =
+      state === "" || !heading.parentNode.id.includes(sortOrderMeta);
     heading.classList.toggle("d-none", hideIcon);
     if (state.includes("ASC")) {
       heading.classList.add("flipped");
@@ -5243,7 +5311,10 @@ function activateResultSort() {
 
   // Update time sort icons
   [...timeHeadings].forEach((heading) => {
-    heading.classList.toggle("flipped", !sortOrderScore && STATE.resultsSortOrder.includes("ASC"));
+    heading.classList.toggle(
+      "flipped",
+      !sortOrderScore && STATE.resultsSortOrder.includes("ASC")
+    );
     heading.classList.toggle("d-none", sortOrderScore);
     heading.parentNode.classList.add("pointer");
   });
@@ -5251,7 +5322,10 @@ function activateResultSort() {
   // Update species sort icons
   [...speciesHeadings].forEach((heading) => {
     heading.parentNode.classList.add("pointer");
-    heading.classList.toggle("flipped", sortOrderScore && STATE.resultsSortOrder.includes("ASC"));
+    heading.classList.toggle(
+      "flipped",
+      sortOrderScore && STATE.resultsSortOrder.includes("ASC")
+    );
     heading.classList.toggle("d-none", !sortOrderScore);
   });
 
@@ -5301,9 +5375,8 @@ const setSortOrder = (field, order) => {
 const setSummarySortOrder = (order) => {
   STATE.summarySortOrder = order;
   worker.postMessage({ action: "update-state", summarySortOrder: order });
-  refreshSummary()
+  refreshSummary();
 };
-
 
 // Drag file to app window to open
 document.addEventListener("dragover", (event) => {
@@ -5323,7 +5396,7 @@ document.addEventListener("drop", (event) => {
     )
     .map((file) => file.path);
 
-  worker.postMessage({action: "get-valid-files-list", files: fileList})
+  worker.postMessage({ action: "get-valid-files-list", files: fileList });
   // For electron 32+
   // const filelist = audioFiles.map(file => window.electron.showFilePath(file));
 });
@@ -5471,7 +5544,7 @@ function initialiseDatePicker() {
           [i18.thisMonth]: thisMonth(),
           [i18.lastMonth]: lastMonth(),
           [i18.thisYear]: thisYear(),
-          [i18.lastYear]: lastYear()
+          [i18.lastYear]: lastYear(),
         },
       },
       TimePlugin: {
@@ -5739,11 +5812,15 @@ const filterIconDisplay = () => {
 };
 // High pass threshold
 const showFilterEffect = () => {
-  if (fileLoaded  && STATE.regionsCompleted) {
-    const position = utils.clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
+  if (fileLoaded && STATE.regionsCompleted) {
+    const position = utils.clamp(
+      wavesurfer.getCurrentTime() / windowLength,
+      0,
+      1
+    );
     postBufferUpdate({
       begin: windowOffsetSecs,
-      position: position
+      position: position,
     });
   }
 };
@@ -5856,11 +5933,11 @@ DOM.gain.addEventListener("input", () => {
 /**
  * Plays the active audio region after sanitizing its boundaries.
  *
- * This function locates the active region from the global REGIONS object by matching the 
- * region's start time with the global activeRegion. It then adjusts the region's start and 
- * end times to ensure they fall within the valid playback window—ensuring the start is not 
- * negative and the end does not exceed 99.5% of the windowLength to avoid triggering a finish 
- * event that causes a page reload. Note that if playback is paused at the end of an adjacent region, 
+ * This function locates the active region from the global REGIONS object by matching the
+ * region's start time with the global activeRegion. It then adjusts the region's start and
+ * end times to ensure they fall within the valid playback window—ensuring the start is not
+ * negative and the end does not exceed 99.5% of the windowLength to avoid triggering a finish
+ * event that causes a page reload. Note that if playback is paused at the end of an adjacent region,
  * the subsequent region may not play.
  *
  * Side Effects:
@@ -5877,11 +5954,11 @@ DOM.gain.addEventListener("input", () => {
 function playRegion() {
   // Sanitise region (after zoom, start or end may be outside the windowlength)
   // I don't want to change the actual region length, so make a copy
-  if (STATE.regionsCompleted){
+  if (STATE.regionsCompleted) {
     const region = REGIONS.regions?.find(
       (region) => region.start === activeRegion.start
     );
-    if (region){
+    if (region) {
       const myRegion = region;
       myRegion.start = Math.max(0, myRegion.start);
       // Have to adjust the windowlength so the finish event isn't fired - causing a page reload)
@@ -5894,7 +5971,10 @@ function playRegion() {
 
 const showRelevantAudioQuality = () => {
   const { format } = config.audio;
-  DOM.audioBitrateContainer.classList.toggle("d-none", !["mp3", "opus", "aac"].includes(format));
+  DOM.audioBitrateContainer.classList.toggle(
+    "d-none",
+    !["mp3", "opus", "aac"].includes(format)
+  );
   DOM.audioQualityContainer.classList.toggle("d-none", format !== "flac");
 };
 
@@ -5913,7 +5993,7 @@ document.addEventListener("click", function (e) {
       break;
     }
     case "saveLabels": {
-      exportData('Audacity');
+      exportData("Audacity");
       break;
     }
     case "saveCSV": {
@@ -5921,11 +6001,11 @@ document.addEventListener("click", function (e) {
       break;
     }
     case "save-eBird": {
-      exportData('eBird');
+      exportData("eBird");
       break;
     }
     case "save-Raven": {
-      exportData('Raven');
+      exportData("Raven");
       break;
     }
     case "export-audio": {
@@ -6046,7 +6126,7 @@ document.addEventListener("click", function (e) {
       break;
     }
     case "known-issues": {
-      const version = VERSION.replace(' (Portable)', '')
+      const version = VERSION.replace(" (Portable)", "");
       fetchIssuesByLabel(["v" + version, "All versions affected"])
         .then((issues) => renderIssuesInModal(issues, version))
         .catch((error) => console.error("Error getting known issues:", error));
@@ -6129,7 +6209,7 @@ document.addEventListener("click", function (e) {
     case "library-location-select": {
       (async () => {
         const files = await window.electron.selectDirectory(
-            config.library.location || ''
+          config.library.location || ""
         );
         if (!files.canceled) {
           const archiveFolder = files.filePaths[0];
@@ -6166,7 +6246,7 @@ document.addEventListener("click", function (e) {
           STATE.resultsMetaSortOrder = `${sort} ASC `;
         } else if (state === `${sort} ASC `) {
           // Third click: reset sort order.
-          STATE.resultsMetaSortOrder = '';
+          STATE.resultsMetaSortOrder = "";
         }
       }
       setSortOrder("resultsMetaSortOrder", STATE.resultsMetaSortOrder);
@@ -6177,10 +6257,10 @@ document.addEventListener("click", function (e) {
     case "sort-time": {
       if (!PREDICTING) {
         const sortBy =
-          STATE.resultsSortOrder === "timestamp ASC" 
-          ? "timestamp DESC" 
-          : "timestamp ASC";
-          setSortOrder("resultsSortOrder", sortBy);
+          STATE.resultsSortOrder === "timestamp ASC"
+            ? "timestamp DESC"
+            : "timestamp ASC";
+        setSortOrder("resultsSortOrder", sortBy);
       }
       break;
     }
@@ -6190,7 +6270,7 @@ document.addEventListener("click", function (e) {
           STATE.resultsSortOrder === "score DESC "
             ? "score ASC "
             : "score DESC ";
-            setSortOrder("resultsSortOrder", sortBy);
+        setSortOrder("resultsSortOrder", sortBy);
       }
       break;
     }
@@ -6201,7 +6281,12 @@ document.addEventListener("click", function (e) {
       break;
     }
     case "summary-cname": {
-      const sortOptions = ["cname ASC", "cname DESC", "sname ASC", "sname DESC"];
+      const sortOptions = [
+        "cname ASC",
+        "cname DESC",
+        "sname ASC",
+        "sname DESC",
+      ];
       const currentIndex = sortOptions.indexOf(STATE.summarySortOrder);
       const nextIndex = (currentIndex + 1) % sortOptions.length;
       const sortBy = sortOptions[nextIndex];
@@ -6344,8 +6429,13 @@ document.addEventListener("click", function (e) {
     }
     case "playToggle": {
       if (wavesurfer) {
-        try {(async () => {await wavesurfer.playPause()})() }
-        catch (e) { console.warn("Wavesurfer error", e.message || JSON.stringify(e)) }
+        try {
+          (async () => {
+            await wavesurfer.playPause();
+          })();
+        } catch (e) {
+          console.warn("Wavesurfer error", e.message || JSON.stringify(e));
+        }
         break;
       }
     }
@@ -6377,8 +6467,10 @@ document.addEventListener("click", function (e) {
     document.getElementById("frequency-range-panel").classList.add("d-none");
     document.getElementById("frequency-range").classList.remove("active");
   }
-  if (!target?.startsWith('bird-')) {
-    document.querySelectorAll('.suggestions').forEach(list => list.style.display = 'none');
+  if (!target?.startsWith("bird-")) {
+    document
+      .querySelectorAll(".suggestions")
+      .forEach((list) => (list.style.display = "none"));
   }
   hideConfidenceSlider();
   config.debug && console.log("clicked", target);
@@ -6432,7 +6524,7 @@ function updateList() {
  * an "update-summary" message to the worker with the current species filter.
  */
 function refreshSummary() {
-  const species = isSpeciesViewFiltered(true)
+  const species = isSpeciesViewFiltered(true);
   if (STATE.analysisDone) {
     // resetResults({});
     worker.postMessage({ action: "update-summary", species });
@@ -6450,16 +6542,24 @@ document.addEventListener("change", function (e) {
     if (/^key\d/.test(target)) {
       if (target.length === 4) {
         // Handle custom-select
-        if (e.detail){
-          config.keyAssignment[target] = {column: 'label', value: e.detail.value, active: true}
-          config.debug && console.log(`${target} is assigned to update 'label' with ${e.detail.value}`)
-        } else { setKeyAssignment(element, target) }
-      }
-      else {
-        const key = target.slice(0,4);
-        const inputElement = document.getElementById(key)
+        if (e.detail) {
+          config.keyAssignment[target] = {
+            column: "label",
+            value: e.detail.value,
+            active: true,
+          };
+          config.debug &&
+            console.log(
+              `${target} is assigned to update 'label' with ${e.detail.value}`
+            );
+        } else {
+          setKeyAssignment(element, target);
+        }
+      } else {
+        const key = target.slice(0, 4);
+        const inputElement = document.getElementById(key);
         const column = e.target.value;
-        const newElement = changeInputElement(column, inputElement, key)
+        const newElement = changeInputElement(column, inputElement, key);
         setKeyAssignment(newElement, key);
       }
     } else {
@@ -6489,7 +6589,7 @@ document.addEventListener("change", function (e) {
           config.detect.autoLoad = element.checked;
           worker.postMessage({
             action: "update-state",
-            detect: config.detect
+            detect: config.detect,
           });
           break;
         }
@@ -6506,22 +6606,35 @@ document.addEventListener("change", function (e) {
         }
         case "auto-library": {
           config.library.auto = element.checked;
-          worker.postMessage({ action: "update-state", library: config.library });
+          worker.postMessage({
+            action: "update-state",
+            library: config.library,
+          });
           break;
         }
         case "library-trim": {
           config.library.trim = element.checked;
-          worker.postMessage({ action: "update-state", library: config.library });
+          worker.postMessage({
+            action: "update-state",
+            library: config.library,
+          });
           break;
         }
         case "library-format": {
-          config.library.format = document.getElementById("library-format").value;
-          worker.postMessage({ action: "update-state", library: config.library });
+          config.library.format =
+            document.getElementById("library-format").value;
+          worker.postMessage({
+            action: "update-state",
+            library: config.library,
+          });
           break;
         }
         case "library-clips": {
           config.library.clips = element.checked;
-          worker.postMessage({ action: "update-state", library: config.library });
+          worker.postMessage({
+            action: "update-state",
+            library: config.library,
+          });
           break;
         }
         case "confidenceValue":
@@ -6570,7 +6683,10 @@ document.addEventListener("change", function (e) {
           config.useWeek = element.checked;
 
           if (!config.useWeek) STATE.week = -1;
-          worker.postMessage({ action: "update-state", useWeek: config.useWeek });
+          worker.postMessage({
+            action: "update-state",
+            useWeek: config.useWeek,
+          });
           updateList();
           break;
         }
@@ -6595,7 +6711,9 @@ document.addEventListener("change", function (e) {
                 ? "chirpity"
                 : "";
             labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_${chirpity}Labels_${element.value}.txt`;
-            i18n.localiseUI(DOM.locale.value).then((result) => (STATE.i18n = result));
+            i18n
+              .localiseUI(DOM.locale.value)
+              .then((result) => (STATE.i18n = result));
             config.locale = element.value;
             setNocmig();
             contextAwareIconDisplay();
@@ -6664,7 +6782,10 @@ document.addEventListener("change", function (e) {
           if (wavesurfer && STATE.currentFile && STATE.regionsCompleted) {
             const fftSamples = spectrogram.fftSamples;
             adjustSpecDims(true, fftSamples);
-            postBufferUpdate({ begin: windowOffsetSecs, position: wavesurfer.getCurrentTime() / windowLength });
+            postBufferUpdate({
+              begin: windowOffsetSecs,
+              position: wavesurfer.getCurrentTime() / windowLength,
+            });
           }
           break;
         }
@@ -6677,9 +6798,9 @@ document.addEventListener("change", function (e) {
           const windowFn = document.getElementById("window-function").value;
           const alpha = document.getElementById("alpha-slider").valueAsNumber;
           config.alpha = alpha;
-          windowFn === 'gauss' 
-            ? document.getElementById('alpha').classList.remove('d-none') 
-            : document.getElementById('alpha').classList.add('d-none')
+          windowFn === "gauss"
+            ? document.getElementById("alpha").classList.remove("d-none")
+            : document.getElementById("alpha").classList.add("d-none");
           const loud = document.getElementById("loud-color").value;
           const mid = document.getElementById("mid-color").value;
           const quiet = document.getElementById("quiet-color").value;
@@ -6707,7 +6828,7 @@ document.addEventListener("change", function (e) {
           config.audio.gain = element.value;
           worker.postMessage({ action: "update-state", audio: config.audio });
           config.filters.active || toggleFilters();
-          if (fileLoaded  && STATE.regionsCompleted) {
+          if (fileLoaded && STATE.regionsCompleted) {
             const position = utils.clamp(
               wavesurfer.getCurrentTime() / windowLength,
               0,
@@ -6715,7 +6836,7 @@ document.addEventListener("change", function (e) {
             );
             postBufferUpdate({
               begin: windowOffsetSecs,
-              position: position
+              position: position,
             });
           }
           break;
@@ -6763,7 +6884,10 @@ document.addEventListener("change", function (e) {
         case "normalise": {
           config.filters.normalise = element.checked;
           element.checked && (config.filters.active = true);
-          worker.postMessage({ action: "update-state", filters: config.filters });
+          worker.postMessage({
+            action: "update-state",
+            filters: config.filters,
+          });
           element.blur();
           if (fileLoaded && STATE.regionsCompleted) {
             const position = utils.clamp(
@@ -6773,14 +6897,17 @@ document.addEventListener("change", function (e) {
             );
             postBufferUpdate({
               begin: windowOffsetSecs,
-              position: position
+              position: position,
             });
           }
           break;
         }
         case "send-filtered-audio-to-model": {
           config.filters.sendToModel = element.checked;
-          worker.postMessage({ action: "update-state", filters: config.filters });
+          worker.postMessage({
+            action: "update-state",
+            filters: config.filters,
+          });
           break;
         }
 
@@ -6932,11 +7059,16 @@ function checkForRegion(e, setActive) {
   return region;
 }
 
-
-function filterLabels(e){
-  DOM.contextMenu.classList.add('d-none');
-  const i18 = getI18n(i18n.Context)
-  createFilterDropdown(e, STATE.tagsList, STATE.labelColors, STATE.labelFilters, i18);
+function filterLabels(e) {
+  DOM.contextMenu.classList.add("d-none");
+  const i18 = getI18n(i18n.Context);
+  createFilterDropdown(
+    e,
+    STATE.tagsList,
+    STATE.labelColors,
+    STATE.labelFilters,
+    i18
+  );
 }
 
 /**
@@ -6970,10 +7102,11 @@ async function createContextMenu(e) {
   this.closest("#spectrogramWrapper") && checkForRegion(e, true);
   const i18 = getI18n(i18n.Context);
   const target = e.target;
-  if (target.closest('#sort-label') ) {
-    if (STATE.isMember) filterLabels(e)
-    return 
-  } else if (target.classList.contains("circle") || target.closest("thead")) return;
+  if (target.closest("#sort-label")) {
+    if (STATE.isMember) filterLabels(e);
+    return;
+  } else if (target.classList.contains("circle") || target.closest("thead"))
+    return;
   let hideInSummary = "",
     hideInSelection = "",
     plural = "";
@@ -7054,7 +7187,7 @@ async function createContextMenu(e) {
         }
       });
   }
-  if (! (inSummary || activeRegion?.label || hideInSelection || hideInSummary)) {
+  if (!(inSummary || activeRegion?.label || hideInSelection || hideInSummary)) {
     const xc = document.getElementById("context-xc");
     xc.classList.add("d-none");
     contextDelete.classList.add("d-none");
@@ -7103,8 +7236,8 @@ let focusBirdList;
  *
  * Retrieves species information from either the batch selector or the active audio region and auto-populates
  * related fields such as call count and comment when an active record exists. Adjusts the UI based on batch mode
- * by toggling visibility of certain elements, updates labels based on localization settings, and initializes a 
- * custom label selector with available tags from the application state. Focus is set to the bird autocomplete input 
+ * by toggling visibility of certain elements, updates labels based on localization settings, and initializes a
+ * custom label selector with available tags from the application state. Focus is set to the bird autocomplete input
  * when the modal is shown.
  *
  * @param {string} mode - Identifier for the record update mode, used to set the DB mode field.
@@ -7120,11 +7253,11 @@ let focusBirdList;
  * showRecordEntryForm('add', true);
  */
 async function showRecordEntryForm(mode, batch) {
-  const i18 = getI18n(i18n.Headings)
+  const i18 = getI18n(i18n.Headings);
   const cname = batch
     ? document.querySelector("#speciesFilter .text-warning .cname .cname")
         .textContent
-    : activeRegion?.label || ''
+    : activeRegion?.label || "";
   let callCount = "",
     commentText = "";
   if (cname && activeRow) {
@@ -7132,18 +7265,18 @@ async function showRecordEntryForm(mode, batch) {
     commentText = activeRow.querySelector(".comment > span")?.title || "";
     callCount = parseInt(activeRow.querySelector(".call-count").textContent);
   }
-  document.querySelectorAll('.species-search-label').forEach(label => label.textContent = i18.search);
-  const selectedBird = recordEntryForm.querySelector(
-    "#selected-bird"
-  );
-  const autoComplete = document.getElementById("bird-autocomplete")
-  autoComplete.value = '';
+  document
+    .querySelectorAll(".species-search-label")
+    .forEach((label) => (label.textContent = i18.search));
+  const selectedBird = recordEntryForm.querySelector("#selected-bird");
+  const autoComplete = document.getElementById("bird-autocomplete");
+  autoComplete.value = "";
   focusBirdList = () => autoComplete.focus();
-  const speciesDisplay = document.createElement('div')
-  speciesDisplay.className = 'border rounded w-100';
+  const speciesDisplay = document.createElement("div");
+  speciesDisplay.className = "border rounded w-100";
   if (cname) {
-    const species = LABELS.find(sp => sp.includes(cname))
-    const styled = species.split('_').reverse().join(' <br/><i>') + '</i>';
+    const species = LABELS.find((sp) => sp.includes(cname));
+    const styled = species.split("_").reverse().join(" <br/><i>") + "</i>";
     selectedBird.innerHTML = styled;
   } else {
     selectedBird.innerHTML = i18.searchPrompt;
@@ -7159,21 +7292,21 @@ async function showRecordEntryForm(mode, batch) {
   recordEntryForm.querySelector("#DBmode").value = mode;
   recordEntryForm.querySelector("#batch-mode").value = batch;
   recordEntryForm.querySelector("#original-id").value = cname;
-  const labelText = activeRow?.querySelector(".label").textContent
+  const labelText = activeRow?.querySelector(".label").textContent;
 
-  const labels = STATE.tagsList.map(item => item.name);
+  const labels = STATE.tagsList.map((item) => item.name);
   const i18nOptions = getI18n(i18n.Select);
   const select = new CustomSelect({
-    theme: 'light',
+    theme: "light",
     labels: labels,
     i18n: i18nOptions,
-    preselectedLabel: labelText
+    preselectedLabel: labelText,
   });
-  const container = document.getElementById('label-container');
-  container.textContent = '';
+  const container = document.getElementById("label-container");
+  container.textContent = "";
   container.appendChild(select);
   recordEntryModalDiv.addEventListener("shown.bs.modal", focusBirdList);
-  recordEntryModal.show()
+  recordEntryModal.show();
 }
 
 recordEntryForm.addEventListener("submit", function (e) {
@@ -7181,9 +7314,11 @@ recordEntryForm.addEventListener("submit", function (e) {
   const action = document.getElementById("DBmode").value;
   // cast boolstring to boolean
   const batch = document.getElementById("batch-mode").value === "true";
-  const cname = document.getElementById("selected-bird").innerText.split('\n')[0];
+  const cname = document
+    .getElementById("selected-bird")
+    .innerText.split("\n")[0];
   // Check we selected a species
-  if (!LABELS.some(item => item.includes(cname))) return
+  if (!LABELS.some((item) => item.includes(cname))) return;
   let start, end;
   if (activeRegion) {
     start = windowOffsetSecs + activeRegion.start;
@@ -7198,7 +7333,7 @@ recordEntryForm.addEventListener("submit", function (e) {
   // Update the region label
   const count = document.getElementById("call-count")?.valueAsNumber;
   const comment = document.getElementById("record-comment")?.value;
-  const select = document.getElementById('label-container').firstChild;
+  const select = document.getElementById("label-container").firstChild;
   const label = select.selectedValue;
 
   recordEntryModal.hide();
@@ -7242,9 +7377,12 @@ const insertManualRecord = (
     DBaction: action,
     batch: batch,
     confidence: confidence,
-    position: { row: activeRow?.rowIndex - 1, page: pagination.getCurrentPage() }, //  have to account for the header row
+    position: {
+      row: activeRow?.rowIndex - 1,
+      page: pagination.getCurrentPage(),
+    }, //  have to account for the header row
     speciesFiltered: isSpeciesViewFiltered(true),
-    reviewed
+    reviewed,
   });
 };
 
@@ -7320,7 +7458,6 @@ function compressAndOrganise() {
     action: "compress-and-organise",
   });
 }
-
 
 // TOUR functions
 const tourModal = document.getElementById("tourModal");
@@ -7413,7 +7550,6 @@ window.electron.onDownloadProgress((_event, progressObj) =>
   displayProgress(progressObj, "Downloading the latest update: ")
 );
 
-
 // Update checking for Mac
 
 function checkForMacUpdates() {
@@ -7488,11 +7624,10 @@ function generateToast({
   // i18n
   const i18 = getI18n(i18n.Toasts);
   if (message === "noFile") {
-      clearTimeout(loadingTimeout) &&
-      DOM.loading.classList.add("d-none");
-      // Alow further interactions!!
-      STATE.regionsCompleted = true;
-      STATE.currentFile && (fileLoaded = true);
+    clearTimeout(loadingTimeout) && DOM.loading.classList.add("d-none");
+    // Alow further interactions!!
+    STATE.regionsCompleted = true;
+    STATE.currentFile && (fileLoaded = true);
   }
   message = variables
     ? utils.interpolate(i18[message], variables)
@@ -7590,7 +7725,6 @@ function generateToast({
 }
 
 async function getXCComparisons() {
-
   let [, , , sname, cname] = activeRow.getAttribute("name").split("|");
   cname.includes("call)") ? "call" : "";
   let XCcache;
@@ -7794,10 +7928,10 @@ function renderComparisons(lists, cname) {
         carouselItem.classList.add("carousel-item");
         // Need to have waveform and spec in the same container for zoom to work.
         // This css caps the height, and only shows the spec, at the bottom
-        carouselItem.style.height = '256px';
-        carouselItem.style.display = 'flex';
-        carouselItem.style.flexDirection = 'column';
-        carouselItem.style.justifyContent = 'flex-end';
+        carouselItem.style.height = "256px";
+        carouselItem.style.display = "flex";
+        carouselItem.style.flexDirection = "column";
+        carouselItem.style.justifyContent = "flex-end";
         i === 0 && carouselItem.classList.add("active");
         i === 0 && indicatorItem.classList.add("active");
         // create div for wavesurfer
@@ -7858,8 +7992,8 @@ function renderComparisons(lists, cname) {
   compareDiv.addEventListener("hidden.bs.modal", () => {
     ws && ws.destroy();
     ws = null;
-    compareDiv.remove()
-});
+    compareDiv.remove();
+  });
   compareDiv.addEventListener("slid.bs.carousel", () => showCompareSpec());
   compareDiv.addEventListener("shown.bs.modal", () => showCompareSpec());
   comparisonModal.show();
@@ -7880,37 +8014,41 @@ const createCompareWS = (mediaContainer) => {
     fillParent: true,
     height: 256,
     minPxPerSec: 195,
-    sampleRate: 24000
+    sampleRate: 24000,
   });
   // set colormap
   const colors = createColormap();
-  const createCmpSpec = () => ws.registerPlugin(Spectrogram.create({
-      //deferInit: false,
-      wavesurfer: ws,
-      // container: "#" + specContainer,
-      windowFunc: "hann",
-      frequencyMin: 0,
-      frequencyMax: 12_000,
-      labels: true,
-      fftSamples: 256,
-      height: 256,
-      colorMap: colors,
-      scale: 'linear'
-  }))
-  createCmpSpec()
-}
+  const createCmpSpec = () =>
+    ws.registerPlugin(
+      Spectrogram.create({
+        //deferInit: false,
+        wavesurfer: ws,
+        // container: "#" + specContainer,
+        windowFunc: "hann",
+        frequencyMin: 0,
+        frequencyMax: 12_000,
+        labels: true,
+        fftSamples: 256,
+        height: 256,
+        colorMap: colors,
+        scale: "linear",
+      })
+    );
+  createCmpSpec();
+};
 
 function showCompareSpec() {
-
   const activeCarouselItem = document.querySelector(
     "#recordings .tab-pane.active .carousel-item.active"
   );
   // Hide all xc-links
-  document.querySelectorAll('.xc-link').forEach(link => link.classList.add('d-none'));
+  document
+    .querySelectorAll(".xc-link")
+    .forEach((link) => link.classList.add("d-none"));
   // Show the active one
-  const activeXCLink = activeCarouselItem.querySelector('.xc-link');
-  activeXCLink && activeXCLink.classList.remove('d-none');
-  
+  const activeXCLink = activeCarouselItem.querySelector(".xc-link");
+  activeXCLink && activeXCLink.classList.remove("d-none");
+
   const mediaContainer = activeCarouselItem.lastChild;
   // need to prevent accumulation, and find event for show/hide loading
   const loading = DOM.loading.cloneNode(true);
@@ -7919,7 +8057,7 @@ function showCompareSpec() {
   mediaContainer.appendChild(loading);
   const [_, file] = mediaContainer.getAttribute("name").split("|");
   // Create an instance of WaveSurfer
-  createCompareWS(mediaContainer)
+  createCompareWS(mediaContainer);
   ws.once("decode", function () {
     mediaContainer.removeChild(loading);
   });
@@ -8067,110 +8205,128 @@ export { config, displayLocationAddress, LOCATIONS, generateToast };
  */
 async function membershipCheck() {
   const oneWeek = 7 * 24 * 60 * 60 * 1000; // "It's been one week since you looked at me, cocked your head to the side..."
-  const cachedStatus = Boolean(localStorage.getItem('isMember'));
-  const cachedTimestamp = Number(localStorage.getItem('memberTimestamp'));
-  const now = Date.now()
-  let installDate = Number(localStorage.getItem('installDate'));
+  const cachedStatus = Boolean(localStorage.getItem("isMember"));
+  const cachedTimestamp = Number(localStorage.getItem("memberTimestamp"));
+  const now = Date.now();
+  let installDate = Number(localStorage.getItem("installDate"));
   if (!installDate) {
-    localStorage.setItem('installDate', now);
-    installDate = now
+    localStorage.setItem("installDate", now);
+    installDate = now;
   }
   const trialPeriod = await window.electron.trialPeriod();
   const inTrial = Date.now() - installDate < trialPeriod;
   const lockedElements = document.querySelectorAll(".locked, .unlocked");
   const unlockElements = () => {
     lockedElements.forEach((el) => {
-      if (el instanceof HTMLSpanElement){
+      if (el instanceof HTMLSpanElement) {
         el.classList.replace("locked", "unlocked");
         el.textContent = "lock_open";
       } else {
-        el.classList.remove('locked')
+        el.classList.remove("locked");
         el.disabled = false;
       }
-      
     });
-  }
-  const MEMBERSHIP_API_ENDPOINT = await window.electron.MEMBERSHIP_API_ENDPOINT();
-  return await checkMembership(config.UUID, MEMBERSHIP_API_ENDPOINT).then(([isMember, expiresIn])  =>{
-    if (isMember || inTrial) {
-      if (expiresIn && expiresIn < 30){  
-        generateToast({message:"membershipExpiry", type:"warning", variables: {expiresIn}})
-      }
-      unlockElements();
-      if (isMember) {
-        document.getElementById('primaryLogo').src = 'img/logo/chirpity_logo_subscriber_bronze.png'; // Silver & Gold available
-      } else {
-        document.getElementById("buy-me-coffee").classList.remove('d-none')
-      }
-      localStorage.setItem('isMember', true);
-      localStorage.setItem('memberTimestamp', now);
-    } else {
-      config.keyAssignment = {};
-      config.specDetections = false; 
-      config.detect.autoLoad = false;
-      config.library.clips = false;
-      lockedElements.forEach((el) => {
-        el.classList.replace("unlocked", "locked");
-
-        if (el instanceof HTMLSpanElement){
-          el.textContent = "lock";
-        } 
-        else {
-          el.classList.remove('locked'); // remove coral color 
-          if (el instanceof HTMLSelectElement) el.selectedIndex = 0;
-          el.checked = false;
-          el.disabled = true;
+  };
+  const MEMBERSHIP_API_ENDPOINT =
+    await window.electron.MEMBERSHIP_API_ENDPOINT();
+  return await checkMembership(config.UUID, MEMBERSHIP_API_ENDPOINT)
+    .then(([isMember, expiresIn]) => {
+      if (isMember || inTrial) {
+        if (expiresIn && expiresIn < 30) {
+          generateToast({
+            message: "membershipExpiry",
+            type: "warning",
+            variables: { expiresIn },
+          });
         }
-      });
-      localStorage.setItem('isMember', false);
-    }
-    
-    console.info(`Version: ${VERSION}. Trial: ${inTrial} subscriber: ${isMember}, All detections: ${config.specDetections}`, expiresIn)
-    return isMember || inTrial
-  }).catch(error =>{ // Period of grace
-    if (cachedStatus === true && cachedTimestamp && now - cachedTimestamp < oneWeek) {
-      console.warn('Using cached membership status during error.', error);
-      unlockElements();
-      document.getElementById('primaryLogo').src = 'img/logo/chirpity_logo_subscriber_bronze.png';
-      return true
-    } else {
-      document.getElementById("buy-me-coffee").classList.remove('d-none')
-    }
-  });
+        unlockElements();
+        if (isMember) {
+          document.getElementById("primaryLogo").src =
+            "img/logo/chirpity_logo_subscriber_bronze.png"; // Silver & Gold available
+        } else {
+          document.getElementById("buy-me-coffee").classList.remove("d-none");
+        }
+        localStorage.setItem("isMember", true);
+        localStorage.setItem("memberTimestamp", now);
+      } else {
+        config.keyAssignment = {};
+        config.specDetections = false;
+        config.detect.autoLoad = false;
+        config.library.clips = false;
+        lockedElements.forEach((el) => {
+          el.classList.replace("unlocked", "locked");
 
+          if (el instanceof HTMLSpanElement) {
+            el.textContent = "lock";
+          } else {
+            el.classList.remove("locked"); // remove coral color
+            if (el instanceof HTMLSelectElement) el.selectedIndex = 0;
+            el.checked = false;
+            el.disabled = true;
+          }
+        });
+        localStorage.setItem("isMember", false);
+      }
+
+      console.info(
+        `Version: ${VERSION}. Trial: ${inTrial} subscriber: ${isMember}, All detections: ${config.specDetections}`,
+        expiresIn
+      );
+      return isMember || inTrial;
+    })
+    .catch((error) => {
+      // Period of grace
+      if (
+        cachedStatus === true &&
+        cachedTimestamp &&
+        now - cachedTimestamp < oneWeek
+      ) {
+        console.warn("Using cached membership status during error.", error);
+        unlockElements();
+        document.getElementById("primaryLogo").src =
+          "img/logo/chirpity_logo_subscriber_bronze.png";
+        return true;
+      } else {
+        document.getElementById("buy-me-coffee").classList.remove("d-none");
+      }
+    });
 }
-
 
 /**
  * Assigns a key binding configuration based on user input.
  *
- * Retrieves the column identifier from the DOM element with the ID matching `${key}-column` and uses it to update the global key assignment stored in `config.keyAssignment`. The function trims the value from the input element and sets it to `null` if empty. It marks the assignment as active when a non-empty value is provided and dynamically enables or disables the input element based on the presence of a valid column.
+ * Retrieves the column identifier from the DOM element with the ID matching `${key}-column` 
+ * and uses it to update the global key assignment stored in `config.keyAssignment`. 
+ * The function trims the value from the input element and sets it to `null` if empty. 
+ * It marks the assignment as active when a non-empty value is provided and dynamically 
+ * enables or disables the input element based on the presence of a valid column.
  *
  * @param {HTMLInputElement} inputEL - The input element that triggered the change event.
  * @param {string} key - The identifier used to locate the corresponding column element and update the key assignment configuration.
  * @returns {void}
  */
-function setKeyAssignment(inputEL, key){
+function setKeyAssignment(inputEL, key) {
   // Called on change to inputs
-  const columnEl = document.getElementById(key + '-column')
+  const columnEl = document.getElementById(key + "-column");
   const column = columnEl.value;
   let active = false;
   const value = inputEL.value?.trim() || null;
   // column === 'label' && worker.postMessage({action: "get-tags"})
-  if (column){
+  if (column) {
     inputEL.disabled = false; // enable input
-    if (value){
+    if (value) {
       active = true;
-      config.keyAssignment[key] = {column, value, active};
-      config.debug && console.log(`${key} is assigned to update ${column} with ${value}`)
+      config.keyAssignment[key] = { column, value, active };
+      config.debug &&
+        console.log(`${key} is assigned to update ${column} with ${value}`);
     } else {
-      config.keyAssignment[key] = {column, value, active};
-      config.debug && console.log(`${key} is assigned to update ${column} with ${value}`)
+      config.keyAssignment[key] = { column, value, active };
+      config.debug &&
+        console.log(`${key} is assigned to update ${column} with ${value}`);
     }
   } else {
-
     inputEL.disabled = true; // disable input
-    config.keyAssignment[key] = {column, value, active};
+    config.keyAssignment[key] = { column, value, active };
   }
 }
 
@@ -8182,7 +8338,7 @@ function setKeyAssignment(inputEL, key){
  * is not "unused", the input is enabled. Additionally, for key assignments with a column of
  * "label" or "species", the input element is further processed for specialized handling.
  *
- * @param {Object.<string, {value: string, column: string}>} keyAssignments - 
+ * @param {Object.<string, {value: string, column: string}>} keyAssignments -
  *   An object mapping element IDs to their key assignment configurations. Each configuration object
  *   should contain:
  *   - {@code value}: The assigned key value. Use "unused" to indicate no assignment.
@@ -8200,15 +8356,16 @@ function setKeyAssignment(inputEL, key){
  * column elements using the format {@code key + '-column'}. Relies on a global {@code getI18n} function and
  * an {@code i18n.Select} parameter to initialize internationalization context.
  */
-function setKeyAssignmentUI(keyAssignments){
+function setKeyAssignmentUI(keyAssignments) {
   const i18 = getI18n(i18n.Select);
   Object.entries(keyAssignments).forEach(([k, v]) => {
     const input = document.getElementById(k);
     input.value = v.value;
-    v.value === 'unused' || (input.disabled = false);
-    document.getElementById(k+'-column').value = v.column;
-    if (['label', 'species'].includes(v.column)) changeInputElement(v.column, input, k, v.value);
-  }) 
+    v.value === "unused" || (input.disabled = false);
+    document.getElementById(k + "-column").value = v.column;
+    if (["label", "species"].includes(v.column))
+      changeInputElement(v.column, input, k, v.value);
+  });
 }
 
 /**
@@ -8223,34 +8380,36 @@ function setKeyAssignmentUI(keyAssignments){
  * @param {string|null} [preSelected=null] - The preselected value to populate the input component.
  * @returns {HTMLElement} The newly created DOM element, either a container with a custom select (for "label") or an input element.
  */
-function changeInputElement(column, element, key, preSelected = null){
-  if (column === 'label'){
-    const i18 = getI18n(i18n.Select)
-    const container = document.createElement('div')
+function changeInputElement(column, element, key, preSelected = null) {
+  if (column === "label") {
+    const i18 = getI18n(i18n.Select);
+    const container = document.createElement("div");
     container.id = key;
-    container.className = 'form-control-sm bg-dark border-0';
-    const labels = STATE.tagsList.map(item => item.name);
+    container.className = "form-control-sm bg-dark border-0";
+    const labels = STATE.tagsList.map((item) => item.name);
     const select = new CustomSelect({
-      theme: 'dark',
+      theme: "dark",
       labels: labels,
       i18n: i18,
-      preselectedLabel: preSelected
+      preselectedLabel: preSelected,
     });
     container.appendChild(select);
-    element.replaceWith(container)
-    return container
+    element.replaceWith(container);
+    return container;
   } else {
-    const input = document.createElement('input');
-    input.className="ms-2 form-control";
-    input.id=key;
+    const input = document.createElement("input");
+    input.className = "ms-2 form-control";
+    input.id = key;
     input.value = preSelected;
-    input.style="font-size: small";
-    if (column === 'species'){
-      const listContainer = document.getElementById(`bird-list-${key}`)
-      input.addEventListener('input', () => updateSuggestions(input, listContainer, true));
+    input.style = "font-size: small";
+    if (column === "species") {
+      const listContainer = document.getElementById(`bird-list-${key}`);
+      input.addEventListener("input", () =>
+        updateSuggestions(input, listContainer, true)
+      );
     }
     element.replaceWith(input);
-    return input
+    return input;
   }
 }
 
@@ -8258,21 +8417,22 @@ document.addEventListener("labelsUpdated", (e) => {
   const tags = e.detail.tags;
   const tagObjects = tags.map((name, index) => ({ id: index, name }));
   const deleted = e.detail.deleted;
-  if (deleted){
+  if (deleted) {
     console.log("Tag deleted:", deleted);
-    worker.postMessage({action: "delete-tag", deleted });
-    STATE.tagsList = STATE.tagsList.filter(item => item.name !== deleted)
+    worker.postMessage({ action: "delete-tag", deleted });
+    STATE.tagsList = STATE.tagsList.filter((item) => item.name !== deleted);
   } else {
     // Find the new or renamed tag
-    const alteredOrNew = tagObjects.find(tag => !STATE.tagsList.find(t => t.name === tag.name));
+    const alteredOrNew = tagObjects.find(
+      (tag) => !STATE.tagsList.find((t) => t.name === tag.name)
+    );
     STATE.tagsList = tags;
     console.log("Tag updated:", alteredOrNew);
-    worker.postMessage({action: "update-tag", alteredOrNew })
+    worker.postMessage({ action: "update-tag", alteredOrNew });
   }
-  
+
   console.log("Tags list:", STATE.tagsList);
 });
-
 
 /**
  * Filters and sorts bird labels based on a search query.
@@ -8291,16 +8451,21 @@ document.addEventListener("labelsUpdated", (e) => {
  * @returns {Array<{cname: string, sname: string, styled: string}>} Array of objects representing filtered and sorted birds.
  */
 function getFilteredBirds(search, list = LABELS) {
-  if (!search || typeof search !== 'string') return [];
-  const sortedList =  list
-    .filter(bird => bird.toLowerCase().includes(search))
-    .map(item => {
+  if (!search || typeof search !== "string") return [];
+  const sortedList = list
+    .filter((bird) => bird.toLowerCase().includes(search))
+    .map((item) => {
       // Flip sname and cname from "sname_cname"
-      const [cname, sname] = item.split('_').reverse();
+      const [cname, sname] = item.split("_").reverse();
       return { cname, sname, styled: `${cname} <br/><i>${sname}</i>` };
     })
-    .sort((a, b) => new Intl.Collator(config.locale.replace(/_.*$/, "")).compare(a.cname, b.cname));
-    return sortedList
+    .sort((a, b) =>
+      new Intl.Collator(config.locale.replace(/_.*$/, "")).compare(
+        a.cname,
+        b.cname
+      )
+    );
+  return sortedList;
 }
 
 /**
@@ -8319,102 +8484,118 @@ function getFilteredBirds(search, list = LABELS) {
  */
 function updateSuggestions(input, element, preserveInput) {
   const search = input.value.toLowerCase();
-  element.textContent = ''; // Clear any existing suggestions
+  element.textContent = ""; // Clear any existing suggestions
   // Close any open lists
-  const suggestionLists = document.querySelectorAll('.suggestions')
-  suggestionLists.forEach(list => list.style.display = 'none');
+  const suggestionLists = document.querySelectorAll(".suggestions");
+  suggestionLists.forEach((list) => (list.style.display = "none"));
   const label = document.querySelector(`label[for="${input.id}"]`);
-  const list = ['bird-autocomplete-explore', 'bird-autocomplete-chart'].includes(input.id) ? STATE.seenSpecies : LABELS;
+  const list = [
+    "bird-autocomplete-explore",
+    "bird-autocomplete-chart",
+  ].includes(input.id)
+    ? STATE.seenSpecies
+    : LABELS;
   let span;
   if (label) {
-      span = label.querySelector('span'); // Check if a span already exists
-  
-      if (!span) {
-          span = document.createElement('span');
-          label.appendChild(span); // Append to label
-      }
-      span.textContent = ` (${list.length})`; // Update existing span
+    span = label.querySelector("span"); // Check if a span already exists
+
+    if (!span) {
+      span = document.createElement("span");
+      label.appendChild(span); // Append to label
+    }
+    span.textContent = ` (${list.length})`; // Update existing span
   }
   if (search.length < 2) {
-    element.style.display = 'none';
+    element.style.display = "none";
     return;
   }
 
-
   const filtered = getFilteredBirds(search, list);
-  if (span) span.textContent = ` (${filtered.length})`
+  if (span) span.textContent = ` (${filtered.length})`;
   const fragment = document.createDocumentFragment();
   // Populate the suggestion list
-  filtered.forEach(item => {
-    const li = document.createElement('li');
-    li.className = 'list-group-item';
+  filtered.forEach((item) => {
+    const li = document.createElement("li");
+    li.className = "list-group-item";
 
-    const text = document.createElement('span');
+    const text = document.createElement("span");
     text.textContent = item.cname;
-    const italic = document.createElement('i');
+    const italic = document.createElement("i");
     italic.textContent = item.sname;
     li.appendChild(text);
-    li.appendChild(document.createElement('br'));
+    li.appendChild(document.createElement("br"));
     li.appendChild(italic);
 
-    li.addEventListener('click', () => {
-      const selectedBird = document.getElementById('selected-bird');
+    li.addEventListener("click", () => {
+      const selectedBird = document.getElementById("selected-bird");
       selectedBird.replaceChildren(
         text.cloneNode(true),
-        document.createElement('br'),
+        document.createElement("br"),
         italic.cloneNode(true)
       );
-      input.value = preserveInput ? item.cname : '';
+      input.value = preserveInput ? item.cname : "";
       const label = document.querySelector(`label[for="${input.id}"]`);
       if (label) {
-          const span = label.querySelector('span');
-          if (span) {
-              span.remove(); // Removes the span if it exists
-          }
+        const span = label.querySelector("span");
+        if (span) {
+          span.remove(); // Removes the span if it exists
+        }
       }
 
-      if (input.id === 'bird-autocomplete-explore'){
+      if (input.id === "bird-autocomplete-explore") {
         filterResults({ species: item.cname, updateSummary: true });
         resetResults({
           clearSummary: false,
           clearPagination: false,
           clearResults: false,
         });
-      } else if  (input.id === 'bird-autocomplete-chart'){
-        worker.postMessage({action: "chart", species: item.cname, range: STATE.chart.range})
+      } else if (input.id === "bird-autocomplete-chart") {
+        worker.postMessage({
+          action: "chart",
+          species: item.cname,
+          range: STATE.chart.range,
+        });
       }
-      input.dispatchEvent(new Event('change', { bubbles: true })); // fire the change event
-      element.style.display = 'none';
+      input.dispatchEvent(new Event("change", { bubbles: true })); // fire the change event
+      element.style.display = "none";
     });
     fragment.appendChild(li);
   });
   element.appendChild(fragment);
-  element.style.display = filtered.length ? 'block' : 'none';
+  element.style.display = filtered.length ? "block" : "none";
   // Make sure the dropdown is visble
   element.getBoundingClientRect().bottom > window.innerHeight &&
-    element.scrollIntoView({behavior: 'smooth', block:'end'})
+    element.scrollIntoView({ behavior: "smooth", block: "end" });
 }
 
 // Update suggestions on each input event
-const autocomplete = document.querySelectorAll('.autocomplete');
-autocomplete.forEach(input => {
-  const listContainer = input.closest('.bird-search').querySelector('.suggestions');
-  input.addEventListener('input', () => updateSuggestions(input, listContainer, true));
-})
-
+const autocomplete = document.querySelectorAll(".autocomplete");
+autocomplete.forEach((input) => {
+  const listContainer = input
+    .closest(".bird-search")
+    .querySelector(".suggestions");
+  input.addEventListener("input", () =>
+    updateSuggestions(input, listContainer, true)
+  );
+});
 
 // Toggle the display of the suggestion list when the caret is clicked
-const dropdownCaret = document.querySelectorAll('.input-caret');
-dropdownCaret.forEach(caret => caret.addEventListener('click', (e) => {
-  const suggestionsList = e.target.closest('.bird-search').querySelector('.suggestions');
-  if (suggestionsList.style.display === 'block') {
-    suggestionsList.style.display = 'none';
-  } else {
-    const inputField = e.target.closest('.bird-search').querySelector('input');
-    updateSuggestions(inputField, suggestionsList);
-  }
-}));
-
+const dropdownCaret = document.querySelectorAll(".input-caret");
+dropdownCaret.forEach((caret) =>
+  caret.addEventListener("click", (e) => {
+    const suggestionsList = e.target
+      .closest(".bird-search")
+      .querySelector(".suggestions");
+    if (suggestionsList.style.display === "block") {
+      suggestionsList.style.display = "none";
+    } else {
+      const inputField = e.target
+        .closest(".bird-search")
+        .querySelector("input");
+      updateSuggestions(inputField, suggestionsList);
+    }
+  })
+);
 
 /**
  * Extracts metadata from a DOM record representing an audio detection and adds it to the global history.
@@ -8425,43 +8606,58 @@ dropdownCaret.forEach(caret => caret.addEventListener('click', (e) => {
  * @param {string} [newCname] - Optional name to override the extracted species name.
  * @returns {Object|undefined} An object containing properties: species, start, end, confidence, label, callCount, comment, file, row, and setting if the record is within a table; otherwise, undefined.
  */
-function addToHistory (record, newCname) {
-    // prepare the undelete record
-    const [file, start, end] = unpackNameAttr(record);
-    const setting = record.closest("table");
-    if (setting) {
-      const row = record.closest("tr");
-      let cname = record.querySelector(".cname").innerText;
-      let [species, confidence] = cname.split("\n");
-      // Manual records don't have a confidence bar
-      if (!confidence) {
-        species = species.slice(0, -11); // remove ' person_add'
-        confidence = 2000;
-      } else {
-        confidence = parseInt(confidence.replace("%", "")) * 10;
-      }
-      const comment = record.querySelector(".comment").innerText;
-      const label = record.querySelector(".label").innerText;
-      let callCount = record.querySelector(".call-count").innerText;
-      let reviewed = !!record.querySelector(".reviewed").innerText;
-      HISTORY.push([
-        species,
-        start,
-        end,
-        comment,
-        callCount,
-        label,
-        undefined,
-        undefined,
-        newCname || species,
-        confidence,
-        reviewed
-      ]);
-    return {species, start, end, confidence, label, callCount, comment, file, row, setting}
+function addToHistory(record, newCname) {
+  // prepare the undelete record
+  const [file, start, end] = unpackNameAttr(record);
+  const setting = record.closest("table");
+  if (setting) {
+    const row = record.closest("tr");
+    let cname = record.querySelector(".cname").innerText;
+    let [species, confidence] = cname.split("\n");
+    // Manual records don't have a confidence bar
+    if (!confidence) {
+      species = species.slice(0, -11); // remove ' person_add'
+      confidence = 2000;
+    } else {
+      confidence = parseInt(confidence.replace("%", "")) * 10;
+    }
+    const comment = record.querySelector(".comment").innerText;
+    const label = record.querySelector(".label").innerText;
+    let callCount = record.querySelector(".call-count").innerText;
+    let reviewed = !!record.querySelector(".reviewed").innerText;
+    HISTORY.push([
+      species,
+      start,
+      end,
+      comment,
+      callCount,
+      label,
+      undefined,
+      undefined,
+      newCname || species,
+      confidence,
+      reviewed,
+    ]);
+    return {
+      species,
+      start,
+      end,
+      confidence,
+      label,
+      callCount,
+      comment,
+      file,
+      row,
+      setting,
+    };
   }
 }
 
-document.addEventListener('filter-labels', (e) => {
+document.addEventListener("filter-labels", (e) => {
   STATE.labelFilters = e.detail.filters;
-  worker.postMessage({ action: "update-state", labelFilters: STATE.labelFilters, species: isSpeciesViewFiltered(true) }); 
-})
+  worker.postMessage({
+    action: "update-state",
+    labelFilters: STATE.labelFilters,
+    species: isSpeciesViewFiltered(true),
+  });
+});

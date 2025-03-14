@@ -2,8 +2,6 @@
  * @file Helper functions for wav file metadata extraction.
  */
 
-
-
 ////////// GUANO Support /////////////
 
 const fs = require("node:fs");
