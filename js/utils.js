@@ -194,17 +194,16 @@ function formatDuration(seconds) {
 }
 
 // Utility functions to wait for a variable to not be falsey
-
-let retryCount = 0;
 function waitFor(checkFn) {
-  let maxRetries = 15;
+  let maxRetries = 25;
+  let retryCount = 0;
   return new Promise((resolve) => {
     let interval = setInterval(() => {
       if (checkFn() || retryCount >= maxRetries) {
         clearInterval(interval); // Stop further retries
-        resolve((retryCount = 0)); // Resolve the promise
+        resolve(); // Resolve the promise
       } else {
-        console.log("retries: ", ++retryCount);
+        ++retryCount;
       }
     }, 100);
   });

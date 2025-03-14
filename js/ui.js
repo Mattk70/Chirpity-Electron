@@ -2110,14 +2110,17 @@ window.onload = async () => {
   document.getElementById("year").textContent = new Date().getFullYear();
   await appVersionLoaded;
   const configFile = p.join(appPath, "config.json");
-  await fs.readFile(configFile, "utf8", (err, hexData) => {
+  await fs.readFile(configFile, "utf8", (err, data) => {
     if (err) {
       console.log("Config not loaded, using defaults");
       // Use defaults if no config file
       if (!fs.existsSync(configFile)) config = defaultConfig;
-      else throw err
+      else {
+        generateToast({ type: "error", message: "configReadError" });
+        config = defaultConfig;
+      }
     } else {
-      config = JSON.parse(hexData);
+      config = JSON.parse(data);
     }
 
 
