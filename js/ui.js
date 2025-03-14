@@ -21,23 +21,10 @@ import {
   parseSemVer,
   isNewVersion,
 } from "./getKnownIssues.js";
-import {
-  i18nAll,
-  i18nSpeciesList,
-  i18nHeadings,
-  localiseUI,
-  i18nContext,
-  i18nLocation,
-  i18nForm,
-  i18nHelp,
-  i18nToasts,
-  i18nTitles,
-  i18nLIST_MAP,
-  i18nLists,
-  IUCNLabel,
-  i18nLocate,
-  i18nSelect
-} from "./i18n.js";
+import * as i18n from "./i18n.js";
+import * as utils from './utils.js';
+
+
 let LOCATIONS,
   locationID = undefined,
   loadingTimeout,
@@ -52,14 +39,6 @@ const originalInfo = console.info;
 const originalWarn = console.warn;
 const originalError = console.error;
 
-function customURLEncode(str) {
-  return encodeURIComponent(str)
-    .replace(/[!'()*]/g, (c) => {
-      // Replacing additional characters not handled by encodeURIComponent
-      return "%" + c.charCodeAt(0).toString(16).toUpperCase();
-    })
-    .replace(/%20/g, "+"); // Replace space with '+' instead of '%20'
-}
 
 
 // Override console.warn to intercept and track warnings
@@ -71,7 +50,7 @@ console.info = function () {
     config.UUID,
     "Information",
     arguments[0],
-    customURLEncode(arguments[1])
+    utils.customURLEncode(arguments[1])
   );
 };
 
@@ -82,7 +61,7 @@ console.warn = function () {
     config.UUID,
     "Warnings",
     arguments[0],
-    customURLEncode(arguments[1])
+    utils.customURLEncode(arguments[1])
   );
 };
 
@@ -93,7 +72,7 @@ console.error = function () {
     config.UUID,
     "Errors",
     arguments[0],
-    customURLEncode(arguments[1])
+    utils.customURLEncode(arguments[1])
   );
 };
 
@@ -107,7 +86,7 @@ window.addEventListener("unhandledrejection", function (event) {
     config.UUID,
     "Unhandled UI Promise Rejection",
     errorMessage,
-    customURLEncode(stackTrace)
+    utils.customURLEncode(stackTrace)
   );
 });
 
@@ -121,7 +100,7 @@ window.addEventListener("rejectionhandled", function (event) {
     config.UUID,
     "Handled UI Promise Rejection",
     errorMessage,
-    customURLEncode(stackTrace)
+    utils.customURLEncode(stackTrace)
   );
 });
 
@@ -192,42 +171,24 @@ const trackVisit = isTestEnv ? () => {} : _trackVisit;
 const trackEvent = isTestEnv ? () => {} : _trackEvent;
 isTestEnv &&  console.log("Running in test environment");
 
-function hexToRgb(hex) {
-  // Remove the '#' character if present
-  hex = hex.replace(/^#/, "");
 
-  // Parse the hex string into individual RGB components
-  var r = parseInt(hex.substring(0, 2), 16);
-  var g = parseInt(hex.substring(2, 4), 16);
-  var b = parseInt(hex.substring(4, 6), 16);
-
-  // Return the RGB components as an array
-  return [r, g, b];
-}
 function createColormap() {
   const cmap = config.colormap;
   const map =
     cmap === "custom"
       ? [
-          { index: 0, rgb: hexToRgb(config.customColormap.quiet) },
+          { index: 0, rgb: utils.hexToRgb(config.customColormap.quiet) },
           {
             index: config.customColormap.threshold,
-            rgb: hexToRgb(config.customColormap.mid),
+            rgb: utils.hexToRgb(config.customColormap.mid),
           },
-          { index: 1, rgb: hexToRgb(config.customColormap.loud) },
+          { index: 1, rgb: utils.hexToRgb(config.customColormap.loud) },
         ]
       : cmap;
     
   return ['roseus', 'gray', 'igray'].includes(cmap)
     ? cmap
     : colormap({ colormap: map, nshades: 256, format: "float" });
-}
-function interpolate(template, variables) {
-  return template.replace(/\$\{(.*?)\}/g, (match, key) => {
-    const value = variables[key.trim()];
-    if (value == null) return match;
-    else return value;
-  });
 }
 
 let worker;
@@ -491,8 +452,8 @@ const resetRegions = (clearActive) => {
   clearActive && (activeRegion = null);
   STATE.selection = false;
   worker.postMessage({ action: "update-state", selection: false });
-  disableMenuItem(["analyseSelection", "export-audio"]);
-  if (fileLoaded) enableMenuItem(["analyse"]);
+  utils.disableMenuItem(["analyseSelection", "export-audio"]);
+  if (fileLoaded) utils.enableMenuItem(["analyse"]);
 };
 
 /**
@@ -620,7 +581,7 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
 
 
   // Show controls
-  showElement(["controlsWrapper"]);
+  utils.showElement(["controlsWrapper"]);
   // Resize canvas of spec and labels
   adjustSpecDims(true);
   // remove the tooltip
@@ -668,7 +629,7 @@ const initWavesurfer = ({ audio = undefined, height = 0 }) => {
 function increaseFFT() {
   if (spectrogram.fftSamples < 2048 && STATE.regionsCompleted) {
     spectrogram.fftSamples *= 2;
-    const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
+    const position = utils.clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
     postBufferUpdate({
       begin: windowOffsetSecs,
       position: position,
@@ -707,7 +668,7 @@ function increaseFFT() {
 function reduceFFT() {
   if (spectrogram.fftSamples > 64 && STATE.regionsCompleted) {
     spectrogram.fftSamples /= 2;
-    const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
+    const position = utils.clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
     postBufferUpdate({
       begin: windowOffsetSecs,
       position: position,
@@ -797,11 +758,7 @@ async function showOpenDialog(fileOrFolder) {
     defaultPath,
   });
   if (!files.canceled) {
-    if (fileOrFolder === "openFiles") {
-      await onOpenFiles({ filePaths: files.filePaths });
-    } else {
-      filterValidFiles({ filePaths: files.filePaths });
-    }
+    filterValidFiles({ filePaths: files.filePaths });
     localStorage.setItem("lastFolder", p.dirname(files.filePaths[0]));
   }
 }
@@ -824,36 +781,16 @@ const buildFileMenu = (e) => {
   //e.preventDefault();
   e.stopImmediatePropagation();
   const menu = DOM.contextMenu;
-  const i18n = getI18n(i18nContext);
+  const i18 = getI18n(i18n.Context);
   menu.innerHTML = `
     <a class="dropdown-item" id="setCustomLocation"><span
-    class="material-symbols-outlined align-bottom pointer">edit_location_alt</span> ${i18n.location}</a>
+    class="material-symbols-outlined align-bottom pointer">edit_location_alt</span> ${i18.location}</a>
     <a class="dropdown-item" id="setFileStart"><span
-    class="material-symbols-outlined align-bottom pointer">edit_calendar</span> ${i18n.time}
+    class="material-symbols-outlined align-bottom pointer">edit_calendar</span> ${i18.time}
     `;
   positionMenu(menu, e);
 };
 
-function getDatetimeLocalFromEpoch(date) {
-  // Assuming you have a Date object, for example:
-  const myDate = new Date(date);
-  let datePart = myDate.toLocaleDateString("en-GB", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  datePart = datePart.split("/").reverse().join("-");
-  const timePart = myDate
-    .toLocaleTimeString([], {
-      hour12: false,
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-    .replace(/\s.M$/, "");
-  // Combine date and time parts in the format expected by datetime-local input
-  const isoDate = datePart + "T" + timePart;
-  return isoDate;
-}
 
 /**
  * Renders a date and time picker form for updating the start time of the current audio file.
@@ -867,7 +804,7 @@ function getDatetimeLocalFromEpoch(date) {
  */
 function showDatePicker() {
   // Create a form element
-  const i18n = getI18n(i18nForm);
+  const i18 = getI18n(i18n.Form);
   const form = document.createElement("form");
   form.classList.add(
     "mt-3",
@@ -880,7 +817,7 @@ function showDatePicker() {
   form.style.zIndex = "1000";
   // Create a label for the datetime-local input
   const label = document.createElement("label");
-  label.innerHTML = i18n.select;
+  label.innerHTML = i18.select;
   label.classList.add("form-label");
   form.appendChild(label);
 
@@ -890,21 +827,21 @@ function showDatePicker() {
   datetimeInput.setAttribute("id", "fileStart");
   datetimeInput.setAttribute(
     "value",
-    getDatetimeLocalFromEpoch(STATE.fileStart)
+    utils.getDatetimeLocalFromEpoch(STATE.fileStart)
   );
-  datetimeInput.setAttribute("max", getDatetimeLocalFromEpoch(new Date()));
+  datetimeInput.setAttribute("max", utils.getDatetimeLocalFromEpoch(new Date()));
   datetimeInput.classList.add("form-control");
   form.appendChild(datetimeInput);
 
   // Create a submit button
   const submitButton = document.createElement("button");
-  submitButton.innerHTML = i18n.submit;
+  submitButton.innerHTML = i18.submit;
   submitButton.classList.add("btn", "btn-primary", "mt-2");
   form.appendChild(submitButton);
 
   // Create a cancel button
   var cancelButton = document.createElement("button");
-  cancelButton.innerHTML = i18n.cancel;
+  cancelButton.innerHTML = i18.cancel;
   cancelButton.classList.add("btn", "btn-secondary", "mt-2", "ms-2");
   form.appendChild(cancelButton);
 
@@ -942,21 +879,6 @@ const filename = DOM.filename;
 // This click handler is needed because the file links have their own id, so the global listener doesn't fire.
 filename.addEventListener("click", openFileInList);
 filename.addEventListener("contextmenu", buildFileMenu);
-
-function extractFileNameAndFolder(path) {
-  const regex = /[\\/]?([^\\/]+)[\\/]?([^\\/]+)$/; // Regular expression to match the parent folder and file name
-
-  const match = path.match(regex);
-
-  if (match) {
-    const parentFolder = match[1];
-    const fileName = match[2];
-    return { parentFolder, fileName };
-  } else {
-    // Return a default value or handle the case where the path doesn't match the pattern
-    return { parentFolder: "", fileName: "" };
-  }
-}
 
 /**
  * Formats a JSON object as a Bootstrap table
@@ -1008,7 +930,7 @@ function showMetadata() {
 }
 
 function renderFilenamePanel() {
-  const i18n = getI18n(i18nTitles);
+  const i18 = getI18n(i18n.Titles);
   if (!STATE.currentFile) return;
   const openFile = STATE.currentFile;
   const files = STATE.openFiles;
@@ -1016,10 +938,10 @@ function renderFilenamePanel() {
   let filenameElement = DOM.filename;
   filenameElement.innerHTML = "";
   //let label = openFile.replace(/^.*[\\\/]/, "");
-  const { parentFolder, fileName } = extractFileNameAndFolder(openFile);
+  const { parentFolder, fileName } = utils.extractFileNameAndFolder(openFile);
   const label = `${parentFolder}/${fileName}`;
   let appendStr;
-  const title = ` title="${i18n.filename}" `;
+  const title = ` title="${i18.filename}" `;
   const isSaved = ["archive", "explore"].includes(STATE.mode)
     ? "text-info"
     : "text-warning";
@@ -1067,12 +989,12 @@ function customAnalysisAllMenu(saved) {
   if (saved) {
     analyseAllMenu.innerHTML = `<span class="material-symbols-outlined">upload_file</span> ${STATE.i18n.retrieveAll}
         <span class="shortcut float-end">${modifier}+Shift+A</span>`;
-    enableMenuItem(["reanalyseAll", "charts"]);
-    STATE.mode === "explore" || enableMenuItem(["explore"]);
+    utils.enableMenuItem(["reanalyseAll", "charts"]);
+    STATE.mode === "explore" || utils.enableMenuItem(["explore"]);
   } else {
     analyseAllMenu.innerHTML = `<span class="material-symbols-outlined">search</span> ${STATE.i18n.analyseAll[0]}
         <span class="shortcut float-end">${modifier}+Shift+A</span>`;
-    disableMenuItem(["reanalyseAll"]);
+    utils.disableMenuItem(["reanalyseAll"]);
   }
 }
 
@@ -1089,22 +1011,22 @@ function customiseAnalysisMenu(saved) {
   if (saved) {
     analyseMenu.innerHTML = `<span class="material-symbols-outlined">upload_file</span> ${STATE.i18n.retrieve}
         <span class="shortcut float-end">${modifier}+A</span>`;
-    enableMenuItem(["reanalyse", "charts"]);
-    STATE.mode === "explore" || enableMenuItem(["explore"]);
+    utils.enableMenuItem(["reanalyse", "charts"]);
+    STATE.mode === "explore" || utils.enableMenuItem(["explore"]);
   } else {
     analyseMenu.innerHTML = `<span class="material-symbols-outlined">search</span> ${STATE.i18n.analyse[0]}
         <span class="shortcut float-end">${modifier}+A</span>`;
-    disableMenuItem(["reanalyse"]);
+    utils.disableMenuItem(["reanalyse"]);
   }
 }
 
 async function generateLocationList(id) {
-  const i18n = getI18n(i18nAll);
-  const defaultText = id === "savedLocations" ? i18n[0] : i18n[1];
+  const i18 = getI18n(i18n.All);
+  const defaultText = id === "savedLocations" ? i18[0] : i18[1];
   const el = document.getElementById(id);
   LOCATIONS = undefined;
   worker.postMessage({ action: "get-locations", file: STATE.currentFile });
-  await waitFor(() => LOCATIONS);
+  await utils.waitFor(() => LOCATIONS);
   el.innerHTML = `<option value="">${defaultText}</option>`; // clear options
   LOCATIONS.forEach((loc) => {
     const option = document.createElement("option");
@@ -1246,14 +1168,14 @@ async function setCustomLocation() {
     showLocation(true);
   });
 
-  const i18n = getI18n(i18nLocation);
+  const i18 = getI18n(i18n.Location);
   const addOrDelete = () => {
     if (customPlaceEl.value) {
-      locationAdd.textContent = i18n[0];
+      locationAdd.textContent = i18[0];
       locationAdd.classList.remove("btn-danger");
       locationAdd.classList.add("button-primary");
     } else {
-      locationAdd.textContent = i18n[1];
+      locationAdd.textContent = i18[1];
       locationAdd.classList.add("btn-danger");
       locationAdd.classList.remove("button-primary");
     }
@@ -1261,15 +1183,15 @@ async function setCustomLocation() {
   // Highlight delete
   customPlaceEl.addEventListener("keyup", addOrDelete);
   addOrDelete();
-  locationModalDiv.querySelector("h5").textContent = i18n[0];
+  locationModalDiv.querySelector("h5").textContent = i18[0];
   const legends = locationModalDiv.querySelectorAll("legend");
   for (let i = 0; i < legends.length; i++) {
-    legends[i].textContent = i18n[i + 2]; // process each node
+    legends[i].textContent = i18[i + 2]; // process each node
   }
   locationModalDiv.querySelector('label[for="batchLocations"]').textContent =
-    i18n[4];
-  document.getElementById("customLatLabel").textContent = i18n[5];
-  document.getElementById("customLonLabel").textContent = i18n[6];
+    i18[4];
+  document.getElementById("customLatLabel").textContent = i18[5];
+  document.getElementById("customLonLabel").textContent = i18[6];
   const locationModal = new bootstrap.Modal(locationModalDiv);
   locationModal.show();
 
@@ -1311,17 +1233,7 @@ const filterValidFiles = ({ filePaths }) => {
   worker.postMessage({ action: "get-valid-files-list", files: filePaths });
 };
 
-function filterFilePaths(filePaths) {
-  const filteredPaths = [];
-  filePaths.forEach((filePath) => {
-    const baseName = p.basename(filePath);
-    const isHiddenFile = baseName.startsWith(".");
-    if (!isHiddenFile) {
-      filteredPaths.push(filePath);
-    }
-  });
-  return filteredPaths;
-}
+
 
 async function sortFilesByTime(fileNames) {
   const fileData = await Promise.all(
@@ -1336,34 +1248,16 @@ async function sortFilesByTime(fileNames) {
     .map((file) => file.name); // Return sorted file names
 }
 async function onOpenFiles(args) {
-  const sanitisedList = filterFilePaths(args.filePaths);
+  const sanitisedList = args.filePaths;
   if (!sanitisedList.length) return;
   DOM.loading.querySelector("#loadingText").textContent = "Loading files...";
   DOM.loading.classList.remove("d-none");
   // Store the sanitised file list and Load First audio file
-  hideAll();
-  showElement(["spectrogramWrapper"], false);
+  utils.hideAll();
+  utils.showElement(["spectrogramWrapper"], false);
   resetResults();
   resetDiagnostics();
-  STATE.openFiles = sanitisedList;
-
-  // Store the file list and Load First audio file
-  worker.postMessage({
-    action: "check-all-files-saved",
-    files: STATE.openFiles,
-  });
-
-  // Sort file by time created (the oldest first):
-  if (STATE.openFiles.length > 1) {
-    if (modelReady) enableMenuItem(["analyseAll", "reanalyseAll"]);
-    STATE.openFiles = await sortFilesByTime(STATE.openFiles);
-  } else {
-    disableMenuItem(["analyseAll", "reanalyseAll"]);
-  }
-  // Reset analysis status
-  STATE.analysisDone = false;
-  loadAudioFileSync({ filePath: STATE.openFiles[0] });
-  disableMenuItem([
+  utils.disableMenuItem([
     "analyseSelection",
     "analyse",
     "analyseAll",
@@ -1371,6 +1265,23 @@ async function onOpenFiles(args) {
     "reanalyseAll",
     "save2db",
   ]);
+
+  // Store the file list and Load First audio file
+  STATE.openFiles = sanitisedList;
+  worker.postMessage({
+    action: "check-all-files-saved",
+    files: STATE.openFiles,
+  });
+
+  // Sort file by time created (the oldest first):
+  if (STATE.openFiles.length > 1) {
+    if (modelReady) utils.enableMenuItem(["analyseAll", "reanalyseAll"]);
+    STATE.openFiles = await sortFilesByTime(STATE.openFiles);
+  }
+  // Reset analysis status
+  STATE.analysisDone = false;
+  loadAudioFileSync({ filePath: STATE.openFiles[0] });
+
   // Clear unsaved records warning
   window.electron.unsavedRecords(false);
   document.getElementById("unsaved-icon").classList.add("d-none");
@@ -1407,16 +1318,7 @@ function analyseReset() {
   DOM.progressDiv.classList.remove("invisible");
 }
 
-/**
- * Checks if the provided object has no enumerable properties.
- *
- * @param {Object} obj - The object to evaluate.
- * @returns {boolean} True if the object is empty, otherwise false.
- */
-function isEmptyObject(obj) {
-  for (const _ in obj) return false;
-  return true;
-}
+
 
 /**
  * Refreshes the results view in the UI based on the current file loading state and available predictions.
@@ -1427,13 +1329,13 @@ function isEmptyObject(obj) {
  */
 function refreshResultsView() {
   if (fileLoaded) {
-    hideAll();
-    showElement(["spectrogramWrapper"], false);
-    if (!isEmptyObject(predictions)) {
-      showElement(["resultTableContainer", "resultsHead"], false);
+    utils.hideAll();
+    utils.showElement(["spectrogramWrapper"], false);
+    if (!utils.isEmptyObject(predictions)) {
+      utils.showElement(["resultTableContainer", "resultsHead"], false);
     }
   } else if (!STATE.openFiles.length) {
-    hideAll();
+    utils.hideAll();
   }
 }
 
@@ -1460,7 +1362,7 @@ function postAnalyseMessage(args) {
   if (!PREDICTING) {
     // Start a timer
     t0_analysis = Date.now();
-    disableMenuItem(["analyseSelection", "explore", "charts"]);
+    utils.disableMenuItem(["analyseSelection", "explore", "charts"]);
     const selection = !!args.end;
     const filesInScope = args.filesInScope;
     args.fromDB || (PREDICTING = true);
@@ -1515,7 +1417,7 @@ async function fetchLocationAddress(lat, lon, pushLocations) {
             action: "get-locations",
             file: STATE.currentFile,
           });
-          await waitFor(() => LOCATIONS); // Ensure this is awaited
+          await utils.waitFor(() => LOCATIONS); // Ensure this is awaited
         }
         const response = await fetch(
           `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=14`
@@ -1562,62 +1464,8 @@ async function fetchLocationAddress(lat, lon, pushLocations) {
 
 // Menu bar functions
 
-function enableMenuItem(id_list) {
-  id_list.forEach((id) => {
-    document.getElementById(id).classList.remove("disabled");
-  });
-}
 
-function disableMenuItem(id_list) {
-  id_list.forEach((id) => {
-    document.getElementById(id).classList.add("disabled");
-  });
-}
 
-function setHeight(el, val) {
-  if (typeof val === "function") val = val();
-  if (typeof val === "string") el.style.height = val;
-  else el.style.height = val + "px";
-}
-
-function showElement(id_list, makeFlex = true, empty = false) {
-  id_list.forEach((id) => {
-    const thisElement = document.getElementById(id);
-    thisElement.classList.remove("d-none");
-    if (makeFlex) thisElement.classList.add("d-flex");
-    if (empty) {
-      setHeight(thisElement, 0);
-      thisElement.replaceChildren(); // empty
-    }
-  });
-}
-
-function hideElement(id_list) {
-  id_list.forEach((id) => {
-    const thisElement = document.getElementById(id);
-    // Don't use replace as d-flex may be absent
-    thisElement.classList.remove("d-flex");
-    thisElement.classList.add("d-none");
-  });
-}
-
-/**
- * Hides key UI components related to audio analysis.
- *
- * This function hides the primary display elements, including the waveform/timeline (exploreWrapper),
- * spectrogram (spectrogramWrapper), results table (resultTableContainer), and records sections (recordsContainer,
- * resultsHead), by delegating to the hideElement utility.
- */
-function hideAll() {
-  //  Waveform, timeline and spec, controls and result table
-  hideElement([
-    "exploreWrapper",
-    "spectrogramWrapper",
-    "resultTableContainer",
-    "recordsContainer",
-    "resultsHead",
-  ]);
-}
 
 async function batchExportAudio() {
   const species = isSpeciesViewFiltered(true);
@@ -1700,8 +1548,8 @@ function saveAnalyseState() {
  */
 async function showCharts() {
   saveAnalyseState();
-  enableMenuItem(["active-analysis", "explore"]);
-  disableMenuItem([
+  utils.enableMenuItem(["active-analysis", "explore"]);
+  utils.disableMenuItem([
     "analyse",
     "analyseSelection",
     "analyseAll",
@@ -1721,8 +1569,8 @@ async function showCharts() {
     // Prevent the wavesurfer error
     spectrogram && spectrogram.destroy();
     spectrogram = null;
-  hideAll();
-  showElement(["recordsContainer"]);
+  utils.hideAll();
+  utils.showElement(["recordsContainer"]);
   worker.postMessage({
     action: "chart",
     species: undefined,
@@ -1755,14 +1603,14 @@ async function showExplore() {
   // Change fileLoaded this one time, so a file will load!
   fileLoaded = true;
   saveAnalyseState();
-  enableMenuItem([
+  utils.enableMenuItem([
     "saveCSV",
     "save-eBird",
     "save-Raven",
     "charts",
     "active-analysis",
   ]);
-  disableMenuItem(["explore", "save2db"]);
+  utils.disableMenuItem(["explore", "save2db"]);
   // Tell the worker we are in Explore mode
   worker.postMessage({ action: "change-mode", mode: "explore" });
   worker.postMessage({
@@ -1771,8 +1619,8 @@ async function showExplore() {
   });
   const locationFilter = await generateLocationList("explore-locations");
   locationFilter.addEventListener("change", handleLocationFilterChange);
-  hideAll();
-  showElement(["exploreWrapper", "spectrogramWrapper"], false);
+  utils.hideAll();
+  utils.showElement(["exploreWrapper", "spectrogramWrapper"], false);
   reInitSpec();
   worker.postMessage({ action: "update-state", filesToAnalyse: [] });
   // Analysis is done
@@ -1799,16 +1647,16 @@ async function showExplore() {
  * @async
  */
 async function showAnalyse() {
-  disableMenuItem(["active-analysis"]);
+  utils.disableMenuItem(["active-analysis"]);
   //Restore STATE
   STATE = { ...STATE, ...STATE.currentAnalysis };
   worker.postMessage({ action: "change-mode", mode: STATE.mode });
       // Prevent the wavesurfer error
       spectrogram && spectrogram.destroy();
       spectrogram = null;
-  hideAll();
+  utils.hideAll();
   if (STATE.currentFile) {
-    showElement(["spectrogramWrapper"], false);
+    utils.showElement(["spectrogramWrapper"], false);
     reInitSpec();
     worker.postMessage({
       action: "update-state",
@@ -1835,22 +1683,6 @@ async function showAnalyse() {
 //     worker.postMessage({ action: 'create-dataset', species: isSpeciesViewFiltered(true) });
 // });
 
-const checkWidth = (text) => {
-  // Create a temporary element to measure the width of the text
-  const tempElement = document.createElement("span");
-  tempElement.style.position = "absolute";
-  tempElement.style.visibility = "hidden";
-  tempElement.textContent = text;
-  document.body.appendChild(tempElement);
-
-  // Get the width of the text
-  const textWidth = tempElement.clientWidth;
-
-  // Remove the temporary element from the document
-  document.body.removeChild(tempElement);
-  return textWidth + 5;
-};
-
 /**
  * Creates and registers a new audio region on the waveform, optionally navigating to its start time.
  *
@@ -1874,16 +1706,6 @@ function createRegion(start, end, label, goToRegion, colour) {
     console.error('Invalid region parameters:', { start, end });
     return;
   }
-    // Check for overlapping regions
-  // const hasOverlap = REGIONS.regions.some(region => {
-  //   return (start < region.end && end > region.start);
-  // });
-  
-  // if (hasOverlap) {
-  //   console.warn('Region overlap detected');
-  //   return;
-  // }
-
   REGIONS.addRegion({
     start: start,
     end: end,
@@ -1940,7 +1762,7 @@ async function resultClick(e) {
     loadResultRegion({ file, start, end, label });
   }
   if (e.target.classList.contains("circle")) {
-    await waitFor(() => fileLoaded);
+    await utils.waitFor(() => fileLoaded);
     getSelectionResults(true);
   }
 }
@@ -1975,9 +1797,6 @@ function setActiveRow(start) {
         }
     }
 }
-function clamp(value, min, max) {
-  return Math.min(Math.max(value, min), max);
-}
 
 const loadResultRegion = ({
   file = "",
@@ -1995,7 +1814,7 @@ const loadResultRegion = ({
     end: end - windowOffsetSecs,
     label,
   };
-  const position = wavesurfer ? clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1) : 0;
+  const position = wavesurfer ? utils.clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1) : 0;
   postBufferUpdate({
     file,
     begin: windowOffsetSecs,
@@ -2190,38 +2009,6 @@ function updatePrefs(file, data) {
   );
 }
 
-/**
- * Synchronizes a configuration object with a default configuration.
- *
- * Removes keys from the configuration that are not found in the default configuration,
- * and adds any missing keys from the default configuration. For keys with values that
- * are both objects in the configuration and the default configuration, the merge is
- * performed recursively, except when the key is "keyAssignment", which is left untouched.
- *
- * @param {Object} config - The configuration object to be synchronized (modified in place).
- * @param {Object} defaultConfig - The default configuration serving as the reference.
- */
-function syncConfig(config, defaultConfig) {
-  // First, remove keys from config that are not in defaultConfig
-  Object.keys(config).forEach((key) => {
-    if (!(key in defaultConfig)) {
-      delete config[key];
-    }
-  });
-
-  // Then, fill in missing keys from defaultConfig
-  Object.keys(defaultConfig).forEach((key) => {
-    if (!(key in config)) {
-      config[key] = defaultConfig[key];
-    } else if (
-      typeof config[key] === "object" &&
-      typeof defaultConfig[key] === "object"
-    ) {
-      // Recursively sync nested objects (but allow key assignment to be empty)
-      key === 'keyAssignment' || syncConfig(config[key], defaultConfig[key]);
-    }
-  });
-}
 
 /////////////////////////  Window Handlers ////////////////////////////
 // Set config defaults
@@ -2328,19 +2115,11 @@ window.onload = async () => {
       console.log("Config not loaded, using defaults");
       // Use defaults if no config file
       if (!fs.existsSync(configFile)) config = defaultConfig;
+      else throw err
     } else {
-      try {
-        const jsonData = hexToUtf8(hexData);
-        config = JSON.parse(jsonData);
-      } catch {
-        //ASCII config or corrupt config
-        try {
-          config = JSON.parse(hexData);
-        } catch {
-          alert("Config file is corrupt");
-        }
-      }
+      config = JSON.parse(hexData);
     }
+
 
     // Attach an error event listener to the window object
     window.onerror = function (message, file, lineno, colno, error) {
@@ -2354,7 +2133,7 @@ window.onload = async () => {
       return false;
     };
     //fill in defaults - after updates add new items
-    syncConfig(config, defaultConfig);
+    utils.syncConfig(config, defaultConfig);
 
     membershipCheck().then(isMember  => STATE.isMember = isMember);
  
@@ -2392,9 +2171,9 @@ window.onload = async () => {
       readLabels(config.customListFile[config.model], "list");
     // Show Locale
     DOM.locale.value = config.locale;
-    LIST_MAP = getI18n(i18nLIST_MAP);
+    LIST_MAP = getI18n(i18n.LIST_MAP);
     // Localise UI
-    localiseUI(DOM.locale.value).then((result) => (STATE.i18n = result));
+    i18n.localiseUI(DOM.locale.value).then((result) => (STATE.i18n = result));
     initialiseDatePicker();
     STATE.picker.options.lang = DOM.locale.value.replace("_uk", "");
 
@@ -2626,14 +2405,14 @@ const setUpWorkerMessaging = () => {
             clearTimeout(loadingTimeout);
             DOM.loading.classList.add("d-none");
             MISSING_FILE = args.file;
-            const i18n = getI18n(i18nLocate);
+            const i18 = getI18n(i18n.Locate);
             args.locate = `
                             <div class="d-flex justify-content-center mt-2">
                                 <button id="locate-missing-file" class="btn btn-primary border-dark text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
-                                    ${i18n.locate}
+                                    ${i18.locate}
                                 </button>
                                 <button id="purge-from-toast" class="ms-3 btn btn-warning text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
-                                ${i18n.remove}
+                                ${i18.remove}
                                 </button>
                             </div>
                             `;
@@ -2695,17 +2474,17 @@ const setUpWorkerMessaging = () => {
             case "analyse": {
               STATE.diskHasRecords &&
                 !PREDICTING &&
-                enableMenuItem(["explore", "charts"]);
+                utils.enableMenuItem(["explore", "charts"]);
               break;
             }
             case "archive": {
-              enableMenuItem(["save2db", "explore", "charts"]);
+              utils.enableMenuItem(["save2db", "explore", "charts"]);
               break;
             }
           }
           config.debug && console.log("Mode changed to: " + mode);
           if (["archive", "explore"].includes(mode)) {
-            enableMenuItem(["purge-file"]);
+            utils.enableMenuItem(["purge-file"]);
             // change header to indicate activation
             DOM.resultHeader.classList.replace(
               "text-bg-secondary",
@@ -2713,7 +2492,7 @@ const setUpWorkerMessaging = () => {
             );
             //adjustSpecDims(true)
           } else {
-            disableMenuItem(["purge-file"]);
+            utils.disableMenuItem(["purge-file"]);
             // change header to indicate deactivation
             DOM.resultHeader.classList.replace(
               "text-bg-dark",
@@ -2974,11 +2753,11 @@ function getDateOfISOWeek(w) {
  */
 function onChartData(args) {
   if (args.species) {
-    showElement(["recordsTableBody"], false);
+    utils.showElement(["recordsTableBody"], false);
     const title = document.getElementById("speciesName");
     title.textContent = args.species;
   } else {
-    hideElement(["recordsTableBody"]);
+    utils.hideElement(["recordsTableBody"]);
   }
   // Destroy the existing charts (if any)
   const chartInstances = Object.values(Chart.instances);
@@ -3267,21 +3046,9 @@ function getTooltipTitle(date, aggregation) {
   }
 }
 
-const waitForFinalEvent = (function () {
-  let timers = {};
-  return function (callback, ms, uniqueId) {
-    if (!uniqueId) {
-      uniqueId = "Don't call this twice without a uniqueId";
-    }
-    if (timers[uniqueId]) {
-      clearTimeout(timers[uniqueId]);
-    }
-    timers[uniqueId] = setTimeout(callback, ms);
-  };
-})();
 
 window.addEventListener("resize", function () {
-  waitForFinalEvent(
+  utils.waitForFinalEvent(
     function () {
       adjustSpecDims(true);
     },
@@ -3304,7 +3071,7 @@ function handleKeyDownDeBounce(e) {
     || e.target instanceof HTMLTextAreaElement
     || e.target instanceof CustomSelect)){
     e.preventDefault();
-    waitForFinalEvent(
+    utils.waitForFinalEvent(
       function () {
         handleKeyDown(e);
       },
@@ -3419,9 +3186,9 @@ function setActiveRegion(region) {
   const labelEl = formatLabel(label, 'gold')
   activeRegion = { start, end, label};
   region.setOptions({ color: STATE.regionActiveColour, content: labelEl});
-  enableMenuItem(["export-audio"]);
+  utils.enableMenuItem(["export-audio"]);
   if (modelReady && !PREDICTING) {
-    enableMenuItem(["analyseSelection"]);
+    utils.enableMenuItem(["analyseSelection"]);
   }
   setActiveRow(start + windowOffsetSecs)
 }
@@ -3541,7 +3308,7 @@ function hideTooltip() {
 
 function specTooltip(event, showHz = !config.specLabels) {
   if (true || config.showTooltip) {
-    const i18n = getI18n(i18nContext);
+    const i18 = getI18n(i18n.Context);
     const waveElement = event.target;
     // Update the tooltip content
     const tooltip = DOM.tooltip;
@@ -3558,11 +3325,11 @@ function specTooltip(event, showHz = !config.specLabels) {
             (frequencyRange / specDimensions.height)
         ) + Number(config.audio.minFrequency);
 
-      tooltip.textContent = `${i18n.frequency}: ${yPosition}Hz`;
+      tooltip.textContent = `${i18.frequency}: ${yPosition}Hz`;
       if (inRegion){
         const { start, end } = inRegion;
         const textNode = document.createTextNode(
-          formatRegionTooltip(i18n.length, start, end)
+          formatRegionTooltip(i18.length, start, end)
         );
         const lineBreak = document.createElement("br");
         tooltip.appendChild(lineBreak); // Add the line break
@@ -3581,7 +3348,7 @@ function specTooltip(event, showHz = !config.specLabels) {
 }
 
 const updateListIcon = () => {
-  LIST_MAP = getI18n(i18nLIST_MAP);
+  LIST_MAP = getI18n(i18n.LIST_MAP);
   DOM.listIcon.style.visibility = "hidden";
   DOM.listIcon.innerHTML =
     config.list === "custom"
@@ -3623,7 +3390,7 @@ DOM.customListSelector.addEventListener("click", async () => {
     config.customListFile[config.model] = customListFile;
     DOM.customListFile.value = customListFile;
     readLabels(customListFile, "list");
-    LIST_MAP = getI18n(i18nLIST_MAP);
+    LIST_MAP = getI18n(i18n.LIST_MAP);
     updatePrefs("config.json", config);
     localStorage.setItem("customList", customListFile);
   }
@@ -3708,7 +3475,7 @@ const timelineToggle = (fromKeys) => {
   setTimelinePreferences();
   if (fileLoaded && STATE.regionsCompleted) {
     // Reload wavesurfer with the new timeline
-    const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
+    const position = utils.clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
     postBufferUpdate({ begin: windowOffsetSecs, position: position });
   }
   updatePrefs("config.json", config);
@@ -3881,7 +3648,7 @@ const GLOBAL_ACTIONS = {
         threads: config[config[config.model].backend].threads,
         list: config.list,
       });
-      STATE.diskHasRecords && enableMenuItem(["explore", "charts"]);
+      STATE.diskHasRecords && utils.enableMenuItem(["explore", "charts"]);
       generateToast({ message: "cancelled" });
       DOM.progressDiv.classList.add("invisible");
     }
@@ -3900,7 +3667,7 @@ const GLOBAL_ACTIONS = {
   },
   PageUp: () => {
     if (currentBuffer && STATE.regionsCompleted) {
-      const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
+      const position = utils.clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
       windowOffsetSecs = windowOffsetSecs - windowLength;
       const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
       let fileToLoad;
@@ -3928,7 +3695,7 @@ const GLOBAL_ACTIONS = {
   },
   PageDown: () => {
     if (currentBuffer && STATE.regionsCompleted) {
-      let position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
+      let position = utils.clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
       windowOffsetSecs = windowOffsetSecs + windowLength;
       const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
       let fileToLoad;
@@ -3966,7 +3733,7 @@ const GLOBAL_ACTIONS = {
     const skip = windowLength / 100;
     if (currentBuffer && STATE.regionsCompleted) {
       wavesurfer.setTime(wavesurfer.getCurrentTime() - skip);
-      let position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
+      let position = utils.clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
       if (wavesurfer.getCurrentTime() < skip && windowOffsetSecs > 0) {
         windowOffsetSecs -= skip;
         postBufferUpdate({
@@ -4080,8 +3847,8 @@ const showGoToPosition = () => {
   if (STATE.currentFile) {
     const gotoLabel = document.getElementById("gotoModalLabel");
     const timeHeading = config.timeOfDay
-      ? getI18n(i18nContext).gotoTimeOfDay
-      : getI18n(i18nContext).gotoPosition;
+      ? getI18n(i18n.Context).gotoTimeOfDay
+      : getI18n(i18n.Context).gotoPosition;
     gotoLabel.textContent = timeHeading;
     goto.show();
   }
@@ -4162,11 +3929,11 @@ gotoForm.addEventListener("submit", gotoTime);
 function onModelReady(args) {
   modelReady = true;
   if (fileLoaded) {
-    enableMenuItem(["analyse"]);
+    utils.enableMenuItem(["analyse"]);
     if (STATE.openFiles.length > 1)
-      enableMenuItem(["analyseAll", "reanalyseAll"]);
+      utils.enableMenuItem(["analyseAll", "reanalyseAll"]);
   }
-  if (activeRegion) enableMenuItem(["analyseSelection"]);
+  if (activeRegion) utils.enableMenuItem(["analyseSelection"]);
   t1_warmup = Date.now();
   DIAGNOSTICS["Warm Up"] =
     ((t1_warmup - t0_warmup) / 1000).toFixed(2) + " seconds";
@@ -4258,8 +4025,8 @@ async function onWorkerLoadedAudio({
   // Doe this after the spec has loaded the file
   fileLoaded = true;
   if (modelReady) {
-    enableMenuItem(["analyse"]);
-    if (STATE.openFiles.length > 1) enableMenuItem(["analyseAll"]);
+    utils.enableMenuItem(["analyse"]);
+    if (STATE.openFiles.length > 1) utils.enableMenuItem(["analyseAll"]);
   }
 }
 
@@ -4308,7 +4075,7 @@ function onProgress(args) {
     )}</span>`;
   } else {
     const count = STATE.openFiles.indexOf(args.file) + 1;
-    DOM.fileNumber.textContent = interpolate(getI18n(i18nFile), {
+    DOM.fileNumber.textContent = utils.interpolate(getI18n(i18nFile), {
       count: count,
       fileCount: STATE.openFiles.length,
     });
@@ -4335,7 +4102,7 @@ function updatePagination(total, offset = STATE.offset) {
 }
 
 const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
-  const i18n = getI18n(i18nHeadings);
+  const i18 = getI18n(i18n.Headings);
   const showIUCN = config.detect.iucn;
 
   // if (summary.length){
@@ -4343,25 +4110,25 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
             ? `<table id="resultSummary" class="table table-dark p-1"><thead>
             <tr class="pointer col-auto text-nowrap">
             <th id="summary-max" scope="col"><span id="summary-max-icon" class="text-muted material-symbols-outlined summary-sort-icon d-none">sort</span>${
-              i18n.max
+              i18.max
             }</th>
             <th id="summary-cname" scope="col">
             <span id="summary-sname-icon" class="text-muted material-symbols-outlined summary-sort-icon">filter_list</span>
             <span id="summary-cname-icon" class="text-muted material-symbols-outlined summary-sort-icon d-none">sort</span>${
-              i18n.species[0]
+              i18.species[0]
             }</th>
             ${showIUCN ? '<th scope="col"></th>' : ""}
             <th id="summary-count" class="text-end" scope="col"><span id="summary-count-icon" class="text-muted material-symbols-outlined summary-sort-icon d-none">sort</span>${
-              i18n.detections
+              i18.detections
             }</th>
             <th id="summary-calls" class="text-end" scope="col"><span id="summary-calls-icon" class="text-muted material-symbols-outlined summary-sort-icon d-none">sort</span>${
-              i18n.calls
+              i18.calls
             }</th>
             </tr>
             </thead><tbody id="speciesFilter">`
             : '';
   let selectedRow = null;
-  const i18nIUCN = getI18n(IUCNLabel);
+  const i18nIUCN = getI18n(i18n.IUCNLabel);
   for (let i = 0; i < summary.length; i++) {
     const item = summary[i];
     const selected = item.cname === filterSpecies ? " text-warning" : "";
@@ -4455,7 +4222,7 @@ function onResultsComplete({ active = undefined, select = undefined } = {}) {
   DOM.resultTable.replaceWith(resultsBuffer.cloneNode(true));
   resultsBuffer.textContent = "";
   const table = DOM.resultTable;
-  showElement(["resultTableContainer", "resultsHead"], false);
+  utils.showElement(["resultTableContainer", "resultsHead"], false);
   const labelSort = document.getElementById('sort-label')
   if (labelSort){
     labelSort.classList.toggle('text-warning', STATE.labelFilters?.length > 0);
@@ -4527,17 +4294,6 @@ function getRowFromStart(table, start) {
   }
 }
 
-// formatDuration: Used for DIAGNOSTICS Duration
-function formatDuration(seconds) {
-  let duration = "";
-  const hours = Math.floor(seconds / 3600); // 1 hour = 3600 seconds
-  if (hours) duration += `${hours} hours `;
-  const minutes = Math.floor((seconds % 3600) / 60); // 1 minute = 60 seconds
-  if (hours || minutes) duration += `${minutes} minutes `;
-  const remainingSeconds = Math.floor(seconds % 60); // Remaining seconds
-  duration += `${remainingSeconds} seconds`;
-  return duration;
-}
 
 /**
  * Finalizes audio analysis by updating application state, re-enabling UI settings,
@@ -4557,7 +4313,7 @@ function onAnalysisComplete({ quiet }) {
   PREDICTING = false;
   disableSettingsDuringAnalysis(false);
   STATE.analysisDone = true;
-  STATE.diskHasRecords && enableMenuItem(["explore", "charts"]);
+  STATE.diskHasRecords && utils.enableMenuItem(["explore", "charts"]);
   DOM.progressDiv.classList.add("invisible");
   if (quiet) return;
   // DIAGNOSTICS:
@@ -4591,7 +4347,7 @@ function onAnalysisComplete({ quiet }) {
       config[config.model].backend,
       parseInt(analysisTime)
     );
-    DIAGNOSTICS["Analysis Duration"] = formatDuration(analysisTime);
+    DIAGNOSTICS["Analysis Duration"] = utils.formatDuration(analysisTime);
     DIAGNOSTICS["Analysis Rate"] =
       rate.toFixed(0) + "x faster than real time performance.";
     generateToast({ message: "complete" });
@@ -4627,10 +4383,10 @@ function onSummaryComplete({
   }
   if (!PREDICTING || STATE.mode !== "analyse") activateResultSort();
   if (summary.length) {
-    enableMenuItem(["saveLabels", "saveCSV", "save-eBird", "save-Raven"]);
-    STATE.mode !== "explore" && enableMenuItem(["save2db"]);
+    utils.enableMenuItem(["saveLabels", "saveCSV", "save-eBird", "save-Raven"]);
+    STATE.mode !== "explore" && utils.enableMenuItem(["save2db"]);
   } else {
-    disableMenuItem([
+    utils.disableMenuItem([
       "saveLabels",
       "saveCSV",
       "save-eBird",
@@ -4638,7 +4394,7 @@ function onSummaryComplete({
       "save2db",
     ]);
   }
-  if (STATE.currentFile) enableMenuItem(["analyse"]);
+  if (STATE.currentFile) utils.enableMenuItem(["analyse"]);
 }
 
 
@@ -4746,22 +4502,22 @@ async function renderResult({
       // if (!isFromDB) {
       //     resetResults({clearResults: false, clearSummary: false, clearPagination: false});
       // }
-      const i18n = getI18n(i18nHeadings);
+      const i18 = getI18n(i18n.Headings);
       // const fragment = new DocumentFragment();
       DOM.resultHeader.innerHTML = `
                 <tr class="text-nowrap">
-                    <th id="sort-time" class="time-sort col text-start timeOfDay" title="${i18n.time[1]}"><span class="text-muted material-symbols-outlined time-sort-icon d-none">sort</span> ${i18n.time[0]}</th>
-                    <th id="sort-position" class="time-sort text-start timestamp" title="${i18n.position[1]}"><span class="text-muted material-symbols-outlined time-sort-icon d-none">sort</span> ${i18n.position[0]}</th>
-                    <th id="confidence-sort" class="text-start" title="${i18n.species[1]}"><span class="text-muted material-symbols-outlined species-sort-icon d-none">sort</span> ${i18n.species[0]}</th>
-                    <th class="text-end">${i18n.calls}</th>
-                    <th id="sort-label" class="col pointer"><span class="text-muted material-symbols-outlined meta-sort-icon d-none">sort</span> ${i18n.label}</th>
-                    <th id="sort-comment" class="col pointer text-end"><span class="text-muted material-symbols-outlined meta-sort-icon d-none">sort</span> ${i18n.notes}</th>
-                    <th id="sort-reviewed" class="col pointer text-end"><span class="text-muted material-symbols-outlined meta-sort-icon d-none">sort</span>${i18n.reviewed}</th>
+                    <th id="sort-time" class="time-sort col text-start timeOfDay" title="${i18.time[1]}"><span class="text-muted material-symbols-outlined time-sort-icon d-none">sort</span> ${i18.time[0]}</th>
+                    <th id="sort-position" class="time-sort text-start timestamp" title="${i18.position[1]}"><span class="text-muted material-symbols-outlined time-sort-icon d-none">sort</span> ${i18.position[0]}</th>
+                    <th id="confidence-sort" class="text-start" title="${i18.species[1]}"><span class="text-muted material-symbols-outlined species-sort-icon d-none">sort</span> ${i18.species[0]}</th>
+                    <th class="text-end">${i18.calls}</th>
+                    <th id="sort-label" class="col pointer"><span class="text-muted material-symbols-outlined meta-sort-icon d-none">sort</span> ${i18.label}</th>
+                    <th id="sort-comment" class="col pointer text-end"><span class="text-muted material-symbols-outlined meta-sort-icon d-none">sort</span> ${i18.notes}</th>
+                    <th id="sort-reviewed" class="col pointer text-end"><span class="text-muted material-symbols-outlined meta-sort-icon d-none">sort</span>${i18.reviewed}</th>
                 </tr>`;
       setTimelinePreferences();
       // DOM.resultHeader.innerHTML = fragment;
     }
-    showElement(["resultTableContainer", "resultsHead"], false);
+    utils.showElement(["resultTableContainer", "resultsHead"], false);
     // If  we have some results, let's update the view in case any are in the window
     if (config.specDetections && !isFromDB && !STATE.selection && STATE.regionsCompleted)
       postBufferUpdate({ file, begin: windowOffsetSecs });
@@ -5165,25 +4921,25 @@ function replaceCtrlWithCommand() {
 }
 
 const populateSpeciesModal = async (included, excluded) => {
-  const i18n = getI18n(i18nSpeciesList);
+  const i18 = getI18n(i18n.SpeciesList);
   const current_file_text =
     STATE.week !== -1 && STATE.week
-      ? interpolate(i18n.week, { week: STATE.week })
+      ? utils.interpolate(i18.week, { week: STATE.week })
       : "";
   const model = config.model === "birdnet" ? "BirdNET" : "Nocmig";
   const localBirdsOnly =
     config.local && config.model === "birdnet" && config.list === "nocturnal"
-      ? i18n.localBirds
+      ? i18.localBirds
       : "";
   let species_filter_text = "",
     location_filter_text = "";
   if (config.list === "location") {
-    const weekSpecific = config.useWeek ? i18n.weekSpecific : "";
-    species_filter_text = interpolate(i18n.threshold, {
+    const weekSpecific = config.useWeek ? i18.weekSpecific : "";
+    species_filter_text = utils.interpolate(i18.threshold, {
       weekSpecific: weekSpecific,
       speciesThreshold: config.speciesThreshold,
     });
-    location_filter_text = interpolate(i18n.location, {
+    location_filter_text = utils.interpolate(i18.location, {
       place: place.textContent.replace("fmd_good", ""),
       current_file_text: current_file_text,
       species_filter_text: species_filter_text,
@@ -5194,15 +4950,15 @@ const populateSpeciesModal = async (included, excluded) => {
     config.useWeek &&
     config.list === "location" &&
     (STATE.week === -1 || !STATE.week)
-      ? i18n.depending
+      ? i18.depending
       : "";
-  const listLabel = getI18n(i18nLists)[config.list];
-  const includedContent = interpolate(i18n.included, {
+  const listLabel = getI18n(i18n.Lists)[config.list];
+  const includedContent = utils.interpolate(i18.included, {
     model: model,
     listInUse: listLabel,
     location_filter_text: location_filter_text,
     localBirdsOnly: localBirdsOnly,
-    upTo: i18n.upTo,
+    upTo: i18.upTo,
     count: included.length,
     depending: depending,
     includedList: includedList,
@@ -5212,11 +4968,11 @@ const populateSpeciesModal = async (included, excluded) => {
   if (excluded) {
     const excludedList = generateBirdIDList(excluded);
 
-    excludedContent = interpolate(i18n.excluded, {
+    excludedContent = utils.interpolate(i18.excluded, {
       excludedList: excludedList,
       excludedCount: excluded.length,
-      cname: i18n.cname,
-      sname: i18n.sname,
+      cname: i18.cname,
+      sname: i18.sname,
     });
   } else {
     disable = " disabled";
@@ -5224,10 +4980,10 @@ const populateSpeciesModal = async (included, excluded) => {
   let modalContent = `
         <ul class="nav nav-tabs" id="myTab" role="tablist">
         <li class="nav-item" role="presentation">
-        <button class="nav-link active" id="included-tab" data-bs-toggle="tab" data-bs-target="#included-tab-pane" type="button" role="tab" aria-controls="included-tab-pane" aria-selected="true">${i18n.includedButton}</button>
+        <button class="nav-link active" id="included-tab" data-bs-toggle="tab" data-bs-target="#included-tab-pane" type="button" role="tab" aria-controls="included-tab-pane" aria-selected="true">${i18.includedButton}</button>
         </li>
         <li class="nav-item" role="presentation">
-        <button class="nav-link" id="excluded-tab" data-bs-toggle="tab" data-bs-target="#excluded-tab-pane" type="button" role="tab" aria-controls="excluded-tab-pane" aria-selected="false" ${disable}>${i18n.excludedButton}</button>
+        <button class="nav-link" id="excluded-tab" data-bs-toggle="tab" data-bs-target="#excluded-tab-pane" type="button" role="tab" aria-controls="excluded-tab-pane" aria-selected="false" ${disable}>${i18.excludedButton}</button>
         </li>
         </ul>
         <div class="tab-content" id="myTabContent">
@@ -5236,7 +4992,7 @@ const populateSpeciesModal = async (included, excluded) => {
         </div>
         `;
   document.getElementById("speciesModalBody").innerHTML = modalContent;
-  document.getElementById("speciesModalLabel").textContent = i18n.title;
+  document.getElementById("speciesModalLabel").textContent = i18.title;
   const species = new bootstrap.Modal(document.getElementById("speciesModal"));
   species.show();
   STATE.includedList = included;
@@ -5261,14 +5017,14 @@ function exportSpeciesList() {
 }
 
 function setNocmig(on) {
-  const i18n = getI18n(i18nTitles);
+  const i18 = getI18n(i18n.Titles);
   if (on) {
     DOM.nocmigButton.textContent = "nights_stay";
-    DOM.nocmigButton.title = i18n.nocmigOn;
+    DOM.nocmigButton.title = i18.nocmigOn;
     DOM.nocmigButton.classList.add("text-info");
   } else {
     DOM.nocmigButton.textContent = "bedtime_off";
-    DOM.nocmigButton.title = i18n.nocmigOff;
+    DOM.nocmigButton.title = i18.nocmigOff;
     DOM.nocmigButton.classList.remove("text-info");
   }
   DOM.nocmig.checked = config.detect.nocmig;
@@ -5366,13 +5122,13 @@ const modelSettingsDisplay = () => {
 };
 
 const contextAwareIconDisplay = () => {
-  const i18n = getI18n(i18nTitles);
+  const i18 = getI18n(i18n.Titles);
   if (config.detect.contextAware) {
     DOM.contextAwareIcon.classList.add("text-warning");
-    DOM.contextAwareIcon.title = i18n.contextModeOn;
+    DOM.contextAwareIcon.title = i18.contextModeOn;
   } else {
     DOM.contextAwareIcon.classList.remove("text-warning");
-    DOM.contextAwareIcon.title = i18n.contextModeOff;
+    DOM.contextAwareIcon.title = i18.contextModeOff;
   }
 };
 
@@ -5425,7 +5181,7 @@ diagnosticMenu.addEventListener("click", async function () {
   for (let [key, value] of Object.entries(DIAGNOSTICS)) {
     if (key === "Audio Duration") {
       // Format duration as days, hours,minutes, etc.
-      value = formatDuration(value);
+      value = utils.formatDuration(value);
     }
     if (key === "UUID") {
       diagnosticTable += `<tr><th scope="row">${key}</th><td id="uuid">${value} 
@@ -5689,14 +5445,14 @@ function initialiseDatePicker() {
     return [middayYesterday, middayToday];
   };
   ["chartRange", "exploreRange"].forEach(function (element) {
-    const i18n = getI18n(i18nContext);
+    const i18 = getI18n(i18n.Context);
     element = document.getElementById(element);
     STATE.picker = new easepick.create({
       element: element,
       lang: config.locale.replace(/_.*$/, ""),
       locale: {
-        cancel: i18n.cancel,
-        apply: i18n.apply,
+        cancel: i18.cancel,
+        apply: i18.apply,
       },
       css: ["./node_modules/@easepick/bundle/dist/index.css"],
       format: "H:mm MMM D, YYYY",
@@ -5706,13 +5462,13 @@ function initialiseDatePicker() {
       plugins: ["RangePlugin", "PresetPlugin", "TimePlugin"],
       PresetPlugin: {
         customPreset: {
-          [i18n.lastNight]: lastNight(),
-          [i18n.thisWeek]: thisWeek(),
-          [i18n.lastWeek]: lastWeek(),
-          [i18n.thisMonth]: thisMonth(),
-          [i18n.lastMonth]: lastMonth(),
-          [i18n.thisYear]: thisYear(),
-          [i18n.lastYear]: lastYear()
+          [i18.lastNight]: lastNight(),
+          [i18.thisWeek]: thisWeek(),
+          [i18.lastWeek]: lastWeek(),
+          [i18.thisMonth]: thisMonth(),
+          [i18.lastMonth]: lastMonth(),
+          [i18.thisYear]: thisYear(),
+          [i18.lastYear]: lastYear()
         },
       },
       TimePlugin: {
@@ -5963,7 +5719,7 @@ const handleThresholdChange = (e) => {
 
 // Filter handling
 const filterIconDisplay = () => {
-  const i18n = getI18n(i18nTitles);
+  const i18 = getI18n(i18n.Titles);
   if (
     config.filters.active &&
     (config.filters.highPassFrequency ||
@@ -5972,16 +5728,16 @@ const filterIconDisplay = () => {
       config.filters.normalise)
   ) {
     DOM.audioFiltersIcon.classList.add("text-warning");
-    DOM.audioFiltersIcon.title = i18n.audioFiltersOn;
+    DOM.audioFiltersIcon.title = i18.audioFiltersOn;
   } else {
     DOM.audioFiltersIcon.classList.remove("text-warning");
-    DOM.audioFiltersIcon.title = i18n.audioFiltersOff;
+    DOM.audioFiltersIcon.title = i18.audioFiltersOff;
   }
 };
 // High pass threshold
 const showFilterEffect = () => {
   if (fileLoaded  && STATE.regionsCompleted) {
-    const position = clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
+    const position = utils.clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1);
     postBufferUpdate({
       begin: windowOffsetSecs,
       position: position
@@ -6269,21 +6025,21 @@ document.addEventListener("click", function (e) {
     // Help Menu
     case "keyboardHelp": {
       (async () =>
-        await populateHelpModal("keyboard", i18nHelp.keyboard[locale]))();
+        await populateHelpModal("keyboard", i18n.Help.keyboard[locale]))();
       break;
     }
     case "settingsHelp": {
       (async () =>
-        await populateHelpModal("settings", i18nHelp.settings[locale]))();
+        await populateHelpModal("settings", i18n.Help.settings[locale]))();
       break;
     }
     case "usage": {
-      (async () => await populateHelpModal("usage", i18nHelp.usage[locale]))();
+      (async () => await populateHelpModal("usage", i18n.Help.usage[locale]))();
       break;
     }
     case "community": {
       (async () =>
-        await populateHelpModal("community", i18nHelp.community[locale]))();
+        await populateHelpModal("community", i18n.Help.community[locale]))();
       break;
     }
     case "known-issues": {
@@ -6306,7 +6062,7 @@ document.addEventListener("click", function (e) {
       break;
     }
     case "eBird": {
-      (async () => await populateHelpModal("ebird", i18nHelp.eBird[locale]))();
+      (async () => await populateHelpModal("ebird", i18n.Help.eBird[locale]))();
       break;
     }
     case "copy-uuid": {
@@ -6836,8 +6592,12 @@ document.addEventListener("change", function (e) {
                 ? "chirpity"
                 : "";
             labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_${chirpity}Labels_${element.value}.txt`;
-            localiseUI(DOM.locale.value).then((result) => (STATE.i18n = result));
+            i18n.localiseUI(DOM.locale.value).then((result) => (STATE.i18n = result));
             config.locale = element.value;
+            setNocmig();
+            contextAwareIconDisplay();
+            updateListIcon();
+            filterIconDisplay();
             initialiseDatePicker();
           }
           config.locale = element.value;
@@ -6857,7 +6617,7 @@ document.addEventListener("change", function (e) {
           modelSettingsDisplay();
           DOM.customListFile.value = config.customListFile[config.model];
           DOM.customListFile.value
-            ? (LIST_MAP = getI18n(i18nLIST_MAP))
+            ? (LIST_MAP = getI18n(i18n.LIST_MAP))
             : delete LIST_MAP.custom;
           document.getElementById("locale").value = config.locale;
           document.getElementById(config[config.model].backend).checked = true;
@@ -6945,7 +6705,7 @@ document.addEventListener("change", function (e) {
           worker.postMessage({ action: "update-state", audio: config.audio });
           config.filters.active || toggleFilters();
           if (fileLoaded  && STATE.regionsCompleted) {
-            const position = clamp(
+            const position = utils.clamp(
               wavesurfer.getCurrentTime() / windowLength,
               0,
               1
@@ -7003,7 +6763,7 @@ document.addEventListener("change", function (e) {
           worker.postMessage({ action: "update-state", filters: config.filters });
           element.blur();
           if (fileLoaded && STATE.regionsCompleted) {
-            const position = clamp(
+            const position = utils.clamp(
               wavesurfer.getCurrentTime() / windowLength,
               0,
               1
@@ -7172,8 +6932,8 @@ function checkForRegion(e, setActive) {
 
 function filterLabels(e){
   DOM.contextMenu.classList.add('d-none');
-  const i18n = getI18n(i18nContext)
-  createFilterDropdown(e, STATE.tagsList, STATE.labelColors, STATE.labelFilters, i18n);
+  const i18 = getI18n(i18n.Context)
+  createFilterDropdown(e, STATE.tagsList, STATE.labelColors, STATE.labelFilters, i18);
 }
 
 /**
@@ -7205,7 +6965,7 @@ async function createContextMenu(e) {
   if (wavesurfer?.isPlaying()) wavesurfer.pause();
   e.stopPropagation();
   this.closest("#spectrogramWrapper") && checkForRegion(e, true);
-  const i18n = getI18n(i18nContext);
+  const i18 = getI18n(i18n.Context);
   const target = e.target;
   if (target.closest('#sort-label') ) {
     if (STATE.isMember) filterLabels(e)
@@ -7232,39 +6992,39 @@ async function createContextMenu(e) {
         !target.closest("tr").classList.contains("table-active"))
     ) {
       target.click(); // Wait for file to load
-      await waitFor(() => fileLoaded);
+      await utils.waitFor(() => fileLoaded);
     }
   }
   if (!activeRegion && !inSummary) return;
   const createOrEdit =
-    activeRegion?.label || target.closest("#summary") ? i18n.edit : i18n.create;
+    activeRegion?.label || target.closest("#summary") ? i18.edit : i18.create;
 
   DOM.contextMenu.innerHTML = `
     <div id="${inSummary ? "inSummary" : "inResults"}">
         <a class="dropdown-item ${hideInSummary}" id="play-region"><span class='material-symbols-outlined'>play_circle</span> ${
-    i18n.play
+    i18.play
   }</a>
         <a class="dropdown-item ${hideInSummary} ${hideInSelection}" href="#" id="context-analyse-selection">
-        <span class="material-symbols-outlined">search</span> ${i18n.analyse}
+        <span class="material-symbols-outlined">search</span> ${i18.analyse}
         </a>
         <div class="dropdown-divider ${hideInSummary}"></div>
         <a class="dropdown-item" id="create-manual-record" href="#">
         <span class="material-symbols-outlined">edit_document</span> ${createOrEdit} ${
-    i18n.record
+    i18.record
   }
         </a>
         <a class="dropdown-item" id="context-create-clip" href="#">
-        <span class="material-symbols-outlined">music_note</span> ${i18n.export}
+        <span class="material-symbols-outlined">music_note</span> ${i18.export}
         </a>
         <span class="dropdown-item" id="context-xc" href='#' target="xc">
         <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> ${
-          i18n.compare
+          i18.compare
         }
         </span>
         <div class="dropdown-divider ${hideInSelection}"></div>
         <a class="dropdown-item ${hideInSelection}" id="context-delete" href="#">
         <span class='delete material-symbols-outlined'>delete_forever</span> ${
-          i18n.delete
+          i18.delete
         }
         </a>
     </div>
@@ -7357,7 +7117,7 @@ let focusBirdList;
  * showRecordEntryForm('add', true);
  */
 async function showRecordEntryForm(mode, batch) {
-  const i18n = getI18n(i18nHeadings)
+  const i18 = getI18n(i18n.Headings)
   const cname = batch
     ? document.querySelector("#speciesFilter .text-warning .cname .cname")
         .textContent
@@ -7369,7 +7129,7 @@ async function showRecordEntryForm(mode, batch) {
     commentText = activeRow.querySelector(".comment > span")?.title || "";
     callCount = parseInt(activeRow.querySelector(".call-count").textContent);
   }
-  document.querySelectorAll('.species-search-label').forEach(label => label.textContent = i18n.search);
+  document.querySelectorAll('.species-search-label').forEach(label => label.textContent = i18.search);
   const selectedBird = recordEntryForm.querySelector(
     "#selected-bird"
   );
@@ -7383,7 +7143,7 @@ async function showRecordEntryForm(mode, batch) {
     const styled = species.split('_').reverse().join(' <br/><i>') + '</i>';
     selectedBird.innerHTML = styled;
   } else {
-    selectedBird.innerHTML = i18n.searchPrompt;
+    selectedBird.innerHTML = i18.searchPrompt;
   }
 
   const batchHide = recordEntryForm.querySelectorAll(".hide-in-batch");
@@ -7399,7 +7159,7 @@ async function showRecordEntryForm(mode, batch) {
   const labelText = activeRow?.querySelector(".label").textContent
 
   const labels = STATE.tagsList.map(item => item.name);
-  const i18nOptions = getI18n(i18nSelect);
+  const i18nOptions = getI18n(i18n.Select);
   const select = new CustomSelect({
     theme: 'light',
     labels: labels,
@@ -7558,22 +7318,6 @@ function compressAndOrganise() {
   });
 }
 
-// Utility functions to wait for a variable to not be falsey
-
-let retryCount = 0;
-function waitFor(checkFn) {
-  let maxRetries = 15;
-  return new Promise((resolve) => {
-    let interval = setInterval(() => {
-      if (checkFn() || retryCount >= maxRetries) {
-        clearInterval(interval); // Stop further retries
-        resolve((retryCount = 0)); // Resolve the promise
-      } else {
-        console.log("retries: ", ++retryCount);
-      }
-    }, 100);
-  });
-}
 
 // TOUR functions
 const tourModal = document.getElementById("tourModal");
@@ -7646,7 +7390,7 @@ const prepTour = async () => {
   if (!fileLoaded) {
     const example_file = await window.electron.getAudio();
     // create a canvas for the audio spec
-    showElement(["spectrogramWrapper"], false);
+    utils.showElement(["spectrogramWrapper"], false);
     loadAudioFileSync({ filePath: example_file });
   }
   startTour();
@@ -7696,7 +7440,7 @@ function checkForMacUpdates() {
             alertPlaceholder.append(wrapper);
           };
           const link = `<a href="https://chirpity.mattkirkland.co.uk?fromVersion=${VERSION}" target="_blank">`;
-          const message = interpolate(getI18n(i18nUpdateMessage), {
+          const message = utils.interpolate(getI18n(i18nUpdateMessage), {
             link: link,
           });
           alert(
@@ -7739,7 +7483,7 @@ function generateToast({
   locate = "",
 } = {}) {
   // i18n
-  const i18n = getI18n(i18nToasts);
+  const i18 = getI18n(i18n.Toasts);
   if (message === "noFile") {
       clearTimeout(loadingTimeout) &&
       DOM.loading.classList.add("d-none");
@@ -7748,8 +7492,8 @@ function generateToast({
       STATE.currentFile && (fileLoaded = true);
   }
   message = variables
-    ? interpolate(i18n[message], variables)
-    : i18n[message] || message;
+    ? utils.interpolate(i18[message], variables)
+    : i18[message] || message;
   // add option to locate a missing file
   message += locate;
   const domEl = document.getElementById("toastContainer");
@@ -7774,9 +7518,9 @@ function generateToast({
     error: "text-danger",
   };
   const typeText = {
-    info: i18n.info,
-    warning: i18n.warning,
-    error: i18n.error,
+    info: i18.info,
+    warning: i18.warning,
+    error: i18.error,
   };
   iconSpan.classList.add(typeColours[type]);
   const strong = document.createElement("strong");
@@ -7811,7 +7555,7 @@ function generateToast({
   domEl.appendChild(wrapper);
   const toast = new bootstrap.Toast(wrapper, { autohide: autohide });
   toast.show();
-  if (message === i18n.complete) {
+  if (message === i18.complete) {
     const duration = parseFloat(
       DIAGNOSTICS["Analysis Duration"].replace(" seconds", "")
     );
@@ -7840,15 +7584,6 @@ function generateToast({
       }
     }
   }
-}
-
-// Not Harlem, but Fisher-Yates shuffle - used for xc call selection
-function shuffle(array) {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-  return array;
 }
 
 async function getXCComparisons() {
@@ -7901,7 +7636,7 @@ async function getXCComparisons() {
           .filter((record) => record.file); // Remove records with empty file URL;
 
         // Shuffle recordings so new cache returns a different set
-        shuffle(recordings);
+        utils.shuffle(recordings);
 
         // Initialize an object to store the lists
         const filteredLists = {
@@ -7965,8 +7700,8 @@ function capitalizeEachWord(str) {
   });
 }
 function renderComparisons(lists, cname) {
-  const i18n = getI18n(i18nContext);
-  const i18nTitle = getI18n(i18nTitles);
+  const i18 = getI18n(i18n.Context);
+  const i18nTitle = getI18n(i18n.Titles);
   cname = cname.replace(/\(.*\)/, "").replace("?", "");
   const compareDiv = document.createElement("div");
   compareDiv.classList.add("modal", "modal-fade", "model-lg");
@@ -7985,10 +7720,10 @@ function renderComparisons(lists, cname) {
                         <div class="modal-footer justify-content-center pb-0">
                             <button id="playComparison" class="p-1 pe-2 btn btn-outline-secondary" title="${i18nTitle.playToggle}">
                                 <span class="material-symbols-outlined ">play_circle</span><span
-                                class="align-middle d-none d-lg-inline"> ${i18n.play} </span>
+                                class="align-middle d-none d-lg-inline"> ${i18.play} </span>
                                 /
                                 <span class="material-symbols-outlined">pause</span><span
-                                class="align-middle d-none d-lg-inline-block">${i18n.pause}</span>
+                                class="align-middle d-none d-lg-inline-block">${i18.pause}</span>
                             </button>
                             <div class="btn-group" role="group">
                                 <button id="cmpZoomIn" title="${i18nTitle.zoomIn}" class="btn btn-outline-secondary p-0">
@@ -8019,7 +7754,7 @@ function renderComparisons(lists, cname) {
       tabHeading.setAttribute("role", "presentation");
       const button = `<button class="nav-link text-nowrap ${active}" id="${callTypePrefix}-tab" data-bs-toggle="tab" data-bs-target="#${callTypePrefix}-tab-pane" type="button" role="tab" aria-controls="${callTypePrefix}-tab-pane" aria-selected="${
         count === 0
-      }">${i18n[callType]}</button>`;
+      }">${i18[callType]}</button>`;
       tabHeading.innerHTML = button;
       callTypeHeader.appendChild(tabHeading);
 
@@ -8402,30 +8137,6 @@ async function membershipCheck() {
 
 }
 
-function utf8ToHex(str) {
-  return Array.from(str)
-    .map((char) => char.charCodeAt(0).toString(16).padStart(2, "0")) // Convert each char to hex
-    .join("");
-}
-
-/**
- * Converts a hexadecimal string into a UTF-8 string.
- *
- * Splits the hex string into two-character segments, converts each segment to its corresponding character,
- * and concatenates the characters to form the decoded string.
- *
- * @param {string} hex - The hexadecimal string to convert. Must consist of an even number of hexadecimal digits.
- * @returns {string} The resulting string after decoding the hexadecimal input.
- *
- * @example
- * hexToUtf8("48656c6c6f") // returns "Hello"
- */
-function hexToUtf8(hex) {
-  return hex
-    .match(/.{1,2}/g) // Split the hex string into pairs
-    .map((byte) => String.fromCharCode(parseInt(byte, 16))) // Convert each pair to a character
-    .join("");
-}
 
 /**
  * Assigns a key binding configuration based on user input.
@@ -8484,10 +8195,10 @@ function setKeyAssignment(inputEL, key){
  * @remarks
  * Assumes that DOM elements exist with IDs matching each key in {@code keyAssignments} and their associated
  * column elements using the format {@code key + '-column'}. Relies on a global {@code getI18n} function and
- * an {@code i18nSelect} parameter to initialize internationalization context.
+ * an {@code i18n.Select} parameter to initialize internationalization context.
  */
 function setKeyAssignmentUI(keyAssignments){
-  const i18n = getI18n(i18nSelect);
+  const i18 = getI18n(i18n.Select);
   Object.entries(keyAssignments).forEach(([k, v]) => {
     const input = document.getElementById(k);
     input.value = v.value;
@@ -8511,7 +8222,7 @@ function setKeyAssignmentUI(keyAssignments){
  */
 function changeInputElement(column, element, key, preSelected = null){
   if (column === 'label'){
-    const i18n = getI18n(i18nSelect)
+    const i18 = getI18n(i18n.Select)
     const container = document.createElement('div')
     container.id = key;
     container.className = 'form-control-sm bg-dark border-0';
@@ -8519,7 +8230,7 @@ function changeInputElement(column, element, key, preSelected = null){
     const select = new CustomSelect({
       theme: 'dark',
       labels: labels,
-      i18n: i18n,
+      i18n: i18,
       preselectedLabel: preSelected
     });
     container.appendChild(select);

@@ -3659,15 +3659,18 @@ async function exportData(result, filename, format){
     eBird: "formateBirdValues",
     Raven: "formatRavenValues",
   };
-  let formattedValues;
-    let previousFile = null,
-      cumulativeOffset = 0;
+    let formattedValues = [];
+    const BATCH_SIZE = 10_000;
+    // For Raven
+    let previousFile = null, cumulativeOffset = 0, fileDurations = {};
     const { writeToPath } = require("@fast-csv/format");
     const {ExportFormatter} = require("./js/exportFormatter.js");
     const formatter = new ExportFormatter(STATE);
+    const locationMap = await formatter.getAllLocations()
     // CSV export. Format the values
-    formattedValues = await Promise.all(
-      result.map(async (item, index) => {
+    for (let i = 0; i < result.length; i += BATCH_SIZE) {
+      const batch = result.slice(i, i + BATCH_SIZE);
+      const processedBatch = await Promise.all(batch.map(async (item, index) => {
         if (format === "Raven") {
           item = { ...item, selection: index + 1 }; // Add a selection number for Raven
           if (item.file !== previousFile) {
@@ -3681,9 +3684,10 @@ async function exportData(result, filename, format){
           }
           item.offset = cumulativeOffset;
         }
-        return formatter[formatFunctions[format]](item);
-      })
-    );
+        return formatter[formatFunctions[format]](item, locationMap);
+      }))
+      formattedValues.push(...processedBatch);
+    };
 
     if (format === "eBird") {
       // Group the data by "Start Time", "Common name", and "Species" and calculate total species count for each group

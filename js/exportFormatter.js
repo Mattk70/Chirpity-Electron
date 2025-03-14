@@ -4,25 +4,16 @@ class ExportFormatter {
     constructor(state) {
       this.state = state;
     }
-  
-    // Helper method to retrieve location info from the database.
-    async getLocation(file) {
-      const result = await this.state.db.getAsync(
-        `
-        SELECT lat, lon, place 
+
+    async getAllLocations() {
+      const rows = await this.state.db.allAsync(`
+        SELECT files.name, locations.lat, locations.lon, locations.place 
         FROM files 
-        JOIN locations ON locations.id = files.locationID 
-        WHERE files.name = ?
-        `,
-        file
-      );
-      return {
-        latitude: result?.lat || this.state.lat,
-        longitude: result?.lon || this.state.lon,
-        place: result?.place || this.state.place,
-      };
+        JOIN locations ON locations.id = files.locationID
+      `);
+      return Object.fromEntries(rows.map(({ name, lat, lon, place }) => [name, { latitude: lat, longitude: lon, place }]));
     }
-  
+    
     // Helper method to process the common name when using the chirpity model.
     processChirpityCommonName(modifiedObj, assignCallType = false) {
       if (this.state.model === "chirpity") {
@@ -58,9 +49,10 @@ class ExportFormatter {
     }
   
     // Formats values for the CSV export.
-    async formatCSVValues(obj) {
+    async formatCSVValues(obj, locationMap) {
       const modifiedObj = { ...obj };
-      const { latitude, longitude, place } = await this.getLocation(modifiedObj.file);
+      const { latitude, longitude, place } = locationMap[modifiedObj.file] 
+        || { latitude: this.state.lat, longitude: this.state.lon, place: this.state.place };
   
       // Adjust score and compute new end time.
       modifiedObj.score /= 1000;
@@ -88,9 +80,10 @@ class ExportFormatter {
     }
   
     // Formats values for the eBird export.
-    async formateBirdValues(obj) {
+    async formateBirdValues(obj, locationMap) {
       const modifiedObj = { ...obj };
-      const { latitude, longitude, place } = await this.getLocation(modifiedObj.file);
+      const { latitude, longitude, place } = locationMap[modifiedObj.file] 
+        || { latitude: this.state.lat, longitude: this.state.lon, place: this.state.place };
   
       // Format the timestamp from the filestart property.
       modifiedObj.timestamp = this.formatDate(modifiedObj.filestart);

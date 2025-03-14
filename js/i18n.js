@@ -1,4 +1,4 @@
-const i18nToasts = { // UI.js
+const Toasts = { // UI.js
     en: {
         info: 'Information', warning: 'Warning', error: 'Error',
         maxFiles: "Chirpity limits the maximum number of open files to 25,000. Only the first 25,000 of the ${STATE.openFiles.length} attempted will be opened",
@@ -704,7 +704,7 @@ const i18nToasts = { // UI.js
     }
     
 };
-const i18nAll = {
+const All = {
     "en": ["(Default)", "All"],
     "da": ["(Standard)", "Alle"],
     "de": ["(Standard)", "Alle"],
@@ -718,7 +718,7 @@ const i18nAll = {
     "ja": ["(デフォルト)", "すべて"]
 };
 
-const i18nHeadings = {
+const Headings = {
     en: {
         position: ['Position', "Sort results by detection time"],
         time: ['Time', "Sort results by detection time"],
@@ -875,7 +875,7 @@ const i18nHeadings = {
     }
 };
 
-const i18nHelp = {
+const Help = {
     keyboard: {
       en: 'Keyboard Shortcuts',
       fr: 'Raccourcis clavier',
@@ -944,7 +944,7 @@ const i18nHelp = {
   }
   
 
-const i18nLocation = {
+const Location = {
     en: [
         'Set Location', 
         'Delete Location', 
@@ -1035,7 +1035,7 @@ const i18nLocation = {
     ]
 };
 
-const i18nContext = {
+const Context = {
     en: {
         lastNight: 'Last Night', thisWeek: 'This Week', lastWeek: 'LastWeek', thisMonth: 'This Month', lastMonth: 'Last Month', thisYear: 'This Year', lastYear: 'Last Year',
         apply: 'Apply', cancel: 'Cancel', filter: 'Apply a date Filter',
@@ -1257,7 +1257,7 @@ const i18nContext = {
     }
 };
 
-const i18nForm = {
+const Form = {
     en: {submit: 'Submit', cancel: 'Cancel', select: "Select New Date and Time:"},
     da: {submit: 'Indsend', cancel: 'Annuller', select: "Vælg ny dato og tid:"},
     de: {submit: 'Absenden', cancel: 'Abbrechen', select: "Neues Datum und Uhrzeit auswählen:"},
@@ -1271,7 +1271,7 @@ const i18nForm = {
     zh: {submit: '提交', cancel: '取消', select: "选择新的日期和时间："}
 };
 
-const i18nLIST_MAP = {
+const LIST_MAP = {
     en: { 
         location: 'Searching for birds in your region',
         nocturnal: 'Searching for nocturnal calls',
@@ -1367,7 +1367,7 @@ const i18nLIST_MAP = {
 
 
 
-const i18nTitles = {
+const Titles = {
     da: {
         filename: "Højreklik for at opdatere filens starttid eller placering",
         controlsWrapper: "Træk for at ændre størrelsen på spektrogramvinduet.",
@@ -1592,7 +1592,7 @@ const i18nTitles = {
     }
   };
   
-  const i18nLists = {
+  const Lists = {
     en: { 
         location: 'Local Birds', 
         nocturnal: 'Nocturnal Calls', 
@@ -1785,7 +1785,7 @@ const i18nTitles = {
     }
 };
 
-const i18nLocate = {
+const Locate = {
     en: { locate: 'Locate File', remove: 'Remove from archive' },
     da: { locate: 'Find fil', remove: 'Fjern fra arkiv' },
     de: { locate: 'Datei suchen', remove: 'Aus dem Archiv entfernen' },
@@ -1799,7 +1799,7 @@ const i18nLocate = {
     zh: { locate: '定位文件', remove: '从存档中删除' }
 };
 
-const i18nTour = {
+const Tour = {
     en: `
         <!-- Carousel items -->
         <div class="carousel-item active">
@@ -2600,7 +2600,7 @@ zh: `
 `
 }
 
-const i18nSpeciesList = {
+const SpeciesList = {
     da: {
         title: 'Aktuel artsliste', 
         includedButton: 'Inkluderet', 
@@ -2947,7 +2947,7 @@ const IUCNLabel = {
     // },
 }; 
 
-const i18nSelect = {
+const Select = {
     en: {
       selectLabel: "Select a label",
       addLabel: "Create new label",
@@ -3089,7 +3089,7 @@ async function localiseUI(locale) {
         buttons.forEach(button => button.textContent &&= localisationData['help-modal-close']);
         // Update Title text
         const titles = document.querySelectorAll('[title]');
-        const i18nT = i18nTitles[locale]
+        const i18nT = Titles[locale]
         titles.forEach(title =>{
             const i18nTitle = i18nT[title.id];
             title.title = i18nTitle ?? title.title;
@@ -3137,8 +3137,8 @@ async function localiseUI(locale) {
         })
         const play = document.querySelector('#playToggle :nth-child(2)');
         const pause = document.querySelector('#playToggle :nth-child(4)');
-        play.textContent = i18nContext[locale].play;
-        pause.textContent = i18nContext[locale].pause;
+        play.textContent = Context[locale].play;
+        pause.textContent = Context[locale].pause;
         const headings = form.querySelectorAll('h4,h5,h6,legend');
         for (let i=0;i<headings.length;i++){
             const heading = headings[i];
@@ -3147,26 +3147,26 @@ async function localiseUI(locale) {
             if (span) heading.appendChild(span)
         }
         // Update the list options:
-        const options = i18nLists[locale];
+        const options = Lists[locale];
         form.querySelectorAll('option').forEach(option => {
-            const key = option.value; // Get the value of the option, which matches the key in i18nLists
+            const key = option.value; // Get the value of the option, which matches the key in Lists
             option.textContent = options[key] ?? option.textContent;
         });
         // placeholholders
         document.getElementById("custom-list-location").setAttribute('placeholder', options['customListPH'])
         document.getElementById("library-location").setAttribute('placeholder', options['libraryLocationPH'])
         // //Explore location header
-        document.querySelector("label[for='explore-locations']").textContent = i18nHeadings[locale].location;
+        document.querySelector("label[for='explore-locations']").textContent = Headings[locale].location;
         document.getElementById('exploreRange').innerHTML = `<span class="material-symbols-outlined align-bottom">date_range</span><span>${localisationData['explore-datefilter']}</span> <span class="material-symbols-outlined float-end">expand_more</span>`;
         // Species search labels
-        document.querySelectorAll('.species-search-label').forEach(label => label.textContent = i18nHeadings[locale].search);
+        document.querySelectorAll('.species-search-label').forEach(label => label.textContent = Headings[locale].search);
         // Tour Carousel items:
         const tour = document.querySelector('.carousel-inner');
-        tour.innerHTML = i18nTour[locale];
+        tour.innerHTML = Tour[locale];
         return localisationData
     } catch (error) {
         console.error('Localisation Error:', error.message);
     }
 }
 
-export {i18nAll, i18nSpeciesList,i18nHeadings, i18nContext, i18nLocation, i18nForm, i18nHelp, i18nToasts, i18nTitles, i18nLIST_MAP, i18nLists, IUCNLabel, i18nLocate,i18nSelect, localiseUI}
+export {All, SpeciesList,Headings, Context, Location, Form, Help, Toasts, Titles, LIST_MAP, Lists, IUCNLabel, Locate,Select, localiseUI}
