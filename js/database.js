@@ -117,14 +117,15 @@ class Mutex {
 function checkpoint(db) {
   return new Promise((resolve, reject) => {
     if (!db) resolve();
-    else {  db.exec("PRAGMA wal_checkpoint(TRUNCATE);", (err) => {
-          if (err) {
-              console.error("Error running WAL checkpoint:", err.message);
-              reject(err);
-          } else {
-              console.log("WAL checkpoint completed.");
-              resolve();
-          }
+    else {
+      db.exec("PRAGMA wal_checkpoint(TRUNCATE);", (err) => {
+        if (err) {
+          console.error("Error running WAL checkpoint:", err.message);
+          reject(err);
+        } else {
+          console.log("WAL checkpoint completed.");
+          resolve();
+        }
       });
     }
   });
@@ -151,40 +152,51 @@ function closeDatabase(db) {
     if (!db) resolve();
     else {
       db.close((err) => {
-          if (err) {
-              console.error("Error closing database:", err.message);
-              reject(err);
-          } else {
-              console.log("Database connection closed.");
-              resolve();
-          }
+        if (err) {
+          console.error("Error closing database:", err.message);
+          reject(err);
+        } else {
+          console.log("Database connection closed.");
+          resolve();
+        }
       });
     }
   });
 }
 
-
-async function upgrade_to_v1(diskDB, dbMutex){
-  let t0 = Date.now()
-  try{
+async function upgrade_to_v1(diskDB, dbMutex) {
+  let t0 = Date.now();
+  try {
     await dbMutex.lock();
     await diskDB.runAsync("PRAGMA foreign_keys=OFF");
     await diskDB.runAsync("BEGIN");
     //1.10.x update
-    await diskDB.runAsync("CREATE INDEX IF NOT EXISTS idx_species_sname ON species(sname)");
-    await diskDB.runAsync("CREATE INDEX IF NOT EXISTS idx_species_cname ON species(cname)");
-    const fileColumns = (await diskDB.allAsync("PRAGMA table_info(files)")).map(row => row.name);
-    if (!fileColumns.includes("archiveName")){
+    await diskDB.runAsync(
+      "CREATE INDEX IF NOT EXISTS idx_species_sname ON species(sname)"
+    );
+    await diskDB.runAsync(
+      "CREATE INDEX IF NOT EXISTS idx_species_cname ON species(cname)"
+    );
+    const fileColumns = (await diskDB.allAsync("PRAGMA table_info(files)")).map(
+      (row) => row.name
+    );
+    if (!fileColumns.includes("archiveName")) {
       await diskDB.runAsync("ALTER TABLE files ADD COLUMN archiveName TEXT");
     }
-    if (!fileColumns.includes("metadata")){
+    if (!fileColumns.includes("metadata")) {
       await diskDB.runAsync("ALTER TABLE files ADD COLUMN metadata TEXT");
     }
 
-    await diskDB.runAsync("CREATE TABLE IF NOT EXISTS tags(id INTEGER PRIMARY KEY, name TEXT NOT NULL, UNIQUE(name))");
-    await diskDB.runAsync("INSERT OR IGNORE INTO tags VALUES(0, 'Nocmig'), (1, 'Local')");
+    await diskDB.runAsync(
+      "CREATE TABLE IF NOT EXISTS tags(id INTEGER PRIMARY KEY, name TEXT NOT NULL, UNIQUE(name))"
+    );
+    await diskDB.runAsync(
+      "INSERT OR IGNORE INTO tags VALUES(0, 'Nocmig'), (1, 'Local')"
+    );
     await diskDB.runAsync("ALTER TABLE records ADD COLUMN tagID INTEGER");
-    await diskDB.runAsync("UPDATE records SET tagID = 0 WHERE label = 'Nocmig'");
+    await diskDB.runAsync(
+      "UPDATE records SET tagID = 0 WHERE label = 'Nocmig'"
+    );
     await diskDB.runAsync("UPDATE records SET tagID = 1 WHERE label = 'Local'");
     await diskDB.runAsync("ALTER TABLE records DROP COLUMN label");
     // Change label names to labelIDs
@@ -214,47 +226,59 @@ async function upgrade_to_v1(diskDB, dbMutex){
       )`);
     await diskDB.runAsync("INSERT INTO files_new SELECT * FROM files");
     await diskDB.runAsync("DROP TABLE files");
-    await diskDB.runAsync("ALTER TABLE files_new RENAME TO files");    
-    await diskDB.runAsync("UPDATE schema_version SET version = 1")
+    await diskDB.runAsync("ALTER TABLE files_new RENAME TO files");
+    await diskDB.runAsync("UPDATE schema_version SET version = 1");
     await diskDB.runAsync("END");
     await diskDB.runAsync("PRAGMA foreign_keys=ON");
     await diskDB.runAsync("PRAGMA integrity_check");
     await diskDB.runAsync("PRAGMA foreign_key_check");
-    console.info("Migrated tags and added 'reviewed' column to ", diskDB.filename)
+    console.info(
+      "Migrated tags and added 'reviewed' column to ",
+      diskDB.filename
+    );
   } catch (e) {
-    console.error("Error adding column and updating version", e.message, e)
+    console.error("Error adding column and updating version", e.message, e);
     await diskDB.runAsync("ROLLBACK");
-  } finally{
-    await checkpoint(diskDB)
+  } finally {
+    await checkpoint(diskDB);
     dbMutex.unlock();
-    console.info(`DB migration took ${Date.now() - t0}ms`)
+    console.info(`DB migration took ${Date.now() - t0}ms`);
   }
 }
 
-async function upgrade_to_v2(diskDB, dbMutex){
+async function upgrade_to_v2(diskDB, dbMutex) {
   let t0 = Date.now();
-  try{
+  try {
     await dbMutex.lock();
     await diskDB.runAsync("PRAGMA foreign_keys=OFF");
     await diskDB.runAsync("BEGIN");
-    await diskDB.runAsync("CREATE TABLE species_new(id INTEGER PRIMARY KEY, sname TEXT NOT NULL, cname TEXT NOT NULL, UNIQUE(cname, sname))");
+    await diskDB.runAsync(
+      "CREATE TABLE species_new(id INTEGER PRIMARY KEY, sname TEXT NOT NULL, cname TEXT NOT NULL, UNIQUE(cname, sname))"
+    );
     await diskDB.runAsync("INSERT INTO species_new SELECT * FROM species");
     await diskDB.runAsync("DROP TABLE species");
     await diskDB.runAsync("ALTER TABLE species_new RENAME TO species");
 
-    await diskDB.runAsync("UPDATE schema_version SET version = 2")
+    await diskDB.runAsync("UPDATE schema_version SET version = 2");
     await diskDB.runAsync("END");
     await diskDB.runAsync("PRAGMA foreign_keys=ON");
     await diskDB.runAsync("PRAGMA integrity_check");
     await diskDB.runAsync("PRAGMA foreign_key_check");
-    console.info(`Adding species unique constraint took ${Date.now() - t0}ms`)
+    console.info(`Adding species unique constraint took ${Date.now() - t0}ms`);
   } catch (e) {
-    console.error("Error adding unique constraint ", e.message, e)
+    console.error("Error adding unique constraint ", e.message, e);
     await diskDB.runAsync("ROLLBACK");
-  } finally{
-    await checkpoint(diskDB)
+  } finally {
+    await checkpoint(diskDB);
     dbMutex.unlock();
   }
 }
 
-export { sqlite3, closeDatabase, checkpoint, upgrade_to_v1, upgrade_to_v2, Mutex };
+export {
+  sqlite3,
+  closeDatabase,
+  checkpoint,
+  upgrade_to_v1,
+  upgrade_to_v2,
+  Mutex,
+};
