@@ -141,7 +141,7 @@ const BIRDNET_NOT_BIRDS = [
   "Noise_Noise",
 ];
 
-const birdnetlabelFile = `../labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_en.txt`;
+const birdnetlabelFile = `../../labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_en.txt`;
 
 async function loadLabels(){
   return  fetch(birdnetlabelFile)
@@ -158,7 +158,7 @@ async function loadLabels(){
 }
 const ACTIVITY_INDEX = JSON.parse(
   fs.readFileSync(
-    path.join(__dirname, "../nocturnal_activity_index.json"),
+    path.join(__dirname, "../../nocturnal_activity_index.json"),
     "utf8"
   )
 );
@@ -185,7 +185,7 @@ onmessage = async (e) => {
         if (model !== "birdnet") {
           listModel.modelLabels[model] ??= JSON.parse(
             fs.readFileSync(
-              path.join(__dirname, `../${model}_model_config.json`),
+              path.join(__dirname, `../../${model}_model_config.json`),
               "utf8"
             )
           ).labels;
@@ -414,7 +414,7 @@ async function _init_() {
       console.log(tf.env().getFlags());
     }
     listModel = new Model(
-      "../BirdNET_GLOBAL_6K_V2.4_Model_TFJS/static/model/mdata/model.json"
+      "../../BirdNET_GLOBAL_6K_V2.4_Model_TFJS/static/model/mdata/model.json"
     );
 
     await listModel.loadModel();

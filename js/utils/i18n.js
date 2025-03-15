@@ -1038,6 +1038,7 @@ const Location = {
 const Context = {
     en: {
         lastNight: 'Last Night', thisWeek: 'This Week', lastWeek: 'LastWeek', thisMonth: 'This Month', lastMonth: 'Last Month', thisYear: 'This Year', lastYear: 'Last Year',
+        midnight: "Midnight", noon: 'Noon', one: 'day', other: 'days',
         apply: 'Apply', cancel: 'Cancel', filter: 'Apply a date Filter',
         'nocturnal flight call': 'Nocturnal Flight Call', 'flight call': 'Flight Call', call: 'Call', song: 'Song',
         play: 'Play',
@@ -1058,6 +1059,7 @@ const Context = {
     },
     da: {
         lastNight: 'I går nat', thisWeek: 'Denne uge', lastWeek: 'Sidste uge', thisMonth: 'Denne måned', lastMonth: 'Sidste måned', thisYear: 'Dette år', lastYear: 'Sidste år',
+        midnight: "Midnat", noon: "Middag", one: "dag", other: "dage",
         apply: 'Anvend', cancel: 'Annuller', filter: 'Anvend en datofiltrering',
         'nocturnal flight call': 'Natterflyvningskald', 'flight call': 'Flyvekald', call: 'Kald', song: 'Sang',
         play: 'Afspil',
@@ -1077,6 +1079,7 @@ const Context = {
     },
     de: {
         lastNight: 'Letzte Nacht', thisWeek: 'Diese Woche', lastWeek: 'Letzte Woche', thisMonth: 'Dieser Monat', lastMonth: 'Letzter Monat', thisYear: 'Dieses Jahr', lastYear: 'Letztes Jahr',
+         midnight: "Mitternacht", noon: "Mittag", one: "Tag", other: "Tage",
         apply: 'Anwenden', cancel: 'Abbrechen', filter: 'Datumsfilter anwenden',
         'nocturnal flight call': 'Nächtlicher Flugruf', 'flight call': 'Flugruf', call: 'Ruf', song: 'Gesang',
         play: 'Abspielen',
@@ -1098,6 +1101,7 @@ const Context = {
     es: {
         lastNight: 'Anoche', thisWeek: 'Esta semana', lastWeek: 'La semana pasada', thisMonth: 'Este mes', lastMonth: 'El mes pasado', thisYear: 'Este año', lastYear: 'El año pasado',
         apply: 'Aplicar', cancel: 'Cancelar', filter: 'Aplicar un filtro de fecha',
+        midnight: "Medianoche", noon: "Mediodía", one: "día", other: "días",
         'nocturnal flight call': 'Reclamos de vuelo nocturno', 'flight call': 'Reclamos de vuelo', call: 'Reclamos', song: 'Canto',
         play: 'Reproducir',
         pause: 'Pausa',
@@ -1118,6 +1122,7 @@ const Context = {
     fr: {
         lastNight: 'La nuit dernière', thisWeek: 'Cette semaine', lastWeek: 'La semaine dernière', thisMonth: 'Ce mois-ci', lastMonth: 'Le mois dernier', thisYear: 'Cette année', lastYear: 'L’année dernière',
         apply: 'Appliquer', cancel: 'Annuler', filter: 'Appliquer un filtre de date',
+        midnight: "Minuit", noon: "Midi", one: "jour", other: "jours",
         'nocturnal flight call': 'Cri de vol nocturne', 'flight call': 'Cri de vol', call: 'Cri', song: 'Chant',
         play: 'Lecture',
         pause: 'Pause',
@@ -1138,6 +1143,7 @@ const Context = {
     ja: {
         lastNight: '昨夜', thisWeek: '今週', lastWeek: '先週', thisMonth: '今月', lastMonth: '先月', thisYear: '今年', lastYear: '昨年',
         apply: '適用', cancel: 'キャンセル', filter: '日付フィルターを適用',
+        midnight: "真夜中", noon: "正午", one: "日", other: "日間",
         'nocturnal flight call': '夜間飛行コール', 'flight call': '飛行コール', call: 'コール', song: '歌',
         play: '再生',
         pause: '一時停止',
@@ -1158,6 +1164,7 @@ const Context = {
     nl: {
         lastNight: 'Gisteravond', thisWeek: 'Deze week', lastWeek: 'Vorige week', thisMonth: 'Deze maand', lastMonth: 'Vorige maand', thisYear: 'Dit jaar', lastYear: 'Vorig jaar',
         apply: 'Toepassen', cancel: 'Annuleren', filter: 'Een datumfilter toepassen',
+        midnight: "Middernacht", noon: "Middag", one: "dag", other: "dagen",
         'nocturnal flight call': 'Nachtelijke vluchtroep', 'flight call': 'Vluchtroep', call: 'Roep', song: 'Zang',
         play: 'Afspelen',
         pause: 'Pauze',
@@ -1178,6 +1185,7 @@ const Context = {
     pt: {
         lastNight: 'Ontem à noite', thisWeek: 'Esta semana', lastWeek: 'Semana passada', thisMonth: 'Este mês', lastMonth: 'Mês passado', thisYear: 'Este ano', lastYear: 'Ano passado',
         apply: 'Aplicar', cancel: 'Cancelar', filter: 'Aplicar um filtro de data',
+        midnight: "Meia-noite", noon: "Meio-dia", one: "dia", other: "dias",
         'nocturnal flight call': 'Chamado de voo noturno', 'flight call': 'Chamado de voo', call: 'Chamado', song: 'Canto',
         play: 'Reproduzir',
         pause: 'Pausar',
@@ -1198,6 +1206,7 @@ const Context = {
     ru: {
         lastNight: 'Прошлой ночью', thisWeek: 'На этой неделе', lastWeek: 'На прошлой неделе', thisMonth: 'В этом месяце', lastMonth: 'В прошлом месяце', thisYear: 'В этом году', lastYear: 'В прошлом году',
         apply: 'Применить', cancel: 'Отмена', filter: 'Применить фильтр по дате',
+        midnight: "Полночь", noon: "Полдень", one: "день", other: "дня",
         'nocturnal flight call': 'Ночной полётный крик', 'flight call': 'Полётный крик', call: 'Крик', song: 'Песня',        
         play: 'Воспроизвести',
         pause: 'Пауза',
@@ -1218,6 +1227,7 @@ const Context = {
     sv: {
         lastNight: 'I går kväll', thisWeek: 'Denna vecka', lastWeek: 'Förra veckan', thisMonth: 'Denna månad', lastMonth: 'Förra månaden', thisYear: 'Det här året', lastYear: 'Förra året',
         apply: 'Tillämpa', cancel: 'Avbryt', filter: 'Tillämpa ett datumfilter',
+        midnight: "Midnatt", noon: "Middag", one: "dag", other: "dagar",
         'nocturnal flight call': 'Nattlig flyktrop', 'flight call': 'Flyktrop', call: 'Rop', song: 'Sång',
         play: 'Spela upp',
         pause: 'Paus',
@@ -1238,6 +1248,7 @@ const Context = {
     zh: {
         lastNight: '昨晚', thisWeek: '本周', lastWeek: '上周', thisMonth: '本月', lastMonth: '上月', thisYear: '今年', lastYear: '去年',
         apply: '应用', cancel: '取消', filter: '应用日期过滤器',
+        midnight: "午夜", noon: "中午", one: "天", other: "天",
         'nocturnal flight call': '夜间飞行叫声', 'flight call': '飞行叫声', call: '叫声', song: '歌声',
         play: '播放',
         pause: '暂停',

@@ -10,7 +10,7 @@ const SunCalc = require("suncalc");
 const ffmpeg = require("fluent-ffmpeg");
 
 const merge = require("lodash.merge");
-import { State } from "./state.js";
+import { State } from "./utils/state.js";
 import {
   sqlite3,
   checkpoint,
@@ -19,7 +19,7 @@ import {
   upgrade_to_v2,
   Mutex,
 } from "./database.js";
-import { trackEvent as _trackEvent } from "./tracking.js";
+import { trackEvent as _trackEvent } from "./utils/tracking.js";
 
 let isWin32 = false;
 
@@ -613,7 +613,7 @@ async function handleMessage(e) {
     }
     case "chart": {
       Object.assign(args, { diskDB, state: STATE, UI });
-      const { onChartRequest } = require("./js/charts.js");
+      const { onChartRequest } = require("./js/components/charts.js");
       await onChartRequest(args);
       break;
     }
@@ -985,15 +985,17 @@ async function onLaunch({
     await loadDB(appPath); // load the diskdb
     await createDB(); // now make the memoryDB
   }
-
-  STATE.update({ db: memoryDB });
+  const db = STATE.mode === 'analyse'
+    ? memoryDB
+    : diskDB;
+  STATE.update({ db });
   NUM_WORKERS = threads;
   spawnPredictWorkers(model, list, batchSize, NUM_WORKERS);
 }
 
 async function spawnListWorker() {
   const worker_1 = await new Promise((resolve, reject) => {
-    const worker = new Worker("./js/listWorker.js", { type: "module" });
+    const worker = new Worker("./js/models/listWorker.js", { type: "module" });
     worker.onmessage = function (event) {
       // Resolve the promise once the worker sends a message indicating it's ready
       const message = event.data.message;
@@ -1891,7 +1893,7 @@ const setMetadata = async ({ file, source_file = file }) => {
   if (!savedMeta?.duration) {
     METADATA[file].duration = await getDuration(file);
     if (file.toLowerCase().endsWith("wav")) {
-      const { extractWaveMetadata } = require("./js/metadata.js");
+      const { extractWaveMetadata } = require("./js/utils/metadata.js");
       const t0 = Date.now();
       const wavMetadata = await extractWaveMetadata(file); //.catch(error => console.warn("Error extracting GUANO", error));
       if (Object.keys(wavMetadata).includes("guano")) {
@@ -2817,7 +2819,7 @@ function spawnPredictWorkers(model, list, batchSize, threads) {
   // And be ready to receive the list:
   for (let i = 0; i < threads; i++) {
     const workerSrc = model === "birdnet" ? "BirdNet2.4" : model;
-    const worker = new Worker(`./js/${workerSrc}.js`, { type: "module" });
+    const worker = new Worker(`./js/models/${workerSrc}.js`, { type: "module" });
     worker.isAvailable = true;
     worker.isReady = false;
     predictWorkers.push(worker);
@@ -2991,10 +2993,7 @@ const onInsertManualRecord = async ({
     );
     fileID = res.lastID;
     changes = 1;
-    let durationSQL = Object.entries(METADATA[file].dateDuration)
-      .map((entry) => `(${entry.toString()},${fileID})`)
-      .join(",");
-    await db.runAsync(`INSERT OR REPLACE INTO duration VALUES ${durationSQL}`);
+    await insertDurations(file, fileID)
   } else {
     fileID = res.id;
     fileStart = res.filestart;
@@ -3066,9 +3065,8 @@ const insertDurations = async (file, id) => {
   const durationSQL = Object.entries(METADATA[file].dateDuration)
     .map((entry) => `(${entry.toString()},${id})`)
     .join(",");
-  // No "OR IGNORE" in this statement because it should only run when the file is new
   const _result = await STATE.db.runAsync(
-    `INSERT INTO duration VALUES ${durationSQL}`
+    `INSERT OR REPLACE INTO duration VALUES ${durationSQL}`
   );
 };
 
@@ -3718,7 +3716,7 @@ async function exportData(result, filename, format) {
     cumulativeOffset = 0,
     fileDurations = {};
   const { writeToPath } = require("@fast-csv/format");
-  const { ExportFormatter } = require("./js/exportFormatter.js");
+  const { ExportFormatter } = require("./js/utils/exportFormatter.js");
   const formatter = new ExportFormatter(STATE);
   const locationMap = await formatter.getAllLocations();
   // CSV export. Format the values
