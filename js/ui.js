@@ -7519,100 +7519,92 @@ async function getXCComparisons() {
       "Loading Xeno-Canto data...";
     DOM.loading.classList.remove("d-none");
     const quality = "+q:%22>C%22";
-    const defaultLength = "+len:3-15";
+    const length = "+len:3-15";
     sname = XCtaxon[sname] || sname;
-    
-    const types = ["nocturnal flight call", "flight call", "call", "song"];
-    const filteredLists = {
-      "nocturnal flight call": [],
-      "flight call": [],
-      call: [],
-      song: []
-    };
-    
-    // Create an array of promises—one for each call type
-    const fetchRequests = types.map((type) => {
-      // Use a different length parameter for "song"
-      const typeLength = type === "song" ? "+len:10-30" : defaultLength;
-      const query = `https://dev.xeno-canto.org/api/3/recordings?key=d5e2d2775c7f2b2fb8325ffacc41b9e6aa94679e&query=sp:"${sname}"${quality}${typeLength}+type:"${type}"`;
-      
-      return fetch(query)
-        .then((response) =>
-          response.json().then((payload) => {
-            if (!response.ok) {
-              DOM.loading.classList.add("d-none");
-              generateToast({ type: "error", message: payload.message || "noXC" });
-              return null;
-            }
-            return payload;
-          })
-        )
-        .then((data) => {
-          if (!data || !data.recordings) return [];
-          // Map each recording to the desired format and filter out empty file URLs
-          const recordings = data.recordings
-            .map((record) => ({
-              file: record.file,    // media file
-              rec: record.rec,      // recordist
-              url: record.url,      // URL on XC
-              type: record.type,    // call type
-              smp: record.smp,      // sample rate
-              licence: record.lic   // licence
-            }))
-            .filter((record) => record.file);
-          // Shuffle the list so that subsequent slicing gives a different order
-          utils.shuffle(recordings);
-          return recordings;
-        })
-        .catch((error) => {
+    fetch(
+      `https://xeno-canto.org/api/2/recordings?query=${sname}${quality}${length}`
+    )
+      .then((response) => {
+        if (!response.ok) {
           DOM.loading.classList.add("d-none");
-          console.warn("Error getting XC data for type", type, error);
-          return [];
-        });
-    });
-    
-    // Wait for all four requests to complete
-    Promise.all(fetchRequests).then((results) => {
-      DOM.loading.classList.add("d-none");
-      // Use a Set to track unique records by a chosen key, here we use 'file'
-      const seenRecords = new Set();
-    
-      types.forEach((type, index) => {
-        // Remove duplicates that have already been added from higher priority types.
-        const uniqueRecords = results[index].filter(record => {
-          const key = record.file;  // change this key if needed
-          if (seenRecords.has(key)) {
-            return false;
-          } else {
-            seenRecords.add(key);
-            return true;
+          return generateToast({ type: "error", message: "noXC" });
+        }
+        return response.json();
+      })
+      .then((data) => {
+        // Hide loading
+        DOM.loading.classList.add("d-none");
+        // Extract the first 10 items from the recordings array
+        const recordings = data.recordings
+          .map((record) => ({
+            file: record.file, // media file
+            rec: record.rec, // recordist
+            url: record.url, // URL on XC
+            type: record.type, // call type
+            smp: record.smp, // sample rate
+            licence: record.lic, //// licence
+          }))
+          .filter((record) => record.file); // Remove records with empty file URL;
+
+        // Shuffle recordings so new cache returns a different set
+        utils.shuffle(recordings);
+
+        // Initialize an object to store the lists
+        const filteredLists = {
+          "nocturnal flight call": [],
+          "flight call": [],
+          call: [],
+          song: [],
+        };
+
+        // Counters to track the number of items added to each list
+        let songCount = 0;
+        let callCount = 0;
+        let flightCallCount = 0;
+        let nocturnalFlightCallCount = 0;
+
+        // Iterate over the recordings array and filter items
+        recordings.forEach((record) => {
+          if (record.type === "song" && songCount < 10) {
+            filteredLists.song.push(record);
+            songCount++;
+          } else if (
+            record.type === "nocturnal flight call" &&
+            nocturnalFlightCallCount < 10
+          ) {
+            filteredLists["nocturnal flight call"].push(record);
+            nocturnalFlightCallCount++;
+          } else if (record.type === "flight call" && flightCallCount < 10) {
+            filteredLists["flight call"].push(record);
+            flightCallCount++;
+          } else if (record.type === "call" && callCount < 10) {
+            filteredLists.call.push(record);
+            callCount++;
           }
         });
-        // Limit to 10 records per type after shuffling and de-duplication
-        filteredLists[type] = uniqueRecords.slice(0, 10);
+        if (
+          songCount === 0 &&
+          callCount === 0 &&
+          flightCallCount === 0 &&
+          nocturnalFlightCallCount === 0
+        ) {
+          generateToast({ type: "warning", message: "noComparisons" });
+          return;
+        } else {
+          // Let's cache the result, 'cos the XC API is quite slow
+          XCcache[sname] = filteredLists;
+          updatePrefs("XCcache.json", XCcache); // TODO: separate the caches, add expiry - a week?
+          console.log("XC response", filteredLists);
+          renderComparisons(filteredLists, cname);
+        }
+      })
+      .catch((error) => {
+        DOM.loading.classList.add("d-none");
+        console.warn("Error getting XC data", error);
       });
-      
-      // If all lists are empty, notify the user
-      if (
-        !filteredLists["nocturnal flight call"].length &&
-        !filteredLists["flight call"].length &&
-        !filteredLists.call.length &&
-        !filteredLists.song.length
-      ) {
-        generateToast({ type: "warning", message: "noComparisons" });
-        return;
-      }
-    
-      // Cache and render the results
-      XCcache[sname] = filteredLists;
-      updatePrefs("XCcache.json", XCcache);
-      console.log("XC response", filteredLists);
-      renderComparisons(filteredLists, cname);
-    });
-    
-
   }
 }
+
 
 function renderComparisons(lists, cname) {
   const i18 = getI18n(i18n.Context);
