@@ -7614,11 +7614,6 @@ async function getXCComparisons() {
   }
 }
 
-function capitalizeEachWord(str) {
-  return str.replace(/\b\w/g, function (char) {
-    return char.toUpperCase();
-  });
-}
 function renderComparisons(lists, cname) {
   const i18 = getI18n(i18n.Context);
   const i18nTitle = getI18n(i18n.Titles);
