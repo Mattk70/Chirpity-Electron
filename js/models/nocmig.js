@@ -20,6 +20,20 @@ const CONFIG = {
   sigmoid: 1,
 };
 
+/**
+ * Loads a machine learning model based on the provided parameters and configures the TensorFlow backend.
+ *
+ * This function reads a model configuration file to obtain image dimensions, label information, and the application's location.
+ * It sets up the specified TensorFlow backend (configuring additional environment settings for WebGL or WebGPU as needed),
+ * initializes and warms up the global model instance, and sends a message indicating that the model is ready.
+ *
+ * @param {Object} params - Configuration parameters for loading the model.
+ * @param {string} params.model - Identifier for the model version, used to locate the configuration file.
+ * @param {string} params.list - Model configuration list.
+ * @param {number} params.batchSize - Batch size used during model warm-up.
+ * @param {string} [params.backend] - Preferred TensorFlow backend (e.g., "webgl" or "webgpu").
+ * @param {*} params.worker - Identifier for the worker thread that will receive the model-ready message.
+ */
 function loadModel(params) {
   const version = params.model;
   DEBUG && console.log("load request to worker");

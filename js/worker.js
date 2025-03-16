@@ -993,6 +993,20 @@ async function onLaunch({
   spawnPredictWorkers(model, list, batchSize, NUM_WORKERS);
 }
 
+/**
+ * Spawns a list worker and returns a function to interact with it.
+ *
+ * This asynchronous function creates a new Web Worker from "./js/models/listWorker.js" and waits until the worker signals it is ready
+ * by sending a "list-model-ready" message. During initialization, if a "tfjs-node" message is received, it updates internal state and notifies the UI
+ * about backend availability. Once the worker is ready, the function returns another function that sends a message to the worker under a mutex lock
+ * and returns a Promise that resolves with the worker's response containing a result and supplemental messages.
+ *
+ * @returns {Function} A function that accepts a message as its argument and returns a Promise resolving to an object with the following properties:
+ *   - result: The outcome of processing the sent message.
+ *   - messages: Additional messages or status information from the worker.
+ *
+ * @throws {Error} Propagates errors encountered during worker initialization or message handling.
+ */
 async function spawnListWorker() {
   const worker_1 = await new Promise((resolve, reject) => {
     const worker = new Worker("./js/models/listWorker.js", { type: "module" });
@@ -2814,7 +2828,20 @@ const processQueue = async () => {
   }
 };
 
-/// Workers  From the MDN example
+/**
+ * Spawns Web Worker threads for parallel prediction processing.
+ *
+ * This function creates the specified number of worker threads that load prediction models in separate modules.
+ * If the model name is "birdnet", it substitutes the worker script with "BirdNet2.4". Each worker is initialized
+ * with configuration details including a processing list, batch size, and various state parameters (such as backend,
+ * geolocation, week, and species threshold) sourced from the global state. Message and error handlers are set up for
+ * asynchronous communication and to manage worker failures.
+ *
+ * @param {string} model - The name of the AI model to use; for "birdnet", the "BirdNet2.4" script is used.
+ * @param {Array} list - The list of data items for the workers to process.
+ * @param {number} batchSize - The number of items each worker should process per batch.
+ * @param {number} threads - The number of Web Worker threads to spawn.
+ */
 function spawnPredictWorkers(model, list, batchSize, threads) {
   // And be ready to receive the list:
   for (let i = 0; i < threads; i++) {
@@ -3703,6 +3730,20 @@ function exportAudacity(result, directory) {
       });
   });
 }
+/**
+ * Exports data records to a CSV file.
+ *
+ * This asynchronous function processes data records in batches (up to 10,000 entries per batch), formatting each record according to the
+ * specified export format ("text", "eBird", or "Raven"). In "Raven" mode, it assigns a sequential selection number and calculates cumulative file
+ * offsets across entries. In "eBird" mode, it aggregates records by "Start Time", "Common name", and "Species" and sums their species counts.
+ * The formatted data is then written as a CSV file using a write stream from the @fast-csv/format module, with the delimiter set to a tab for
+ * "Raven" format and a comma for other formats.
+ *
+ * @async
+ * @param {Array<Object>} result - An array of data records to be exported.
+ * @param {string} filename - The output file path.
+ * @param {string} format - The export format, which must be one of "text", "eBird", or "Raven".
+ */
 async function exportData(result, filename, format) {
   const formatFunctions = {
     text: "formatCSVValues",

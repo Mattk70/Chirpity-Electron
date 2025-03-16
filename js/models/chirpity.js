@@ -19,6 +19,21 @@ const CONFIG = {
   sigmoid: 1,
 };
 
+/**
+ * Loads the model configuration and initializes the global model instance.
+ *
+ * Reads a JSON configuration file using the provided model version, configures the TensorFlow.js backend
+ * (WebGL or WebGPU) with appropriate environment flags, and sets up the global model instance. The function
+ * creates a mask tensor for filtering prediction indexes, loads and warms up the model for inference, and then
+ * sends a "model-ready" message to the designated worker with relevant model details.
+ *
+ * @param {Object} params - Parameters for loading the model.
+ * @param {string} params.model - Version identifier used to locate the model configuration file.
+ * @param {string} params.list - Identifier used during model initialization.
+ * @param {number} params.batchSize - Batch size used for warming up the model.
+ * @param {string} [params.backend] - Optional TensorFlow.js backend; defaults to the global backend if not provided.
+ * @param {*} params.worker - Identifier of the worker to receive the "model-ready" message.
+ */
 function loadModel(params) {
   const version = params.model;
   if (DEBUG) {

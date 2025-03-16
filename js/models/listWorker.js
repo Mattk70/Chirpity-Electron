@@ -143,6 +143,15 @@ const BIRDNET_NOT_BIRDS = [
 
 const birdnetlabelFile = `../../labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_en.txt`;
 
+/**
+ * Asynchronously loads and returns bird labels from a file.
+ *
+ * This function fetches the text content from the file specified by the global variable
+ * `birdnetlabelFile`. The content is trimmed and split by newline characters into an array of label strings.
+ * If the fetch operation fails or returns a non-ok response, the error is logged and the function returns undefined.
+ *
+ * @returns {Promise<string[]|undefined>} A promise that resolves to an array of label strings on success, or undefined if an error occurs.
+ */
 async function loadLabels(){
   return  fetch(birdnetlabelFile)
     .then((response) => {
@@ -403,6 +412,15 @@ function findAllIndexes(array, value) {
   }, []);
 }
 const getFirstElement = (label) => label.split("_")[0];
+/**
+ * Initializes TensorFlow.js with the specified backend and loads the bird identification model.
+ *
+ * This asynchronous function sets the TensorFlow.js backend to the value specified in BACKEND, enables production mode, 
+ * and creates an instance of the Model class with the provided model path. Once the model is successfully loaded,
+ * it signals readiness by sending a "list-model-ready" message via postMessage.
+ *
+ * @async
+ */
 async function _init_() {
   DEBUG && console.log("load loading metadata_model");
   // const appPath = "../" + location + "/";
