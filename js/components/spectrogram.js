@@ -22,6 +22,7 @@ export class ChirpityWS {
     this.actions = actions;
 
     this.specTooltip = this.specTooltip.bind(this);
+    this.centreSpec = this.centreSpec.bind(this);
     this.handleGesture = this.handleGesture.bind(this);
   }
 
@@ -170,7 +171,7 @@ export class ChirpityWS {
       color: STATE.regionActiveColour,
     });
     const wavesurfer = this.wavesurfer;
-    wavesurfer.on("dblclick", () => this.centreSpec);
+    wavesurfer.on("dblclick", this.centreSpec);
     wavesurfer.on("click", () => this.REGIONS.clearRegions());
     wavesurfer.on("ready", () => (wavesurfer.isReady = true));
     wavesurfer.on("pause", () => {
@@ -210,7 +211,7 @@ export class ChirpityWS {
     // Show controls
     showElement(["controlsWrapper"]);
     // Resize canvas of spec and labels
-    this.adjustSpecDims(true);
+    this.adjustDims(true);
     // remove the tooltip
     DOM.tooltip?.remove();
 
@@ -587,15 +588,15 @@ export class ChirpityWS {
 
   centreSpec() {
     const STATE = this.getState();
-    let { windowOffsetSecs, activeRegion } = STATE;
-    if (STATE.regionsCompleted) {
+    let { windowOffsetSecs, activeRegion, currentFileDuration, windowLength, regionsCompleted } = STATE;
+    if (regionsCompleted) {
       const saveBufferBegin = windowOffsetSecs;
-      const middle = windowOffsetSecs + wavesurfer.getCurrentTime();
-      windowOffsetSecs = middle - STATE.windowLength / 2;
+      const middle = windowOffsetSecs + this.wavesurfer.getCurrentTime();
+      windowOffsetSecs = middle - windowLength / 2;
       windowOffsetSecs = Math.max(0, windowOffsetSecs);
       windowOffsetSecs = Math.min(
         windowOffsetSecs,
-        currentFileDuration - STATE.windowLength
+        currentFileDuration - windowLength
       );
 
       if (activeRegion) {
@@ -603,13 +604,13 @@ export class ChirpityWS {
         activeRegion.start += shift;
         activeRegion.end += shift;
         const { start, end } = activeRegion;
-        if (start < 0 || end > STATE.windowLength) activeRegion = null;
+        if (start < 0 || end > windowLength) activeRegion = null;
       }
       this.handlers.onStateUpdate({
         windowOffsetSecs,
         activeRegion,
       });
-      postBufferUpdate({
+      this.handlers.postBufferUpdate({
         begin: windowOffsetSecs,
         position: 0.5,
       });
@@ -647,7 +648,12 @@ export class ChirpityWS {
   /**
    * Updates the spectrogram visualization and timeline asynchronously.
    *
-   * This function ensures that the spectrogram element is visible by removing the "d-none" class and updates the display based on the provided audio buffer and options. It resets the spectrogram dimensions if a reset is requested or if the wavesurfer instance is uninitialized; otherwise, it loads the new audio buffer. After updating the spectrogram, the timeline is refreshed, the playback position is set using a normalized value, and playback is initiated if specified.
+   * This function ensures that the spectrogram element is visible by removing 
+   * the "d-none" class and updates the display based on the provided audio buffer and options. 
+   * It resets the spectrogram dimensions if a reset is requested or if the 
+   * wavesurfer instance is uninitialized; otherwise, it loads the new audio buffer. 
+   * After updating the spectrogram, the timeline is refreshed, the playback position
+   * is set using a normalized value, and playback is initiated if specified.
    *
    * @async
    * @param {Object} options - Configuration options for updating the spectrogram.
@@ -659,7 +665,7 @@ export class ChirpityWS {
    */
   async updateSpec({ buffer, play = false, position = 0, resetSpec = false }) {
     DOM.spectrogramWrapper.classList.remove("d-none");
-    if (resetSpec || !this.wavesurfer) await this.adjustSpecDims(true);
+    if (resetSpec || !this.wavesurfer) await this.adjustDims(true);
     else {
       await this.loadBuffer(buffer);
     }
@@ -766,7 +772,7 @@ export class ChirpityWS {
    * @returns {Promise<void>} A promise that resolves once the UI adjustments and spectrogram rendering updates are complete.
    */
 
-  async adjustSpecDims(redraw, fftSamples, newHeight) {
+  async adjustDims(redraw, fftSamples, newHeight) {
     const config = this.getConfig();
     const STATE = this.getState();
     const wavesurfer = this.wavesurfer;

@@ -129,7 +129,7 @@ const GLOBAL_ACTIONS = {
       STATE.currentFile &&
       document.getElementById("analyseAll").click();
   },
-  c: (e) => (e.ctrlKey || e.metaKey) && STATE.currentBuffer && centreSpec(),
+  c: (e) => (e.ctrlKey || e.metaKey) && STATE.currentBuffer && spec.centreSpec(),
   // D: (e) => {
   //     if (( e.ctrlKey || e.metaKey)) worker.postMessage({ action: 'create-dataset' });
   // },
@@ -438,7 +438,7 @@ DOM.controlsWrapper.addEventListener("mousedown", (e) => {
     newHeight = Math.min(newHeight, spec.maxHeight(DOM));
     // Adjust the spectrogram dimensions accordingly
     debounceTimer = setTimeout(() => {
-      spec.adjustSpecDims(true, config.FFT, newHeight);
+      spec.adjustDims(true, config.FFT, newHeight);
     }, 10);
   };
 
@@ -1454,7 +1454,7 @@ async function showExplore() {
   });
   resetResults();
   // Prevent scroll up hiding navbar
-  spec.adjustSpecDims();
+  spec.adjustDims();
 }
 
 /**
@@ -1508,9 +1508,9 @@ async function showAnalyse() {
 
 // We add the handler to the whole table as the body gets replaced and the handlers on it would be wiped
 const results = document.getElementById("results");
-results.addEventListener("click", resultClick);
+results.addEventListener("click", debounceClick(resultClick));
 const selectionTable = document.getElementById("selectionResultTableBody");
-selectionTable.addEventListener("click", resultClick);
+selectionTable.addEventListener("click", debounceClick(resultClick));
 
 /**
  * Processes click events on audio analysis result rows.
@@ -1633,7 +1633,7 @@ function setFontSizeScale(doNotScroll) {
   doNotScroll ||
     decreaseBtn.scrollIntoView({ block: "center", behavior: "auto" });
   updatePrefs("config.json", config);
-  spec.adjustSpecDims(true);
+  spec.adjustDims(true);
 }
 
 
@@ -2125,7 +2125,7 @@ const setUpWorkerMessaging = () => {
           const mode = args.mode;
           STATE.mode = mode;
           renderFilenamePanel();
-          spec.adjustSpecDims();
+          spec.adjustDims();
           switch (mode) {
             case "analyse": {
               STATE.diskHasRecords &&
@@ -2590,7 +2590,7 @@ function getTooltipTitle(date, aggregation) {
 window.addEventListener("resize", function () {
   utils.waitForFinalEvent(
     function () {
-      spec.adjustSpecDims(true);
+      spec.adjustDims(true);
     },
     100,
     "id1"
@@ -2623,6 +2623,20 @@ function handleKeyDownDeBounce(e) {
       "keyhandler"
     );
   }
+}
+
+function debounceClick(handler, delay = 250) {
+  let timeout;
+  return function (e) {
+    if (timeout) {
+      // If second click within delay, ignore
+      return;
+    }
+    handler.call(this, e); // Preserve `this` context
+    timeout = setTimeout(() => {
+      timeout = null;
+    }, delay);
+  };
 }
 
 /**
@@ -4788,8 +4802,8 @@ const showRelevantAudioQuality = () => {
   );
   DOM.audioQualityContainer.classList.toggle("d-none", format !== "flac");
 };
-
-document.addEventListener("click", function (e) {
+document.addEventListener("click", debounceClick(handleUIClicks));
+function handleUIClicks(e) {
   const element = e.target;
   const target = element.closest("[id]")?.id;
   const locale = config.locale.replace(/_.*$/, "");
@@ -5158,7 +5172,7 @@ document.addEventListener("click", function (e) {
       checkFilteredFrequency();
       worker.postMessage({ action: "update-state", audio: config.audio });
       const fftSamples = spec.spectrogram.fftSamples;
-      spec.adjustSpecDims(true, fftSamples);
+      spec.adjustDims(true, fftSamples);
       document
         .getElementById("frequency-range")
         .classList.remove("text-warning");
@@ -5288,7 +5302,7 @@ document.addEventListener("click", function (e) {
   target &&
     target !== "result1" &&
     trackEvent(config.UUID, "UI", "Click", target);
-});
+};
 
 function changeSettingsMode(target) {
   // Get references to the buttons
@@ -5592,7 +5606,7 @@ document.addEventListener("change", function (e) {
           }
           if (spec.wavesurfer && STATE.currentFile && STATE.regionsCompleted) {
             const fftSamples = spec.spectrogram.fftSamples;
-            spec.adjustSpecDims(true, fftSamples);
+            spec.adjustDims(true, fftSamples);
             postBufferUpdate({
               begin: STATE.windowOffsetSecs,
               position: spec.wavesurfer.getCurrentTime() / STATE.windowLength,
@@ -5628,7 +5642,7 @@ document.addEventListener("change", function (e) {
           };
           if (spec.wavesurfer && STATE.currentFile) {
             const fftSamples = spec.spectrogram.fftSamples;
-            spec.adjustSpecDims(true, fftSamples);
+            spec.adjustDims(true, fftSamples);
             spec.refreshTimeline();
           }
           break;
@@ -5656,7 +5670,7 @@ document.addEventListener("change", function (e) {
           config.specLabels = element.checked;
           if (spec.wavesurfer && STATE.currentFile) {
             const fftSamples = spec.spectrogram.fftSamples;
-            spec.adjustSpecDims(true, fftSamples);
+            spec.adjustDims(true, fftSamples);
           }
           break;
         }
@@ -5674,7 +5688,7 @@ document.addEventListener("change", function (e) {
           DOM.fromInput.value = config.audio.minFrequency;
           DOM.fromSlider.value = config.audio.minFrequency;
           const fftSamples = spec.spectrogram.fftSamples;
-          spec.adjustSpecDims(true, fftSamples);
+          spec.adjustDims(true, fftSamples);
           checkFilteredFrequency();
           element.blur();
           worker.postMessage({ action: "update-state", audio: config.audio });
@@ -5686,7 +5700,7 @@ document.addEventListener("change", function (e) {
           DOM.toInput.value = config.audio.maxFrequency;
           DOM.toSlider.value = config.audio.maxFrequency;
           const fftSamples = spec.spectrogram.fftSamples;
-          spec.adjustSpecDims(true, fftSamples);
+          spec.adjustDims(true, fftSamples);
           checkFilteredFrequency();
           element.blur();
           worker.postMessage({ action: "update-state", audio: config.audio });
