@@ -5131,7 +5131,7 @@ function handleUIClicks(e) {
       break;
     }
     case "reset-defaults": {
-      const i18n = {
+      const i18 = {
         en: "Are you sure you want to revert to the default settings? You will need to relaunch Chirpity to see the changes.",
         da: "Er du sikker på, at du vil gendanne standardindstillingerne? Du skal genstarte Chirpity for at se ændringerne.",
         de: "Sind Sie sicher, dass Sie die Standardeinstellungen wiederherstellen möchten? Sie müssen Chirpity neu starten, um die Änderungen zu sehen.",
@@ -5144,9 +5144,7 @@ function handleUIClicks(e) {
         zh: "您确定要恢复默认设置吗？您需要重新启动 Chirpity 才能看到更改。",
         ja: "デフォルト設定に戻してもよろしいですか？ 変更を反映するには、Chirpityを再起動する必要があります。",
       };
-
-      const locale = config.locale;
-      const message = i18n.get(i18n);
+      const message = i18n.get(i18);
       if (confirm(message)) {
         const uuid = config.UUID;
         config = defaultConfig;
