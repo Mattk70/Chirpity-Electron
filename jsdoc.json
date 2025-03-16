@@ -1,6 +1,6 @@
 {
   "source": {
-    "include": [".", "js"],
+    "include": [".", "./js"],
     "exclude": ["node_modules", "docs", "test", "dist", "fonts", "img", "labels", ".vscode", 
     ".github", "build", "fonts", "Help",
     "2023511_Augs~00100_EfficientNetV2B0_SigmoidFocalCrossentropy_256x384_Adam_408", 
