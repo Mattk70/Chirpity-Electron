@@ -13,6 +13,17 @@
 
 import {Context, get} from '../utils/i18n.js';
 
+/**
+ * Initializes and configures date picker elements for both chart and explore UI controls.
+ *
+ * This function destroys any existing date picker instance held in the global state, computes preset date ranges
+ * (e.g., this week, last month, last night), and creates a new easepick date picker with range, preset, and time
+ * selection capabilities. It attaches event listeners to handle selection, clearing, clicks (for setting midnight or noon),
+ * and visibility changes, updating the relevant state and communicating with a worker thread for subsequent processing.
+ *
+ * @param {Function} resetResults - Callback to reset the results UI by clearing summaries and pagination.
+ * @param {Function} filterResults - Callback to update filtered results based on the newly selected date range.
+ */
 function initialiseDatePicker(state, worker, config, resetResults, filterResults) {
   let midnight = false;
   if (state.picker) {
@@ -226,18 +237,18 @@ function initialiseDatePicker(state, worker, config, resetResults, filterResults
 }
 
 /**
- * Appends a clear date filter button to the specified UI element.
+ * Appends a clear date filter button to a designated UI element.
  *
- * The function creates a clickable span styled as a "cancel" icon that, when activated,
- * clears the date selection using the provided picker instance. Upon clicking the button,
- * the date picker is cleared and the original date filter UI is restored in the element.
+ * This function creates a clickable cancel icon that lets users clear an active date filter.
+ * When clicked, it invokes the clear() method on the provided date picker instance and restores
+ * the element's original content using localized text from the global state.
  *
- * @param {HTMLElement} element - The container element that displays the date filter.
- * @param {Object} picker - The date picker instance with a clear() method to remove the active date filter.
+ * @param {HTMLElement} element - The UI element displaying the active date filter.
+ * @param {Object} picker - The date picker instance with a clear() method to remove the current selection.
  *
  * @example
- * // Assuming dateFilterElement is a valid HTMLElement and datePicker is a date picker instance:
- * createDateClearButton(dateFilterElement, datePicker);
+ * // Assuming dateFilterElement is a valid HTMLElement and datePicker is a configured date picker instance:
+ * createDateClearButton(state, dateFilterElement, datePicker);
  */
 function createDateClearButton(state, element, picker) {
   const span = document.createElement("span");

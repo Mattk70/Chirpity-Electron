@@ -1,3 +1,16 @@
+/**
+ * Retrieves the IUCN status for a given species from the local cache.
+ *
+ * On the first call, if the in-memory cache is empty, the function attempts to read and parse
+ * a local "IUCNcache.json" file based on the current window's location to populate the cache.
+ * It then returns the cached IUCN status corresponding to the provided species name.
+ *
+ * Note: Legacy code for fetching data from the IUCN API is present after the cache retrieval
+ * logic but is not executed in the packaged application.
+ *
+ * @param {string} [sname="Anser anser"] - The scientific name of the species.
+ * @returns {*} The cached IUCN status data for the species, or undefined if no data exists.
+ */
 async function getIUCNStatus(sname = "Anser anser") {
   if (!Object.keys(STATE.IUCNcache).length) {
     //const path = p.join(appPath, 'IUCNcache.json');
