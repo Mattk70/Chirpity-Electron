@@ -823,11 +823,10 @@ export class ChirpityWS {
    */
   reInitSpec() {
     const wavesurfer = this.wavesurfer;
-    const spectrogram = this.spectrogram;
     const config = this.getConfig();
-    if (wavesurfer && !spectrogram) {
-      spectrogram = this.initSpectrogram(config.specMaxHeight);
-      wavesurfer.registerPlugin(spectrogram);
+    if (wavesurfer && !this.spectrogram) {
+        this.spectrogram = this.initSpectrogram(config.specMaxHeight);
+      wavesurfer.registerPlugin(this.spectrogram);
     }
   }
 
