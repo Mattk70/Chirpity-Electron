@@ -3027,6 +3027,18 @@ const Select = {
     }
   };
   
+  const UpdateMessage = {
+    en: "There's a new version of Chirpity available! ${link}Check the website</a> for more information",
+    da: "Der er en ny version af Chirpity tilgængelig! ${link}Besøg hjemmesiden</a> for mere information",
+    de: "Eine neue Version von Chirpity ist verfügbar! ${link}Besuchen Sie die Website</a> für weitere Informationen",
+    es: "¡Hay una nueva versión de Chirpity disponible! ${link}Visita el sitio web</a> para más información",
+    fr: "Une nouvelle version de Chirpity est disponible ! ${link}Consultez le site web</a> pour plus d'informations",
+    nl: "Er is een nieuwe versie van Chirpity beschikbaar! ${link}Bezoek de website</a> voor meer informatie",
+    pt: "Há uma nova versão do Chirpity disponível! ${link}Visite o site</a> para mais informações",
+    ru: "Доступна новая версия Chirpity! ${link}Посетите сайт</a> для получения дополнительной информации",
+    sv: "En ny version av Chirpity är tillgänglig! ${link}Besök webbplatsen</a> för mer information",
+    zh: "Chirpity有新版本可用！${link}访问网站</a>了解更多信息",
+  };
   
 
 /**
@@ -3180,4 +3192,4 @@ async function localiseUI(locale) {
     }
 }
 
-export {All, SpeciesList,Headings, Context, Location, Form, Help, Toasts, Titles, LIST_MAP, Lists, IUCNLabel, Locate,Select, localiseUI}
+export {All, SpeciesList,Headings, Context, Location, Form, Help, Toasts, Titles, LIST_MAP, Lists, IUCNLabel, Locate,Select, UpdateMessage, localiseUI}

@@ -262,4 +262,96 @@ async function onChartRequest(args) {
     aggregation,
   });
 }
+
+function setChartOptions(
+  species,
+  total,
+  rate,
+  results,
+  dataPoints,
+  aggregation,
+  pointStart
+) {
+  let chartOptions = {};
+  //chartOptions.plugins = [ChartDataLabels];
+
+  chartOptions.data = {
+    labels: dataPoints, // Assuming dataPoints is an array of labels
+    datasets: [
+      {
+        label: "Hours of recordings",
+        data: total,
+        borderColor: "#003",
+        backgroundColor: "rgba(0, 51, 0, 0.2)",
+        fill: true,
+        yAxisID: "y-axis-0",
+      },
+      // Add other datasets as needed
+    ],
+  };
+
+  chartOptions.options = {
+    scales: {
+      x: {
+        type: "time",
+        time: {
+          unit: aggregation.toLowerCase(), // Assuming aggregation is 'Week', 'Day', or 'Hour'
+          displayFormats: {
+            day: "ddd D MMM",
+            week: "MMM D",
+            hour: "hA",
+          },
+        },
+      },
+      y: [
+        {
+          id: "y-axis-0",
+          type: "linear",
+          position: "left",
+          title: {
+            text: "Hours recorded",
+          },
+        },
+        // Add other y-axes as needed
+      ],
+    },
+    plugins: {
+      legend: {
+        display: true,
+        position: "top",
+      },
+      tooltip: {
+        enabled: true,
+        mode: "index",
+        intersect: false,
+        position: "nearest",
+        callbacks: {
+          title: function (tooltipItems) {
+            const timestamp = tooltipItems[0].parsed.x;
+            const date = new Date(timestamp);
+            return getTooltipTitle(date, aggregation);
+          },
+          label: function (tooltipItem) {
+            return `${tooltipItem.dataset.label}: ${tooltipItem.formattedValue}`;
+          },
+        },
+      },
+      datalabels: {
+        display: true,
+        color: "white",
+        backgroundColor: "rgba(0, 0, 0, 0.7)",
+        borderRadius: 3,
+        padding: {
+          top: 2,
+        },
+        formatter: function (value, _) {
+          return value; // Customize the displayed value as needed
+        },
+      },
+    },
+  };
+
+  return chartOptions;
+}
+
 module.exports = { onChartRequest };

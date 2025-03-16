@@ -11,10 +11,6 @@ import { checkMembership } from "./utils/member.js";
 import { DOM } from "./utils/DOMcache.js";
 import { IUCNCache, IUCNtaxonomy } from "./utils/IUCNcache.js";
 import { XCtaxonomy as XCtaxon } from "./utils/XCtaxonomy.js";
-import WaveSurfer from "../node_modules/wavesurfer.js/dist/wavesurfer.esm.js";
-import RegionsPlugin from "../node_modules/wavesurfer.js/dist/plugins/regions.esm.js";
-import Spectrogram from "../node_modules/wavesurfer.js/dist/plugins/spectrogram.esm.js";
-import TimelinePlugin from "../node_modules/wavesurfer.js/dist/plugins/timeline.esm.js";
 import { CustomSelect } from "./components/custom-select.js";
 import createFilterDropdown from "./components/custom-filter.js";
 import { Pagination } from "./components/pagination.js";
@@ -27,6 +23,7 @@ import {
 } from "./utils/getKnownIssues.js";
 import * as i18n from "./utils/i18n.js";
 import * as utils from "./utils/utils.js";
+import { ChirpityWS } from './components/spectrogram.js';
 
 let LOCATIONS,
   locationID = undefined,
@@ -141,6 +138,10 @@ let STATE = {
     offset: 0,
     active: null,
   },
+  currentBuffer: null,
+  windowLength: 20,
+  windowOffsetSecs: 0,
+  activeRegion: null,
   IUCNcache: IUCNCache,
   translations: ["da", "de", "es", "fr", "ja", "nl", "pt", "ru", "sv", "zh"],
   regionColour: "rgba(255, 255, 255, 0.1)",
@@ -169,7 +170,6 @@ const BATCH_SIZE_LIST = [4, 8, 16, 32, 48, 64, 96];
 
 // Get the modules loaded in preload.js
 const fs = window.module.fs;
-const colormap = window.module.colormap;
 const p = window.module.p;
 const uuidv4 = window.module.uuidv4;
 const os = window.module.os;
@@ -179,25 +179,6 @@ const isTestEnv = window.env.TEST_ENV === "true";
 const trackVisit = isTestEnv ? () => {} : _trackVisit;
 const trackEvent = isTestEnv ? () => {} : _trackEvent;
 isTestEnv && console.log("Running in test environment");
-
-function createColormap() {
-  const cmap = config.colormap;
-  const map =
-    cmap === "custom"
-      ? [
-          { index: 0, rgb: utils.hexToRgb(config.customColormap.quiet) },
-          {
-            index: config.customColormap.threshold,
-            rgb: utils.hexToRgb(config.customColormap.mid),
-          },
-          { index: 1, rgb: utils.hexToRgb(config.customColormap.loud) },
-        ]
-      : cmap;
-
-  return ["roseus", "gray", "igray"].includes(cmap)
-    ? cmap
-    : colormap({ colormap: map, nshades: 256, format: "float" });
-}
 
 let worker;
 
@@ -258,33 +239,16 @@ let modelReady = false,
 let PREDICTING = false,
   t0,
   app_t0 = Date.now();
-let activeRegion, wavesurfer;
-let bufferStartTime, fileEnd;
 
-// set up some DOM element handles
-const bodyElement = document.body;
+let bufferStartTime;
+
 
 let activeRow;
 let predictions = {},
   clickedIndex,
   currentFileDuration;
-
-let currentBuffer,
-  windowOffsetSecs = 0,
-  windowLength = 20; // seconds
 // Set content container height
-DOM.contentWrapper.style.height = bodyElement.clientHeight - 80 + "px";
-
-const specMaxHeight = () => {
-  // Get the available viewport height
-  const formOffset = DOM.exploreWrapper.offsetHeight;
-  const navPadding = DOM.navPadding.clientHeight;
-  const footerHeight = DOM.footer.clientHeight;
-  const controlsHeight = DOM.controlsWrapper.clientHeight;
-  return (
-    window.innerHeight - navPadding - footerHeight - controlsHeight - formOffset
-  );
-};
+DOM.contentWrapper.style.height = document.body.clientHeight - 80 + "px";
 
 // Mouse down event to start dragging
 DOM.controlsWrapper.addEventListener("mousedown", (e) => {
@@ -299,10 +263,10 @@ DOM.controlsWrapper.addEventListener("mousedown", (e) => {
     // Calculate the delta y (drag distance)
     newHeight = initialHeight + e.clientY - startY;
     // Clamp newHeight to ensure it doesn't exceed the available height
-    newHeight = Math.min(newHeight, specMaxHeight());
+    newHeight = Math.min(newHeight, spec.maxHeight(DOM));
     // Adjust the spectrogram dimensions accordingly
     debounceTimer = setTimeout(() => {
-      adjustSpecDims(true, spectrogram.fftSamples, newHeight);
+      spec.adjustSpecDims(true, config.FFT, newHeight);
     }, 10);
   };
 
@@ -392,74 +356,37 @@ function loadAudioFileSync({ filePath = "", preserveResults = false }) {
   });
 }
 
-/**
- * Updates the spectrogram visualization and timeline asynchronously.
- *
- * This function ensures that the spectrogram element is visible by removing the "d-none" class and updates the display based on the provided audio buffer and options. It resets the spectrogram dimensions if a reset is requested or if the wavesurfer instance is uninitialized; otherwise, it loads the new audio buffer. After updating the spectrogram, the timeline is refreshed, the playback position is set using a normalized value, and playback is initiated if specified.
- *
- * @async
- * @param {Object} options - Configuration options for updating the spectrogram.
- * @param {AudioBuffer|*} options.buffer - The audio buffer to be visualized.
- * @param {boolean} [options.play=false] - If true, starts playback immediately after the update.
- * @param {number} [options.position=0] - Normalized playback position (between 0 and 1) to seek to.
- * @param {boolean} [options.resetSpec=false] - If true, resets the spectrogram dimensions before loading the buffer.
- * @returns {Promise<void>} A promise that resolves once the spectrogram and timeline update process is complete.
- */
-async function updateSpec({
-  buffer,
-  play = false,
-  position = 0,
-  resetSpec = false,
-}) {
-  DOM.spectrogramWrapper.classList.remove("d-none");
-  if (resetSpec || !wavesurfer) await adjustSpecDims(true);
-  else {
-    await loadBuffer(buffer);
-  }
-  refreshTimeline();
-  wavesurfer.seekTo(position);
-  if (play) await wavesurfer.play();
-}
 
-/**
- * Creates and registers a timeline plugin for WaveSurfer.js.
- *
- * This function computes the timeline display intervals based on the global variable `windowLength`.
- * It determines the primary label interval as the ceiling of (`windowLength` divided by 5) and calculates
- * the time interval as one-tenth of this primary interval. Using these values, it configures a timeline
- * plugin via the `TimelinePlugin.create` method with customized options, including:
- * - Label formatting through the global `formatTimeCallback`
- * - Secondary label opacity set to 0.35
- * - Styling options such as font size ("0.75rem") and color obtained from `wsTextColour()`
- *
- * If a global WaveSurfer instance exists (referenced by `wavesurfer`), the timeline is automatically
- * registered with it; otherwise, the standalone timeline plugin object is returned.
- *
- * @returns {Object} The timeline plugin instance, either as a registered plugin with WaveSurfer or as a standalone object.
- */
-function createTimeline() {
-  const primaryLabelInterval = Math.ceil(windowLength / 5);
-  const secondaryLabelInterval = 0;
-  const timeinterval = primaryLabelInterval / 10;
-  const colour = wsTextColour();
-  const timeline = TimelinePlugin.create({
-    insertPosition: "beforebegin",
-    formatTimeCallback: formatTimeCallback,
-    timeInterval: timeinterval,
-    primaryLabelInterval: primaryLabelInterval,
-    secondaryLabelInterval: secondaryLabelInterval,
-    secondaryLabelOpacity: 0.35,
-    style: {
-      fontSize: "0.75rem",
-      color: colour,
-    },
+const postBufferUpdate = ({
+  file = STATE.currentFile,
+  begin = 0,
+  position = 0,
+  play = false,
+  resetSpec = false,
+  goToRegion = false,
+}) => {
+  STATE.regionsCompleted = false;
+  fileLoaded = false;
+  worker.postMessage({
+    action: "update-buffer",
+    file: file,
+    position: position,
+    start: begin,
+    end: begin + STATE.windowLength,
+    play: play,
+    resetSpec: resetSpec,
+    goToRegion: goToRegion,
   });
-  return wavesurfer ? wavesurfer.registerPlugin(timeline) : timeline;
-}
+  // In case it takes a while:
+  loadingTimeout = setTimeout(() => {
+    DOM.loading.querySelector("#loadingText").textContent = "Loading file...";
+    DOM.loading.classList.remove("d-none");
+  }, 500);
+};
 
 const resetRegions = (clearActive) => {
-  if (wavesurfer) REGIONS.clearRegions();
-  clearActive && (activeRegion = null);
+  if (spec.wavesurfer) spec.REGIONS.clearRegions();
+  clearActive && (STATE.activeRegion = null);
   STATE.selection = false;
   worker.postMessage({ action: "update-state", selection: false });
   utils.disableMenuItem(["analyseSelection", "export-audio"]);
@@ -482,293 +409,8 @@ function clearActive() {
   activeRow = undefined;
 }
 
-const WSPluginPurge = () => {
-  // Destroy leaves the plugins in the plugin list.
-  // So, this is needed to remove plugins where the `wavesurfer` key is null
-  wavesurfer &&
-    (wavesurfer.plugins = wavesurfer.plugins.filter(
-      (plugin) => plugin.wavesurfer !== null
-    ));
-};
 
-function makeBlob(audio) {
-  // Recreate TypedArray
-  const int16Array = new Int16Array(audio.buffer);
-  // Convert to Float32Array (Web Audio API uses Float32 samples)
-  const float32Array = new Float32Array(int16Array.length);
-  for (let i = 0; i < int16Array.length; i++) {
-    float32Array[i] = int16Array[i] / 32768; // Normalize from Int16 to Float32
-  }
-  // Create AudioBuffer using AudioContext
-  const audioBuffer = audioContext.createBuffer(
-    1,
-    float32Array.length,
-    sampleRate
-  ); // Mono channel
-  // Populate the AudioBuffer with float32Array data
-  audioBuffer.copyToChannel(float32Array, 0);
-  const blob = new Blob([audio], { type: "audio/wav" });
-  const peaks = [audioBuffer.getChannelData(0)];
-  const duration = audioBuffer.duration;
-  return [blob, peaks, duration];
-}
-const audioContext = new AudioContext();
-async function loadBuffer(audio = currentBuffer) {
-  t0 = Date.now();
-  const [blob, peaks, duration] = STATE.blob || makeBlob(audio);
-  await wavesurfer.loadBlob(blob, peaks, duration);
-  STATE.blob = null;
-}
-const nullRender = (peaks, ctx) => {};
-const wsTextColour = () =>
-  config.colormap === "custom"
-    ? config.customColormap.loud
-    : config.colormap === "gray"
-    ? "#000"
-    : "#fff";
 
-const initWavesurfer = ({ audio = undefined, height = 0 }) => {
-  wavesurfer && wavesurfer.destroy();
-  const loggedErrors = new Set();
-  initRegion();
-  spectrogram = initSpectrogram(height);
-  timeline = createTimeline();
-  // Setup waveform and spec views
-  wavesurfer = WaveSurfer.create({
-    container: document.querySelector("#waveform"),
-    // make waveform transparent
-    backgroundColor: "rgba(0,0,0,0)",
-    waveColor: "rgba(0,0,0,0)",
-    progressColor: "rgba(0,0,0,0)",
-    // but keep the playhead
-    cursorColor: wsTextColour(),
-    cursorWidth: 2,
-    height: "auto",
-    renderFunction: nullRender, // no need to render a waveform
-    plugins: [REGIONS, spectrogram, timeline],
-  });
-
-  if (audio) {
-    loadBuffer(audio);
-  }
-  DOM.colourmap.value = config.colormap;
-  // Set click event that removes all REGIONS
-
-  REGIONS.enableDragSelection({
-    color: STATE.regionActiveColour,
-  });
-
-  wavesurfer.on("dblclick", centreSpec);
-  wavesurfer.on("click", () => REGIONS.clearRegions());
-  wavesurfer.on("ready", () => (wavesurfer.isReady = true));
-  wavesurfer.on("pause", () => {
-    const position =
-      wavesurfer.getCurrentTime() / wavesurfer.decodedData.duration;
-    // Pause event fired right before 'finish' event, so
-    // this is set=== to signal whether it was playing up to that point
-    if (position < 0.998) wavesurfer.isPaused = true;
-  });
-
-  wavesurfer.on("play", () => (wavesurfer.isPaused = false));
-
-  wavesurfer.on("finish", function () {
-    const bufferEnd = windowOffsetSecs + windowLength;
-    if (currentFileDuration > bufferEnd) {
-      wavesurfer.isReady = false;
-      postBufferUpdate({
-        begin: windowOffsetSecs + windowLength,
-        play: !wavesurfer.isPaused,
-      });
-    } else if (!wavesurfer.isPaused) {
-      const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
-      if (fileIndex < STATE.openFiles.length - 1) {
-        // Move to next file
-        const fileToLoad = STATE.openFiles[fileIndex + 1];
-        wavesurfer.isReady = false;
-        postBufferUpdate({
-          file: fileToLoad,
-          begin: 0,
-          position: 0,
-          play: !wavesurfer.isPaused,
-        });
-      }
-    }
-  });
-
-  // Show controls
-  utils.showElement(["controlsWrapper"]);
-  // Resize canvas of spec and labels
-  adjustSpecDims(true);
-  // remove the tooltip
-  DOM.tooltip?.remove();
-
-  const tooltip = document.createElement("div");
-  tooltip.id = "tooltip";
-  document.body.appendChild(tooltip);
-  // Add event listener for the gesture events
-  const wave = DOM.waveElement;
-  wave.removeEventListener("wheel", handleGesture);
-  wave.addEventListener("wheel", handleGesture, { passive: true });
-
-  wave.removeEventListener("mousemove", specTooltip);
-  wave.removeEventListener("mouseout", hideTooltip);
-
-  wave.addEventListener("mousemove", specTooltip, { passive: true });
-  wave.addEventListener("mouseout", hideTooltip);
-};
-
-/**
- * Increases the FFT sample count for the spectrogram if it is below 2048.
- *
- * This function checks if the current FFT sample count (spectrogram.fftSamples) is less than 2048.
- * If so, it doubles the sample count, updates the global FFT configuration (config.FFT), and refreshes
- * the audio buffer by invoking postBufferUpdate with the current window offset, normalized playback position,
- * and playback state from wavesurfer. The playback position is calculated by dividing wavesurfer.getCurrentTime()
- * by windowLength, then clamped between 0 and 1. Finally, the updated FFT sample count is logged to the console.
- *
- * Side Effects:
- * - Modifies spectrogram.fftSamples and config.FFT.
- * - Calls postBufferUpdate to refresh the audio buffer.
- * - Logs the new FFT sample count using console.log.
- *
- * External Dependencies:
- * - spectrogram: Object containing FFT settings.
- * - config: Global configuration object for FFT.
- * - wavesurfer: Instance controlling audio playback and current time.
- * - windowLength: Global variable used to normalize the playback position.
- * - windowOffsetSecs: Global variable indicating the current window offset in seconds.
- * - clamp: Utility function to restrict a value between a minimum and maximum.
- * - postBufferUpdate: Function to update the audio buffer after FFT changes.
- */
-function increaseFFT() {
-  if (spectrogram.fftSamples < 2048 && STATE.regionsCompleted) {
-    spectrogram.fftSamples *= 2;
-    const position = utils.clamp(
-      wavesurfer.getCurrentTime() / windowLength,
-      0,
-      1
-    );
-    postBufferUpdate({
-      begin: windowOffsetSecs,
-      position: position,
-      play: wavesurfer.isPlaying(),
-    });
-    console.log(spectrogram.fftSamples);
-    config.FFT = spectrogram.fftSamples;
-  }
-}
-
-/**
- * Halve the FFT sample count for the spectrogram when it exceeds the minimum threshold.
- *
- * This function checks if `spectrogram.fftSamples` is greater than 64. If so, the FFT sample
- * count is halved, and the normalized playback position is computed using the ratio of the current
- * playback time (from `wavesurfer.getCurrentTime()`) to the `windowLength`, clamped between 0 and 1.
- * It then calls `postBufferUpdate` with an object containing:
- *   - `begin`: the current window offset in seconds (`windowOffsetSecs`),
- *   - `position`: the normalized (and clamped) playback position,
- *   - `play`: a boolean indicating whether audio is currently playing (`wavesurfer.isPlaying()`).
- *
- * The updated FFT sample count is logged to the console, and the global configuration (`config.FFT`)
- * is updated accordingly.
- *
- * Assumes that the following globals and helper functions are available in the scope:
- *   - `spectrogram`
- *   - `wavesurfer`
- *   - `windowLength`
- *   - `windowOffsetSecs`
- *   - `config`
- *   - `clamp`
- *   - `postBufferUpdate`
- *
- * @returns {void}
- */
-function reduceFFT() {
-  if (spectrogram.fftSamples > 64 && STATE.regionsCompleted) {
-    spectrogram.fftSamples /= 2;
-    const position = utils.clamp(
-      wavesurfer.getCurrentTime() / windowLength,
-      0,
-      1
-    );
-    postBufferUpdate({
-      begin: windowOffsetSecs,
-      position: position,
-      play: wavesurfer.isPlaying(),
-    });
-    console.log(spectrogram.fftSamples);
-    config.FFT = spectrogram.fftSamples;
-  }
-}
-
-const refreshTimeline = () => {
-  timeline.destroy();
-  timeline = createTimeline();
-};
-
-/**
- * Adjusts the spectrogram zoom level and repositions the playhead relative to the audio timeline.
- *
- * Halves the display window during a "zoomIn" operation—without reducing the window below 1.5 seconds—
- * and doubles it during a "zoomOut" operation, capped at 100 seconds or the total duration of the file.
- * The window offset is recalculated to keep the playhead at the same absolute position within the audio,
- * and any active audio regions are updated to remain consistent with the new window.
- *
- * No operation is performed if no audio file is loaded or if the audio regions have not been fully initialized.
- *
- * @param {(string|Event)} direction - A zoom command either as a string ("zoomIn" or "zoomOut") for direct calls,
- * or as an Event from which the command is extracted using the event target's closest button ID.
- * @returns {void}
- *
- * @example
- * // Programmatically zoom in:
- * zoomSpec("zoomIn");
- *
- * @example
- * // Zoom out via a button click:
- * buttonElement.addEventListener("click", zoomSpec);
- */
-function zoomSpec(direction) {
-  if (fileLoaded && STATE.regionsCompleted) {
-    if (typeof direction !== "string") {
-      // then it's an event
-      direction = direction.target.closest("button").id;
-    }
-    let playedSeconds = wavesurfer.getCurrentTime();
-    let position = playedSeconds / windowLength;
-    let timeNow = windowOffsetSecs + playedSeconds;
-    const oldBufferBegin = windowOffsetSecs;
-    if (direction === "zoomIn") {
-      if (windowLength < 1.5) return;
-      windowLength /= 2;
-      windowOffsetSecs += windowLength * position;
-    } else {
-      if (windowLength > 100 || windowLength === currentFileDuration) return;
-      windowOffsetSecs -= windowLength * position;
-      windowLength = Math.min(currentFileDuration, windowLength * 2);
-
-      if (windowOffsetSecs < 0) {
-        windowOffsetSecs = 0;
-      } else if (windowOffsetSecs + windowLength > currentFileDuration) {
-        windowOffsetSecs = currentFileDuration - windowLength;
-      }
-    }
-    // Keep playhead at same time in file
-    position = (timeNow - windowOffsetSecs) / windowLength;
-    // adjust region start time to new window start time
-    if (activeRegion) {
-      const duration = activeRegion.end - activeRegion.start;
-      activeRegion.start =
-        oldBufferBegin + activeRegion.start - windowOffsetSecs;
-      activeRegion.end = activeRegion.start + duration;
-    }
-    postBufferUpdate({
-      begin: windowOffsetSecs,
-      position: position,
-      play: wavesurfer.isPlaying(),
-    });
-  }
-}
 
 async function showOpenDialog(fileOrFolder) {
   const defaultPath = localStorage.getItem("lastFolder") || "";
@@ -1307,8 +949,8 @@ async function onOpenFiles(args) {
   window.electron.unsavedRecords(false);
   document.getElementById("unsaved-icon").classList.add("d-none");
   // Reset the buffer playhead and zoom:
-  windowOffsetSecs = 0;
-  windowLength = 20;
+  STATE.windowOffsetSecs = 0;
+  STATE.windowLength = 20;
 }
 
 /**
@@ -1361,9 +1003,9 @@ function refreshResultsView() {
 // fromDB is requested when circle clicked
 const getSelectionResults = (fromDB) => {
   if (fromDB instanceof PointerEvent) fromDB = false;
-  let start = activeRegion.start + windowOffsetSecs;
+  let start = STATE.activeRegion.start + STATE.windowOffsetSecs;
   // Remove small amount of region to avoid pulling in results from 'end'
-  let end = activeRegion.end + windowOffsetSecs; // - 0.001;
+  let end = STATE.activeRegion.end + STATE.windowOffsetSecs; // - 0.001;
   STATE.selection = {};
   STATE["selection"]["start"] = start.toFixed(3);
   STATE["selection"]["end"] = end.toFixed(3);
@@ -1599,19 +1241,7 @@ async function showCharts() {
   });
 }
 
-/**
- * Reinitializes the spectrogram plugin if it has not been initialized.
- *
- * Checks if a global wavesurfer instance exists and the spectrogram is not already set up.
- * If both conditions are met, it initializes the spectrogram using the configured maximum height
- * and registers it as a plugin with wavesurfer.
- */
-function reInitSpec() {
-  if (wavesurfer && !spectrogram) {
-    spectrogram = initSpectrogram(config.specMaxHeight);
-    wavesurfer.registerPlugin(spectrogram);
-  }
-}
+
 /**
  * Prepares the interface for Explore mode by updating UI elements, state flags, and worker messages.
  *
@@ -1652,7 +1282,7 @@ async function showExplore() {
   });
   resetResults();
   // Prevent scroll up hiding navbar
-  adjustSpecDims();
+  spec.adjustSpecDims();
 }
 
 /**
@@ -1703,39 +1333,6 @@ async function showAnalyse() {
 // datasetLink.addEventListener('click', async () => {
 //     worker.postMessage({ action: 'create-dataset', species: isSpeciesViewFiltered(true) });
 // });
-
-/**
- * Creates and registers a new audio region on the waveform, optionally navigating to its start time.
- *
- * This function validates the input parameters and adds a new region to the global REGIONS collection using the
- * specified start and end times. It applies the provided color or defaults to STATE.regionColour, and formats the label
- * using the formatLabel helper. If the goToRegion flag is true, the waveform's current time is set to the new region's start time.
- *
- * Note: If the start and end parameters are invalid (i.e., non-numeric or if start is not less than end), the function logs
- * an error and returns early without creating the region.
- *
- * @param {number} start - The start time of the region in seconds.
- * @param {number} end - The end time of the region in seconds (must be greater than start).
- * @param {string} label - The label for the region.
- * @param {boolean} goToRegion - If true, navigates the waveform to the region's start time.
- * @param {string} [colour] - Optional color for the region; defaults to STATE.regionColour if not provided.
- * @returns {void}
- */
-function createRegion(start, end, label, goToRegion, colour) {
-  // Validate input parameters
-  if (typeof start !== "number" || typeof end !== "number" || start >= end) {
-    console.error("Invalid region parameters:", { start, end });
-    return;
-  }
-  REGIONS.addRegion({
-    start: start,
-    end: end,
-    color: colour || STATE.regionColour,
-    content: formatLabel(label, colour),
-  });
-
-  if (goToRegion) wavesurfer.setTime(start);
-}
 
 // We add the handler to the whole table as the body gets replaced and the handlers on it would be wiped
 const results = document.getElementById("results");
@@ -1829,15 +1426,16 @@ const loadResultRegion = ({
   start = parseFloat(start);
   end = parseFloat(end);
   // ensure region doesn't spread across the whole window
-  if (windowLength <= 3.5) windowLength = 6;
-  windowOffsetSecs = Math.max(0, start - windowLength / 2 + 1.5);
-  activeRegion = {
+  if (STATE.windowLength <= 3.5) STATE.windowLength = 6;
+  const windowOffsetSecs = STATE.windowOffsetSecs;
+  windowOffsetSecs = Math.max(0, start - STATE.windowLength / 2 + 1.5);
+  STATE.activeRegion = {
     start: Math.max(start - windowOffsetSecs, 0),
     end: end - windowOffsetSecs,
     label,
   };
   const position = wavesurfer
-    ? utils.clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1)
+    ? utils.clamp(wavesurfer.getCurrentTime() / STATE.windowLength, 0, 1)
     : 0;
   postBufferUpdate({
     file,
@@ -1847,73 +1445,6 @@ const loadResultRegion = ({
   });
 };
 
-/**
- * Adjusts the dimensions of the spectrogram and related UI elements based on the current window and DOM sizes.
- *
- * This asynchronous function recalculates the layout of key UI components such as the content wrapper,
- * spectrogram display, and result table, ensuring they adapt to changes in the window size. When the
- * `redraw` flag is true and an audio file is loaded, the function computes a new spectrogram height using
- * either the specified `newHeight` (if non-zero) or the current configuration limits. If a new height is provided,
- * it updates the configuration preferences accordingly.
- *
- * Depending on whether WaveSurfer is already initialized, the function will either:
- * - Initialize a new WaveSurfer instance with the current audio buffer and updated height.
- * - Update the existing WaveSurfer instance's options (including height and cursor color), re-register the spectrogram
- *   plugin with the new settings (using `fftSamples` if provided), and reload the audio buffer.
- *
- * Finally, it adjusts the height of the result table to fill the remaining vertical space.
- *
- * @param {boolean} redraw - Indicates whether the spectrogram should be re-rendered and WaveSurfer updated.
- * @param {number} [fftSamples] - Optional. The number of FFT samples to use for rendering; must be a power of two.
- * @param {number} [newHeight=0] - Optional. Overrides the dynamic height calculation for the spectrogram; a value of 0 triggers dynamic sizing.
- * @returns {Promise<void>} A promise that resolves once the UI adjustments and spectrogram rendering updates are complete.
- */
-
-async function adjustSpecDims(redraw, fftSamples, newHeight) {
-  const footerHeight = DOM.footer.offsetHeight;
-  const navHeight = DOM.navPadding.clientHeight;
-  newHeight ??= 0;
-  DOM.contentWrapper.style.top = navHeight.toString() + "px"; // for padding
-  DOM.contentWrapper.style.height =
-    (bodyElement.clientHeight - footerHeight - navHeight).toString() + "px";
-  const contentHeight = contentWrapper.offsetHeight;
-  // + 2 for padding
-  const formOffset = DOM.exploreWrapper.offsetHeight;
-
-  let specOffset;
-  if (!DOM.spectrogramWrapper.classList.contains("d-none")) {
-    const specHeight =
-      newHeight || Math.min(config.specMaxHeight, specMaxHeight());
-    if (newHeight !== 0) {
-      config.specMaxHeight = specHeight;
-      updatePrefs("config.json", config);
-    }
-    if (STATE.currentFile && redraw) {
-      // give the wrapper space for the transport controls and element padding/margins
-      if (!wavesurfer) {
-        initWavesurfer({
-          audio: currentBuffer,
-          height: specHeight,
-        });
-      } else {
-        wavesurfer.setOptions({
-          height: specHeight,
-          cursorColor: wsTextColour(),
-        });
-        spectrogram = initSpectrogram(specHeight, fftSamples);
-        wavesurfer.registerPlugin(spectrogram);
-        await loadBuffer();
-      }
-    }
-    if (wavesurfer) {
-      specOffset = spectrogramWrapper.offsetHeight;
-    }
-  } else {
-    specOffset = 0;
-  }
-  DOM.resultTableElement.style.height =
-    contentHeight - specOffset - formOffset + "px";
-}
 
 ///////////////// Font functions ////////////////
 // Function to set the font size scale
@@ -1930,25 +1461,10 @@ function setFontSizeScale(doNotScroll) {
   doNotScroll ||
     decreaseBtn.scrollIntoView({ block: "center", behavior: "auto" });
   updatePrefs("config.json", config);
-  adjustSpecDims(true);
+  spec.adjustSpecDims(true);
 }
 
-///////////////////////// Timeline Callbacks /////////////////////////
 
-/**
- * Use formatTimeCallback to style the notch labels as you wish, such
- * as with more detail as the number of pixels per second increases.
- *
- * Here we format as M:SS.frac, with M suppressed for times < 1 minute,
- * and frac having 0, 1, or 2 digits as the zoom increases.
- *
- * Note that if you override the default function, you'll almost
- * certainly want to override timeInterval, primaryLabelInterval and/or
- * secondaryLabelInterval so they all work together.
- *
- * @param: seconds
- * @param: pxPerSec
- */
 
 function formatRegionTooltip(regionLength, start, end) {
   const length = end - start;
@@ -2003,7 +1519,7 @@ function formatTimeCallback(secs) {
       ].join(":");
     }
   }
-  if (windowLength <= 5) {
+  if (STATE.windowLength <= 5) {
     formattedTime += "." + milliseconds.toString();
   } else {
     milliseconds = (milliseconds / 1000).toFixed(1);
@@ -2167,7 +1683,7 @@ window.onload = async () => {
     utils.syncConfig(config, defaultConfig);
 
     membershipCheck().then((isMember) => (STATE.isMember = isMember));
-
+    spec.init({audio:undefined, height:config.specMaxHeight })
     // Disable SNR
     config.filters.SNR = 0;
 
@@ -2501,7 +2017,7 @@ const setUpWorkerMessaging = () => {
           const mode = args.mode;
           STATE.mode = mode;
           renderFilenamePanel();
-          adjustSpecDims();
+          spec.adjustSpecDims();
           switch (mode) {
             case "analyse": {
               STATE.diskHasRecords &&
@@ -2522,7 +2038,6 @@ const setUpWorkerMessaging = () => {
               "text-bg-secondary",
               "text-bg-dark"
             );
-            //adjustSpecDims(true)
           } else {
             utils.disableMenuItem(["purge-file"]);
             // change header to indicate deactivation
@@ -2630,7 +2145,7 @@ const setUpWorkerMessaging = () => {
  * For each detection, the function adjusts its start and end times by subtracting the global offset
  * `windowOffsetSecs`. Only detections with an adjusted start time less than the current window length are processed.
  * A detection is considered "active" if its adjusted start time matches the start time of the currently active region
- * (`activeRegion.start`, if defined). If the detection is active and the `goToRegion` flag is true, the view is repositioned
+ * (`STATE.activeRegion.start`, if defined). If the detection is active and the `goToRegion` flag is true, the view is repositioned
  * to focus on that region. Otherwise, the detection is processed only if the configuration flag `config.specDetections` is enabled.
  *
  * Audio regions are created by calling `createRegion` with the adjusted start and end times, the detection's label,
@@ -2649,10 +2164,10 @@ const setUpWorkerMessaging = () => {
  */
 function showWindowDetections({ detections, goToRegion }) {
   for (const detection of detections) {
-    const start = detection.start - windowOffsetSecs;
-    if (start < windowLength) {
-      const end = detection.end - windowOffsetSecs;
-      const active = start === activeRegion?.start;
+    const start = detection.start - STATE.windowOffsetSecs;
+    if (start < STATE.windowLength) {
+      const end = detection.end - STATE.windowOffsetSecs;
+      const active = start === STATE.activeRegion?.start;
       if (!config.specDetections && !active) continue;
       const colour = active ? STATE.regionActiveColour : null;
       const setPosition = active && goToRegion;
@@ -2707,32 +2222,7 @@ function getSpecies(target) {
   return species;
 }
 
-/**
- * Handles a swipe gesture event to trigger page navigation actions.
- *
- * This function throttles gesture events by ignoring any that occur within 1.2 seconds of the previous event.
- * It determines the direction of the gesture by evaluating the horizontal (deltaX) or, if absent, vertical (deltaY) movement.
- * A positive movement results in a "PageDown" action, while a negative movement triggers a "PageUp" action.
- * If debugging is enabled, the gesture details are logged, and each action is tracked via a tracking event.
- *
- * @param {Object} e - The gesture event object.
- * @param {number} [e.deltaX] - The horizontal movement delta.
- * @param {number} [e.deltaY] - The vertical movement delta used if horizontal movement is zero.
- */
-function handleGesture(e) {
-  const currentTime = Date.now();
-  if (currentTime - STATE.lastGestureTime < 1200) {
-    return; // Ignore successive events within 1.2 second
-  }
-  STATE.lastGestureTime = currentTime;
-  const moveDirection = e.deltaX || e.deltaY; // If deltaX is 0, use deltaY
-  const key = moveDirection > 0 ? "PageDown" : "PageUp";
-  config.debug && console.log(`scrolling x: ${e.deltaX} y: ${e.deltaY}`);
-  // waitForFinalEvent(() => {
-  GLOBAL_ACTIONS[key](e);
-  trackEvent(config.UUID, "Swipe", key, "");
-  // }, 200, 'swipe');
-}
+
 
 /**
  * Asynchronously saves an audio clip using Electron's file system API.
@@ -2960,96 +2450,7 @@ function formatDate(date, aggregation) {
 
   return formattedDate + date.toLocaleDateString("en-GB", options);
 }
-function setChartOptions(
-  species,
-  total,
-  rate,
-  results,
-  dataPoints,
-  aggregation,
-  pointStart
-) {
-  let chartOptions = {};
-  //chartOptions.plugins = [ChartDataLabels];
 
-  chartOptions.data = {
-    labels: dataPoints, // Assuming dataPoints is an array of labels
-    datasets: [
-      {
-        label: "Hours of recordings",
-        data: total,
-        borderColor: "#003",
-        backgroundColor: "rgba(0, 51, 0, 0.2)",
-        fill: true,
-        yAxisID: "y-axis-0",
-      },
-      // Add other datasets as needed
-    ],
-  };
-
-  chartOptions.options = {
-    scales: {
-      x: {
-        type: "time",
-        time: {
-          unit: aggregation.toLowerCase(), // Assuming aggregation is 'Week', 'Day', or 'Hour'
-          displayFormats: {
-            day: "ddd D MMM",
-            week: "MMM D",
-            hour: "hA",
-          },
-        },
-      },
-      y: [
-        {
-          id: "y-axis-0",
-          type: "linear",
-          position: "left",
-          title: {
-            text: "Hours recorded",
-          },
-        },
-        // Add other y-axes as needed
-      ],
-    },
-    plugins: {
-      legend: {
-        display: true,
-        position: "top",
-      },
-      tooltip: {
-        enabled: true,
-        mode: "index",
-        intersect: false,
-        position: "nearest",
-        callbacks: {
-          title: function (tooltipItems) {
-            const timestamp = tooltipItems[0].parsed.x;
-            const date = new Date(timestamp);
-            return getTooltipTitle(date, aggregation);
-          },
-          label: function (tooltipItem) {
-            return `${tooltipItem.dataset.label}: ${tooltipItem.formattedValue}`;
-          },
-        },
-      },
-      datalabels: {
-        display: true,
-        color: "white",
-        backgroundColor: "rgba(0, 0, 0, 0.7)",
-        borderRadius: 3,
-        padding: {
-          top: 2,
-        },
-        formatter: function (value, _) {
-          return value; // Customize the displayed value as needed
-        },
-      },
-    },
-  };
-
-  return chartOptions;
-}
 
 function getTooltipTitle(date, aggregation) {
   if (aggregation === "Week") {
@@ -3081,7 +2482,7 @@ function getTooltipTitle(date, aggregation) {
 window.addEventListener("resize", function () {
   utils.waitForFinalEvent(
     function () {
-      adjustSpecDims(true);
+      spec.adjustSpecDims(true);
     },
     100,
     "id1"
@@ -3216,7 +2617,7 @@ function setActiveRegion(region) {
   }
   const { start, end, content } = region;
   // Clear active regions
-  REGIONS.regions.forEach((r) =>
+  spec.REGIONS.regions.forEach((r) =>
     r.setOptions({
       color: STATE.regionColour,
       content: formatLabel(r.content?.innerText),
@@ -3225,168 +2626,22 @@ function setActiveRegion(region) {
   // Set the playhead to the start of the region
   const label = content?.innerText || "";
   const labelEl = formatLabel(label, "gold");
-  activeRegion = { start, end, label };
+  STATE.activeRegion = { start, end, label };
   region.setOptions({ color: STATE.regionActiveColour, content: labelEl });
   utils.enableMenuItem(["export-audio"]);
   if (modelReady && !PREDICTING) {
     utils.enableMenuItem(["analyseSelection"]);
   }
-  setActiveRow(start + windowOffsetSecs);
+  setActiveRow(start + STATE.windowOffsetSecs);
 }
 
-/**
- * Initializes and configures audio region management using the RegionsPlugin.
- *
- * Destroys any existing RegionsPlugin instance and creates a new instance with regions that are draggable,
- * a maximum limit of 100 regions, and a default color defined by STATE.regionColour.
- *
- * Registers event listeners for region interactions:
- * - "region-clicked": Hides the context menu, updates the active region, and seeks playback to the region's start.
- *   If the Shift key is pressed, all regions with the default color are removed; if the Ctrl/Cmd key is pressed,
- *   the clicked region is removed.
- * - "region-created": Marks a new region as active if it has no label (content) or its start time matches the current active region.
- * - "region-update": Clears the region's label and sets the updated region as active.
- *
- * @returns {Object} The new RegionsPlugin instance.
- */
-function initRegion() {
-  if (REGIONS) REGIONS.destroy();
-  REGIONS = RegionsPlugin.create({
-    drag: true,
-    maxRegions: 100,
-    color: STATE.regionColour,
-  });
+const spec = new ChirpityWS(
+  document.querySelector(".pagination"),
+  () => STATE, // Returns the current state
+  () => config, // Returns the current config
+  { postBufferUpdate, trackEvent, setActiveRegion }
+);
 
-  REGIONS.on("region-clicked", function (r, e) {
-    e.stopPropagation();
-    // Hide context menu
-    DOM.contextMenu.classList.add("d-none");
-    if (r.start !== activeRegion?.start) {
-      setActiveRegion(r);
-    }
-    wavesurfer.seekTo(e.clientX / window.innerWidth);
-    // If shift key held, clear other regions
-    if (e.shiftKey) {
-      REGIONS.regions.forEach(
-        (r) => r.color === STATE.regionColour && r.remove()
-      );
-      // Ctrl / Cmd: remove the current region
-    } else if (e.ctrlKey || e.metaKey) r.remove();
-  });
-
-  // Enable analyse selection when region created
-  REGIONS.on("region-created", function (r) {
-    const { start, content } = r;
-    const activeStart = activeRegion ? activeRegion.start : null;
-    // If a new region is created without a label, it must be user generated
-    if (!content || start === activeStart) {
-      setActiveRegion(r);
-    }
-  });
-
-  // Clear label on modifying region
-  REGIONS.on("region-update", function (r) {
-    r.setOptions({ content: " " });
-    setActiveRegion(r);
-  });
-
-  return REGIONS;
-}
-
-/**
- * Initializes and returns a new spectrogram visualization instance.
- *
- * This function destroys any existing spectrogram instance and purges related plugins before creating a new one.
- * The FFT sample count defaults to the value from configuration (config.FFT) if not provided.
- * If FFT samples remain unset, they are determined heuristically based on a global window length:
- *  - 256 samples if the window length is less than 5,
- *  - 512 samples if the window length is 5 to 15 (inclusive),
- *  - 1024 samples if the window length is greater than 15.
- * Likewise, the spectrogram height defaults to half of the FFT sample count if not specified.
- * A custom colormap is generated and applied along with configured frequency ranges and label settings.
- *
- * @param {number} [height] - The height of the spectrogram in pixels. Defaults to fftSamples/2 if not provided.
- * @param {number} [fftSamples] - The number of FFT samples used for analysis. Defaults to config.FFT or is computed based on window length.
- * @returns {Object} The initialized spectrogram instance.
- */
-function initSpectrogram(height, fftSamples) {
-  fftSamples ??= config.FFT;
-  config.debug && console.log("initializing spectrogram");
-  spectrogram && spectrogram.destroy() && WSPluginPurge();
-  if (!fftSamples) {
-    if (windowLength < 5) {
-      fftSamples = 256;
-    } else if (windowLength <= 15) {
-      fftSamples = 512;
-    } else {
-      fftSamples = 1024;
-    }
-  }
-  if (!height) {
-    height = fftSamples / 2;
-  }
-  // set colormap
-  const colors = createColormap();
-  return Spectrogram.create({
-    container: "#spectrogram",
-    windowFunc: config.customColormap.windowFn,
-    frequencyMin: config.audio.minFrequency,
-    frequencyMax: config.audio.maxFrequency,
-    // noverlap: 128, Auto (the default) seems fine
-    // gainDB: 50, Adjusts spec brightness without increasing volume
-    labels: config.specLabels,
-    labelsColor: wsTextColour(),
-    labelsBackground: "rgba(0,0,0,0)",
-    height: height,
-    fftSamples: fftSamples,
-    scale: "linear",
-    colorMap: colors,
-    alpha: config.alpha,
-  });
-}
-
-function hideTooltip() {
-  DOM.tooltip.style.visibility = "hidden";
-}
-
-function specTooltip(event, showHz = !config.specLabels) {
-  const i18 = getI18n(i18n.Context);
-  const waveElement = event.target;
-  // Update the tooltip content
-  const tooltip = DOM.tooltip;
-  tooltip.style.display = "none";
-  tooltip.replaceChildren();
-  const inRegion = checkForRegion(event, false);
-  if (showHz || inRegion) {
-    const specDimensions = waveElement.getBoundingClientRect();
-    const frequencyRange =
-      Number(config.audio.maxFrequency) - Number(config.audio.minFrequency);
-    const yPosition =
-      Math.round(
-        (specDimensions.bottom - event.clientY) *
-          (frequencyRange / specDimensions.height)
-      ) + Number(config.audio.minFrequency);
-
-    tooltip.textContent = `${i18.frequency}: ${yPosition}Hz`;
-    if (inRegion) {
-      const { start, end } = inRegion;
-      const textNode = document.createTextNode(
-        formatRegionTooltip(i18.length, start, end)
-      );
-      const lineBreak = document.createElement("br");
-      tooltip.appendChild(lineBreak); // Add the line break
-      tooltip.appendChild(textNode); // Add the text node
-    }
-    // Apply styles to the tooltip
-    Object.assign(tooltip.style, {
-      top: `${event.clientY}px`,
-      left: `${event.clientX + 15}px`,
-      display: "block",
-      visibility: "visible",
-      opacity: 1,
-    });
-  }
-}
 
 const updateListIcon = () => {
   LIST_MAP = getI18n(i18n.LIST_MAP);
@@ -3517,60 +2772,15 @@ const timelineToggle = (fromKeys) => {
   if (fileLoaded && STATE.regionsCompleted) {
     // Reload wavesurfer with the new timeline
     const position = utils.clamp(
-      wavesurfer.getCurrentTime() / windowLength,
+      wavesurfer.getCurrentTime() / STATE.windowLength,
       0,
       1
     );
-    postBufferUpdate({ begin: windowOffsetSecs, position: position });
+    postBufferUpdate({ begin: STATE.windowOffsetSecs, position: position });
   }
   updatePrefs("config.json", config);
 };
-/**
- * Centers the spectrogram view around the current playback time.
- *
- * This function recalculates the starting offset of the audio window so that the
- * current time (from the WaveSurfer instance) appears at the center of the display.
- * It updates the global variable `windowOffsetSecs` by subtracting half of the
- * window's length from the computed midpoint. The offset is clamped between 0 and
- * the maximum valid offset determined by `currentFileDuration - windowLength`.
- *
- * If an active audio region exists (stored in `activeRegion`), the function adjusts
- * its start and end times by the same offset shift. Should the region extend beyond the
- * valid window boundaries after the shift, it is cleared (set to null).
- *
- * Finally, the function invokes `postBufferUpdate` to refresh the audio display with
- * the new configuration, positioning the center at 0.5.
- *
- * Side Effects:
- * - Modifies the global variables `windowOffsetSecs` and `activeRegion`.
- * - Relies on and interacts with global state including `wavesurfer`, `windowLength`,
- *   `currentFileDuration`, and `postBufferUpdate`.
- */
 
-function centreSpec() {
-  if (STATE.regionsCompleted) {
-    const saveBufferBegin = windowOffsetSecs;
-    const middle = windowOffsetSecs + wavesurfer.getCurrentTime();
-    windowOffsetSecs = middle - windowLength / 2;
-    windowOffsetSecs = Math.max(0, windowOffsetSecs);
-    windowOffsetSecs = Math.min(
-      windowOffsetSecs,
-      currentFileDuration - windowLength
-    );
-
-    if (activeRegion) {
-      const shift = saveBufferBegin - windowOffsetSecs;
-      activeRegion.start += shift;
-      activeRegion.end += shift;
-      const { start, end } = activeRegion;
-      if (start < 0 || end > windowLength) activeRegion = null;
-    }
-    postBufferUpdate({
-      begin: windowOffsetSecs,
-      position: 0.5,
-    });
-  }
-}
 
 /**
  * Updates the active record based on the key assignment configuration.
@@ -3647,15 +2857,15 @@ const GLOBAL_ACTIONS = {
       STATE.currentFile &&
       document.getElementById("analyseAll").click();
   },
-  c: (e) => (e.ctrlKey || e.metaKey) && currentBuffer && centreSpec(),
+  c: (e) => (e.ctrlKey || e.metaKey) && STATE.currentBuffer && centreSpec(),
   // D: (e) => {
   //     if (( e.ctrlKey || e.metaKey)) worker.postMessage({ action: 'create-dataset' });
   // },
-  e: (e) => (e.ctrlKey || e.metaKey) && activeRegion && exportAudio(),
+  e: (e) => (e.ctrlKey || e.metaKey) && STATE.activeRegion && exportAudio(),
   g: (e) => (e.ctrlKey || e.metaKey) && showGoToPosition(),
   o: async (e) =>
     (e.ctrlKey || e.metaKey) && (await showOpenDialog("openFile")),
-  p: () => activeRegion && playRegion(),
+  p: () => STATE.activeRegion && playRegion(),
   q: (e) => e.metaKey && isMac && window.electron.exitApplication(),
   s: (e) =>
     (e.ctrlKey || e.metaKey) && document.getElementById("save2db").click(),
@@ -3699,37 +2909,37 @@ const GLOBAL_ACTIONS = {
     }
   },
   Home: () => {
-    if (currentBuffer && STATE.regionsCompleted) {
-      windowOffsetSecs = 0;
+    if (STATE.currentBuffer && STATE.regionsCompleted) {
+      STATE.windowOffsetSecs = 0;
       postBufferUpdate({});
     }
   },
   End: () => {
-    if (currentBuffer && STATE.regionsCompleted) {
-      windowOffsetSecs = currentFileDuration - windowLength;
-      postBufferUpdate({ begin: windowOffsetSecs, position: 1 });
+    if (STATE.currentBuffer && STATE.regionsCompleted) {
+      STATE.windowOffsetSecs = currentFileDuration - STATE.windowLength;
+      postBufferUpdate({ begin: STATE.windowOffsetSecs, position: 1 });
     }
   },
   PageUp: () => {
-    if (currentBuffer && STATE.regionsCompleted) {
+    if (STATE.currentBuffer && STATE.regionsCompleted) {
       const position = utils.clamp(
-        wavesurfer.getCurrentTime() / windowLength,
+        wavesurfer.getCurrentTime() / STATE.windowLength,
         0,
         1
       );
-      windowOffsetSecs = windowOffsetSecs - windowLength;
+      STATE.windowOffsetSecs = STATE.windowOffsetSecs - STATE.windowLength;
       const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
       let fileToLoad;
-      if (fileIndex > 0 && windowOffsetSecs < 0) {
-        windowOffsetSecs = -windowLength;
+      if (fileIndex > 0 && STATE.windowOffsetSecs < 0) {
+        STATE.windowOffsetSecs = -STATE.windowLength;
         fileToLoad = STATE.openFiles[fileIndex - 1];
       } else {
-        windowOffsetSecs = Math.max(0, windowOffsetSecs);
+        STATE.windowOffsetSecs = Math.max(0, STATE.windowOffsetSecs);
         fileToLoad = STATE.currentFile;
       }
       postBufferUpdate({
         file: fileToLoad,
-        begin: windowOffsetSecs,
+        begin: STATE.windowOffsetSecs,
         position: position,
       });
     }
@@ -3743,33 +2953,33 @@ const GLOBAL_ACTIONS = {
     }
   },
   PageDown: () => {
-    if (currentBuffer && STATE.regionsCompleted) {
+    if (STATE.currentBuffer && STATE.regionsCompleted) {
       let position = utils.clamp(
-        wavesurfer.getCurrentTime() / windowLength,
+        wavesurfer.getCurrentTime() / STATE.windowLength,
         0,
         1
       );
-      windowOffsetSecs = windowOffsetSecs + windowLength;
+      STATE.windowOffsetSecs = STATE.windowOffsetSecs + STATE.windowLength;
       const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
       let fileToLoad;
       if (
         fileIndex < STATE.openFiles.length - 1 &&
-        windowOffsetSecs >= currentFileDuration - windowLength
+        STATE.windowOffsetSecs >= currentFileDuration - STATE.windowLength
       ) {
         // Move to next file
         fileToLoad = STATE.openFiles[fileIndex + 1];
-        windowOffsetSecs = 0;
+        STATE.windowOffsetSecs = 0;
         position = 0;
       } else {
-        windowOffsetSecs = Math.min(
-          windowOffsetSecs,
-          currentFileDuration - windowLength
+        STATE.windowOffsetSecs = Math.min(
+          STATE.windowOffsetSecs,
+          currentFileDuration - STATE.windowLength
         );
         fileToLoad = STATE.currentFile;
       }
       postBufferUpdate({
         file: fileToLoad,
-        begin: windowOffsetSecs,
+        begin: STATE.windowOffsetSecs,
         position: position,
       });
     }
@@ -3783,27 +2993,27 @@ const GLOBAL_ACTIONS = {
     }
   },
   ArrowLeft: () => {
-    const skip = windowLength / 100;
-    if (currentBuffer && STATE.regionsCompleted) {
+    const skip = STATE.windowLength / 100;
+    if (STATE.currentBuffer && STATE.regionsCompleted) {
       wavesurfer.setTime(wavesurfer.getCurrentTime() - skip);
       let position = utils.clamp(
-        wavesurfer.getCurrentTime() / windowLength,
+        wavesurfer.getCurrentTime() / STATE.windowLength,
         0,
         1
       );
-      if (wavesurfer.getCurrentTime() < skip && windowOffsetSecs > 0) {
-        windowOffsetSecs -= skip;
+      if (wavesurfer.getCurrentTime() < skip && STATE.windowOffsetSecs > 0) {
+        STATE.windowOffsetSecs -= skip;
         postBufferUpdate({
-          begin: windowOffsetSecs,
-          position: (position += skip / windowLength),
+          begin: STATE.windowOffsetSecs,
+          position: (position += skip / STATE.windowLength),
           play: wavesurfer.isPlaying(),
         });
       }
     }
   },
   ArrowRight: () => {
-    const skip = windowLength / 100;
-    if (currentBuffer && STATE.regionsCompleted) {
+    const skip = STATE.windowLength / 100;
+    if (STATE.currentBuffer && STATE.regionsCompleted) {
       const now = wavesurfer.getCurrentTime();
       if (wavesurfer.isReady) {
         // This will trigger the finish event if at the end of the window
@@ -3812,9 +3022,9 @@ const GLOBAL_ACTIONS = {
       // }
     }
   },
-  "=": (e) => (e.metaKey || e.ctrlKey ? reduceFFT() : zoomSpec("zoomIn")),
-  "+": (e) => (e.metaKey || e.ctrlKey ? reduceFFT() : zoomSpec("zoomIn")),
-  "-": (e) => (e.metaKey || e.ctrlKey ? increaseFFT() : zoomSpec("zoomOut")),
+  "=": (e) => (e.metaKey || e.ctrlKey ? reduceFFT() : spec.zoom("In")),
+  "+": (e) => (e.metaKey || e.ctrlKey ? reduceFFT() : spec.zoom("In")),
+  "-": (e) => (e.metaKey || e.ctrlKey ? increaseFFT() : spec.zoom("Out")),
   F5: () => reduceFFT(),
   F4: () => increaseFFT(),
   " ": async () => {
@@ -3871,33 +3081,6 @@ function disableSettingsDuringAnalysis(bool) {
   DOM.backendOptions?.forEach((backend) => (backend.disabled = bool));
 }
 
-const postBufferUpdate = ({
-  file = STATE.currentFile,
-  begin = 0,
-  position = 0,
-  play = false,
-  resetSpec = false,
-  goToRegion = false,
-}) => {
-  STATE.regionsCompleted = false;
-  fileLoaded = false;
-  worker.postMessage({
-    action: "update-buffer",
-    file: file,
-    position: position,
-    start: begin,
-    end: begin + windowLength,
-    play: play,
-    resetSpec: resetSpec,
-    // region: activeRegion,
-    goToRegion: goToRegion,
-  });
-  // In case it takes a while:
-  loadingTimeout = setTimeout(() => {
-    DOM.loading.querySelector("#loadingText").textContent = "Loading file...";
-    DOM.loading.classList.remove("d-none");
-  }, 500);
-};
 
 // Go to position
 const goto = new bootstrap.Modal(document.getElementById("gotoModal"));
@@ -3954,12 +3137,12 @@ const gotoTime = (e) => {
     } else {
       start = hours * 3600 + minutes * 60 + seconds;
     }
-    windowLength = 20;
+    STATE.windowLength = 20;
 
     start = Math.min(start, currentFileDuration);
-    windowOffsetSecs = Math.max(start - windowLength / 2, 0);
+    STATE.windowOffsetSecs = Math.max(start - STATE.windowLength / 2, 0);
     const position = start === 0 ? 0 : 0.5;
-    postBufferUpdate({ begin: windowOffsetSecs, position: position });
+    postBufferUpdate({ begin: STATE.windowOffsetSecs, position: position });
     // Close the modal
     goto.hide();
   }
@@ -3991,7 +3174,7 @@ function onModelReady(args) {
     if (STATE.openFiles.length > 1)
       utils.enableMenuItem(["analyseAll", "reanalyseAll"]);
   }
-  if (activeRegion) utils.enableMenuItem(["analyseSelection"]);
+  if (STATE.activeRegion) utils.enableMenuItem(["analyseSelection"]);
   t1_warmup = Date.now();
   DIAGNOSTICS["Warm Up"] =
     ((t1_warmup - t0_warmup) / 1000).toFixed(2) + " seconds";
@@ -4062,14 +3245,13 @@ async function onWorkerLoadedAudio({
     );
   // Dismiss a context menu if it's open
   DOM.contextMenu.classList.add("d-none");
-  currentBuffer = contents;
+  STATE.currentBuffer = contents;
 
   STATE.fileStart = fileStart;
   locationID = location;
-  windowOffsetSecs = windowBegin;
+  STATE.windowOffsetSecs = windowBegin;
   if (STATE.currentFile !== file) {
     STATE.currentFile = file;
-    fileEnd = new Date(fileStart + currentFileDuration * 1000);
     STATE.metadata[STATE.currentFile] = metadata;
     renderFilenamePanel();
   }
@@ -4079,11 +3261,11 @@ async function onWorkerLoadedAudio({
     : new Date(0, 0, 0, 0, 0, 0, 0);
   bufferStartTime = new Date(initialTime.getTime() + windowBegin * 1000);
 
-  if (windowLength > currentFileDuration) windowLength = currentFileDuration;
+  if (STATE.windowLength > currentFileDuration) STATE.windowLength = currentFileDuration;
 
   resetRegions();
-  await updateSpec({
-    buffer: currentBuffer,
+  await spec.updateSpec({
+    buffer: STATE.currentBuffer,
     position: position,
     play: play,
     resetSpec: resetSpec,
@@ -4586,7 +3768,7 @@ async function renderResult({
       !STATE.selection &&
       STATE.regionsCompleted
     )
-      postBufferUpdate({ file, begin: windowOffsetSecs });
+      postBufferUpdate({ file, begin: STATE.windowOffsetSecs });
   } else if (!isFromDB && index % (config.limit + 1) === 0) {
     pagination.add(index, 0);
   }
@@ -4785,12 +3967,12 @@ function sendFile(mode, result) {
     const datetime = dateArray.slice(0, 5).join(" ");
     filename = `${result.cname}_${datetime}.${config.audio.format}`;
   } else if (start === undefined) {
-    if (activeRegion.start) {
-      start = activeRegion.start + windowOffsetSecs;
-      end = activeRegion.end + windowOffsetSecs;
+    if (STATE.activeRegion.start) {
+      start = STATE.activeRegion.start + STATE.windowOffsetSecs;
+      end = STATE.activeRegion.end + STATE.windowOffsetSecs;
     } else {
       start = 0;
-      end = currentBuffer.duration;
+      end = STATE.currentBuffer.duration;
     }
     const dateArray = new Date(STATE.fileStart + start * 1000)
       .toString()
@@ -4867,7 +4049,7 @@ const iconizeScore = (score) => {
 
 const exportAudio = () => {
   let result;
-  if (activeRegion.label) {
+  if (STATE.activeRegion.label) {
     setClickedIndex(activeRow);
     result = predictions[clickedIndex];
   }
@@ -5588,12 +4770,12 @@ const filterIconDisplay = () => {
 const showFilterEffect = () => {
   if (fileLoaded && STATE.regionsCompleted) {
     const position = utils.clamp(
-      wavesurfer.getCurrentTime() / windowLength,
+      wavesurfer.getCurrentTime() / STATE.windowLength,
       0,
       1
     );
     postBufferUpdate({
-      begin: windowOffsetSecs,
+      begin: STATE.windowOffsetSecs,
       position: position,
     });
   }
@@ -5708,7 +4890,7 @@ DOM.gain.addEventListener("input", () => {
  * Plays the active audio region after sanitizing its boundaries.
  *
  * This function locates the active region from the global REGIONS object by matching the
- * region's start time with the global activeRegion. It then adjusts the region's start and
+ * region's start time with the global STATE.activeRegion. It then adjusts the region's start and
  * end times to ensure they fall within the valid playback window—ensuring the start is not
  * negative and the end does not exceed 99.5% of the windowLength to avoid triggering a finish
  * event that causes a page reload. Note that if playback is paused at the end of an adjacent region,
@@ -5720,7 +4902,7 @@ DOM.gain.addEventListener("input", () => {
  *
  * Global Dependencies:
  * - REGIONS: An object containing all audio regions.
- * - activeRegion: The currently active region used for matching.
+ * - STATE.activeRegion: The currently active region used for matching.
  * - windowLength: A number representing the maximum playback window length.
  *
  * @returns {void}
@@ -5730,13 +4912,13 @@ function playRegion() {
   // I don't want to change the actual region length, so make a copy
   if (STATE.regionsCompleted) {
     const region = REGIONS.regions?.find(
-      (region) => region.start === activeRegion.start
+      (region) => region.start === STATE.activeRegion.start
     );
     if (region) {
       const myRegion = region;
       myRegion.start = Math.max(0, myRegion.start);
       // Have to adjust the windowlength so the finish event isn't fired - causing a page reload)
-      myRegion.end = Math.min(myRegion.end, windowLength * 0.995);
+      myRegion.end = Math.min(myRegion.end, STATE.windowLength * 0.995);
       myRegion.play(true);
     }
   }
@@ -6121,7 +5303,7 @@ document.addEventListener("click", function (e) {
       checkFilteredFrequency();
       worker.postMessage({ action: "update-state", audio: config.audio });
       const fftSamples = spectrogram.fftSamples;
-      adjustSpecDims(true, fftSamples);
+      spec.adjustSpecDims(true, fftSamples);
       document
         .getElementById("frequency-range")
         .classList.remove("text-warning");
@@ -6178,7 +5360,7 @@ document.addEventListener("click", function (e) {
 
     case "zoomIn":
     case "zoomOut": {
-      zoomSpec(e);
+      spec.zoom(e);
       break;
     }
     case "cmpZoomIn":
@@ -6555,10 +5737,10 @@ document.addEventListener("change", function (e) {
           }
           if (wavesurfer && STATE.currentFile && STATE.regionsCompleted) {
             const fftSamples = spectrogram.fftSamples;
-            adjustSpecDims(true, fftSamples);
+            spec.adjustSpecDims(true, fftSamples);
             postBufferUpdate({
-              begin: windowOffsetSecs,
-              position: wavesurfer.getCurrentTime() / windowLength,
+              begin: STATE.windowOffsetSecs,
+              position: wavesurfer.getCurrentTime() / STATE.windowLength,
             });
           }
           break;
@@ -6591,7 +5773,7 @@ document.addEventListener("change", function (e) {
           };
           if (wavesurfer && STATE.currentFile) {
             const fftSamples = spectrogram.fftSamples;
-            adjustSpecDims(true, fftSamples);
+            spec.adjustSpecDims(true, fftSamples);
             refreshTimeline();
           }
           break;
@@ -6604,12 +5786,12 @@ document.addEventListener("change", function (e) {
           config.filters.active || toggleFilters();
           if (fileLoaded && STATE.regionsCompleted) {
             const position = utils.clamp(
-              wavesurfer.getCurrentTime() / windowLength,
+              wavesurfer.getCurrentTime() / STATE.windowLength,
               0,
               1
             );
             postBufferUpdate({
-              begin: windowOffsetSecs,
+              begin: STATE.windowOffsetSecs,
               position: position,
             });
           }
@@ -6619,7 +5801,7 @@ document.addEventListener("change", function (e) {
           config.specLabels = element.checked;
           if (wavesurfer && STATE.currentFile) {
             const fftSamples = spectrogram.fftSamples;
-            adjustSpecDims(true, fftSamples);
+            spec.adjustSpecDims(true, fftSamples);
           }
           break;
         }
@@ -6637,7 +5819,7 @@ document.addEventListener("change", function (e) {
           DOM.fromInput.value = config.audio.minFrequency;
           DOM.fromSlider.value = config.audio.minFrequency;
           const fftSamples = spectrogram.fftSamples;
-          adjustSpecDims(true, fftSamples);
+          spec.adjustSpecDims(true, fftSamples);
           checkFilteredFrequency();
           element.blur();
           worker.postMessage({ action: "update-state", audio: config.audio });
@@ -6649,7 +5831,7 @@ document.addEventListener("change", function (e) {
           DOM.toInput.value = config.audio.maxFrequency;
           DOM.toSlider.value = config.audio.maxFrequency;
           const fftSamples = spectrogram.fftSamples;
-          adjustSpecDims(true, fftSamples);
+          spec.adjustSpecDims(true, fftSamples);
           checkFilteredFrequency();
           element.blur();
           worker.postMessage({ action: "update-state", audio: config.audio });
@@ -6665,12 +5847,12 @@ document.addEventListener("change", function (e) {
           element.blur();
           if (fileLoaded && STATE.regionsCompleted) {
             const position = utils.clamp(
-              wavesurfer.getCurrentTime() / windowLength,
+              wavesurfer.getCurrentTime() / STATE.windowLength,
               0,
               1
             );
             postBufferUpdate({
-              begin: windowOffsetSecs,
+              begin: STATE.windowOffsetSecs,
               position: position,
             });
           }
@@ -6817,7 +5999,7 @@ function getI18n(context) {
  * Determines if a right-click event occurred within an audio region and optionally sets it as active.
  *
  * This function calculates the time position from the event's x-coordinate relative to the target element's width
- * using the global "windowLength". It then searches the global "REGIONS.regions" array for an audio region that spans
+ * using the global "STATE.windowLength". It then searches the global "REGIONS.regions" array for an audio region that spans
  * the computed time. If a matching region is found and the setActive flag is true, the region is set as active by calling
  * the global "setActiveRegion" function.
  *
@@ -6827,7 +6009,7 @@ function getI18n(context) {
  */
 function checkForRegion(e, setActive) {
   const relativePosition = e.clientX / e.currentTarget.clientWidth;
-  const time = relativePosition * windowLength;
+  const time = relativePosition * STATE.windowLength;
   const region = REGIONS.regions.find((r) => r.start < time && r.end > time);
   region && setActive && setActiveRegion(region);
   return region;
@@ -6905,9 +6087,9 @@ async function createContextMenu(e) {
       await utils.waitFor(() => fileLoaded);
     }
   }
-  if (!activeRegion && !inSummary) return;
+  if (!STATE.activeRegion && !inSummary) return;
   const createOrEdit =
-    activeRegion?.label || target.closest("#summary") ? i18.edit : i18.create;
+    STATE.activeRegion?.label || target.closest("#summary") ? i18.edit : i18.create;
 
   DOM.contextMenu.innerHTML = `
     <div id="${inSummary ? "inSummary" : "inResults"}">
@@ -6961,7 +6143,7 @@ async function createContextMenu(e) {
         }
       });
   }
-  if (!(inSummary || activeRegion?.label || hideInSelection || hideInSummary)) {
+  if (!(inSummary || STATE.activeRegion?.label || hideInSelection || hideInSummary)) {
     const xc = document.getElementById("context-xc");
     xc.classList.add("d-none");
     contextDelete.classList.add("d-none");
@@ -7031,7 +6213,7 @@ async function showRecordEntryForm(mode, batch) {
   const cname = batch
     ? document.querySelector("#speciesFilter .text-warning .cname .cname")
         .textContent
-    : activeRegion?.label || "";
+    : STATE.activeRegion?.label || "";
   let callCount = "",
     commentText = "";
   if (cname && activeRow) {
@@ -7094,11 +6276,11 @@ recordEntryForm.addEventListener("submit", function (e) {
   // Check we selected a species
   if (!LABELS.some((item) => item.includes(cname))) return;
   let start, end;
-  if (activeRegion) {
-    start = windowOffsetSecs + activeRegion.start;
-    end = windowOffsetSecs + activeRegion.end;
+  if (STATE.activeRegion) {
+    start = STATE.windowOffsetSecs + STATE.activeRegion.start;
+    end = STATE.windowOffsetSecs + STATE.activeRegion.end;
     const region = REGIONS.regions.find(
-      (region) => region.start === activeRegion.start
+      (region) => region.start === STATE.activeRegion.start
     );
     // You can still add a record if you cleared the regions
     region?.setOptions({ content: cname });
@@ -7353,7 +6535,7 @@ function checkForMacUpdates() {
             alertPlaceholder.append(wrapper);
           };
           const link = `<a href="https://chirpity.mattkirkland.co.uk?fromVersion=${VERSION}" target="_blank">`;
-          const message = utils.interpolate(getI18n(i18nUpdateMessage), {
+          const message = utils.interpolate(getI18n(i18n.UpdateMessage), {
             link: link,
           });
           alert(
@@ -7375,18 +6557,7 @@ function checkForMacUpdates() {
       });
   }
 }
-const i18nUpdateMessage = {
-  en: "There's a new version of Chirpity available! ${link}Check the website</a> for more information",
-  da: "Der er en ny version af Chirpity tilgængelig! ${link}Besøg hjemmesiden</a> for mere information",
-  de: "Eine neue Version von Chirpity ist verfügbar! ${link}Besuchen Sie die Website</a> für weitere Informationen",
-  es: "¡Hay una nueva versión de Chirpity disponible! ${link}Visita el sitio web</a> para más información",
-  fr: "Une nouvelle version de Chirpity est disponible ! ${link}Consultez le site web</a> pour plus d'informations",
-  nl: "Er is een nieuwe versie van Chirpity beschikbaar! ${link}Bezoek de website</a> voor meer informatie",
-  pt: "Há uma nova versão do Chirpity disponível! ${link}Visite o site</a> para mais informações",
-  ru: "Доступна новая версия Chirpity! ${link}Посетите сайт</a> для получения дополнительной информации",
-  sv: "En ny version av Chirpity är tillgänglig! ${link}Besök webbplatsen</a> för mer information",
-  zh: "Chirpity有新版本可用！${link}访问网站</a>了解更多信息",
-};
+
 
 function generateToast({
   message = "",
@@ -7769,7 +6940,7 @@ function renderComparisons(lists, cname) {
   comparisonModal.show();
 }
 
-let ws, compareSpec;
+let ws;
 const createCompareWS = (mediaContainer) => {
   if (ws) ws.destroy();
   ws = WaveSurfer.create({
@@ -7787,7 +6958,7 @@ const createCompareWS = (mediaContainer) => {
     sampleRate: 24000,
   });
   // set colormap
-  const colors = createColormap();
+  const colors = spec.createColormap(config);
   const createCmpSpec = () =>
     ws.registerPlugin(
       Spectrogram.create({
@@ -7834,99 +7005,7 @@ function showCompareSpec() {
   ws.load(file);
 }
 
-async function getIUCNStatus(sname = "Anser anser") {
-  if (!Object.keys(STATE.IUCNcache).length) {
-    //const path = p.join(appPath, 'IUCNcache.json');
-    const path = window.location.pathname
-      .replace(/^\/(\w:)/, "$1")
-      .replace("index.html", "IUCNcache.json");
-    if (fs.existsSync(path)) {
-      const data = await fs.promises.readFile(path, "utf8").catch((err) => {});
-      STATE.IUCNcache = JSON.parse(data);
-    } else {
-      STATE.IUCNcache = {};
-    }
-  }
-  return STATE.IUCNcache[sname];
 
-  /* The following code should not be called in the packaged app */
-
-  const [genus, species] = sname.split(" ");
-
-  const headers = {
-    Accept: "application/json",
-    Authorization: "API_KEY", // Replace with the actual API key
-    keepalive: true,
-  };
-
-  try {
-    const response = await fetch(
-      `https://api.iucnredlist.org/api/v4/taxa/scientific_name?genus_name=${genus}&species_name=${species}`,
-      { headers }
-    );
-
-    if (!response.ok) {
-      throw new Error(
-        `Network error: code ${response.status} fetching IUCN data.`
-      );
-    }
-
-    const data = await response.json();
-
-    // Filter out all but the latest assessments
-    const filteredAssessments = data.assessments.filter(
-      (assessment) => assessment.latest
-    );
-    const speciesData = { sname, scopes: [] };
-
-    // Fetch all the assessments concurrently
-    const assessmentResults = await Promise.all(
-      filteredAssessments.map(async (item) => {
-        const response = await fetch(
-          `https://api.iucnredlist.org/api/v4/assessment/${item.assessment_id}`,
-          { headers }
-        );
-        if (!response.ok) {
-          throw new Error(
-            `Network error: code ${response.status} fetching IUCN data.`
-          );
-        }
-        const data = await response.json();
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        return data;
-      })
-    );
-
-    // Process each result
-    for (let item of assessmentResults) {
-      const scope = item.scopes?.[0]?.description?.en || "Unknown";
-      const status = item.red_list_category?.code || "Unknown";
-      const url = item.url || "No URL provided";
-
-      speciesData.scopes.push({ scope, status, url });
-    }
-
-    console.log(speciesData);
-    STATE.IUCNcache[sname] = speciesData;
-    updatePrefs("IUCNcache.json", STATE.IUCNcache);
-    return true; // Optionally return the data if you need to use it elsewhere
-  } catch (error) {
-    if (error.message.includes("404")) {
-      generateToast({
-        message: "noIUCNRecord",
-        variables: { sname: sname },
-        type: "warning",
-      });
-      STATE.IUCNcache[sname] = {
-        scopes: [{ scope: "Global", status: "NA", url: null }],
-      };
-      updatePrefs("IUCNcache.json", STATE.IUCNcache);
-      return true;
-    }
-    console.error("Error fetching IUCN data:", error.message);
-    return false;
-  }
-}
 const IUCNMap = {
   NA: "text-bg-secondary",
   DD: "text-bg-secondary",
