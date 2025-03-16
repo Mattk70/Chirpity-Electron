@@ -10,7 +10,7 @@ const SunCalc = require("suncalc");
 const ffmpeg = require("fluent-ffmpeg");
 
 const merge = require("lodash.merge");
-import { State } from "./utils/state.js";
+import { WorkerState as State } from "./utils/state.js";
 import {
   sqlite3,
   checkpoint,

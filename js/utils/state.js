@@ -1,10 +1,9 @@
 /**
  * @file Helper functions for managing state.
  */
-
 const sqlite3 = require("sqlite3");
+export class WorkerState {
 
-export class State {
   constructor(db) {
     (this.db = db),
       (this.mode = "analyse"), // analyse, explore, chart

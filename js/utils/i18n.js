@@ -1,3 +1,6 @@
+
+let LOCALE;
+
 const Toasts = { // UI.js
     en: {
         info: 'Information', warning: 'Warning', error: 'Error',
@@ -3041,6 +3044,9 @@ const Select = {
   };
   
 
+const setLocale = (locale) => LOCALE = locale;
+const get = (context) => context[LOCALE] || context["en"];
+
 /**
  * Updates UI elements with localized text based on the provided locale.
  *
@@ -3062,6 +3068,7 @@ const Select = {
  */
 async function localiseUI(locale) {
     locale = locale.replace(/_.*$/, '');
+    setLocale(locale);
     try {
          // Try fetching the localisation JSON file
         let localisationData = {};
@@ -3192,4 +3199,4 @@ async function localiseUI(locale) {
     }
 }
 
-export {All, SpeciesList,Headings, Context, Location, Form, Help, Toasts, Titles, LIST_MAP, Lists, IUCNLabel, Locate,Select, UpdateMessage, localiseUI}
+export {All, SpeciesList,Headings, Context, Location, Form, Help, Toasts, Titles, LIST_MAP, Lists, IUCNLabel, Locate,Select, UpdateMessage, localiseUI, get}

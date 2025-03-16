@@ -9,7 +9,7 @@ import {
 } from "./utils/tracking.js";
 import { checkMembership } from "./utils/member.js";
 import { DOM } from "./utils/DOMcache.js";
-import { IUCNCache, IUCNtaxonomy } from "./utils/IUCNcache.js";
+import { IUCNtaxonomy } from "./utils/IUCNcache.js";
 import { XCtaxonomy as XCtaxon } from "./utils/XCtaxonomy.js";
 import { CustomSelect } from "./components/custom-select.js";
 import createFilterDropdown from "./components/custom-filter.js";
@@ -23,6 +23,7 @@ import {
 } from "./utils/getKnownIssues.js";
 import * as i18n from "./utils/i18n.js";
 import * as utils from "./utils/utils.js";
+import { UIState as State } from "./utils/UIState.js";
 import { ChirpityWS } from './components/spectrogram.js';
 
 let LOCATIONS,
@@ -30,7 +31,6 @@ let LOCATIONS,
   loadingTimeout,
   LIST_MAP;
 
-let REGIONS, spectrogram, timeline;
 let APPLICATION_LOADED = false;
 let LABELS = [],
   HISTORY = [];
@@ -102,61 +102,236 @@ window.addEventListener("rejectionhandled", function (event) {
   );
 });
 
-let STATE = {
-  metadata: {},
-  lastGestureTime: 0,
-  mode: "analyse",
-  analysisDone: false,
-  openFiles: [],
-  chart: {
-    aggregation: "Week",
-    species: undefined,
-    range: { start: undefined, end: undefined },
+
+
+const state = new State();
+const STATE = state.state;
+
+
+const GLOBAL_ACTIONS = {
+  // Handle number keys 1-9 dynamically
+  handleNumberKeys: (e) => {
+    if (/^[0-9]$/.test(e.key)) {
+      // number keys here
+      if (activeRow) {
+        recordUpdate(e.key);
+      }
+    }
   },
-  explore: {
-    species: undefined,
-    range: { start: undefined, end: undefined },
+  a: (e) => {
+    if ((e.ctrlKey || e.metaKey) && STATE.currentFile) {
+      const element = e.shiftKey ? "analyseAll" : "analyse";
+      document.getElementById(element).click();
+    }
   },
-  resultsSortOrder: "timestamp",
-  summarySortOrder: "cname ASC",
-  resultsMetaSortOrder: "",
-  dataFormatOptions: {
-    day: "2-digit",
-    month: "short",
-    year: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
+  A: (e) => {
+    (e.ctrlKey || e.metaKey) &&
+      STATE.currentFile &&
+      document.getElementById("analyseAll").click();
   },
-  birdList: { lastSelectedSpecies: undefined }, // Used to put the last selected species at the top of the all-species list
-  selection: { start: undefined, end: undefined },
-  currentAnalysis: {
-    currentFile: null,
-    openFiles: [],
-    mode: null,
-    species: null,
-    offset: 0,
-    active: null,
+  c: (e) => (e.ctrlKey || e.metaKey) && STATE.currentBuffer && centreSpec(),
+  // D: (e) => {
+  //     if (( e.ctrlKey || e.metaKey)) worker.postMessage({ action: 'create-dataset' });
+  // },
+  e: (e) => (e.ctrlKey || e.metaKey) && STATE.activeRegion && exportAudio(),
+  g: (e) => (e.ctrlKey || e.metaKey) && showGoToPosition(),
+  o: async (e) =>
+    (e.ctrlKey || e.metaKey) && (await showOpenDialog("openFile")),
+  p: () => STATE.activeRegion && playRegion(),
+  q: (e) => e.metaKey && isMac && window.electron.exitApplication(),
+  s: (e) =>
+    (e.ctrlKey || e.metaKey) && document.getElementById("save2db").click(),
+  t: (e) => (e.ctrlKey || e.metaKey) && timelineToggle(true),
+  v: (e) => {
+    if (activeRow && (e.ctrlKey || e.metaKey)) {
+      const nameAttribute = activeRow.getAttribute("name");
+      const [file, start, end, sname, cname] = nameAttribute.split("|");
+      insertManualRecord(
+        cname,
+        parseFloat(start),
+        parseFloat(end),
+        "",
+        "",
+        "",
+        "Update",
+        false,
+        cname
+      );
+    }
   },
-  currentBuffer: null,
-  windowLength: 20,
-  windowOffsetSecs: 0,
-  activeRegion: null,
-  IUCNcache: IUCNCache,
-  translations: ["da", "de", "es", "fr", "ja", "nl", "pt", "ru", "sv", "zh"],
-  regionColour: "rgba(255, 255, 255, 0.1)",
-  regionActiveColour: "rgba(255, 255, 0, 0.1)",
-  regionsCompleted: true,
-  labelColors: [
-    "dark",
-    "success",
-    "warning",
-    "info",
-    "secondary",
-    "danger",
-    "primary",
-  ],
+  z: (e) => {
+    if ((e.ctrlKey || e.metaKey) && HISTORY.length)
+      insertManualRecord(...HISTORY.pop());
+  },
+  Escape: () => {
+    if (PREDICTING) {
+      console.log("Operation aborted");
+      PREDICTING = false;
+      disableSettingsDuringAnalysis(false);
+      STATE.analysisDone = true;
+      worker.postMessage({
+        action: "abort",
+        model: config.model,
+        threads: config[config[config.model].backend].threads,
+        list: config.list,
+      });
+      STATE.diskHasRecords && utils.enableMenuItem(["explore", "charts"]);
+      generateToast({ message: "cancelled" });
+      DOM.progressDiv.classList.add("invisible");
+    }
+  },
+  Home: () => {
+    if (STATE.currentBuffer && STATE.regionsCompleted) {
+      STATE.windowOffsetSecs = 0;
+      postBufferUpdate({});
+    }
+  },
+  End: () => {
+    if (STATE.currentBuffer && STATE.regionsCompleted) {
+      STATE.windowOffsetSecs = STATE.currentFileDuration - STATE.windowLength;
+      postBufferUpdate({ begin: STATE.windowOffsetSecs, position: 1 });
+    }
+  },
+  PageUp: () => {
+    if (STATE.currentBuffer && STATE.regionsCompleted) {
+      const position = utils.clamp(
+        spec.wavesurfer.getCurrentTime() / STATE.windowLength,
+        0,
+        1
+      );
+      STATE.windowOffsetSecs = STATE.windowOffsetSecs - STATE.windowLength;
+      const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
+      let fileToLoad;
+      if (fileIndex > 0 && STATE.windowOffsetSecs < 0) {
+        STATE.windowOffsetSecs = -STATE.windowLength;
+        fileToLoad = STATE.openFiles[fileIndex - 1];
+      } else {
+        STATE.windowOffsetSecs = Math.max(0, STATE.windowOffsetSecs);
+        fileToLoad = STATE.currentFile;
+      }
+      postBufferUpdate({
+        file: fileToLoad,
+        begin: STATE.windowOffsetSecs,
+        position: position,
+      });
+    }
+  },
+  ArrowUp: () => {
+    if (activeRow && STATE.regionsCompleted) {
+      activeRow.classList.remove("table-active");
+      activeRow = activeRow.previousSibling || activeRow;
+      if (!activeRow.classList.contains("text-bg-dark")) activeRow.click();
+      // activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  },
+  PageDown: () => {
+    if (STATE.currentBuffer && STATE.regionsCompleted) {
+      let position = utils.clamp(
+        spec.wavesurfer.getCurrentTime() / STATE.windowLength,
+        0,
+        1
+      );
+      STATE.windowOffsetSecs = STATE.windowOffsetSecs + STATE.windowLength;
+      const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
+      let fileToLoad;
+      if (
+        fileIndex < STATE.openFiles.length - 1 &&
+        STATE.windowOffsetSecs >= STATE.currentFileDuration - STATE.windowLength
+      ) {
+        // Move to next file
+        fileToLoad = STATE.openFiles[fileIndex + 1];
+        STATE.windowOffsetSecs = 0;
+        position = 0;
+      } else {
+        STATE.windowOffsetSecs = Math.min(
+          STATE.windowOffsetSecs,
+          STATE.currentFileDuration - STATE.windowLength
+        );
+        fileToLoad = STATE.currentFile;
+      }
+      postBufferUpdate({
+        file: fileToLoad,
+        begin: STATE.windowOffsetSecs,
+        position: position,
+      });
+    }
+  },
+  ArrowDown: () => {
+    if (activeRow && STATE.regionsCompleted) {
+      activeRow.classList.remove("table-active");
+      activeRow = activeRow.nextSibling || activeRow;
+      if (!activeRow.classList.contains("text-bg-dark")) activeRow.click();
+      // activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  },
+  ArrowLeft: () => {
+    const skip = STATE.windowLength / 100;
+    if (STATE.currentBuffer && STATE.regionsCompleted) {
+      spec.wavesurfer.setTime(spec.wavesurfer.getCurrentTime() - skip);
+      let position = utils.clamp(
+        spec.wavesurfer.getCurrentTime() / STATE.windowLength,
+        0,
+        1
+      );
+      if (spec.wavesurfer.getCurrentTime() < skip && STATE.windowOffsetSecs > 0) {
+        STATE.windowOffsetSecs -= skip;
+        postBufferUpdate({
+          begin: STATE.windowOffsetSecs,
+          position: (position += skip / STATE.windowLength),
+          play: spec.wavesurfer.isPlaying(),
+        });
+      }
+    }
+  },
+  ArrowRight: () => {
+    const skip = STATE.windowLength / 100;
+    if (STATE.currentBuffer && STATE.regionsCompleted) {
+      const now = spec.wavesurfer.getCurrentTime();
+      if (spec.wavesurfer.isReady) {
+        // This will trigger the finish event if at the end of the window
+        spec.wavesurfer.setTime(now + skip);
+      }
+      // }
+    }
+  },
+  "=": (e) => (e.metaKey || e.ctrlKey ? config.FFT = spec.reduceFFT() : spec.zoom("In")),
+  "+": (e) => (e.metaKey || e.ctrlKey ? config.FFT = spec.reduceFFT() : spec.zoom("In")),
+  "-": (e) => (e.metaKey || e.ctrlKey ? config.FFT = spec.increaseFFT() : spec.zoom("Out")),
+  F5: () => config.FFT = spec.reduceFFT(),
+  F4: () => config.FFT = spec.increaseFFT(),
+  " ": async () => {
+    if (spec.wavesurfer) {
+      try {
+        await spec.wavesurfer.playPause();
+      } catch (e) {
+        console.warn("Wavesurfer error", error.message || error);
+      }
+    }
+  },
+  Tab: (e) => {
+    if ((e.metaKey || e.ctrlKey) && !PREDICTING && STATE.diskHasRecords) {
+      // If you did this when predicting, your results would go straight to the archive
+      const modeToSet =
+        STATE.mode === "explore" ? "active-analysis" : "explore";
+      document.getElementById(modeToSet).click();
+    } else if (activeRow && STATE.regionsCompleted) {
+      activeRow.classList.remove("table-active");
+      if (e.shiftKey) {
+        activeRow = activeRow.previousSibling || activeRow;
+        activeRow.scrollIntoView({ behavior: "instant", block: "nearest" });
+      } else {
+        activeRow = activeRow.nextSibling || activeRow;
+        activeRow.scrollIntoView({ behavior: "instant", block: "nearest" });
+      }
+      if (!activeRow.classList.contains("text-bg-dark")) {
+        activeRow.click();
+      }
+    }
+  },
+  Delete: () => activeRow && deleteRecord(activeRow),
+  Backspace: () => activeRow && deleteRecord(activeRow),
 };
+
 
 //Open Files from OS "open with"
 const OS_FILE_QUEUE = [];
@@ -234,19 +409,16 @@ let appVersionLoaded = new Promise((resolve, reject) => {
     });
 });
 
-let modelReady = false,
-  fileLoaded = false;
+let modelReady = false;
 let PREDICTING = false,
   t0,
   app_t0 = Date.now();
 
-let bufferStartTime;
 
 
 let activeRow;
 let predictions = {},
-  clickedIndex,
-  currentFileDuration;
+  clickedIndex;
 // Set content container height
 DOM.contentWrapper.style.height = document.body.clientHeight - 80 + "px";
 
@@ -344,7 +516,7 @@ function updateProgress(val) {
  * @param {boolean} preserveResults - If true, existing analysis results are retained; otherwise, they are cleared.
  */
 function loadAudioFileSync({ filePath = "", preserveResults = false }) {
-  fileLoaded = false;
+  STATE.fileLoaded = false;
   locationID = undefined;
   worker.postMessage({
     action: "file-load-request",
@@ -366,7 +538,7 @@ const postBufferUpdate = ({
   goToRegion = false,
 }) => {
   STATE.regionsCompleted = false;
-  fileLoaded = false;
+  STATE.fileLoaded = false;
   worker.postMessage({
     action: "update-buffer",
     file: file,
@@ -390,7 +562,7 @@ const resetRegions = (clearActive) => {
   STATE.selection = false;
   worker.postMessage({ action: "update-state", selection: false });
   utils.disableMenuItem(["analyseSelection", "export-audio"]);
-  if (fileLoaded) utils.enableMenuItem(["analyse"]);
+  if (STATE.fileLoaded) utils.enableMenuItem(["analyse"]);
 };
 
 /**
@@ -444,7 +616,7 @@ const buildFileMenu = (e) => {
   //e.preventDefault();
   e.stopImmediatePropagation();
   const menu = DOM.contextMenu;
-  const i18 = getI18n(i18n.Context);
+  const i18 = i18n.get(i18n.Context);
   menu.innerHTML = `
     <a class="dropdown-item" id="setCustomLocation"><span
     class="material-symbols-outlined align-bottom pointer">edit_location_alt</span> ${i18.location}</a>
@@ -466,7 +638,7 @@ const buildFileMenu = (e) => {
  */
 function showDatePicker() {
   // Create a form element
-  const i18 = getI18n(i18n.Form);
+  const i18 = i18n.get(i18n.Form);
   const form = document.createElement("form");
   form.classList.add(
     "mt-3",
@@ -595,7 +767,7 @@ function showMetadata() {
 }
 
 function renderFilenamePanel() {
-  const i18 = getI18n(i18n.Titles);
+  const i18 = i18n.get(i18n.Titles);
   if (!STATE.currentFile) return;
   const openFile = STATE.currentFile;
   const files = STATE.openFiles;
@@ -686,7 +858,7 @@ function customiseAnalysisMenu(saved) {
 }
 
 async function generateLocationList(id) {
-  const i18 = getI18n(i18n.All);
+  const i18 = i18n.get(i18n.All);
   const defaultText = id === "savedLocations" ? i18[0] : i18[1];
   const el = document.getElementById(id);
   LOCATIONS = undefined;
@@ -833,7 +1005,7 @@ async function setCustomLocation() {
     showLocation(true);
   });
 
-  const i18 = getI18n(i18n.Location);
+  const i18 = i18n.get(i18n.Location);
   const addOrDelete = () => {
     if (customPlaceEl.value) {
       locationAdd.textContent = i18[0];
@@ -989,7 +1161,7 @@ function analyseReset() {
  * If no file is loaded and there are no open files, all UI elements are hidden.
  */
 function refreshResultsView() {
-  if (fileLoaded) {
+  if (STATE.fileLoaded) {
     utils.hideAll();
     utils.showElement(["spectrogramWrapper"], false);
     if (!utils.isEmptyObject(predictions)) {
@@ -1230,8 +1402,8 @@ async function showCharts() {
   const locationFilter = await generateLocationList("chart-locations");
   locationFilter.addEventListener("change", handleLocationFilterChange);
   // Prevent the wavesurfer error
-  spectrogram && spectrogram.destroy();
-  spectrogram = null;
+  spec.spectrogram && spec.spectrogram.destroy();
+  spec.spectrogram = null;
   utils.hideAll();
   utils.showElement(["recordsContainer"]);
   worker.postMessage({
@@ -1251,8 +1423,8 @@ async function showCharts() {
  * resets analysis results, and adjusts the UI layout to prevent scroll issues.
  */
 async function showExplore() {
-  // Change fileLoaded this one time, so a file will load!
-  fileLoaded = true;
+  // Change STATE.fileLoaded this one time, so a file will load!
+  STATE.fileLoaded = true;
   saveAnalyseState();
   utils.enableMenuItem([
     "saveCSV",
@@ -1272,7 +1444,7 @@ async function showExplore() {
   locationFilter.addEventListener("change", handleLocationFilterChange);
   utils.hideAll();
   utils.showElement(["exploreWrapper", "spectrogramWrapper"], false);
-  reInitSpec();
+  spec.reInitSpec();
   worker.postMessage({ action: "update-state", filesToAnalyse: [] });
   // Analysis is done
   STATE.analysisDone = true;
@@ -1303,12 +1475,12 @@ async function showAnalyse() {
   STATE = { ...STATE, ...STATE.currentAnalysis };
   worker.postMessage({ action: "change-mode", mode: STATE.mode });
   // Prevent the wavesurfer error
-  spectrogram && spectrogram.destroy();
-  spectrogram = null;
+  spec.spectrogram && spec.spectrogram.destroy();
+  spec.spectrogram = null;
   utils.hideAll();
   if (STATE.currentFile) {
     utils.showElement(["spectrogramWrapper"], false);
-    reInitSpec();
+    spec.reInitSpec();
     worker.postMessage({
       action: "update-state",
       filesToAnalyse: STATE.openFiles,
@@ -1358,7 +1530,7 @@ selectionTable.addEventListener("click", resultClick);
  * document.querySelector('tr').addEventListener('click', resultClick);
  */
 async function resultClick(e) {
-  if (!fileLoaded) {
+  if (!STATE.fileLoaded) {
     console.warn("Cannot process click - no audio file is loaded");
     return;
   }
@@ -1381,7 +1553,7 @@ async function resultClick(e) {
     loadResultRegion({ file, start, end, label });
   }
   if (e.target.classList.contains("circle")) {
-    await utils.waitFor(() => fileLoaded);
+    await utils.waitFor(() => STATE.fileLoaded);
     getSelectionResults(true);
   }
 }
@@ -1411,7 +1583,7 @@ function setActiveRow(start) {
       r.classList.add("table-active");
       activeRow = r; // Update the active row reference
 
-      activeRow.scrollIntoView({ behavior: "smooth", block: "center" });
+      activeRow.scrollIntoView({ behavior: "instant", block: "center" });
       break; // Exit loop once the target row is found
     }
   }
@@ -1427,15 +1599,15 @@ const loadResultRegion = ({
   end = parseFloat(end);
   // ensure region doesn't spread across the whole window
   if (STATE.windowLength <= 3.5) STATE.windowLength = 6;
-  const windowOffsetSecs = STATE.windowOffsetSecs;
+  let windowOffsetSecs = STATE.windowOffsetSecs;
   windowOffsetSecs = Math.max(0, start - STATE.windowLength / 2 + 1.5);
   STATE.activeRegion = {
     start: Math.max(start - windowOffsetSecs, 0),
     end: end - windowOffsetSecs,
     label,
   };
-  const position = wavesurfer
-    ? utils.clamp(wavesurfer.getCurrentTime() / STATE.windowLength, 0, 1)
+  const position = spec.wavesurfer
+    ? utils.clamp(spec.wavesurfer.getCurrentTime() / STATE.windowLength, 0, 1)
     : 0;
   postBufferUpdate({
     file,
@@ -1464,70 +1636,6 @@ function setFontSizeScale(doNotScroll) {
   spec.adjustSpecDims(true);
 }
 
-
-
-function formatRegionTooltip(regionLength, start, end) {
-  const length = end - start;
-  if (length === 3) {
-    return `${formatTimeCallback(start)} -  ${formatTimeCallback(end)}`;
-  } else if (length < 1)
-    return `${regionLength}: ${(length * 1000).toFixed(0)}ms`;
-  else {
-    return `${regionLength}: ${length.toFixed(3)}s`;
-  }
-}
-
-function formatTimeCallback(secs) {
-  secs = secs.toFixed(2);
-  // Add 500 to deal with overflow errors
-  let now = new Date(bufferStartTime.getTime() + secs * 1000);
-  let milliseconds = now.getMilliseconds();
-  if (milliseconds > 949) {
-    // Deal with overflow errors
-    now = new Date(now.getTime() + 50);
-    milliseconds = 0;
-  }
-  // Extract the components
-  let hours = now.getHours();
-  let minutes = now.getMinutes();
-  let seconds = now.getSeconds();
-
-  let formattedTime;
-  if (config.timeOfDay) {
-    // Format the time as hh:mm:ss
-    formattedTime = [
-      hours.toString().padStart(2, "0"),
-      minutes.toString().padStart(2, "0"),
-      seconds.toString().padStart(2, "0"),
-    ].join(":");
-  } else {
-    if (hours === 0 && minutes === 0) {
-      // Format as ss
-      formattedTime = seconds.toString();
-    } else if (hours === 0) {
-      // Format as mm:ss
-      formattedTime = [
-        minutes.toString(),
-        seconds.toString().padStart(2, "0"),
-      ].join(":");
-    } else {
-      // Format as hh:mm:ss
-      formattedTime = [
-        hours.toString(),
-        minutes.toString().padStart(2, "0"),
-        seconds.toString().padStart(2, "0"),
-      ].join(":");
-    }
-  }
-  if (STATE.windowLength <= 5) {
-    formattedTime += "." + milliseconds.toString();
-  } else {
-    milliseconds = (milliseconds / 1000).toFixed(1);
-    formattedTime += milliseconds.slice(1);
-  }
-
-  return formattedTime;
-}
 
 ////////// Store preferences //////////
 
@@ -1683,7 +1791,7 @@ window.onload = async () => {
     utils.syncConfig(config, defaultConfig);
 
     membershipCheck().then((isMember) => (STATE.isMember = isMember));
-    spec.init({audio:undefined, height:config.specMaxHeight })
+
     // Disable SNR
     config.filters.SNR = 0;
 
@@ -1718,10 +1826,10 @@ window.onload = async () => {
       readLabels(config.customListFile[config.model], "list");
     // Show Locale
     DOM.locale.value = config.locale;
-    LIST_MAP = getI18n(i18n.LIST_MAP);
+    LIST_MAP = i18n.get(i18n.LIST_MAP);
     // Localise UI
     i18n.localiseUI(DOM.locale.value).then((result) => (STATE.i18n = result));
-    initialiseDatePicker(STATE, worker, config, resetResults, filterResults, getI18n);
+    initialiseDatePicker(STATE, worker, config, resetResults, filterResults, i18n.get);
     STATE.picker.options.lang = DOM.locale.value.replace("_uk", "");
 
     // remember audio notification setting
@@ -1953,7 +2061,7 @@ const setUpWorkerMessaging = () => {
             clearTimeout(loadingTimeout);
             DOM.loading.classList.add("d-none");
             MISSING_FILE = args.file;
-            const i18 = getI18n(i18n.Locate);
+            const i18 = i18n.get(i18n.Locate);
             args.locate = `
                             <div class="d-flex justify-content-center mt-2">
                                 <button id="locate-missing-file" class="btn btn-primary border-dark text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
@@ -2171,7 +2279,7 @@ function showWindowDetections({ detections, goToRegion }) {
       if (!config.specDetections && !active) continue;
       const colour = active ? STATE.regionActiveColour : null;
       const setPosition = active && goToRegion;
-      createRegion(start, end, detection.label, setPosition, colour);
+      spec.createRegion(start, end, detection.label, setPosition, colour);
     }
   }
   // Prevent region cluster fest
@@ -2553,34 +2661,7 @@ function handleKeyDown(e) {
   }
 }
 
-/**
- * Creates and returns a styled label element for a navigation option.
- *
- * This function generates an HTML <span> element with specific styling properties, including absolute positioning,
- * a text color, and a text shadow effect. If the global configuration's colormap is set to 'gray', the provided color
- * is overridden: a truthy color results in 'purple', whereas a falsy value defaults to '#666'. If no label text is provided,
- * the function returns undefined.
- *
- * @param {string} label - The text to display in the label. If falsy, the function returns undefined.
- * @param {string} [color] - The desired color for the label text (subject to configuration overrides).
- * @returns {(HTMLElement|undefined)} The styled <span> element containing the label text, or undefined if no label is provided.
- */
-function formatLabel(label, color) {
-  if (config.colormap === "gray") {
-    color = color ? "purple" : "#666";
-  }
-  if (!label) return;
-  const labelEl = document.createElement("span");
-  Object.assign(labelEl.style, {
-    position: "absolute",
-    color: color || "beige",
-    top: "1rem",
-    left: "0.5rem",
-    textShadow: "2px 2px 3px rgb(0, 0, 0, 0.5)",
-  });
-  labelEl.textContent = label;
-  return labelEl;
-}
+
 
 /**
  * Activates the specified audio region by updating the global state and UI.
@@ -2620,12 +2701,12 @@ function setActiveRegion(region) {
   spec.REGIONS.regions.forEach((r) =>
     r.setOptions({
       color: STATE.regionColour,
-      content: formatLabel(r.content?.innerText),
+      content: spec.formatLabel(r.content?.innerText),
     })
   );
   // Set the playhead to the start of the region
   const label = content?.innerText || "";
-  const labelEl = formatLabel(label, "gold");
+  const labelEl = spec.formatLabel(label, "gold");
   STATE.activeRegion = { start, end, label };
   region.setOptions({ color: STATE.regionActiveColour, content: labelEl });
   utils.enableMenuItem(["export-audio"]);
@@ -2636,15 +2717,16 @@ function setActiveRegion(region) {
 }
 
 const spec = new ChirpityWS(
-  document.querySelector(".pagination"),
+  "#waveform",
   () => STATE, // Returns the current state
   () => config, // Returns the current config
-  { postBufferUpdate, trackEvent, setActiveRegion }
+  { postBufferUpdate, trackEvent, setActiveRegion, onStateUpdate: state.update, updatePrefs },
+  GLOBAL_ACTIONS
 );
 
 
 const updateListIcon = () => {
-  LIST_MAP = getI18n(i18n.LIST_MAP);
+  LIST_MAP = i18n.get(i18n.LIST_MAP);
   DOM.listIcon.style.visibility = "hidden";
   DOM.listIcon.innerHTML =
     config.list === "custom"
@@ -2669,7 +2751,6 @@ DOM.listIcon.addEventListener("click", () => {
   DOM.listToUse.value = config.list;
   updateListIcon();
   updatePrefs("config.json", config);
-  //resetResults();
   setListUIState(config.list);
   updateList();
 });
@@ -2686,7 +2767,7 @@ DOM.customListSelector.addEventListener("click", async () => {
     config.customListFile[config.model] = customListFile;
     DOM.customListFile.value = customListFile;
     readLabels(customListFile, "list");
-    LIST_MAP = getI18n(i18n.LIST_MAP);
+    LIST_MAP = i18n.get(i18n.LIST_MAP);
     updatePrefs("config.json", config);
     localStorage.setItem("customList", customListFile);
   }
@@ -2741,8 +2822,6 @@ const handleBackendChange = (backend) => {
   DOM.batchSizeValue.textContent =
     BATCH_SIZE_LIST[DOM.batchSizeSlider.value].toString();
   updatePrefs("config.json", config);
-  // restart wavesurfer regions to set new maxLength
-  // initRegion();
   loadModel();
 };
 
@@ -2769,10 +2848,10 @@ const timelineToggle = (fromKeys) => {
   }
   config.timeOfDay = DOM.timelineSetting.value === "timeOfDay"; //toggle setting
   setTimelinePreferences();
-  if (fileLoaded && STATE.regionsCompleted) {
+  if (STATE.fileLoaded && STATE.regionsCompleted) {
     // Reload wavesurfer with the new timeline
     const position = utils.clamp(
-      wavesurfer.getCurrentTime() / STATE.windowLength,
+      spec.wavesurfer.getCurrentTime() / STATE.windowLength,
       0,
       1
     );
@@ -2836,230 +2915,6 @@ function recordUpdate(key) {
   }
 }
 
-const GLOBAL_ACTIONS = {
-  // Handle number keys 1-9 dynamically
-  handleNumberKeys: (e) => {
-    if (/^[0-9]$/.test(e.key)) {
-      // number keys here
-      if (activeRow) {
-        recordUpdate(e.key);
-      }
-    }
-  },
-  a: (e) => {
-    if ((e.ctrlKey || e.metaKey) && STATE.currentFile) {
-      const element = e.shiftKey ? "analyseAll" : "analyse";
-      document.getElementById(element).click();
-    }
-  },
-  A: (e) => {
-    (e.ctrlKey || e.metaKey) &&
-      STATE.currentFile &&
-      document.getElementById("analyseAll").click();
-  },
-  c: (e) => (e.ctrlKey || e.metaKey) && STATE.currentBuffer && centreSpec(),
-  // D: (e) => {
-  //     if (( e.ctrlKey || e.metaKey)) worker.postMessage({ action: 'create-dataset' });
-  // },
-  e: (e) => (e.ctrlKey || e.metaKey) && STATE.activeRegion && exportAudio(),
-  g: (e) => (e.ctrlKey || e.metaKey) && showGoToPosition(),
-  o: async (e) =>
-    (e.ctrlKey || e.metaKey) && (await showOpenDialog("openFile")),
-  p: () => STATE.activeRegion && playRegion(),
-  q: (e) => e.metaKey && isMac && window.electron.exitApplication(),
-  s: (e) =>
-    (e.ctrlKey || e.metaKey) && document.getElementById("save2db").click(),
-  t: (e) => (e.ctrlKey || e.metaKey) && timelineToggle(true),
-  v: (e) => {
-    if (activeRow && (e.ctrlKey || e.metaKey)) {
-      const nameAttribute = activeRow.getAttribute("name");
-      const [file, start, end, sname, cname] = nameAttribute.split("|");
-      insertManualRecord(
-        cname,
-        parseFloat(start),
-        parseFloat(end),
-        "",
-        "",
-        "",
-        "Update",
-        false,
-        cname
-      );
-    }
-  },
-  z: (e) => {
-    if ((e.ctrlKey || e.metaKey) && HISTORY.length)
-      insertManualRecord(...HISTORY.pop());
-  },
-  Escape: () => {
-    if (PREDICTING) {
-      console.log("Operation aborted");
-      PREDICTING = false;
-      disableSettingsDuringAnalysis(false);
-      STATE.analysisDone = true;
-      worker.postMessage({
-        action: "abort",
-        model: config.model,
-        threads: config[config[config.model].backend].threads,
-        list: config.list,
-      });
-      STATE.diskHasRecords && utils.enableMenuItem(["explore", "charts"]);
-      generateToast({ message: "cancelled" });
-      DOM.progressDiv.classList.add("invisible");
-    }
-  },
-  Home: () => {
-    if (STATE.currentBuffer && STATE.regionsCompleted) {
-      STATE.windowOffsetSecs = 0;
-      postBufferUpdate({});
-    }
-  },
-  End: () => {
-    if (STATE.currentBuffer && STATE.regionsCompleted) {
-      STATE.windowOffsetSecs = currentFileDuration - STATE.windowLength;
-      postBufferUpdate({ begin: STATE.windowOffsetSecs, position: 1 });
-    }
-  },
-  PageUp: () => {
-    if (STATE.currentBuffer && STATE.regionsCompleted) {
-      const position = utils.clamp(
-        wavesurfer.getCurrentTime() / STATE.windowLength,
-        0,
-        1
-      );
-      STATE.windowOffsetSecs = STATE.windowOffsetSecs - STATE.windowLength;
-      const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
-      let fileToLoad;
-      if (fileIndex > 0 && STATE.windowOffsetSecs < 0) {
-        STATE.windowOffsetSecs = -STATE.windowLength;
-        fileToLoad = STATE.openFiles[fileIndex - 1];
-      } else {
-        STATE.windowOffsetSecs = Math.max(0, STATE.windowOffsetSecs);
-        fileToLoad = STATE.currentFile;
-      }
-      postBufferUpdate({
-        file: fileToLoad,
-        begin: STATE.windowOffsetSecs,
-        position: position,
-      });
-    }
-  },
-  ArrowUp: () => {
-    if (activeRow && STATE.regionsCompleted) {
-      activeRow.classList.remove("table-active");
-      activeRow = activeRow.previousSibling || activeRow;
-      if (!activeRow.classList.contains("text-bg-dark")) activeRow.click();
-      // activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }
-  },
-  PageDown: () => {
-    if (STATE.currentBuffer && STATE.regionsCompleted) {
-      let position = utils.clamp(
-        wavesurfer.getCurrentTime() / STATE.windowLength,
-        0,
-        1
-      );
-      STATE.windowOffsetSecs = STATE.windowOffsetSecs + STATE.windowLength;
-      const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
-      let fileToLoad;
-      if (
-        fileIndex < STATE.openFiles.length - 1 &&
-        STATE.windowOffsetSecs >= currentFileDuration - STATE.windowLength
-      ) {
-        // Move to next file
-        fileToLoad = STATE.openFiles[fileIndex + 1];
-        STATE.windowOffsetSecs = 0;
-        position = 0;
-      } else {
-        STATE.windowOffsetSecs = Math.min(
-          STATE.windowOffsetSecs,
-          currentFileDuration - STATE.windowLength
-        );
-        fileToLoad = STATE.currentFile;
-      }
-      postBufferUpdate({
-        file: fileToLoad,
-        begin: STATE.windowOffsetSecs,
-        position: position,
-      });
-    }
-  },
-  ArrowDown: () => {
-    if (activeRow && STATE.regionsCompleted) {
-      activeRow.classList.remove("table-active");
-      activeRow = activeRow.nextSibling || activeRow;
-      if (!activeRow.classList.contains("text-bg-dark")) activeRow.click();
-      // activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }
-  },
-  ArrowLeft: () => {
-    const skip = STATE.windowLength / 100;
-    if (STATE.currentBuffer && STATE.regionsCompleted) {
-      wavesurfer.setTime(wavesurfer.getCurrentTime() - skip);
-      let position = utils.clamp(
-        wavesurfer.getCurrentTime() / STATE.windowLength,
-        0,
-        1
-      );
-      if (wavesurfer.getCurrentTime() < skip && STATE.windowOffsetSecs > 0) {
-        STATE.windowOffsetSecs -= skip;
-        postBufferUpdate({
-          begin: STATE.windowOffsetSecs,
-          position: (position += skip / STATE.windowLength),
-          play: wavesurfer.isPlaying(),
-        });
-      }
-    }
-  },
-  ArrowRight: () => {
-    const skip = STATE.windowLength / 100;
-    if (STATE.currentBuffer && STATE.regionsCompleted) {
-      const now = wavesurfer.getCurrentTime();
-      if (wavesurfer.isReady) {
-        // This will trigger the finish event if at the end of the window
-        wavesurfer.setTime(now + skip);
-      }
-      // }
-    }
-  },
-  "=": (e) => (e.metaKey || e.ctrlKey ? reduceFFT() : spec.zoom("In")),
-  "+": (e) => (e.metaKey || e.ctrlKey ? reduceFFT() : spec.zoom("In")),
-  "-": (e) => (e.metaKey || e.ctrlKey ? increaseFFT() : spec.zoom("Out")),
-  F5: () => reduceFFT(),
-  F4: () => increaseFFT(),
-  " ": async () => {
-    if (wavesurfer) {
-      try {
-        await wavesurfer.playPause();
-      } catch (e) {
-        console.warn("Wavesurfer error", error.message || error);
-      }
-    }
-  },
-  Tab: (e) => {
-    if ((e.metaKey || e.ctrlKey) && !PREDICTING && STATE.diskHasRecords) {
-      // If you did this when predicting, your results would go straight to the archive
-      const modeToSet =
-        STATE.mode === "explore" ? "active-analysis" : "explore";
-      document.getElementById(modeToSet).click();
-    } else if (activeRow && STATE.regionsCompleted) {
-      activeRow.classList.remove("table-active");
-      if (e.shiftKey) {
-        activeRow = activeRow.previousSibling || activeRow;
-        activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      } else {
-        activeRow = activeRow.nextSibling || activeRow;
-        activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      }
-      if (!activeRow.classList.contains("text-bg-dark")) {
-        activeRow.click();
-      }
-    }
-  },
-  Delete: () => activeRow && deleteRecord(activeRow),
-  Backspace: () => activeRow && deleteRecord(activeRow),
-};
-
 function disableSettingsDuringAnalysis(bool) {
   const elements = [
     "modelToUse",
@@ -3088,8 +2943,8 @@ const showGoToPosition = () => {
   if (STATE.currentFile) {
     const gotoLabel = document.getElementById("gotoModalLabel");
     const timeHeading = config.timeOfDay
-      ? getI18n(i18n.Context).gotoTimeOfDay
-      : getI18n(i18n.Context).gotoPosition;
+      ? i18n.get(i18n.Context).gotoTimeOfDay
+      : i18n.get(i18n.Context).gotoPosition;
     gotoLabel.textContent = timeHeading;
     goto.show();
   }
@@ -3139,7 +2994,7 @@ const gotoTime = (e) => {
     }
     STATE.windowLength = 20;
 
-    start = Math.min(start, currentFileDuration);
+    start = Math.min(start, STATE.currentFileDuration);
     STATE.windowOffsetSecs = Math.max(start - STATE.windowLength / 2, 0);
     const position = start === 0 ? 0 : 0.5;
     postBufferUpdate({ begin: STATE.windowOffsetSecs, position: position });
@@ -3169,7 +3024,7 @@ gotoForm.addEventListener("submit", gotoTime);
  */
 function onModelReady(args) {
   modelReady = true;
-  if (fileLoaded) {
+  if (STATE.fileLoaded) {
     utils.enableMenuItem(["analyse"]);
     if (STATE.openFiles.length > 1)
       utils.enableMenuItem(["analyseAll", "reanalyseAll"]);
@@ -3235,7 +3090,7 @@ async function onWorkerLoadedAudio({
   // Clear the loading animation
   DOM.loading.classList.add("d-none");
   const resetSpec = !STATE.currentFile;
-  currentFileDuration = fileDuration;
+  STATE.currentFileDuration = fileDuration;
   //if (preserveResults) completeDiv.hide();
   config.debug &&
     console.log(
@@ -3259,9 +3114,9 @@ async function onWorkerLoadedAudio({
   const initialTime = config.timeOfDay
     ? new Date(fileStart)
     : new Date(0, 0, 0, 0, 0, 0, 0);
-  bufferStartTime = new Date(initialTime.getTime() + windowBegin * 1000);
+  STATE.bufferStartTime = new Date(initialTime.getTime() + windowBegin * 1000);
 
-  if (STATE.windowLength > currentFileDuration) STATE.windowLength = currentFileDuration;
+  if (STATE.windowLength > STATE.currentFileDuration) STATE.windowLength = STATE.currentFileDuration;
 
   resetRegions();
   await spec.updateSpec({
@@ -3271,7 +3126,7 @@ async function onWorkerLoadedAudio({
     resetSpec: resetSpec,
   });
   // Doe this after the spec has loaded the file
-  fileLoaded = true;
+  STATE.fileLoaded = true;
   if (modelReady) {
     utils.enableMenuItem(["analyse"]);
     if (STATE.openFiles.length > 1) utils.enableMenuItem(["analyseAll"]);
@@ -3318,12 +3173,12 @@ const awaiting = {
 function onProgress(args) {
   DOM.progressDiv.classList.remove("invisible");
   if (args.text) {
-    DOM.fileNumber.innerHTML = `<span class='loading text-nowrap'>${getI18n(
+    DOM.fileNumber.innerHTML = `<span class='loading text-nowrap'>${i18n.get(
       awaiting
     )}</span>`;
   } else {
     const count = STATE.openFiles.indexOf(args.file) + 1;
-    DOM.fileNumber.textContent = utils.interpolate(getI18n(i18nFile), {
+    DOM.fileNumber.textContent = utils.interpolate(i18n.get(i18nFile), {
       count: count,
       fileCount: STATE.openFiles.length,
     });
@@ -3348,7 +3203,7 @@ function updatePagination(total, offset = STATE.offset) {
 }
 
 const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
-  const i18 = getI18n(i18n.Headings);
+  const i18 = i18n.get(i18n.Headings);
   const showIUCN = config.detect.iucn;
 
   // if (summary.length){
@@ -3374,7 +3229,7 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
             </thead><tbody id="speciesFilter">`
     : "";
   let selectedRow = null;
-  const i18nIUCN = getI18n(i18n.IUCNLabel);
+  const i18nIUCN = i18n.get(i18n.IUCNLabel);
   for (let i = 0; i < summary.length; i++) {
     const item = summary[i];
     const selected = item.cname === filterSpecies ? " text-warning" : "";
@@ -3745,7 +3600,7 @@ async function renderResult({
       // if (!isFromDB) {
       //     resetResults({clearResults: false, clearSummary: false, clearPagination: false});
       // }
-      const i18 = getI18n(i18n.Headings);
+      const i18 = i18n.get(i18n.Headings);
       // const fragment = new DocumentFragment();
       DOM.resultHeader.innerHTML = `
                 <tr class="text-nowrap">
@@ -4174,7 +4029,7 @@ function replaceCtrlWithCommand() {
 }
 
 const populateSpeciesModal = async (included, excluded) => {
-  const i18 = getI18n(i18n.SpeciesList);
+  const i18 = i18n.get(i18n.SpeciesList);
   const current_file_text =
     STATE.week !== -1 && STATE.week
       ? utils.interpolate(i18.week, { week: STATE.week })
@@ -4205,7 +4060,7 @@ const populateSpeciesModal = async (included, excluded) => {
     (STATE.week === -1 || !STATE.week)
       ? i18.depending
       : "";
-  const listLabel = getI18n(i18n.Lists)[config.list];
+  const listLabel = i18n.get(i18n.Lists)[config.list];
   const includedContent = utils.interpolate(i18.included, {
     model: model,
     listInUse: listLabel,
@@ -4270,7 +4125,7 @@ function exportSpeciesList() {
 }
 
 function setNocmig(on) {
-  const i18 = getI18n(i18n.Titles);
+  const i18 = i18n.get(i18n.Titles);
   if (on) {
     DOM.nocmigButton.textContent = "nights_stay";
     DOM.nocmigButton.title = i18.nocmigOn;
@@ -4375,7 +4230,7 @@ const modelSettingsDisplay = () => {
 };
 
 const contextAwareIconDisplay = () => {
-  const i18 = getI18n(i18n.Titles);
+  const i18 = i18n.get(i18n.Titles);
   if (config.detect.contextAware) {
     DOM.contextAwareIcon.classList.add("text-warning");
     DOM.contextAwareIcon.title = i18.contextModeOn;
@@ -4751,7 +4606,7 @@ const handleThresholdChange = (e) => {
 
 // Filter handling
 const filterIconDisplay = () => {
-  const i18 = getI18n(i18n.Titles);
+  const i18 = i18n.get(i18n.Titles);
   if (
     config.filters.active &&
     (config.filters.highPassFrequency ||
@@ -4768,9 +4623,9 @@ const filterIconDisplay = () => {
 };
 // High pass threshold
 const showFilterEffect = () => {
-  if (fileLoaded && STATE.regionsCompleted) {
+  if (STATE.fileLoaded && STATE.regionsCompleted) {
     const position = utils.clamp(
-      wavesurfer.getCurrentTime() / STATE.windowLength,
+      spec.wavesurfer.getCurrentTime() / STATE.windowLength,
       0,
       1
     );
@@ -4911,7 +4766,7 @@ function playRegion() {
   // Sanitise region (after zoom, start or end may be outside the windowlength)
   // I don't want to change the actual region length, so make a copy
   if (STATE.regionsCompleted) {
-    const region = REGIONS.regions?.find(
+    const region = spec.REGIONS.regions?.find(
       (region) => region.start === STATE.activeRegion.start
     );
     if (region) {
@@ -5277,7 +5132,7 @@ document.addEventListener("click", function (e) {
       };
 
       const locale = config.locale;
-      const message = getI18n(i18n);
+      const message = i18n.get(i18n);
       if (confirm(message)) {
         const uuid = config.UUID;
         config = defaultConfig;
@@ -5302,7 +5157,7 @@ document.addEventListener("click", function (e) {
       );
       checkFilteredFrequency();
       worker.postMessage({ action: "update-state", audio: config.audio });
-      const fftSamples = spectrogram.fftSamples;
+      const fftSamples = spec.spectrogram.fftSamples;
       spec.adjustSpecDims(true, fftSamples);
       document
         .getElementById("frequency-range")
@@ -5384,10 +5239,10 @@ document.addEventListener("click", function (e) {
       break;
     }
     case "playToggle": {
-      if (wavesurfer) {
+      if (spec.wavesurfer) {
         try {
           (async () => {
-            await wavesurfer.playPause();
+            await spec.wavesurfer.playPause();
           })();
         } catch (e) {
           console.warn("Wavesurfer error", e.message || JSON.stringify(e));
@@ -5675,7 +5530,7 @@ document.addEventListener("change", function (e) {
             contextAwareIconDisplay();
             updateListIcon();
             filterIconDisplay();
-            initialiseDatePicker(STATE, worker, config, resetResults, filterResults, getI18n);
+            initialiseDatePicker(STATE, worker, config, resetResults, filterResults, i18n.get);
           }
           config.locale = element.value;
           STATE.picker.options.lang = element.value.replace("_uk", "");
@@ -5694,7 +5549,7 @@ document.addEventListener("change", function (e) {
           modelSettingsDisplay();
           DOM.customListFile.value = config.customListFile[config.model];
           DOM.customListFile.value
-            ? (LIST_MAP = getI18n(i18n.LIST_MAP))
+            ? (LIST_MAP = i18n.get(i18n.LIST_MAP))
             : delete LIST_MAP.custom;
           document.getElementById("locale").value = config.locale;
           document.getElementById(config[config.model].backend).checked = true;
@@ -5735,12 +5590,12 @@ document.addEventListener("change", function (e) {
           } else {
             colorMapFieldset.classList.add("d-none");
           }
-          if (wavesurfer && STATE.currentFile && STATE.regionsCompleted) {
-            const fftSamples = spectrogram.fftSamples;
+          if (spec.wavesurfer && STATE.currentFile && STATE.regionsCompleted) {
+            const fftSamples = spec.spectrogram.fftSamples;
             spec.adjustSpecDims(true, fftSamples);
             postBufferUpdate({
               begin: STATE.windowOffsetSecs,
-              position: wavesurfer.getCurrentTime() / STATE.windowLength,
+              position: spec.wavesurfer.getCurrentTime() / STATE.windowLength,
             });
           }
           break;
@@ -5771,10 +5626,10 @@ document.addEventListener("change", function (e) {
             threshold: threshold,
             windowFn: windowFn,
           };
-          if (wavesurfer && STATE.currentFile) {
-            const fftSamples = spectrogram.fftSamples;
+          if (spec.wavesurfer && STATE.currentFile) {
+            const fftSamples = spec.spectrogram.fftSamples;
             spec.adjustSpecDims(true, fftSamples);
-            refreshTimeline();
+            spec.refreshTimeline();
           }
           break;
         }
@@ -5784,9 +5639,9 @@ document.addEventListener("change", function (e) {
           config.audio.gain = element.value;
           worker.postMessage({ action: "update-state", audio: config.audio });
           config.filters.active || toggleFilters();
-          if (fileLoaded && STATE.regionsCompleted) {
+          if (STATE.fileLoaded && STATE.regionsCompleted) {
             const position = utils.clamp(
-              wavesurfer.getCurrentTime() / STATE.windowLength,
+              spec.wavesurfer.getCurrentTime() / STATE.windowLength,
               0,
               1
             );
@@ -5799,8 +5654,8 @@ document.addEventListener("change", function (e) {
         }
         case "spec-labels": {
           config.specLabels = element.checked;
-          if (wavesurfer && STATE.currentFile) {
-            const fftSamples = spectrogram.fftSamples;
+          if (spec.wavesurfer && STATE.currentFile) {
+            const fftSamples = spec.spectrogram.fftSamples;
             spec.adjustSpecDims(true, fftSamples);
           }
           break;
@@ -5818,7 +5673,7 @@ document.addEventListener("change", function (e) {
           config.audio.minFrequency = Math.max(element.valueAsNumber, 0);
           DOM.fromInput.value = config.audio.minFrequency;
           DOM.fromSlider.value = config.audio.minFrequency;
-          const fftSamples = spectrogram.fftSamples;
+          const fftSamples = spec.spectrogram.fftSamples;
           spec.adjustSpecDims(true, fftSamples);
           checkFilteredFrequency();
           element.blur();
@@ -5830,7 +5685,7 @@ document.addEventListener("change", function (e) {
           config.audio.maxFrequency = Math.min(element.valueAsNumber, 11950);
           DOM.toInput.value = config.audio.maxFrequency;
           DOM.toSlider.value = config.audio.maxFrequency;
-          const fftSamples = spectrogram.fftSamples;
+          const fftSamples = spec.spectrogram.fftSamples;
           spec.adjustSpecDims(true, fftSamples);
           checkFilteredFrequency();
           element.blur();
@@ -5845,9 +5700,9 @@ document.addEventListener("change", function (e) {
             filters: config.filters,
           });
           element.blur();
-          if (fileLoaded && STATE.regionsCompleted) {
+          if (STATE.fileLoaded && STATE.regionsCompleted) {
             const position = utils.clamp(
-              wavesurfer.getCurrentTime() / STATE.windowLength,
+              spec.wavesurfer.getCurrentTime() / STATE.windowLength,
               0,
               1
             );
@@ -5990,34 +5845,15 @@ async function readLabels(labelFile, updating) {
     });
 }
 
-function getI18n(context) {
-  const locale = config.locale.replace(/_.*$/, "");
-  return context[locale] || context["en"];
-}
+// function getI18n(context) {
+//   const locale = config.locale.replace(/_.*$/, "");
+//   return context[locale] || context["en"];
+// }
 
-/**
- * Determines if a right-click event occurred within an audio region and optionally sets it as active.
- *
- * This function calculates the time position from the event's x-coordinate relative to the target element's width
- * using the global "STATE.windowLength". It then searches the global "REGIONS.regions" array for an audio region that spans
- * the computed time. If a matching region is found and the setActive flag is true, the region is set as active by calling
- * the global "setActiveRegion" function.
- *
- * @param {MouseEvent} e - The right-click event containing the clientX coordinate and target element dimensions.
- * @param {boolean} setActive - Flag indicating whether to mark the located region as active.
- * @returns {Object|undefined} The audio region that contains the computed time, or undefined if none is found.
- */
-function checkForRegion(e, setActive) {
-  const relativePosition = e.clientX / e.currentTarget.clientWidth;
-  const time = relativePosition * STATE.windowLength;
-  const region = REGIONS.regions.find((r) => r.start < time && r.end > time);
-  region && setActive && setActiveRegion(region);
-  return region;
-}
 
 function filterLabels(e) {
   DOM.contextMenu.classList.add("d-none");
-  const i18 = getI18n(i18n.Context);
+  const i18 = i18n.get(i18n.Context);
   createFilterDropdown(
     e,
     STATE.tagsList,
@@ -6032,7 +5868,7 @@ function filterLabels(e) {
  *
  * This asynchronous function handles user interactions for generating a context menu
  * in the spectrogram interface. It performs the following actions:
- * - Pauses any ongoing audio playback via the wavesurfer instance to prevent interference.
+ * - Pauses any ongoing audio playback via the spec.wavesurfer instance to prevent interference.
  * - Stops the propagation of the triggering event.
  * - Checks and adjusts for region detection within the spectrogram.
  * - Determines the context (e.g., summary, selection, or results) of the click and sets
@@ -6053,10 +5889,10 @@ function filterLabels(e) {
  */
 async function createContextMenu(e) {
   // If we let the playback continue, the region may get wiped
-  if (wavesurfer?.isPlaying()) wavesurfer.pause();
+  if (spec.wavesurfer?.isPlaying()) spec.wavesurfer.pause();
   e.stopPropagation();
-  this.closest("#spectrogramWrapper") && checkForRegion(e, true);
-  const i18 = getI18n(i18n.Context);
+  this.closest("#spectrogramWrapper") && spec.checkForRegion(e, true);
+  const i18 = i18n.get(i18n.Context);
   const target = e.target;
   if (target.closest("#sort-label")) {
     if (STATE.isMember) filterLabels(e);
@@ -6084,7 +5920,7 @@ async function createContextMenu(e) {
         !target.closest("tr").classList.contains("table-active"))
     ) {
       target.click(); // Wait for file to load
-      await utils.waitFor(() => fileLoaded);
+      await utils.waitFor(() => STATE.fileLoaded);
     }
   }
   if (!STATE.activeRegion && !inSummary) return;
@@ -6209,7 +6045,7 @@ let focusBirdList;
  * showRecordEntryForm('add', true);
  */
 async function showRecordEntryForm(mode, batch) {
-  const i18 = getI18n(i18n.Headings);
+  const i18 = i18n.get(i18n.Headings);
   const cname = batch
     ? document.querySelector("#speciesFilter .text-warning .cname .cname")
         .textContent
@@ -6251,7 +6087,7 @@ async function showRecordEntryForm(mode, batch) {
   const labelText = activeRow?.querySelector(".label").textContent;
 
   const labels = STATE.tagsList.map((item) => item.name);
-  const i18nOptions = getI18n(i18n.Select);
+  const i18nOptions = i18n.get(i18n.Select);
   const select = new CustomSelect({
     theme: "light",
     labels: labels,
@@ -6279,7 +6115,7 @@ recordEntryForm.addEventListener("submit", function (e) {
   if (STATE.activeRegion) {
     start = STATE.windowOffsetSecs + STATE.activeRegion.start;
     end = STATE.windowOffsetSecs + STATE.activeRegion.end;
-    const region = REGIONS.regions.find(
+    const region = spec.REGIONS.regions.find(
       (region) => region.start === STATE.activeRegion.start
     );
     // You can still add a record if you cleared the regions
@@ -6397,7 +6233,7 @@ function deleteFile(file) {
       sv: `Detta kommer att ta bort ${file} och alla tillhörande detektioner från databasarvet. Fortsätt?`,
       zh: `这将删除 ${file} 及其所有相关检测记录从数据库存档中。继续吗？`,
     };
-    const message = getI18n(i18nPurge);
+    const message = i18n.get(i18nPurge);
     if (confirm(message)) {
       worker.postMessage({
         action: "purge-file",
@@ -6483,7 +6319,7 @@ tourModal.addEventListener("hidden.bs.modal", function () {
 
 // Event handler for starting the tour
 const prepTour = async () => {
-  if (!fileLoaded) {
+  if (!STATE.fileLoaded) {
     const example_file = await window.electron.getAudio();
     // create a canvas for the audio spec
     utils.showElement(["spectrogramWrapper"], false);
@@ -6535,7 +6371,7 @@ function checkForMacUpdates() {
             alertPlaceholder.append(wrapper);
           };
           const link = `<a href="https://chirpity.mattkirkland.co.uk?fromVersion=${VERSION}" target="_blank">`;
-          const message = utils.interpolate(getI18n(i18n.UpdateMessage), {
+          const message = utils.interpolate(i18n.get(i18n.UpdateMessage), {
             link: link,
           });
           alert(
@@ -6567,12 +6403,12 @@ function generateToast({
   locate = "",
 } = {}) {
   // i18n
-  const i18 = getI18n(i18n.Toasts);
+  const i18 = i18n.get(i18n.Toasts);
   if (message === "noFile") {
     clearTimeout(loadingTimeout) && DOM.loading.classList.add("d-none");
     // Alow further interactions!!
     STATE.regionsCompleted = true;
-    STATE.currentFile && (fileLoaded = true);
+    STATE.currentFile && (STATE.fileLoaded = true);
   }
   message = variables
     ? utils.interpolate(i18[message], variables)
@@ -6778,8 +6614,8 @@ async function getXCComparisons() {
 
 
 function renderComparisons(lists, cname) {
-  const i18 = getI18n(i18n.Context);
-  const i18nTitle = getI18n(i18n.Titles);
+  const i18 = i18n.get(i18n.Context);
+  const i18nTitle = i18n.get(i18n.Titles);
   cname = cname.replace(/\(.*\)/, "").replace("?", "");
   const compareDiv = document.createElement("div");
   compareDiv.classList.add("modal", "modal-fade", "model-lg");
@@ -7202,11 +7038,11 @@ function setKeyAssignment(inputEL, key) {
  *
  * @remarks
  * Assumes that DOM elements exist with IDs matching each key in {@code keyAssignments} and their associated
- * column elements using the format {@code key + '-column'}. Relies on a global {@code getI18n} function and
+ * column elements using the format {@code key + '-column'}. Relies on a global {@code i18n.get} function and
  * an {@code i18n.Select} parameter to initialize internationalization context.
  */
 function setKeyAssignmentUI(keyAssignments) {
-  const i18 = getI18n(i18n.Select);
+  const i18 = i18n.get(i18n.Select);
   Object.entries(keyAssignments).forEach(([k, v]) => {
     const input = document.getElementById(k);
     input.value = v.value;
@@ -7231,7 +7067,7 @@ function setKeyAssignmentUI(keyAssignments) {
  */
 function changeInputElement(column, element, key, preSelected = null) {
   if (column === "label") {
-    const i18 = getI18n(i18n.Select);
+    const i18 = i18n.get(i18n.Select);
     const container = document.createElement("div");
     container.id = key;
     container.className = "form-control-sm bg-dark border-0";
