@@ -274,8 +274,103 @@ async function upgrade_to_v2(diskDB, dbMutex) {
   }
 }
 
+const createDB = async ({file, LABELS, diskDB, memoryDB, dbMutex}) => {
+  const archiveMode = !!file;
+  if (file) {
+    fs.openSync(file, "w");
+    diskDB = new sqlite3.Database(file);
+    DEBUG && console.log("Created disk database", diskDB.filename);
+  } else {
+    memoryDB = new sqlite3.Database(":memory:");
+    DEBUG && console.log("Created new in-memory database");
+  }
+  const db = archiveMode ? diskDB : memoryDB;
+
+  await dbMutex.lock();
+  try {
+    db.locale = "en";
+    await db.runAsync("BEGIN");
+    await db.runAsync(
+      "CREATE TABLE tags(id INTEGER PRIMARY KEY, name TEXT NOT NULL, UNIQUE(name))"
+    );
+    await db.runAsync("INSERT INTO tags VALUES(0, 'Nocmig'), (1, 'Local')");
+    await db.runAsync(
+      "CREATE TABLE species(id INTEGER PRIMARY KEY, sname TEXT NOT NULL, cname TEXT NOT NULL, UNIQUE(cname, sname))"
+    );
+    await db.runAsync(
+      `CREATE TABLE locations( id INTEGER PRIMARY KEY, lat REAL NOT NULL, lon  REAL NOT NULL, place TEXT NOT NULL, UNIQUE (lat, lon))`
+    );
+    await db.runAsync(`CREATE TABLE files(id INTEGER PRIMARY KEY, name TEXT NOT NULL, duration REAL, filestart INTEGER, locationID INTEGER, archiveName TEXT, metadata TEXT, UNIQUE (name),
+            CONSTRAINT fk_locations FOREIGN KEY (locationID) REFERENCES locations(id) ON DELETE SET NULL)`);
+    // Ensure place names are unique too
+    await db.runAsync(
+      "CREATE UNIQUE INDEX idx_unique_place ON locations(lat, lon)"
+    );
+    await db.runAsync(`CREATE TABLE records( dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, 
+      comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER, reviewed INTEGER, tagID INTEGER,
+      UNIQUE (dateTime, fileID, speciesID), 
+      CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,
+      CONSTRAINT fk_species FOREIGN KEY (speciesID) REFERENCES species(id),
+      CONSTRAINT fk_tags FOREIGN KEY (tagID) REFERENCES tags(id) ON DELETE SET NULL)`);
+    await db.runAsync(
+      `CREATE TABLE duration( day INTEGER, duration INTEGER, fileID INTEGER, UNIQUE (day, fileID), CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE)`
+    );
+    await db.runAsync("CREATE INDEX idx_species_sname ON species(sname)");
+    await db.runAsync("CREATE INDEX idx_species_cname ON species(cname)");
+    if (archiveMode) {
+      await diskDB.runAsync(
+        "CREATE TABLE schema_version (version INTEGER NOT NULL)"
+      );
+      await diskDB.runAsync("INSERT INTO schema_version (version) VALUES (2)");
+      const stmt = db.prepare("INSERT INTO species VALUES (?, ?, ?)");
+      try {
+        // Only called when creating a new archive database
+        for (let i = 0; i < LABELS.length; i++) {
+          const [sname, cname] = LABELS[i].split("_");
+          await stmt.runAsync(i, sname, cname);
+        }
+      } finally {
+        // Ensure stmt is finalized
+        stmt.finalize();
+      }
+    } else {
+      const filename = diskDB?.filename;
+      await db.runAsync("ATTACH ? as disk", filename);
+      let response = await db.runAsync(
+        "INSERT INTO files SELECT * FROM disk.files"
+      );
+      response = await db.runAsync(
+        "INSERT INTO locations SELECT * FROM disk.locations"
+      );
+      DEBUG &&
+        console.log(response.changes + " locations added to memory database");
+      DEBUG &&
+        console.log(response.changes + " files added to memory database");
+      response = await db.runAsync(
+        "INSERT INTO species SELECT * FROM disk.species"
+      );
+      DEBUG &&
+        console.log(response.changes + " species added to memory database");
+
+      response = await db.runAsync(
+        "INSERT OR IGNORE INTO tags SELECT * FROM disk.tags"
+      );
+      DEBUG && console.log(response.changes + " tags added to memory database");
+    }
+    await db.runAsync("END");
+  } catch (error) {
+    console.error("Error during DB transaction:", error);
+    await db.runAsync("ROLLBACK"); // Rollback the transaction in case of error
+  } finally {
+    dbMutex.unlock();
+  }
+  return db;
+};
+
+
 export {
   sqlite3,
+  createDB,
   closeDatabase,
   checkpoint,
   upgrade_to_v1,

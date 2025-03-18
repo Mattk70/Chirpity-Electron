@@ -349,6 +349,7 @@ class Model {
       // WebGL backend works best when all batches are the same size
       paddedTensorBatch = this.padBatch(TensorBatch); // + 1 tensor
     } else if (threshold && BACKEND === "tensorflow" && !this.selection) {
+    // This whole block is for SNR and currently unused
       if (this.version !== "v1") threshold *= 4;
       const keysTensor = tf.stack(keys); // + 1 tensor
       const snr = this.getSNR(TensorBatch);

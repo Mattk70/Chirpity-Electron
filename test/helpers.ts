@@ -5,6 +5,8 @@ let page: Page;
 
 async function openExampleFile(page: Page){
     await page.locator('#navBarFile').click()
+    // deal with debounce timer
+    await page.waitForTimeout(300);
     await page.locator('#open-file').click()
     await page.locator('#spectrogramWrapper').waitFor({state: 'visible'})
   }
@@ -21,6 +23,8 @@ async function openExampleFile(page: Page){
     }  else {
       await page.locator(elementID).fill(value);
     }
+    // deal with debounce timer
+    await page.waitForTimeout(300);
     await page.locator('#close-settings').click();
     // Wait ?
     if (timeout) await page.waitForTimeout(timeout);
@@ -31,6 +35,8 @@ async function openExampleFile(page: Page){
     await changeSettings(page,'select', 'model-to-use', model, 2000)
   
     await  page.locator('#navbarAnalysis').click()
+    // deal with debounce timer
+    await page.waitForTimeout(300);
     await page.locator('#analyse').click()
     await page.locator('div.show > div.toast-header').waitFor({
       state: 'visible',

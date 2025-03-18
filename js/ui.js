@@ -144,24 +144,24 @@ const GLOBAL_ACTIONS = {
   t: (e) => (e.ctrlKey || e.metaKey) && timelineToggle(true),
   v: (e) => {
     if (activeRow && (e.ctrlKey || e.metaKey)) {
-      const nameAttribute = activeRow.getAttribute("name");
-      const [file, start, end, sname, cname] = nameAttribute.split("|");
-      insertManualRecord(
-        cname,
-        parseFloat(start),
-        parseFloat(end),
-        "",
-        "",
-        "",
-        "Update",
-        false,
-        cname
-      );
+      const {species, start, end,  label, callCount, comment, file} = addToHistory(activeRow);
+      insertManualRecord({
+        files: file,
+        cname: species,
+        start: parseFloat(start),
+        end: parseFloat(end),
+        label,
+        comment,
+        count: callCount,
+        action: "Update",
+        batch: false,
+        originalCname: species
+      });
     }
   },
   z: (e) => {
     if ((e.ctrlKey || e.metaKey) && HISTORY.length)
-      insertManualRecord(...HISTORY.pop());
+      insertManualRecord(HISTORY.pop());
   },
   Escape: () => {
     if (PREDICTING) {
@@ -439,7 +439,7 @@ DOM.controlsWrapper.addEventListener("mousedown", (e) => {
     // Adjust the spectrogram dimensions accordingly
     debounceTimer = setTimeout(() => {
       spec.adjustDims(true, config.FFT, newHeight);
-    }, 10);
+    }, 100);
   };
 
   // Remove event listener on mouseup
@@ -2619,7 +2619,7 @@ function handleKeyDownDeBounce(e) {
       function () {
         handleKeyDown(e);
       },
-      100,
+      250,
       "keyhandler"
     );
   }
@@ -2914,18 +2914,19 @@ function recordUpdate(key) {
     // If we set a new species, we want to give the record a 2000 confidence
     // However, if we just add a label or, leave the confidence alone
     const certainty = assignment.column === "species" ? 2000 : confidence;
-    insertManualRecord(
-      newCname,
-      parseFloat(start),
-      parseFloat(end),
-      newComment,
-      callCount,
-      newLabel,
-      "Update",
-      false,
-      cname,
-      certainty
-    );
+    insertManualRecord({
+      files: file,
+      cname: newCname,
+      start: parseFloat(start),
+      end: parseFloat(end),
+      comment: newComment,
+      count: callCount,
+      label: newLabel,
+      action: "Update",
+      batch: false,
+      originalCname: cname,
+      confidence: certainty
+    });
   }
 }
 
@@ -6141,7 +6142,8 @@ recordEntryForm.addEventListener("submit", function (e) {
   const label = select.selectedValue;
 
   recordEntryModal.hide();
-  insertManualRecord(
+  insertManualRecord({
+    files: STATE.currentFile,
     cname,
     start,
     end,
@@ -6151,10 +6153,11 @@ recordEntryForm.addEventListener("submit", function (e) {
     action,
     batch,
     originalCname
-  );
+  });
 });
 
-const insertManualRecord = (
+const insertManualRecord = ( {
+  files,
   cname,
   start,
   end,
@@ -6166,21 +6169,20 @@ const insertManualRecord = (
   originalCname,
   confidence,
   reviewed
-) => {
-  const files = batch ? STATE.openFiles : STATE.currentFile;
+}  = {}) => {
   worker.postMessage({
     action: "insert-manual-record",
-    cname: cname,
-    originalCname: originalCname,
+    cname,
+    originalCname,
     start: start?.toFixed(3),
     end: end?.toFixed(3),
-    comment: comment,
-    count: count || undefined,
+    comment,
+    count,
     file: files,
-    label: label,
+    label,
     DBaction: action,
-    batch: batch,
-    confidence: confidence,
+    batch,
+    confidence,
     position: {
       row: activeRow?.rowIndex - 1,
       page: pagination.getCurrentPage(),
@@ -7297,7 +7299,12 @@ dropdownCaret.forEach((caret) =>
 /**
  * Extracts metadata from a DOM record representing an audio detection and adds it to the global history.
  *
- * The function parses details from the record's child elements—such as species information, confidence (or a default value for records lacking a confidence bar), comment, label, and call count—while also determining the record's associated file, row, and table (setting). If a new canonical name is provided via the second argument, it will override the extracted species name in the history entry. The constructed data array is pushed to the global HISTORY. If the record is not part of a table, no history entry is added and undefined is returned.
+ * The function parses details from the record's child elements—such as species information, confidence 
+ * (or a default value for records lacking a confidence bar), comment, label, and call count—while also 
+ * determining the record's associated file, row, and table (setting). If a new canonical name is 
+ * provided via the second argument, it will override the extracted species name in the history entry.
+ * The constructed data array is pushed to the global HISTORY. If the record is not part of a table, 
+ * no history entry is added and undefined is returned.
  *
  * @param {HTMLElement} record - The DOM element containing record details.
  * @param {string} [newCname] - Optional name to override the extracted species name.
@@ -7322,19 +7329,18 @@ function addToHistory(record, newCname) {
     const label = record.querySelector(".label").innerText;
     let callCount = record.querySelector(".call-count").innerText;
     let reviewed = !!record.querySelector(".reviewed").innerText;
-    HISTORY.push([
-      species,
+    HISTORY.push({
+      files:file,
+      cname: species,
       start,
       end,
       comment,
-      callCount,
+      count: parseInt(callCount),
       label,
-      undefined,
-      undefined,
-      newCname || species,
+      originalCname: newCname || species,
       confidence,
       reviewed,
-    ]);
+    });
     return {
       species,
       start,
