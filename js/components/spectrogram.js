@@ -88,7 +88,6 @@ export class ChirpityWS {
    */
   initRegion() {
     let REGIONS = this.REGIONS;
-    const wavesurfer = this.wavesurfer;
     const STATE = this.getState();
     if (REGIONS) REGIONS.destroy();
     REGIONS = RegionsPlugin.create({
@@ -194,6 +193,7 @@ export class ChirpityWS {
     wavesurfer.on("play", () => (wavesurfer.isPaused = false));
 
     wavesurfer.on("finish", () => {
+      const {windowLength, windowOffsetSecs, currentFile, currentFileDuration, openFiles} = STATE;
       const bufferEnd = windowOffsetSecs + windowLength;
       if (currentFileDuration > bufferEnd) {
         wavesurfer.isReady = false;
@@ -202,10 +202,10 @@ export class ChirpityWS {
           play: !wavesurfer.isPaused,
         });
       } else if (!wavesurfer.isPaused) {
-        const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
-        if (fileIndex < STATE.openFiles.length - 1) {
+        const fileIndex = openFiles.indexOf(currentFile);
+        if (fileIndex < openFiles.length - 1) {
           // Move to next file
-          const fileToLoad = STATE.openFiles[fileIndex + 1];
+          const fileToLoad = openFiles[fileIndex + 1];
           wavesurfer.isReady = false;
           this.handlers.postBufferUpdate({
             file: fileToLoad,
