@@ -179,6 +179,31 @@ const getRate = (diskDB, state, species) => {
     );
   });
 };
+/**
+ * Handles chart data requests by gathering seasonal records, call detections, and aggregated chart totals for a given species and date range, then sending the compiled data to the UI.
+ *
+ * This function performs multiple asynchronous database queries to:
+ * - Retrieve the earliest and latest record dates for "spring" and "autumn" seasons.
+ * - Determine the date with the highest number of detections.
+ * - Aggregate record counts based on the provided date range and aggregation type.
+ * - Optionally compute total recording duration and call rate when weekly data (52 data points) is available.
+ *
+ * The compiled data is then sent to the UI via a postMessage call.
+ *
+ * @example
+ * onChartRequest({
+ *   diskDB,
+ *   state,
+ *   species: 'sparrow',
+ *   range: { start: '2020-01-01', end: '2020-12-31' },
+ *   UI
+ * });
+ *
+ * @param {object} args - Request parameters that must include:
+ *   - species {string} The species identifier for which to query records.
+ *   - range {object} An object specifying the query date range (with at least a start property).
+ * Note: Other properties like diskDB, state, and UI are used internally.
+ */
 async function onChartRequest(args) {
   const { diskDB, state, species, UI } = args;
   DEBUG &&
@@ -262,4 +287,111 @@ async function onChartRequest(args) {
     aggregation,
   });
 }
+
+/**
+ * Constructs and returns a chart configuration object for visualizing species recording data.
+ *
+ * The returned object contains the dataset configuration, time-series x-axis settings based on the aggregation unit,
+ * and tooltip callbacks for formatting time labels and dataset values. Some parameters are reserved for future enhancements.
+ *
+ * @param {*} species - Identifier for the species (currently not used in the configuration).
+ * @param {Array<number>} total - Array of recording hours corresponding to each data point.
+ * @param {*} rate - The call rate for the species (currently not utilized).
+ * @param {*} results - Additional metrics or results (currently not utilized).
+ * @param {Array<string|Date>} dataPoints - Array of labels or timestamps for the chart's x-axis.
+ * @param {string} aggregation - Time aggregation unit (e.g., "Day", "Week", "Hour") used to configure the x-axis.
+ * @param {*} pointStart - The starting point for the time series data (currently not used).
+ * @returns {Object} The chart configuration options object.
+ */
+function setChartOptions(
+  species,
+  total,
+  rate,
+  results,
+  dataPoints,
+  aggregation,
+  pointStart
+) {
+  let chartOptions = {};
+  //chartOptions.plugins = [ChartDataLabels];
+
+  chartOptions.data = {
+    labels: dataPoints, // Assuming dataPoints is an array of labels
+    datasets: [
+      {
+        label: "Hours of recordings",
+        data: total,
+        borderColor: "#003",
+        backgroundColor: "rgba(0, 51, 0, 0.2)",
+        fill: true,
+        yAxisID: "y-axis-0",
+      },
+      // Add other datasets as needed
+    ],
+  };
+
+  chartOptions.options = {
+    scales: {
+      x: {
+        type: "time",
+        time: {
+          unit: aggregation.toLowerCase(), // Assuming aggregation is 'Week', 'Day', or 'Hour'
+          displayFormats: {
+            day: "ddd D MMM",
+            week: "MMM D",
+            hour: "hA",
+          },
+        },
+      },
+      y: [
+        {
+          id: "y-axis-0",
+          type: "linear",
+          position: "left",
+          title: {
+            text: "Hours recorded",
+          },
+        },
+        // Add other y-axes as needed
+      ],
+    },
+    plugins: {
+      legend: {
+        display: true,
+        position: "top",
+      },
+      tooltip: {
+        enabled: true,
+        mode: "index",
+        intersect: false,
+        position: "nearest",
+        callbacks: {
+          title: function (tooltipItems) {
+            const timestamp = tooltipItems[0].parsed.x;
+            const date = new Date(timestamp);
+            return getTooltipTitle(date, aggregation);
+          },
+          label: function (tooltipItem) {
+            return `${tooltipItem.dataset.label}: ${tooltipItem.formattedValue}`;
+          },
+        },
+      },
+      datalabels: {
+        display: true,
+        color: "white",
+        backgroundColor: "rgba(0, 0, 0, 0.7)",
+        borderRadius: 3,
+        padding: {
+          top: 2,
+        },
+        formatter: function (value, _) {
+          return value; // Customize the displayed value as needed
+        },
+      },
+    },
+  };
+
+  return chartOptions;
+}
+
 module.exports = { onChartRequest };

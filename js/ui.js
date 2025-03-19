@@ -6,33 +6,31 @@
 import {
   trackVisit as _trackVisit,
   trackEvent as _trackEvent,
-} from "./tracking.js";
-import { checkMembership } from "./member.js";
-import { DOM } from "./DOMcache.js";
-import { IUCNCache, IUCNtaxonomy } from "./IUCNcache.js";
-import { XCtaxonomy as XCtaxon } from "./XCtaxonomy.js";
-import WaveSurfer from "../node_modules/wavesurfer.js/dist/wavesurfer.esm.js";
-import RegionsPlugin from "../node_modules/wavesurfer.js/dist/plugins/regions.esm.js";
-import Spectrogram from "../node_modules/wavesurfer.js/dist/plugins/spectrogram.esm.js";
-import TimelinePlugin from "../node_modules/wavesurfer.js/dist/plugins/timeline.esm.js";
-import { CustomSelect } from "./custom-select.js";
-import createFilterDropdown from "./custom-filter.js";
-import { Pagination } from "./pagination.js";
+} from "./utils/tracking.js";
+import { checkMembership } from "./utils/member.js";
+import { DOM } from "./utils/DOMcache.js";
+import { IUCNtaxonomy } from "./utils/IUCNcache.js";
+import { XCtaxonomy as XCtaxon } from "./utils/XCtaxonomy.js";
+import { CustomSelect } from "./components/custom-select.js";
+import createFilterDropdown from "./components/custom-filter.js";
+import { Pagination } from "./components/pagination.js";
+import { initialiseDatePicker } from "./components/datePicker.js";
 import {
   fetchIssuesByLabel,
   renderIssuesInModal,
   parseSemVer,
   isNewVersion,
-} from "./getKnownIssues.js";
-import * as i18n from "./i18n.js";
-import * as utils from "./utils.js";
+} from "./utils/getKnownIssues.js";
+import * as i18n from "./utils/i18n.js";
+import * as utils from "./utils/utils.js";
+import { UIState as State } from "./utils/UIState.js";
+import { ChirpityWS } from './components/spectrogram.js';
 
 let LOCATIONS,
   locationID = undefined,
   loadingTimeout,
   LIST_MAP;
 
-let REGIONS, spectrogram, timeline;
 let APPLICATION_LOADED = false;
 let LABELS = [],
   HISTORY = [];
@@ -104,57 +102,236 @@ window.addEventListener("rejectionhandled", function (event) {
   );
 });
 
-let STATE = {
-  metadata: {},
-  lastGestureTime: 0,
-  mode: "analyse",
-  analysisDone: false,
-  openFiles: [],
-  chart: {
-    aggregation: "Week",
-    species: undefined,
-    range: { start: undefined, end: undefined },
+
+
+const state = new State();
+let STATE = state.state;
+
+
+const GLOBAL_ACTIONS = {
+  // Handle number keys 1-9 dynamically
+  handleNumberKeys: (e) => {
+    if (/^[0-9]$/.test(e.key)) {
+      // number keys here
+      if (activeRow) {
+        recordUpdate(e.key);
+      }
+    }
   },
-  explore: {
-    species: undefined,
-    range: { start: undefined, end: undefined },
+  a: (e) => {
+    if ((e.ctrlKey || e.metaKey) && STATE.currentFile) {
+      const element = e.shiftKey ? "analyseAll" : "analyse";
+      document.getElementById(element).click();
+    }
   },
-  resultsSortOrder: "timestamp",
-  summarySortOrder: "cname ASC",
-  resultsMetaSortOrder: "",
-  dataFormatOptions: {
-    day: "2-digit",
-    month: "short",
-    year: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
+  A: (e) => {
+    (e.ctrlKey || e.metaKey) &&
+      STATE.currentFile &&
+      document.getElementById("analyseAll").click();
   },
-  birdList: { lastSelectedSpecies: undefined }, // Used to put the last selected species at the top of the all-species list
-  selection: { start: undefined, end: undefined },
-  currentAnalysis: {
-    currentFile: null,
-    openFiles: [],
-    mode: null,
-    species: null,
-    offset: 0,
-    active: null,
+  c: (e) => (e.ctrlKey || e.metaKey) && STATE.currentBuffer && spec.centreSpec(),
+  // D: (e) => {
+  //     if (( e.ctrlKey || e.metaKey)) worker.postMessage({ action: 'create-dataset' });
+  // },
+  e: (e) => (e.ctrlKey || e.metaKey) && STATE.activeRegion && exportAudio(),
+  g: (e) => (e.ctrlKey || e.metaKey) && showGoToPosition(),
+  o: async (e) =>
+    (e.ctrlKey || e.metaKey) && (await showOpenDialog("openFile")),
+  p: () => STATE.activeRegion && playRegion(),
+  q: (e) => e.metaKey && isMac && window.electron.exitApplication(),
+  s: (e) =>
+    (e.ctrlKey || e.metaKey) && document.getElementById("save2db").click(),
+  t: (e) => (e.ctrlKey || e.metaKey) && timelineToggle(true),
+  v: (e) => {
+    if (activeRow && (e.ctrlKey || e.metaKey)) {
+      const {species, start, end,  label, callCount, comment, file} = addToHistory(activeRow);
+      insertManualRecord({
+        files: file,
+        cname: species,
+        start: parseFloat(start),
+        end: parseFloat(end),
+        label,
+        comment,
+        count: callCount,
+        action: "Update",
+        batch: false,
+        originalCname: species
+      });
+    }
   },
-  IUCNcache: IUCNCache,
-  translations: ["da", "de", "es", "fr", "ja", "nl", "pt", "ru", "sv", "zh"],
-  regionColour: "rgba(255, 255, 255, 0.1)",
-  regionActiveColour: "rgba(255, 255, 0, 0.1)",
-  regionsCompleted: true,
-  labelColors: [
-    "dark",
-    "success",
-    "warning",
-    "info",
-    "secondary",
-    "danger",
-    "primary",
-  ],
+  z: (e) => {
+    if ((e.ctrlKey || e.metaKey) && HISTORY.length)
+      insertManualRecord(HISTORY.pop());
+  },
+  Escape: () => {
+    if (PREDICTING) {
+      console.log("Operation aborted");
+      PREDICTING = false;
+      disableSettingsDuringAnalysis(false);
+      STATE.analysisDone = true;
+      worker.postMessage({
+        action: "abort",
+        model: config.model,
+        threads: config[config[config.model].backend].threads,
+        list: config.list,
+      });
+      STATE.diskHasRecords && utils.enableMenuItem(["explore", "charts"]);
+      generateToast({ message: "cancelled" });
+      DOM.progressDiv.classList.add("invisible");
+    }
+  },
+  Home: () => {
+    if (STATE.currentBuffer && STATE.regionsCompleted) {
+      STATE.windowOffsetSecs = 0;
+      postBufferUpdate({});
+    }
+  },
+  End: () => {
+    if (STATE.currentBuffer && STATE.regionsCompleted) {
+      STATE.windowOffsetSecs = STATE.currentFileDuration - STATE.windowLength;
+      postBufferUpdate({ begin: STATE.windowOffsetSecs, position: 1 });
+    }
+  },
+  PageUp: () => {
+    if (STATE.currentBuffer && STATE.regionsCompleted) {
+      const position = utils.clamp(
+        spec.wavesurfer.getCurrentTime() / STATE.windowLength,
+        0,
+        1
+      );
+      STATE.windowOffsetSecs = STATE.windowOffsetSecs - STATE.windowLength;
+      const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
+      let fileToLoad;
+      if (fileIndex > 0 && STATE.windowOffsetSecs < 0) {
+        STATE.windowOffsetSecs = -STATE.windowLength;
+        fileToLoad = STATE.openFiles[fileIndex - 1];
+      } else {
+        STATE.windowOffsetSecs = Math.max(0, STATE.windowOffsetSecs);
+        fileToLoad = STATE.currentFile;
+      }
+      postBufferUpdate({
+        file: fileToLoad,
+        begin: STATE.windowOffsetSecs,
+        position: position,
+      });
+    }
+  },
+  ArrowUp: () => {
+    if (activeRow && STATE.regionsCompleted) {
+      activeRow.classList.remove("table-active");
+      activeRow = activeRow.previousSibling || activeRow;
+      if (!activeRow.classList.contains("text-bg-dark")) activeRow.click();
+      // activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  },
+  PageDown: () => {
+    if (STATE.currentBuffer && STATE.regionsCompleted) {
+      let position = utils.clamp(
+        spec.wavesurfer.getCurrentTime() / STATE.windowLength,
+        0,
+        1
+      );
+      STATE.windowOffsetSecs = STATE.windowOffsetSecs + STATE.windowLength;
+      const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
+      let fileToLoad;
+      if (
+        fileIndex < STATE.openFiles.length - 1 &&
+        STATE.windowOffsetSecs >= STATE.currentFileDuration - STATE.windowLength
+      ) {
+        // Move to next file
+        fileToLoad = STATE.openFiles[fileIndex + 1];
+        STATE.windowOffsetSecs = 0;
+        position = 0;
+      } else {
+        STATE.windowOffsetSecs = Math.min(
+          STATE.windowOffsetSecs,
+          STATE.currentFileDuration - STATE.windowLength
+        );
+        fileToLoad = STATE.currentFile;
+      }
+      postBufferUpdate({
+        file: fileToLoad,
+        begin: STATE.windowOffsetSecs,
+        position: position,
+      });
+    }
+  },
+  ArrowDown: () => {
+    if (activeRow && STATE.regionsCompleted) {
+      activeRow.classList.remove("table-active");
+      activeRow = activeRow.nextSibling || activeRow;
+      if (!activeRow.classList.contains("text-bg-dark")) activeRow.click();
+      // activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  },
+  ArrowLeft: () => {
+    const skip = STATE.windowLength / 100;
+    if (STATE.currentBuffer && STATE.regionsCompleted) {
+      spec.wavesurfer.setTime(spec.wavesurfer.getCurrentTime() - skip);
+      let position = utils.clamp(
+        spec.wavesurfer.getCurrentTime() / STATE.windowLength,
+        0,
+        1
+      );
+      if (spec.wavesurfer.getCurrentTime() < skip && STATE.windowOffsetSecs > 0) {
+        STATE.windowOffsetSecs -= skip;
+        postBufferUpdate({
+          begin: STATE.windowOffsetSecs,
+          position: (position += skip / STATE.windowLength),
+          play: spec.wavesurfer.isPlaying(),
+        });
+      }
+    }
+  },
+  ArrowRight: () => {
+    const skip = STATE.windowLength / 100;
+    if (STATE.currentBuffer && STATE.regionsCompleted) {
+      const now = spec.wavesurfer.getCurrentTime();
+      if (spec.wavesurfer.isReady) {
+        // This will trigger the finish event if at the end of the window
+        spec.wavesurfer.setTime(now + skip);
+      }
+      // }
+    }
+  },
+  "=": (e) => (e.metaKey || e.ctrlKey ? config.FFT = spec.reduceFFT() : spec.zoom("In")),
+  "+": (e) => (e.metaKey || e.ctrlKey ? config.FFT = spec.reduceFFT() : spec.zoom("In")),
+  "-": (e) => (e.metaKey || e.ctrlKey ? config.FFT = spec.increaseFFT() : spec.zoom("Out")),
+  F5: () => config.FFT = spec.reduceFFT(),
+  F4: () => config.FFT = spec.increaseFFT(),
+  " ": async () => {
+    if (spec.wavesurfer) {
+      try {
+        await spec.wavesurfer.playPause();
+      } catch (e) {
+        console.warn("Wavesurfer error", error.message || error);
+      }
+    }
+  },
+  Tab: (e) => {
+    if ((e.metaKey || e.ctrlKey) && !PREDICTING && STATE.diskHasRecords) {
+      // If you did this when predicting, your results would go straight to the archive
+      const modeToSet =
+        STATE.mode === "explore" ? "active-analysis" : "explore";
+      document.getElementById(modeToSet).click();
+    } else if (activeRow && STATE.regionsCompleted) {
+      activeRow.classList.remove("table-active");
+      if (e.shiftKey) {
+        activeRow = activeRow.previousSibling || activeRow;
+        activeRow.scrollIntoView({ behavior: "instant", block: "nearest" });
+      } else {
+        activeRow = activeRow.nextSibling || activeRow;
+        activeRow.scrollIntoView({ behavior: "instant", block: "nearest" });
+      }
+      if (!activeRow.classList.contains("text-bg-dark")) {
+        activeRow.click();
+      }
+    }
+  },
+  Delete: () => activeRow && deleteRecord(activeRow),
+  Backspace: () => activeRow && deleteRecord(activeRow),
 };
+
 
 //Open Files from OS "open with"
 const OS_FILE_QUEUE = [];
@@ -168,7 +345,6 @@ const BATCH_SIZE_LIST = [4, 8, 16, 32, 48, 64, 96];
 
 // Get the modules loaded in preload.js
 const fs = window.module.fs;
-const colormap = window.module.colormap;
 const p = window.module.p;
 const uuidv4 = window.module.uuidv4;
 const os = window.module.os;
@@ -178,25 +354,6 @@ const isTestEnv = window.env.TEST_ENV === "true";
 const trackVisit = isTestEnv ? () => {} : _trackVisit;
 const trackEvent = isTestEnv ? () => {} : _trackEvent;
 isTestEnv && console.log("Running in test environment");
-
-function createColormap() {
-  const cmap = config.colormap;
-  const map =
-    cmap === "custom"
-      ? [
-          { index: 0, rgb: utils.hexToRgb(config.customColormap.quiet) },
-          {
-            index: config.customColormap.threshold,
-            rgb: utils.hexToRgb(config.customColormap.mid),
-          },
-          { index: 1, rgb: utils.hexToRgb(config.customColormap.loud) },
-        ]
-      : cmap;
-
-  return ["roseus", "gray", "igray"].includes(cmap)
-    ? cmap
-    : colormap({ colormap: map, nshades: 256, format: "float" });
-}
 
 let worker;
 
@@ -252,38 +409,18 @@ let appVersionLoaded = new Promise((resolve, reject) => {
     });
 });
 
-let modelReady = false,
-  fileLoaded = false;
+let modelReady = false;
 let PREDICTING = false,
   t0,
   app_t0 = Date.now();
-let activeRegion, wavesurfer;
-let bufferStartTime, fileEnd;
 
-// set up some DOM element handles
-const bodyElement = document.body;
+
 
 let activeRow;
 let predictions = {},
-  clickedIndex,
-  currentFileDuration;
-
-let currentBuffer,
-  windowOffsetSecs = 0,
-  windowLength = 20; // seconds
+  clickedIndex;
 // Set content container height
-DOM.contentWrapper.style.height = bodyElement.clientHeight - 80 + "px";
-
-const specMaxHeight = () => {
-  // Get the available viewport height
-  const formOffset = DOM.exploreWrapper.offsetHeight;
-  const navPadding = DOM.navPadding.clientHeight;
-  const footerHeight = DOM.footer.clientHeight;
-  const controlsHeight = DOM.controlsWrapper.clientHeight;
-  return (
-    window.innerHeight - navPadding - footerHeight - controlsHeight - formOffset
-  );
-};
+DOM.contentWrapper.style.height = document.body.clientHeight - 80 + "px";
 
 // Mouse down event to start dragging
 DOM.controlsWrapper.addEventListener("mousedown", (e) => {
@@ -298,11 +435,11 @@ DOM.controlsWrapper.addEventListener("mousedown", (e) => {
     // Calculate the delta y (drag distance)
     newHeight = initialHeight + e.clientY - startY;
     // Clamp newHeight to ensure it doesn't exceed the available height
-    newHeight = Math.min(newHeight, specMaxHeight());
+    newHeight = Math.min(newHeight, spec.maxHeight(DOM));
     // Adjust the spectrogram dimensions accordingly
     debounceTimer = setTimeout(() => {
-      adjustSpecDims(true, spectrogram.fftSamples, newHeight);
-    }, 10);
+      spec.adjustDims(true, config.FFT, newHeight);
+    }, 100);
   };
 
   // Remove event listener on mouseup
@@ -379,7 +516,7 @@ function updateProgress(val) {
  * @param {boolean} preserveResults - If true, existing analysis results are retained; otherwise, they are cleared.
  */
 function loadAudioFileSync({ filePath = "", preserveResults = false }) {
-  fileLoaded = false;
+  STATE.fileLoaded = false;
   locationID = undefined;
   worker.postMessage({
     action: "file-load-request",
@@ -391,78 +528,41 @@ function loadAudioFileSync({ filePath = "", preserveResults = false }) {
   });
 }
 
-/**
- * Updates the spectrogram visualization and timeline asynchronously.
- *
- * This function ensures that the spectrogram element is visible by removing the "d-none" class and updates the display based on the provided audio buffer and options. It resets the spectrogram dimensions if a reset is requested or if the wavesurfer instance is uninitialized; otherwise, it loads the new audio buffer. After updating the spectrogram, the timeline is refreshed, the playback position is set using a normalized value, and playback is initiated if specified.
- *
- * @async
- * @param {Object} options - Configuration options for updating the spectrogram.
- * @param {AudioBuffer|*} options.buffer - The audio buffer to be visualized.
- * @param {boolean} [options.play=false] - If true, starts playback immediately after the update.
- * @param {number} [options.position=0] - Normalized playback position (between 0 and 1) to seek to.
- * @param {boolean} [options.resetSpec=false] - If true, resets the spectrogram dimensions before loading the buffer.
- * @returns {Promise<void>} A promise that resolves once the spectrogram and timeline update process is complete.
- */
-async function updateSpec({
-  buffer,
-  play = false,
-  position = 0,
-  resetSpec = false,
-}) {
-  DOM.spectrogramWrapper.classList.remove("d-none");
-  if (resetSpec || !wavesurfer) await adjustSpecDims(true);
-  else {
-    await loadBuffer(buffer);
-  }
-  refreshTimeline();
-  wavesurfer.seekTo(position);
-  if (play) await wavesurfer.play();
-}
 
-/**
- * Creates and registers a timeline plugin for WaveSurfer.js.
- *
- * This function computes the timeline display intervals based on the global variable `windowLength`.
- * It determines the primary label interval as the ceiling of (`windowLength` divided by 5) and calculates
- * the time interval as one-tenth of this primary interval. Using these values, it configures a timeline
- * plugin via the `TimelinePlugin.create` method with customized options, including:
- * - Label formatting through the global `formatTimeCallback`
- * - Secondary label opacity set to 0.35
- * - Styling options such as font size ("0.75rem") and color obtained from `wsTextColour()`
- *
- * If a global WaveSurfer instance exists (referenced by `wavesurfer`), the timeline is automatically
- * registered with it; otherwise, the standalone timeline plugin object is returned.
- *
- * @returns {Object} The timeline plugin instance, either as a registered plugin with WaveSurfer or as a standalone object.
- */
-function createTimeline() {
-  const primaryLabelInterval = Math.ceil(windowLength / 5);
-  const secondaryLabelInterval = 0;
-  const timeinterval = primaryLabelInterval / 10;
-  const colour = wsTextColour();
-  const timeline = TimelinePlugin.create({
-    insertPosition: "beforebegin",
-    formatTimeCallback: formatTimeCallback,
-    timeInterval: timeinterval,
-    primaryLabelInterval: primaryLabelInterval,
-    secondaryLabelInterval: secondaryLabelInterval,
-    secondaryLabelOpacity: 0.35,
-    style: {
-      fontSize: "0.75rem",
-      color: colour,
-    },
+const postBufferUpdate = ({
+  file = STATE.currentFile,
+  begin = 0,
+  position = 0,
+  play = false,
+  resetSpec = false,
+  goToRegion = false,
+}) => {
+  STATE.regionsCompleted = false;
+  STATE.fileLoaded = false;
+  worker.postMessage({
+    action: "update-buffer",
+    file: file,
+    position: position,
+    start: begin,
+    end: begin + STATE.windowLength,
+    play: play,
+    resetSpec: resetSpec,
+    goToRegion: goToRegion,
   });
-  return wavesurfer ? wavesurfer.registerPlugin(timeline) : timeline;
-}
+  // In case it takes a while:
+  loadingTimeout = setTimeout(() => {
+    DOM.loading.querySelector("#loadingText").textContent = "Loading file...";
+    DOM.loading.classList.remove("d-none");
+  }, 500);
+};
 
 const resetRegions = (clearActive) => {
-  if (wavesurfer) REGIONS.clearRegions();
-  clearActive && (activeRegion = null);
+  if (spec.wavesurfer) spec.REGIONS.clearRegions();
+  clearActive && (STATE.activeRegion = null);
   STATE.selection = false;
   worker.postMessage({ action: "update-state", selection: false });
   utils.disableMenuItem(["analyseSelection", "export-audio"]);
-  if (fileLoaded) utils.enableMenuItem(["analyse"]);
+  if (STATE.fileLoaded) utils.enableMenuItem(["analyse"]);
 };
 
 /**
@@ -481,293 +581,8 @@ function clearActive() {
   activeRow = undefined;
 }
 
-const WSPluginPurge = () => {
-  // Destroy leaves the plugins in the plugin list.
-  // So, this is needed to remove plugins where the `wavesurfer` key is null
-  wavesurfer &&
-    (wavesurfer.plugins = wavesurfer.plugins.filter(
-      (plugin) => plugin.wavesurfer !== null
-    ));
-};
 
-function makeBlob(audio) {
-  // Recreate TypedArray
-  const int16Array = new Int16Array(audio.buffer);
-  // Convert to Float32Array (Web Audio API uses Float32 samples)
-  const float32Array = new Float32Array(int16Array.length);
-  for (let i = 0; i < int16Array.length; i++) {
-    float32Array[i] = int16Array[i] / 32768; // Normalize from Int16 to Float32
-  }
-  // Create AudioBuffer using AudioContext
-  const audioBuffer = audioContext.createBuffer(
-    1,
-    float32Array.length,
-    sampleRate
-  ); // Mono channel
-  // Populate the AudioBuffer with float32Array data
-  audioBuffer.copyToChannel(float32Array, 0);
-  const blob = new Blob([audio], { type: "audio/wav" });
-  const peaks = [audioBuffer.getChannelData(0)];
-  const duration = audioBuffer.duration;
-  return [blob, peaks, duration];
-}
-const audioContext = new AudioContext();
-async function loadBuffer(audio = currentBuffer) {
-  t0 = Date.now();
-  const [blob, peaks, duration] = STATE.blob || makeBlob(audio);
-  await wavesurfer.loadBlob(blob, peaks, duration);
-  STATE.blob = null;
-}
-const nullRender = (peaks, ctx) => {};
-const wsTextColour = () =>
-  config.colormap === "custom"
-    ? config.customColormap.loud
-    : config.colormap === "gray"
-    ? "#000"
-    : "#fff";
 
-const initWavesurfer = ({ audio = undefined, height = 0 }) => {
-  wavesurfer && wavesurfer.destroy();
-  const loggedErrors = new Set();
-  initRegion();
-  spectrogram = initSpectrogram(height);
-  timeline = createTimeline();
-  // Setup waveform and spec views
-  wavesurfer = WaveSurfer.create({
-    container: document.querySelector("#waveform"),
-    // make waveform transparent
-    backgroundColor: "rgba(0,0,0,0)",
-    waveColor: "rgba(0,0,0,0)",
-    progressColor: "rgba(0,0,0,0)",
-    // but keep the playhead
-    cursorColor: wsTextColour(),
-    cursorWidth: 2,
-    height: "auto",
-    renderFunction: nullRender, // no need to render a waveform
-    plugins: [REGIONS, spectrogram, timeline],
-  });
-
-  if (audio) {
-    loadBuffer(audio);
-  }
-  DOM.colourmap.value = config.colormap;
-  // Set click event that removes all REGIONS
-
-  REGIONS.enableDragSelection({
-    color: STATE.regionActiveColour,
-  });
-
-  wavesurfer.on("dblclick", centreSpec);
-  wavesurfer.on("click", () => REGIONS.clearRegions());
-  wavesurfer.on("ready", () => (wavesurfer.isReady = true));
-  wavesurfer.on("pause", () => {
-    const position =
-      wavesurfer.getCurrentTime() / wavesurfer.decodedData.duration;
-    // Pause event fired right before 'finish' event, so
-    // this is set=== to signal whether it was playing up to that point
-    if (position < 0.998) wavesurfer.isPaused = true;
-  });
-
-  wavesurfer.on("play", () => (wavesurfer.isPaused = false));
-
-  wavesurfer.on("finish", function () {
-    const bufferEnd = windowOffsetSecs + windowLength;
-    if (currentFileDuration > bufferEnd) {
-      wavesurfer.isReady = false;
-      postBufferUpdate({
-        begin: windowOffsetSecs + windowLength,
-        play: !wavesurfer.isPaused,
-      });
-    } else if (!wavesurfer.isPaused) {
-      const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
-      if (fileIndex < STATE.openFiles.length - 1) {
-        // Move to next file
-        const fileToLoad = STATE.openFiles[fileIndex + 1];
-        wavesurfer.isReady = false;
-        postBufferUpdate({
-          file: fileToLoad,
-          begin: 0,
-          position: 0,
-          play: !wavesurfer.isPaused,
-        });
-      }
-    }
-  });
-
-  // Show controls
-  utils.showElement(["controlsWrapper"]);
-  // Resize canvas of spec and labels
-  adjustSpecDims(true);
-  // remove the tooltip
-  DOM.tooltip?.remove();
-
-  const tooltip = document.createElement("div");
-  tooltip.id = "tooltip";
-  document.body.appendChild(tooltip);
-  // Add event listener for the gesture events
-  const wave = DOM.waveElement;
-  wave.removeEventListener("wheel", handleGesture);
-  wave.addEventListener("wheel", handleGesture, { passive: true });
-
-  wave.removeEventListener("mousemove", specTooltip);
-  wave.removeEventListener("mouseout", hideTooltip);
-
-  wave.addEventListener("mousemove", specTooltip, { passive: true });
-  wave.addEventListener("mouseout", hideTooltip);
-};
-
-/**
- * Increases the FFT sample count for the spectrogram if it is below 2048.
- *
- * This function checks if the current FFT sample count (spectrogram.fftSamples) is less than 2048.
- * If so, it doubles the sample count, updates the global FFT configuration (config.FFT), and refreshes
- * the audio buffer by invoking postBufferUpdate with the current window offset, normalized playback position,
- * and playback state from wavesurfer. The playback position is calculated by dividing wavesurfer.getCurrentTime()
- * by windowLength, then clamped between 0 and 1. Finally, the updated FFT sample count is logged to the console.
- *
- * Side Effects:
- * - Modifies spectrogram.fftSamples and config.FFT.
- * - Calls postBufferUpdate to refresh the audio buffer.
- * - Logs the new FFT sample count using console.log.
- *
- * External Dependencies:
- * - spectrogram: Object containing FFT settings.
- * - config: Global configuration object for FFT.
- * - wavesurfer: Instance controlling audio playback and current time.
- * - windowLength: Global variable used to normalize the playback position.
- * - windowOffsetSecs: Global variable indicating the current window offset in seconds.
- * - clamp: Utility function to restrict a value between a minimum and maximum.
- * - postBufferUpdate: Function to update the audio buffer after FFT changes.
- */
-function increaseFFT() {
-  if (spectrogram.fftSamples < 2048 && STATE.regionsCompleted) {
-    spectrogram.fftSamples *= 2;
-    const position = utils.clamp(
-      wavesurfer.getCurrentTime() / windowLength,
-      0,
-      1
-    );
-    postBufferUpdate({
-      begin: windowOffsetSecs,
-      position: position,
-      play: wavesurfer.isPlaying(),
-    });
-    console.log(spectrogram.fftSamples);
-    config.FFT = spectrogram.fftSamples;
-  }
-}
-
-/**
- * Halve the FFT sample count for the spectrogram when it exceeds the minimum threshold.
- *
- * This function checks if `spectrogram.fftSamples` is greater than 64. If so, the FFT sample
- * count is halved, and the normalized playback position is computed using the ratio of the current
- * playback time (from `wavesurfer.getCurrentTime()`) to the `windowLength`, clamped between 0 and 1.
- * It then calls `postBufferUpdate` with an object containing:
- *   - `begin`: the current window offset in seconds (`windowOffsetSecs`),
- *   - `position`: the normalized (and clamped) playback position,
- *   - `play`: a boolean indicating whether audio is currently playing (`wavesurfer.isPlaying()`).
- *
- * The updated FFT sample count is logged to the console, and the global configuration (`config.FFT`)
- * is updated accordingly.
- *
- * Assumes that the following globals and helper functions are available in the scope:
- *   - `spectrogram`
- *   - `wavesurfer`
- *   - `windowLength`
- *   - `windowOffsetSecs`
- *   - `config`
- *   - `clamp`
- *   - `postBufferUpdate`
- *
- * @returns {void}
- */
-function reduceFFT() {
-  if (spectrogram.fftSamples > 64 && STATE.regionsCompleted) {
-    spectrogram.fftSamples /= 2;
-    const position = utils.clamp(
-      wavesurfer.getCurrentTime() / windowLength,
-      0,
-      1
-    );
-    postBufferUpdate({
-      begin: windowOffsetSecs,
-      position: position,
-      play: wavesurfer.isPlaying(),
-    });
-    console.log(spectrogram.fftSamples);
-    config.FFT = spectrogram.fftSamples;
-  }
-}
-
-const refreshTimeline = () => {
-  timeline.destroy();
-  timeline = createTimeline();
-};
-
-/**
- * Adjusts the spectrogram zoom level and repositions the playhead relative to the audio timeline.
- *
- * Halves the display window during a "zoomIn" operation—without reducing the window below 1.5 seconds—
- * and doubles it during a "zoomOut" operation, capped at 100 seconds or the total duration of the file.
- * The window offset is recalculated to keep the playhead at the same absolute position within the audio,
- * and any active audio regions are updated to remain consistent with the new window.
- *
- * No operation is performed if no audio file is loaded or if the audio regions have not been fully initialized.
- *
- * @param {(string|Event)} direction - A zoom command either as a string ("zoomIn" or "zoomOut") for direct calls,
- * or as an Event from which the command is extracted using the event target's closest button ID.
- * @returns {void}
- *
- * @example
- * // Programmatically zoom in:
- * zoomSpec("zoomIn");
- *
- * @example
- * // Zoom out via a button click:
- * buttonElement.addEventListener("click", zoomSpec);
- */
-function zoomSpec(direction) {
-  if (fileLoaded && STATE.regionsCompleted) {
-    if (typeof direction !== "string") {
-      // then it's an event
-      direction = direction.target.closest("button").id;
-    }
-    let playedSeconds = wavesurfer.getCurrentTime();
-    let position = playedSeconds / windowLength;
-    let timeNow = windowOffsetSecs + playedSeconds;
-    const oldBufferBegin = windowOffsetSecs;
-    if (direction === "zoomIn") {
-      if (windowLength < 1.5) return;
-      windowLength /= 2;
-      windowOffsetSecs += windowLength * position;
-    } else {
-      if (windowLength > 100 || windowLength === currentFileDuration) return;
-      windowOffsetSecs -= windowLength * position;
-      windowLength = Math.min(currentFileDuration, windowLength * 2);
-
-      if (windowOffsetSecs < 0) {
-        windowOffsetSecs = 0;
-      } else if (windowOffsetSecs + windowLength > currentFileDuration) {
-        windowOffsetSecs = currentFileDuration - windowLength;
-      }
-    }
-    // Keep playhead at same time in file
-    position = (timeNow - windowOffsetSecs) / windowLength;
-    // adjust region start time to new window start time
-    if (activeRegion) {
-      const duration = activeRegion.end - activeRegion.start;
-      activeRegion.start =
-        oldBufferBegin + activeRegion.start - windowOffsetSecs;
-      activeRegion.end = activeRegion.start + duration;
-    }
-    postBufferUpdate({
-      begin: windowOffsetSecs,
-      position: position,
-      play: wavesurfer.isPlaying(),
-    });
-  }
-}
 
 async function showOpenDialog(fileOrFolder) {
   const defaultPath = localStorage.getItem("lastFolder") || "";
@@ -801,7 +616,7 @@ const buildFileMenu = (e) => {
   //e.preventDefault();
   e.stopImmediatePropagation();
   const menu = DOM.contextMenu;
-  const i18 = getI18n(i18n.Context);
+  const i18 = i18n.get(i18n.Context);
   menu.innerHTML = `
     <a class="dropdown-item" id="setCustomLocation"><span
     class="material-symbols-outlined align-bottom pointer">edit_location_alt</span> ${i18.location}</a>
@@ -823,7 +638,7 @@ const buildFileMenu = (e) => {
  */
 function showDatePicker() {
   // Create a form element
-  const i18 = getI18n(i18n.Form);
+  const i18 = i18n.get(i18n.Form);
   const form = document.createElement("form");
   form.classList.add(
     "mt-3",
@@ -952,7 +767,7 @@ function showMetadata() {
 }
 
 function renderFilenamePanel() {
-  const i18 = getI18n(i18n.Titles);
+  const i18 = i18n.get(i18n.Titles);
   if (!STATE.currentFile) return;
   const openFile = STATE.currentFile;
   const files = STATE.openFiles;
@@ -1043,7 +858,7 @@ function customiseAnalysisMenu(saved) {
 }
 
 async function generateLocationList(id) {
-  const i18 = getI18n(i18n.All);
+  const i18 = i18n.get(i18n.All);
   const defaultText = id === "savedLocations" ? i18[0] : i18[1];
   const el = document.getElementById(id);
   LOCATIONS = undefined;
@@ -1190,7 +1005,7 @@ async function setCustomLocation() {
     showLocation(true);
   });
 
-  const i18 = getI18n(i18n.Location);
+  const i18 = i18n.get(i18n.Location);
   const addOrDelete = () => {
     if (customPlaceEl.value) {
       locationAdd.textContent = i18[0];
@@ -1306,8 +1121,8 @@ async function onOpenFiles(args) {
   window.electron.unsavedRecords(false);
   document.getElementById("unsaved-icon").classList.add("d-none");
   // Reset the buffer playhead and zoom:
-  windowOffsetSecs = 0;
-  windowLength = 20;
+  STATE.windowOffsetSecs = 0;
+  STATE.windowLength = 20;
 }
 
 /**
@@ -1346,7 +1161,7 @@ function analyseReset() {
  * If no file is loaded and there are no open files, all UI elements are hidden.
  */
 function refreshResultsView() {
-  if (fileLoaded) {
+  if (STATE.fileLoaded) {
     utils.hideAll();
     utils.showElement(["spectrogramWrapper"], false);
     if (!utils.isEmptyObject(predictions)) {
@@ -1360,9 +1175,9 @@ function refreshResultsView() {
 // fromDB is requested when circle clicked
 const getSelectionResults = (fromDB) => {
   if (fromDB instanceof PointerEvent) fromDB = false;
-  let start = activeRegion.start + windowOffsetSecs;
+  let start = STATE.activeRegion.start + STATE.windowOffsetSecs;
   // Remove small amount of region to avoid pulling in results from 'end'
-  let end = activeRegion.end + windowOffsetSecs; // - 0.001;
+  let end = STATE.activeRegion.end + STATE.windowOffsetSecs; // - 0.001;
   STATE.selection = {};
   STATE["selection"]["start"] = start.toFixed(3);
   STATE["selection"]["end"] = end.toFixed(3);
@@ -1587,8 +1402,8 @@ async function showCharts() {
   const locationFilter = await generateLocationList("chart-locations");
   locationFilter.addEventListener("change", handleLocationFilterChange);
   // Prevent the wavesurfer error
-  spectrogram && spectrogram.destroy();
-  spectrogram = null;
+  spec.spectrogram && spec.spectrogram.destroy();
+  spec.spectrogram = null;
   utils.hideAll();
   utils.showElement(["recordsContainer"]);
   worker.postMessage({
@@ -1598,19 +1413,7 @@ async function showCharts() {
   });
 }
 
-/**
- * Reinitializes the spectrogram plugin if it has not been initialized.
- *
- * Checks if a global wavesurfer instance exists and the spectrogram is not already set up.
- * If both conditions are met, it initializes the spectrogram using the configured maximum height
- * and registers it as a plugin with wavesurfer.
- */
-function reInitSpec() {
-  if (wavesurfer && !spectrogram) {
-    spectrogram = initSpectrogram(config.specMaxHeight);
-    wavesurfer.registerPlugin(spectrogram);
-  }
-}
+
 /**
  * Prepares the interface for Explore mode by updating UI elements, state flags, and worker messages.
  *
@@ -1620,8 +1423,8 @@ function reInitSpec() {
  * resets analysis results, and adjusts the UI layout to prevent scroll issues.
  */
 async function showExplore() {
-  // Change fileLoaded this one time, so a file will load!
-  fileLoaded = true;
+  // Change STATE.fileLoaded this one time, so a file will load!
+  STATE.fileLoaded = true;
   saveAnalyseState();
   utils.enableMenuItem([
     "saveCSV",
@@ -1641,7 +1444,7 @@ async function showExplore() {
   locationFilter.addEventListener("change", handleLocationFilterChange);
   utils.hideAll();
   utils.showElement(["exploreWrapper", "spectrogramWrapper"], false);
-  reInitSpec();
+  spec.reInitSpec(config.specMaxHeight);
   worker.postMessage({ action: "update-state", filesToAnalyse: [] });
   // Analysis is done
   STATE.analysisDone = true;
@@ -1651,7 +1454,7 @@ async function showExplore() {
   });
   resetResults();
   // Prevent scroll up hiding navbar
-  adjustSpecDims();
+  spec.adjustDims();
 }
 
 /**
@@ -1672,12 +1475,12 @@ async function showAnalyse() {
   STATE = { ...STATE, ...STATE.currentAnalysis };
   worker.postMessage({ action: "change-mode", mode: STATE.mode });
   // Prevent the wavesurfer error
-  spectrogram && spectrogram.destroy();
-  spectrogram = null;
+  spec.spectrogram && spec.spectrogram.destroy();
+  spec.spectrogram = null;
   utils.hideAll();
   if (STATE.currentFile) {
     utils.showElement(["spectrogramWrapper"], false);
-    reInitSpec();
+    spec.reInitSpec(config.specMaxHeight);
     worker.postMessage({
       action: "update-state",
       filesToAnalyse: STATE.openFiles,
@@ -1703,44 +1506,11 @@ async function showAnalyse() {
 //     worker.postMessage({ action: 'create-dataset', species: isSpeciesViewFiltered(true) });
 // });
 
-/**
- * Creates and registers a new audio region on the waveform, optionally navigating to its start time.
- *
- * This function validates the input parameters and adds a new region to the global REGIONS collection using the
- * specified start and end times. It applies the provided color or defaults to STATE.regionColour, and formats the label
- * using the formatLabel helper. If the goToRegion flag is true, the waveform's current time is set to the new region's start time.
- *
- * Note: If the start and end parameters are invalid (i.e., non-numeric or if start is not less than end), the function logs
- * an error and returns early without creating the region.
- *
- * @param {number} start - The start time of the region in seconds.
- * @param {number} end - The end time of the region in seconds (must be greater than start).
- * @param {string} label - The label for the region.
- * @param {boolean} goToRegion - If true, navigates the waveform to the region's start time.
- * @param {string} [colour] - Optional color for the region; defaults to STATE.regionColour if not provided.
- * @returns {void}
- */
-function createRegion(start, end, label, goToRegion, colour) {
-  // Validate input parameters
-  if (typeof start !== "number" || typeof end !== "number" || start >= end) {
-    console.error("Invalid region parameters:", { start, end });
-    return;
-  }
-  REGIONS.addRegion({
-    start: start,
-    end: end,
-    color: colour || STATE.regionColour,
-    content: formatLabel(label, colour),
-  });
-
-  if (goToRegion) wavesurfer.setTime(start);
-}
-
 // We add the handler to the whole table as the body gets replaced and the handlers on it would be wiped
 const results = document.getElementById("results");
-results.addEventListener("click", resultClick);
+results.addEventListener("click", debounceClick(resultClick));
 const selectionTable = document.getElementById("selectionResultTableBody");
-selectionTable.addEventListener("click", resultClick);
+selectionTable.addEventListener("click", debounceClick(resultClick));
 
 /**
  * Processes click events on audio analysis result rows.
@@ -1760,7 +1530,7 @@ selectionTable.addEventListener("click", resultClick);
  * document.querySelector('tr').addEventListener('click', resultClick);
  */
 async function resultClick(e) {
-  if (!fileLoaded) {
+  if (!STATE.fileLoaded) {
     console.warn("Cannot process click - no audio file is loaded");
     return;
   }
@@ -1783,7 +1553,7 @@ async function resultClick(e) {
     loadResultRegion({ file, start, end, label });
   }
   if (e.target.classList.contains("circle")) {
-    await utils.waitFor(() => fileLoaded);
+    await utils.waitFor(() => STATE.fileLoaded);
     getSelectionResults(true);
   }
 }
@@ -1813,7 +1583,7 @@ function setActiveRow(start) {
       r.classList.add("table-active");
       activeRow = r; // Update the active row reference
 
-      activeRow.scrollIntoView({ behavior: "smooth", block: "center" });
+      activeRow.scrollIntoView({ behavior: "instant", block: "center" });
       break; // Exit loop once the target row is found
     }
   }
@@ -1828,15 +1598,16 @@ const loadResultRegion = ({
   start = parseFloat(start);
   end = parseFloat(end);
   // ensure region doesn't spread across the whole window
-  if (windowLength <= 3.5) windowLength = 6;
-  windowOffsetSecs = Math.max(0, start - windowLength / 2 + 1.5);
-  activeRegion = {
+  if (STATE.windowLength <= 3.5) STATE.windowLength = 6;
+  let windowOffsetSecs = STATE.windowOffsetSecs;
+  windowOffsetSecs = Math.max(0, start - STATE.windowLength / 2 + 1.5);
+  STATE.activeRegion = {
     start: Math.max(start - windowOffsetSecs, 0),
     end: end - windowOffsetSecs,
     label,
   };
-  const position = wavesurfer
-    ? utils.clamp(wavesurfer.getCurrentTime() / windowLength, 0, 1)
+  const position = spec.wavesurfer
+    ? utils.clamp(spec.wavesurfer.getCurrentTime() / STATE.windowLength, 0, 1)
     : 0;
   postBufferUpdate({
     file,
@@ -1846,73 +1617,6 @@ const loadResultRegion = ({
   });
 };
 
-/**
- * Adjusts the dimensions of the spectrogram and related UI elements based on the current window and DOM sizes.
- *
- * This asynchronous function recalculates the layout of key UI components such as the content wrapper,
- * spectrogram display, and result table, ensuring they adapt to changes in the window size. When the
- * `redraw` flag is true and an audio file is loaded, the function computes a new spectrogram height using
- * either the specified `newHeight` (if non-zero) or the current configuration limits. If a new height is provided,
- * it updates the configuration preferences accordingly.
- *
- * Depending on whether WaveSurfer is already initialized, the function will either:
- * - Initialize a new WaveSurfer instance with the current audio buffer and updated height.
- * - Update the existing WaveSurfer instance's options (including height and cursor color), re-register the spectrogram
- *   plugin with the new settings (using `fftSamples` if provided), and reload the audio buffer.
- *
- * Finally, it adjusts the height of the result table to fill the remaining vertical space.
- *
- * @param {boolean} redraw - Indicates whether the spectrogram should be re-rendered and WaveSurfer updated.
- * @param {number} [fftSamples] - Optional. The number of FFT samples to use for rendering; must be a power of two.
- * @param {number} [newHeight=0] - Optional. Overrides the dynamic height calculation for the spectrogram; a value of 0 triggers dynamic sizing.
- * @returns {Promise<void>} A promise that resolves once the UI adjustments and spectrogram rendering updates are complete.
- */
-
-async function adjustSpecDims(redraw, fftSamples, newHeight) {
-  const footerHeight = DOM.footer.offsetHeight;
-  const navHeight = DOM.navPadding.clientHeight;
-  newHeight ??= 0;
-  DOM.contentWrapper.style.top = navHeight.toString() + "px"; // for padding
-  DOM.contentWrapper.style.height =
-    (bodyElement.clientHeight - footerHeight - navHeight).toString() + "px";
-  const contentHeight = contentWrapper.offsetHeight;
-  // + 2 for padding
-  const formOffset = DOM.exploreWrapper.offsetHeight;
-
-  let specOffset;
-  if (!DOM.spectrogramWrapper.classList.contains("d-none")) {
-    const specHeight =
-      newHeight || Math.min(config.specMaxHeight, specMaxHeight());
-    if (newHeight !== 0) {
-      config.specMaxHeight = specHeight;
-      updatePrefs("config.json", config);
-    }
-    if (STATE.currentFile && redraw) {
-      // give the wrapper space for the transport controls and element padding/margins
-      if (!wavesurfer) {
-        initWavesurfer({
-          audio: currentBuffer,
-          height: specHeight,
-        });
-      } else {
-        wavesurfer.setOptions({
-          height: specHeight,
-          cursorColor: wsTextColour(),
-        });
-        spectrogram = initSpectrogram(specHeight, fftSamples);
-        wavesurfer.registerPlugin(spectrogram);
-        await loadBuffer();
-      }
-    }
-    if (wavesurfer) {
-      specOffset = spectrogramWrapper.offsetHeight;
-    }
-  } else {
-    specOffset = 0;
-  }
-  DOM.resultTableElement.style.height =
-    contentHeight - specOffset - formOffset + "px";
-}
 
 ///////////////// Font functions ////////////////
 // Function to set the font size scale
@@ -1929,88 +1633,9 @@ function setFontSizeScale(doNotScroll) {
   doNotScroll ||
     decreaseBtn.scrollIntoView({ block: "center", behavior: "auto" });
   updatePrefs("config.json", config);
-  adjustSpecDims(true);
+  spec.adjustDims(true);
 }
 
-///////////////////////// Timeline Callbacks /////////////////////////
-
-/**
- * Use formatTimeCallback to style the notch labels as you wish, such
- * as with more detail as the number of pixels per second increases.
- *
- * Here we format as M:SS.frac, with M suppressed for times < 1 minute,
- * and frac having 0, 1, or 2 digits as the zoom increases.
- *
- * Note that if you override the default function, you'll almost
- * certainly want to override timeInterval, primaryLabelInterval and/or
- * secondaryLabelInterval so they all work together.
- *
- * @param: seconds
- * @param: pxPerSec
- */
-
-function formatRegionTooltip(regionLength, start, end) {
-  const length = end - start;
-  if (length === 3) {
-    return `${formatTimeCallback(start)} -  ${formatTimeCallback(end)}`;
-  } else if (length < 1)
-    return `${regionLength}: ${(length * 1000).toFixed(0)}ms`;
-  else {
-    return `${regionLength}: ${length.toFixed(3)}s`;
-  }
-}
-
-function formatTimeCallback(secs) {
-  secs = secs.toFixed(2);
-  // Add 500 to deal with overflow errors
-  let now = new Date(bufferStartTime.getTime() + secs * 1000);
-  let milliseconds = now.getMilliseconds();
-  if (milliseconds > 949) {
-    // Deal with overflow errors
-    now = new Date(now.getTime() + 50);
-    milliseconds = 0;
-  }
-  // Extract the components
-  let hours = now.getHours();
-  let minutes = now.getMinutes();
-  let seconds = now.getSeconds();
-
-  let formattedTime;
-  if (config.timeOfDay) {
-    // Format the time as hh:mm:ss
-    formattedTime = [
-      hours.toString().padStart(2, "0"),
-      minutes.toString().padStart(2, "0"),
-      seconds.toString().padStart(2, "0"),
-    ].join(":");
-  } else {
-    if (hours === 0 && minutes === 0) {
-      // Format as ss
-      formattedTime = seconds.toString();
-    } else if (hours === 0) {
-      // Format as mm:ss
-      formattedTime = [
-        minutes.toString(),
-        seconds.toString().padStart(2, "0"),
-      ].join(":");
-    } else {
-      // Format as hh:mm:ss
-      formattedTime = [
-        hours.toString(),
-        minutes.toString().padStart(2, "0"),
-        seconds.toString().padStart(2, "0"),
-      ].join(":");
-    }
-  }
-  if (windowLength <= 5) {
-    formattedTime += "." + milliseconds.toString();
-  } else {
-    milliseconds = (milliseconds / 1000).toFixed(1);
-    formattedTime += milliseconds.slice(1);
-  }
-
-  return formattedTime;
-}
 
 ////////// Store preferences //////////
 
@@ -2201,10 +1826,10 @@ window.onload = async () => {
       readLabels(config.customListFile[config.model], "list");
     // Show Locale
     DOM.locale.value = config.locale;
-    LIST_MAP = getI18n(i18n.LIST_MAP);
+    LIST_MAP = i18n.get(i18n.LIST_MAP);
     // Localise UI
     i18n.localiseUI(DOM.locale.value).then((result) => (STATE.i18n = result));
-    initialiseDatePicker();
+    initialiseDatePicker(STATE, worker, config, resetResults, filterResults, i18n.get);
     STATE.picker.options.lang = DOM.locale.value.replace("_uk", "");
 
     // remember audio notification setting
@@ -2436,7 +2061,7 @@ const setUpWorkerMessaging = () => {
             clearTimeout(loadingTimeout);
             DOM.loading.classList.add("d-none");
             MISSING_FILE = args.file;
-            const i18 = getI18n(i18n.Locate);
+            const i18 = i18n.get(i18n.Locate);
             args.locate = `
                             <div class="d-flex justify-content-center mt-2">
                                 <button id="locate-missing-file" class="btn btn-primary border-dark text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
@@ -2500,7 +2125,7 @@ const setUpWorkerMessaging = () => {
           const mode = args.mode;
           STATE.mode = mode;
           renderFilenamePanel();
-          adjustSpecDims();
+          spec.adjustDims();
           switch (mode) {
             case "analyse": {
               STATE.diskHasRecords &&
@@ -2521,7 +2146,6 @@ const setUpWorkerMessaging = () => {
               "text-bg-secondary",
               "text-bg-dark"
             );
-            //adjustSpecDims(true)
           } else {
             utils.disableMenuItem(["purge-file"]);
             // change header to indicate deactivation
@@ -2629,7 +2253,7 @@ const setUpWorkerMessaging = () => {
  * For each detection, the function adjusts its start and end times by subtracting the global offset
  * `windowOffsetSecs`. Only detections with an adjusted start time less than the current window length are processed.
  * A detection is considered "active" if its adjusted start time matches the start time of the currently active region
- * (`activeRegion.start`, if defined). If the detection is active and the `goToRegion` flag is true, the view is repositioned
+ * (`STATE.activeRegion.start`, if defined). If the detection is active and the `goToRegion` flag is true, the view is repositioned
  * to focus on that region. Otherwise, the detection is processed only if the configuration flag `config.specDetections` is enabled.
  *
  * Audio regions are created by calling `createRegion` with the adjusted start and end times, the detection's label,
@@ -2648,14 +2272,14 @@ const setUpWorkerMessaging = () => {
  */
 function showWindowDetections({ detections, goToRegion }) {
   for (const detection of detections) {
-    const start = detection.start - windowOffsetSecs;
-    if (start < windowLength) {
-      const end = detection.end - windowOffsetSecs;
-      const active = start === activeRegion?.start;
+    const start = detection.start - STATE.windowOffsetSecs;
+    if (start < STATE.windowLength) {
+      const end = detection.end - STATE.windowOffsetSecs;
+      const active = start === STATE.activeRegion?.start;
       if (!config.specDetections && !active) continue;
       const colour = active ? STATE.regionActiveColour : null;
       const setPosition = active && goToRegion;
-      createRegion(start, end, detection.label, setPosition, colour);
+      spec.createRegion(start, end, detection.label, setPosition, colour);
     }
   }
   // Prevent region cluster fest
@@ -2706,32 +2330,7 @@ function getSpecies(target) {
   return species;
 }
 
-/**
- * Handles a swipe gesture event to trigger page navigation actions.
- *
- * This function throttles gesture events by ignoring any that occur within 1.2 seconds of the previous event.
- * It determines the direction of the gesture by evaluating the horizontal (deltaX) or, if absent, vertical (deltaY) movement.
- * A positive movement results in a "PageDown" action, while a negative movement triggers a "PageUp" action.
- * If debugging is enabled, the gesture details are logged, and each action is tracked via a tracking event.
- *
- * @param {Object} e - The gesture event object.
- * @param {number} [e.deltaX] - The horizontal movement delta.
- * @param {number} [e.deltaY] - The vertical movement delta used if horizontal movement is zero.
- */
-function handleGesture(e) {
-  const currentTime = Date.now();
-  if (currentTime - STATE.lastGestureTime < 1200) {
-    return; // Ignore successive events within 1.2 second
-  }
-  STATE.lastGestureTime = currentTime;
-  const moveDirection = e.deltaX || e.deltaY; // If deltaX is 0, use deltaY
-  const key = moveDirection > 0 ? "PageDown" : "PageUp";
-  config.debug && console.log(`scrolling x: ${e.deltaX} y: ${e.deltaY}`);
-  // waitForFinalEvent(() => {
-  GLOBAL_ACTIONS[key](e);
-  trackEvent(config.UUID, "Swipe", key, "");
-  // }, 200, 'swipe');
-}
+
 
 /**
  * Asynchronously saves an audio clip using Electron's file system API.
@@ -2959,96 +2558,7 @@ function formatDate(date, aggregation) {
 
   return formattedDate + date.toLocaleDateString("en-GB", options);
 }
-function setChartOptions(
-  species,
-  total,
-  rate,
-  results,
-  dataPoints,
-  aggregation,
-  pointStart
-) {
-  let chartOptions = {};
-  //chartOptions.plugins = [ChartDataLabels];
 
-  chartOptions.data = {
-    labels: dataPoints, // Assuming dataPoints is an array of labels
-    datasets: [
-      {
-        label: "Hours of recordings",
-        data: total,
-        borderColor: "#003",
-        backgroundColor: "rgba(0, 51, 0, 0.2)",
-        fill: true,
-        yAxisID: "y-axis-0",
-      },
-      // Add other datasets as needed
-    ],
-  };
-
-  chartOptions.options = {
-    scales: {
-      x: {
-        type: "time",
-        time: {
-          unit: aggregation.toLowerCase(), // Assuming aggregation is 'Week', 'Day', or 'Hour'
-          displayFormats: {
-            day: "ddd D MMM",
-            week: "MMM D",
-            hour: "hA",
-          },
-        },
-      },
-      y: [
-        {
-          id: "y-axis-0",
-          type: "linear",
-          position: "left",
-          title: {
-            text: "Hours recorded",
-          },
-        },
-        // Add other y-axes as needed
-      ],
-    },
-    plugins: {
-      legend: {
-        display: true,
-        position: "top",
-      },
-      tooltip: {
-        enabled: true,
-        mode: "index",
-        intersect: false,
-        position: "nearest",
-        callbacks: {
-          title: function (tooltipItems) {
-            const timestamp = tooltipItems[0].parsed.x;
-            const date = new Date(timestamp);
-            return getTooltipTitle(date, aggregation);
-          },
-          label: function (tooltipItem) {
-            return `${tooltipItem.dataset.label}: ${tooltipItem.formattedValue}`;
-          },
-        },
-      },
-      datalabels: {
-        display: true,
-        color: "white",
-        backgroundColor: "rgba(0, 0, 0, 0.7)",
-        borderRadius: 3,
-        padding: {
-          top: 2,
-        },
-        formatter: function (value, _) {
-          return value; // Customize the displayed value as needed
-        },
-      },
-    },
-  };
-
-  return chartOptions;
-}
 
 function getTooltipTitle(date, aggregation) {
   if (aggregation === "Week") {
@@ -3080,7 +2590,7 @@ function getTooltipTitle(date, aggregation) {
 window.addEventListener("resize", function () {
   utils.waitForFinalEvent(
     function () {
-      adjustSpecDims(true);
+      spec.adjustDims(true);
     },
     100,
     "id1"
@@ -3109,10 +2619,24 @@ function handleKeyDownDeBounce(e) {
       function () {
         handleKeyDown(e);
       },
-      100,
+      250,
       "keyhandler"
     );
   }
+}
+
+function debounceClick(handler, delay = 250) {
+  let timeout;
+  return function (e) {
+    if (timeout) {
+      // If second click within delay, ignore
+      return;
+    }
+    handler.call(this, e); // Preserve `this` context
+    timeout = setTimeout(() => {
+      timeout = null;
+    }, delay);
+  };
 }
 
 /**
@@ -3151,34 +2675,7 @@ function handleKeyDown(e) {
   }
 }
 
-/**
- * Creates and returns a styled label element for a navigation option.
- *
- * This function generates an HTML <span> element with specific styling properties, including absolute positioning,
- * a text color, and a text shadow effect. If the global configuration's colormap is set to 'gray', the provided color
- * is overridden: a truthy color results in 'purple', whereas a falsy value defaults to '#666'. If no label text is provided,
- * the function returns undefined.
- *
- * @param {string} label - The text to display in the label. If falsy, the function returns undefined.
- * @param {string} [color] - The desired color for the label text (subject to configuration overrides).
- * @returns {(HTMLElement|undefined)} The styled <span> element containing the label text, or undefined if no label is provided.
- */
-function formatLabel(label, color) {
-  if (config.colormap === "gray") {
-    color = color ? "purple" : "#666";
-  }
-  if (!label) return;
-  const labelEl = document.createElement("span");
-  Object.assign(labelEl.style, {
-    position: "absolute",
-    color: color || "beige",
-    top: "1rem",
-    left: "0.5rem",
-    textShadow: "2px 2px 3px rgb(0, 0, 0, 0.5)",
-  });
-  labelEl.textContent = label;
-  return labelEl;
-}
+
 
 /**
  * Activates the specified audio region by updating the global state and UI.
@@ -3215,180 +2712,35 @@ function setActiveRegion(region) {
   }
   const { start, end, content } = region;
   // Clear active regions
-  REGIONS.regions.forEach((r) =>
+  spec.REGIONS.regions.forEach((r) =>
     r.setOptions({
       color: STATE.regionColour,
-      content: formatLabel(r.content?.innerText),
+      content: spec.formatLabel(r.content?.innerText),
     })
   );
   // Set the playhead to the start of the region
   const label = content?.innerText || "";
-  const labelEl = formatLabel(label, "gold");
-  activeRegion = { start, end, label };
+  const labelEl = spec.formatLabel(label, "gold");
+  STATE.activeRegion = { start, end, label };
   region.setOptions({ color: STATE.regionActiveColour, content: labelEl });
   utils.enableMenuItem(["export-audio"]);
   if (modelReady && !PREDICTING) {
     utils.enableMenuItem(["analyseSelection"]);
   }
-  setActiveRow(start + windowOffsetSecs);
+  setActiveRow(start + STATE.windowOffsetSecs);
 }
 
-/**
- * Initializes and configures audio region management using the RegionsPlugin.
- *
- * Destroys any existing RegionsPlugin instance and creates a new instance with regions that are draggable,
- * a maximum limit of 100 regions, and a default color defined by STATE.regionColour.
- *
- * Registers event listeners for region interactions:
- * - "region-clicked": Hides the context menu, updates the active region, and seeks playback to the region's start.
- *   If the Shift key is pressed, all regions with the default color are removed; if the Ctrl/Cmd key is pressed,
- *   the clicked region is removed.
- * - "region-created": Marks a new region as active if it has no label (content) or its start time matches the current active region.
- * - "region-update": Clears the region's label and sets the updated region as active.
- *
- * @returns {Object} The new RegionsPlugin instance.
- */
-function initRegion() {
-  if (REGIONS) REGIONS.destroy();
-  REGIONS = RegionsPlugin.create({
-    drag: true,
-    maxRegions: 100,
-    color: STATE.regionColour,
-  });
+const spec = new ChirpityWS(
+  "#waveform",
+  () => STATE, // Returns the current state
+  () => config, // Returns the current config
+  { postBufferUpdate, trackEvent, setActiveRegion, onStateUpdate: state.update, updatePrefs },
+  GLOBAL_ACTIONS
+);
 
-  REGIONS.on("region-clicked", function (r, e) {
-    e.stopPropagation();
-    // Hide context menu
-    DOM.contextMenu.classList.add("d-none");
-    if (r.start !== activeRegion?.start) {
-      setActiveRegion(r);
-    }
-    wavesurfer.seekTo(e.clientX / window.innerWidth);
-    // If shift key held, clear other regions
-    if (e.shiftKey) {
-      REGIONS.regions.forEach(
-        (r) => r.color === STATE.regionColour && r.remove()
-      );
-      // Ctrl / Cmd: remove the current region
-    } else if (e.ctrlKey || e.metaKey) r.remove();
-  });
-
-  // Enable analyse selection when region created
-  REGIONS.on("region-created", function (r) {
-    const { start, content } = r;
-    const activeStart = activeRegion ? activeRegion.start : null;
-    // If a new region is created without a label, it must be user generated
-    if (!content || start === activeStart) {
-      setActiveRegion(r);
-    }
-  });
-
-  // Clear label on modifying region
-  REGIONS.on("region-update", function (r) {
-    r.setOptions({ content: " " });
-    setActiveRegion(r);
-  });
-
-  return REGIONS;
-}
-
-/**
- * Initializes and returns a new spectrogram visualization instance.
- *
- * This function destroys any existing spectrogram instance and purges related plugins before creating a new one.
- * The FFT sample count defaults to the value from configuration (config.FFT) if not provided.
- * If FFT samples remain unset, they are determined heuristically based on a global window length:
- *  - 256 samples if the window length is less than 5,
- *  - 512 samples if the window length is 5 to 15 (inclusive),
- *  - 1024 samples if the window length is greater than 15.
- * Likewise, the spectrogram height defaults to half of the FFT sample count if not specified.
- * A custom colormap is generated and applied along with configured frequency ranges and label settings.
- *
- * @param {number} [height] - The height of the spectrogram in pixels. Defaults to fftSamples/2 if not provided.
- * @param {number} [fftSamples] - The number of FFT samples used for analysis. Defaults to config.FFT or is computed based on window length.
- * @returns {Object} The initialized spectrogram instance.
- */
-function initSpectrogram(height, fftSamples) {
-  fftSamples ??= config.FFT;
-  config.debug && console.log("initializing spectrogram");
-  spectrogram && spectrogram.destroy() && WSPluginPurge();
-  if (!fftSamples) {
-    if (windowLength < 5) {
-      fftSamples = 256;
-    } else if (windowLength <= 15) {
-      fftSamples = 512;
-    } else {
-      fftSamples = 1024;
-    }
-  }
-  if (!height) {
-    height = fftSamples / 2;
-  }
-  // set colormap
-  const colors = createColormap();
-  return Spectrogram.create({
-    container: "#spectrogram",
-    windowFunc: config.customColormap.windowFn,
-    frequencyMin: config.audio.minFrequency,
-    frequencyMax: config.audio.maxFrequency,
-    // noverlap: 128, Auto (the default) seems fine
-    // gainDB: 50, Adjusts spec brightness without increasing volume
-    labels: config.specLabels,
-    labelsColor: wsTextColour(),
-    labelsBackground: "rgba(0,0,0,0)",
-    height: height,
-    fftSamples: fftSamples,
-    scale: "linear",
-    colorMap: colors,
-    alpha: config.alpha,
-  });
-}
-
-function hideTooltip() {
-  DOM.tooltip.style.visibility = "hidden";
-}
-
-function specTooltip(event, showHz = !config.specLabels) {
-  const i18 = getI18n(i18n.Context);
-  const waveElement = event.target;
-  // Update the tooltip content
-  const tooltip = DOM.tooltip;
-  tooltip.style.display = "none";
-  tooltip.replaceChildren();
-  const inRegion = checkForRegion(event, false);
-  if (showHz || inRegion) {
-    const specDimensions = waveElement.getBoundingClientRect();
-    const frequencyRange =
-      Number(config.audio.maxFrequency) - Number(config.audio.minFrequency);
-    const yPosition =
-      Math.round(
-        (specDimensions.bottom - event.clientY) *
-          (frequencyRange / specDimensions.height)
-      ) + Number(config.audio.minFrequency);
-
-    tooltip.textContent = `${i18.frequency}: ${yPosition}Hz`;
-    if (inRegion) {
-      const { start, end } = inRegion;
-      const textNode = document.createTextNode(
-        formatRegionTooltip(i18.length, start, end)
-      );
-      const lineBreak = document.createElement("br");
-      tooltip.appendChild(lineBreak); // Add the line break
-      tooltip.appendChild(textNode); // Add the text node
-    }
-    // Apply styles to the tooltip
-    Object.assign(tooltip.style, {
-      top: `${event.clientY}px`,
-      left: `${event.clientX + 15}px`,
-      display: "block",
-      visibility: "visible",
-      opacity: 1,
-    });
-  }
-}
 
 const updateListIcon = () => {
-  LIST_MAP = getI18n(i18n.LIST_MAP);
+  LIST_MAP = i18n.get(i18n.LIST_MAP);
   DOM.listIcon.style.visibility = "hidden";
   DOM.listIcon.innerHTML =
     config.list === "custom"
@@ -3413,7 +2765,6 @@ DOM.listIcon.addEventListener("click", () => {
   DOM.listToUse.value = config.list;
   updateListIcon();
   updatePrefs("config.json", config);
-  //resetResults();
   setListUIState(config.list);
   updateList();
 });
@@ -3430,7 +2781,7 @@ DOM.customListSelector.addEventListener("click", async () => {
     config.customListFile[config.model] = customListFile;
     DOM.customListFile.value = customListFile;
     readLabels(customListFile, "list");
-    LIST_MAP = getI18n(i18n.LIST_MAP);
+    LIST_MAP = i18n.get(i18n.LIST_MAP);
     updatePrefs("config.json", config);
     localStorage.setItem("customList", customListFile);
   }
@@ -3485,8 +2836,6 @@ const handleBackendChange = (backend) => {
   DOM.batchSizeValue.textContent =
     BATCH_SIZE_LIST[DOM.batchSizeSlider.value].toString();
   updatePrefs("config.json", config);
-  // restart wavesurfer regions to set new maxLength
-  // initRegion();
   loadModel();
 };
 
@@ -3513,63 +2862,18 @@ const timelineToggle = (fromKeys) => {
   }
   config.timeOfDay = DOM.timelineSetting.value === "timeOfDay"; //toggle setting
   setTimelinePreferences();
-  if (fileLoaded && STATE.regionsCompleted) {
+  if (STATE.fileLoaded && STATE.regionsCompleted) {
     // Reload wavesurfer with the new timeline
     const position = utils.clamp(
-      wavesurfer.getCurrentTime() / windowLength,
+      spec.wavesurfer.getCurrentTime() / STATE.windowLength,
       0,
       1
     );
-    postBufferUpdate({ begin: windowOffsetSecs, position: position });
+    postBufferUpdate({ begin: STATE.windowOffsetSecs, position: position });
   }
   updatePrefs("config.json", config);
 };
-/**
- * Centers the spectrogram view around the current playback time.
- *
- * This function recalculates the starting offset of the audio window so that the
- * current time (from the WaveSurfer instance) appears at the center of the display.
- * It updates the global variable `windowOffsetSecs` by subtracting half of the
- * window's length from the computed midpoint. The offset is clamped between 0 and
- * the maximum valid offset determined by `currentFileDuration - windowLength`.
- *
- * If an active audio region exists (stored in `activeRegion`), the function adjusts
- * its start and end times by the same offset shift. Should the region extend beyond the
- * valid window boundaries after the shift, it is cleared (set to null).
- *
- * Finally, the function invokes `postBufferUpdate` to refresh the audio display with
- * the new configuration, positioning the center at 0.5.
- *
- * Side Effects:
- * - Modifies the global variables `windowOffsetSecs` and `activeRegion`.
- * - Relies on and interacts with global state including `wavesurfer`, `windowLength`,
- *   `currentFileDuration`, and `postBufferUpdate`.
- */
 
-function centreSpec() {
-  if (STATE.regionsCompleted) {
-    const saveBufferBegin = windowOffsetSecs;
-    const middle = windowOffsetSecs + wavesurfer.getCurrentTime();
-    windowOffsetSecs = middle - windowLength / 2;
-    windowOffsetSecs = Math.max(0, windowOffsetSecs);
-    windowOffsetSecs = Math.min(
-      windowOffsetSecs,
-      currentFileDuration - windowLength
-    );
-
-    if (activeRegion) {
-      const shift = saveBufferBegin - windowOffsetSecs;
-      activeRegion.start += shift;
-      activeRegion.end += shift;
-      const { start, end } = activeRegion;
-      if (start < 0 || end > windowLength) activeRegion = null;
-    }
-    postBufferUpdate({
-      begin: windowOffsetSecs,
-      position: 0.5,
-    });
-  }
-}
 
 /**
  * Updates the active record based on the key assignment configuration.
@@ -3610,244 +2914,21 @@ function recordUpdate(key) {
     // If we set a new species, we want to give the record a 2000 confidence
     // However, if we just add a label or, leave the confidence alone
     const certainty = assignment.column === "species" ? 2000 : confidence;
-    insertManualRecord(
-      newCname,
-      parseFloat(start),
-      parseFloat(end),
-      newComment,
-      callCount,
-      newLabel,
-      "Update",
-      false,
-      cname,
-      certainty
-    );
+    insertManualRecord({
+      files: file,
+      cname: newCname,
+      start: parseFloat(start),
+      end: parseFloat(end),
+      comment: newComment,
+      count: callCount,
+      label: newLabel,
+      action: "Update",
+      batch: false,
+      originalCname: cname,
+      confidence: certainty
+    });
   }
 }
-
-const GLOBAL_ACTIONS = {
-  // Handle number keys 1-9 dynamically
-  handleNumberKeys: (e) => {
-    if (/^[0-9]$/.test(e.key)) {
-      // number keys here
-      if (activeRow) {
-        recordUpdate(e.key);
-      }
-    }
-  },
-  a: (e) => {
-    if ((e.ctrlKey || e.metaKey) && STATE.currentFile) {
-      const element = e.shiftKey ? "analyseAll" : "analyse";
-      document.getElementById(element).click();
-    }
-  },
-  A: (e) => {
-    (e.ctrlKey || e.metaKey) &&
-      STATE.currentFile &&
-      document.getElementById("analyseAll").click();
-  },
-  c: (e) => (e.ctrlKey || e.metaKey) && currentBuffer && centreSpec(),
-  // D: (e) => {
-  //     if (( e.ctrlKey || e.metaKey)) worker.postMessage({ action: 'create-dataset' });
-  // },
-  e: (e) => (e.ctrlKey || e.metaKey) && activeRegion && exportAudio(),
-  g: (e) => (e.ctrlKey || e.metaKey) && showGoToPosition(),
-  o: async (e) =>
-    (e.ctrlKey || e.metaKey) && (await showOpenDialog("openFile")),
-  p: () => activeRegion && playRegion(),
-  q: (e) => e.metaKey && isMac && window.electron.exitApplication(),
-  s: (e) =>
-    (e.ctrlKey || e.metaKey) && document.getElementById("save2db").click(),
-  t: (e) => (e.ctrlKey || e.metaKey) && timelineToggle(true),
-  v: (e) => {
-    if (activeRow && (e.ctrlKey || e.metaKey)) {
-      const nameAttribute = activeRow.getAttribute("name");
-      const [file, start, end, sname, cname] = nameAttribute.split("|");
-      insertManualRecord(
-        cname,
-        parseFloat(start),
-        parseFloat(end),
-        "",
-        "",
-        "",
-        "Update",
-        false,
-        cname
-      );
-    }
-  },
-  z: (e) => {
-    if ((e.ctrlKey || e.metaKey) && HISTORY.length)
-      insertManualRecord(...HISTORY.pop());
-  },
-  Escape: () => {
-    if (PREDICTING) {
-      console.log("Operation aborted");
-      PREDICTING = false;
-      disableSettingsDuringAnalysis(false);
-      STATE.analysisDone = true;
-      worker.postMessage({
-        action: "abort",
-        model: config.model,
-        threads: config[config[config.model].backend].threads,
-        list: config.list,
-      });
-      STATE.diskHasRecords && utils.enableMenuItem(["explore", "charts"]);
-      generateToast({ message: "cancelled" });
-      DOM.progressDiv.classList.add("invisible");
-    }
-  },
-  Home: () => {
-    if (currentBuffer && STATE.regionsCompleted) {
-      windowOffsetSecs = 0;
-      postBufferUpdate({});
-    }
-  },
-  End: () => {
-    if (currentBuffer && STATE.regionsCompleted) {
-      windowOffsetSecs = currentFileDuration - windowLength;
-      postBufferUpdate({ begin: windowOffsetSecs, position: 1 });
-    }
-  },
-  PageUp: () => {
-    if (currentBuffer && STATE.regionsCompleted) {
-      const position = utils.clamp(
-        wavesurfer.getCurrentTime() / windowLength,
-        0,
-        1
-      );
-      windowOffsetSecs = windowOffsetSecs - windowLength;
-      const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
-      let fileToLoad;
-      if (fileIndex > 0 && windowOffsetSecs < 0) {
-        windowOffsetSecs = -windowLength;
-        fileToLoad = STATE.openFiles[fileIndex - 1];
-      } else {
-        windowOffsetSecs = Math.max(0, windowOffsetSecs);
-        fileToLoad = STATE.currentFile;
-      }
-      postBufferUpdate({
-        file: fileToLoad,
-        begin: windowOffsetSecs,
-        position: position,
-      });
-    }
-  },
-  ArrowUp: () => {
-    if (activeRow && STATE.regionsCompleted) {
-      activeRow.classList.remove("table-active");
-      activeRow = activeRow.previousSibling || activeRow;
-      if (!activeRow.classList.contains("text-bg-dark")) activeRow.click();
-      // activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }
-  },
-  PageDown: () => {
-    if (currentBuffer && STATE.regionsCompleted) {
-      let position = utils.clamp(
-        wavesurfer.getCurrentTime() / windowLength,
-        0,
-        1
-      );
-      windowOffsetSecs = windowOffsetSecs + windowLength;
-      const fileIndex = STATE.openFiles.indexOf(STATE.currentFile);
-      let fileToLoad;
-      if (
-        fileIndex < STATE.openFiles.length - 1 &&
-        windowOffsetSecs >= currentFileDuration - windowLength
-      ) {
-        // Move to next file
-        fileToLoad = STATE.openFiles[fileIndex + 1];
-        windowOffsetSecs = 0;
-        position = 0;
-      } else {
-        windowOffsetSecs = Math.min(
-          windowOffsetSecs,
-          currentFileDuration - windowLength
-        );
-        fileToLoad = STATE.currentFile;
-      }
-      postBufferUpdate({
-        file: fileToLoad,
-        begin: windowOffsetSecs,
-        position: position,
-      });
-    }
-  },
-  ArrowDown: () => {
-    if (activeRow && STATE.regionsCompleted) {
-      activeRow.classList.remove("table-active");
-      activeRow = activeRow.nextSibling || activeRow;
-      if (!activeRow.classList.contains("text-bg-dark")) activeRow.click();
-      // activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    }
-  },
-  ArrowLeft: () => {
-    const skip = windowLength / 100;
-    if (currentBuffer && STATE.regionsCompleted) {
-      wavesurfer.setTime(wavesurfer.getCurrentTime() - skip);
-      let position = utils.clamp(
-        wavesurfer.getCurrentTime() / windowLength,
-        0,
-        1
-      );
-      if (wavesurfer.getCurrentTime() < skip && windowOffsetSecs > 0) {
-        windowOffsetSecs -= skip;
-        postBufferUpdate({
-          begin: windowOffsetSecs,
-          position: (position += skip / windowLength),
-          play: wavesurfer.isPlaying(),
-        });
-      }
-    }
-  },
-  ArrowRight: () => {
-    const skip = windowLength / 100;
-    if (currentBuffer && STATE.regionsCompleted) {
-      const now = wavesurfer.getCurrentTime();
-      if (wavesurfer.isReady) {
-        // This will trigger the finish event if at the end of the window
-        wavesurfer.setTime(now + skip);
-      }
-      // }
-    }
-  },
-  "=": (e) => (e.metaKey || e.ctrlKey ? reduceFFT() : zoomSpec("zoomIn")),
-  "+": (e) => (e.metaKey || e.ctrlKey ? reduceFFT() : zoomSpec("zoomIn")),
-  "-": (e) => (e.metaKey || e.ctrlKey ? increaseFFT() : zoomSpec("zoomOut")),
-  F5: () => reduceFFT(),
-  F4: () => increaseFFT(),
-  " ": async () => {
-    if (wavesurfer) {
-      try {
-        await wavesurfer.playPause();
-      } catch (e) {
-        console.warn("Wavesurfer error", error.message || error);
-      }
-    }
-  },
-  Tab: (e) => {
-    if ((e.metaKey || e.ctrlKey) && !PREDICTING && STATE.diskHasRecords) {
-      // If you did this when predicting, your results would go straight to the archive
-      const modeToSet =
-        STATE.mode === "explore" ? "active-analysis" : "explore";
-      document.getElementById(modeToSet).click();
-    } else if (activeRow && STATE.regionsCompleted) {
-      activeRow.classList.remove("table-active");
-      if (e.shiftKey) {
-        activeRow = activeRow.previousSibling || activeRow;
-        activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      } else {
-        activeRow = activeRow.nextSibling || activeRow;
-        activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      }
-      if (!activeRow.classList.contains("text-bg-dark")) {
-        activeRow.click();
-      }
-    }
-  },
-  Delete: () => activeRow && deleteRecord(activeRow),
-  Backspace: () => activeRow && deleteRecord(activeRow),
-};
 
 function disableSettingsDuringAnalysis(bool) {
   const elements = [
@@ -3870,33 +2951,6 @@ function disableSettingsDuringAnalysis(bool) {
   DOM.backendOptions?.forEach((backend) => (backend.disabled = bool));
 }
 
-const postBufferUpdate = ({
-  file = STATE.currentFile,
-  begin = 0,
-  position = 0,
-  play = false,
-  resetSpec = false,
-  goToRegion = false,
-}) => {
-  STATE.regionsCompleted = false;
-  fileLoaded = false;
-  worker.postMessage({
-    action: "update-buffer",
-    file: file,
-    position: position,
-    start: begin,
-    end: begin + windowLength,
-    play: play,
-    resetSpec: resetSpec,
-    // region: activeRegion,
-    goToRegion: goToRegion,
-  });
-  // In case it takes a while:
-  loadingTimeout = setTimeout(() => {
-    DOM.loading.querySelector("#loadingText").textContent = "Loading file...";
-    DOM.loading.classList.remove("d-none");
-  }, 500);
-};
 
 // Go to position
 const goto = new bootstrap.Modal(document.getElementById("gotoModal"));
@@ -3904,8 +2958,8 @@ const showGoToPosition = () => {
   if (STATE.currentFile) {
     const gotoLabel = document.getElementById("gotoModalLabel");
     const timeHeading = config.timeOfDay
-      ? getI18n(i18n.Context).gotoTimeOfDay
-      : getI18n(i18n.Context).gotoPosition;
+      ? i18n.get(i18n.Context).gotoTimeOfDay
+      : i18n.get(i18n.Context).gotoPosition;
     gotoLabel.textContent = timeHeading;
     goto.show();
   }
@@ -3953,12 +3007,12 @@ const gotoTime = (e) => {
     } else {
       start = hours * 3600 + minutes * 60 + seconds;
     }
-    windowLength = 20;
+    STATE.windowLength = 20;
 
-    start = Math.min(start, currentFileDuration);
-    windowOffsetSecs = Math.max(start - windowLength / 2, 0);
+    start = Math.min(start, STATE.currentFileDuration);
+    STATE.windowOffsetSecs = Math.max(start - STATE.windowLength / 2, 0);
     const position = start === 0 ? 0 : 0.5;
-    postBufferUpdate({ begin: windowOffsetSecs, position: position });
+    postBufferUpdate({ begin: STATE.windowOffsetSecs, position: position });
     // Close the modal
     goto.hide();
   }
@@ -3985,12 +3039,12 @@ gotoForm.addEventListener("submit", gotoTime);
  */
 function onModelReady(args) {
   modelReady = true;
-  if (fileLoaded) {
+  if (STATE.fileLoaded) {
     utils.enableMenuItem(["analyse"]);
     if (STATE.openFiles.length > 1)
       utils.enableMenuItem(["analyseAll", "reanalyseAll"]);
   }
-  if (activeRegion) utils.enableMenuItem(["analyseSelection"]);
+  if (STATE.activeRegion) utils.enableMenuItem(["analyseSelection"]);
   t1_warmup = Date.now();
   DIAGNOSTICS["Warm Up"] =
     ((t1_warmup - t0_warmup) / 1000).toFixed(2) + " seconds";
@@ -4051,7 +3105,7 @@ async function onWorkerLoadedAudio({
   // Clear the loading animation
   DOM.loading.classList.add("d-none");
   const resetSpec = !STATE.currentFile;
-  currentFileDuration = fileDuration;
+  STATE.currentFileDuration = fileDuration;
   //if (preserveResults) completeDiv.hide();
   config.debug &&
     console.log(
@@ -4061,14 +3115,13 @@ async function onWorkerLoadedAudio({
     );
   // Dismiss a context menu if it's open
   DOM.contextMenu.classList.add("d-none");
-  currentBuffer = contents;
+  STATE.currentBuffer = contents;
 
   STATE.fileStart = fileStart;
   locationID = location;
-  windowOffsetSecs = windowBegin;
+  STATE.windowOffsetSecs = windowBegin;
   if (STATE.currentFile !== file) {
     STATE.currentFile = file;
-    fileEnd = new Date(fileStart + currentFileDuration * 1000);
     STATE.metadata[STATE.currentFile] = metadata;
     renderFilenamePanel();
   }
@@ -4076,19 +3129,19 @@ async function onWorkerLoadedAudio({
   const initialTime = config.timeOfDay
     ? new Date(fileStart)
     : new Date(0, 0, 0, 0, 0, 0, 0);
-  bufferStartTime = new Date(initialTime.getTime() + windowBegin * 1000);
+  STATE.bufferStartTime = new Date(initialTime.getTime() + windowBegin * 1000);
 
-  if (windowLength > currentFileDuration) windowLength = currentFileDuration;
+  if (STATE.windowLength > STATE.currentFileDuration) STATE.windowLength = STATE.currentFileDuration;
 
   resetRegions();
-  await updateSpec({
-    buffer: currentBuffer,
+  await spec.updateSpec({
+    buffer: STATE.currentBuffer,
     position: position,
     play: play,
     resetSpec: resetSpec,
   });
   // Doe this after the spec has loaded the file
-  fileLoaded = true;
+  STATE.fileLoaded = true;
   if (modelReady) {
     utils.enableMenuItem(["analyse"]);
     if (STATE.openFiles.length > 1) utils.enableMenuItem(["analyseAll"]);
@@ -4135,12 +3188,12 @@ const awaiting = {
 function onProgress(args) {
   DOM.progressDiv.classList.remove("invisible");
   if (args.text) {
-    DOM.fileNumber.innerHTML = `<span class='loading text-nowrap'>${getI18n(
+    DOM.fileNumber.innerHTML = `<span class='loading text-nowrap'>${i18n.get(
       awaiting
     )}</span>`;
   } else {
     const count = STATE.openFiles.indexOf(args.file) + 1;
-    DOM.fileNumber.textContent = utils.interpolate(getI18n(i18nFile), {
+    DOM.fileNumber.textContent = utils.interpolate(i18n.get(i18nFile), {
       count: count,
       fileCount: STATE.openFiles.length,
     });
@@ -4165,7 +3218,7 @@ function updatePagination(total, offset = STATE.offset) {
 }
 
 const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
-  const i18 = getI18n(i18n.Headings);
+  const i18 = i18n.get(i18n.Headings);
   const showIUCN = config.detect.iucn;
 
   // if (summary.length){
@@ -4191,14 +3244,14 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
             </thead><tbody id="speciesFilter">`
     : "";
   let selectedRow = null;
-  const i18nIUCN = getI18n(i18n.IUCNLabel);
+  const i18nIUCN = i18n.get(i18n.IUCNLabel);
   for (let i = 0; i < summary.length; i++) {
     const item = summary[i];
     const selected = item.cname === filterSpecies ? " text-warning" : "";
     if (selected) selectedRow = i + 1;
     summaryHTML += `<tr tabindex="-1" class="${selected}">
                 <td class="max">${iconizeScore(item.max)}</td>
-                    <td class="cname">
+                    <td class="cname not-allowed">
                         <span class="cname">${item.cname}</span> <br><i>${
       item.sname
     }</i>
@@ -4433,8 +3486,8 @@ function onSummaryComplete({ filterSpecies = undefined, summary = [] }) {
   updateSummary({ summary: summary, filterSpecies: filterSpecies });
   // Add pointer icon to species summaries
   const summarySpecies = DOM.summaryTable.querySelectorAll(".cname");
-  summarySpecies.forEach((row) => row.classList.add("pointer"));
-
+  summarySpecies.forEach((row) => row.classList.replace("not-allowed","pointer"));
+  
   // Add hover to the summary
   const summaryNode = document.getElementById("resultSummary");
   if (summaryNode) {
@@ -4562,7 +3615,7 @@ async function renderResult({
       // if (!isFromDB) {
       //     resetResults({clearResults: false, clearSummary: false, clearPagination: false});
       // }
-      const i18 = getI18n(i18n.Headings);
+      const i18 = i18n.get(i18n.Headings);
       // const fragment = new DocumentFragment();
       DOM.resultHeader.innerHTML = `
                 <tr class="text-nowrap">
@@ -4585,7 +3638,7 @@ async function renderResult({
       !STATE.selection &&
       STATE.regionsCompleted
     )
-      postBufferUpdate({ file, begin: windowOffsetSecs });
+      postBufferUpdate({ file, begin: STATE.windowOffsetSecs });
   } else if (!isFromDB && index % (config.limit + 1) === 0) {
     pagination.add(index, 0);
   }
@@ -4784,12 +3837,12 @@ function sendFile(mode, result) {
     const datetime = dateArray.slice(0, 5).join(" ");
     filename = `${result.cname}_${datetime}.${config.audio.format}`;
   } else if (start === undefined) {
-    if (activeRegion.start) {
-      start = activeRegion.start + windowOffsetSecs;
-      end = activeRegion.end + windowOffsetSecs;
+    if (STATE.activeRegion.start) {
+      start = STATE.activeRegion.start + STATE.windowOffsetSecs;
+      end = STATE.activeRegion.end + STATE.windowOffsetSecs;
     } else {
       start = 0;
-      end = currentBuffer.duration;
+      end = STATE.currentBuffer.duration;
     }
     const dateArray = new Date(STATE.fileStart + start * 1000)
       .toString()
@@ -4866,7 +3919,7 @@ const iconizeScore = (score) => {
 
 const exportAudio = () => {
   let result;
-  if (activeRegion.label) {
+  if (STATE.activeRegion.label) {
     setClickedIndex(activeRow);
     result = predictions[clickedIndex];
   }
@@ -4991,7 +4044,7 @@ function replaceCtrlWithCommand() {
 }
 
 const populateSpeciesModal = async (included, excluded) => {
-  const i18 = getI18n(i18n.SpeciesList);
+  const i18 = i18n.get(i18n.SpeciesList);
   const current_file_text =
     STATE.week !== -1 && STATE.week
       ? utils.interpolate(i18.week, { week: STATE.week })
@@ -5022,7 +4075,7 @@ const populateSpeciesModal = async (included, excluded) => {
     (STATE.week === -1 || !STATE.week)
       ? i18.depending
       : "";
-  const listLabel = getI18n(i18n.Lists)[config.list];
+  const listLabel = i18n.get(i18n.Lists)[config.list];
   const includedContent = utils.interpolate(i18.included, {
     model: model,
     listInUse: listLabel,
@@ -5087,7 +4140,7 @@ function exportSpeciesList() {
 }
 
 function setNocmig(on) {
-  const i18 = getI18n(i18n.Titles);
+  const i18 = i18n.get(i18n.Titles);
   if (on) {
     DOM.nocmigButton.textContent = "nights_stay";
     DOM.nocmigButton.title = i18.nocmigOn;
@@ -5192,7 +4245,7 @@ const modelSettingsDisplay = () => {
 };
 
 const contextAwareIconDisplay = () => {
-  const i18 = getI18n(i18n.Titles);
+  const i18 = i18n.get(i18n.Titles);
   if (config.detect.contextAware) {
     DOM.contextAwareIcon.classList.add("text-warning");
     DOM.contextAwareIcon.title = i18.contextModeOn;
@@ -5439,234 +4492,7 @@ function makeDraggable(header) {
     draggable.closest(".modal").addEventListener("hide.bs.modal", stopDrag);
   });
 }
-/**
- * Initializes and configures the date picker elements for selecting date ranges.
- *
- * This function first removes any existing date picker instance stored in the global state,
- * then defines several preset date ranges (e.g., last night, this week, last month, etc.) based on the
- * current date. It creates new date pickers for the 'chartRange' and 'exploreRange' DOM elements using the easepick
- * library with Range, Preset, and Time plugins. Event listeners are attached to handle date selection,
- * clearing of the selection, button clicks, and visibility changes, updating the global state and communicating
- * with the worker as needed.
- *
- * @remark Relies on global variables (STATE, config, worker) and internationalization via getI18n.
- */
 
-function initialiseDatePicker() {
-  if (STATE.picker) {
-    STATE.picker.destroy();
-    delete STATE.picker;
-  }
-  const currentDate = new Date();
-
-  const thisYear = () => {
-    const d1 = new Date(currentDate.getFullYear(), 0, 1);
-    return [d1, currentDate];
-  };
-  const lastYear = () => {
-    const d1 = new Date(currentDate.getFullYear() - 1, 0, 1);
-    const d2 = new Date(currentDate.getFullYear() - 1, 11, 31, 23, 59, 59, 999);
-    return [d1, d2];
-  };
-  const thisMonth = () => {
-    const startOfMonth = new Date(
-      currentDate.getFullYear(),
-      currentDate.getMonth(),
-      1
-    );
-    return [startOfMonth, currentDate];
-  };
-
-  const lastMonth = () => {
-    const startOfLastMonth = new Date(
-      currentDate.getFullYear(),
-      currentDate.getMonth() - 1,
-      1
-    );
-    const endOfLastMonth = new Date(
-      currentDate.getFullYear(),
-      currentDate.getMonth(),
-      0,
-      23,
-      59,
-      59,
-      999
-    );
-
-    return [startOfLastMonth, endOfLastMonth];
-  };
-  const thisWeek = () => {
-    const today = currentDate.getDay(); // 0 (Sunday) to 6 (Saturday)
-    const startOfWeek = new Date(currentDate);
-    startOfWeek.setDate(currentDate.getDate() - today); // Move to the beginning of the week (Sunday)
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 6); // Move to the end of the week (Saturday)
-    return [startOfWeek, currentDate];
-  };
-
-  const lastWeek = () => {
-    const today = currentDate.getDay(); // 0 (Sunday) to 6 (Saturday)
-    const startOfLastWeek = new Date(currentDate);
-    startOfLastWeek.setDate(currentDate.getDate() - today - 7); // Move to the beginning of the last week (Sunday)
-    const endOfLastWeek = new Date(startOfLastWeek);
-    endOfLastWeek.setDate(startOfLastWeek.getDate() + 6); // Move to the end of the last week (Saturday)
-    return [startOfLastWeek, endOfLastWeek];
-  };
-  const lastNight = () => {
-    const middayYesterday = new Date(currentDate);
-    middayYesterday.setDate(currentDate.getDate() - 1);
-    middayYesterday.setHours(12, 0, 0, 0); // Set to midday yesterday
-    const middayToday = new Date(currentDate);
-    middayToday.setHours(12, 0, 0, 0); // Set to midday today
-    return [middayYesterday, middayToday];
-  };
-  ["chartRange", "exploreRange"].forEach(function (element) {
-    const i18 = getI18n(i18n.Context);
-    element = document.getElementById(element);
-    STATE.picker = new easepick.create({
-      element: element,
-      lang: config.locale.replace(/_.*$/, ""),
-      locale: {
-        cancel: i18.cancel,
-        apply: i18.apply,
-      },
-      css: ["./node_modules/@easepick/bundle/dist/index.css"],
-      format: "H:mm MMM D, YYYY",
-      zIndex: 10,
-      calendars: 1,
-      autoApply: false,
-      plugins: ["RangePlugin", "PresetPlugin", "TimePlugin"],
-      PresetPlugin: {
-        customPreset: {
-          [i18.lastNight]: lastNight(),
-          [i18.thisWeek]: thisWeek(),
-          [i18.lastWeek]: lastWeek(),
-          [i18.thisMonth]: thisMonth(),
-          [i18.lastMonth]: lastMonth(),
-          [i18.thisYear]: thisYear(),
-          [i18.lastYear]: lastYear(),
-        },
-      },
-      TimePlugin: {
-        format: "HH:mm",
-      },
-    });
-    const picker = STATE.picker;
-    picker.on("select", (e) => {
-      const { start, end } = e.detail;
-      console.log("Range Selected!", JSON.stringify(e.detail));
-      if (element.id === "chartRange") {
-        STATE.chart.range = { start: start.getTime(), end: end.getTime() };
-        worker.postMessage({ action: "update-state", chart: STATE.chart });
-        t0 = Date.now();
-        worker.postMessage({
-          action: "chart",
-          species: STATE.chart.species,
-          range: STATE.chart.range,
-          aggregation: STATE.chart.aggregation,
-        });
-      } else if (element.id === "exploreRange") {
-        STATE.explore.range = { start: start.getTime(), end: end.getTime() };
-        resetResults({
-          clearSummary: true,
-          clearPagination: true,
-          clearResults: false,
-        });
-        worker.postMessage({
-          action: "update-state",
-          globalOffset: 0,
-          filteredOffset: {},
-          explore: STATE.explore,
-        });
-        filterResults({ range: STATE.explore.range });
-      }
-
-      // Update the seen species list
-      worker.postMessage({ action: "get-detected-species-list" });
-    });
-    picker.on("clear", (e) => {
-      console.log("Range Cleared!", JSON.stringify(e.detail));
-      if (element.id === "chartRange") {
-        STATE.chart.range = { start: undefined, end: undefined };
-        worker.postMessage({ action: "update-state", chart: STATE.chart });
-        t0 = Date.now();
-        worker.postMessage({
-          action: "chart",
-          species: STATE.chart.species,
-          range: STATE.chart.range,
-          aggregation: STATE.chart.aggregation,
-        });
-      } else if (element.id === "exploreRange") {
-        STATE.explore.range = { start: undefined, end: undefined };
-        worker.postMessage({
-          action: "update-state",
-          globalOffset: 0,
-          filteredOffset: {},
-          explore: STATE.explore,
-        });
-        resetResults({
-          clearSummary: true,
-          clearPagination: true,
-          clearResults: false,
-        });
-        filterResults({
-          species: STATE.explore.species,
-          range: STATE.explore.range,
-        });
-      }
-    });
-    picker.on("click", (e) => {
-      if (e.target.classList.contains("cancel-button")) {
-        console.log("cancelled");
-        //element.innerHTML = savedContent;
-      }
-    });
-    picker.on("show", () => {
-      picker.setStartTime("12:00");
-      picker.setEndTime("12:00");
-    });
-    picker.on("hide", () => {
-      const id = STATE.mode === "chart" ? "chartRange" : "exploreRange";
-      const element = document.getElementById(id);
-      if (!element.textContent) {
-        // It's blank
-        element.innerHTML = `<span class="material-symbols-outlined align-bottom">date_range</span><span>${STATE.i18n["explore-datefilter"]}</span> <span class="material-symbols-outlined float-end">expand_more</span>`;
-      } else if (
-        !element.textContent.includes(STATE.i18n["explore-datefilter"])
-      ) {
-        createDateClearButton(element, picker);
-      }
-    });
-  });
-}
-
-/**
- * Appends a clear date filter button to the specified UI element.
- *
- * The function creates a clickable span styled as a "cancel" icon that, when activated,
- * clears the date selection using the provided picker instance. Upon clicking the button,
- * the date picker is cleared and the original date filter UI is restored in the element.
- *
- * @param {HTMLElement} element - The container element that displays the date filter.
- * @param {Object} picker - The date picker instance with a clear() method to remove the active date filter.
- *
- * @example
- * // Assuming dateFilterElement is a valid HTMLElement and datePicker is a date picker instance:
- * createDateClearButton(dateFilterElement, datePicker);
- */
-function createDateClearButton(element, picker) {
-  const span = document.createElement("span");
-  span.classList.add("material-symbols-outlined", "text-secondary", "ps-2");
-  element.appendChild(span);
-  span.textContent = "cancel";
-  span.title = "Clear date filter";
-  span.id = element.id + "-clear";
-  span.addEventListener("click", (e) => {
-    e.stopImmediatePropagation();
-    picker.clear();
-    element.innerHTML = `<span class="material-symbols-outlined align-bottom">date_range</span><span>${STATE.i18n["explore-datefilter"]}</span> <span class="material-symbols-outlined float-end">expand_more</span>`;
-  });
-}
 
 document.addEventListener("DOMContentLoaded", function () {
   document.addEventListener("keydown", handleKeyDownDeBounce, true);
@@ -5795,7 +4621,7 @@ const handleThresholdChange = (e) => {
 
 // Filter handling
 const filterIconDisplay = () => {
-  const i18 = getI18n(i18n.Titles);
+  const i18 = i18n.get(i18n.Titles);
   if (
     config.filters.active &&
     (config.filters.highPassFrequency ||
@@ -5812,14 +4638,14 @@ const filterIconDisplay = () => {
 };
 // High pass threshold
 const showFilterEffect = () => {
-  if (fileLoaded && STATE.regionsCompleted) {
+  if (STATE.fileLoaded && STATE.regionsCompleted) {
     const position = utils.clamp(
-      wavesurfer.getCurrentTime() / windowLength,
+      spec.wavesurfer.getCurrentTime() / STATE.windowLength,
       0,
       1
     );
     postBufferUpdate({
-      begin: windowOffsetSecs,
+      begin: STATE.windowOffsetSecs,
       position: position,
     });
   }
@@ -5934,7 +4760,7 @@ DOM.gain.addEventListener("input", () => {
  * Plays the active audio region after sanitizing its boundaries.
  *
  * This function locates the active region from the global REGIONS object by matching the
- * region's start time with the global activeRegion. It then adjusts the region's start and
+ * region's start time with the global STATE.activeRegion. It then adjusts the region's start and
  * end times to ensure they fall within the valid playback window—ensuring the start is not
  * negative and the end does not exceed 99.5% of the windowLength to avoid triggering a finish
  * event that causes a page reload. Note that if playback is paused at the end of an adjacent region,
@@ -5946,7 +4772,7 @@ DOM.gain.addEventListener("input", () => {
  *
  * Global Dependencies:
  * - REGIONS: An object containing all audio regions.
- * - activeRegion: The currently active region used for matching.
+ * - STATE.activeRegion: The currently active region used for matching.
  * - windowLength: A number representing the maximum playback window length.
  *
  * @returns {void}
@@ -5955,14 +4781,14 @@ function playRegion() {
   // Sanitise region (after zoom, start or end may be outside the windowlength)
   // I don't want to change the actual region length, so make a copy
   if (STATE.regionsCompleted) {
-    const region = REGIONS.regions?.find(
-      (region) => region.start === activeRegion.start
+    const region = spec.REGIONS.regions?.find(
+      (region) => region.start === STATE.activeRegion.start
     );
     if (region) {
       const myRegion = region;
       myRegion.start = Math.max(0, myRegion.start);
       // Have to adjust the windowlength so the finish event isn't fired - causing a page reload)
-      myRegion.end = Math.min(myRegion.end, windowLength * 0.995);
+      myRegion.end = Math.min(myRegion.end, STATE.windowLength * 0.995);
       myRegion.play(true);
     }
   }
@@ -5977,8 +4803,8 @@ const showRelevantAudioQuality = () => {
   );
   DOM.audioQualityContainer.classList.toggle("d-none", format !== "flac");
 };
-
-document.addEventListener("click", function (e) {
+document.addEventListener("click", debounceClick(handleUIClicks));
+function handleUIClicks(e) {
   const element = e.target;
   const target = element.closest("[id]")?.id;
   const locale = config.locale.replace(/_.*$/, "");
@@ -6306,7 +5132,7 @@ document.addEventListener("click", function (e) {
       break;
     }
     case "reset-defaults": {
-      const i18n = {
+      const i18 = {
         en: "Are you sure you want to revert to the default settings? You will need to relaunch Chirpity to see the changes.",
         da: "Er du sikker på, at du vil gendanne standardindstillingerne? Du skal genstarte Chirpity for at se ændringerne.",
         de: "Sind Sie sicher, dass Sie die Standardeinstellungen wiederherstellen möchten? Sie müssen Chirpity neu starten, um die Änderungen zu sehen.",
@@ -6319,9 +5145,7 @@ document.addEventListener("click", function (e) {
         zh: "您确定要恢复默认设置吗？您需要重新启动 Chirpity 才能看到更改。",
         ja: "デフォルト設定に戻してもよろしいですか？ 変更を反映するには、Chirpityを再起動する必要があります。",
       };
-
-      const locale = config.locale;
-      const message = getI18n(i18n);
+      const message = i18n.get(i18);
       if (confirm(message)) {
         const uuid = config.UUID;
         config = defaultConfig;
@@ -6346,8 +5170,8 @@ document.addEventListener("click", function (e) {
       );
       checkFilteredFrequency();
       worker.postMessage({ action: "update-state", audio: config.audio });
-      const fftSamples = spectrogram.fftSamples;
-      adjustSpecDims(true, fftSamples);
+      const fftSamples = spec.spectrogram.fftSamples;
+      spec.adjustDims(true, fftSamples);
       document
         .getElementById("frequency-range")
         .classList.remove("text-warning");
@@ -6404,7 +5228,7 @@ document.addEventListener("click", function (e) {
 
     case "zoomIn":
     case "zoomOut": {
-      zoomSpec(e);
+      spec.zoom(e);
       break;
     }
     case "cmpZoomIn":
@@ -6428,10 +5252,10 @@ document.addEventListener("click", function (e) {
       break;
     }
     case "playToggle": {
-      if (wavesurfer) {
+      if (spec.wavesurfer) {
         try {
           (async () => {
-            await wavesurfer.playPause();
+            await spec.wavesurfer.playPause();
           })();
         } catch (e) {
           console.warn("Wavesurfer error", e.message || JSON.stringify(e));
@@ -6477,7 +5301,7 @@ document.addEventListener("click", function (e) {
   target &&
     target !== "result1" &&
     trackEvent(config.UUID, "UI", "Click", target);
-});
+};
 
 function changeSettingsMode(target) {
   // Get references to the buttons
@@ -6719,7 +5543,7 @@ document.addEventListener("change", function (e) {
             contextAwareIconDisplay();
             updateListIcon();
             filterIconDisplay();
-            initialiseDatePicker();
+            initialiseDatePicker(STATE, worker, config, resetResults, filterResults, i18n.get);
           }
           config.locale = element.value;
           STATE.picker.options.lang = element.value.replace("_uk", "");
@@ -6738,7 +5562,7 @@ document.addEventListener("change", function (e) {
           modelSettingsDisplay();
           DOM.customListFile.value = config.customListFile[config.model];
           DOM.customListFile.value
-            ? (LIST_MAP = getI18n(i18n.LIST_MAP))
+            ? (LIST_MAP = i18n.get(i18n.LIST_MAP))
             : delete LIST_MAP.custom;
           document.getElementById("locale").value = config.locale;
           document.getElementById(config[config.model].backend).checked = true;
@@ -6779,12 +5603,12 @@ document.addEventListener("change", function (e) {
           } else {
             colorMapFieldset.classList.add("d-none");
           }
-          if (wavesurfer && STATE.currentFile && STATE.regionsCompleted) {
-            const fftSamples = spectrogram.fftSamples;
-            adjustSpecDims(true, fftSamples);
+          if (spec.wavesurfer && STATE.currentFile && STATE.regionsCompleted) {
+            const fftSamples = spec.spectrogram.fftSamples;
+            spec.adjustDims(true, fftSamples);
             postBufferUpdate({
-              begin: windowOffsetSecs,
-              position: wavesurfer.getCurrentTime() / windowLength,
+              begin: STATE.windowOffsetSecs,
+              position: spec.wavesurfer.getCurrentTime() / STATE.windowLength,
             });
           }
           break;
@@ -6815,10 +5639,10 @@ document.addEventListener("change", function (e) {
             threshold: threshold,
             windowFn: windowFn,
           };
-          if (wavesurfer && STATE.currentFile) {
-            const fftSamples = spectrogram.fftSamples;
-            adjustSpecDims(true, fftSamples);
-            refreshTimeline();
+          if (spec.wavesurfer && STATE.currentFile) {
+            const fftSamples = spec.spectrogram.fftSamples;
+            spec.adjustDims(true, fftSamples);
+            spec.refreshTimeline();
           }
           break;
         }
@@ -6828,14 +5652,14 @@ document.addEventListener("change", function (e) {
           config.audio.gain = element.value;
           worker.postMessage({ action: "update-state", audio: config.audio });
           config.filters.active || toggleFilters();
-          if (fileLoaded && STATE.regionsCompleted) {
+          if (STATE.fileLoaded && STATE.regionsCompleted) {
             const position = utils.clamp(
-              wavesurfer.getCurrentTime() / windowLength,
+              spec.wavesurfer.getCurrentTime() / STATE.windowLength,
               0,
               1
             );
             postBufferUpdate({
-              begin: windowOffsetSecs,
+              begin: STATE.windowOffsetSecs,
               position: position,
             });
           }
@@ -6843,9 +5667,9 @@ document.addEventListener("change", function (e) {
         }
         case "spec-labels": {
           config.specLabels = element.checked;
-          if (wavesurfer && STATE.currentFile) {
-            const fftSamples = spectrogram.fftSamples;
-            adjustSpecDims(true, fftSamples);
+          if (spec.wavesurfer && STATE.currentFile) {
+            const fftSamples = spec.spectrogram.fftSamples;
+            spec.adjustDims(true, fftSamples);
           }
           break;
         }
@@ -6862,8 +5686,8 @@ document.addEventListener("change", function (e) {
           config.audio.minFrequency = Math.max(element.valueAsNumber, 0);
           DOM.fromInput.value = config.audio.minFrequency;
           DOM.fromSlider.value = config.audio.minFrequency;
-          const fftSamples = spectrogram.fftSamples;
-          adjustSpecDims(true, fftSamples);
+          const fftSamples = spec.spectrogram.fftSamples;
+          spec.adjustDims(true, fftSamples);
           checkFilteredFrequency();
           element.blur();
           worker.postMessage({ action: "update-state", audio: config.audio });
@@ -6874,8 +5698,8 @@ document.addEventListener("change", function (e) {
           config.audio.maxFrequency = Math.min(element.valueAsNumber, 11950);
           DOM.toInput.value = config.audio.maxFrequency;
           DOM.toSlider.value = config.audio.maxFrequency;
-          const fftSamples = spectrogram.fftSamples;
-          adjustSpecDims(true, fftSamples);
+          const fftSamples = spec.spectrogram.fftSamples;
+          spec.adjustDims(true, fftSamples);
           checkFilteredFrequency();
           element.blur();
           worker.postMessage({ action: "update-state", audio: config.audio });
@@ -6889,14 +5713,14 @@ document.addEventListener("change", function (e) {
             filters: config.filters,
           });
           element.blur();
-          if (fileLoaded && STATE.regionsCompleted) {
+          if (STATE.fileLoaded && STATE.regionsCompleted) {
             const position = utils.clamp(
-              wavesurfer.getCurrentTime() / windowLength,
+              spec.wavesurfer.getCurrentTime() / STATE.windowLength,
               0,
               1
             );
             postBufferUpdate({
-              begin: windowOffsetSecs,
+              begin: STATE.windowOffsetSecs,
               position: position,
             });
           }
@@ -7034,34 +5858,15 @@ async function readLabels(labelFile, updating) {
     });
 }
 
-function getI18n(context) {
-  const locale = config.locale.replace(/_.*$/, "");
-  return context[locale] || context["en"];
-}
+// function getI18n(context) {
+//   const locale = config.locale.replace(/_.*$/, "");
+//   return context[locale] || context["en"];
+// }
 
-/**
- * Determines if a right-click event occurred within an audio region and optionally sets it as active.
- *
- * This function calculates the time position from the event's x-coordinate relative to the target element's width
- * using the global "windowLength". It then searches the global "REGIONS.regions" array for an audio region that spans
- * the computed time. If a matching region is found and the setActive flag is true, the region is set as active by calling
- * the global "setActiveRegion" function.
- *
- * @param {MouseEvent} e - The right-click event containing the clientX coordinate and target element dimensions.
- * @param {boolean} setActive - Flag indicating whether to mark the located region as active.
- * @returns {Object|undefined} The audio region that contains the computed time, or undefined if none is found.
- */
-function checkForRegion(e, setActive) {
-  const relativePosition = e.clientX / e.currentTarget.clientWidth;
-  const time = relativePosition * windowLength;
-  const region = REGIONS.regions.find((r) => r.start < time && r.end > time);
-  region && setActive && setActiveRegion(region);
-  return region;
-}
 
 function filterLabels(e) {
   DOM.contextMenu.classList.add("d-none");
-  const i18 = getI18n(i18n.Context);
+  const i18 = i18n.get(i18n.Context);
   createFilterDropdown(
     e,
     STATE.tagsList,
@@ -7076,7 +5881,7 @@ function filterLabels(e) {
  *
  * This asynchronous function handles user interactions for generating a context menu
  * in the spectrogram interface. It performs the following actions:
- * - Pauses any ongoing audio playback via the wavesurfer instance to prevent interference.
+ * - Pauses any ongoing audio playback via the spec.wavesurfer instance to prevent interference.
  * - Stops the propagation of the triggering event.
  * - Checks and adjusts for region detection within the spectrogram.
  * - Determines the context (e.g., summary, selection, or results) of the click and sets
@@ -7097,10 +5902,10 @@ function filterLabels(e) {
  */
 async function createContextMenu(e) {
   // If we let the playback continue, the region may get wiped
-  if (wavesurfer?.isPlaying()) wavesurfer.pause();
+  if (spec.wavesurfer?.isPlaying()) spec.wavesurfer.pause();
   e.stopPropagation();
-  this.closest("#spectrogramWrapper") && checkForRegion(e, true);
-  const i18 = getI18n(i18n.Context);
+  this.closest("#spectrogramWrapper") && spec.checkForRegion(e, true);
+  const i18 = i18n.get(i18n.Context);
   const target = e.target;
   if (target.closest("#sort-label")) {
     if (STATE.isMember) filterLabels(e);
@@ -7128,12 +5933,12 @@ async function createContextMenu(e) {
         !target.closest("tr").classList.contains("table-active"))
     ) {
       target.click(); // Wait for file to load
-      await utils.waitFor(() => fileLoaded);
+      await utils.waitFor(() => STATE.fileLoaded);
     }
   }
-  if (!activeRegion && !inSummary) return;
+  if (!STATE.activeRegion && !inSummary) return;
   const createOrEdit =
-    activeRegion?.label || target.closest("#summary") ? i18.edit : i18.create;
+    STATE.activeRegion?.label || target.closest("#summary") ? i18.edit : i18.create;
 
   DOM.contextMenu.innerHTML = `
     <div id="${inSummary ? "inSummary" : "inResults"}">
@@ -7187,7 +5992,7 @@ async function createContextMenu(e) {
         }
       });
   }
-  if (!(inSummary || activeRegion?.label || hideInSelection || hideInSummary)) {
+  if (!(inSummary || STATE.activeRegion?.label || hideInSelection || hideInSummary)) {
     const xc = document.getElementById("context-xc");
     xc.classList.add("d-none");
     contextDelete.classList.add("d-none");
@@ -7253,11 +6058,11 @@ let focusBirdList;
  * showRecordEntryForm('add', true);
  */
 async function showRecordEntryForm(mode, batch) {
-  const i18 = getI18n(i18n.Headings);
+  const i18 = i18n.get(i18n.Headings);
   const cname = batch
     ? document.querySelector("#speciesFilter .text-warning .cname .cname")
         .textContent
-    : activeRegion?.label || "";
+    : STATE.activeRegion?.label || "";
   let callCount = "",
     commentText = "";
   if (cname && activeRow) {
@@ -7295,7 +6100,7 @@ async function showRecordEntryForm(mode, batch) {
   const labelText = activeRow?.querySelector(".label").textContent;
 
   const labels = STATE.tagsList.map((item) => item.name);
-  const i18nOptions = getI18n(i18n.Select);
+  const i18nOptions = i18n.get(i18n.Select);
   const select = new CustomSelect({
     theme: "light",
     labels: labels,
@@ -7320,11 +6125,11 @@ recordEntryForm.addEventListener("submit", function (e) {
   // Check we selected a species
   if (!LABELS.some((item) => item.includes(cname))) return;
   let start, end;
-  if (activeRegion) {
-    start = windowOffsetSecs + activeRegion.start;
-    end = windowOffsetSecs + activeRegion.end;
-    const region = REGIONS.regions.find(
-      (region) => region.start === activeRegion.start
+  if (STATE.activeRegion) {
+    start = STATE.windowOffsetSecs + STATE.activeRegion.start;
+    end = STATE.windowOffsetSecs + STATE.activeRegion.end;
+    const region = spec.REGIONS.regions.find(
+      (region) => region.start === STATE.activeRegion.start
     );
     // You can still add a record if you cleared the regions
     region?.setOptions({ content: cname });
@@ -7337,7 +6142,8 @@ recordEntryForm.addEventListener("submit", function (e) {
   const label = select.selectedValue;
 
   recordEntryModal.hide();
-  insertManualRecord(
+  insertManualRecord({
+    files: STATE.currentFile,
     cname,
     start,
     end,
@@ -7347,10 +6153,11 @@ recordEntryForm.addEventListener("submit", function (e) {
     action,
     batch,
     originalCname
-  );
+  });
 });
 
-const insertManualRecord = (
+const insertManualRecord = ( {
+  files,
   cname,
   start,
   end,
@@ -7362,21 +6169,20 @@ const insertManualRecord = (
   originalCname,
   confidence,
   reviewed
-) => {
-  const files = batch ? STATE.openFiles : STATE.currentFile;
+}  = {}) => {
   worker.postMessage({
     action: "insert-manual-record",
-    cname: cname,
-    originalCname: originalCname,
+    cname,
+    originalCname,
     start: start?.toFixed(3),
     end: end?.toFixed(3),
-    comment: comment,
-    count: count || undefined,
+    comment,
+    count,
     file: files,
-    label: label,
+    label,
     DBaction: action,
-    batch: batch,
-    confidence: confidence,
+    batch,
+    confidence,
     position: {
       row: activeRow?.rowIndex - 1,
       page: pagination.getCurrentPage(),
@@ -7441,7 +6247,7 @@ function deleteFile(file) {
       sv: `Detta kommer att ta bort ${file} och alla tillhörande detektioner från databasarvet. Fortsätt?`,
       zh: `这将删除 ${file} 及其所有相关检测记录从数据库存档中。继续吗？`,
     };
-    const message = getI18n(i18nPurge);
+    const message = i18n.get(i18nPurge);
     if (confirm(message)) {
       worker.postMessage({
         action: "purge-file",
@@ -7527,7 +6333,7 @@ tourModal.addEventListener("hidden.bs.modal", function () {
 
 // Event handler for starting the tour
 const prepTour = async () => {
-  if (!fileLoaded) {
+  if (!STATE.fileLoaded) {
     const example_file = await window.electron.getAudio();
     // create a canvas for the audio spec
     utils.showElement(["spectrogramWrapper"], false);
@@ -7579,7 +6385,7 @@ function checkForMacUpdates() {
             alertPlaceholder.append(wrapper);
           };
           const link = `<a href="https://chirpity.mattkirkland.co.uk?fromVersion=${VERSION}" target="_blank">`;
-          const message = utils.interpolate(getI18n(i18nUpdateMessage), {
+          const message = utils.interpolate(i18n.get(i18n.UpdateMessage), {
             link: link,
           });
           alert(
@@ -7601,18 +6407,7 @@ function checkForMacUpdates() {
       });
   }
 }
-const i18nUpdateMessage = {
-  en: "There's a new version of Chirpity available! ${link}Check the website</a> for more information",
-  da: "Der er en ny version af Chirpity tilgængelig! ${link}Besøg hjemmesiden</a> for mere information",
-  de: "Eine neue Version von Chirpity ist verfügbar! ${link}Besuchen Sie die Website</a> für weitere Informationen",
-  es: "¡Hay una nueva versión de Chirpity disponible! ${link}Visita el sitio web</a> para más información",
-  fr: "Une nouvelle version de Chirpity est disponible ! ${link}Consultez le site web</a> pour plus d'informations",
-  nl: "Er is een nieuwe versie van Chirpity beschikbaar! ${link}Bezoek de website</a> voor meer informatie",
-  pt: "Há uma nova versão do Chirpity disponível! ${link}Visite o site</a> para mais informações",
-  ru: "Доступна новая версия Chirpity! ${link}Посетите сайт</a> для получения дополнительной информации",
-  sv: "En ny version av Chirpity är tillgänglig! ${link}Besök webbplatsen</a> för mer information",
-  zh: "Chirpity有新版本可用！${link}访问网站</a>了解更多信息",
-};
+
 
 function generateToast({
   message = "",
@@ -7622,12 +6417,12 @@ function generateToast({
   locate = "",
 } = {}) {
   // i18n
-  const i18 = getI18n(i18n.Toasts);
+  const i18 = i18n.get(i18n.Toasts);
   if (message === "noFile") {
     clearTimeout(loadingTimeout) && DOM.loading.classList.add("d-none");
     // Alow further interactions!!
     STATE.regionsCompleted = true;
-    STATE.currentFile && (fileLoaded = true);
+    STATE.currentFile && (STATE.fileLoaded = true);
   }
   message = variables
     ? utils.interpolate(i18[message], variables)
@@ -7831,14 +6626,10 @@ async function getXCComparisons() {
   }
 }
 
-function capitalizeEachWord(str) {
-  return str.replace(/\b\w/g, function (char) {
-    return char.toUpperCase();
-  });
-}
+
 function renderComparisons(lists, cname) {
-  const i18 = getI18n(i18n.Context);
-  const i18nTitle = getI18n(i18n.Titles);
+  const i18 = i18n.get(i18n.Context);
+  const i18nTitle = i18n.get(i18n.Titles);
   cname = cname.replace(/\(.*\)/, "").replace("?", "");
   const compareDiv = document.createElement("div");
   compareDiv.classList.add("modal", "modal-fade", "model-lg");
@@ -7998,9 +6789,20 @@ function renderComparisons(lists, cname) {
   compareDiv.addEventListener("shown.bs.modal", () => showCompareSpec());
   comparisonModal.show();
 }
-
-let ws, compareSpec;
+import WaveSurfer from "../node_modules/wavesurfer.js/dist/wavesurfer.esm.js";
+import Spectrogram from "../node_modules/wavesurfer.js/dist/plugins/spectrogram.esm.js";
+let ws;
 const createCompareWS = (mediaContainer) => {
+  // const instance =  new ChirpityWS(
+  //   "",
+  //   () => STATE, // No-op
+  //   () => config, // Returns the current config
+  //   {}, // no handlers
+  //   GLOBAL_ACTIONS
+  // )
+  // const spectrogram = instance.initSpectrogram(null, 256, 256);
+  // ws = instance.initWavesurfer(mediaContainer, [spectrogram])
+  // return ws
   if (ws) ws.destroy();
   ws = WaveSurfer.create({
     container: mediaContainer,
@@ -8011,19 +6813,15 @@ const createCompareWS = (mediaContainer) => {
     cursorColor: "#fff",
     hideScrollbar: true,
     cursorWidth: 2,
-    fillParent: true,
     height: 256,
     minPxPerSec: 195,
     sampleRate: 24000,
   });
   // set colormap
-  const colors = createColormap();
+  const colors = spec.createColormap(config);
   const createCmpSpec = () =>
     ws.registerPlugin(
       Spectrogram.create({
-        //deferInit: false,
-        wavesurfer: ws,
-        // container: "#" + specContainer,
         windowFunc: "hann",
         frequencyMin: 0,
         frequencyMax: 12_000,
@@ -8064,99 +6862,7 @@ function showCompareSpec() {
   ws.load(file);
 }
 
-async function getIUCNStatus(sname = "Anser anser") {
-  if (!Object.keys(STATE.IUCNcache).length) {
-    //const path = p.join(appPath, 'IUCNcache.json');
-    const path = window.location.pathname
-      .replace(/^\/(\w:)/, "$1")
-      .replace("index.html", "IUCNcache.json");
-    if (fs.existsSync(path)) {
-      const data = await fs.promises.readFile(path, "utf8").catch((err) => {});
-      STATE.IUCNcache = JSON.parse(data);
-    } else {
-      STATE.IUCNcache = {};
-    }
-  }
-  return STATE.IUCNcache[sname];
 
-  /* The following code should not be called in the packaged app */
-
-  const [genus, species] = sname.split(" ");
-
-  const headers = {
-    Accept: "application/json",
-    Authorization: "API_KEY", // Replace with the actual API key
-    keepalive: true,
-  };
-
-  try {
-    const response = await fetch(
-      `https://api.iucnredlist.org/api/v4/taxa/scientific_name?genus_name=${genus}&species_name=${species}`,
-      { headers }
-    );
-
-    if (!response.ok) {
-      throw new Error(
-        `Network error: code ${response.status} fetching IUCN data.`
-      );
-    }
-
-    const data = await response.json();
-
-    // Filter out all but the latest assessments
-    const filteredAssessments = data.assessments.filter(
-      (assessment) => assessment.latest
-    );
-    const speciesData = { sname, scopes: [] };
-
-    // Fetch all the assessments concurrently
-    const assessmentResults = await Promise.all(
-      filteredAssessments.map(async (item) => {
-        const response = await fetch(
-          `https://api.iucnredlist.org/api/v4/assessment/${item.assessment_id}`,
-          { headers }
-        );
-        if (!response.ok) {
-          throw new Error(
-            `Network error: code ${response.status} fetching IUCN data.`
-          );
-        }
-        const data = await response.json();
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        return data;
-      })
-    );
-
-    // Process each result
-    for (let item of assessmentResults) {
-      const scope = item.scopes?.[0]?.description?.en || "Unknown";
-      const status = item.red_list_category?.code || "Unknown";
-      const url = item.url || "No URL provided";
-
-      speciesData.scopes.push({ scope, status, url });
-    }
-
-    console.log(speciesData);
-    STATE.IUCNcache[sname] = speciesData;
-    updatePrefs("IUCNcache.json", STATE.IUCNcache);
-    return true; // Optionally return the data if you need to use it elsewhere
-  } catch (error) {
-    if (error.message.includes("404")) {
-      generateToast({
-        message: "noIUCNRecord",
-        variables: { sname: sname },
-        type: "warning",
-      });
-      STATE.IUCNcache[sname] = {
-        scopes: [{ scope: "Global", status: "NA", url: null }],
-      };
-      updatePrefs("IUCNcache.json", STATE.IUCNcache);
-      return true;
-    }
-    console.error("Error fetching IUCN data:", error.message);
-    return false;
-  }
-}
 const IUCNMap = {
   NA: "text-bg-secondary",
   DD: "text-bg-secondary",
@@ -8353,11 +7059,11 @@ function setKeyAssignment(inputEL, key) {
  *
  * @remarks
  * Assumes that DOM elements exist with IDs matching each key in {@code keyAssignments} and their associated
- * column elements using the format {@code key + '-column'}. Relies on a global {@code getI18n} function and
+ * column elements using the format {@code key + '-column'}. Relies on a global {@code i18n.get} function and
  * an {@code i18n.Select} parameter to initialize internationalization context.
  */
 function setKeyAssignmentUI(keyAssignments) {
-  const i18 = getI18n(i18n.Select);
+  const i18 = i18n.get(i18n.Select);
   Object.entries(keyAssignments).forEach(([k, v]) => {
     const input = document.getElementById(k);
     input.value = v.value;
@@ -8382,7 +7088,7 @@ function setKeyAssignmentUI(keyAssignments) {
  */
 function changeInputElement(column, element, key, preSelected = null) {
   if (column === "label") {
-    const i18 = getI18n(i18n.Select);
+    const i18 = i18n.get(i18n.Select);
     const container = document.createElement("div");
     container.id = key;
     container.className = "form-control-sm bg-dark border-0";
@@ -8600,7 +7306,12 @@ dropdownCaret.forEach((caret) =>
 /**
  * Extracts metadata from a DOM record representing an audio detection and adds it to the global history.
  *
- * The function parses details from the record's child elements—such as species information, confidence (or a default value for records lacking a confidence bar), comment, label, and call count—while also determining the record's associated file, row, and table (setting). If a new canonical name is provided via the second argument, it will override the extracted species name in the history entry. The constructed data array is pushed to the global HISTORY. If the record is not part of a table, no history entry is added and undefined is returned.
+ * The function parses details from the record's child elements—such as species information, confidence 
+ * (or a default value for records lacking a confidence bar), comment, label, and call count—while also 
+ * determining the record's associated file, row, and table (setting). If a new canonical name is 
+ * provided via the second argument, it will override the extracted species name in the history entry.
+ * The constructed data array is pushed to the global HISTORY. If the record is not part of a table, 
+ * no history entry is added and undefined is returned.
  *
  * @param {HTMLElement} record - The DOM element containing record details.
  * @param {string} [newCname] - Optional name to override the extracted species name.
@@ -8625,19 +7336,18 @@ function addToHistory(record, newCname) {
     const label = record.querySelector(".label").innerText;
     let callCount = record.querySelector(".call-count").innerText;
     let reviewed = !!record.querySelector(".reviewed").innerText;
-    HISTORY.push([
-      species,
+    HISTORY.push({
+      files:file,
+      cname: species,
       start,
       end,
       comment,
-      callCount,
+      count: parseInt(callCount),
       label,
-      undefined,
-      undefined,
-      newCname || species,
+      originalCname: newCname || species,
       confidence,
       reviewed,
-    ]);
+    });
     return {
       species,
       start,

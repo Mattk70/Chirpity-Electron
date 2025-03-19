@@ -145,14 +145,15 @@ class Mutex {
 function checkpoint(db) {
   return new Promise((resolve, reject) => {
     if (!db) resolve();
-    else {  db.exec("PRAGMA wal_checkpoint(TRUNCATE);", (err) => {
-          if (err) {
-              console.error("Error running WAL checkpoint:", err.message);
-              reject(err);
-          } else {
-              console.log("WAL checkpoint completed.");
-              resolve();
-          }
+    else {
+      db.exec("PRAGMA wal_checkpoint(TRUNCATE);", (err) => {
+        if (err) {
+          console.error("Error running WAL checkpoint:", err.message);
+          reject(err);
+        } else {
+          console.log("WAL checkpoint completed.");
+          resolve();
+        }
       });
     }
   });
@@ -179,18 +180,136 @@ function closeDatabase(db) {
     if (!db) resolve();
     else {
       db.close((err) => {
-          if (err) {
-              console.error("Error closing database:", err.message);
-              reject(err);
-          } else {
-              console.log("Database connection closed.");
-              resolve();
-          }
+        if (err) {
+          console.error("Error closing database:", err.message);
+          reject(err);
+        } else {
+          console.log("Database connection closed.");
+          resolve();
+        }
       });
     }
   });
 }
-export { sqlite3, closeDatabase, checkpoint, Mutex };
+
+async function upgrade_to_v1(diskDB, dbMutex) {
+  let t0 = Date.now();
+  try {
+    await dbMutex.lock();
+    await diskDB.runAsync("PRAGMA foreign_keys=OFF");
+    await diskDB.runAsync("BEGIN");
+    //1.10.x update
+    await diskDB.runAsync(
+      "CREATE INDEX IF NOT EXISTS idx_species_sname ON species(sname)"
+    );
+    await diskDB.runAsync(
+      "CREATE INDEX IF NOT EXISTS idx_species_cname ON species(cname)"
+    );
+    const fileColumns = (await diskDB.allAsync("PRAGMA table_info(files)")).map(
+      (row) => row.name
+    );
+    if (!fileColumns.includes("archiveName")) {
+      await diskDB.runAsync("ALTER TABLE files ADD COLUMN archiveName TEXT");
+    }
+    if (!fileColumns.includes("metadata")) {
+      await diskDB.runAsync("ALTER TABLE files ADD COLUMN metadata TEXT");
+    }
+
+    await diskDB.runAsync(
+      "CREATE TABLE IF NOT EXISTS tags(id INTEGER PRIMARY KEY, name TEXT NOT NULL, UNIQUE(name))"
+    );
+    await diskDB.runAsync(
+      "INSERT OR IGNORE INTO tags VALUES(0, 'Nocmig'), (1, 'Local')"
+    );
+    await diskDB.runAsync("ALTER TABLE records ADD COLUMN tagID INTEGER");
+    await diskDB.runAsync(
+      "UPDATE records SET tagID = 0 WHERE label = 'Nocmig'"
+    );
+    await diskDB.runAsync("UPDATE records SET tagID = 1 WHERE label = 'Local'");
+    await diskDB.runAsync("ALTER TABLE records DROP COLUMN label");
+    // Change label names to labelIDs
+    await diskDB.runAsync("ALTER TABLE records ADD COLUMN reviewed INTEGER");
+
+    await diskDB.runAsync(`CREATE TABLE records_temp( dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, 
+      comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER, reviewed INTEGER, tagID INTEGER,
+      UNIQUE (dateTime, fileID, speciesID), 
+      CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,
+      CONSTRAINT fk_species FOREIGN KEY (speciesID) REFERENCES species(id),
+      CONSTRAINT fk_tags FOREIGN KEY (tagID) REFERENCES tags(id) ON DELETE SET NULL)`);
+    await diskDB.runAsync("INSERT INTO records_temp SELECT * from records");
+    await diskDB.runAsync("DROP TABLE records");
+    await diskDB.runAsync("ALTER TABLE records_temp RENAME TO records");
+    // Add old files table update
+    await diskDB.runAsync(`
+      CREATE TABLE files_new (
+          id INTEGER PRIMARY KEY, 
+          name TEXT NOT NULL, 
+          duration REAL,
+          filestart INTEGER, 
+          locationID INTEGER, 
+          archiveName TEXT, 
+          metadata TEXT, 
+          UNIQUE (name),
+          CONSTRAINT fk_locations FOREIGN KEY (locationID) REFERENCES locations(id) ON DELETE SET NULL
+      )`);
+    await diskDB.runAsync("INSERT INTO files_new SELECT * FROM files");
+    await diskDB.runAsync("DROP TABLE files");
+    await diskDB.runAsync("ALTER TABLE files_new RENAME TO files");
+    await diskDB.runAsync("UPDATE schema_version SET version = 1");
+    await diskDB.runAsync("END");
+    await diskDB.runAsync("PRAGMA foreign_keys=ON");
+    await diskDB.runAsync("PRAGMA integrity_check");
+    await diskDB.runAsync("PRAGMA foreign_key_check");
+    console.info(
+      "Migrated tags and added 'reviewed' column to ",
+      diskDB.filename
+    );
+  } catch (e) {
+    console.error("Error adding column and updating version", e.message, e);
+    await diskDB.runAsync("ROLLBACK");
+  } finally {
+    await checkpoint(diskDB);
+    dbMutex.unlock();
+    console.info(`DB migration took ${Date.now() - t0}ms`);
+  }
+}
+
+async function upgrade_to_v2(diskDB, dbMutex) {
+  let t0 = Date.now();
+  try {
+    await dbMutex.lock();
+    await diskDB.runAsync("PRAGMA foreign_keys=OFF");
+    await diskDB.runAsync("BEGIN");
+    await diskDB.runAsync(
+      "CREATE TABLE species_new(id INTEGER PRIMARY KEY, sname TEXT NOT NULL, cname TEXT NOT NULL, UNIQUE(cname, sname))"
+    );
+    await diskDB.runAsync("INSERT INTO species_new SELECT * FROM species");
+    await diskDB.runAsync("DROP TABLE species");
+    await diskDB.runAsync("ALTER TABLE species_new RENAME TO species");
+
+    await diskDB.runAsync("UPDATE schema_version SET version = 2");
+    await diskDB.runAsync("END");
+    await diskDB.runAsync("PRAGMA foreign_keys=ON");
+    await diskDB.runAsync("PRAGMA integrity_check");
+    await diskDB.runAsync("PRAGMA foreign_key_check");
+    console.info(`Adding species unique constraint took ${Date.now() - t0}ms`);
+  } catch (e) {
+    console.error("Error adding unique constraint ", e.message, e);
+    await diskDB.runAsync("ROLLBACK");
+  } finally {
+    await checkpoint(diskDB);
+    dbMutex.unlock();
+  }
+}
+
+export {
+  sqlite3,
+  closeDatabase,
+  checkpoint,
+  upgrade_to_v1,
+  upgrade_to_v2,
+  Mutex,
+};
 </code></pre>
         </article>
     </section>
@@ -201,13 +320,13 @@ export { sqlite3, closeDatabase, checkpoint, Mutex };
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#LIST_CACHE">LIST_CACHE</a></li><li><a href="global.html#REQUEST_TIMEOUT_MS">REQUEST_TIMEOUT_MS</a></li><li><a href="global.html#_parseMetadataText">_parseMetadataText</a></li><li><a href="global.html#_updateSpeciesLocale">_updateSpeciesLocale</a></li><li><a href="global.html#activateResultFilters">activateResultFilters</a></li><li><a href="global.html#addDays">addDays</a></li><li><a href="global.html#adjustSpecDims">adjustSpecDims</a></li><li><a href="global.html#batchInsertRecords">batchInsertRecords</a></li><li><a href="global.html#centreSpec">centreSpec</a></li><li><a href="global.html#changeInputElement">changeInputElement</a></li><li><a href="global.html#checkForRegion">checkForRegion</a></li><li><a href="global.html#checkMembership">checkMembership</a></li><li><a href="global.html#checkpoint">checkpoint</a></li><li><a href="global.html#clearActive">clearActive</a></li><li><a href="global.html#closeDatabase">closeDatabase</a></li><li><a href="global.html#controlFromInput">controlFromInput</a></li><li><a href="global.html#convertFile">convertFile</a></li><li><a href="global.html#createContextMenu">createContextMenu</a></li><li><a href="global.html#createDateClearButton">createDateClearButton</a></li><li><a href="global.html#createRegion">createRegion</a></li><li><a href="global.html#createTimeline">createTimeline</a></li><li><a href="global.html#extractWaveMetadata">extractWaveMetadata</a></li><li><a href="global.html#fetchAudioBuffer">fetchAudioBuffer</a></li><li><a href="global.html#fetchIssuesByLabel">fetchIssuesByLabel</a></li><li><a href="global.html#filterValidFiles">filterValidFiles</a></li><li><a href="global.html#formatAsBootstrapTable">formatAsBootstrapTable</a></li><li><a href="global.html#formatLabel">formatLabel</a></li><li><a href="global.html#formatRegionTooltip">formatRegionTooltip</a></li><li><a href="global.html#generateBirdOptionList">generateBirdOptionList</a></li><li><a href="global.html#getDetectedSpecies">getDetectedSpecies</a></li><li><a href="global.html#getFileSQLAndParams">getFileSQLAndParams</a></li><li><a href="global.html#getFiles">getFiles</a></li><li><a href="global.html#getFilteredBirds">getFilteredBirds</a></li><li><a href="global.html#getIncludedIDs">getIncludedIDs</a></li><li><a href="global.html#getRegion">getRegion</a></li><li><a href="global.html#getResults">getResults</a></li><li><a href="global.html#getRowFromStart">getRowFromStart</a></li><li><a href="global.html#getValidSpecies">getValidSpecies</a></li><li><a href="global.html#getWorkingFile">getWorkingFile</a></li><li><a href="global.html#handleKeyDown">handleKeyDown</a></li><li><a href="global.html#handleKeyDownDeBounce">handleKeyDownDeBounce</a></li><li><a href="global.html#handleMessage">handleMessage</a></li><li><a href="global.html#hexToUtf8">hexToUtf8</a></li><li><a href="global.html#increaseFFT">increaseFFT</a></li><li><a href="global.html#initRegion">initRegion</a></li><li><a href="global.html#isValidUUID">isValidUUID</a></li><li><a href="global.html#loadAudioFile">loadAudioFile</a></li><li><a href="global.html#loadAudioFileSync">loadAudioFileSync</a></li><li><a href="global.html#loadDB">loadDB</a></li><li><a href="global.html#localiseUI">localiseUI</a></li><li><a href="global.html#locateFile">locateFile</a></li><li><a href="global.html#membershipCheck">membershipCheck</a></li><li><a href="global.html#notifyMissingFile">notifyMissingFile</a></li><li><a href="global.html#onAnalysisComplete">onAnalysisComplete</a></li><li><a href="global.html#onLaunch">onLaunch</a></li><li><a href="global.html#onModelReady">onModelReady</a></li><li><a href="global.html#onResultsComplete">onResultsComplete</a></li><li><a href="global.html#onSave2DiskDB">onSave2DiskDB</a></li><li><a href="global.html#onUpdateLocale">onUpdateLocale</a></li><li><a href="global.html#playRegion">playRegion</a></li><li><a href="global.html#recordUpdate">recordUpdate</a></li><li><a href="global.html#reduceFFT">reduceFFT</a></li><li><a href="global.html#renderResult">renderResult</a></li><li><a href="global.html#resultClick">resultClick</a></li><li><a href="global.html#savedFileCheck">savedFileCheck</a></li><li><a href="global.html#sendDetections">sendDetections</a></li><li><a href="global.html#setActiveRegion">setActiveRegion</a></li><li><a href="global.html#setActiveRow">setActiveRow</a></li><li><a href="global.html#setClickedIndex">setClickedIndex</a></li><li><a href="global.html#setKeyAssignment">setKeyAssignment</a></li><li><a href="global.html#setKeyAssignmentUI">setKeyAssignmentUI</a></li><li><a href="global.html#setMetadata">setMetadata</a></li><li><a href="global.html#showDatePicker">showDatePicker</a></li><li><a href="global.html#showRecordEntryForm">showRecordEntryForm</a></li><li><a href="global.html#showSummarySortIcon">showSummarySortIcon</a></li><li><a href="global.html#showWindowDetections">showWindowDetections</a></li><li><a href="global.html#speciesFilter">speciesFilter</a></li><li><a href="global.html#syncConfig">syncConfig</a></li><li><a href="global.html#t0_warmup">t0_warmup</a></li><li><a href="global.html#trackEvent">trackEvent</a></li><li><a href="global.html#updateFilesBeingProcessed">updateFilesBeingProcessed</a></li><li><a href="global.html#updateSpec">updateSpec</a></li><li><a href="global.html#updateSuggestions">updateSuggestions</a></li><li><a href="global.html#zoomSpec">zoomSpec</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#LIST_CACHE">LIST_CACHE</a></li><li><a href="global.html#_updateSpeciesLocale">_updateSpeciesLocale</a></li><li><a href="global.html#activateResultSort">activateResultSort</a></li><li><a href="global.html#addDays">addDays</a></li><li><a href="global.html#addToHistory">addToHistory</a></li><li><a href="global.html#analyseReset">analyseReset</a></li><li><a href="global.html#batchInsertRecords">batchInsertRecords</a></li><li><a href="global.html#changeInputElement">changeInputElement</a></li><li><a href="global.html#checkFilteredFrequency">checkFilteredFrequency</a></li><li><a href="global.html#checkpoint">checkpoint</a></li><li><a href="global.html#clearActive">clearActive</a></li><li><a href="global.html#closeDatabase">closeDatabase</a></li><li><a href="global.html#convertAndOrganiseFiles">convertAndOrganiseFiles</a></li><li><a href="global.html#convertFile">convertFile</a></li><li><a href="global.html#createContextMenu">createContextMenu</a></li><li><a href="global.html#customAnalysisAllMenu">customAnalysisAllMenu</a></li><li><a href="global.html#customiseAnalysisMenu">customiseAnalysisMenu</a></li><li><a href="global.html#fetchAudioBuffer">fetchAudioBuffer</a></li><li><a href="global.html#filterResults">filterResults</a></li><li><a href="global.html#filterValidFiles">filterValidFiles</a></li><li><a href="global.html#formatAsBootstrapTable">formatAsBootstrapTable</a></li><li><a href="global.html#generateBirdIDList">generateBirdIDList</a></li><li><a href="global.html#getDetectedSpecies">getDetectedSpecies</a></li><li><a href="global.html#getFileSQLAndParams">getFileSQLAndParams</a></li><li><a href="global.html#getFiles">getFiles</a></li><li><a href="global.html#getFilteredBirds">getFilteredBirds</a></li><li><a href="global.html#getIncludedIDs">getIncludedIDs</a></li><li><a href="global.html#getResults">getResults</a></li><li><a href="global.html#getRowFromStart">getRowFromStart</a></li><li><a href="global.html#getValidSpecies">getValidSpecies</a></li><li><a href="global.html#getWorkingFile">getWorkingFile</a></li><li><a href="global.html#handleKeyDown">handleKeyDown</a></li><li><a href="global.html#handleKeyDownDeBounce">handleKeyDownDeBounce</a></li><li><a href="global.html#handleMessage">handleMessage</a></li><li><a href="global.html#loadAudioFile">loadAudioFile</a></li><li><a href="global.html#loadAudioFileSync">loadAudioFileSync</a></li><li><a href="global.html#loadDB">loadDB</a></li><li><a href="global.html#locateFile">locateFile</a></li><li><a href="global.html#membershipCheck">membershipCheck</a></li><li><a href="global.html#notifyMissingFile">notifyMissingFile</a></li><li><a href="global.html#onAnalysisComplete">onAnalysisComplete</a></li><li><a href="global.html#onChartData">onChartData</a></li><li><a href="global.html#onLaunch">onLaunch</a></li><li><a href="global.html#onModelReady">onModelReady</a></li><li><a href="global.html#onProgress">onProgress</a></li><li><a href="global.html#onResultsComplete">onResultsComplete</a></li><li><a href="global.html#onSave2DiskDB">onSave2DiskDB</a></li><li><a href="global.html#onSaveAudio">onSaveAudio</a></li><li><a href="global.html#onSummaryComplete">onSummaryComplete</a></li><li><a href="global.html#onUpdateLocale">onUpdateLocale</a></li><li><a href="global.html#onWorkerLoadedAudio">onWorkerLoadedAudio</a></li><li><a href="global.html#playRegion">playRegion</a></li><li><a href="global.html#recordUpdate">recordUpdate</a></li><li><a href="global.html#refreshResultsView">refreshResultsView</a></li><li><a href="global.html#refreshSummary">refreshSummary</a></li><li><a href="global.html#renderResult">renderResult</a></li><li><a href="global.html#resetDiagnostics">resetDiagnostics</a></li><li><a href="global.html#resultClick">resultClick</a></li><li><a href="global.html#savedFileCheck">savedFileCheck</a></li><li><a href="global.html#sendDetections">sendDetections</a></li><li><a href="global.html#setActiveRegion">setActiveRegion</a></li><li><a href="global.html#setActiveRow">setActiveRow</a></li><li><a href="global.html#setClickedIndex">setClickedIndex</a></li><li><a href="global.html#setKeyAssignment">setKeyAssignment</a></li><li><a href="global.html#setKeyAssignmentUI">setKeyAssignmentUI</a></li><li><a href="global.html#setMetadata">setMetadata</a></li><li><a href="global.html#showAnalyse">showAnalyse</a></li><li><a href="global.html#showCharts">showCharts</a></li><li><a href="global.html#showDatePicker">showDatePicker</a></li><li><a href="global.html#showExplore">showExplore</a></li><li><a href="global.html#showRecordEntryForm">showRecordEntryForm</a></li><li><a href="global.html#showSummarySortIcon">showSummarySortIcon</a></li><li><a href="global.html#showWindowDetections">showWindowDetections</a></li><li><a href="global.html#speciesFilter">speciesFilter</a></li><li><a href="global.html#t0_warmup">t0_warmup</a></li><li><a href="global.html#updateFilesBeingProcessed">updateFilesBeingProcessed</a></li><li><a href="global.html#updatePagination">updatePagination</a></li><li><a href="global.html#updateSuggestions">updateSuggestions</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Fri Feb 21 2025 14:32:13 GMT+0000 (Greenwich Mean Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Sun Mar 16 2025 17:29:59 GMT+0000 (Greenwich Mean Time)
 </footer>
 
 <script> prettyPrint(); </script>

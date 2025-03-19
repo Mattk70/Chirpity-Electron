@@ -10,16 +10,17 @@ const SunCalc = require("suncalc");
 const ffmpeg = require("fluent-ffmpeg");
 
 const merge = require("lodash.merge");
-import { State } from "./state.js";
+import { WorkerState as State } from "./utils/state.js";
 import {
   sqlite3,
+  createDB,
   checkpoint,
   closeDatabase,
   upgrade_to_v1,
   upgrade_to_v2,
   Mutex,
 } from "./database.js";
-import { trackEvent as _trackEvent } from "./tracking.js";
+import { trackEvent as _trackEvent } from "./utils/tracking.js";
 
 let isWin32 = false;
 
@@ -274,99 +275,7 @@ const getSelectionRange = (file, start, end) => {
     end: end * 1000 + METADATA[file].fileStart,
   };
 };
-const createDB = async (file) => {
-  const archiveMode = !!file;
-  if (file) {
-    fs.openSync(file, "w");
-    diskDB = new sqlite3.Database(file);
-    DEBUG && console.log("Created disk database", diskDB.filename);
-  } else {
-    memoryDB = new sqlite3.Database(":memory:");
-    DEBUG && console.log("Created new in-memory database");
-  }
-  const db = archiveMode ? diskDB : memoryDB;
 
-  await dbMutex.lock();
-  try {
-    db.locale = "en";
-    await db.runAsync("BEGIN");
-    await db.runAsync(
-      "CREATE TABLE tags(id INTEGER PRIMARY KEY, name TEXT NOT NULL, UNIQUE(name))"
-    );
-    await db.runAsync("INSERT INTO tags VALUES(0, 'Nocmig'), (1, 'Local')");
-    await db.runAsync(
-      "CREATE TABLE species(id INTEGER PRIMARY KEY, sname TEXT NOT NULL, cname TEXT NOT NULL, UNIQUE(cname, sname))"
-    );
-    await db.runAsync(
-      `CREATE TABLE locations( id INTEGER PRIMARY KEY, lat REAL NOT NULL, lon  REAL NOT NULL, place TEXT NOT NULL, UNIQUE (lat, lon))`
-    );
-    await db.runAsync(`CREATE TABLE files(id INTEGER PRIMARY KEY, name TEXT NOT NULL, duration REAL, filestart INTEGER, locationID INTEGER, archiveName TEXT, metadata TEXT, UNIQUE (name),
-            CONSTRAINT fk_locations FOREIGN KEY (locationID) REFERENCES locations(id) ON DELETE SET NULL)`);
-    // Ensure place names are unique too
-    await db.runAsync(
-      "CREATE UNIQUE INDEX idx_unique_place ON locations(lat, lon)"
-    );
-    await db.runAsync(`CREATE TABLE records( dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, 
-      comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER, reviewed INTEGER, tagID INTEGER,
-      UNIQUE (dateTime, fileID, speciesID), 
-      CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,
-      CONSTRAINT fk_species FOREIGN KEY (speciesID) REFERENCES species(id),
-      CONSTRAINT fk_tags FOREIGN KEY (tagID) REFERENCES tags(id) ON DELETE SET NULL)`);
-    await db.runAsync(
-      `CREATE TABLE duration( day INTEGER, duration INTEGER, fileID INTEGER, UNIQUE (day, fileID), CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE)`
-    );
-    await db.runAsync("CREATE INDEX idx_species_sname ON species(sname)");
-    await db.runAsync("CREATE INDEX idx_species_cname ON species(cname)");
-    if (archiveMode) {
-      await diskDB.runAsync(
-        "CREATE TABLE schema_version (version INTEGER NOT NULL)"
-      );
-      await diskDB.runAsync("INSERT INTO schema_version (version) VALUES (2)");
-      const stmt = db.prepare("INSERT INTO species VALUES (?, ?, ?)");
-      try {
-        // Only called when creating a new archive database
-        for (let i = 0; i < LABELS.length; i++) {
-          const [sname, cname] = LABELS[i].split("_");
-          await stmt.runAsync(i, sname, cname);
-        }
-      } finally {
-        // Ensure stmt is finalized
-        stmt.finalize();
-      }
-    } else {
-      const filename = diskDB.filename;
-      await db.runAsync("ATTACH ? as disk", filename);
-      let response = await db.runAsync(
-        "INSERT INTO files SELECT * FROM disk.files"
-      );
-      response = await db.runAsync(
-        "INSERT INTO locations SELECT * FROM disk.locations"
-      );
-      DEBUG &&
-        console.log(response.changes + " locations added to memory database");
-      DEBUG &&
-        console.log(response.changes + " files added to memory database");
-      response = await db.runAsync(
-        "INSERT INTO species SELECT * FROM disk.species"
-      );
-      DEBUG &&
-        console.log(response.changes + " species added to memory database");
-
-      response = await db.runAsync(
-        "INSERT OR IGNORE INTO tags SELECT * FROM disk.tags"
-      );
-      DEBUG && console.log(response.changes + " tags added to memory database");
-    }
-    await db.runAsync("END");
-  } catch (error) {
-    console.error("Error during DB transaction:", error);
-    await db.runAsync("ROLLBACK"); // Rollback the transaction in case of error
-  } finally {
-    dbMutex.unlock();
-    UI.postMessage({ event: "label-translation-needed", locale: STATE.locale });
-  }
-  return db;
-};
 
 /**
  * Loads, configures, and migrates the SQLite database used for audio records and metadata.
@@ -428,8 +337,9 @@ async function loadDB(path) {
     : p.join(path, `archive${num_labels}.sqlite`);
   if (!fs.existsSync(file)) {
     console.log("No db file: ", file);
-    await createDB(file);
+    diskDB = await createDB({file, LABELS, dbMutex});
     console.log("DB created at : ", file);
+    UI.postMessage({ event: "label-translation-needed", locale: STATE.locale });
   } else if (!diskDB || diskDB.filename !== file) {
     diskDB = new sqlite3.Database(file);
     STATE.update({ db: diskDB });
@@ -487,7 +397,7 @@ async function loadDB(path) {
  * Supported actions include:
  *
  * - "_init_": Sets up the environment by initializing the list worker, launching the predictive model, and updating state.
- * - "abort": Aborts currently ongoing processes.
+ * - "abort": Aborts currently ongoing analysis.
  * - "analyse": Initiates audio analysis by validating prediction workers and sending alerts if they are not ready.
  * - "change-batch-size": Adjusts the batch size used by prediction workers.
  * - "change-threads": Modifies the number of active prediction worker threads.
@@ -613,7 +523,7 @@ async function handleMessage(e) {
     }
     case "chart": {
       Object.assign(args, { diskDB, state: STATE, UI });
-      const { onChartRequest } = require("./js/charts.js");
+      const { onChartRequest } = require("./js/components/charts.js");
       await onChartRequest(args);
       break;
     }
@@ -926,7 +836,10 @@ function setGetSummaryQueryInterval(threads) {
 
 async function onChangeMode(mode) {
   if (STATE.mode !== mode) {
-    memoryDB || (await createDB());
+    if (!memoryDB){
+      await createDB({file: null, LABELS, diskDB, dbMutex});
+      UI.postMessage({ event: "label-translation-needed", locale: STATE.locale });
+    }
     UI.postMessage({ event: "mode-changed", mode: mode });
     STATE.changeMode({
       mode: mode,
@@ -983,17 +896,34 @@ async function onLaunch({
   if (!STATE.model || STATE.model !== model) {
     STATE.update({ model: model });
     await loadDB(appPath); // load the diskdb
-    await createDB(); // now make the memoryDB
+    memoryDB = await createDB({file: null, LABELS, diskDB, dbMutex}); // now make the memoryDB
+    UI.postMessage({ event: "label-translation-needed", locale: STATE.locale });
   }
-
-  STATE.update({ db: memoryDB });
+  const db = STATE.mode === 'analyse'
+    ? memoryDB
+    : diskDB;
+  STATE.update({ db });
   NUM_WORKERS = threads;
   spawnPredictWorkers(model, list, batchSize, NUM_WORKERS);
 }
 
+/**
+ * Spawns a list worker and returns a function to interact with it.
+ *
+ * This asynchronous function creates a new Web Worker from "./js/models/listWorker.js" and waits until the worker signals it is ready
+ * by sending a "list-model-ready" message. During initialization, if a "tfjs-node" message is received, it updates internal state and notifies the UI
+ * about backend availability. Once the worker is ready, the function returns another function that sends a message to the worker under a mutex lock
+ * and returns a Promise that resolves with the worker's response containing a result and supplemental messages.
+ *
+ * @returns {Function} A function that accepts a message as its argument and returns a Promise resolving to an object with the following properties:
+ *   - result: The outcome of processing the sent message.
+ *   - messages: Additional messages or status information from the worker.
+ *
+ * @throws {Error} Propagates errors encountered during worker initialization or message handling.
+ */
 async function spawnListWorker() {
   const worker_1 = await new Promise((resolve, reject) => {
-    const worker = new Worker("./js/listWorker.js", { type: "module" });
+    const worker = new Worker("./js/models/listWorker.js", { type: "module" });
     worker.onmessage = function (event) {
       // Resolve the promise once the worker sends a message indicating it's ready
       const message = event.data.message;
@@ -1370,6 +1300,98 @@ const prepResultsStatement = (
   return [resultStatement, params];
 };
 
+// Helper to chunk an array
+function chunkArray(array, size) {
+  const result = [];
+  for (let i = 0; i < array.length; i += size) {
+      result.push(array.slice(i, i + size));
+  }
+  return result;
+}
+
+async function updateMetadata(fileNames) {
+  const batchSize = 10000;
+  const batches = chunkArray(fileNames, batchSize);
+  const finalResult = {};
+  for (const batch of batches) {
+    // Build placeholders (?, ?, ?) dynamically based on number of file names
+    const placeholders = batch.map(() => '?').join(', ');
+
+    // 1. Get files and locations
+    const fileQuery = `
+        SELECT 
+            f.id,
+            f.name,
+            f.duration,
+            f.filestart as fileStart,
+            f.metadata,
+            f.locationID,
+            l.lat,
+            l.lon
+        FROM files f
+        LEFT JOIN locations l ON f.locationID = l.id
+        WHERE f.name IN (${placeholders})
+    `;
+
+    const fileRows = await diskDB.allAsync(fileQuery, ...batch);
+
+    if (fileRows.length === 0) {
+        continue
+    }
+
+    // Extract file IDs for duration query
+    const fileIDs = fileRows.map(row => row.id);
+    const durationPlaceholders = fileIDs.map(() => '?').join(', ');
+
+    // 2. Get durations
+    const durationQuery = `
+        SELECT day, duration, fileID 
+        FROM duration 
+        WHERE fileID IN (${durationPlaceholders})
+    `;
+    const durationRows = await diskDB.allAsync(durationQuery, ...fileIDs);
+
+    // 3. Organise durations by fileID
+    const durationMap = {};
+    durationRows.forEach(row => {
+        if (!durationMap[row.fileID]) durationMap[row.fileID] = {};
+        durationMap[row.fileID][row.day] = row.duration;
+    });
+
+    // 4. Build object keyed by file name
+
+    fileRows.forEach(row => {
+      const {name, duration, fileStart, metadata, locationID, lat, lon} = row;
+      const complete = !!duration && !!fileStart;
+      finalResult[name] = {
+            duration,
+            fileStart,
+            metadata,
+            locationID,
+            dateDuration: durationMap[row.id] || {},
+            lat,
+            lon,
+            isSaved: true,
+            isComplete: complete
+        };
+    });
+  }
+  // 5. Merge with METADATA
+  for (const [fileName, metadataObj] of Object.entries(METADATA)) {
+    if (finalResult[fileName]) {
+        // Shallow merge: overwrite keys in finalResult[fileName] with METADATA[fileName]
+        finalResult[fileName] = {
+            ...finalResult[fileName],
+            ...metadataObj
+        };
+    } else {
+        // Add new entry if fileName not in finalResult
+        finalResult[fileName] = { ...metadataObj };
+    }
+  }
+  return finalResult;
+}
+
 // Not an arrow function. Async function has access to arguments - so we can pass them to processnextfile
 async function onAnalyse({
   filesInScope = [],
@@ -1428,12 +1450,11 @@ async function onAnalyse({
     // we only consider it cached if all files have been saved to the disk DB)
     // BECAUSE we want to change state.db to disk if they are
     let allCached = true;
+    METADATA = await updateMetadata(FILE_QUEUE)
     for (let i = 0; i < FILE_QUEUE.length; i++) {
       const file = FILE_QUEUE[i];
-      const row = await getSavedFileInfo(file);
-      if (row) {
-        await setMetadata({ file: file });
-      } else {
+      const meta = METADATA[file];
+      if (!meta?.isComplete || !meta?.isSaved){
         allCached = false;
         break;
       }
@@ -1891,7 +1912,7 @@ const setMetadata = async ({ file, source_file = file }) => {
   if (!savedMeta?.duration) {
     METADATA[file].duration = await getDuration(file);
     if (file.toLowerCase().endsWith("wav")) {
-      const { extractWaveMetadata } = require("./js/metadata.js");
+      const { extractWaveMetadata } = require("./js/utils/metadata.js");
       const t0 = Date.now();
       const wavMetadata = await extractWaveMetadata(file); //.catch(error => console.warn("Error extracting GUANO", error));
       if (Object.keys(wavMetadata).includes("guano")) {
@@ -2812,12 +2833,25 @@ const processQueue = async () => {
   }
 };
 
-/// Workers  From the MDN example
+/**
+ * Spawns Web Worker threads for parallel prediction processing.
+ *
+ * This function creates the specified number of worker threads that load prediction models in separate modules.
+ * If the model name is "birdnet", it substitutes the worker script with "BirdNet2.4". Each worker is initialized
+ * with configuration details including a processing list, batch size, and various state parameters (such as backend,
+ * geolocation, week, and species threshold) sourced from the global state. Message and error handlers are set up for
+ * asynchronous communication and to manage worker failures.
+ *
+ * @param {string} model - The name of the AI model to use; for "birdnet", the "BirdNet2.4" script is used.
+ * @param {Array} list - The list of data items for the workers to process.
+ * @param {number} batchSize - The number of items each worker should process per batch.
+ * @param {number} threads - The number of Web Worker threads to spawn.
+ */
 function spawnPredictWorkers(model, list, batchSize, threads) {
   // And be ready to receive the list:
   for (let i = 0; i < threads; i++) {
     const workerSrc = model === "birdnet" ? "BirdNet2.4" : model;
-    const worker = new Worker(`./js/${workerSrc}.js`, { type: "module" });
+    const worker = new Worker(`./js/models/${workerSrc}.js`, { type: "module" });
     worker.isAvailable = true;
     worker.isReady = false;
     predictWorkers.push(worker);
@@ -2828,10 +2862,6 @@ function spawnPredictWorkers(model, list, batchSize, threads) {
       list: list,
       batchSize: batchSize,
       backend: STATE.detect.backend,
-      lat: STATE.lat,
-      lon: STATE.lon,
-      week: STATE.week,
-      threshold: STATE.speciesThreshold,
       worker: i,
     });
 
@@ -2943,18 +2973,13 @@ const onInsertManualRecord = async ({
   originalCname,
   confidence,
   reviewed = true,
-  calledByBatch,
-  position,
-  speciesFiltered,
-  updateResults = true,
+  calledByBatch
 }) => {
   if (batch)
     return batchInsertRecords(cname, label, file, originalCname, confidence);
   (start = parseFloat(start)), (end = parseFloat(end));
   const startMilliseconds = Math.round(start * 1000);
-  let changes = 0,
-    fileID,
-    fileStart;
+  let fileID, fileStart;
   const db = STATE.db;
   const speciesFound = await db.getAsync(
     `SELECT id as speciesID FROM species WHERE cname = ?`,
@@ -2972,7 +2997,7 @@ const onInsertManualRecord = async ({
     return;
   }
   let res = await db.getAsync(
-    `SELECT id,filestart FROM files WHERE name = ?`,
+    `SELECT id, filestart FROM files WHERE name = ?`,
     file
   );
 
@@ -2980,7 +3005,12 @@ const onInsertManualRecord = async ({
     // Manual records can be added off the bat, so there may be no record of the file in either db
     fileStart = METADATA[file].fileStart;
     res = await db.runAsync(
-      "INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,?,?,? )",
+      `INSERT INTO files ( id, name, duration, filestart, locationID, archiveName, metadata ) VALUES (?,?,?,?,?,?,?)
+        ON CONFLICT(name) DO UPDATE SET
+        duration = EXCLUDED.duration,
+        filestart = EXCLUDED.filestart,
+        metadata = EXCLUDED.metadata
+        `,
       fileID,
       file,
       METADATA[file].duration,
@@ -2990,11 +3020,7 @@ const onInsertManualRecord = async ({
       METADATA[file].metadata
     );
     fileID = res.lastID;
-    changes = 1;
-    let durationSQL = Object.entries(METADATA[file].dateDuration)
-      .map((entry) => `(${entry.toString()},${fileID})`)
-      .join(",");
-    await db.runAsync(`INSERT OR REPLACE INTO duration VALUES ${durationSQL}`);
+    await insertDurations(file, fileID)
   } else {
     fileID = res.id;
     fileStart = res.filestart;
@@ -3066,9 +3092,8 @@ const insertDurations = async (file, id) => {
   const durationSQL = Object.entries(METADATA[file].dateDuration)
     .map((entry) => `(${entry.toString()},${id})`)
     .join(",");
-  // No "OR IGNORE" in this statement because it should only run when the file is new
   const _result = await STATE.db.runAsync(
-    `INSERT INTO duration VALUES ${durationSQL}`
+    `INSERT OR REPLACE INTO duration VALUES ${durationSQL}`
   );
 };
 
@@ -3705,6 +3730,20 @@ function exportAudacity(result, directory) {
       });
   });
 }
+/**
+ * Exports data records to a CSV file.
+ *
+ * This asynchronous function processes data records in batches (up to 10,000 entries per batch), formatting each record according to the
+ * specified export format ("text", "eBird", or "Raven"). In "Raven" mode, it assigns a sequential selection number and calculates cumulative file
+ * offsets across entries. In "eBird" mode, it aggregates records by "Start Time", "Common name", and "Species" and sums their species counts.
+ * The formatted data is then written as a CSV file using a write stream from the @fast-csv/format module, with the delimiter set to a tab for
+ * "Raven" format and a comma for other formats.
+ *
+ * @async
+ * @param {Array<Object>} result - An array of data records to be exported.
+ * @param {string} filename - The output file path.
+ * @param {string} format - The export format, which must be one of "text", "eBird", or "Raven".
+ */
 async function exportData(result, filename, format) {
   const formatFunctions = {
     text: "formatCSVValues",
@@ -3718,7 +3757,7 @@ async function exportData(result, filename, format) {
     cumulativeOffset = 0,
     fileDurations = {};
   const { writeToPath } = require("@fast-csv/format");
-  const { ExportFormatter } = require("./js/exportFormatter.js");
+  const { ExportFormatter } = require("./js/utils/exportFormatter.js");
   const formatter = new ExportFormatter(STATE);
   const locationMap = await formatter.getAllLocations();
   // CSV export. Format the values
@@ -3820,9 +3859,9 @@ const getSavedFileInfo = async (file) => {
       const archiveFile = file.replace(prefix, "");
       row = await diskDB.getAsync(
         `
-              SELECT duration, filestart AS fileStart, metadata, locationID
-              FROM files LEFT JOIN locations ON files.locationID = locations.id 
-              WHERE name = ? OR archiveName = ?`,
+          SELECT duration, filestart AS fileStart, metadata, locationID
+          FROM files LEFT JOIN locations ON files.locationID = locations.id 
+          WHERE name = ? OR archiveName = ?`,
         file,
         archiveFile
       );
@@ -3996,7 +4035,10 @@ const onUpdateFileStart = async (args) => {
   if (!row) {
     DEBUG && console.log("File not found in database, adding.");
     const result = await db.runAsync(
-      "INSERT INTO files (id, name, duration, filestart) values (?, ?, ?, ?)",
+      `INSERT INTO files (id, name, duration, filestart) values (?, ?, ?, ?) 
+      ON CONFLICT(name) DO UPDATE SET 
+      filestart = EXCLUDED.filestart,
+      durartion = EXCLUDED.duration`,
       undefined,
       file,
       METADATA[file].duration,
@@ -4410,15 +4452,12 @@ async function onSetCustomLocation({
 
     for (const file of files) {
       const result = await db.runAsync(
-        `INSERT INTO files (id, name, duration, filestart, locationID) values (?, ?, ?, ?, ?)
+        `INSERT INTO files (id, name, locationID) values (?, ?, ?)
         ON CONFLICT(name) DO UPDATE SET locationID = EXCLUDED.locationID`,
         undefined,
         file,
-        METADATA[file].duration,
-        METADATA[file].fileStart,
         id
       );
-      const test = await db.getAsync("select * from files"); // file not in db yet
       // we may not have set the METADATA for the file
       METADATA[file] = { ...(METADATA[file] || {}), locationID: id };
       // tell the UI the file has a location id
@@ -4588,7 +4627,7 @@ const pLimit = require("p-limit");
  * @returns {Promise<boolean|undefined>} Resolves to false if the archive directory is missing or unwritable; otherwise,
  * the promise resolves when all conversion tasks have been processed.
  */
-async function convertAndOrganiseFiles(threadLimit) {
+async function convertAndOrganiseFiles(threadLimit = 4) {
   // SANITY checks: archive location exists and is writeable?
   if (!fs.existsSync(STATE.library.location)) {
     generateAlert({
@@ -4608,7 +4647,6 @@ async function convertAndOrganiseFiles(threadLimit) {
     });
     return false;
   }
-  threadLimit ??= 4; // Set a default
   const limit = pLimit(threadLimit);
 
   const db = diskDB;
