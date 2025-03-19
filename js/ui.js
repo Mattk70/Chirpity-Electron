@@ -1937,6 +1937,7 @@ window.onload = async () => {
         config.library.location;
       document.getElementById("library-format").value = config.library.format;
       document.getElementById("library-trim").checked = config.library.trim;
+      document.getElementById("library-clips").checked = config.library.clips;
       const autoArchive = document.getElementById("auto-library");
       autoArchive.checked = config.library.auto;
     }
