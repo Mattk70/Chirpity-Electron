@@ -105,7 +105,7 @@ window.addEventListener("rejectionhandled", function (event) {
 
 
 const state = new State();
-const STATE = state.state;
+let STATE = state.state;
 
 
 const GLOBAL_ACTIONS = {
@@ -1444,7 +1444,7 @@ async function showExplore() {
   locationFilter.addEventListener("change", handleLocationFilterChange);
   utils.hideAll();
   utils.showElement(["exploreWrapper", "spectrogramWrapper"], false);
-  spec.reInitSpec();
+  spec.reInitSpec(config.specMaxHeight);
   worker.postMessage({ action: "update-state", filesToAnalyse: [] });
   // Analysis is done
   STATE.analysisDone = true;
@@ -1480,7 +1480,7 @@ async function showAnalyse() {
   utils.hideAll();
   if (STATE.currentFile) {
     utils.showElement(["spectrogramWrapper"], false);
-    spec.reInitSpec();
+    spec.reInitSpec(config.specMaxHeight);
     worker.postMessage({
       action: "update-state",
       filesToAnalyse: STATE.openFiles,
@@ -3251,7 +3251,7 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
     if (selected) selectedRow = i + 1;
     summaryHTML += `<tr tabindex="-1" class="${selected}">
                 <td class="max">${iconizeScore(item.max)}</td>
-                    <td class="cname">
+                    <td class="cname not-allowed">
                         <span class="cname">${item.cname}</span> <br><i>${
       item.sname
     }</i>
@@ -3486,8 +3486,8 @@ function onSummaryComplete({ filterSpecies = undefined, summary = [] }) {
   updateSummary({ summary: summary, filterSpecies: filterSpecies });
   // Add pointer icon to species summaries
   const summarySpecies = DOM.summaryTable.querySelectorAll(".cname");
-  summarySpecies.forEach((row) => row.classList.add("pointer"));
-
+  summarySpecies.forEach((row) => row.classList.replace("not-allowed","pointer"));
+  
   // Add hover to the summary
   const summaryNode = document.getElementById("resultSummary");
   if (summaryNode) {
@@ -6789,9 +6789,20 @@ function renderComparisons(lists, cname) {
   compareDiv.addEventListener("shown.bs.modal", () => showCompareSpec());
   comparisonModal.show();
 }
-
+import WaveSurfer from "../node_modules/wavesurfer.js/dist/wavesurfer.esm.js";
+import Spectrogram from "../node_modules/wavesurfer.js/dist/plugins/spectrogram.esm.js";
 let ws;
 const createCompareWS = (mediaContainer) => {
+  // const instance =  new ChirpityWS(
+  //   "",
+  //   () => STATE, // No-op
+  //   () => config, // Returns the current config
+  //   {}, // no handlers
+  //   GLOBAL_ACTIONS
+  // )
+  // const spectrogram = instance.initSpectrogram(null, 256, 256);
+  // ws = instance.initWavesurfer(mediaContainer, [spectrogram])
+  // return ws
   if (ws) ws.destroy();
   ws = WaveSurfer.create({
     container: mediaContainer,
@@ -6802,7 +6813,6 @@ const createCompareWS = (mediaContainer) => {
     cursorColor: "#fff",
     hideScrollbar: true,
     cursorWidth: 2,
-    fillParent: true,
     height: 256,
     minPxPerSec: 195,
     sampleRate: 24000,
@@ -6812,9 +6822,6 @@ const createCompareWS = (mediaContainer) => {
   const createCmpSpec = () =>
     ws.registerPlugin(
       Spectrogram.create({
-        //deferInit: false,
-        wavesurfer: ws,
-        // container: "#" + specContainer,
         windowFunc: "hann",
         frequencyMin: 0,
         frequencyMax: 12_000,

@@ -90,10 +90,6 @@ body {
   filter: invert(100%);
 }
 
-img {
-  width: calc(100 * var(--font-size-scale)); /* Scale width */
-  height: auto; /* Maintain aspect ratio */
-}
 
 span[id^="filename_"] {
   border-bottom: 1px;
@@ -113,7 +109,9 @@ span[id^="filename_"] {
 .pointer {
   cursor: pointer;
 }
-
+.not-allowed {
+  cursor: not-allowed;
+}
 #controlsWrapper {
   cursor: move;
 }

@@ -836,8 +836,10 @@ function setGetSummaryQueryInterval(threads) {
 
 async function onChangeMode(mode) {
   if (STATE.mode !== mode) {
-    memoryDB ??= (await createDB({file: null, LABELS, diskDB, dbMutex}));
-    UI.postMessage({ event: "label-translation-needed", locale: STATE.locale });
+    if (!memoryDB){
+      await createDB({file: null, LABELS, diskDB, dbMutex});
+      UI.postMessage({ event: "label-translation-needed", locale: STATE.locale });
+    }
     UI.postMessage({ event: "mode-changed", mode: mode });
     STATE.changeMode({
       mode: mode,
@@ -1451,7 +1453,8 @@ async function onAnalyse({
     METADATA = await updateMetadata(FILE_QUEUE)
     for (let i = 0; i < FILE_QUEUE.length; i++) {
       const file = FILE_QUEUE[i];
-      if (!METADATA[file]?.isComplete){
+      const meta = METADATA[file];
+      if (!meta?.isComplete || !meta?.isSaved){
         allCached = false;
         break;
       }

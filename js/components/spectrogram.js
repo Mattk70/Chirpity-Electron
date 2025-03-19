@@ -5,6 +5,7 @@ import TimelinePlugin from "../../node_modules/wavesurfer.js/dist/plugins/timeli
 import { hexToRgb, showElement, clamp } from "../utils/utils.js";
 import { DOM } from "../utils/DOMcache.js";
 import { Context, get } from "../utils/i18n.js";
+
 const colormap = window.module.colormap;
 
 export class ChirpityWS {
@@ -134,32 +135,40 @@ export class ChirpityWS {
     return REGIONS;
   }
 
-  init = ({ audio = undefined, height = 0 }) => {
+  initWavesurfer = (container, plugins) => {
+    const config = this.getConfig();
+    // this.spectrogram ??= this.initSpectrogram(container, 256, 256)
+    return WaveSurfer.create({
+        container,
+        // make waveform transparent
+        backgroundColor: "rgba(0,0,0,0)",
+        waveColor: "rgba(0,0,0,0)",
+        progressColor: "rgba(0,0,0,0)",
+        // but keep the playhead
+        cursorColor: this.wsTextColour(config),
+        cursorWidth: 2,
+        height: "auto",
+        sampleRate: this.sampleRate,
+        renderFunction: () => {}, // no need to render a waveform
+        plugins
+      });
+  }
+  initAll = ({ audio = undefined, height = 0 }) => {
     const config = this.getConfig();
     const STATE = this.getState();
     const windowLength = STATE.windowLength;
 
     this.wavesurfer && this.wavesurfer.destroy();
-    const loggedErrors = new Set();
     this.REGIONS = this.initRegion();
-    const REGIONS = this.REGIONS;
-    this.spectrogram = this.initSpectrogram(height);
+    this.spectrogram = this.initSpectrogram('#spectrogram', height);
     this.timeline = this.createTimeline(windowLength);
-    const container = document.getElementById("waveform");
     // Setup waveform and spec views
-    this.wavesurfer = WaveSurfer.create({
-      container,
-      // make waveform transparent
-      backgroundColor: "rgba(0,0,0,0)",
-      waveColor: "rgba(0,0,0,0)",
-      progressColor: "rgba(0,0,0,0)",
-      // but keep the playhead
-      cursorColor: this.wsTextColour(config),
-      cursorWidth: 2,
-      height: "auto",
-      renderFunction: () => {}, // no need to render a waveform
-      plugins: [this.REGIONS, this.spectrogram, this.timeline],
-    });
+    const plugins = [this.spectrogram, this.timeline, this.REGIONS];
+    const container = document.getElementById("waveform");
+    this.wavesurfer = this.initWavesurfer(container, plugins);
+    // this.wavesurfer.registerPlugin(this.spectrogram)
+    // this.wavesurfer.registerPlugin(this.REGIONS)
+    // this.wavesurfer.registerPlugin(this.timeline)
 
     if (audio) {
       this.loadBuffer(audio);
@@ -248,7 +257,7 @@ export class ChirpityWS {
    * @param {number} [fftSamples] - The number of FFT samples used for analysis. Defaults to config.FFT or is computed based on window length.
    * @returns {Object} The initialized spectrogram instance.
    */
-  initSpectrogram(height, fftSamples) {
+  initSpectrogram(container, height, fftSamples) {
     const config = this.getConfig();
     const spectrogram = this.spectrogram;
     const STATE = this.getState();
@@ -271,7 +280,7 @@ export class ChirpityWS {
     // set colormap
     const colors = this.createColormap(config);
     return Spectrogram.create({
-      container: "#spectrogram",
+      container,
       windowFunc: config.customColormap.windowFn,
       frequencyMin: config.audio.minFrequency,
       frequencyMax: config.audio.maxFrequency,
@@ -797,7 +806,7 @@ export class ChirpityWS {
       if (STATE.currentFile && redraw) {
         // give the wrapper space for the transport controls and element padding/margins
         if (!wavesurfer) {
-          this.init({
+          this.initAll({
             audio: STATE.currentBuffer,
             height: specHeight,
           });
@@ -806,7 +815,7 @@ export class ChirpityWS {
             height: specHeight,
             cursorColor: this.wsTextColour(),
           });
-          this.spectrogram = this.initSpectrogram(specHeight, fftSamples);
+          this.spectrogram = this.initSpectrogram('#spectrogram', specHeight, fftSamples);
           wavesurfer.registerPlugin(this.spectrogram);
           await this.loadBuffer();
         }
@@ -827,11 +836,10 @@ export class ChirpityWS {
    * If both conditions are met, it initializes the spectrogram using the configured maximum height
    * and registers it as a plugin with wavesurfer.
    */
-  reInitSpec() {
+  reInitSpec(height) {
     const wavesurfer = this.wavesurfer;
-    const config = this.getConfig();
     if (wavesurfer && !this.spectrogram) {
-        this.spectrogram = this.initSpectrogram(config.specMaxHeight);
+        this.spectrogram = this.initSpectrogram('#spectrogram', height);
       wavesurfer.registerPlugin(this.spectrogram);
     }
   }
