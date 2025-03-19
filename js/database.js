@@ -277,7 +277,8 @@ async function upgrade_to_v2(diskDB, dbMutex) {
 const createDB = async ({file, LABELS, diskDB, memoryDB, dbMutex}) => {
   const archiveMode = !!file;
   if (file) {
-    fs.openSync(file, "w");
+    const {openSync} = require('node:fs')
+    openSync(file, "w");
     diskDB = new sqlite3.Database(file);
     DEBUG && console.log("Created disk database", diskDB.filename);
   } else {
