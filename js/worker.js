@@ -4038,7 +4038,7 @@ const onUpdateFileStart = async (args) => {
       `INSERT INTO files (id, name, duration, filestart) values (?, ?, ?, ?) 
       ON CONFLICT(name) DO UPDATE SET 
       filestart = EXCLUDED.filestart,
-      durartion = EXCLUDED.duration`,
+      duration = EXCLUDED.duration`,
       undefined,
       file,
       METADATA[file].duration,
