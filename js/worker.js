@@ -3001,7 +3001,7 @@ const onInsertManualRecord = async ({
     file
   );
 
-  if (!res) {
+  if (!res?.filestart) {
     // Manual records can be added off the bat, so there may be no record of the file in either db
     fileStart = METADATA[file].fileStart;
     res = await db.runAsync(
@@ -3105,8 +3105,8 @@ const generateInsertQuery = async (latestResult, file) => {
   try {
     await db.runAsync("BEGIN");
     let insertQuery = "INSERT OR IGNORE INTO records VALUES ";
-    let res = await db.getAsync("SELECT id FROM files WHERE name = ?", file);
-    if (!res) {
+    let res = await db.getAsync("SELECT id, filestart, duration FROM files WHERE name = ?", file);
+    if (!res?.filestart) {
       let id = null;
       if (meta.metadata) {
         const metadata = JSON.parse(meta.metadata);
@@ -3133,13 +3133,16 @@ const generateInsertQuery = async (latestResult, file) => {
         }
       }
       res = await db.runAsync(
-        "INSERT OR IGNORE INTO files VALUES ( ?,?,?,?,?,?,? )",
-        undefined,
+        // If the file has GUANO, there will be a database entry for it, but possibly no filestart or duration
+        `INSERT INTO files (name, duration, filestart, locationID, metadata) VALUES ( ?,?,?,?,? )
+          ON CONFLICT(name) DO UPDATE SET
+          duration = EXCLUDED.duration,
+          filestart = EXCLUDED.filestart,
+          metadata = EXCLUDED.metadata`,
         file,
         meta.duration,
         meta.fileStart,
         id,
-        null,
         meta.metadata
       );
       fileID = res.lastID;
@@ -4038,7 +4041,7 @@ const onUpdateFileStart = async (args) => {
       `INSERT INTO files (id, name, duration, filestart) values (?, ?, ?, ?) 
       ON CONFLICT(name) DO UPDATE SET 
       filestart = EXCLUDED.filestart,
-      durartion = EXCLUDED.duration`,
+      duration = EXCLUDED.duration`,
       undefined,
       file,
       METADATA[file].duration,
