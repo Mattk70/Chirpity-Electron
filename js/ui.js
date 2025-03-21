@@ -940,7 +940,7 @@ const displayLocationAddress = async (where) => {
       '<span class="material-symbols-outlined">fmd_good</span> ' + address;
     placeEl.innerHTML = content;
     const button = document.getElementById("apply-location");
-    button.classList.add("btn-danger");
+    button.classList.replace("btn-primary", "btn-danger");
     button.textContent = "Apply";
   }
 };
@@ -956,7 +956,7 @@ const cancelDefaultLocation = () => {
     config.location;
   updateMap(latEl.value, lonEl.value);
   const button = document.getElementById("apply-location");
-  button.classList.remove("btn-danger");
+  button.classList.replace("btn-danger","btn-primary");
   button.innerHTML = 'Set <span class="material-symbols-outlined">done</span>';
 };
 
@@ -985,7 +985,7 @@ const setDefaultLocation = () => {
     list: "location",
   });
   const button = document.getElementById("apply-location");
-  button.classList.remove("btn-danger");
+  button.classList.replace("btn-danger","btn-primary");
   button.innerHTML = 'Set <span class="material-symbols-outlined">done</span>';
 };
 
