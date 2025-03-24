@@ -20,7 +20,7 @@ sqlite3.Statement.prototype.runAsync = function (...params) {
   if (DEBUG) console.log("SQL\n", this.sql, "\nParams\n", params);
   return new Promise((resolve, reject) => {
     this.run(params, (err) => {
-      if (err) return reject(err, console.log(err, this.sql));
+      if (err) return reject(err, console.log(err, this.sql, params));
       // if (DEBUG) console.log('\nRows:', rows)
       resolve(this);
     });
@@ -274,7 +274,7 @@ async function upgrade_to_v2(diskDB, dbMutex) {
   }
 }
 
-const createDB = async ({file, LABELS, diskDB, memoryDB, dbMutex}) => {
+const createDB = async ({file, LABELS, model, diskDB, memoryDB, dbMutex}) => {
   const archiveMode = !!file;
   if (file) {
     const {openSync} = require('node:fs');
@@ -292,48 +292,98 @@ const createDB = async ({file, LABELS, diskDB, memoryDB, dbMutex}) => {
     db.locale = "en";
     await db.runAsync("BEGIN");
     await db.runAsync(
-      "CREATE TABLE tags(id INTEGER PRIMARY KEY, name TEXT NOT NULL, UNIQUE(name))"
+      `CREATE TABLE tags(
+        id INTEGER PRIMARY KEY, 
+        name TEXT NOT NULL, 
+        UNIQUE(name)
+      )`
     );
     await db.runAsync("INSERT INTO tags VALUES(0, 'Nocmig'), (1, 'Local')");
-    await db.runAsync(
-      "CREATE TABLE species(id INTEGER PRIMARY KEY, sname TEXT NOT NULL, cname TEXT NOT NULL, UNIQUE(cname, sname))"
+    await db.runAsync(`
+      CREATE TABLE models (
+        id INTEGER PRIMARY KEY, 
+        name TEXT NOT NULL, UNIQUE(name)
+      )`
     );
     await db.runAsync(
-      `CREATE TABLE locations( id INTEGER PRIMARY KEY, lat REAL NOT NULL, lon  REAL NOT NULL, place TEXT NOT NULL, UNIQUE (lat, lon))`
+      `CREATE TABLE species(
+        id INTEGER PRIMARY KEY, 
+        sname TEXT NOT NULL, 
+        cname TEXT NOT NULL, 
+        modelID INTEGER NOT NULL,
+        classIndex INTEGER NOT NULL,
+        UNIQUE (modelID, classIndex),
+        UNIQUE (modelID, sname, cname),
+        FOREIGN KEY (modelID) REFERENCES models(id) ON DELETE CASCADE
+      )`
     );
-    await db.runAsync(`CREATE TABLE files(id INTEGER PRIMARY KEY, name TEXT NOT NULL, duration REAL, filestart INTEGER, locationID INTEGER, archiveName TEXT, metadata TEXT, UNIQUE (name),
-            CONSTRAINT fk_locations FOREIGN KEY (locationID) REFERENCES locations(id) ON DELETE SET NULL)`);
+    await db.runAsync(
+      `CREATE TABLE locations(
+        id INTEGER PRIMARY KEY, 
+        lat REAL NOT NULL,
+        lon REAL NOT NULL,
+        place TEXT NOT NULL, 
+        UNIQUE (lat, lon)
+      )`
+    );
+    await db.runAsync(
+      `CREATE TABLE files(
+        id INTEGER PRIMARY KEY, 
+        name TEXT NOT NULL, 
+        duration REAL, 
+        filestart INTEGER, 
+        locationID INTEGER, 
+        archiveName TEXT, 
+        metadata TEXT, 
+        UNIQUE (name),
+        CONSTRAINT fk_locations FOREIGN KEY (locationID) REFERENCES locations(id) ON DELETE SET NULL
+      )`
+    );
     // Ensure place names are unique too
     await db.runAsync(
       "CREATE UNIQUE INDEX idx_unique_place ON locations(lat, lon)"
     );
-    await db.runAsync(`CREATE TABLE records( dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, 
-      comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER, reviewed INTEGER, tagID INTEGER,
-      UNIQUE (dateTime, fileID, speciesID), 
-      CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,
-      CONSTRAINT fk_species FOREIGN KEY (speciesID) REFERENCES species(id),
-      CONSTRAINT fk_tags FOREIGN KEY (tagID) REFERENCES tags(id) ON DELETE SET NULL)`);
     await db.runAsync(
-      `CREATE TABLE duration( day INTEGER, duration INTEGER, fileID INTEGER, UNIQUE (day, fileID), CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE)`
+      `CREATE TABLE records( 
+        dateTime INTEGER, 
+        position INTEGER, 
+        fileID INTEGER, 
+        speciesID INTEGER,
+        modelID INTEGER,
+        confidence INTEGER, 
+        comment TEXT, 
+        end INTEGER, 
+        callCount INTEGER, 
+        isDaylight INTEGER, 
+        reviewed INTEGER, 
+        tagID INTEGER,
+        UNIQUE (dateTime, fileID, speciesID), 
+        CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,
+        CONSTRAINT fk_species FOREIGN KEY (speciesID) REFERENCES species(id),
+        CONSTRAINT fk_tags FOREIGN KEY (tagID) REFERENCES tags(id) ON DELETE SET NULL
+      )`
     );
+    await db.runAsync(
+      `CREATE TABLE duration(
+        day INTEGER, 
+        duration INTEGER, 
+        fileID INTEGER, 
+        UNIQUE (day, fileID), 
+        CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE
+      )`
+    );
+    console.log('duration created')
     await db.runAsync("CREATE INDEX idx_species_sname ON species(sname)");
     await db.runAsync("CREATE INDEX idx_species_cname ON species(cname)");
     if (archiveMode) {
       await diskDB.runAsync(
-        "CREATE TABLE schema_version (version INTEGER NOT NULL)"
+        `CREATE TABLE schema_version(
+          version INTEGER NOT NULL
+        )`
       );
-      await diskDB.runAsync("INSERT INTO schema_version (version) VALUES (2)");
-      const stmt = db.prepare("INSERT INTO species VALUES (?, ?, ?)");
-      try {
-        // Only called when creating a new archive database
-        for (let i = 0; i < LABELS.length; i++) {
-          const [sname, cname] = LABELS[i].split("_");
-          await stmt.runAsync(i, sname, cname);
-        }
-      } finally {
-        // Ensure stmt is finalized
-        stmt.finalize();
-      }
+      await diskDB.runAsync("INSERT INTO schema_version (version) VALUES (3)");
+      
+    console.log('version created')
     } else {
       const filename = diskDB?.filename;
       await db.runAsync("ATTACH ? as disk", filename);
@@ -357,6 +407,11 @@ const createDB = async ({file, LABELS, diskDB, memoryDB, dbMutex}) => {
         "INSERT OR IGNORE INTO tags SELECT * FROM disk.tags"
       );
       DEBUG && console.log(response.changes + " tags added to memory database");
+
+      response = await db.runAsync(
+        "INSERT OR IGNORE INTO models SELECT * FROM disk.models"
+      );
+      DEBUG && console.log(response.changes + " models added to memory database");
     }
     await db.runAsync("END");
   } catch (error) {
@@ -368,6 +423,148 @@ const createDB = async ({file, LABELS, diskDB, memoryDB, dbMutex}) => {
   return db;
 };
 
+const mergeDbIfNeeded = async ({diskDB, model, labels, dbMutex}) => {
+  // Check if we have this model already
+  const modelRow = await diskDB.getAsync(`SELECT id FROM models WHERE name = ?`, model)
+  if (modelRow) return modelRow.id
+
+  const models = {birdnet: '6523', chirpity: '409', nocmig: '432'}
+  const modelDbPath = diskDB.filename.replace('.sqlite', models[model] + '.sqlite')
+
+  // Check if model DB exists
+  const {existsSync} = require('node:fs');
+  if (!existsSync(modelDbPath)) {
+    console.log(`Model database not found: ${modelDbPath}`);
+    // Fill species table with this model's labels and translate
+    return;
+  }
+
+  // Migration. Step 1: Attach the old model db
+  await dbMutex.lock();
+  try {
+    await diskDB.runAsync('BEGIN');
+    let result = await diskDB.runAsync('INSERT INTO models (name) VALUES (?)', model)
+    const modelID = result.lastID;
+
+    // Run schema update on existing database if needed
+    const legacyDB = new sqlite3.Database(modelDbPath)
+    // Add empty version table if not exists
+    await legacyDB.runAsync(
+      "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)"
+    );
+    const row = await legacyDB.getAsync(`SELECT version FROM schema_version`);
+    let user_version;
+    if (!row) {
+      const { pragma_version } = await legacyDB.getAsync("PRAGMA user_version");
+      user_version = pragma_version || 0;
+      await legacyDB.runAsync(
+        "INSERT INTO schema_version (version) VALUES (?)",
+        user_version
+      );
+    } else {
+      user_version = row.version;
+    }
+    if (user_version < 1) {
+      await upgrade_to_v1(legacyDB, dbMutex);
+    }
+    if (user_version < 2) {
+      await upgrade_to_v2(legacyDB, dbMutex);
+    }
+
+    await diskDB.runAsync('ATTACH DATABASE ? AS modelDb', modelDbPath)
+
+    // Migrate and de-duplicate tags
+    await diskDB.runAsync(`
+      INSERT OR IGNORE INTO tags (name)
+      SELECT name FROM modelDb.tags
+    `)
+
+    // Create temporary mapping table for tags
+    await diskDB.runAsync(`
+        CREATE TEMP TABLE tag_map AS
+        SELECT modelDb.tags.id AS oldID, unified.id AS newID
+        FROM modelDb.tags
+        JOIN tags AS unified
+          ON modelDb.tags.name = unified.name
+      `);
+
+    // Migrate and de-duplicate locations
+    await diskDB.runAsync(`
+      INSERT OR IGNORE INTO locations (lat, lon, place)
+      SELECT lat, lon, place FROM modelDb.locations
+    `);
+
+    // Create temporary mapping table for locations
+    await diskDB.runAsync(`
+      CREATE TEMP TABLE location_map AS
+      SELECT modelDb.locations.id AS oldID, unified.id AS newID
+      FROM modelDb.locations
+      JOIN locations AS unified
+        ON modelDb.locations.lat = unified.lat
+       AND modelDb.locations.lon = unified.lon
+    `);
+
+    // Migrate and de-duplicate files
+    await diskDB.runAsync(`
+      INSERT OR IGNORE INTO files (name, duration, filestart, locationID, archiveName, metadata)
+      SELECT f.name, f.duration, f.filestart, lm.newID, f.archiveName, f.metadata
+      FROM modelDb.files f
+      LEFT JOIN location_map lm ON f.locationID = lm.oldID
+    `);
+
+    // Create temporary mapping table for files
+    await diskDB.runAsync(`
+      CREATE TEMP TABLE file_map AS
+      SELECT modelDb.files.id AS oldID, unified.id AS newID
+      FROM modelDb.files
+      JOIN files AS unified
+        ON modelDb.files.name = unified.name
+    `);
+
+    await diskDB.runAsync(`
+      INSERT INTO species (sname, cname, modelID, classIndex)
+      SELECT sname, cname, ?, id
+      FROM modelDb.species
+      `,  modelID);
+
+    // Create temporary mapping table for species
+    await diskDB.runAsync(`
+      CREATE TEMP TABLE species_map AS
+      SELECT modelDb.species.id AS oldID, unified.id AS newID
+      FROM modelDb.species
+      JOIN species AS unified
+        ON modelDb.species.sname = unified.sname
+        AND modelDb.species.cname = unified.cname
+        AND unified.modelID = ?
+      `, modelID);
+
+
+    // Migrate records with updated foreign keys
+    await diskDB.runAsync(`
+      INSERT INTO records (dateTime, position, fileID, speciesID, modelID, confidence, comment, end, callCount, isDaylight, reviewed, tagID)
+      SELECT r.dateTime, r.position, fm.newID, sm.newID, ?, r.confidence, r.comment, r.end, r.callCount, r.isDaylight, r.reviewed, tm.newID
+      FROM modelDb.records r
+      JOIN file_map fm ON r.fileID = fm.oldID
+      JOIN species_map sm ON r.speciesID = sm.oldID
+      LEFT JOIN tag_map tm ON r.tagID = tm.oldID
+    `, modelID);
+
+    // Tidy up
+    await diskDB.runAsync(`DROP TABLE location_map`);
+    await diskDB.runAsync(`DROP TABLE file_map`);
+    await diskDB.runAsync(`DROP TABLE tag_map`);
+    await diskDB.runAsync(`DROP TABLE species_map`);
+
+    await diskDB.runAsync('END');
+    await diskDB.runAsync(`DETACH DATABASE modelDb`);
+  } catch (err) {
+    console.error(`Error migrating model "${model}":`, err.message);
+    await diskDB.runAsync('ROLLBACK');
+  } finally {
+    dbMutex.unlock()
+  }
+  return modelID
+}
 
 export {
   sqlite3,
@@ -377,4 +574,5 @@ export {
   upgrade_to_v1,
   upgrade_to_v2,
   Mutex,
+  mergeDbIfNeeded
 };

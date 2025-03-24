@@ -86,7 +86,8 @@ export class WorkerState {
       (this.debug = false),
       (this.fileStartMtime = false),
       (this.specDetections = false),
-      (this.labelFilters = []);
+      (this.labelFilters = []),
+      (this.speciesMap = new Map());
   }
 
   update(updates) {

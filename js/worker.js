@@ -19,6 +19,7 @@ import {
   upgrade_to_v1,
   upgrade_to_v2,
   Mutex,
+  mergeDbIfNeeded
 } from "./database.js";
 import { trackEvent as _trackEvent } from "./utils/tracking.js";
 
@@ -332,57 +333,45 @@ async function loadDB(path) {
   modelLabels.push("Unknown Sp._Unknown Sp.");
   const num_labels = modelLabels.length;
   LABELS = modelLabels; // these are the default english labels
-  const file = DATASET
-    ? p.join(path, `${DATABASE}${num_labels}.sqlite`)
-    : p.join(path, `archive${num_labels}.sqlite`);
+  const file = p.join(path, `archive.sqlite`);
   if (!fs.existsSync(file)) {
     console.log("No db file: ", file);
-    diskDB = await createDB({file, LABELS, dbMutex});
+    diskDB = await createDB({file, dbMutex});
     console.log("DB created at : ", file);
+    await mergeDbIfNeeded({diskDB, model, LABELS, dbMutex })
     UI.postMessage({ event: "label-translation-needed", locale: STATE.locale });
-  } else if (!diskDB || diskDB.filename !== file) {
+  } else {
     diskDB = new sqlite3.Database(file);
     STATE.update({ db: diskDB });
     await diskDB.runAsync("VACUUM");
     await diskDB.runAsync("PRAGMA foreign_keys = ON");
     await diskDB.runAsync("PRAGMA journal_mode = WAL");
     await diskDB.runAsync("PRAGMA busy_timeout = 5000");
-
-    // Add empty version table if not exists
-    await diskDB.runAsync(
-      "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)"
-    );
-    const row = await diskDB.getAsync(`SELECT version FROM schema_version`);
-    let user_version;
-    if (!row) {
-      const { pragma_version } = await diskDB.getAsync("PRAGMA user_version");
-      user_version = pragma_version || 0;
-      await diskDB.runAsync(
-        "INSERT INTO schema_version (version) VALUES (?)",
-        user_version
-      );
-    } else {
-      user_version = row.version;
-    }
-    if (user_version < 1) {
-      await upgrade_to_v1(diskDB, dbMutex);
-    }
-    if (user_version < 2) {
-      await upgrade_to_v2(diskDB, dbMutex);
-    }
-    const { count } = await diskDB.getAsync(
-      "SELECT COUNT(*) as count FROM records"
-    );
-    if (count) {
-      UI.postMessage({ event: "diskDB-has-records" });
-    }
+    await mergeDbIfNeeded({diskDB, model, LABELS, dbMutex })
     // Get the labels from the DB. These will be in preferred locale
     DEBUG && console.log("Getting labels from disk db " + path);
     const res = await diskDB.allAsync(
-      "SELECT sname || '_' || cname AS labels FROM species ORDER BY id"
+      `SELECT sname || '_' || cname AS labels FROM species
+        WHERE modelID = (SELECT id FROM models WHERE name = ?)
+        ORDER BY id`, model
     );
     LABELS = res.map((obj) => obj.labels); // these are the labels in the preferred locale
     DEBUG && console.log("Opened and cleaned disk db " + file);
+  }
+  // Set mapping from model IDs to db species ids
+  const speciesResults = await diskDB.allAsync(
+    `SELECT classIndex, id FROM species
+      WHERE modelID = (SELECT id FROM models WHERE name = ?)`, model,
+  );
+  speciesResults.forEach(({ classIndex, id }) => {
+    STATE.speciesMap.set(classIndex, id);
+  });
+
+  const row = await diskDB.getAsync(
+    "SELECT 1 FROM records LIMIT 1"
+  );
+  if (row) {
+    UI.postMessage({ event: "diskDB-has-records" });
   }
   return true;
 }
@@ -1098,6 +1087,7 @@ function getExcluded(included, fullRange = LABELS.length) {
   return missing;
 }
 const prepSummaryStatement = (included) => {
+  included = included.map(item => STATE.speciesMap.get(item))
   const range = STATE.mode === "explore" ? STATE.explore.range : undefined;
   const params = [STATE.detect.confidence];
   let summaryStatement = `
@@ -1201,6 +1191,7 @@ const prepResultsStatement = (
   topRankin
 ) => {
   const params = [STATE.detect.confidence];
+  included = included.map(item => STATE.speciesMap.get(item))
   let resultStatement = `
     WITH ranked_records AS (
         SELECT 
@@ -3097,95 +3088,113 @@ const insertDurations = async (file, id) => {
   );
 };
 
-const generateInsertQuery = async (latestResult, file) => {
+const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, file, modelID) => {
   const db = STATE.db;
+  const { fileStart, metadata, duration } = METADATA[file];
   let fileID;
-  const meta = METADATA[file];
   await dbMutex.lock();
   try {
     await db.runAsync("BEGIN");
-    let insertQuery = "INSERT OR IGNORE INTO records VALUES ";
-    let res = await db.getAsync("SELECT id, filestart, duration FROM files WHERE name = ?", file);
-    if (!res?.filestart) {
-      let id = null;
-      if (meta.metadata) {
-        const metadata = JSON.parse(meta.metadata);
-        const guano = metadata.guano;
+
+    
+
+    // Fetch or Insert File ID
+    const res = await db.getAsync("SELECT id, filestart FROM files WHERE name = ?", file);
+    fileID = res?.id;
+
+    if (!fileID) {
+      let locationID = null;
+
+      // Extract location from GUANO metadata
+      if (metadata) {
+        const meta = JSON.parse(metadata);
+        const guano = meta.guano;
         if (guano && guano["Loc Position"]) {
           const [lat, lon] = guano["Loc Position"].split(" ");
           const place = guano["Site Name"] || guano["Loc Position"];
-          // Note diskDB used here
-          const row = await db.getAsync(
-            "SELECT id FROM locations WHERE lat = ? AND lon = ?",
+
+          // Use INSERT OR IGNORE + RETURNING to avoid extra SELECT
+          const result = await db.getAsync(
+            `INSERT OR IGNORE INTO locations (lat, lon, place) 
+             VALUES (?, ?, ?) RETURNING id`,
             roundedFloat(lat),
-            roundedFloat(lon)
+            roundedFloat(lon),
+            place
           );
-          if (!row) {
-            const result = await db.runAsync(
-              "INSERT OR IGNORE INTO locations VALUES ( ?,?,?,? )",
-              undefined,
-              roundedFloat(lat),
-              roundedFloat(lon),
-              place
-            );
-            id = result.lastID;
-          }
+
+          locationID = result?.id;
         }
       }
-      res = await db.runAsync(
-        // If the file has GUANO, there will be a database entry for it, but possibly no filestart or duration
-        `INSERT INTO files (name, duration, filestart, locationID, metadata) VALUES ( ?,?,?,?,? )
-          ON CONFLICT(name) DO UPDATE SET
-          duration = EXCLUDED.duration,
-          filestart = EXCLUDED.filestart,
-          metadata = EXCLUDED.metadata`,
-        file,
-        meta.duration,
-        meta.fileStart,
-        id,
-        meta.metadata
+
+      // Use RETURNING to get fileID immediately
+      const fileInsert = await db.getAsync(
+        `INSERT INTO files (name, duration, filestart, locationID, metadata) 
+         VALUES (?, ?, ?, ?, ?) 
+         ON CONFLICT(name) DO UPDATE SET 
+         duration = EXCLUDED.duration,
+         filestart = EXCLUDED.filestart,
+         metadata = EXCLUDED.metadata 
+         RETURNING id`,
+        file, duration, fileStart, locationID, metadata
       );
-      fileID = res.lastID;
+
+      fileID = fileInsert.id;
+
+      // Insert duration information
       await insertDurations(file, fileID);
-    } else {
-      fileID = res.id;
     }
 
-    let [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
-    const minConfidence = Math.min(STATE.detect.confidence, 150); // store results with 15% confidence and up unless confidence set lower
+    // Extract species and confidence data
+    const minConfidence = Math.min(STATE.detect.confidence, 150); 
+
+
+
+    // **Use batch inserts instead of string concatenation**
+    const insertValues = [];
+    const insertPlaceholders = [];
+    const params = [];
+
     for (let i = 0; i < keysArray.length; i++) {
       const key = parseFloat(keysArray[i]);
-      const timestamp = meta.fileStart + key * 1000;
+      const timestamp = fileStart + key * 1000;
       const isDaylight = isDuringDaylight(timestamp, STATE.lat, STATE.lon);
       const confidenceArray = confidenceBatch[i];
       const speciesIDArray = speciesIDBatch[i];
+
       for (let j = 0; j < confidenceArray.length; j++) {
         const confidence = Math.round(confidenceArray[j] * 1000);
         if (confidence < minConfidence) break;
-        const speciesID = speciesIDArray[j];
-        insertQuery += `(${timestamp}, ${key}, ${fileID}, ${speciesID}, ${confidence}, null, ${
-          key + 3
-        }, null, ${isDaylight}, 0, null), `;
+
+        const modelSpeciesID = speciesIDArray[j];
+        const speciesID = STATE.speciesMap.get(modelSpeciesID);
+
+        if (!speciesID) continue; // Skip unknown species
+
+        insertPlaceholders.push("(?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        insertValues.push(timestamp, key, fileID, speciesID, modelID, confidence, key + 3, isDaylight, 0);
       }
     }
-    // Remove the trailing comma and space
-    insertQuery = insertQuery.slice(0, -2);
-    //DEBUG && console.log(insertQuery);
-    // Make sure we have some values to INSERT
-    if (insertQuery.endsWith(")")) {
-      await db
-        .runAsync(insertQuery)
-        .catch((error) => console.log("Database error:", error));
+
+    if (insertValues.length > 0) {
+      await db.runAsync(
+        `INSERT OR IGNORE INTO records 
+         (dateTime, position, fileID, speciesID, modelID, confidence, end, isDaylight, reviewed) 
+         VALUES ${insertPlaceholders.join(", ")}`,
+        ...insertValues
+      );
     }
+
     await db.runAsync("END");
   } catch (error) {
     await db.runAsync("ROLLBACK");
-    console.log("Transaction error:", error);
+    console.error("Transaction error:", error);
   } finally {
     dbMutex.unlock();
   }
-  return fileID;
+
 };
+
+
 const parsePredictions = async (response) => {
   let file = response.file;
   AUDIO_BACKLOG--;
@@ -3195,11 +3204,31 @@ const parsePredictions = async (response) => {
     return response.worker;
   }
   DEBUG && console.log("worker being used:", response.worker);
+  let [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
+  const db = STATE.db;
+  // const speciesMap = new Map();
+
+  // // **Batch-fetch species IDs instead of querying inside loop**
+  // const classIndices = [...new Set(speciesIDBatch.flat())]; // Unique classIndices
+  // Fetch Model ID once
+  const { modelID } = await db.getAsync("SELECT id as modelID FROM models WHERE name = ?", STATE.model);
+
+  // if (classIndices.length > 0) {
+  //   const placeholders = classIndices.map(() => "?").join(",");
+  //   const speciesResults = await db.allAsync(
+  //     `SELECT classIndex, id FROM species WHERE modelID = ? AND classIndex IN (${placeholders})`,
+  //     modelID, ...classIndices
+  //   );
+
+  //   speciesResults.forEach(({ classIndex, id }) => {
+  //     speciesMap.set(classIndex, id);
+  //   });
+  // }
+
   if (!STATE.selection)
-    await generateInsertQuery(latestResult, file).catch((error) =>
+    await generateInsertQuery(keysArray, speciesIDBatch, confidenceBatch, file, modelID).catch((error) =>
       console.warn("Error generating insert query", error)
     );
-  let [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
   if (index < 500) {
     const included = await getIncludedIDs(file).catch((error) =>
       console.log("Error getting included IDs", error)
@@ -3214,10 +3243,11 @@ const parsePredictions = async (response) => {
         let confidence = confidenceArray[j];
         if (confidence < 0.05) break;
         confidence *= 1000;
-        let speciesID = speciesIDArray[j];
+        const species = speciesIDArray[j]
+        let speciesID = STATE.speciesMap.get(species);
         updateUI =
           confidence >= STATE.detect.confidence &&
-          (!included.length || included.includes(speciesID));
+          (!included.length || included.includes(species));
         if (STATE.selection || updateUI) {
           let end, confidenceRequired;
           if (STATE.selection) {
@@ -3232,7 +3262,7 @@ const parsePredictions = async (response) => {
             confidenceRequired = STATE.detect.confidence;
           }
           if (confidence >= confidenceRequired) {
-            const { cname, sname } = await memoryDB
+            const { cname, sname } = await db
               .getAsync(
                 `SELECT cname, sname FROM species WHERE id = ${speciesID}`
               )
@@ -4308,49 +4338,42 @@ const dbMutex = new Mutex();
 async function _updateSpeciesLocale(db, labels) {
   const updatePromises = [];
   await dbMutex.lock();
-  const updateStmt = db.prepare("UPDATE species SET cname = ? WHERE sname = ?");
+  const updateStmt = db.prepare("UPDATE species SET cname = ? WHERE sname = ? AND modelID = ?");
   const updateChirpityStmt = db.prepare(
     "UPDATE species SET cname = ? WHERE sname = ? AND cname LIKE ?"
   );
   const speciesSelectStmt = db.prepare(
-    "SELECT cname FROM species WHERE sname = ?"
+    "SELECT cname, modelID FROM species WHERE sname = ?"
   );
   await db.runAsync("BEGIN");
 
-  if (STATE.model === "birdnet") {
-    for (const label of labels) {
-      const [sname, cname] = label.trim().split("_");
-      updatePromises.push(updateStmt.runAsync(cname, sname));
-    }
-  } else {
-    for (const label of labels) {
-      const [sname, newCname] = label.split("_");
-      const existingCnameResult = await speciesSelectStmt.allAsync(sname);
-      if (existingCnameResult.length) {
-        for (const { cname: existingCname } of existingCnameResult) {
-          const existingCnameMatch = existingCname.match(/\(([^)]+)\)$/);
-          const newCnameMatch = newCname.match(/\(([^)]+)\)$/);
-          if (newCnameMatch) {
-            if (newCnameMatch[0] === existingCnameMatch[0]) {
-              const callTypeMatch = "%" + newCnameMatch[0] + "%";
-              updatePromises.push(
-                updateChirpityStmt.runAsync(newCname, sname, callTypeMatch)
-              );
-            }
+  for (const label of labels) {
+    const [sname, newCname] = label.split("_");
+    const existingCnameResult = await speciesSelectStmt.allAsync(sname);
+    if (existingCnameResult.length) {
+      for (const { cname: existingCname, modelID } of existingCnameResult) {
+        const existingCnameMatch = existingCname.match(/\(([^)]+)\)$/);
+        const newCnameMatch = newCname.match(/\(([^)]+)\)$/);
+        if (newCnameMatch) {
+          if (newCnameMatch[0] === existingCnameMatch[0]) {
+            const callTypeMatch = "%" + newCnameMatch[0] + "%";
+            updatePromises.push(
+              updateChirpityStmt.runAsync(newCname, sname, callTypeMatch)
+            );
+          }
+        } else {
+          let appendedCname = newCname;
+          if (existingCnameMatch) {
+            const bracketedWord = existingCnameMatch[0];
+            appendedCname += ` ${bracketedWord}`;
+            const callTypeMatch = "%" + bracketedWord + "%";
+            updatePromises.push(
+              updateChirpityStmt.runAsync(appendedCname, sname, callTypeMatch)
+            );
           } else {
-            let appendedCname = newCname;
-            if (existingCnameMatch) {
-              const bracketedWord = existingCnameMatch[0];
-              appendedCname += ` ${bracketedWord}`;
-              const callTypeMatch = "%" + bracketedWord + "%";
-              updatePromises.push(
-                updateChirpityStmt.runAsync(appendedCname, sname, callTypeMatch)
-              );
-            } else {
-              updatePromises.push(
-                updatePromises.push(updateStmt.runAsync(appendedCname, sname))
-              );
-            }
+            updatePromises.push(
+              updatePromises.push(updateStmt.runAsync(appendedCname, sname, modelID))
+            );
           }
         }
       }
