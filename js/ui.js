@@ -114,7 +114,7 @@ const GLOBAL_ACTIONS = {
     if (/^[0-9]$/.test(e.key)) {
       // number keys here
       if (activeRow) {
-        recordUpdate(e.key);
+        recordUpdate(e);
       }
     }
   },
@@ -148,8 +148,8 @@ const GLOBAL_ACTIONS = {
       insertManualRecord({
         files: file,
         cname: species,
-        start: parseFloat(start),
-        end: parseFloat(end),
+        start,
+        end,
         label,
         comment,
         count: callCount,
@@ -168,6 +168,8 @@ const GLOBAL_ACTIONS = {
       console.log("Operation aborted");
       PREDICTING = false;
       disableSettingsDuringAnalysis(false);
+      const summarySpecies = DOM.summaryTable.querySelectorAll(".cname");
+      summarySpecies.forEach((row) => row.classList.replace("not-allowed","pointer"));
       STATE.analysisDone = true;
       worker.postMessage({
         action: "abort",
@@ -417,7 +419,7 @@ let PREDICTING = false,
 
 
 let activeRow;
-let predictions = {},
+let predictions = new Map(),
   clickedIndex;
 // Set content container height
 DOM.contentWrapper.style.height = document.body.clientHeight - 80 + "px";
@@ -487,7 +489,7 @@ function resetResults({
     DOM.resultTable.textContent = "";
     DOM.resultHeader.textContent = "";
   }
-  predictions = {};
+  predictions.clear();
   DOM.progressDiv.classList.add("invisible");
   updateProgress(0);
 }
@@ -1164,7 +1166,7 @@ function refreshResultsView() {
   if (STATE.fileLoaded) {
     utils.hideAll();
     utils.showElement(["spectrogramWrapper"], false);
-    if (!utils.isEmptyObject(predictions)) {
+    if (predictions.size) {
       utils.showElement(["resultTableContainer", "resultsHead"], false);
     }
   } else if (!STATE.openFiles.length) {
@@ -2312,16 +2314,12 @@ const isSpeciesViewFiltered = (sendSpecies) => {
   return sendSpecies ? species : filtered !== null;
 };
 
-function unpackNameAttr(el, cname) {
+function unpackNameAttr(el) {
   const currentRow = el.closest("tr");
   let [file, start, end, sname, commonName] = currentRow
     .getAttribute("name")
     .split("|");
-  if (cname) commonName = cname;
-  currentRow.attributes[0].value = [file, start, end, sname, commonName].join(
-    "|"
-  );
-  return [file, parseFloat(start), parseFloat(end), currentRow];
+  return [file, parseFloat(start), parseFloat(end), sname, commonName];
 }
 
 function getSpecies(target) {
@@ -2890,39 +2888,48 @@ const timelineToggle = (fromKeys) => {
  * // Assuming a key assignment exists for key "1" in config.keyAssignment:
  * recordUpdate(1);
  */
-function recordUpdate(key) {
+function recordUpdate(e) {
+  const {key, code} = e;
+  const setCallCount = code.includes('Numpad');
   if (!activeRow) {
     console.info("No active row selected for key assignment", key);
     return;
   }
   const assignment = config.keyAssignment["key" + key];
-  if (assignment?.column && assignment?.value) {
-    const nameAttribute = activeRow.getAttribute("name");
-    const [file, start, end, sname, cname] = nameAttribute.split("|");
-    const commentCell = activeRow.querySelector(".comment > span");
-    const comment = commentCell ? commentCell.title : "";
-    const labelCell = activeRow.querySelector(".label > span");
-    const label = labelCell ? labelCell.textContent : "";
-    const name = cname.replace("?", "");
+  if ((assignment?.column && assignment?.value) || setCallCount) {
+    const [file, start, end, _sname, cname] = unpackNameAttr(activeRow)
 
-    const newCname = assignment.column === "species" ? assignment.value : name;
-    const newLabel =
-      assignment.column === "label" ? assignment.value : label || "";
-    const newComment =
-      assignment.column === "comment" ? assignment.value : comment;
+    const commentCell = activeRow.querySelector(".comment > span");
+    let comment = commentCell ? commentCell.title : "";
+    const labelCell = activeRow.querySelector(".label > span");
+    let label = labelCell ? labelCell.textContent : "";
+    let name = cname;
+    let newCallCount, newConfidence;
+    if (setCallCount && STATE.isMember){
+      // Shift + number to set call count
+      newCallCount = Number(key);
+    } else {
+      name = assignment.column === "species" ? assignment.value : name;
+      label =
+        assignment.column === "label" ? assignment.value : label || "";
+      comment =
+        assignment.column === "comment" ? assignment.value : comment;
+      newConfidence = assignment.column === "species" ? 2000 : null;
+    }
     // Save record for undo
-    const { callCount, confidence } = addToHistory(activeRow, newCname);
+    const { callCount, confidence } = addToHistory(activeRow, name);
+    const count = newCallCount || callCount;
     // If we set a new species, we want to give the record a 2000 confidence
     // However, if we just add a label or, leave the confidence alone
-    const certainty = assignment.column === "species" ? 2000 : confidence;
+    const certainty = newConfidence || confidence;
     insertManualRecord({
       files: file,
-      cname: newCname,
-      start: parseFloat(start),
-      end: parseFloat(end),
-      comment: newComment,
-      count: callCount,
-      label: newLabel,
+      cname: name,
+      start,
+      end,
+      comment,
+      count,
+      label,
       action: "Update",
       batch: false,
       originalCname: cname,
@@ -3677,7 +3684,7 @@ async function renderResult({
       ? `<span class='material-symbols-outlined'>check_small</span>`
       : "";
     // store result for feedback function to use
-    if (!selection) predictions[index] = result;
+    if (!selection) predictions.set(index, result);
     // Format date and position for  UI
     const date = new Date(timestamp);
     const UI_timestamp = date.toLocaleString(
@@ -3761,15 +3768,15 @@ const isExplore = () => {
  * Stores the row index of the table row associated with the clicked element.
  *
  * Traverses upward from the provided element to locate the nearest ancestor <tr> element,
- * then assigns its rowIndex to the global variable clickedIndex. It is assumed that the
- * target element is within a table row; otherwise, the function may produce errors.
+ * then assigns its rowIndex to the global variable clickedIndex. If there is no matching row, 
+ * null is set
  *
  * @param {HTMLElement} target - The DOM element that triggered the event.
  */
 
 function setClickedIndex(target) {
   const clickedNode = target.closest("tr");
-  clickedIndex = clickedNode.rowIndex;
+  clickedIndex = clickedNode?.rowIndex;
 }
 
 const deleteRecord = (target) => {
@@ -3908,6 +3915,7 @@ const iconDict = {
 };
 
 const iconizeScore = (score) => {
+  score /= 10;
   const tooltip = score.toString();
   if (score < 50) return iconDict["guess"].replaceAll("--", tooltip);
   else if (score < 65) return iconDict["low"].replaceAll("--", tooltip);
@@ -3922,7 +3930,7 @@ const exportAudio = () => {
   let result;
   if (STATE.activeRegion.label) {
     setClickedIndex(activeRow);
-    result = predictions[clickedIndex];
+    result = predictions.get(clickedIndex);
   }
   sendFile("save", result);
 };
@@ -4855,8 +4863,6 @@ function handleUIClicks(e) {
     // Records menu
     case "save2db": {
       worker.postMessage({ action: "save2db", file: STATE.currentFile });
-      if (config.library.auto)
-        document.getElementById("compress-and-organise").click();
       break;
     }
     case "charts": {
@@ -5789,9 +5795,6 @@ function setListUIState(list) {
   listElements.forEach((element) => {
     element.classList.replace("list-visible", "list-hidden");
   });
-  // DOM.customListContainer.classList.add('d-none');
-  // DOM.localSwitchContainer.classList.add('d-none')
-  // DOM.speciesThresholdEl.classList.add('d-none');
   if (list === "location") {
     DOM.speciesThresholdEl.classList.replace("list-hidden", "list-visible");
   } else if (list === "nocturnal") {
@@ -5831,20 +5834,20 @@ async function readLabels(labelFile, updating) {
       }
     })
     .then((filecontents) => {
-      LABELS = filecontents.trim().split(/\r?\n/);
+      const labels = filecontents.trim().split(/\r?\n/);
       // Add unknown species
-      !LABELS.includes("Unknown Sp._Unknown Sp.") &&
-        LABELS.push("Unknown Sp._Unknown Sp.");
-
+      !labels.includes("Unknown Sp._Unknown Sp.") &&
+        labels.push("Unknown Sp._Unknown Sp.");
       if (updating === "list") {
         worker.postMessage({
           action: "update-list",
           list: config.list,
-          customLabels: LABELS,
+          customLabels: labels,
           refreshResults: STATE.analysisDone,
         });
         trackEvent(config.UUID, "UI", "Create", "Custom list", LABELS.length);
       } else {
+        LABELS = labels;
         worker.postMessage({
           action: "update-locale",
           locale: config.locale,
@@ -6175,8 +6178,8 @@ const insertManualRecord = ( {
     action: "insert-manual-record",
     cname,
     originalCname,
-    start: start?.toFixed(3),
-    end: end?.toFixed(3),
+    start,
+    end,
     comment,
     count,
     file: files,

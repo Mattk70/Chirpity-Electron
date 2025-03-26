@@ -16,8 +16,6 @@ import {
   createDB,
   checkpoint,
   closeDatabase,
-  upgrade_to_v1,
-  upgrade_to_v2,
   Mutex,
   mergeDbIfNeeded
 } from "./database.js";
@@ -338,7 +336,7 @@ async function loadDB(path) {
     console.log("No db file: ", file);
     diskDB = await createDB({file, dbMutex});
     console.log("DB created at : ", file);
-    await mergeDbIfNeeded({diskDB, model, LABELS, dbMutex })
+    STATE.modelID = await mergeDbIfNeeded({diskDB, model, labels: LABELS, dbMutex })
     UI.postMessage({ event: "label-translation-needed", locale: STATE.locale });
   } else {
     diskDB = new sqlite3.Database(file);
@@ -347,13 +345,12 @@ async function loadDB(path) {
     await diskDB.runAsync("PRAGMA foreign_keys = ON");
     await diskDB.runAsync("PRAGMA journal_mode = WAL");
     await diskDB.runAsync("PRAGMA busy_timeout = 5000");
-    await mergeDbIfNeeded({diskDB, model, LABELS, dbMutex })
+    STATE.modelID = await mergeDbIfNeeded({diskDB, model, labels: LABELS, dbMutex })
     // Get the labels from the DB. These will be in preferred locale
     DEBUG && console.log("Getting labels from disk db " + path);
     const res = await diskDB.allAsync(
       `SELECT sname || '_' || cname AS labels FROM species
-        WHERE modelID = (SELECT id FROM models WHERE name = ?)
-        ORDER BY id`, model
+        WHERE modelID = ? ORDER BY id`, STATE.modelID
     );
     LABELS = res.map((obj) => obj.labels); // these are the labels in the preferred locale
     DEBUG && console.log("Opened and cleaned disk db " + file);
@@ -361,7 +358,7 @@ async function loadDB(path) {
   // Set mapping from model IDs to db species ids
   const speciesResults = await diskDB.allAsync(
     `SELECT classIndex, id FROM species
-      WHERE modelID = (SELECT id FROM models WHERE name = ?)`, model,
+      WHERE modelID = ?`, STATE.modelID,
   );
   speciesResults.forEach(({ classIndex, id }) => {
     STATE.speciesMap.set(classIndex, id);
@@ -672,6 +669,7 @@ async function handleMessage(e) {
     }
     case "save2db": {
       await onSave2DiskDB(args);
+      STATE.library.auto && convertAndOrganiseFiles();
       break;
     }
     case "set-custom-file-location": {
@@ -694,7 +692,7 @@ async function handleMessage(e) {
       // Clear the LIST_CACHE & STATE.included keys to force list regeneration
       LIST_CACHE = {}; //[`${lat}-${lon}-${week}-${STATE.model}-${STATE.list}`];
       delete STATE.included?.[STATE.model]?.[STATE.list];
-      LIST_WORKER && (await setIncludedIDs(lat, lon, week));
+      LIST_WORKER && (await getIncludedIDs());
       updateSpeciesLabelLocale();
       args.refreshResults && (await Promise.all([getResults(), getSummary()]));
       break;
@@ -1087,9 +1085,9 @@ function getExcluded(included, fullRange = LABELS.length) {
   return missing;
 }
 const prepSummaryStatement = (included) => {
-  included = included.map(item => STATE.speciesMap.get(item))
-  const range = STATE.mode === "explore" ? STATE.explore.range : undefined;
-  const params = [STATE.detect.confidence];
+  const {mode, explore, labelFilters, detect, list, locationID, topRankin, summarySortOrder} = STATE;
+  const range = mode === "explore" ? explore.range : undefined;
+  const params = [detect.confidence];
   let summaryStatement = `
     WITH ranked_records AS (
         SELECT records.dateTime, records.confidence, files.name as file, files.archiveName, cname, sname, COALESCE(callCount, 1) as callCount, speciesID, isDaylight, tagID,
@@ -1101,13 +1099,13 @@ const prepSummaryStatement = (included) => {
 
   const [SQLtext, fileParams] = getFileSQLAndParams(range);
   (summaryStatement += SQLtext), params.push(...fileParams);
-  if (STATE.labelFilters.length) {
-    summaryStatement += ` AND tagID in (${prepParams(STATE.labelFilters)}) `;
-    params.push(...STATE.labelFilters);
+  if (labelFilters.length) {
+    summaryStatement += ` AND tagID in (${prepParams(labelFilters)}) `;
+    params.push(...labelFilters);
   }
   let not = "";
-  if (filtersApplied(included)) {
-    if (STATE.list === "birds") {
+  if (list !== 'everything') {
+    if (list === "birds") {
       included = getExcluded(included);
       not = "NOT";
     }
@@ -1117,21 +1115,21 @@ const prepSummaryStatement = (included) => {
     summaryStatement += ` AND speciesID ${not} IN (${includedParams}) `;
     params.push(...included);
   }
-  if (STATE.detect.nocmig) {
+  if (detect.nocmig) {
     summaryStatement += " AND COALESCE(isDaylight, 0) != 1 ";
   }
 
-  if (STATE.locationID) {
+  if (locationID) {
     summaryStatement += " AND locationID = ? ";
-    params.push(STATE.locationID);
+    params.push(locationID);
   }
   summaryStatement += `
     )
     SELECT speciesID, cname, sname, COUNT(cname) as count, SUM(callcount) as calls, ROUND(MAX(ranked_records.confidence) / 10.0, 0) as max
     FROM ranked_records
-    WHERE ranked_records.rank <= ${STATE.topRankin}`;
+    WHERE ranked_records.rank <= ${topRankin}`;
 
-  summaryStatement += ` GROUP BY speciesID  ORDER BY ${STATE.summarySortOrder}`;
+  summaryStatement += ` GROUP BY speciesID  ORDER BY ${summarySortOrder}`;
 
   return [summaryStatement, params];
 };
@@ -1142,39 +1140,43 @@ const getTotal = async ({
   included = undefined,
   file = undefined,
 } = {}) => {
+  
+  const {db, mode, explore, filteredOffset, globalOffset, labelFilters, detect, list, locationID, topRankin} = STATE;
   let params = [];
-  included ??= await getIncludedIDs(file);
-  const range = STATE.mode === "explore" ? STATE.explore.range : undefined;
+  const range = mode === "explore" ? explore.range : undefined;
   offset =
     offset ??
     (species !== undefined
-      ? STATE.filteredOffset[species]
-      : STATE.globalOffset);
+      ? filteredOffset[species]
+      : globalOffset);
   let SQL = ` WITH MaxConfidencePerDateTime AS (
         SELECT confidence,
         speciesID, files.name as file, tagID,
         RANK() OVER (PARTITION BY fileID, dateTime ORDER BY records.confidence DESC) AS rank
         FROM records 
         JOIN files ON records.fileID = files.id 
-        WHERE confidence >= ${STATE.detect.confidence} `;
+        WHERE confidence >= ${detect.confidence} `;
 
-  if (filtersApplied(included)) SQL += ` AND speciesID IN (${included}) `;
-  if (STATE.labelFilters.length) {
-    SQL += ` AND tagID in (${prepParams(STATE.labelFilters)}) `;
-    params.push(...STATE.labelFilters);
+  if (list !== 'everything') {
+    included ??= await getIncludedIDs(file);
+    SQL += ` AND speciesID IN (${included}) `;
   }
-  if (STATE.detect.nocmig) SQL += " AND NOT isDaylight";
-  if (STATE.locationID) SQL += ` AND locationID =  ${STATE.locationID}`;
+  if (labelFilters.length) {
+    SQL += ` AND tagID in (${prepParams(labelFilters)}) `;
+    params.push(...labelFilters);
+  }
+  if (detect.nocmig) SQL += " AND NOT isDaylight";
+  if (locationID) SQL += ` AND locationID =  ${locationID}`;
   const [SQLtext, fileParams] = getFileSQLAndParams(range);
   (SQL += SQLtext), params.push(...fileParams);
   SQL += " ) ";
-  SQL += `SELECT COUNT(confidence) AS total FROM MaxConfidencePerDateTime WHERE rank <= ${STATE.topRankin}`;
+  SQL += `SELECT COUNT(confidence) AS total FROM MaxConfidencePerDateTime WHERE rank <= ${topRankin}`;
 
   if (species) {
     params.push(species);
     SQL += " AND speciesID = (SELECT id from species WHERE cname = ?) ";
   }
-  const { total } = await STATE.db.getAsync(SQL, ...params);
+  const { total } = await db.getAsync(SQL, ...params);
   UI.postMessage({
     event: "total-records",
     total: total,
@@ -1190,8 +1192,8 @@ const prepResultsStatement = (
   offset,
   topRankin
 ) => {
-  const params = [STATE.detect.confidence];
-  included = included.map(item => STATE.speciesMap.get(item))
+  const {mode, explore, limit, resultsMetaSortOrder, resultsSortOrder, labelFilters, detect, list, locationID, selection} = STATE;
+  const params = [detect.confidence];
   let resultStatement = `
     WITH ranked_records AS (
         SELECT 
@@ -1222,32 +1224,32 @@ const prepResultsStatement = (
         WHERE confidence >= ? 
         `;
   // // Prioritise selection ranges
-  const range = STATE.selection?.start
-    ? STATE.selection
-    : STATE.mode === "explore"
-    ? STATE.explore.range
+  const range = selection?.start
+    ? selection
+    : mode === "explore"
+    ? explore.range
     : false;
 
   // If you're using the memory db, you're either analysing one,  or all of the files
   const [SQLtext, fileParams] = getFileSQLAndParams(range);
   (resultStatement += SQLtext), params.push(...fileParams);
-  if (STATE.labelFilters.length) {
+  if (labelFilters.length) {
     resultStatement += ` AND tagID in (${prepParams(STATE.labelFilters)}) `;
     params.push(...STATE.labelFilters);
   }
-  if (filtersApplied(included)) {
+  if (!selection && list !== 'everything') {
     resultStatement += ` AND speciesID IN (${prepParams(included)}) `;
     params.push(...included);
   }
-  if (STATE.selection) {
+  if (selection) {
     resultStatement += ` AND file = ? `;
     params.push(FILE_QUEUE[0]);
   }
-  if (STATE.locationID) {
+  if (locationID) {
     resultStatement += ` AND locationID = ? `;
-    params.push(STATE.locationID);
+    params.push(locationID);
   }
-  if (STATE.detect.nocmig) {
+  if (detect.nocmig) {
     resultStatement += " AND COALESCE(isDaylight, 0) != 1 "; // Backward compatibility for < v0.9.
   }
 
@@ -1282,11 +1284,11 @@ const prepResultsStatement = (
     params.push(species);
   }
   const limitClause = noLimit ? "" : "LIMIT ?  OFFSET ?";
-  noLimit || params.push(STATE.limit, offset);
-  const metaSort = STATE.resultsMetaSortOrder
-    ? `${STATE.resultsMetaSortOrder}, `
+  noLimit || params.push(limit, offset);
+  const metaSort = resultsMetaSortOrder
+    ? `${resultsMetaSortOrder}, `
     : "";
-  resultStatement += ` ORDER BY ${metaSort} ${STATE.resultsSortOrder} ${limitClause} `;
+  resultStatement += ` ORDER BY ${metaSort} ${resultsSortOrder} ${limitClause} `;
 
   return [resultStatement, params];
 };
@@ -1306,7 +1308,7 @@ async function updateMetadata(fileNames) {
   const finalResult = {};
   for (const batch of batches) {
     // Build placeholders (?, ?, ?) dynamically based on number of file names
-    const placeholders = batch.map(() => '?').join(', ');
+    const placeholders = prepParams(batch);
 
     // 1. Get files and locations
     const fileQuery = `
@@ -1831,7 +1833,7 @@ async function sendDetections(file, start, end, goToRegion) {
   start = METADATA[file].fileStart + start * 1000;
   end = METADATA[file].fileStart + end * 1000;
   const params = [STATE.detect.confidence, file, start, end];
-  const included = await getIncludedIDs();
+  let included = await getIncludedIDs();
   const includedSQL = filtersApplied(included)
     ? ` AND speciesID IN (${prepParams(included)})`
     : "";
@@ -2905,10 +2907,11 @@ const terminateWorkers = () => {
 async function batchInsertRecords(cname, label, files, originalCname) {
   const db = STATE.db;
   const t0 = Date.now();
+  const included = await getIncludedIDs();
   const [sql, params] = prepResultsStatement(
     originalCname,
     true,
-    STATE.included,
+    included,
     undefined,
     STATE.topRankin
   );
@@ -2994,9 +2997,9 @@ const onInsertManualRecord = async ({
 
   if (!res?.filestart) {
     // Manual records can be added off the bat, so there may be no record of the file in either db
-    fileStart = METADATA[file].fileStart;
+    const {fileStart, duration, metadata} = METADATA[file];
     res = await db.runAsync(
-      `INSERT INTO files ( id, name, duration, filestart, locationID, archiveName, metadata ) VALUES (?,?,?,?,?,?,?)
+      `INSERT INTO files ( id, name, duration, filestart,  metadata ) VALUES (?,?,?,?,?)
         ON CONFLICT(name) DO UPDATE SET
         duration = EXCLUDED.duration,
         filestart = EXCLUDED.filestart,
@@ -3004,11 +3007,9 @@ const onInsertManualRecord = async ({
         `,
       fileID,
       file,
-      METADATA[file].duration,
+      duration,
       fileStart,
-      undefined,
-      undefined,
-      METADATA[file].metadata
+      metadata
     );
     fileID = res.lastID;
     await insertDurations(file, fileID)
@@ -3196,7 +3197,7 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
 
 
 const parsePredictions = async (response) => {
-  let file = response.file;
+  const file = response.file;
   AUDIO_BACKLOG--;
   const latestResult = response.result;
   if (!latestResult.length) {
@@ -3204,33 +3205,15 @@ const parsePredictions = async (response) => {
     return response.worker;
   }
   DEBUG && console.log("worker being used:", response.worker);
-  let [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
-  const db = STATE.db;
-  // const speciesMap = new Map();
+  const [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
+  const {db, modelID, selection, detect} = STATE;
 
-  // // **Batch-fetch species IDs instead of querying inside loop**
-  // const classIndices = [...new Set(speciesIDBatch.flat())]; // Unique classIndices
-  // Fetch Model ID once
-  const { modelID } = await db.getAsync("SELECT id as modelID FROM models WHERE name = ?", STATE.model);
-
-  // if (classIndices.length > 0) {
-  //   const placeholders = classIndices.map(() => "?").join(",");
-  //   const speciesResults = await db.allAsync(
-  //     `SELECT classIndex, id FROM species WHERE modelID = ? AND classIndex IN (${placeholders})`,
-  //     modelID, ...classIndices
-  //   );
-
-  //   speciesResults.forEach(({ classIndex, id }) => {
-  //     speciesMap.set(classIndex, id);
-  //   });
-  // }
-
-  if (!STATE.selection)
+  if (!selection)
     await generateInsertQuery(keysArray, speciesIDBatch, confidenceBatch, file, modelID).catch((error) =>
       console.warn("Error generating insert query", error)
     );
   if (index < 500) {
-    const included = await getIncludedIDs(file).catch((error) =>
+    const included = await getIncludedIDs(file, false).catch((error) =>
       console.log("Error getting included IDs", error)
     );
     for (let i = 0; i < keysArray.length; i++) {
@@ -3242,24 +3225,24 @@ const parsePredictions = async (response) => {
       for (let j = 0; j < confidenceArray.length; j++) {
         let confidence = confidenceArray[j];
         if (confidence < 0.05) break;
-        confidence *= 1000;
+        confidence = Math.round(confidence * 1000);
         const species = speciesIDArray[j]
         let speciesID = STATE.speciesMap.get(species);
         updateUI =
-          confidence >= STATE.detect.confidence &&
+          confidence >= detect.confidence &&
           (!included.length || included.includes(species));
-        if (STATE.selection || updateUI) {
+        if (selection || updateUI) {
           let end, confidenceRequired;
-          if (STATE.selection) {
+          if (selection) {
             const duration =
-              (STATE.selection.end - STATE.selection.start) / 1000;
+              (selection.end - selection.start) / 1000;
             end = key + duration;
             confidenceRequired = STATE.userSettingsInSelection
-              ? STATE.detect.confidence
+              ? detect.confidence
               : 50;
           } else {
             end = key + 3;
-            confidenceRequired = STATE.detect.confidence;
+            confidenceRequired = detect.confidence;
           }
           if (confidence >= confidenceRequired) {
             const { cname, sname } = await db
@@ -3279,7 +3262,6 @@ const parsePredictions = async (response) => {
               score: confidence,
             };
             sendResult(++index, result, false);
-            //getResults()
             if (index > 499) {
               setGetSummaryQueryInterval(NUM_WORKERS);
               DEBUG &&
@@ -3289,7 +3271,7 @@ const parsePredictions = async (response) => {
                 );
             }
             // Only show the highest confidence detection, unless it's a selection analysis
-            if (!STATE.selection) break;
+            if (!selection) break;
           }
         }
       }
@@ -3324,7 +3306,7 @@ const parsePredictions = async (response) => {
       );
   }
 
-  if (!STATE.selection && STATE.increment() === 0) {
+  if (!selection && STATE.increment() === 0) {
     if (fileProgress < 1) getSummary({ interim: true });
     getTotal({ file });
   }
@@ -3872,7 +3854,7 @@ async function exportData(result, filename, format) {
 
 const sendResult = (index, result, fromDBQuery) => {
   // Convert confidence back to % value
-  result.score = (result.score / 10).toFixed(0);
+  // result.score;
   UI.postMessage({
     event: "new-result",
     file: result.file,
@@ -4201,7 +4183,7 @@ async function onDelete({
     "SELECT id, filestart from files WHERE name = ?",
     file
   );
-  const datetime = filestart + parseFloat(start) * 1000;
+  const datetime = Math.round(filestart + (parseFloat(start) * 1000));
   end = parseFloat(end);
   const params = [id, datetime, end];
   let sql = "DELETE FROM records WHERE fileID = ? AND datetime = ? AND end = ?";
@@ -4335,52 +4317,89 @@ const dbMutex = new Mutex();
  * // For a 'birdnet' model, updating a species 'sparrow' to a common name 'House Sparrow'
  * await _updateSpeciesLocale(db, ["sparrow_House Sparrow"]);
  */
+
 async function _updateSpeciesLocale(db, labels) {
   const updatePromises = [];
   await dbMutex.lock();
+
+  // Prepare statements
   const updateStmt = db.prepare("UPDATE species SET cname = ? WHERE sname = ? AND modelID = ?");
   const updateChirpityStmt = db.prepare(
     "UPDATE species SET cname = ? WHERE sname = ? AND cname LIKE ?"
   );
-  const speciesSelectStmt = db.prepare(
-    "SELECT cname, modelID FROM species WHERE sname = ?"
-  );
-  await db.runAsync("BEGIN");
 
-  for (const label of labels) {
-    const [sname, newCname] = label.split("_");
-    const existingCnameResult = await speciesSelectStmt.allAsync(sname);
-    if (existingCnameResult.length) {
-      for (const { cname: existingCname, modelID } of existingCnameResult) {
-        const existingCnameMatch = existingCname.match(/\(([^)]+)\)$/);
-        const newCnameMatch = newCname.match(/\(([^)]+)\)$/);
-        if (newCnameMatch) {
-          if (newCnameMatch[0] === existingCnameMatch[0]) {
-            const callTypeMatch = "%" + newCnameMatch[0] + "%";
-            updatePromises.push(
-              updateChirpityStmt.runAsync(newCname, sname, callTypeMatch)
-            );
-          }
-        } else {
-          let appendedCname = newCname;
-          if (existingCnameMatch) {
-            const bracketedWord = existingCnameMatch[0];
-            appendedCname += ` ${bracketedWord}`;
-            const callTypeMatch = "%" + bracketedWord + "%";
-            updatePromises.push(
-              updateChirpityStmt.runAsync(appendedCname, sname, callTypeMatch)
-            );
+  try {
+    await db.runAsync("BEGIN");
+    // 1. Collect unique snames from labels
+    const labelMap = new Map(); // Map sname => array of newCname(s)
+    for (const label of labels) {
+      const [sname, newCname] = label.split("_");
+      labelMap.has(sname) || labelMap.set(sname, []);
+      labelMap.get(sname).push(newCname);
+    }
+    // 2. Batch query species by sname using an IN clause
+    // Note: Adjust the query parameter syntax as needed for your DB library
+    const placeholders =  '?'.repeat(labelMap.size).split("").join(",");
+    const speciesQuery = `
+      SELECT sname, cname, modelID 
+      FROM species 
+      WHERE sname IN (${placeholders}) 
+      ORDER BY sname
+    `;
+    const speciesRows = await db.allAsync(speciesQuery, ...labelMap.keys());
+
+    // Group species rows by sname for easy lookup
+    const speciesBySname = {};
+    for (const row of speciesRows) {
+      (speciesBySname[row.sname] ||= []).push(row);
+    }
+
+    // Helper: Extract call type from a string (including the preceding space)
+    const extractCallType = str => str.match(/\s+\(([^)]+)\)$/)?.[0] || "";
+    // Helper: Remove any call type from a string
+    const stripCallType = str => str.replace(/\s+\([\w\s]+\)$/, '');
+
+    // 3. Process each label and prepare updates
+    for (const [sname, newCnames] of labelMap) {
+      const speciesList = speciesBySname[sname];
+      if (!speciesList) continue; // no species row for this sname
+
+      for (const rawNewCname of newCnames) {
+        // Determine the intended new call type and base cname
+        const newCallType = extractCallType(rawNewCname);
+        
+
+        for (const { cname: existingCname, modelID } of speciesList) {
+          const existingCallType = extractCallType(existingCname);
+          let finalCname = rawNewCname;
+
+          // Decide which update to run based on presence of call types
+          if (existingCallType) {
+            // If new value does not include a call type, append the existing one
+            if (!newCallType) finalCname += existingCallType;
+            else if (newCallType !== existingCallType) continue
+            // Only update if final cname differs from the existing one
+            if (finalCname !== existingCname) {
+              updatePromises.push(
+                updateChirpityStmt.runAsync(finalCname, sname, `%${existingCallType}%`)
+              );
+            }
           } else {
-            updatePromises.push(
-              updatePromises.push(updateStmt.runAsync(appendedCname, sname, modelID))
-            );
+            // Existing species has no call type, so ensure none is included in final value
+            if (newCallType) {
+              // Remove call type if present in new label
+              finalCname = stripCallType(rawNewCname);
+            }
+            if (finalCname !== existingCname) {
+              updatePromises.push(
+                updateStmt.runAsync(finalCname, sname, modelID)
+              );
+            }
           }
         }
       }
     }
-  }
 
-  try {
     await Promise.all(updatePromises);
     await db.runAsync("END");
   } catch (error) {
@@ -4391,9 +4410,9 @@ async function _updateSpeciesLocale(db, labels) {
     dbMutex.unlock();
     updateStmt.finalize();
     updateChirpityStmt.finalize();
-    speciesSelectStmt.finalize();
   }
 }
+
 
 /**
  * Updates the application's locale by modifying state and database entries, and optionally refreshes analysis results.
@@ -4515,7 +4534,7 @@ async function getLocations({ file, db = STATE.db }) {
  * @param {*} [file] - Optional key for retrieving file metadata from METADATA. Expected metadata should include properties like `fileStart`, `lat`, and `lon`.
  * @returns {Promise<number[]>} Promise resolving to an array of species IDs included in the current filtered results.
  */
-async function getIncludedIDs(file) {
+async function getIncludedIDs(file, map = true) {
   let lat, lon, week;
   if (
     STATE.list === "location" ||
@@ -4540,14 +4559,17 @@ async function getIncludedIDs(file) {
       // Cache miss
       await setIncludedIDs(lat, lon, week);
     }
-    const included = STATE.included[STATE.model][STATE.list][week][location];
+    let included = STATE.included[STATE.model][STATE.list][week][location];
+    map && (included = included.map(item => STATE.speciesMap.get(item)))
     return included;
   } else {
     if (STATE.included?.[STATE.model]?.[STATE.list] === undefined) {
       // The object lacks the week / location
       LIST_WORKER && (await setIncludedIDs());
     }
-    return STATE.included[STATE.model][STATE.list];
+    let included = STATE.included[STATE.model][STATE.list];
+    map && (included = included.map(item => STATE.speciesMap.get(item)))
+    return included
   }
 }
 /**

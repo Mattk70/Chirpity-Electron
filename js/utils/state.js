@@ -57,6 +57,7 @@ export class WorkerState {
         range: { start: undefined, end: undefined },
       }),
       (this.model = undefined),
+      (this.modelID = null),
       (this.predictionCount = 0),
       (this.topRankin = 1),
       (this.lat = undefined),

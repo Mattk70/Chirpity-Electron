@@ -97,16 +97,6 @@ function getDatetimeLocalFromEpoch(date) {
   return isoDate;
 }
 
-/**
- * Checks if the provided object has no enumerable properties.
- *
- * @param {Object} obj - The object to evaluate.
- * @returns {boolean} True if the object is empty, otherwise false.
- */
-function isEmptyObject(obj) {
-  for (const _ in obj) return false;
-  return true;
-}
 
 function enableMenuItem(id_list) {
   id_list.forEach((id) => {
@@ -243,7 +233,6 @@ export {
   customURLEncode,
   extractFileNameAndFolder,
   getDatetimeLocalFromEpoch,
-  isEmptyObject,
   enableMenuItem,
   disableMenuItem,
   showElement,
