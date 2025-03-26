@@ -788,7 +788,7 @@ function renderFilenamePanel() {
     appendStr = `<div id="fileContainer" class="btn-group dropup pointer">
         <span ${title} class="filename ${isSaved}">${label}</span>
         </button>
-        <button class="btn btn-dark dropdown-toggle dropdown-toggle-split" type="button" 
+        <button id="filecount" class="btn btn-dark dropdown-toggle dropdown-toggle-split" type="button" 
         data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">+${
           files.length - 1
         }
