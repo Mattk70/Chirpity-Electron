@@ -303,65 +303,64 @@ const getSelectionRange = (file, start, end) => {
  * This function depends on global variables (e.g., STATE, DATASET, LABELS, diskDB, UI) and auxiliary functions such as createDB, checkpoint, and dbMutex.
  */
 async function loadDB(path) {
-  // We need to get the default labels from the config file
   DEBUG && console.log("Loading db " + path);
-  let modelLabels;
-  const model = STATE.model;
-  if (model === "birdnet") {
-    const labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_en.txt`;
-    await fetch(labelFile)
-      .then((response) => {
-        if (!response.ok) throw new Error("Network response was not ok");
-        return response.text();
-      })
-      .then((filecontents) => {
-        modelLabels = filecontents.trim().split(/\r?\n/);
-      })
-      .catch((error) => {
-        console.error("There was a problem fetching the label file:", error);
-      });
-  } else {
-    const { labels } = JSON.parse(
-      fs.readFileSync(p.join(__dirname, `${model}_model_config.json`), "utf8")
-    );
-    modelLabels = labels;
-  }
-
-  // Add Unknown Sp.
-  modelLabels.push("Unknown Sp._Unknown Sp.");
-  const num_labels = modelLabels.length;
-  LABELS = modelLabels; // these are the default english labels
   const file = p.join(path, `archive.sqlite`);
   if (!fs.existsSync(file)) {
+    // We need to get the default labels from the config file
+    const model = STATE.model;
+    if (model === "birdnet") {
+      const labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_en.txt`;
+      await fetch(labelFile)
+        .then((response) => {
+          if (!response.ok) throw new Error("Network response was not ok");
+          return response.text();
+        })
+        .then((filecontents) => {
+          LABELS = filecontents.trim().split(/\r?\n/);
+        })
+        .catch((error) => {
+          console.error("There was a problem fetching the label file:", error);
+        });
+    } else {
+      const { labels } = JSON.parse(
+        fs.readFileSync(p.join(__dirname, `${model}_model_config.json`), "utf8")
+      );
+      LABELS = labels;
+    }
+    // Add Unknown Sp.
+    LABELS.push("Unknown Sp._Unknown Sp.");
     console.log("No db file: ", file);
     diskDB = await createDB({file, dbMutex});
     console.log("DB created at : ", file);
     STATE.modelID = await mergeDbIfNeeded({diskDB, model, labels: LABELS, dbMutex })
-    UI.postMessage({ event: "label-translation-needed", locale: STATE.locale });
   } else {
     diskDB = new sqlite3.Database(file);
     STATE.update({ db: diskDB });
+    diskDB.locale = STATE.locale;
     await diskDB.runAsync("VACUUM");
     await diskDB.runAsync("PRAGMA foreign_keys = ON");
     await diskDB.runAsync("PRAGMA journal_mode = WAL");
     await diskDB.runAsync("PRAGMA busy_timeout = 5000");
+    const model = STATE.model
     STATE.modelID = await mergeDbIfNeeded({diskDB, model, labels: LABELS, dbMutex })
-    // Get the labels from the DB. These will be in preferred locale
-    DEBUG && console.log("Getting labels from disk db " + path);
-    const res = await diskDB.allAsync(
-      `SELECT sname || '_' || cname AS labels FROM species
-        WHERE modelID = ? ORDER BY id`, STATE.modelID
-    );
-    LABELS = res.map((obj) => obj.labels); // these are the labels in the preferred locale
     DEBUG && console.log("Opened and cleaned disk db " + file);
+  }
+  if (diskDB.locale === STATE.locale){
+    // Get the labels from the DB. These will be in preferred locale
+    await setLabelState()
+  } else {
+    UI.postMessage({ event: "label-translation-needed", locale: STATE.locale });
   }
   // Set mapping from model IDs to db species ids
   const speciesResults = await diskDB.allAsync(
-    `SELECT classIndex, id FROM species
-      WHERE modelID = ?`, STATE.modelID,
+    "SELECT id, classIndex, modelID FROM species ORDER BY id"
   );
-  speciesResults.forEach(({ classIndex, id }) => {
-    STATE.speciesMap.set(classIndex, id);
+  // Populate speciesMap for each model
+  speciesResults.forEach(({ modelID, classIndex, id }) => {
+    if (!STATE.speciesMap.has(modelID)) {
+      STATE.speciesMap.set(modelID, new Map());
+    }
+    STATE.speciesMap.get(modelID).set(classIndex, id);
   });
 
   const row = await diskDB.getAsync(
@@ -370,7 +369,18 @@ async function loadDB(path) {
   if (row) {
     UI.postMessage({ event: "diskDB-has-records" });
   }
-  return true;
+  return diskDB;
+}
+
+
+async function setLabelState() {
+  DEBUG && console.log("Getting labels from disk db");
+  const res = await diskDB.allAsync(
+    "SELECT sname || '_' || cname AS labels, modelID FROM species ORDER BY id"
+  );
+  STATE.allLabels = res.map((obj) => obj.labels ); // these are the labels in the preferred locale
+  LABELS = res.filter(obj => obj.modelID === STATE.modelID).map((obj) => obj.labels );
+  return LABELS
 }
 
 /**
@@ -693,7 +703,8 @@ async function handleMessage(e) {
       LIST_CACHE = {}; //[`${lat}-${lon}-${week}-${STATE.model}-${STATE.list}`];
       delete STATE.included?.[STATE.model]?.[STATE.list];
       LIST_WORKER && (await getIncludedIDs());
-      updateSpeciesLabelLocale();
+      // updateSpeciesLabelLocale();
+      UI.postMessage({ event: "labels", labels: LABELS });
       args.refreshResults && (await Promise.all([getResults(), getSummary()]));
       break;
     }
@@ -823,10 +834,10 @@ function setGetSummaryQueryInterval(threads) {
 
 async function onChangeMode(mode) {
   if (STATE.mode !== mode) {
-    if (!memoryDB){
-      await createDB({file: null, LABELS, diskDB, dbMutex});
-      UI.postMessage({ event: "label-translation-needed", locale: STATE.locale });
-    }
+    // if (!memoryDB){
+      memoryDB = await createDB({file: null, diskDB, dbMutex});
+      // UI.postMessage({ event: "label-translation-needed", locale: STATE.locale });
+    // }
     UI.postMessage({ event: "mode-changed", mode: mode });
     STATE.changeMode({
       mode: mode,
@@ -837,8 +848,9 @@ async function onChangeMode(mode) {
 }
 
 const filtersApplied = (list) => {
-  const filtered = list?.length && list.length < LABELS.length - 1;
-  return filtered;
+  return STATE.list !== 'everything';
+  // const filtered = list?.length && list.length < LABELS.length - 1;
+  // return filtered;
 };
 
 /**
@@ -882,9 +894,11 @@ async function onLaunch({
   BATCH_SIZE = batchSize;
   if (!STATE.model || STATE.model !== model) {
     STATE.update({ model: model });
-    await loadDB(appPath); // load the diskdb
-    memoryDB = await createDB({file: null, LABELS, diskDB, dbMutex}); // now make the memoryDB
-    UI.postMessage({ event: "label-translation-needed", locale: STATE.locale });
+    if (! await diskDB?.getAsync('SELECT id FROM models WHERE NAME = ?', model)){
+      diskDB = await loadDB(appPath); // load the diskdb
+      memoryDB = await createDB({file: null, diskDB, dbMutex}); // now make the memoryDB
+      // UI.postMessage({ event: "label-translation-needed", locale: STATE.locale });
+    }
   }
   const db = STATE.mode === 'analyse'
     ? memoryDB
@@ -1055,8 +1069,8 @@ function getFileSQLAndParams(range) {
     params.push(range.start, range.end);
     // If you create a record manually before analysis, STATE.filesToAnalyse will be empty
   } else if (["analyse"].includes(STATE.mode) && fileParams) {
-    // SQL += ` AND name IN  (${fileParams}) `;
-    // params.push(...STATE.filesToAnalyse);
+    SQL += ` AND file IN  (${fileParams}) `;
+    params.push(...STATE.filesToAnalyse);
   } else if (["archive"].includes(STATE.mode)) {
     SQL += ` AND ( file IN  (${fileParams}) `;
     params.push(...STATE.filesToAnalyse);
@@ -1069,7 +1083,7 @@ function getFileSQLAndParams(range) {
   }
   return [SQL, params];
 }
-function getExcluded(included, fullRange = LABELS.length) {
+function getExcluded(included, fullRange = STATE.allLabels.length) {
   const missing = [];
   let currentIndex = 0;
 
@@ -1088,13 +1102,14 @@ const prepSummaryStatement = (included) => {
   const {mode, explore, labelFilters, detect, list, locationID, topRankin, summarySortOrder} = STATE;
   const range = mode === "explore" ? explore.range : undefined;
   const params = [detect.confidence];
+  const partition = detect.split ? ', r.modelID' : '';
   let summaryStatement = `
     WITH ranked_records AS (
-        SELECT records.dateTime, records.confidence, files.name as file, files.archiveName, cname, sname, COALESCE(callCount, 1) as callCount, speciesID, isDaylight, tagID,
-        RANK() OVER (PARTITION BY fileID, dateTime ORDER BY records.confidence DESC) AS rank
-        FROM records
-        JOIN files ON files.id = records.fileID
-        JOIN species ON species.id = records.speciesID
+        SELECT r.dateTime, r.confidence, f.name as file, f.archiveName, cname, sname, COALESCE(callCount, 1) as callCount, speciesID, isDaylight, tagID,
+        RANK() OVER (PARTITION BY fileID${partition}, dateTime ORDER BY r.confidence DESC) AS rank
+        FROM records r
+        JOIN files f ON f.id = r.fileID
+        JOIN species s ON s.id = r.speciesID
         WHERE confidence >=  ? `;
 
   const [SQLtext, fileParams] = getFileSQLAndParams(range);
@@ -1109,8 +1124,8 @@ const prepSummaryStatement = (included) => {
       included = getExcluded(included);
       not = "NOT";
     }
-    // DEBUG &&
-    //   console.log("included", included.length, "# labels", LABELS.length);
+    DEBUG &&
+      console.log("included", included.length, "# labels", LABELS.length);
     const includedParams = prepParams(included);
     summaryStatement += ` AND speciesID ${not} IN (${includedParams}) `;
     params.push(...included);
@@ -1125,7 +1140,7 @@ const prepSummaryStatement = (included) => {
   }
   summaryStatement += `
     )
-    SELECT speciesID, cname, sname, COUNT(cname) as count, SUM(callcount) as calls, ROUND(MAX(ranked_records.confidence) / 10.0, 0) as max
+    SELECT speciesID, cname, sname, COUNT(cname) as count, SUM(callcount) as calls, MAX(ranked_records.confidence) as max
     FROM ranked_records
     WHERE ranked_records.rank <= ${topRankin}`;
 
@@ -1144,6 +1159,7 @@ const getTotal = async ({
   const {db, mode, explore, filteredOffset, globalOffset, labelFilters, detect, list, locationID, topRankin} = STATE;
   let params = [];
   const range = mode === "explore" ? explore.range : undefined;
+  const partition = detect.split ? ', r.modelID' : '';
   offset =
     offset ??
     (species !== undefined
@@ -1151,10 +1167,10 @@ const getTotal = async ({
       : globalOffset);
   let SQL = ` WITH MaxConfidencePerDateTime AS (
         SELECT confidence,
-        speciesID, files.name as file, tagID,
-        RANK() OVER (PARTITION BY fileID, dateTime ORDER BY records.confidence DESC) AS rank
-        FROM records 
-        JOIN files ON records.fileID = files.id 
+        speciesID, f.name as file, tagID,
+        RANK() OVER (PARTITION BY fileID${partition}, dateTime ORDER BY r.confidence DESC) AS rank
+        FROM records r
+        JOIN files f ON r.fileID = f.id 
         WHERE confidence >= ${detect.confidence} `;
 
   if (list !== 'everything') {
@@ -1174,7 +1190,7 @@ const getTotal = async ({
 
   if (species) {
     params.push(species);
-    SQL += " AND speciesID = (SELECT id from species WHERE cname = ?) ";
+    SQL += " AND speciesID IN (SELECT id from species WHERE cname = ?) ";
   }
   const { total } = await db.getAsync(SQL, ...params);
   UI.postMessage({
@@ -1193,34 +1209,38 @@ const prepResultsStatement = (
   topRankin
 ) => {
   const {mode, explore, limit, resultsMetaSortOrder, resultsSortOrder, labelFilters, detect, list, locationID, selection} = STATE;
+  const partition = detect.split ? ', r.modelID' : '';  
   const params = [detect.confidence];
   let resultStatement = `
     WITH ranked_records AS (
         SELECT 
-        records.dateTime, 
-        files.duration, 
-        files.filestart, 
+        r.dateTime, 
+        f.duration, 
+        f.filestart, 
         fileID,
-        files.name as file,
-        files.archiveName,
-        files.locationID,
-        records.position, 
-        records.speciesID,
-        species.sname, 
-        species.cname, 
-        records.confidence as score, 
+        f.name as file,
+        f.archiveName,
+        f.locationID,
+        r.position, 
+        r.speciesID,
+        models.name as modelName,
+        models.id as modelID,
+        s.sname, 
+        s.cname, 
+        r.confidence as score, 
         tagID,
         tags.name as label, 
-        records.comment, 
-        records.end,
-        records.callCount,
-        records.isDaylight,
-        records.reviewed,
-        RANK() OVER (PARTITION BY fileID, dateTime ORDER BY records.confidence DESC) AS rank
-        FROM records 
-        JOIN species ON records.speciesID = species.id 
-        JOIN files ON records.fileID = files.id 
-        LEFT JOIN tags ON records.tagID = tags.id
+        r.comment, 
+        r.end,
+        r.callCount,
+        r.isDaylight,
+        r.reviewed,
+        RANK() OVER (PARTITION BY fileID${partition}, dateTime ORDER BY r.confidence DESC) AS rank
+        FROM records r
+        JOIN species s ON r.speciesID = s.id 
+        JOIN files f ON r.fileID = f.id 
+        JOIN models ON r.modelID = models.id
+        LEFT JOIN tags ON r.tagID = tags.id
         WHERE confidence >= ? 
         `;
   // // Prioritise selection ranges
@@ -1237,7 +1257,7 @@ const prepResultsStatement = (
     resultStatement += ` AND tagID in (${prepParams(STATE.labelFilters)}) `;
     params.push(...STATE.labelFilters);
   }
-  if (!selection && list !== 'everything') {
+  if (!selection || list !== 'everything') {
     resultStatement += ` AND speciesID IN (${prepParams(included)}) `;
     params.push(...included);
   }
@@ -1264,6 +1284,8 @@ const prepResultsStatement = (
     fileID,
     position, 
     speciesID,
+    modelName as model,
+    modelID,
     sname, 
     cname, 
     score,
@@ -1829,7 +1851,8 @@ function addDays(date, days) {
  * @returns {Promise<void>} A promise that resolves when detections have been successfully retrieved and sent to the UI.
  */
 async function sendDetections(file, start, end, goToRegion) {
-  const db = STATE.db;
+  const {db, detect} = STATE;
+  const partition = detect.split ? ', r.modelID' : '';  
   start = METADATA[file].fileStart + start * 1000;
   end = METADATA[file].fileStart + end * 1000;
   const params = [STATE.detect.confidence, file, start, end];
@@ -1845,12 +1868,12 @@ async function sendDetections(file, start, end, goToRegion) {
                 position AS start, 
                 end, 
                 cname AS label, 
-                ROW_NUMBER() OVER (PARTITION BY fileID, dateTime ORDER BY confidence DESC) AS rank,
+                ROW_NUMBER() OVER (PARTITION BY fileID${partition}, dateTime ORDER BY confidence DESC) AS rank,
                 confidence,
                 name,
                 dateTime,
                 speciesID
-            FROM records
+            FROM records r
             JOIN species ON speciesID = species.ID
             JOIN files ON fileID = files.ID
             WHERE confidence >= ?
@@ -2966,6 +2989,7 @@ const onInsertManualRecord = async ({
   batch,
   originalCname,
   confidence,
+  modelID = STATE.modelID,
   reviewed = true,
   calledByBatch
 }) => {
@@ -2976,8 +3000,8 @@ const onInsertManualRecord = async ({
   let fileID, fileStart;
   const db = STATE.db;
   const speciesFound = await db.getAsync(
-    `SELECT id as speciesID FROM species WHERE cname = ?`,
-    cname
+    `SELECT id as speciesID FROM species WHERE cname = ? AND modelID = ?`,
+    cname, modelID
   );
   let speciesID;
   if (speciesFound) {
@@ -3024,8 +3048,8 @@ const onInsertManualRecord = async ({
   // Delete an existing record if species was changed
   if (cname !== originalCname) {
     const result = await db.getAsync(
-      `SELECT id as originalSpeciesID FROM species WHERE cname = ?`,
-      originalCname
+      `SELECT id as originalSpeciesID FROM species WHERE cname = ? AND modelID = ?`,
+      originalCname, modelID
     );
     if (result?.originalSpeciesID) {
       await db.runAsync(
@@ -3037,10 +3061,6 @@ const onInsertManualRecord = async ({
       confidence ??= 2000; // Manual record
     }
   } else {
-    // const r = await db.getAsync(
-    //   "SELECT * FROM records WHERE dateTime = ? AND fileID = ? AND speciesID = ?",
-    //   dateTime, fileID, speciesID);
-    // confidence = r?.confidence || 2000; // Save confidence
     confidence ??= 2000;
   }
   const result = await db.getAsync("SELECT id FROM tags WHERE name = ?", label);
@@ -3059,7 +3079,7 @@ const onInsertManualRecord = async ({
     await db.runAsync(
       `INSERT INTO records (dateTime, position, fileID, speciesID, confidence, tagID, comment, end, callCount, isDaylight, reviewed)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(dateTime, fileID, speciesID) DO UPDATE SET 
+        ON CONFLICT(dateTime, fileID, speciesID, modelID) DO UPDATE SET 
           confidence = excluded.confidence, 
           tagID = excluded.tagID,
           comment = excluded.comment,
@@ -3167,7 +3187,7 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
         if (confidence < minConfidence) break;
 
         const modelSpeciesID = speciesIDArray[j];
-        const speciesID = STATE.speciesMap.get(modelSpeciesID);
+        const speciesID = STATE.speciesMap.get(modelID).get(modelSpeciesID);
 
         if (!speciesID) continue; // Skip unknown species
 
@@ -3213,7 +3233,7 @@ const parsePredictions = async (response) => {
       console.warn("Error generating insert query", error)
     );
   if (index < 500) {
-    const included = await getIncludedIDs(file, false).catch((error) =>
+    const included = await getIncludedIDs(file).catch((error) =>
       console.log("Error getting included IDs", error)
     );
     for (let i = 0; i < keysArray.length; i++) {
@@ -3227,10 +3247,10 @@ const parsePredictions = async (response) => {
         if (confidence < 0.05) break;
         confidence = Math.round(confidence * 1000);
         const species = speciesIDArray[j]
-        let speciesID = STATE.speciesMap.get(species);
+        let speciesID = STATE.speciesMap.get(modelID).get(species);
         updateUI =
           confidence >= detect.confidence &&
-          (!included.length || included.includes(species));
+          (!included.length || included.includes(speciesID));
         if (selection || updateUI) {
           let end, confidenceRequired;
           if (selection) {
@@ -3245,13 +3265,14 @@ const parsePredictions = async (response) => {
             confidenceRequired = detect.confidence;
           }
           if (confidence >= confidenceRequired) {
-            const { cname, sname } = await db
-              .getAsync(
-                `SELECT cname, sname FROM species WHERE id = ${speciesID}`
-              )
-              .catch((error) =>
-                console.warn("Error getting species name", error)
-              );
+            const [sname, cname] = STATE.allLabels[speciesID -1].split('_') // Much faster!!
+            // const { cname, sname } = await db
+            //   .getAsync(
+            //     `SELECT cname, sname FROM species WHERE id = ${speciesID}`
+            //   )
+            //   .catch((error) =>
+            //     console.warn("Error getting species name", error)
+            //   );
             const result = {
               timestamp: timestamp,
               position: key,
@@ -3853,8 +3874,7 @@ async function exportData(result, filename, format) {
 }
 
 const sendResult = (index, result, fromDBQuery) => {
-  // Convert confidence back to % value
-  // result.score;
+  if (!fromDBQuery) {result.model = STATE.model, result.modelID = STATE.modelID};
   UI.postMessage({
     event: "new-result",
     file: result.file,
@@ -3979,7 +3999,7 @@ const filterLocation = () =>
  * It doesn't really make sense to use location specific filtering here, as there is a location filter in the
  * page. For now, I'm just going skip the included IDs filter if location mode is selected
  */
-const getDetectedSpecies = () => {
+const getDetectedSpecies = async () => {
   const range = STATE.explore.range;
   const confidence = STATE.detect.confidence;
   let sql = `SELECT sname || '_' || cname as label, locationID
@@ -3988,8 +4008,9 @@ const getDetectedSpecies = () => {
     JOIN files on records.fileID = files.id`;
 
   if (STATE.mode === "explore") sql += ` WHERE confidence >= ${confidence}`;
-  if (STATE.list !== "location" && filtersApplied(STATE.included)) {
-    sql += ` AND speciesID IN (${STATE.included.join(",")})`;
+  if (!["location", "everything"].includes(STATE.list)) {
+    const included = await getIncludedIDs();
+    sql += ` AND speciesID IN (${included.join(",")})`;
   }
   if (range?.start)
     sql += ` AND datetime BETWEEN ${range.start} AND ${range.end}`;
@@ -4174,25 +4195,24 @@ async function onDelete({
   start,
   end,
   species,
+  modelID,
   active,
   // need speciesfiltered because species triggers getSummary to highlight it
   speciesFiltered,
 }) {
-  const db = STATE.db;
+  const {db} = STATE;
   const { id, filestart } = await db.getAsync(
     "SELECT id, filestart from files WHERE name = ?",
     file
   );
   const datetime = Math.round(filestart + (parseFloat(start) * 1000));
   end = parseFloat(end);
-  const params = [id, datetime, end];
-  let sql = "DELETE FROM records WHERE fileID = ? AND datetime = ? AND end = ?";
+  const params = [id, datetime, end, modelID];
+  let sql = "DELETE FROM records WHERE fileID = ? AND datetime = ? AND end = ? AND modelID = ?";
   if (species) {
-    sql += " AND speciesID = (SELECT id FROM species WHERE cname = ?)";
-    params.push(species);
+    sql += " AND speciesID = (SELECT id FROM species WHERE cname = ? AND modelID = ?)";
+    params.push(species, modelID);
   }
-  // let test = await db.allAsync('SELECT * from records WHERE speciesID = (SELECT id FROM species WHERE cname = ?)', species)
-  // console.log('After insert: ',JSON.stringify(test));
   let { changes } = await db.runAsync(sql, ...params);
   if (changes) {
     if (STATE.mode !== "selection") {
@@ -4213,13 +4233,13 @@ async function onDelete({
 
 async function onDeleteSpecies({
   species,
-  // need speciesfiltered because species triggers getSummary to highlight it
+  // need speciesFiltered because species triggers getSummary to highlight it
   speciesFiltered,
 }) {
   const db = STATE.db;
   const params = [species];
   let SQL = `DELETE FROM records 
-    WHERE speciesID = (SELECT id FROM species WHERE cname = ?)`;
+    WHERE speciesID IN (SELECT id FROM species WHERE cname = ?)`;
   if (STATE.mode === "analyse") {
     const rows = await db.allAsync(
       `SELECT id FROM files WHERE NAME IN (${prepParams(
@@ -4446,22 +4466,11 @@ async function onUpdateLocale(locale, labels, refreshResults) {
   } finally {
     DEBUG &&
       console.log(`Locale update took ${(Date.now() - t0) / 1000} seconds`);
-    updateSpeciesLabelLocale();
+    
   }
-}
-
-async function updateSpeciesLabelLocale() {
-  // Get labels in the new locale
-  DEBUG && console.log("Getting labels from disk db");
-  const included = await getIncludedIDs();
-  const scope = filtersApplied(included)
-    ? `WHERE id in (${included.join(",")}) `
-    : "";
-  const res = await diskDB.allAsync(
-    `SELECT sname || '_' || cname AS labels FROM species ${scope} ORDER BY id `
-  );
-  const labels = res.map((obj) => obj.labels); // these are the labels in the preferred locale
-  UI.postMessage({ event: "labels", labels: labels });
+  await setLabelState()
+  UI.postMessage({ event: "labels", labels: LABELS });
+  // await updateSpeciesLabelLocale();
 }
 
 async function onSetCustomLocation({
@@ -4534,44 +4543,62 @@ async function getLocations({ file, db = STATE.db }) {
  * @param {*} [file] - Optional key for retrieving file metadata from METADATA. Expected metadata should include properties like `fileStart`, `lat`, and `lon`.
  * @returns {Promise<number[]>} Promise resolving to an array of species IDs included in the current filtered results.
  */
-async function getIncludedIDs(file, map = true) {
-  let lat, lon, week;
+async function getIncludedIDs(file) {
+  let latitude, longitude, week;
+  const {list, local, lat, lon, useWeek, included, model, modelID, speciesMap} = STATE;
   if (
-    STATE.list === "location" ||
-    (STATE.list === "nocturnal" && STATE.local)
+    list === "location" ||
+    (list === "nocturnal" && local)
   ) {
     if (file) {
       file = METADATA[file];
-      week = STATE.useWeek ? new Date(file.fileStart).getWeekNumber() : "-1";
-      lat = file.lat || STATE.lat;
-      lon = file.lon || STATE.lon;
+      week = useWeek ? new Date(file.fileStart).getWeekNumber() : "-1";
+      latitude = file.lat || lat;
+      longitude = file.lon || lon;
       STATE.week = week;
     } else {
       // summary context: use the week, lat & lon from the first file??
-      (lat = STATE.lat), (lon = STATE.lon);
-      week = STATE.useWeek ? STATE.week : "-1";
+      (latitude = lat), (longitude = lon);
+      week = useWeek ? STATE.week : "-1";
     }
-    const location = lat.toString() + lon.toString();
+    const location = latitude.toString() + longitude.toString();
     if (
-      STATE.included?.[STATE.model]?.[STATE.list]?.[week]?.[location] ===
+      included?.[model]?.[list]?.[week]?.[location] ===
       undefined
     ) {
       // Cache miss
-      await setIncludedIDs(lat, lon, week);
+      await setIncludedIDs(latitude, longitude, week);
     }
-    let included = STATE.included[STATE.model][STATE.list][week][location];
-    map && (included = included.map(item => STATE.speciesMap.get(item)))
-    return included;
+    let include;
+    if (file) include =  STATE.included[model][list][week][location];
+    else {
+      include = deepMergeLists(model, list)
+    }
+    return include;
   } else {
-    if (STATE.included?.[STATE.model]?.[STATE.list] === undefined) {
+    if (included?.[model]?.[list] === undefined) {
       // The object lacks the week / location
       LIST_WORKER && (await setIncludedIDs());
     }
-    let included = STATE.included[STATE.model][STATE.list];
-    map && (included = included.map(item => STATE.speciesMap.get(item)))
-    return included
+    let include = STATE.included[model][list];
+    return include
   }
 }
+
+function deepMergeLists(model, list) {
+  if (!STATE.included?.[model]?.[list]) return [];
+  let mergedSet = new Set();
+  function collectValues(obj) {
+      if (Array.isArray(obj)) {
+          obj.forEach(num => mergedSet.add(num));
+      } else if (typeof obj === 'object' && obj !== null) {
+          Object.values(obj).forEach(collectValues);
+      }
+  }
+  collectValues(STATE.included[model][list]);
+  return [...mergedSet];
+}
+
 /**
 
  * setIncludedIDs
@@ -4596,6 +4623,7 @@ async function setIncludedIDs(lat, lon, week) {
     const { result, messages } = await LIST_WORKER({
       message: "get-list",
       model: STATE.model,
+      labels: STATE.allLabels || LABELS,
       listType: STATE.list,
       customLabels: STATE.customLabels,
       lat: lat || STATE.lat,
@@ -4606,7 +4634,7 @@ async function setIncludedIDs(lat, lon, week) {
       threshold: STATE.speciesThreshold,
     });
     // Add the index of "Unknown Sp." to all lists
-    STATE.list !== "everything" && result.push(LABELS.length - 1);
+    // STATE.list !== "everything" && result.push(LABELS.length - 1);
 
     let includedObject = {};
     if (

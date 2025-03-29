@@ -274,9 +274,10 @@ async function upgrade_to_v2(diskDB, dbMutex) {
   }
 }
 
-const createDB = async ({file, diskDB, memoryDB, dbMutex}) => {
+const createDB = async ({file, diskDB, dbMutex}) => {
   const archiveMode = !!file;
-  if (file) {
+  let memoryDB;
+  if (archiveMode) {
     const {openSync} = require('node:fs');
     openSync(file, "w");
     diskDB = new sqlite3.Database(file);
@@ -289,7 +290,6 @@ const createDB = async ({file, diskDB, memoryDB, dbMutex}) => {
 
   await dbMutex.lock();
   try {
-    db.locale = "en";
     await db.runAsync("BEGIN");
     await db.runAsync(
       `CREATE TABLE tags(
@@ -364,7 +364,7 @@ const createDB = async ({file, diskDB, memoryDB, dbMutex}) => {
         isDaylight INTEGER, 
         reviewed INTEGER, 
         tagID INTEGER,
-        UNIQUE (dateTime, fileID, speciesID), 
+        UNIQUE (dateTime, fileID, speciesID, modelID), 
         CONSTRAINT fk_models FOREIGN KEY (modelID) REFERENCES models(id) ON DELETE CASCADE,
         CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,
         CONSTRAINT fk_species FOREIGN KEY (speciesID) REFERENCES species(id),
@@ -384,13 +384,13 @@ const createDB = async ({file, diskDB, memoryDB, dbMutex}) => {
     await db.runAsync("CREATE INDEX idx_species_sname ON species(sname)");
     await db.runAsync("CREATE INDEX idx_species_cname ON species(cname)");
     if (archiveMode) {
-      await diskDB.runAsync(
-        `CREATE TABLE schema_version(
-          version INTEGER NOT NULL
-        )`
-      );
-      await diskDB.runAsync("INSERT INTO schema_version (version) VALUES (3)");
-      console.log('version table created')
+      // await diskDB.runAsync(
+      //   `CREATE TABLE schema_version(
+      //     version INTEGER NOT NULL
+      //   )`
+      // );
+      // await diskDB.runAsync("INSERT INTO schema_version (version) VALUES (3)");
+      // console.log('version table created')
     } else {
       const filename = diskDB?.filename;
       await db.runAsync("ATTACH ? as disk", filename);
@@ -435,16 +435,14 @@ const mergeDbIfNeeded = async ({diskDB, model, labels, dbMutex}) => {
   // Check if we have this model already
   const modelRow = await diskDB.getAsync(`SELECT id FROM models WHERE name = ?`, model)
   if (modelRow) return modelRow.id
-
+  // If not, let's look for a legacy database
   const models = {birdnet: '6523', chirpity: '409', nocmig: '432'}
   const modelDbPath = diskDB.filename.replace('.sqlite', models[model] + '.sqlite')
   let modelID;
   try {
     await dbMutex.lock();
-    await diskDB.runAsync('BEGIN');
     let result = await diskDB.runAsync('INSERT INTO models (name) VALUES (?)', model)
     modelID = result.lastID;
-
     // Check if model DB exists
     const {existsSync} = require('node:fs');
     if (!existsSync(modelDbPath)) {
@@ -461,12 +459,11 @@ const mergeDbIfNeeded = async ({diskDB, model, labels, dbMutex}) => {
       // Remove trailing comma
       insertQuery = insertQuery.slice(0, -1);
       await diskDB.runAsync(insertQuery, ...params);
+      dbMutex.unlock();
       return modelID;
     }
   } catch (err) {
     console.error(`Error migrating model "${model}":`, err.message);
-    await diskDB.runAsync('ROLLBACK');
-
   } finally {
     dbMutex.unlock()
   }
@@ -590,6 +587,8 @@ const mergeDbIfNeeded = async ({diskDB, model, labels, dbMutex}) => {
   } finally {
     dbMutex.unlock()
   }
+  // Set the local to English after migration so all labels will get the translation treatment
+  diskDB.locale = 'en'
   return modelID
 }
 

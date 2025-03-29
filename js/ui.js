@@ -288,12 +288,8 @@ const GLOBAL_ACTIONS = {
   ArrowRight: () => {
     const skip = STATE.windowLength / 100;
     if (STATE.currentBuffer && STATE.regionsCompleted) {
-      const now = spec.wavesurfer.getCurrentTime();
-      if (spec.wavesurfer.isReady) {
-        // This will trigger the finish event if at the end of the window
-        spec.wavesurfer.setTime(now + skip);
-      }
-      // }
+      // This will trigger the finish event if at the end of the window
+      spec.wavesurfer.setTime(now + skip);
     }
   },
   "=": (e) => (e.metaKey || e.ctrlKey ? config.FFT = spec.reduceFFT() : spec.zoom("In")),
@@ -301,15 +297,7 @@ const GLOBAL_ACTIONS = {
   "-": (e) => (e.metaKey || e.ctrlKey ? config.FFT = spec.increaseFFT() : spec.zoom("Out")),
   F5: () => config.FFT = spec.reduceFFT(),
   F4: () => config.FFT = spec.increaseFFT(),
-  " ": async () => {
-    if (spec.wavesurfer) {
-      try {
-        await spec.wavesurfer.playPause();
-      } catch (e) {
-        console.warn("Wavesurfer error", error.message || error);
-      }
-    }
-  },
+  " ": () => playPauseWS(),
   Tab: (e) => {
     if ((e.metaKey || e.ctrlKey) && !PREDICTING && STATE.diskHasRecords) {
       // If you did this when predicting, your results would go straight to the archive
@@ -1550,6 +1538,7 @@ async function resultClick(e) {
   if (activeRow) activeRow.classList.remove("table-active");
   row.classList.add("table-active");
   activeRow = row;
+  activeRow.scrollIntoView({ behavior: "instant", block: "center" });
   if (this.closest("#results")) {
     // Don't do this after "analyse selection"
     loadResultRegion({ file, start, end, label });
@@ -2106,12 +2095,9 @@ const setUpWorkerMessaging = () => {
           // Called when the initial system locale isn't english
           let locale = args.locale;
           let labelFile;
-          if (config.list === "custom") {
-            labelFile = config.customListFile[config.model];
-          } else {
-            locale === "pt" && (locale = "pt_PT");
-            labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_${locale}.txt`;
-          }
+          locale === "pt" && (locale = "pt_PT");
+          labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_${locale}.txt`;
+
           readLabels(labelFile);
           break;
         }
@@ -2316,10 +2302,18 @@ const isSpeciesViewFiltered = (sendSpecies) => {
 
 function unpackNameAttr(el) {
   const currentRow = el.closest("tr");
-  let [file, start, end, sname, commonName] = currentRow
+  let [file, start, end, sname, cname, score, modelID] = currentRow
     .getAttribute("name")
     .split("|");
-  return [file, parseFloat(start), parseFloat(end), sname, commonName];
+  return {
+    file, 
+    start: parseFloat(start), 
+    end: parseFloat(end), 
+    sname, 
+    cname, 
+    score: parseInt(score),
+    modelID: parseInt(modelID)
+  };
 }
 
 function getSpecies(target) {
@@ -2618,7 +2612,7 @@ function handleKeyDownDeBounce(e) {
       function () {
         handleKeyDown(e);
       },
-      250,
+      50,
       "keyhandler"
     );
   }
@@ -2700,7 +2694,7 @@ function handleKeyDown(e) {
  * };
  * setActiveRegion(region);
  */
-function setActiveRegion(region) {
+function setActiveRegion(region, activateRow) {
   if (
     !region ||
     typeof region.start !== "number" ||
@@ -2726,7 +2720,7 @@ function setActiveRegion(region) {
   if (modelReady && !PREDICTING) {
     utils.enableMenuItem(["analyseSelection"]);
   }
-  setActiveRow(start + STATE.windowOffsetSecs);
+  activateRow && setActiveRow(start + STATE.windowOffsetSecs);
 }
 
 const spec = new ChirpityWS(
@@ -2889,15 +2883,15 @@ const timelineToggle = (fromKeys) => {
  * recordUpdate(1);
  */
 function recordUpdate(e) {
-  const {key, code} = e;
-  const setCallCount = code.includes('Numpad');
+  const {key, ctrlKey, metaKey} = e;
+  // const setCallCount = code.includes('Numpad');
   if (!activeRow) {
     console.info("No active row selected for key assignment", key);
     return;
   }
   const assignment = config.keyAssignment["key" + key];
   if ((assignment?.column && assignment?.value) || setCallCount) {
-    const [file, start, end, _sname, cname] = unpackNameAttr(activeRow)
+    const {file, start, end, cname,} = unpackNameAttr(activeRow)
 
     const commentCell = activeRow.querySelector(".comment > span");
     let comment = commentCell ? commentCell.title : "";
@@ -2905,8 +2899,8 @@ function recordUpdate(e) {
     let label = labelCell ? labelCell.textContent : "";
     let name = cname;
     let newCallCount, newConfidence;
-    if (setCallCount && STATE.isMember){
-      // Shift + number to set call count
+    if ((ctrlKey || metaKey) && STATE.isMember){
+      // Ctrl/Cmd + number to set call count
       newCallCount = Number(key);
     } else {
       name = assignment.column === "species" ? assignment.value : name;
@@ -3634,6 +3628,7 @@ async function renderResult({
                     <th id="sort-label" class="col pointer"><span class="text-muted material-symbols-outlined meta-sort-icon d-none">sort</span> ${i18.label}</th>
                     <th id="sort-comment" class="col pointer text-end"><span class="text-muted material-symbols-outlined meta-sort-icon d-none">sort</span> ${i18.notes}</th>
                     <th id="sort-reviewed" class="col pointer text-end"><span class="text-muted material-symbols-outlined meta-sort-icon d-none">sort</span>${i18.reviewed}</th>
+                    <th id="sort-model" class="col pointer text-end"><span class="text-muted material-symbols-outlined meta-sort-icon d-none">sort</span>${i18.model || 'Model'}</th>
                 </tr>`;
       setTimelinePreferences();
       // DOM.resultHeader.innerHTML = fragment;
@@ -3668,6 +3663,8 @@ async function renderResult({
       callCount,
       isDaylight,
       reviewed,
+      model,
+      modelID
     } = result;
     const dayNight = isDaylight ? "daytime" : "nighttime";
     // Todo: move this logic so pre dark sections of file are not even analysed
@@ -3711,7 +3708,7 @@ async function renderResult({
         : "";
     tr += `<tr tabindex="-1" id="result${index}" name="${file}|${position}|${
       end || position + 3
-    }|${sname}|${cname}" class='${activeTable} border-top border-2 border-secondary ${dayNight}'>
+    }|${sname}|${cname}|${score}|${modelID}" class='${activeTable} border-top border-2 border-secondary ${dayNight}'>
             <td class='text-start timeOfDay ${showTimeOfDay}'>${UI_timestamp}</td>
             <td class="text-start timestamp ${showTimestamp}">${UI_position} </td>
             <td name="${cname}" class='text-start cname'>
@@ -3724,6 +3721,7 @@ async function renderResult({
             <td class="label ${hide}">${labelHTML}</td>
             <td class="comment text-end ${hide}">${commentHTML}</td>
             <td class="reviewed text-end ${hide}">${reviewHTML}</td>
+            <td class="text-end ${hide}"><img class="model-logo" src="img/icon/${model}_logo.png" title="${model}" alt="${model}"></td>
             </tr>`;
   }
   updateResultTable(tr, isFromDB, selection);
@@ -3801,7 +3799,7 @@ const deleteRecord = (target) => {
   setClickedIndex(target);
   // If there is no row (deleted last record and hit delete again):
   if (clickedIndex === -1) return;
-  const { species, start, end, file, row, setting } = addToHistory(target);
+  const { species, start, end, file, row, setting, modelID } = addToHistory(target);
 
   worker.postMessage({
     action: "delete",
@@ -3810,6 +3808,7 @@ const deleteRecord = (target) => {
     end,
     species,
     speciesFiltered: isSpeciesViewFiltered(),
+    modelID
   });
   // Clear the record in the UI
   const index = row.rowIndex;
@@ -3915,7 +3914,7 @@ const iconDict = {
 };
 
 const iconizeScore = (score) => {
-  score /= 10;
+  score = Math.round(score/10);
   const tooltip = score.toString();
   if (score < 50) return iconDict["guess"].replaceAll("--", tooltip);
   else if (score < 65) return iconDict["low"].replaceAll("--", tooltip);
@@ -5259,16 +5258,8 @@ function handleUIClicks(e) {
       break;
     }
     case "playToggle": {
-      if (spec.wavesurfer) {
-        try {
-          (async () => {
-            await spec.wavesurfer.playPause();
-          })();
-        } catch (e) {
-          console.warn("Wavesurfer error", e.message || JSON.stringify(e));
-        }
-        break;
-      }
+      playPauseWS()
+      break;
     }
     case "setCustomLocation": {
       setCustomLocation();
@@ -5284,11 +5275,7 @@ function handleUIClicks(e) {
       getXCComparisons();
       break;
     }
-    case "debug-mode": {
-      config.debug = !config.debug;
-      updatePrefs("config.json", config);
-      break;
-    }
+
   }
   DOM.contextMenu.classList.add("d-none");
   if (
@@ -5310,6 +5297,13 @@ function handleUIClicks(e) {
     trackEvent(config.UUID, "UI", "Click", target);
 };
 
+const playPauseWS = () =>{
+  // if (spec.wavesurfer?.isReady) {
+    spec.wavesurfer.playPause();
+  // } else {
+  //   spec.wavesurfer.once('ready', () => setTimeout(() => spec.wavesurfer.playPause(), 50))
+  // }
+}
 function changeSettingsMode(target) {
   // Get references to the buttons
   const basicButton = document.getElementById("basic");
@@ -5537,11 +5531,7 @@ document.addEventListener("change", function (e) {
               return;
             }
           } else {
-            const chirpity =
-              element.value === "en_uk" && config.model !== "birdnet"
-                ? "chirpity"
-                : "";
-            labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_${chirpity}Labels_${element.value}.txt`;
+            labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_${element.value}.txt`;
             i18n
               .localiseUI(DOM.locale.value)
               .then((result) => (STATE.i18n = result));
@@ -5777,6 +5767,10 @@ document.addEventListener("change", function (e) {
         case "downmix": {
           config.audio.downmix = e.target.checked;
           worker.postMessage({ action: "update-state", audio: config.audio });
+          break;
+        }
+        case "debug-mode": {
+          config.debug = !config.debug;
           break;
         }
       }
@@ -6502,7 +6496,7 @@ function generateToast({
         // if so, create a notification
         const notification = new Notification(
           `Analysis completed in ${duration.toFixed(0)} seconds`,
-          { requireInteraction: true, icon: "img/icon/chirpity_logo2.png" }
+          { requireInteraction: true, icon: "img/icon/chirpity_logo.png" }
         );
       } else if (Notification.permission !== "denied") {
         // We need to ask the user for permission
@@ -6511,7 +6505,7 @@ function generateToast({
           if (permission === "granted") {
             const notification = new Notification(
               `Analysis completed in ${duration.toFixed(0)} seconds`,
-              { requireInteraction: true, icon: "img/icon/chirpity_logo2.png" }
+              { requireInteraction: true, icon: "img/icon/chirpity_logo.png" }
             );
           }
         });
@@ -7323,19 +7317,19 @@ dropdownCaret.forEach((caret) =>
  */
 function addToHistory(record, newCname) {
   // prepare the undelete record
-  const [file, start, end] = unpackNameAttr(record);
+  const {file, start, end, cname: species, score: confidence, modelID} = unpackNameAttr(record);
   const setting = record.closest("table");
   if (setting) {
-    const row = record.closest("tr");
-    let cname = record.querySelector(".cname").innerText;
-    let [species, confidence] = cname.split("\n");
-    // Manual records don't have a confidence bar
-    if (!confidence) {
-      species = species.slice(0, -11); // remove ' person_add'
-      confidence = 2000;
-    } else {
-      confidence = parseInt(confidence.replace("%", "")) * 10;
-    }
+    // const row = record.closest("tr");
+    // let cname = record.querySelector(".cname").innerText;
+    // let [species, confidence] = cname.split("\n");
+    // // Manual records don't have a confidence bar
+    // if (!confidence) {
+    //   species = species.slice(0, -11); // remove ' person_add'
+    //   confidence = 2000;
+    // } else {
+    //   confidence = parseInt(confidence.replace("%", "")) * 10;
+    // }
     const comment = record.querySelector(".comment").innerText;
     const label = record.querySelector(".label").innerText;
     let callCount = record.querySelector(".call-count").innerText;
@@ -7350,6 +7344,7 @@ function addToHistory(record, newCname) {
       label,
       originalCname: newCname || species,
       confidence,
+      modelID,
       reviewed,
     });
     return {
@@ -7361,8 +7356,9 @@ function addToHistory(record, newCname) {
       callCount,
       comment,
       file,
-      row,
+      row: record.closest('tr'),
       setting,
+      modelID
     };
   }
 }

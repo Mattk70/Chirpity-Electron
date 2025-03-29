@@ -203,7 +203,7 @@ function formatDuration(seconds) {
 
 // Utility functions to wait for a variable to not be falsey
 function waitFor(checkFn) {
-  let maxRetries = 25;
+  let maxRetries = 250;
   let retryCount = 0;
   return new Promise((resolve) => {
     let interval = setInterval(() => {

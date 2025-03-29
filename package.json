@@ -213,7 +213,7 @@
     "suncalc": "^1.9.0",
     "utimes": "^5.2.1",
     "uuid": "^8.3.2",
-    "wavesurfer.js": "^7.9.1"
+    "wavesurfer.js": "^7.9.4"
   },
   "optionalDependencies": {
     "ntsuspend": "^1.0.2"

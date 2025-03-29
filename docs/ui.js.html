@@ -6512,7 +6512,7 @@ function generateToast({
         // if so, create a notification
         const notification = new Notification(
           `Analysis completed in ${duration.toFixed(0)} seconds`,
-          { requireInteraction: true, icon: "img/icon/chirpity_logo2.png" }
+          { requireInteraction: true, icon: "img/icon/chirpity_logo.png" }
         );
       } else if (Notification.permission !== "denied") {
         // We need to ask the user for permission
@@ -6521,7 +6521,7 @@ function generateToast({
           if (permission === "granted") {
             const notification = new Notification(
               `Analysis completed in ${duration.toFixed(0)} seconds`,
-              { requireInteraction: true, icon: "img/icon/chirpity_logo2.png" }
+              { requireInteraction: true, icon: "img/icon/chirpity_logo.png" }
             );
           }
         });
