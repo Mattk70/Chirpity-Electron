@@ -441,12 +441,36 @@ const mergeDbIfNeeded = async ({diskDB, model, labels, dbMutex}) => {
   let modelID;
   try {
     await dbMutex.lock();
+    await diskDB.runAsync('BEGIN');
     let result = await diskDB.runAsync('INSERT INTO models (name) VALUES (?)', model)
     modelID = result.lastID;
     // Check if model DB exists
     const {existsSync} = require('node:fs');
     if (!existsSync(modelDbPath)) {
       console.log(`Model database not found: ${modelDbPath}`);
+      // We need to get the default labels from the config file
+      // There may not be a db, or the db may not have the labels required 
+      let labels;
+      if (model === "birdnet") {
+        const labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_en.txt`;
+        await fetch(labelFile)
+          .then((response) => {
+            if (!response.ok) throw new Error("Network response was not ok");
+            return response.text();
+          })
+          .then((fileContents) => {
+            labels = fileContents.trim().split(/\r?\n/);
+          })
+          .catch((error) => {
+            console.error("There was a problem fetching the label file:", error);
+          });
+      } else {
+        labels = JSON.parse(
+          fs.readFileSync(p.join(__dirname, `${model}_model_config.json`), "utf8")
+        ).labels;
+      }
+      // Add Unknown Sp.
+      labels.push("Unknown Sp._Unknown Sp.");
       // Fill species table with this model's labels and translate
       let insertQuery = `INSERT INTO species (sname, cname, modelID, classIndex) VALUES `;
       const params = [];
@@ -459,12 +483,16 @@ const mergeDbIfNeeded = async ({diskDB, model, labels, dbMutex}) => {
       // Remove trailing comma
       insertQuery = insertQuery.slice(0, -1);
       await diskDB.runAsync(insertQuery, ...params);
-      dbMutex.unlock();
+      // await diskDB.runAsync('COMMIT');
+      // dbMutex.unlock();
       return modelID;
     }
   } catch (err) {
-    console.error(`Error migrating model "${model}":`, err.message);
+    await diskDB.runAsync('ROLLBACK');
+    console.error(`Error adding model species for "${model}":`, err.message);
+
   } finally {
+    await diskDB.runAsync('COMMIT');
     dbMutex.unlock()
   }
   // Migration. Step 1: Attach the old model db

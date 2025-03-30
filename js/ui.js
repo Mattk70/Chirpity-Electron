@@ -7151,13 +7151,13 @@ document.addEventListener("labelsUpdated", (e) => {
  * If the search is empty or not a string, the function returns an empty array.
  *
  * @param {string} search - Substring used to filter bird labels.
- * @param {Array<string>} [list=LABELS] - Optional array of bird labels to filter; each label should be formatted as "sname_cname".
+ * @param {Array<string>} [list] - Array of bird labels to filter; each label should be formatted as "sname_cname".
  * @returns {Array<{cname: string, sname: string, styled: string}>} Array of objects representing filtered and sorted birds.
  */
-function getFilteredBirds(search, list = LABELS) {
+function getFilteredBirds(search, list) {
   if (!search || typeof search !== "string") return [];
   const sortedList = list
-    .filter((bird) => bird.toLowerCase().includes(search))
+    .filter(bird => bird.toLowerCase().includes(search))
     .map((item) => {
       // Flip sname and cname from "sname_cname"
       const [cname, sname] = item.split("_").reverse();

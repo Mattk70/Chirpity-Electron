@@ -300,54 +300,35 @@ const getSelectionRange = (file, start, end) => {
  *   .catch(error => console.error('Error loading database:', error));
  *
  * @remarks
- * This function depends on global variables (e.g., STATE, DATASET, LABELS, diskDB, UI) and auxiliary functions such as createDB, checkpoint, and dbMutex.
+ * This function depends on global variables (e.g., STATE, diskDB, UI) and auxiliary functions such as createDB, checkpoint, and dbMutex.
  */
 async function loadDB(path) {
   DEBUG && console.log("Loading db " + path);
+  const model = STATE.model;
+
   const file = p.join(path, `archive.sqlite`);
   if (!fs.existsSync(file)) {
-    // We need to get the default labels from the config file
-    const model = STATE.model;
-    if (model === "birdnet") {
-      const labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_en.txt`;
-      await fetch(labelFile)
-        .then((response) => {
-          if (!response.ok) throw new Error("Network response was not ok");
-          return response.text();
-        })
-        .then((filecontents) => {
-          LABELS = filecontents.trim().split(/\r?\n/);
-        })
-        .catch((error) => {
-          console.error("There was a problem fetching the label file:", error);
-        });
-    } else {
-      const { labels } = JSON.parse(
-        fs.readFileSync(p.join(__dirname, `${model}_model_config.json`), "utf8")
-      );
-      LABELS = labels;
-    }
-    // Add Unknown Sp.
-    LABELS.push("Unknown Sp._Unknown Sp.");
     console.log("No db file: ", file);
     diskDB = await createDB({file, dbMutex});
     console.log("DB created at : ", file);
-    STATE.modelID = await mergeDbIfNeeded({diskDB, model, labels: LABELS, dbMutex })
+    STATE.modelID = await mergeDbIfNeeded({diskDB, model, dbMutex })
   } else {
     diskDB = new sqlite3.Database(file);
-    STATE.update({ db: diskDB });
-    diskDB.locale = STATE.locale;
-    await diskDB.runAsync("VACUUM");
-    await diskDB.runAsync("PRAGMA foreign_keys = ON");
-    await diskDB.runAsync("PRAGMA journal_mode = WAL");
-    await diskDB.runAsync("PRAGMA busy_timeout = 5000");
     const model = STATE.model
-    STATE.modelID = await mergeDbIfNeeded({diskDB, model, labels: LABELS, dbMutex })
+    STATE.modelID = await mergeDbIfNeeded({diskDB, model, dbMutex })
     DEBUG && console.log("Opened and cleaned disk db " + file);
   }
+
+  STATE.update({ db: diskDB });
+  diskDB.locale = STATE.locale;
+  await diskDB.runAsync("VACUUM");
+  await diskDB.runAsync("PRAGMA foreign_keys = ON");
+  await diskDB.runAsync("PRAGMA journal_mode = WAL");
+  await diskDB.runAsync("PRAGMA busy_timeout = 5000");
+  
   if (diskDB.locale === STATE.locale){
     // Get the labels from the DB. These will be in preferred locale
-    await setLabelState()
+    await setLabelState({regenerate:true})
   } else {
     UI.postMessage({ event: "label-translation-needed", locale: STATE.locale });
   }
@@ -373,14 +354,20 @@ async function loadDB(path) {
 }
 
 
-async function setLabelState() {
-  DEBUG && console.log("Getting labels from disk db");
-  const res = await diskDB.allAsync(
-    "SELECT sname || '_' || cname AS labels, modelID FROM species ORDER BY id"
-  );
-  STATE.allLabels = res.map((obj) => obj.labels ); // these are the labels in the preferred locale
-  LABELS = res.filter(obj => obj.modelID === STATE.modelID).map((obj) => obj.labels );
-  return LABELS
+async function setLabelState({regenerate}) {
+  if (regenerate || !STATE.allLabels){
+    DEBUG && console.log("Getting labels from disk db");
+    const res = await diskDB.allAsync(
+      "SELECT sname || '_' || cname AS labels, modelID FROM species ORDER BY id"
+    );
+    STATE.allLabels = res.map((obj) => obj.labels ); // these are the labels in the preferred locale
+  }
+  // LABELS = res.filter(obj => obj.modelID === STATE.modelID).map((obj) => obj.labels );
+  const included = await getIncludedIDs()
+  STATE.filteredLabels = STATE.list === 'everything' 
+    ? STATE.allLabels
+    : included.map(i => STATE.allLabels[i-1]); // included is 1 based, list is 0 based
+  UI.postMessage({ event: "labels", labels: STATE.filteredLabels });
 }
 
 /**
@@ -703,8 +690,7 @@ async function handleMessage(e) {
       LIST_CACHE = {}; //[`${lat}-${lon}-${week}-${STATE.model}-${STATE.list}`];
       delete STATE.included?.[STATE.model]?.[STATE.list];
       LIST_WORKER && (await getIncludedIDs());
-      // updateSpeciesLabelLocale();
-      UI.postMessage({ event: "labels", labels: LABELS });
+      setLabelState({regenerate:false});
       args.refreshResults && (await Promise.all([getResults(), getSummary()]));
       break;
     }
@@ -849,8 +835,6 @@ async function onChangeMode(mode) {
 
 const filtersApplied = (list) => {
   return STATE.list !== 'everything';
-  // const filtered = list?.length && list.length < LABELS.length - 1;
-  // return filtered;
 };
 
 /**
@@ -1125,7 +1109,7 @@ const prepSummaryStatement = (included) => {
       not = "NOT";
     }
     DEBUG &&
-      console.log("included", included.length, "# labels", LABELS.length);
+      console.log("included", included.length, "# labels", STATE.allLabels.length);
     const includedParams = prepParams(included);
     summaryStatement += ` AND speciesID ${not} IN (${includedParams}) `;
     params.push(...included);
@@ -4032,7 +4016,6 @@ const getValidSpecies = async (file) => {
   const included = await getIncludedIDs(file);
   let excludedSpecies, includedSpecies;
   let sql = `SELECT cname, sname FROM species`;
-  // We'll ignore Unknown Sp. here, hence length < (LABELS.length *-1*)
 
   if (filtersApplied(included)) {
     sql += ` WHERE id IN (${included.join(",")})`;
@@ -4468,9 +4451,7 @@ async function onUpdateLocale(locale, labels, refreshResults) {
       console.log(`Locale update took ${(Date.now() - t0) / 1000} seconds`);
     
   }
-  await setLabelState()
-  UI.postMessage({ event: "labels", labels: LABELS });
-  // await updateSpeciesLabelLocale();
+  await setLabelState({regenerate:true})
 }
 
 async function onSetCustomLocation({
@@ -4623,7 +4604,7 @@ async function setIncludedIDs(lat, lon, week) {
     const { result, messages } = await LIST_WORKER({
       message: "get-list",
       model: STATE.model,
-      labels: STATE.allLabels || LABELS,
+      labels: STATE.allLabels, // || LABELS,
       listType: STATE.list,
       customLabels: STATE.customLabels,
       lat: lat || STATE.lat,
@@ -4633,8 +4614,9 @@ async function setIncludedIDs(lat, lon, week) {
       localBirdsOnly: STATE.local,
       threshold: STATE.speciesThreshold,
     });
-    // Add the index of "Unknown Sp." to all lists
-    // STATE.list !== "everything" && result.push(LABELS.length - 1);
+    // // Add the *label* id of "Unknown Sp." to all lists
+    STATE.list !== "everything" 
+      && result.push(STATE.allLabels.indexOf('Unknown Sp._Unknown Sp.') + 1);
 
     let includedObject = {};
     if (
