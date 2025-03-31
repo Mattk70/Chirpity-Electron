@@ -683,6 +683,7 @@ async function handleMessage(e) {
     }
     case "save2db": {
       await onSave2DiskDB(args);
+      STATE.library.auto && convertAndOrganiseFiles();
       break;
     }
     case "set-custom-file-location": {

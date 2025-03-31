@@ -168,6 +168,8 @@ const GLOBAL_ACTIONS = {
       console.log("Operation aborted");
       PREDICTING = false;
       disableSettingsDuringAnalysis(false);
+      const summarySpecies = DOM.summaryTable.querySelectorAll(".cname");
+      summarySpecies.forEach((row) => row.classList.replace("not-allowed","pointer"));
       STATE.analysisDone = true;
       worker.postMessage({
         action: "abort",
@@ -2612,7 +2614,7 @@ function handleKeyDownDeBounce(e) {
       function () {
         handleKeyDown(e);
       },
-      250,
+      60,
       "keyhandler"
     );
   }
@@ -3761,7 +3763,7 @@ const isExplore = () => {
 
 function setClickedIndex(target) {
   const clickedNode = target.closest("tr");
-  clickedIndex = clickedNode.rowIndex;
+  clickedIndex = clickedNode?.rowIndex;
 }
 
 const deleteRecord = (target) => {
@@ -4847,8 +4849,6 @@ function handleUIClicks(e) {
     // Records menu
     case "save2db": {
       worker.postMessage({ action: "save2db", file: STATE.currentFile });
-      if (config.library.auto)
-        document.getElementById("compress-and-organise").click();
       break;
     }
     case "charts": {
