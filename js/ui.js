@@ -5297,13 +5297,6 @@ function handleUIClicks(e) {
     trackEvent(config.UUID, "UI", "Click", target);
 };
 
-const playPauseWS = () =>{
-  // if (spec.wavesurfer?.isReady) {
-    spec.wavesurfer.playPause();
-  // } else {
-  //   spec.wavesurfer.once('ready', () => setTimeout(() => spec.wavesurfer.playPause(), 50))
-  // }
-}
 function changeSettingsMode(target) {
   // Get references to the buttons
   const basicButton = document.getElementById("basic");
