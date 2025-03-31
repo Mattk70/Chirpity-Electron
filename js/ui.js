@@ -294,20 +294,12 @@ const GLOBAL_ACTIONS = {
       // }
     }
   },
-  "=": (e) => (e.metaKey || e.ctrlKey ? config.FFT = spec.reduceFFT() : spec.zoom("In")),
-  "+": (e) => (e.metaKey || e.ctrlKey ? config.FFT = spec.reduceFFT() : spec.zoom("In")),
-  "-": (e) => (e.metaKey || e.ctrlKey ? config.FFT = spec.increaseFFT() : spec.zoom("Out")),
-  F5: () => config.FFT = spec.reduceFFT(),
-  F4: () => config.FFT = spec.increaseFFT(),
-  " ": async () => {
-    if (spec.wavesurfer) {
-      try {
-        await spec.wavesurfer.playPause();
-      } catch (e) {
-        console.warn("Wavesurfer error", error.message || error);
-      }
-    }
-  },
+  "=": (e) => ( spec.wavesurfer && (e.metaKey || e.ctrlKey) ? config.FFT = spec.reduceFFT() : spec.zoom("In")),
+  "+": (e) => (spec.wavesurfer && (e.metaKey || e.ctrlKey) ? config.FFT = spec.reduceFFT() : spec.zoom("In")),
+  "-": (e) => (spec.wavesurfer && (e.metaKey || e.ctrlKey) ? config.FFT = spec.increaseFFT() : spec.zoom("Out")),
+  F5: () =>  spec.wavesurfer && (config.FFT = spec.reduceFFT()),
+  F4: () =>  spec.wavesurfer && (config.FFT = spec.increaseFFT()),
+  " ": () => { spec.wavesurfer && spec.wavesurfer.playPause() },
   Tab: (e) => {
     if ((e.metaKey || e.ctrlKey) && !PREDICTING && STATE.diskHasRecords) {
       // If you did this when predicting, your results would go straight to the archive
@@ -5253,16 +5245,8 @@ function handleUIClicks(e) {
       break;
     }
     case "playToggle": {
-      if (spec.wavesurfer) {
-        try {
-          (async () => {
-            await spec.wavesurfer.playPause();
-          })();
-        } catch (e) {
-          console.warn("Wavesurfer error", e.message || JSON.stringify(e));
-        }
-        break;
-      }
+      if (spec.wavesurfer) spec.wavesurfer.playPause();
+        break;      
     }
     case "setCustomLocation": {
       setCustomLocation();
