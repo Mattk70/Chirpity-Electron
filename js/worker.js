@@ -683,6 +683,7 @@ async function handleMessage(e) {
     }
     case "save2db": {
       await onSave2DiskDB(args);
+      STATE.library.auto && convertAndOrganiseFiles();
       break;
     }
     case "set-custom-file-location": {
@@ -4269,6 +4270,8 @@ const onFileDelete = async (fileName) => {
     fileName
   );
   if (result.changes) {
+    // remove the saved flag
+    delete METADATA[fileName].isSaved;
     //await onChangeMode('analyse');
     getDetectedSpecies();
     generateAlert({
@@ -4442,27 +4445,27 @@ async function onSetCustomLocation({
     }
   } else {
     const SQL = overwritePlaceName
-      ? `INSERT INTO locations VALUES (?, ?, ?, ?)
-         ON CONFLICT(lat, lon) DO UPDATE SET place = excluded.place`
-      : `INSERT OR IGNORE INTO locations VALUES (?, ?, ?, ?)`;
-
-    const result = await db.runAsync(SQL, undefined, lat, lon, place);
-    const { id } = await db.getAsync(
-      "SELECT ID FROM locations WHERE lat = ? AND lon = ?",
-      lat,
-      lon
-    );
+    ? `INSERT INTO locations (lat, lon, place) VALUES (?, ?, ?)
+       ON CONFLICT(lat, lon) DO UPDATE SET place = excluded.place
+       RETURNING id;`
+    : `INSERT OR IGNORE INTO locations (lat, lon, place) VALUES (?, ?, ?)
+       RETURNING id;`;
+  
+    const result = await db.getAsync(SQL, lat, lon, place);
+    const id = result?.id ?? (
+      await db.getAsync("SELECT id FROM locations WHERE lat = ? AND lon = ?", lat, lon)
+    )?.id;
+  
 
     for (const file of files) {
+      // Only update the file location id if it is already in the db
       const result = await db.runAsync(
-        `INSERT INTO files (id, name, locationID) values (?, ?, ?)
-        ON CONFLICT(name) DO UPDATE SET locationID = EXCLUDED.locationID`,
-        undefined,
-        file,
-        id
+        `UPDATE OR IGNORE files SET locationID = ?
+          WHERE name = ?`, id, file
       );
+      
       // we may not have set the METADATA for the file
-      METADATA[file] = { ...(METADATA[file] || {}), locationID: id };
+      METADATA[file] = { ...(METADATA[file] || {}), locationID: id, lat, lon };
       // tell the UI the file has a location id
       UI.postMessage({ event: "file-location-id", file, id });
     }

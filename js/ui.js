@@ -168,6 +168,8 @@ const GLOBAL_ACTIONS = {
       console.log("Operation aborted");
       PREDICTING = false;
       disableSettingsDuringAnalysis(false);
+      const summarySpecies = DOM.summaryTable.querySelectorAll(".cname");
+      summarySpecies.forEach((row) => row.classList.replace("not-allowed","pointer"));
       STATE.analysisDone = true;
       worker.postMessage({
         action: "abort",
@@ -294,20 +296,12 @@ const GLOBAL_ACTIONS = {
       // }
     }
   },
-  "=": (e) => (e.metaKey || e.ctrlKey ? config.FFT = spec.reduceFFT() : spec.zoom("In")),
-  "+": (e) => (e.metaKey || e.ctrlKey ? config.FFT = spec.reduceFFT() : spec.zoom("In")),
-  "-": (e) => (e.metaKey || e.ctrlKey ? config.FFT = spec.increaseFFT() : spec.zoom("Out")),
-  F5: () => config.FFT = spec.reduceFFT(),
-  F4: () => config.FFT = spec.increaseFFT(),
-  " ": async () => {
-    if (spec.wavesurfer) {
-      try {
-        await spec.wavesurfer.playPause();
-      } catch (e) {
-        console.warn("Wavesurfer error", error.message || error);
-      }
-    }
-  },
+  "=": (e) => ( spec.wavesurfer && (e.metaKey || e.ctrlKey) ? config.FFT = spec.reduceFFT() : spec.zoom("In")),
+  "+": (e) => (spec.wavesurfer && (e.metaKey || e.ctrlKey) ? config.FFT = spec.reduceFFT() : spec.zoom("In")),
+  "-": (e) => (spec.wavesurfer && (e.metaKey || e.ctrlKey) ? config.FFT = spec.increaseFFT() : spec.zoom("Out")),
+  F5: () =>  spec.wavesurfer && (config.FFT = spec.reduceFFT()),
+  F4: () =>  spec.wavesurfer && (config.FFT = spec.increaseFFT()),
+  " ": () => { spec.wavesurfer && spec.wavesurfer.playPause() },
   Tab: (e) => {
     if ((e.metaKey || e.ctrlKey) && !PREDICTING && STATE.diskHasRecords) {
       // If you did this when predicting, your results would go straight to the archive
@@ -940,7 +934,7 @@ const displayLocationAddress = async (where) => {
       '<span class="material-symbols-outlined">fmd_good</span> ' + address;
     placeEl.innerHTML = content;
     const button = document.getElementById("apply-location");
-    button.classList.add("btn-danger");
+    button.classList.replace("btn-primary", "btn-danger");
     button.textContent = "Apply";
   }
 };
@@ -956,7 +950,7 @@ const cancelDefaultLocation = () => {
     config.location;
   updateMap(latEl.value, lonEl.value);
   const button = document.getElementById("apply-location");
-  button.classList.remove("btn-danger");
+  button.classList.replace("btn-danger","btn-primary");
   button.innerHTML = 'Set <span class="material-symbols-outlined">done</span>';
 };
 
@@ -985,7 +979,7 @@ const setDefaultLocation = () => {
     list: "location",
   });
   const button = document.getElementById("apply-location");
-  button.classList.remove("btn-danger");
+  button.classList.replace("btn-danger","btn-primary");
   button.innerHTML = 'Set <span class="material-symbols-outlined">done</span>';
 };
 
@@ -2620,7 +2614,7 @@ function handleKeyDownDeBounce(e) {
       function () {
         handleKeyDown(e);
       },
-      250,
+      60,
       "keyhandler"
     );
   }
@@ -3769,7 +3763,7 @@ const isExplore = () => {
 
 function setClickedIndex(target) {
   const clickedNode = target.closest("tr");
-  clickedIndex = clickedNode.rowIndex;
+  clickedIndex = clickedNode?.rowIndex;
 }
 
 const deleteRecord = (target) => {
@@ -4855,8 +4849,6 @@ function handleUIClicks(e) {
     // Records menu
     case "save2db": {
       worker.postMessage({ action: "save2db", file: STATE.currentFile });
-      if (config.library.auto)
-        document.getElementById("compress-and-organise").click();
       break;
     }
     case "charts": {
@@ -5253,16 +5245,8 @@ function handleUIClicks(e) {
       break;
     }
     case "playToggle": {
-      if (spec.wavesurfer) {
-        try {
-          (async () => {
-            await spec.wavesurfer.playPause();
-          })();
-        } catch (e) {
-          console.warn("Wavesurfer error", e.message || JSON.stringify(e));
-        }
-        break;
-      }
+      if (spec.wavesurfer) spec.wavesurfer.playPause();
+        break;      
     }
     case "setCustomLocation": {
       setCustomLocation();
