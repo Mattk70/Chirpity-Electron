@@ -4284,6 +4284,8 @@ const onFileDelete = async (fileName) => {
     fileName
   );
   if (result.changes) {
+    // remove the saved flag
+    delete METADATA[fileName].isSaved;
     //await onChangeMode('analyse');
     getDetectedSpecies();
     generateAlert({
