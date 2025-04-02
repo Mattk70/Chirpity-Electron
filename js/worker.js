@@ -878,10 +878,13 @@ async function onLaunch({
   BATCH_SIZE = batchSize;
   if (!STATE.model || STATE.model !== model) {
     STATE.update({ model: model });
-    if (! await diskDB?.getAsync('SELECT id FROM models WHERE NAME = ?', model)){
+    const result = await diskDB?.getAsync('SELECT id FROM models WHERE NAME = ?', model)
+    if (!result){
       diskDB = await loadDB(appPath); // load the diskdb
       memoryDB = await createDB({file: null, diskDB, dbMutex}); // now make the memoryDB
       // UI.postMessage({ event: "label-translation-needed", locale: STATE.locale });
+    } else {
+      STATE.modelID = result.id;
     }
   }
   const db = STATE.mode === 'analyse'
@@ -1082,8 +1085,27 @@ function getExcluded(included, fullRange = STATE.allLabels.length) {
   }
   return missing;
 }
-const prepSummaryStatement = (included) => {
-  const {mode, explore, labelFilters, detect, list, locationID, topRankin, summarySortOrder} = STATE;
+
+async function getSpeciesSQLAsync(){
+  let not = "", SQL = "";
+  const {list, allLabels} = STATE;
+  if (list !== 'everything') {
+    let included = await getIncludedIDs();
+    if (list === "birds") {
+      included = getExcluded(included);
+      not = "NOT";
+    }
+    DEBUG &&
+      console.log("included", included.length, "# labels", allLabels.length);
+    // const includedParams = prepParams(included);
+    SQL = ` AND speciesID ${not} IN (${included}) `;
+    // params.push(...included);
+  }
+  return SQL
+}
+
+const prepSummaryStatement = async () => {
+  const {mode, explore, labelFilters, detect, locationID, topRankin, summarySortOrder} = STATE;
   const range = mode === "explore" ? explore.range : undefined;
   const params = [detect.confidence];
   const partition = detect.split ? ', r.modelID' : '';
@@ -1102,18 +1124,8 @@ const prepSummaryStatement = (included) => {
     summaryStatement += ` AND tagID in (${prepParams(labelFilters)}) `;
     params.push(...labelFilters);
   }
-  let not = "";
-  if (list !== 'everything') {
-    if (list === "birds") {
-      included = getExcluded(included);
-      not = "NOT";
-    }
-    DEBUG &&
-      console.log("included", included.length, "# labels", STATE.allLabels.length);
-    const includedParams = prepParams(included);
-    summaryStatement += ` AND speciesID ${not} IN (${includedParams}) `;
-    params.push(...included);
-  }
+  summaryStatement += await getSpeciesSQLAsync();
+  
   if (detect.nocmig) {
     summaryStatement += " AND COALESCE(isDaylight, 0) != 1 ";
   }
@@ -1140,7 +1152,7 @@ const getTotal = async ({
   file = undefined,
 } = {}) => {
   
-  const {db, mode, explore, filteredOffset, globalOffset, labelFilters, detect, list, locationID, topRankin} = STATE;
+  const {db, mode, explore, filteredOffset, globalOffset, labelFilters, detect, locationID, topRankin} = STATE;
   let params = [];
   const range = mode === "explore" ? explore.range : undefined;
   const partition = detect.split ? ', r.modelID' : '';
@@ -1157,10 +1169,7 @@ const getTotal = async ({
         JOIN files f ON r.fileID = f.id 
         WHERE confidence >= ${detect.confidence} `;
 
-  if (list !== 'everything') {
-    included ??= await getIncludedIDs(file);
-    SQL += ` AND speciesID IN (${included}) `;
-  }
+  SQL += await getSpeciesSQLAsync();
   if (labelFilters.length) {
     SQL += ` AND tagID in (${prepParams(labelFilters)}) `;
     params.push(...labelFilters);
@@ -1185,10 +1194,9 @@ const getTotal = async ({
   });
 };
 
-const prepResultsStatement = (
+const prepResultsStatement = async (
   species,
   noLimit,
-  included,
   offset,
   topRankin
 ) => {
@@ -1241,13 +1249,11 @@ const prepResultsStatement = (
     resultStatement += ` AND tagID in (${prepParams(STATE.labelFilters)}) `;
     params.push(...STATE.labelFilters);
   }
-  if (!selection || list !== 'everything') {
-    resultStatement += ` AND speciesID IN (${prepParams(included)}) `;
-    params.push(...included);
-  }
   if (selection) {
     resultStatement += ` AND file = ? `;
     params.push(FILE_QUEUE[0]);
+  } else {
+    resultStatement += await getSpeciesSQLAsync()
   }
   if (locationID) {
     resultStatement += ` AND locationID = ? `;
@@ -1840,11 +1846,7 @@ async function sendDetections(file, start, end, goToRegion) {
   start = METADATA[file].fileStart + start * 1000;
   end = METADATA[file].fileStart + end * 1000;
   const params = [STATE.detect.confidence, file, start, end];
-  let included = await getIncludedIDs();
-  const includedSQL = filtersApplied(included)
-    ? ` AND speciesID IN (${prepParams(included)})`
-    : "";
-  includedSQL && params.push(...included);
+  const includedSQL = await getSpeciesSQLAsync();
   const results = await db.allAsync(
     `
         WITH RankedRecords AS (
@@ -2914,11 +2916,9 @@ const terminateWorkers = () => {
 async function batchInsertRecords(cname, label, files, originalCname) {
   const db = STATE.db;
   const t0 = Date.now();
-  const included = await getIncludedIDs();
   const [sql, params] = prepResultsStatement(
     originalCname,
     true,
-    included,
     undefined,
     STATE.topRankin
   );
@@ -3061,8 +3061,8 @@ const onInsertManualRecord = async ({
     );
   } else {
     await db.runAsync(
-      `INSERT INTO records (dateTime, position, fileID, speciesID, confidence, tagID, comment, end, callCount, isDaylight, reviewed)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO records (dateTime, position, fileID, speciesID, modelID, confidence, tagID, comment, end, callCount, isDaylight, reviewed)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(dateTime, fileID, speciesID, modelID) DO UPDATE SET 
           confidence = excluded.confidence, 
           tagID = excluded.tagID,
@@ -3073,6 +3073,7 @@ const onInsertManualRecord = async ({
       start,
       fileID,
       speciesID,
+      modelID,
       confidence,
       tagID,
       comment,
@@ -3220,6 +3221,7 @@ const parsePredictions = async (response) => {
     const included = await getIncludedIDs(file).catch((error) =>
       console.log("Error getting included IDs", error)
     );
+    const loopConfidence = selection ? 50 : detect.confidence;
     for (let i = 0; i < keysArray.length; i++) {
       let updateUI = false;
       let key = parseFloat(keysArray[i]);
@@ -3227,57 +3229,36 @@ const parsePredictions = async (response) => {
       const confidenceArray = confidenceBatch[i];
       const speciesIDArray = speciesIDBatch[i];
       for (let j = 0; j < confidenceArray.length; j++) {
-        let confidence = confidenceArray[j];
-        if (confidence < 0.05) break;
-        confidence = Math.round(confidence * 1000);
+        let confidence = Math.round(confidenceArray[j] * 1000);
+        if (confidence < loopConfidence) break;
         const species = speciesIDArray[j]
         let speciesID = STATE.speciesMap.get(modelID).get(species);
-        updateUI =
-          confidence >= detect.confidence &&
-          (!included.length || included.includes(speciesID));
-        if (selection || updateUI) {
-          let end, confidenceRequired;
+        updateUI = selection || !included.length || included.includes(speciesID);
+        if (updateUI) {
+          let end;
           if (selection) {
             const duration =
               (selection.end - selection.start) / 1000;
             end = key + duration;
-            confidenceRequired = STATE.userSettingsInSelection
-              ? detect.confidence
-              : 50;
-          } else {
-            end = key + 3;
-            confidenceRequired = detect.confidence;
+          } else { end = key + 3; }
+          const [sname, cname] = STATE.allLabels[speciesID -1].split('_') // Much faster!!
+          const result = {
+            timestamp: timestamp,
+            position: key,
+            end: end,
+            file: file,
+            cname: cname,
+            sname: sname,
+            score: confidence,
+          };
+          sendResult(++index, result, false);
+          if (index > 499) {
+            setGetSummaryQueryInterval(NUM_WORKERS);
+            DEBUG &&
+              console.log("Reducing summary updates to one every", STATE.incrementor);
           }
-          if (confidence >= confidenceRequired) {
-            const [sname, cname] = STATE.allLabels[speciesID -1].split('_') // Much faster!!
-            // const { cname, sname } = await db
-            //   .getAsync(
-            //     `SELECT cname, sname FROM species WHERE id = ${speciesID}`
-            //   )
-            //   .catch((error) =>
-            //     console.warn("Error getting species name", error)
-            //   );
-            const result = {
-              timestamp: timestamp,
-              position: key,
-              end: end,
-              file: file,
-              cname: cname,
-              sname: sname,
-              score: confidence,
-            };
-            sendResult(++index, result, false);
-            if (index > 499) {
-              setGetSummaryQueryInterval(NUM_WORKERS);
-              DEBUG &&
-                console.log(
-                  "Reducing summary updates to one every ",
-                  STATE.incrementor
-                );
-            }
-            // Only show the highest confidence detection, unless it's a selection analysis
-            if (!selection) break;
-          }
+          // Only show the highest confidence detection, unless it's a selection analysis
+          if (!selection) break;
         }
       }
     }
@@ -3310,12 +3291,10 @@ const parsePredictions = async (response) => {
         } seconds: ${filesBeingProcessed.length} files to go`
       );
   }
-
   if (!selection && STATE.increment() === 0) {
     if (fileProgress < 1) getSummary({ interim: true });
     getTotal({ file });
   }
-
   return response.worker;
 };
 
@@ -3572,8 +3551,7 @@ const getSummary = async ({
   interim = false,
   action = undefined,
 } = {}) => {
-  const included = STATE.selection ? [] : await getIncludedIDs();
-  const [sql, params] = prepSummaryStatement(included);
+  const [sql, params] = await prepSummaryStatement();
   const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
 
   const summary = await STATE.db.allAsync(sql, ...params);
@@ -3612,7 +3590,6 @@ const getResults = async ({
   position = undefined,
 } = {}) => {
   let confidence = STATE.detect.confidence;
-  const included = STATE.selection ? [] : await getIncludedIDs();
   if (position) {
     //const position = await getPosition({species: species, dateTime: select.dateTime, included: included});
     offset = (position.page - 1) * limit;
@@ -3629,16 +3606,14 @@ const getResults = async ({
 
   let index = offset;
 
-  const [sql, params] = prepResultsStatement(
+  const [sql, params] = await prepResultsStatement(
     species,
     limit === Infinity,
-    included,
     offset,
     topRankin
   );
 
   const result = await STATE.db.allAsync(sql, ...params);
-
   if (["text", "eBird", "Raven"].includes(format)) {
     await exportData(result, path, format);
   } else if (format === "Audacity") {
@@ -3911,10 +3886,8 @@ const onSave2DiskDB = async ({ file }) => {
     generateAlert({ message: "NoOP" });
     return; // nothing to do. Also will crash if trying to update disk from disk.
   }
-  const included = await getIncludedIDs(file);
-  let filterClause = filtersApplied(included)
-    ? `AND speciesID IN (${included})`
-    : "";
+  let filterClause = await getSpeciesSQLAsync();
+
   if (STATE.detect.nocmig) filterClause += " AND isDaylight = FALSE ";
   let response,
     errorOccurred = false;
@@ -3950,6 +3923,7 @@ const onSave2DiskDB = async ({ file }) => {
     errorOccurred = true;
     console.log("Transaction error:", error);
   } finally {
+    dbMutex.unlock();
     if (!errorOccurred) {
       if (response?.changes) {
         UI.postMessage({ event: "diskDB-has-records" });
@@ -3962,7 +3936,6 @@ const onSave2DiskDB = async ({ file }) => {
         Object.values(METADATA).forEach((file) => (file.isSaved = true));
       }
     }
-    dbMutex.unlock();
     DEBUG && console.log("transaction ended successfully");
     const total = response.changes;
     const seconds = (Date.now() - t0) / 1000;

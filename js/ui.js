@@ -1520,11 +1520,12 @@ selectionTable.addEventListener("click", debounceClick(resultClick));
  * document.querySelector('tr').addEventListener('click', resultClick);
  */
 async function resultClick(e) {
-  if (!STATE.fileLoaded) {
+  const {currentFile, fileLoaded, regionsCompleted} = STATE;
+  if (!fileLoaded && currentFile) {
     console.warn("Cannot process click - no audio file is loaded");
     return;
   }
-  if (!STATE.regionsCompleted) {
+  if (!regionsCompleted && currentFile) {
     console.warn("Cannot process click - regions are still being created");
     return;
   }
@@ -1538,13 +1539,13 @@ async function resultClick(e) {
   if (activeRow) activeRow.classList.remove("table-active");
   row.classList.add("table-active");
   activeRow = row;
-  activeRow.scrollIntoView({ behavior: "instant", block: "center" });
+  activeRow.scrollIntoView({ behavior: "instant", block: "nearest",  inline: "nearest" });
   if (this.closest("#results")) {
     // Don't do this after "analyse selection"
     loadResultRegion({ file, start, end, label });
   }
   if (e.target.classList.contains("circle")) {
-    await utils.waitFor(() => STATE.fileLoaded);
+    await utils.waitFor(() => fileLoaded);
     getSelectionResults(true);
   }
 }
@@ -3284,7 +3285,7 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
                     <td class="text-end">${item.calls}</td>
                     </tr>`;
   }
-  summaryHTML += "</tbody></table>";
+  summary.length && (summaryHTML += "</tbody></table>");
   // Get rid of flicker...
   const old_summary = DOM.summaryTable;
   const fragment = document.createDocumentFragment(); // Create a document fragment
@@ -3800,7 +3801,6 @@ const deleteRecord = (target) => {
   // If there is no row (deleted last record and hit delete again):
   if (clickedIndex === -1) return;
   const { species, start, end, file, row, setting, modelID } = addToHistory(target);
-
   worker.postMessage({
     action: "delete",
     file,
@@ -6159,7 +6159,8 @@ const insertManualRecord = ( {
   batch,
   originalCname,
   confidence,
-  reviewed
+  reviewed,
+  modelID
 }  = {}) => {
   worker.postMessage({
     action: "insert-manual-record",
@@ -6180,6 +6181,7 @@ const insertManualRecord = ( {
     }, //  have to account for the header row
     speciesFiltered: isSpeciesViewFiltered(true),
     reviewed,
+    modelID
   });
 };
 
@@ -7313,16 +7315,6 @@ function addToHistory(record, newCname) {
   const {file, start, end, cname: species, score: confidence, modelID} = unpackNameAttr(record);
   const setting = record.closest("table");
   if (setting) {
-    // const row = record.closest("tr");
-    // let cname = record.querySelector(".cname").innerText;
-    // let [species, confidence] = cname.split("\n");
-    // // Manual records don't have a confidence bar
-    // if (!confidence) {
-    //   species = species.slice(0, -11); // remove ' person_add'
-    //   confidence = 2000;
-    // } else {
-    //   confidence = parseInt(confidence.replace("%", "")) * 10;
-    // }
     const comment = record.querySelector(".comment").innerText;
     const label = record.querySelector(".label").innerText;
     let callCount = record.querySelector(".call-count").innerText;
