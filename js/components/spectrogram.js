@@ -788,22 +788,24 @@ export class ChirpityWS {
   async adjustDims(redraw, fftSamples, newHeight) {
     const config = this.getConfig();
     const STATE = this.getState();
+    const {footer, navPadding, contentWrapper, exploreWrapper, 
+      spectrogramWrapper, resultTableElement} = DOM;
     const wavesurfer = this.wavesurfer;
-    const footerHeight = DOM.footer.offsetHeight;
-    const navHeight = DOM.navPadding.clientHeight;
+    const footerHeight = footer.offsetHeight;
+    const navHeight = navPadding.clientHeight;
     newHeight ??= 0;
-    DOM.contentWrapper.style.top = navHeight.toString() + "px"; // for padding
-    DOM.contentWrapper.style.height =
+    contentWrapper.style.top = navHeight.toString() + "px"; // for padding
+    contentWrapper.style.height =
       (document.body.clientHeight - footerHeight - navHeight).toString() + "px";
     const contentHeight = contentWrapper.offsetHeight;
     // + 2 for padding
-    const formOffset = DOM.exploreWrapper.offsetHeight;
+    const formOffset = exploreWrapper.offsetHeight;
 
-    let specOffset;
-    if (!DOM.spectrogramWrapper.classList.contains("d-none")) {
+    let specOffset = 0;
+    if (!spectrogramWrapper.classList.contains("d-none")) {
       const specHeight =
         newHeight || Math.min(config.specMaxHeight, this.maxHeight());
-      if (newHeight !== 0) {
+      if (newHeight) {
         config.specMaxHeight = specHeight;
         this.handlers.updatePrefs("config.json", config);
       }
@@ -824,13 +826,9 @@ export class ChirpityWS {
           await this.loadBuffer();
         }
       }
-      if (wavesurfer) {
-        specOffset = spectrogramWrapper.offsetHeight;
-      }
-    } else {
-      specOffset = 0;
+      specOffset = spectrogramWrapper.offsetHeight;
     }
-    DOM.resultTableElement.style.height =
+    resultTableElement.style.height =
       contentHeight - specOffset - formOffset + "px";
   }
   /**
