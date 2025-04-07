@@ -305,33 +305,32 @@ const getSelectionRange = (file, start, end) => {
 async function loadDB(path) {
   DEBUG && console.log("Loading db " + path);
   const model = STATE.model;
-
+  let modelID, needsTranslation;
   const file = p.join(path, `archive.sqlite`);
   if (!fs.existsSync(file)) {
     console.log("No db file: ", file);
     diskDB = await createDB({file, dbMutex});
     console.log("DB created at : ", file);
-    STATE.modelID = await mergeDbIfNeeded({diskDB, model, dbMutex })
+    STATE.modelID = modelID;
   } else {
     diskDB = new sqlite3.Database(file);
-    const model = STATE.model
-    STATE.modelID = await mergeDbIfNeeded({diskDB, model, dbMutex })
     DEBUG && console.log("Opened and cleaned disk db " + file);
   }
 
+  ([modelID, needsTranslation] = await mergeDbIfNeeded({diskDB, model, dbMutex }) )
+  STATE.modelID = modelID;
   STATE.update({ db: diskDB });
   diskDB.locale = STATE.locale;
   await diskDB.runAsync("VACUUM");
   await diskDB.runAsync("PRAGMA foreign_keys = ON");
   await diskDB.runAsync("PRAGMA journal_mode = WAL");
   await diskDB.runAsync("PRAGMA busy_timeout = 5000");
-  
-  if (diskDB.locale === STATE.locale){
-    // Get the labels from the DB. These will be in preferred locale
-    await setLabelState({regenerate:true})
-  } else {
+  if (needsTranslation){
     UI.postMessage({ event: "label-translation-needed", locale: STATE.locale });
+  } else {
+    await setLabelState({regenerate:true})
   }
+
   // Set mapping from model IDs to db species ids
   const speciesResults = await diskDB.allAsync(
     "SELECT id, classIndex, modelID FROM species ORDER BY id"
@@ -1111,7 +1110,7 @@ const prepSummaryStatement = async () => {
   const partition = detect.split ? ', r.modelID' : '';
   let summaryStatement = `
     WITH ranked_records AS (
-        SELECT r.dateTime, r.confidence, f.name as file, f.archiveName, cname, sname, COALESCE(callCount, 1) as callCount, speciesID, isDaylight, tagID,
+        SELECT r.dateTime, r.confidence, f.name as file, f.archiveName, cname, sname, COALESCE(callCount, 1) as callCount, isDaylight, tagID,
         RANK() OVER (PARTITION BY fileID${partition}, dateTime ORDER BY r.confidence DESC) AS rank
         FROM records r
         JOIN files f ON f.id = r.fileID
@@ -1136,20 +1135,17 @@ const prepSummaryStatement = async () => {
   }
   summaryStatement += `
     )
-    SELECT speciesID, cname, sname, COUNT(cname) as count, SUM(callcount) as calls, MAX(ranked_records.confidence) as max
+    SELECT cname, sname, COUNT(cname) as count, SUM(callcount) as calls, MAX(ranked_records.confidence) as max
     FROM ranked_records
-    WHERE ranked_records.rank <= ${topRankin}`;
+    WHERE ranked_records.rank <= ${topRankin}
+    GROUP BY cname ORDER BY ${summarySortOrder}`;
 
-  summaryStatement += ` GROUP BY speciesID  ORDER BY ${summarySortOrder}`;
-
-  return [summaryStatement, params];
+  return {sql: summaryStatement, params};
 };
 
 const getTotal = async ({
   species = undefined,
   offset = undefined,
-  included = undefined,
-  file = undefined,
 } = {}) => {
   
   const {db, mode, explore, filteredOffset, globalOffset, labelFilters, detect, locationID, topRankin} = STATE;
@@ -1200,7 +1196,7 @@ const prepResultsStatement = async (
   offset,
   topRankin
 ) => {
-  const {mode, explore, limit, resultsMetaSortOrder, resultsSortOrder, labelFilters, detect, list, locationID, selection} = STATE;
+  const {mode, explore, limit, resultsMetaSortOrder, resultsSortOrder, labelFilters, detect, locationID, selection} = STATE;
   const partition = detect.split ? ', r.modelID' : '';  
   const params = [detect.confidence];
   let resultStatement = `
@@ -1302,7 +1298,7 @@ const prepResultsStatement = async (
     : "";
   resultStatement += ` ORDER BY ${metaSort} ${resultsSortOrder} ${limitClause} `;
 
-  return [resultStatement, params];
+  return {sql: resultStatement, params};
 };
 
 // Helper to chunk an array
@@ -2916,7 +2912,7 @@ const terminateWorkers = () => {
 async function batchInsertRecords(cname, label, files, originalCname) {
   const db = STATE.db;
   const t0 = Date.now();
-  const [sql, params] = prepResultsStatement(
+  const {sql, params} = await prepResultsStatement(
     originalCname,
     true,
     undefined,
@@ -2930,7 +2926,7 @@ async function batchInsertRecords(cname, label, files, originalCname) {
     await db.runAsync("BEGIN");
     for (let i = 0; i < records.length; i++) {
       const item = records[i];
-      const { dateTime, speciesID, fileID, position, end, comment, callCount } =
+      const { fileID, position, end, comment, callCount, modelID } =
         item;
       const { name } = await STATE.db.getAsync(
         "SELECT name FROM files WHERE id = ?",
@@ -2946,6 +2942,7 @@ async function batchInsertRecords(cname, label, files, originalCname) {
         label,
         batch: false,
         originalCname,
+        modelID,
         calledByBatch: true,
         updateResults: i === records.length - 1, // trigger a UI update after the last item
       });
@@ -2973,23 +2970,25 @@ const onInsertManualRecord = async ({
   batch,
   originalCname,
   confidence,
-  modelID = STATE.modelID,
+  modelID,
   reviewed = true,
-  calledByBatch
+  calledByBatch,
+  undo
 }) => {
   if (batch)
     return batchInsertRecords(cname, label, file, originalCname, confidence);
-  (start = parseFloat(start)), (end = parseFloat(end));
+  // (start = parseFloat(start)), (end = parseFloat(end));
   const startMilliseconds = Math.round(start * 1000);
   let fileID, fileStart;
   const db = STATE.db;
-  const speciesFound = await db.getAsync(
-    `SELECT id as speciesID FROM species WHERE cname = ? AND modelID = ?`,
-    cname, modelID
+  const speciesFound = await db.allAsync(
+    "SELECT id as speciesID, modelID FROM species WHERE cname = ?",
+    cname
   );
   let speciesID;
-  if (speciesFound) {
-    speciesID = speciesFound.speciesID;
+  if (speciesFound.length) {
+    const match = speciesFound.find(s => s.modelID === modelID);
+    speciesID = (match || speciesFound[0]).speciesID;
   } else {
     generateAlert({
       message: "noSpecies",
@@ -3005,7 +3004,8 @@ const onInsertManualRecord = async ({
 
   if (!res?.filestart) {
     // Manual records can be added off the bat, so there may be no record of the file in either db
-    const {fileStart, duration, metadata} = METADATA[file];
+    let duration, metadata;
+    ({fileStart, duration, metadata} = METADATA[file]);
     res = await db.runAsync(
       `INSERT INTO files ( id, name, duration, filestart,  metadata ) VALUES (?,?,?,?,?)
         ON CONFLICT(name) DO UPDATE SET
@@ -3031,20 +3031,27 @@ const onInsertManualRecord = async ({
 
   // Delete an existing record if species was changed
   if (cname !== originalCname) {
-    const result = await db.getAsync(
-      `SELECT id as originalSpeciesID FROM species WHERE cname = ? AND modelID = ?`,
-      originalCname, modelID
+    const result = await db.allAsync(
+      `SELECT id as originalSpeciesID FROM species WHERE cname = ?`,
+      originalCname
     );
-    if (result?.originalSpeciesID) {
-      await db.runAsync(
-        "DELETE FROM records WHERE datetime = ? AND speciesID = ? AND fileID = ?",
+    if (result.length) {
+      const ids = result.map(r => r.originalSpeciesID);
+      const placeholders = ids.map(() => '?').join(',');
+      const res = await db.runAsync(
+        `DELETE FROM records WHERE datetime = ? AND speciesID in (${placeholders}) AND fileID = ?`,
         dateTime,
-        result.originalSpeciesID,
+        ...ids,
         fileID
       );
-      confidence ??= 2000; // Manual record
+      if (!undo){
+        // Manual record
+        modelID = 0;
+        confidence = 2000; 
+      }
     }
   } else {
+    // New record
     confidence ??= 2000;
   }
   const result = await db.getAsync("SELECT id FROM tags WHERE name = ?", label);
@@ -3101,9 +3108,6 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
   await dbMutex.lock();
   try {
     await db.runAsync("BEGIN");
-
-    
-
     // Fetch or Insert File ID
     const res = await db.getAsync("SELECT id, filestart FROM files WHERE name = ?", file);
     fileID = res?.id;
@@ -3293,7 +3297,7 @@ const parsePredictions = async (response) => {
   }
   if (!selection && STATE.increment() === 0) {
     if (fileProgress < 1) getSummary({ interim: true });
-    getTotal({ file });
+    getTotal();
   }
   return response.worker;
 };
@@ -3551,7 +3555,7 @@ const getSummary = async ({
   interim = false,
   action = undefined,
 } = {}) => {
-  const [sql, params] = await prepSummaryStatement();
+  const {sql, params} = await prepSummaryStatement();
   const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
 
   const summary = await STATE.db.allAsync(sql, ...params);
@@ -3596,7 +3600,7 @@ const getResults = async ({
     // We want to consistently move to the next record. If results are sorted by time, this will be row + 1.
     active = position.row; //+ 1;
     // update the pagination
-    await getTotal({ species: species, offset: offset, included: included });
+    await getTotal({ species, offset });
   }
   offset =
     offset ??
@@ -3606,7 +3610,7 @@ const getResults = async ({
 
   let index = offset;
 
-  const [sql, params] = await prepResultsStatement(
+  const {sql, params} = await prepResultsStatement(
     species,
     limit === Infinity,
     offset,
@@ -3937,7 +3941,7 @@ const onSave2DiskDB = async ({ file }) => {
       }
     }
     DEBUG && console.log("transaction ended successfully");
-    const total = response.changes;
+    const total = response?.changes || 0;
     const seconds = (Date.now() - t0) / 1000;
     generateAlert({
       message: "goodDBUpdate",
@@ -3991,7 +3995,7 @@ const getValidSpecies = async (file) => {
   let sql = `SELECT cname, sname FROM species`;
 
   if (filtersApplied(included)) {
-    sql += ` WHERE id IN (${included.join(",")})`;
+    sql += ` WHERE id IN (${included.join(",")}) AND modelID = ${STATE.modelID}`;
   }
   sql += " GROUP BY cname ORDER BY cname";
   includedSpecies = await diskDB.allAsync(sql);
@@ -4166,8 +4170,8 @@ async function onDelete({
   const params = [id, datetime, end, modelID];
   let sql = "DELETE FROM records WHERE fileID = ? AND datetime = ? AND end = ? AND modelID = ?";
   if (species) {
-    sql += " AND speciesID = (SELECT id FROM species WHERE cname = ? AND modelID = ?)";
-    params.push(species, modelID);
+    sql += " AND speciesID IN (SELECT id FROM species WHERE cname = ?)";
+    params.push(species);
   }
   let { changes } = await db.runAsync(sql, ...params);
   if (changes) {
@@ -4413,10 +4417,8 @@ async function onUpdateLocale(locale, labels, refreshResults) {
   try {
     STATE.update({ locale: locale });
     for (db of [diskDB, memoryDB]) {
-      if (db.locale !== locale) {
-        db.locale = locale;
-        await _updateSpeciesLocale(db, labels);
-      }
+      db.locale = locale;
+      await _updateSpeciesLocale(db, labels);
     }
     if (refreshResults) await Promise.all([getResults(), getSummary()]);
   } catch (error) {

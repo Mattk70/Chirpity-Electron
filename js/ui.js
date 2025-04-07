@@ -144,7 +144,7 @@ const GLOBAL_ACTIONS = {
   t: (e) => (e.ctrlKey || e.metaKey) && timelineToggle(true),
   v: (e) => {
     if (activeRow && (e.ctrlKey || e.metaKey)) {
-      const {species, start, end,  label, callCount, comment, file} = addToHistory(activeRow);
+      const {species, start, end,  label, callCount, comment, file, modelID} = addToHistory(activeRow);
       insertManualRecord({
         files: file,
         cname: species,
@@ -155,13 +155,14 @@ const GLOBAL_ACTIONS = {
         count: callCount,
         action: "Update",
         batch: false,
-        originalCname: species
+        originalCname: species,
+        modelID
       });
     }
   },
   z: (e) => {
     if ((e.ctrlKey || e.metaKey) && HISTORY.length)
-      insertManualRecord(HISTORY.pop());
+      insertManualRecord({...HISTORY.pop(), undo: true});
   },
   Escape: () => {
     if (PREDICTING) {
@@ -2078,7 +2079,8 @@ const setUpWorkerMessaging = () => {
           break;
         }
         case "labels": {
-          LABELS = args.labels;
+          // Remove duplicate labels
+          LABELS = [...new Set(args.labels)];
           /* Code below to retrieve Red list data
                         for (let i = 0;i< LABELS.length; i++){
                             const label = LABELS[i];
@@ -2885,50 +2887,44 @@ const timelineToggle = (fromKeys) => {
  */
 function recordUpdate(e) {
   const {key, ctrlKey, metaKey} = e;
-  // const setCallCount = code.includes('Numpad');
+  const setCallCount = ctrlKey || metaKey;
   if (!activeRow) {
     console.info("No active row selected for key assignment", key);
     return;
   }
   const assignment = config.keyAssignment["key" + key];
   if ((assignment?.column && assignment?.value) || setCallCount) {
-    const {file, start, end, cname,} = unpackNameAttr(activeRow)
-
-    const commentCell = activeRow.querySelector(".comment > span");
-    let comment = commentCell ? commentCell.title : "";
-    const labelCell = activeRow.querySelector(".label > span");
-    let label = labelCell ? labelCell.textContent : "";
-    let name = cname;
-    let newCallCount, newConfidence;
-    if ((ctrlKey || metaKey) && STATE.isMember){
+    // const {file, start, end, cname,} = unpackNameAttr(activeRow)
+    let newLabel, newName, newCallCount, newConfidence, newComment;
+    if (setCallCount && STATE.isMember){
       // Ctrl/Cmd + number to set call count
       newCallCount = Number(key);
     } else {
-      name = assignment.column === "species" ? assignment.value : name;
-      label =
-        assignment.column === "label" ? assignment.value : label || "";
-      comment =
-        assignment.column === "comment" ? assignment.value : comment;
-      newConfidence = assignment.column === "species" ? 2000 : null;
+      const {column, value} = assignment;
+      // If we set a new species, we want to give the record a 2000 confidence
+      newName = column === "species" ? value : null;
+      newConfidence = column === "species" ? 2000 : null;
+      newLabel = column === "label" ? value : null;
+      newComment = column === "comment" ? value : null;
     }
     // Save record for undo
-    const { callCount, confidence } = addToHistory(activeRow, name);
-    const count = newCallCount || callCount;
-    // If we set a new species, we want to give the record a 2000 confidence
-    // However, if we just add a label or, leave the confidence alone
-    const certainty = newConfidence || confidence;
+    const {species, start, end,  label, callCount, 
+      comment, confidence, file, modelID
+    } = addToHistory(activeRow, newName);
+
     insertManualRecord({
       files: file,
-      cname: name,
+      cname: newName ?? species,
       start,
       end,
-      comment,
-      count,
-      label,
+      comment: newComment ?? comment,
+      count: newCallCount ?? callCount,
+      label: newLabel ?? label,
       action: "Update",
       batch: false,
-      originalCname: cname,
-      confidence: certainty
+      originalCname: species,
+      confidence: newConfidence ?? confidence,
+      modelID
     });
   }
 }
@@ -6009,7 +6005,7 @@ function positionMenu(menu, event) {
   }
 
   menu.style.display = "block";
-  menu.style.top = top + "px";
+  menu.style.top = top + "px"; 
   menu.style.left = left + "px";
 }
 
@@ -6025,7 +6021,7 @@ const recordEntryModal = new bootstrap.Modal(recordEntryModalDiv, {
 });
 
 const recordEntryForm = document.getElementById("record-entry-form");
-let focusBirdList;
+// let focusBirdList;
 
 /**
  * Populates and displays the record entry modal for updating or adding audio record details.
@@ -6055,11 +6051,16 @@ async function showRecordEntryForm(mode, batch) {
         .textContent
     : STATE.activeRegion?.label || "";
   let callCount = "",
-    commentText = "";
+    commentText = "",
+    modelID, score;
   if (cname && activeRow) {
     // Populate the form with existing values
+    ({modelID, score} = unpackNameAttr(activeRow))
     commentText = activeRow.querySelector(".comment > span")?.title || "";
     callCount = parseInt(activeRow.querySelector(".call-count").textContent);
+  } else {
+    // Brand new record
+    modelID = 0;
   }
   document
     .querySelectorAll(".species-search-label")
@@ -6067,12 +6068,13 @@ async function showRecordEntryForm(mode, batch) {
   const selectedBird = recordEntryForm.querySelector("#selected-bird");
   const autoComplete = document.getElementById("bird-autocomplete");
   autoComplete.value = "";
-  focusBirdList = () => autoComplete.focus();
+  const focusBirdList = () => autoComplete.focus();
   const speciesDisplay = document.createElement("div");
   speciesDisplay.className = "border rounded w-100";
   if (cname) {
-    const species = LABELS.find((sp) => sp.includes(cname));
-    const styled = species.split("_").reverse().join(" <br/><i>") + "</i>";
+    const species = LABELS.find(sp => sp.split('_')[1] === cname);
+    const [sciName, commonName] = species.split('_');
+    const styled = `${commonName}<br/><i>${sciName}</i>`;
     selectedBird.innerHTML = styled;
   } else {
     selectedBird.innerHTML = i18.searchPrompt;
@@ -6083,11 +6085,13 @@ async function showRecordEntryForm(mode, batch) {
     batch ? el.classList.add("d-none") : el.classList.remove("d-none")
   );
 
-  recordEntryForm.querySelector("#call-count").value = callCount;
+  recordEntryForm.querySelector("#call-count").value = callCount || 1;
   recordEntryForm.querySelector("#record-comment").value = commentText;
   recordEntryForm.querySelector("#DBmode").value = mode;
   recordEntryForm.querySelector("#batch-mode").value = batch;
   recordEntryForm.querySelector("#original-id").value = cname;
+  recordEntryForm.querySelector("#original-modelID").value = modelID;
+  recordEntryForm.querySelector("#original-score").value = score;
   const labelText = activeRow?.querySelector(".label").textContent;
 
   const labels = STATE.tagsList.map((item) => item.name);
@@ -6130,6 +6134,8 @@ recordEntryForm.addEventListener("submit", function (e) {
   const count = document.getElementById("call-count")?.valueAsNumber;
   const comment = document.getElementById("record-comment")?.value;
   const select = document.getElementById("label-container").firstChild;
+  const modelID = Number(document.getElementById("original-modelID").value) || 0;
+  const confidence = Number(document.getElementById("original-score").value) || null;
   const label = select.selectedValue;
 
   recordEntryModal.hide();
@@ -6143,7 +6149,9 @@ recordEntryForm.addEventListener("submit", function (e) {
     label,
     action,
     batch,
-    originalCname
+    originalCname,
+    confidence,
+    modelID
   });
 });
 
@@ -6160,7 +6168,8 @@ const insertManualRecord = ( {
   originalCname,
   confidence,
   reviewed,
-  modelID
+  modelID,
+  undo
 }  = {}) => {
   worker.postMessage({
     action: "insert-manual-record",
@@ -6181,7 +6190,8 @@ const insertManualRecord = ( {
     }, //  have to account for the header row
     speciesFiltered: isSpeciesViewFiltered(true),
     reviewed,
-    modelID
+    modelID,
+    undo
   });
 };
 
@@ -7317,7 +7327,7 @@ function addToHistory(record, newCname) {
   if (setting) {
     const comment = record.querySelector(".comment").innerText;
     const label = record.querySelector(".label").innerText;
-    let callCount = record.querySelector(".call-count").innerText;
+    let callCount = Number(record.querySelector(".call-count").innerText || 1);
     let reviewed = !!record.querySelector(".reviewed").innerText;
     HISTORY.push({
       files:file,

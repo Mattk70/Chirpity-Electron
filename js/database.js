@@ -305,6 +305,7 @@ const createDB = async ({file, diskDB, dbMutex}) => {
         name TEXT NOT NULL, UNIQUE(name)
       )`
     );
+    await db.runAsync("INSERT INTO models VALUES(0, 'user')");
     await db.runAsync(
       `CREATE TABLE species(
         id INTEGER PRIMARY KEY, 
@@ -353,13 +354,13 @@ const createDB = async ({file, diskDB, dbMutex}) => {
     await db.runAsync(
       `CREATE TABLE records( 
         dateTime INTEGER, 
-        position INTEGER, 
+        position INTEGER,
         fileID INTEGER, 
         speciesID INTEGER,
         modelID INTEGER,
         confidence INTEGER, 
-        comment TEXT, 
-        end INTEGER, 
+        comment TEXT,
+        end INTEGER,
         callCount INTEGER, 
         isDaylight INTEGER, 
         reviewed INTEGER, 
@@ -431,70 +432,79 @@ const createDB = async ({file, diskDB, dbMutex}) => {
   return db;
 };
 
-const mergeDbIfNeeded = async ({diskDB, model, labels, dbMutex}) => {
-  // Check if we have this model already
-  const modelRow = await diskDB.getAsync(`SELECT id FROM models WHERE name = ?`, model)
-  if (modelRow) return modelRow.id
-  // If not, let's look for a legacy database
-  const models = {birdnet: '6523', chirpity: '409', nocmig: '432'}
-  const modelDbPath = diskDB.filename.replace('.sqlite', models[model] + '.sqlite')
+
+const addNewModel = async ({model, diskDB, dbMutex}) => {
   let modelID;
   try {
     await dbMutex.lock();
     await diskDB.runAsync('BEGIN');
     let result = await diskDB.runAsync('INSERT INTO models (name) VALUES (?)', model)
     modelID = result.lastID;
-    // Check if model DB exists
-    const {existsSync} = require('node:fs');
-    if (!existsSync(modelDbPath)) {
-      console.log(`Model database not found: ${modelDbPath}`);
-      // We need to get the default labels from the config file
-      // There may not be a db, or the db may not have the labels required 
-      let labels;
-      if (model === "birdnet") {
-        const labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_en.txt`;
-        await fetch(labelFile)
-          .then((response) => {
-            if (!response.ok) throw new Error("Network response was not ok");
-            return response.text();
-          })
-          .then((fileContents) => {
-            labels = fileContents.trim().split(/\r?\n/);
-          })
-          .catch((error) => {
-            console.error("There was a problem fetching the label file:", error);
-          });
-      } else {
-        labels = JSON.parse(
-          fs.readFileSync(p.join(__dirname, `${model}_model_config.json`), "utf8")
-        ).labels;
-      }
-      // Add Unknown Sp.
-      labels.push("Unknown Sp._Unknown Sp.");
-      // Fill species table with this model's labels and translate
-      let insertQuery = `INSERT INTO species (sname, cname, modelID, classIndex) VALUES `;
-      const params = [];
-        labels.forEach((entry, index) => {
-          const [sname, cname] = entry.split("_");
-          console.log(cname)
-          insertQuery += '(?, ?, ?, ?),';
-          params.push(sname, cname, modelID, index);
+    // We need to get the default labels from the config file
+    // There may not be a db, or the db may not have the labels required 
+    let labels;
+    if (model === "birdnet") {
+      const labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_en.txt`;
+      await fetch(labelFile)
+        .then((response) => {
+          if (!response.ok) throw new Error("Network response was not ok");
+          return response.text();
+        })
+        .then((fileContents) => {
+          labels = fileContents.trim().split(/\r?\n/);
+        })
+        .catch((error) => {
+          console.error("There was a problem fetching the label file:", error);
+          throw error;
         });
-      // Remove trailing comma
-      insertQuery = insertQuery.slice(0, -1);
-      await diskDB.runAsync(insertQuery, ...params);
-      // await diskDB.runAsync('COMMIT');
-      // dbMutex.unlock();
-      return modelID;
+    } else {
+      const {readFileSync} = require('node:fs');
+      const path = require('node:path');
+      labels = JSON.parse(
+        readFileSync(path.join(__dirname, `${model}_model_config.json`), "utf8")
+      ).labels;
     }
+    // Add Unknown Sp.
+    labels.push("Unknown Sp._Unknown Sp.");
+    // Fill species table with this model's labels (will be default lingo)
+    let insertQuery = `INSERT INTO species (sname, cname, modelID, classIndex) VALUES `;
+    const params = [];
+      labels.forEach((entry, index) => {
+        const [sname, cname] = entry.split("_");
+        // console.log(cname)
+        insertQuery += '(?, ?, ?, ?),';
+        params.push(sname, cname, modelID, index);
+      });
+    // Remove trailing comma
+    insertQuery = insertQuery.slice(0, -1);
+    await diskDB.runAsync(insertQuery, ...params);
+    await diskDB.runAsync('COMMIT');
   } catch (err) {
     await diskDB.runAsync('ROLLBACK');
     console.error(`Error adding model species for "${model}":`, err.message);
-
   } finally {
-    await diskDB.runAsync('COMMIT');
-    dbMutex.unlock()
+    dbMutex.unlock();
   }
+  return modelID;
+}
+
+const mergeDbIfNeeded = async ({diskDB, model, dbMutex}) => {
+  // Check if we have this model already
+  const modelRow = await diskDB.getAsync(`SELECT id FROM models WHERE name = ?`, model)
+  if (modelRow) return [modelRow.id, false]
+  // If not, let's look for a legacy database
+  const models = {birdnet: '6523', chirpity: '409', nocmig: '432'}
+  const modelDbPath = diskDB.filename.replace('.sqlite', models[model] + '.sqlite')
+  // Check if model DB exists
+  const {existsSync} = require('node:fs');
+  const dbNotFound = !existsSync(modelDbPath);
+  if (dbNotFound) {
+    console.log(`Model database not found: ${modelDbPath}`);
+    const modelID = await addNewModel({model, diskDB, dbMutex})
+    // translation needed
+    return [modelID, true]
+  }
+  let modelID;
   // Migration. Step 1: Attach the old model db
   try {
     // Run schema update on existing database if needed
@@ -524,7 +534,8 @@ const mergeDbIfNeeded = async ({diskDB, model, labels, dbMutex}) => {
     await dbMutex.lock();
     await diskDB.runAsync('BEGIN');
     await diskDB.runAsync('ATTACH DATABASE ? AS modelDb', modelDbPath)
-
+    let result = await diskDB.runAsync('INSERT INTO models (name) VALUES (?)', model)
+    modelID = result.lastID;
     // Migrate and de-duplicate tags
     await diskDB.runAsync(`
       INSERT OR IGNORE INTO tags (name)
@@ -617,7 +628,7 @@ const mergeDbIfNeeded = async ({diskDB, model, labels, dbMutex}) => {
   }
   // Set the local to English after migration so all labels will get the translation treatment
   diskDB.locale = 'en'
-  return modelID
+  return [modelID, false]
 }
 
 async function insertTranslations(db){

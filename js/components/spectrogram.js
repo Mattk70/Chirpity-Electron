@@ -785,7 +785,7 @@ export class ChirpityWS {
    * @returns {Promise<void>} A promise that resolves once the UI adjustments and spectrogram rendering updates are complete.
    */
 
-  async adjustDims(redraw, fftSamples, newHeight) {
+  async adjustDims(redraw, fftSamples, newHeight = 0) {
     const config = this.getConfig();
     const STATE = this.getState();
     const {footer, navPadding, contentWrapper, exploreWrapper, 
@@ -793,7 +793,7 @@ export class ChirpityWS {
     const wavesurfer = this.wavesurfer;
     const footerHeight = footer.offsetHeight;
     const navHeight = navPadding.clientHeight;
-    newHeight ??= 0;
+    fftSamples ??= config.FFT;
     contentWrapper.style.top = navHeight.toString() + "px"; // for padding
     contentWrapper.style.height =
       (document.body.clientHeight - footerHeight - navHeight).toString() + "px";
