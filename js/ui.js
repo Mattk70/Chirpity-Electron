@@ -6492,8 +6492,8 @@ function generateToast({
   const toast = new bootstrap.Toast(wrapper, { autohide: autohide });
   toast.show();
   if (message === i18.complete) {
-    const duration = parseFloat(
-      DIAGNOSTICS["Analysis Duration"].replace(" seconds", "")
+    const duration = utils.parseDuration(
+      DIAGNOSTICS["Analysis Duration"]
     );
     if (config.audio.notification && duration > 30) {
       if (Notification.permission === "granted") {

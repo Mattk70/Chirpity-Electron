@@ -201,6 +201,22 @@ function formatDuration(seconds) {
   return duration;
 }
 
+// Used for notifications, converts DIAGNOSTICS duratino back to seconds:
+
+function parseDuration(durationString) {
+  const regex = /(?:(\d+)\s*hours?)?\s*(?:(\d+)\s*minutes?)?\s*(?:(\d+)\s*seconds?)?/i;
+  const match = durationString.match(regex);
+
+  if (!match) return 0;
+
+  const hours = parseInt(match[1], 10) || 0;
+  const minutes = parseInt(match[2], 10) || 0;
+  const seconds = parseInt(match[3], 10) || 0;
+
+  return hours * 3600 + minutes * 60 + seconds;
+}
+
+
 // Utility functions to wait for a variable to not be falsey
 function waitFor(checkFn) {
   let maxRetries = 250;
@@ -241,6 +257,7 @@ export {
   clamp,
   waitForFinalEvent,
   formatDuration,
+  parseDuration,
   waitFor,
   shuffle,
 };
