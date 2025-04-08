@@ -34,7 +34,6 @@ onmessage = async (e) => {
           )
         );
         const appPath = "../../" + location + "/";
-        const list = e.data.list;
         const batch = e.data.batchSize;
         const backend = BACKEND || e.data.backend;
         backend === "webgpu" && require("@tensorflow/tfjs-backend-webgpu");
@@ -56,7 +55,7 @@ onmessage = async (e) => {
           });
         DEBUG &&
           console.log(
-            `model received load instruction. Using list: ${list}, batch size ${batch}`
+            `Model received load instruction. Using batch size ${batch}`
           );
 
         tf.setBackend(backend).then(async () => {

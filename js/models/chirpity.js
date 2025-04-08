@@ -29,7 +29,6 @@ const CONFIG = {
  *
  * @param {Object} params - Parameters for loading the model.
  * @param {string} params.model - Version identifier used to locate the model configuration file.
- * @param {string} params.list - Identifier used during model initialization.
  * @param {number} params.batchSize - Batch size used for warming up the model.
  * @param {string} [params.backend] - Optional TensorFlow.js backend; defaults to the global backend if not provided.
  * @param {*} params.worker - Identifier of the worker to receive the "model-ready" message.
@@ -46,13 +45,12 @@ function loadModel(params) {
     )
   );
   const appPath = "../../" + location + "/";
-  const list = params.list;
   const batch = params.batchSize;
   const backend = BACKEND || params.backend;
   backend === "webgpu" && require("@tensorflow/tfjs-backend-webgpu");
   if (DEBUG) {
     console.log(
-      `model received load instruction. Using list: ${list}, batch size ${batch}`
+      `model received load instruction. Using batch size ${batch}`
     );
   }
   tf.setBackend(backend).then(async () => {

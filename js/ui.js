@@ -2786,14 +2786,14 @@ DOM.customListSelector.addEventListener("click", async () => {
 const loadModel = () => {
   PREDICTING = false;
   t0_warmup = Date.now();
+  const {model, warmup} = config;
   worker.postMessage({
     action: "load-model",
-    model: config.model,
-    list: config.list,
-    batchSize: config[config[config.model].backend].batchSize,
-    warmup: config.warmup,
-    threads: config[config[config.model].backend].threads,
-    backend: config[config.model].backend,
+    model,
+    batchSize: config[config[model].backend].batchSize,
+    warmup,
+    threads: config[config[model].backend].threads,
+    backend: config[model].backend,
   });
 };
 

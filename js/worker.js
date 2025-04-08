@@ -489,7 +489,7 @@ async function handleMessage(e) {
       const delta = threads - predictWorkers.length;
       NUM_WORKERS += delta;
       if (delta > 0) {
-        spawnPredictWorkers(STATE.model, STATE.list, BATCH_SIZE, delta);
+        spawnPredictWorkers(STATE.model, BATCH_SIZE, delta);
       } else {
         for (let i = delta; i < 0; i++) {
           const worker = predictWorkers.pop();
@@ -868,7 +868,6 @@ async function onLaunch({
   batchSize = 32,
   threads = 1,
   backend = "tensorflow",
-  list = "everything",
 }) {
   SEEN_MODEL_READY = false;
   LIST_CACHE = {};
@@ -891,7 +890,7 @@ async function onLaunch({
     : diskDB;
   STATE.update({ db });
   NUM_WORKERS = threads;
-  spawnPredictWorkers(model, list, batchSize, NUM_WORKERS);
+  spawnPredictWorkers(model, batchSize, NUM_WORKERS);
 }
 
 /**
@@ -1499,7 +1498,7 @@ async function onAnalyse({
   }
 }
 
-function onAbort({ model = STATE.model, list = STATE.list }) {
+function onAbort({ model = STATE.model }) {
   aborted = true;
   FILE_QUEUE = [];
   predictQueue = [];
@@ -1514,7 +1513,7 @@ function onAbort({ model = STATE.model, list = STATE.list }) {
   //restart the workers
   terminateWorkers();
   setTimeout(
-    () => spawnPredictWorkers(model, list, BATCH_SIZE, NUM_WORKERS),
+    () => spawnPredictWorkers(model, BATCH_SIZE, NUM_WORKERS),
     20
   );
 }
@@ -2841,12 +2840,10 @@ const processQueue = async () => {
  * asynchronous communication and to manage worker failures.
  *
  * @param {string} model - The name of the AI model to use; for "birdnet", the "BirdNet2.4" script is used.
- * @param {Array} list - The list of data items for the workers to process.
  * @param {number} batchSize - The number of items each worker should process per batch.
  * @param {number} threads - The number of Web Worker threads to spawn.
  */
-function spawnPredictWorkers(model, list, batchSize, threads) {
-  // And be ready to receive the list:
+function spawnPredictWorkers(model, batchSize, threads) {
   for (let i = 0; i < threads; i++) {
     const workerSrc = model === "birdnet" ? "BirdNet2.4" : model;
     const worker = new Worker(`./js/models/${workerSrc}.js`, { type: "module" });
@@ -2857,7 +2854,6 @@ function spawnPredictWorkers(model, list, batchSize, threads) {
     worker.postMessage({
       message: "load",
       model: model,
-      list: list,
       batchSize: batchSize,
       backend: STATE.detect.backend,
       worker: i,
