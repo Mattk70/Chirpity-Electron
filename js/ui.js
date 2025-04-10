@@ -5409,6 +5409,7 @@ document.addEventListener("change", function (e) {
             action: "update-state",
             detect: config.detect,
           });
+          filterResults()
           break;
         }
         case "combine-detections": {
@@ -5417,7 +5418,6 @@ document.addEventListener("change", function (e) {
             action: "update-state",
             detect: config.detect,
           });
-          filterResults()
           break;
         }
         case "auto-load": {
