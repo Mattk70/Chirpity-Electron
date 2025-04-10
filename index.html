@@ -273,6 +273,7 @@
                                 <th class="text-start timeOfDay">Time</th>
                                 <th class="text-start timestamp">Position</th>
                                 <th class="text-start">Species</th>
+                                <th class="text-start">Model</th>
                             </tr>
                         </thead>
                         <tbody class="text-dark" id="selectionResultTableBody">
@@ -549,6 +550,24 @@
                         </div>
                     </div>
                     <div class="form-group rounded p-2 pe-0 mb-2">
+                        <div class="form-check form-switch">
+                            <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature.">
+                                <span class="pointer locked material-symbols-outlined">lock</span></a>
+                            <input class="locked form-check-input" type="checkbox" role="switch" id="combine-detections" disabled>
+                            <label class="form-check-label" for="combine-detections">Combine model detections</label>
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-html="true" data-bs-title="Merge model detections" id="Merge-circle-help"  data-bs-content="When enabled, repeating the analysis of open files with a different model will add the model's detections to the list. Note: <b>during</b> the new analysis, only the results of the current model will be shown">?</a>
+                        </div>
+                    </div>
+                    <div class="form-group rounded p-2 pe-0 mb-2">
+                        <div class="form-check form-switch">
+                            <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature.">
+                                <span class="pointer locked material-symbols-outlined">lock</span></a>
+                            <input class="locked form-check-input" type="checkbox" role="switch" id="merge-detections" disabled>
+                            <label class="form-check-label" for="merge-detections">Merge model detections</label>
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-html="true" data-bs-title="Combine model detections" id="Combine-circle-help"  data-bs-content="When enabled, detections for each model will be merged, only the detection with the highest confidence from the models will be displayed. Note: <b>during</b> the new analysis, only the results of the current model will be shown">?</a>
+                        </div>
+                    </div>
+                    <div class="form-group rounded p-2 pe-0 mb-2">
                         <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Confidence Threshold" id="Confidence Threshold-circle-help"  data-bs-content="Determines the minimum confidence required for results to be returned">?</a>
                         <div class="input-group">
                             <label for="confidence">Confidence threshold:</label>
@@ -674,8 +693,7 @@
                     <div class="form-group rounded p-2 pe-0 mb-2">
                         <div class="form-check form-switch">
                             <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature.">
-                                <span class="pointer locked material-symbols-outlined">lock</span>
-                            </a>
+                                <span class="pointer locked material-symbols-outlined">lock</span></a>
                             <input class="locked form-check-input" type="checkbox" role="switch" id="auto-load" disabled>
                             <label class="form-check-label" for="auto-load">Auto-load saved detections</label>
                             <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Auto-load detections" id="Auto-load-circle-help"  data-bs-content="When enabled, saved detections are displayed immediately upon opening a file.">?</a>

@@ -1170,15 +1170,15 @@ const getSelectionResults = (fromDB) => {
   // Remove small amount of region to avoid pulling in results from 'end'
   let end = STATE.activeRegion.end + STATE.windowOffsetSecs; // - 0.001;
   STATE.selection = {};
-  STATE["selection"]["start"] = start.toFixed(3);
-  STATE["selection"]["end"] = end.toFixed(3);
+  STATE["selection"]["start"] = Number(start.toFixed(3));
+  STATE["selection"]["end"] = Number(end.toFixed(3));
 
   postAnalyseMessage({
     filesInScope: [STATE.currentFile],
     start: STATE["selection"]["start"],
     end: STATE["selection"]["end"],
     offset: 0,
-    fromDB: fromDB,
+    fromDB,
   });
 };
 
@@ -1694,6 +1694,8 @@ const defaultConfig = {
     nocmig: false,
     autoLoad: false,
     contextAware: false,
+    merge: false,
+    combine: false,
     confidence: 45,
     iucn: true,
     iucnScope: "Global",
@@ -1880,6 +1882,8 @@ window.onload = async () => {
     DOM.audioFade.disabled = !DOM.audioPadding.checked;
     DOM.audioDownmix.checked = config.audio.downmix;
     setNocmig(config.detect.nocmig);
+    document.getElementById("merge-detections").checked = config.detect.merge;
+    document.getElementById("combine-detections").checked = config.detect.combine;
     document.getElementById("auto-load").checked = config.detect.autoLoad;
     document.getElementById("iucn").checked = config.detect.iucn;
     document.getElementById("iucn-scope").selected = config.detect.iucnScope;
@@ -3718,7 +3722,7 @@ async function renderResult({
             <td class="label ${hide}">${labelHTML}</td>
             <td class="comment text-end ${hide}">${commentHTML}</td>
             <td class="reviewed text-end ${hide}">${reviewHTML}</td>
-            <td class="text-end ${hide}"><img class="model-logo" src="img/icon/${model}_logo.png" title="${model}" alt="${model}"></td>
+            <td class="text-end"><img class="model-logo" src="img/icon/${model}_logo.png" title="${model}" alt="${model}"></td>
             </tr>`;
   }
   updateResultTable(tr, isFromDB, selection);
@@ -5399,6 +5403,23 @@ document.addEventListener("change", function (e) {
           changeNocmigMode(e);
           break;
         }
+        case "merge-detections": {
+          config.detect.merge = element.checked;
+          worker.postMessage({
+            action: "update-state",
+            detect: config.detect,
+          });
+          break;
+        }
+        case "combine-detections": {
+          config.detect.combine = element.checked;
+          worker.postMessage({
+            action: "update-state",
+            detect: config.detect,
+          });
+          filterResults()
+          break;
+        }
         case "auto-load": {
           config.detect.autoLoad = element.checked;
           worker.postMessage({
@@ -6958,9 +6979,12 @@ async function membershipCheck() {
         localStorage.setItem("isMember", true);
         localStorage.setItem("memberTimestamp", now);
       } else {
+        document.getElementById("buy-me-coffee").classList.remove("d-none");
         config.keyAssignment = {};
         config.specDetections = false;
         config.detect.autoLoad = false;
+        config.detect.combine = false;
+        config.detect.merge = false;
         config.library.clips = false;
         lockedElements.forEach((el) => {
           el.classList.replace("unlocked", "locked");

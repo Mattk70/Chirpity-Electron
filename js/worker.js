@@ -821,7 +821,6 @@ async function onChangeMode(mode) {
   if (STATE.mode !== mode) {
     // if (!memoryDB){
       memoryDB = await createDB({file: null, diskDB, dbMutex});
-      // UI.postMessage({ event: "label-translation-needed", locale: STATE.locale });
     // }
     UI.postMessage({ event: "mode-changed", mode: mode });
     STATE.changeMode({
@@ -1106,7 +1105,7 @@ const prepSummaryStatement = async () => {
   const {mode, explore, labelFilters, detect, locationID, topRankin, summarySortOrder} = STATE;
   const range = mode === "explore" ? explore.range : undefined;
   const params = [detect.confidence];
-  const partition = detect.split ? ', r.modelID' : '';
+  const partition = detect.merge ? '' : ', r.modelID';
   let summaryStatement = `
     WITH ranked_records AS (
         SELECT r.dateTime, r.confidence, f.name as file, f.archiveName, cname, sname, COALESCE(callCount, 1) as callCount, isDaylight, tagID,
@@ -1150,7 +1149,7 @@ const getTotal = async ({
   const {db, mode, explore, filteredOffset, globalOffset, labelFilters, detect, locationID, topRankin} = STATE;
   let params = [];
   const range = mode === "explore" ? explore.range : undefined;
-  const partition = detect.split ? ', r.modelID' : '';
+  const partition = detect.merge ? '' : ', r.modelID';
   offset =
     offset ??
     (species !== undefined
@@ -1196,7 +1195,7 @@ const prepResultsStatement = async (
   topRankin
 ) => {
   const {mode, explore, limit, resultsMetaSortOrder, resultsSortOrder, labelFilters, detect, locationID, selection} = STATE;
-  const partition = detect.split ? ', r.modelID' : '';  
+  const partition = detect.merge ? '' : ', r.modelID'; 
   const params = [detect.confidence];
   let resultStatement = `
     WITH ranked_records AS (
@@ -1395,7 +1394,7 @@ async function updateMetadata(fileNames) {
 // Not an arrow function. Async function has access to arguments - so we can pass them to processnextfile
 async function onAnalyse({
   filesInScope = [],
-  start = 0,
+  start = undefined,
   end = undefined,
   reanalyse = false,
   circleClicked = false,
@@ -1423,7 +1422,7 @@ async function onAnalyse({
 
   if (!STATE.selection) {
     // Clear records from the memory db
-    await memoryDB.runAsync("DELETE FROM records; VACUUM");
+    STATE.detect.combine || await memoryDB.runAsync("DELETE FROM records; VACUUM");
     //create a copy of files in scope for state, as filesInScope is spliced
     STATE.setFiles([...filesInScope]);
   }
@@ -1837,7 +1836,7 @@ function addDays(date, days) {
  */
 async function sendDetections(file, start, end, goToRegion) {
   const {db, detect} = STATE;
-  const partition = detect.split ? ', r.modelID' : '';  
+  const partition = detect.merge ? "" : ', r.modelID';  
   start = METADATA[file].fileStart + start * 1000;
   end = METADATA[file].fileStart + end * 1000;
   const params = [STATE.detect.confidence, file, start, end];
@@ -3403,7 +3402,7 @@ async function processNextFile({
       if (end) {
       }
       let boundaries = [];
-      if (!start)
+      if (start === undefined)
         boundaries = await setStartEnd(file).catch((error) =>
           console.warn("Error in setStartEnd", error)
         );
@@ -4163,8 +4162,12 @@ async function onDelete({
   );
   const datetime = Math.round(filestart + (parseFloat(start) * 1000));
   end = parseFloat(end);
-  const params = [id, datetime, end, modelID];
-  let sql = "DELETE FROM records WHERE fileID = ? AND datetime = ? AND end = ? AND modelID = ?";
+  const params = [id, datetime, end];
+  let sql = "DELETE FROM records WHERE fileID = ? AND datetime = ? AND end = ?";
+  if (! STATE.detect.merge){
+    params.push(modelID)
+    sql += " AND modelID = ?";
+  }
   if (species) {
     sql += " AND speciesID IN (SELECT id FROM species WHERE cname = ?)";
     params.push(species);

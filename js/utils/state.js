@@ -45,7 +45,8 @@ export class WorkerState {
         autoLoad: false,
         contextAware: false,
         confidence: 450,
-        split: true, // Whether to split or merge results from different models
+        merge: false, // Whether to layer model analyses
+        combine: true, // Whether to split or merge results from different models
         iucn: false,
         iucnScope: "Global",
       }),
