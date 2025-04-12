@@ -3779,28 +3779,12 @@ function setClickedIndex(target) {
 }
 
 const deleteRecord = (target) => {
-  if (target === activeRow) {
-  } else if (target instanceof PointerEvent) target = activeRow;
-  else {
-    // A batch delete?
-    target.forEach((position) => {
-      const [start, end] = position;
-      worker.postMessage({
-        action: "delete",
-        file: STATE.currentFile,
-        start: start,
-        end: end,
-        active: getActiveRowID(),
-      });
-    });
-    activeRow = undefined;
-    return;
-  }
-
+  if (! STATE.fileLoaded ) return;
+  if (target instanceof PointerEvent) target = activeRow;
   setClickedIndex(target);
   // If there is no row (deleted last record and hit delete again):
-  if (clickedIndex === -1) return;
-  const { species, start, end, file, row, setting, modelID } = addToHistory(target);
+  if (clickedIndex === -1 || clickedIndex === undefined) return;
+  const { species, start, end, file, setting, modelID } = addToHistory(target);
   worker.postMessage({
     action: "delete",
     file,
@@ -3811,10 +3795,9 @@ const deleteRecord = (target) => {
     modelID
   });
   // Clear the record in the UI
-  const index = row.rowIndex;
   // there may be no records remaining (no index)
-  index > -1 && setting.deleteRow(index);
-  setting.rows[index]?.click();
+  setting.deleteRow(clickedIndex);
+  setting.rows[clickedIndex]?.click();
 };
 
 const deleteSpecies = (target) => {
