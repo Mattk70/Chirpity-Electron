@@ -90,6 +90,7 @@ class ExportFormatter {
       Latitude: latitude,
       Longitude: longitude,
       Place: place,
+      Model: modifiedObj.model
     };
   }
 

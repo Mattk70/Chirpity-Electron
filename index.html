@@ -555,7 +555,7 @@
                                 <span class="pointer locked material-symbols-outlined">lock</span></a>
                             <input class="locked form-check-input" type="checkbox" role="switch" id="combine-detections" disabled>
                             <label class="form-check-label" for="combine-detections">Combine model detections</label>
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-html="true" data-bs-title="Merge model detections" id="Merge-circle-help"  data-bs-content="When enabled, repeating the analysis of open files with a different model will add the model's detections to the list. Note: <b>during</b> the new analysis, only the results of the current model will be shown">?</a>
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-html="true" data-bs-title="Combine model detections" id="Combine-circle-help"  data-bs-content="When enabled, repeating the analysis of open files with a different model will add the model's detections to the list. Note: <b>during</b> the new analysis, only the results of the current model will be shown">?</a>
                         </div>
                     </div>
                     <div class="form-group rounded p-2 pe-0 mb-2">
@@ -564,7 +564,7 @@
                                 <span class="pointer locked material-symbols-outlined">lock</span></a>
                             <input class="locked form-check-input" type="checkbox" role="switch" id="merge-detections" disabled>
                             <label class="form-check-label" for="merge-detections">Merge model detections</label>
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-html="true" data-bs-title="Combine model detections" id="Combine-circle-help"  data-bs-content="When enabled, detections for each model will be merged, only the detection with the highest confidence from the models will be displayed. Note: <b>during</b> the new analysis, only the results of the current model will be shown">?</a>
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-html="true" data-bs-title="Merge model detections" id="Merge-circle-help"  data-bs-content="When enabled, detections for each model will be merged, only the detection with the highest confidence from the models will be displayed. Note: <b>during</b> the new analysis, only the results of the current model will be shown">?</a>
                         </div>
                     </div>
                     <div class="form-group rounded p-2 pe-0 mb-2">
@@ -935,6 +935,20 @@
                                         File timestamps mark recording start
                                     </label>
                                     
+                                </div>
+                            </div>
+                        </div>
+                        <div class="input-group rounded p-2" id="choose-database-location">
+                            <div class="col-auto pe-1">
+                                <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature.">
+                                <span class="pointer locked material-symbols-outlined">lock</span></a>
+                            </div>
+                            <div class="col">
+                                <div class="input-group">
+                                    <button class="btn btn-outline-secondary text-warning locked" type="button" id="database-location-select">
+                                        Database Location:</button>
+                                    <input type="text" class="form-control" id="database-location" aria-describedby="database-location-select" placeholder="Default" readonly>
+                                    <span id="clear-database-location" class="material-symbols-outlined btn btn-outline-secondary p-1" title="Clear custom database location">clear</span>
                                 </div>
                             </div>
                         </div>
@@ -1396,6 +1410,10 @@
                             <div class="dropdown-divider"></div>
                             <li><a class="dropdown-item disabled" id="saveCSV" href="#">
                                 <span class="material-symbols-outlined">ios_share</span> Export Results
+                                to CSV</a>
+                            </li>
+                            <li><a class="dropdown-item disabled" id="save-summary" href="#">
+                                <span class="material-symbols-outlined">ios_share</span> Export Summary
                                 to CSV</a>
                             </li>
                             <li><a class="dropdown-item disabled" id="save-eBird" href="#">

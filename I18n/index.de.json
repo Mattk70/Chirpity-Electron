@@ -35,7 +35,9 @@
     "Use Location settings-circle-help": ["Wenn aktiviert, meldet der Nachtaktive Rufen-Filter die Vögel basierend auf Ihren Standorteinstellungen."],
     "Volume Adjustment-circle-help": ["Passen Sie die Lautstärke des Audios an, um niedrige Aufnahmestufen auszugleichen."],
     "File-timestamp-circle-help": [ "Einige Audio-Recorder, zum Beispiel der Zoom H1 Essential, können das gespeicherte Datum und die Uhrzeit der Datei auf den Beginn der Aufnahme statt auf das Ende setzen. Wenn Sie einen solchen Recorder haben, wird durch die Auswahl dieser Option die angezeigte Zeit für Ihre Erkennungen korrigiert (Änderungen an dieser Einstellung erfordern einen Neustart von Chirpity, um wirksam zu werden)."],
-    
+    "Combine-circle-help": ["Wenn aktiviert, wird das erneute Analysieren geöffneter Dateien mit einem anderen Modell die Erkennungen des Modells zur Liste hinzufügen. Hinweis: <b>während</b> der neuen Analyse werden nur die Ergebnisse des aktuellen Modells angezeigt."],
+    "Merge-circle-help": ["Wenn aktiviert, werden Erkennungen jedes Modells zusammengeführt; es wird nur die Erkennung mit der höchsten Konfidenz angezeigt. Hinweis: <b>während</b> der neuen Analyse werden nur die Ergebnisse des aktuellen Modells angezeigt."],
+
     "loading-text": ["Alles wird vorbereitet..."],
     "navBarFile": ["Datei"],
     "navbarHelp": ["Hilfe"],
@@ -46,6 +48,7 @@
     ],
     "open-folder": ["Ordner öffnen"],
     "saveCSV": ["Ergebnisse in CSV exportieren"],
+    "save-summary": ["Zusammenfassung als CSV exportieren"],
     "save-eBird": ["eBird Datensatz exportieren"],
     "save-Raven": ["Raven-Auswahltabelle exportieren"],
     "export-audio": ["Ausgewählte Audio exportieren","Ctrl+E"
@@ -93,6 +96,7 @@
     "apply-location": ["Festlegen"],
     "cancel-location": ["Abbrechen"],
     "library-location-select": ["Bibliotheksspeicherort:"],
+    "database-location-select": ["Datenbankstandort:"],
     "close-tour": ["Schließen"],
     "settings": {
       "basic": "Standard",
@@ -101,6 +105,8 @@
       "clear-call-cache": ["Referenzruf-Cache löschen"],
       "reset-defaults": ["Auf Standardeinstellungen zurücksetzen"],
       "model-to-use": "Modell:",
+      "combine-detections": "Modellerkennungen kombinieren",
+      "merge-detections": "Modellerkennungen zusammenführen",
       "confidence": "Konfidenzschwelle:",
       "list-to-use": "Liste:",
       "local": "Verwenden Sie Standorteinstellungen",

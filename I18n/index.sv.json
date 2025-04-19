@@ -35,7 +35,9 @@
     "Use Location settings-circle-help": ["När aktiverat, rapporterar filtret för nattliga läten arter baserat på dina platsinställningar."],
     "Volume Adjustment-circle-help": ["Justera ljudvolymen för att kompensera för låga inspelningsnivåer."],
     "File-timestamp-circle-help": ["Vissa ljudinspelningsenheter, till exempel Zoom H1 Essential, kan ställa in filens sparade datum och tid till början av inspelningen, istället för slutet. Om du har en sådan inspelare kommer valet av det här alternativet att korrigera tiderna som visas för dina detektioner (ändringar i denna inställning kräver en omstart av Chirpity för att träda i kraft)."],
-    
+    "Combine-circle-help": ["När aktiverat kommer upprepad analys av öppna filer med en annan modell att lägga till modellens detektioner i listan. Obs: <b>under</b> den nya analysen visas endast resultat från den aktuella modellen."],
+    "Merge-circle-help": ["När aktiverat kommer detektioner från varje modell att slås samman; endast detektionen med högst tillförlitlighet visas. Obs: <b>under</b> den nya analysen visas endast resultat från den aktuella modellen."],
+
     "loading-text": ["Förbereder saker..."],
     "navBarFile": ["Fil"],
     "navbarHelp": ["Hjälp"],
@@ -46,6 +48,7 @@
     ],
     "open-folder": ["Öppna mapp(er)"],
     "saveCSV": ["Exportera resultat till CSV"],
+    "save-summary": ["Exportera sammanfattning till CSV"],
     "save-eBird": ["Exportera eBird registerfil"],
     "save-Raven": ["Exportera Raven urvalstabell"],
     "export-audio": ["Exportera vald ljudfil","Ctrl+E"
@@ -93,6 +96,7 @@
     "apply-location": ["Ange"],
     "cancel-location": ["Avbryt"],
     "library-location-select": ["Bibliotekets plats:"],
+    "database-location-select": ["Databasplats:"],
     "close-tour": ["Stäng"],
     "settings": {
         "basic": "Standard",
@@ -101,6 +105,8 @@
         "clear-call-cache": ["Rensa referenssamtalscache"],
         "reset-defaults": ["Återställ till standardinställningar"],
         "model-to-use": "Modell:",
+        "combine-detections": "Kombinera modelldetektioner",
+        "merge-detections": "Sammanfoga modelldetektioner",
         "confidence": "Konfidensnivå:",
         "list-to-use": "Lista:",
         "local": "Använd platsinställningar",

@@ -17,7 +17,8 @@ import {
   checkpoint,
   closeDatabase,
   Mutex,
-  mergeDbIfNeeded
+  mergeDbIfNeeded,
+  addNewModel
 } from "./database.js";
 import { trackEvent as _trackEvent } from "./utils/tracking.js";
 
@@ -186,7 +187,6 @@ let workerInstance = 0;
 let appPath,
   tempPath,
   BATCH_SIZE,
-  LABELS,
   batchChunksToSend = {};
 let LIST_WORKER;
 
@@ -289,20 +289,19 @@ const getSelectionRange = (file, start, end) => {
  *   - Creating indices on species(sname) and species(cname).
  *   - Adding missing columns ("archiveName" and "metadata") to the files table.
  *   - Updating the tags and records tables (including adding a 'reviewed' column and migrating existing records).
- * - Refreshing the global LABELS variable with the preferred locale labels from the species table and notifying the UI if records exist.
  *
- * @param {string} path - The directory path where the database file is or will be located.
  * @returns {Promise<boolean>} Resolves to true when the database is successfully loaded and configured.
  *
  * @example
- * loadDB('/data/db')
+ * loadDB()
  *   .then(success => console.log('Database loaded:', success))
  *   .catch(error => console.error('Error loading database:', error));
  *
  * @remarks
  * This function depends on global variables (e.g., STATE, diskDB, UI) and auxiliary functions such as createDB, checkpoint, and dbMutex.
  */
-async function loadDB(path) {
+async function loadDB() {
+  const path = STATE.database.location || appPath;
   DEBUG && console.log("Loading db " + path);
   const model = STATE.model;
   let modelID, needsTranslation;
@@ -317,7 +316,7 @@ async function loadDB(path) {
     DEBUG && console.log("Opened and cleaned disk db " + file);
   }
 
-  ([modelID, needsTranslation] = await mergeDbIfNeeded({diskDB, model, dbMutex }) )
+  ([modelID, needsTranslation] = await mergeDbIfNeeded({diskDB, model, appPath, dbMutex }) )
   STATE.modelID = modelID;
   STATE.update({ db: diskDB });
   diskDB.locale = STATE.locale;
@@ -361,7 +360,6 @@ async function setLabelState({regenerate}) {
     );
     STATE.allLabels = res.map((obj) => obj.labels ); // these are the labels in the preferred locale
   }
-  // LABELS = res.filter(obj => obj.modelID === STATE.modelID).map((obj) => obj.labels );
   const included = await getIncludedIDs()
   STATE.filteredLabels = STATE.list === 'everything' 
     ? STATE.allLabels
@@ -433,7 +431,7 @@ async function handleMessage(e) {
   const args = e.data;
   const action = args.action;
   DEBUG && console.log("message received", action);
-  if (action !== "_init_" && INITIALISED) {
+  if (action !== "_init_" ) {
     // Wait until _init_ or onLaunch completes before processing other messages
     await INITIALISED;
   }
@@ -500,7 +498,7 @@ async function handleMessage(e) {
     }
     case "change-mode": {
       const mode = args.mode;
-      await onChangeMode(mode);
+      INITIALISED = await onChangeMode(mode);
       break;
     }
     case "chart": {
@@ -536,7 +534,9 @@ async function handleMessage(e) {
       break;
     }
     case "export-results": {
-      await getResults(args);
+      args.format === 'summary' 
+      ? await getSummary(args) 
+      : await getResults(args);
       break;
     }
     case "file-load-request": {
@@ -687,7 +687,9 @@ async function handleMessage(e) {
       const { lat, lon, week } = STATE;
       // Clear the LIST_CACHE & STATE.included keys to force list regeneration
       LIST_CACHE = {}; //[`${lat}-${lon}-${week}-${STATE.model}-${STATE.list}`];
-      delete STATE.included?.[STATE.model]?.[STATE.list];
+      // delete STATE.included?.[STATE.model]?.[STATE.list];
+      STATE.included = {}
+      await INITIALISED;
       LIST_WORKER && (await getIncludedIDs());
       setLabelState({regenerate:false});
       args.refreshResults && (await Promise.all([getResults(), getSummary()]));
@@ -706,17 +708,27 @@ async function handleMessage(e) {
       tempPath = args.temp || tempPath;
       // If we change the speciesThreshold, we need to invalidate any location caches
       if (args.speciesThreshold) {
-        if (STATE.included?.["birdnet"]?.["location"])
-          STATE.included.birdnet.location = {};
-        if (STATE.included?.["chirpity"]?.["location"])
-          STATE.included.chirpity.location = {};
+        for (const key in STATE.included) {
+          if (STATE.included[key]?.location) {
+            STATE.included[key].location = {};
+          }
+        }
       }
       // likewise, if we change the "use local birds" setting we need to flush the migrants cache"
       if (args.local !== undefined) {
-        if (STATE.included?.["birdnet"]?.["nocturnal"])
-          delete STATE.included.birdnet.nocturnal;
+        for (const key in STATE.included) {
+          if (STATE.included[key]?.nocturnal) {
+            delete STATE.included[key].nocturnal;
+          }
+        }
       }
       STATE.update(args);
+      if (args.database && !args.UUID) {
+        // load a new database
+        diskDB = await loadDB()
+        // Create a fresh memoryDB to attach to it
+        memoryDB = await createDB({file: null, diskDB, dbMutex})
+      }
       if (args.labelFilters) {
         const species = args.species;
         await Promise.all([
@@ -819,15 +831,15 @@ function setGetSummaryQueryInterval(threads) {
 
 async function onChangeMode(mode) {
   if (STATE.mode !== mode) {
-    // if (!memoryDB){
+    if (!memoryDB){
       memoryDB = await createDB({file: null, diskDB, dbMutex});
-    // }
-    UI.postMessage({ event: "mode-changed", mode: mode });
+    }
     STATE.changeMode({
       mode: mode,
       disk: diskDB,
       memory: memoryDB,
     });
+    UI.postMessage({ event: "mode-changed", mode: mode });
   }
 }
 
@@ -873,16 +885,19 @@ async function onLaunch({
   sampleRate = model === "birdnet" ? 48_000 : 24_000;
   STATE.detect.backend = backend;
   BATCH_SIZE = batchSize;
-  if (!STATE.model || STATE.model !== model) {
-    STATE.update({ model: model });
-    const result = await diskDB?.getAsync('SELECT id FROM models WHERE NAME = ?', model)
-    if (!result){
-      diskDB = await loadDB(appPath); // load the diskdb
-      memoryDB = await createDB({file: null, diskDB, dbMutex}); // now make the memoryDB
-      // UI.postMessage({ event: "label-translation-needed", locale: STATE.locale });
-    } else {
-      STATE.modelID = result.id;
-    }
+  STATE.update({ model: model });
+  const result = await diskDB?.getAsync('SELECT id FROM models WHERE NAME = ?', model)
+  console.log(result)
+  if (!result){
+    // THe model isn't in the db
+    diskDB = await loadDB(); // load the diskdb with the model species added
+  } else {
+    STATE.modelID = result.id;
+  }
+  if (!memoryDB || !STATE.detect.combine){
+    memoryDB = await createDB({file: null, diskDB, dbMutex}); // create new memoryDB
+  } else if (!result){
+    addNewModel({model, db:memoryDB, dbMutex})
   }
   const db = STATE.mode === 'analyse'
     ? memoryDB
@@ -1422,7 +1437,9 @@ async function onAnalyse({
 
   if (!STATE.selection) {
     // Clear records from the memory db
-    STATE.detect.combine || await memoryDB.runAsync("DELETE FROM records; VACUUM");
+    if (!STATE.detect.combine){
+      await memoryDB.runAsync("DELETE FROM records; VACUUM");
+    }
     //create a copy of files in scope for state, as filesInScope is spliced
     STATE.setFiles([...filesInScope]);
   }
@@ -1489,7 +1506,7 @@ async function onAnalyse({
       count,
       "files ignored"
     );
-  STATE.selection || onChangeMode("analyse");
+  STATE.selection || await onChangeMode("analyse");
 
   filesBeingProcessed = [...FILE_QUEUE];
   for (let i = 0; i < NUM_WORKERS; i++) {
@@ -1603,9 +1620,13 @@ async function locateFile(file) {
     file
   );
   if (row?.archiveName) {
-    const fullPathToFile = p.join(STATE.library.location, row.archiveName);
-    if (fs.existsSync(fullPathToFile)) {
-      return fullPathToFile;
+    if (STATE.library.location){
+      const fullPathToFile = p.join(STATE.library.location, row.archiveName);
+      if (fs.existsSync(fullPathToFile)) {
+        return fullPathToFile;
+      }
+    } else {
+      console.warn('Library location is not set') // TODO: Needs translations
     }
   }
   // Not there, search the directory
@@ -3157,7 +3178,6 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
     // **Use batch inserts instead of string concatenation**
     const insertValues = [];
     const insertPlaceholders = [];
-    const params = [];
 
     for (let i = 0; i < keysArray.length; i++) {
       const key = parseFloat(keysArray[i]);
@@ -3180,7 +3200,7 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
       }
     }
 
-    if (insertValues.length > 0) {
+    if (insertValues.length) {
       await db.runAsync(
         `INSERT OR IGNORE INTO records 
          (dateTime, position, fileID, speciesID, modelID, confidence, end, isDaylight, reviewed) 
@@ -3545,24 +3565,31 @@ async function setStartEnd(file) {
 }
 
 const getSummary = async ({
-  species = undefined,
-  active = undefined,
-  interim = false,
-  action = undefined,
+  format,
+  path,
+  headers,
+  species,
+  active,
+  interim,
+  action,
 } = {}) => {
   const {sql, params} = await prepSummaryStatement();
   const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
 
   const summary = await STATE.db.allAsync(sql, ...params);
-  const event = interim ? "update-summary" : "summary-complete";
-  UI.postMessage({
-    event: event,
-    summary: summary,
-    offset: offset,
-    filterSpecies: species,
-    active: active,
-    action: action,
-  });
+  if (format){ // Export called
+    await exportData(summary, path, format, headers);
+  } else {
+    const event = interim ? "update-summary" : "summary-complete";
+    UI.postMessage({
+      event: event,
+      summary: summary,
+      offset: offset,
+      filterSpecies: species,
+      active: active,
+      action: action,
+    });
+  }
 };
 
 /**
@@ -3738,7 +3765,7 @@ function exportAudacity(result, directory) {
  * @param {string} filename - The output file path.
  * @param {string} format - The export format, which must be one of "text", "eBird", or "Raven".
  */
-async function exportData(result, filename, format) {
+async function exportData(result, filename, format, headers) {
   const formatFunctions = {
     text: "formatCSVValues",
     eBird: "formateBirdValues",
@@ -3751,72 +3778,84 @@ async function exportData(result, filename, format) {
     cumulativeOffset = 0,
     fileDurations = {};
   const { writeToPath } = require("@fast-csv/format");
-  const { ExportFormatter } = require("./js/utils/exportFormatter.js");
-  const formatter = new ExportFormatter(STATE);
-  const locationMap = await formatter.getAllLocations();
-  // CSV export. Format the values
-  for (let i = 0; i < result.length; i += BATCH_SIZE) {
-    const batch = result.slice(i, i + BATCH_SIZE);
-    const processedBatch = await Promise.all(
-      batch.map(async (item, index) => {
-        if (format === "Raven") {
-          item = { ...item, selection: index + 1 }; // Add a selection number for Raven
-          if (item.file !== previousFile) {
-            // Positions need to be cumulative across files in Raven
-            if (previousFile !== null) {
-              cumulativeOffset += result.find(
-                (r) => r.file === previousFile
-              ).duration;
-            }
-            previousFile = item.file;
-          }
-          item.offset = cumulativeOffset;
-        }
-        return formatter[formatFunctions[format]](item, locationMap);
-      })
-    );
-    formattedValues.push(...processedBatch);
-  }
-
-  if (format === "eBird") {
-    // Group the data by "Start Time", "Common name", and "Species" and calculate total species count for each group
-    const summary = formattedValues.reduce((acc, curr) => {
-      const key = `${curr["Start Time"]}_${curr["Common name"]}_${curr["Species"]}`;
-      if (!acc[key]) {
-        acc[key] = {
-          "Common name": curr["Common name"],
-          // Include other fields from the original data
-          Genus: curr["Genus"],
-          Species: curr["Species"],
-          "Species Count": 0,
-          "Species Comments": curr["Species Comments"],
-          "Location Name": curr["Location Name"],
-          Latitude: curr["Latitude"],
-          Longitude: curr["Longitude"],
-          Date: curr["Date"],
-          "Start Time": curr["Start Time"],
-          "State/Province": curr["State/Province"],
-          Country: curr["Country"],
-          Protocol: curr["Protocol"],
-          "Number of observers": curr["Number of observers"],
-          Duration: curr["Duration"],
-          "All observations reported?": curr["All observations reported?"],
-          "Distance covered": curr["Distance covered"],
-          "Area covered": curr["Area covered"],
-          "Submission Comments": curr["Submission Comments"],
-        };
+  if (format === 'summary'){
+    formattedValues = result.map(item => {
+      const renamedItem = {};
+      for (const key in headers) {
+        key === 'max' && (item[key] /= 1000)
+        renamedItem[headers[key]] = item[key];
       }
-      // Increment total species count for the group
-      acc[key]["Species Count"] += curr["Species Count"];
-      return acc;
-    }, {});
-    // Convert summary object into an array of objects
-    formattedValues = Object.values(summary);
+      return renamedItem;
+    });
+  } else {
+    const { ExportFormatter } = require("./js/utils/exportFormatter.js");
+    const formatter = new ExportFormatter(STATE);
+    const locationMap = await formatter.getAllLocations();
+    // CSV export. Format the values
+    for (let i = 0; i < result.length; i += BATCH_SIZE) {
+      const batch = result.slice(i, i + BATCH_SIZE);
+      const processedBatch = await Promise.all(
+        batch.map(async (item, index) => {
+          if (format === "Raven") {
+            item = { ...item, selection: index + 1 }; // Add a selection number for Raven
+            if (item.file !== previousFile) {
+              // Positions need to be cumulative across files in Raven
+              if (previousFile !== null) {
+                cumulativeOffset += result.find(
+                  (r) => r.file === previousFile
+                ).duration;
+              }
+              previousFile = item.file;
+            }
+            item.offset = cumulativeOffset;
+          }
+          return formatter[formatFunctions[format]](item, locationMap);
+        })
+      );
+      formattedValues.push(...processedBatch);
+    }
+
+    if (format === "eBird") {
+      // Group the data by "Start Time", "Common name", and "Species" and calculate total species count for each group
+      const summary = formattedValues.reduce((acc, curr) => {
+        const key = `${curr["Start Time"]}_${curr["Common name"]}_${curr["Species"]}`;
+        if (!acc[key]) {
+          acc[key] = {
+            "Common name": curr["Common name"],
+            // Include other fields from the original data
+            Genus: curr["Genus"],
+            Species: curr["Species"],
+            "Species Count": 0,
+            "Species Comments": curr["Species Comments"],
+            "Location Name": curr["Location Name"],
+            Latitude: curr["Latitude"],
+            Longitude: curr["Longitude"],
+            Date: curr["Date"],
+            "Start Time": curr["Start Time"],
+            "State/Province": curr["State/Province"],
+            Country: curr["Country"],
+            Protocol: curr["Protocol"],
+            "Number of observers": curr["Number of observers"],
+            Duration: curr["Duration"],
+            "All observations reported?": curr["All observations reported?"],
+            "Distance covered": curr["Distance covered"],
+            "Area covered": curr["Area covered"],
+            "Submission Comments": curr["Submission Comments"],
+          };
+        }
+        // Increment total species count for the group
+        acc[key]["Species Count"] += curr["Species Count"];
+        return acc;
+      }, {});
+      // Convert summary object into an array of objects
+      formattedValues = Object.values(summary);
+    }
   }
   const filePath = filename;
   // Create a write stream for the CSV file
   writeToPath(filePath, formattedValues, {
     headers: true,
+    writeBOM: true,
     delimiter: format === "Raven" ? "\t" : ",",
   })
     .on("error", (_err) =>
@@ -4414,7 +4453,7 @@ async function onUpdateLocale(locale, labels, refreshResults) {
   if (DEBUG) t0 = Date.now();
   let db;
   try {
-    STATE.update({ locale: locale });
+    STATE.update({ locale });
     for (db of [diskDB, memoryDB]) {
       db.locale = locale;
       await _updateSpeciesLocale(db, labels);
@@ -4470,7 +4509,7 @@ async function onSetCustomLocation({
       );
       
       // we may not have set the METADATA for the file
-      METADATA[file] = { ...(METADATA[file] || {}), locationID: id, lat, lon };
+      METADATA[file] = { ...METADATA[file], locationID: id, lat, lon };
       // tell the UI the file has a location id
       UI.postMessage({ event: "file-location-id", file, id });
     }
@@ -4524,6 +4563,7 @@ async function getIncludedIDs(file) {
       undefined
     ) {
       // Cache miss
+      await LIST_WORKER;
       await setIncludedIDs(latitude, longitude, week);
     }
     let include;
@@ -4535,7 +4575,8 @@ async function getIncludedIDs(file) {
   } else {
     if (included?.[model]?.[list] === undefined) {
       // The object lacks the week / location
-      LIST_WORKER && (await setIncludedIDs());
+      await LIST_WORKER;
+      await setIncludedIDs();
     }
     let include = STATE.included[model][list];
     return include
@@ -4580,7 +4621,7 @@ async function setIncludedIDs(lat, lon, week) {
     const { result, messages } = await LIST_WORKER({
       message: "get-list",
       model: STATE.model,
-      labels: STATE.allLabels, // || LABELS,
+      labels: STATE.allLabels,
       listType: STATE.list,
       customLabels: STATE.customLabels,
       lat: lat || STATE.lat,

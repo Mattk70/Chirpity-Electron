@@ -967,9 +967,8 @@ const setDefaultLocation = () => {
   // We will switch to location filtering when the default location is changed.
   config.list = "location";
   DOM.speciesThresholdEl.classList.remove("d-none");
+  updateList();
 
-  updateListIcon();
-  DOM.listToUse.value = config.list;
   resetResults();
   worker.postMessage({
     action: "update-list",
@@ -1189,8 +1188,10 @@ function postAnalyseMessage(args) {
     utils.disableMenuItem(["analyseSelection", "explore", "charts"]);
     const selection = !!args.end;
     const filesInScope = args.filesInScope;
-    args.fromDB || (PREDICTING = true);
-    disableSettingsDuringAnalysis(true);
+    if (!args.fromDB){
+      PREDICTING = true;
+      disableSettingsDuringAnalysis(true);
+    }
     if (!selection) {
       analyseReset();
       refreshResultsView();
@@ -1302,7 +1303,7 @@ async function exportData(
   duration
 ) {
   const defaultPath = localStorage.getItem("lastSaveFolder") || "";
-  let location, lastSaveFolder;
+  let location, lastSaveFolder, headers;
   if (["Audacity", "audio"].includes(format)) {
     // Audacity exports one label file per file in results
     const response = await window.electron.selectDirectory(defaultPath);
@@ -1310,8 +1311,17 @@ async function exportData(
     location = response.filePaths[0];
     lastSaveFolder = location;
   } else {
-    let filename = species || "All";
-    filename += format == "Raven" ? `_selections.txt` : "_detections.csv";
+    let filename;
+    if (format === 'summary'){
+      filename = 'detection-summary.csv';
+      const {cname, sname} = i18n.get(i18n.SpeciesList)
+      const {calls, detections, max} = i18n.get(i18n.Headings)
+      headers = {cname, sname, count:detections, calls, max};
+
+    } else {
+      filename = species || "All";
+      filename += format == "Raven" ? `_selections.txt` : "_detections.csv";
+    }
     const filePath = p.join(defaultPath, filename);
     location = await window.electron.exportData({ defaultPath: filePath });
     if (!location) return;
@@ -1321,6 +1331,7 @@ async function exportData(
     action: "export-results",
     path: location,
     format,
+    headers,
     duration,
     species,
     files: isExplore() ? [] : STATE.openFiles,
@@ -1420,6 +1431,7 @@ async function showExplore() {
   utils.enableMenuItem([
     "saveCSV",
     "save-eBird",
+    "save-summary",
     "save-Raven",
     "charts",
     "active-analysis",
@@ -1661,6 +1673,7 @@ const defaultConfig = {
     trim: false,
     clips: false,
   },
+  database: { location: undefined },
   fontScale: 1,
   seenTour: false,
   lastUpdateCheck: 0,
@@ -1770,7 +1783,43 @@ window.onload = async () => {
     } else {
       config = JSON.parse(data);
     }
+    const { model, library, database, detect, filters, audio, 
+      limit, locale, speciesThreshold, list, useWeek, UUID, 
+      local, debug, fileStartMtime, specDetections } = config;
 
+    worker.postMessage({
+      action: "update-state",
+      model,
+      library,
+      database,
+      path: appPath,
+      temp: tempPath,
+      lat: config.latitude,
+      lon: config.longitude,
+      place: config.location,
+      detect,
+      filters,
+      audio,
+      limit,
+      locale,
+      speciesThreshold,
+      list,
+      useWeek,
+      local,
+      UUID,
+      debug,
+      fileStartMtime,
+      specDetections,
+    });
+    t0_warmup = Date.now();
+    worker.postMessage({
+      action: "_init_",
+      model: model,
+      batchSize: config[config[model].backend].batchSize,
+      threads: config[config[model].backend].threads,
+      backend: config[model].backend,
+      list: list,
+    });
     // Attach an error event listener to the window object
     window.onerror = function (message, file, lineno, colno, error) {
       trackEvent(
@@ -1838,6 +1887,7 @@ window.onload = async () => {
     if (!DOM.customListFile.value) delete LIST_MAP.custom;
     // And update the icon
     updateListIcon();
+    setListUIState(list)
     // timeline
     DOM.timelineSetting.value = config.timeOfDay ? "timeOfDay" : "timecode";
     // Spectrogram colour
@@ -1938,39 +1988,13 @@ window.onload = async () => {
       const autoArchive = document.getElementById("auto-library");
       autoArchive.checked = config.library.auto;
     }
-    setListUIState(config.list);
-    worker.postMessage({
-      action: "update-state",
-      library: config.library,
-      path: appPath,
-      temp: tempPath,
-      lat: config.latitude,
-      lon: config.longitude,
-      place: config.location,
-      detect: config.detect,
-      filters: config.filters,
-      audio: config.audio,
-      limit: config.limit,
-      locale: config.locale,
-      speciesThreshold: config.speciesThreshold,
-      list: config.list,
-      useWeek: config.useWeek,
-      local: config.local,
-      UUID: config.UUID,
-      debug: config.debug,
-      fileStartMtime: config.fileStartMtime,
-      specDetections: config.specDetections,
-    });
-    const { model, list } = config;
-    t0_warmup = Date.now();
-    worker.postMessage({
-      action: "_init_",
-      model: model,
-      batchSize: config[config[model].backend].batchSize,
-      threads: config[config[model].backend].threads,
-      backend: config[model].backend,
-      list: list,
-    });
+    if (config.database.location) {
+      document.getElementById("database-location").value =
+        config.database.location;
+    }
+    
+
+
     // Enable popovers
     const myAllowList = bootstrap.Tooltip.Default.allowList;
     myAllowList.table = []; // Allow <table> element with no attributes
@@ -2762,10 +2786,7 @@ DOM.listIcon.addEventListener("click", () => {
   const currentListIndex = keys.indexOf(config.list);
   const next = currentListIndex === keys.length - 1 ? 0 : currentListIndex + 1;
   config.list = keys[next];
-  DOM.listToUse.value = config.list;
-  updateListIcon();
   updatePrefs("config.json", config);
-  setListUIState(config.list);
   updateList();
 });
 
@@ -3498,13 +3519,14 @@ function onSummaryComplete({ filterSpecies = undefined, summary = [] }) {
   }
   if (!PREDICTING || STATE.mode !== "analyse") activateResultSort();
   if (summary.length) {
-    utils.enableMenuItem(["saveLabels", "saveCSV", "save-eBird", "save-Raven"]);
+    utils.enableMenuItem(["saveLabels", "saveCSV", "save-summary", "save-eBird", "save-Raven"]);
     STATE.mode !== "explore" && utils.enableMenuItem(["save2db"]);
   } else {
     utils.disableMenuItem([
       "saveLabels",
       "saveCSV",
       "save-eBird",
+      "save-summary",
       "save-Raven",
       "save2db",
     ]);
@@ -4817,6 +4839,10 @@ function handleUIClicks(e) {
       exportData("text");
       break;
     }
+    case "save-summary": {
+      exportData("summary");
+      break;
+    }
     case "save-eBird": {
       exportData("eBird");
       break;
@@ -4907,17 +4933,26 @@ function handleUIClicks(e) {
       config.customListFile[config.model] = "";
       delete LIST_MAP.custom;
       config.list = "birds";
-      DOM.listToUse.value = config.list;
       DOM.customListFile.value = "";
-      updateListIcon();
       updatePrefs("config.json", config);
       resetResults({
         clearSummary: true,
         clearPagination: true,
         clearResults: true,
       });
-      setListUIState(config.list);
-      if (STATE.currentFile) updateList();
+      updateList();
+      break;
+    }
+    case "clear-database-location": {
+      config.database.location = undefined;
+      document.getElementById("database-location").value = "";
+      worker.postMessage({
+        action: "update-state",
+        database: config.database,
+      });
+      config.list = 'everything';
+      updateList();
+      updatePrefs("config.json", config);
       break;
     }
     // Help Menu
@@ -5039,6 +5074,27 @@ function handleUIClicks(e) {
             action: "update-state",
             library: config.library,
           });
+        }
+      })();
+      break;
+    }
+    case "database-location-select": {
+      (async () => {
+        const files = await window.electron.selectDirectory(
+          config.database.location || ""
+        );
+        if (!files.canceled) {
+          const archiveFolder = files.filePaths[0];
+          config.database.location = archiveFolder;
+          document.getElementById("database-location").value = archiveFolder;
+          updatePrefs("config.json", config);
+          worker.postMessage({
+            action: "update-state",
+            database: config.database,
+          });
+          config.list = 'everything';
+          updateList()
+          updatePrefs("config.json", config);
         }
       })();
       break;
@@ -5307,6 +5363,8 @@ function changeSettingsMode(target) {
 }
 
 function updateList() {
+  updateListIcon();
+  setListUIState(config.list)
   if (config.list === "custom") {
     readLabels(config.customListFile[config.model], "list");
   } else {
@@ -5509,9 +5567,7 @@ document.addEventListener("change", function (e) {
           break;
         }
         case "list-to-use": {
-          setListUIState(element.value);
           config.list = element.value;
-          updateListIcon();
           updateList();
           break;
         }
@@ -5778,6 +5834,7 @@ document.addEventListener("change", function (e) {
 function setListUIState(list) {
   // Sets User Preferences for chosen model
   // cf. modelSettingsDisplay
+  DOM.listToUse.value = list;
   const listElements = document.querySelectorAll(".list-hidden, .list-visible");
   listElements.forEach((element) => {
     element.classList.replace("list-visible", "list-hidden");
@@ -6959,7 +7016,7 @@ async function membershipCheck() {
         } else {
           document.getElementById("buy-me-coffee").classList.remove("d-none");
         }
-        localStorage.setItem("isMember", true);
+        localStorage.setItem("isMember", isMember);
         localStorage.setItem("memberTimestamp", now);
       } else {
         document.getElementById("buy-me-coffee").classList.remove("d-none");
@@ -6969,6 +7026,7 @@ async function membershipCheck() {
         config.detect.combine = false;
         config.detect.merge = false;
         config.library.clips = false;
+        config.database.location = "";
         lockedElements.forEach((el) => {
           el.classList.replace("unlocked", "locked");
 

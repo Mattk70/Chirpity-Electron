@@ -35,7 +35,9 @@
   "Use Location settings-circle-help": ["Quando ativada, o filtro de Chamadas noturnos relata as aves com base nas configurações de localização."],
   "Volume Adjustment-circle-help": ["Ajuste o volume do áudio para compensar os níveis baixos de gravação."],
   "File-timestamp-circle-help": ["Alguns gravadores de áudio, como o Zoom H1 Essential, podem definir a data e hora do arquivo salvo para o início da gravação, em vez de para o final. Se você tiver um gravador desse tipo, selecionar esta opção corrigirá os horários mostrados para suas detecções (as alterações nesta configuração requerem o reinício do Chirpity para ter efeito)."],
-  
+  "Combine-circle-help": ["Quando activado, repetir a análise de ficheiros abertos com um modelo diferente adicionará as detecções do modelo à lista. Nota: <b>durante</b> a nova análise, apenas os resultados do modelo actual serão mostrados."],
+  "Merge-circle-help": ["Quando activado, as detecções de cada modelo serão fundidas; apenas a detecção com maior confiança será exibida. Nota: <b>durante</b> a nova análise, apenas os resultados do modelo actual serão mostrados."],
+
   "loading-text": ["Preparando as coisas..."],
   "navBarFile": ["Arquivo"],
   "navbarHelp": ["Ajuda"],
@@ -46,6 +48,7 @@
   ],
   "open-folder": ["Abrir Pasta(s)"],
   "saveCSV": ["Exportar Resultados para CSV"],
+  "save-summary": ["Exportar resumo para CSV"],
   "save-eBird": ["Exportar Arquivo de Registro eBird"],
   "save-Raven": ["Exportar Tabela de Seleção Raven"],
   "export-audio": ["Exportar Áudio Selecionado","Ctrl+E"
@@ -93,6 +96,7 @@
   "apply-location": ["Definir"],
   "cancel-location": ["Cancelar"],
   "library-location-select": ["Localização da biblioteca:"],
+  "database-location-select": ["Localização do banco de dados:"],
   "close-tour": ["Fechar"],
   "settings": {
     "basic": "Padrão",
@@ -101,6 +105,8 @@
     "clear-call-cache": ["Limpar cache de chamadas de referência"],
     "reset-defaults": ["Redefinir para as configurações padrão"],
     "model-to-use": "Modelo:",
+    "combine-detections": "Combinar detecções de modelos",
+    "merge-detections": "Fundir detecções de modelos",
     "confidence": "Limite de confiança:",
     "list-to-use": "Lista:",
     "local": "Usar configurações de localização",

@@ -35,7 +35,9 @@
     "Use Location settings-circle-help": ["Lorsqu'il est activé, le filtre des cris nocturnes rapporte les oiseaux en fonction de vos paramètres de localisation."],
     "Volume Adjustment-circle-help": ["Ajustez le volume de l'audio pour compenser les niveaux d'enregistrement faibles."],
     "File-timestamp-circle-help": ["Certains enregistreurs audio, par exemple le Zoom H1 Essential, peuvent définir la date et l'heure du fichier enregistré au début de l'enregistrement, plutôt qu'à la fin. Si vous avez un tel enregistreur, sélectionner cette option corrigera les horaires affichés pour vos détections (les modifications de ce paramètre nécessitent un redémarrage de Chirpity pour prendre effet)."],
-    
+    "Combine-circle-help": ["Lorsqu’il est activé, répéter l’analyse des fichiers ouverts avec un autre modèle ajoutera les détections du modèle à la liste. Remarque : <b>pendant</b> la nouvelle analyse, seuls les résultats du modèle actuel seront affichés."],
+    "Merge-circle-help": ["Lorsqu’il est activé, les détections de chaque modèle seront fusionnées ; seule la détection avec la plus haute confiance sera affichée. Remarque : <b>pendant</b> la nouvelle analyse, seuls les résultats du modèle actuel seront affichés."],
+
     "loading-text": ["Préparation en cours..."],
     "navBarFile": ["Fichier"],
     "navbarHelp": ["Aide"],
@@ -46,6 +48,7 @@
     ],
     "open-folder": ["Ouvrir le(s) dossier(s)"],
     "saveCSV": ["Exporter les résultats au format CSV"],
+    "save-summary": ["Exporter le résumé en CSV"],
     "save-eBird": ["Exporter le fichier d'enregistrement eBird"],
     "save-Raven": ["Exporter la table de sélection Raven"],
     "export-audio": ["Exporter l'audio sélectionné","Ctrl+E"
@@ -93,6 +96,7 @@
     "apply-location": ["Définir"],
     "cancel-location": ["Annuler"],
     "library-location-select": ["Lieu de la Bibliothèque:"],
+    "database-location-select": ["Emplacement de la base de données:"],
     "close-tour": ["Fermer"],
     "settings": {
       "basic": "Standard",
@@ -101,6 +105,8 @@
       "clear-call-cache": ["Effacer le cache des cris de référence"],
       "reset-defaults": ["Réinitialiser aux paramètres par défaut"],
       "model-to-use": "Modèle:",
+      "combine-detections": "Combiner les détections des modèles",
+      "merge-detections": "Fusionner les détections des modèles",
       "confidence": "Seuil de confiance:",
       "list-to-use": "Liste:",
       "local": "Utiliser les paramètres de localisation",

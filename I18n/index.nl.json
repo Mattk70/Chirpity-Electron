@@ -35,6 +35,8 @@
     "Use Location settings-circle-help": ["Wanneer ingeschakeld, rapporteert het filter voor nachtelijke roepen, vogels op basis van je locatie-instellingen."],
     "Volume Adjustment-circle-help": ["Pas het volume van audio aan om lage opnamevolumes te compenseren."],
     "File-timestamp-circle-help": [ "Sommige audiorecorders, bijvoorbeeld de Zoom H1 Essential, kunnen de opgeslagen datum en tijd van het bestand instellen op het begin van de opname, in plaats van het einde. Als je zo'n recorder hebt, zal het selecteren van deze optie de weergegeven tijden voor je detecties corrigeren (wijzigingen in deze instelling vereisen een herstart van Chirpity om effect te hebben)."],
+    "Combine-circle-help": ["Wanneer ingeschakeld, zal het opnieuw analyseren van geopende bestanden met een ander model de detecties van dat model aan de lijst toevoegen. Opmerking: <b>tijdens</b> de nieuwe analyse worden alleen de resultaten van het huidige model weergegeven."],
+    "Merge-circle-help": ["Wanneer ingeschakeld, worden detecties van elk model samengevoegd; alleen de detectie met het hoogste vertrouwen wordt weergegeven. Opmerking: <b>tijdens</b> de nieuwe analyse worden alleen de resultaten van het huidige model weergegeven."],
 
     "loading-text": ["Dingen gereedmaken..."],
     "navBarFile": ["Bestand"],
@@ -46,6 +48,7 @@
     ],
     "open-folder": ["Open Map(pen)"],
     "saveCSV": ["Exporteer Resultaten naar CSV"],
+    "save-summary": ["Samenvatting exporteren naar CSV"],
     "save-eBird": ["Exporteer eBird Record bestand"],
     "save-Raven": ["Exporteer Raven Selectie Tabel"],
     "export-audio": ["Exporteer Geselecteerd Audio","Ctrl+E"
@@ -93,6 +96,7 @@
     "apply-location": ["Instellen"],
     "cancel-location": ["Annuleren"],
     "library-location-select": ["Bibliotheeklocatie:"],
+    "database-location-select": ["Database locatie:"],
     "close-tour": ["Sluiten"],
     "settings": {
         "basic": "Standaard",
@@ -101,6 +105,8 @@
         "clear-call-cache": ["Referentieoproep-cache wissen"],
         "reset-defaults": ["Herstellen naar standaardinstellingen"],
         "model-to-use": "Model:",
+        "combine-detections": "Detecties van modellen combineren",
+        "merge-detections": "Detecties van modellen samenvoegen",
         "confidence": "Betrouwbaarheid:",
         "list-to-use": "Lijst:",
         "local": "Gebruik locatie-instellingen",

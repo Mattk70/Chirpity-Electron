@@ -1397,6 +1397,7 @@ const Titles = {
         "frequency-range": "Juster spektrogrammets frekvensområde",
         "threshold-value": "Grænseværdi for forudsigelsestillid",
         "clear-custom-list": "Ryd brugerdefineret liste",
+        "clear-database-location": "Ryd brugerdefineret databaseplacering",
         primaryLogoLink: "Besøg Chirpity-websitet"
       },
     de: {
@@ -1414,6 +1415,7 @@ const Titles = {
         "frequency-range": "Frequenzbereich des Spektrogramms anpassen",
         "threshold-value": "Schwellenwert für Vorhersagevertrauen",
         "clear-custom-list": "Benutzerdefinierte Liste löschen",
+        "clear-database-location": "Benutzerdefinierten Datenbankstandort löschen",
         primaryLogoLink: "Besuchen Sie die Chirpity-Website"
       },
     en: {
@@ -1432,6 +1434,7 @@ const Titles = {
         "frequency-range": "Adjust spectrogram frequency range",
         "threshold-value": "Prediction confidence threshold",
         "clear-custom-list": "Clear custom list",
+        "clear-database-location": "Clear custom database location",
         primaryLogoLink: "Visit the Chirpity website"
     },
     es: {
@@ -1449,6 +1452,7 @@ const Titles = {
       "frequency-range": "Ajustar el rango de frecuencias del sonograma",
       "threshold-value": "Umbral de confianza de la predicción",
       "clear-custom-list": "Borrar lista personalizada",
+      "clear-database-location": "Borrar ubicación personalizada de la base de datos",
       primaryLogoLink: "Visita la web de Chirpity"
     },
     fr: {
@@ -1466,7 +1470,26 @@ const Titles = {
       "frequency-range": "Ajuster la plage de fréquences du spectrogramme",
       "threshold-value": "Seuil de confiance pour les prédictions",
       "clear-custom-list": "Effacer la liste personnalisée",
+      "clear-database-location": "Effacer l'emplacement personnalisé de la base de données",
       primaryLogoLink: "Visitez le site Web de Chirpity"
+    },
+    ja: {
+        filename: "右クリックしてファイルの開始時間または場所を更新",
+        controlsWrapper: "ドラッグしてスペクトログラムウィンドウのサイズを変更します。",
+        playToggle: "再生 / 一時停止 (スペースキー)",
+        zoomIn: "スペクトログラムをズームイン (ショートカットキー: + キー)",
+        zoomOut: "スペクトログラムをズームアウト (ショートカットキー: - キー)",
+        nocmigOn: "Nocmigモードオン",
+        nocmigOff: "Nocmigモードオフ",
+        audioFiltersOn: "オーディオフィルターが適用されました",
+        audioFiltersOff: "オーディオフィルターなし",
+        contextModeOn: "コンテキストモードが有効",
+        contextModeOff: "コンテキストモードが無効",
+        "frequency-range": "スペクトログラムの周波数範囲を調整",
+        "threshold-value": "予測信頼度のしきい値",
+        "clear-custom-list": "カスタムリストをクリア",
+        "clear-database-location": "カスタムデータベースの場所をクリア",
+        primaryLogoLink: "Chirpityのウェブサイトを訪問"
     },
     nl: {
         filename: "Klik met de rechtermuisknop om de starttijd of locatie van het bestand bij te werken",
@@ -1483,6 +1506,7 @@ const Titles = {
         "frequency-range": "Frequentiebereik van het spectrogram aanpassen",
         "threshold-value": "Drempelwaarde voor voorspelling",
         "clear-custom-list": "Aangepaste lijst wissen",
+        "clear-database-location": "Aangepaste database locatie wissen",
         primaryLogoLink: "Bezoek de Chirpity-website"
       },
     pt: {
@@ -1500,6 +1524,7 @@ const Titles = {
         "frequency-range": "Ajustar o intervalo de frequência do espectrograma",
         "threshold-value": "Limite de confiança da previsão",
         "clear-custom-list": "Limpar lista personalizada",
+        "clear-database-location": "Limpar localização personalizada do banco de dados",
         primaryLogoLink: "Visite o site da Chirpity"
       },
     ru: {
@@ -1517,6 +1542,7 @@ const Titles = {
         "frequency-range": "Настройте диапазон частот спектрограммы",
         "threshold-value": "Порог уверенности в прогнозе",
         "clear-custom-list": "Очистить пользовательский список",
+        "clear-database-location": "Очистить пользовательское расположение базы данных",
         primaryLogoLink: "Посетите сайт Chirpity"
     },
     sv: {
@@ -1534,6 +1560,7 @@ const Titles = {
         "frequency-range": "Justera spektrogrammets frekvensomfång",
         "threshold-value": "Tröskel för förutsägelseförtroende",
         "clear-custom-list": "Rensa anpassad lista",
+        "clear-database-location": "Rensa anpassad databasplats",
         primaryLogoLink: "Besök Chirpity-webbplatsen"
     },
     zh: {
@@ -1551,6 +1578,7 @@ const Titles = {
       "frequency-range": "调整光谱图的频率范围",
       "threshold-value": "预测置信度阈值",
       "clear-custom-list": "清除自定义列表",
+      "clear-database-location": "清除自定义数据库位置",
       primaryLogoLink: "访问 Chirpity 网站"
     },
     it: { // random! But will leave in. Italian
@@ -1569,23 +1597,6 @@ const Titles = {
         "threshold-value": "Soglia di confidenza della previsione",
         "clear-custom-list": "Cancella lista personalizzata",
         primaryLogoLink: "Visita il sito web di Chirpity"
-    },
-    ja: {
-        filename: "右クリックしてファイルの開始時間または場所を更新",
-        controlsWrapper: "ドラッグしてスペクトログラムウィンドウのサイズを変更します。",
-        playToggle: "再生 / 一時停止 (スペースキー)",
-        zoomIn: "スペクトログラムをズームイン (ショートカットキー: + キー)",
-        zoomOut: "スペクトログラムをズームアウト (ショートカットキー: - キー)",
-        nocmigOn: "Nocmigモードオン",
-        nocmigOff: "Nocmigモードオフ",
-        audioFiltersOn: "オーディオフィルターが適用されました",
-        audioFiltersOff: "オーディオフィルターなし",
-        contextModeOn: "コンテキストモードが有効",
-        contextModeOff: "コンテキストモードが無効",
-        "frequency-range": "スペクトログラムの周波数範囲を調整",
-        "threshold-value": "予測信頼度のしきい値",
-        "clear-custom-list": "カスタムリストをクリア",
-        primaryLogoLink: "Chirpityのウェブサイトを訪問"
     },
     pl: { // Also random! Polish
         filename: "Kliknij prawym przyciskiem myszy, aby zaktualizować czas rozpoczęcia lub lokalizację pliku",

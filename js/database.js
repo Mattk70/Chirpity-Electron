@@ -381,17 +381,16 @@ const createDB = async ({file, diskDB, dbMutex}) => {
         CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE
       )`
     );
-    console.log('duration created')
     await db.runAsync("CREATE INDEX idx_species_sname ON species(sname)");
     await db.runAsync("CREATE INDEX idx_species_cname ON species(cname)");
     if (archiveMode) {
-      // await diskDB.runAsync(
-      //   `CREATE TABLE schema_version(
-      //     version INTEGER NOT NULL
-      //   )`
-      // );
-      // await diskDB.runAsync("INSERT INTO schema_version (version) VALUES (3)");
-      // console.log('version table created')
+      await diskDB.runAsync(
+        `CREATE TABLE schema_version(
+          version INTEGER NOT NULL
+        )`
+      );
+      await diskDB.runAsync("INSERT INTO schema_version (version) VALUES (3)");
+      console.log('version table created')
     } else {
       const filename = diskDB?.filename;
       await db.runAsync("ATTACH ? as disk", filename);
@@ -433,12 +432,12 @@ const createDB = async ({file, diskDB, dbMutex}) => {
 };
 
 
-const addNewModel = async ({model, diskDB, dbMutex}) => {
+const addNewModel = async ({model, db = diskDB, dbMutex}) => {
   let modelID;
   try {
     await dbMutex.lock();
-    await diskDB.runAsync('BEGIN');
-    let result = await diskDB.runAsync('INSERT INTO models (name) VALUES (?)', model)
+    await db.runAsync('BEGIN');
+    let result = await db.runAsync('INSERT INTO models (name) VALUES (?)', model)
     modelID = result.lastID;
     // We need to get the default labels from the config file
     // There may not be a db, or the db may not have the labels required 
@@ -477,10 +476,10 @@ const addNewModel = async ({model, diskDB, dbMutex}) => {
       });
     // Remove trailing comma
     insertQuery = insertQuery.slice(0, -1);
-    await diskDB.runAsync(insertQuery, ...params);
-    await diskDB.runAsync('COMMIT');
+    await db.runAsync(insertQuery, ...params);
+    await db.runAsync('COMMIT');
   } catch (err) {
-    await diskDB.runAsync('ROLLBACK');
+    await db.runAsync('ROLLBACK');
     console.error(`Error adding model species for "${model}":`, err.message);
   } finally {
     dbMutex.unlock();
@@ -488,19 +487,22 @@ const addNewModel = async ({model, diskDB, dbMutex}) => {
   return modelID;
 }
 
-const mergeDbIfNeeded = async ({diskDB, model, dbMutex}) => {
+const mergeDbIfNeeded = async ({diskDB, model, appPath, dbMutex}) => {
   // Check if we have this model already
   const modelRow = await diskDB.getAsync(`SELECT id FROM models WHERE name = ?`, model)
   if (modelRow) return [modelRow.id, false]
   // If not, let's look for a legacy database
   const models = {birdnet: '6523', chirpity: '409', nocmig: '432'}
-  const modelDbPath = diskDB.filename.replace('.sqlite', models[model] + '.sqlite')
+  const p = require('node:path');
+  const legacyDbPath = p.join(appPath, 'archive' + models[model] + '.sqlite')
   // Check if model DB exists
   const {existsSync} = require('node:fs');
-  const dbNotFound = !existsSync(modelDbPath);
+  const dbNotFound = !existsSync(legacyDbPath);
+  const isCustomDB = !diskDB.filename.includes(appPath);
+  console.log('isCustomDB:', isCustomDB)
   if (dbNotFound) {
-    console.log(`Model database not found: ${modelDbPath}`);
-    const modelID = await addNewModel({model, diskDB, dbMutex})
+    console.log(`Model database not found: ${legacyDbPath}`);
+    const modelID = await addNewModel({model, db:diskDB, dbMutex})
     // translation needed
     return [modelID, true]
   }
@@ -508,7 +510,7 @@ const mergeDbIfNeeded = async ({diskDB, model, dbMutex}) => {
   // Migration. Step 1: Attach the old model db
   try {
     // Run schema update on existing database if needed
-    const legacyDB = new sqlite3.Database(modelDbPath)
+    const legacyDB = new sqlite3.Database(legacyDbPath)
     // Add empty version table if not exists
     await legacyDB.runAsync(
       "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)"
@@ -533,91 +535,94 @@ const mergeDbIfNeeded = async ({diskDB, model, dbMutex}) => {
     }
     await dbMutex.lock();
     await diskDB.runAsync('BEGIN');
-    await diskDB.runAsync('ATTACH DATABASE ? AS modelDb', modelDbPath)
+    await diskDB.runAsync('ATTACH DATABASE ? AS modelDb', legacyDbPath)
     let result = await diskDB.runAsync('INSERT INTO models (name) VALUES (?)', model)
     modelID = result.lastID;
-    // Migrate and de-duplicate tags
-    await diskDB.runAsync(`
-      INSERT OR IGNORE INTO tags (name)
-      SELECT name FROM modelDb.tags
-    `)
-
-    // Create temporary mapping table for tags
-    await diskDB.runAsync(`
-        CREATE TEMP TABLE tag_map AS
-        SELECT modelDb.tags.id AS oldID, unified.id AS newID
-        FROM modelDb.tags
-        JOIN tags AS unified
-          ON modelDb.tags.name = unified.name
-      `);
-
-    // Migrate and de-duplicate locations
-    await diskDB.runAsync(`
-      INSERT OR IGNORE INTO locations (lat, lon, place)
-      SELECT lat, lon, place FROM modelDb.locations
-    `);
-
-    // Create temporary mapping table for locations
-    await diskDB.runAsync(`
-      CREATE TEMP TABLE location_map AS
-      SELECT modelDb.locations.id AS oldID, unified.id AS newID
-      FROM modelDb.locations
-      JOIN locations AS unified
-        ON modelDb.locations.lat = unified.lat
-       AND modelDb.locations.lon = unified.lon
-    `);
-
-    // Migrate and de-duplicate files
-    await diskDB.runAsync(`
-      INSERT OR IGNORE INTO files (name, duration, filestart, locationID, archiveName, metadata)
-      SELECT f.name, f.duration, f.filestart, lm.newID, f.archiveName, f.metadata
-      FROM modelDb.files f
-      LEFT JOIN location_map lm ON f.locationID = lm.oldID
-    `);
-
-    // Create temporary mapping table for files
-    await diskDB.runAsync(`
-      CREATE TEMP TABLE file_map AS
-      SELECT modelDb.files.id AS oldID, unified.id AS newID
-      FROM modelDb.files
-      JOIN files AS unified
-        ON modelDb.files.name = unified.name
-    `);
-
+    // Copy species across
     await diskDB.runAsync(`
       INSERT INTO species (sname, cname, modelID, classIndex)
       SELECT sname, cname, ?, id
       FROM modelDb.species
       `,  modelID);
+    if (!isCustomDB){
+      // Migrate and de-duplicate tags
+      await diskDB.runAsync(`
+        INSERT OR IGNORE INTO tags (name)
+        SELECT name FROM modelDb.tags
+      `)
 
-    // Create temporary mapping table for species
-    await diskDB.runAsync(`
-      CREATE TEMP TABLE species_map AS
-      SELECT modelDb.species.id AS oldID, unified.id AS newID
-      FROM modelDb.species
-      JOIN species AS unified
-        ON modelDb.species.sname = unified.sname
-        AND modelDb.species.cname = unified.cname
-        AND unified.modelID = ?
+      // Create temporary mapping table for tags
+      await diskDB.runAsync(`
+          CREATE TEMP TABLE tag_map AS
+          SELECT modelDb.tags.id AS oldID, unified.id AS newID
+          FROM modelDb.tags
+          JOIN tags AS unified
+            ON modelDb.tags.name = unified.name
+        `);
+
+      // Migrate and de-duplicate locations
+      await diskDB.runAsync(`
+        INSERT OR IGNORE INTO locations (lat, lon, place)
+        SELECT lat, lon, place FROM modelDb.locations
+      `);
+
+      // Create temporary mapping table for locations
+      await diskDB.runAsync(`
+        CREATE TEMP TABLE location_map AS
+        SELECT modelDb.locations.id AS oldID, unified.id AS newID
+        FROM modelDb.locations
+        JOIN locations AS unified
+          ON modelDb.locations.lat = unified.lat
+        AND modelDb.locations.lon = unified.lon
+      `);
+
+      // Migrate and de-duplicate files
+      await diskDB.runAsync(`
+        INSERT OR IGNORE INTO files (name, duration, filestart, locationID, archiveName, metadata)
+        SELECT f.name, f.duration, f.filestart, lm.newID, f.archiveName, f.metadata
+        FROM modelDb.files f
+        LEFT JOIN location_map lm ON f.locationID = lm.oldID
+      `);
+
+      // Create temporary mapping table for files
+      await diskDB.runAsync(`
+        CREATE TEMP TABLE file_map AS
+        SELECT modelDb.files.id AS oldID, unified.id AS newID
+        FROM modelDb.files
+        JOIN files AS unified
+          ON modelDb.files.name = unified.name
+      `);
+
+
+
+      // Create temporary mapping table for species
+      await diskDB.runAsync(`
+        CREATE TEMP TABLE species_map AS
+        SELECT modelDb.species.id AS oldID, unified.id AS newID
+        FROM modelDb.species
+        JOIN species AS unified
+          ON modelDb.species.sname = unified.sname
+          AND modelDb.species.cname = unified.cname
+          AND unified.modelID = ?
+        `, modelID);
+
+
+      // Migrate records with updated foreign keys
+      await diskDB.runAsync(`
+        INSERT INTO records (dateTime, position, fileID, speciesID, modelID, confidence, comment, end, callCount, isDaylight, reviewed, tagID)
+        SELECT r.dateTime, r.position, fm.newID, sm.newID, ?, r.confidence, r.comment, r.end, r.callCount, r.isDaylight, r.reviewed, tm.newID
+        FROM modelDb.records r
+        JOIN file_map fm ON r.fileID = fm.oldID
+        JOIN species_map sm ON r.speciesID = sm.oldID
+        LEFT JOIN tag_map tm ON r.tagID = tm.oldID
       `, modelID);
 
-
-    // Migrate records with updated foreign keys
-    await diskDB.runAsync(`
-      INSERT INTO records (dateTime, position, fileID, speciesID, modelID, confidence, comment, end, callCount, isDaylight, reviewed, tagID)
-      SELECT r.dateTime, r.position, fm.newID, sm.newID, ?, r.confidence, r.comment, r.end, r.callCount, r.isDaylight, r.reviewed, tm.newID
-      FROM modelDb.records r
-      JOIN file_map fm ON r.fileID = fm.oldID
-      JOIN species_map sm ON r.speciesID = sm.oldID
-      LEFT JOIN tag_map tm ON r.tagID = tm.oldID
-    `, modelID);
-
-    // Tidy up
-    await diskDB.runAsync(`DROP TABLE location_map`);
-    await diskDB.runAsync(`DROP TABLE file_map`);
-    await diskDB.runAsync(`DROP TABLE tag_map`);
-    await diskDB.runAsync(`DROP TABLE species_map`);
-
+      // Tidy up
+      await diskDB.runAsync(`DROP TABLE location_map`);
+      await diskDB.runAsync(`DROP TABLE file_map`);
+      await diskDB.runAsync(`DROP TABLE tag_map`);
+      await diskDB.runAsync(`DROP TABLE species_map`);
+    }
     await diskDB.runAsync('END');
     await diskDB.runAsync(`DETACH DATABASE modelDb`);
   } catch (err) {
@@ -692,5 +697,6 @@ export {
   closeDatabase,
   checkpoint,
   Mutex,
-  mergeDbIfNeeded
+  mergeDbIfNeeded,
+  addNewModel
 };

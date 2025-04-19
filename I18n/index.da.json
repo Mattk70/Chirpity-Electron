@@ -35,6 +35,8 @@
     "Use Location settings-circle-help": ["Når aktiveret, rapporterer natfuglefilteret fugle baseret på dine placeringsindstillinger."],
     "Volume Adjustment-circle-help": ["Juster lydstyrken for at kompensere for lave optagelsesniveauer."],
     "File-timestamp-circle-help": ["Nogle lydoptagere, for eksempel Zoom H1 Essential, kan indstille den gemte filens dato og tid til begyndelsen af optagelsen i stedet for slutningen. Hvis du har en sådan optager, vil valg af denne indstilling rette tiderne vist for dine detektioner (ændringer i denne indstilling kræver en genstart af Chirpity for at træde i kraft)."],
+"Combine-circle-help": ["Når aktiveret, vil gentagelse af analysen af åbne filer med en anden model tilføje modellens detektioner til listen. Bemærk: <b>under</b> den nye analyse vises kun resultaterne fra den aktuelle model."],
+"Merge-circle-help": ["Når aktiveret, vil detektioner fra hver model blive flettet, og kun detektionen med den højeste sikkerhed vises. Bemærk: <b>under</b> den nye analyse vises kun resultaterne fra den aktuelle model."],
 
     "loading-text": ["Gør tingene klar..."],
     "navBarFile": ["Fil"],
@@ -46,6 +48,7 @@
       ],
       "open-folder": ["Åbn mappe(r)"],
       "saveCSV": ["Eksportér resultater til CSV"],
+      "save-summary": ["Eksportér oversigt til CSV"],
       "save-eBird": ["Eksportér eBird rekordfil"],
       "save-Raven": ["Eksportér Raven valg tabel"],
       "export-audio": ["Eksportér valgt lyd","Ctrl+E"
@@ -93,6 +96,7 @@
       "apply-location": ["Sæt"],
       "cancel-location": ["Annuller"],
       "library-location-select": ["Biblioteksplacering:"],
+      "database-location-select": ["Databasens placering:"],
       "close-tour": ["Luk"],
       "settings": {
         "basic": "Standard",
@@ -101,6 +105,8 @@
         "clear-call-cache": ["Ryd referencelyd-cache"],
         "reset-defaults": ["Nulstil til standardindstillinger"],
         "model-to-use": "Model:",
+        "combine-detections": "Kombinér modeldetektioner",
+        "merge-detections": "Flet modeldetektioner",
         "confidence": "Konfidensinterval:",
         "list-to-use": "Liste:",
         "local": "Brug Lokationsindstillinger",

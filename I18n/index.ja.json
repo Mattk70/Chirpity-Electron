@@ -35,6 +35,8 @@
     "Use Location settings-circle-help": ["有効にすると、夜間のコールフィルターは位置設定に基づいて鳥を報告します。"],
     "Volume Adjustment-circle-help": ["録音レベルが低い場合にオーディオの音量を調整します。"],
     "File-timestamp-circle-help": ["例えばZoom H1 Essentialのような一部のオーディオレコーダーは、ファイル保存日時を録音の開始時点に設定することができます。このオプションを選択すると、検出の表示時間が修正されます（この設定の変更はChirpityの再起動が必要です）。"],
+    "Combine-circle-help": ["有効にすると、別のモデルで開いているファイルを再分析することで、そのモデルの検出結果がリストに追加されます。注意：新しい分析の<b>間</b>は、現在のモデルの結果のみが表示されます。"],
+    "Merge-circle-help": ["有効にすると、各モデルの検出結果が統合され、最も高い信頼度の検出のみが表示されます。注意：新しい分析の<b>間</b>は、現在のモデルの結果のみが表示されます。"],
 
     "loading-text": ["準備中..."],
     "navBarFile": ["ファイル"],
@@ -46,6 +48,7 @@
     "open-file": ["オーディオファイルを開く","Ctrl+O"],
     "open-folder": ["フォルダーを開く"],
     "saveCSV": ["結果をCSVにエクスポート"],
+    "save-summary": ["サマリーをCSVでエクスポート"],
     "save-eBird": ["eBird記録ファイルをエクスポート"],
     "save-Raven": ["Raven選択テーブルをエクスポート"],
     "export-audio": ["選択したオーディオをエクスポート","Ctrl+E"],
@@ -90,6 +93,7 @@
 "apply-location": ["設定"],
 "cancel-location": ["キャンセル"],
 "library-location-select": ["ライブラリの場所："],
+"database-location-select": ["データベースの場所:"],
 "close-tour": ["閉じる"],
 "settings": {
   "basic": "標準",
@@ -98,6 +102,8 @@
   "clear-call-cache": ["参照コールキャッシュをクリア"],
   "reset-defaults": ["デフォルト設定にリセット"],
   "model-to-use": "モデル：",
+  "combine-detections": "モデルの検出を結合する",
+  "merge-detections": "モデルの検出を統合する",
   "confidence": "信頼度しきい値：",
   "list-to-use": "リスト：",
   "local": "位置設定を使用",

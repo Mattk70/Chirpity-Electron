@@ -35,7 +35,9 @@
   "Use Location settings-circle-help": ["激活后，夜间叫声过滤器将基于您的位置设置报告鸟类。"],
   "Volume Adjustment-circle-help": ["调整音量以补偿低录音电平。"],
   "File-timestamp-circle-help": ["一些音频录音设备，例如Zoom H1 Essential，可以将文件保存的日期和时间设置为录音开始时，而不是结束时。如果您有这样的录音设备，选择此选项将修正检测中显示的时间。（更改此设置需要重新启动 Chirpity 才能生效）。"],
-  
+  "Combine-circle-help": ["启用后，使用不同模型重新分析打开的文件将把该模型的检测结果添加到列表中。注意：<b>在</b>新的分析过程中，仅显示当前模型的结果。"],
+  "Merge-circle-help": ["启用后，将合并每个模型的检测结果，仅显示置信度最高的检测。注意：<b>在</b>新的分析过程中，仅显示当前模型的结果。"],
+
   "loading-text": ["正在准备..."],
   "navBarFile": ["文件"],
   "navbarHelp": ["帮助"],
@@ -46,6 +48,7 @@
   ],
   "open-folder": ["打开文件夹"],
   "saveCSV": ["将结果导出为CSV"],
+  "save-summary": ["导出摘要为 CSV"],
   "save-eBird": ["导出eBird记录文件"],
   "save-Raven": ["导出Raven选择表"],
   "export-audio": ["导出选定的音频","Ctrl+E"
@@ -93,6 +96,7 @@
   "apply-location": ["设置"],
   "cancel-location": ["取消"],
   "library-location-select": ["库位置："],
+  "database-location-select": ["数据库位置:"],
   "close-tour": ["关闭"],
   "settings": {
     "basic": "标准",
@@ -101,6 +105,8 @@
     "clear-call-cache": ["清除参考通话缓存"],
     "reset-defaults": ["恢复默认设置"],
     "model-to-use": "模型：",
+    "combine-detections": "合并模型检测结果",
+    "merge-detections": "融合模型检测结果",
     "confidence": "置信度阈值：",
     "list-to-use": "列表：",
     "local": "使用位置设置",
