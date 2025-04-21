@@ -516,8 +516,8 @@ const mergeDbIfNeeded = async ({diskDB, model, appPath, dbMutex}) => {
     const row = await legacyDB.getAsync(`SELECT version FROM schema_version`);
     let user_version;
     if (!row) {
-      const { pragma_version } = await legacyDB.getAsync("PRAGMA user_version");
-      user_version = pragma_version || 0;
+      let { user_version } = await legacyDB.getAsync("PRAGMA user_version");
+      user_version ??=  0;
       await legacyDB.runAsync(
         "INSERT INTO schema_version (version) VALUES (?)",
         user_version

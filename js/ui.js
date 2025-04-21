@@ -289,6 +289,7 @@ const GLOBAL_ACTIONS = {
   ArrowRight: () => {
     const skip = STATE.windowLength / 100;
     if (STATE.currentBuffer && STATE.regionsCompleted) {
+      const now = spec.wavesurfer.getCurrentTime();
       // This will trigger the finish event if at the end of the window
       spec.wavesurfer.setTime(now + skip);
     }
