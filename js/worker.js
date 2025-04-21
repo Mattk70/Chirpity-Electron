@@ -24,6 +24,7 @@ import { trackEvent as _trackEvent } from "./utils/tracking.js";
 
 let isWin32 = false;
 
+const dbMutex = new Mutex();
 const DATASET = false;
 const DATABASE = "archive_test";
 const adding_chirpity_additions = false;
@@ -4338,7 +4339,6 @@ const onFileDelete = async (fileName) => {
   }
 };
 
-const dbMutex = new Mutex();
 /**
  * Update species common names in the database using provided label mappings.
  *
