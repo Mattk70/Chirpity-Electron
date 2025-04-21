@@ -2,7 +2,22 @@ const fs = require('node:fs');
 const csv = require('@fast-csv/parse');
 
 
-async function importData({db, file, format, METADATA, defaultLocation, setMetadata}){
+/**
+   * Imports and processes CSV data into the database, resolving related entities and updating metadata.
+   *
+   * Reads a CSV file stream, parses each row sequentially, and inserts or updates records in the database. Utilizes in-memory caches to minimize redundant queries for models, species, tags, locations, and files. Tracks unique files referenced in the CSV and updates metadata as needed.
+   *
+   * @param {Object} options - Import options.
+   * @param {string} options.file - Path to the CSV file to import.
+   * @param {string} options.format - Format identifier for the import.
+   * @param {Object} options.METADATA - Metadata object to be updated during import.
+   * @param {Object} options.defaultLocation - Default location object used for new entries.
+   * @param {Function} options.setMetadata - Callback to update metadata for new files.
+   * @returns {Promise<{files: string[], meta: Object}>} Resolves with a list of unique files processed and the updated metadata.
+   *
+   * @throws {Error} If a parsing or database error occurs, or if required entities are missing.
+   */
+  async function importData({db, file, format, METADATA, defaultLocation, setMetadata}){
     const caches = {
         models: new Map(),
         species: new Map(),
@@ -48,6 +63,22 @@ async function importData({db, file, format, METADATA, defaultLocation, setMetad
     })
   }
   
+  /**
+   * Prepares and inserts a CSV row's data into the database, resolving and caching related entity IDs.
+   *
+   * Extracts and converts relevant fields from the input row, resolves or inserts associated model, species, file, location, and tag records as needed, and inserts a new record into the `records` table. Utilizes in-memory caches to minimize redundant database queries and updates file metadata if necessary.
+   *
+   * @param {Object} params - The parameters for processing the row.
+   * @param {Object} params.row - The CSV row data to process and insert.
+   * @param {Object} params.defaultLocation - Default location values for fallback.
+   * @param {Object} params.METADATA - Metadata object to update with file information.
+   * @param {Function} params.setMetadata - Function to set up file metadata if missing.
+   * @param {Object} params.caches - In-memory caches for models, species, tags, locations, and files.
+   * @returns {Object} The updated metadata object.
+   *
+   * @throws {Error} If the model specified in the row does not exist in the database.
+   * @throws {Error} If the species specified in the row does not exist for the given model.
+   */
   async function prepInsertParams({ db, row, defaultLocation, METADATA, setMetadata, caches }) {
     let { file, time, endTime, cname, confidence, label, comment, callCount, position, lat, lon, place, model } = row;
     const {defaultLat, defaultLon, defaultPlace} = defaultLocation;

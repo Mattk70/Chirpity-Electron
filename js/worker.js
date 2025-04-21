@@ -277,28 +277,11 @@ const getSelectionRange = (file, start, end) => {
 
 
 /**
- * Loads, configures, and migrates the SQLite database used for audio records and metadata.
+ * Loads and initializes the application's SQLite database for audio records and metadata.
  *
- * This asynchronous function initializes the database by:
- * - Fetching default model labels from a remote file (for the "birdnet" model) or a local configuration file,
- *   then appending a default "Unknown Sp." label.
- * - Constructing a unique database filename based on the total number of labels and either creating a new database (via createDB)
- *   or opening an existing one.
- * - Enforcing PRAGMA settings (foreign keys, journal mode, and busy timeout) for reliable operation.
- * - Performing schema migrations on an existing database when necessary, such as:
- *   - Creating indices on species(sname) and species(cname).
- *   - Adding missing columns ("archiveName" and "metadata") to the files table.
- *   - Updating the tags and records tables (including adding a 'reviewed' column and migrating existing records).
+ * Opens or creates the main database file, applies schema migrations if needed, sets PRAGMA options, and prepares species mappings for the current model. Notifies the UI if label translation is required, and updates global state with the loaded database instance.
  *
- * @returns {Promise<boolean>} Resolves to true when the database is successfully loaded and configured.
- *
- * @example
- * loadDB()
- *   .then(success => console.log('Database loaded:', success))
- *   .catch(error => console.error('Error loading database:', error));
- *
- * @remarks
- * This function depends on global variables (e.g., STATE, diskDB, UI) and auxiliary functions such as createDB, checkpoint, and dbMutex.
+ * @returns {Promise<sqlite3.Database>} Resolves with the initialized database instance.
  */
 async function loadDB() {
   const path = STATE.database.location || appPath;
@@ -352,6 +335,14 @@ async function loadDB() {
 }
 
 
+/**
+ * Updates the application's label state by retrieving species labels from the database and applying current inclusion filters.
+ *
+ * If regeneration is requested or labels are not yet loaded, fetches all species labels from the database. Then filters the labels based on the current inclusion list and posts the filtered labels to the UI.
+ *
+ * @param {Object} options
+ * @param {boolean} options.regenerate - Whether to force regeneration of the label list from the database.
+ */
 async function setLabelState({regenerate}) {
   if (regenerate || !STATE.allLabels){
     DEBUG && console.log("Getting labels from disk db");
@@ -368,64 +359,12 @@ async function setLabelState({regenerate}) {
 }
 
 /**
- * Dispatches incoming worker messages by executing actions specified in the event's data payload.
+ * Handles and dispatches worker messages to perform actions such as analysis, file operations, prediction management, database updates, and UI communication.
  *
- * This asynchronous function processes event messages that include an `action` field alongside associated parameters.
- * For any action other than "_init_", it waits for any pending initialization to complete before proceeding.
- * Depending on the action, the function delegates tasks such as initializing environments, processing audio files,
- * managing prediction worker threads, updating database records, handling file operations, and more.
- * Supported actions include:
+ * Processes incoming event messages containing an `action` field and delegates tasks accordingly, including model initialization, audio analysis, prediction worker management, database record manipulation, file loading and saving, exporting, importing, and updating application state. Waits for initialization to complete before handling most actions. Supports a wide range of commands for audio processing, data management, and UI updates.
  *
- * - "_init_": Sets up the environment by initializing the list worker, launching the predictive model, and updating state.
- * - "abort": Aborts currently ongoing analysis.
- * - "analyse": Initiates audio analysis by validating prediction workers and sending alerts if they are not ready.
- * - "change-batch-size": Adjusts the batch size used by prediction workers.
- * - "change-threads": Modifies the number of active prediction worker threads.
- * - "change-mode": Switches the operational mode.
- * - "chart": Processes chart data requests.
- * - "check-all-files-saved": Verifies that specified files have been saved in the database.
- * - "convert-dataset": Converts dataset specifications from existing formats.
- * - "create-dataset": Creates a dataset with inclusion identifiers.
- * - "delete": Performs deletion operations.
- * - "delete-species": Removes specified species records.
- * - "export-results": Exports detection results.
- * - "file-load-request": Loads an audio file, optionally clearing in-memory records, and switches modes based on file state.
- * - "filter": Applies filters to results, refreshes summaries, and updates inclusion identifiers.
- * - "get-detected-species-list": Retrieves a list of detected species.
- * - "get-valid-species": Fetches valid species associated with a file.
- * - "get-locations": Retrieves location details for a specified file from the database.
- * - "get-tags": Retrieves a list of tags from the disk database.
- * - "delete-tag": Deletes a tag and generates an alert if an error occurs.
- * - "update-tag": Updates a tag in the database and refreshes the UI with the updated tag list.
- * - "get-valid-files-list": Returns a list of valid files after scanning.
- * - "insert-manual-record": Manually inserts a record and updates summaries and results accordingly.
- * - "load-model": Loads a new predictive model, aborting ongoing processing if necessary.
- * - "post": Uploads processed audio data.
- * - "purge-file": Deletes the specified file.
- * - "compress-and-organise": Compresses and reorganises audio files.
- * - "relocated-file": Updates file paths after relocation.
- * - "save": Saves audio processing data along with associated metadata.
- * - "save2db": Persists changes from the in-memory database to disk.
- * - "set-custom-file-location": Specifies a custom location for file storage.
- * - "update-buffer": Reloads an audio file to update its buffer.
- * - "update-file-start": Adjusts the starting point for audio file processing.
- * - "update-list": Updates internal lists and custom labels, optionally refreshing summaries and results.
- * - "update-locale": Updates locale settings and associated labels.
- * - "update-summary": Refreshes summary data.
- * - "update-state": Updates overall application state, including paths and processing thresholds.
- *
- * @example
- * const msgEvent = {
- *   data: {
- *     action: "analyse",
- *     file: "audio_sample.mp3",
- *     // ...additional parameters for analysis
- *   }
- * };
- * handleMessage(msgEvent);
- *
- * @param {Object} e - The message event object containing the action and related parameters.
- * @returns {Promise<void>} Resolves once the message is processed.
+ * @param {Object} e - The message event containing an `action` and associated parameters.
+ * @returns {Promise<void>} Resolves when the requested action is completed.
  */
 async function handleMessage(e) {
   const args = e.data;
@@ -849,6 +788,13 @@ function setGetSummaryQueryInterval(threads) {
     STATE.detect.backend !== "tensorflow" ? threads * 10 : threads;
 }
 
+/**
+ * Switches the application to a new operational mode, initializing the in-memory database if needed and notifying the UI.
+ *
+ * If the mode is different from the current state, this function ensures the memory database is available, updates the application state to reflect the new mode, and posts a "mode-changed" event to the UI.
+ *
+ * @param {string} mode - The new mode to activate.
+ */
 async function onChangeMode(mode) {
   if (STATE.mode !== mode) {
     if (!memoryDB){
@@ -868,30 +814,17 @@ const filtersApplied = (list) => {
 };
 
 /**
- * Initializes and launches the application environment by configuring model settings, databases, and prediction workers.
+ * Initializes the application environment with the specified model, database, and prediction worker configuration.
  *
- * This function is invoked when the application is first opened or when the model is changed. It sets global flags,
- * configures the sample rate based on the model, updates the application state, loads the disk and memory databases,
- * and spawns prediction workers to process audio data.
+ * Sets up global state, selects the appropriate sample rate for the chosen model, loads or updates the disk and memory databases, and spawns prediction workers for audio analysis.
  *
- * @async
- * @param {Object} options - Configuration options for launching the application.
- * @param {string} [options.model="chirpity"] - The name of the model to use; if "birdnet", sets sample rate to 48000 Hz, otherwise 24000 Hz.
- * @param {number} [options.batchSize=32] - The size of the batch to process audio data.
- * @param {number} [options.threads=1] - The number of worker threads to spawn for prediction processing.
- * @param {string} [options.backend="tensorflow"] - The backend to use for predictions.
- * @param {string} [options.list="everything"] - Specifies the list or category to use for predictions.
- * @returns {Promise<void>} A promise that resolves when the application environment is initialized and prediction workers are spawned.
- * @throws {Error} Propagates any error encountered during database loading or worker spawning.
+ * @param {Object} options - Launch configuration.
+ * @param {string} [options.model="chirpity"] - Model name; sets sample rate to 48000 Hz for "birdnet", otherwise 24000 Hz.
+ * @param {number} [options.batchSize=32] - Number of audio samples per prediction batch.
+ * @param {number} [options.threads=1] - Number of prediction worker threads to spawn.
+ * @param {string} [options.backend="tensorflow"] - Prediction backend to use.
  *
- * @example
- * onLaunch({
- *   model: "birdnet",
- *   batchSize: 64,
- *   threads: 4,
- *   backend: "tensorflow",
- *   list: "selected"
- * });
+ * @returns {Promise<void>}
  */
 
 async function onLaunch({
@@ -1057,25 +990,16 @@ const getFilesInDirectory = async (dir) => {
 const prepParams = (list) => "?".repeat(list.length).split("").join(",");
 
 /**
- * Generates an SQL filtering clause along with its corresponding parameters for file record retrieval.
+ * Constructs an SQL filter clause and parameter list for file record queries based on date range and application mode.
  *
- * This function constructs an SQL fragment to filter file records based on an optional date range and the
- * current application mode stored in the global STATE variable. Depending on whether a valid range is provided
- * or the application mode is set to "archive", it generates the appropriate conditions and parameters:
+ * If a date range is provided, filters records by `dateTime` between the specified start (inclusive) and end (exclusive) values.
+ * In "archive" mode, filters records where the file name or archive name matches entries in the current analysis file list, adjusting paths as needed.
+ * In "analyse" mode, filters by file name if applicable.
  *
- * - When a range object with a defined `start` property is provided, an SQL condition is appended to filter
- *   records where `dateTime` is between `range.start` (inclusive) and `range.end` (exclusive). The provided range
- *   values are pushed to the parameters array.
- * - In "archive" mode, the function creates an SQL condition that filters records by matching either the file's
- *   name or its archiveName against the list obtained from STATE.filesToAnalyse. It also processes file paths
- *   by removing the archive path prefix defined in STATE.library.location.
- * - In "analyse" mode, a file-based filtering condition exists in the code but is currently commented out.
- *
- * @param {Object} [range] - Optional object specifying a date range for filtering records.
- * @param {(number|string)} range.start - The start boundary of the date range (inclusive).
- * @param {(number|string)} range.end - The end boundary of the date range (exclusive).
- * @returns {Array.<(string | any[])>} A tuple where the first element is the SQL condition fragment (string)
- * and the second element is an array of parameters to bind to the SQL query.
+ * @param {Object} [range] - Optional date range for filtering.
+ * @param {(number|string)} range.start - Inclusive start of the date range.
+ * @param {(number|string)} range.end - Exclusive end of the date range.
+ * @returns {[string, any[]]} An array containing the SQL condition string and its associated parameter values.
  */
 function getFileSQLAndParams(range) {
   const fileParams = prepParams(STATE.filesToAnalyse);
@@ -1101,6 +1025,13 @@ function getFileSQLAndParams(range) {
   }
   return [SQL, params];
 }
+/**
+ * Returns an array of indices not present in the sorted `included` list up to a specified range.
+ *
+ * @param {number[]} included - Sorted array of indices to include.
+ * @param {number} [fullRange=STATE.allLabels.length] - The exclusive upper bound for indices to check.
+ * @returns {number[]} Array of indices from 0 to {@link fullRange} - 1 that are not in {@link included}.
+ */
 function getExcluded(included, fullRange = STATE.allLabels.length) {
   const missing = [];
   let currentIndex = 0;
@@ -1117,6 +1048,13 @@ function getExcluded(included, fullRange = STATE.allLabels.length) {
   return missing;
 }
 
+/**
+ * Asynchronously generates an SQL clause for filtering species based on the current list selection.
+ *
+ * If the active list is not "everything", the clause restricts or excludes species IDs according to the list type (e.g., "birds"). The resulting SQL fragment can be used to filter query results by included or excluded species.
+ *
+ * @returns {Promise<string>} An SQL fragment for species filtering, or an empty string if no filtering is applied.
+ */
 async function getSpeciesSQLAsync(){
   let not = "", SQL = "";
   const {list, allLabels} = STATE;
@@ -1342,6 +1280,14 @@ function chunkArray(array, size) {
   return result;
 }
 
+/**
+ * Retrieves and merges metadata for a list of audio files from the database and in-memory cache.
+ *
+ * For each file name, fetches file details, associated location, and per-day durations from the database, then merges these with any existing in-memory metadata. Returns an object keyed by file name containing the combined metadata.
+ *
+ * @param {string[]} fileNames - List of audio file names to retrieve metadata for.
+ * @returns {Promise<Object>} An object mapping each file name to its metadata, including duration, start time, location, and completion status.
+ */
 async function updateMetadata(fileNames) {
   const batchSize = 10000;
   const batches = chunkArray(fileNames, batchSize);
@@ -1425,7 +1371,18 @@ async function updateMetadata(fileNames) {
   return finalResult;
 }
 
-// Not an arrow function. Async function has access to arguments - so we can pass them to processnextfile
+/**
+ * Initiates analysis of a set of audio files, managing selection state, caching, and worker processing.
+ *
+ * If all files are already analyzed and cached, retrieves results from the database or summary as appropriate. Otherwise, prepares the files for analysis, clears or updates relevant state, and dispatches processing tasks to available workers.
+ *
+ * @param {Object} params - Analysis parameters.
+ * @param {string[]} [params.filesInScope=[]] - List of audio files to analyze.
+ * @param {number} [params.start] - Optional start time for analysis (in seconds).
+ * @param {number} [params.end] - Optional end time for analysis (in seconds).
+ * @param {boolean} [params.reanalyse=false] - If true, forces reanalysis even if results are cached.
+ * @param {boolean} [params.circleClicked=false] - If true, triggers a special retrieval mode for results.
+ */
 async function onAnalyse({
   filesInScope = [],
   start = undefined,
@@ -1533,6 +1490,12 @@ async function onAnalyse({
   }
 }
 
+/**
+ * Aborts ongoing audio processing and prediction tasks, clears related queues and state, terminates active workers, and restarts prediction workers for the specified model.
+ *
+ * @param {Object} params - Parameters for aborting processing.
+ * @param {string} [params.model=STATE.model] - The model identifier to use when restarting prediction workers.
+ */
 function onAbort({ model = STATE.model }) {
   aborted = true;
   FILE_QUEUE = [];
@@ -1628,9 +1591,14 @@ async function getWorkingFile(file) {
 }
 
 /**
- * Function to locate a file either in the archive, or with the same basename but different extension from SUPPORTED_FILES
- * @param {string} file - Full path to a file that doesn't exist
- * @returns {string | null} - Full path to the located file or null if not found
+ * Attempts to locate a missing file by searching the archive or the original directory for files with the same base name and a supported extension.
+ *
+ * If the file is archived, returns its path in the library location. Otherwise, searches the original directory for a file with the same base name and a supported audio extension.
+ *
+ * @param {string} file - The full path of the missing file.
+ * @returns {Promise<string|null>} The full path to the located file, or null if not found.
+ *
+ * @remark Generates an error alert if the directory cannot be read.
  */
 async function locateFile(file) {
   // Check if the file has been archived
@@ -1853,26 +1821,14 @@ function addDays(date, days) {
 }
 
 /**
- * Retrieves detection records for a given audio file within a specified time range and posts them to the UI.
+ * Retrieves and sends detection records for a specific audio file and time range to the UI.
  *
- * This asynchronous function calculates absolute start and end timestamps by adding the file's metadata offset
- * (in milliseconds) to the provided start and end offsets (in seconds). It queries the database for detection
- * records that satisfy the following criteria:
- * - A confidence level greater than or equal to the configured minimum (STATE.detect.confidence).
- * - A file name matching the provided file parameter.
- * - A detection timestamp between the calculated start and end times.
+ * Queries the database for detections within the specified segment of the audio file, applying confidence and species filters, and posts the top-ranked results to the UI for display or navigation.
  *
- * If additional species filters are active, the query further restricts results by species ID. Records are
- * ranked using a window function to select the top (most confident) detection per grouping of file and datetime.
- * The function posts the resulting detections to the UI along with a flag that instructs the UI whether to
- * navigate directly to the corresponding region.
- *
- * @async
- * @param {string} file - The identifier or name of the audio file used for querying metadata and filtering detections.
- * @param {number} start - The starting offset in seconds from the beginning of the file's recording.
- * @param {number} end - The ending offset in seconds from the beginning of the file's recording.
- * @param {boolean} goToRegion - If true, signals the UI to navigate to the detected region.
- * @returns {Promise<void>} A promise that resolves when detections have been successfully retrieved and sent to the UI.
+ * @param {string} file - The audio file identifier.
+ * @param {number} start - Start offset in seconds from the file's beginning.
+ * @param {number} end - End offset in seconds from the file's beginning.
+ * @param {boolean} goToRegion - Whether the UI should navigate to the detected region.
  */
 async function sendDetections(file, start, end, goToRegion) {
   const {db, detect} = STATE;
@@ -2870,17 +2826,13 @@ const processQueue = async () => {
 };
 
 /**
- * Spawns Web Worker threads for parallel prediction processing.
+ * Spawns multiple Web Workers for parallel AI model prediction.
  *
- * This function creates the specified number of worker threads that load prediction models in separate modules.
- * If the model name is "birdnet", it substitutes the worker script with "BirdNet2.4". Each worker is initialized
- * with configuration details including a processing list, batch size, and various state parameters (such as backend,
- * geolocation, week, and species threshold) sourced from the global state. Message and error handlers are set up for
- * asynchronous communication and to manage worker failures.
+ * Creates the specified number of prediction worker threads, each loading the given model (substituting "BirdNet2.4" for "birdnet"). Workers are initialized with batch size and relevant state parameters, and are set up for asynchronous communication and error handling.
  *
- * @param {string} model - The name of the AI model to use; for "birdnet", the "BirdNet2.4" script is used.
- * @param {number} batchSize - The number of items each worker should process per batch.
- * @param {number} threads - The number of Web Worker threads to spawn.
+ * @param {string} model - The AI model to load for prediction; "birdnet" uses the "BirdNet2.4" worker script.
+ * @param {number} batchSize - Number of items each worker processes per batch.
+ * @param {number} threads - Number of worker threads to spawn.
  */
 function spawnPredictWorkers(model, batchSize, threads) {
   for (let i = 0; i < threads; i++) {
@@ -2924,25 +2876,17 @@ const terminateWorkers = () => {
 };
 
 /**
- * Performs batch insertion of audio records into the database.
+ * Inserts multiple audio detection records into the database based on existing results.
  *
- * Retrieves records using a prepared statement based on the original identifier,
- * then iterates through each record to insert it individually via onInsertManualRecord.
- * The operation is performed within a mutex lock and a database transaction to
- * guarantee atomicity. A UI update is triggered after the final record is processed,
- * and debug timing information is logged if enabled.
+ * Retrieves records associated with the specified original identifier, then inserts each as a new manual record with the provided identifier and label. All insertions are performed within a single transaction and mutex lock to ensure atomicity. Triggers a UI update after the final record is inserted.
  *
- * @param {string} cname - Identifier used for the new records.
+ * @param {string} cname - Identifier to assign to the new records.
  * @param {string} label - Label to associate with each inserted record.
- * @param {Array} files - List of files; currently reserved and not utilized by the function.
- * @param {string} originalCname - Original identifier used in the prepared statement query.
- * @returns {Promise<void>} A promise that resolves when the batch insertion completes.
+ * @param {Array} files - Reserved for future use; not currently utilized.
+ * @param {string} originalCname - Identifier used to select existing records for duplication.
+ * @returns {Promise<void>} Resolves when all records have been inserted.
  *
- * @throws {Error} Propagates any error encountered during the database transaction,
- *                 ensuring a rollback to avoid partial insertions.
- *
- * @example
- * await batchInsertRecords("newCampaign", "approved", fileList, "origCampaign");
+ * @throws {Error} If any error occurs during the transaction, all changes are rolled back.
  */
 async function batchInsertRecords(cname, label, files, originalCname) {
   const db = STATE.db;
@@ -3414,7 +3358,16 @@ function updateFilesBeingProcessed(file) {
   }
 }
 
-// Optional Arguments
+/**
+ * Processes the next audio file in the queue for prediction, handling file retrieval, boundary determination, and error conditions.
+ *
+ * If a file is missing or cannot be processed, it generates a warning alert and continues to the next file. For each valid file, it determines analysis boundaries and invokes prediction. Recursively processes all files in the queue until empty.
+ *
+ * @param {Object} [options] - Optional arguments.
+ * @param {number} [options.start] - Start time for analysis, if specified.
+ * @param {number} [options.end] - End time for analysis, if specified.
+ * @param {Worker} [options.worker] - Prediction worker to use, if specified.
+ */
 async function processNextFile({
   start = undefined,
   end = undefined,
@@ -3557,6 +3510,14 @@ function calculateNighttimeBoundaries(fileStart, fileEnd, latitude, longitude) {
   return activeIntervals;
 }
 
+/**
+ * Determines the active time boundaries for a given audio file based on its metadata and detection mode.
+ *
+ * If nocturnal migration detection is enabled, calculates nighttime intervals using the file's start time, duration, and associated location coordinates. Otherwise, returns the full duration of the file as a single interval.
+ *
+ * @param {string} file - The file name or identifier for which to compute boundaries.
+ * @returns {Promise<Array<{start: number, end: number}>>} An array of time interval objects representing active boundaries in seconds.
+ */
 async function setStartEnd(file) {
   const meta = METADATA[file];
   let boundaries;
@@ -3733,6 +3694,14 @@ const getResults = async ({
   }
 };
 
+/**
+ * Exports detection results as Audacity label track files grouped by audio file.
+ *
+ * Each output file contains tab-delimited start and end times with species names and confidence scores, formatted for Audacity label import.
+ *
+ * @param {Array<Object>} result - Detection results to export, each containing file, position, end, cname, and score.
+ * @param {string} directory - Directory where the label track files will be saved.
+ */
 function exportAudacity(result, directory) {
   const { writeToPath } = require("@fast-csv/format");
   const groupedResult = result.reduce((acc, item) => {
@@ -3773,18 +3742,15 @@ function exportAudacity(result, directory) {
 
 
 /**
- * Exports data records to a CSV file.
+ * Exports data records to a CSV file in the specified format.
  *
- * This asynchronous function processes data records in batches (up to 10,000 entries per batch), formatting each record according to the
- * specified export format ("text", "eBird", or "Raven"). In "Raven" mode, it assigns a sequential selection number and calculates cumulative file
- * offsets across entries. In "eBird" mode, it aggregates records by "Start Time", "Common name", and "Species" and sums their species counts.
- * The formatted data is then written as a CSV file using a write stream from the @fast-csv/format module, with the delimiter set to a tab for
- * "Raven" format and a comma for other formats.
+ * Supports "text", "eBird", "Raven", and "summary" formats, formatting records accordingly and batching large datasets for efficient processing. In "Raven" format, assigns selection numbers and cumulative file offsets; in "eBird" format, aggregates species counts by group. Writes the output as a CSV file with appropriate delimiter and headers, and notifies the UI on completion or error.
  *
  * @async
- * @param {Array<Object>} result - An array of data records to be exported.
+ * @param {Array<Object>} result - The data records to export.
  * @param {string} filename - The output file path.
- * @param {string} format - The export format, which must be one of "text", "eBird", or "Raven".
+ * @param {string} format - The export format: "text", "eBird", "Raven", or "summary".
+ * @param {Object} [headers] - Optional mapping of output column headers for "summary" format.
  */
 async function exportData(result, filename, format, headers) {
   const formatFunctions = {
@@ -4205,6 +4171,13 @@ const onUpdateFileStart = async (args) => {
   }
 };
 
+/**
+ * Deletes detection records from the database matching the specified file, time range, species, and model.
+ *
+ * If records are deleted, updates the summary and detected species list or notifies the UI of unsaved records, depending on the database context.
+ *
+ * @param {Object} params - Parameters specifying which records to delete, including file name, start and end times, species name, model ID, and filtering options.
+ */
 async function onDelete({
   file,
   start,
@@ -4250,6 +4223,15 @@ async function onDelete({
   }
 }
 
+/**
+ * Deletes all detection records for a specified species from the database, applying current mode filters.
+ *
+ * In "analyse" mode, only records from files currently being analyzed are deleted. In "explore" mode, deletions are limited to the selected date range. After deletion, updates the detected species list or notifies the UI if records remain unsaved.
+ *
+ * @param {Object} params
+ * @param {string} params.species - The common name of the species to delete records for.
+ * @param {string} [params.speciesFiltered] - Used for UI highlighting; does not affect deletion logic.
+ */
 async function onDeleteSpecies({
   species,
   // need speciesFiltered because species triggers getSummary to highlight it
@@ -4340,23 +4322,15 @@ const onFileDelete = async (fileName) => {
 
 const dbMutex = new Mutex();
 /**
- * Update species common names in the database using provided label mappings.
+ * Updates species common names in the database based on provided label mappings.
  *
- * Parses an array of label strings formatted as "speciesName_commonName" and updates the corresponding
- * entries in the species table. For the "birdnet" model, a direct update query is executed; for other models,
- * existing common names are retrieved and conditionally updated based on matching parenthesized tokens.
- * All operations are executed within a single transaction to ensure atomicity. If any update fails, the
- * transaction is rolled back and the error is propagated.
+ * For each label in the format "speciesName_commonName", updates the corresponding species entry's common name (`cname`) in the database. Handles call type suffixes in common names and applies updates per model ID, ensuring that only changed values are written. All updates are performed within a single transaction for atomicity.
  *
- * @param {object} db - A database connection object that supports asynchronous methods (runAsync, prepare, and finalize).
- * @param {Array<string>} labels - An array of label strings in the format "speciesName_commonName".
- * @returns {Promise<void>} A promise that resolves when all updates are successfully committed.
+ * @param {object} db - Database connection supporting async methods (`runAsync`, `prepare`, `finalize`).
+ * @param {Array<string>} labels - Array of label strings in the format "speciesName_commonName".
+ * @returns {Promise<void>} Resolves when all updates are committed.
  *
  * @throws {Error} If any database operation fails during the transaction.
- *
- * @example
- * // For a 'birdnet' model, updating a species 'sparrow' to a common name 'House Sparrow'
- * await _updateSpeciesLocale(db, ["sparrow_House Sparrow"]);
  */
 
 async function _updateSpeciesLocale(db, labels) {
@@ -4456,19 +4430,13 @@ async function _updateSpeciesLocale(db, labels) {
 
 
 /**
- * Updates the application's locale by modifying state and database entries, and optionally refreshes analysis results.
+ * Updates the application's locale and species labels, and optionally refreshes analysis results.
  *
- * This asynchronous function updates the global state with the new locale, applies the new locale to both the
- * disk and memory databases by updating their species labels, and optionally refreshes the application's results
- * and summary if requested. It ensures that database operations are performed within a locked context for concurrency
- * safety, and performs a rollback in case of any error during the update process.
+ * Sets the new locale in the global state and updates species labels in both disk and memory databases. If requested, refreshes the application's results and summary to reflect the new locale.
  *
- * @async
- * @param {string} locale - The new locale identifier (e.g., "en-US").
- * @param {Object} labels - An object mapping species IDs to their localized labels.
- * @param {boolean} refreshResults - Indicates whether to refresh the results and summary following the locale update.
- * @returns {Promise<void>} A promise that resolves when the locale update process is completed.
- * @throws {Error} Propagates any error encountered during the update process after rolling back the database transaction.
+ * @param {string} locale - The locale identifier to set (e.g., "en-US").
+ * @param {Object} labels - Mapping of species IDs to localized labels.
+ * @param {boolean} refreshResults - Whether to refresh results and summary after updating the locale.
  */
 async function onUpdateLocale(locale, labels, refreshResults) {
   if (DEBUG) t0 = Date.now();
@@ -4490,6 +4458,19 @@ async function onUpdateLocale(locale, labels, refreshResults) {
   await setLabelState({regenerate:true})
 }
 
+/**
+ * Sets or removes a custom location for a group of files and updates their metadata and UI.
+ *
+ * If a place name is provided, inserts or updates the location in the database and assigns its ID to each file. If no place is provided, deletes the location matching the given latitude and longitude. Updates in-memory metadata and notifies the UI of changes.
+ *
+ * @param {Object} params - Parameters for setting or removing the location.
+ * @param {number} params.lat - Latitude of the location.
+ * @param {number} params.lon - Longitude of the location.
+ * @param {string} [params.place] - Name of the location. If omitted, the location is deleted.
+ * @param {string[]} params.files - List of file names to update.
+ * @param {Object} [params.db] - Database instance to use.
+ * @param {boolean} [params.overwritePlaceName=true] - Whether to overwrite the place name if the location already exists.
+ */
 async function onSetCustomLocation({
   lat,
   lon,
@@ -4550,16 +4531,12 @@ async function getLocations({ file, db = STATE.db }) {
 }
 
 /**
- * Retrieves a filtered list of species IDs based on the current state and file metadata.
+ * Retrieves the list of species IDs included in the current filter context, using file metadata and cached results as needed.
  *
- * For "location" or "nocturnal" lists when local mode is enabled, if a file identifier is provided, the function uses
- * its metadata to extract latitude (lat), longitude (lon), and week information (derived from fileStart if STATE.useWeek is true).
- * The latitude and longitude are concatenated to form a location key. If the corresponding cache entry in STATE.included is missing,
- * setIncludedIDs is invoked to populate it. For other list types, if the cache is absent, setIncludedIDs is called without parameters.
+ * For "location" or "nocturnal" lists in local mode, uses file metadata or global state to determine latitude, longitude, and week, and ensures the inclusion cache is populated. For other list types, retrieves included species IDs from the cache, populating it if necessary.
  *
- * @async
- * @param {*} [file] - Optional key for retrieving file metadata from METADATA. Expected metadata should include properties like `fileStart`, `lat`, and `lon`.
- * @returns {Promise<number[]>} Promise resolving to an array of species IDs included in the current filtered results.
+ * @param {*} [file] - Optional file identifier used to extract metadata for filtering.
+ * @returns {Promise<number[]>} Promise resolving to an array of included species IDs for the current filter context.
  */
 async function getIncludedIDs(file) {
   let latitude, longitude, week;
@@ -4605,6 +4582,13 @@ async function getIncludedIDs(file) {
   }
 }
 
+/**
+ * Recursively merges all numeric species IDs from a nested inclusion list for a given model into a flat array.
+ *
+ * @param {string|number} model - The model identifier.
+ * @param {string} list - The inclusion list key.
+ * @returns {number[]} An array of unique species IDs included for the specified model and list.
+ */
 function deepMergeLists(model, list) {
   if (!STATE.included?.[model]?.[list]) return [];
   let mergedSet = new Set();
@@ -4631,6 +4615,18 @@ function deepMergeLists(model, list) {
 
 let LIST_CACHE = {};
 
+/**
+ * Retrieves and caches the included species IDs for a given location and week, updating the global state.
+ *
+ * Requests a species inclusion list from the list worker based on model, labels, location, and week, merges the result into the global included species state, and caches the promise to avoid redundant requests. Generates alerts for any unrecognized labels and throws an error if such labels are found.
+ *
+ * @param {number|string} lat - Latitude for location-based filtering.
+ * @param {number|string} lon - Longitude for location-based filtering.
+ * @param {number|string} week - Week number for seasonal filtering.
+ * @returns {Promise<Object>} The updated included species object in the global state.
+ *
+ * @throws {Error} If unrecognized labels are found in the custom list.
+ */
 async function setIncludedIDs(lat, lon, week) {
   const key = `${lat}-${lon}-${week}-${STATE.model}-${STATE.list}`;
   if (LIST_CACHE[key]) {
@@ -4872,27 +4868,20 @@ async function convertAndOrganiseFiles(threadLimit = 4) {
 }
 
 /**
- * Converts an audio file to the target archive format using FFmpeg, with optional trimming.
+ * Converts an audio file to the archive format using FFmpeg, with optional trimming and progress tracking.
  *
- * The function configures FFmpeg’s encoding parameters based on global settings. When converting to "ogg", it applies
- * preset audio settings (128k bitrate, mono channel, 30000 Hz sample rate). If trimming is enabled, the function adjusts
- * the audio duration according to computed start and end boundaries and issues alerts for atypical recording lengths.
- * Progress is tracked via a provided map, and upon successful conversion, the file’s modification timestamp and
- * corresponding database record are updated.
+ * Applies preset encoding parameters for "ogg" format and trims the audio based on calculated boundaries if enabled. Updates the file's modification time and corresponding database record upon successful conversion. Progress is reported via the provided map and UI messages.
  *
- * @param {string} inputFilePath - Path to the input audio file.
+ * @param {string} inputFilePath - Path to the source audio file.
  * @param {string} fullFilePath - Destination path for the converted file.
- * @param {object} row - File metadata including properties such as `id`, `duration`, and `filestart`; the duration may be updated if trimming is applied.
+ * @param {object} row - File metadata, including `id`, `duration`, and `filestart`; `duration` may be updated if trimming is applied.
  * @param {string} dbArchiveName - Archive name to record in the database.
  * @param {Object.<string, number>} fileProgressMap - Map tracking conversion progress, keyed by file paths.
- * @returns {Promise<void>} Resolves when conversion and database updates complete.
+ * @returns {Promise<void>} Resolves when conversion and database updates are complete.
  *
- * @throws {Error} If an error occurs during the FFmpeg conversion process.
+ * @throws {Error} If FFmpeg encounters an error during conversion.
  *
- * @example
- * convertFile('/path/to/input.wav', '/path/to/output.ogg', fileRecord, db, 'archive123', progressMap)
- *   .then(() => console.log('Conversion completed successfully.'))
- *   .catch(err => console.error('Conversion failed:', err));
+ * @remark Issues alerts for multi-day or all-daylight recordings when trimming boundaries are atypical.
  */
 async function convertFile(
   inputFilePath,

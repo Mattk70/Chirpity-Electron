@@ -246,6 +246,13 @@ async function upgrade_to_v1(diskDB, dbMutex) {
   }
 }
 
+/**
+ * Migrates the database schema to version 2 by adding a unique constraint on the `species` table.
+ *
+ * Recreates the `species` table with a unique constraint on the combination of `cname` and `sname`, updates the schema version, and performs integrity checks. The migration is executed within a mutex lock to ensure concurrency safety.
+ *
+ * @remark Rolls back the transaction if an error occurs during migration.
+ */
 async function upgrade_to_v2(diskDB, dbMutex) {
   let t0 = Date.now();
   try {
@@ -278,6 +285,8 @@ const createDB = async ({file, diskDB, dbMutex}) => {
   const archiveMode = !!file;
   let memoryDB;
   if (archiveMode) {
+    const {openSync} = require('node:fs');
+    openSync(file, "w");
     diskDB = new sqlite3.Database(file);
     DEBUG && console.log("Created disk database", diskDB.filename);
   } else {
@@ -634,6 +643,15 @@ const mergeDbIfNeeded = async ({diskDB, model, appPath, dbMutex}) => {
   return [modelID, false]
 }
 
+/**
+ * Inserts species name translations from label files into the database.
+ *
+ * Reads translation files from the `labels/V2.4` directory, parses each file for language-specific species names, and inserts them into the `species_translations` table. Skips files with unexpected formats and malformed lines.
+ *
+ * @remark Assumes the existence of a `species_translations` table with columns `(sname, language, cname)`. Foreign key constraints are temporarily disabled during insertion.
+ *
+ * @param {object} db - The SQLite database instance supporting `runAsync`.
+ */
 async function insertTranslations(db){
   let t0 = Date.now()
   const fs = require("fs");

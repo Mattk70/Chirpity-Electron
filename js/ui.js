@@ -466,6 +466,14 @@ DIAGNOSTICS["Cores"] = os.cpus().length;
 DIAGNOSTICS["System Memory"] =
   (os.totalmem() / (1024 ** 2 * 1000)).toFixed(0) + " GB";
 
+/**
+ * Resets the results display and related UI components to their initial state.
+ *
+ * @param {Object} [options] - Options for which UI elements to reset.
+ * @param {boolean} [options.clearSummary=true] - Whether to clear the summary table.
+ * @param {boolean} [options.clearPagination=true] - Whether to hide pagination controls.
+ * @param {boolean} [options.clearResults=true] - Whether to clear the results table and header.
+ */
 function resetResults({
   clearSummary = true,
   clearPagination = true,
@@ -756,6 +764,11 @@ function showMetadata() {
   }
 }
 
+/**
+ * Renders the filename panel, displaying the current audio file and a dropdown for switching between multiple open files.
+ *
+ * Updates the UI to show the active file's name and parent folder, and provides a dropdown menu if multiple files are open. Also adapts the analysis menu based on the file's save state.
+ */
 function renderFilenamePanel() {
   const i18 = i18n.get(i18n.Titles);
   if (!STATE.currentFile) return;
@@ -1071,6 +1084,15 @@ async function sortFilesByTime(fileNames) {
     .sort((a, b) => a.time - b.time) // Sort by modification time
     .map((file) => file.name); // Return sorted file names
 }
+/**
+ * Handles opening one or more audio files, updating the UI and application state accordingly.
+ *
+ * Loads the selected files, resets analysis and diagnostics, updates menu items, and initiates loading of the first file. If multiple files are selected, sorts them by creation time and enables batch analysis options.
+ *
+ * @param {Object} args - Arguments containing file paths and options.
+ * @param {string[]} args.filePaths - List of file paths to open.
+ * @param {boolean} [args.preserveResults] - Whether to preserve previous analysis results.
+ */
 async function onOpenFiles(args) {
   const sanitisedList = args.filePaths;
   if (!sanitisedList.length) return;
@@ -1143,11 +1165,9 @@ function analyseReset() {
 }
 
 /**
- * Refreshes the results view in the UI based on the current file loading state and available predictions.
+ * Updates the UI to display the spectrogram and results table based on the current file and prediction state.
  *
- * When a file is loaded, this function hides all UI elements and then displays the spectrogram wrapper.
- * If there are prediction results available, it additionally reveals the results table container and results header.
- * If no file is loaded and there are no open files, all UI elements are hidden.
+ * Shows the spectrogram when a file is loaded, and displays the results table if predictions are available. Hides all UI elements if no file is loaded and there are no open files.
  */
 function refreshResultsView() {
   if (STATE.fileLoaded) {
@@ -1180,6 +1200,13 @@ const getSelectionResults = (fromDB) => {
   });
 };
 
+/**
+ * Initiates an audio analysis operation by sending an analysis request to the worker thread.
+ *
+ * Disables relevant UI controls during analysis and resets results if not analyzing a selection. If an analysis is already in progress, displays a warning notification.
+ *
+ * @param {Object} args - Analysis parameters, including start/end positions, file scope, reanalysis flag, and source.
+ */
 function postAnalyseMessage(args) {
   if (!PREDICTING) {
     // Start a timer
@@ -1286,7 +1313,11 @@ async function fetchLocationAddress(lat, lon, pushLocations) {
   });
 }
 
-// Menu bar functions
+/**
+ * Exports audio clips in batch for the currently filtered species.
+ *
+ * If no species filter is active, displays a warning notification.
+ */
 
 async function batchExportAudio() {
   const species = isSpeciesViewFiltered(true);
@@ -1295,6 +1326,11 @@ async function batchExportAudio() {
     : generateToast({ type: "warning", message: "mustFilterSpecies" });
 }
 
+/**
+ * Opens a file dialog to import analysis results data and sends the selected file to the worker for processing.
+ *
+ * @param {string} format - The format of the data to import (e.g., "CSV").
+ */
 async function importData(format){
   const defaultPath = localStorage.getItem("lastSaveFolder") || "";
   const files = await window.electron.openDialog("showOpenDialog", {
@@ -1313,6 +1349,16 @@ async function importData(format){
   })
 }
 
+/**
+ * Exports detection results or summaries in the specified format.
+ *
+ * Depending on the chosen format, prompts the user to select a directory or file location, then sends an export request to the worker with the relevant parameters and headers. Updates the last used save folder in local storage.
+ *
+ * @param {string} format - The export format (e.g., "Audacity", "audio", "summary", "Raven").
+ * @param {string|string[]} [species] - Species or list of species to include in the export. Defaults to the current species filter.
+ * @param {number} [limit=Infinity] - Maximum number of results to export.
+ * @param {number} [duration] - Optional duration filter for exported results.
+ */
 async function exportData(
   format,
   species = isSpeciesViewFiltered(true),
@@ -1434,12 +1480,9 @@ async function showCharts() {
 
 
 /**
- * Prepares the interface for Explore mode by updating UI elements, state flags, and worker messages.
+ * Switches the UI to Explore mode, updating state, menus, and worker communication.
  *
- * This asynchronous function sets the file load flag and analysis state, enables and disables appropriate menu items,
- * and sends corresponding messages to the worker to switch to Explore mode and fetch the detected species list for the current range.
- * It also awaits the generation of a location filter, attaches a change event listener to it, reinitializes the spectrogram,
- * resets analysis results, and adjusts the UI layout to prevent scroll issues.
+ * Enables relevant menu items, sets analysis state flags, requests detected species and location filters from the worker, and reinitializes the spectrogram. Resets analysis results and adjusts the UI layout for Explore mode.
  */
 async function showExplore() {
   // Change STATE.fileLoaded this one time, so a file will load!
@@ -1533,21 +1576,12 @@ const selectionTable = document.getElementById("selectionResultTableBody");
 selectionTable.addEventListener("click", debounceClick(resultClick));
 
 /**
- * Processes click events on audio analysis result rows.
+ * Handles click events on result table rows to activate and load the corresponding audio region.
  *
- * Validates that audio regions are fully established and an audio file is loaded before proceeding. Extracts the file name,
- * start time, end time, and label from the clicked row's "name" attribute (expected in the format "file|start|end|unused|label"),
- * sets the row as active by updating its CSS class, and loads the corresponding audio region. If the clicked target has a "circle"
- * class, waits until the audio file is completely loaded before obtaining selection results.
+ * Validates that the audio file is loaded and regions are ready, then extracts region details from the clicked row and updates the UI to reflect the active selection. If the clicked element is a "circle", waits for the audio file to finish loading before retrieving selection results.
  *
- * @param {Event} e - The click event triggered by the user.
- * @returns {Promise<void>} A promise that resolves once the event processing is complete.
- *
- * @example
- * // Assuming a table row element with the following "name" attribute:
- * // <tr name="audio.mp3|10|20|unused|Speech">...</tr>
- * // Attach the event handler as follows:
- * document.querySelector('tr').addEventListener('click', resultClick);
+ * @param {Event} e - The click event on a result row.
+ * @returns {Promise<void>}
  */
 async function resultClick(e) {
   const {currentFile, fileLoaded, regionsCompleted} = STATE;
@@ -2290,27 +2324,13 @@ const setUpWorkerMessaging = () => {
 };
 
 /**
- * Creates audio regions for detections that occur within the current view window.
+ * Creates and displays audio regions for detections within the current spectrogram window.
  *
- * For each detection, the function adjusts its start and end times by subtracting the global offset
- * `windowOffsetSecs`. Only detections with an adjusted start time less than the current window length are processed.
- * A detection is considered "active" if its adjusted start time matches the start time of the currently active region
- * (`STATE.activeRegion.start`, if defined). If the detection is active and the `goToRegion` flag is true, the view is repositioned
- * to focus on that region. Otherwise, the detection is processed only if the configuration flag `config.specDetections` is enabled.
+ * Adjusts detection times relative to the current window offset and creates regions for those visible in the window. Only active detections or those allowed by configuration are processed. Optionally repositions the view to an active region.
  *
- * Audio regions are created by calling `createRegion` with the adjusted start and end times, the detection's label,
- * a flag indicating whether to reposition the view (only for active detections when `goToRegion` is true), and an optional
- * colour (set to `STATE.regionActiveColour` for active regions). After processing all detections,
- * `STATE.regionsCompleted` is set to true to indicate that region creation is complete.
- *
- * @param {Object} options - An options object.
- * @param {Array<Object>} options.detections - An array of detection objects. Each object should include:
- *   @param {number} options.detections[].start - The starting time of the detection in seconds.
- *   @param {number} options.detections[].end - The ending time of the detection in seconds.
- *   @param {string} options.detections[].label - The label associated with the detection.
- * @param {boolean} options.goToRegion - If true, reposition the view to the newly created region when the detection is active.
- *
- * @returns {void}
+ * @param {Object} options - Options for region creation.
+ * @param {Array<Object>} options.detections - Detections to display, each with `start`, `end`, and `label` properties.
+ * @param {boolean} options.goToRegion - Whether to reposition the view to the active region.
  */
 function showWindowDetections({ detections, goToRegion }) {
   STATE.regionsCompleted = false;
@@ -2354,6 +2374,12 @@ const isSpeciesViewFiltered = (sendSpecies) => {
   return sendSpecies ? species : filtered !== null;
 };
 
+/**
+ * Extracts and parses metadata fields from the `name` attribute of a table row element.
+ *
+ * @param {HTMLElement} el - An element within the target table row.
+ * @returns {Object} An object containing the file name, start and end times (as numbers), scientific and common names, score, and model ID (as numbers).
+ */
 function unpackNameAttr(el) {
   const currentRow = el.closest("tr");
   let [file, start, end, sname, cname, score, modelID] = currentRow
@@ -2370,6 +2396,12 @@ function unpackNameAttr(el) {
   };
 }
 
+/**
+ * Retrieves the species name from a table row element.
+ *
+ * @param {HTMLElement} target - An element within the table row containing the species.
+ * @returns {string} The species name extracted from the row.
+ */
 function getSpecies(target) {
   const row = target.closest("tr");
   const speciesCell = row.querySelector(".cname .cname");
@@ -2645,13 +2677,11 @@ window.addEventListener("resize", function () {
 });
 
 /**
- * Debounces keydown event processing for non-interactive elements.
+ * Debounces keydown event handling for non-input elements.
  *
- * Prevents the default behavior of keydown events when they do not originate from
- * an HTMLInputElement, HTMLTextAreaElement, or CustomSelect. The debounced call delays
- * the execution of the keydown handler by 100 milliseconds using a unique identifier ("keyhandler").
+ * If the keydown event does not originate from an input, textarea, or custom select element, prevents its default action and schedules the keydown handler to run after a short delay.
  *
- * @param {KeyboardEvent} e - The keydown event triggered by the user.
+ * @param {KeyboardEvent} e - The keydown event.
  */
 function handleKeyDownDeBounce(e) {
   if (
@@ -2725,28 +2755,15 @@ function handleKeyDown(e) {
 
 
 /**
- * Activates the specified audio region by updating the global state and UI.
+ * Sets the specified audio region as active, updating UI highlights and playhead position.
  *
- * This function first clears any previously active regions by resetting their colors
- * and labels to the default state. It then applies an active style to the provided region,
- * which includes setting a new color and formatting the label. The function updates the global
- * active region, positions the playhead at the region's start time (taking into account any window offset),
- * and enables UI menu items such as "export-audio" and, when applicable (i.e., if the model is ready and not predicting),
- * "analyseSelection". If the provided region object is invalid (missing or having non-numeric start or end values),
- * the function logs an error and exits without modifying the state.
+ * Clears any previously active regions, applies active styling to the selected region, updates the global active region state, and moves the playhead to the region's start. Enables relevant menu items for exporting audio and, if available, analyzing the selection. Optionally activates the corresponding result row in the UI.
  *
- * @param {Object} region - The audio region to activate.
- * @param {number} region.start - The start time of the region in seconds.
- * @param {number} region.end - The end time of the region in seconds.
- * @param {Object} region.content - A DOM element or object with an `innerText` property for displaying the region's label.
+ * @param {Object} region - The audio region to activate, containing start and end times and label content.
+ * @param {boolean} [activateRow] - If true, also activates the corresponding result row.
  *
- * @example
- * const region = {
- *   start: 15,
- *   end: 30,
- *   content: { innerText: 'Bird Call' }
- * };
- * setActiveRegion(region);
+ * @remark
+ * If the region is invalid (missing or with non-numeric start/end), the function logs an error and does not update the state.
  */
 function setActiveRegion(region, activateRow) {
   if (
@@ -2920,18 +2937,11 @@ const timelineToggle = (fromKeys) => {
 
 
 /**
- * Updates the active record based on the key assignment configuration.
+ * Updates the currently selected record using a key assignment or sets the call count with a modifier key.
  *
- * When an assignment exists for the provided key, extracts record details from the currently
- * selected row, modifies the appropriate field (species, label, or comment) based on the assignment,
- * and calls the record insertion routine with the updated values. If no active row is selected,
- * logs an informational message and aborts the update.
+ * If a key assignment exists for the pressed key, updates the corresponding field (species, label, or comment) in the active row and inserts the modified record. If Ctrl or Cmd is held, sets the call count to the key's numeric value (for members only). Does nothing if no row is selected.
  *
- * @param {number|string} key - Identifier used to retrieve the key assignment (appended to "key" for lookup) from the configuration.
- *
- * @example
- * // Assuming a key assignment exists for key "1" in config.keyAssignment:
- * recordUpdate(1);
+ * @param {KeyboardEvent} e - The keyboard event triggering the update.
  */
 function recordUpdate(e) {
   const {key, ctrlKey, metaKey} = e;
@@ -3069,20 +3079,9 @@ const gotoForm = document.getElementById("gotoForm");
 gotoForm.addEventListener("submit", gotoTime);
 
 /**
- * Initializes application state after the audio model becomes ready.
+ * Handles initialization tasks after the audio model is ready.
  *
- * Sets the model ready flag and updates UI elements based on current audio assets:
- * - Enables the "analyse" menu item if an audio file is loaded, and additionally "analyseAll" and "reanalyseAll" if multiple files are open.
- * - Enables the "analyseSelection" menu item when an active audio region exists.
- * - Calculates the warm-up time and logs it in the DIAGNOSTICS object.
- * - Logs the application launch time if this is the first load.
- * - Marks the application as loaded and hides the loading screen.
- * - Requests tag data from the worker.
- * - Initiates the user tour for new users in non-testing environments.
- * - Processes any queued operating system file inputs.
- *
- * @param {Object} [args={}] - Optional parameters (currently unused).
- * @returns {void}
+ * Updates UI elements based on loaded audio files and regions, logs warm-up and launch times, hides the loading screen, requests tag data from the worker, starts the user tour for new users, and processes any queued OS file inputs.
  */
 function onModelReady(args) {
   modelReady = true;
@@ -3116,23 +3115,21 @@ function onModelReady(args) {
 }
 
 /**
- * Handles audio data loaded by the worker and updates the UI and application state.
+ * Processes audio data loaded by the worker, updates global state, resets regions, and refreshes the spectrogram and UI.
  *
- * This function clears loading indicators and any open context menus, assigns the loaded audio buffer
- * along with its timing and metadata to global state, resets any existing audio regions, and updates
- * the spectrogram with the new audio data. It also updates the filename display and enables analysis-related
- * menu options when applicable.
+ * Assigns the loaded audio buffer and metadata to the application state, updates timing information, resets any existing audio regions, and refreshes the spectrogram display. Also updates the filename panel and enables analysis menu options if a model is ready.
  *
- * @param {*} location - Identifier for the source location of the audio.
- * @param {number} fileStart - Unix epoch time in milliseconds marking the start time of the audio file.
- * @param {number} fileDuration - Duration of the audio file in seconds.
- * @param {number} windowBegin - Offset in seconds from the start of the file indicating the beginning of the audio window.
- * @param {string} file - Full path to the audio file.
- * @param {number} position - Normalized playhead position (0 to 1) within the audio file.
- * @param {*} contents - Audio buffer containing the loaded audio data.
- * @param {boolean} play - Flag indicating whether to automatically play the audio after loading.
- * @param {boolean} queued - Flag indicating if the audio load was queued.
- * @param {Object} [metadata] - Optional metadata associated with the audio file.
+ * @param {Object} params - Audio load parameters.
+ * @param {*} params.location - Identifier for the audio source location.
+ * @param {number} [params.fileStart=0] - Start time of the audio file in milliseconds since the Unix epoch.
+ * @param {number} [params.fileDuration=0] - Duration of the audio file in seconds.
+ * @param {number} [params.windowBegin=0] - Offset in seconds from the file start for the audio window.
+ * @param {string} [params.file=""] - Full path to the audio file.
+ * @param {number} [params.position=0] - Normalized playhead position (0 to 1).
+ * @param {*} [params.contents] - Audio buffer containing the loaded data.
+ * @param {boolean} [params.play=false] - Whether to automatically play the audio after loading.
+ * @param {boolean} [params.queued=false] - Whether the audio load was queued.
+ * @param {Object} [params.metadata] - Optional metadata for the audio file.
  * @returns {Promise<void>}
  */
 
@@ -3360,24 +3357,13 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
 };
 
 /**
- * Finalizes result processing after the database has sent the last result.
+ * Completes result processing by updating the UI and activating the appropriate result row.
  *
- * Updates analysis state by disabling the predicting flag and re-enabling settings, replaces the result table
- * with the latest content cloned from a buffer, resets the buffer's content, and ensures that the designated row
- * in the results table is activated. The active row is selected based on the following priority:
- * - If an `active` index is provided, uses that row; if not found (which can occur after an edit), selects the last row
- *   matching daytime or nighttime criteria.
- * - If a `select` value is provided, determines the row index via a helper function and activates that row.
- * - Otherwise, attempts to activate a row marked with the "table-active" class, or defaults to the first table row.
+ * Replaces the results table with the latest content, resets analysis state, and determines which row to activate based on provided options or table state. Ensures the active row is selected, clicked, and scrolled into view, then updates related UI elements.
  *
- * Once the active row is determined, it simulates a click on that row and scrolls it into view, hides the progress indicator,
- * and updates the filename panel.
- *
- * @param {Object} [options={}] - Options for handling result activation.
- * @param {number} [options.active] - Specific row index to activate in the result table.
- * @param {*} [options.select] - Value used by a helper function to determine which row to activate.
- *
- * @returns {void}
+ * @param {Object} [options={}] - Options for result row activation.
+ * @param {number} [options.active] - Index of the row to activate.
+ * @param {*} [options.select] - Value used to determine the row to activate via a helper function.
  */
 function onResultsComplete({ active = undefined, select = undefined } = {}) {
   PREDICTING = false;
@@ -3434,6 +3420,13 @@ function onResultsComplete({ active = undefined, select = undefined } = {}) {
   activateResultSort();
 }
 
+/**
+ * Returns a promise that resolves when the Wavesurfer instance is ready.
+ *
+ * Use this to ensure audio waveform rendering and related operations only proceed after initialization is complete.
+ * 
+ * @returns {Promise<void>} Resolves when the Wavesurfer instance emits the 'ready' event.
+ */
 function waitForWavesurferReady() {
   return new Promise(resolve => {
     const wavesurfer = spec.wavesurfer;
@@ -3476,18 +3469,12 @@ function getRowFromStart(table, start) {
 }
 
 /**
- * Finalizes audio analysis by updating application state, re-enabling UI settings,
- * and logging diagnostic metrics and tracking events.
+ * Completes the audio analysis process by updating application state, restoring UI controls, and logging diagnostic metrics.
  *
- * Resets the prediction flag, restores settings, updates analysis state,
- * and conditionally enables menu items based on available disk records.
- * Hides the progress indicator and, when not in quiet mode, calculates
- * the analysis duration and rate for telemetry. In non-quiet mode, records
- * these metrics through event tracking and displays a completion notification.
+ * Resets prediction status, re-enables settings, updates analysis state, and manages menu item availability based on disk records. Hides the progress indicator. If not in quiet mode, calculates and logs analysis duration and rate, tracks relevant events, and displays a completion notification.
  *
- * @param {Object} options - Options for analysis completion.
- * @param {boolean} options.quiet - Suppresses diagnostic tracking and notifications if true.
- *
+ * @param {Object} options - Analysis completion options.
+ * @param {boolean} options.quiet - If true, suppresses diagnostic tracking and notifications.
  */
 function onAnalysisComplete({ quiet }) {
   PREDICTING = false;
@@ -3537,16 +3524,11 @@ function onAnalysisComplete({ quiet }) {
 }
 
 /**
- * Finalizes UI updates after summary data retrieval.
+ * Updates the UI after summary data is loaded, refreshing the summary table, enabling or disabling menu items, and applying species filters if provided.
  *
- * This function updates the summary view with new data and applies filters if specified.
- * It enhances the summary table by adding pointer and hover effects to species rows, triggers
- * result sorting when appropriate,  and toggles
- * menu item availability based on the summary content and current application state.
- *
- * @param {Object} options - An object containing update parameters.
- * @param {*} [options.filterSpecies] - Optional criteria to filter species in the summary.
- * @param {Array} [options.summary=[]] - An array of summary records to be used for updating the UI.
+ * @param {Object} options - Parameters for updating the summary view.
+ * @param {*} [options.filterSpecies] - Optional filter to restrict summary to specific species.
+ * @param {Array} [options.summary=[]] - Summary records to display in the UI.
  */
 function onSummaryComplete({ filterSpecies = undefined, summary = [] }) {
   updateSummary({ summary: summary, filterSpecies: filterSpecies });
@@ -3643,25 +3625,20 @@ function setAutocomplete(species) {
 }
 
 /**
- * Renders a detection result into the results table while managing table headers, pagination, and UI updates.
+ * Renders a detection result row in the results table, updating headers, pagination, and UI as needed.
  *
- * For the first result (index ≤ 1), clears or resets the results table based on the selection mode and sets up table headers
- * with localized labels. When handling non-database results beyond the configured limit, the function adds pagination or
- * aborts further processing. For valid detection results, it formats timestamps and positions for display, constructs the
- * corresponding table row including species details, call counts, labels, comments, and review status, and schedules UI
- * updates to incorporate the new entry.
+ * For the first result, resets the table and sets up localized headers. Handles pagination and result limits for non-database results. Formats and displays detection details including timestamps, species, call counts, labels, comments, review status, and model information. Stores results for feedback and updates the UI accordingly.
  *
- * @param {Object} options - Options for rendering the result.
- * @param {number} [options.index=1] - Sequential index of the detection result.
- * @param {Object} [options.result={}] - Detection result data containing properties such as timestamp, position, active,
- *   sname, cname, score, label, tagID, comment, end, count, callCount, isDaylight, and reviewed.
- * @param {*} [options.file=undefined] - The audio file reference associated with the detection.
- * @param {boolean} [options.isFromDB=false] - Flag indicating whether the result originates from the database.
- * @param {boolean} [options.selection=false] - Flag indicating if the rendering is for a selection-specific view.
+ * @param {Object} options - Rendering options.
+ * @param {number} [options.index=1] - The sequential index of the detection result.
+ * @param {Object} [options.result={}] - Detection result data, including timestamp, position, species, score, label, and related fields.
+ * @param {*} [options.file=undefined] - The audio file reference for the detection.
+ * @param {boolean} [options.isFromDB=false] - Whether the result is from the database.
+ * @param {boolean} [options.selection=false] - Whether rendering is for a selection-specific view.
  *
- * @returns {Promise<void>} A promise that resolves once the result has been rendered and the UI updated.
+ * @returns {Promise<void>} Resolves when the result has been rendered and the UI updated.
  *
- * @todo Display each detection as a distinct region on the spectrogram.
+ * @remark Results detected as daytime are skipped if nocturnal migration detection is enabled and not in selection mode.
  */
 
 async function renderResult({
@@ -3828,13 +3805,11 @@ const isExplore = () => {
 };
 
 /**
- * Stores the row index of the table row associated with the clicked element.
+ * Updates the global clickedIndex to the row index of the nearest table row ancestor of the given element.
  *
- * Traverses upward from the provided element to locate the nearest ancestor <tr> element,
- * then assigns its rowIndex to the global variable clickedIndex. If there is no matching row, 
- * null is set
+ * If the element is not within a table row, clickedIndex is set to null.
  *
- * @param {HTMLElement} target - The DOM element that triggered the event.
+ * @param {HTMLElement} target - The element from which to start the search for a table row.
  */
 
 function setClickedIndex(target) {
@@ -4859,6 +4834,13 @@ const showRelevantAudioQuality = () => {
   DOM.audioQualityContainer.classList.toggle("d-none", format !== "flac");
 };
 document.addEventListener("click", debounceClick(handleUIClicks));
+/**
+ * Handles all UI click events by dispatching actions based on the clicked element's ID.
+ *
+ * This function serves as a central event handler for UI interactions, including file operations, analysis actions, menu commands, settings adjustments, help dialogs, sorting, and context menu actions. It updates application state, communicates with the worker thread, manages configuration, and triggers UI updates as needed.
+ *
+ * @param {MouseEvent} e - The click event object.
+ */
 function handleUIClicks(e) {
   const element = e.target;
   const target = element.closest("[id]")?.id;
@@ -5381,6 +5363,13 @@ function handleUIClicks(e) {
     trackEvent(config.UUID, "UI", "Click", target);
 };
 
+/**
+ * Toggles between basic and advanced settings modes in the UI.
+ *
+ * Updates button styles and shows or hides advanced settings elements based on the selected mode.
+ *
+ * @param {string} target - The selected mode, either "basic" or "advanced".
+ */
 function changeSettingsMode(target) {
   // Get references to the buttons
   const basicButton = document.getElementById("basic");
@@ -5407,6 +5396,11 @@ function changeSettingsMode(target) {
   });
 }
 
+/**
+ * Updates the species list UI and synchronizes the active list with the worker.
+ *
+ * If a custom list is selected, loads labels from the specified custom list file. Otherwise, notifies the worker to update the list and optionally refresh results based on analysis state.
+ */
 function updateList() {
   updateListIcon();
   setListUIState(config.list)
@@ -5876,6 +5870,13 @@ document.addEventListener("change", function (e) {
   }
 });
 
+/**
+ * Updates the UI to reflect the selected species list type and displays relevant controls.
+ *
+ * Shows or hides UI elements based on the chosen list type ("location", "nocturnal", or "custom"). If "custom" is selected and no custom list file is set for the current model, displays a warning toast.
+ *
+ * @param {string} list - The selected species list type.
+ */
 function setListUIState(list) {
   // Sets User Preferences for chosen model
   // cf. modelSettingsDisplay
@@ -5896,6 +5897,17 @@ function setListUIState(list) {
   }
 }
 
+/**
+ * Loads and processes a label file, updating species labels or custom lists for the application.
+ *
+ * If the label file cannot be fetched, displays an error toast and updates the UI to prompt for correction.
+ * On success, updates the worker with the new labels or custom list, and ensures an "Unknown Sp._Unknown Sp." entry is present.
+ *
+ * @param {string} labelFile - Path or URL to the label file to load.
+ * @param {string} [updating] - If set to "list", updates the custom species list; otherwise, updates locale labels.
+ *
+ * @throws {Error} If the label file cannot be fetched or read.
+ */
 async function readLabels(labelFile, updating) {
   fetch(labelFile)
     .then((response) => {
@@ -6093,6 +6105,14 @@ async function createContextMenu(e) {
   setTimeout(() => positionMenu(DOM.contextMenu, e), 100);
 }
 
+/**
+ * Positions a context menu element near the mouse event, ensuring it remains within the visible viewport.
+ *
+ * Adjusts the menu's top and left coordinates to prevent it from overflowing the right or bottom edges of the window.
+ *
+ * @param {HTMLElement} menu - The menu element to position.
+ * @param {MouseEvent} event - The mouse event triggering the menu display.
+ */
 function positionMenu(menu, event) {
   menu.classList.remove("d-none");
   // Calculate menu positioning:
@@ -6130,25 +6150,13 @@ const recordEntryForm = document.getElementById("record-entry-form");
 // let focusBirdList;
 
 /**
- * Populates and displays the record entry modal for updating or adding audio record details.
+ * Displays and populates the record entry modal for adding or updating audio record details.
  *
- * Retrieves species information from either the batch selector or the active audio region and auto-populates
- * related fields such as call count and comment when an active record exists. Adjusts the UI based on batch mode
- * by toggling visibility of certain elements, updates labels based on localization settings, and initializes a
- * custom label selector with available tags from the application state. Focus is set to the bird autocomplete input
- * when the modal is shown.
+ * Automatically fills form fields such as species, call count, comment, model ID, and score based on the current selection or batch mode. Adjusts UI elements for batch operations, updates localized labels, and initializes the label selector with available tags. Focus is set to the bird autocomplete input when the modal appears.
  *
- * @param {string} mode - Identifier for the record update mode, used to set the DB mode field.
- * @param {boolean} batch - If true, applies batch mode settings by using batch-specific species selection and hiding certain form elements.
- * @returns {Promise<void>} Resolves once the record entry form is fully populated and the modal is displayed.
- *
- * @example
- * // Open the record entry form for a single record update
- * showRecordEntryForm('update', false);
- *
- * @example
- * // Open the record entry form in batch mode for multiple records
- * showRecordEntryForm('add', true);
+ * @param {string} mode - The record update mode identifier.
+ * @param {boolean} batch - Whether to apply batch mode settings.
+ * @returns {Promise<void>} Resolves when the record entry form is ready and displayed.
  */
 async function showRecordEntryForm(mode, batch) {
   const i18 = i18n.get(i18n.Headings);
@@ -6518,6 +6526,21 @@ function checkForMacUpdates() {
 }
 
 
+/**
+ * Displays a toast notification in the UI with optional localization, icon, and notification sound.
+ *
+ * The toast can be customized by type (info, warning, error), message variables, and autohide behavior. For certain messages (e.g., analysis completion), it may also trigger a desktop notification or play a sound if enabled in the configuration.
+ *
+ * @param {Object} [options] - Toast configuration options.
+ * @param {string} [options.message] - The message key or text to display.
+ * @param {string} [options.type] - The type of toast ('info', 'warning', or 'error').
+ * @param {boolean} [options.autohide] - Whether the toast should automatically hide.
+ * @param {Object} [options.variables] - Variables for message interpolation.
+ * @param {string} [options.locate] - Additional HTML or text to append to the message.
+ *
+ * @remark
+ * If the message indicates analysis completion and the analysis duration exceeds 30 seconds, a desktop notification or sound is triggered based on user settings and notification permissions.
+ */
 function generateToast({
   message = "",
   type = "info",
@@ -6978,35 +7001,14 @@ const IUCNMap = {
 export { config, displayLocationAddress, LOCATIONS, generateToast };
 
 /**
- * Asynchronously verifies the current user's membership status and updates the UI accordingly.
+ * Checks the user's membership status and updates the UI to reflect access permissions.
  *
- * This function checks membership status via a remote call using the global configuration UUID and retrieves the trial period
- * from the Electron API. It uses localStorage to cache the membership status, its timestamp, and the installation date. The function
- * determines if the user is either a subscriber or within the trial period based on the installation date and trial duration.
- * Based on the result, it updates UI elements by toggling "locked" and "unlocked" classes, enabling or disabling controls, and,
- * if the user is a confirmed member, updating the primary logo image.
+ * Verifies membership via a remote API using the user's UUID and manages trial period logic based on installation date. Caches membership status and timestamp in localStorage, and uses cached status as a fallback if the remote check fails within a grace period. Updates UI elements to lock or unlock features, adjusts button states, and changes the primary logo image for members.
  *
- * Side Effects:
- * - Reads from and writes to localStorage (membership status, membership timestamp, and install date).
- * - Modifies DOM elements by replacing "locked" and "unlocked" classes, updating button states, and changing text content.
- * - Changes the primary logo's image source when membership is verified.
- * - Logs membership check details and error information using console.info and console.warn.
+ * @returns {Promise<boolean|undefined>} Resolves to `true` if the user is a member or within the trial period, `false` if not, or `undefined` if status cannot be determined and no valid cache exists.
  *
- * Note:
- * In case of a remote check error, if a valid cached membership status (cached within the last week) exists, it is used as a
- * fallback. Otherwise, the promise may resolve to undefined.
- *
- * @returns {Promise<boolean|undefined>} A promise that resolves to a boolean indicating whether the user is a member,
- * or undefined if an error occurs and no valid cached membership status is available.
- *
- * @example
- * membershipCheck().then(isMember => {
- *   if (isMember) {
- *     console.log('User is a member or within the trial period.');
- *   } else {
- *     console.log('User is not a member or membership status could not be determined.');
- *   }
- * });
+ * @remark
+ * If the remote membership check fails but a valid cached status exists (less than one week old), the cached status is used to grant access.
  */
 async function membershipCheck() {
   const oneWeek = 7 * 24 * 60 * 60 * 1000; // "It's been one week since you looked at me, cocked your head to the side..."
@@ -7246,20 +7248,13 @@ document.addEventListener("labelsUpdated", (e) => {
 });
 
 /**
- * Filters and sorts bird labels based on a search query.
+ * Returns a sorted list of bird label objects matching a search query.
  *
- * This function filters a list of bird labels—each expected to be in the format "sname_cname"—by performing
- * a case-insensitive match with the provided search string. For each label that contains the search term, it splits
- * the label by the underscore, reverses the parts to assign the common name (cname) and scientific name (sname), and
- * creates a `styled` HTML string that formats the names with a line break and italicized scientific name. The resulting
- * array is then sorted alphabetically by the common name using locale comparison based on the application's locale
- * configuration.
+ * Filters the provided list of bird labels for entries containing the search string (case-insensitive), then splits each label into common and scientific names, and formats them for display. The results are sorted alphabetically by common name according to the application's locale.
  *
- * If the search is empty or not a string, the function returns an empty array.
- *
- * @param {string} search - Substring used to filter bird labels.
- * @param {Array<string>} [list] - Array of bird labels to filter; each label should be formatted as "sname_cname".
- * @returns {Array<{cname: string, sname: string, styled: string}>} Array of objects representing filtered and sorted birds.
+ * @param {string} search - The search term to match against bird labels.
+ * @param {Array<string>} list - The list of bird labels in "sname_cname" format.
+ * @returns {Array<{cname: string, sname: string, styled: string}>} Filtered and sorted bird label objects with display formatting.
  */
 function getFilteredBirds(search, list) {
   if (!search || typeof search !== "string") return [];
@@ -7409,18 +7404,13 @@ dropdownCaret.forEach((caret) =>
 );
 
 /**
- * Extracts metadata from a DOM record representing an audio detection and adds it to the global history.
+ * Adds a record's metadata to the global history and returns its extracted details.
  *
- * The function parses details from the record's child elements—such as species information, confidence 
- * (or a default value for records lacking a confidence bar), comment, label, and call count—while also 
- * determining the record's associated file, row, and table (setting). If a new canonical name is 
- * provided via the second argument, it will override the extracted species name in the history entry.
- * The constructed data array is pushed to the global HISTORY. If the record is not part of a table, 
- * no history entry is added and undefined is returned.
+ * Extracts species, time range, confidence, label, call count, comment, file, row, table, and model ID from a DOM record element. Optionally overrides the species name with a provided canonical name. Returns an object with the extracted data if the record is within a table; otherwise, returns undefined.
  *
- * @param {HTMLElement} record - The DOM element containing record details.
- * @param {string} [newCname] - Optional name to override the extracted species name.
- * @returns {Object|undefined} An object containing properties: species, start, end, confidence, label, callCount, comment, file, row, and setting if the record is within a table; otherwise, undefined.
+ * @param {HTMLElement} record - The DOM element representing the detection record.
+ * @param {string} [newCname] - Optional canonical species name to override the extracted value.
+ * @returns {Object|undefined} Extracted record details if the element is within a table; otherwise, undefined.
  */
 function addToHistory(record, newCname) {
   // prepare the undelete record
