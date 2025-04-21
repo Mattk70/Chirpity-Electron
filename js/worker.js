@@ -907,7 +907,6 @@ async function onLaunch({
   BATCH_SIZE = batchSize;
   STATE.update({ model: model });
   const result = await diskDB?.getAsync('SELECT id FROM models WHERE NAME = ?', model)
-  console.log(result)
   if (!result){
     // THe model isn't in the db
     diskDB = await loadDB(); // load the diskdb with the model species added

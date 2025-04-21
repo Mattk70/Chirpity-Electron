@@ -7011,7 +7011,7 @@ export { config, displayLocationAddress, LOCATIONS, generateToast };
 async function membershipCheck() {
   const oneWeek = 7 * 24 * 60 * 60 * 1000; // "It's been one week since you looked at me, cocked your head to the side..."
   const cachedStatus = localStorage.getItem("isMember") === 'true';
-  console.log('cached membership is', cachedStatus)
+  config.debug && console.log('cached membership is', cachedStatus)
   const cachedTimestamp = Number(localStorage.getItem("memberTimestamp"));
   const now = Date.now();
   let installDate = Number(localStorage.getItem("installDate"));
