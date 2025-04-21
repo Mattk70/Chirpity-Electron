@@ -278,8 +278,6 @@ const createDB = async ({file, diskDB, dbMutex}) => {
   const archiveMode = !!file;
   let memoryDB;
   if (archiveMode) {
-    const {openSync} = require('node:fs');
-    openSync(file, "w");
     diskDB = new sqlite3.Database(file);
     DEBUG && console.log("Created disk database", diskDB.filename);
   } else {
