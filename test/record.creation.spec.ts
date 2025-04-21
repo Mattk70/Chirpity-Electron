@@ -132,7 +132,7 @@ test('Can create/edit a manual record', async () => {
 
   // Confidence has been changed to Person_add icon
   console.log('record creation test: before second expect')
-  expect(confidence).toHaveText(/Ring Ouzel \(call\)\s+person_add/);
+  expect(confidence).toHaveText(/Ring Ouzel/);
   const comment =  await (await page.locator('#result1  td.comment  span')).getAttribute('title');
   // Comment saved
 

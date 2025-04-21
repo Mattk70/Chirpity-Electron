@@ -64,7 +64,11 @@ const Toasts = { // UI.js
         fileToConvertNotFound: 'Cannot find ${file}, skipping conversion.',
         mkDirFailed: 'Failed to create directory: ${path}<br>Error: ${error}',
         conversionComplete: 'Conversion complete, ${successTotal} successful, ${failedTotal} failed.',
-        libraryUpToDate: 'Library is up to date. Nothing to do'
+        libraryUpToDate: 'Library is up to date. Nothing to do',
+        badModel: 'Model "${model}" was not found in the database.',
+        noModel: 'The necessary model column was not found in the file',
+
+
     },
     da: {
         info: 'Besked', warning: 'Advarsel', error: 'Fejl',
@@ -128,7 +132,10 @@ const Toasts = { // UI.js
         fileToConvertNotFound: "Kan ikke finde ${file}, springer over konvertering.",
         mkDirFailed: "Kunne ikke oprette mappen: ${path}<br>Fejl: ${error}",
         conversionComplete: "Konvertering fuldført, ${successTotal} lykkedes, ${failedTotal} fejlede.",
-        libraryUpToDate: "Biblioteket er opdateret. Ingen handling nødvendig"
+        libraryUpToDate: "Biblioteket er opdateret. Ingen handling nødvendig",
+        badModel: 'Modellen "${model}" blev ikke fundet i databasen.',
+        noModel: "Den nødvendige modelkolonne blev ikke fundet i filen"
+
     },
     de: {
         info: 'Hinweis', warning: 'Warnung', error: 'Fehler',
@@ -192,7 +199,11 @@ const Toasts = { // UI.js
         fileToConvertNotFound: "Kann ${file} nicht finden, Überspringe Konvertierung.",
         mkDirFailed: "Fehler beim Erstellen des Verzeichnisses: ${path}<br>Fehler: ${error}",
         conversionComplete: "Konvertierung abgeschlossen, ${successTotal} erfolgreich, ${failedTotal} fehlgeschlagen.",
-        libraryUpToDate: "Die Bibliothek ist auf dem neuesten Stand. Keine Aktion erforderlich"
+        libraryUpToDate: "Die Bibliothek ist auf dem neuesten Stand. Keine Aktion erforderlich",
+        badModel: 'Modell "${model}" wurde nicht in der Datenbank gefunden.',
+        noModel: "Die erforderliche Modellspalte wurde in der Datei nicht gefunden"
+
+
     },
     es: {
         info: 'Aviso', warning: 'Advertencia', error: 'Error',
@@ -256,7 +267,11 @@ const Toasts = { // UI.js
         fileToConvertNotFound: "No se puede encontrar ${file}, se omite la conversión.",
         mkDirFailed: "Error al crear el directorio: ${path}<br>Error: ${error}",
         conversionComplete: "Conversión completada, ${successTotal} exitosas, ${failedTotal} fallidas.",
-        libraryUpToDate: "La biblioteca está actualizada. No hay nada que hacer"
+        libraryUpToDate: "La biblioteca está actualizada. No hay nada que hacer",
+        badModel: 'El modelo "${model}" no se encontró en la base de datos.',
+        noModel: "La columna de modelo necesaria no se encontró en el archivo"
+
+
     },
     fr: {
         info: 'Avis', warning: 'Avertissement', error: 'Erreur' ,
@@ -320,7 +335,10 @@ const Toasts = { // UI.js
         fileToConvertNotFound: "Impossible de trouver ${file}, conversion ignorée.",
         mkDirFailed: "Échec de la création du répertoire : ${path}<br>Erreur : ${error}",
         conversionComplete: "Conversion terminée, ${successTotal} réussie(s), ${failedTotal} échouée(s).",
-        libraryUpToDate: "La bibliothèque est à jour. Aucune action nécessaire"
+        libraryUpToDate: "La bibliothèque est à jour. Aucune action nécessaire",
+        badModel: 'Le modèle "${model}" n’a pas été trouvé dans la base de données.',
+        noModel: "La colonne de modèle requise n’a pas été trouvée dans le fichier"
+
     },
     ja: {
         info: '情報', warning: '警告', error: 'エラー',
@@ -383,7 +401,11 @@ const Toasts = { // UI.js
         fileToConvertNotFound: '${file}が見つかりません、変換をスキップします。',
         mkDirFailed: 'ディレクトリの作成に失敗しました: ${path}<br>エラー: ${error}',
         conversionComplete: '変換が完了しました。成功: ${successTotal}、失敗: ${failedTotal}',
-        libraryUpToDate: 'ライブラリは最新です。何もすることはありません'
+        libraryUpToDate: 'ライブラリは最新です。何もすることはありません',
+        badModel: 'モデル "${model}" はデータベースに見つかりませんでした。',
+        noModel: "必要なモデル列がファイルに見つかりませんでした"
+
+
     },
     nl: {
         info: 'Kennisgeving', warning: 'Waarschuwing', error: 'Fout',
@@ -447,7 +469,11 @@ const Toasts = { // UI.js
         fileToConvertNotFound: "Kan ${file} niet vinden, conversie overgeslagen.",
         mkDirFailed: "Kan map niet aanmaken: ${path}<br>Fout: ${error}",
         conversionComplete: "Conversie voltooid, ${successTotal} succesvol, ${failedTotal} mislukt.",
-        libraryUpToDate: "De bibliotheek is up-to-date. Niets te doen"
+        libraryUpToDate: "De bibliotheek is up-to-date. Niets te doen",
+        badModel: 'Model "${model}" is niet gevonden in de database.',
+        noModel: "De vereiste modelkolom is niet gevonden in het bestand"
+
+
     },
     pt: {
         info: 'Informação', warning: 'Aviso', error: 'Erro',
@@ -511,7 +537,11 @@ const Toasts = { // UI.js
         fileToConvertNotFound: "Não foi possível encontrar ${file}, conversão ignorada.",
         mkDirFailed: "Falha ao criar o diretório: ${path}<br>Erro: ${error}",
         conversionComplete: "Conversão concluída, ${successTotal} bem-sucedida(s), ${failedTotal} falhada(s).",
-        libraryUpToDate: "A biblioteca está atualizada. Nada a fazer"
+        libraryUpToDate: "A biblioteca está atualizada. Nada a fazer",
+        badModel: 'O modelo "${model}" não foi encontrado na base de dados.',
+        noModel: "A coluna de modelo necessária não foi encontrada no ficheiro"
+
+
     },
     ru: {
         info: 'Уведомление', warning: 'Предупреждение', error: 'Ошибка',
@@ -575,7 +605,11 @@ const Toasts = { // UI.js
         fileToConvertNotFound: "Не удалось найти ${file}, пропуск конвертации.",
         mkDirFailed: "Не удалось создать директорию: ${path}<br>Ошибка: ${error}",
         conversionComplete: "Конвертация завершена: ${successTotal} успешно, ${failedTotal} с ошибками.",
-        libraryUpToDate: "Библиотека актуальна. Действий не требуется"
+        libraryUpToDate: "Библиотека актуальна. Действий не требуется",
+        badModel: 'Модель "${model}" не найдена в базе данных.',
+        noModel: "Необходимый столбец модели не найден в файле"
+
+
     },
     sv: {
         info: 'Meddelande', warning: 'Varning', error: 'Fel',
@@ -639,7 +673,11 @@ const Toasts = { // UI.js
         fileToConvertNotFound: "Kan inte hitta ${file}, hoppar över konverteringen.",
         mkDirFailed: "Kunde inte skapa katalog: ${path}<br>Fel: ${error}",
         conversionComplete: "Konvertering klar, ${successTotal} lyckades, ${failedTotal} misslyckades.",
-        libraryUpToDate: "Biblioteket är uppdaterat. Inget att göra"
+        libraryUpToDate: "Biblioteket är uppdaterat. Inget att göra",
+        badModel: 'Modellen "${model}" hittades inte i databasen.',
+        noModel: "Den nödvändiga modellkolumnen hittades inte i filen"
+
+
     },
     zh: {
         info: '通知', warning: '警告', error: '错误',
@@ -703,7 +741,10 @@ const Toasts = { // UI.js
         fileToConvertNotFound: "无法找到 ${file}，跳过转换。",
         mkDirFailed: "无法创建目录：${path}<br>错误：${error}",
         conversionComplete: "转换完成，成功：${successTotal}，失败：${failedTotal}。",
-        libraryUpToDate: "资料库已是最新，无需操作"
+        libraryUpToDate: "资料库已是最新，无需操作",
+        badModel: '模型 "${model}" 未在数据库中找到。',
+        noModel: "文件中未找到所需的模型列"
+
     }
     
 };
@@ -3145,14 +3186,19 @@ async function localiseUI(locale) {
             }
         })
         // Padlock items
-        const padlocks = document.querySelectorAll('.padlock')
+        const padlocks = document.querySelectorAll('#unsaved-icon, .padlock')
         padlocks.forEach(lock => {
-            lock.setAttribute('data-bs-title', localisationData['padlock'][0]);
-            lock.setAttribute('data-bs-content', localisationData['padlock'][1]);
+            if (lock.id === 'unsaved-icon'){
+                lock.setAttribute('data-bs-title', localisationData['unsaved-link'][0]);
+                lock.setAttribute('data-bs-content', localisationData['unsaved-link'][1]);
+            } else {
+                lock.setAttribute('data-bs-title', localisationData['padlock'][0]);
+                lock.setAttribute('data-bs-content', localisationData['padlock'][1]);
+            }
             const popover = new bootstrap.Popover(lock);
             popover.update();
         })
-        // Translate settings labels
+
         const form = document.getElementById('settings');
         const labels = form.querySelectorAll('label, button');
         settings = localisationData['settings']

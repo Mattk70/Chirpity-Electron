@@ -28,6 +28,7 @@
     "Show frequency labels-circle-help": ["Si se activa se mostrarán los valores de la frecuencia del sonograma en el eje vertical."],
     "Show all detections-circle-help": "Cuando está activado, el sonograma destacará todas las detecciones en la pantalla.",
     "padlock": ["Función bloqueada", "Hazte <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>miembro</a> para desbloquear esta función permanentemente."],
+    "unsaved-link": ["Cambios no guardados", "Hay cambios en los resultados que no se han guardado"],
     "Clip Library-circle-help": ["Cuando está habilitado, solo se añaden a la biblioteca los archivos de audio que contienen registros guardados. Si configuras tu grabadora para incrementar automáticamente los archivos después de un breve período de tiempo, habilitar esta configuración reducirá drásticamente el almacenamiento necesario si hay largos períodos sin actividad"],
     "Signal to Noise Ratio-circle-help": ["Si se activa el filtro SNR, se omitirá cualquier sonido que esté por debajo del umbral. Los valores altos del filtro omiten sonidos más ruidosos. Aunque esto implique que el procesamiento sea más rápido, debe usarse con cuidado <b><i>experimental</i></b> puesto que cualquier valor distinto de cero puede excluir detecciones. <b>Consejo:</b> Para encontrar un valor de SNR adecuado realiza primero un análisis en un audio corto con las detecciones más tenues que puedas identificar con confianza. Luego ve aumentando el valor del SNR hasta que no detectes nada. Una vez que encuentres este umbral, modifícalo al nivel más alto que sea capaz de identificar la especie del ejemplo."],
     "Species Threshold-circle-help": ["Define la frecuencia mínima de la lista de verificación de eBird para la inclusión de las especies. Si se activa 'Ajustar la lista para la semana del año', la lista se ajustará para que se centre en las especies probables para la semana de grabación."],
@@ -54,6 +55,7 @@
     "export-audio": ["Exportar el audio seleccionado","Ctrl+E"
     ],
     "saveLabels": ["Guardar etiquetas de Audacity"],
+    "import-csv": ["Importar resultados desde CSV"],
     "exit": ["Salir"],
     "save2db": ["Guardar en el archivo","Ctrl+S"
     ],
@@ -83,7 +85,7 @@
     "FAQ": ["Preguntas frecuentes"],
     "species": ["¿Qué especies se detectan?"],
     "eBird": ["¿Qué es un registro de eBird?"],
-    "update-progress": ["Descargando la actualización:"],
+    "update-progress-text": ["Descargando la actualización:"],
     "record-add": ["Añadir"],
     "record-dismiss": ["Descartar"],
     "help-modal-close": ["Cerrar"],

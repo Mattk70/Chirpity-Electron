@@ -506,12 +506,13 @@ if (!gotTheLock) {
                   options.filters = [{ name: 'Audio Files', extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg', 'mp4', 'opus', 'mov'] } ]
               }
           } else {
-              options = {
-                  filters: [
-                      { name: 'Text Files', extensions: ['txt'] }
-                  ],
-                  properties: ['openFile']
-              }
+            const ext = type === 'Text' ? 'txt' : 'csv';
+            options = {
+                filters: [
+                    { name: `${type} Files`, extensions: [ext] }
+                ],
+                properties: ['openFile']
+            }
           }
           // Show file dialog 
           return await dialog.showOpenDialog(mainWindow, options);

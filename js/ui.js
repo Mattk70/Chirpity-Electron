@@ -528,7 +528,6 @@ const postBufferUpdate = ({
   resetSpec = false,
   goToRegion = false,
 }) => {
-  STATE.regionsCompleted = false;
   STATE.fileLoaded = false;
   worker.postMessage({
     action: "update-buffer",
@@ -1105,7 +1104,7 @@ async function onOpenFiles(args) {
   }
   // Reset analysis status
   STATE.analysisDone = false;
-  loadAudioFileSync({ filePath: STATE.openFiles[0] });
+  loadAudioFileSync({ filePath: STATE.openFiles[0], preserveResults:args.preserveResults });
 
   // Clear unsaved records warning
   window.electron.unsavedRecords(false);
@@ -1294,6 +1293,24 @@ async function batchExportAudio() {
   species
     ? exportData("audio", species, 1000)
     : generateToast({ type: "warning", message: "mustFilterSpecies" });
+}
+
+async function importData(format){
+  const defaultPath = localStorage.getItem("lastSaveFolder") || "";
+  const files = await window.electron.openDialog("showOpenDialog", {
+    type: "CSV",
+    defaultPath,
+  });
+  if (files.canceled) return;
+  const file = files.filePaths[0]
+  const lastSaveFolder = p.dirname(file);
+  localStorage.setItem("lastSaveFolder", lastSaveFolder);
+  DOM.loadingScreen.classList.remove("d-none");
+  worker.postMessage({
+    action: "import-results",
+    file,
+    format
+  })
 }
 
 async function exportData(
@@ -1783,6 +1800,23 @@ window.onload = async () => {
     } else {
       config = JSON.parse(data);
     }
+
+    // Attach an error event listener to the window object
+    window.onerror = function (message, file, lineno, colno, error) {
+      trackEvent(
+        config.UUID,
+        "Error",
+        error.message,
+        encodeURIComponent(error.stack)
+      );
+      // Return false not to inhibit the default error handling
+      return false;
+    };
+    //fill in defaults - after updates add new items
+    utils.syncConfig(config, defaultConfig);
+
+    membershipCheck().then((isMember) => (STATE.isMember = isMember));
+
     const { model, library, database, detect, filters, audio, 
       limit, locale, speciesThreshold, list, useWeek, UUID, 
       local, debug, fileStartMtime, specDetections } = config;
@@ -1820,22 +1854,6 @@ window.onload = async () => {
       backend: config[model].backend,
       list: list,
     });
-    // Attach an error event listener to the window object
-    window.onerror = function (message, file, lineno, colno, error) {
-      trackEvent(
-        config.UUID,
-        "Error",
-        error.message,
-        encodeURIComponent(error.stack)
-      );
-      // Return false not to inhibit the default error handling
-      return false;
-    };
-    //fill in defaults - after updates add new items
-    utils.syncConfig(config, defaultConfig);
-
-    membershipCheck().then((isMember) => (STATE.isMember = isMember));
-
     // Disable SNR
     config.filters.SNR = 0;
 
@@ -2046,6 +2064,10 @@ const setUpWorkerMessaging = () => {
           onChartData(args);
           break;
         }
+        case "clear-loading": {
+          DOM.loadingScreen.classList.add('d-none')
+          break;
+        }
         case "conversion-progress": {
           displayProgress(args.progress, args.text);
           break;
@@ -2248,7 +2270,7 @@ const setUpWorkerMessaging = () => {
           break;
         }
         case "window-detections": {
-          showWindowDetections(args);
+          waitForWavesurferReady().then(() => showWindowDetections(args));
           break;
         }
         case "worker-loaded-audio": {
@@ -2291,6 +2313,7 @@ const setUpWorkerMessaging = () => {
  * @returns {void}
  */
 function showWindowDetections({ detections, goToRegion }) {
+  STATE.regionsCompleted = false;
   for (const detection of detections) {
     const start = detection.start - STATE.windowOffsetSecs;
     if (start < STATE.windowLength) {
@@ -2793,7 +2816,7 @@ DOM.listIcon.addEventListener("click", () => {
 DOM.customListSelector.addEventListener("click", async () => {
   const defaultPath = localStorage.getItem("customList") || "";
   const files = await window.electron.openDialog("showOpenDialog", {
-    type: "text",
+    type: "Text",
     defaultPath,
   });
   if (!files.canceled) {
@@ -3080,7 +3103,7 @@ function onModelReady(args) {
     );
   APPLICATION_LOADED = true;
 
-  document.getElementById("loading-screen").classList.add("d-none");
+  DOM.loadingScreen.classList.add("d-none");
   // Get all the tags from the db
   worker.postMessage({ action: "get-tags", init: true });
   // New users - show the tour
@@ -3164,7 +3187,7 @@ async function onWorkerLoadedAudio({
     play: play,
     resetSpec: resetSpec,
   });
-  // Doe this after the spec has loaded the file
+  // Do this after the spec has loaded the file
   STATE.fileLoaded = true;
   if (modelReady) {
     utils.enableMenuItem(["analyse"]);
@@ -3398,7 +3421,11 @@ function onResultsComplete({ active = undefined, select = undefined } = {}) {
   }
 
   if (activeRow) {
-    activeRow.click();
+    if (spec.wavesurfer) {
+      waitForWavesurferReady().then(() => activeRow.click());
+    } else {
+      activeRow.click()
+    }
     activeRow.scrollIntoView({ behavior: "instant", block: "center" });
   }
   // hide progress div
@@ -3407,6 +3434,20 @@ function onResultsComplete({ active = undefined, select = undefined } = {}) {
   activateResultSort();
 }
 
+function waitForWavesurferReady() {
+  return new Promise(resolve => {
+    const wavesurfer = spec.wavesurfer;
+    if (wavesurfer.isReady) {
+      resolve();
+    } else {
+      const onReady = () => {
+        wavesurfer.un('ready', onReady);
+        resolve();
+      };
+      wavesurfer.on('ready', onReady);
+    }
+  });
+}
 /**
  * Retrieves the index of a table row whose associated start time matches a specified value.
  *
@@ -3492,6 +3533,7 @@ function onAnalysisComplete({ quiet }) {
     generateToast({ message: "complete" });
     // activateResultSort();
   }
+  worker.postMessage({ action: "update-state", selection: false });
 }
 
 /**
@@ -4855,11 +4897,14 @@ function handleUIClicks(e) {
       exportAudio();
       break;
     }
+    case "import-csv": {
+      importData('csv');
+      break;
+    }
     case "exit": {
       window.close();
       break;
     }
-
     case "dataset": {
       worker.postMessage({
         action: "create-dataset",
@@ -6857,16 +6902,6 @@ import WaveSurfer from "../node_modules/wavesurfer.js/dist/wavesurfer.esm.js";
 import Spectrogram from "../node_modules/wavesurfer.js/dist/plugins/spectrogram.esm.js";
 let ws;
 const createCompareWS = (mediaContainer) => {
-  // const instance =  new ChirpityWS(
-  //   "",
-  //   () => STATE, // No-op
-  //   () => config, // Returns the current config
-  //   {}, // no handlers
-  //   GLOBAL_ACTIONS
-  // )
-  // const spectrogram = instance.initSpectrogram(null, 256, 256);
-  // ws = instance.initWavesurfer(mediaContainer, [spectrogram])
-  // return ws
   if (ws) ws.destroy();
   ws = WaveSurfer.create({
     container: mediaContainer,
@@ -6975,7 +7010,8 @@ export { config, displayLocationAddress, LOCATIONS, generateToast };
  */
 async function membershipCheck() {
   const oneWeek = 7 * 24 * 60 * 60 * 1000; // "It's been one week since you looked at me, cocked your head to the side..."
-  const cachedStatus = Boolean(localStorage.getItem("isMember"));
+  const cachedStatus = localStorage.getItem("isMember") === 'true';
+  console.log('cached membership is', cachedStatus)
   const cachedTimestamp = Number(localStorage.getItem("memberTimestamp"));
   const now = Date.now();
   let installDate = Number(localStorage.getItem("installDate"));
@@ -7035,6 +7071,7 @@ async function membershipCheck() {
           } else {
             el.classList.remove("locked"); // remove coral color
             if (el instanceof HTMLSelectElement) el.selectedIndex = 0;
+            el.classList.add('disabled');
             el.checked = false;
             el.disabled = true;
           }

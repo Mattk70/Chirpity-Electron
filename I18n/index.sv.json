@@ -28,6 +28,7 @@
     "Show frequency labels-circle-help": ["När aktiverat, kommer spektrogrammet att visa frekvensen på vänster sida."],
     "Show all detections-circle-help": "När aktiverat kommer spektrogrammet att markera alla upptäckter på skärmen.",
     "padlock": ["Funktion låst", "Bli en <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>medlem</a> för att låsa upp denna funktion permanent."],
+    "unsaved-link": ["Osparade ändringar", "Det finns ändringar i resultaten som inte har sparats"],
     "Clip Library-circle-help":["När den är aktiverad läggs endast ljudfiler med sparade poster till i biblioteket. Om din inspelare är inställd på att automatiskt öka filerna efter en kort tidsperiod, kommer aktivering av denna inställning dramatiskt att minska det utrymme som krävs om det finns långa perioder utan aktivitet"],
     "Signal to Noise Ratio-circle-help": ["SNR-filtret, när det är aktiverat, hoppar över delar av ljud där något ljudhändelse är under tröskelvärdet. Högre värden hoppar över allt mer bullriga segment. Även om detta resulterar i snabbare bearbetning måste det betraktas som <b><i>experimentellt</i></b> och vilket som helst icke-nollvärde kan missa detekteringar. <b>Tips:</b> För att hitta ett fungerande SNR-värde, kör analys på en kort fil med de svagaste detektionerna du kan identifiera med säkerhet. Öka SNR-värdet tills detektionen inte plockas upp. När du hittar denna tröskel, backa det till den högsta nivån som plockar upp detektionen."],
     "Species Threshold-circle-help": ["Definiera den minsta eBird-checklistans frekvens för artinkludering. Om 'Justera lista för årets vecka' är aktiverad, justeras listan för att inkludera arter förväntade för inspelningsveckan."],
@@ -54,6 +55,7 @@
     "export-audio": ["Exportera vald ljudfil","Ctrl+E"
     ],
     "saveLabels": ["Spara Audacity etiketter"],
+    "import-csv": ["Importera resultat från CSV"],
     "exit": ["Avsluta"],
     "save2db": ["Spara till arkiv","Ctrl+S"
     ],
@@ -83,7 +85,7 @@
     "FAQ": ["Vanliga frågor"],
     "species": ["Vilka arter har upptäckts?"],
     "eBird": ["Vad är en eBird-register?"],
-    "update-progress": ["Laddar ner uppdatering:"],
+    "update-progress-text": ["Laddar ner uppdatering:"],
     "record-add": ["Lägg till"],
     "record-dismiss": ["Avvisa"],
     "help-modal-close": ["Stäng"],

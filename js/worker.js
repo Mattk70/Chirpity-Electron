@@ -512,7 +512,7 @@ async function handleMessage(e) {
       if (STATE.detect.autoLoad && allSaved) {
         STATE.filesToAnalyse = args.files;
         await onChangeMode("archive");
-        await Promise.all([getResults(), getSummary()]);
+        await Promise.all([getResults(), getSummary(), getTotal()]);
       }
       break;
     }
@@ -537,6 +537,26 @@ async function handleMessage(e) {
       args.format === 'summary' 
       ? await getSummary(args) 
       : await getResults(args);
+      break;
+    }
+    case "import-results": {
+      const {importData} = require('./js/utils/importer.js');
+      const {file, format} = args;
+      const { lat, lon, place } = STATE;
+      const defaultLocation = { defaultLat:lat, defaultLon:lon, defaultPlace:place };
+      const result = await importData({db:memoryDB, file, format, defaultLocation, METADATA, setMetadata })
+        .catch(error => {
+          const {message, variables} = error;
+          generateAlert({message, type: 'error', variables})
+          
+        })
+      if (result) {
+        const {files, meta} = result;
+        METADATA = meta;
+        await getFiles({files, preserveResults:true});
+        await Promise.all([getResults(), getSummary(), getTotal()])
+      }
+      UI.postMessage({ event: "clear-loading"})
       break;
     }
     case "file-load-request": {
@@ -615,7 +635,7 @@ async function handleMessage(e) {
       break;
     }
     case "get-valid-files-list": {
-      await getFiles(args.files);
+      await getFiles({files: args.files});
       break;
     }
     case "insert-manual-record": {
@@ -692,7 +712,7 @@ async function handleMessage(e) {
       await INITIALISED;
       LIST_WORKER && (await getIncludedIDs());
       setLabelState({regenerate:false});
-      args.refreshResults && (await Promise.all([getResults(), getSummary()]));
+      args.refreshResults && (await Promise.all([getResults(), getSummary(), getTotal()]));
       break;
     }
     case "update-locale": {
@@ -973,7 +993,7 @@ async function spawnListWorker() {
  * Sends this list to the UI
  * @param {*} files must be a list of file paths
  */
-const getFiles = async (files, image) => {
+const getFiles = async ({files, image, preserveResults}) => {
   const supportedFiles = image ? [".png"] : SUPPORTED_FILES;
   let folderDropped = false;
   let fileList = [];
@@ -1010,7 +1030,7 @@ const getFiles = async (files, image) => {
   }
   const fileOrFolder = folderDropped ? "Open Folder(s)" : "Open Files(s)";
   trackEvent(STATE.UUID, "UI", "Drop", fileOrFolder, fileList.length);
-  UI.postMessage({ event: "files", filePaths: fileList });
+  UI.postMessage({ event: "files", filePaths: fileList, preserveResults });
   return fileList;
 };
 
@@ -2467,7 +2487,7 @@ function findFile(pathParts, filename, species) {
 const convertSpecsFromExistingSpecs = async (path) => {
   path ??=
     "/media/matt/36A5CC3B5FA24585/DATASETS/MISSING/NEW_DATASET_WITHOUT_ALSO_MERGED";
-  const file_list = await getFiles([path], true);
+  const file_list = await getFiles({files:[path], image:true});
   for (let i = 0; i < file_list.length; i++) {
     if (i % 100 === 0) {
       console.log(`${i} records processed`);
@@ -3751,6 +3771,8 @@ function exportAudacity(result, directory) {
       });
   });
 }
+
+
 /**
  * Exports data records to a CSV file.
  *
@@ -4173,7 +4195,7 @@ const onUpdateFileStart = async (args) => {
           // Commit transaction once all rows are processed
           await db.runAsync("COMMIT");
           DEBUG && console.log(`File ${file} updated successfully.`);
-          count && (await Promise.all([getResults(), getSummary()]));
+          count && (await Promise.all([getResults(), getSummary(), getTotal()]));
         }
       );
     } catch (error) {
@@ -4308,7 +4330,7 @@ const onFileDelete = async (fileName) => {
       variables: { file: fileName },
       updateFilenamePanel: true,
     });
-    await Promise.all([getResults(), getSummary()]);
+    await Promise.all([getResults(), getSummary(), getTotal()]);
   } else {
     generateAlert({
       message: "failedFilePurge",
@@ -4500,7 +4522,8 @@ async function onSetCustomLocation({
       await db.getAsync("SELECT id FROM locations WHERE lat = ? AND lon = ?", lat, lon)
     )?.id;
   
-
+// TODO: check if file in audio library and update its location on disk and in library
+// await checkLibrary(file, lat,lon, place)
     for (const file of files) {
       // Only update the file location id if it is already in the db
       const result = await db.runAsync(
@@ -4972,3 +4995,5 @@ async function convertFile(
       .run();
   });
 }
+
+module.exports = {setMetadata}

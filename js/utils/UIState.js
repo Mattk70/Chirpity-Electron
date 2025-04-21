@@ -38,7 +38,7 @@ export class UIState {
         currentAnalysis: {
           currentFile: null,
           openFiles: [],
-          mode: null,
+          mode: 'analyse',
           species: null,
           offset: 0,
           active: null,

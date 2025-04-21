@@ -28,6 +28,7 @@
   "Show frequency labels-circle-help": ["Quando ativada, o espectrograma exibirá a frequência no lado esquerdo."],
   "Show all detections-circle-help": "Quando ativado, o espectrograma destacará todas as detecções na tela.",
   "padlock": ["Recurso bloqueado", "Torne-se um <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>membro</a> para desbloquear este recurso permanentemente."],
+  "unsaved-link": ["Edições não guardadas", "Há alterações nos resultados que ainda não foram guardadas"],
   "Clip Library-circle-help":["Quando ativado, apenas arquivos de áudio contendo registros salvos são adicionados à biblioteca. Se configurar o gravador para incrementar automaticamente os arquivos após um curto período de tempo, ativar esta configuração reduzirá drasticamente o armazenamento necessário se houver longos períodos sem atividade"],
   "Signal to Noise Ratio-circle-help": ["O filtro SNR, quando ativado, ignorará porções de áudio onde qualquer evento de áudio esteja abaixo do limiar. Valores mais altos ignoram segmentos progressivamente mais ruidosos. Apesar de resultar em processamento mais rápido, deve ser considerado <b><i>experimental</i></b>, e qualquer valor acima de zero pode levar à perda de deteções. <b>Dica:</b> Para encontrar um valor SNR adequado, execute uma análise num ficheiro curto com as deteções mais fracas que conseguir identificar com confiança. Aumente o valor SNR até que a deteção não seja captada. Depois de encontrar esse limiar, reduza-o para o nível mais alto que capte a deteção."],
   "Species Threshold-circle-help": ["Defina a frequência mínima da lista de verificação do eBird para a inclusão de espécies. Se 'Ajustar lista para a semana do ano' estiver ativado, a lista será ajustada para incluir as espécies esperadas na semana da gravação."],
@@ -54,6 +55,7 @@
   "export-audio": ["Exportar Áudio Selecionado","Ctrl+E"
   ],
   "saveLabels": ["Salvar Rótulos Audacity"],
+  "import-csv": ["Importar resultados de CSV"],
   "exit": ["Sair"],
   "save2db": ["Salvar no Arquivo","Ctrl+S"
   ],
@@ -83,7 +85,7 @@
   "FAQ": ["FAQs"],
   "species": ["Quais espécies são detectadas?"],
   "eBird": ["O que é um Registro eBird?"],
-  "update-progress": ["Baixando atualização:"],
+  "update-progress-text": ["Baixando atualização:"],
   "record-add": ["Adicionar"],
   "record-dismiss": ["Descartar"],
   "help-modal-close": ["Fechar"],

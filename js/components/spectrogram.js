@@ -136,7 +136,6 @@ export class ChirpityWS {
 
   initWavesurfer = (container, plugins) => {
     const config = this.getConfig();
-    // this.spectrogram ??= this.initSpectrogram(container, 256, 256)
     return WaveSurfer.create({
         container,
         // make waveform transparent
@@ -176,6 +175,8 @@ export class ChirpityWS {
       color: STATE.regionActiveColour,
     });
     const wavesurfer = this.wavesurfer;
+    wavesurfer.on('load', () => wavesurfer.isReady = false)
+    wavesurfer.on('ready', () => wavesurfer.isReady = true)
     wavesurfer.on("dblclick", this.centreSpec);
     wavesurfer.on("click", () => this.REGIONS.clearRegions());
     wavesurfer.on("pause", () => {
@@ -675,6 +676,7 @@ export class ChirpityWS {
     this.refreshTimeline();
     this.wavesurfer.seekTo(position);
     if (play) await this.wavesurfer.play();
+    return this.spectrogram.fftSamples;
   }
 
   WSPluginPurge = () => {
