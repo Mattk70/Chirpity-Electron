@@ -404,6 +404,13 @@ class Model {
     return [includedIDs.sort((a, b) => a - b), messages];
   }
 }
+/**
+ * Returns all indices at which a specified value occurs in an array.
+ *
+ * @param {Array} array - The array to search.
+ * @param {*} value - The value to find within the array.
+ * @returns {number[]} An array of indices where the value is found.
+ */
 function findAllIndexes(array, value) {
   return array.reduce((acc, currentValue, currentIndex) => {
     if (currentValue === value) {

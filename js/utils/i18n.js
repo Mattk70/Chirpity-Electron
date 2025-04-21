@@ -1,4 +1,3 @@
-
 let LOCALE;
 
 const Toasts = { // UI.js
@@ -3100,23 +3099,12 @@ const setLocale = (locale) => LOCALE = locale;
 const get = (context) => context[LOCALE] || context["en"];
 
 /**
- * Updates UI elements with localized text based on the provided locale.
+ * Dynamically updates UI elements with localized text for the specified locale.
  *
- * Asynchronously fetches a localization JSON file corresponding to the given locale, falling back to English if necessary. Updates DOM elements—including text content, data attributes, popover titles, form labels, button text, option values, and carousel items—with the localized strings retrieved from the JSON file and other i18n objects. If the JSON file for the specified locale is not available, the function logs a warning and returns without modifying the UI.
+ * Fetches and applies a localization JSON file for the given locale, updating DOM elements such as labels, buttons, tooltips, popovers, form controls, and carousel content with the appropriate localized strings. Falls back to English localization if the specified locale file is unavailable. If neither the locale nor English localization files are found, the UI remains unchanged.
  *
- * @param {string} locale - Locale code (e.g., "en", "de_CA"). Any substring following an underscore is removed before fetching the JSON file.
- * @returns {Promise<Object|undefined>} A promise that resolves to the localization data object if successfully fetched and applied, or undefined if the localization file is not found.
- *
- * @example
- * localiseUI('es_MX')
- *   .then((localisationData) => {
- *     if (localisationData) {
- *       console.log('UI updated with localized strings.');
- *     } else {
- *       console.log('Localization file not found; UI remains unmodified.');
- *     }
- *   })
- *   .catch(error => console.error('Localization error:', error));
+ * @param {string} locale - The locale code (e.g., "en", "de_CA"). Any suffix after an underscore is ignored.
+ * @returns {Promise<Object|undefined>} Resolves to the localization data object if successful, or undefined if no localization file is found.
  */
 async function localiseUI(locale) {
     locale = locale.replace(/_.*$/, '');

@@ -20,12 +20,9 @@ const CONFIG = {
 };
 
 /**
- * Loads the model configuration and initializes the global model instance.
+ * Loads the model configuration, sets up the TensorFlow.js backend, and initializes the global model instance for inference.
  *
- * Reads a JSON configuration file using the provided model version, configures the TensorFlow.js backend
- * (WebGL or WebGPU) with appropriate environment flags, and sets up the global model instance. The function
- * creates a mask tensor for filtering prediction indexes, loads and warms up the model for inference, and then
- * sends a "model-ready" message to the designated worker with relevant model details.
+ * Reads the model configuration based on the specified version, configures the TensorFlow.js backend with environment flags, creates a mask tensor for filtering prediction indexes, and loads and warms up the model. Sends a "model-ready" message to the specified worker with model details upon completion.
  *
  * @param {Object} params - Parameters for loading the model.
  * @param {string} params.model - Version identifier used to locate the model configuration file.

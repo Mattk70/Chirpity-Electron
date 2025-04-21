@@ -76,6 +76,12 @@ function extractFileNameAndFolder(path) {
   }
 }
 
+/**
+ * Converts a Date object or timestamp into a string formatted for HTML datetime-local input fields.
+ *
+ * @param {Date|number|string} date - The date value to convert, as a Date object, timestamp, or date string.
+ * @returns {string} A string in the format "YYYY-MM-DDTHH:mm" suitable for use in datetime-local inputs.
+ */
 function getDatetimeLocalFromEpoch(date) {
   // Assuming you have a Date object, for example:
   const myDate = new Date(date);
@@ -98,6 +104,13 @@ function getDatetimeLocalFromEpoch(date) {
 }
 
 
+/**
+ * Enables DOM elements by removing the "disabled" CSS class from each element with an ID in the provided list.
+ *
+ * @param {string[]} id_list - List of DOM element IDs to enable.
+ *
+ * @remark Logs a warning for any ID that does not correspond to an existing DOM element.
+ */
 function enableMenuItem(id_list) {
   id_list.forEach((id) => {
     const element = document.getElementById(id);
@@ -189,7 +202,12 @@ const waitForFinalEvent = (function () {
   };
 })();
 
-// formatDuration: Used for DIAGNOSTICS Duration
+/**
+ * Converts a duration in seconds to a human-readable string in hours, minutes, and seconds.
+ *
+ * @param {number} seconds - The total duration in seconds.
+ * @returns {string} The formatted duration string (e.g., "1 hours 2 minutes 3 seconds").
+ */
 function formatDuration(seconds) {
   let duration = "";
   const hours = Math.floor(seconds / 3600); // 1 hour = 3600 seconds
@@ -201,7 +219,12 @@ function formatDuration(seconds) {
   return duration;
 }
 
-// Used for notifications, converts DIAGNOSTICS duratino back to seconds:
+/**
+ * Parses a duration string containing hours, minutes, and seconds and returns the total duration in seconds.
+ *
+ * @param {string} durationString - A string representing a duration (e.g., "2 hours 5 minutes 10 seconds").
+ * @returns {number} The total duration in seconds, or 0 if parsing fails.
+ */
 
 function parseDuration(durationString) {
   const regex = /(?:(\d+)\s*hours?)?\s*(?:(\d+)\s*minutes?)?\s*(?:(\d+)\s*seconds?)?/i;
@@ -217,7 +240,14 @@ function parseDuration(durationString) {
 }
 
 
-// Utility functions to wait for a variable to not be falsey
+/**
+ * Returns a Promise that resolves when the provided check function returns a truthy value or after a maximum number of retries.
+ *
+ * The check function is evaluated every 100 milliseconds, up to 250 times.
+ *
+ * @param {Function} checkFn - A function that is repeatedly called until it returns a truthy value.
+ * @returns {Promise<void>} Resolves when {@link checkFn} returns a truthy value or after the maximum retries.
+ */
 function waitFor(checkFn) {
   let maxRetries = 250;
   let retryCount = 0;
