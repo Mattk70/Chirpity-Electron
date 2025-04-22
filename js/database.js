@@ -449,23 +449,14 @@ const addNewModel = async ({model, db = diskDB, dbMutex}) => {
     // We need to get the default labels from the config file
     // There may not be a db, or the db may not have the labels required 
     let labels;
+    const {readFileSync} = require('node:fs');
+    const path = require('node:path');
     if (model === "birdnet") {
-      const labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_en.txt`;
-      await fetch(labelFile)
-        .then((response) => {
-          if (!response.ok) throw new Error("Network response was not ok");
-          return response.text();
-        })
-        .then((fileContents) => {
+      const labelFile = path.join(__dirname, "labels", "V2.4",
+         "BirdNET_GLOBAL_6K_V2.4_Labels_en.txt");
+        const fileContents = readFileSync(labelFile, "utf8");
           labels = fileContents.trim().split(/\r?\n/);
-        })
-        .catch((error) => {
-          console.error("There was a problem fetching the label file:", error);
-          throw error;
-        });
     } else {
-      const {readFileSync} = require('node:fs');
-      const path = require('node:path');
       labels = JSON.parse(
         readFileSync(path.join(__dirname, `${model}_model_config.json`), "utf8")
       ).labels;
