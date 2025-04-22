@@ -675,8 +675,7 @@ export class ChirpityWS {
     }
     this.refreshTimeline();
     this.wavesurfer.seekTo(position);
-    if (play) await this.wavesurfer.play();
-    return this.spectrogram.fftSamples;
+    if (play) this.wavesurfer.play();
   }
 
   WSPluginPurge = () => {

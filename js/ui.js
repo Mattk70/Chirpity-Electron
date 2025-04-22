@@ -299,7 +299,7 @@ const GLOBAL_ACTIONS = {
   "-": (e) => (spec.wavesurfer && (e.metaKey || e.ctrlKey) ? config.FFT = spec.increaseFFT() : spec.zoom("Out")),
   F5: () =>  spec.wavesurfer && (config.FFT = spec.reduceFFT()),
   F4: () =>  spec.wavesurfer && (config.FFT = spec.increaseFFT()),
-  " ": () => { spec.wavesurfer && spec.wavesurfer.playPause() },
+  " ": () => { spec.wavesurfer && WSPlayPause()},
   Tab: (e) => {
     if ((e.metaKey || e.ctrlKey) && !PREDICTING && STATE.diskHasRecords) {
       // If you did this when predicting, your results would go straight to the archive
@@ -324,6 +324,41 @@ const GLOBAL_ACTIONS = {
   Backspace: () => activeRow && deleteRecord(activeRow),
 };
 
+/**
+ * Returns a promise that resolves when the Wavesurfer instance is ready.
+ *
+ * Use this to ensure audio waveform rendering and related operations only proceed after initialization is complete.
+ * 
+ * @returns {Promise<void>} Resolves when the Wavesurfer instance emits the 'ready' event.
+ */
+function waitForWavesurferReady() {
+  return new Promise(resolve => {
+    const wavesurfer = spec.wavesurfer;
+    if (wavesurfer.isReady) {
+      resolve();
+    } else {
+      const onReady = () => {
+        wavesurfer.un('ready', onReady);
+        resolve();
+      };
+      wavesurfer.on('ready', onReady);
+    }
+  });
+}
+
+/**
+ * Helper function to ensure play promise has resolved before calling ws.pause().
+ * A workaround for https://github.com/katspaugh/wavesurfer.js/issues/4047
+ */
+function WSPlayPause(){
+  waitForWavesurferReady().then(() => {
+    if (spec.wavesurfer.isPlaying() ){
+      spec.wavesurfer.once('audioprocess', () => spec.wavesurfer.pause() )
+    } else {
+      spec.wavesurfer.play() 
+    }
+  })
+}
 
 //Open Files from OS "open with"
 const OS_FILE_QUEUE = [];
@@ -2195,7 +2230,7 @@ const setUpWorkerMessaging = () => {
           break;
         }
         case "model-ready": {
-          onModelReady(args);
+          onModelReady();
           break;
         }
         case "mode-changed": {
@@ -3084,7 +3119,7 @@ gotoForm.addEventListener("submit", gotoTime);
  *
  * Updates UI elements based on loaded audio files and regions, logs warm-up and launch times, hides the loading screen, requests tag data from the worker, starts the user tour for new users, and processes any queued OS file inputs.
  */
-function onModelReady(args) {
+function onModelReady() {
   modelReady = true;
   if (STATE.fileLoaded) {
     utils.enableMenuItem(["analyse"]);
@@ -3129,7 +3164,6 @@ function onModelReady(args) {
  * @param {number} [params.position=0] - Normalized playhead position (0 to 1).
  * @param {*} [params.contents] - Audio buffer containing the loaded data.
  * @param {boolean} [params.play=false] - Whether to automatically play the audio after loading.
- * @param {boolean} [params.queued=false] - Whether the audio load was queued.
  * @param {Object} [params.metadata] - Optional metadata for the audio file.
  * @returns {Promise<void>}
  */
@@ -3141,10 +3175,9 @@ async function onWorkerLoadedAudio({
   windowBegin = 0,
   file = "",
   position = 0,
-  contents = undefined,
+  contents,
   play = false,
-  queued = false,
-  metadata = undefined,
+  metadata,
 }) {
   clearTimeout(loadingTimeout);
   // Clear the loading animation
@@ -3154,9 +3187,7 @@ async function onWorkerLoadedAudio({
   //if (preserveResults) completeDiv.hide();
   config.debug &&
     console.log(
-      `UI received worker-loaded-audio: ${file}, buffered: ${
-        queued === true
-      }, play: ${play}`
+      `UI received worker-loaded-audio: ${file}, play: ${play}`
     );
   // Dismiss a context menu if it's open
   DOM.contextMenu.classList.add("d-none");
@@ -3421,27 +3452,7 @@ function onResultsComplete({ active = undefined, select = undefined } = {}) {
   activateResultSort();
 }
 
-/**
- * Returns a promise that resolves when the Wavesurfer instance is ready.
- *
- * Use this to ensure audio waveform rendering and related operations only proceed after initialization is complete.
- * 
- * @returns {Promise<void>} Resolves when the Wavesurfer instance emits the 'ready' event.
- */
-function waitForWavesurferReady() {
-  return new Promise(resolve => {
-    const wavesurfer = spec.wavesurfer;
-    if (wavesurfer.isReady) {
-      resolve();
-    } else {
-      const onReady = () => {
-        wavesurfer.un('ready', onReady);
-        resolve();
-      };
-      wavesurfer.on('ready', onReady);
-    }
-  });
-}
+
 /**
  * Retrieves the index of a table row whose associated start time matches a specified value.
  *
@@ -5325,7 +5336,7 @@ function handleUIClicks(e) {
       break;
     }
     case "playToggle": {
-      if (spec.wavesurfer) spec.wavesurfer.playPause();
+      if (spec.wavesurfer) WSPlayPause();
         break;      
     }
     case "setCustomLocation": {
@@ -6007,10 +6018,13 @@ function filterLabels(e) {
  * @returns {Promise<void>} Resolves once the context menu is setup and positioned.
  */
 async function createContextMenu(e) {
-  // If we let the playback continue, the region may get wiped
-  if (spec.wavesurfer?.isPlaying()) spec.wavesurfer.pause();
   e.stopPropagation();
-  this.closest("#spectrogramWrapper") && spec.checkForRegion(e, true);
+  if (this.closest("#spectrogramWrapper")){
+    const region = spec.checkForRegion(e, true);
+    if (!region)  return
+      // If we let the playback continue, the region may get wiped
+    if (spec.wavesurfer?.isPlaying()) WSPlayPause();
+  }
   const i18 = i18n.get(i18n.Context);
   const target = e.target;
   if (target.closest("#sort-label")) {
@@ -6043,6 +6057,7 @@ async function createContextMenu(e) {
     }
   }
   if (!STATE.activeRegion && !inSummary) return;
+
   const createOrEdit =
     STATE.activeRegion?.label || target.closest("#summary") ? i18.edit : i18.create;
 
