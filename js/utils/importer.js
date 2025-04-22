@@ -136,6 +136,9 @@ const csv = require('@fast-csv/parse');
             METADATA[file] = await setMetadata({ file });
         }
       // Location
+      if (Number.isNaN(lat) || Number.isNaN(lon)) {
+        ({lat, lon, place} = { lat:defaultLat, lon:defaultLon, place:defaultPlace}); 
+      }
       const locationKey = `${lat}_${lon}`;
       locationID = caches.locations.get(locationKey);
       if (!locationID && !(lat === defaultLat && lon === defaultLon && place === defaultPlace)) {

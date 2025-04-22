@@ -2,7 +2,11 @@
  * @file User Interface code.
  * Contains functions for rendering the spectrogram, updating settings, rendering the screen
  */
-
+// Get the modules loaded in preload.js
+const fs = window.module.fs;
+const p = window.module.p;
+const uuidv4 = window.module.uuidv4;
+const os = window.module.os;
 import {
   trackVisit as _trackVisit,
   trackEvent as _trackEvent,
@@ -370,11 +374,7 @@ window.electron.onFileOpen((filePath) => {
 // Batch size map for slider
 const BATCH_SIZE_LIST = [4, 8, 16, 32, 48, 64, 96];
 
-// Get the modules loaded in preload.js
-const fs = window.module.fs;
-const p = window.module.p;
-const uuidv4 = window.module.uuidv4;
-const os = window.module.os;
+
 
 // Is this CI / playwright?
 const isTestEnv = window.env.TEST_ENV === "true";
@@ -5921,14 +5921,9 @@ function setListUIState(list) {
  * @throws {Error} If the label file cannot be fetched or read.
  */
 async function readLabels(labelFile, updating) {
-  fetch(labelFile)
-    .then((response) => {
-      if (!response.ok) throw new Error("Network response was not ok");
-      if (!labelFile) throw new Error("Failed to fetch");
-      return response.text();
-    })
+  fs.promises.readFile(labelFile,"utf8")
     .catch((error) => {
-      if (error.message === "Failed to fetch") {
+      if (error.message.startsWith('ENOENT')) {
         generateToast({
           type: "error",
           message: "listNotFound",
