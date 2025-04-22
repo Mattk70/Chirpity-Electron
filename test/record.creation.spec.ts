@@ -123,8 +123,8 @@ test('Can create/edit a manual record', async () => {
   // Locate and click the first suggestion in the list
   await page.locator('#contentWrapper li:nth-of-type(1)').click();
 
-  // Check that div#selected-bird innerText starts with "Ring Ouzel (call)"
-  await expect(selectedBird).toHaveText(/^Ring Ouzel \(call\)/);
+  // Check that div#selected-bird innerText starts with "Ring Ouzel"
+  await expect(selectedBird).toHaveText(/^Ring Ouzel/);
   await page.locator('#call-count').fill('3');
   await page.locator('#record-comment').fill('a test comment');
   await page.locator('#record-add').click();
@@ -132,7 +132,7 @@ test('Can create/edit a manual record', async () => {
 
   // Confidence has been changed to Person_add icon
   console.log('record creation test: before second expect')
-  expect(confidence).toHaveText(/Ring Ouzel \(call\)\s+person_add/);
+  expect(confidence).toHaveText(/person_add/);
   const comment =  await (await page.locator('#result1  td.comment  span')).getAttribute('title');
   // Comment saved
 

@@ -16,14 +16,15 @@ import {
   createDB,
   checkpoint,
   closeDatabase,
-  upgrade_to_v1,
-  upgrade_to_v2,
   Mutex,
+  mergeDbIfNeeded,
+  addNewModel
 } from "./database.js";
 import { trackEvent as _trackEvent } from "./utils/tracking.js";
 
 let isWin32 = false;
 
+const dbMutex = new Mutex();
 const DATASET = false;
 const DATABASE = "archive_test";
 const adding_chirpity_additions = false;
@@ -187,7 +188,6 @@ let workerInstance = 0;
 let appPath,
   tempPath,
   BATCH_SIZE,
-  LABELS,
   batchChunksToSend = {};
 let LIST_WORKER;
 
@@ -278,180 +278,100 @@ const getSelectionRange = (file, start, end) => {
 
 
 /**
- * Loads, configures, and migrates the SQLite database used for audio records and metadata.
+ * Loads and initializes the application's SQLite database for audio records and metadata.
  *
- * This asynchronous function initializes the database by:
- * - Fetching default model labels from a remote file (for the "birdnet" model) or a local configuration file,
- *   then appending a default "Unknown Sp." label.
- * - Constructing a unique database filename based on the total number of labels and either creating a new database (via createDB)
- *   or opening an existing one.
- * - Enforcing PRAGMA settings (foreign keys, journal mode, and busy timeout) for reliable operation.
- * - Performing schema migrations on an existing database when necessary, such as:
- *   - Creating indices on species(sname) and species(cname).
- *   - Adding missing columns ("archiveName" and "metadata") to the files table.
- *   - Updating the tags and records tables (including adding a 'reviewed' column and migrating existing records).
- * - Refreshing the global LABELS variable with the preferred locale labels from the species table and notifying the UI if records exist.
+ * Opens or creates the main database file, applies schema migrations if needed, sets PRAGMA options, and prepares species mappings for the current model. Notifies the UI if label translation is required, and updates global state with the loaded database instance.
  *
- * @param {string} path - The directory path where the database file is or will be located.
- * @returns {Promise<boolean>} Resolves to true when the database is successfully loaded and configured.
- *
- * @example
- * loadDB('/data/db')
- *   .then(success => console.log('Database loaded:', success))
- *   .catch(error => console.error('Error loading database:', error));
- *
- * @remarks
- * This function depends on global variables (e.g., STATE, DATASET, LABELS, diskDB, UI) and auxiliary functions such as createDB, checkpoint, and dbMutex.
+ * @returns {Promise<sqlite3.Database>} Resolves with the initialized database instance.
  */
-async function loadDB(path) {
-  // We need to get the default labels from the config file
+async function loadDB() {
+  const path = STATE.database.location || appPath;
   DEBUG && console.log("Loading db " + path);
-  let modelLabels;
   const model = STATE.model;
-  if (model === "birdnet") {
-    const labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_en.txt`;
-    await fetch(labelFile)
-      .then((response) => {
-        if (!response.ok) throw new Error("Network response was not ok");
-        return response.text();
-      })
-      .then((filecontents) => {
-        modelLabels = filecontents.trim().split(/\r?\n/);
-      })
-      .catch((error) => {
-        console.error("There was a problem fetching the label file:", error);
-      });
-  } else {
-    const { labels } = JSON.parse(
-      fs.readFileSync(p.join(__dirname, `${model}_model_config.json`), "utf8")
-    );
-    modelLabels = labels;
-  }
-
-  // Add Unknown Sp.
-  modelLabels.push("Unknown Sp._Unknown Sp.");
-  const num_labels = modelLabels.length;
-  LABELS = modelLabels; // these are the default english labels
-  const file = DATASET
-    ? p.join(path, `${DATABASE}${num_labels}.sqlite`)
-    : p.join(path, `archive${num_labels}.sqlite`);
+  let modelID, needsTranslation;
+  const file = p.join(path, `archive.sqlite`);
   if (!fs.existsSync(file)) {
     console.log("No db file: ", file);
-    diskDB = await createDB({file, LABELS, dbMutex});
+    diskDB = await createDB({file, dbMutex});
     console.log("DB created at : ", file);
-    UI.postMessage({ event: "label-translation-needed", locale: STATE.locale });
-  } else if (!diskDB || diskDB.filename !== file) {
+    STATE.modelID = modelID;
+  } else {
     diskDB = new sqlite3.Database(file);
-    STATE.update({ db: diskDB });
-    await diskDB.runAsync("VACUUM");
-    await diskDB.runAsync("PRAGMA foreign_keys = ON");
-    await diskDB.runAsync("PRAGMA journal_mode = WAL");
-    await diskDB.runAsync("PRAGMA busy_timeout = 5000");
-
-    // Add empty version table if not exists
-    await diskDB.runAsync(
-      "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)"
-    );
-    const row = await diskDB.getAsync(`SELECT version FROM schema_version`);
-    let user_version;
-    if (!row) {
-      const { pragma_version } = await diskDB.getAsync("PRAGMA user_version");
-      user_version = pragma_version || 0;
-      await diskDB.runAsync(
-        "INSERT INTO schema_version (version) VALUES (?)",
-        user_version
-      );
-    } else {
-      user_version = row.version;
-    }
-    if (user_version < 1) {
-      await upgrade_to_v1(diskDB, dbMutex);
-    }
-    if (user_version < 2) {
-      await upgrade_to_v2(diskDB, dbMutex);
-    }
-    const { count } = await diskDB.getAsync(
-      "SELECT COUNT(*) as count FROM records"
-    );
-    if (count) {
-      UI.postMessage({ event: "diskDB-has-records" });
-    }
-    // Get the labels from the DB. These will be in preferred locale
-    DEBUG && console.log("Getting labels from disk db " + path);
-    const res = await diskDB.allAsync(
-      "SELECT sname || '_' || cname AS labels FROM species ORDER BY id"
-    );
-    LABELS = res.map((obj) => obj.labels); // these are the labels in the preferred locale
     DEBUG && console.log("Opened and cleaned disk db " + file);
   }
-  return true;
+
+  ([modelID, needsTranslation] = await mergeDbIfNeeded({diskDB, model, appPath, dbMutex }) )
+  STATE.modelID = modelID;
+  STATE.update({ db: diskDB });
+  diskDB.locale = STATE.locale;
+  await diskDB.runAsync("VACUUM");
+  await diskDB.runAsync("PRAGMA foreign_keys = ON");
+  await diskDB.runAsync("PRAGMA journal_mode = WAL");
+  await diskDB.runAsync("PRAGMA busy_timeout = 5000");
+  if (needsTranslation){
+    UI.postMessage({ event: "label-translation-needed", locale: STATE.locale });
+  } else {
+    await setLabelState({regenerate:true})
+  }
+
+  // Set mapping from model IDs to db species ids
+  const speciesResults = await diskDB.allAsync(
+    "SELECT id, classIndex, modelID FROM species ORDER BY id"
+  );
+  // Populate speciesMap for each model
+  speciesResults.forEach(({ modelID, classIndex, id }) => {
+    if (!STATE.speciesMap.has(modelID)) {
+      STATE.speciesMap.set(modelID, new Map());
+    }
+    STATE.speciesMap.get(modelID).set(classIndex, id);
+  });
+
+  const row = await diskDB.getAsync(
+    "SELECT 1 FROM records LIMIT 1"
+  );
+  if (row) {
+    UI.postMessage({ event: "diskDB-has-records" });
+  }
+  return diskDB;
+}
+
+
+/**
+ * Updates the application's label state by retrieving species labels from the database and applying current inclusion filters.
+ *
+ * If regeneration is requested or labels are not yet loaded, fetches all species labels from the database. Then filters the labels based on the current inclusion list and posts the filtered labels to the UI.
+ *
+ * @param {Object} options
+ * @param {boolean} options.regenerate - Whether to force regeneration of the label list from the database.
+ */
+async function setLabelState({regenerate}) {
+  if (regenerate || !STATE.allLabels){
+    DEBUG && console.log("Getting labels from disk db");
+    const res = await diskDB.allAsync(
+      "SELECT sname || '_' || cname AS labels, modelID FROM species ORDER BY id"
+    );
+    STATE.allLabels = res.map((obj) => obj.labels ); // these are the labels in the preferred locale
+  }
+  const included = await getIncludedIDs()
+  STATE.filteredLabels = STATE.list === 'everything' 
+    ? STATE.allLabels
+    : included.map(i => STATE.allLabels[i-1]); // included is 1 based, list is 0 based
+  UI.postMessage({ event: "labels", labels: STATE.filteredLabels });
 }
 
 /**
- * Dispatches incoming worker messages by executing actions specified in the event's data payload.
+ * Handles and dispatches worker messages to perform actions such as analysis, file operations, prediction management, database updates, and UI communication.
  *
- * This asynchronous function processes event messages that include an `action` field alongside associated parameters.
- * For any action other than "_init_", it waits for any pending initialization to complete before proceeding.
- * Depending on the action, the function delegates tasks such as initializing environments, processing audio files,
- * managing prediction worker threads, updating database records, handling file operations, and more.
- * Supported actions include:
+ * Processes incoming event messages containing an `action` field and delegates tasks accordingly, including model initialization, audio analysis, prediction worker management, database record manipulation, file loading and saving, exporting, importing, and updating application state. Waits for initialization to complete before handling most actions. Supports a wide range of commands for audio processing, data management, and UI updates.
  *
- * - "_init_": Sets up the environment by initializing the list worker, launching the predictive model, and updating state.
- * - "abort": Aborts currently ongoing analysis.
- * - "analyse": Initiates audio analysis by validating prediction workers and sending alerts if they are not ready.
- * - "change-batch-size": Adjusts the batch size used by prediction workers.
- * - "change-threads": Modifies the number of active prediction worker threads.
- * - "change-mode": Switches the operational mode.
- * - "chart": Processes chart data requests.
- * - "check-all-files-saved": Verifies that specified files have been saved in the database.
- * - "convert-dataset": Converts dataset specifications from existing formats.
- * - "create-dataset": Creates a dataset with inclusion identifiers.
- * - "delete": Performs deletion operations.
- * - "delete-species": Removes specified species records.
- * - "export-results": Exports detection results.
- * - "file-load-request": Loads an audio file, optionally clearing in-memory records, and switches modes based on file state.
- * - "filter": Applies filters to results, refreshes summaries, and updates inclusion identifiers.
- * - "get-detected-species-list": Retrieves a list of detected species.
- * - "get-valid-species": Fetches valid species associated with a file.
- * - "get-locations": Retrieves location details for a specified file from the database.
- * - "get-tags": Retrieves a list of tags from the disk database.
- * - "delete-tag": Deletes a tag and generates an alert if an error occurs.
- * - "update-tag": Updates a tag in the database and refreshes the UI with the updated tag list.
- * - "get-valid-files-list": Returns a list of valid files after scanning.
- * - "insert-manual-record": Manually inserts a record and updates summaries and results accordingly.
- * - "load-model": Loads a new predictive model, aborting ongoing processing if necessary.
- * - "post": Uploads processed audio data.
- * - "purge-file": Deletes the specified file.
- * - "compress-and-organise": Compresses and reorganises audio files.
- * - "relocated-file": Updates file paths after relocation.
- * - "save": Saves audio processing data along with associated metadata.
- * - "save2db": Persists changes from the in-memory database to disk.
- * - "set-custom-file-location": Specifies a custom location for file storage.
- * - "update-buffer": Reloads an audio file to update its buffer.
- * - "update-file-start": Adjusts the starting point for audio file processing.
- * - "update-list": Updates internal lists and custom labels, optionally refreshing summaries and results.
- * - "update-locale": Updates locale settings and associated labels.
- * - "update-summary": Refreshes summary data.
- * - "update-state": Updates overall application state, including paths and processing thresholds.
- *
- * @example
- * const msgEvent = {
- *   data: {
- *     action: "analyse",
- *     file: "audio_sample.mp3",
- *     // ...additional parameters for analysis
- *   }
- * };
- * handleMessage(msgEvent);
- *
- * @param {Object} e - The message event object containing the action and related parameters.
- * @returns {Promise<void>} Resolves once the message is processed.
+ * @param {Object} e - The message event containing an `action` and associated parameters.
+ * @returns {Promise<void>} Resolves when the requested action is completed.
  */
 async function handleMessage(e) {
   const args = e.data;
   const action = args.action;
   DEBUG && console.log("message received", action);
-  if (action !== "_init_" && INITIALISED) {
+  if (action !== "_init_" ) {
     // Wait until _init_ or onLaunch completes before processing other messages
     await INITIALISED;
   }
@@ -507,7 +427,7 @@ async function handleMessage(e) {
       const delta = threads - predictWorkers.length;
       NUM_WORKERS += delta;
       if (delta > 0) {
-        spawnPredictWorkers(STATE.model, STATE.list, BATCH_SIZE, delta);
+        spawnPredictWorkers(STATE.model, BATCH_SIZE, delta);
       } else {
         for (let i = delta; i < 0; i++) {
           const worker = predictWorkers.pop();
@@ -518,7 +438,7 @@ async function handleMessage(e) {
     }
     case "change-mode": {
       const mode = args.mode;
-      await onChangeMode(mode);
+      INITIALISED = await onChangeMode(mode);
       break;
     }
     case "chart": {
@@ -532,7 +452,7 @@ async function handleMessage(e) {
       if (STATE.detect.autoLoad && allSaved) {
         STATE.filesToAnalyse = args.files;
         await onChangeMode("archive");
-        await Promise.all([getResults(), getSummary()]);
+        await Promise.all([getResults(), getSummary(), getTotal()]);
       }
       break;
     }
@@ -554,7 +474,29 @@ async function handleMessage(e) {
       break;
     }
     case "export-results": {
-      await getResults(args);
+      args.format === 'summary' 
+      ? await getSummary(args) 
+      : await getResults(args);
+      break;
+    }
+    case "import-results": {
+      const {importData} = require('./js/utils/importer.js');
+      const {file, format} = args;
+      const { lat, lon, place } = STATE;
+      const defaultLocation = { defaultLat:lat, defaultLon:lon, defaultPlace:place };
+      const result = await importData({db:memoryDB, file, format, defaultLocation, METADATA, setMetadata })
+        .catch(error => {
+          const {message, variables} = error;
+          generateAlert({message, type: 'error', variables})
+          
+        })
+      if (result) {
+        const {files, meta} = result;
+        METADATA = meta;
+        await getFiles({files, preserveResults:true});
+        await Promise.all([getResults(), getSummary(), getTotal()])
+      }
+      UI.postMessage({ event: "clear-loading"})
       break;
     }
     case "file-load-request": {
@@ -633,7 +575,7 @@ async function handleMessage(e) {
       break;
     }
     case "get-valid-files-list": {
-      await getFiles(args.files);
+      await getFiles({files: args.files});
       break;
     }
     case "insert-manual-record": {
@@ -705,10 +647,12 @@ async function handleMessage(e) {
       const { lat, lon, week } = STATE;
       // Clear the LIST_CACHE & STATE.included keys to force list regeneration
       LIST_CACHE = {}; //[`${lat}-${lon}-${week}-${STATE.model}-${STATE.list}`];
-      delete STATE.included?.[STATE.model]?.[STATE.list];
-      LIST_WORKER && (await setIncludedIDs(lat, lon, week));
-      updateSpeciesLabelLocale();
-      args.refreshResults && (await Promise.all([getResults(), getSummary()]));
+      // delete STATE.included?.[STATE.model]?.[STATE.list];
+      STATE.included = {}
+      await INITIALISED;
+      LIST_WORKER && (await getIncludedIDs());
+      setLabelState({regenerate:false});
+      args.refreshResults && (await Promise.all([getResults(), getSummary(), getTotal()]));
       break;
     }
     case "update-locale": {
@@ -724,17 +668,27 @@ async function handleMessage(e) {
       tempPath = args.temp || tempPath;
       // If we change the speciesThreshold, we need to invalidate any location caches
       if (args.speciesThreshold) {
-        if (STATE.included?.["birdnet"]?.["location"])
-          STATE.included.birdnet.location = {};
-        if (STATE.included?.["chirpity"]?.["location"])
-          STATE.included.chirpity.location = {};
+        for (const key in STATE.included) {
+          if (STATE.included[key]?.location) {
+            STATE.included[key].location = {};
+          }
+        }
       }
       // likewise, if we change the "use local birds" setting we need to flush the migrants cache"
       if (args.local !== undefined) {
-        if (STATE.included?.["birdnet"]?.["nocturnal"])
-          delete STATE.included.birdnet.nocturnal;
+        for (const key in STATE.included) {
+          if (STATE.included[key]?.nocturnal) {
+            delete STATE.included[key].nocturnal;
+          }
+        }
       }
       STATE.update(args);
+      if (args.database && !args.UUID) {
+        // load a new database
+        diskDB = await loadDB()
+        // Create a fresh memoryDB to attach to it
+        memoryDB = await createDB({file: null, diskDB, dbMutex})
+      }
       if (args.labelFilters) {
         const species = args.species;
         await Promise.all([
@@ -835,51 +789,43 @@ function setGetSummaryQueryInterval(threads) {
     STATE.detect.backend !== "tensorflow" ? threads * 10 : threads;
 }
 
+/**
+ * Switches the application to a new operational mode, initializing the in-memory database if needed and notifying the UI.
+ *
+ * If the mode is different from the current state, this function ensures the memory database is available, updates the application state to reflect the new mode, and posts a "mode-changed" event to the UI.
+ *
+ * @param {string} mode - The new mode to activate.
+ */
 async function onChangeMode(mode) {
   if (STATE.mode !== mode) {
     if (!memoryDB){
-      await createDB({file: null, LABELS, diskDB, dbMutex});
-      UI.postMessage({ event: "label-translation-needed", locale: STATE.locale });
+      memoryDB = await createDB({file: null, diskDB, dbMutex});
     }
-    UI.postMessage({ event: "mode-changed", mode: mode });
     STATE.changeMode({
       mode: mode,
       disk: diskDB,
       memory: memoryDB,
     });
+    UI.postMessage({ event: "mode-changed", mode: mode });
   }
 }
 
 const filtersApplied = (list) => {
-  const filtered = list?.length && list.length < LABELS.length - 1;
-  return filtered;
+  return STATE.list !== 'everything';
 };
 
 /**
- * Initializes and launches the application environment by configuring model settings, databases, and prediction workers.
+ * Initializes the application environment with the specified model, database, and prediction worker configuration.
  *
- * This function is invoked when the application is first opened or when the model is changed. It sets global flags,
- * configures the sample rate based on the model, updates the application state, loads the disk and memory databases,
- * and spawns prediction workers to process audio data.
+ * Sets up global state, selects the appropriate sample rate for the chosen model, loads or updates the disk and memory databases, and spawns prediction workers for audio analysis.
  *
- * @async
- * @param {Object} options - Configuration options for launching the application.
- * @param {string} [options.model="chirpity"] - The name of the model to use; if "birdnet", sets sample rate to 48000 Hz, otherwise 24000 Hz.
- * @param {number} [options.batchSize=32] - The size of the batch to process audio data.
- * @param {number} [options.threads=1] - The number of worker threads to spawn for prediction processing.
- * @param {string} [options.backend="tensorflow"] - The backend to use for predictions.
- * @param {string} [options.list="everything"] - Specifies the list or category to use for predictions.
- * @returns {Promise<void>} A promise that resolves when the application environment is initialized and prediction workers are spawned.
- * @throws {Error} Propagates any error encountered during database loading or worker spawning.
+ * @param {Object} options - Launch configuration.
+ * @param {string} [options.model="chirpity"] - Model name; sets sample rate to 48000 Hz for "birdnet", otherwise 24000 Hz.
+ * @param {number} [options.batchSize=32] - Number of audio samples per prediction batch.
+ * @param {number} [options.threads=1] - Number of prediction worker threads to spawn.
+ * @param {string} [options.backend="tensorflow"] - Prediction backend to use.
  *
- * @example
- * onLaunch({
- *   model: "birdnet",
- *   batchSize: 64,
- *   threads: 4,
- *   backend: "tensorflow",
- *   list: "selected"
- * });
+ * @returns {Promise<void>}
  */
 
 async function onLaunch({
@@ -887,25 +833,31 @@ async function onLaunch({
   batchSize = 32,
   threads = 1,
   backend = "tensorflow",
-  list = "everything",
 }) {
   SEEN_MODEL_READY = false;
   LIST_CACHE = {};
   sampleRate = model === "birdnet" ? 48_000 : 24_000;
   STATE.detect.backend = backend;
   BATCH_SIZE = batchSize;
-  if (!STATE.model || STATE.model !== model) {
-    STATE.update({ model: model });
-    await loadDB(appPath); // load the diskdb
-    memoryDB = await createDB({file: null, LABELS, diskDB, dbMutex}); // now make the memoryDB
-    UI.postMessage({ event: "label-translation-needed", locale: STATE.locale });
+  STATE.update({ model: model });
+  const result = await diskDB?.getAsync('SELECT id FROM models WHERE NAME = ?', model)
+  if (!result){
+    // THe model isn't in the db
+    diskDB = await loadDB(); // load the diskdb with the model species added
+  } else {
+    STATE.modelID = result.id;
+  }
+  if (!memoryDB || !STATE.detect.combine){
+    memoryDB = await createDB({file: null, diskDB, dbMutex}); // create new memoryDB
+  } else if (!result){
+    addNewModel({model, db:memoryDB, dbMutex})
   }
   const db = STATE.mode === 'analyse'
     ? memoryDB
     : diskDB;
   STATE.update({ db });
   NUM_WORKERS = threads;
-  spawnPredictWorkers(model, list, batchSize, NUM_WORKERS);
+  spawnPredictWorkers(model, batchSize, NUM_WORKERS);
 }
 
 /**
@@ -974,7 +926,7 @@ async function spawnListWorker() {
  * Sends this list to the UI
  * @param {*} files must be a list of file paths
  */
-const getFiles = async (files, image) => {
+const getFiles = async ({files, image, preserveResults}) => {
   const supportedFiles = image ? [".png"] : SUPPORTED_FILES;
   let folderDropped = false;
   let fileList = [];
@@ -1011,7 +963,7 @@ const getFiles = async (files, image) => {
   }
   const fileOrFolder = folderDropped ? "Open Folder(s)" : "Open Files(s)";
   trackEvent(STATE.UUID, "UI", "Drop", fileOrFolder, fileList.length);
-  UI.postMessage({ event: "files", filePaths: fileList });
+  UI.postMessage({ event: "files", filePaths: fileList, preserveResults });
   return fileList;
 };
 
@@ -1039,25 +991,16 @@ const getFilesInDirectory = async (dir) => {
 const prepParams = (list) => "?".repeat(list.length).split("").join(",");
 
 /**
- * Generates an SQL filtering clause along with its corresponding parameters for file record retrieval.
+ * Constructs an SQL filter clause and parameter list for file record queries based on date range and application mode.
  *
- * This function constructs an SQL fragment to filter file records based on an optional date range and the
- * current application mode stored in the global STATE variable. Depending on whether a valid range is provided
- * or the application mode is set to "archive", it generates the appropriate conditions and parameters:
+ * If a date range is provided, filters records by `dateTime` between the specified start (inclusive) and end (exclusive) values.
+ * In "archive" mode, filters records where the file name or archive name matches entries in the current analysis file list, adjusting paths as needed.
+ * In "analyse" mode, filters by file name if applicable.
  *
- * - When a range object with a defined `start` property is provided, an SQL condition is appended to filter
- *   records where `dateTime` is between `range.start` (inclusive) and `range.end` (exclusive). The provided range
- *   values are pushed to the parameters array.
- * - In "archive" mode, the function creates an SQL condition that filters records by matching either the file's
- *   name or its archiveName against the list obtained from STATE.filesToAnalyse. It also processes file paths
- *   by removing the archive path prefix defined in STATE.library.location.
- * - In "analyse" mode, a file-based filtering condition exists in the code but is currently commented out.
- *
- * @param {Object} [range] - Optional object specifying a date range for filtering records.
- * @param {(number|string)} range.start - The start boundary of the date range (inclusive).
- * @param {(number|string)} range.end - The end boundary of the date range (exclusive).
- * @returns {Array.<(string | any[])>} A tuple where the first element is the SQL condition fragment (string)
- * and the second element is an array of parameters to bind to the SQL query.
+ * @param {Object} [range] - Optional date range for filtering.
+ * @param {(number|string)} range.start - Inclusive start of the date range.
+ * @param {(number|string)} range.end - Exclusive end of the date range.
+ * @returns {[string, any[]]} An array containing the SQL condition string and its associated parameter values.
  */
 function getFileSQLAndParams(range) {
   const fileParams = prepParams(STATE.filesToAnalyse);
@@ -1069,8 +1012,8 @@ function getFileSQLAndParams(range) {
     params.push(range.start, range.end);
     // If you create a record manually before analysis, STATE.filesToAnalyse will be empty
   } else if (["analyse"].includes(STATE.mode) && fileParams) {
-    // SQL += ` AND name IN  (${fileParams}) `;
-    // params.push(...STATE.filesToAnalyse);
+    SQL += ` AND file IN  (${fileParams}) `;
+    params.push(...STATE.filesToAnalyse);
   } else if (["archive"].includes(STATE.mode)) {
     SQL += ` AND ( file IN  (${fileParams}) `;
     params.push(...STATE.filesToAnalyse);
@@ -1083,7 +1026,14 @@ function getFileSQLAndParams(range) {
   }
   return [SQL, params];
 }
-function getExcluded(included, fullRange = LABELS.length) {
+/**
+ * Returns an array of indices not present in the sorted `included` list up to a specified range.
+ *
+ * @param {number[]} included - Sorted array of indices to include.
+ * @param {number} [fullRange=STATE.allLabels.length] - The exclusive upper bound for indices to check.
+ * @returns {number[]} Array of indices from 0 to {@link fullRange} - 1 that are not in {@link included}.
+ */
+function getExcluded(included, fullRange = STATE.allLabels.length) {
   const missing = [];
   let currentIndex = 0;
 
@@ -1098,94 +1048,111 @@ function getExcluded(included, fullRange = LABELS.length) {
   }
   return missing;
 }
-const prepSummaryStatement = (included) => {
-  const range = STATE.mode === "explore" ? STATE.explore.range : undefined;
-  const params = [STATE.detect.confidence];
+
+/**
+ * Asynchronously generates an SQL clause for filtering species based on the current list selection.
+ *
+ * If the active list is not "everything", the clause restricts or excludes species IDs according to the list type (e.g., "birds"). The resulting SQL fragment can be used to filter query results by included or excluded species.
+ *
+ * @returns {Promise<string>} An SQL fragment for species filtering, or an empty string if no filtering is applied.
+ */
+async function getSpeciesSQLAsync(){
+  let not = "", SQL = "";
+  const {list, allLabels} = STATE;
+  if (list !== 'everything') {
+    let included = await getIncludedIDs();
+    if (list === "birds") {
+      included = getExcluded(included);
+      not = "NOT";
+    }
+    DEBUG &&
+      console.log("included", included.length, "# labels", allLabels.length);
+    // const includedParams = prepParams(included);
+    SQL = ` AND speciesID ${not} IN (${included}) `;
+    // params.push(...included);
+  }
+  return SQL
+}
+
+const prepSummaryStatement = async () => {
+  const {mode, explore, labelFilters, detect, locationID, topRankin, summarySortOrder} = STATE;
+  const range = mode === "explore" ? explore.range : undefined;
+  const params = [detect.confidence];
+  const partition = detect.merge ? '' : ', r.modelID';
   let summaryStatement = `
     WITH ranked_records AS (
-        SELECT records.dateTime, records.confidence, files.name as file, files.archiveName, cname, sname, COALESCE(callCount, 1) as callCount, speciesID, isDaylight, tagID,
-        RANK() OVER (PARTITION BY fileID, dateTime ORDER BY records.confidence DESC) AS rank
-        FROM records
-        JOIN files ON files.id = records.fileID
-        JOIN species ON species.id = records.speciesID
+        SELECT r.dateTime, r.confidence, f.name as file, f.archiveName, cname, sname, COALESCE(callCount, 1) as callCount, isDaylight, tagID,
+        RANK() OVER (PARTITION BY fileID${partition}, dateTime ORDER BY r.confidence DESC) AS rank
+        FROM records r
+        JOIN files f ON f.id = r.fileID
+        JOIN species s ON s.id = r.speciesID
         WHERE confidence >=  ? `;
 
   const [SQLtext, fileParams] = getFileSQLAndParams(range);
   (summaryStatement += SQLtext), params.push(...fileParams);
-  if (STATE.labelFilters.length) {
-    summaryStatement += ` AND tagID in (${prepParams(STATE.labelFilters)}) `;
-    params.push(...STATE.labelFilters);
+  if (labelFilters.length) {
+    summaryStatement += ` AND tagID in (${prepParams(labelFilters)}) `;
+    params.push(...labelFilters);
   }
-  let not = "";
-  if (filtersApplied(included)) {
-    if (STATE.list === "birds") {
-      included = getExcluded(included);
-      not = "NOT";
-    }
-    // DEBUG &&
-    //   console.log("included", included.length, "# labels", LABELS.length);
-    const includedParams = prepParams(included);
-    summaryStatement += ` AND speciesID ${not} IN (${includedParams}) `;
-    params.push(...included);
-  }
-  if (STATE.detect.nocmig) {
+  summaryStatement += await getSpeciesSQLAsync();
+  
+  if (detect.nocmig) {
     summaryStatement += " AND COALESCE(isDaylight, 0) != 1 ";
   }
 
-  if (STATE.locationID) {
+  if (locationID) {
     summaryStatement += " AND locationID = ? ";
-    params.push(STATE.locationID);
+    params.push(locationID);
   }
   summaryStatement += `
     )
-    SELECT speciesID, cname, sname, COUNT(cname) as count, SUM(callcount) as calls, ROUND(MAX(ranked_records.confidence) / 10.0, 0) as max
+    SELECT cname, sname, COUNT(cname) as count, SUM(callcount) as calls, MAX(ranked_records.confidence) as max
     FROM ranked_records
-    WHERE ranked_records.rank <= ${STATE.topRankin}`;
+    WHERE ranked_records.rank <= ${topRankin}
+    GROUP BY cname ORDER BY ${summarySortOrder}`;
 
-  summaryStatement += ` GROUP BY speciesID  ORDER BY ${STATE.summarySortOrder}`;
-
-  return [summaryStatement, params];
+  return {sql: summaryStatement, params};
 };
 
 const getTotal = async ({
   species = undefined,
   offset = undefined,
-  included = undefined,
-  file = undefined,
 } = {}) => {
+  
+  const {db, mode, explore, filteredOffset, globalOffset, labelFilters, detect, locationID, topRankin} = STATE;
   let params = [];
-  included ??= await getIncludedIDs(file);
-  const range = STATE.mode === "explore" ? STATE.explore.range : undefined;
+  const range = mode === "explore" ? explore.range : undefined;
+  const partition = detect.merge ? '' : ', r.modelID';
   offset =
     offset ??
     (species !== undefined
-      ? STATE.filteredOffset[species]
-      : STATE.globalOffset);
+      ? filteredOffset[species]
+      : globalOffset);
   let SQL = ` WITH MaxConfidencePerDateTime AS (
         SELECT confidence,
-        speciesID, files.name as file, tagID,
-        RANK() OVER (PARTITION BY fileID, dateTime ORDER BY records.confidence DESC) AS rank
-        FROM records 
-        JOIN files ON records.fileID = files.id 
-        WHERE confidence >= ${STATE.detect.confidence} `;
+        speciesID, f.name as file, tagID,
+        RANK() OVER (PARTITION BY fileID${partition}, dateTime ORDER BY r.confidence DESC) AS rank
+        FROM records r
+        JOIN files f ON r.fileID = f.id 
+        WHERE confidence >= ${detect.confidence} `;
 
-  if (filtersApplied(included)) SQL += ` AND speciesID IN (${included}) `;
-  if (STATE.labelFilters.length) {
-    SQL += ` AND tagID in (${prepParams(STATE.labelFilters)}) `;
-    params.push(...STATE.labelFilters);
+  SQL += await getSpeciesSQLAsync();
+  if (labelFilters.length) {
+    SQL += ` AND tagID in (${prepParams(labelFilters)}) `;
+    params.push(...labelFilters);
   }
-  if (STATE.detect.nocmig) SQL += " AND NOT isDaylight";
-  if (STATE.locationID) SQL += ` AND locationID =  ${STATE.locationID}`;
+  if (detect.nocmig) SQL += " AND NOT isDaylight";
+  if (locationID) SQL += ` AND locationID =  ${locationID}`;
   const [SQLtext, fileParams] = getFileSQLAndParams(range);
   (SQL += SQLtext), params.push(...fileParams);
   SQL += " ) ";
-  SQL += `SELECT COUNT(confidence) AS total FROM MaxConfidencePerDateTime WHERE rank <= ${STATE.topRankin}`;
+  SQL += `SELECT COUNT(confidence) AS total FROM MaxConfidencePerDateTime WHERE rank <= ${topRankin}`;
 
   if (species) {
     params.push(species);
-    SQL += " AND speciesID = (SELECT id from species WHERE cname = ?) ";
+    SQL += " AND speciesID IN (SELECT id from species WHERE cname = ?) ";
   }
-  const { total } = await STATE.db.getAsync(SQL, ...params);
+  const { total } = await db.getAsync(SQL, ...params);
   UI.postMessage({
     event: "total-records",
     total: total,
@@ -1194,70 +1161,72 @@ const getTotal = async ({
   });
 };
 
-const prepResultsStatement = (
+const prepResultsStatement = async (
   species,
   noLimit,
-  included,
   offset,
   topRankin
 ) => {
-  const params = [STATE.detect.confidence];
+  const {mode, explore, limit, resultsMetaSortOrder, resultsSortOrder, labelFilters, detect, locationID, selection} = STATE;
+  const partition = detect.merge ? '' : ', r.modelID'; 
+  const params = [detect.confidence];
   let resultStatement = `
     WITH ranked_records AS (
         SELECT 
-        records.dateTime, 
-        files.duration, 
-        files.filestart, 
+        r.dateTime, 
+        f.duration, 
+        f.filestart, 
         fileID,
-        files.name as file,
-        files.archiveName,
-        files.locationID,
-        records.position, 
-        records.speciesID,
-        species.sname, 
-        species.cname, 
-        records.confidence as score, 
+        f.name as file,
+        f.archiveName,
+        f.locationID,
+        r.position, 
+        r.speciesID,
+        models.name as modelName,
+        models.id as modelID,
+        s.sname, 
+        s.cname, 
+        r.confidence as score, 
         tagID,
         tags.name as label, 
-        records.comment, 
-        records.end,
-        records.callCount,
-        records.isDaylight,
-        records.reviewed,
-        RANK() OVER (PARTITION BY fileID, dateTime ORDER BY records.confidence DESC) AS rank
-        FROM records 
-        JOIN species ON records.speciesID = species.id 
-        JOIN files ON records.fileID = files.id 
-        LEFT JOIN tags ON records.tagID = tags.id
+        r.comment, 
+        r.end,
+        r.callCount,
+        r.isDaylight,
+        r.reviewed,
+        RANK() OVER (PARTITION BY fileID${partition}, dateTime ORDER BY r.confidence DESC) AS rank
+        FROM records r
+        JOIN species s ON r.speciesID = s.id 
+        JOIN files f ON r.fileID = f.id 
+        JOIN models ON r.modelID = models.id
+        LEFT JOIN tags ON r.tagID = tags.id
         WHERE confidence >= ? 
         `;
   // // Prioritise selection ranges
-  const range = STATE.selection?.start
-    ? STATE.selection
-    : STATE.mode === "explore"
-    ? STATE.explore.range
+  const range = selection?.start
+    ? selection
+    : mode === "explore"
+    ? explore.range
     : false;
 
   // If you're using the memory db, you're either analysing one,  or all of the files
   const [SQLtext, fileParams] = getFileSQLAndParams(range);
   (resultStatement += SQLtext), params.push(...fileParams);
-  if (STATE.labelFilters.length) {
+  if (labelFilters.length) {
     resultStatement += ` AND tagID in (${prepParams(STATE.labelFilters)}) `;
     params.push(...STATE.labelFilters);
   }
-  if (filtersApplied(included)) {
-    resultStatement += ` AND speciesID IN (${prepParams(included)}) `;
-    params.push(...included);
-  }
-  if (STATE.selection) {
+  if (selection) {
     resultStatement += ` AND file = ? `;
     params.push(FILE_QUEUE[0]);
+  } else {
+    resultStatement += await getSpeciesSQLAsync()
   }
-  if (STATE.locationID) {
+  if (locationID) {
     resultStatement += ` AND locationID = ? `;
-    params.push(STATE.locationID);
+    params.push(locationID);
   }
-  if (STATE.detect.nocmig) {
+  if (detect.nocmig) {
     resultStatement += " AND COALESCE(isDaylight, 0) != 1 "; // Backward compatibility for < v0.9.
   }
 
@@ -1272,6 +1241,8 @@ const prepResultsStatement = (
     fileID,
     position, 
     speciesID,
+    modelName as model,
+    modelID,
     sname, 
     cname, 
     score,
@@ -1292,13 +1263,13 @@ const prepResultsStatement = (
     params.push(species);
   }
   const limitClause = noLimit ? "" : "LIMIT ?  OFFSET ?";
-  noLimit || params.push(STATE.limit, offset);
-  const metaSort = STATE.resultsMetaSortOrder
-    ? `${STATE.resultsMetaSortOrder}, `
+  noLimit || params.push(limit, offset);
+  const metaSort = resultsMetaSortOrder
+    ? `${resultsMetaSortOrder}, `
     : "";
-  resultStatement += ` ORDER BY ${metaSort} ${STATE.resultsSortOrder} ${limitClause} `;
+  resultStatement += ` ORDER BY ${metaSort} ${resultsSortOrder} ${limitClause} `;
 
-  return [resultStatement, params];
+  return {sql: resultStatement, params};
 };
 
 // Helper to chunk an array
@@ -1310,13 +1281,21 @@ function chunkArray(array, size) {
   return result;
 }
 
+/**
+ * Retrieves and merges metadata for a list of audio files from the database and in-memory cache.
+ *
+ * For each file name, fetches file details, associated location, and per-day durations from the database, then merges these with any existing in-memory metadata. Returns an object keyed by file name containing the combined metadata.
+ *
+ * @param {string[]} fileNames - List of audio file names to retrieve metadata for.
+ * @returns {Promise<Object>} An object mapping each file name to its metadata, including duration, start time, location, and completion status.
+ */
 async function updateMetadata(fileNames) {
   const batchSize = 10000;
   const batches = chunkArray(fileNames, batchSize);
   const finalResult = {};
   for (const batch of batches) {
     // Build placeholders (?, ?, ?) dynamically based on number of file names
-    const placeholders = batch.map(() => '?').join(', ');
+    const placeholders = prepParams(batch);
 
     // 1. Get files and locations
     const fileQuery = `
@@ -1393,10 +1372,21 @@ async function updateMetadata(fileNames) {
   return finalResult;
 }
 
-// Not an arrow function. Async function has access to arguments - so we can pass them to processnextfile
+/**
+ * Initiates analysis of a set of audio files, managing selection state, caching, and worker processing.
+ *
+ * If all files are already analyzed and cached, retrieves results from the database or summary as appropriate. Otherwise, prepares the files for analysis, clears or updates relevant state, and dispatches processing tasks to available workers.
+ *
+ * @param {Object} params - Analysis parameters.
+ * @param {string[]} [params.filesInScope=[]] - List of audio files to analyze.
+ * @param {number} [params.start] - Optional start time for analysis (in seconds).
+ * @param {number} [params.end] - Optional end time for analysis (in seconds).
+ * @param {boolean} [params.reanalyse=false] - If true, forces reanalysis even if results are cached.
+ * @param {boolean} [params.circleClicked=false] - If true, triggers a special retrieval mode for results.
+ */
 async function onAnalyse({
   filesInScope = [],
-  start = 0,
+  start = undefined,
   end = undefined,
   reanalyse = false,
   circleClicked = false,
@@ -1424,7 +1414,9 @@ async function onAnalyse({
 
   if (!STATE.selection) {
     // Clear records from the memory db
-    await memoryDB.runAsync("DELETE FROM records; VACUUM");
+    if (!STATE.detect.combine){
+      await memoryDB.runAsync("DELETE FROM records; VACUUM");
+    }
     //create a copy of files in scope for state, as filesInScope is spliced
     STATE.setFiles([...filesInScope]);
   }
@@ -1491,7 +1483,7 @@ async function onAnalyse({
       count,
       "files ignored"
     );
-  STATE.selection || onChangeMode("analyse");
+  STATE.selection || await onChangeMode("analyse");
 
   filesBeingProcessed = [...FILE_QUEUE];
   for (let i = 0; i < NUM_WORKERS; i++) {
@@ -1499,7 +1491,13 @@ async function onAnalyse({
   }
 }
 
-function onAbort({ model = STATE.model, list = STATE.list }) {
+/**
+ * Aborts ongoing audio processing and prediction tasks, clears related queues and state, terminates active workers, and restarts prediction workers for the specified model.
+ *
+ * @param {Object} params - Parameters for aborting processing.
+ * @param {string} [params.model=STATE.model] - The model identifier to use when restarting prediction workers.
+ */
+function onAbort({ model = STATE.model }) {
   aborted = true;
   FILE_QUEUE = [];
   predictQueue = [];
@@ -1514,7 +1512,7 @@ function onAbort({ model = STATE.model, list = STATE.list }) {
   //restart the workers
   terminateWorkers();
   setTimeout(
-    () => spawnPredictWorkers(model, list, BATCH_SIZE, NUM_WORKERS),
+    () => spawnPredictWorkers(model, BATCH_SIZE, NUM_WORKERS),
     20
   );
 }
@@ -1594,9 +1592,14 @@ async function getWorkingFile(file) {
 }
 
 /**
- * Function to locate a file either in the archive, or with the same basename but different extension from SUPPORTED_FILES
- * @param {string} file - Full path to a file that doesn't exist
- * @returns {string | null} - Full path to the located file or null if not found
+ * Attempts to locate a missing file by searching the archive or the original directory for files with the same base name and a supported extension.
+ *
+ * If the file is archived, returns its path in the library location. Otherwise, searches the original directory for a file with the same base name and a supported audio extension.
+ *
+ * @param {string} file - The full path of the missing file.
+ * @returns {Promise<string|null>} The full path to the located file, or null if not found.
+ *
+ * @remark Generates an error alert if the directory cannot be read.
  */
 async function locateFile(file) {
   // Check if the file has been archived
@@ -1605,9 +1608,13 @@ async function locateFile(file) {
     file
   );
   if (row?.archiveName) {
-    const fullPathToFile = p.join(STATE.library.location, row.archiveName);
-    if (fs.existsSync(fullPathToFile)) {
-      return fullPathToFile;
+    if (STATE.library.location){
+      const fullPathToFile = p.join(STATE.library.location, row.archiveName);
+      if (fs.existsSync(fullPathToFile)) {
+        return fullPathToFile;
+      }
+    } else {
+      console.warn('Library location is not set') // TODO: Needs translations
     }
   }
   // Not there, search the directory
@@ -1815,37 +1822,22 @@ function addDays(date, days) {
 }
 
 /**
- * Retrieves detection records for a given audio file within a specified time range and posts them to the UI.
+ * Retrieves and sends detection records for a specific audio file and time range to the UI.
  *
- * This asynchronous function calculates absolute start and end timestamps by adding the file's metadata offset
- * (in milliseconds) to the provided start and end offsets (in seconds). It queries the database for detection
- * records that satisfy the following criteria:
- * - A confidence level greater than or equal to the configured minimum (STATE.detect.confidence).
- * - A file name matching the provided file parameter.
- * - A detection timestamp between the calculated start and end times.
+ * Queries the database for detections within the specified segment of the audio file, applying confidence and species filters, and posts the top-ranked results to the UI for display or navigation.
  *
- * If additional species filters are active, the query further restricts results by species ID. Records are
- * ranked using a window function to select the top (most confident) detection per grouping of file and datetime.
- * The function posts the resulting detections to the UI along with a flag that instructs the UI whether to
- * navigate directly to the corresponding region.
- *
- * @async
- * @param {string} file - The identifier or name of the audio file used for querying metadata and filtering detections.
- * @param {number} start - The starting offset in seconds from the beginning of the file's recording.
- * @param {number} end - The ending offset in seconds from the beginning of the file's recording.
- * @param {boolean} goToRegion - If true, signals the UI to navigate to the detected region.
- * @returns {Promise<void>} A promise that resolves when detections have been successfully retrieved and sent to the UI.
+ * @param {string} file - The audio file identifier.
+ * @param {number} start - Start offset in seconds from the file's beginning.
+ * @param {number} end - End offset in seconds from the file's beginning.
+ * @param {boolean} goToRegion - Whether the UI should navigate to the detected region.
  */
 async function sendDetections(file, start, end, goToRegion) {
-  const db = STATE.db;
+  const {db, detect} = STATE;
+  const partition = detect.merge ? "" : ', r.modelID';  
   start = METADATA[file].fileStart + start * 1000;
   end = METADATA[file].fileStart + end * 1000;
   const params = [STATE.detect.confidence, file, start, end];
-  const included = await getIncludedIDs();
-  const includedSQL = filtersApplied(included)
-    ? ` AND speciesID IN (${prepParams(included)})`
-    : "";
-  includedSQL && params.push(...included);
+  const includedSQL = await getSpeciesSQLAsync();
   const results = await db.allAsync(
     `
         WITH RankedRecords AS (
@@ -1853,12 +1845,12 @@ async function sendDetections(file, start, end, goToRegion) {
                 position AS start, 
                 end, 
                 cname AS label, 
-                ROW_NUMBER() OVER (PARTITION BY fileID, dateTime ORDER BY confidence DESC) AS rank,
+                ROW_NUMBER() OVER (PARTITION BY fileID${partition}, dateTime ORDER BY confidence DESC) AS rank,
                 confidence,
                 name,
                 dateTime,
                 speciesID
-            FROM records
+            FROM records r
             JOIN species ON speciesID = species.ID
             JOIN files ON fileID = files.ID
             WHERE confidence >= ?
@@ -2451,7 +2443,7 @@ function findFile(pathParts, filename, species) {
 const convertSpecsFromExistingSpecs = async (path) => {
   path ??=
     "/media/matt/36A5CC3B5FA24585/DATASETS/MISSING/NEW_DATASET_WITHOUT_ALSO_MERGED";
-  const file_list = await getFiles([path], true);
+  const file_list = await getFiles({files:[path], image:true});
   for (let i = 0; i < file_list.length; i++) {
     if (i % 100 === 0) {
       console.log(`${i} records processed`);
@@ -2835,21 +2827,15 @@ const processQueue = async () => {
 };
 
 /**
- * Spawns Web Worker threads for parallel prediction processing.
+ * Spawns multiple Web Workers for parallel AI model prediction.
  *
- * This function creates the specified number of worker threads that load prediction models in separate modules.
- * If the model name is "birdnet", it substitutes the worker script with "BirdNet2.4". Each worker is initialized
- * with configuration details including a processing list, batch size, and various state parameters (such as backend,
- * geolocation, week, and species threshold) sourced from the global state. Message and error handlers are set up for
- * asynchronous communication and to manage worker failures.
+ * Creates the specified number of prediction worker threads, each loading the given model (substituting "BirdNet2.4" for "birdnet"). Workers are initialized with batch size and relevant state parameters, and are set up for asynchronous communication and error handling.
  *
- * @param {string} model - The name of the AI model to use; for "birdnet", the "BirdNet2.4" script is used.
- * @param {Array} list - The list of data items for the workers to process.
- * @param {number} batchSize - The number of items each worker should process per batch.
- * @param {number} threads - The number of Web Worker threads to spawn.
+ * @param {string} model - The AI model to load for prediction; "birdnet" uses the "BirdNet2.4" worker script.
+ * @param {number} batchSize - Number of items each worker processes per batch.
+ * @param {number} threads - Number of worker threads to spawn.
  */
-function spawnPredictWorkers(model, list, batchSize, threads) {
-  // And be ready to receive the list:
+function spawnPredictWorkers(model, batchSize, threads) {
   for (let i = 0; i < threads; i++) {
     const workerSrc = model === "birdnet" ? "BirdNet2.4" : model;
     const worker = new Worker(`./js/models/${workerSrc}.js`, { type: "module" });
@@ -2860,7 +2846,6 @@ function spawnPredictWorkers(model, list, batchSize, threads) {
     worker.postMessage({
       message: "load",
       model: model,
-      list: list,
       batchSize: batchSize,
       backend: STATE.detect.backend,
       worker: i,
@@ -2892,33 +2877,24 @@ const terminateWorkers = () => {
 };
 
 /**
- * Performs batch insertion of audio records into the database.
+ * Inserts multiple audio detection records into the database based on existing results.
  *
- * Retrieves records using a prepared statement based on the original identifier,
- * then iterates through each record to insert it individually via onInsertManualRecord.
- * The operation is performed within a mutex lock and a database transaction to
- * guarantee atomicity. A UI update is triggered after the final record is processed,
- * and debug timing information is logged if enabled.
+ * Retrieves records associated with the specified original identifier, then inserts each as a new manual record with the provided identifier and label. All insertions are performed within a single transaction and mutex lock to ensure atomicity. Triggers a UI update after the final record is inserted.
  *
- * @param {string} cname - Identifier used for the new records.
+ * @param {string} cname - Identifier to assign to the new records.
  * @param {string} label - Label to associate with each inserted record.
- * @param {Array} files - List of files; currently reserved and not utilized by the function.
- * @param {string} originalCname - Original identifier used in the prepared statement query.
- * @returns {Promise<void>} A promise that resolves when the batch insertion completes.
+ * @param {Array} files - Reserved for future use; not currently utilized.
+ * @param {string} originalCname - Identifier used to select existing records for duplication.
+ * @returns {Promise<void>} Resolves when all records have been inserted.
  *
- * @throws {Error} Propagates any error encountered during the database transaction,
- *                 ensuring a rollback to avoid partial insertions.
- *
- * @example
- * await batchInsertRecords("newCampaign", "approved", fileList, "origCampaign");
+ * @throws {Error} If any error occurs during the transaction, all changes are rolled back.
  */
 async function batchInsertRecords(cname, label, files, originalCname) {
   const db = STATE.db;
   const t0 = Date.now();
-  const [sql, params] = prepResultsStatement(
+  const {sql, params} = await prepResultsStatement(
     originalCname,
     true,
-    STATE.included,
     undefined,
     STATE.topRankin
   );
@@ -2930,7 +2906,7 @@ async function batchInsertRecords(cname, label, files, originalCname) {
     await db.runAsync("BEGIN");
     for (let i = 0; i < records.length; i++) {
       const item = records[i];
-      const { dateTime, speciesID, fileID, position, end, comment, callCount } =
+      const { fileID, position, end, comment, callCount, modelID } =
         item;
       const { name } = await STATE.db.getAsync(
         "SELECT name FROM files WHERE id = ?",
@@ -2946,6 +2922,7 @@ async function batchInsertRecords(cname, label, files, originalCname) {
         label,
         batch: false,
         originalCname,
+        modelID,
         calledByBatch: true,
         updateResults: i === records.length - 1, // trigger a UI update after the last item
       });
@@ -2973,22 +2950,25 @@ const onInsertManualRecord = async ({
   batch,
   originalCname,
   confidence,
+  modelID,
   reviewed = true,
-  calledByBatch
+  calledByBatch,
+  undo
 }) => {
   if (batch)
     return batchInsertRecords(cname, label, file, originalCname, confidence);
-  (start = parseFloat(start)), (end = parseFloat(end));
+  // (start = parseFloat(start)), (end = parseFloat(end));
   const startMilliseconds = Math.round(start * 1000);
   let fileID, fileStart;
   const db = STATE.db;
-  const speciesFound = await db.getAsync(
-    `SELECT id as speciesID FROM species WHERE cname = ?`,
+  const speciesFound = await db.allAsync(
+    "SELECT id as speciesID, modelID FROM species WHERE cname = ?",
     cname
   );
   let speciesID;
-  if (speciesFound) {
-    speciesID = speciesFound.speciesID;
+  if (speciesFound.length) {
+    const match = speciesFound.find(s => s.modelID === modelID);
+    speciesID = (match || speciesFound[0]).speciesID;
   } else {
     generateAlert({
       message: "noSpecies",
@@ -3004,9 +2984,10 @@ const onInsertManualRecord = async ({
 
   if (!res?.filestart) {
     // Manual records can be added off the bat, so there may be no record of the file in either db
-    fileStart = METADATA[file].fileStart;
+    let duration, metadata;
+    ({fileStart, duration, metadata} = METADATA[file]);
     res = await db.runAsync(
-      `INSERT INTO files ( id, name, duration, filestart, locationID, archiveName, metadata ) VALUES (?,?,?,?,?,?,?)
+      `INSERT INTO files ( id, name, duration, filestart,  metadata ) VALUES (?,?,?,?,?)
         ON CONFLICT(name) DO UPDATE SET
         duration = EXCLUDED.duration,
         filestart = EXCLUDED.filestart,
@@ -3014,11 +2995,9 @@ const onInsertManualRecord = async ({
         `,
       fileID,
       file,
-      METADATA[file].duration,
+      duration,
       fileStart,
-      undefined,
-      undefined,
-      METADATA[file].metadata
+      metadata
     );
     fileID = res.lastID;
     await insertDurations(file, fileID)
@@ -3032,24 +3011,27 @@ const onInsertManualRecord = async ({
 
   // Delete an existing record if species was changed
   if (cname !== originalCname) {
-    const result = await db.getAsync(
+    const result = await db.allAsync(
       `SELECT id as originalSpeciesID FROM species WHERE cname = ?`,
       originalCname
     );
-    if (result?.originalSpeciesID) {
-      await db.runAsync(
-        "DELETE FROM records WHERE datetime = ? AND speciesID = ? AND fileID = ?",
+    if (result.length) {
+      const ids = result.map(r => r.originalSpeciesID);
+      const placeholders = ids.map(() => '?').join(',');
+      const res = await db.runAsync(
+        `DELETE FROM records WHERE datetime = ? AND speciesID in (${placeholders}) AND fileID = ?`,
         dateTime,
-        result.originalSpeciesID,
+        ...ids,
         fileID
       );
-      confidence ??= 2000; // Manual record
+      if (!undo){
+        // Manual record
+        modelID = 0;
+        confidence = 2000; 
+      }
     }
   } else {
-    // const r = await db.getAsync(
-    //   "SELECT * FROM records WHERE dateTime = ? AND fileID = ? AND speciesID = ?",
-    //   dateTime, fileID, speciesID);
-    // confidence = r?.confidence || 2000; // Save confidence
+    // New record
     confidence ??= 2000;
   }
   const result = await db.getAsync("SELECT id FROM tags WHERE name = ?", label);
@@ -3066,9 +3048,9 @@ const onInsertManualRecord = async ({
     );
   } else {
     await db.runAsync(
-      `INSERT INTO records (dateTime, position, fileID, speciesID, confidence, tagID, comment, end, callCount, isDaylight, reviewed)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(dateTime, fileID, speciesID) DO UPDATE SET 
+      `INSERT INTO records (dateTime, position, fileID, speciesID, modelID, confidence, tagID, comment, end, callCount, isDaylight, reviewed)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(dateTime, fileID, speciesID, modelID) DO UPDATE SET 
           confidence = excluded.confidence, 
           tagID = excluded.tagID,
           comment = excluded.comment,
@@ -3078,6 +3060,7 @@ const onInsertManualRecord = async ({
       start,
       fileID,
       speciesID,
+      modelID,
       confidence,
       tagID,
       comment,
@@ -3098,97 +3081,111 @@ const insertDurations = async (file, id) => {
   );
 };
 
-const generateInsertQuery = async (latestResult, file) => {
+const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, file, modelID) => {
   const db = STATE.db;
+  const { fileStart, metadata, duration } = METADATA[file];
   let fileID;
-  const meta = METADATA[file];
   await dbMutex.lock();
   try {
     await db.runAsync("BEGIN");
-    let insertQuery = "INSERT OR IGNORE INTO records VALUES ";
-    let res = await db.getAsync("SELECT id, filestart, duration FROM files WHERE name = ?", file);
-    if (!res?.filestart) {
-      let id = null;
-      if (meta.metadata) {
-        const metadata = JSON.parse(meta.metadata);
-        const guano = metadata.guano;
+    // Fetch or Insert File ID
+    const res = await db.getAsync("SELECT id, filestart FROM files WHERE name = ?", file);
+    fileID = res?.id;
+
+    if (!fileID) {
+      let locationID = null;
+
+      // Extract location from GUANO metadata
+      if (metadata) {
+        const meta = JSON.parse(metadata);
+        const guano = meta.guano;
         if (guano && guano["Loc Position"]) {
           const [lat, lon] = guano["Loc Position"].split(" ");
           const place = guano["Site Name"] || guano["Loc Position"];
-          // Note diskDB used here
-          const row = await db.getAsync(
-            "SELECT id FROM locations WHERE lat = ? AND lon = ?",
+
+          // Use INSERT OR IGNORE + RETURNING to avoid extra SELECT
+          const result = await db.getAsync(
+            `INSERT OR IGNORE INTO locations (lat, lon, place) 
+             VALUES (?, ?, ?) RETURNING id`,
             roundedFloat(lat),
-            roundedFloat(lon)
+            roundedFloat(lon),
+            place
           );
-          if (!row) {
-            const result = await db.runAsync(
-              "INSERT OR IGNORE INTO locations VALUES ( ?,?,?,? )",
-              undefined,
-              roundedFloat(lat),
-              roundedFloat(lon),
-              place
-            );
-            id = result.lastID;
-          }
+
+          locationID = result?.id;
         }
       }
-      res = await db.runAsync(
-        // If the file has GUANO, there will be a database entry for it, but possibly no filestart or duration
-        `INSERT INTO files (name, duration, filestart, locationID, metadata) VALUES ( ?,?,?,?,? )
-          ON CONFLICT(name) DO UPDATE SET
-          duration = EXCLUDED.duration,
-          filestart = EXCLUDED.filestart,
-          metadata = EXCLUDED.metadata`,
-        file,
-        meta.duration,
-        meta.fileStart,
-        id,
-        meta.metadata
+
+      // Use RETURNING to get fileID immediately
+      const fileInsert = await db.getAsync(
+        `INSERT INTO files (name, duration, filestart, locationID, metadata) 
+         VALUES (?, ?, ?, ?, ?) 
+         ON CONFLICT(name) DO UPDATE SET 
+         duration = EXCLUDED.duration,
+         filestart = EXCLUDED.filestart,
+         metadata = EXCLUDED.metadata 
+         RETURNING id`,
+        file, duration, fileStart, locationID, metadata
       );
-      fileID = res.lastID;
+
+      fileID = fileInsert.id;
+
+      // Insert duration information
       await insertDurations(file, fileID);
-    } else {
-      fileID = res.id;
     }
 
-    let [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
-    const minConfidence = Math.min(STATE.detect.confidence, 150); // store results with 15% confidence and up unless confidence set lower
+    // Extract species and confidence data
+    const minConfidence = Math.min(STATE.detect.confidence, 150); 
+
+
+
+    // **Use batch inserts instead of string concatenation**
+    const insertValues = [];
+    const insertPlaceholders = [];
+
     for (let i = 0; i < keysArray.length; i++) {
       const key = parseFloat(keysArray[i]);
-      const timestamp = meta.fileStart + key * 1000;
+      const timestamp = fileStart + key * 1000;
       const isDaylight = isDuringDaylight(timestamp, STATE.lat, STATE.lon);
       const confidenceArray = confidenceBatch[i];
       const speciesIDArray = speciesIDBatch[i];
+
       for (let j = 0; j < confidenceArray.length; j++) {
         const confidence = Math.round(confidenceArray[j] * 1000);
         if (confidence < minConfidence) break;
-        const speciesID = speciesIDArray[j];
-        insertQuery += `(${timestamp}, ${key}, ${fileID}, ${speciesID}, ${confidence}, null, ${
-          key + 3
-        }, null, ${isDaylight}, 0, null), `;
+
+        const modelSpeciesID = speciesIDArray[j];
+        const speciesID = STATE.speciesMap.get(modelID).get(modelSpeciesID);
+
+        if (!speciesID) continue; // Skip unknown species
+
+        insertPlaceholders.push("(?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        insertValues.push(timestamp, key, fileID, speciesID, modelID, confidence, key + 3, isDaylight, 0);
       }
     }
-    // Remove the trailing comma and space
-    insertQuery = insertQuery.slice(0, -2);
-    //DEBUG && console.log(insertQuery);
-    // Make sure we have some values to INSERT
-    if (insertQuery.endsWith(")")) {
-      await db
-        .runAsync(insertQuery)
-        .catch((error) => console.log("Database error:", error));
+
+    if (insertValues.length) {
+      await db.runAsync(
+        `INSERT OR IGNORE INTO records 
+         (dateTime, position, fileID, speciesID, modelID, confidence, end, isDaylight, reviewed) 
+         VALUES ${insertPlaceholders.join(", ")}`,
+        ...insertValues
+      );
     }
+
     await db.runAsync("END");
   } catch (error) {
     await db.runAsync("ROLLBACK");
-    console.log("Transaction error:", error);
+    console.error("Transaction error:", error);
   } finally {
     dbMutex.unlock();
   }
-  return fileID;
+
 };
+
+
 const parsePredictions = async (response) => {
-  let file = response.file;
+  const file = response.file;
   AUDIO_BACKLOG--;
   const latestResult = response.result;
   if (!latestResult.length) {
@@ -3196,15 +3193,18 @@ const parsePredictions = async (response) => {
     return response.worker;
   }
   DEBUG && console.log("worker being used:", response.worker);
-  if (!STATE.selection)
-    await generateInsertQuery(latestResult, file).catch((error) =>
+  const [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
+  const {db, modelID, selection, detect} = STATE;
+
+  if (!selection)
+    await generateInsertQuery(keysArray, speciesIDBatch, confidenceBatch, file, modelID).catch((error) =>
       console.warn("Error generating insert query", error)
     );
-  let [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
   if (index < 500) {
     const included = await getIncludedIDs(file).catch((error) =>
       console.log("Error getting included IDs", error)
     );
+    const loopConfidence = selection ? 50 : detect.confidence;
     for (let i = 0; i < keysArray.length; i++) {
       let updateUI = false;
       let key = parseFloat(keysArray[i]);
@@ -3212,56 +3212,36 @@ const parsePredictions = async (response) => {
       const confidenceArray = confidenceBatch[i];
       const speciesIDArray = speciesIDBatch[i];
       for (let j = 0; j < confidenceArray.length; j++) {
-        let confidence = confidenceArray[j];
-        if (confidence < 0.05) break;
-        confidence *= 1000;
-        let speciesID = speciesIDArray[j];
-        updateUI =
-          confidence >= STATE.detect.confidence &&
-          (!included.length || included.includes(speciesID));
-        if (STATE.selection || updateUI) {
-          let end, confidenceRequired;
-          if (STATE.selection) {
+        let confidence = Math.round(confidenceArray[j] * 1000);
+        if (confidence < loopConfidence) break;
+        const species = speciesIDArray[j]
+        let speciesID = STATE.speciesMap.get(modelID).get(species);
+        updateUI = selection || !included.length || included.includes(speciesID);
+        if (updateUI) {
+          let end;
+          if (selection) {
             const duration =
-              (STATE.selection.end - STATE.selection.start) / 1000;
+              (selection.end - selection.start) / 1000;
             end = key + duration;
-            confidenceRequired = STATE.userSettingsInSelection
-              ? STATE.detect.confidence
-              : 50;
-          } else {
-            end = key + 3;
-            confidenceRequired = STATE.detect.confidence;
+          } else { end = key + 3; }
+          const [sname, cname] = STATE.allLabels[speciesID -1].split('_') // Much faster!!
+          const result = {
+            timestamp: timestamp,
+            position: key,
+            end: end,
+            file: file,
+            cname: cname,
+            sname: sname,
+            score: confidence,
+          };
+          sendResult(++index, result, false);
+          if (index > 499) {
+            setGetSummaryQueryInterval(NUM_WORKERS);
+            DEBUG &&
+              console.log("Reducing summary updates to one every", STATE.incrementor);
           }
-          if (confidence >= confidenceRequired) {
-            const { cname, sname } = await memoryDB
-              .getAsync(
-                `SELECT cname, sname FROM species WHERE id = ${speciesID}`
-              )
-              .catch((error) =>
-                console.warn("Error getting species name", error)
-              );
-            const result = {
-              timestamp: timestamp,
-              position: key,
-              end: end,
-              file: file,
-              cname: cname,
-              sname: sname,
-              score: confidence,
-            };
-            sendResult(++index, result, false);
-            //getResults()
-            if (index > 499) {
-              setGetSummaryQueryInterval(NUM_WORKERS);
-              DEBUG &&
-                console.log(
-                  "Reducing summary updates to one every ",
-                  STATE.incrementor
-                );
-            }
-            // Only show the highest confidence detection, unless it's a selection analysis
-            if (!STATE.selection) break;
-          }
+          // Only show the highest confidence detection, unless it's a selection analysis
+          if (!selection) break;
         }
       }
     }
@@ -3294,12 +3274,10 @@ const parsePredictions = async (response) => {
         } seconds: ${filesBeingProcessed.length} files to go`
       );
   }
-
-  if (!STATE.selection && STATE.increment() === 0) {
+  if (!selection && STATE.increment() === 0) {
     if (fileProgress < 1) getSummary({ interim: true });
-    getTotal({ file });
+    getTotal();
   }
-
   return response.worker;
 };
 
@@ -3381,7 +3359,16 @@ function updateFilesBeingProcessed(file) {
   }
 }
 
-// Optional Arguments
+/**
+ * Processes the next audio file in the queue for prediction, handling file retrieval, boundary determination, and error conditions.
+ *
+ * If a file is missing or cannot be processed, it generates a warning alert and continues to the next file. For each valid file, it determines analysis boundaries and invokes prediction. Recursively processes all files in the queue until empty.
+ *
+ * @param {Object} [options] - Optional arguments.
+ * @param {number} [options.start] - Start time for analysis, if specified.
+ * @param {number} [options.end] - End time for analysis, if specified.
+ * @param {Worker} [options.worker] - Prediction worker to use, if specified.
+ */
 async function processNextFile({
   start = undefined,
   end = undefined,
@@ -3408,7 +3395,7 @@ async function processNextFile({
       if (end) {
       }
       let boundaries = [];
-      if (!start)
+      if (start === undefined)
         boundaries = await setStartEnd(file).catch((error) =>
           console.warn("Error in setStartEnd", error)
         );
@@ -3524,6 +3511,14 @@ function calculateNighttimeBoundaries(fileStart, fileEnd, latitude, longitude) {
   return activeIntervals;
 }
 
+/**
+ * Determines the active time boundaries for a given audio file based on its metadata and detection mode.
+ *
+ * If nocturnal migration detection is enabled, calculates nighttime intervals using the file's start time, duration, and associated location coordinates. Otherwise, returns the full duration of the file as a single interval.
+ *
+ * @param {string} file - The file name or identifier for which to compute boundaries.
+ * @returns {Promise<Array<{start: number, end: number}>>} An array of time interval objects representing active boundaries in seconds.
+ */
 async function setStartEnd(file) {
   const meta = METADATA[file];
   let boundaries;
@@ -3551,25 +3546,31 @@ async function setStartEnd(file) {
 }
 
 const getSummary = async ({
-  species = undefined,
-  active = undefined,
-  interim = false,
-  action = undefined,
+  format,
+  path,
+  headers,
+  species,
+  active,
+  interim,
+  action,
 } = {}) => {
-  const included = STATE.selection ? [] : await getIncludedIDs();
-  const [sql, params] = prepSummaryStatement(included);
+  const {sql, params} = await prepSummaryStatement();
   const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
 
   const summary = await STATE.db.allAsync(sql, ...params);
-  const event = interim ? "update-summary" : "summary-complete";
-  UI.postMessage({
-    event: event,
-    summary: summary,
-    offset: offset,
-    filterSpecies: species,
-    active: active,
-    action: action,
-  });
+  if (format){ // Export called
+    await exportData(summary, path, format, headers);
+  } else {
+    const event = interim ? "update-summary" : "summary-complete";
+    UI.postMessage({
+      event: event,
+      summary: summary,
+      offset: offset,
+      filterSpecies: species,
+      active: active,
+      action: action,
+    });
+  }
 };
 
 /**
@@ -3596,14 +3597,13 @@ const getResults = async ({
   position = undefined,
 } = {}) => {
   let confidence = STATE.detect.confidence;
-  const included = STATE.selection ? [] : await getIncludedIDs();
   if (position) {
     //const position = await getPosition({species: species, dateTime: select.dateTime, included: included});
     offset = (position.page - 1) * limit;
     // We want to consistently move to the next record. If results are sorted by time, this will be row + 1.
     active = position.row; //+ 1;
     // update the pagination
-    await getTotal({ species: species, offset: offset, included: included });
+    await getTotal({ species, offset });
   }
   offset =
     offset ??
@@ -3613,16 +3613,14 @@ const getResults = async ({
 
   let index = offset;
 
-  const [sql, params] = prepResultsStatement(
+  const {sql, params} = await prepResultsStatement(
     species,
     limit === Infinity,
-    included,
     offset,
     topRankin
   );
 
   const result = await STATE.db.allAsync(sql, ...params);
-
   if (["text", "eBird", "Raven"].includes(format)) {
     await exportData(result, path, format);
   } else if (format === "Audacity") {
@@ -3697,6 +3695,14 @@ const getResults = async ({
   }
 };
 
+/**
+ * Exports detection results as Audacity label track files grouped by audio file.
+ *
+ * Each output file contains tab-delimited start and end times with species names and confidence scores, formatted for Audacity label import.
+ *
+ * @param {Array<Object>} result - Detection results to export, each containing file, position, end, cname, and score.
+ * @param {string} directory - Directory where the label track files will be saved.
+ */
 function exportAudacity(result, directory) {
   const { writeToPath } = require("@fast-csv/format");
   const groupedResult = result.reduce((acc, item) => {
@@ -3734,21 +3740,20 @@ function exportAudacity(result, directory) {
       });
   });
 }
+
+
 /**
- * Exports data records to a CSV file.
+ * Exports data records to a CSV file in the specified format.
  *
- * This asynchronous function processes data records in batches (up to 10,000 entries per batch), formatting each record according to the
- * specified export format ("text", "eBird", or "Raven"). In "Raven" mode, it assigns a sequential selection number and calculates cumulative file
- * offsets across entries. In "eBird" mode, it aggregates records by "Start Time", "Common name", and "Species" and sums their species counts.
- * The formatted data is then written as a CSV file using a write stream from the @fast-csv/format module, with the delimiter set to a tab for
- * "Raven" format and a comma for other formats.
+ * Supports "text", "eBird", "Raven", and "summary" formats, formatting records accordingly and batching large datasets for efficient processing. In "Raven" format, assigns selection numbers and cumulative file offsets; in "eBird" format, aggregates species counts by group. Writes the output as a CSV file with appropriate delimiter and headers, and notifies the UI on completion or error.
  *
  * @async
- * @param {Array<Object>} result - An array of data records to be exported.
+ * @param {Array<Object>} result - The data records to export.
  * @param {string} filename - The output file path.
- * @param {string} format - The export format, which must be one of "text", "eBird", or "Raven".
+ * @param {string} format - The export format: "text", "eBird", "Raven", or "summary".
+ * @param {Object} [headers] - Optional mapping of output column headers for "summary" format.
  */
-async function exportData(result, filename, format) {
+async function exportData(result, filename, format, headers) {
   const formatFunctions = {
     text: "formatCSVValues",
     eBird: "formateBirdValues",
@@ -3761,72 +3766,84 @@ async function exportData(result, filename, format) {
     cumulativeOffset = 0,
     fileDurations = {};
   const { writeToPath } = require("@fast-csv/format");
-  const { ExportFormatter } = require("./js/utils/exportFormatter.js");
-  const formatter = new ExportFormatter(STATE);
-  const locationMap = await formatter.getAllLocations();
-  // CSV export. Format the values
-  for (let i = 0; i < result.length; i += BATCH_SIZE) {
-    const batch = result.slice(i, i + BATCH_SIZE);
-    const processedBatch = await Promise.all(
-      batch.map(async (item, index) => {
-        if (format === "Raven") {
-          item = { ...item, selection: index + 1 }; // Add a selection number for Raven
-          if (item.file !== previousFile) {
-            // Positions need to be cumulative across files in Raven
-            if (previousFile !== null) {
-              cumulativeOffset += result.find(
-                (r) => r.file === previousFile
-              ).duration;
-            }
-            previousFile = item.file;
-          }
-          item.offset = cumulativeOffset;
-        }
-        return formatter[formatFunctions[format]](item, locationMap);
-      })
-    );
-    formattedValues.push(...processedBatch);
-  }
-
-  if (format === "eBird") {
-    // Group the data by "Start Time", "Common name", and "Species" and calculate total species count for each group
-    const summary = formattedValues.reduce((acc, curr) => {
-      const key = `${curr["Start Time"]}_${curr["Common name"]}_${curr["Species"]}`;
-      if (!acc[key]) {
-        acc[key] = {
-          "Common name": curr["Common name"],
-          // Include other fields from the original data
-          Genus: curr["Genus"],
-          Species: curr["Species"],
-          "Species Count": 0,
-          "Species Comments": curr["Species Comments"],
-          "Location Name": curr["Location Name"],
-          Latitude: curr["Latitude"],
-          Longitude: curr["Longitude"],
-          Date: curr["Date"],
-          "Start Time": curr["Start Time"],
-          "State/Province": curr["State/Province"],
-          Country: curr["Country"],
-          Protocol: curr["Protocol"],
-          "Number of observers": curr["Number of observers"],
-          Duration: curr["Duration"],
-          "All observations reported?": curr["All observations reported?"],
-          "Distance covered": curr["Distance covered"],
-          "Area covered": curr["Area covered"],
-          "Submission Comments": curr["Submission Comments"],
-        };
+  if (format === 'summary'){
+    formattedValues = result.map(item => {
+      const renamedItem = {};
+      for (const key in headers) {
+        key === 'max' && (item[key] /= 1000)
+        renamedItem[headers[key]] = item[key];
       }
-      // Increment total species count for the group
-      acc[key]["Species Count"] += curr["Species Count"];
-      return acc;
-    }, {});
-    // Convert summary object into an array of objects
-    formattedValues = Object.values(summary);
+      return renamedItem;
+    });
+  } else {
+    const { ExportFormatter } = require("./js/utils/exportFormatter.js");
+    const formatter = new ExportFormatter(STATE);
+    const locationMap = await formatter.getAllLocations();
+    // CSV export. Format the values
+    for (let i = 0; i < result.length; i += BATCH_SIZE) {
+      const batch = result.slice(i, i + BATCH_SIZE);
+      const processedBatch = await Promise.all(
+        batch.map(async (item, index) => {
+          if (format === "Raven") {
+            item = { ...item, selection: index + 1 }; // Add a selection number for Raven
+            if (item.file !== previousFile) {
+              // Positions need to be cumulative across files in Raven
+              if (previousFile !== null) {
+                cumulativeOffset += result.find(
+                  (r) => r.file === previousFile
+                ).duration;
+              }
+              previousFile = item.file;
+            }
+            item.offset = cumulativeOffset;
+          }
+          return formatter[formatFunctions[format]](item, locationMap);
+        })
+      );
+      formattedValues.push(...processedBatch);
+    }
+
+    if (format === "eBird") {
+      // Group the data by "Start Time", "Common name", and "Species" and calculate total species count for each group
+      const summary = formattedValues.reduce((acc, curr) => {
+        const key = `${curr["Start Time"]}_${curr["Common name"]}_${curr["Species"]}`;
+        if (!acc[key]) {
+          acc[key] = {
+            "Common name": curr["Common name"],
+            // Include other fields from the original data
+            Genus: curr["Genus"],
+            Species: curr["Species"],
+            "Species Count": 0,
+            "Species Comments": curr["Species Comments"],
+            "Location Name": curr["Location Name"],
+            Latitude: curr["Latitude"],
+            Longitude: curr["Longitude"],
+            Date: curr["Date"],
+            "Start Time": curr["Start Time"],
+            "State/Province": curr["State/Province"],
+            Country: curr["Country"],
+            Protocol: curr["Protocol"],
+            "Number of observers": curr["Number of observers"],
+            Duration: curr["Duration"],
+            "All observations reported?": curr["All observations reported?"],
+            "Distance covered": curr["Distance covered"],
+            "Area covered": curr["Area covered"],
+            "Submission Comments": curr["Submission Comments"],
+          };
+        }
+        // Increment total species count for the group
+        acc[key]["Species Count"] += curr["Species Count"];
+        return acc;
+      }, {});
+      // Convert summary object into an array of objects
+      formattedValues = Object.values(summary);
+    }
   }
   const filePath = filename;
   // Create a write stream for the CSV file
   writeToPath(filePath, formattedValues, {
     headers: true,
+    writeBOM: true,
     delimiter: format === "Raven" ? "\t" : ",",
   })
     .on("error", (_err) =>
@@ -3842,8 +3859,7 @@ async function exportData(result, filename, format) {
 }
 
 const sendResult = (index, result, fromDBQuery) => {
-  // Convert confidence back to % value
-  result.score = (result.score / 10).toFixed(0);
+  if (!fromDBQuery) {result.model = STATE.model, result.modelID = STATE.modelID};
   UI.postMessage({
     event: "new-result",
     file: result.file,
@@ -3896,10 +3912,8 @@ const onSave2DiskDB = async ({ file }) => {
     generateAlert({ message: "NoOP" });
     return; // nothing to do. Also will crash if trying to update disk from disk.
   }
-  const included = await getIncludedIDs(file);
-  let filterClause = filtersApplied(included)
-    ? `AND speciesID IN (${included})`
-    : "";
+  let filterClause = await getSpeciesSQLAsync();
+
   if (STATE.detect.nocmig) filterClause += " AND isDaylight = FALSE ";
   let response,
     errorOccurred = false;
@@ -3935,6 +3949,7 @@ const onSave2DiskDB = async ({ file }) => {
     errorOccurred = true;
     console.log("Transaction error:", error);
   } finally {
+    dbMutex.unlock();
     if (!errorOccurred) {
       if (response?.changes) {
         UI.postMessage({ event: "diskDB-has-records" });
@@ -3947,9 +3962,8 @@ const onSave2DiskDB = async ({ file }) => {
         Object.values(METADATA).forEach((file) => (file.isSaved = true));
       }
     }
-    dbMutex.unlock();
     DEBUG && console.log("transaction ended successfully");
-    const total = response.changes;
+    const total = response?.changes || 0;
     const seconds = (Date.now() - t0) / 1000;
     generateAlert({
       message: "goodDBUpdate",
@@ -3968,7 +3982,7 @@ const filterLocation = () =>
  * It doesn't really make sense to use location specific filtering here, as there is a location filter in the
  * page. For now, I'm just going skip the included IDs filter if location mode is selected
  */
-const getDetectedSpecies = () => {
+const getDetectedSpecies = async () => {
   const range = STATE.explore.range;
   const confidence = STATE.detect.confidence;
   let sql = `SELECT sname || '_' || cname as label, locationID
@@ -3977,8 +3991,9 @@ const getDetectedSpecies = () => {
     JOIN files on records.fileID = files.id`;
 
   if (STATE.mode === "explore") sql += ` WHERE confidence >= ${confidence}`;
-  if (STATE.list !== "location" && filtersApplied(STATE.included)) {
-    sql += ` AND speciesID IN (${STATE.included.join(",")})`;
+  if (!["location", "everything"].includes(STATE.list)) {
+    const included = await getIncludedIDs();
+    sql += ` AND speciesID IN (${included.join(",")})`;
   }
   if (range?.start)
     sql += ` AND datetime BETWEEN ${range.start} AND ${range.end}`;
@@ -4000,10 +4015,9 @@ const getValidSpecies = async (file) => {
   const included = await getIncludedIDs(file);
   let excludedSpecies, includedSpecies;
   let sql = `SELECT cname, sname FROM species`;
-  // We'll ignore Unknown Sp. here, hence length < (LABELS.length *-1*)
 
   if (filtersApplied(included)) {
-    sql += ` WHERE id IN (${included.join(",")})`;
+    sql += ` WHERE id IN (${included.join(",")}) AND modelID = ${STATE.modelID}`;
   }
   sql += " GROUP BY cname ORDER BY cname";
   includedSpecies = await diskDB.allAsync(sql);
@@ -4147,7 +4161,7 @@ const onUpdateFileStart = async (args) => {
           // Commit transaction once all rows are processed
           await db.runAsync("COMMIT");
           DEBUG && console.log(`File ${file} updated successfully.`);
-          count && (await Promise.all([getResults(), getSummary()]));
+          count && (await Promise.all([getResults(), getSummary(), getTotal()]));
         }
       );
     } catch (error) {
@@ -4158,30 +4172,40 @@ const onUpdateFileStart = async (args) => {
   }
 };
 
+/**
+ * Deletes detection records from the database matching the specified file, time range, species, and model.
+ *
+ * If records are deleted, updates the summary and detected species list or notifies the UI of unsaved records, depending on the database context.
+ *
+ * @param {Object} params - Parameters specifying which records to delete, including file name, start and end times, species name, model ID, and filtering options.
+ */
 async function onDelete({
   file,
   start,
   end,
   species,
+  modelID,
   active,
   // need speciesfiltered because species triggers getSummary to highlight it
   speciesFiltered,
 }) {
-  const db = STATE.db;
+  const {db} = STATE;
   const { id, filestart } = await db.getAsync(
     "SELECT id, filestart from files WHERE name = ?",
     file
   );
-  const datetime = filestart + parseFloat(start) * 1000;
+  const datetime = Math.round(filestart + (parseFloat(start) * 1000));
   end = parseFloat(end);
   const params = [id, datetime, end];
   let sql = "DELETE FROM records WHERE fileID = ? AND datetime = ? AND end = ?";
+  if (! STATE.detect.merge){
+    params.push(modelID)
+    sql += " AND modelID = ?";
+  }
   if (species) {
-    sql += " AND speciesID = (SELECT id FROM species WHERE cname = ?)";
+    sql += " AND speciesID IN (SELECT id FROM species WHERE cname = ?)";
     params.push(species);
   }
-  // let test = await db.allAsync('SELECT * from records WHERE speciesID = (SELECT id FROM species WHERE cname = ?)', species)
-  // console.log('After insert: ',JSON.stringify(test));
   let { changes } = await db.runAsync(sql, ...params);
   if (changes) {
     if (STATE.mode !== "selection") {
@@ -4200,15 +4224,24 @@ async function onDelete({
   }
 }
 
+/**
+ * Deletes all detection records for a specified species from the database, applying current mode filters.
+ *
+ * In "analyse" mode, only records from files currently being analyzed are deleted. In "explore" mode, deletions are limited to the selected date range. After deletion, updates the detected species list or notifies the UI if records remain unsaved.
+ *
+ * @param {Object} params
+ * @param {string} params.species - The common name of the species to delete records for.
+ * @param {string} [params.speciesFiltered] - Used for UI highlighting; does not affect deletion logic.
+ */
 async function onDeleteSpecies({
   species,
-  // need speciesfiltered because species triggers getSummary to highlight it
+  // need speciesFiltered because species triggers getSummary to highlight it
   speciesFiltered,
 }) {
   const db = STATE.db;
   const params = [species];
   let SQL = `DELETE FROM records 
-    WHERE speciesID = (SELECT id FROM species WHERE cname = ?)`;
+    WHERE speciesID IN (SELECT id FROM species WHERE cname = ?)`;
   if (STATE.mode === "analyse") {
     const rows = await db.allAsync(
       `SELECT id FROM files WHERE NAME IN (${prepParams(
@@ -4279,7 +4312,7 @@ const onFileDelete = async (fileName) => {
       variables: { file: fileName },
       updateFilenamePanel: true,
     });
-    await Promise.all([getResults(), getSummary()]);
+    await Promise.all([getResults(), getSummary(), getTotal()]);
   } else {
     generateAlert({
       message: "failedFilePurge",
@@ -4288,79 +4321,100 @@ const onFileDelete = async (fileName) => {
   }
 };
 
-const dbMutex = new Mutex();
 /**
- * Update species common names in the database using provided label mappings.
+ * Updates species common names in the database based on provided label mappings.
  *
- * Parses an array of label strings formatted as "speciesName_commonName" and updates the corresponding
- * entries in the species table. For the "birdnet" model, a direct update query is executed; for other models,
- * existing common names are retrieved and conditionally updated based on matching parenthesized tokens.
- * All operations are executed within a single transaction to ensure atomicity. If any update fails, the
- * transaction is rolled back and the error is propagated.
+ * For each label in the format "speciesName_commonName", updates the corresponding species entry's common name (`cname`) in the database. Handles call type suffixes in common names and applies updates per model ID, ensuring that only changed values are written. All updates are performed within a single transaction for atomicity.
  *
- * @param {object} db - A database connection object that supports asynchronous methods (runAsync, prepare, and finalize).
- * @param {Array<string>} labels - An array of label strings in the format "speciesName_commonName".
- * @returns {Promise<void>} A promise that resolves when all updates are successfully committed.
+ * @param {object} db - Database connection supporting async methods (`runAsync`, `prepare`, `finalize`).
+ * @param {Array<string>} labels - Array of label strings in the format "speciesName_commonName".
+ * @returns {Promise<void>} Resolves when all updates are committed.
  *
  * @throws {Error} If any database operation fails during the transaction.
- *
- * @example
- * // For a 'birdnet' model, updating a species 'sparrow' to a common name 'House Sparrow'
- * await _updateSpeciesLocale(db, ["sparrow_House Sparrow"]);
  */
+
 async function _updateSpeciesLocale(db, labels) {
   const updatePromises = [];
   await dbMutex.lock();
-  const updateStmt = db.prepare("UPDATE species SET cname = ? WHERE sname = ?");
+
+  // Prepare statements
+  const updateStmt = db.prepare("UPDATE species SET cname = ? WHERE sname = ? AND modelID = ?");
   const updateChirpityStmt = db.prepare(
     "UPDATE species SET cname = ? WHERE sname = ? AND cname LIKE ?"
   );
-  const speciesSelectStmt = db.prepare(
-    "SELECT cname FROM species WHERE sname = ?"
-  );
-  await db.runAsync("BEGIN");
 
-  if (STATE.model === "birdnet") {
-    for (const label of labels) {
-      const [sname, cname] = label.trim().split("_");
-      updatePromises.push(updateStmt.runAsync(cname, sname));
-    }
-  } else {
+  try {
+    await db.runAsync("BEGIN");
+    // 1. Collect unique snames from labels
+    const labelMap = new Map(); // Map sname => array of newCname(s)
     for (const label of labels) {
       const [sname, newCname] = label.split("_");
-      const existingCnameResult = await speciesSelectStmt.allAsync(sname);
-      if (existingCnameResult.length) {
-        for (const { cname: existingCname } of existingCnameResult) {
-          const existingCnameMatch = existingCname.match(/\(([^)]+)\)$/);
-          const newCnameMatch = newCname.match(/\(([^)]+)\)$/);
-          if (newCnameMatch) {
-            if (newCnameMatch[0] === existingCnameMatch[0]) {
-              const callTypeMatch = "%" + newCnameMatch[0] + "%";
+      labelMap.has(sname) || labelMap.set(sname, []);
+      labelMap.get(sname).push(newCname);
+    }
+    // 2. Batch query species by sname using an IN clause
+    // Note: Adjust the query parameter syntax as needed for your DB library
+    const placeholders =  '?'.repeat(labelMap.size).split("").join(",");
+    const speciesQuery = `
+      SELECT sname, cname, modelID 
+      FROM species 
+      WHERE sname IN (${placeholders}) 
+      ORDER BY sname
+    `;
+    const speciesRows = await db.allAsync(speciesQuery, ...labelMap.keys());
+
+    // Group species rows by sname for easy lookup
+    const speciesBySname = {};
+    for (const row of speciesRows) {
+      (speciesBySname[row.sname] ||= []).push(row);
+    }
+
+    // Helper: Extract call type from a string (including the preceding space)
+    const extractCallType = str => str.match(/\s+\(([^)]+)\)$/)?.[0] || "";
+    // Helper: Remove any call type from a string
+    const stripCallType = str => str.replace(/\s+\([\w\s]+\)$/, '');
+
+    // 3. Process each label and prepare updates
+    for (const [sname, newCnames] of labelMap) {
+      const speciesList = speciesBySname[sname];
+      if (!speciesList) continue; // no species row for this sname
+
+      for (const rawNewCname of newCnames) {
+        // Determine the intended new call type and base cname
+        const newCallType = extractCallType(rawNewCname);
+        
+
+        for (const { cname: existingCname, modelID } of speciesList) {
+          const existingCallType = extractCallType(existingCname);
+          let finalCname = rawNewCname;
+
+          // Decide which update to run based on presence of call types
+          if (existingCallType) {
+            // If new value does not include a call type, append the existing one
+            if (!newCallType) finalCname += existingCallType;
+            else if (newCallType !== existingCallType) continue
+            // Only update if final cname differs from the existing one
+            if (finalCname !== existingCname) {
               updatePromises.push(
-                updateChirpityStmt.runAsync(newCname, sname, callTypeMatch)
+                updateChirpityStmt.runAsync(finalCname, sname, `%${existingCallType}%`)
               );
             }
           } else {
-            let appendedCname = newCname;
-            if (existingCnameMatch) {
-              const bracketedWord = existingCnameMatch[0];
-              appendedCname += ` ${bracketedWord}`;
-              const callTypeMatch = "%" + bracketedWord + "%";
+            // Existing species has no call type, so ensure none is included in final value
+            if (newCallType) {
+              // Remove call type if present in new label
+              finalCname = stripCallType(rawNewCname);
+            }
+            if (finalCname !== existingCname) {
               updatePromises.push(
-                updateChirpityStmt.runAsync(appendedCname, sname, callTypeMatch)
-              );
-            } else {
-              updatePromises.push(
-                updatePromises.push(updateStmt.runAsync(appendedCname, sname))
+                updateStmt.runAsync(finalCname, sname, modelID)
               );
             }
           }
         }
       }
     }
-  }
 
-  try {
     await Promise.all(updatePromises);
     await db.runAsync("END");
   } catch (error) {
@@ -4371,35 +4425,27 @@ async function _updateSpeciesLocale(db, labels) {
     dbMutex.unlock();
     updateStmt.finalize();
     updateChirpityStmt.finalize();
-    speciesSelectStmt.finalize();
   }
 }
 
+
 /**
- * Updates the application's locale by modifying state and database entries, and optionally refreshes analysis results.
+ * Updates the application's locale and species labels, and optionally refreshes analysis results.
  *
- * This asynchronous function updates the global state with the new locale, applies the new locale to both the
- * disk and memory databases by updating their species labels, and optionally refreshes the application's results
- * and summary if requested. It ensures that database operations are performed within a locked context for concurrency
- * safety, and performs a rollback in case of any error during the update process.
+ * Sets the new locale in the global state and updates species labels in both disk and memory databases. If requested, refreshes the application's results and summary to reflect the new locale.
  *
- * @async
- * @param {string} locale - The new locale identifier (e.g., "en-US").
- * @param {Object} labels - An object mapping species IDs to their localized labels.
- * @param {boolean} refreshResults - Indicates whether to refresh the results and summary following the locale update.
- * @returns {Promise<void>} A promise that resolves when the locale update process is completed.
- * @throws {Error} Propagates any error encountered during the update process after rolling back the database transaction.
+ * @param {string} locale - The locale identifier to set (e.g., "en-US").
+ * @param {Object} labels - Mapping of species IDs to localized labels.
+ * @param {boolean} refreshResults - Whether to refresh results and summary after updating the locale.
  */
 async function onUpdateLocale(locale, labels, refreshResults) {
   if (DEBUG) t0 = Date.now();
   let db;
   try {
-    STATE.update({ locale: locale });
+    STATE.update({ locale });
     for (db of [diskDB, memoryDB]) {
-      if (db.locale !== locale) {
-        db.locale = locale;
-        await _updateSpeciesLocale(db, labels);
-      }
+      db.locale = locale;
+      await _updateSpeciesLocale(db, labels);
     }
     if (refreshResults) await Promise.all([getResults(), getSummary()]);
   } catch (error) {
@@ -4407,24 +4453,24 @@ async function onUpdateLocale(locale, labels, refreshResults) {
   } finally {
     DEBUG &&
       console.log(`Locale update took ${(Date.now() - t0) / 1000} seconds`);
-    updateSpeciesLabelLocale();
+    
   }
+  await setLabelState({regenerate:true})
 }
 
-async function updateSpeciesLabelLocale() {
-  // Get labels in the new locale
-  DEBUG && console.log("Getting labels from disk db");
-  const included = await getIncludedIDs();
-  const scope = filtersApplied(included)
-    ? `WHERE id in (${included.join(",")}) `
-    : "";
-  const res = await diskDB.allAsync(
-    `SELECT sname || '_' || cname AS labels FROM species ${scope} ORDER BY id `
-  );
-  const labels = res.map((obj) => obj.labels); // these are the labels in the preferred locale
-  UI.postMessage({ event: "labels", labels: labels });
-}
-
+/**
+ * Sets or removes a custom location for a group of files and updates their metadata and UI.
+ *
+ * If a place name is provided, inserts or updates the location in the database and assigns its ID to each file. If no place is provided, deletes the location matching the given latitude and longitude. Updates in-memory metadata and notifies the UI of changes.
+ *
+ * @param {Object} params - Parameters for setting or removing the location.
+ * @param {number} params.lat - Latitude of the location.
+ * @param {number} params.lon - Longitude of the location.
+ * @param {string} [params.place] - Name of the location. If omitted, the location is deleted.
+ * @param {string[]} params.files - List of file names to update.
+ * @param {Object} [params.db] - Database instance to use.
+ * @param {boolean} [params.overwritePlaceName=true] - Whether to overwrite the place name if the location already exists.
+ */
 async function onSetCustomLocation({
   lat,
   lon,
@@ -4456,7 +4502,8 @@ async function onSetCustomLocation({
       await db.getAsync("SELECT id FROM locations WHERE lat = ? AND lon = ?", lat, lon)
     )?.id;
   
-
+// TODO: check if file in audio library and update its location on disk and in library
+// await checkLibrary(file, lat,lon, place)
     for (const file of files) {
       // Only update the file location id if it is already in the db
       const result = await db.runAsync(
@@ -4465,7 +4512,7 @@ async function onSetCustomLocation({
       );
       
       // we may not have set the METADATA for the file
-      METADATA[file] = { ...(METADATA[file] || {}), locationID: id, lat, lon };
+      METADATA[file] = { ...METADATA[file], locationID: id, lat, lon };
       // tell the UI the file has a location id
       UI.postMessage({ event: "file-location-id", file, id });
     }
@@ -4484,52 +4531,78 @@ async function getLocations({ file, db = STATE.db }) {
 }
 
 /**
- * Retrieves a filtered list of species IDs based on the current state and file metadata.
+ * Retrieves the list of species IDs included in the current filter context, using file metadata and cached results as needed.
  *
- * For "location" or "nocturnal" lists when local mode is enabled, if a file identifier is provided, the function uses
- * its metadata to extract latitude (lat), longitude (lon), and week information (derived from fileStart if STATE.useWeek is true).
- * The latitude and longitude are concatenated to form a location key. If the corresponding cache entry in STATE.included is missing,
- * setIncludedIDs is invoked to populate it. For other list types, if the cache is absent, setIncludedIDs is called without parameters.
+ * For "location" or "nocturnal" lists in local mode, uses file metadata or global state to determine latitude, longitude, and week, and ensures the inclusion cache is populated. For other list types, retrieves included species IDs from the cache, populating it if necessary.
  *
- * @async
- * @param {*} [file] - Optional key for retrieving file metadata from METADATA. Expected metadata should include properties like `fileStart`, `lat`, and `lon`.
- * @returns {Promise<number[]>} Promise resolving to an array of species IDs included in the current filtered results.
+ * @param {*} [file] - Optional file identifier used to extract metadata for filtering.
+ * @returns {Promise<number[]>} Promise resolving to an array of included species IDs for the current filter context.
  */
 async function getIncludedIDs(file) {
-  let lat, lon, week;
+  let latitude, longitude, week;
+  const {list, local, lat, lon, useWeek, included, model, modelID, speciesMap} = STATE;
   if (
-    STATE.list === "location" ||
-    (STATE.list === "nocturnal" && STATE.local)
+    list === "location" ||
+    (list === "nocturnal" && local)
   ) {
     if (file) {
       file = METADATA[file];
-      week = STATE.useWeek ? new Date(file.fileStart).getWeekNumber() : "-1";
-      lat = file.lat || STATE.lat;
-      lon = file.lon || STATE.lon;
+      week = useWeek ? new Date(file.fileStart).getWeekNumber() : "-1";
+      latitude = file.lat || lat;
+      longitude = file.lon || lon;
       STATE.week = week;
     } else {
       // summary context: use the week, lat & lon from the first file??
-      (lat = STATE.lat), (lon = STATE.lon);
-      week = STATE.useWeek ? STATE.week : "-1";
+      (latitude = lat), (longitude = lon);
+      week = useWeek ? STATE.week : "-1";
     }
-    const location = lat.toString() + lon.toString();
+    const location = latitude.toString() + longitude.toString();
     if (
-      STATE.included?.[STATE.model]?.[STATE.list]?.[week]?.[location] ===
+      included?.[model]?.[list]?.[week]?.[location] ===
       undefined
     ) {
       // Cache miss
-      await setIncludedIDs(lat, lon, week);
+      await LIST_WORKER;
+      await setIncludedIDs(latitude, longitude, week);
     }
-    const included = STATE.included[STATE.model][STATE.list][week][location];
-    return included;
+    let include;
+    if (file) include =  STATE.included[model][list][week][location];
+    else {
+      include = deepMergeLists(model, list)
+    }
+    return include;
   } else {
-    if (STATE.included?.[STATE.model]?.[STATE.list] === undefined) {
+    if (included?.[model]?.[list] === undefined) {
       // The object lacks the week / location
-      LIST_WORKER && (await setIncludedIDs());
+      await LIST_WORKER;
+      await setIncludedIDs();
     }
-    return STATE.included[STATE.model][STATE.list];
+    let include = STATE.included[model][list];
+    return include
   }
 }
+
+/**
+ * Recursively merges all numeric species IDs from a nested inclusion list for a given model into a flat array.
+ *
+ * @param {string|number} model - The model identifier.
+ * @param {string} list - The inclusion list key.
+ * @returns {number[]} An array of unique species IDs included for the specified model and list.
+ */
+function deepMergeLists(model, list) {
+  if (!STATE.included?.[model]?.[list]) return [];
+  let mergedSet = new Set();
+  function collectValues(obj) {
+      if (Array.isArray(obj)) {
+          obj.forEach(num => mergedSet.add(num));
+      } else if (typeof obj === 'object' && obj !== null) {
+          Object.values(obj).forEach(collectValues);
+      }
+  }
+  collectValues(STATE.included[model][list]);
+  return [...mergedSet];
+}
+
 /**
 
  * setIncludedIDs
@@ -4542,6 +4615,18 @@ async function getIncludedIDs(file) {
 
 let LIST_CACHE = {};
 
+/**
+ * Retrieves and caches the included species IDs for a given location and week, updating the global state.
+ *
+ * Requests a species inclusion list from the list worker based on model, labels, location, and week, merges the result into the global included species state, and caches the promise to avoid redundant requests. Generates alerts for any unrecognized labels and throws an error if such labels are found.
+ *
+ * @param {number|string} lat - Latitude for location-based filtering.
+ * @param {number|string} lon - Longitude for location-based filtering.
+ * @param {number|string} week - Week number for seasonal filtering.
+ * @returns {Promise<Object>} The updated included species object in the global state.
+ *
+ * @throws {Error} If unrecognized labels are found in the custom list.
+ */
 async function setIncludedIDs(lat, lon, week) {
   const key = `${lat}-${lon}-${week}-${STATE.model}-${STATE.list}`;
   if (LIST_CACHE[key]) {
@@ -4554,6 +4639,7 @@ async function setIncludedIDs(lat, lon, week) {
     const { result, messages } = await LIST_WORKER({
       message: "get-list",
       model: STATE.model,
+      labels: STATE.allLabels,
       listType: STATE.list,
       customLabels: STATE.customLabels,
       lat: lat || STATE.lat,
@@ -4563,8 +4649,9 @@ async function setIncludedIDs(lat, lon, week) {
       localBirdsOnly: STATE.local,
       threshold: STATE.speciesThreshold,
     });
-    // Add the index of "Unknown Sp." to all lists
-    STATE.list !== "everything" && result.push(LABELS.length - 1);
+    // // Add the *label* id of "Unknown Sp." to all lists
+    STATE.list !== "everything" 
+      && result.push(STATE.allLabels.indexOf('Unknown Sp._Unknown Sp.') + 1);
 
     let includedObject = {};
     if (
@@ -4781,27 +4868,20 @@ async function convertAndOrganiseFiles(threadLimit = 4) {
 }
 
 /**
- * Converts an audio file to the target archive format using FFmpeg, with optional trimming.
+ * Converts an audio file to the archive format using FFmpeg, with optional trimming and progress tracking.
  *
- * The function configures FFmpeg’s encoding parameters based on global settings. When converting to "ogg", it applies
- * preset audio settings (128k bitrate, mono channel, 30000 Hz sample rate). If trimming is enabled, the function adjusts
- * the audio duration according to computed start and end boundaries and issues alerts for atypical recording lengths.
- * Progress is tracked via a provided map, and upon successful conversion, the file’s modification timestamp and
- * corresponding database record are updated.
+ * Applies preset encoding parameters for "ogg" format and trims the audio based on calculated boundaries if enabled. Updates the file's modification time and corresponding database record upon successful conversion. Progress is reported via the provided map and UI messages.
  *
- * @param {string} inputFilePath - Path to the input audio file.
+ * @param {string} inputFilePath - Path to the source audio file.
  * @param {string} fullFilePath - Destination path for the converted file.
- * @param {object} row - File metadata including properties such as `id`, `duration`, and `filestart`; the duration may be updated if trimming is applied.
+ * @param {object} row - File metadata, including `id`, `duration`, and `filestart`; `duration` may be updated if trimming is applied.
  * @param {string} dbArchiveName - Archive name to record in the database.
  * @param {Object.<string, number>} fileProgressMap - Map tracking conversion progress, keyed by file paths.
- * @returns {Promise<void>} Resolves when conversion and database updates complete.
+ * @returns {Promise<void>} Resolves when conversion and database updates are complete.
  *
- * @throws {Error} If an error occurs during the FFmpeg conversion process.
+ * @throws {Error} If FFmpeg encounters an error during conversion.
  *
- * @example
- * convertFile('/path/to/input.wav', '/path/to/output.ogg', fileRecord, db, 'archive123', progressMap)
- *   .then(() => console.log('Conversion completed successfully.'))
- *   .catch(err => console.error('Conversion failed:', err));
+ * @remark Issues alerts for multi-day or all-daylight recordings when trimming boundaries are atypical.
  */
 async function convertFile(
   inputFilePath,
@@ -4903,3 +4983,5 @@ async function convertFile(
       .run();
   });
 }
+
+module.exports = {setMetadata}

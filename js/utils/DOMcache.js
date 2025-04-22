@@ -263,6 +263,12 @@ const DOM = {
     }
     return this._customListContainer;
   },
+  get loadingScreen() {
+    if (!this._loadingScreen) {
+      this._loadingScreen = document.getElementById("loading-screen");
+    }
+    return this._loadingScreen;
+  },
   get locale() {
     if (!this._locale) {
       this._locale = document.getElementById("locale");

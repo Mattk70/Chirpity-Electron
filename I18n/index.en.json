@@ -28,6 +28,7 @@
     "Show frequency labels-circle-help": ["When enabled, the spectrogram will display the frequency on the left side."],
     "Show all detections-circle-help": "When enabled, the spectrogram will highlight all the detections on screen.",
     "padlock": ["Feature Locked","Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature permanently."],
+    "unsaved-link": ["Unsaved Edits", "There are changes to the results that haven't been saved"],
     "Clip Library-circle-help": ["When enabled, only audio files containing saved records are added to the library. If you set your recorder to auto-increment files after a short period of time, enabling this setting will dramatically reduce the storage required if there are long periods without activity"],
     "Signal to Noise Ratio-circle-help": ["The SNR filter, when enabled, will skip over portions of audio where any audio event is below the threshold. Higher values skip increasingly noisy segments. whilst this will result in faster processing it must be considered <b><i>experimental</i></b> and any non-zero value may miss detections. <b>Tip:</b> To find a workable SNR value, run analysis on a short file with the faintest detections you can confidently identify. Increase the SNR value until the detection is not picked up. Once you find this threshold, back it off to the highest level that picks up the detection."],
     "Species Threshold-circle-help": ["Define the minimum eBird checklist frequency for species inclusion. If 'Adjust list for the week of the year' is enabled, the list will be adjusted to include species expected for the recording week."],
@@ -35,7 +36,8 @@
     "Use Location settings-circle-help": ["When activated, the Nocturnal Calls filter reports birds based on your location settings."],
     "Volume Adjustment-circle-help": ["Adjust the volume of audio to compensate for low recording levels."],
     "File-timestamp-circle-help": ["Some audio recorders, for example the Zoom H1 Essential, can set the file saved date and time to the beginning of the recording, rather than the end. If you have such a recorder selecting this option will fix the times shown for your detections (changes to this setting require a Chirpity relaunch to take effect)"],
-
+    "Combine-circle-help":["When enabled, repeating the analysis of open files with a different model will add the model's detections to the list. Note: <b>during</b> the new analysis, only the results of the current model will be shown"],
+    "Merge-circle-help":["When enabled, detections for each model will be merged, only the detection with the highest confidence from the models will be displayed. Note: <b>during</b> the new analysis, only the results of the current model will be shown"],
 
     "loading-text": ["Getting things ready..."],
     "navBarFile": ["File"],
@@ -49,11 +51,13 @@
     ],
     "open-folder": ["Open Folder(s)"],
     "saveCSV": ["Export Results to CSV"],
+    "save-summary": ["Export Summary to CSV"],
     "save-eBird": ["Export eBird Record file"],
     "save-Raven": ["Export Raven Selection Table"],
     "export-audio": ["Export Selected Audio","Ctrl+E"
     ],
     "saveLabels": ["Save Audacity Labels"],
+    "import-csv": ["Import Results from CSV"],
     "exit": ["Exit"],
     "save2db": ["Save to Archive","Ctrl+S"
     ],
@@ -83,7 +87,7 @@
     "FAQ": ["FAQs"],
     "species": ["What species are detected?"],
     "eBird": ["What is an eBird Record?"],
-    "update-progress": ["Downloading update:"],
+    "update-progress-text": ["Downloading update:"],
 
 
     "record-add": ["Add"],
@@ -98,6 +102,7 @@
     "apply-location": ["Set"],
     "cancel-location": ["Cancel"],
     "library-location-select": ["Library Location:"],
+    "database-location-select": ["Database Location:"],
     "close-tour": ["Close"],
     "settings": {
       "basic": "Standard",
@@ -106,6 +111,8 @@
       "clear-call-cache": ["Clear Reference Call Cache"],
       "reset-defaults": ["Reset to default settings"],
       "model-to-use": "Model:",
+      "combine-detections": "Combine model detections",
+      "merge-detections": "Merge model detections",
       "confidence": "Confidence threshold:",
       "list-to-use": "List:",
       "local": "Use Location settings",

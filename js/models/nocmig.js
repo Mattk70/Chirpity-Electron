@@ -21,18 +21,15 @@ const CONFIG = {
 };
 
 /**
- * Loads a machine learning model based on the provided parameters and configures the TensorFlow backend.
+ * Loads and initializes a machine learning model with the specified configuration and TensorFlow backend.
  *
- * This function reads a model configuration file to obtain image dimensions, label information, and the application's location.
- * It sets up the specified TensorFlow backend (configuring additional environment settings for WebGL or WebGPU as needed),
- * initializes and warms up the global model instance, and sends a message indicating that the model is ready.
+ * Reads the model's configuration file to obtain image dimensions, labels, and application path. Sets up the requested TensorFlow backend with appropriate environment settings, initializes the global model instance, warms it up with the given batch size, and notifies the worker when the model is ready.
  *
- * @param {Object} params - Configuration parameters for loading the model.
- * @param {string} params.model - Identifier for the model version, used to locate the configuration file.
- * @param {string} params.list - Model configuration list.
- * @param {number} params.batchSize - Batch size used during model warm-up.
- * @param {string} [params.backend] - Preferred TensorFlow backend (e.g., "webgl" or "webgpu").
- * @param {*} params.worker - Identifier for the worker thread that will receive the model-ready message.
+ * @param {Object} params - Parameters for model loading.
+ * @param {string} params.model - Model version identifier used to locate the configuration file.
+ * @param {number} params.batchSize - Batch size for model warm-up.
+ * @param {string} [params.backend] - Preferred TensorFlow backend ("webgl", "webgpu", etc.).
+ * @param {*} params.worker - Worker identifier to receive the model-ready notification.
  */
 function loadModel(params) {
   const version = params.model;
@@ -44,13 +41,13 @@ function loadModel(params) {
     )
   );
   const appPath = "../../" + location + "/";
-  const list = params.list;
+
   const batch = params.batchSize;
   const backend = BACKEND || params.backend;
   backend === "webgpu" && require("@tensorflow/tfjs-backend-webgpu");
   DEBUG &&
     console.log(
-      `model received load instruction. Using list: ${list}, batch size ${batch}`
+      `model received load instruction. Using batch size ${batch}`
     );
   tf.setBackend(backend).then(async () => {
     if (backend === "webgl") {

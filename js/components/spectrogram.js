@@ -102,7 +102,7 @@ export class ChirpityWS {
       // Hide context menu
       DOM.contextMenu.classList.add("d-none");
       if (r.start !== STATE.activeRegion?.start) {
-        this.handlers.setActiveRegion(r);
+        this.handlers.setActiveRegion(r, true);
       }
       this.wavesurfer.seekTo(e.clientX / window.innerWidth);
       // If shift key held, clear other regions
@@ -121,14 +121,14 @@ export class ChirpityWS {
       const activeStart = STATE.activeRegion ? STATE.activeRegion.start : null;
       // If a new region is created without a label, it must be user generated
       if (!content || start === activeStart) {
-        this.handlers.setActiveRegion(r);
+        this.handlers.setActiveRegion(r, false);
       }
     });
 
     // Clear label on modifying region
     REGIONS.on("region-update", (r) => {
       r.setOptions({ content: " " });
-      this.handlers.setActiveRegion(r);
+      this.handlers.setActiveRegion(r, false);
     });
 
     return REGIONS;
@@ -136,7 +136,6 @@ export class ChirpityWS {
 
   initWavesurfer = (container, plugins) => {
     const config = this.getConfig();
-    // this.spectrogram ??= this.initSpectrogram(container, 256, 256)
     return WaveSurfer.create({
         container,
         // make waveform transparent
@@ -165,9 +164,6 @@ export class ChirpityWS {
     const plugins = [this.spectrogram, this.timeline, this.REGIONS];
     const container = document.getElementById("waveform");
     this.wavesurfer = this.initWavesurfer(container, plugins);
-    // this.wavesurfer.registerPlugin(this.spectrogram)
-    // this.wavesurfer.registerPlugin(this.REGIONS)
-    // this.wavesurfer.registerPlugin(this.timeline)
 
     if (audio) {
       this.loadBuffer(audio);
@@ -179,14 +175,15 @@ export class ChirpityWS {
       color: STATE.regionActiveColour,
     });
     const wavesurfer = this.wavesurfer;
+    wavesurfer.on('load', () => wavesurfer.isReady = false)
+    wavesurfer.on('ready', () => wavesurfer.isReady = true)
     wavesurfer.on("dblclick", this.centreSpec);
     wavesurfer.on("click", () => this.REGIONS.clearRegions());
-    wavesurfer.on("ready", () => (wavesurfer.isReady = true));
     wavesurfer.on("pause", () => {
       const position =
         wavesurfer.getCurrentTime() / wavesurfer.decodedData.duration;
       // Pause event fired right before 'finish' event, so
-      // this is set=== to signal whether it was playing up to that point
+      // this is set to signal whether it was playing up to that point
       if (position < 0.998) wavesurfer.isPaused = true;
     });
 
@@ -196,7 +193,6 @@ export class ChirpityWS {
       const {windowLength, windowOffsetSecs, currentFile, currentFileDuration, openFiles} = STATE;
       const bufferEnd = windowOffsetSecs + windowLength;
       if (currentFileDuration > bufferEnd) {
-        wavesurfer.isReady = false;
         this.handlers.postBufferUpdate({
           begin: windowOffsetSecs + windowLength,
           play: !wavesurfer.isPaused,
@@ -206,7 +202,6 @@ export class ChirpityWS {
         if (fileIndex < openFiles.length - 1) {
           // Move to next file
           const fileToLoad = openFiles[fileIndex + 1];
-          wavesurfer.isReady = false;
           this.handlers.postBufferUpdate({
             file: fileToLoad,
             begin: 0,
@@ -680,7 +675,7 @@ export class ChirpityWS {
     }
     this.refreshTimeline();
     this.wavesurfer.seekTo(position);
-    if (play) await this.wavesurfer.play();
+    if (play) this.wavesurfer.play();
   }
 
   WSPluginPurge = () => {
@@ -719,13 +714,23 @@ export class ChirpityWS {
       console.error("Invalid region parameters:", { start, end });
       return;
     }
-    REGIONS.addRegion({
-      start: start,
-      end: end,
-      color: colour || STATE.regionColour,
-      content: this.formatLabel(label, colour),
-    });
+    // Check for an existing region with the same start/end
+    const existingRegion = REGIONS.getRegions().find(region => 
+      region.start === start && region.end === end
+    );
 
+    if (existingRegion) {
+      // Append a new label to the existing region
+      // const newLabel = this.formatLabel(' / ' + label, colour);
+      existingRegion.content.textContent += ' / ' + label;
+    } else {
+      REGIONS.addRegion({
+        start: start,
+        end: end,
+        color: colour || STATE.regionColour,
+        content: this.formatLabel(label, colour),
+      });
+    }
     if (goToRegion) wavesurfer.setTime(start);
   }
 
@@ -781,25 +786,27 @@ export class ChirpityWS {
    * @returns {Promise<void>} A promise that resolves once the UI adjustments and spectrogram rendering updates are complete.
    */
 
-  async adjustDims(redraw, fftSamples, newHeight) {
+  async adjustDims(redraw, fftSamples, newHeight = 0) {
     const config = this.getConfig();
     const STATE = this.getState();
+    const {footer, navPadding, contentWrapper, exploreWrapper, 
+      spectrogramWrapper, resultTableElement} = DOM;
     const wavesurfer = this.wavesurfer;
-    const footerHeight = DOM.footer.offsetHeight;
-    const navHeight = DOM.navPadding.clientHeight;
-    newHeight ??= 0;
-    DOM.contentWrapper.style.top = navHeight.toString() + "px"; // for padding
-    DOM.contentWrapper.style.height =
+    const footerHeight = footer.offsetHeight;
+    const navHeight = navPadding.clientHeight;
+    fftSamples ??= config.FFT;
+    contentWrapper.style.top = navHeight.toString() + "px"; // for padding
+    contentWrapper.style.height =
       (document.body.clientHeight - footerHeight - navHeight).toString() + "px";
     const contentHeight = contentWrapper.offsetHeight;
     // + 2 for padding
-    const formOffset = DOM.exploreWrapper.offsetHeight;
+    const formOffset = exploreWrapper.offsetHeight;
 
-    let specOffset;
-    if (!DOM.spectrogramWrapper.classList.contains("d-none")) {
+    let specOffset = 0;
+    if (!spectrogramWrapper.classList.contains("d-none")) {
       const specHeight =
         newHeight || Math.min(config.specMaxHeight, this.maxHeight());
-      if (newHeight !== 0) {
+      if (newHeight) {
         config.specMaxHeight = specHeight;
         this.handlers.updatePrefs("config.json", config);
       }
@@ -820,13 +827,9 @@ export class ChirpityWS {
           await this.loadBuffer();
         }
       }
-      if (wavesurfer) {
-        specOffset = spectrogramWrapper.offsetHeight;
-      }
-    } else {
-      specOffset = 0;
+      specOffset = spectrogramWrapper.offsetHeight;
     }
-    DOM.resultTableElement.style.height =
+    resultTableElement.style.height =
       contentHeight - specOffset - formOffset + "px";
   }
   /**
@@ -867,7 +870,7 @@ export class ChirpityWS {
     const region = this.REGIONS.regions.find(
       (r) => r.start < time && r.end > time
     );
-    region && setActive && this.handlers.setActiveRegion(region);
+    region && setActive && this.handlers.setActiveRegion(region, false);
     return region;
   }
 

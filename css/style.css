@@ -80,6 +80,10 @@ body {
   max-width: auto;
 }
 
+.model-logo{
+  height: 2.5rem
+}
+
 .icon {
   max-height: calc(30px * var(--font-size-scale));
   max-width: calc(30px * var(--font-size-scale));
@@ -722,17 +726,6 @@ input[type="range"].vertical {
   cursor: pointer;
 }
 
-/*  .range_container input[type=range]::-moz-range-thumb {
-    -webkit-appearance: none;
-    pointer-events: all;
-    width: 24px;
-    height: 24px;
-    background-color: #fff;
-    border-radius: 50%;
-    box-shadow: 0 0 0 1px #C6C6C6;
-    cursor: pointer;  
-  }
-    */
 
 .range_container input[type="range"]::-webkit-slider-thumb:hover {
   background: #f7f7f7;

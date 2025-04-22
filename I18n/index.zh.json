@@ -28,6 +28,7 @@
   "Show frequency labels-circle-help": ["启用后，频谱图将在左侧显示频率。"],
   "Show all detections-circle-help": "启用后，频谱图将突出显示屏幕上的所有检测。",
   "padlock": ["功能已锁定", "成为<a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>会员</a>，即可永久解锁此功能。"],
+  "unsaved-link": ["未保存的编辑", "结果中有尚未保存的更改"],
   "Clip Library-circle-help":  ["启用时，只有包含已保存记录的音频文件会添加到库中。如果您将录音设备设置为在短时间后自动递增文件，启用此设置将在长时间无活动时显著减少所需的存储空间"],
   "Signal to Noise Ratio-circle-help": ["启用 SNR 滤波器后，会跳过音频中任何音频事件低于阈值的部分。较高的值会跳过噪声更大的部分。虽然这会加快处理速度，但必须被视为<b><i>实验性</i></b>，且任何非零值都可能遗漏检测。<b>提示：</b>要找到合适的 SNR 值，请对您可以自信识别的最微弱检测运行短文件分析。增加 SNR 值直到未拾取检测。一旦找到该阈值，将其降低到仍能拾取检测的最高水平。"],
   "Species Threshold-circle-help": ["定义物种包含的最低 eBird 检查表频率。如果启用了‘根据年份周调整列表’，则会调整列表以包含录音周内预期的物种。"],
@@ -35,7 +36,9 @@
   "Use Location settings-circle-help": ["激活后，夜间叫声过滤器将基于您的位置设置报告鸟类。"],
   "Volume Adjustment-circle-help": ["调整音量以补偿低录音电平。"],
   "File-timestamp-circle-help": ["一些音频录音设备，例如Zoom H1 Essential，可以将文件保存的日期和时间设置为录音开始时，而不是结束时。如果您有这样的录音设备，选择此选项将修正检测中显示的时间。（更改此设置需要重新启动 Chirpity 才能生效）。"],
-  
+  "Combine-circle-help": ["启用后，使用不同模型重新分析打开的文件将把该模型的检测结果添加到列表中。注意：<b>在</b>新的分析过程中，仅显示当前模型的结果。"],
+  "Merge-circle-help": ["启用后，将合并每个模型的检测结果，仅显示置信度最高的检测。注意：<b>在</b>新的分析过程中，仅显示当前模型的结果。"],
+
   "loading-text": ["正在准备..."],
   "navBarFile": ["文件"],
   "navbarHelp": ["帮助"],
@@ -46,11 +49,13 @@
   ],
   "open-folder": ["打开文件夹"],
   "saveCSV": ["将结果导出为CSV"],
+  "save-summary": ["导出摘要为 CSV"],
   "save-eBird": ["导出eBird记录文件"],
   "save-Raven": ["导出Raven选择表"],
   "export-audio": ["导出选定的音频","Ctrl+E"
   ],
   "saveLabels": ["保存Audacity标签"],
+  "import-csv": ["从CSV导入结果"],
   "exit": ["退出"],
   "save2db": ["保存到档案","Ctrl+S"
   ],
@@ -80,7 +85,7 @@
   "FAQ": ["常见问题"],
   "species": ["检测到哪些物种？"],
   "eBird": ["什么是eBird记录？"],
-  "update-progress": ["正在下载更新："],
+  "update-progress-text": ["正在下载更新："],
   "record-add": ["添加"],
   "record-dismiss": ["取消"],
   "help-modal-close": ["关闭"],
@@ -93,6 +98,7 @@
   "apply-location": ["设置"],
   "cancel-location": ["取消"],
   "library-location-select": ["库位置："],
+  "database-location-select": ["数据库位置:"],
   "close-tour": ["关闭"],
   "settings": {
     "basic": "标准",
@@ -101,6 +107,8 @@
     "clear-call-cache": ["清除参考通话缓存"],
     "reset-defaults": ["恢复默认设置"],
     "model-to-use": "模型：",
+    "combine-detections": "合并模型检测结果",
+    "merge-detections": "融合模型检测结果",
     "confidence": "置信度阈值：",
     "list-to-use": "列表：",
     "local": "使用位置设置",
