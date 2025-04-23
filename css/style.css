@@ -85,11 +85,12 @@ body {
 }
 
 .icon {
-  max-height: calc(30px * var(--font-size-scale));
-  max-width: calc(30px * var(--font-size-scale));
+  height: 1.8rem;
+  width: 1.8rem;
+}
+.filter {
   filter: invert(45%);
 }
-
 #list-icon:hover > img {
   filter: invert(100%);
 }

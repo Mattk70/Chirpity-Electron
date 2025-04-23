@@ -2841,16 +2841,14 @@ const spec = new ChirpityWS(
 
 const updateListIcon = () => {
   LIST_MAP = i18n.get(i18n.LIST_MAP);
-  DOM.listIcon.style.visibility = "hidden";
   DOM.listIcon.innerHTML =
     config.list === "custom"
       ? `<span class="material-symbols-outlined mt-1" title="${
           LIST_MAP[config.list]
-        }" style="width: 30px">fact_check</span>`
-      : `<img class="icon" src="img/${config.list}.png" alt="${
+        }" style="width: 1.8rem">fact_check</span>`
+      : `<img class="icon filter" src="img/${config.list}.png" alt="${
           config.list
         }"  title="${LIST_MAP[config.list]}">`;
-  DOM.listIcon.style.visibility = "visible";
 };
 
 DOM.listIcon.addEventListener("click", () => {
