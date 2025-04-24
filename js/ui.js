@@ -2843,27 +2843,38 @@ const spec = new ChirpityWS(
 
 
 const updateListIcon = () => {
-  LIST_MAP = i18n.get(i18n.LIST_MAP);
-  DOM.listIcon.innerHTML =
-    config.list === "custom"
-      ? `<span class="material-symbols-outlined mt-1" title="${
-          LIST_MAP[config.list]
-        }" style="width: 1.8rem">fact_check</span>`
-      : `<img class="icon filter" src="img/${config.list}.png" alt="${
-          config.list
-        }"  title="${LIST_MAP[config.list]}">`;
+  const LIST_MAP = i18n.get(i18n.LIST_MAP);
+  const {list} = config;
+  let node;
+  if (list === "custom"){
+    node = document.createElement("span");
+    node.className = "material-symbols-outlined mt-1";
+    node.style.width =  "1.8rem";
+    node.textContent = "fact_check";
+  } else {
+    node = document.createElement("img");
+    node.className = "icon filter";
+    node.setAttribute("src", `img/${list}.png`);
+    node.setAttribute("alt", list);
+  }
+  node.setAttribute("title", LIST_MAP[list] || "Unknown List");
+  DOM.listIcon.replaceChildren(node);
 };
 
 const updateModelIcon = (model) => {
-let title = "BirdNET";
-if (model !== 'birdnet') {
-  title = model === 'chirpity'
-  ? "Nocmig"
-  : "Nocmig (beta)";
+  let title = "BirdNET";
+  if (model !== 'birdnet') {
+    title = model === 'chirpity'
+    ? "Nocmig"
+    : "Nocmig (beta)";
+  }
+  const img = document.createElement("img");
+  img.className = "icon";
+  img.setAttribute("src", `img/icon/${model}_logo.png`);
+  img.setAttribute("alt", title);
+  img.setAttribute("title", title);
+  DOM.modelIcon.replaceChildren(img); // Clear existing content
 }
-  DOM.modelIcon.innerHTML =
-    `<img class="icon" src="img/icon/${model}_logo.png" alt="${title}"  title="${title}">`;
-};
 
 DOM.listIcon.addEventListener("click", () => {
   if (PREDICTING) {
