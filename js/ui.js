@@ -1885,7 +1885,10 @@ window.onload = async () => {
     //fill in defaults - after updates add new items
     utils.syncConfig(config, defaultConfig);
 
-    membershipCheck().then((isMember) => (STATE.isMember = isMember));
+    membershipCheck().then((isMember) => {
+      STATE.isMember = isMember;
+      if (config.detect.combine) document.getElementById('model-icon').classList.remove('d-none')
+    });
 
     const { model, library, database, detect, filters, audio, 
       limit, locale, speciesThreshold, list, useWeek, UUID, 
@@ -2025,7 +2028,7 @@ window.onload = async () => {
     document.getElementById("auto-load").checked = config.detect.autoLoad;
     document.getElementById("iucn").checked = config.detect.iucn;
     document.getElementById("iucn-scope").selected = config.detect.iucnScope;
-    modelSettingsDisplay();
+    handleModelChange(config.model, false)
     // Block powersave?
     document.getElementById("power-save-block").checked =
       config.powerSaveBlocker;
@@ -2840,18 +2843,48 @@ const spec = new ChirpityWS(
 
 
 const updateListIcon = () => {
-  LIST_MAP = i18n.get(i18n.LIST_MAP);
-  DOM.listIcon.style.visibility = "hidden";
-  DOM.listIcon.innerHTML =
-    config.list === "custom"
-      ? `<span class="material-symbols-outlined mt-1" title="${
-          LIST_MAP[config.list]
-        }" style="width: 30px">fact_check</span>`
-      : `<img class="icon" src="img/${config.list}.png" alt="${
-          config.list
-        }"  title="${LIST_MAP[config.list]}">`;
-  DOM.listIcon.style.visibility = "visible";
+  const LIST_MAP = i18n.get(i18n.LIST_MAP);
+  const {list} = config;
+  let node;
+  if (list === "custom"){
+    node = document.createElement("span");
+    node.className = "material-symbols-outlined mt-1";
+    node.style.width =  "1.8rem";
+    node.textContent = "fact_check";
+  } else {
+    if (!['location', 'birds', 'nocturnal', 'everything'].includes(list)) return
+    node = document.createElement("img");
+    node.className = "icon filter";
+    node.setAttribute("src", `img/${list}.png`);
+    node.setAttribute("alt", list);
+  }
+  node.setAttribute("title", LIST_MAP[list] || "Unknown List");
+  DOM.listIcon.replaceChildren(node);
 };
+
+const updateModelIcon = (model) => {
+  let title;
+  switch (model) {
+    case 'birdnet':
+      title = "BirdNET";
+      break;
+    case 'chirpity':
+      title = "Nocmig";
+      break;
+    case 'nocmig':
+      title = "Nocmig (beta)";
+      break;
+    default:
+      title = i18n.get(i18n.Lists).custom;
+      model = "custom"
+  }
+  const img = document.createElement("img");
+  img.className = "icon";
+  img.setAttribute("src", `img/icon/${model}_logo.png`);
+  img.setAttribute("alt", title);
+  img.setAttribute("title", title);
+  DOM.modelIcon.replaceChildren(img); // Clear existing content
+}
 
 DOM.listIcon.addEventListener("click", () => {
   if (PREDICTING) {
@@ -2897,6 +2930,21 @@ const loadModel = () => {
     backend: config[model].backend,
   });
 };
+
+const handleModelChange = (model, reload = true) => {
+  
+  STATE.analysisDone = false;
+  modelSettingsDisplay();
+  DOM.customListFile.value = config.customListFile[model];
+  DOM.customListFile.value
+    ? (LIST_MAP = i18n.get(i18n.LIST_MAP))
+    : delete LIST_MAP.custom;
+  document.getElementById(config[model].backend).checked = true;
+  if (reload) {
+    handleBackendChange(config[model].backend);
+  }
+  updateModelIcon(model);
+}
 
 const handleBackendChange = (backend) => {
   backend = backend instanceof Event ? backend.target.value : backend;
@@ -5297,6 +5345,20 @@ function handleUIClicks(e) {
       document.getElementById("frequency-range").classList.toggle("active");
       break;
     }
+    case "model-icon": {
+      if (PREDICTING) {
+        // generateToast({ message: "changeListBlocked", type: "warning" });
+        return;
+      }
+      const el = DOM.modelToUse;
+      const numberOfOptions = el.options.length;
+      const currentListIndex = el.selectedIndex;
+      const next = currentListIndex === numberOfOptions - 1 ? 0 : currentListIndex + 1;
+      config.model = el.options[next].value;
+      el.selectedIndex = next;
+      handleModelChange(config.model)
+      break;
+    }
     case "nocmigMode": {
       changeNocmigMode();
       break;
@@ -5506,6 +5568,7 @@ document.addEventListener("change", function (e) {
         }
         case "combine-detections": {
           config.detect.combine = element.checked;
+          document.getElementById('model-icon').classList.toggle('d-none', !element.checked)
           worker.postMessage({
             action: "update-state",
             detect: config.detect,
@@ -5655,19 +5718,7 @@ document.addEventListener("change", function (e) {
         }
         case "model-to-use": {
           config.model = element.value;
-          STATE.analysisDone = false;
-          modelSettingsDisplay();
-          DOM.customListFile.value = config.customListFile[config.model];
-          DOM.customListFile.value
-            ? (LIST_MAP = i18n.get(i18n.LIST_MAP))
-            : delete LIST_MAP.custom;
-          document.getElementById("locale").value = config.locale;
-          document.getElementById(config[config.model].backend).checked = true;
-          handleBackendChange(config[config.model].backend);
-          setListUIState(config.list);
-          DOM.chartsLink.classList.add("disabled");
-          DOM.exploreLink.classList.add("disabled");
-          STATE.diskHasRecords = false;
+          handleModelChange(config.model);
           break;
         }
         case "thread-slider": {
@@ -6474,7 +6525,7 @@ const prepTour = async () => {
 const tracking = document.getElementById("update-progress");
 const updateProgressBar = document.getElementById("update-progress-bar");
 const displayProgress = (progressObj, text) => {
-  tracking.firstChild.nodeValue = text;
+  tracking.querySelector('span').textContent = text;
   tracking.classList.remove("d-none");
   // Update your UI with the progress information
   updateProgressBar.value = progressObj.percent;

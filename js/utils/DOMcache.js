@@ -295,6 +295,12 @@ const DOM = {
     }
     return this._modelToUse;
   },
+  get modelIcon() {
+    if (!this._modelIcon) {
+      this._modelIcon = document.getElementById("model-icon");
+    }
+    return this._modelIcon;
+  },
   get navPadding() {
     if (!this._navPadding) {
       this._navPadding = document.getElementById("navPadding");
