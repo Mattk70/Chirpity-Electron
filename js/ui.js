@@ -2875,7 +2875,7 @@ const updateModelIcon = (model) => {
       title = "Nocmig (beta)";
       break;
     default:
-      title = "Custom"; //TODO: TRANSLATIONS
+      title = i18n.get(i18n.Lists).custom;
       model = "custom"
   }
   const img = document.createElement("img");
