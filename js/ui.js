@@ -1885,7 +1885,10 @@ window.onload = async () => {
     //fill in defaults - after updates add new items
     utils.syncConfig(config, defaultConfig);
 
-    membershipCheck().then((isMember) => (STATE.isMember = isMember));
+    membershipCheck().then((isMember) => {
+      STATE.isMember = isMember;
+      if (config.detect.combine) document.getElementById('model-icon').classList.remove('d-none')
+    });
 
     const { model, library, database, detect, filters, audio, 
       limit, locale, speciesThreshold, list, useWeek, UUID, 
@@ -2025,7 +2028,7 @@ window.onload = async () => {
     document.getElementById("auto-load").checked = config.detect.autoLoad;
     document.getElementById("iucn").checked = config.detect.iucn;
     document.getElementById("iucn-scope").selected = config.detect.iucnScope;
-    modelSettingsDisplay();
+    handleModelChange(config.model, false)
     // Block powersave?
     document.getElementById("power-save-block").checked =
       config.powerSaveBlocker;
@@ -2851,6 +2854,17 @@ const updateListIcon = () => {
         }"  title="${LIST_MAP[config.list]}">`;
 };
 
+const updateModelIcon = (model) => {
+let title = "BirdNET";
+if (model !== 'birdnet') {
+  title = model === 'chirpity'
+  ? "Nocmig"
+  : "Nocmig (beta)";
+}
+  DOM.modelIcon.innerHTML =
+    `<img class="icon" src="img/icon/${model}_logo.png" alt="${title}"  title="${title}">`;
+};
+
 DOM.listIcon.addEventListener("click", () => {
   if (PREDICTING) {
     generateToast({ message: "changeListBlocked", type: "warning" });
@@ -2895,6 +2909,21 @@ const loadModel = () => {
     backend: config[model].backend,
   });
 };
+
+const handleModelChange = (model, reload = true) => {
+  
+  STATE.analysisDone = false;
+  modelSettingsDisplay();
+  DOM.customListFile.value = config.customListFile[config.model];
+  DOM.customListFile.value
+    ? (LIST_MAP = i18n.get(i18n.LIST_MAP))
+    : delete LIST_MAP.custom;
+  document.getElementById(config[config.model].backend).checked = true;
+  if (reload) {
+    handleBackendChange(config[config.model].backend);
+  }
+  updateModelIcon(config.model);
+}
 
 const handleBackendChange = (backend) => {
   backend = backend instanceof Event ? backend.target.value : backend;
@@ -5295,6 +5324,20 @@ function handleUIClicks(e) {
       document.getElementById("frequency-range").classList.toggle("active");
       break;
     }
+    case "model-icon": {
+      if (PREDICTING) {
+        // generateToast({ message: "changeListBlocked", type: "warning" });
+        return;
+      }
+      const el = DOM.modelToUse;
+      const numberOfOptions = el.options.length;
+      const currentListIndex = el.selectedIndex;
+      const next = currentListIndex === numberOfOptions - 1 ? 0 : currentListIndex + 1;
+      config.model = el.options[next].value;
+      el.selectedIndex = (el.selectedIndex + 1) % numberOfOptions;
+      handleModelChange(config.model)
+      break;
+    }
     case "nocmigMode": {
       changeNocmigMode();
       break;
@@ -5504,6 +5547,7 @@ document.addEventListener("change", function (e) {
         }
         case "combine-detections": {
           config.detect.combine = element.checked;
+          document.getElementById('model-icon').classList.toggle('d-none', !element.checked)
           worker.postMessage({
             action: "update-state",
             detect: config.detect,
@@ -5653,19 +5697,7 @@ document.addEventListener("change", function (e) {
         }
         case "model-to-use": {
           config.model = element.value;
-          STATE.analysisDone = false;
-          modelSettingsDisplay();
-          DOM.customListFile.value = config.customListFile[config.model];
-          DOM.customListFile.value
-            ? (LIST_MAP = i18n.get(i18n.LIST_MAP))
-            : delete LIST_MAP.custom;
-          document.getElementById("locale").value = config.locale;
-          document.getElementById(config[config.model].backend).checked = true;
-          handleBackendChange(config[config.model].backend);
-          setListUIState(config.list);
-          DOM.chartsLink.classList.add("disabled");
-          DOM.exploreLink.classList.add("disabled");
-          STATE.diskHasRecords = false;
+          handleModelChange(config.model);
           break;
         }
         case "thread-slider": {
@@ -6472,7 +6504,7 @@ const prepTour = async () => {
 const tracking = document.getElementById("update-progress");
 const updateProgressBar = document.getElementById("update-progress-bar");
 const displayProgress = (progressObj, text) => {
-  tracking.firstChild.nodeValue = text;
+  tracking.querySelector('span').textContent = text;
   tracking.classList.remove("d-none");
   // Update your UI with the progress information
   updateProgressBar.value = progressObj.percent;
