@@ -2935,15 +2935,15 @@ const handleModelChange = (model, reload = true) => {
   
   STATE.analysisDone = false;
   modelSettingsDisplay();
-  DOM.customListFile.value = config.customListFile[config.model];
+  DOM.customListFile.value = config.customListFile[model];
   DOM.customListFile.value
     ? (LIST_MAP = i18n.get(i18n.LIST_MAP))
     : delete LIST_MAP.custom;
-  document.getElementById(config[config.model].backend).checked = true;
+  document.getElementById(config[model].backend).checked = true;
   if (reload) {
-    handleBackendChange(config[config.model].backend);
+    handleBackendChange(config[model].backend);
   }
-  updateModelIcon(config.model);
+  updateModelIcon(model);
 }
 
 const handleBackendChange = (backend) => {
