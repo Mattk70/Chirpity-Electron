@@ -2862,11 +2862,20 @@ const updateListIcon = () => {
 };
 
 const updateModelIcon = (model) => {
-  let title = "BirdNET";
-  if (model !== 'birdnet') {
-    title = model === 'chirpity'
-    ? "Nocmig"
-    : "Nocmig (beta)";
+  let title;
+  switch (model) {
+    case 'birdnet':
+      title = "BirdNET";
+      break;
+    case 'chirpity':
+      title = "Nocmig";
+      break;
+    case 'nocmig':
+      title = "Nocmig (beta)";
+      break;
+    default:
+      title = "Custom"; //TODO: TRANSLATIONS
+      model = "custom"
   }
   const img = document.createElement("img");
   img.className = "icon";
