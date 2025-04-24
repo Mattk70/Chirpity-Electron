@@ -2852,6 +2852,7 @@ const updateListIcon = () => {
     node.style.width =  "1.8rem";
     node.textContent = "fact_check";
   } else {
+    if (!['location', 'birds', 'nocturnal', 'everything'].includes(list)) return
     node = document.createElement("img");
     node.className = "icon filter";
     node.setAttribute("src", `img/${list}.png`);
