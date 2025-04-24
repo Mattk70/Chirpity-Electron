@@ -5355,7 +5355,7 @@ function handleUIClicks(e) {
       const currentListIndex = el.selectedIndex;
       const next = currentListIndex === numberOfOptions - 1 ? 0 : currentListIndex + 1;
       config.model = el.options[next].value;
-      el.selectedIndex = (el.selectedIndex + 1) % numberOfOptions;
+      el.selectedIndex = next;
       handleModelChange(config.model)
       break;
     }
