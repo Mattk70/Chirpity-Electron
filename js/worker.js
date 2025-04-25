@@ -4983,5 +4983,3 @@ async function convertFile(
       .run();
   });
 }
-
-module.exports = {setMetadata}
