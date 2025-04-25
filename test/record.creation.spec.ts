@@ -128,6 +128,8 @@ test('Can create/edit a manual record', async () => {
   await page.locator('#call-count').fill('3');
   await page.locator('#record-comment').fill('a test comment');
   await page.locator('#record-add').click();
+  // wait for audio to load
+  await page.waitForTimeout(300);
   const confidence = await page.locator('#result1 td.cname');
 
   // Confidence has been changed to Person_add icon
