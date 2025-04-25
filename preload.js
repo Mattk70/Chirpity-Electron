@@ -57,6 +57,7 @@ contextBridge.exposeInMainWorld("electron", {
   openDialog: (method, config) =>
     ipcRenderer.invoke("openFiles", method, config),
   getPath: () => ipcRenderer.invoke("getPath"),
+  getAppPath: () => ipcRenderer.invoke("getAppPath"),
   getLocale: () => ipcRenderer.invoke("getLocale"),
   getTemp: () => ipcRenderer.invoke("getTemp"),
   getVersion: () => ipcRenderer.invoke("getVersion"),

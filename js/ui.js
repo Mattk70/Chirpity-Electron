@@ -414,8 +414,9 @@ async function getPaths() {
   const appPath = await window.electron.getPath();
   const tempPath = await window.electron.getTemp();
   const locale = await window.electron.getLocale();
-  //console.log('path is', appPath, 'temp is', tempPath, 'raw locale is', locale);
-  return [appPath, tempPath, locale];
+  const dirname = await window.electron.getAppPath();
+  // console.log('Folder is', dirname, 'data path is', appPath, 'temp is', tempPath, 'raw locale is', locale);
+  return [appPath, tempPath, locale, dirname];
 }
 
 let VERSION;
@@ -438,7 +439,6 @@ let appVersionLoaded = new Promise((resolve, reject) => {
 
 let modelReady = false;
 let PREDICTING = false,
-  t0,
   app_t0 = Date.now();
 
 
@@ -481,7 +481,6 @@ DOM.controlsWrapper.addEventListener("mousedown", (e) => {
 
 // Set default Options
 let config;
-let sampleRate = 24_000;
 
 /** Collect DIAGNOSTICS Information
 DIAGNOSTICS keys:
@@ -1833,7 +1832,7 @@ const defaultConfig = {
   fileStartMtime: false,
   keyAssignment: {},
 };
-let appPath, tempPath, systemLocale, isMac;
+let dirname, appPath, tempPath, systemLocale, isMac;
 window.onload = async () => {
   window.electron.requestWorkerChannel();
   isMac = await window.electron.isMac();
@@ -1841,7 +1840,7 @@ window.onload = async () => {
   DOM.contentWrapper.classList.add("loaded");
 
   // Load preferences and override defaults
-  [appPath, tempPath, systemLocale] = await getPaths();
+  [appPath, tempPath, systemLocale, dirname] = await getPaths();
   // Set default locale
   systemLocale = systemLocale.replace("en-GB", "en_uk");
   systemLocale =
@@ -2222,7 +2221,7 @@ const setUpWorkerMessaging = () => {
           let locale = args.locale;
           let labelFile;
           locale === "pt" && (locale = "pt_PT");
-          labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_${locale}.txt`;
+          labelFile = p.join(dirname,`labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_${locale}.txt`);
 
           readLabels(labelFile);
           break;
@@ -2405,7 +2404,6 @@ function generateBirdIDList(rows) {
   return listHTML;
 }
 
-const getActiveRowID = () => activeRow?.rowIndex - 1;
 
 const isSpeciesViewFiltered = (sendSpecies) => {
   const filtered = document.querySelector("#speciesFilter tr.text-warning");
@@ -2541,7 +2539,6 @@ function onChartData(args) {
 
   const aggregation = args.aggregation;
   const results = args.results;
-  const rate = args.rate;
   const total = args.total;
   const dataPoints = args.dataPoints;
   // start hourly charts at midday if no filter applied
@@ -5694,7 +5691,7 @@ document.addEventListener("change", function (e) {
               return;
             }
           } else {
-            labelFile = `labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_${element.value}.txt`;
+            labelFile = p.join(dirname,`labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_${element.value}.txt`);
             i18n
               .localiseUI(DOM.locale.value)
               .then((result) => (STATE.i18n = result));

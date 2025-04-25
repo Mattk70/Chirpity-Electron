@@ -419,6 +419,7 @@ if (!gotTheLock) {
     }
 
       ipcMain.handle('getPath', () => app.getPath('userData'));
+      ipcMain.handle('getAppPath', () => app.getAppPath());
       ipcMain.handle('trialPeriod', () => 14*24*3600*1000); // 14 days
       ipcMain.handle('getLocale', () => app.getLocale());
       ipcMain.handle('getTemp', () => app.getPath('temp'));
