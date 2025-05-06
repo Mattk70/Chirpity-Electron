@@ -81,6 +81,10 @@ console.error = function () {
 window.addEventListener("unhandledrejection", function (event) {
   // Extract the error message and stack trace from the event
   const errorMessage = event.reason.message;
+  // if (errorMessage?.startsWith("The play() request was interrupted by a call to pause()")) {
+  //   // Hack: Reload the audio segment
+  //   postBufferUpdate({file: STATE.currentFile, begin: STATE.windowOffsetSecs, position: 0, play: false, resetSpec: true});
+  // };
   const stackTrace = event.reason.stack;
 
   // Track the unhandled promise rejection
@@ -188,19 +192,19 @@ const GLOBAL_ACTIONS = {
     }
   },
   Home: () => {
-    if (STATE.currentBuffer && STATE.regionsCompleted) {
+    if (STATE.currentBuffer) {
       STATE.windowOffsetSecs = 0;
       postBufferUpdate({});
     }
   },
   End: () => {
-    if (STATE.currentBuffer && STATE.regionsCompleted) {
+    if (STATE.currentBuffer) {
       STATE.windowOffsetSecs = STATE.currentFileDuration - STATE.windowLength;
       postBufferUpdate({ begin: STATE.windowOffsetSecs, position: 1 });
     }
   },
   PageUp: () => {
-    if (STATE.currentBuffer && STATE.regionsCompleted) {
+    if (STATE.currentBuffer) {
       const position = utils.clamp(
         spec.wavesurfer.getCurrentTime() / STATE.windowLength,
         0,
@@ -224,7 +228,7 @@ const GLOBAL_ACTIONS = {
     }
   },
   ArrowUp: () => {
-    if (activeRow && STATE.regionsCompleted) {
+    if (activeRow) {
       activeRow.classList.remove("table-active");
       activeRow = activeRow.previousSibling || activeRow;
       if (!activeRow.classList.contains("text-bg-dark")) activeRow.click();
@@ -232,7 +236,7 @@ const GLOBAL_ACTIONS = {
     }
   },
   PageDown: () => {
-    if (STATE.currentBuffer && STATE.regionsCompleted) {
+    if (STATE.currentBuffer) {
       let position = utils.clamp(
         spec.wavesurfer.getCurrentTime() / STATE.windowLength,
         0,
@@ -264,7 +268,7 @@ const GLOBAL_ACTIONS = {
     }
   },
   ArrowDown: () => {
-    if (activeRow && STATE.regionsCompleted) {
+    if (activeRow) {
       activeRow.classList.remove("table-active");
       activeRow = activeRow.nextSibling || activeRow;
       if (!activeRow.classList.contains("text-bg-dark")) activeRow.click();
@@ -273,7 +277,7 @@ const GLOBAL_ACTIONS = {
   },
   ArrowLeft: () => {
     const skip = STATE.windowLength / 100;
-    if (STATE.currentBuffer && STATE.regionsCompleted) {
+    if (STATE.currentBuffer) {
       spec.wavesurfer.setTime(spec.wavesurfer.getCurrentTime() - skip);
       let position = utils.clamp(
         spec.wavesurfer.getCurrentTime() / STATE.windowLength,
@@ -292,7 +296,7 @@ const GLOBAL_ACTIONS = {
   },
   ArrowRight: () => {
     const skip = STATE.windowLength / 100;
-    if (STATE.currentBuffer && STATE.regionsCompleted) {
+    if (STATE.currentBuffer) {
       const now = spec.wavesurfer.getCurrentTime();
       // This will trigger the finish event if at the end of the window
       spec.wavesurfer.setTime(now + skip);
@@ -310,7 +314,7 @@ const GLOBAL_ACTIONS = {
       const modeToSet =
         STATE.mode === "explore" ? "active-analysis" : "explore";
       document.getElementById(modeToSet).click();
-    } else if (activeRow && STATE.regionsCompleted) {
+    } else if (activeRow) {
       activeRow.classList.remove("table-active");
       if (e.shiftKey) {
         activeRow = activeRow.previousSibling || activeRow;
@@ -1619,12 +1623,12 @@ selectionTable.addEventListener("click", debounceClick(resultClick));
  * @returns {Promise<void>}
  */
 async function resultClick(e) {
-  const {currentFile, fileLoaded, regionsCompleted} = STATE;
+  const {currentFile, fileLoaded} = STATE;
   if (!fileLoaded && currentFile) {
     console.warn("Cannot process click - no audio file is loaded");
     return;
   }
-  if (!regionsCompleted && currentFile) {
+  if (currentFile) {
     console.warn("Cannot process click - regions are still being created");
     return;
   }
@@ -2371,7 +2375,6 @@ const setUpWorkerMessaging = () => {
  * @param {boolean} options.goToRegion - Whether to reposition the view to the active region.
  */
 function showWindowDetections({ detections, goToRegion }) {
-  STATE.regionsCompleted = false;
   for (const detection of detections) {
     const start = detection.start - STATE.windowOffsetSecs;
     if (start < STATE.windowLength) {
@@ -2383,8 +2386,6 @@ function showWindowDetections({ detections, goToRegion }) {
       spec.createRegion(start, end, detection.label, setPosition, colour);
     }
   }
-  // Prevent region cluster fest
-  STATE.regionsCompleted = true;
 }
 
 /**
@@ -3004,7 +3005,7 @@ const timelineToggle = (fromKeys) => {
   }
   config.timeOfDay = DOM.timelineSetting.value === "timeOfDay"; //toggle setting
   setTimelinePreferences();
-  if (STATE.fileLoaded && STATE.regionsCompleted) {
+  if (STATE.fileLoaded) {
     // Reload wavesurfer with the new timeline
     const position = utils.clamp(
       spec.wavesurfer.getCurrentTime() / STATE.windowLength,
@@ -3113,7 +3114,7 @@ gotoModal.addEventListener("shown.bs.modal", () => {
 });
 
 const gotoTime = (e) => {
-  if (STATE.currentFile && STATE.regionsCompleted) {
+  if (STATE.currentFile) {
     e.preventDefault();
     const time = document.getElementById("timeInput").value;
     // Nothing entered?
@@ -3647,7 +3648,6 @@ pagination.init();
  */
 function speciesFilter(e) {
   if (
-    !STATE.regionsCompleted ||
     PREDICTING ||
     ["TBODY", "TH", "DIV"].includes(e.target.tagName)
   )
@@ -3737,8 +3737,7 @@ async function renderResult({
     if (
       config.specDetections &&
       !isFromDB &&
-      !STATE.selection &&
-      STATE.regionsCompleted
+      !STATE.selection
     )
       postBufferUpdate({ file, begin: STATE.windowOffsetSecs });
   } else if (!isFromDB && index % (config.limit + 1) === 0) {
@@ -4725,7 +4724,7 @@ const filterIconDisplay = () => {
 };
 // High pass threshold
 const showFilterEffect = () => {
-  if (STATE.fileLoaded && STATE.regionsCompleted) {
+  if (STATE.fileLoaded) {
     const position = utils.clamp(
       spec.wavesurfer.getCurrentTime() / STATE.windowLength,
       0,
@@ -4867,17 +4866,15 @@ DOM.gain.addEventListener("input", () => {
 function playRegion() {
   // Sanitise region (after zoom, start or end may be outside the windowlength)
   // I don't want to change the actual region length, so make a copy
-  if (STATE.regionsCompleted) {
-    const region = spec.REGIONS.regions?.find(
-      (region) => region.start === STATE.activeRegion.start
-    );
-    if (region) {
-      const myRegion = region;
-      myRegion.start = Math.max(0, myRegion.start);
-      // Have to adjust the windowlength so the finish event isn't fired - causing a page reload)
-      myRegion.end = Math.min(myRegion.end, STATE.windowLength * 0.995);
-      myRegion.play(true);
-    }
+  const region = spec.REGIONS.regions?.find(
+    (region) => region.start === STATE.activeRegion.start
+  );
+  if (region) {
+    const myRegion = region;
+    myRegion.start = Math.max(0, myRegion.start);
+    // Have to adjust the windowlength so the finish event isn't fired - causing a page reload)
+    myRegion.end = Math.min(myRegion.end, STATE.windowLength * 0.995);
+    myRegion.play(true);
   }
 }
 // Audio preferences:
@@ -5748,7 +5745,7 @@ document.addEventListener("change", function (e) {
           } else {
             colorMapFieldset.classList.add("d-none");
           }
-          if (spec.wavesurfer && STATE.currentFile && STATE.regionsCompleted) {
+          if (spec.wavesurfer && STATE.currentFile) {
             const fftSamples = spec.spectrogram.fftSamples;
             spec.adjustDims(true, fftSamples);
             postBufferUpdate({
@@ -5797,7 +5794,7 @@ document.addEventListener("change", function (e) {
           config.audio.gain = element.value;
           worker.postMessage({ action: "update-state", audio: config.audio });
           config.filters.active || toggleFilters();
-          if (STATE.fileLoaded && STATE.regionsCompleted) {
+          if (STATE.fileLoaded) {
             const position = utils.clamp(
               spec.wavesurfer.getCurrentTime() / STATE.windowLength,
               0,
@@ -5858,7 +5855,7 @@ document.addEventListener("change", function (e) {
             filters: config.filters,
           });
           element.blur();
-          if (STATE.fileLoaded && STATE.regionsCompleted) {
+          if (STATE.fileLoaded) {
             const position = utils.clamp(
               spec.wavesurfer.getCurrentTime() / STATE.windowLength,
               0,
@@ -6612,7 +6609,6 @@ function generateToast({
   if (message === "noFile") {
     clearTimeout(loadingTimeout) && DOM.loading.classList.add("d-none");
     // Alow further interactions!!
-    STATE.regionsCompleted = true;
     STATE.currentFile && (STATE.fileLoaded = true);
   }
   message = variables
