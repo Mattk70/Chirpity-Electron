@@ -1628,10 +1628,6 @@ async function resultClick(e) {
     console.warn("Cannot process click - no audio file is loaded");
     return;
   }
-  if (currentFile) {
-    console.warn("Cannot process click - regions are still being created");
-    return;
-  }
   let row = e.target.closest("tr");
   if (!row || row.classList.length === 0 || row.closest("#resultsHead")) {
     // 1. clicked and dragged, 2 no detections in file row 3. clicked a header
