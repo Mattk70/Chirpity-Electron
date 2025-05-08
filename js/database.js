@@ -497,7 +497,7 @@ const mergeDbIfNeeded = async ({diskDB, model, appPath, dbMutex}) => {
   const {existsSync} = require('node:fs');
   const dbNotFound = !existsSync(legacyDbPath);
   const isCustomDB = !diskDB.filename.includes(appPath);
-  console.log('isCustomDB:', isCustomDB)
+  DEBUG && console.log('isCustomDB:', isCustomDB);
   if (dbNotFound) {
     console.log(`Model database not found: ${legacyDbPath}`);
     const modelID = await addNewModel({model, db:diskDB, dbMutex})
