@@ -426,7 +426,7 @@ export class ChirpityWS {
     const wavesurfer = this.wavesurfer;
     const spectrogram = this.spectrogram;
     const STATE = this.getState();
-    if (spectrogram.fftSamples < 2048 && STATE.regionsCompleted) {
+    if (spectrogram.fftSamples < 2048) {
       spectrogram.fftSamples *= 2;
       const position = clamp(
         wavesurfer.getCurrentTime() / STATE.windowLength,
@@ -472,7 +472,7 @@ export class ChirpityWS {
     const wavesurfer = this.wavesurfer;
     const spectrogram = this.spectrogram;
     const STATE = this.getState();
-    if (spectrogram.fftSamples > 64 && STATE.regionsCompleted) {
+    if (spectrogram.fftSamples > 64) {
       spectrogram.fftSamples /= 2;
       const position = clamp(
         wavesurfer.getCurrentTime() / STATE.windowLength,
@@ -520,9 +520,9 @@ export class ChirpityWS {
   zoom(direction) {
     const wavesurfer = this.wavesurfer;
     const STATE = this.getState();
-    const { fileLoaded, regionsCompleted, currentFileDuration } = STATE;
+    const { fileLoaded, currentFileDuration } = STATE;
     let { windowLength, windowOffsetSecs, activeRegion } = STATE;
-    if (fileLoaded && regionsCompleted) {
+    if (fileLoaded) {
       if (typeof direction !== "string") {
         // then it's an event
         direction = direction.target.closest("button").id.replace("zoom", "");
@@ -592,33 +592,31 @@ export class ChirpityWS {
 
   centreSpec() {
     const STATE = this.getState();
-    let { windowOffsetSecs, activeRegion, currentFileDuration, windowLength, regionsCompleted } = STATE;
-    if (regionsCompleted) {
-      const saveBufferBegin = windowOffsetSecs;
-      const middle = windowOffsetSecs + this.wavesurfer.getCurrentTime();
-      windowOffsetSecs = middle - windowLength / 2;
-      windowOffsetSecs = Math.max(0, windowOffsetSecs);
-      windowOffsetSecs = Math.min(
-        windowOffsetSecs,
-        currentFileDuration - windowLength
-      );
+    let { windowOffsetSecs, activeRegion, currentFileDuration, windowLength} = STATE;
+    const saveBufferBegin = windowOffsetSecs;
+    const middle = windowOffsetSecs + this.wavesurfer.getCurrentTime();
+    windowOffsetSecs = middle - windowLength / 2;
+    windowOffsetSecs = Math.max(0, windowOffsetSecs);
+    windowOffsetSecs = Math.min(
+      windowOffsetSecs,
+      currentFileDuration - windowLength
+    );
 
-      if (activeRegion) {
-        const shift = saveBufferBegin - windowOffsetSecs;
-        activeRegion.start += shift;
-        activeRegion.end += shift;
-        const { start, end } = activeRegion;
-        if (start < 0 || end > windowLength) activeRegion = null;
-      }
-      this.handlers.onStateUpdate({
-        windowOffsetSecs,
-        activeRegion,
-      });
-      this.handlers.postBufferUpdate({
-        begin: windowOffsetSecs,
-        position: 0.5,
-      });
+    if (activeRegion) {
+      const shift = saveBufferBegin - windowOffsetSecs;
+      activeRegion.start += shift;
+      activeRegion.end += shift;
+      const { start, end } = activeRegion;
+      if (start < 0 || end > windowLength) activeRegion = null;
     }
+    this.handlers.onStateUpdate({
+      windowOffsetSecs,
+      activeRegion,
+    });
+    this.handlers.postBufferUpdate({
+      begin: windowOffsetSecs,
+      position: 0.5,
+    });
   }
   makeBlob(audio) {
     // Recreate TypedArray
