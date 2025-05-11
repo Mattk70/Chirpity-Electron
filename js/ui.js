@@ -137,7 +137,7 @@ const GLOBAL_ACTIONS = {
       STATE.currentFile &&
       document.getElementById("analyseAll").click();
   },
-  c: (e) => (e.ctrlKey || e.metaKey) && STATE.currentBuffer && spec.centreSpec(),
+  c: (e) => (e.ctrlKey || e.metaKey) && STATE.fileLoaded && spec.centreSpec(),
   // D: (e) => {
   //     if (( e.ctrlKey || e.metaKey)) worker.postMessage({ action: 'create-dataset' });
   // },
@@ -192,19 +192,19 @@ const GLOBAL_ACTIONS = {
     }
   },
   Home: () => {
-    if (STATE.currentBuffer) {
+    if (STATE.fileLoaded) {
       STATE.windowOffsetSecs = 0;
       postBufferUpdate({});
     }
   },
   End: () => {
-    if (STATE.currentBuffer) {
+    if (STATE.fileLoaded) {
       STATE.windowOffsetSecs = STATE.currentFileDuration - STATE.windowLength;
       postBufferUpdate({ begin: STATE.windowOffsetSecs, position: 1 });
     }
   },
   PageUp: () => {
-    if (STATE.currentBuffer) {
+    if (STATE.fileLoaded) {
       const position = utils.clamp(
         spec.wavesurfer.getCurrentTime() / STATE.windowLength,
         0,
@@ -236,7 +236,7 @@ const GLOBAL_ACTIONS = {
     }
   },
   PageDown: () => {
-    if (STATE.currentBuffer) {
+    if (STATE.fileLoaded) {
       let position = utils.clamp(
         spec.wavesurfer.getCurrentTime() / STATE.windowLength,
         0,
@@ -277,7 +277,7 @@ const GLOBAL_ACTIONS = {
   },
   ArrowLeft: () => {
     const skip = STATE.windowLength / 100;
-    if (STATE.currentBuffer) {
+    if (STATE.fileLoaded) {
       spec.wavesurfer.setTime(spec.wavesurfer.getCurrentTime() - skip);
       let position = utils.clamp(
         spec.wavesurfer.getCurrentTime() / STATE.windowLength,
@@ -296,18 +296,18 @@ const GLOBAL_ACTIONS = {
   },
   ArrowRight: () => {
     const skip = STATE.windowLength / 100;
-    if (STATE.currentBuffer) {
+    if (STATE.fileLoaded) {
       const now = spec.wavesurfer.getCurrentTime();
       // This will trigger the finish event if at the end of the window
       spec.wavesurfer.setTime(now + skip);
     }
   },
-  "=": (e) => ( spec.wavesurfer && (e.metaKey || e.ctrlKey) ? config.FFT = spec.reduceFFT() : spec.zoom("In")),
-  "+": (e) => (spec.wavesurfer && (e.metaKey || e.ctrlKey) ? config.FFT = spec.reduceFFT() : spec.zoom("In")),
-  "-": (e) => (spec.wavesurfer && (e.metaKey || e.ctrlKey) ? config.FFT = spec.increaseFFT() : spec.zoom("Out")),
-  F5: () =>  spec.wavesurfer && (config.FFT = spec.reduceFFT()),
-  F4: () =>  spec.wavesurfer && (config.FFT = spec.increaseFFT()),
-  " ": () => { spec.wavesurfer && WSPlayPause()},
+  "=": (e) => STATE.fileLoaded && (spec.wavesurfer && (e.metaKey || e.ctrlKey) ? config.FFT = spec.reduceFFT() : spec.zoom("In")),
+  "+": (e) => STATE.fileLoaded && (spec.wavesurfer && (e.metaKey || e.ctrlKey) ? config.FFT = spec.reduceFFT() : spec.zoom("In")),
+  "-": (e) => STATE.fileLoaded && (spec.wavesurfer && (e.metaKey || e.ctrlKey) ? config.FFT = spec.increaseFFT() : spec.zoom("Out")),
+  F5: () =>  STATE.fileLoaded && (spec.wavesurfer && (config.FFT = spec.reduceFFT())),
+  F4: () =>  STATE.fileLoaded && (spec.wavesurfer && (config.FFT = spec.increaseFFT())),
+  " ": () => { WSPlayPause()},
   Tab: (e) => {
     if ((e.metaKey || e.ctrlKey) && !PREDICTING && STATE.diskHasRecords) {
       // If you did this when predicting, your results would go straight to the archive
@@ -328,8 +328,8 @@ const GLOBAL_ACTIONS = {
       }
     }
   },
-  Delete: () => activeRow && deleteRecord(activeRow),
-  Backspace: () => activeRow && deleteRecord(activeRow),
+  Delete: () => STATE.fileLoaded && activeRow && deleteRecord(activeRow),
+  Backspace: () => STATE.fileLoaded && activeRow && deleteRecord(activeRow),
 };
 
 /**
@@ -345,7 +345,7 @@ function waitForWavesurferReady() {
     if (wavesurfer.isReady) {
       resolve();
     } else {
-      const onReady = () => {
+      const onReady = () => { 
         wavesurfer.un('ready', onReady);
         resolve();
       };
@@ -2926,8 +2926,6 @@ const loadModel = () => {
 };
 
 const handleModelChange = (model, reload = true) => {
-  
-  STATE.analysisDone = false;
   modelSettingsDisplay();
   DOM.customListFile.value = config.customListFile[model];
   DOM.customListFile.value
