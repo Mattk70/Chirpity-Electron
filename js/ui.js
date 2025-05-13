@@ -6740,7 +6740,7 @@ async function getXCComparisons() {
     const fetchRequests = types.map((type) => {
       // Use a different length parameter for "song"
       const typeLength = type === "song" ? "+len:10-30" : defaultLength;
-      const query = `https://www.xeno-canto.org/api/3/recordings?key=d5e2d2775c7f2b2fb8325ffacc41b9e6aa94679e&query=sp:"${sname}"${quality}${typeLength}+type:"${type}"`;
+      const query = `https://xeno-canto.org/api/3/recordings?key=d5e2d2775c7f2b2fb8325ffacc41b9e6aa94679e&query=sp:"${sname}"${quality}${typeLength}+type:"${type}"`;
       
       return fetch(query)
         .then((response) =>
