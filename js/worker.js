@@ -4016,10 +4016,10 @@ const getDetectedSpecies = async () => {
 const getValidSpecies = async (file) => {
   const included = await getIncludedIDs(file);
   let excludedSpecies, includedSpecies;
-  let sql = `SELECT cname, sname FROM species`;
+  let sql = `SELECT cname, sname FROM species WHERE modelID = ${STATE.modelID}`;
 
   if (filtersApplied(included)) {
-    sql += ` WHERE id IN (${included.join(",")}) AND modelID = ${STATE.modelID}`;
+    sql += ` AND id IN (${included.join(",")})`;
   }
   sql += " GROUP BY cname ORDER BY cname";
   includedSpecies = await diskDB.allAsync(sql);
