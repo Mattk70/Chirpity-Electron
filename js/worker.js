@@ -502,7 +502,7 @@ async function handleMessage(e) {
     case "file-load-request": {
       const {preserveResults, file, model} = args;
       index = 0;
-      filesBeingProcessed.length && onAbort(model);
+      filesBeingProcessed.length && onAbort({model});
       DEBUG && console.log("Worker received audio " + file);
       await loadAudioFile(args).catch((_e) =>
         console.warn("Error opening file:", file)
