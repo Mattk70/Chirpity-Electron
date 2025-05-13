@@ -1629,8 +1629,7 @@ selectionTable.addEventListener("click", debounceClick(resultClick));
  * @returns {Promise<void>}
  */
 async function resultClick(e) {
-  const {fileLoaded} = STATE;
-  if (!fileLoaded) {
+  if (!STATE.fileLoaded) {
     console.warn("Cannot process click - no audio file is loaded");
     return;
   }
@@ -1650,7 +1649,7 @@ async function resultClick(e) {
     loadResultRegion({ file, start, end, label });
   }
   if (e.target.classList.contains("circle")) {
-    await utils.waitFor(() => fileLoaded);
+    await utils.waitFor(() => STATE.fileLoaded);
     getSelectionResults(true);
   }
 }
