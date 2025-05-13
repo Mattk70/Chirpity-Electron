@@ -1,6 +1,16 @@
 const fs = require('node:fs');
 const csv = require('@fast-csv/parse');
+const readline = require('readline');
 
+async function countLines(filePath) {
+  const fileStream = fs.createReadStream(filePath);
+  const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
+  let lineCount = 0;
+  for await (const _line of rl) {
+    lineCount++;
+  }
+  return lineCount - 1; // Subtract 1 for header row
+}
 
 /**
    * Imports and processes CSV data into the database, resolving related entities and updating metadata.
@@ -17,7 +27,7 @@ const csv = require('@fast-csv/parse');
    *
    * @throws {Error} If a parsing or database error occurs, or if required entities are missing.
    */
-  async function importData({db, file, format, METADATA, defaultLocation, setMetadata}){
+  async function importData({db, file, format, METADATA, defaultLocation, setMetadata, UI}){
     const caches = {
         models: new Map(),
         species: new Map(),
@@ -25,6 +35,8 @@ const csv = require('@fast-csv/parse');
         locations: new Map(),
         files: new Map()
       };
+    const totalLines = await countLines(file);
+    let rowCounter = 0, lastPercentReported = -1;
     let t0 = Date.now()
     const stream = fs.createReadStream(file);
     const fileSet = new Set();
@@ -49,6 +61,13 @@ const csv = require('@fast-csv/parse');
             processing = processing.then(async () => {
             try {
                 METADATA = await prepInsertParams({db, row, METADATA, setMetadata, defaultLocation, caches})
+                rowCounter++;
+                const percent = Math.floor((rowCounter / totalLines) * 100 );
+                
+                if (percent !== lastPercentReported ) {
+                  lastPercentReported = percent;
+                  UI.postMessage({event: 'conversion-progress', progress: {percent}, text: 'Importing' });
+                }
             } catch (error) {
                 return reject(error)
             }
@@ -101,6 +120,7 @@ const csv = require('@fast-csv/parse');
       if (!res) {
         const message = model ? 'badModel' : 'noModel'
         const error = new Error(message);
+        model = model.replace('nocmig', 'Nocmig (beta)').replace('chirpity', 'Nocmig')
         error.variables = { model };
         throw error;
       }

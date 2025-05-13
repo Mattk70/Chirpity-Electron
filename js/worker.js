@@ -484,7 +484,7 @@ async function handleMessage(e) {
       const {file, format} = args;
       const { lat, lon, place } = STATE;
       const defaultLocation = { defaultLat:lat, defaultLon:lon, defaultPlace:place };
-      const result = await importData({db:memoryDB, file, format, defaultLocation, METADATA, setMetadata })
+      const result = await importData({db:memoryDB, file, format, defaultLocation, METADATA, setMetadata, UI })
         .catch(error => {
           const {message, variables} = error;
           generateAlert({message, type: 'error', variables})
@@ -493,26 +493,26 @@ async function handleMessage(e) {
       if (result) {
         const {files, meta} = result;
         METADATA = meta;
-        await getFiles({files, preserveResults:true});
+        STATE.filesToAnalyse = await getFiles({files, preserveResults:true, checkSaved: false});
         await Promise.all([getResults(), getSummary(), getTotal()])
       }
       UI.postMessage({ event: "clear-loading"})
       break;
     }
     case "file-load-request": {
-      if (!args.preserveResults) {
+      const {preserveResults, file, model} = args;
+      index = 0;
+      filesBeingProcessed.length && onAbort({model});
+      DEBUG && console.log("Worker received audio " + file);
+      await loadAudioFile(args).catch((_e) =>
+        console.warn("Error opening file:", file)
+      );
+      if (!preserveResults) {
         // Clear records from the memory db
         await memoryDB.runAsync("DELETE FROM records; VACUUM");
+        const mode = METADATA[file].isSaved ? "archive" : "analyse";
+        await onChangeMode(mode);
       }
-      index = 0;
-      filesBeingProcessed.length && onAbort(args);
-      DEBUG && console.log("Worker received audio " + args.file);
-      await loadAudioFile(args).catch((_e) =>
-        console.warn("Error opening file:", args.file)
-      );
-      const file = args.file;
-      const mode = METADATA[file].isSaved ? "archive" : "analyse";
-      await onChangeMode(mode);
       break;
     }
     case "filter": {
@@ -926,10 +926,10 @@ async function spawnListWorker() {
  * Sends this list to the UI
  * @param {*} files must be a list of file paths
  */
-const getFiles = async ({files, image, preserveResults}) => {
+const getFiles = async ({files, image, preserveResults, checkSaved = true}) => {
   const supportedFiles = image ? [".png"] : SUPPORTED_FILES;
   let folderDropped = false;
-  let fileList = [];
+  let filePaths = [];
 
   for (const path of files) {
     try {
@@ -942,12 +942,12 @@ const getFiles = async ({files, image, preserveResults}) => {
             supportedFiles.some((ext) => file.toLowerCase().endsWith(ext)) &&
             !p.basename(file).startsWith(".")
         );
-        fileList.push(...dirFiles);
+        filePaths.push(...dirFiles);
       } else if (
         !p.basename(path).startsWith(".") &&
         supportedFiles.some((ext) => path.toLowerCase().endsWith(ext))
       ) {
-        fileList.push(path);
+        filePaths.push(path);
       }
     } catch (error) {
       if (error.code === "EACCES") {
@@ -962,9 +962,9 @@ const getFiles = async ({files, image, preserveResults}) => {
     }
   }
   const fileOrFolder = folderDropped ? "Open Folder(s)" : "Open Files(s)";
-  trackEvent(STATE.UUID, "UI", "Drop", fileOrFolder, fileList.length);
-  UI.postMessage({ event: "files", filePaths: fileList, preserveResults });
-  return fileList;
+  trackEvent(STATE.UUID, "UI", "Drop", fileOrFolder, filePaths.length);
+  UI.postMessage({ event: "files", filePaths, preserveResults, checkSaved });
+  return filePaths;
 };
 
 const getFilesInDirectory = async (dir) => {
@@ -1833,9 +1833,7 @@ function addDays(date, days) {
  */
 async function sendDetections(file, start, end, goToRegion) {
   const {db, detect} = STATE;
-  const partition = detect.merge ? "" : ', r.modelID';  
-  start = METADATA[file].fileStart + start * 1000;
-  end = METADATA[file].fileStart + end * 1000;
+  const partition = detect.merge ? "" : ', r.modelID';
   const params = [STATE.detect.confidence, file, start, end];
   const includedSQL = await getSpeciesSQLAsync();
   const results = await db.allAsync(
@@ -1855,7 +1853,7 @@ async function sendDetections(file, start, end, goToRegion) {
             JOIN files ON fileID = files.ID
             WHERE confidence >= ?
             AND name = ? 
-            AND dateTime BETWEEN ? AND ?
+            AND start BETWEEN ? AND ?
             ${includedSQL}
         )
         SELECT start, end, label
@@ -2207,6 +2205,10 @@ async function processAudio(
 }
 
 function getMonoChannelData(audio) {
+  if (audio.length % 2 !== 0) {
+    generateAlert({message: `WAV audio sample length must be even, got ${audio.length}`, type: 'error'})
+    throw new Error(`Audio length must be even, got ${audio.length}`);
+  }
   const sampleCount = audio.length / 2;
   const channelData = new Float32Array(sampleCount);
   const dataView = new DataView(
@@ -4014,10 +4016,10 @@ const getDetectedSpecies = async () => {
 const getValidSpecies = async (file) => {
   const included = await getIncludedIDs(file);
   let excludedSpecies, includedSpecies;
-  let sql = `SELECT cname, sname FROM species`;
+  let sql = `SELECT cname, sname FROM species WHERE modelID = ${STATE.modelID}`;
 
   if (filtersApplied(included)) {
-    sql += ` WHERE id IN (${included.join(",")}) AND modelID = ${STATE.modelID}`;
+    sql += ` AND id IN (${included.join(",")})`;
   }
   sql += " GROUP BY cname ORDER BY cname";
   includedSpecies = await diskDB.allAsync(sql);
@@ -4190,14 +4192,14 @@ async function onDelete({
   speciesFiltered,
 }) {
   const {db} = STATE;
-  const { id, filestart } = await db.getAsync(
-    "SELECT id, filestart from files WHERE name = ?",
+  const { id } = await db.getAsync(
+    "SELECT id from files WHERE name = ?",
     file
   );
-  const datetime = Math.round(filestart + (parseFloat(start) * 1000));
-  end = parseFloat(end);
-  const params = [id, datetime, end];
-  let sql = "DELETE FROM records WHERE fileID = ? AND datetime = ? AND end = ?";
+  // const datetime = Math.round(filestart + (parseFloat(start) * 1000));
+  end = parseFloat(end); start = parseFloat(start);
+  const params = [id, start, end];
+  let sql = "DELETE FROM records WHERE fileID = ? AND position = ? AND end = ?";
   if (! STATE.detect.merge){
     params.push(modelID)
     sql += " AND modelID = ?";

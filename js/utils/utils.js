@@ -259,7 +259,7 @@ function waitFor(checkFn) {
       } else {
         ++retryCount;
       }
-    }, 100);
+    }, 10);
   });
 }
 

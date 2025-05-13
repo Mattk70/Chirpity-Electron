@@ -679,7 +679,7 @@ export class ChirpityWS {
   WSPluginPurge = () => {
     const wavesurfer = this.wavesurfer;
     // Destroy leaves the plugins in the plugin list.
-    // So, this is needed to remove plugins where the `wavesurfer` key is null
+    // So, this is needed to remove plugins where the `wavesurfer` key is not null
     wavesurfer &&
       (wavesurfer.plugins = wavesurfer.plugins.filter(
         (plugin) => plugin.wavesurfer !== null

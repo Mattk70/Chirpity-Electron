@@ -137,7 +137,7 @@ const GLOBAL_ACTIONS = {
       STATE.currentFile &&
       document.getElementById("analyseAll").click();
   },
-  c: (e) => (e.ctrlKey || e.metaKey) && STATE.currentBuffer && spec.centreSpec(),
+  c: (e) => (e.ctrlKey || e.metaKey) && STATE.fileLoaded && spec.centreSpec(),
   // D: (e) => {
   //     if (( e.ctrlKey || e.metaKey)) worker.postMessage({ action: 'create-dataset' });
   // },
@@ -192,19 +192,19 @@ const GLOBAL_ACTIONS = {
     }
   },
   Home: () => {
-    if (STATE.currentBuffer) {
+    if (STATE.fileLoaded) {
       STATE.windowOffsetSecs = 0;
       postBufferUpdate({});
     }
   },
   End: () => {
-    if (STATE.currentBuffer) {
+    if (STATE.fileLoaded) {
       STATE.windowOffsetSecs = STATE.currentFileDuration - STATE.windowLength;
       postBufferUpdate({ begin: STATE.windowOffsetSecs, position: 1 });
     }
   },
   PageUp: () => {
-    if (STATE.currentBuffer) {
+    if (STATE.fileLoaded) {
       const position = utils.clamp(
         spec.wavesurfer.getCurrentTime() / STATE.windowLength,
         0,
@@ -236,7 +236,7 @@ const GLOBAL_ACTIONS = {
     }
   },
   PageDown: () => {
-    if (STATE.currentBuffer) {
+    if (STATE.fileLoaded) {
       let position = utils.clamp(
         spec.wavesurfer.getCurrentTime() / STATE.windowLength,
         0,
@@ -277,7 +277,7 @@ const GLOBAL_ACTIONS = {
   },
   ArrowLeft: () => {
     const skip = STATE.windowLength / 100;
-    if (STATE.currentBuffer) {
+    if (STATE.fileLoaded) {
       spec.wavesurfer.setTime(spec.wavesurfer.getCurrentTime() - skip);
       let position = utils.clamp(
         spec.wavesurfer.getCurrentTime() / STATE.windowLength,
@@ -296,18 +296,18 @@ const GLOBAL_ACTIONS = {
   },
   ArrowRight: () => {
     const skip = STATE.windowLength / 100;
-    if (STATE.currentBuffer) {
+    if (STATE.fileLoaded) {
       const now = spec.wavesurfer.getCurrentTime();
       // This will trigger the finish event if at the end of the window
       spec.wavesurfer.setTime(now + skip);
     }
   },
-  "=": (e) => ( spec.wavesurfer && (e.metaKey || e.ctrlKey) ? config.FFT = spec.reduceFFT() : spec.zoom("In")),
-  "+": (e) => (spec.wavesurfer && (e.metaKey || e.ctrlKey) ? config.FFT = spec.reduceFFT() : spec.zoom("In")),
-  "-": (e) => (spec.wavesurfer && (e.metaKey || e.ctrlKey) ? config.FFT = spec.increaseFFT() : spec.zoom("Out")),
-  F5: () =>  spec.wavesurfer && (config.FFT = spec.reduceFFT()),
-  F4: () =>  spec.wavesurfer && (config.FFT = spec.increaseFFT()),
-  " ": () => { spec.wavesurfer && WSPlayPause()},
+  "=": (e) => STATE.fileLoaded && (spec.wavesurfer && (e.metaKey || e.ctrlKey) ? config.FFT = spec.reduceFFT() : spec.zoom("In")),
+  "+": (e) => STATE.fileLoaded && (spec.wavesurfer && (e.metaKey || e.ctrlKey) ? config.FFT = spec.reduceFFT() : spec.zoom("In")),
+  "-": (e) => STATE.fileLoaded && (spec.wavesurfer && (e.metaKey || e.ctrlKey) ? config.FFT = spec.increaseFFT() : spec.zoom("Out")),
+  F5: () =>  STATE.fileLoaded && (spec.wavesurfer && (config.FFT = spec.reduceFFT())),
+  F4: () =>  STATE.fileLoaded && (spec.wavesurfer && (config.FFT = spec.increaseFFT())),
+  " ": () => { WSPlayPause()},
   Tab: (e) => {
     if ((e.metaKey || e.ctrlKey) && !PREDICTING && STATE.diskHasRecords) {
       // If you did this when predicting, your results would go straight to the archive
@@ -328,8 +328,8 @@ const GLOBAL_ACTIONS = {
       }
     }
   },
-  Delete: () => activeRow && deleteRecord(activeRow),
-  Backspace: () => activeRow && deleteRecord(activeRow),
+  Delete: () => STATE.fileLoaded && activeRow && deleteRecord(activeRow),
+  Backspace: () => STATE.fileLoaded && activeRow && deleteRecord(activeRow),
 };
 
 /**
@@ -345,7 +345,7 @@ function waitForWavesurferReady() {
     if (wavesurfer.isReady) {
       resolve();
     } else {
-      const onReady = () => {
+      const onReady = () => { 
         wavesurfer.un('ready', onReady);
         resolve();
       };
@@ -1133,8 +1133,8 @@ async function sortFilesByTime(fileNames) {
  * @param {boolean} [args.preserveResults] - Whether to preserve previous analysis results.
  */
 async function onOpenFiles(args) {
-  const sanitisedList = args.filePaths;
-  if (!sanitisedList.length) return;
+  const {filePaths, checkSaved, preserveResults} = args;
+  if (!filePaths.length) return;
   DOM.loading.querySelector("#loadingText").textContent = "Loading files...";
   DOM.loading.classList.remove("d-none");
   // Store the sanitised file list and Load First audio file
@@ -1152,20 +1152,24 @@ async function onOpenFiles(args) {
   ]);
 
   // Store the file list and Load First audio file
-  STATE.openFiles = sanitisedList;
-  worker.postMessage({
-    action: "check-all-files-saved",
-    files: STATE.openFiles,
-  });
+  STATE.openFiles = filePaths;
+  // We don't check if all files are saved when results are imported
+  if (checkSaved){
+    worker.postMessage({
+      action: "check-all-files-saved",
+      files: STATE.openFiles,
+    });
+  }
+  // Reset analysis status - when importing, we want to set analysis done = true
+  STATE.analysisDone = !checkSaved;
 
   // Sort file by time created (the oldest first):
   if (STATE.openFiles.length > 1) {
     if (modelReady) utils.enableMenuItem(["analyseAll", "reanalyseAll"]);
     STATE.openFiles = await sortFilesByTime(STATE.openFiles);
   }
-  // Reset analysis status
-  STATE.analysisDone = false;
-  loadAudioFileSync({ filePath: STATE.openFiles[0], preserveResults:args.preserveResults });
+
+  loadAudioFileSync({ filePath: STATE.openFiles[0], preserveResults });
 
   // Clear unsaved records warning
   window.electron.unsavedRecords(false);
@@ -1577,8 +1581,10 @@ async function showAnalyse() {
   STATE = { ...STATE, ...STATE.currentAnalysis };
   worker.postMessage({ action: "change-mode", mode: STATE.mode });
   // Prevent the wavesurfer error
-  spec.spectrogram && spec.spectrogram.destroy();
-  spec.spectrogram = null;
+  if (spec.spectrogram) {
+    spec.spectrogram.destroy();
+    spec.spectrogram = null;
+  }
   utils.hideAll();
   if (STATE.currentFile) {
     utils.showElement(["spectrogramWrapper"], false);
@@ -1623,8 +1629,7 @@ selectionTable.addEventListener("click", debounceClick(resultClick));
  * @returns {Promise<void>}
  */
 async function resultClick(e) {
-  const {currentFile, fileLoaded} = STATE;
-  if (!fileLoaded && currentFile) {
+  if (!STATE.fileLoaded) {
     console.warn("Cannot process click - no audio file is loaded");
     return;
   }
@@ -1644,7 +1649,7 @@ async function resultClick(e) {
     loadResultRegion({ file, start, end, label });
   }
   if (e.target.classList.contains("circle")) {
-    await utils.waitFor(() => fileLoaded);
+    await utils.waitFor(() => STATE.fileLoaded);
     getSelectionResults(true);
   }
 }
@@ -2342,7 +2347,7 @@ const setUpWorkerMessaging = () => {
           break;
         }
         case "window-detections": {
-          waitForWavesurferReady().then(() => showWindowDetections(args));
+          utils.waitFor(() => STATE.fileLoaded).then(() => showWindowDetections(args));
           break;
         }
         case "worker-loaded-audio": {
@@ -2926,8 +2931,6 @@ const loadModel = () => {
 };
 
 const handleModelChange = (model, reload = true) => {
-  
-  STATE.analysisDone = false;
   modelSettingsDisplay();
   DOM.customListFile.value = config.customListFile[model];
   DOM.customListFile.value
@@ -3481,11 +3484,7 @@ function onResultsComplete({ active = undefined, select = undefined } = {}) {
   }
 
   if (activeRow) {
-    if (spec.wavesurfer) {
-      waitForWavesurferReady().then(() => activeRow.click());
-    } else {
-      activeRow.click()
-    }
+    utils.waitFor(() => STATE.fileLoaded).then(() => activeRow.click());
     activeRow.scrollIntoView({ behavior: "instant", block: "center" });
   }
   // hide progress div
@@ -4930,6 +4929,8 @@ function handleUIClicks(e) {
       break;
     }
     case "import-csv": {
+      STATE.fileLoaded = false;
+      showAnalyse();
       importData('csv');
       break;
     }
@@ -6723,89 +6724,98 @@ async function getXCComparisons() {
       "Loading Xeno-Canto data...";
     DOM.loading.classList.remove("d-none");
     const quality = "+q:%22>C%22";
-    const length = "+len:3-15";
+    const defaultLength = "+len:3-15";
     sname = XCtaxon[sname] || sname;
-    fetch(
-      `https://xeno-canto.org/api/2/recordings?query=${sname}${quality}${length}`
-    )
-      .then((response) => {
-        if (!response.ok) {
+    
+    const types = ["nocturnal flight call", "flight call", "call", "song"];
+    const filteredLists = {
+      "nocturnal flight call": [],
+      "flight call": [],
+      call: [],
+      song: []
+    };
+    
+    // Create an array of promises—one for each call type
+    const fetchRequests = types.map((type) => {
+      // Use a different length parameter for "song"
+      const typeLength = type === "song" ? "+len:10-30" : defaultLength;
+      const query = `https://xeno-canto.org/api/3/recordings?key=d5e2d2775c7f2b2fb8325ffacc41b9e6aa94679e&query=sp:"${sname}"${quality}${typeLength}+type:"${type}"`;
+      
+      return fetch(query)
+        .then((response) =>
+          response.json().then((payload) => {
+            if (!response.ok) {
+              DOM.loading.classList.add("d-none");
+              generateToast({ type: "error", message: payload.message || "noXC" });
+              return null;
+            }
+            return payload;
+          })
+        )
+        .then((data) => {
+          if (!data || !data.recordings) return [];
+          // Map each recording to the desired format and filter out empty file URLs
+          const recordings = data.recordings
+            .map((record) => ({
+              file: record.file,    // media file
+              rec: record.rec,      // recordist
+              url: record.url,      // URL on XC
+              type: record.type,    // call type
+              smp: record.smp,      // sample rate
+              licence: record.lic   // licence
+            }))
+            .filter((record) => record.file);
+          // Shuffle the list so that subsequent slicing gives a different order
+          utils.shuffle(recordings);
+          return recordings;
+        })
+        .catch((error) => {
           DOM.loading.classList.add("d-none");
-          return generateToast({ type: "error", message: "noXC" });
-        }
-        return response.json();
-      })
-      .then((data) => {
-        // Hide loading
-        DOM.loading.classList.add("d-none");
-        // Extract the first 10 items from the recordings array
-        const recordings = data.recordings
-          .map((record) => ({
-            file: record.file, // media file
-            rec: record.rec, // recordist
-            url: record.url, // URL on XC
-            type: record.type, // call type
-            smp: record.smp, // sample rate
-            licence: record.lic, //// licence
-          }))
-          .filter((record) => record.file); // Remove records with empty file URL;
-
-        // Shuffle recordings so new cache returns a different set
-        utils.shuffle(recordings);
-
-        // Initialize an object to store the lists
-        const filteredLists = {
-          "nocturnal flight call": [],
-          "flight call": [],
-          call: [],
-          song: [],
-        };
-
-        // Counters to track the number of items added to each list
-        let songCount = 0;
-        let callCount = 0;
-        let flightCallCount = 0;
-        let nocturnalFlightCallCount = 0;
-
-        // Iterate over the recordings array and filter items
-        recordings.forEach((record) => {
-          if (record.type === "song" && songCount < 10) {
-            filteredLists.song.push(record);
-            songCount++;
-          } else if (
-            record.type === "nocturnal flight call" &&
-            nocturnalFlightCallCount < 10
-          ) {
-            filteredLists["nocturnal flight call"].push(record);
-            nocturnalFlightCallCount++;
-          } else if (record.type === "flight call" && flightCallCount < 10) {
-            filteredLists["flight call"].push(record);
-            flightCallCount++;
-          } else if (record.type === "call" && callCount < 10) {
-            filteredLists.call.push(record);
-            callCount++;
+          console.warn("Error getting XC data for type", type, error);
+          return [];
+        });
+    });
+    
+    // Wait for all four requests to complete
+    Promise.all(fetchRequests).then((results) => {
+      DOM.loading.classList.add("d-none");
+      // Use a Set to track unique records by a chosen key, here we use 'file'
+      const seenRecords = new Set();
+    
+      types.forEach((type, index) => {
+        // Remove duplicates that have already been added from higher priority types.
+        const uniqueRecords = results[index].filter(record => {
+          const key = record.file;  // change this key if needed
+          if (seenRecords.has(key)) {
+            return false;
+          } else {
+            seenRecords.add(key);
+            return true;
           }
         });
-        if (
-          songCount === 0 &&
-          callCount === 0 &&
-          flightCallCount === 0 &&
-          nocturnalFlightCallCount === 0
-        ) {
-          generateToast({ type: "warning", message: "noComparisons" });
-          return;
-        } else {
-          // Let's cache the result, 'cos the XC API is quite slow
-          XCcache[sname] = filteredLists;
-          updatePrefs("XCcache.json", XCcache); // TODO: separate the caches, add expiry - a week?
-          console.log("XC response", filteredLists);
-          renderComparisons(filteredLists, cname);
-        }
-      })
-      .catch((error) => {
-        DOM.loading.classList.add("d-none");
-        console.warn("Error getting XC data", error);
+        // Limit to 10 records per type after shuffling and de-duplication
+        filteredLists[type] = uniqueRecords.slice(0, 10);
       });
+      
+      // If all lists are empty, notify the user
+      if (
+        !filteredLists["nocturnal flight call"].length &&
+        !filteredLists["flight call"].length &&
+        !filteredLists.call.length &&
+        !filteredLists.song.length
+      ) {
+        generateToast({ type: "warning", message: "noComparisons" });
+        return;
+      }
+    
+      // Cache and render the results
+      XCcache[sname] = filteredLists;
+      updatePrefs("XCcache.json", XCcache);
+      console.log("XC response", filteredLists);
+      renderComparisons(filteredLists, cname);
+    });
+    
+
   }
 }
 
