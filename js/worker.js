@@ -3091,14 +3091,14 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
   try {
     await db.runAsync("BEGIN");
     // Fetch or Insert File ID
-    const res = await db.getAsync("SELECT id, filestart FROM files WHERE name = ?", file);
-    fileID = res?.id;
+    const res = await db.getAsync("SELECT id, filestart, locationID FROM files WHERE name = ?", file);
+    fileID = res?.id; 
+    let locationID = res?.locationID;
+    const start = res?.filestart;
 
-    if (!fileID) {
-      let locationID = null;
-
-      // Extract location from GUANO metadata
-      if (metadata) {
+    if (!start) {
+      // If we need it, extract location from GUANO metadata
+      if (!locationID && metadata) {
         const meta = JSON.parse(metadata);
         const guano = meta.guano;
         if (guano && guano["Loc Position"]) {
@@ -4506,13 +4506,14 @@ async function onSetCustomLocation({
   
 // TODO: check if file in audio library and update its location on disk and in library
 // await checkLibrary(file, lat,lon, place)
+    // Upsert the file location id in the db
+    const placeholders = files.map(() => "(?, ?)").join(",");
+    const res = await db.runAsync(
+      `INSERT INTO files (name, locationID) VALUES ${placeholders}
+        ON CONFLICT(name) DO UPDATE SET locationID = excluded.locationID `,
+      ...files.flatMap(f => [f, id]));
+
     for (const file of files) {
-      // Only update the file location id if it is already in the db
-      const result = await db.runAsync(
-        `UPDATE OR IGNORE files SET locationID = ?
-          WHERE name = ?`, id, file
-      );
-      
       // we may not have set the METADATA for the file
       METADATA[file] = { ...METADATA[file], locationID: id, lat, lon };
       // tell the UI the file has a location id
