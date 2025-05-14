@@ -4506,13 +4506,14 @@ async function onSetCustomLocation({
   
 // TODO: check if file in audio library and update its location on disk and in library
 // await checkLibrary(file, lat,lon, place)
+    // Upsert the file location id in the db
+    const placeholders = files.map(() => "(?, ?)").join(",");
+    const res = await db.runAsync(
+      `INSERT INTO files (name, locationID) VALUES ${placeholders}
+        ON CONFLICT(name) DO UPDATE SET locationID = excluded.locationID `,
+      ...files.flatMap(f => [f, id]));
 
     for (const file of files) {
-      // Upsert the file location id in the db
-      const result = await db.runAsync(
-        `INSERT INTO files (name, locationID) VALUES (?,?)
-          ON CONFLICT(name) DO UPDATE SET locationID = excluded.locationID `,
-        file, id);
       // we may not have set the METADATA for the file
       METADATA[file] = { ...METADATA[file], locationID: id, lat, lon };
       // tell the UI the file has a location id
