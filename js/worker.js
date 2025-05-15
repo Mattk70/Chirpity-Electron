@@ -1417,6 +1417,8 @@ async function onAnalyse({
     if (!STATE.detect.combine){
       await memoryDB.runAsync("DELETE FROM records; VACUUM");
     }
+    // Clear any location filters set in explore/charts
+    STATE.locationID = undefined;
     //create a copy of files in scope for state, as filesInScope is spliced
     STATE.setFiles([...filesInScope]);
   }
