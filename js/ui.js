@@ -1153,6 +1153,10 @@ async function onOpenFiles(args) {
 
   // Store the file list and Load First audio file
   STATE.openFiles = filePaths;
+  // Reset the mode
+  STATE.mode = 'analyse';
+  // If spec was destroyed (when visiting charts) this code allows it to work again
+  spec.reInitSpec(config.specMaxHeight)
   // We don't check if all files are saved when results are imported
   if (checkSaved){
     worker.postMessage({
@@ -1478,6 +1482,12 @@ function saveAnalyseState() {
   }
 }
 
+const clearLocationFilter = () =>   // Clear any species/location filters from explore/charts
+  worker.postMessage({
+    action: "update-state",
+    locationID: undefined,
+  });
+
 /**
  * Activates chart visualization mode in the UI.
  *
@@ -1491,7 +1501,10 @@ function saveAnalyseState() {
  */
 async function showCharts() {
   saveAnalyseState();
-  utils.enableMenuItem(["active-analysis", "explore"]);
+  clearLocationFilter();
+  const state = STATE.currentAnalysis;
+  if (state.currentFile) utils.enableMenuItem(["active-analysis"]);
+  utils.enableMenuItem(["explore"]);
   utils.disableMenuItem([
     "analyse",
     "analyseSelection",
@@ -1513,6 +1526,7 @@ async function showCharts() {
   spec.spectrogram && spec.spectrogram.destroy();
   spec.spectrogram = null;
   utils.hideAll();
+ 
   utils.showElement(["recordsContainer"]);
   worker.postMessage({
     action: "chart",
@@ -1531,14 +1545,17 @@ async function showExplore() {
   // Change STATE.fileLoaded this one time, so a file will load!
   STATE.fileLoaded = true;
   saveAnalyseState();
+  STATE.openFiles = [];
+  const state = STATE.currentAnalysis;
   utils.enableMenuItem([
     "saveCSV",
     "save-eBird",
     "save-summary",
     "save-Raven",
     "charts",
-    "active-analysis",
   ]);
+  if (state.currentFile) utils.enableMenuItem(["active-analysis"]);
+
   utils.disableMenuItem(["explore", "save2db"]);
   // Tell the worker we are in Explore mode
   worker.postMessage({ action: "change-mode", mode: "explore" });
@@ -1555,7 +1572,7 @@ async function showExplore() {
   // Analysis is done
   STATE.analysisDone = true;
   filterResults({
-    species: isSpeciesViewFiltered(true),
+    species: undefined,
     range: STATE.explore.range,
   });
   resetResults();
@@ -1580,6 +1597,7 @@ async function showAnalyse() {
   //Restore STATE
   STATE = { ...STATE, ...STATE.currentAnalysis };
   worker.postMessage({ action: "change-mode", mode: STATE.mode });
+  clearLocationFilter();
   // Prevent the wavesurfer error
   if (spec.spectrogram) {
     spec.spectrogram.destroy();
@@ -4269,16 +4287,20 @@ const changeNocmigMode = () => {
  * @param {Object} [options.range] - Optional constraints to limit the range of filtered results.
  */
 function filterResults({
-  species = isSpeciesViewFiltered(true),
+  species,
   updateSummary = true,
   offset = undefined,
   limit = 500,
   range = undefined,
 } = {}) {
+  // This allows you to pass {species: undefined} and override the default
+  const effectiveSpecies = Object.hasOwn(arguments[0] ?? {}, 'species')
+    ? species
+    : isSpeciesViewFiltered(true);
   STATE.analysisDone &&
     worker.postMessage({
       action: "filter",
-      species,
+      species: effectiveSpecies,
       updateSummary,
       offset,
       limit,
