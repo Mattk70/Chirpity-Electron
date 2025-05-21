@@ -1000,11 +1000,11 @@
                     <div class="me-auto">
                         <div class="form-group rounded p-2 mb-2">
                             <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="High Pass Filter" id="High Pass Filter-circle-help"  data-bs-content="When set, removes low frequency noise below the threshold.">?</a>
-                            <label for="HighPassFrequency" class="form-label">
+                            <label for="highPassFrequency" class="form-label">
                                 High Pass filter:
                             </label>
                             <div class="input-group me-0 p-0">
-                                <input type="range" class="form-control-range w-75" min="0" max="12000" step="25" id="HighPassFrequency">
+                                <input type="range" class="form-control-range w-75" min="0" max="15000" step="25" id="highPassFrequency">
                                 <div class="input-group-append">
                                     <span class="input-group-text" id="HP-threshold">0</span>
                                 </div>
@@ -1013,14 +1013,14 @@
                     </div>
                     <div class="me-auto">
                         <div class="form-group rounded p-2 mb-2">
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="High Pass Filter" id="High Pass Filter-circle-help"  data-bs-content="When set, removes high frequency noise below the threshold.">?</a>
-                            <label for="LowPassFrequency" class="form-label">
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Low Pass Filter" id="Low Pass Filter-circle-help"  data-bs-content="When set, removes high frequency noise above the threshold.">?</a>
+                            <label for="lowPassFrequency" class="form-label">
                                 Low Pass filter:
                             </label>
                             <div class="input-group me-0 p-0">
-                                <input type="range" class="form-control-range w-75" min="0" max="2500" step="25" id="HighPassFrequency">
+                                <input type="range" class="form-control-range w-75" min="0" max="15000" step="25" id="lowPassFrequency">
                                 <div class="input-group-append">
-                                    <span class="input-group-text" id="HP-threshold">0</span>
+                                    <span class="input-group-text" id="LP-threshold">15000Hz</span>
                                 </div>
                             </div>
                         </div>

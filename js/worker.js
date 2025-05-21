@@ -2342,7 +2342,7 @@ function setAudioFilters() {
         },
         filters.lowPassFrequency && {
           filter: "lowpass",
-          options: `f=${filters.lowPassFrequency}:poles=2`,
+          options: `f=${filters.lowPassFrequency}:t=q:poles=2`,
         },
         STATE.audio.gain > 0 && {
           filter: "volume",

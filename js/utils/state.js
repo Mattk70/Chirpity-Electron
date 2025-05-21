@@ -32,6 +32,7 @@ export class WorkerState {
     (this.filters = {
       active: false,
       highPassFrequency: 0,
+      lowPassFrequency: 15000,
       lowShelfFrequency: 0,
       lowShelfAttenuation: 0,
       SNR: 0,

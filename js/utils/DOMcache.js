@@ -187,9 +187,15 @@ const DOM = {
   },
   get HPSlider() {
     if (!this._HPSlider) {
-      this._HPSlider = document.getElementById("HighPassFrequency");
+      this._HPSlider = document.getElementById("highPassFrequency");
     }
     return this._HPSlider;
+  },
+  get LPSlider() {
+    if (!this._LPSlider) {
+      this._LPSlider = document.getElementById("lowPassFrequency");
+    }
+    return this._LPSlider;
   },
   get LowShelfSlider() {
     if (!this._LowShelfSlider) {

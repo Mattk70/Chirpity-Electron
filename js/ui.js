@@ -1827,6 +1827,7 @@ const defaultConfig = {
   filters: {
     active: false,
     highPassFrequency: 0,
+    lowPassFrequency: 15000,
     lowShelfFrequency: 0,
     lowShelfAttenuation: 0,
     SNR: 0,
@@ -2072,10 +2073,13 @@ window.onload = async () => {
     // };
 
     // Filters
-    document.getElementById("HP-threshold").textContent = config.filters.highPassFrequency + "Hz";
-    document.getElementById("HighPassFrequency").value = config.filters.highPassFrequency;
+    document.getElementById("HP-threshold").textContent = formatHz(config.filters.highPassFrequency);
+    document.getElementById("highPassFrequency").value = config.filters.highPassFrequency;
+    const lowPass = document.getElementById("lowPassFrequency")
+    lowPass.value = Number(lowPass.max) - config.filters.lowPassFrequency;
+    document.getElementById("LP-threshold").textContent = formatHz(config.filters.lowPassFrequency);
     document.getElementById("lowShelfFrequency").value = config.filters.lowShelfFrequency;
-    document.getElementById("LowShelf-threshold").textContent = config.filters.lowShelfFrequency + "Hz";
+    document.getElementById("LowShelf-threshold").textContent = formatHz(config.filters.lowShelfFrequency);
     DOM.attenuation.value = -config.filters.lowShelfAttenuation;
     document.getElementById("attenuation-threshold").textContent = DOM.attenuation.value + "dB";
     DOM.sendFilteredAudio.checked = config.filters.sendToModel;
@@ -4729,12 +4733,21 @@ const handleThresholdChange = (e) => {
 // Filter handling
 const filterIconDisplay = () => {
   const i18 = i18n.get(i18n.Titles);
+  const {
+    active, 
+    highPassFrequency, 
+    lowPassFrequency, 
+    lowShelfAttenuation, 
+    lowShelfFrequency, 
+    normalise} = config.filters;
   if (
-    config.filters.active &&
-    (config.filters.highPassFrequency ||
-      (config.filters.lowShelfAttenuation &&
-        config.filters.lowShelfFrequency) ||
-      config.filters.normalise)
+    active &&
+    (
+      highPassFrequency || 
+      lowPassFrequency  ||
+      (lowShelfAttenuation && lowShelfFrequency) ||
+      normalise
+    )
   ) {
     DOM.audioFiltersIcon.classList.add("text-warning");
     DOM.audioFiltersIcon.title = i18.audioFiltersOn;
@@ -4758,9 +4771,19 @@ const showFilterEffect = () => {
   }
 };
 
-function updateDisplay(element, id, unit){
+
+const formatHz = (n) => n >= 1000 ? `${(n / 1000).toFixed(1)}kHz` : `${n}Hz`;
+
+
+function updateDisplay(el, id, unit){
   const display = document.getElementById(id);
-  display.textContent = element.value + (unit || '');
+  let value = el.value;
+  if (el.id === 'lowPassFrequency') value = Number(el.max) - value;
+  if (unit === 'Hz'){
+    value = formatHz(value);
+    unit = null
+  }
+  display.textContent = value + (unit || '');
 }
 
 document.addEventListener('input', (e) =>{
@@ -4779,8 +4802,12 @@ document.addEventListener('input', (e) =>{
       updateDisplay(el, "alpha-value");
       break;
     }
-    case "HighPassFrequency": {
+    case "highPassFrequency": {
       updateDisplay(el, "HP-threshold", 'Hz');
+      break;
+    }
+    case "lowPassFrequency": {
+      updateDisplay(el, "LP-threshold", 'Hz');
       break;
     }
     case "lowShelfFrequency": {
@@ -4809,16 +4836,20 @@ document.addEventListener('input', (e) =>{
   }
 })
 
-const handleHPchange = () => {
-  config.filters.highPassFrequency = DOM.HPSlider.valueAsNumber;
+const handlePassFilterchange = (el) => {
+  const filter = el.id;
+  let value = el.valueAsNumber;
+  // Invert scale for low pass
+  if (filter === 'lowPassFrequency') value = Number(el.max) - value;
+  config.filters[filter] = value;
   config.filters.active || toggleFilters();
   worker.postMessage({
     action: "update-state",
-    filters: { highPassFrequency: config.filters.highPassFrequency },
+    filters: { [filter]: config.filters[filter] },
   });
   showFilterEffect();
   filterIconDisplay();
-  DOM.HPSlider.blur(); // Fix slider capturing the focus so you can't use spaceBar or hit 'p' directly
+  el.blur(); // Fix slider capturing the focus so you can't use spaceBar or hit 'p' directly
 };
 
 
@@ -5650,14 +5681,18 @@ document.addEventListener("change", async function (e) {
           handleLowShelfchange(e);
           break;
         }
-        case "HighPassFrequency": {
-          handleHPchange(e);
+        case "highPassFrequency": {
+          handlePassFilterchange(DOM.HPSlider);
           break;
         }
-        case "snrValue": {
-          handleSNRchange(e);
+        case "lowPassFrequency": {
+          handlePassFilterchange(DOM.LPSlider);
           break;
         }
+        // case "snrValue": {
+        //   handleSNRchange(e);
+        //   break;
+        // }
         case "file-timestamp": {
           config.fileStartMtime = element.checked;
           worker.postMessage({
