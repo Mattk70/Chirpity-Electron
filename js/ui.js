@@ -1577,7 +1577,7 @@ async function showExplore() {
   });
   resetResults();
   // Prevent scroll up hiding navbar
-  spec.adjustDims();
+  await spec.adjustDims();
 }
 
 /**
@@ -1734,7 +1734,7 @@ const loadResultRegion = ({
 
 ///////////////// Font functions ////////////////
 // Function to set the font size scale
-function setFontSizeScale(doNotScroll) {
+async function setFontSizeScale(doNotScroll) {
   document.documentElement.style.setProperty(
     "--font-size-scale",
     config.fontScale
@@ -1747,7 +1747,7 @@ function setFontSizeScale(doNotScroll) {
   doNotScroll ||
     decreaseBtn.scrollIntoView({ block: "center", behavior: "auto" });
   updatePrefs("config.json", config);
-  spec.adjustDims(true);
+  STATE.currentFile && await flushSpec();
 }
 
 
@@ -1795,8 +1795,10 @@ const defaultConfig = {
     loud: "#ff7b00",
     mid: "#850035",
     quiet: "#000000",
-    threshold: 0.5,
+    quietThreshold: 0.0,
+    midThreshold: 0.5,
     windowFn: "hann",
+    alpha: 0.5
   },
   timeOfDay: true,
   list: "birds",
@@ -2025,13 +2027,17 @@ window.onload = async () => {
       document.getElementById("alpha").classList.remove("d-none");
     config.colormap === "custom" &&
       document.getElementById("colormap-fieldset").classList.remove("d-none");
-    document.getElementById("color-threshold").textContent =
-      config.customColormap.threshold;
-    document.getElementById("loud-color").value = config.customColormap.loud;
-    document.getElementById("mid-color").value = config.customColormap.mid;
-    document.getElementById("quiet-color").value = config.customColormap.quiet;
-    document.getElementById("color-threshold-slider").value =
-      config.customColormap.threshold;
+    const {loud, mid, quiet, quietThreshold, midThreshold, alpha} = config.customColormap;
+    document.getElementById("quiet-color-threshold").textContent = quietThreshold;
+    document.getElementById("quiet-color-threshold-slider").value = quietThreshold;
+    document.getElementById("mid-color-threshold").textContent = midThreshold;
+    document.getElementById("mid-color-threshold-slider").value = midThreshold;
+    document.getElementById("loud-color").value = loud;
+    document.getElementById("mid-color").value = mid;
+    document.getElementById("quiet-color").value = quiet;
+    document.getElementById("alpha-slider").value = alpha;
+    document.getElementById("alpha-value").textContent = alpha;
+    
     // Audio preferences:
     DOM.gain.value = config.audio.gain;
     DOM.gainAdjustment.textContent = config.audio.gain + "dB";
@@ -2066,12 +2072,12 @@ window.onload = async () => {
     // };
 
     // Filters
-    HPThreshold.textContent = config.filters.highPassFrequency + "Hz";
-    HPSlider.value = config.filters.highPassFrequency;
-    LowShelfSlider.value = config.filters.lowShelfFrequency;
-    LowShelfThreshold.textContent = config.filters.lowShelfFrequency + "Hz";
-    lowShelfAttenuation.value = -config.filters.lowShelfAttenuation;
-    lowShelfAttenuationThreshold.textContent = lowShelfAttenuation.value + "dB";
+    document.getElementById("HP-threshold").textContent = config.filters.highPassFrequency + "Hz";
+    document.getElementById("HighPassFrequency").value = config.filters.highPassFrequency;
+    document.getElementById("lowShelfFrequency").value = config.filters.lowShelfFrequency;
+    document.getElementById("LowShelf-threshold").textContent = config.filters.lowShelfFrequency + "Hz";
+    DOM.attenuation.value = -config.filters.lowShelfAttenuation;
+    document.getElementById("attenuation-threshold").textContent = DOM.attenuation.value + "dB";
     DOM.sendFilteredAudio.checked = config.filters.sendToModel;
     filterIconDisplay();
     if (config[config.model].backend.includes("web")) {
@@ -2261,8 +2267,6 @@ const setUpWorkerMessaging = () => {
         case "mode-changed": {
           const mode = args.mode;
           STATE.mode = mode;
-          renderFilenamePanel();
-          spec.adjustDims();
           switch (mode) {
             case "analyse": {
               STATE.diskHasRecords &&
@@ -2724,8 +2728,8 @@ function getTooltipTitle(date, aggregation) {
 
 window.addEventListener("resize", function () {
   utils.waitForFinalEvent(
-    function () {
-      spec.adjustDims(true);
+    async function () {
+      await spec.adjustDims(true);
     },
     100,
     "id1"
@@ -2850,7 +2854,7 @@ function setActiveRegion(region, activateRow) {
   activateRow && setActiveRow(start + STATE.windowOffsetSecs);
 }
 
-const spec = new ChirpityWS(
+let spec = new ChirpityWS(
   "#waveform",
   () => STATE, // Returns the current state
   () => config, // Returns the current config
@@ -4692,8 +4696,8 @@ function showThreshold(e) {
   filterPanelRangeInput.value = threshold;
   settingsPanelRangeInput.value = threshold;
 }
-settingsPanelRangeInput.addEventListener("input", showThreshold);
-filterPanelRangeInput.addEventListener("input", showThreshold);
+// settingsPanelRangeInput.addEventListener("input", showThreshold);
+// filterPanelRangeInput.addEventListener("input", showThreshold);
 
 const handleThresholdChange = (e) => {
   const threshold = e.target.valueAsNumber;
@@ -4754,41 +4758,59 @@ const showFilterEffect = () => {
   }
 };
 
-// SNR
-// const handleSNRchange = () => {
-//     config.filters.SNR = parseFloat(SNRSlider.value);
-//     if (config.filters.SNR > 0) {
-//         config.detect.contextAware = false;
-//         DOM.contextAware.disabled = true;
-//     } else {
-//         config.detect.contextAware = DOM.contextAware.checked;
-//         DOM.contextAware.disabled = false;
-//     }
-//     worker.postMessage({ action: 'update-state', filters: { SNR: config.filters.SNR } })
-//     filterIconDisplay();
-// }
+function updateDisplay(element, id, unit){
+  const display = document.getElementById(id);
+  display.textContent = element.value + (unit || '');
+}
 
-// const SNRThreshold = document.getElementById('SNR-threshold');
-// // const SNRSlider = document.getElementById('snrValue');
-// SNRSlider.addEventListener('input', () => {
-//     SNRThreshold.textContent = SNRSlider.value;
-// });
-
-const colorMapThreshold = document.getElementById("color-threshold");
-const colorMapSlider = document.getElementById("color-threshold-slider");
-colorMapSlider.addEventListener("input", () => {
-  colorMapThreshold.textContent = colorMapSlider.value;
-});
-
-// Gauss Alpha
-const alphaValue = document.getElementById("alpha-value");
-const alphaSlider = document.getElementById("alpha-slider");
-alphaSlider.addEventListener("input", () => {
-  alphaValue.textContent = alphaSlider.value;
-});
+document.addEventListener('input', (e) =>{
+  const el = e.target;
+  const target = el.id;
+  switch (target){
+    case 'mid-color-threshold-slider':{
+      updateDisplay(el, "mid-color-threshold")
+      break;
+    }
+    case "quiet-color-threshold-slider": {
+      updateDisplay(el, "quiet-color-threshold");
+      break;
+    }
+    case "alpha-slider": {
+      updateDisplay(el, "alpha-value");
+      break;
+    }
+    case "HighPassFrequency": {
+      updateDisplay(el, "HP-threshold", 'Hz');
+      break;
+    }
+    case "lowShelfFrequency": {
+      updateDisplay(el, "LowShelf-threshold", 'dB');
+      break;
+    }
+    case "attenuation": {
+      updateDisplay(el, "attenuation-threshold", 'dB');
+      break;
+    }
+    case "batch-size":{
+      DOM.batchSizeValue.textContent = BATCH_SIZE_LIST[DOM.batchSizeSlider.value];
+      break;
+    }
+    case "confidence":
+    case "confidenceValue": {
+      showThreshold(e)
+      break;
+    }
+    case "thread-slider": {
+      DOM.numberOfThreads.textContent = DOM.threadSlider.value;
+    }
+    case "gain": {
+      DOM.gainAdjustment.textContent = DOM.gain.value + "dB";
+    }
+  }
+})
 
 const handleHPchange = () => {
-  config.filters.highPassFrequency = HPSlider.valueAsNumber;
+  config.filters.highPassFrequency = DOM.HPSlider.valueAsNumber;
   config.filters.active || toggleFilters();
   worker.postMessage({
     action: "update-state",
@@ -4796,18 +4818,13 @@ const handleHPchange = () => {
   });
   showFilterEffect();
   filterIconDisplay();
-  HPSlider.blur(); // Fix slider capturing thefocus so you can't use spaceBar or hit 'p' directly
+  DOM.HPSlider.blur(); // Fix slider capturing the focus so you can't use spaceBar or hit 'p' directly
 };
 
-const HPThreshold = document.getElementById("HP-threshold");
-const HPSlider = document.getElementById("HighPassFrequency");
-HPSlider.addEventListener("input", () => {
-  HPThreshold.textContent = HPSlider.value + "Hz";
-});
 
 // Low shelf threshold
 const handleLowShelfchange = () => {
-  config.filters.lowShelfFrequency = LowShelfSlider.valueAsNumber;
+  config.filters.lowShelfFrequency = DOM.LowShelfSlider.valueAsNumber;
   config.filters.active || toggleFilters();
   worker.postMessage({
     action: "update-state",
@@ -4815,18 +4832,13 @@ const handleLowShelfchange = () => {
   });
   showFilterEffect();
   filterIconDisplay();
-  LowShelfSlider.blur(); // Fix slider capturing thefocus so you can't use spaceBar or hit 'p' directly
+  DOM.LowShelfSlider.blur(); // Fix slider capturing thefocus so you can't use spaceBar or hit 'p' directly
 };
 
-const LowShelfThreshold = document.getElementById("LowShelf-threshold");
-const LowShelfSlider = document.getElementById("lowShelfFrequency");
-LowShelfSlider.addEventListener("input", () => {
-  LowShelfThreshold.textContent = LowShelfSlider.value + "Hz";
-});
 
 // Low shelf gain
 const handleAttenuationchange = () => {
-  config.filters.lowShelfAttenuation = -lowShelfAttenuation.valueAsNumber;
+  config.filters.lowShelfAttenuation = -DOM.attenuation.valueAsNumber;
   config.filters.active = true;
   worker.postMessage({
     action: "update-state",
@@ -4834,30 +4846,9 @@ const handleAttenuationchange = () => {
   });
   showFilterEffect();
   filterIconDisplay();
-  lowShelfAttenuation.blur();
+  DOM.attenuation.blur();
 };
 
-const lowShelfAttenuation = document.getElementById("attenuation");
-const lowShelfAttenuationThreshold = document.getElementById(
-  "attenuation-threshold"
-);
-
-lowShelfAttenuation.addEventListener("input", () => {
-  lowShelfAttenuationThreshold.textContent = lowShelfAttenuation.value + "dB";
-});
-
-// Show batch size / threads as user moves slider
-DOM.batchSizeSlider.addEventListener("input", () => {
-  DOM.batchSizeValue.textContent = BATCH_SIZE_LIST[DOM.batchSizeSlider.value];
-});
-
-DOM.threadSlider.addEventListener("input", () => {
-  DOM.numberOfThreads.textContent = DOM.threadSlider.value;
-});
-
-DOM.gain.addEventListener("input", () => {
-  DOM.gainAdjustment.textContent = DOM.gain.value + "dB";
-});
 
 /**
  * Plays the active audio region after sanitizing its boundaries.
@@ -4912,7 +4903,7 @@ document.addEventListener("click", debounceClick(handleUIClicks));
  *
  * @param {MouseEvent} e - The click event object.
  */
-function handleUIClicks(e) {
+async function handleUIClicks(e) {
   const element = e.target;
   const target = element.closest("[id]")?.id;
   const locale = config.locale.replace(/_.*$/, "");
@@ -5053,6 +5044,7 @@ function handleUIClicks(e) {
       config.list = 'everything';
       updateList();
       updatePrefs("config.json", config);
+      showAnalyse();
       break;
     }
     // Help Menu
@@ -5195,6 +5187,7 @@ function handleUIClicks(e) {
           config.list = 'everything';
           updateList()
           updatePrefs("config.json", config);
+          showAnalyse();
         }
       })();
       break;
@@ -5316,7 +5309,7 @@ function handleUIClicks(e) {
       checkFilteredFrequency();
       worker.postMessage({ action: "update-state", audio: config.audio });
       const fftSamples = spec.spectrogram.fftSamples;
-      spec.adjustDims(true, fftSamples);
+      spec.setRange({frequencyMin: config.audio.minFrequency, frequencyMax: config.audio.minFrequency});
       document
         .getElementById("frequency-range")
         .classList.remove("text-warning");
@@ -5328,7 +5321,7 @@ function handleUIClicks(e) {
         Math.min(1.1, config.fontScale + 0.1).toFixed(1)
       ); // Don't let it go above 1.1
       config.fontScale = fontScale;
-      setFontSizeScale();
+      await setFontSizeScale();
       break;
     }
     case "decreaseFont": {
@@ -5336,7 +5329,7 @@ function handleUIClicks(e) {
         Math.max(0.7, config.fontScale - 0.1).toFixed(1)
       ); // Don't let it go below 0.7
       config.fontScale = fontScale;
-      setFontSizeScale();
+      await setFontSizeScale();
       break;
     }
     case "speciesFilter": {
@@ -5518,7 +5511,7 @@ function refreshSummary() {
 
 // Beginnings of the all-powerful document 'change' listener
 // One listener to rule them all!
-document.addEventListener("change", function (e) {
+document.addEventListener("change", async function (e) {
   const element = e.target.closest("[id]");
   if (element) {
     const target = element.id;
@@ -5765,45 +5758,48 @@ document.addEventListener("change", function (e) {
             colorMapFieldset.classList.add("d-none");
           }
           if (spec.wavesurfer && STATE.currentFile) {
-            const fftSamples = spec.spectrogram.fftSamples;
-            spec.adjustDims(true, fftSamples);
-            postBufferUpdate({
-              begin: STATE.windowOffsetSecs,
-              position: spec.wavesurfer.getCurrentTime() / STATE.windowLength,
-            });
+            spec.setColorMap() || flushSpec()
           }
           break;
         }
-        case "window-function":
-        case "alpha-slider":
+        case "window-function":{
+          const windowFn = document.getElementById("window-function").value;
+          document.getElementById("alpha").classList.toggle("d-none", windowFn !== "gauss")
+          config.customColormap = {
+              ...config.customColormap, 
+              windowFn
+            };
+          STATE.fileLoaded && flushSpec();
+          break
+        }
         case "loud-color":
         case "mid-color":
         case "quiet-color":
-        case "color-threshold-slider": {
-          const windowFn = document.getElementById("window-function").value;
+        case "mid-color-threshold-slider":
+        case "quiet-color-threshold-slider":
+        case "alpha-slider": {
           const alpha = document.getElementById("alpha-slider").valueAsNumber;
-          config.alpha = alpha;
-          windowFn === "gauss"
-            ? document.getElementById("alpha").classList.remove("d-none")
-            : document.getElementById("alpha").classList.add("d-none");
           const loud = document.getElementById("loud-color").value;
           const mid = document.getElementById("mid-color").value;
           const quiet = document.getElementById("quiet-color").value;
-          const threshold = document.getElementById(
-            "color-threshold-slider"
+          const quietThreshold = document.getElementById(
+            "quiet-color-threshold-slider"
           ).valueAsNumber;
-          document.getElementById("color-threshold").textContent = threshold;
+          const midThreshold = document.getElementById(
+            "mid-color-threshold-slider"
+          ).valueAsNumber;
+          // document.getElementById("color-threshold").textContent = threshold;
           config.customColormap = {
-            loud: loud,
-            mid: mid,
-            quiet: quiet,
-            threshold: threshold,
-            windowFn: windowFn,
+            ...config.customColormap,
+            loud,
+            mid,
+            quiet,
+            quietThreshold,
+            midThreshold,
+            alpha
           };
           if (spec.wavesurfer && STATE.currentFile) {
-            const fftSamples = spec.spectrogram.fftSamples;
-            spec.adjustDims(true, fftSamples);
-            spec.refreshTimeline();
+            spec.setColorMap() || flushSpec();     
           }
           break;
         }
@@ -5829,8 +5825,7 @@ document.addEventListener("change", function (e) {
         case "spec-labels": {
           config.specLabels = element.checked;
           if (spec.wavesurfer && STATE.currentFile) {
-            const fftSamples = spec.spectrogram.fftSamples;
-            spec.adjustDims(true, fftSamples);
+            flushSpec()
           }
           break;
         }
@@ -5847,8 +5842,7 @@ document.addEventListener("change", function (e) {
           config.audio.minFrequency = Math.max(element.valueAsNumber, 0);
           DOM.fromInput.value = config.audio.minFrequency;
           DOM.fromSlider.value = config.audio.minFrequency;
-          const fftSamples = spec.spectrogram.fftSamples;
-          spec.adjustDims(true, fftSamples);
+          spec.setRange({frequencyMin: config.audio.minFrequency});
           checkFilteredFrequency();
           element.blur();
           worker.postMessage({ action: "update-state", audio: config.audio });
@@ -5859,8 +5853,7 @@ document.addEventListener("change", function (e) {
           config.audio.maxFrequency = Math.min(element.valueAsNumber, 11950);
           DOM.toInput.value = config.audio.maxFrequency;
           DOM.toSlider.value = config.audio.maxFrequency;
-          const fftSamples = spec.spectrogram.fftSamples;
-          spec.adjustDims(true, fftSamples);
+          spec.setRange({frequencyMax: config.audio.maxFrequency});
           checkFilteredFrequency();
           element.blur();
           worker.postMessage({ action: "update-state", audio: config.audio });
@@ -5945,6 +5938,20 @@ document.addEventListener("change", function (e) {
       trackEvent(config.UUID, "Settings Change", target, value);
   }
 });
+
+const flushSpec = async () =>{
+  DOM.waveElement.replaceChildren();
+  DOM.spectrogram.replaceChildren();
+  spec = new ChirpityWS(
+    "#waveform",
+    () => STATE, // Returns the current state
+    () => config, // Returns the current config
+    { postBufferUpdate, trackEvent, setActiveRegion, onStateUpdate: state.update, updatePrefs },
+    GLOBAL_ACTIONS
+  );
+  await spec.initAll({audio:STATE.currentBuffer, height: STATE.specMaxHeight})
+  spec.reload()
+}
 
 /**
  * Updates the UI to reflect the selected species list type and displays relevant controls.

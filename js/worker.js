@@ -39,7 +39,7 @@ if (process.platform === "win32") {
 const isTestEnv = process.env.TEST_ENV;
 const trackEvent = isTestEnv ? () => {} : _trackEvent;
 
-let DEBUG;
+let DEBUG = true;
 
 let METADATA = {};
 let index = 0,
@@ -683,6 +683,7 @@ async function handleMessage(e) {
         }
       }
       STATE.update(args);
+      // Call new db functions when not initial state update (where UUID is sent)
       if (args.database && !args.UUID) {
         // load a new database
         diskDB = await loadDB()
@@ -2337,7 +2338,11 @@ function setAudioFilters() {
           },
         filters.highPassFrequency && {
           filter: "highpass",
-          options: `f=${filters.highPassFrequency}:poles=1`,
+          options: `f=${filters.highPassFrequency}:t=q:poles=2`,
+        },
+        filters.lowPassFrequency && {
+          filter: "lowpass",
+          options: `f=${filters.lowPassFrequency}:poles=2`,
         },
         STATE.audio.gain > 0 && {
           filter: "volume",

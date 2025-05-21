@@ -6,7 +6,7 @@ export class WorkerState {
 
   constructor() {
     (this.db = null),
-    (this.mode = "analyse"), // analyse, explore, chart
+    (this.mode = "analyse"), // archive, explore, chart
     (this.resultsSortOrder = "dateTime"),
     this.resultsMetaSortOrder = '',
     (this.summarySortOrder = "cname ASC"),
