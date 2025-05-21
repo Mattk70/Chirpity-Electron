@@ -554,7 +554,7 @@
                     </div>
                     <div class="form-group rounded p-2 pe-0 mb-2">
                         <div class="form-check form-switch">
-                            <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature.">
+                            <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature.">
                                 <span class="pointer locked material-symbols-outlined">lock</span></a>
                             <input class="locked form-check-input" type="checkbox" role="switch" id="combine-detections" disabled>
                             <label class="form-check-label" for="combine-detections">Combine model detections</label>
@@ -563,7 +563,7 @@
                     </div>
                     <div class="form-group rounded p-2 pe-0 mb-2">
                         <div class="form-check form-switch">
-                            <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature.">
+                            <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature.">
                                 <span class="pointer locked material-symbols-outlined">lock</span></a>
                             <input class="locked form-check-input" type="checkbox" role="switch" id="merge-detections" disabled>
                             <label class="form-check-label" for="merge-detections">Merge model detections</label>
@@ -695,7 +695,7 @@
                     </div>
                     <div class="form-group rounded p-2 pe-0 mb-2">
                         <div class="form-check form-switch">
-                            <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature.">
+                            <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature.">
                                 <span class="pointer locked material-symbols-outlined">lock</span></a>
                             <input class="locked form-check-input" type="checkbox" role="switch" id="auto-load" disabled>
                             <label class="form-check-label" for="auto-load">Auto-load saved detections</label>
@@ -732,7 +732,7 @@
                     </div>
                     
                     <fieldset class="advanced border border-secondary rounded m-2 mb-0 p-2 "> 
-                        <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature."><span class="pointer locked material-symbols-outlined">lock</span></a>
+                        <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature."><span class="pointer locked material-symbols-outlined">lock</span></a>
                         <span class="d-inline-flex float-end"><a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Keyboard assignment" id="Assign Keyboard-circle-help"  data-bs-content="Use number keys for rapid result tagging. Assign a species, label or predefined comment to a result">?</a></span>
                         <legend style="font-size: small; font-weight:bold">
                             Keyboard Assignment
@@ -943,7 +943,7 @@
                         </div>
                         <div class="input-group rounded p-2" id="choose-database-location">
                             <div class="col-auto pe-1">
-                                <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature.">
+                                <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature.">
                                 <span class="pointer locked material-symbols-outlined">lock</span></a>
                             </div>
                             <div class="col">
@@ -1002,6 +1002,20 @@
                             <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="High Pass Filter" id="High Pass Filter-circle-help"  data-bs-content="When set, removes low frequency noise below the threshold.">?</a>
                             <label for="HighPassFrequency" class="form-label">
                                 High Pass filter:
+                            </label>
+                            <div class="input-group me-0 p-0">
+                                <input type="range" class="form-control-range w-75" min="0" max="12000" step="25" id="HighPassFrequency">
+                                <div class="input-group-append">
+                                    <span class="input-group-text" id="HP-threshold">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="me-auto">
+                        <div class="form-group rounded p-2 mb-2">
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="High Pass Filter" id="High Pass Filter-circle-help"  data-bs-content="When set, removes high frequency noise below the threshold.">?</a>
+                            <label for="LowPassFrequency" class="form-label">
+                                Low Pass filter:
                             </label>
                             <div class="input-group me-0 p-0">
                                 <input type="range" class="form-control-range w-75" min="0" max="2500" step="25" id="HighPassFrequency">
@@ -1127,7 +1141,7 @@
                             <div class="col form-check form-switch">
                                 <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Only save files with records" id="Clip Library-circle-help"  data-bs-content="When enabled, only audio files containing saved records are added to the library. 
                                 If you set your recorder to auto-increment files after a short period of time, enabling this setting will dramatically reduce the storage required if there are long periods without activity">?</a>
-                                <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature.">
+                                <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature.">
                                         <span class="pointer locked material-symbols-outlined">lock</span></a>
                                 <input class="locked form-check-input" type="checkbox" role="switch" id="library-clips" disabled>
                                 <label class="form-check-label" for="library-clips">Only save files with records</label>
@@ -1162,7 +1176,7 @@
                     </div>
                     <div class="form-group rounded p-2 mb-2">
                         <div class="col form-check form-switch">
-                            <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature."><span class="pointer locked material-symbols-outlined">lock</span></a>
+                            <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature."><span class="pointer locked material-symbols-outlined">lock</span></a>
                             <input class="locked form-check-input" type="checkbox" role="switch" id="spec-detections" disabled>
                             <label class="form-check-label" for="spec-detections">Show all detections</label>
                             <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Show all detections" id="Show all detections-circle-help"  data-bs-content="When enabled, the spectrogram will highlight all the detections on screen.">?</a>
@@ -1447,7 +1461,7 @@
                                <div class="row ms-0 me-0">
                                 <a class="dropdown-item locked col" id="import-csv" href="#">
                                 <span class="material-symbols-outlined">place_item</span> Import Results from CSV</a>
-                                <a class="padlock col" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature.">
+                                <a class="padlock col" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature.">
                                     <span class="pointer locked material-symbols-outlined float-end mt-1">lock</span></a>
                                 </div> 
                             </li>
