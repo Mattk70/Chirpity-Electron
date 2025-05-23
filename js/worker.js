@@ -39,7 +39,7 @@ if (process.platform === "win32") {
 const isTestEnv = process.env.TEST_ENV;
 const trackEvent = isTestEnv ? () => {} : _trackEvent;
 
-let DEBUG = true;
+let DEBUG;
 
 let METADATA = {};
 let index = 0,
