@@ -4811,7 +4811,7 @@ document.addEventListener('input', (e) =>{
       break;
     }
     case "lowShelfFrequency": {
-      updateDisplay(el, "LowShelf-threshold", 'dB');
+      updateDisplay(el, "LowShelf-threshold", 'Hz');
       break;
     }
     case "attenuation": {

@@ -1004,25 +1004,19 @@ const prepParams = (list) => "?".repeat(list.length).split("").join(",");
  * @returns {[string, any[]]} An array containing the SQL condition string and its associated parameter values.
  */
 function getFileSQLAndParams(range) {
-  const fileParams = prepParams(STATE.filesToAnalyse);
   const params = [];
   let SQL = "";
   if (range?.start) {
     // Prioritise range queries
     SQL += " AND dateTime >= ? AND dateTime < ? ";
     params.push(range.start, range.end);
-    // If you create a record manually before analysis, STATE.filesToAnalyse will be empty
-  } else if (["analyse"].includes(STATE.mode) && fileParams) {
-    SQL += ` AND file IN  (${fileParams}) `;
-    params.push(...STATE.filesToAnalyse);
-  } else if (["archive"].includes(STATE.mode)) {
+  } else {
+    const fileParams = prepParams(STATE.filesToAnalyse);
     SQL += ` AND ( file IN  (${fileParams}) `;
     params.push(...STATE.filesToAnalyse);
     SQL += ` OR archiveName IN  (${fileParams}) ) `;
     const archivePath = STATE.library.location + p.sep;
-    const archive_names = STATE.filesToAnalyse.map((item) =>
-      item.replace(archivePath, "")
-    );
+    const archive_names = STATE.filesToAnalyse.map((item) => item.replace(archivePath, ""));
     params.push(...archive_names);
   }
   return [SQL, params];
@@ -1088,9 +1082,10 @@ const prepSummaryStatement = async () => {
         JOIN files f ON f.id = r.fileID
         JOIN species s ON s.id = r.speciesID
         WHERE confidence >=  ? `;
-
-  const [SQLtext, fileParams] = getFileSQLAndParams(range);
-  (summaryStatement += SQLtext), params.push(...fileParams);
+  if (STATE.mode === 'archive' || range?.start){
+    const [SQLtext, fileParams] = getFileSQLAndParams(range);
+    (summaryStatement += SQLtext), params.push(...fileParams);
+  }
   if (labelFilters.length) {
     summaryStatement += ` AND tagID in (${prepParams(labelFilters)}) `;
     params.push(...labelFilters);
@@ -1144,8 +1139,10 @@ const getTotal = async ({
   }
   if (detect.nocmig) SQL += " AND NOT isDaylight";
   if (locationID) SQL += ` AND locationID =  ${locationID}`;
-  const [SQLtext, fileParams] = getFileSQLAndParams(range);
-  (SQL += SQLtext), params.push(...fileParams);
+  if (mode === 'archive' || range?.start){
+    const [SQLtext, fileParams] = getFileSQLAndParams(range);
+    (SQL += SQLtext), params.push(...fileParams);
+  }
   SQL += " ) ";
   SQL += `SELECT COUNT(confidence) AS total FROM MaxConfidencePerDateTime WHERE rank <= ${topRankin}`;
 
@@ -1211,8 +1208,10 @@ const prepResultsStatement = async (
     : false;
 
   // If you're using the memory db, you're either analysing one,  or all of the files
-  const [SQLtext, fileParams] = getFileSQLAndParams(range);
-  (resultStatement += SQLtext), params.push(...fileParams);
+  if (mode === 'archive' || range?.start){
+    const [SQLtext, fileParams] = getFileSQLAndParams(range);
+    (resultStatement += SQLtext), params.push(...fileParams);
+  }
   if (labelFilters.length) {
     resultStatement += ` AND tagID in (${prepParams(STATE.labelFilters)}) `;
     params.push(...STATE.labelFilters);
@@ -2328,33 +2327,59 @@ const fetchAudioBuffer = async ({ file = "", start = 0, end }) => {
 };
 
 function setAudioFilters() {
-  const filters = STATE.filters;
-  return STATE.filters.active
-    ? [
-        filters.lowShelfAttenuation &&
-          filters.lowShelfFrequency && {
-            filter: "lowshelf",
-            options: `gain=${filters.lowShelfAttenuation}:f=${filters.lowShelfFrequency}`,
-          },
-        filters.highPassFrequency && {
-          filter: "highpass",
-          options: `f=${filters.highPassFrequency}:t=q:poles=2`,
-        },
-        filters.lowPassFrequency && {
-          filter: "lowpass",
-          options: `f=${filters.lowPassFrequency}:t=q:poles=2`,
-        },
-        STATE.audio.gain > 0 && {
-          filter: "volume",
-          options: `volume=${STATE.audio.gain}dB`,
-        },
-        filters.normalise && {
-          filter: "loudnorm",
-          options: "I=-16:LRA=11:TP=-1.5",
-        },
-      ].filter(Boolean)
-    : [];
+  const {
+    active,
+    lowShelfAttenuation: attenuation,
+    lowShelfFrequency: lowShelf,
+    highPassFrequency: highPass,
+    lowPassFrequency: lowPass,
+    normalise
+  } = STATE.filters;
+
+  if (!active) return [];
+
+  const filters = [];
+
+  // === Filter chain logic ===
+
+  if (highPass || lowPass < 15_000) {
+    // Use sinc + afir
+    filters.push(
+      {
+        filter: 'sinc',
+        options: { lp: lowPass, hp: highPass, att: 40 },
+        outputs: 'ir'
+      },
+      { filter: 'afir', inputs: ['a', 'ir'] }
+    );
+  }
+  // Low shelf filter
+  if (lowShelf && attenuation) {
+    filters.push({
+      filter: "lowshelf",
+      options: `gain=${attenuation}:f=${lowShelf}`
+    });
+  }
+
+  // Gain
+  if (STATE.audio.gain > 0) {
+    filters.push({
+      filter: "volume",
+      options: `volume=${STATE.audio.gain}dB`
+    });
+  }
+
+  // Normalisation
+  if (normalise) {
+    filters.push({
+      filter: "loudnorm",
+      options: "I=-16:LRA=11:TP=-1.5"
+    });
+  }
+
+  return filters;
 }
+
 
 // Helper function to check if a given time is within daylight hours
 function isDuringDaylight(datetime, lat, lon) {
