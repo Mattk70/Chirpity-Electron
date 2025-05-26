@@ -24,7 +24,7 @@ import {Context, get} from '../utils/i18n.js';
  * @param {Function} resetResults - Callback to reset the results UI by clearing summaries and pagination.
  * @param {Function} filterResults - Callback to update filtered results based on the newly selected date range.
  */
-function initialiseDatePicker(state, worker, config, resetResults, filterResults) {
+function initialiseDatePicker(state, worker, config, resetResults, filterResults, generateToast) {
   let midnight = false;
   if (state.picker) {
     state.picker.destroy();
@@ -141,7 +141,10 @@ function initialiseDatePicker(state, worker, config, resetResults, filterResults
     const picker = state.picker;
     picker.on("select", (e) => {
       const { start, end } = e.detail;
-      //console.log("Range Selected!", JSON.stringify(e.detail));
+      if (end - start === 0) {
+        generateToast({ type: "warning", message: "badRange" });
+        console.log("Range Selected:", end - start);
+      }
       if (element.id === "chartRange") {
         state.chart.range = { start: start.getTime(), end: end.getTime() };
         worker.postMessage({ action: "update-state", chart: state.chart });

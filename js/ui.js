@@ -1989,7 +1989,7 @@ window.onload = async () => {
     LIST_MAP = i18n.get(i18n.LIST_MAP);
     // Localise UI
     i18n.localiseUI(DOM.locale.value).then((result) => (STATE.i18n = result));
-    initialiseDatePicker(STATE, worker, config, resetResults, filterResults, i18n.get);
+    initialiseDatePicker(STATE, worker, config, resetResults, filterResults, generateToast);
     STATE.picker.options.lang = DOM.locale.value.replace("_uk", "");
 
     // remember audio notification setting
@@ -5744,7 +5744,7 @@ document.addEventListener("change", async function (e) {
             contextAwareIconDisplay();
             updateListIcon();
             filterIconDisplay();
-            initialiseDatePicker(STATE, worker, config, resetResults, filterResults, i18n.get);
+            initialiseDatePicker(STATE, worker, config, resetResults, filterResults, generateToast);
           }
           config.locale = element.value;
           STATE.picker.options.lang = element.value.replace("_uk", "");
