@@ -106,7 +106,7 @@ async function countLines(filePath) {
     position = parseFloat(position);
     const dateTime = Date.parse(time);
     endTime = Date.parse(endTime);
-    confidence *= 1000;
+    confidence = parseFloat(confidence.replace('confirmed', '2')) * 1000;
     const detectionDuration = (endTime - dateTime) / 1000;
     const end = position + detectionDuration;
     callCount && (callCount = parseInt(callCount));
