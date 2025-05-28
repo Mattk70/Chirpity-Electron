@@ -4832,6 +4832,12 @@ document.addEventListener('input', (e) =>{
     }
     case "gain": {
       DOM.gainAdjustment.textContent = DOM.gain.value + "dB";
+      break;
+    }
+    default: {
+      // Log unhandled input events for debugging
+      config.debug && console.log(`Unhandled input event for element: ${target}`);
+      break;  
     }
   }
 })

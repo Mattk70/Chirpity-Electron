@@ -143,7 +143,6 @@ function initialiseDatePicker(state, worker, config, resetResults, filterResults
       const { start, end } = e.detail;
       if (end - start === 0) {
         generateToast({ type: "warning", message: "badRange" });
-        console.log("Range Selected:", end - start);
       }
       if (element.id === "chartRange") {
         state.chart.range = { start: start.getTime(), end: end.getTime() };
