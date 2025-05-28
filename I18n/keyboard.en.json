@@ -1,7 +1,11 @@
 {
-  "file-handling": [
-    "File Handling"
-    ],
+"toggle-settings": [
+"Toggle display of the settings panel"
+],
+"file-handling": [
+  "File Handling"
+  ],
+
 "show-file-open": [
   "Show file open dialog"
 ],

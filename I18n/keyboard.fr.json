@@ -1,7 +1,11 @@
 {
+
     "file-handling": [
       "Gestion des fichiers"
     ],
+      "toggle-settings": [
+      "Basculer l'affichage du panneau de paramètres"
+],
     "show-file-open": [
       "Afficher la boîte de dialogue d'ouverture de fichier"
     ],

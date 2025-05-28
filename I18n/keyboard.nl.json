@@ -5,6 +5,9 @@
   "show-file-open": [
     "Bestandsopen dialoog tonen"
   ],
+    "toggle-settings": [
+    "Schakel de weergave van het instellingenpaneel in of uit"
+],
   "save-detections": [
     "Opslaan van detecties naar het archief van records."
   ],

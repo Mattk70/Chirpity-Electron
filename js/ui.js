@@ -305,6 +305,11 @@ const GLOBAL_ACTIONS = {
   "=": (e) => STATE.fileLoaded && (spec.wavesurfer && (e.metaKey || e.ctrlKey) ? config.FFT = spec.reduceFFT() : spec.zoom("In")),
   "+": (e) => STATE.fileLoaded && (spec.wavesurfer && (e.metaKey || e.ctrlKey) ? config.FFT = spec.reduceFFT() : spec.zoom("In")),
   "-": (e) => STATE.fileLoaded && (spec.wavesurfer && (e.metaKey || e.ctrlKey) ? config.FFT = spec.increaseFFT() : spec.zoom("Out")),
+  F1: () => { 
+    const settingsEl = document.getElementById("settings");
+    const bsOffcanvas = bootstrap.Offcanvas.getOrCreateInstance(settingsEl);
+    settingsEl.classList.contains("show") ? bsOffcanvas.hide() : bsOffcanvas.show(); 
+    },
   F5: () =>  STATE.fileLoaded && (spec.wavesurfer && (config.FFT = spec.reduceFFT())),
   F4: () =>  STATE.fileLoaded && (spec.wavesurfer && (config.FFT = spec.increaseFFT())),
   " ": () => { WSPlayPause()},

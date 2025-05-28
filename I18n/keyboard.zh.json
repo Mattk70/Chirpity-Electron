@@ -8,6 +8,9 @@
   "save-detections": [
     "将检测结果保存到记录档案中"
   ],
+    "toggle-settings": [
+    "切换设置面板的显示"
+],
   "analysis": [
     "分析"
   ],

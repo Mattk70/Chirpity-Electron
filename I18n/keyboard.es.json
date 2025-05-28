@@ -1,4 +1,7 @@
 {
+  "toggle-settings": [
+    "Alternar la visualización del panel de configuración"
+],
   "file-handling": [
     "Gestión de archivos"
     ],
