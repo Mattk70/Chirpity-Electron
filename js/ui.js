@@ -6672,10 +6672,12 @@ function checkForMacUpdates() {
 function generateToast({
   message = "",
   type = "info",
-  autohide = true,
+  autohide,
   variables = undefined,
   locate = "",
 } = {}) {
+  // By default toasts are autohidden, unless they are errors
+  autohide = autohide === undefined ? type !== "error" : autohide;
   // i18n
   const i18 = i18n.get(i18n.Toasts);
   if (message === "noFile") {
