@@ -312,7 +312,7 @@ const GLOBAL_ACTIONS = {
     },
   F5: () =>  STATE.fileLoaded && (spec.wavesurfer && (config.FFT = spec.reduceFFT())),
   F4: () =>  STATE.fileLoaded && (spec.wavesurfer && (config.FFT = spec.increaseFFT())),
-  " ": () => { WSPlayPause()},
+  " ": () => { STATE.fileLoaded && WSPlayPause()},
   Tab: (e) => {
     if ((e.metaKey || e.ctrlKey) && !PREDICTING && STATE.diskHasRecords) {
       // If you did this when predicting, your results would go straight to the archive
@@ -5885,7 +5885,7 @@ document.addEventListener("change", async function (e) {
         }
         case "fromInput":
         case "fromSlider": {
-          config.audio.minFrequency = Math.max(element.valueAsNumber, 0);
+          config.audio.minFrequency = Math.min(element.valueAsNumber, config.audio.maxFrequency - 50);
           DOM.fromInput.value = config.audio.minFrequency;
           DOM.fromSlider.value = config.audio.minFrequency;
           spec.setRange({frequencyMin: config.audio.minFrequency});
@@ -5896,7 +5896,7 @@ document.addEventListener("change", async function (e) {
         }
         case "toInput":
         case "toSlider": {
-          config.audio.maxFrequency = Math.min(element.valueAsNumber, 11950);
+          config.audio.maxFrequency = Math.max(element.valueAsNumber, config.audio.minFrequency + 50);
           DOM.toInput.value = config.audio.maxFrequency;
           DOM.toSlider.value = config.audio.maxFrequency;
           spec.setRange({frequencyMax: config.audio.maxFrequency});
