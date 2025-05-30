@@ -5806,7 +5806,7 @@ document.addEventListener("change", async function (e) {
             colorMapFieldset.classList.add("d-none");
           }
           if (spec.wavesurfer && STATE.currentFile) {
-            spec.setColorMap() || flushSpec()
+            spec.setColorMap() || await flushSpec()
           }
           break;
         }
@@ -5817,7 +5817,7 @@ document.addEventListener("change", async function (e) {
               ...config.customColormap, 
               windowFn
             };
-          STATE.fileLoaded && flushSpec();
+          STATE.fileLoaded && await flushSpec();
           break
         }
         case "loud-color":
@@ -5847,7 +5847,7 @@ document.addEventListener("change", async function (e) {
             alpha
           };
           if (spec.wavesurfer && STATE.currentFile) {
-            spec.setColorMap() || flushSpec();     
+            spec.setColorMap() || await flushSpec();     
           }
           break;
         }
@@ -5873,7 +5873,7 @@ document.addEventListener("change", async function (e) {
         case "spec-labels": {
           config.specLabels = element.checked;
           if (spec.wavesurfer && STATE.currentFile) {
-            flushSpec()
+            await flushSpec()
           }
           break;
         }
