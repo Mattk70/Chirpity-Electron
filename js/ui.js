@@ -1853,8 +1853,8 @@ const defaultConfig = {
     padding: false,
     fade: false,
     notification: true,
-    minFrequency: 0,
-    maxFrequency: 11950,
+    frequencyMin: 0,
+    frequencyMax: 11950,
   },
   limit: 500,
   debug: false,
@@ -2020,10 +2020,10 @@ window.onload = async () => {
     // Show all detections
     DOM.specDetections.checked = config.specDetections;
     // Spectrogram frequencies
-    DOM.fromInput.value = config.audio.minFrequency;
-    DOM.fromSlider.value = config.audio.minFrequency;
-    DOM.toInput.value = config.audio.maxFrequency;
-    DOM.toSlider.value = config.audio.maxFrequency;
+    DOM.fromInput.value = config.audio.frequencyMin;
+    DOM.fromSlider.value = config.audio.frequencyMin;
+    DOM.toInput.value = config.audio.frequencyMax;
+    DOM.toSlider.value = config.audio.frequencyMax;
     fillSlider(DOM.fromInput, DOM.toInput, "#C6C6C6", "#0d6efd", DOM.toSlider);
     checkFilteredFrequency();
     // Window function & colormap
@@ -5336,12 +5336,13 @@ async function handleUIClicks(e) {
       break;
     }
     case "reset-spec-frequency": {
-      config.audio.minFrequency = 0;
-      config.audio.maxFrequency = 11950;
-      DOM.fromInput.value = config.audio.minFrequency;
-      DOM.fromSlider.value = config.audio.minFrequency;
-      DOM.toInput.value = config.audio.maxFrequency;
-      DOM.toSlider.value = config.audio.maxFrequency;
+      config.audio.frequencyMin = 0;
+      config.audio.frequencyMax = 11950;
+      const {frequencyMax, frequencyMin} = config.audio;
+      DOM.fromInput.value = frequencyMin;
+      DOM.fromSlider.value = frequencyMin;
+      DOM.toInput.value = frequencyMax;
+      DOM.toSlider.value = frequencyMax;
       fillSlider(
         DOM.fromInput,
         DOM.toInput,
@@ -5351,8 +5352,8 @@ async function handleUIClicks(e) {
       );
       checkFilteredFrequency();
       worker.postMessage({ action: "update-state", audio: config.audio });
-      const fftSamples = spec.spectrogram.fftSamples;
-      spec.setRange({frequencyMin: config.audio.minFrequency, frequencyMax: config.audio.minFrequency});
+
+      spec.setRange({frequencyMin, frequencyMax});
       document
         .getElementById("frequency-range")
         .classList.remove("text-warning");
@@ -5886,10 +5887,10 @@ document.addEventListener("change", async function (e) {
         }
         case "fromInput":
         case "fromSlider": {
-          config.audio.minFrequency = Math.min(element.valueAsNumber, config.audio.maxFrequency - 50);
-          DOM.fromInput.value = config.audio.minFrequency;
-          DOM.fromSlider.value = config.audio.minFrequency;
-          spec.setRange({frequencyMin: config.audio.minFrequency});
+          config.audio.frequencyMin = Math.min(element.valueAsNumber, config.audio.frequencyMax - 50);
+          DOM.fromInput.value = config.audio.frequencyMin;
+          DOM.fromSlider.value = config.audio.frequencyMin;
+          spec.setRange({frequencyMin: config.audio.frequencyMin});
           checkFilteredFrequency();
           element.blur();
           worker.postMessage({ action: "update-state", audio: config.audio });
@@ -5897,10 +5898,10 @@ document.addEventListener("change", async function (e) {
         }
         case "toInput":
         case "toSlider": {
-          config.audio.maxFrequency = Math.max(element.valueAsNumber, config.audio.minFrequency + 50);
-          DOM.toInput.value = config.audio.maxFrequency;
-          DOM.toSlider.value = config.audio.maxFrequency;
-          spec.setRange({frequencyMax: config.audio.maxFrequency});
+          config.audio.frequencyMax = Math.max(element.valueAsNumber, config.audio.frequencyMin + 50);
+          DOM.toInput.value = config.audio.frequencyMax;
+          DOM.toSlider.value = config.audio.frequencyMax;
+          spec.setRange({frequencyMax: config.audio.frequencyMax});
           checkFilteredFrequency();
           element.blur();
           worker.postMessage({ action: "update-state", audio: config.audio });
@@ -6442,12 +6443,12 @@ const insertManualRecord = ( {
  * Updates the UI to reflect whether a custom frequency filter is active.
  *
  * Checks the audio configuration to determine if the frequency range has been altered from its default
- * (minFrequency > 0 or maxFrequency < 11950). If so, it applies warning styles to the frequency range display
+ * (frequencyMin > 0 or frequencyMax < 11950). If so, it applies warning styles to the frequency range display
  * and enables the reset button. Otherwise, it restores the default styling.
  */
 function checkFilteredFrequency() {
   const resetButton = document.getElementById("reset-spec-frequency");
-  if (config.audio.minFrequency > 0 || config.audio.maxFrequency < 11950) {
+  if (config.audio.frequencyMin > 0 || config.audio.frequencyMax < 11950) {
     document.getElementById("frequency-range").classList.add("text-warning");
     resetButton.classList.add("btn-warning");
     resetButton.classList.remove("btn-secondary", "disabled");

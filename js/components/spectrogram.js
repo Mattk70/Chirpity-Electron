@@ -299,7 +299,7 @@ export class ChirpityWS {
     // set colormap
     const colorMap = this.createColormap();
     const {windowFn:windowFunc, alpha} = config.customColormap;
-    const {minFrequency: frequencyMin, maxFrequency: frequencyMax} = config.audio;
+    const {frequencyMin: frequencyMin, frequencyMax: frequencyMax} = config.audio;
     return Spectrogram.create({
       container,
       windowFunc,
@@ -916,12 +916,12 @@ export class ChirpityWS {
     if (showHz || inRegion) {
       const specDimensions = waveElement.getBoundingClientRect();
       const frequencyRange =
-        Number(config.audio.maxFrequency) - Number(config.audio.minFrequency);
+        Number(config.audio.frequencyMax) - Number(config.audio.frequencyMin);
       const yPosition =
         Math.round(
           (specDimensions.bottom - event.clientY) *
             (frequencyRange / specDimensions.height)
-        ) + Number(config.audio.minFrequency);
+        ) + Number(config.audio.frequencyMin);
 
       tooltip.textContent = `${i18.frequency}: ${yPosition}Hz`;
       if (inRegion) {

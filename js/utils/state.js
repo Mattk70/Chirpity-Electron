@@ -26,8 +26,8 @@ export class WorkerState {
       downmix: false,
       quality: 5,
       notification: true,
-      maxFrequency: 11950,
-      minFrequency: 0,
+      frequencyMax: 11950,
+      frequencyMin: 0,
     }),
     (this.filters = {
       active: false,
