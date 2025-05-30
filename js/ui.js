@@ -4834,6 +4834,7 @@ document.addEventListener('input', (e) =>{
     }
     case "thread-slider": {
       DOM.numberOfThreads.textContent = DOM.threadSlider.value;
+      break;
     }
     case "gain": {
       DOM.gainAdjustment.textContent = DOM.gain.value + "dB";
