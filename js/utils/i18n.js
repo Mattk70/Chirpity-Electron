@@ -3206,10 +3206,17 @@ async function localiseUI(locale) {
             if (settings[id]){
                 label.textContent = settings[id];
                 // Some nested labels must be skipped
-                if (['tensorflow', 'webgpu', 'webgl', 'colourmap', 'window-function', 'timelineSetting', 'iucn-scope', 'archive-format',
-                     'loud-color', 'mid-color', 'quiet-color', "color-threshold-slider", 'bitrate', 'format', 'quality', 'species-week'].includes(id)) return
+                if (['tensorflow', 'webgpu', 'webgl', 'colourmap', 'window-function', 'timelineSetting', 'iucn-scope', 'library-format',
+                     'loud-color', 'mid-color', 'quiet-color', "mid-color-threshold-slider", "quiet-color-threshold-slider",'bitrate', 
+                     'format', 'quality', 'species-week', 'show-species'].includes(id)) return
                 // Set popOver title. It's in the div, or div parent div
-                const elements = label.parentNode.querySelectorAll('a') || label.parentNode.parentNode.querySelectorAll('a') || label.parentNode.parentNode.parentNode.querySelectorAll('a');
+                let elements = label.parentNode.querySelectorAll('a');
+                if (elements.length === 0 && label.parentNode.parentNode) {
+                elements = label.parentNode.parentNode.querySelectorAll('a');
+                }
+                if (elements.length === 0 && label.parentNode.parentNode?.parentNode) {
+                elements = label.parentNode.parentNode.parentNode.querySelectorAll('a');
+                }
                 const heading = label.textContent.replace(':', '');
                 // Support multipe headings (locked items)
                 elements.forEach(el => {

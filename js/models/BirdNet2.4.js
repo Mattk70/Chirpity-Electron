@@ -299,49 +299,49 @@ tf.serialization.registerClass(MelSpecLayerSimple);
 //     y = tf.add(tf.div(y, sharpness), xmax2);
 //     return y
 // }
-function logmeanexp(x, axis, keepdims, sharpness) {
-  return tf.add(
-    tf.div(
-      tf.log(
-        tf.mean(
-          tf.exp(x.mul(sharpness, x.sub(tf.max(x, axis, true)))),
-          axis,
-          keepdims
-        )
-      ),
-      sharpness
-    ),
-    tf.max(x, axis, keepdims)
-  );
-}
-class GlobalLogExpPooling2D extends tf.layers.Layer {
-  constructor(config) {
-    super(config);
-  }
+// function logmeanexp(x, axis, keepdims, sharpness) {
+//   return tf.add(
+//     tf.div(
+//       tf.log(
+//         tf.mean(
+//           tf.exp(x.mul(sharpness, x.sub(tf.max(x, axis, true)))),
+//           axis,
+//           keepdims
+//         )
+//       ),
+//       sharpness
+//     ),
+//     tf.max(x, axis, keepdims)
+//   );
+// }
+// class GlobalLogExpPooling2D extends tf.layers.Layer {
+//   constructor(config) {
+//     super(config);
+//   }
 
-  build(inputShape) {
-    this.sharpness = this.addWeight(
-      "sharpness",
-      [1],
-      "float32",
-      tf.initializers.constant({ value: 2 })
-    );
-  }
+//   build(inputShape) {
+//     this.sharpness = this.addWeight(
+//       "sharpness",
+//       [1],
+//       "float32",
+//       tf.initializers.constant({ value: 2 })
+//     );
+//   }
 
-  computeOutputShape(inputShape) {
-    return [inputShape[0], inputShape[3]];
-  }
+//   computeOutputShape(inputShape) {
+//     return [inputShape[0], inputShape[3]];
+//   }
 
-  call(input, kwargs) {
-    return logmeanexp(input[0], [1, 2], false, this.sharpness.read()); //.read().dataSync()[0]);
-  }
+//   call(input, kwargs) {
+//     return logmeanexp(input[0], [1, 2], false, this.sharpness.read()); //.read().dataSync()[0]);
+//   }
 
-  static get className() {
-    return "GlobalLogExpPooling2D";
-  }
-}
+//   static get className() {
+//     return "GlobalLogExpPooling2D";
+//   }
+// }
 
-tf.serialization.registerClass(GlobalLogExpPooling2D);
+// tf.serialization.registerClass(GlobalLogExpPooling2D);
 
 /////////////////////////  Build Sigmoid Layer  /////////////////////////
 class SigmoidLayer extends tf.layers.Layer {
