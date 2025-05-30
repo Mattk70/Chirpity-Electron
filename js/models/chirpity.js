@@ -6,6 +6,8 @@ try {
   require("@tensorflow/tfjs-backend-webgpu");
   BACKEND = "webgpu";
 }
+
+import { BaseModel } from "./BaseModel.js";
 const fs = require("node:fs");
 const path = require("node:path");
 let DEBUG = false;
@@ -66,7 +68,7 @@ function loadModel(params) {
       console.log(tf.env());
       console.log(tf.env().getFlags());
     }
-    myModel = new Model(appPath, version);
+    myModel = new ChirpityModel(appPath, version);
     myModel.height = height;
     myModel.width = width;
 
@@ -195,80 +197,16 @@ onmessage = async (e) => {
   }
 };
 
-class Model {
+class ChirpityModel extends BaseModel {
+  /**
+   * Creates an instance of the ChirpityModel.
+   * @param {string} appPath - The path to the application directory.
+   * @param {string} version - The version of the model to be used.
+   */
   constructor(appPath, version) {
-    this.model = undefined;
-    this.labels = undefined;
-    this.height = undefined;
-    this.width = undefined;
-    this.config = CONFIG;
-    this.chunkLength = this.config.sampleRate * this.config.specLength;
-    this.model_loaded = false;
-    this.frame_length = 512;
-    this.frame_step = 186;
-    this.appPath = appPath;
-    this.useContext = undefined;
-    this.version = version;
-    this.selection = false;
+    super(appPath, version);
   }
 
-  async loadModel() {
-    if (this.model_loaded === false) {
-      // Model files must be in a different folder than the js, assets files
-      if (DEBUG) console.log("loading model from", this.appPath + "model.json");
-      this.model = await tf.loadGraphModel(this.appPath + "model.json", {
-        weightPathPrefix: this.appPath,
-      });
-      this.model_loaded = true;
-      this.inputShape = [...this.model.inputs[0].shape];
-    }
-  }
-
-  async warmUp(batchSize) {
-    this.batchSize = parseInt(batchSize);
-    this.inputShape[0] = this.batchSize;
-    DEBUG && console.log("WarmUp begin", tf.memory().numTensors);
-    const input = tf.zeros(this.inputShape);
-
-    // Parallel compilation for faster warmup
-    // https://github.com/tensorflow/tfjs/pull/7755/files#diff-a70aa640d286e39c922aa79fc636e610cae6e3a50dd75b3960d0acbe543c3a49R316
-    if (tf.getBackend() === "webgl") {
-      tf.env().set("ENGINE_COMPILE_ONLY", true);
-      const compileRes = this.model.predict(input, {
-        batchSize: this.batchSize,
-      });
-      tf.env().set("ENGINE_COMPILE_ONLY", false);
-      await tf.backend().checkCompileCompletionAsync();
-      tf.backend().getUniformLocations();
-      tf.dispose(compileRes);
-      input.dispose();
-    } else if (tf.getBackend() === "webgpu") {
-      tf.env().set("WEBGPU_ENGINE_COMPILE_ONLY", true);
-      const compileRes = this.model.predict(input, {
-        batchSize: this.batchSize,
-      });
-      tf.env().set("WEBGPU_ENGINE_COMPILE_ONLY", false);
-      await tf.backend().checkCompileCompletionAsync();
-      tf.dispose(compileRes);
-    }
-    input.dispose();
-    DEBUG && console.log("WarmUp end", tf.memory().numTensors);
-    return true;
-  }
-
-  normalise(spec) {
-    return tf.tidy(() => {
-      const spec_max = tf.max(spec, [1, 2], true);
-      // if (this.version === 'v4'){
-      //     const spec_min = tf.min(spec, [1, 2], true)
-      //     spec = tf.sub(spec, spec_min).div(tf.sub(spec_max, spec_min));
-      // } else {
-      spec = spec.mul(255);
-      spec = spec.div(spec_max);
-      // }
-      return spec;
-    });
-  }
 
   getSNR(spectrograms) {
     return tf.tidy(() => {
@@ -276,19 +214,6 @@ class Model {
       const peak = tf.div(variance, mean);
       let snr = tf.squeeze(tf.max(peak, 1));
       return snr;
-    });
-  }
-
-  padBatch(tensor) {
-    return tf.tidy(() => {
-      if (DEBUG)
-        console.log(
-          `Adding ${this.batchSize - tensor.shape[0]} tensors to the batch`
-        );
-      const shape = [...tensor.shape];
-      shape[0] = this.batchSize - shape[0];
-      const padding = tf.zeros(shape);
-      return tf.concat([tensor, padding], 0);
     });
   }
 
@@ -432,15 +357,6 @@ class Model {
     return [keys, topIndices, topValues];
   }
 
-  makeSpectrogram(signal) {
-    return tf.tidy(() => {
-      let spec = tf.abs(
-        tf.signal.stft(signal, this.frame_length, this.frame_step)
-      );
-      signal.dispose();
-      return spec;
-    });
-  }
   fixUpSpecBatch(specBatch, h, w) {
     const img_height = h || this.height;
     const img_width = w || this.width;
@@ -492,18 +408,6 @@ class Model {
     });
   };
 
-  padAudio = (audio) => {
-    const remainder = audio.length % this.chunkLength;
-    if (remainder) {
-      // Create a new array with the desired length
-      const paddedAudio = new Float32Array(
-        audio.length + (this.chunkLength - remainder)
-      );
-      // Copy the existing values into the new array
-      paddedAudio.set(audio);
-      return paddedAudio;
-    } else return audio;
-  };
 
   async predictChunk(
     audioBuffer,

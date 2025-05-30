@@ -622,7 +622,8 @@ input[type="range"].vertical {
 }
 
 .offcanvas {
-  --bs-offcanvas-width: 450px; /* Change the width as desired */
+  min-width: 30rem;
+  --bs-offcanvas-width: 25vw; /* Change the width as desired */
 }
 
 .offcanvas-backdrop {

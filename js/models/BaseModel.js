@@ -57,7 +57,9 @@ class BaseModel {
       input.dispose();
     } else if (tf.getBackend() === "webgpu") {
       tf.env().set("WEBGPU_ENGINE_COMPILE_ONLY", true);
-      const compileRes = this.model.predict(input);
+      const compileRes = this.model.predict(input, {
+        batchSize: this.batchSize,
+      });
       await tf.backend().checkCompileCompletionAsync();
       tf.dispose(compileRes);
       tf.env().set("WEBGPU_ENGINE_COMPILE_ONLY", false);
@@ -71,8 +73,7 @@ class BaseModel {
     return true;
   }
 
-  normalise = (spec) =>
-    tf.tidy(() => spec.mul(255).div(spec.max([1, 2], true)));
+  normalise = (spec) => spec.mul(255).div(spec.max([1, 2], true));
 
   padBatch(tensor) {
     return tf.tidy(() => {
@@ -113,15 +114,8 @@ class BaseModel {
     return [keys, topIndices, topValues];
   }
 
-  makeSpectrogram(signal) {
-    return tf.tidy(() => {
-      let spec = tf.abs(
-        tf.signal.stft(signal, this.frame_length, this.frame_step)
-      );
-      signal.dispose();
-      return spec;
-    });
-  }
+  makeSpectrogram = (signal) => tf.abs(tf.signal.stft(signal, this.frame_length, this.frame_step));
+  
 
   fixUpSpecBatch(specBatch, h, w) {
     const img_height = h || this.height;
