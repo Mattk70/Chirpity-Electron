@@ -305,9 +305,14 @@ const GLOBAL_ACTIONS = {
   "=": (e) => STATE.fileLoaded && (spec.wavesurfer && (e.metaKey || e.ctrlKey) ? config.FFT = spec.reduceFFT() : spec.zoom("In")),
   "+": (e) => STATE.fileLoaded && (spec.wavesurfer && (e.metaKey || e.ctrlKey) ? config.FFT = spec.reduceFFT() : spec.zoom("In")),
   "-": (e) => STATE.fileLoaded && (spec.wavesurfer && (e.metaKey || e.ctrlKey) ? config.FFT = spec.increaseFFT() : spec.zoom("Out")),
+  F1: () => { 
+    const settingsEl = document.getElementById("settings");
+    const bsOffcanvas = bootstrap.Offcanvas.getOrCreateInstance(settingsEl);
+    settingsEl.classList.contains("show") ? bsOffcanvas.hide() : bsOffcanvas.show(); 
+    },
   F5: () =>  STATE.fileLoaded && (spec.wavesurfer && (config.FFT = spec.reduceFFT())),
   F4: () =>  STATE.fileLoaded && (spec.wavesurfer && (config.FFT = spec.increaseFFT())),
-  " ": () => { WSPlayPause()},
+  " ": () => { STATE.fileLoaded && WSPlayPause()},
   Tab: (e) => {
     if ((e.metaKey || e.ctrlKey) && !PREDICTING && STATE.diskHasRecords) {
       // If you did this when predicting, your results would go straight to the archive
@@ -1577,7 +1582,7 @@ async function showExplore() {
   });
   resetResults();
   // Prevent scroll up hiding navbar
-  spec.adjustDims();
+  await spec.adjustDims();
 }
 
 /**
@@ -1734,7 +1739,7 @@ const loadResultRegion = ({
 
 ///////////////// Font functions ////////////////
 // Function to set the font size scale
-function setFontSizeScale(doNotScroll) {
+async function setFontSizeScale(doNotScroll) {
   document.documentElement.style.setProperty(
     "--font-size-scale",
     config.fontScale
@@ -1747,7 +1752,7 @@ function setFontSizeScale(doNotScroll) {
   doNotScroll ||
     decreaseBtn.scrollIntoView({ block: "center", behavior: "auto" });
   updatePrefs("config.json", config);
-  spec.adjustDims(true);
+  STATE.currentFile && await flushSpec();
 }
 
 
@@ -1795,8 +1800,10 @@ const defaultConfig = {
     loud: "#ff7b00",
     mid: "#850035",
     quiet: "#000000",
-    threshold: 0.5,
+    quietThreshold: 0.0,
+    midThreshold: 0.5,
     windowFn: "hann",
+    alpha: 0.5
   },
   timeOfDay: true,
   list: "birds",
@@ -1825,6 +1832,7 @@ const defaultConfig = {
   filters: {
     active: false,
     highPassFrequency: 0,
+    lowPassFrequency: 15000,
     lowShelfFrequency: 0,
     lowShelfAttenuation: 0,
     SNR: 0,
@@ -1845,8 +1853,8 @@ const defaultConfig = {
     padding: false,
     fade: false,
     notification: true,
-    minFrequency: 0,
-    maxFrequency: 11950,
+    frequencyMin: 0,
+    frequencyMax: 11950,
   },
   limit: 500,
   debug: false,
@@ -1986,7 +1994,7 @@ window.onload = async () => {
     LIST_MAP = i18n.get(i18n.LIST_MAP);
     // Localise UI
     i18n.localiseUI(DOM.locale.value).then((result) => (STATE.i18n = result));
-    initialiseDatePicker(STATE, worker, config, resetResults, filterResults, i18n.get);
+    initialiseDatePicker(STATE, worker, config, resetResults, filterResults, generateToast);
     STATE.picker.options.lang = DOM.locale.value.replace("_uk", "");
 
     // remember audio notification setting
@@ -2012,10 +2020,10 @@ window.onload = async () => {
     // Show all detections
     DOM.specDetections.checked = config.specDetections;
     // Spectrogram frequencies
-    DOM.fromInput.value = config.audio.minFrequency;
-    DOM.fromSlider.value = config.audio.minFrequency;
-    DOM.toInput.value = config.audio.maxFrequency;
-    DOM.toSlider.value = config.audio.maxFrequency;
+    DOM.fromInput.value = config.audio.frequencyMin;
+    DOM.fromSlider.value = config.audio.frequencyMin;
+    DOM.toInput.value = config.audio.frequencyMax;
+    DOM.toSlider.value = config.audio.frequencyMax;
     fillSlider(DOM.fromInput, DOM.toInput, "#C6C6C6", "#0d6efd", DOM.toSlider);
     checkFilteredFrequency();
     // Window function & colormap
@@ -2025,13 +2033,17 @@ window.onload = async () => {
       document.getElementById("alpha").classList.remove("d-none");
     config.colormap === "custom" &&
       document.getElementById("colormap-fieldset").classList.remove("d-none");
-    document.getElementById("color-threshold").textContent =
-      config.customColormap.threshold;
-    document.getElementById("loud-color").value = config.customColormap.loud;
-    document.getElementById("mid-color").value = config.customColormap.mid;
-    document.getElementById("quiet-color").value = config.customColormap.quiet;
-    document.getElementById("color-threshold-slider").value =
-      config.customColormap.threshold;
+    const {loud, mid, quiet, quietThreshold, midThreshold, alpha} = config.customColormap;
+    document.getElementById("quiet-color-threshold").textContent = quietThreshold;
+    document.getElementById("quiet-color-threshold-slider").value = quietThreshold;
+    document.getElementById("mid-color-threshold").textContent = midThreshold;
+    document.getElementById("mid-color-threshold-slider").value = midThreshold;
+    document.getElementById("loud-color").value = loud;
+    document.getElementById("mid-color").value = mid;
+    document.getElementById("quiet-color").value = quiet;
+    document.getElementById("alpha-slider").value = alpha;
+    document.getElementById("alpha-value").textContent = alpha;
+    
     // Audio preferences:
     DOM.gain.value = config.audio.gain;
     DOM.gainAdjustment.textContent = config.audio.gain + "dB";
@@ -2066,12 +2078,15 @@ window.onload = async () => {
     // };
 
     // Filters
-    HPThreshold.textContent = config.filters.highPassFrequency + "Hz";
-    HPSlider.value = config.filters.highPassFrequency;
-    LowShelfSlider.value = config.filters.lowShelfFrequency;
-    LowShelfThreshold.textContent = config.filters.lowShelfFrequency + "Hz";
-    lowShelfAttenuation.value = -config.filters.lowShelfAttenuation;
-    lowShelfAttenuationThreshold.textContent = lowShelfAttenuation.value + "dB";
+    document.getElementById("HP-threshold").textContent = formatHz(config.filters.highPassFrequency);
+    document.getElementById("highPassFrequency").value = config.filters.highPassFrequency;
+    const lowPass = document.getElementById("lowPassFrequency")
+    lowPass.value = Number(lowPass.max) - config.filters.lowPassFrequency;
+    document.getElementById("LP-threshold").textContent = formatHz(config.filters.lowPassFrequency);
+    document.getElementById("lowShelfFrequency").value = config.filters.lowShelfFrequency;
+    document.getElementById("LowShelf-threshold").textContent = formatHz(config.filters.lowShelfFrequency);
+    DOM.attenuation.value = -config.filters.lowShelfAttenuation;
+    document.getElementById("attenuation-threshold").textContent = DOM.attenuation.value + "dB";
     DOM.sendFilteredAudio.checked = config.filters.sendToModel;
     filterIconDisplay();
     if (config[config.model].backend.includes("web")) {
@@ -2261,8 +2276,6 @@ const setUpWorkerMessaging = () => {
         case "mode-changed": {
           const mode = args.mode;
           STATE.mode = mode;
-          renderFilenamePanel();
-          spec.adjustDims();
           switch (mode) {
             case "analyse": {
               STATE.diskHasRecords &&
@@ -2724,8 +2737,8 @@ function getTooltipTitle(date, aggregation) {
 
 window.addEventListener("resize", function () {
   utils.waitForFinalEvent(
-    function () {
-      spec.adjustDims(true);
+    async function () {
+      await spec.adjustDims(true);
     },
     100,
     "id1"
@@ -2850,7 +2863,7 @@ function setActiveRegion(region, activateRow) {
   activateRow && setActiveRow(start + STATE.windowOffsetSecs);
 }
 
-const spec = new ChirpityWS(
+let spec = new ChirpityWS(
   "#waveform",
   () => STATE, // Returns the current state
   () => config, // Returns the current config
@@ -4692,8 +4705,8 @@ function showThreshold(e) {
   filterPanelRangeInput.value = threshold;
   settingsPanelRangeInput.value = threshold;
 }
-settingsPanelRangeInput.addEventListener("input", showThreshold);
-filterPanelRangeInput.addEventListener("input", showThreshold);
+// settingsPanelRangeInput.addEventListener("input", showThreshold);
+// filterPanelRangeInput.addEventListener("input", showThreshold);
 
 const handleThresholdChange = (e) => {
   const threshold = e.target.valueAsNumber;
@@ -4725,12 +4738,21 @@ const handleThresholdChange = (e) => {
 // Filter handling
 const filterIconDisplay = () => {
   const i18 = i18n.get(i18n.Titles);
+  const {
+    active, 
+    highPassFrequency, 
+    lowPassFrequency, 
+    lowShelfAttenuation, 
+    lowShelfFrequency, 
+    normalise} = config.filters;
   if (
-    config.filters.active &&
-    (config.filters.highPassFrequency ||
-      (config.filters.lowShelfAttenuation &&
-        config.filters.lowShelfFrequency) ||
-      config.filters.normalise)
+    active &&
+    (
+      highPassFrequency || 
+      lowPassFrequency  ||
+      (lowShelfAttenuation && lowShelfFrequency) ||
+      normalise
+    )
   ) {
     DOM.audioFiltersIcon.classList.add("text-warning");
     DOM.audioFiltersIcon.title = i18.audioFiltersOn;
@@ -4754,60 +4776,98 @@ const showFilterEffect = () => {
   }
 };
 
-// SNR
-// const handleSNRchange = () => {
-//     config.filters.SNR = parseFloat(SNRSlider.value);
-//     if (config.filters.SNR > 0) {
-//         config.detect.contextAware = false;
-//         DOM.contextAware.disabled = true;
-//     } else {
-//         config.detect.contextAware = DOM.contextAware.checked;
-//         DOM.contextAware.disabled = false;
-//     }
-//     worker.postMessage({ action: 'update-state', filters: { SNR: config.filters.SNR } })
-//     filterIconDisplay();
-// }
 
-// const SNRThreshold = document.getElementById('SNR-threshold');
-// // const SNRSlider = document.getElementById('snrValue');
-// SNRSlider.addEventListener('input', () => {
-//     SNRThreshold.textContent = SNRSlider.value;
-// });
+const formatHz = (n) => n >= 1000 ? `${(n / 1000).toFixed(1)}kHz` : `${n}Hz`;
 
-const colorMapThreshold = document.getElementById("color-threshold");
-const colorMapSlider = document.getElementById("color-threshold-slider");
-colorMapSlider.addEventListener("input", () => {
-  colorMapThreshold.textContent = colorMapSlider.value;
-});
 
-// Gauss Alpha
-const alphaValue = document.getElementById("alpha-value");
-const alphaSlider = document.getElementById("alpha-slider");
-alphaSlider.addEventListener("input", () => {
-  alphaValue.textContent = alphaSlider.value;
-});
+function updateDisplay(el, id, unit){
+  const display = document.getElementById(id);
+  let value = el.value;
+  if (el.id === 'lowPassFrequency') value = Number(el.max) - value;
+  if (unit === 'Hz'){
+    value = formatHz(value);
+    unit = null
+  }
+  display.textContent = value + (unit || '');
+}
 
-const handleHPchange = () => {
-  config.filters.highPassFrequency = HPSlider.valueAsNumber;
+document.addEventListener('input', (e) =>{
+  const el = e.target;
+  const target = el.id;
+  switch (target){
+    case 'mid-color-threshold-slider':{
+      updateDisplay(el, "mid-color-threshold")
+      break;
+    }
+    case "quiet-color-threshold-slider": {
+      updateDisplay(el, "quiet-color-threshold");
+      break;
+    }
+    case "alpha-slider": {
+      updateDisplay(el, "alpha-value");
+      break;
+    }
+    case "highPassFrequency": {
+      updateDisplay(el, "HP-threshold", 'Hz');
+      break;
+    }
+    case "lowPassFrequency": {
+      updateDisplay(el, "LP-threshold", 'Hz');
+      break;
+    }
+    case "lowShelfFrequency": {
+      updateDisplay(el, "LowShelf-threshold", 'Hz');
+      break;
+    }
+    case "attenuation": {
+      updateDisplay(el, "attenuation-threshold", 'dB');
+      break;
+    }
+    case "batch-size":{
+      DOM.batchSizeValue.textContent = BATCH_SIZE_LIST[DOM.batchSizeSlider.value];
+      break;
+    }
+    case "confidence":
+    case "confidenceValue": {
+      showThreshold(e)
+      break;
+    }
+    case "thread-slider": {
+      DOM.numberOfThreads.textContent = DOM.threadSlider.value;
+      break;
+    }
+    case "gain": {
+      DOM.gainAdjustment.textContent = DOM.gain.value + "dB";
+      break;
+    }
+    default: {
+      // Log unhandled input events for debugging
+      config.debug && console.log(`Unhandled input event for element: ${target}`);
+      break;  
+    }
+  }
+})
+
+const handlePassFilterchange = (el) => {
+  const filter = el.id;
+  let value = el.valueAsNumber;
+  // Invert scale for low pass
+  if (filter === 'lowPassFrequency') value = Number(el.max) - value;
+  config.filters[filter] = value;
   config.filters.active || toggleFilters();
   worker.postMessage({
     action: "update-state",
-    filters: { highPassFrequency: config.filters.highPassFrequency },
+    filters: { [filter]: config.filters[filter] },
   });
   showFilterEffect();
   filterIconDisplay();
-  HPSlider.blur(); // Fix slider capturing thefocus so you can't use spaceBar or hit 'p' directly
+  el.blur(); // Fix slider capturing the focus so you can't use spaceBar or hit 'p' directly
 };
 
-const HPThreshold = document.getElementById("HP-threshold");
-const HPSlider = document.getElementById("HighPassFrequency");
-HPSlider.addEventListener("input", () => {
-  HPThreshold.textContent = HPSlider.value + "Hz";
-});
 
 // Low shelf threshold
 const handleLowShelfchange = () => {
-  config.filters.lowShelfFrequency = LowShelfSlider.valueAsNumber;
+  config.filters.lowShelfFrequency = DOM.LowShelfSlider.valueAsNumber;
   config.filters.active || toggleFilters();
   worker.postMessage({
     action: "update-state",
@@ -4815,18 +4875,13 @@ const handleLowShelfchange = () => {
   });
   showFilterEffect();
   filterIconDisplay();
-  LowShelfSlider.blur(); // Fix slider capturing thefocus so you can't use spaceBar or hit 'p' directly
+  DOM.LowShelfSlider.blur(); // Fix slider capturing thefocus so you can't use spaceBar or hit 'p' directly
 };
 
-const LowShelfThreshold = document.getElementById("LowShelf-threshold");
-const LowShelfSlider = document.getElementById("lowShelfFrequency");
-LowShelfSlider.addEventListener("input", () => {
-  LowShelfThreshold.textContent = LowShelfSlider.value + "Hz";
-});
 
 // Low shelf gain
 const handleAttenuationchange = () => {
-  config.filters.lowShelfAttenuation = -lowShelfAttenuation.valueAsNumber;
+  config.filters.lowShelfAttenuation = -DOM.attenuation.valueAsNumber;
   config.filters.active = true;
   worker.postMessage({
     action: "update-state",
@@ -4834,30 +4889,9 @@ const handleAttenuationchange = () => {
   });
   showFilterEffect();
   filterIconDisplay();
-  lowShelfAttenuation.blur();
+  DOM.attenuation.blur();
 };
 
-const lowShelfAttenuation = document.getElementById("attenuation");
-const lowShelfAttenuationThreshold = document.getElementById(
-  "attenuation-threshold"
-);
-
-lowShelfAttenuation.addEventListener("input", () => {
-  lowShelfAttenuationThreshold.textContent = lowShelfAttenuation.value + "dB";
-});
-
-// Show batch size / threads as user moves slider
-DOM.batchSizeSlider.addEventListener("input", () => {
-  DOM.batchSizeValue.textContent = BATCH_SIZE_LIST[DOM.batchSizeSlider.value];
-});
-
-DOM.threadSlider.addEventListener("input", () => {
-  DOM.numberOfThreads.textContent = DOM.threadSlider.value;
-});
-
-DOM.gain.addEventListener("input", () => {
-  DOM.gainAdjustment.textContent = DOM.gain.value + "dB";
-});
 
 /**
  * Plays the active audio region after sanitizing its boundaries.
@@ -4912,7 +4946,7 @@ document.addEventListener("click", debounceClick(handleUIClicks));
  *
  * @param {MouseEvent} e - The click event object.
  */
-function handleUIClicks(e) {
+async function handleUIClicks(e) {
   const element = e.target;
   const target = element.closest("[id]")?.id;
   const locale = config.locale.replace(/_.*$/, "");
@@ -5053,6 +5087,7 @@ function handleUIClicks(e) {
       config.list = 'everything';
       updateList();
       updatePrefs("config.json", config);
+      showAnalyse();
       break;
     }
     // Help Menu
@@ -5195,6 +5230,7 @@ function handleUIClicks(e) {
           config.list = 'everything';
           updateList()
           updatePrefs("config.json", config);
+          showAnalyse();
         }
       })();
       break;
@@ -5300,12 +5336,13 @@ function handleUIClicks(e) {
       break;
     }
     case "reset-spec-frequency": {
-      config.audio.minFrequency = 0;
-      config.audio.maxFrequency = 11950;
-      DOM.fromInput.value = config.audio.minFrequency;
-      DOM.fromSlider.value = config.audio.minFrequency;
-      DOM.toInput.value = config.audio.maxFrequency;
-      DOM.toSlider.value = config.audio.maxFrequency;
+      config.audio.frequencyMin = 0;
+      config.audio.frequencyMax = 11950;
+      const {frequencyMax, frequencyMin} = config.audio;
+      DOM.fromInput.value = frequencyMin;
+      DOM.fromSlider.value = frequencyMin;
+      DOM.toInput.value = frequencyMax;
+      DOM.toSlider.value = frequencyMax;
       fillSlider(
         DOM.fromInput,
         DOM.toInput,
@@ -5315,8 +5352,8 @@ function handleUIClicks(e) {
       );
       checkFilteredFrequency();
       worker.postMessage({ action: "update-state", audio: config.audio });
-      const fftSamples = spec.spectrogram.fftSamples;
-      spec.adjustDims(true, fftSamples);
+
+      spec.setRange({frequencyMin, frequencyMax});
       document
         .getElementById("frequency-range")
         .classList.remove("text-warning");
@@ -5328,7 +5365,7 @@ function handleUIClicks(e) {
         Math.min(1.1, config.fontScale + 0.1).toFixed(1)
       ); // Don't let it go above 1.1
       config.fontScale = fontScale;
-      setFontSizeScale();
+      await setFontSizeScale();
       break;
     }
     case "decreaseFont": {
@@ -5336,7 +5373,7 @@ function handleUIClicks(e) {
         Math.max(0.7, config.fontScale - 0.1).toFixed(1)
       ); // Don't let it go below 0.7
       config.fontScale = fontScale;
-      setFontSizeScale();
+      await setFontSizeScale();
       break;
     }
     case "speciesFilter": {
@@ -5518,7 +5555,7 @@ function refreshSummary() {
 
 // Beginnings of the all-powerful document 'change' listener
 // One listener to rule them all!
-document.addEventListener("change", function (e) {
+document.addEventListener("change", async function (e) {
   const element = e.target.closest("[id]");
   if (element) {
     const target = element.id;
@@ -5657,14 +5694,18 @@ document.addEventListener("change", function (e) {
           handleLowShelfchange(e);
           break;
         }
-        case "HighPassFrequency": {
-          handleHPchange(e);
+        case "highPassFrequency": {
+          handlePassFilterchange(DOM.HPSlider);
           break;
         }
-        case "snrValue": {
-          handleSNRchange(e);
+        case "lowPassFrequency": {
+          handlePassFilterchange(DOM.LPSlider);
           break;
         }
+        // case "snrValue": {
+        //   handleSNRchange(e);
+        //   break;
+        // }
         case "file-timestamp": {
           config.fileStartMtime = element.checked;
           worker.postMessage({
@@ -5716,7 +5757,7 @@ document.addEventListener("change", function (e) {
             contextAwareIconDisplay();
             updateListIcon();
             filterIconDisplay();
-            initialiseDatePicker(STATE, worker, config, resetResults, filterResults, i18n.get);
+            initialiseDatePicker(STATE, worker, config, resetResults, filterResults, generateToast);
           }
           config.locale = element.value;
           STATE.picker.options.lang = element.value.replace("_uk", "");
@@ -5765,45 +5806,48 @@ document.addEventListener("change", function (e) {
             colorMapFieldset.classList.add("d-none");
           }
           if (spec.wavesurfer && STATE.currentFile) {
-            const fftSamples = spec.spectrogram.fftSamples;
-            spec.adjustDims(true, fftSamples);
-            postBufferUpdate({
-              begin: STATE.windowOffsetSecs,
-              position: spec.wavesurfer.getCurrentTime() / STATE.windowLength,
-            });
+            spec.setColorMap() || await flushSpec()
           }
           break;
         }
-        case "window-function":
-        case "alpha-slider":
+        case "window-function":{
+          const windowFn = document.getElementById("window-function").value;
+          document.getElementById("alpha").classList.toggle("d-none", windowFn !== "gauss")
+          config.customColormap = {
+              ...config.customColormap, 
+              windowFn
+            };
+          STATE.fileLoaded && await flushSpec();
+          break
+        }
         case "loud-color":
         case "mid-color":
         case "quiet-color":
-        case "color-threshold-slider": {
-          const windowFn = document.getElementById("window-function").value;
+        case "mid-color-threshold-slider":
+        case "quiet-color-threshold-slider":
+        case "alpha-slider": {
           const alpha = document.getElementById("alpha-slider").valueAsNumber;
-          config.alpha = alpha;
-          windowFn === "gauss"
-            ? document.getElementById("alpha").classList.remove("d-none")
-            : document.getElementById("alpha").classList.add("d-none");
           const loud = document.getElementById("loud-color").value;
           const mid = document.getElementById("mid-color").value;
           const quiet = document.getElementById("quiet-color").value;
-          const threshold = document.getElementById(
-            "color-threshold-slider"
+          const quietThreshold = document.getElementById(
+            "quiet-color-threshold-slider"
           ).valueAsNumber;
-          document.getElementById("color-threshold").textContent = threshold;
+          const midThreshold = document.getElementById(
+            "mid-color-threshold-slider"
+          ).valueAsNumber;
+          // document.getElementById("color-threshold").textContent = threshold;
           config.customColormap = {
-            loud: loud,
-            mid: mid,
-            quiet: quiet,
-            threshold: threshold,
-            windowFn: windowFn,
+            ...config.customColormap,
+            loud,
+            mid,
+            quiet,
+            quietThreshold,
+            midThreshold,
+            alpha
           };
           if (spec.wavesurfer && STATE.currentFile) {
-            const fftSamples = spec.spectrogram.fftSamples;
-            spec.adjustDims(true, fftSamples);
-            spec.refreshTimeline();
+            spec.setColorMap() || await flushSpec();     
           }
           break;
         }
@@ -5829,8 +5873,7 @@ document.addEventListener("change", function (e) {
         case "spec-labels": {
           config.specLabels = element.checked;
           if (spec.wavesurfer && STATE.currentFile) {
-            const fftSamples = spec.spectrogram.fftSamples;
-            spec.adjustDims(true, fftSamples);
+            await flushSpec()
           }
           break;
         }
@@ -5844,11 +5887,10 @@ document.addEventListener("change", function (e) {
         }
         case "fromInput":
         case "fromSlider": {
-          config.audio.minFrequency = Math.max(element.valueAsNumber, 0);
-          DOM.fromInput.value = config.audio.minFrequency;
-          DOM.fromSlider.value = config.audio.minFrequency;
-          const fftSamples = spec.spectrogram.fftSamples;
-          spec.adjustDims(true, fftSamples);
+          config.audio.frequencyMin = Math.min(element.valueAsNumber, config.audio.frequencyMax - 50);
+          DOM.fromInput.value = config.audio.frequencyMin;
+          DOM.fromSlider.value = config.audio.frequencyMin;
+          spec.setRange({frequencyMin: config.audio.frequencyMin});
           checkFilteredFrequency();
           element.blur();
           worker.postMessage({ action: "update-state", audio: config.audio });
@@ -5856,11 +5898,10 @@ document.addEventListener("change", function (e) {
         }
         case "toInput":
         case "toSlider": {
-          config.audio.maxFrequency = Math.min(element.valueAsNumber, 11950);
-          DOM.toInput.value = config.audio.maxFrequency;
-          DOM.toSlider.value = config.audio.maxFrequency;
-          const fftSamples = spec.spectrogram.fftSamples;
-          spec.adjustDims(true, fftSamples);
+          config.audio.frequencyMax = Math.max(element.valueAsNumber, config.audio.frequencyMin + 50);
+          DOM.toInput.value = config.audio.frequencyMax;
+          DOM.toSlider.value = config.audio.frequencyMax;
+          spec.setRange({frequencyMax: config.audio.frequencyMax});
           checkFilteredFrequency();
           element.blur();
           worker.postMessage({ action: "update-state", audio: config.audio });
@@ -5945,6 +5986,21 @@ document.addEventListener("change", function (e) {
       trackEvent(config.UUID, "Settings Change", target, value);
   }
 });
+
+const flushSpec = async () =>{
+  DOM.waveElement.replaceChildren();
+  DOM.spectrogram.replaceChildren();
+  spec.wavesurfer.destroy();
+  spec = new ChirpityWS(
+    "#waveform",
+    () => STATE, // Returns the current state
+    () => config, // Returns the current config
+    { postBufferUpdate, trackEvent, setActiveRegion, onStateUpdate: state.update, updatePrefs },
+    GLOBAL_ACTIONS
+  );
+  await spec.initAll({audio:STATE.currentBuffer, height: STATE.specMaxHeight})
+  spec.reload()
+}
 
 /**
  * Updates the UI to reflect the selected species list type and displays relevant controls.
@@ -6388,12 +6444,12 @@ const insertManualRecord = ( {
  * Updates the UI to reflect whether a custom frequency filter is active.
  *
  * Checks the audio configuration to determine if the frequency range has been altered from its default
- * (minFrequency > 0 or maxFrequency < 11950). If so, it applies warning styles to the frequency range display
+ * (frequencyMin > 0 or frequencyMax < 11950). If so, it applies warning styles to the frequency range display
  * and enables the reset button. Otherwise, it restores the default styling.
  */
 function checkFilteredFrequency() {
   const resetButton = document.getElementById("reset-spec-frequency");
-  if (config.audio.minFrequency > 0 || config.audio.maxFrequency < 11950) {
+  if (config.audio.frequencyMin > 0 || config.audio.frequencyMax < 11950) {
     document.getElementById("frequency-range").classList.add("text-warning");
     resetButton.classList.add("btn-warning");
     resetButton.classList.remove("btn-secondary", "disabled");
@@ -6619,10 +6675,12 @@ function checkForMacUpdates() {
 function generateToast({
   message = "",
   type = "info",
-  autohide = true,
+  autohide,
   variables = undefined,
   locate = "",
 } = {}) {
+  // By default toasts are autohidden, unless they are errors
+  autohide = autohide === undefined ? type !== "error" : autohide;
   // i18n
   const i18 = i18n.get(i18n.Toasts);
   if (message === "noFile") {

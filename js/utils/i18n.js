@@ -13,6 +13,7 @@ const Toasts = { // UI.js
         changeListBlocked:"It is not possible to change the list settings while an analysis is underway. However, the list <b>can</b> be changed after the analysis completes",
         cancelled: "Operation cancelled",
         badTime: "Invalid time format. Please enter time in one of the following formats: \n1. Float (for seconds) \n2. Two numbers separated by a colon (for minutes and seconds) \n3. Three numbers separated by colons (for hours, minutes, and seconds)",
+        badRange: "Invalid range. The start and end times are identical",
         complete: "Analysis complete.",
         feedback: "Thank you, your feedback helps improve Chirpity predictions",
         contextBlocked: "It is not possible to change the context-mode settings while an analysis is underway.",
@@ -81,6 +82,7 @@ const Toasts = { // UI.js
         changeListBlocked: "Det er ikke muligt at ændre listeindstillingerne, mens en analyse er i gang. Listen <b>kan</b> dog ændres, når analysen er færdig.",
         cancelled: "Handling annulleret",
         badTime: "Ugyldigt tidsformat. Indtast tid i et af følgende formater: \n1. Flydende tal (for sekunder) \n2. To tal adskilt af et kolon (for minutter og sekunder) \n3. Tre tal adskilt af kolon (for timer, minutter og sekunder)",
+        badRange: "Ugyldigt interval. Start- og sluttidspunktet er identiske",
         complete: "Analyse fuldført.",
         feedback: "Tak, din feedback hjælper med at forbedre Chirpitys forudsigelser",
         contextBlocked: "Det er ikke muligt at ændre indstillinger for konteksttilstand, mens en analyse er i gang.",
@@ -148,6 +150,7 @@ const Toasts = { // UI.js
         changeListBlocked: "Es ist nicht möglich, die Listeneinstellungen während einer laufenden Analyse zu ändern. Die Liste <b>kann</b> jedoch nach Abschluss der Analyse geändert werden.",
         cancelled: "Vorgang abgebrochen",
         badTime: "Ungültiges Zeitformat. Bitte geben Sie die Zeit in einem der folgenden Formate ein: \n1. Dezimalzahl (für Sekunden) \n2. Zwei Zahlen getrennt durch einen Doppelpunkt (für Minuten und Sekunden) \n3. Drei Zahlen getrennt durch Doppelpunkte (für Stunden, Minuten und Sekunden)",
+        badRange: "Ungültiger Bereich. Start- und Endzeit sind identisch",
         complete: "Analyse abgeschlossen.",
         feedback: "Vielen Dank, Ihr Feedback hilft dabei, die Vorhersagen von Chirpity zu verbessern.",
         contextBlocked: "Es ist nicht möglich, die Kontextmodus-Einstellungen während einer laufenden Analyse zu ändern.",
@@ -216,6 +219,7 @@ const Toasts = { // UI.js
         changeListBlocked: "No es posible cambiar la configuración de la lista mientras se está realizando un análisis. No obstante, la configuración <b>sí</b> se puede cambiar después de que termine el análisis.",
         cancelled: "Operación cancelada",
         badTime: "No se admite ese formato de hora. Indíquelo de alguno de los siguientes modos: \n1. Decimal (para segundos) \n2. Dos números separados por dos puntos (para minutos y segundos) \n3. Tres números separados por dos puntos (para horas, minutos y segundos)",
+        badRange: "Rango no válido. La hora de inicio y la de finalización son idénticas",
         complete: "Análisis completo.",
         feedback: "Gracias, su retroalimentación ayuda a mejorar las predicciones de Chirpity.",
         contextBlocked: "No es posible cambiar la configuración del modo contexto mientras se está efectuando un análisis.",
@@ -284,6 +288,7 @@ const Toasts = { // UI.js
         changeListBlocked: "Il n'est pas possible de changer les paramètres de la liste pendant qu'une analyse est en cours. Cependant, la liste <b>peut</b> être modifiée après la fin de l'analyse.",
         cancelled: "Opération annulée",
         badTime: "Format de temps invalide. Veuillez entrer l'heure dans l'un des formats suivants : \n1. Flottant (pour les secondes) \n2. Deux chiffres séparés par un deux-points (pour les minutes et les secondes) \n3. Trois chiffres séparés par des deux-points (pour les heures, les minutes et les secondes)",
+        badRange: "Plage invalide. L'heure de début et l'heure de fin sont identiques",
         complete: "Analyse terminée.",
         feedback: "Merci, vos commentaires aident à améliorer les prédictions de Chirpity.",
         contextBlocked: "Il n'est pas possible de changer les paramètres du mode de contexte pendant qu'une analyse est en cours.",
@@ -351,6 +356,7 @@ const Toasts = { // UI.js
         changeListBlocked:"分析が進行中のため、リスト設定を変更することはできません。ただし、分析が完了した後にリストを変更することは<b>可能</b>です",
         cancelled: "操作がキャンセルされました",
         badTime: "無効な時間形式です。次の形式のいずれかで時間を入力してください：\n1. 浮動小数点数（秒）\n2. コロンで区切られた2つの数字（分と秒）\n3. コロンで区切られた3つの数字（時、分、秒）",
+        badRange: "無効な範囲です。開始時間と終了時間が同じです",
         complete: "分析が完了しました。",
         feedback: "ありがとうございます。あなたのフィードバックはChirpityの予測を改善するのに役立ちます",
         contextBlocked: "分析が進行中のため、コンテキストモード設定を変更することはできません。",
@@ -418,6 +424,7 @@ const Toasts = { // UI.js
         changeListBlocked: "Het is niet mogelijk om de lijstinstellingen te wijzigen terwijl een analyse bezig is. De lijst <b>kan</b> echter worden gewijzigd nadat de analyse is voltooid.",
         cancelled: "Operatie geannuleerd",
         badTime: "Ongeldig tijdformaat. Voer de tijd in een van de volgende formaten in: \n1. Float (voor seconden) \n2. Twee getallen gescheiden door een dubbele punt (voor minuten en seconden) \n3. Drie getallen gescheiden door dubbele punten (voor uren, minuten en seconden)",
+        badRange: "Ongeldige bereik. De starttijd en eindtijd zijn identiek",
         complete: "Analyse voltooid.",
         feedback: "Dank je, je feedback helpt Chirpity-voorspellingen te verbeteren.",
         contextBlocked: "Het is niet mogelijk om de instellingen van de context-modus te wijzigen terwijl een analyse bezig is.",
@@ -486,6 +493,7 @@ const Toasts = { // UI.js
         changeListBlocked: "Não é possível alterar as configurações da lista enquanto uma análise está em andamento. No entanto, a lista <b>pode</b> ser alterada após a conclusão da análise.",
         cancelled: "Operação cancelada",
         badTime: "Formato de hora inválido. Por favor, insira a hora em um dos seguintes formatos: \n1. Float (para segundos) \n2. Dois números separados por dois pontos (para minutos e segundos) \n3. Três números separados por dois pontos (para horas, minutos e segundos)",
+        badRange: "Intervalo inválido. O horário de início e o horário de término são idênticos",
         complete: "Análise concluída.",
         feedback: "Obrigado, seu feedback ajuda a melhorar as previsões do Chirpity.",
         contextBlocked: "Não é possível alterar as configurações do modo de contexto enquanto uma análise está em andamento.",
@@ -554,6 +562,7 @@ const Toasts = { // UI.js
         changeListBlocked: "Невозможно изменить настройки списка во время анализа. Однако список <b>можно</b> изменить после его завершения.",
         cancelled: "Операция отменена",
         badTime: "Неверный формат времени. Пожалуйста, введите время в одном из следующих форматов: \n1. Время с плавающей точкой (в секундах) \n2. Два числа, разделенные двоеточием (для минут и секунд) \n3. Три числа, разделенные двоеточием (для часов, минут и секунд)",
+        badRange: "Неверный диапазон. Время начала и время окончания идентичны",
         complete: "Анализ завершен.",
         feedback: "Спасибо, ваш отзыв помогает улучшить прогнозы Chirpity.",
         contextBlocked: "Во время выполнения анализа изменить настройки контекстного режима невозможно.",
@@ -622,6 +631,7 @@ const Toasts = { // UI.js
         changeListBlocked: "Det går inte att ändra listinställningarna medan en analys pågår. Listan <b>kan</b> dock ändras efter att analysen är klar.",
         cancelled: "Operationen avbröts",
         badTime: "Ogiltigt tidsformat. Vänligen ange tid i ett av följande format: \n1. Flyttal (i sekunder) \n2. Två siffror separerade med kolon (för minuter och sekunder) \n3. Tre siffror separerade med kolon (för timmar, minuter och sekunder)",
+        badRange: "Ogiltigt intervall. Start- och sluttid är identiska",
         complete: "Analys klar.",
         feedback: "Tack, din feedback hjälper oss att förbättra Chirpity-prediktionerna.",
         contextBlocked: "Det går inte att ändra inställningarna för kontextläge medan en analys pågår.",
@@ -687,6 +697,7 @@ const Toasts = { // UI.js
         mustFilterSpecies: "按物种过滤结果以导出音频文件。",
         noNode: "无法加载标准后端。已使用实验性后端（webGPU）替代。",
         badMessage: "来自工作线程的无法识别消息: ${args.event}",
+        badRange: "无效的范围。开始时间和结束时间相同",
         changeListBlocked: "在分析进行时无法更改列表设置。但可以在分析完成后更改列表。",
         cancelled: "操作已取消",
         badTime: "无效的时间格式。请输入以下格式之一：\n1. 浮动值（以秒为单位）\n2. 两个数字用冒号分隔（表示分钟和秒）\n3. 三个数字用冒号分隔（表示小时、分钟和秒）",
@@ -3195,10 +3206,17 @@ async function localiseUI(locale) {
             if (settings[id]){
                 label.textContent = settings[id];
                 // Some nested labels must be skipped
-                if (['tensorflow', 'webgpu', 'webgl', 'colourmap', 'window-function', 'timelineSetting', 'iucn-scope', 'archive-format',
-                     'loud-color', 'mid-color', 'quiet-color', "color-threshold-slider", 'bitrate', 'format', 'quality', 'species-week'].includes(id)) return
+                if (['tensorflow', 'webgpu', 'webgl', 'colourmap', 'window-function', 'timelineSetting', 'iucn-scope', 'library-format',
+                     'loud-color', 'mid-color', 'quiet-color', "mid-color-threshold-slider", "quiet-color-threshold-slider",'bitrate', 
+                     'format', 'quality', 'species-week', 'show-species'].includes(id)) return
                 // Set popOver title. It's in the div, or div parent div
-                const elements = label.parentNode.querySelectorAll('a') || label.parentNode.parentNode.querySelectorAll('a') || label.parentNode.parentNode.parentNode.querySelectorAll('a');
+                let elements = label.parentNode.querySelectorAll('a');
+                if (elements.length === 0 && label.parentNode.parentNode) {
+                elements = label.parentNode.parentNode.querySelectorAll('a');
+                }
+                if (elements.length === 0 && label.parentNode.parentNode?.parentNode) {
+                elements = label.parentNode.parentNode.parentNode.querySelectorAll('a');
+                }
                 const heading = label.textContent.replace(':', '');
                 // Support multipe headings (locked items)
                 elements.forEach(el => {

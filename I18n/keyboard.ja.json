@@ -1,10 +1,14 @@
 {
+
   "file-handling": [
     "ファイル処理"
   ],
   "show-file-open": [
     "ファイルオープンダイアログを表示"
   ],
+    "toggle-settings": [
+    "設定パネルの表示を切り替え"
+],
   "save-detections": [
     "検出結果を記録アーカイブに保存"
   ],

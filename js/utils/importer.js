@@ -106,7 +106,16 @@ async function countLines(filePath) {
     position = parseFloat(position);
     const dateTime = Date.parse(time);
     endTime = Date.parse(endTime);
-    confidence *= 1000;
+    // Handle special confidence values - 'confirmed' maps to confidence level 2.0
+    if (confidence === 'confirmed') {
+      confidence = 2.0;
+    } else {
+      confidence = parseFloat(confidence);
+      if (isNaN(confidence)) {
+          throw new Error(`CSV Import encountered an invalid confidence value: ${confidence}`);
+      }
+    }
+    confidence = confidence * 1000;
     const detectionDuration = (endTime - dateTime) / 1000;
     const end = position + detectionDuration;
     callCount && (callCount = parseInt(callCount));

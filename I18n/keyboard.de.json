@@ -1,10 +1,14 @@
 {
+
 "file-handling": [
     "Dateiverwaltung"
     ],
   "show-file-open": [
     "Dateiauswahldialog anzeigen"
   ],
+    "toggle-settings": [
+    "Einstellungen-Panel anzeigen/ausblenden"
+],
   "save-detections": [
     "Erkenntnisse im Aufzeichnungsarchiv speichern."
   ],

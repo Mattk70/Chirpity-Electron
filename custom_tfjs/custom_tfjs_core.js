@@ -21,3 +21,111 @@
 import {registerKernel} from '@tensorflow/tfjs-core/dist/base';
 import '@tensorflow/tfjs-core/dist/base_side_effects';
 export * from '@tensorflow/tfjs-core/dist/base';
+
+   <script>
+      tf.registerKernel({
+        kernelName: 'FFT2',
+        backendName: 'webgl',
+        kernelFunc: ({ backend, inputs: { input: x } }) => {
+          const innerDimensionSize = x.shape[x.shape.length - 1]
+          const batch = tf.util.sizeFromShape(x.shape) / innerDimensionSize
+          const realPart = backend.runWebGLProgram({
+            variableNames: ['real'],
+            outputShape: [batch, innerDimensionSize],
+            userCode: `
+              void main() {
+                ivec2 coords = getOutputCoords();
+                int batch = coords[0];
+                float exponentMultiplierTimesIndexRatio = -2.0 * ${Math.PI} * float(coords[1]) / float(${innerDimensionSize});
+                float result = 0.0;
+                for (int i = 0; i < ${innerDimensionSize}; i++) {
+                  float x = exponentMultiplierTimesIndexRatio * float(i);
+                  result += getReal(batch, i) * cos(x);
+                }
+                setOutput(result);
+              }`
+          }, [{ dataId: x.dataId, dtype: x.dtype, shape: [batch, innerDimensionSize]}], 'float32')
+          const res = tf.engine().runKernel('Reshape', { x: realPart }, { shape: x.shape })
+          backend.disposeIntermediateTensorInfo(realPart)
+          return res
+        }
+      })
+      function stft(signal, frameLength, frameStep, fftLength, windowFn) {
+        const framedSignal = tf.signal.frame(signal, frameLength, frameStep)
+        const input = tf.mul(framedSignal, windowFn(frameLength))
+        let innerDimensionSize = input.shape[input.shape.length - 1]
+        const batch = input.size / innerDimensionSize
+        const realValues = tf.engine().runKernel('FFT2', {input: tf.reshape(input, [batch, innerDimensionSize])})
+        const half = Math.floor(innerDimensionSize / 2) + 1
+        const realComplexConjugate = tf.split(
+            realValues, [half, innerDimensionSize - half],
+            realValues.shape.length - 1)
+        const outputShape = input.shape.slice()
+        outputShape[input.shape.length - 1] = half
+        return tf.reshape(realComplexConjugate[0], outputShape)
+      }
+      class MelSpecLayerSimple extends tf.layers.Layer {
+          constructor(config) {
+              super(config)
+              this.sampleRate = config.sampleRate
+              this.specShape = config.specShape
+              this.frameStep = config.frameStep
+              this.frameLength = config.frameLength
+              this.melFilterbank = tf.tensor2d(config.melFilterbank)
+          }
+          build(inputShape) {
+              this.magScale = this.addWeight(
+                  'magnitude_scaling',
+                  [],
+                  'float32',
+                  tf.initializers.constant({ value: 1.23 })
+              );
+              super.build(inputShape)
+          }
+          computeOutputShape(inputShape) {
+              return [inputShape[0], this.specShape[0], this.specShape[1], 1];
+          }
+          call(inputs) {
+            return tf.tidy(() => {
+                  inputs = inputs[0];
+                  const inputList = tf.split(inputs, inputs.shape[0])
+                  const specBatch = inputList.map(input =>{
+                      input = input.squeeze();
+                      input = tf.sub(input, tf.min(input, -1, true));
+                      input = tf.div(input, tf.max(input, -1, true).add(0.000001));
+                      input = tf.sub(input, 0.5);
+                      input = tf.mul(input, 2.0);
+
+                      let spec;
+                      if (window.useFastFFT) {
+                        spec = stft(
+                          input,
+                          this.frameLength,
+                          this.frameStep,
+                          this.frameLength,
+                          tf.signal.hannWindow,
+                        )
+                      } else {
+                        spec = tf.signal.stft(
+                            input,
+                            this.frameLength,
+                            this.frameStep,
+                            this.frameLength,
+                            tf.signal.hannWindow,
+                        )
+                        spec = tf.cast(spec, 'float32')
+                      }
+                      spec = tf.matMul(spec, this.melFilterbank)
+                      spec = spec.pow(2.0)
+                      spec = spec.pow(tf.div(1.0, tf.add(1.0, tf.exp(this.magScale.read()))))
+                      spec = tf.reverse(spec, -1)
+                      spec = tf.transpose(spec)
+                      spec = spec.expandDims(-1)
+                      return spec;
+                  })
+                  return tf.stack(specBatch)
+              });
+          }
+          static get className() { return 'MelSpecLayerSimple' }
+      }
+      tf.serialization.registerClass(MelSpecLayerSimple);

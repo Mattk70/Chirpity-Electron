@@ -6,7 +6,7 @@ export class WorkerState {
 
   constructor() {
     (this.db = null),
-    (this.mode = "analyse"), // analyse, explore, chart
+    (this.mode = "analyse"), // archive, explore, chart
     (this.resultsSortOrder = "dateTime"),
     this.resultsMetaSortOrder = '',
     (this.summarySortOrder = "cname ASC"),
@@ -26,12 +26,13 @@ export class WorkerState {
       downmix: false,
       quality: 5,
       notification: true,
-      maxFrequency: 11950,
-      minFrequency: 0,
+      frequencyMax: 11950,
+      frequencyMin: 0,
     }),
     (this.filters = {
       active: false,
       highPassFrequency: 0,
+      lowPassFrequency: 15000,
       lowShelfFrequency: 0,
       lowShelfAttenuation: 0,
       SNR: 0,

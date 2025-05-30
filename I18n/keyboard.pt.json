@@ -5,6 +5,9 @@
   "show-file-open": [
     "Mostrar caixa de diálogo de abertura de arquivo"
   ],
+    "toggle-settings": [
+    "Alternar exibição do painel de configurações"
+],
   "save-detections": [
     "Salvar as detecções no arquivo de registros."
   ],

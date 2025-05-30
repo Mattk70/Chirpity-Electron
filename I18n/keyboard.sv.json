@@ -5,6 +5,9 @@
   "show-file-open": [
     "Visa filöppningsdialog"
   ],
+    "toggle-settings": [
+    "Växla visning av inställningspanelen"
+],
   "save-detections": [
     "Spara detektioner till rekordarkivet."
   ],

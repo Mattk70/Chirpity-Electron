@@ -185,6 +185,30 @@ const DOM = {
     }
     return this._footer;
   },
+  get HPSlider() {
+    if (!this._HPSlider) {
+      this._HPSlider = document.getElementById("highPassFrequency");
+    }
+    return this._HPSlider;
+  },
+  get LPSlider() {
+    if (!this._LPSlider) {
+      this._LPSlider = document.getElementById("lowPassFrequency");
+    }
+    return this._LPSlider;
+  },
+  get LowShelfSlider() {
+    if (!this._LowShelfSlider) {
+      this._LowShelfSlider = document.getElementById("lowShelfFrequency");
+    }
+    return this._LowShelfSlider;
+  },
+  get attenuation() {
+    if (!this._attenuation) {
+      this._attenuation = document.getElementById("attenuation");
+    }
+    return this._attenuation;
+  },
   get gain() {
     if (!this._gain) {
       this._gain = document.getElementById("gain");
