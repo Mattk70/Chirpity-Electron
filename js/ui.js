@@ -5990,6 +5990,7 @@ document.addEventListener("change", async function (e) {
 const flushSpec = async () =>{
   DOM.waveElement.replaceChildren();
   DOM.spectrogram.replaceChildren();
+  spec.wavesurfer.destroy();
   spec = new ChirpityWS(
     "#waveform",
     () => STATE, // Returns the current state
