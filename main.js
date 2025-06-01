@@ -278,19 +278,13 @@ async function windowStateKeeper(windowName) {
 
   function track(win) {
     window = win;
-    ["resize", "move", "close", "maximize",  'enter-full-screen',  'leave-full-screen'].forEach((event) => {
+    ["resize", "move", "close", "maximize", "unmaximize"].forEach((event) => {
       win.on(event, saveState);
     });
   }
 
   await setBounds();
-  return {
-    x: windowState.x,
-    y: windowState.y,
-    width: windowState.width,
-    height: windowState.height,
-    track,
-  };
+  return { ...windowState, track };
 }
 
 async function createWindow() {
@@ -315,6 +309,8 @@ async function createWindow() {
   });
 
   mainWindow.setFullScreen(mainWindowStateKeeper.isFullScreen);
+  mainWindowStateKeeper.isMaximized &&  mainWindow.maximize();
+
   // Track window state
   mainWindowStateKeeper.track(mainWindow);
 
