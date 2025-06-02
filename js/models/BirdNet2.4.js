@@ -9,10 +9,11 @@ const fs = require("node:fs");
 const path = require("node:path");
 let DEBUG = false;
 
-import { BaseModel } from "./BaseModel.js";
+import { BaseModel, stft } from "./BaseModel.js";
 
 //GLOBALS
 let myModel;
+
 
 onmessage = async (e) => {
   const modelRequest = e.data.message;
@@ -35,7 +36,7 @@ onmessage = async (e) => {
         );
         const appPath = "../../" + location + "/";
         const batch = e.data.batchSize;
-        const backend = BACKEND || e.data.backend;
+        const backend = 'webgpu';//BACKEND || e.data.backend;
         backend === "webgpu" && require("@tensorflow/tfjs-backend-webgpu");
         let labels;
         const labelFile = `../../labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_en.txt`;
@@ -246,15 +247,15 @@ class MelSpecLayerSimple extends tf.layers.Layer {
           input = tf.mul(input, 2.0);
 
           // Perform STFT and cast result to float
-          let spec = tf.signal
-            .stft(
+          let spec = // tf.signal
+            stft(
               input,
               this.frameLength,
               this.frameStep,
               this.frameLength,
               tf.signal.hannWindow
             )
-            .cast("float32");
+            //.cast("float32");
 
           // Apply mel filter bank
           spec = spec
