@@ -6,6 +6,9 @@ try {
   tf = require("@tensorflow/tfjs");
 }
 
+/*
+Credit for these functions goes to https://github.com/georg95/birdnet-web.
+*/
 function arrayProduct (arr) {
     let product = 1;
     for (let i = 0; i < arr.length; i++) { product *= arr[i] }
@@ -19,6 +22,66 @@ return [Math.ceil(arrayProduct(layout.x.map(d => outputShape[d])) /(workgroupSiz
 }
 
 if (!globalThis.tf) { globalThis.tf = {} }
+function bitReverse(num, bits) {
+          let reversed = 0;
+          for (let i = 0; i < bits; i++) {
+              if ((num & (1 << i))) {
+                  reversed |= (1 << (bits - 1 - i));
+              }
+          }
+          return reversed;
+      }
+      tf.registerKernel({
+    kernelName: 'FFT2',
+    backendName: 'webgl',
+    kernelFunc: ({ backend, inputs: { input } }) => {
+        const innerDim = input.shape[input.shape.length - 1]
+        const batch = tf.util.sizeFromShape(input.shape) / innerDim
+        const reorderMap = Array.from({ length: innerDim }, (_, i) => bitReverse(i, Math.log2(innerDim)))
+        let currentTensor = backend.runWebGLProgram({
+            variableNames: ['mapvalue'],
+            outputShape: [batch, innerDim * 2],
+            userCode: `
+              int reorderMap[${innerDim}] = int[](${reorderMap.join(', ')});
+              void main() {
+                ivec2 coords = getOutputCoords();
+                int batch = coords[0];
+                int k = reorderMap[coords[1] % ${innerDim}];
+                float result = coords[1] < ${innerDim} ? getMapvalue(batch, k) : 0.0;
+                setOutput(result);
+              }`
+        }, [input], 'float32')
+        for (let len = 1; len < innerDim; len *= 2) {
+            let prevTensor = currentTensor
+            currentTensor = backend.runWebGLProgram({
+                variableNames: [`value_${len}`],
+                outputShape: [batch, len*2 >= innerDim ? innerDim : innerDim * 2],
+                userCode: `void main() {
+                            ivec2 coords = getOutputCoords();
+                            int batch = coords[0];
+                            int i = coords[1];
+                            int k = i % ${innerDim};
+                            int isHigh = (k % ${len * 2}) / ${len};
+                            int isImag = i / ${innerDim};
+                            int isReal = 1 - isImag;
+                            int highSign = (1 - isHigh * 2);
+                            int baseIndex = k - isHigh * ${len};
+                            float t = ${Math.PI / len} * float(k % ${len});
+                            float a = cos(t);
+                            float b = sin(-t);
+                            float evenK_re = getValue_${len}(batch, baseIndex);
+                            float oddK_re = getValue_${len}(batch, baseIndex + ${len});
+                            float evenK_im = getValue_${len}(batch, baseIndex + ${innerDim});
+                            float oddK_im = getValue_${len}(batch, baseIndex + ${len + innerDim});
+                            float outp = (evenK_im + (oddK_re * b + oddK_im * a) * float(highSign)) * float(isImag)
+                            + (evenK_re + (oddK_re * a - oddK_im * b) * float(highSign)) * float(isReal);
+                            setOutput(outp);
+                            }` }, [currentTensor], 'float32')
+            backend.disposeIntermediateTensorInfo(prevTensor)
+        }
+        return currentTensor
+    }
+})
 tf.registerKernel?.({
     kernelName: 'FFT2',
     backendName: 'webgpu',
@@ -119,23 +182,46 @@ tf.registerKernel({
     backendName: 'webgpu',
     kernelFunc: ({ backend, inputs: { input, frameLength, frameStep } }) => {
         const workgroupSize = [64, 1, 1]
-        const outpLen = (input.size - frameLength + frameStep) / frameStep | 0
-        const dispatchLayout = flatDispatchLayout([outpLen, frameLength])
+        const outputLength = (input.size - frameLength + frameStep) / frameStep | 0
+        const dispatchLayout = flatDispatchLayout([outputLength, frameLength])
         return backend.runWebGPUProgram({
             variableNames: ['x'],
-            outputShape: [outpLen, frameLength],
+            outputShape: [outputLength, frameLength],
             workgroupSize,
             shaderKey: `frame_${frameLength}_${frameStep}`,
             dispatchLayout,
-            dispatch: computeDispatch(dispatchLayout, [outpLen, frameLength], workgroupSize),
+            dispatch: computeDispatch(dispatchLayout, [outputLength, frameLength], workgroupSize),
             getUserCode: () => `
-    fn main(i: i32) {
-        setOutputAtIndex(i, getX((i / ${frameLength}) * ${frameStep} + i % ${frameLength}));
-    }`
+              fn main(i: i32) {
+                  setOutputAtIndex(i, getX((i / ${frameLength}) * ${frameStep} + i % ${frameLength}));
+              }`
         }, [input], 'float32')
     }
 })
-function stft(signal, frameLength, frameStep, fftLength, windowFn = tf.signal.hannWindow) {
+
+tf.registerKernel({
+    kernelName: 'FRAME',
+    backendName: 'webgl',
+    kernelFunc: ({ backend, inputs: { input, frameLength, frameStep } }) => {
+        const outputLength = (input.size - frameLength + frameStep) / frameStep | 0
+        
+        return backend.runWebGLProgram({
+            variableNames: ['x'],
+            outputShape: [outputLength, frameLength],
+            userCode: `
+              void main() {
+                ivec2 coords = getOutputCoords();
+                int j = coords[1];
+                int b = coords[0];
+                int i = b * ${frameLength} + j;
+                setOutput(getX((i / ${frameLength}) * ${frameStep} + i % ${frameLength}));
+              }`
+        }, [input], 'float32')
+    }
+})
+
+
+function stft(signal, frameLength, frameStep, fftLength = frameLength, windowFn = tf.signal.hannWindow) {
   const framedSignal = tf.engine().runKernel('FRAME', {input: signal, frameLength, frameStep })
   const input = tf.mul(framedSignal, windowFn(frameLength))
   let innerDim = input.shape[input.shape.length - 1]
@@ -149,6 +235,7 @@ function stft(signal, frameLength, frameStep, fftLength, windowFn = tf.signal.ha
   outputShape[input.shape.length - 1] = half
   return tf.reshape(realComplexConjugate[0], outputShape)
 }
+
 
 const DEBUG = false;
 class BaseModel {
@@ -192,9 +279,9 @@ class BaseModel {
     // Parallel compilation for faster warmup
     // https://github.com/tensorflow/tfjs/pull/7755/files#diff-a70aa640d286e39c922aa79fc636e610cae6e3a50dd75b3960d0acbe543c3a49R316
     if (tf.getBackend() === "webgl") {
-      tf.env().set("ENGINE_COMPILE_ONLY", true);
-      const compileRes = this.model.predict(input);
-      tf.env().set("ENGINE_COMPILE_ONLY", false);
+      // tf.env().set("ENGINE_COMPILE_ONLY", true);
+      const compileRes = this.model.predict(input, {batchSize: this.batchSize});
+      // tf.env().set("ENGINE_COMPILE_ONLY", false);
       await tf.backend().checkCompileCompletionAsync();
       tf.backend().getUniformLocations();
       tf.dispose(compileRes);
@@ -258,8 +345,11 @@ class BaseModel {
     return [keys, topIndices, topValues];
   }
 
-  makeSpectrogram = (signal) => stft(signal, this.frame_length, this.frame_step);
-  
+  makeSpectrogram = (input) => tf.abs(stft(
+              input,
+              this.frame_length,
+              this.frame_step))
+//  makeSpectrogram = (signal) => tf.abs(tf.signal.stft(signal, this.frame_length, this.frame_step));
 
   fixUpSpecBatch(specBatch, h, w) {
     const img_height = h || this.height;

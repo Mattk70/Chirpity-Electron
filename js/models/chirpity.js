@@ -423,8 +423,7 @@ class ChirpityModel extends BaseModel {
     const numSamples = audioBuffer.shape / this.chunkLength;
     let buffers = tf.reshape(audioBuffer, [numSamples, this.chunkLength]);
     audioBuffer.dispose();
-    const bufferList =
-      this.version !== "v4" ? this.normalise_audio_batch(buffers) : buffers;
+    const bufferList =  this.normalise_audio_batch(buffers);
     const specBatch = tf.tidy(() => {
       const bufferArray = tf.unstack(bufferList);
       const toStack = bufferArray.map((x) => {
