@@ -4336,7 +4336,7 @@ const modelSettingsDisplay = () => {
       element.classList.replace("chirpity-only-visible", "chirpity-only");
     });
     DOM.contextAware.checked = false;
-    DOM.contextAware.disabed = true;
+    DOM.contextAware.disabled = true;
     config.detect.contextAware = false;
     DOM.contextAwareIcon.classList.add("d-none");
 
@@ -4352,11 +4352,12 @@ const modelSettingsDisplay = () => {
     DOM.contextAware.checked = config.detect.contextAware;
     DOM.contextAwareIcon.classList.remove("d-none");
     // SNRSlider.disabled = false;
-    if (config.hasNode) {
-      nodeOnly.forEach((element) => element.classList.remove("d-none"));
-    } else {
-      nodeOnly.forEach((element) => element.classList.add("d-none"));
-    }
+
+  }    
+  if (config.hasNode) {
+    nodeOnly.forEach((element) => element.classList.remove("d-none"));
+  } else {
+    nodeOnly.forEach((element) => element.classList.add("d-none"));
   }
 };
 
