@@ -59,8 +59,8 @@ function loadModel(params) {
       tf.env().set("TOPK_K_CPU_HANDOFF_THRESHOLD", 128);
       tf.env().set("TOPK_LAST_DIM_CPU_HANDOFF_SIZE_THRESHOLD", 128);
     } else if (backend === "webgpu") {
-      tf.env().set("WEBGPU_DEFERRED_SUBMIT_BATCH_SIZE", 64); // Affects GPU RAM at expense of speed
-      tf.env().set("WEBGPU_CPU_HANDOFF_SIZE_THRESHOLD", 1000); // MatMulPackedProgram
+      // tf.env().set("WEBGPU_DEFERRED_SUBMIT_BATCH_SIZE", 64); // Affects GPU RAM at expense of speed
+      // tf.env().set("WEBGPU_CPU_HANDOFF_SIZE_THRESHOLD", 1000); // MatMulPackedProgram
     }
     tf.enableProdMode();
     //tf.enableDebugMode();
@@ -84,13 +84,13 @@ function loadModel(params) {
     myModel.labels = labels;
     await myModel.loadModel();
     myModel.warmUp(batch);
-    BACKEND = tf.getBackend();
+    myModel.backend = backend;
     postMessage({
       message: "model-ready",
       sampleRate: myModel.config.sampleRate,
       chunkLength: myModel.chunkLength,
-      backend: tf.getBackend(),
-      labels: labels,
+      backend,
+      labels,
       worker: params.worker,
     });
   });
