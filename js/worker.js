@@ -2071,7 +2071,8 @@ async function processAudio(
   highWaterMark,
   samplesInBatch
 ) {
-  const MAX_CHUNKS = Math.max(12, NUM_WORKERS * 2);
+  // Find a balance between performance and memory usage
+  const MAX_CHUNKS = Math.max(12, Math.min(NUM_WORKERS * 2, 36));
   return new Promise((resolve, reject) => {
     // Many compressed files start with a small section of silence due to encoder padding, which affects predictions
     // To compensate, we move the start back a small amount, and slice the data to remove the silence
