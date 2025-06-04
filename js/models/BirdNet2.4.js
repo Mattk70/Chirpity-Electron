@@ -14,7 +14,6 @@ import { BaseModel, stft } from "./BaseModel.js";
 //GLOBALS
 let myModel;
 
-
 onmessage = async (e) => {
   const modelRequest = e.data.message;
   const worker = e.data.worker;

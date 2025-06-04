@@ -360,7 +360,7 @@ class ChirpityModel extends BaseModel {
   fixUpSpecBatch(specBatch, h, w) {
     const img_height = h || this.height;
     const img_width = w || this.width;
-    return tf.tidy(() => {
+
       /*
             Try out taking log of spec when SNR is below threshold?
             */
@@ -377,7 +377,6 @@ class ChirpityModel extends BaseModel {
         true
       );
       return this.normalise(specBatch);
-    });
   }
   normalise_audio_batch = (tensor) => {
     return tf.tidy(() => {
@@ -417,21 +416,17 @@ class ChirpityModel extends BaseModel {
     threshold,
     confidence
   ) {
-    if (DEBUG) console.log("predictCunk begin", tf.memory().numTensors);
+
     audioBuffer = this.padAudio(audioBuffer);
     audioBuffer = tf.tensor1d(audioBuffer);
     const numSamples = audioBuffer.shape / this.chunkLength;
     let buffers = tf.reshape(audioBuffer, [numSamples, this.chunkLength]);
     audioBuffer.dispose();
     const bufferList =  this.normalise_audio_batch(buffers);
-    const specBatch = tf.tidy(() => {
-      const bufferArray = tf.unstack(bufferList);
-      const toStack = bufferArray.map((x) => {
-        return this.makeSpectrogram(x);
-      });
-      return this.fixUpSpecBatch(tf.stack(toStack));
-    });
     buffers.dispose();
+
+    const specBatch = tf.tidy(() => this.fixUpSpecBatch(this.makeSpectrogram(bufferList)));
+
     bufferList.dispose();
     //const specBatch = tf.stack(bufferList);
     const batchKeys = [...Array(numSamples).keys()].map(
@@ -443,6 +438,8 @@ class ChirpityModel extends BaseModel {
       threshold,
       confidence
     );
+    specBatch.dispose();
+    if (DEBUG) console.log("predictChunk end", tf.memory().numTensors);
     return [result, file, fileStart];
   }
 }

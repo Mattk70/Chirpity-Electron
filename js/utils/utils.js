@@ -214,8 +214,8 @@ function formatDuration(seconds) {
   if (hours) duration += `${hours} hours `;
   const minutes = Math.floor((seconds % 3600) / 60); // 1 minute = 60 seconds
   if (hours || minutes) duration += `${minutes} minutes `;
-  const remainingSeconds = Math.floor(seconds % 60); // Remaining seconds
-  duration += `${remainingSeconds} seconds`;
+  const remainingSeconds = seconds % 60; // Remaining seconds
+  duration += `${remainingSeconds.toFixed(2)} seconds`;
   return duration;
 }
 
@@ -234,7 +234,7 @@ function parseDuration(durationString) {
 
   const hours = parseInt(match[1], 10) || 0;
   const minutes = parseInt(match[2], 10) || 0;
-  const seconds = parseInt(match[3], 10) || 0;
+  const seconds = parseFloat(match[3], 10) || 0;
 
   return hours * 3600 + minutes * 60 + seconds;
 }
