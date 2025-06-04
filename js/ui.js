@@ -1888,7 +1888,7 @@ window.onload = async () => {
   document.getElementById("year").textContent = new Date().getFullYear();
   await appVersionLoaded;
   const configFile = p.join(appPath, "config.json");
-  await fs.readFile(configFile, "utf8", (err, data) => {
+  await fs.readFile(configFile, "utf8", async (err, data) => {
     if (err) {
       console.log("Config not loaded, using defaults");
       // Use defaults if no config file
@@ -1915,10 +1915,11 @@ window.onload = async () => {
     //fill in defaults - after updates add new items
     utils.syncConfig(config, defaultConfig);
 
-    membershipCheck().then((isMember) => {
-      STATE.isMember = isMember;
-      if (config.detect.combine) document.getElementById('model-icon').classList.remove('d-none')
-    });
+    const isMember = await membershipCheck()
+      .catch(err => {console.error(err); return false});
+    STATE.isMember = isMember;
+    isMember && config.hasNode || (config[config.model].backend = "tensorflow");
+    if (config.detect.combine) document.getElementById('model-icon').classList.remove('d-none')
 
     const { model, library, database, detect, filters, audio, 
       limit, locale, speciesThreshold, list, useWeek, UUID, 

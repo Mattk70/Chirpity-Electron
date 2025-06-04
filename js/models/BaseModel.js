@@ -6,7 +6,7 @@ try {
   tf = require("@tensorflow/tfjs");
 }
 
-const {stft, custom_stft} = require("./custom-ops.js");;
+const {stft, batch_custom_stft} = require("./custom-ops.js");;
 const DEBUG = false;
 class BaseModel {
   constructor(appPath, version) {
@@ -119,7 +119,7 @@ class BaseModel {
 
   makeSpectrogram = (input) => {
     return this.backend !== "tensorflow" 
-    ? tf.abs(stft(input, this.frame_length, this.frame_step))
+    ? tf.abs(batch_custom_stft(input, this.frame_length, this.frame_step))
     : tf.abs(tf.signal.stft(input, this.frame_length, this.frame_step))
   };
 

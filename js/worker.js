@@ -2086,7 +2086,7 @@ async function processAudio(
     }
     let currentIndex = 0,
       duration = 0,
-      bytesPerSecond = 96_000;
+      bytesPerSecond = 2 * sampleRate;
     const audioBuffer = Buffer.allocUnsafe(highWaterMark);
     const additionalFilters = STATE.filters.sendToModel
       ? setAudioFilters()
@@ -2898,7 +2898,7 @@ function spawnPredictWorkers(model, batchSize, threads) {
     worker.onerror = (e) => {
       console.warn(
         `Worker ${i} is suffering, shutting it down. THe error was:`,
-        e.message
+        e
       );
       predictWorkers.splice(i, 1);
       worker.terminate();
