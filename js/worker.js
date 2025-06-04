@@ -2036,7 +2036,8 @@ const getPredictBuffers = async ({ file = "", start = 0, end = undefined }) => {
   }
 
   const duration = end - start;
-  batchChunksToSend[file] = Math.ceil(duration / (BATCH_SIZE * WINDOW_SIZE));
+  const EPSILON = 0.025;
+  batchChunksToSend[file] = Math.ceil((duration - EPSILON) / (BATCH_SIZE * WINDOW_SIZE));
   predictionsReceived[file] = 0;
   predictionsRequested[file] = 0;
 
@@ -2073,6 +2074,7 @@ async function processAudio(
 ) {
   // Find a balance between performance and memory usage
   const MAX_CHUNKS = Math.max(12, Math.min(NUM_WORKERS * 2, 36));
+  const EPSILON = 0.025;
   return new Promise((resolve, reject) => {
     // Many compressed files start with a small section of silence due to encoder padding, which affects predictions
     // To compensate, we move the start back a small amount, and slice the data to remove the silence
@@ -2084,7 +2086,7 @@ async function processAudio(
     }
     let currentIndex = 0,
       duration = 0,
-      bytesPerSecond = 48_000;
+      bytesPerSecond = 96_000;
     const audioBuffer = Buffer.allocUnsafe(highWaterMark);
     const additionalFilters = STATE.filters.sendToModel
       ? setAudioFilters()
@@ -2176,7 +2178,7 @@ async function processAudio(
         // If we have a short file (header duration > processed duration)
         // *and* were looking for the whole file, we'll fix # of expected chunks here
         batchChunksToSend[file] = Math.ceil(
-          duration / (BATCH_SIZE * WINDOW_SIZE)
+          (duration - EPSILON) / (BATCH_SIZE * WINDOW_SIZE)
         );
 
         const diff = Math.abs(metaDuration - duration);
