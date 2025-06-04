@@ -424,8 +424,14 @@ class ChirpityModel extends BaseModel {
     audioBuffer.dispose();
     const bufferList =  this.normalise_audio_batch(buffers);
     buffers.dispose();
-
-    const specBatch = tf.tidy(() => this.fixUpSpecBatch(this.makeSpectrogram(bufferList)));
+    const specBatch = tf.tidy(() => {
+      const bufferArray = tf.unstack(bufferList);
+      const toStack = bufferArray.map((x) => {
+        return this.makeSpectrogram(x);
+      });
+      return this.fixUpSpecBatch(tf.stack(toStack));
+    });
+    // const specBatch = tf.tidy(() => this.fixUpSpecBatch(this.makeSpectrogram(bufferList)));
 
     bufferList.dispose();
     //const specBatch = tf.stack(bufferList);

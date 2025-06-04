@@ -119,11 +119,9 @@ class BaseModel {
 
   makeSpectrogram = (input) => {
     return this.backend !== "tensorflow" 
-    ? tf.abs(custom_stft(input, this.frame_length, this.frame_step))
+    ? tf.abs(stft(input, this.frame_length, this.frame_step))
     : tf.abs(tf.signal.stft(input, this.frame_length, this.frame_step))
   };
-
-  // makeSpectrogram = (input) => tf.abs(tf.signal.stft(input, this.frame_length, this.frame_step))
 
 
   fixUpSpecBatch(specBatch, h, w) {
