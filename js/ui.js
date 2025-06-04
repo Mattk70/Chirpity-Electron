@@ -1842,8 +1842,8 @@ const defaultConfig = {
   warmup: true,
   hasNode: false,
   tensorflow: { threads: DIAGNOSTICS["Cores"], batchSize: 8 },
-  webgpu: { threads: 2, batchSize: 8 },
-  webgl: { threads: 2, batchSize: 32 },
+  webgpu: { threads: 1, batchSize: 16 },
+  webgl: { threads: 1, batchSize: 32 },
   audio: {
     gain: 0,
     format: "mp3",
@@ -4339,21 +4339,16 @@ const modelSettingsDisplay = () => {
     DOM.contextAware.disabled = true;
     config.detect.contextAware = false;
     DOM.contextAwareIcon.classList.add("d-none");
-
-    // SNRSlider.disabled = true;
-    // config.filters.SNR = 0;
   } else {
     // show chirpity-only features
     chirpityOnly.forEach((element) => {
       element.classList.replace("chirpity-only", "chirpity-only-visible");
     });
-    // Remove GPU option on Mac
-    isMac && noMac.forEach((element) => element.classList.add("d-none"));
     DOM.contextAware.checked = config.detect.contextAware;
     DOM.contextAwareIcon.classList.remove("d-none");
-    // SNRSlider.disabled = false;
-
   }    
+  // Remove WebGL option on Mac
+  isMac && noMac.forEach((element) => element.classList.add("d-none"));
   if (config.hasNode) {
     nodeOnly.forEach((element) => element.classList.remove("d-none"));
   } else {
