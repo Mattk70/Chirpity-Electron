@@ -56,8 +56,8 @@ function loadModel(params) {
     if (backend === "webgl") {
       tf.env().set("WEBGL_FORCE_F16_TEXTURES", true);
       tf.env().set("WEBGL_EXP_CONV", true);
-      tf.env().set("TOPK_K_CPU_HANDOFF_THRESHOLD", 128);
-      tf.env().set("TOPK_LAST_DIM_CPU_HANDOFF_SIZE_THRESHOLD", 128);
+      // tf.env().set("TOPK_K_CPU_HANDOFF_THRESHOLD", 128); <- this is the default
+      tf.env().set("TOPK_LAST_DIM_CPU_HANDOFF_SIZE_THRESHOLD", 0);
     } else if (backend === "webgpu") {
       // tf.env().set("WEBGPU_DEFERRED_SUBMIT_BATCH_SIZE", 64); // Affects GPU RAM at expense of speed
       // tf.env().set("WEBGPU_CPU_HANDOFF_SIZE_THRESHOLD", 1000); // MatMulPackedProgram
@@ -71,6 +71,7 @@ function loadModel(params) {
     myModel = new ChirpityModel(appPath, version);
     myModel.height = height;
     myModel.width = width;
+    myModel.backend = backend;
 
     // Create a mask tensor where the specified indexes are set to 0 and others to 1
     const indexesToZero = [25, 30, 110, 319, 378, 403, 404, 405, 406];
@@ -84,7 +85,6 @@ function loadModel(params) {
     myModel.labels = labels;
     await myModel.loadModel();
     myModel.warmUp(batch);
-    myModel.backend = backend;
     postMessage({
       message: "model-ready",
       sampleRate: myModel.config.sampleRate,
@@ -357,26 +357,14 @@ class ChirpityModel extends BaseModel {
     return [keys, topIndices, topValues];
   }
 
-  fixUpSpecBatch(specBatch, h, w) {
-    const img_height = h || this.height;
-    const img_width = w || this.width;
-
-      /*
-            Try out taking log of spec when SNR is below threshold?
-            */
-      //specBatch = tf.log1p(specBatch).mul(20);
-      // Swap axes to fit output shape
-      specBatch = tf.transpose(specBatch, [0, 2, 1]);
-      specBatch = tf.reverse(specBatch, [1]);
-      // Add channel axis
-      specBatch = tf.expandDims(specBatch, -1);
-      //specBatch = tf.slice4d(specBatch, [0, 1, 0, 0], [-1, img_height, img_width, -1]);
-      specBatch = tf.image.resizeBilinear(
-        specBatch,
-        [img_height, img_width],
+  fixUpSpecBatch(specBatch) {
+    const { height, width } = this;
+    specBatch = tf.image.resizeBilinear(
+        specBatch.transpose([0, 2, 1]).reverse([1]).expandDims(-1),
+        [height, width],
         true
       );
-      return this.normalise(specBatch);
+    return this.normalise(specBatch);
   }
   normalise_audio_batch = (tensor) => {
     return tf.tidy(() => {
@@ -416,18 +404,18 @@ class ChirpityModel extends BaseModel {
     threshold,
     confidence
   ) {
-
-    audioBuffer = this.padAudio(audioBuffer);
-    audioBuffer = tf.tensor1d(audioBuffer);
-    const numSamples = audioBuffer.shape / this.chunkLength;
-    let buffers = tf.reshape(audioBuffer, [numSamples, this.chunkLength]);
-    audioBuffer.dispose();
-    const bufferList =  this.normalise_audio_batch(buffers);
+    const [buffers, numSamples] = this.createAudioTensorBatch(audioBuffer);
+    const bufferList = this.normalise_audio_batch(buffers);
     buffers.dispose();
-    const specBatch = tf.tidy(() => this.fixUpSpecBatch(this.makeSpectrogram(bufferList)));
+    let specBatch;
+    this.backend === "tensorflow"
+      ? (specBatch = tf.tidy(() => {
+          const toStack = tf.unstack(bufferList).map((x) => this.makeSpectrogram(x));
+          return this.fixUpSpecBatch(tf.stack(toStack));
+        }))
+      : (specBatch = tf.tidy(() => this.fixUpSpecBatch(this.makeSpectrogram(bufferList))));
 
     bufferList.dispose();
-    //const specBatch = tf.stack(bufferList);
     const batchKeys = [...Array(numSamples).keys()].map(
       (i) => start + this.chunkLength * i
     );

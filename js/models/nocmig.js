@@ -75,13 +75,14 @@ function loadModel(params) {
     myModel.labels = labels;
     await myModel.loadModel();
     myModel.warmUp(batch);
+    myModel.backend = backend;
     BACKEND = tf.getBackend();
     postMessage({
       message: "model-ready",
       sampleRate: myModel.config.sampleRate,
       chunkLength: myModel.chunkLength,
-      backend: tf.getBackend(),
-      labels: labels,
+      backend,
+      labels,
       worker: params.worker,
     });
   });
@@ -344,12 +345,17 @@ class ChirpityModel extends BaseModel {
     threshold,
     confidence
   ) {
-    DEBUG && console.log("predictCunk begin", tf.memory().numTensors);
     const [buffers, numSamples] = this.createAudioTensorBatch(audioBuffer);
-    const specBatch = tf.tidy(() => {
-      const toStack = tf.unstack(buffers).map((x) => this.makeSpectrogram(x));
-      return this.fixUpSpecBatch(tf.stack(toStack));
-    });
+    let specBatch;
+    if (this.backend === "tensorflow") {
+      specBatch = tf.tidy(() => {
+        const toStack = tf.unstack(buffers).map((x) => this.makeSpectrogram(x));
+        return this.fixUpSpecBatch(tf.stack(toStack));
+      });
+    } else {
+      specBatch = tf.tidy(() => this.fixUpSpecBatch(this.makeSpectrogram(buffers)));
+    }
+
     buffers.dispose();
     const batchKeys = this.getKeys(numSamples, start);
     const result = await this.predictBatch(
@@ -358,6 +364,8 @@ class ChirpityModel extends BaseModel {
       threshold,
       confidence
     );
+    specBatch.dispose();
+    if (DEBUG) console.log("predictChunk end", tf.memory().numTensors);
     return [result, file, fileStart];
   }
 }

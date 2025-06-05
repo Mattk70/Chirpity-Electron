@@ -305,13 +305,9 @@ const GLOBAL_ACTIONS = {
   "=": (e) => STATE.fileLoaded && (spec.wavesurfer && (e.metaKey || e.ctrlKey) ? config.FFT = spec.reduceFFT() : spec.zoom("In")),
   "+": (e) => STATE.fileLoaded && (spec.wavesurfer && (e.metaKey || e.ctrlKey) ? config.FFT = spec.reduceFFT() : spec.zoom("In")),
   "-": (e) => STATE.fileLoaded && (spec.wavesurfer && (e.metaKey || e.ctrlKey) ? config.FFT = spec.increaseFFT() : spec.zoom("Out")),
-  F1: () => { 
-    const settingsEl = document.getElementById("settings");
-    const bsOffcanvas = bootstrap.Offcanvas.getOrCreateInstance(settingsEl);
-    settingsEl.classList.contains("show") ? bsOffcanvas.hide() : bsOffcanvas.show(); 
-    },
-  F5: () =>  STATE.fileLoaded && (spec.wavesurfer && (config.FFT = spec.reduceFFT())),
+  F1: () => document.getElementById("navbarSettings").click(),
   F4: () =>  STATE.fileLoaded && (spec.wavesurfer && (config.FFT = spec.increaseFFT())),
+  F5: () =>  STATE.fileLoaded && (spec.wavesurfer && (config.FFT = spec.reduceFFT())),
   " ": () => { STATE.fileLoaded && WSPlayPause()},
   Tab: (e) => {
     if ((e.metaKey || e.ctrlKey) && !PREDICTING && STATE.diskHasRecords) {
@@ -5180,14 +5176,6 @@ async function handleUIClicks(e) {
       break;
     }
 
-    // --- Backends
-    case "tensorflow":
-    case "webgl":
-    case "webgpu": {
-      handleBackendChange(target);
-      break;
-    }
-
     case "library-location-select": {
       (async () => {
         const files = await window.electron.selectDirectory(
@@ -5583,6 +5571,10 @@ document.addEventListener("change", async function (e) {
       }
     } else {
       switch (target) {
+        // --- Backends
+        case "tensorflow":
+        case "webgl":
+        case "webgpu": { handleBackendChange(target); break }
         case "species-frequency-threshold": {
           if (isNaN(element.value) || element.value === "") {
             generateToast({ type: "warning", message: "badThreshold" });
@@ -7196,6 +7188,7 @@ async function membershipCheck() {
         localStorage.setItem("memberTimestamp", now);
       } else {
         document.getElementById("buy-me-coffee").classList.remove("d-none");
+
         config.keyAssignment = {};
         config.specDetections = false;
         config.detect.autoLoad = false;
