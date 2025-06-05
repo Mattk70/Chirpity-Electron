@@ -24,6 +24,8 @@ class BaseModel {
     this.version = version;
     this.selection = false;
     this.scalarFive = tf.scalar(5);
+    this.two  = tf.scalar(2);
+    this.one = tf.scalar(1);
   }
 
   async loadModel(type) {
@@ -80,17 +82,20 @@ class BaseModel {
 
   
   normalise_audio_batch = (tensor) => {
-    return tf.tidy(() => {
-      const sigMax = tf.max(tensor, 1, true);
-      const sigMin = tf.min(tensor, 1, true);
-      const normalized = tensor
-        .sub(sigMin)
-        .divNoNan(sigMax.sub(sigMin))
-        .mul(tf.scalar(2))
-        .sub(tf.scalar(1));
-      return normalized;
-    });
-  };
+  return tf.tidy(() => {
+    const sigMax = tf.max(tensor, 1, true);
+    const sigMin = tf.min(tensor, 1, true);
+    const range = sigMax.sub(sigMin);
+
+    const normalized = tensor
+      .sub(sigMin)
+      .divNoNan(range)
+      .mul(this.two)
+      .sub(this.one);
+    return normalized;
+  });
+};
+
   padBatch(tensor) {
     return tf.tidy(() => {
       DEBUG &&

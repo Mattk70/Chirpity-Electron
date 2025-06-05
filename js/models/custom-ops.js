@@ -41,51 +41,9 @@ function computeDispatch(
   ];
 }
 
-tf.registerKernel({
-    kernelName: 'FRAME',
-    backendName: 'webgpu',
-    kernelFunc: ({ backend, inputs: { input, frameLength, frameStep } }) => {
-        const workgroupSize = [64, 1, 1]
-        const outpLen = (input.size - frameLength + frameStep) / frameStep | 0
-        const dispatchLayout = flatDispatchLayout([outpLen, frameLength])
-        return backend.runWebGPUProgram({
-            variableNames: ['x'],
-            outputShape: [outpLen, frameLength],
-            workgroupSize,
-            shaderKey: `frame_${frameLength}_${frameStep}`,
-            dispatchLayout,
-            dispatch: computeDispatch(dispatchLayout, [outpLen, frameLength], workgroupSize),
-            getUserCode: () => `
-    fn main(i: i32) {
-        setOutputAtIndex(i, getX((i / ${frameLength}) * ${frameStep} + i % ${frameLength}));
-    }`
-        }, [input], 'float32')
-    }
-})
 
 tf.registerKernel({
-    kernelName: 'FRAME',
-    backendName: 'webgl',
-    kernelFunc: ({ backend, inputs: { input, frameLength, frameStep } }) => {
-        const outpLen = (input.size - frameLength + frameStep) / frameStep | 0
-        
-        return backend.runWebGLProgram({
-            variableNames: ['x'],
-            outputShape: [outpLen, frameLength],
-            userCode: `
-    void main() {
-    ivec2 coords = getOutputCoords();
-    int j = coords[1];
-    int b = coords[0];
-    int i = b * ${frameLength} + j;
-    setOutput(getX((i / ${frameLength}) * ${frameStep} + i % ${frameLength}));
-    }`
-        }, [input], 'float32')
-    }
-})
-
-tf.registerKernel({
-  kernelName: "custom_frame_batched",
+  kernelName: "batchFrame",
   backendName: "webgpu",
   kernelFunc: ({ backend, inputs: { input, frameLength, frameStep } }) => {
     const [batchSize, signalLength] = input.shape;
@@ -119,7 +77,7 @@ tf.registerKernel({
 });
 
 tf.registerKernel({
-  kernelName: "custom_frame_batched",
+  kernelName: "batchFrame",
   backendName: "webgl",
   kernelFunc: ({ inputs: { input, frameLength, frameStep }, backend }) => {
     const [batchSize, signalLength] = input.shape;
@@ -152,7 +110,7 @@ function custom_stft(
   windowFn = tf.signal.hannWindow
 ) {
 //   const [batchSize, signalLength] = signal.shape;
-  const framedSignal = tf.engine().runKernel("custom_frame_batched", {
+  const framedSignal = tf.engine().runKernel("batchFrame", {
     input: signal,
     frameLength,
     frameStep,
@@ -167,7 +125,7 @@ function custom_stft(
 
 
 function stft(signal, frameLength, frameStep, fftLength, windowFn) {
-    const framedSignal = tf.engine().runKernel('custom_frame_batched', {input: signal, frameLength, frameStep })
+    const framedSignal = tf.engine().runKernel('batchFrame', {input: signal, frameLength, frameStep })
     const window = windowFn(frameLength).reshape([1, 1, frameLength]);
     const input = tf.mul(framedSignal, window);
     const innerDim = input.shape[input.shape.length - 1];
@@ -192,71 +150,74 @@ tf.registerKernel({
             variableNames: ['mapvalue'],
             outputShape: [batch, innerDim * 2],
             userCode: `
-void main() {
-  ivec2 coords = getOutputCoords();
-  int p = coords[1] % ${innerDim};
-  int k = 0;
-  for (int i = 0; i < ${Math.log2(innerDim)}; ++i) {
-    if ((p & (1 << i)) != 0) { k |= (1 << (${Math.log2(innerDim) - 1} - i)); }
-  }
-  if (coords[1] < ${innerDim}) {
-    setOutput(getMapvalue(coords[0], 2 * k));
-  } else {
-    setOutput(getMapvalue(coords[0], 2 * (k % ${innerDim}) + 1));
-  }
-}`
+              void main() {
+                ivec2 coords = getOutputCoords();
+                int p = coords[1] % ${innerDim};
+                int k = 0;
+                for (int i = 0; i < ${Math.log2(innerDim)}; ++i) {
+                  if ((p & (1 << i)) != 0) { k |= (1 << (${Math.log2(innerDim) - 1} - i)); }
+                }
+                if (coords[1] < ${innerDim}) {
+                  setOutput(getMapvalue(coords[0], 2 * k));
+                } else {
+                  setOutput(getMapvalue(coords[0], 2 * (k % ${innerDim}) + 1));
+                }
+              }`
         }, [input], 'float32')
         for (let len = 1; len < innerDim; len *= 2) {
             let prevTensor = currentTensor
             currentTensor = backend.runWebGLProgram({
-                variableNames: [`x`],
-                outputShape: [batch, innerDim * 2],
-                userCode: `void main() {
-ivec2 coords = getOutputCoords();
-int batch = coords[0];
-int i = coords[1];
-int k = i % ${innerDim};
-int isHigh = (k % ${len * 2}) / ${len};
-int highSign = (1 - isHigh * 2);
-int baseIndex = k - isHigh * ${len};
-float t = ${Math.PI / len} * float(k % ${len});
-float a = cos(t);
-float b = sin(-t);
-float oddK_re = getX(batch, baseIndex + ${len});
-float oddK_im = getX(batch, baseIndex + ${len + innerDim});
-if (i / ${innerDim} == 0) { // real
-    float evenK_re = getX(batch, baseIndex);
-    float outp = evenK_re + (oddK_re * a - oddK_im * b) * float(highSign);
-    setOutput(outp);
-} else { // imaginary
-    float evenK_im = getX(batch, baseIndex + ${innerDim});
-    float outp = evenK_im + (oddK_re * b + oddK_im * a) * float(highSign);
-    setOutput(outp);
-}
-}` }, [currentTensor], 'float32')
+              variableNames: [`x`],
+              outputShape: [batch, innerDim * 2],
+              userCode: `
+                void main() {
+                  ivec2 coords = getOutputCoords();
+                  int batch = coords[0];
+                  int i = coords[1];
+                  int k = i % ${innerDim};
+                  int isHigh = (k % ${len * 2}) / ${len};
+                  int highSign = (1 - isHigh * 2);
+                  int baseIndex = k - isHigh * ${len};
+                  float t = ${Math.PI / len} * float(k % ${len});
+                  float a = cos(t);
+                  float b = sin(-t);
+                  float oddK_re = getX(batch, baseIndex + ${len});
+                  float oddK_im = getX(batch, baseIndex + ${len + innerDim});
+                  if (i / ${innerDim} == 0) { // real
+                      float evenK_re = getX(batch, baseIndex);
+                      float outp = evenK_re + (oddK_re * a - oddK_im * b) * float(highSign);
+                      setOutput(outp);
+                  } else { // imaginary
+                      float evenK_im = getX(batch, baseIndex + ${innerDim});
+                      float outp = evenK_im + (oddK_re * b + oddK_im * a) * float(highSign);
+                      setOutput(outp);
+                  }
+                }` 
+              }, [currentTensor], 'float32')
             backend.disposeIntermediateTensorInfo(prevTensor)
         }
 
         let prevTensor = currentTensor
         currentTensor = backend.runWebGLProgram({
-            variableNames: ['x'],
-            outputShape: [batch, innerDim * 2],
-            userCode: `
-void main() {
-    ivec2 coords = getOutputCoords();
-    int i = coords[1];
-    int batch = coords[0];
+          variableNames: ['x'],
+          outputShape: [batch, innerDim * 2],
+          userCode: `
+            void main() {
+                ivec2 coords = getOutputCoords();
+                int i = coords[1];
+                int batch = coords[0];
 
-    int k = i <= ${innerDim} ? i : ${innerDim * 2} - i;
-    int zI = k % ${innerDim};
-    int conjI = (${innerDim} - k) % ${innerDim};
-    float Zk0 = getX(batch, zI);
-    float Zk_conj0 = getX(batch, conjI);
-    float t = ${-2 * Math.PI} * float(k) / float(${innerDim * 2});
-    float result = (Zk0 + Zk_conj0 + cos(t) * (getX(batch, zI+${innerDim}) + getX(batch, conjI+${innerDim})) + sin(t) * (Zk0 - Zk_conj0)) * 0.5;
-    setOutput(result);
-}`
-        }, [currentTensor], 'float32')
+                int k = i <= ${innerDim} ? i : ${innerDim * 2} - i;
+                int zI = k % ${innerDim};
+                int conjI = (${innerDim} - k) % ${innerDim};
+                float Zk0 = getX(batch, zI);
+                float Zk_conj0 = getX(batch, conjI);
+                float t = ${-2 * Math.PI} * float(k) / float(${innerDim * 2});
+                float result = (Zk0 + Zk_conj0 + cos(t) * (getX(batch, zI+${innerDim}) + getX(batch, conjI+${innerDim})) + sin(t) * (Zk0 - Zk_conj0)) * 0.5;
+                setOutput(result);
+            }`
+        }, 
+        [currentTensor], 'float32')
         backend.disposeIntermediateTensorInfo(prevTensor)
         return currentTensor
     }
@@ -303,7 +264,8 @@ tf.registerKernel({
                 shaderKey: `fft_step_${innerDim}_${len}`,
                 dispatchLayout,
                 dispatch,
-                getUserCode: () => `fn main(index: i32) {
+                getUserCode: () => `
+                  fn main(index: i32) {
                     let batch = index / ${innerDim};
                     let i = index % ${innerDim};
                     let outIndexReal = batch * ${innerDim * 2} + i;
@@ -324,7 +286,7 @@ tf.registerKernel({
                     let evenK_im = getValue(batch, baseIndex + ${innerDim});
                     let outpI = (evenK_im + (oddK_re * b + oddK_im * a) * f32(highSign));
                     setOutputAtIndex(outIndexImag, outpI);
-                    }`
+                  }`
                 }, [currentTensor], 'float32')
             backend.disposeData(prevTensor.dataId)
         }
@@ -338,20 +300,20 @@ tf.registerKernel({
             dispatch: computeDispatch(flatDispatchLayout([batch, innerDim * 2]), [batch, innerDim * 2], workgroupSize, [1, 1, 1]),
             getUserCode: () => `
                 fn main(index: i32) {
-                    let coords = getOutputCoords();
-                    let i = coords[1];
-                    let batch = coords[0];
-                    var k = i;
-                    if (i > ${innerDim}) {
-                      k = ${innerDim * 2} - i;
-                    }
-                    let zI = k % ${innerDim};
-                    let conjI = (${innerDim} - k) % ${innerDim};
-                    let Zk0 = getX(batch, zI);
-                    let Zk_conj0 = getX(batch, conjI);
-                    let t = ${-2 * Math.PI} * f32(k) / f32(${innerDim * 2});
-                    let result = (Zk0 + Zk_conj0 + cos(t) * (getX(batch, zI+${innerDim}) + getX(batch, conjI+${innerDim})) + sin(t) * (Zk0 - Zk_conj0)) * 0.5;
-                    setOutputAtIndex(index, result);
+                  let coords = getOutputCoords();
+                  let i = coords[1];
+                  let batch = coords[0];
+                  var k = i;
+                  if (i > ${innerDim}) {
+                    k = ${innerDim * 2} - i;
+                  }
+                  let zI = k % ${innerDim};
+                  let conjI = (${innerDim} - k) % ${innerDim};
+                  let Zk0 = getX(batch, zI);
+                  let Zk_conj0 = getX(batch, conjI);
+                  let t = ${-2 * Math.PI} * f32(k) / f32(${innerDim * 2});
+                  let result = (Zk0 + Zk_conj0 + cos(t) * (getX(batch, zI+${innerDim}) + getX(batch, conjI+${innerDim})) + sin(t) * (Zk0 - Zk_conj0)) * 0.5;
+                  setOutputAtIndex(index, result);
                 }`}, [currentTensor], 'float32')
         backend.disposeData(prevTensor.dataId)
         return currentTensor

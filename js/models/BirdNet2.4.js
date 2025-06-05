@@ -234,15 +234,25 @@ class MelSpecLayerSimple extends tf.layers.Layer {
     return [inputShape[0], this.specShape[0], this.specShape[1], 1];
   }
 
-  normalise_audio_batch = (tensor) => {
+normalise_audio_batch = (tensor) => {
+  return tf.tidy(() => {
     const sigMax = tf.max(tensor, 1, true);
     const sigMin = tf.min(tensor, 1, true);
-    return tensor
+    const range = sigMax.sub(sigMin);
+
+    const two = tf.scalar(2);
+    const one = tf.scalar(1);
+
+    const normalized = tensor
       .sub(sigMin)
-      .divNoNan(sigMax.sub(sigMin))
-      .mul(tf.scalar(2))
-      .sub(tf.scalar(1));
-  };
+      .divNoNan(range)
+      .mul(two)
+      .sub(one);
+
+    return normalized;
+  });
+};
+
   // Define the layer's forward pass
   call(inputs) {
     return tf.tidy(() => {
