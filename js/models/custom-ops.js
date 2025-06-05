@@ -89,7 +89,7 @@ tf.registerKernel({
   backendName: "webgpu",
   kernelFunc: ({ backend, inputs: { input, frameLength, frameStep } }) => {
     const [batchSize, signalLength] = input.shape;
-    const outputLength = ((signalLength - frameLength + frameStep) / frameStep) | 0;
+    const outputLength = (signalLength - frameLength + frameStep) / frameStep | 0;
     const outputShape = [batchSize, outputLength, frameLength];
     const workgroupSize = [64, 1, 1]; // tune as needed
     const dispatchLayout = flatDispatchLayout(outputShape);
@@ -123,7 +123,7 @@ tf.registerKernel({
   backendName: "webgl",
   kernelFunc: ({ inputs: { input, frameLength, frameStep }, backend }) => {
     const [batchSize, signalLength] = input.shape;
-    const outputLength = ((signalLength - frameLength + frameStep) / frameStep) | 0;
+    const outputLength = (signalLength - frameLength + frameStep) / frameStep | 0;
     const outputShape = [batchSize, outputLength, frameLength];
     const userCode = `void main() {
         ivec3 coords = getOutputCoords(); // [batch, frame, sample]
@@ -167,17 +167,18 @@ function custom_stft(
 
 
 function stft(signal, frameLength, frameStep, fftLength, windowFn) {
-    const framedSignal = tf.engine().runKernel('FRAME', {input: signal, frameLength, frameStep })
-    const input = tf.mul(framedSignal, windowFn(frameLength))
-    let innerDim = input.shape[input.shape.length - 1]
-    const batch = input.size / innerDim
-    const realValues = tf.engine().runKernel('FFT2', {input: tf.reshape(input, [batch, innerDim])})
-    const half = Math.floor(innerDim / 2) + 1
+    const framedSignal = tf.engine().runKernel('custom_frame_batched', {input: signal, frameLength, frameStep })
+    const window = windowFn(frameLength).reshape([1, 1, frameLength]);
+    const input = tf.mul(framedSignal, window);
+    const innerDim = input.shape[input.shape.length - 1];
+    const batch = input.size / innerDim;
+    const realValues = tf.engine().runKernel('FFT2', {input: input.reshape([batch, frameLength])})
+    const half = Math.floor(innerDim / 2) + 1;
     const realComplexConjugate = tf.split(
         realValues, [half, innerDim - half],
-        realValues.shape.length - 1)
-    const outputShape = input.shape.slice()
-    outputShape[input.shape.length - 1] = half
+        realValues.shape.length - 1);
+    const outputShape = input.shape.slice();
+    outputShape[input.shape.length - 1] = half;
     return tf.reshape(realComplexConjugate[0], outputShape)
 }
 
@@ -265,8 +266,10 @@ tf.registerKernel({
     kernelName: 'FFT2',
     backendName: 'webgpu',
     kernelFunc: ({ backend, inputs: { input } }) => {
-        const innerDim = input.shape[input.shape.length - 1] / 2
-        const batch = tf.util.sizeFromShape(input.shape) / innerDim / 2
+        // const innerDim = input.shape[input.shape.length - 1] / 2
+        const [batch, width] = input.shape;
+        const innerDim = width / 2;
+
         const workgroupSize = [64, 1, 1]
         const dispatchLayout = flatDispatchLayout([batch, innerDim * 2])
         const dispatch = computeDispatch(dispatchLayout, [batch, innerDim * 2], workgroupSize, [2, 1, 1])

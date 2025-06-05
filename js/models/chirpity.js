@@ -366,18 +366,6 @@ class ChirpityModel extends BaseModel {
       );
     return this.normalise(specBatch);
   }
-  normalise_audio_batch = (tensor) => {
-    return tf.tidy(() => {
-      const sigMax = tf.max(tensor, 1, true);
-      const sigMin = tf.min(tensor, 1, true);
-      const normalized = tensor
-        .sub(sigMin)
-        .divNoNan(sigMax.sub(sigMin))
-        .mul(tf.scalar(2))
-        .sub(tf.scalar(1));
-      return normalized;
-    });
-  };
 
   //Used by get-spectrogram
   normalise_audio = (signal) => {

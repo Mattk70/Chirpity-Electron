@@ -6,7 +6,7 @@ try {
   tf = require("@tensorflow/tfjs");
 }
 
-const {stft, custom_stft} = require("./custom-ops.js");;
+const {stft, custom_stft} = require("./custom-ops.js");
 const DEBUG = false;
 class BaseModel {
   constructor(appPath, version) {
@@ -59,7 +59,7 @@ class BaseModel {
       tf.dispose(compileRes);
       input.dispose();
     } else if (tf.getBackend() === "webgpu") {
-      tf.env().set("WEBGPU_ENGINE_COMPILE_ONLY", true);
+      // tf.env().set("WEBGPU_ENGINE_COMPILE_ONLY", true);
       const compileRes = this.model.predict(input, {
         batchSize: this.batchSize,
       });
@@ -78,6 +78,19 @@ class BaseModel {
 
   normalise = (spec) => spec.mul(255).div(spec.max([1, 2], true));
 
+  
+  normalise_audio_batch = (tensor) => {
+    return tf.tidy(() => {
+      const sigMax = tf.max(tensor, 1, true);
+      const sigMin = tf.min(tensor, 1, true);
+      const normalized = tensor
+        .sub(sigMin)
+        .divNoNan(sigMax.sub(sigMin))
+        .mul(tf.scalar(2))
+        .sub(tf.scalar(1));
+      return normalized;
+    });
+  };
   padBatch(tensor) {
     return tf.tidy(() => {
       DEBUG &&
@@ -119,7 +132,7 @@ class BaseModel {
 
   makeSpectrogram = (input) => {
     return this.backend !== "tensorflow" 
-    ? tf.abs(custom_stft(input, this.frame_length, this.frame_step))
+    ? tf.abs(custom_stft(input, this.frame_length, this.frame_step, this.frame_length, tf.signal.hannWindow))
     : tf.abs(tf.signal.stft(input, this.frame_length, this.frame_step))
   };
 

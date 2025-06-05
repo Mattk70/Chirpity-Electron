@@ -9,7 +9,8 @@ const fs = require("node:fs");
 const path = require("node:path");
 let DEBUG = false;
 
-import { BaseModel, stft } from "./BaseModel.js";
+import { BaseModel } from "./BaseModel.js";
+const {stft, custom_stft} = require("./custom-ops.js");
 
 //GLOBALS
 let myModel;
@@ -233,53 +234,62 @@ class MelSpecLayerSimple extends tf.layers.Layer {
     return [inputShape[0], this.specShape[0], this.specShape[1], 1];
   }
 
+  normalise_audio_batch = (tensor) => {
+    const sigMax = tf.max(tensor, 1, true);
+    const sigMin = tf.min(tensor, 1, true);
+    return tensor
+      .sub(sigMin)
+      .divNoNan(sigMax.sub(sigMin))
+      .mul(tf.scalar(2))
+      .sub(tf.scalar(1));
+  };
   // Define the layer's forward pass
   call(inputs) {
     return tf.tidy(() => {
       // inputs is a tensor representing the input data
       inputs = inputs[0];
-      return tf.stack(
-        inputs.split(inputs.shape[0]).map((input) => {
-          input = input.squeeze();
-          // Normalize values between -1 and 1
-          input = tf.sub(input, tf.min(input, -1, true));
-          input = tf.div(input, tf.max(input, -1, true).add(0.000001));
-          input = tf.sub(input, 0.5);
-          input = tf.mul(input, 2.0);
-
-          // Perform STFT and cast result to float
-          const stftFn = BACKEND === "tensorflow" ? tf.signal.stft : stft;
-          let spec = stftFn(
-            input,
-            this.frameLength,
-            this.frameStep,
-            this.frameLength,
-            tf.signal.hannWindow
-          )
-          BACKEND === "tensorflow" && (spec = spec.cast("float32"));
-
-          // Apply mel filter bank
-          spec = spec
-            .matMul(this.melFilterbank)
-
-            // Convert to power spectrogram
-            .pow(2.0)
-
-            // Apply nonlinearity
-            .pow(tf.div(1.0, tf.add(1.0, tf.exp(this.magScale.read()))))
-
-            // Flip the spectrogram
-            .reverse(-1)
-
-            // Swap axes to fit input shape
-            .transpose()
-
-            // Adding the channel dimension
-            .expandDims(-1);
-
-          return spec;
-        })
-      );
+      const isBatched = inputs.shape.length === 2;
+      let result;
+      if (BACKEND === 'tensorflow') {
+        result = tf.stack(
+          inputs.split(inputs.shape[0]).map((input) => {
+            input = input.squeeze();
+            
+            // Normalize values between -1 and 1
+            input = this.normalise_audio_batch(input);
+            // Perform STFT and cast result to float
+            return tf.signal.stft(
+              input,
+              this.frameLength,
+              this.frameStep,
+              this.frameLength,
+              tf.signal.hannWindow
+            ).cast("float32");
+          })
+        )
+      } else {
+        // Normalise batch
+        inputs = this.normalise_audio_batch(inputs);
+        //Custom optimized and batch-capable stft
+        result = stft(
+          inputs,
+          this.frameLength,
+          this.frameStep,
+          this.frameLength,
+          tf.signal.hannWindow
+        )
+      }
+      result = result
+          .matMul(this.melFilterbank)
+          .pow(2.0)
+          .pow(tf.div(1.0, tf.add(1.0, tf.exp(this.magScale.read()))))
+          .reverse(-1);
+      // Transpose to [melBins, frames] or [batch, melBins, frames]
+      result = isBatched
+        ? result.transpose([0, 2, 1])
+        : result.transpose();
+      // Add channel dimension
+      return result.expandDims(-1);
     });
   }
 
