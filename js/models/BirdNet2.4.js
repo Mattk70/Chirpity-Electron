@@ -9,11 +9,11 @@ const fs = require("node:fs");
 const path = require("node:path");
 let DEBUG = false;
 
-import { BaseModel, stft } from "./BaseModel.js";
+import { BaseModel } from "./BaseModel.js";
+const {stft, custom_stft} = require("./custom-ops.js");
 
 //GLOBALS
-let myModel;
-
+let myModel
 
 onmessage = async (e) => {
   const modelRequest = e.data.message;
@@ -98,9 +98,9 @@ onmessage = async (e) => {
         let image;
         image = tf.tidy(() => {
           const signal = tf.tensor1d(buffer, "float32");
-          // const bufferTensor = myModel.normalise_audio(signal);
+          const bufferTensor = myModel.normalise_audio_batch(signal);
           const imageTensor = tf.tidy(() => {
-            return myModel.makeSpectrogram(signal);
+            return myModel.makeSpectrogram(bufferTensor);
           });
           let spec = myModel.fixUpSpecBatch(
             tf.expandDims(imageTensor, 0),
@@ -215,6 +215,8 @@ class MelSpecLayerSimple extends tf.layers.Layer {
     this.fmin = config.fmin;
     this.fmax = config.fmax;
     this.melFilterbank = tf.tensor2d(config.melFilterbank);
+    this.two = tf.scalar(2);
+    this.one = tf.scalar(1);
   }
 
   build(inputShape) {
@@ -234,53 +236,61 @@ class MelSpecLayerSimple extends tf.layers.Layer {
     return [inputShape[0], this.specShape[0], this.specShape[1], 1];
   }
 
+normalise_audio_batch = (tensor) => {
+  return tf.tidy(() => {
+    const sigMax = tf.max(tensor, -1, true);
+    const sigMin = tf.min(tensor, -1, true);
+    const range = sigMax.sub(sigMin);
+    return tensor
+      .sub(sigMin)
+      .divNoNan(range)
+      .mul(this.two)
+      .sub(this.one);
+  });
+};
+
   // Define the layer's forward pass
   call(inputs) {
     return tf.tidy(() => {
       // inputs is a tensor representing the input data
       inputs = inputs[0];
-      return tf.stack(
-        inputs.split(inputs.shape[0]).map((input) => {
-          input = input.squeeze();
-          // Normalize values between -1 and 1
-          input = tf.sub(input, tf.min(input, -1, true));
-          input = tf.div(input, tf.max(input, -1, true).add(0.000001));
-          input = tf.sub(input, 0.5);
-          input = tf.mul(input, 2.0);
-
-          // Perform STFT and cast result to float
-          const stftFn = BACKEND === "tensorflow" ? tf.signal.stft : stft;
-          let spec = stftFn(
-            input,
-            this.frameLength,
-            this.frameStep,
-            this.frameLength,
-            tf.signal.hannWindow
-          )
-          BACKEND === "tensorflow" && (spec = spec.cast("float32"));
-
-          // Apply mel filter bank
-          spec = spec
-            .matMul(this.melFilterbank)
-
-            // Convert to power spectrogram
-            .pow(2.0)
-
-            // Apply nonlinearity
-            .pow(tf.div(1.0, tf.add(1.0, tf.exp(this.magScale.read()))))
-
-            // Flip the spectrogram
-            .reverse(-1)
-
-            // Swap axes to fit input shape
-            .transpose()
-
-            // Adding the channel dimension
-            .expandDims(-1);
-
-          return spec;
-        })
-      );
+      let result;
+      if (BACKEND === 'tensorflow') {
+        result = tf.stack(
+          inputs.split(inputs.shape[0]).map((input) => {
+            input = input.squeeze();
+            
+            // Normalize values between -1 and 1
+            input = this.normalise_audio_batch(input);
+            // Perform STFT and cast result to float
+            return tf.signal.stft(
+              input,
+              this.frameLength,
+              this.frameStep,
+              this.frameLength,
+              tf.signal.hannWindow
+            ).cast("float32");
+          })
+        )
+      } else {
+        // Normalise batch
+        inputs = this.normalise_audio_batch(inputs);
+        //Custom optimized and batch-capable stft
+        result = stft(
+          inputs,
+          this.frameLength,
+          this.frameStep,
+          this.frameLength,
+          tf.signal.hannWindow
+        )
+      }
+      return result
+        .matMul(this.melFilterbank)
+        .pow(this.two)
+        .pow(tf.div(this.one, tf.add(this.one, tf.exp(this.magScale.read()))))
+        .reverse(-1)
+        .transpose([0, 2, 1])
+        .expandDims(-1);
     });
   }
 
@@ -347,34 +357,34 @@ tf.serialization.registerClass(MelSpecLayerSimple);
 // tf.serialization.registerClass(GlobalLogExpPooling2D);
 
 /////////////////////////  Build Sigmoid Layer  /////////////////////////
-class SigmoidLayer extends tf.layers.Layer {
-  constructor(config) {
-    super(config);
-    this.config = config;
-  }
+// class SigmoidLayer extends tf.layers.Layer {
+//   constructor(config) {
+//     super(config);
+//     this.config = config;
+//   }
 
-  build(inputShape) {
-    this.kernel = this.addWeight(
-      "scale_factor",
-      [1],
-      "float32",
-      tf.initializers.constant({ value: 1 })
-    );
-  }
+//   build(inputShape) {
+//     this.kernel = this.addWeight(
+//       "scale_factor",
+//       [1],
+//       "float32",
+//       tf.initializers.constant({ value: 1 })
+//     );
+//   }
 
-  computeOutputShape(inputShape) {
-    return inputShape;
-  }
+//   computeOutputShape(inputShape) {
+//     return inputShape;
+//   }
 
-  call(input, kwargs) {
-    // Since sigmoid is always 1, we simplify here
-    //return tf.sigmoid(tf.mul(input[0], CONFIG.sigmoid))
-    return tf.sigmoid(input[0]);
-  }
+//   call(input, kwargs) {
+//     // Since sigmoid is always 1, we simplify here
+//     return tf.sigmoid(tf.mul(input[0], CONFIG.sigmoid))
+//     // return tf.sigmoid(input[0]);
+//   }
 
-  static get className() {
-    return "SigmoidLayer";
-  }
-}
+//   static get className() {
+//     return "SigmoidLayer";
+//   }
+// }
 
-tf.serialization.registerClass(SigmoidLayer);
+// tf.serialization.registerClass(SigmoidLayer);

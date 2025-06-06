@@ -21,15 +21,11 @@ const CONFIG = {
 };
 
 /**
- * Loads and initializes a machine learning model with the specified configuration and TensorFlow backend.
+ * Loads and initializes the machine learning model with the specified configuration and TensorFlow backend.
  *
- * Reads the model's configuration file to obtain image dimensions, labels, and application path. Sets up the requested TensorFlow backend with appropriate environment settings, initializes the global model instance, warms it up with the given batch size, and notifies the worker when the model is ready.
+ * Reads the model configuration file to obtain image dimensions, labels, and model location. Sets up the requested TensorFlow backend with appropriate environment settings, initializes the model instance, warms it up with the given batch size, and notifies the worker when the model is ready.
  *
- * @param {Object} params - Parameters for model loading.
- * @param {string} params.model - Model version identifier used to locate the configuration file.
- * @param {number} params.batchSize - Batch size for model warm-up.
- * @param {string} [params.backend] - Preferred TensorFlow backend ("webgl", "webgpu", etc.).
- * @param {*} params.worker - Worker identifier to receive the model-ready notification.
+ * @param {Object} params - Parameters for model loading, including model version, batch size, backend, and worker identifier.
  */
 function loadModel(params) {
   const version = params.model;
@@ -75,13 +71,14 @@ function loadModel(params) {
     myModel.labels = labels;
     await myModel.loadModel();
     myModel.warmUp(batch);
+    myModel.backend = backend;
     BACKEND = tf.getBackend();
     postMessage({
       message: "model-ready",
       sampleRate: myModel.config.sampleRate,
       chunkLength: myModel.chunkLength,
-      backend: tf.getBackend(),
-      labels: labels,
+      backend,
+      labels,
       worker: params.worker,
     });
   });
@@ -344,12 +341,17 @@ class ChirpityModel extends BaseModel {
     threshold,
     confidence
   ) {
-    DEBUG && console.log("predictCunk begin", tf.memory().numTensors);
     const [buffers, numSamples] = this.createAudioTensorBatch(audioBuffer);
-    const specBatch = tf.tidy(() => {
-      const toStack = tf.unstack(buffers).map((x) => this.makeSpectrogram(x));
-      return this.fixUpSpecBatch(tf.stack(toStack));
-    });
+    let specBatch;
+    if (this.backend === "tensorflow") {
+      specBatch = tf.tidy(() => {
+        const toStack = tf.unstack(buffers).map((x) => this.makeSpectrogram(x));
+        return this.fixUpSpecBatch(tf.stack(toStack));
+      });
+    } else {
+      specBatch = tf.tidy(() => this.fixUpSpecBatch(this.makeSpectrogram(buffers)));
+    }
+
     buffers.dispose();
     const batchKeys = this.getKeys(numSamples, start);
     const result = await this.predictBatch(
@@ -358,6 +360,8 @@ class ChirpityModel extends BaseModel {
       threshold,
       confidence
     );
+    specBatch.dispose();
+    if (DEBUG) console.log("predictChunk end", tf.memory().numTensors);
     return [result, file, fileStart];
   }
 }

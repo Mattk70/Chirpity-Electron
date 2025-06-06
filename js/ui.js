@@ -305,13 +305,9 @@ const GLOBAL_ACTIONS = {
   "=": (e) => STATE.fileLoaded && (spec.wavesurfer && (e.metaKey || e.ctrlKey) ? config.FFT = spec.reduceFFT() : spec.zoom("In")),
   "+": (e) => STATE.fileLoaded && (spec.wavesurfer && (e.metaKey || e.ctrlKey) ? config.FFT = spec.reduceFFT() : spec.zoom("In")),
   "-": (e) => STATE.fileLoaded && (spec.wavesurfer && (e.metaKey || e.ctrlKey) ? config.FFT = spec.increaseFFT() : spec.zoom("Out")),
-  F1: () => { 
-    const settingsEl = document.getElementById("settings");
-    const bsOffcanvas = bootstrap.Offcanvas.getOrCreateInstance(settingsEl);
-    settingsEl.classList.contains("show") ? bsOffcanvas.hide() : bsOffcanvas.show(); 
-    },
-  F5: () =>  STATE.fileLoaded && (spec.wavesurfer && (config.FFT = spec.reduceFFT())),
+  F1: () => document.getElementById("navbarSettings").click(),
   F4: () =>  STATE.fileLoaded && (spec.wavesurfer && (config.FFT = spec.increaseFFT())),
+  F5: () =>  STATE.fileLoaded && (spec.wavesurfer && (config.FFT = spec.reduceFFT())),
   " ": () => { STATE.fileLoaded && WSPlayPause()},
   Tab: (e) => {
     if ((e.metaKey || e.ctrlKey) && !PREDICTING && STATE.diskHasRecords) {
@@ -1842,8 +1838,8 @@ const defaultConfig = {
   warmup: true,
   hasNode: false,
   tensorflow: { threads: DIAGNOSTICS["Cores"], batchSize: 8 },
-  webgpu: { threads: 2, batchSize: 8 },
-  webgl: { threads: 2, batchSize: 32 },
+  webgpu: { threads: 1, batchSize: 16 },
+  webgl: { threads: 1, batchSize: 32 },
   audio: {
     gain: 0,
     format: "mp3",
@@ -1888,7 +1884,7 @@ window.onload = async () => {
   document.getElementById("year").textContent = new Date().getFullYear();
   await appVersionLoaded;
   const configFile = p.join(appPath, "config.json");
-  await fs.readFile(configFile, "utf8", (err, data) => {
+  await fs.readFile(configFile, "utf8", async (err, data) => {
     if (err) {
       console.log("Config not loaded, using defaults");
       // Use defaults if no config file
@@ -1915,10 +1911,11 @@ window.onload = async () => {
     //fill in defaults - after updates add new items
     utils.syncConfig(config, defaultConfig);
 
-    membershipCheck().then((isMember) => {
-      STATE.isMember = isMember;
-      if (config.detect.combine) document.getElementById('model-icon').classList.remove('d-none')
-    });
+    const isMember = await membershipCheck()
+      .catch(err => {console.error(err); return false});
+    STATE.isMember = isMember;
+    isMember && config.hasNode || (config[config.model].backend = "tensorflow");
+    if (config.detect.combine) document.getElementById('model-icon').classList.remove('d-none')
 
     const { model, library, database, detect, filters, audio, 
       limit, locale, speciesThreshold, list, useWeek, UUID, 
@@ -4339,21 +4336,16 @@ const modelSettingsDisplay = () => {
     DOM.contextAware.disabled = true;
     config.detect.contextAware = false;
     DOM.contextAwareIcon.classList.add("d-none");
-
-    // SNRSlider.disabled = true;
-    // config.filters.SNR = 0;
   } else {
     // show chirpity-only features
     chirpityOnly.forEach((element) => {
       element.classList.replace("chirpity-only", "chirpity-only-visible");
     });
-    // Remove GPU option on Mac
-    isMac && noMac.forEach((element) => element.classList.add("d-none"));
     DOM.contextAware.checked = config.detect.contextAware;
     DOM.contextAwareIcon.classList.remove("d-none");
-    // SNRSlider.disabled = false;
-
   }    
+  // Remove WebGL option on Mac
+  isMac && noMac.forEach((element) => element.classList.add("d-none"));
   if (config.hasNode) {
     nodeOnly.forEach((element) => element.classList.remove("d-none"));
   } else {
@@ -4941,9 +4933,9 @@ const showRelevantAudioQuality = () => {
 };
 document.addEventListener("click", debounceClick(handleUIClicks));
 /**
- * Handles all UI click events by dispatching actions based on the clicked element's ID.
+ * Central handler for UI click events, dispatching actions based on the clicked element's ID.
  *
- * This function serves as a central event handler for UI interactions, including file operations, analysis actions, menu commands, settings adjustments, help dialogs, sorting, and context menu actions. It updates application state, communicates with the worker thread, manages configuration, and triggers UI updates as needed.
+ * Routes user interactions to the appropriate application logic, including file operations, analysis commands, menu actions, settings adjustments, help dialogs, sorting, context menu actions, and UI updates. Updates application state, communicates with the worker thread, manages configuration, and triggers relevant UI changes as needed.
  *
  * @param {MouseEvent} e - The click event object.
  */
@@ -5181,14 +5173,6 @@ async function handleUIClicks(e) {
     // XC compare play/pause
     case "playComparison": {
       ws.playPause();
-      break;
-    }
-
-    // --- Backends
-    case "tensorflow":
-    case "webgl":
-    case "webgpu": {
-      handleBackendChange(target);
       break;
     }
 
@@ -5587,6 +5571,10 @@ document.addEventListener("change", async function (e) {
       }
     } else {
       switch (target) {
+        // --- Backends
+        case "tensorflow":
+        case "webgl":
+        case "webgpu": { handleBackendChange(target); break }
         case "species-frequency-threshold": {
           if (isNaN(element.value) || element.value === "") {
             generateToast({ type: "warning", message: "badThreshold" });
@@ -7143,9 +7131,9 @@ const IUCNMap = {
 export { config, displayLocationAddress, LOCATIONS, generateToast };
 
 /**
- * Checks the user's membership status and updates the UI to reflect access permissions.
+ * Checks the user's membership status and updates the UI to reflect feature access.
  *
- * Verifies membership via a remote API using the user's UUID and manages trial period logic based on installation date. Caches membership status and timestamp in localStorage, and uses cached status as a fallback if the remote check fails within a grace period. Updates UI elements to lock or unlock features, adjusts button states, and changes the primary logo image for members.
+ * Verifies membership via a remote API using the user's UUID, manages trial period eligibility based on installation date, and caches membership status in localStorage. If the remote check fails, uses a cached status if it is less than one week old. Updates UI elements to lock or unlock features, adjusts button states, and changes the logo for members.
  *
  * @returns {Promise<boolean|undefined>} Resolves to `true` if the user is a member or within the trial period, `false` if not, or `undefined` if status cannot be determined and no valid cache exists.
  *
@@ -7200,6 +7188,7 @@ async function membershipCheck() {
         localStorage.setItem("memberTimestamp", now);
       } else {
         document.getElementById("buy-me-coffee").classList.remove("d-none");
+
         config.keyAssignment = {};
         config.specDetections = false;
         config.detect.autoLoad = false;

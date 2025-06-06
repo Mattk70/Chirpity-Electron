@@ -581,51 +581,7 @@
                         </div>
                     </div>
                     <div class="advanced">
-                        <div class="p-0 node-only d-none">
-                            <div class="form-group rounded p-2 pe-0 mb-2">
-                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Backend" id="Backend-circle-help"  data-bs-content="The webGL/webGPU backends can improve performance and reduce power consumption on some systems.">?</a>
-                                <div>
-                                    <label class="ps-0 fs-6 text-start" for="backend">Backend:</label>
-                                    <div class="form-check form-check-inline">
-                                        <label class="form-check-label" for="tensorflow">CPU</label>
-                                        <input class="form-check-input" type="radio" name="backend" id="tensorflow" value="tensorflow" checked="">
-                                    </div>
-                                    <div class="form-check form-check-inline chirpity-only no-mac">
-                                        <input class="form-check-input" type="radio" name="backend" id="webgl" value="webgl">
-                                        <label class="form-check-label" for="webgl">WebGL</label>
-                                    </div>
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input" type="radio" name="backend" id="webgpu" value="webgpu">
-                                        <label class="form-check-label" for="webgpu">WebGPU</label>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div>
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Threads" id="Threads-circle-help"  data-bs-content="The number of parallel analyses to run. By default, 
-                            this is set to the number of CPU cores on the machine for fastest performance. With the GPU backend, a lower number works better e.g. 1-3">?</a>
-                            <div class="form-group rounded p-2 pe-0 mb-2">
-                                <label for="thread-slider">Threads:</label>
-                                <div class="input-group">
-                                    <input type="range" class="form-control-range w-75" id="thread-slider" min="1" max="24">
-                                    <div class="input-group-append">
-                                        <span class="input-group-text" id="threads-value">12</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div>
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Batch Size" id="Batch Size-circle-help"  data-bs-content="Optimising the batch size can increase processing speed on longer files.">?</a>
-                            <div class="form-group rounded p-2 pe-0 mb-2">
-                                <label for="batch-size">Batch Size:</label>
-                                <div class="input-group">
-                                    <input type="range" class="form-control-range w-75" id="batch-size" min="0" max="7">
-                                    <div class="input-group-append">
-                                        <span class="input-group-text" id="batch-size-value">2</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        
                         <div class="chirpity-only">
                             <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Context Mode" id="Context Mode-circle-help"  data-bs-content="When enabled, context mode adapts predictions by analysing the surrounding context.
                                     It can only be changed prior to an analysis, and a low initial confidence threshold is recommended e.g 20-30%. Context mode is not available in the BirdNET model">?</a>
@@ -907,8 +863,53 @@
                             </select>
                         </div>
                     </div>
-                    <div class="advanced">
-                        
+                    <div class="">
+                        <div class="p-0 node-only d-none">
+                            <div class="form-group rounded p-2 pe-0 mb-2">
+                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Backend" id="Backend-circle-help"  data-bs-content="The webGL/webGPU backends can improve performance and reduce power consumption on some systems.">?</a>
+                                <div>
+                                    <label class="ps-0 fs-6 text-start form-check" for="backend">Backend: <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature.">
+                                <span class="pointer locked material-symbols-outlined">lock</span></a></label>
+                                    <div class="form-check form-check-inline">
+                                        <label class="form-check-label" for="tensorflow">CPU</label>
+                                        <input class="form-check-input" type="radio" name="backend" id="tensorflow" value="tensorflow" checked="">
+                                    </div>
+                                    <div class="form-check form-check-inline ">
+                                        <input class="form-check-input locked" type="radio" name="backend" id="webgl" value="webgl" disabled>
+                                        <label class="form-check-label" for="webgl">WebGL</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input locked" type="radio" name="backend" id="webgpu" value="webgpu" disabled>
+                                        <label class="form-check-label" for="webgpu">WebGPU</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Threads" id="Threads-circle-help"  data-bs-content="The number of parallel analyses to run. By default, 
+                            this is set to the number of CPU cores on the machine for fastest performance. With the GPU backend, a lower number works better e.g. 1-3">?</a>
+                            <div class="form-group rounded p-2 pe-0 mb-2">
+                                <label for="thread-slider">Threads:</label>
+                                <div class="input-group">
+                                    <input type="range" class="form-control-range w-75" id="thread-slider" min="1" max="24">
+                                    <div class="input-group-append">
+                                        <span class="input-group-text" id="threads-value">12</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Batch Size" id="Batch Size-circle-help"  data-bs-content="Optimising the batch size can increase processing speed on longer files.">?</a>
+                            <div class="form-group rounded p-2 pe-0 mb-2">
+                                <label for="batch-size">Batch Size:</label>
+                                <div class="input-group">
+                                    <input type="range" class="form-control-range w-75" id="batch-size" min="0" max="7">
+                                    <div class="input-group-append">
+                                        <span class="input-group-text" id="batch-size-value">2</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         <div>
                             <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Audio notification" id="Audio notification-circle-help"  data-bs-content="When enabled, there will be a system notification when analyses that take over thirty seconds are finished.">?</a>
                             <div class="pe-3 form-group rounded p-2 mb-2">

@@ -3110,9 +3110,9 @@ const setLocale = (locale) => LOCALE = locale;
 const get = (context) => context[LOCALE] || context["en"];
 
 /**
- * Dynamically updates UI elements with localized text for the specified locale.
+ * Loads and applies localized UI text for the specified locale.
  *
- * Fetches and applies a localization JSON file for the given locale, updating DOM elements such as labels, buttons, tooltips, popovers, form controls, and carousel content with the appropriate localized strings. Falls back to English localization if the specified locale file is unavailable. If neither the locale nor English localization files are found, the UI remains unchanged.
+ * Fetches a localization JSON file for the given locale and updates relevant DOM elements—including labels, buttons, tooltips, popovers, form controls, and carousel content—with the corresponding localized strings. If the locale file is unavailable, falls back to English. If neither is found, the UI remains unchanged.
  *
  * @param {string} locale - The locale code (e.g., "en", "de_CA"). Any suffix after an underscore is ignored.
  * @returns {Promise<Object|undefined>} Resolves to the localization data object if successful, or undefined if no localization file is found.
@@ -3208,7 +3208,7 @@ async function localiseUI(locale) {
                 // Some nested labels must be skipped
                 if (['tensorflow', 'webgpu', 'webgl', 'colourmap', 'window-function', 'timelineSetting', 'iucn-scope', 'library-format',
                      'loud-color', 'mid-color', 'quiet-color', "mid-color-threshold-slider", "quiet-color-threshold-slider",'bitrate', 
-                     'format', 'quality', 'species-week', 'show-species'].includes(id)) return
+                     'format', 'quality', 'species-week', 'show-species', 'advanced', 'basic'].includes(id)) return
                 // Set popOver title. It's in the div, or div parent div
                 let elements = label.parentNode.querySelectorAll('a');
                 if (elements.length === 0 && label.parentNode.parentNode) {
