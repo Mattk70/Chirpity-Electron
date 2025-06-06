@@ -227,7 +227,7 @@ function formatDuration(seconds) {
  */
 
 function parseDuration(durationString) {
-  const regex = /(?:(\d+)\s*hours?)?\s*(?:(\d+)\s*minutes?)?\s*(?:(\d+)\s*seconds?)?/i;
+  const regex = /(?:(\d+)\s*hours?)?\s*(?:(\d+)\s*minutes?)?\s*(?:([\d.]+)\s*seconds?)?/i;
   const match = durationString.match(regex);
 
   if (!match) return 0;
