@@ -1838,7 +1838,7 @@ const defaultConfig = {
   warmup: true,
   hasNode: false,
   tensorflow: { threads: DIAGNOSTICS["Cores"], batchSize: 8 },
-  webgpu: { threads: 1, batchSize: 16 },
+  webgpu: { threads: 1, batchSize: 32 },
   webgl: { threads: 1, batchSize: 32 },
   audio: {
     gain: 0,
@@ -1884,7 +1884,7 @@ window.onload = async () => {
   document.getElementById("year").textContent = new Date().getFullYear();
   await appVersionLoaded;
   const configFile = p.join(appPath, "config.json");
-  await fs.readFile(configFile, "utf8", async (err, data) => {
+  fs.readFile(configFile, "utf8", async (err, data) => {
     if (err) {
       console.log("Config not loaded, using defaults");
       // Use defaults if no config file
@@ -4344,7 +4344,7 @@ const modelSettingsDisplay = () => {
     DOM.contextAware.checked = config.detect.contextAware;
     DOM.contextAwareIcon.classList.remove("d-none");
   }    
-  // Remove WebGL option on Mac
+
   isMac && noMac.forEach((element) => element.classList.add("d-none"));
   if (config.hasNode) {
     nodeOnly.forEach((element) => element.classList.remove("d-none"));

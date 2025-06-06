@@ -8,11 +8,11 @@ require("@tensorflow/tfjs-backend-webgpu");
  * @returns {number} The product of all elements in {@link arr}.
  */
 function arrayProduct(arr) {
-    let product = 1;
+  let product = 1;
   for (let i = 0; i < arr.length; i++) {
     product *= arr[i];
   }
-    return product;
+  return product;
 }
 /**
  * Creates a dispatch layout object mapping each dimension index of a tensor shape to an array `x`.
@@ -151,7 +151,7 @@ function custom_stft(
 
 /**
  * Computes the short-time Fourier transform (STFT) of a batched signal tensor using a custom GPU-accelerated FFT kernel.
- *
+ * Adapted from https://github.com/georg95/birdnet-web/blob/main/birdnet.js
  * Frames the input signal, applies a window function, and computes the real FFT for each frame. Returns the complex frequency-domain representation for each frame, retaining only the non-redundant half of the spectrum.
  *
  * @param {tf.Tensor} signal - Input tensor of shape [batch, signalLength].
@@ -176,6 +176,7 @@ function stft(signal, frameLength, frameStep, fftLength, windowFn) {
     return tf.reshape(realComplexConjugate[0], outputShape)
 }
 
+// Credit for these 2 FFT kernels goes to https://github.com/georg95
 tf.registerKernel({
     kernelName: 'FFT2',
     backendName: 'webgl',
