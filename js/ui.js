@@ -4933,9 +4933,9 @@ const showRelevantAudioQuality = () => {
 };
 document.addEventListener("click", debounceClick(handleUIClicks));
 /**
- * Handles all UI click events by dispatching actions based on the clicked element's ID.
+ * Central handler for UI click events, dispatching actions based on the clicked element's ID.
  *
- * This function serves as a central event handler for UI interactions, including file operations, analysis actions, menu commands, settings adjustments, help dialogs, sorting, and context menu actions. It updates application state, communicates with the worker thread, manages configuration, and triggers UI updates as needed.
+ * Routes user interactions to the appropriate application logic, including file operations, analysis commands, menu actions, settings adjustments, help dialogs, sorting, context menu actions, and UI updates. Updates application state, communicates with the worker thread, manages configuration, and triggers relevant UI changes as needed.
  *
  * @param {MouseEvent} e - The click event object.
  */
@@ -7131,9 +7131,9 @@ const IUCNMap = {
 export { config, displayLocationAddress, LOCATIONS, generateToast };
 
 /**
- * Checks the user's membership status and updates the UI to reflect access permissions.
+ * Checks the user's membership status and updates the UI to reflect feature access.
  *
- * Verifies membership via a remote API using the user's UUID and manages trial period logic based on installation date. Caches membership status and timestamp in localStorage, and uses cached status as a fallback if the remote check fails within a grace period. Updates UI elements to lock or unlock features, adjusts button states, and changes the primary logo image for members.
+ * Verifies membership via a remote API using the user's UUID, manages trial period eligibility based on installation date, and caches membership status in localStorage. If the remote check fails, uses a cached status if it is less than one week old. Updates UI elements to lock or unlock features, adjusts button states, and changes the logo for members.
  *
  * @returns {Promise<boolean|undefined>} Resolves to `true` if the user is a member or within the trial period, `false` if not, or `undefined` if status cannot be determined and no valid cache exists.
  *
