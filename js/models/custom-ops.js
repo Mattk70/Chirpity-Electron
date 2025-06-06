@@ -114,11 +114,8 @@ function custom_stft(
     frameLength,
     frameStep,
   });
-
   const window = windowFn(frameLength).reshape([1, 1, frameLength]); // broadcast over batch and frames
   const windowed = tf.mul(framedSignal, window);
-
-  // rfft operates over last axis; so works fine on shape [B, N, frameLength]
   return  tf.spectral.rfft(windowed, fftLength);
 }
 
@@ -127,14 +124,14 @@ function stft(signal, frameLength, frameStep, fftLength, windowFn) {
     const framedSignal = tf.engine().runKernel('batchFrame', {input: signal, frameLength, frameStep })
     const window = windowFn(frameLength).reshape([1, 1, frameLength]);
     const input = tf.mul(framedSignal, window);
-    const innerDim = input.shape[input.shape.length - 1];
+    const shape = input.shape;
     const realValues = tf.engine().runKernel('FFT2', {input: input.reshape([-1, frameLength])})
-    const half = Math.floor(innerDim / 2) + 1;
+    const half = Math.floor(frameLength / 2) + 1;
     const realComplexConjugate = tf.split(
-        realValues, [half, innerDim - half],
+        realValues, [half, frameLength - half],
         realValues.shape.length - 1);
-    const outputShape = input.shape.slice();
-    outputShape[input.shape.length - 1] = half;
+    const outputShape = shape.slice();
+    outputShape[shape.length - 1] = half;
     return tf.reshape(realComplexConjugate[0], outputShape)
 }
 
