@@ -258,7 +258,6 @@ normalise_audio_batch = (tensor) => {
     return tf.tidy(() => {
       // inputs is a tensor representing the input data
       inputs = inputs[0];
-      const isBatched = inputs.shape.length === 2;
       let result;
       if (BACKEND === 'tensorflow') {
         result = tf.stack(
@@ -289,17 +288,13 @@ normalise_audio_batch = (tensor) => {
           tf.signal.hannWindow
         )
       }
-      result = result
-          .matMul(this.melFilterbank)
-          .pow(2.0)
-          .pow(tf.div(1.0, tf.add(1.0, tf.exp(this.magScale.read()))))
-          .reverse(-1);
-      // Transpose to [melBins, frames] or [batch, melBins, frames]
-      result = isBatched
-        ? result.transpose([0, 2, 1])
-        : result.transpose();
-      // Add channel dimension
-      return result.expandDims(-1);
+      return result
+        .matMul(this.melFilterbank)
+        .pow(2.0)
+        .pow(tf.div(1.0, tf.add(1.0, tf.exp(this.magScale.read()))))
+        .reverse(-1)
+        .transpose([0, 2, 1])
+        .expandDims(-1);
     });
   }
 
