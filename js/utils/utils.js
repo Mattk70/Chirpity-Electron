@@ -203,10 +203,10 @@ const waitForFinalEvent = (function () {
 })();
 
 /**
- * Converts a duration in seconds to a human-readable string in hours, minutes, and seconds.
+ * Formats a duration given in seconds as a human-readable string with hours, minutes, and seconds (including fractional seconds).
  *
- * @param {number} seconds - The total duration in seconds.
- * @returns {string} The formatted duration string (e.g., "1 hours 2 minutes 3 seconds").
+ * @param {number} seconds - The total duration in seconds, which may include fractional values.
+ * @returns {string} The formatted duration string (e.g., "1 hours 2 minutes 3.50 seconds").
  */
 function formatDuration(seconds) {
   let duration = "";
@@ -220,10 +220,10 @@ function formatDuration(seconds) {
 }
 
 /**
- * Parses a duration string containing hours, minutes, and seconds and returns the total duration in seconds.
+ * Parses a duration string with optional hours, minutes, and seconds, returning the total duration in seconds as a number.
  *
- * @param {string} durationString - A string representing a duration (e.g., "2 hours 5 minutes 10 seconds").
- * @returns {number} The total duration in seconds, or 0 if parsing fails.
+ * @param {string} durationString - A string such as "2 hours 5 minutes 10.25 seconds".
+ * @returns {number} The total duration in seconds, including fractional seconds, or 0 if parsing fails.
  */
 
 function parseDuration(durationString) {

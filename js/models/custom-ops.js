@@ -1,10 +1,12 @@
-
 const tf = require("@tensorflow/tfjs");
 require("@tensorflow/tfjs-backend-webgpu");
 
-/*
-Credit for these functions goes to https://github.com/georg95/birdnet-web.
-*/
+/**
+ * Computes the product of all elements in an array.
+ *
+ * @param {number[]} arr - Array of numbers to multiply.
+ * @returns {number} The product of all elements in {@link arr}.
+ */
 function arrayProduct(arr) {
     let product = 1;
   for (let i = 0; i < arr.length; i++) {
@@ -12,9 +14,24 @@ function arrayProduct(arr) {
   }
     return product;
 }
+/**
+ * Creates a dispatch layout object mapping each dimension index of a tensor shape to an array `x`.
+ *
+ * @param {number[]} shape - The shape of the tensor.
+ * @returns {{x: number[]}} An object with property `x` containing the indices of each dimension in {@link shape}.
+ */
 function flatDispatchLayout(shape) {
   return { x: shape.map((d, i) => i) };
 }
+/**
+ * Calculates the dispatch size for GPU kernel execution based on the provided layout, output shape, workgroup size, and elements processed per thread.
+ *
+ * @param {Object} layout - An object specifying the mapping of output shape dimensions to dispatch axes (`x`, `y`, `z`).
+ * @param {number[]} outputShape - The shape of the output tensor.
+ * @param {number[]} [workgroupSize=[1, 1, 1]] - The size of each workgroup along each axis.
+ * @param {number[]} [elementsPerThread=[1, 1, 1]] - The number of elements processed by each thread along each axis.
+ * @returns {number[]} An array of three numbers representing the dispatch size along the x, y, and z axes.
+ */
 function computeDispatch(
   layout,
   outputShape,
@@ -102,6 +119,18 @@ tf.registerKernel({
 });
 
 
+/**
+ * Computes the short-time Fourier transform (STFT) of a batched signal using a custom framing kernel and window function.
+ *
+ * Frames the input signal into overlapping segments, applies a window function to each frame, and computes the real FFT of each windowed frame.
+ *
+ * @param {tf.Tensor} signal - Input tensor of shape [batchSize, signalLength].
+ * @param {number} frameLength - Length of each frame.
+ * @param {number} frameStep - Step size between frames.
+ * @param {number} [fftLength=frameLength] - Length of the FFT to compute for each frame.
+ * @param {function} [windowFn=tf.signal.hannWindow] - Function that generates the window to apply to each frame.
+ * @returns {tf.Tensor} Complex tensor containing the STFT of the input signal.
+ */
 function custom_stft(
   signal,                   // shape: [batchSize, signalLength]
   frameLength,
@@ -120,6 +149,18 @@ function custom_stft(
 }
 
 
+/**
+ * Computes the short-time Fourier transform (STFT) of a batched signal tensor using a custom GPU-accelerated FFT kernel.
+ *
+ * Frames the input signal, applies a window function, and computes the real FFT for each frame. Returns the complex frequency-domain representation for each frame, retaining only the non-redundant half of the spectrum.
+ *
+ * @param {tf.Tensor} signal - Input tensor of shape [batch, signalLength].
+ * @param {number} frameLength - Length of each frame for STFT.
+ * @param {number} frameStep - Step size between consecutive frames.
+ * @param {number} fftLength - Length of the FFT to compute for each frame.
+ * @param {function} windowFn - Function that generates a window tensor of length {@link frameLength}.
+ * @returns {tf.Tensor} STFT output tensor of shape [batch, numFrames, halfFftLength, 2], where the last dimension contains real and imaginary parts.
+ */
 function stft(signal, frameLength, frameStep, fftLength, windowFn) {
     const framedSignal = tf.engine().runKernel('batchFrame', {input: signal, frameLength, frameStep })
     const window = windowFn(frameLength).reshape([1, 1, frameLength]);

@@ -2064,6 +2064,23 @@ const getPredictBuffers = async ({ file = "", start = 0, end = undefined }) => {
   );
 };
 
+/**
+ * Streams and processes audio data from a file in chunks for AI model prediction.
+ *
+ * Extracts audio from the specified file and time range, applies optional filters, and manages chunked buffering for efficient parallel processing. Handles encoder padding, backpressure, and backlog limits to balance performance and memory usage. Prepares and queues audio data for prediction workers, updating chunk counts and metadata as needed.
+ *
+ * @param {string} file - Path to the audio file to process.
+ * @param {number} start - Start time in seconds for audio extraction.
+ * @param {number} end - End time in seconds for audio extraction.
+ * @param {number} chunkStart - Initial sample index for chunking.
+ * @param {number} highWaterMark - Buffer size in bytes for each audio chunk.
+ * @param {number} samplesInBatch - Number of audio samples per batch sent to the model.
+ *
+ * @returns {Promise<void>} Resolves when all audio chunks have been processed and queued for prediction.
+ *
+ * @remark
+ * Adjusts for encoder padding by moving the start time backward and trimming silence. Caps the maximum backlog of audio chunks to prevent excessive memory usage. Updates the expected number of prediction chunks based on actual processed duration.
+ */
 async function processAudio(
   file,
   start,
@@ -2866,7 +2883,7 @@ const processQueue = async () => {
 /**
  * Spawns multiple Web Workers for parallel AI model prediction.
  *
- * Creates the specified number of prediction worker threads, each loading the given model (substituting "BirdNet2.4" for "birdnet"). Workers are initialized with batch size and relevant state parameters, and are set up for asynchronous communication and error handling.
+ * Initializes the specified number of prediction worker threads, each loading the given AI model (using "BirdNet2.4" for "birdnet"). Workers are configured with batch size and backend settings, and set up for asynchronous communication and error handling.
  *
  * @param {string} model - The AI model to load for prediction; "birdnet" uses the "BirdNet2.4" worker script.
  * @param {number} batchSize - Number of items each worker processes per batch.
