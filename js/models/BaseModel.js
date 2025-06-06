@@ -78,7 +78,7 @@ class BaseModel {
     return true;
   }
 
-  normalise = (spec) => spec.mul(255).div(spec.max([1, 2], true));
+  normalise = (spec) => spec.mul(255).divNoNan(spec.max([1, 2], true));
 
   
   normalise_audio_batch = (tensor) => {
@@ -136,9 +136,9 @@ class BaseModel {
   }
 
   makeSpectrogram = (input) => {
-    return this.backend !== "tensorflow" 
-    ? tf.abs(custom_stft(input, this.frame_length, this.frame_step, this.frame_length, tf.signal.hannWindow))
-    : tf.abs(tf.signal.stft(input, this.frame_length, this.frame_step))
+    return this.backend === "tensorflow" 
+    ? tf.abs(tf.signal.stft(input, this.frame_length, this.frame_step))
+    : tf.abs(custom_stft(input, this.frame_length, this.frame_step, this.frame_length, tf.signal.hannWindow))
   };
 
 

@@ -13,7 +13,7 @@ import { BaseModel } from "./BaseModel.js";
 const {stft, custom_stft} = require("./custom-ops.js");
 
 //GLOBALS
-let myModel;
+let myModel
 
 onmessage = async (e) => {
   const modelRequest = e.data.message;
@@ -215,6 +215,8 @@ class MelSpecLayerSimple extends tf.layers.Layer {
     this.fmin = config.fmin;
     this.fmax = config.fmax;
     this.melFilterbank = tf.tensor2d(config.melFilterbank);
+    this.two = tf.scalar(2);
+    this.one = tf.scalar(1);
   }
 
   build(inputShape) {
@@ -239,17 +241,11 @@ normalise_audio_batch = (tensor) => {
     const sigMax = tf.max(tensor, 1, true);
     const sigMin = tf.min(tensor, 1, true);
     const range = sigMax.sub(sigMin);
-
-    const two = tf.scalar(2);
-    const one = tf.scalar(1);
-
-    const normalized = tensor
+    return tensor
       .sub(sigMin)
       .divNoNan(range)
-      .mul(two)
-      .sub(one);
-
-    return normalized;
+      .mul(this.two)
+      .sub(this.one);
   });
 };
 
@@ -290,8 +286,8 @@ normalise_audio_batch = (tensor) => {
       }
       return result
         .matMul(this.melFilterbank)
-        .pow(2.0)
-        .pow(tf.div(1.0, tf.add(1.0, tf.exp(this.magScale.read()))))
+        .pow(this.two)
+        .pow(tf.div(this.one, tf.add(this.one, tf.exp(this.magScale.read()))))
         .reverse(-1)
         .transpose([0, 2, 1])
         .expandDims(-1);
@@ -361,34 +357,34 @@ tf.serialization.registerClass(MelSpecLayerSimple);
 // tf.serialization.registerClass(GlobalLogExpPooling2D);
 
 /////////////////////////  Build Sigmoid Layer  /////////////////////////
-class SigmoidLayer extends tf.layers.Layer {
-  constructor(config) {
-    super(config);
-    this.config = config;
-  }
+// class SigmoidLayer extends tf.layers.Layer {
+//   constructor(config) {
+//     super(config);
+//     this.config = config;
+//   }
 
-  build(inputShape) {
-    this.kernel = this.addWeight(
-      "scale_factor",
-      [1],
-      "float32",
-      tf.initializers.constant({ value: 1 })
-    );
-  }
+//   build(inputShape) {
+//     this.kernel = this.addWeight(
+//       "scale_factor",
+//       [1],
+//       "float32",
+//       tf.initializers.constant({ value: 1 })
+//     );
+//   }
 
-  computeOutputShape(inputShape) {
-    return inputShape;
-  }
+//   computeOutputShape(inputShape) {
+//     return inputShape;
+//   }
 
-  call(input, kwargs) {
-    // Since sigmoid is always 1, we simplify here
-    //return tf.sigmoid(tf.mul(input[0], CONFIG.sigmoid))
-    return tf.sigmoid(input[0]);
-  }
+//   call(input, kwargs) {
+//     // Since sigmoid is always 1, we simplify here
+//     return tf.sigmoid(tf.mul(input[0], CONFIG.sigmoid))
+//     // return tf.sigmoid(input[0]);
+//   }
 
-  static get className() {
-    return "SigmoidLayer";
-  }
-}
+//   static get className() {
+//     return "SigmoidLayer";
+//   }
+// }
 
-tf.serialization.registerClass(SigmoidLayer);
+// tf.serialization.registerClass(SigmoidLayer);

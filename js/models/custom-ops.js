@@ -109,7 +109,6 @@ function custom_stft(
   fftLength = frameLength,
   windowFn = tf.signal.hannWindow
 ) {
-//   const [batchSize, signalLength] = signal.shape;
   const framedSignal = tf.engine().runKernel("batchFrame", {
     input: signal,
     frameLength,
@@ -120,7 +119,7 @@ function custom_stft(
   const windowed = tf.mul(framedSignal, window);
 
   // rfft operates over last axis; so works fine on shape [B, N, frameLength]
-  return tf.spectral.rfft(windowed, fftLength);
+  return  tf.spectral.rfft(windowed, fftLength);
 }
 
 
@@ -129,8 +128,7 @@ function stft(signal, frameLength, frameStep, fftLength, windowFn) {
     const window = windowFn(frameLength).reshape([1, 1, frameLength]);
     const input = tf.mul(framedSignal, window);
     const innerDim = input.shape[input.shape.length - 1];
-    const batch = input.size / innerDim;
-    const realValues = tf.engine().runKernel('FFT2', {input: input.reshape([batch, frameLength])})
+    const realValues = tf.engine().runKernel('FFT2', {input: input.reshape([-1, frameLength])})
     const half = Math.floor(innerDim / 2) + 1;
     const realComplexConjugate = tf.split(
         realValues, [half, innerDim - half],
@@ -230,13 +228,12 @@ tf.registerKernel({
         // const innerDim = input.shape[input.shape.length - 1] / 2
         const [batch, width] = input.shape;
         const innerDim = width / 2;
-
         const workgroupSize = [64, 1, 1]
-        const dispatchLayout = flatDispatchLayout([batch, innerDim * 2])
+        const dispatchLayout = flatDispatchLayout([batch, width])
         const dispatch = computeDispatch(dispatchLayout, [batch, innerDim * 2], workgroupSize, [2, 1, 1])
         let currentTensor = backend.runWebGPUProgram({
             variableNames: ['X'],
-            outputShape: [batch, innerDim * 2],
+            outputShape: [batch, width],
             workgroupSize,
             shaderKey: `fft_permut_${innerDim}`,
             dispatchLayout,
@@ -268,7 +265,7 @@ tf.registerKernel({
                   fn main(index: i32) {
                     let batch = index / ${innerDim};
                     let i = index % ${innerDim};
-                    let outIndexReal = batch * ${innerDim * 2} + i;
+                    let outIndexReal = batch * ${width} + i;
                     let outIndexImag = outIndexReal + ${innerDim};
                     let k = i % ${innerDim};
                     let isHigh = (k % (${len} * 2)) / ${len};
@@ -297,7 +294,7 @@ tf.registerKernel({
             workgroupSize,
             shaderKey: `fft_post_${innerDim}`,
             dispatchLayout,
-            dispatch: computeDispatch(flatDispatchLayout([batch, innerDim * 2]), [batch, innerDim * 2], workgroupSize, [1, 1, 1]),
+            dispatch: computeDispatch(flatDispatchLayout([batch, width]), [batch, width], workgroupSize, [1, 1, 1]),
             getUserCode: () => `
                 fn main(index: i32) {
                   let coords = getOutputCoords();
@@ -305,13 +302,13 @@ tf.registerKernel({
                   let batch = coords[0];
                   var k = i;
                   if (i > ${innerDim}) {
-                    k = ${innerDim * 2} - i;
+                    k = ${width} - i;
                   }
                   let zI = k % ${innerDim};
                   let conjI = (${innerDim} - k) % ${innerDim};
                   let Zk0 = getX(batch, zI);
                   let Zk_conj0 = getX(batch, conjI);
-                  let t = ${-2 * Math.PI} * f32(k) / f32(${innerDim * 2});
+                  let t = ${-2 * Math.PI} * f32(k) / f32(${width});
                   let result = (Zk0 + Zk_conj0 + cos(t) * (getX(batch, zI+${innerDim}) + getX(batch, conjI+${innerDim})) + sin(t) * (Zk0 - Zk_conj0)) * 0.5;
                   setOutputAtIndex(index, result);
                 }`}, [currentTensor], 'float32')
