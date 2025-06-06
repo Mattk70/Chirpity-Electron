@@ -98,9 +98,9 @@ onmessage = async (e) => {
         let image;
         image = tf.tidy(() => {
           const signal = tf.tensor1d(buffer, "float32");
-          // const bufferTensor = myModel.normalise_audio(signal);
+          const bufferTensor = myModel.normalise_audio_batch(signal);
           const imageTensor = tf.tidy(() => {
-            return myModel.makeSpectrogram(signal);
+            return myModel.makeSpectrogram(bufferTensor);
           });
           let spec = myModel.fixUpSpecBatch(
             tf.expandDims(imageTensor, 0),
@@ -238,8 +238,8 @@ class MelSpecLayerSimple extends tf.layers.Layer {
 
 normalise_audio_batch = (tensor) => {
   return tf.tidy(() => {
-    const sigMax = tf.max(tensor, 1, true);
-    const sigMin = tf.min(tensor, 1, true);
+    const sigMax = tf.max(tensor, -1, true);
+    const sigMin = tf.min(tensor, -1, true);
     const range = sigMax.sub(sigMin);
     return tensor
       .sub(sigMin)

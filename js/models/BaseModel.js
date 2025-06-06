@@ -83,8 +83,8 @@ class BaseModel {
   
   normalise_audio_batch = (tensor) => {
   return tf.tidy(() => {
-    const sigMax = tf.max(tensor, 1, true);
-    const sigMin = tf.min(tensor, 1, true);
+    const sigMax = tf.max(tensor, -1, true);
+    const sigMin = tf.min(tensor, -1, true);
     const range = sigMax.sub(sigMin);
 
     const normalized = tensor

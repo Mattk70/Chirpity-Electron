@@ -161,7 +161,7 @@ onmessage = async (e) => {
         let image;
         image = tf.tidy(() => {
           const signal = tf.tensor1d(buffer, "float32");
-          const bufferTensor = myModel.normalise_audio(signal);
+          const bufferTensor = myModel.normalise_audio_batch(signal);
           const imageTensor = tf.tidy(() => {
             return myModel.makeSpectrogram(bufferTensor);
           });
@@ -366,23 +366,6 @@ class ChirpityModel extends BaseModel {
       );
     return this.normalise(specBatch);
   }
-
-  //Used by get-spectrogram
-  normalise_audio = (signal) => {
-    return tf.tidy(() => {
-      //signal = tf.tensor1d(signal, 'float32');
-      const sigMax = tf.max(signal);
-      const sigMin = tf.min(signal);
-      const range = sigMax.sub(sigMin);
-      //return signal.sub(sigMin).div(range).mul(tf.scalar(8192.0, 'float32')).sub(tf.scalar(4095, 'float32'))
-      return signal
-        .sub(sigMin)
-        .divNoNan(range)
-        .mul(tf.scalar(2))
-        .sub(tf.scalar(1));
-    });
-  };
-
 
   async predictChunk(
     audioBuffer,
