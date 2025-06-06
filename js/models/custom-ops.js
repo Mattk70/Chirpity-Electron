@@ -166,7 +166,7 @@ function stft(signal, frameLength, frameStep, fftLength, windowFn) {
     const window = windowFn(frameLength).reshape([1, 1, frameLength]);
     const input = tf.mul(framedSignal, window);
     const shape = input.shape;
-    const realValues = tf.engine().runKernel('FFT', {input: input.reshape([-1, frameLength])})
+    const realValues = tf.engine().runKernel('FFT2', {input: input.reshape([-1, frameLength])})
     const half = Math.floor(frameLength / 2) + 1;
     const realComplexConjugate = tf.split(
         realValues, [half, frameLength - half],
@@ -178,7 +178,7 @@ function stft(signal, frameLength, frameStep, fftLength, windowFn) {
 
 // Credit for these 2 FFT kernels goes to https://github.com/georg95
 tf.registerKernel({
-    kernelName: 'FFT',
+    kernelName: 'FFT2',
     backendName: 'webgl',
     kernelFunc: ({ backend, inputs: { input } }) => {
       const [batch, width] = input.shape;
@@ -261,7 +261,7 @@ tf.registerKernel({
 })
 
 tf.registerKernel({
-    kernelName: 'FFT',
+    kernelName: 'FFT2',
     backendName: 'webgpu',
     kernelFunc: ({ backend, inputs: { input } }) => {
         // const innerDim = input.shape[input.shape.length - 1] / 2
