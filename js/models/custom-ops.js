@@ -167,13 +167,12 @@ function stft(signal, frameLength, frameStep, fftLength, windowFn) {
     const input = tf.mul(framedSignal, window);
     const shape = input.shape;
     const realValues = tf.engine().runKernel('FFT2', {input: input.reshape([-1, frameLength])})
-    const half = Math.floor(frameLength / 2) + 1;
+    const half = frameLength / 2 + 1; // here we assume that frameLength is a power of 2
     const realComplexConjugate = tf.split(
         realValues, [half, frameLength - half],
         realValues.shape.length - 1);
-    const outputShape = shape.slice();
-    outputShape[shape.length - 1] = half;
-    return tf.reshape(realComplexConjugate[0], outputShape)
+    shape[shape.length - 1] = half;
+    return tf.reshape(realComplexConjugate[0], shape)
 }
 
 // Credit for these 2 FFT kernels goes to https://github.com/georg95
@@ -269,7 +268,7 @@ tf.registerKernel({
         const innerDim = width / 2;
         const workgroupSize = [64, 1, 1]
         const dispatchLayout = flatDispatchLayout([batch, width])
-        const dispatch = computeDispatch(dispatchLayout, [batch, innerDim * 2], workgroupSize, [2, 1, 1])
+        const dispatch = computeDispatch(dispatchLayout, [batch, width], workgroupSize, [2, 1, 1])
         let currentTensor = backend.runWebGPUProgram({
             variableNames: ['X'],
             outputShape: [batch, width],
