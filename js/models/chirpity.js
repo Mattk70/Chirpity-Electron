@@ -159,12 +159,6 @@ onmessage = async (e) => {
           let imageTensor = tf.tidy(() => {
             return myModel.makeSpectrogram(bufferTensor);
           });
-          //imageTensor = imageTensor.expandDims(0)
-          // let spec = myModel.fixUpSpecBatch(
-          //   imageTensor,
-          //   spec_height,
-          //   spec_width
-          // );
 
           let spec = myModel.normalise(imageTensor);
           const spec_max = tf.max(spec);

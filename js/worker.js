@@ -29,7 +29,7 @@ const DATASET = false;
 const DATABASE = "archive_test";
 const adding_chirpity_additions = true;
 const DATASET_SAVE_LOCATION =
-  "/Users/matthew/Downloads";
+  "C:/Users/simpo/Downloads";
 let ntsuspend;
 if (process.platform === "win32") {
   ntsuspend = require("ntsuspend");
@@ -2279,7 +2279,7 @@ function prepareWavForModel(audio, file, end, chunkStart) {
  * @param {number} [params.end] - The end time in seconds.
  * @returns {Promise<Buffer[]>} - The audio buffer and start time.
  */
-const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav' }) => {
+const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sampleRate = 24_000 }) => {
   if (!fs.existsSync(file)) {
     const result = await getWorkingFile(file);
     if (!result) throw new Error(`Cannot locate ${file}`);
@@ -2311,7 +2311,7 @@ const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav' }) =
       file,
       start,
       end,
-      sampleRate: 24000,
+      sampleRate,
       format,
       channels: 1,
       additionalFilters,
@@ -2657,6 +2657,7 @@ const saveResults2DataSet = ({ species, included }) => {
                 end,
                 file: result.file,
                 format: "s16le",
+                sampleRate
               });
               if (AudioBuffer) {
                 // condition to prevent barfing when audio snippet is v short i.e. fetchAudioBUffer false when < 0.1s

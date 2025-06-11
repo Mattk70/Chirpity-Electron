@@ -91,43 +91,45 @@ onmessage = async (e) => {
       }
       case "get-spectrogram": {
         const buffer = e.data.buffer;
-        if (buffer.length < myModel.chunkLength / 2) {
-          DEBUG && console.log("Short spec, bailing");
+        if (buffer.length < myModel.chunkLength) {
           return;
         }
         const specFile = e.data.file;
         const filepath = e.data.filepath;
-        const spec_height = e.data.height;
-        const spec_width = e.data.width;
-        let image;
-        image = tf.tidy(() => {
-          const signal = tf.tensor1d(buffer, "float32");
-          const bufferTensor = myModel.normalise_audio_batch(signal);
-          const imageTensor = tf.tidy(() => {
-            return myModel.makeSpectrogram(bufferTensor);
-          });
-          let spec = myModel.fixUpSpecBatch(
-            tf.expandDims(imageTensor, 0),
-            spec_height,
-            spec_width
-          );
-          return spec.dataSync();
-        });
+        const image = tf.tidy(() => {
+          // Get the spec layer by name
+          const melSpec1Layer = myModel.model.getLayer('MEL_SPEC1');
+          const melSpec2Layer = myModel.model.getLayer('MEL_SPEC2');
 
+          // Create a new model that outputs the MEL_SPEC1 layer
+          function getOutput(layer) {
+            const intermediateModel = tf.model({
+              inputs: myModel.model.inputs,
+              outputs: layer.output,
+            });
+            const signal = tf.tensor1d(buffer, "float32").reshape([1, 144000]);
+            // Get the output of the MEL_SPEC1 layer
+            return intermediateModel.predict(signal);
+          }
+          let spec1 = myModel.normalise(getOutput(melSpec1Layer));
+          let spec2 = myModel.normalise(getOutput(melSpec2Layer));
+          // Concatenate the two spectrograms along the last dimension
+          return tf.concat([spec2, spec1, tf.zerosLike(spec1)], -1);
+        });
+        const [batch, height, width, channels] = image.shape;
         response = {
           message: "spectrogram",
-          width: 384, //myModel.inputShape[2],
-          height: 256, //myModel.inputShape[1],
-          channels: 1, //myModel.inputShape[3],
-          image: image,
+          width: width,
+          height: height,
+          channels,
+          image: await image.data(),
           file: specFile,
-          filepath: filepath,
-          worker: worker,
+          filepath,
+          worker,
         };
         postMessage(response);
-        DEBUG && console.log("Made a spectrogram", tf.memory().numTensors);
         break;
-      }
+    }
       case "predict": {
         if (myModel?.model_loaded) {
           const {
