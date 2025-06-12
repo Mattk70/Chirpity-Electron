@@ -560,7 +560,7 @@ async function handleMessage(e) {
           const query = STATE.db.runAsync(
             `
             INSERT OR REPLACE INTO tags (id, name) VALUES (?, ?)
-            ON CONFLICT(id) DO UPDATE SET name = excluded.name
+            ON CONFLICT(name) DO UPDATE SET name = excluded.name
             `,
             tag.id,
             tag.name
