@@ -7,6 +7,8 @@ try {
 }
 
 const {stft, custom_stft} = require("./custom-ops.js");
+require("./fft.js");
+
 const DEBUG = false;
 class BaseModel {
   constructor(appPath, version) {
@@ -138,7 +140,7 @@ class BaseModel {
   makeSpectrogram = (input) => {
     return this.backend === "tensorflow" 
     ? tf.abs(tf.signal.stft(input, this.frame_length, this.frame_step))
-    : tf.abs(custom_stft(input, this.frame_length, this.frame_step, this.frame_length, tf.signal.hannWindow))
+    : tf.abs(tf.signal.stft(input, this.frame_length, this.frame_step, this.frame_length, tf.signal.hannWindow))
   };
 
 
@@ -192,4 +194,4 @@ class BaseModel {
   getKeys = (numSamples, start) =>
     [...Array(numSamples).keys()].map((i) => start + this.chunkLength * i);
 }
-export { BaseModel, stft };
+export { BaseModel };

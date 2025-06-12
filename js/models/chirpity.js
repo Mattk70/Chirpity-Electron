@@ -373,7 +373,7 @@ class ChirpityModel extends BaseModel {
     let specBatch = tf.tidy(() => {
       return this.backend === "tensorflow"
         ? this.fixUpSpecBatch(tf.stack(tf.unstack(bufferList).map((x) => this.makeSpectrogram(x))))
-        : (this.fixUpSpecBatch(this.makeSpectrogram(bufferList)));
+        : this.fixUpSpecBatch(tf.stack(tf.unstack(bufferList).map((x) => this.makeSpectrogram(x))))//this.fixUpSpecBatch(this.makeSpectrogram(bufferList));
     });
 
     bufferList.dispose();
