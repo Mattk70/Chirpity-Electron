@@ -1,24 +1,5 @@
-let tf;
+const {flatDispatchLayout, computeDispatch, tf} = require("./custom-ops.js");
 
-try {
-  tf = require("@tensorflow/tfjs-node");
-} catch {
-  tf = require("@tensorflow/tfjs");
-}
-
-// ---------------------------------------- WEBGPU
-
-function arrayProduct (arr) {
-    let product = 1;
-    for (let i = 0; i < arr.length; i++) { product *= arr[i] }
-    return product;
-}
-function flatDispatchLayout(shape) { return {x: shape.map((d, i) => i)} }
-function computeDispatch(layout, outputShape, workgroupSize = [1, 1, 1], elementsPerThread = [1, 1, 1]) {
-return [Math.ceil(arrayProduct(layout.x.map(d => outputShape[d])) /(workgroupSize[0] * elementsPerThread[0])),
-    layout.y ? Math.ceil(arrayProduct(layout.y.map(d => outputShape[d])) / (workgroupSize[1] * elementsPerThread[1])) : 1,
-    layout.z ? Math.ceil(arrayProduct(layout.z.map(d => outputShape[d])) / (workgroupSize[2] * elementsPerThread[2])) : 1]
-}
 
 function fftWebGPU({ backend, inputs: { input } }, inverse) {
     const innerDim = input.shape[input.shape.length - 1]
@@ -186,27 +167,6 @@ class RfftReassembleGPU {
     }
 }
 
-tf.registerKernel({
-    kernelName: 'FRAME',
-    backendName: 'webgpu',
-    kernelFunc: ({ backend, inputs: { input, frameLength, frameStep } }) => {
-        const workgroupSize = [64, 1, 1]
-        const outpLen = (input.size - frameLength + frameStep) / frameStep | 0
-        const dispatchLayout = flatDispatchLayout([outpLen, frameLength])
-        return backend.runWebGPUProgram({
-            variableNames: ['x'],
-            outputShape: [outpLen, frameLength],
-            workgroupSize,
-            shaderKey: `frame_${frameLength}_${frameStep}`,
-            dispatchLayout,
-            dispatch: computeDispatch(dispatchLayout, [outpLen, frameLength], workgroupSize),
-            getUserCode: () => `
-                fn main(i: i32) {
-                    setOutputAtIndex(i, getX((i / ${frameLength}) * ${frameStep} + i % ${frameLength}));
-                }`
-        }, [input], 'float32')
-    }
-})
 
 tf.registerKernel({
     kernelName: 'RFFT',
@@ -366,26 +326,6 @@ class RfftReassemble {
 
 
 tf.registerKernel({
-    kernelName: 'FRAME',
-    backendName: 'webgl',
-    kernelFunc: ({ backend, inputs: { input, frameLength, frameStep } }) => {
-        const outpLen = (input.size - frameLength + frameStep) / frameStep | 0
-        return backend.runWebGLProgram({
-            variableNames: ['x'],
-            outputShape: [outpLen, frameLength],
-            userCode: `void main() {
-                ivec2 coords = getOutputCoords();
-                int j = coords[1];
-                int b = coords[0];
-                int i = b * ${frameLength} + j;
-                setOutput(getX((i / ${frameLength}) * ${frameStep} + i % ${frameLength}));
-            }`
-        }, [input], 'float32')
-    }
-})
-
-
-tf.registerKernel({
     kernelName: 'RFFT',
     backendName: 'webgl',
     kernelFunc: ({ backend, inputs: { input } }) => {
@@ -417,16 +357,18 @@ const slowStft = tf.signal.stft
 tf.signal.stft = stft
 function stft(signal, frameLength, frameStep, fftLength, windowFn=tf.signal.hannWindow) {
     const engine = tf.engine()
-    if (engine.backendName !== 'webgl' && engine.backendName !== 'webgpu') {
+    if (!['webgl', 'webgpu'].includes(engine.backendName)) {
         return slowStft(signal, frameLength, frameStep, fftLength, windowFn)
     }
-    fftLength = fftLength || frameLength
+    fftLength ??= frameLength;
     if (fftLength !== frameLength || (frameLength & (frameLength - 1)) !== 0) {
         console.warn('STFT is slow when fftLength != frameLength, or frameLength is not power of 2')
         return slowStft(signal, frameLength, frameStep, fftLength, windowFn)
     }
-    return tf.tidy(() => {
-        const framedSignal = engine.runKernel('FRAME', { input: signal, frameLength, frameStep })
-        return engine.runKernel('RFFT', { input: tf.mul(framedSignal, windowFn(frameLength)) })
-    })
+    const framedSignal = engine.runKernel('batchFrame', { input: signal, frameLength, frameStep })
+    const [batch, numFrames, frameLen] = framedSignal.shape;
+    const reshaped = framedSignal.reshape([batch * numFrames, frameLen]);
+    framedSignal.dispose();
+    const FFT  = engine.runKernel('RFFT', { input: tf.mul(reshaped, windowFn(frameLength)) })
+    return FFT.reshape([batch, numFrames, fftLength / 2 + 1])
 }

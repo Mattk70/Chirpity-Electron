@@ -371,7 +371,9 @@ class ChirpityModel extends BaseModel {
     const bufferList = this.normalise_audio_batch(buffers);
     buffers.dispose();
     let specBatch = tf.tidy(() => {
-      return this.fixUpSpecBatch(tf.stack(tf.unstack(bufferList).map((x) => this.makeSpectrogram(x))));
+      return this.backend === "tensorflow"
+        ? this.fixUpSpecBatch(tf.stack(tf.unstack(bufferList).map((x) => this.makeSpectrogram(x))))
+        : this.fixUpSpecBatch(this.makeSpectrogram(bufferList));
     });
 
     bufferList.dispose();

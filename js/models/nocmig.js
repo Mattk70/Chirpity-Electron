@@ -342,15 +342,11 @@ class ChirpityModel extends BaseModel {
     confidence
   ) {
     const [buffers, numSamples] = this.createAudioTensorBatch(audioBuffer);
-    let specBatch;
-    // if (this.backend === "tensorflow") {
-      specBatch = tf.tidy(() => {
-        const toStack = tf.unstack(buffers).map((x) => this.makeSpectrogram(x));
-        return this.fixUpSpecBatch(tf.stack(toStack));
-      });
-    // } else {
-    //   specBatch = tf.tidy(() => this.fixUpSpecBatch(this.makeSpectrogram(buffers)));
-    // }
+    const specBatch = tf.tidy(() => {
+      return this.backend === "tensorflow"
+        ? this.fixUpSpecBatch(tf.stack(tf.unstack(buffers).map((x) => this.makeSpectrogram(x))))
+        : this.fixUpSpecBatch(this.makeSpectrogram(buffers));
+    });
 
     buffers.dispose();
     const batchKeys = this.getKeys(numSamples, start);

@@ -6,7 +6,7 @@ try {
   tf = require("@tensorflow/tfjs");
 }
 
-const {stft, custom_stft} = require("./custom-ops.js");
+// Import override for tf.signal.stft
 require("./fft.js");
 
 const DEBUG = false;

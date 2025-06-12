@@ -10,7 +10,7 @@ const path = require("node:path");
 let DEBUG = false;
 
 import { BaseModel } from "./BaseModel.js";
-const {stft, custom_stft} = require("./custom-ops.js");
+const {stft} = require("./custom-ops.js");
 
 //GLOBALS
 let myModel
