@@ -120,36 +120,6 @@ tf.registerKernel({
 
 
 /**
- * Computes the short-time Fourier transform (STFT) of a batched signal using a custom framing kernel and window function.
- *
- * Frames the input signal into overlapping segments, applies a window function to each frame, and computes the real FFT of each windowed frame.
- *
- * @param {tf.Tensor} signal - Input tensor of shape [batchSize, signalLength].
- * @param {number} frameLength - Length of each frame.
- * @param {number} frameStep - Step size between frames.
- * @param {number} [fftLength=frameLength] - Length of the FFT to compute for each frame.
- * @param {function} [windowFn=tf.signal.hannWindow] - Function that generates the window to apply to each frame.
- * @returns {tf.Tensor} Complex tensor containing the STFT of the input signal.
- */
-function custom_stft(
-  signal,                   // shape: [batchSize, signalLength]
-  frameLength,
-  frameStep,
-  fftLength = frameLength,
-  windowFn = tf.signal.hannWindow
-) {
-  const framedSignal = tf.engine().runKernel("batchFrame", {
-    input: signal,
-    frameLength,
-    frameStep,
-  });
-  const window = windowFn(frameLength).reshape([1, 1, frameLength]); // broadcast over batch and frames
-  const windowed = tf.mul(framedSignal, window);
-  return  tf.spectral.rfft(windowed, fftLength);
-}
-
-
-/**
  * Computes the short-time Fourier transform (STFT) of a batched signal tensor using a custom GPU-accelerated FFT kernel.
  * Adapted from https://github.com/georg95/birdnet-web/blob/main/birdnet.js
  * Frames the input signal, applies a window function, and computes the real FFT for each frame. Returns the complex frequency-domain representation for each frame, retaining only the non-redundant half of the spectrum.
@@ -355,4 +325,4 @@ tf.registerKernel({
     }
 })
 
-module.exports = {stft, custom_stft}
+module.exports = {stft, flatDispatchLayout, computeDispatch, tf};

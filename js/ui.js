@@ -7374,8 +7374,7 @@ document.addEventListener("labelsUpdated", (e) => {
     console.log("Tag updated:", alteredOrNew);
     worker.postMessage({ action: "update-tag", alteredOrNew });
   }
-
-  console.log("Tags list:", STATE.tagsList);
+  config.debug && console.log("Tags list:", STATE.tagsList);
 });
 
 /**

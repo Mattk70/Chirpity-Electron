@@ -556,8 +556,8 @@ async function handleMessage(e) {
     case "update-tag": {
       try {
         const tag = args.alteredOrNew;
-        if (tag.id && tag.name) {
-          const query = STATE.db.runAsync(
+        if (tag?.name) {
+          const query = await STATE.db.runAsync(
             `
             INSERT OR REPLACE INTO tags (id, name) VALUES (?, ?)
             ON CONFLICT(id) DO UPDATE SET name = excluded.name
@@ -565,6 +565,7 @@ async function handleMessage(e) {
             tag.id,
             tag.name
           );
+          console.log(query)
         }
         const result = await STATE.db.allAsync("SELECT id, name FROM tags");
         UI.postMessage({ event: "tags", tags: result, init: false });
