@@ -556,7 +556,7 @@ async function handleMessage(e) {
     case "update-tag": {
       try {
         const tag = args.alteredOrNew;
-        if (tag.id && tag.name) {
+        if (tag?.name) {
           const query = await STATE.db.runAsync(
             `
             INSERT OR REPLACE INTO tags (id, name) VALUES (?, ?)
