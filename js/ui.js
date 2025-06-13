@@ -5083,6 +5083,12 @@ async function handleUIClicks(e) {
       showAnalyse();
       break;
     }
+    // Train menu
+    case "train": {
+      worker.postMessage({action: "train-model"});
+      // disableSettingsDuringAnalysis(true)
+      break;
+    }
     // Help Menu
     case "keyboardHelp": {
       (async () =>

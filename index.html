@@ -1475,8 +1475,7 @@
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="navbarRecords" role="button"
                             data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                            Records
-                        </a>
+                            Records</a>
                         <ul class="dropdown-menu" aria-labelledby="navbarRecords">
                             <li class="dropdown-item disabled" id="save2db">
                                 <span class="material-symbols-outlined">archive</span> Save to Archive
@@ -1508,89 +1507,101 @@
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="navbarAnalysis" role="button"
                         data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                        Analysis
-                    </a>
+                        Analysis</a>
                     <ul class="dropdown-menu" aria-labelledby="navbarAnalysis">
                         <li><a class="dropdown-item disabled" href="#" id="analyse">
                             <span class="material-symbols-outlined">search</span> Analyse Current File
-                            <span class="shortcut float-end">Ctrl+A</span> </a></li>
-                            <li><a class="dropdown-item disabled" href="#" id="analyseSelection">
-                                <span class="material-symbols-outlined">manage_search</span> Analyse Selected
-                                Interval</a></li>
-                                <li><a class="dropdown-item disabled" href="#" id="analyseAll">
-                                    <span class="material-symbols-outlined">search</span> Analyse All Open
-                                    Files <span class="shortcut float-end">Ctrl+Shift+A</span></a>
-                                </li>
-                                <li class="dropdown-divider"></li>
-                                <li><a class="dropdown-item disabled" href="#" id="reanalyse">
-                                    <span class="material-symbols-outlined">youtube_searched_for</span> Re-analyse
-                                    Current File</a></li>
-                                    <li><a class="dropdown-item disabled" href="#" id="reanalyseAll">
-                                        <span class="material-symbols-outlined">youtube_searched_for</span> Re-analyse All
-                                        Open Files</a></li>
-                                    </ul>
-                                </li>
-                                <li class="nav-item dropdown">
-                                    <a class="nav-link dropdown-toggle" href="#" id="navbarHelp" role="button"
-                                    data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                    Help
-                                </a>
-                                <ul class="dropdown-menu" aria-labelledby="navBarHelp">
-                                    <li><a class="dropdown-item" id="usage" href="#">
-                                        <span class="material-symbols-outlined">help</span> Using Chirpity</a>
-                                    </li>
-                                    <!-- <li>
-                                        <a class="dropdown-item" id="settingsHelp" href="#">
-                                            <span class="material-symbols-outlined">help</span> Settings
-                                        </a>
-                                    </li> -->
-                                    <li><a class="dropdown-item" id="keyboardHelp" href="#">
-                                        <span class="material-symbols-outlined">help</span> Keyboard Shortcuts
-                                    </a>
-                                </li>
-                                <li><a class="dropdown-item" id="diagnostics" href="#">
-                                    <span class="material-symbols-outlined">insights</span> Diagnostics
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" id="startTour" href="#">
-                                    <span class="material-symbols-outlined">tour</span> Show Tour
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" id="community" href="#">
-                                    <span class="material-symbols-outlined">forum</span> Join the community
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" id="known-issues" href="#">
-                                    <span class="material-symbols-outlined">bug_report</span> Known Issues
-                                </a>
-                            </li>
-                            <div class="dropdown-divider"></div>
-                            <h6 class="fs-6 ps-3" id="FAQ">FAQs</h6>
-                            <li>
-                                <a class="dropdown-item" id="species" href="#">
-                                    <span class="material-symbols-outlined">help</span> What species are detected?
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" id="eBird" href="#">
-                                    <span class="material-symbols-outlined">help</span> What is an eBird Record?
-                                </a>
-                            </li>
-                        </ul>
+                            <span class="shortcut float-end">Ctrl+A</span> </a>
+                        </li>
+                        <li><a class="dropdown-item disabled" href="#" id="analyseSelection">
+                            <span class="material-symbols-outlined">manage_search</span> Analyse Selected
+                            Interval</a>
+                        </li>
+                        <li><a class="dropdown-item disabled" href="#" id="analyseAll">
+                            <span class="material-symbols-outlined">search</span> Analyse All Open
+                            Files <span class="shortcut float-end">Ctrl+Shift+A</span></a>
+                        </li>
+                        <li class="dropdown-divider"></li>
+                        <li><a class="dropdown-item disabled" href="#" id="reanalyse">
+                            <span class="material-symbols-outlined">youtube_searched_for</span> Re-analyse
+                            Current File</a>
+                        </li>
+                        <li><a class="dropdown-item disabled" href="#" id="reanalyseAll">
+                            <span class="material-symbols-outlined">youtube_searched_for</span> Re-analyse All
+                            Open Files</a>
+                        </li>
+                    </ul>
+                </li>
+                <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarTraining" role="button"
+                        data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        Train</a>
+                    <ul class="dropdown-menu" aria-labelledby="navbarTraining">
+                        <li>
+                            <div class="row ms-0 me-0">
+                                <a class="dropdown-item locked col" id="train" href="#">
+                                <span class="material-symbols-outlined">model_training</span> Train a Custom Model</a>
+                                <a class="padlock col" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature.">
+                                    <span class="pointer locked material-symbols-outlined float-end mt-1">lock</span></a>
+                            </div> 
+                        </li>
+                    </ul>
+                </li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarHelp" role="button"
+                    data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    Help</a>
+                <ul class="dropdown-menu" aria-labelledby="navBarHelp">
+                    <li><a class="dropdown-item" id="usage" href="#">
+                        <span class="material-symbols-outlined">help</span> Using Chirpity</a>
                     </li>
-                    <div class="nav-item">
-                        <li class="nav-link text-nowrap"  onclick="placeMap('settingsMap')" id="navbarSettings"
-                        data-bs-toggle="offcanvas" data-bs-target="#settings" aria-controls="settings">Settings</li>
-                    </div>
+                    <!-- <li>
+                        <a class="dropdown-item" id="settingsHelp" href="#">
+                            <span class="material-symbols-outlined">help</span> Settings
+                        </a>
+                    </li> -->
+                    <li><a class="dropdown-item" id="keyboardHelp" href="#">
+                        <span class="material-symbols-outlined">help</span> Keyboard Shortcuts</a>
+                    </li>
+                    <li><a class="dropdown-item" id="diagnostics" href="#">
+                        <span class="material-symbols-outlined">insights</span> Diagnostics</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item" id="startTour" href="#">
+                            <span class="material-symbols-outlined">tour</span> Show Tour</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item" id="community" href="#">
+                            <span class="material-symbols-outlined">forum</span> Join the community</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item" id="known-issues" href="#">
+                            <span class="material-symbols-outlined">bug_report</span> Known Issues</a>
+                    </li>
+                    <div class="dropdown-divider"></div>
+                    <h6 class="fs-6 ps-3" id="FAQ">FAQs</h6>
+                    <li>
+                        <a class="dropdown-item" id="species" href="#">
+                            <span class="material-symbols-outlined">help</span> What species are detected?
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item" id="eBird" href="#">
+                            <span class="material-symbols-outlined">help</span> What is an eBird Record?
+                        </a>
+                    </li>
                 </ul>
+            </li>
+            <div class="nav-item">
+                <li class="nav-link text-nowrap"  onclick="placeMap('settingsMap')" id="navbarSettings"
+                data-bs-toggle="offcanvas" data-bs-target="#settings" aria-controls="settings">Settings</li>
             </div>
-            <div id="buy-me-coffee" class="d-none"><a href="https://www.buymeacoffee.com/matthew_kirkland" target="_blank"><img src="img/bmc.png" alt="Become a Chirpity supporter on Buy-me-a-coffee" title="Support Chirpity's ongoing development and unlock exclusive features"></a></div>
-            <!-- navbar-collapse.// -->
-            <a href="https://chirpity.mattkirkland.co.uk" title="Visit the Chirpity website" target="_blank"  id="primaryLogoLink"><img id="primaryLogo" src="img/logo/chirpity_logo2.png" alt="Chirpity bird calls: Identifying birds by sound"></a>
+            </ul>
         </div>
+        <div id="buy-me-coffee" class="d-none"><a href="https://www.buymeacoffee.com/matthew_kirkland" target="_blank"><img src="img/bmc.png" alt="Become a Chirpity supporter on Buy-me-a-coffee" title="Support Chirpity's ongoing development and unlock exclusive features"></a></div>
+        <!-- navbar-collapse.// -->
+        <a href="https://chirpity.mattkirkland.co.uk" title="Visit the Chirpity website" target="_blank"  id="primaryLogoLink"><img id="primaryLogo" src="img/logo/chirpity_logo2.png" alt="Chirpity bird calls: Identifying birds by sound"></a>
+    </div>
         <!-- container-fluid.// -->
     </nav>
 </div>

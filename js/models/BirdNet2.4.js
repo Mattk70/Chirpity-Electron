@@ -86,12 +86,24 @@ onmessage = async (e) => {
             labels: labels,
             worker: worker,
           });
-          trainModel(myModel.model).then(() => {
-            console.log("Model training completed");
+        });
+        break;
+      }
+      case "train-model":{
+          trainModel(myModel.model).then((result) => {
+            postMessage({
+              message: "training-results", 
+              notice: "Training completed successfully!"
+
+            });
           }).catch((err) => {
+            postMessage({
+              message: "training-results", 
+              notice: `Error during model training: ${err}`,
+              type: 'error'
+            });
             console.error("Error during model training:", err);
           })
-        });
         break;
       }
       case "get-spectrogram": {
@@ -397,8 +409,8 @@ tf.serialization.registerClass(MelSpecLayerSimple);
 
 // tf.serialization.registerClass(SigmoidLayer);
 
-async function trainModel(baseModel) {
-
+async function trainModel(model) {
+  const baseModel = tf.model({ inputs: model.inputs, outputs: model.outputs });
   // Freeze base layers (optional)
   for (const layer of baseModel.layers) {
     layer.trainable = false;
@@ -417,42 +429,124 @@ async function trainModel(baseModel) {
   const newClassifier = tf.layers.dense({ units: labels.length, activation: 'sigmoid', name: 'new_classes' }).apply(embeddings);
 
   // Concatenate the original output with the new classifier's output
-  const combinedOutput = tf.layers.concatenate({ axis: -1 }).apply([originalOutput, newClassifier]);
+  // const combinedOutput = tf.layers.concatenate({ axis: -1 }).apply([originalOutput, newClassifier]);
 
   // Build a new model
   const transferModel = tf.model({
     inputs: input,
     outputs: newClassifier,
   });
-
+  const optimizer = tf.train.adam(0.001);
+  const loss = tf.losses.sigmoidCrossEntropy;
+  const metric = tf.metrics.categoricalAccuracy;
   // Compile the model
   transferModel.compile({
-    optimizer: tf.train.adam(0.0001),
-    loss: 'categoricalCrossentropy',
-    metrics: ['accuracy'],
+    optimizer,
+    loss,
+    metrics: metric,
   });
 
+  const cacheFolder = "c:/temp/";
+  const trainBin = cacheFolder + "train_ds.bin";
+  const valBin = cacheFolder + "val_ds.bin";
+
+  if (!fs.existsSync(trainBin)){
+    const { trainFiles, valFiles } = stratifiedSplit(allFiles, 0.2);
+    await writeBinaryGzipDataset(trainFiles, trainBin, labelToIndex, postMessage, "Preparing training data");
+    await writeBinaryGzipDataset(valFiles, valBin, labelToIndex, postMessage, "Preparing validation data");
+  }
+  const train_ds = tf.data.generator(() => readBinaryGzipDataset(trainBin)).shuffle(100 /* bufferSize */).batch(32);
+  const val_ds = tf.data.generator(() => readBinaryGzipDataset(valBin)).batch(32);
+
+  const epochs = 50;
   // Train on your new data
   // Assume `xTrain` and `yTrain` are your input and combined output labels
-  await transferModel.fitDataset(ds, {
+  const history = await transferModel.fitDataset(train_ds, {
     batchSize: 32,
-    epochs: 10,
-    callbacks: {
+    epochs,
+    validationData: val_ds,
+    yieldEvery: 1000,
+    callbacks: [
+      tf.callbacks.earlyStopping({monitor: 'val_loss', minDelta: 0.0001, patience: 3}),
+      new tf.CustomCallback({
+      onYield: (epoch, batch, _logs) =>{
+        batch += 1;
+        const batchesInEpoch = Math.floor(allFiles.length / 32);
+        const progress = (batch / batchesInEpoch) * 100
+        postMessage({
+              message: "training-progress", 
+              progress: {percent: progress},
+              text: `Epoch ${epoch + 1} / ${epochs}: `
+        });
+      },
       onEpochEnd: (epoch, logs) => {
-        console.log(`Epoch ${epoch + 1}: loss = ${logs.loss}, accuracy = ${logs.acc}`);
+        console.log(`Epoch ${epoch + 1}: loss = ${logs.loss.toFixed(4)}, accuracy = ${logs.categoricalAccuracy.toFixed(4)}`);
         tensors.forEach(t => t.dispose());  // Dispose tensors to free memory
         tensors.length = 0;  // Clear the array
         console.log(`Tensors in memory: ${tf.memory().numTensors}`);
+        postMessage({
+          message: "training-progress", 
+          progress: {percent: 100},
+          text: `Epoch ${epoch + 1} / ${epochs}: `
+        });
+        postMessage({
+              message: "training-results", 
+              notice: 
+              `Epoch ${epoch + 1}: <br>
+              Loss = ${logs.loss.toFixed(4)}<br>
+              Accuracy = ${(logs.categoricalAccuracy*100).toFixed(2)}%<br>
+              Validation Loss = ${logs.val_loss.toFixed(4)}<br>
+              Validation Accuracy = ${(logs.val_categoricalAccuracy*100).toFixed(2)}%`
+            });
       },
-      onTrainEnd: () => {
+      onTrainEnd: (logs) => {
+        
+        postMessage({
+          message: "training-progress", 
+          progress: {percent: 100},
+          text: ''
+        });
         const t1 = Date.now();
         console.log(`Training completed in ${((t1 - t0) / 1000).toFixed(2)} seconds`);
+        return logs
       }
     }
+      )
+    ]
   });
 
+  if (history.epoch.length < epochs){
+    const logs = history.history;
+      postMessage({
+        message: "training-results", 
+        notice: 
+        `Training halted at Epoch ${history.epoch.length} due to no further improvement: <br>
+        Loss = ${logs.loss[logs.loss.length -1].toFixed(4)}<br>
+        Accuracy = ${(logs.categoricalAccuracy[logs.categoricalAccuracy.length -1]* 100).toFixed(2)}%<br>
+        Validation Loss = ${logs.val_loss[logs.val_loss.length -1].toFixed(4)}<br>
+        Validation Accuracy = ${(logs.val_categoricalAccuracy[logs.val_categoricalAccuracy.length -1]*100).toFixed(2)}%`,
+        type: 'warning',
+        autohide: false
+      });
+  }
   // Save the new model
-  await transferModel.save('file://C:/Users/simpo/PycharmProjects/transfer-model');  // or indexedDB/localstorage/http
+  await transferModel.save('file://C:/Users/simpo/PycharmProjects/transfer-model');
+  console.log(`Tensors in memory before: ${tf.memory().numTensors}`);
+  model.dispose()
+  transferModel.layers.forEach(layer => {
+    try{ 
+      layer.dispose();
+    } catch {
+      // Skip previously disposed layers
+    }
+  })
+  optimizer.dispose();
+  console.log(`Tensors in memory after: ${tf.memory().numTensors}`);
+  myModel.model_loaded = false;
+  await myModel.loadModel("layers");
+  console.log(`Tensors in memory new model: ${JSON.stringify(tf.memory())}`);
+  // await myModel.warmUp(32);
+  console.log('new model made')
 }
 
 
@@ -481,17 +575,102 @@ const labels = [...new Set(allFiles.map(f => f.label))];
 const labelToIndex = Object.fromEntries(labels.map((l, i) => [l, i]));
 const tensors = [];
 const t0 = Date.now();
-async function* data() {
-  for (const { filePath, label } of allFiles) {
-    const audioTensor = await decodeAudioToTensor(filePath);
-    const labelTensor = tf.oneHot(labelToIndex[label], labels.length);
-    tensors.push(labelTensor);
-    tensors.push(audioTensor);
-    yield {xs: audioTensor, ys: labelTensor};
+const zlib = require('zlib');
+
+/**
+ * Writes a compressed binary dataset where each record is:
+ *   - audio: Float32Array of 144000 samples (576000 bytes)
+ *   - label: UInt8 (1 byte)
+ * Total per record: 576001 bytes
+ */
+async function writeBinaryGzipDataset(fileList, outputPath, labelToIndex, postMessage, description = "Preparing data") {
+  const gzip = zlib.createGzip();
+  const writeStream = fs.createWriteStream(outputPath);
+  gzip.pipe(writeStream);
+  let count = 0;
+
+  for (const { filePath, label } of fileList) {
+    count++;
+    postMessage({
+      message: "training-progress", 
+      progress: { percent: (count / fileList.length) * 100 },
+      text: `${description}: `
+    });
+
+    let audioArray = await decodeAudioToTensor(filePath);
+    const expectedSamples = 48000 * 3;
+    if (audioArray.length !== expectedSamples) {
+      const padded = new Float32Array(expectedSamples);
+      padded.set(audioArray.slice(0, expectedSamples));
+      audioArray = padded;
+    }
+
+    const audioBuffer = Buffer.from(audioArray.buffer);
+    gzip.write(audioBuffer);
+
+    const labelIndex = labelToIndex[label];
+    gzip.write(Buffer.from([labelIndex]));
+  }
+
+  gzip.end();
+}
+
+
+function stratifiedSplit(allFiles, valRatio = 0.2) {
+  const byLabel = {};
+  for (const item of allFiles) {
+    const { label } = item;
+    if (!byLabel[label]) byLabel[label] = [];
+    byLabel[label].push(item);
+  }
+
+  const trainFiles = [];
+  const valFiles = [];
+
+  for (const label in byLabel) {
+    const items = byLabel[label];
+    tf.util.shuffle(items);
+    const splitIndex = Math.max(1, Math.floor(items.length * valRatio)); // at least 1 item
+    valFiles.push(...items.slice(0, splitIndex));
+    trainFiles.push(...items.slice(splitIndex));
+  }
+
+  tf.util.shuffle(trainFiles);
+  tf.util.shuffle(valFiles);
+  return { trainFiles, valFiles };
+}
+
+async function* readBinaryGzipDataset(gzippedPath) {
+  const RECORD_SIZE = 576001; // 144000 * 4 + 1
+  const gunzip = zlib.createGunzip();
+  const stream = fs.createReadStream(gzippedPath).pipe(gunzip);
+
+  let leftover = Buffer.alloc(0);
+
+  for await (const chunk of stream) {
+    const data = Buffer.concat([leftover, chunk]);
+    const total = Math.floor(data.length / RECORD_SIZE) * RECORD_SIZE;
+    let offset = 0;
+
+    while (offset + RECORD_SIZE <= total) {
+      const record = data.subarray(offset, offset + RECORD_SIZE);
+      const audioBuf = record.subarray(0, 144000 * 4);
+      const labelByte = record.readUInt8(RECORD_SIZE - 1);
+
+      const audio = new Float32Array(audioBuf.buffer, audioBuf.byteOffset, 144000);
+      yield {
+        xs: tf.tensor1d(audio),
+        ys: tf.oneHot(labelByte, labels.length)
+      };
+
+      offset += RECORD_SIZE;
+    }
+
+    leftover = data.subarray(offset); // save leftover for next chunk
   }
 }
 
-const ds = tf.data.generator(data).shuffle(100 /* bufferSize */).batch(32);
+
 
 
 /**
@@ -515,8 +694,7 @@ async function decodeAudioToTensor(filePath) {
       .on('end', () => {
         const wavBuffer = Buffer.concat(chunks);
         try {
-          const decoded = tf.tidy(() => tf.tensor1d(wavBuffer).slice(0, 144000));
-          resolve(decoded); // shape: [samples, 1]
+          resolve(wavBuffer); // shape: [samples, 1]
 
         } catch (err) {
           reject(err);

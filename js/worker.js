@@ -633,6 +633,14 @@ async function handleMessage(e) {
       onSetCustomLocation(args);
       break;
     }
+    case "train-model":{
+      const worker = predictWorkers[0];
+      worker.postMessage({
+          message: "train-model",
+          batchSize: BATCH_SIZE,
+        });
+      break;
+    }
     case "update-buffer": {
       await loadAudioFile(args);
       break;
@@ -3421,6 +3429,23 @@ async function parseMessage(e) {
         response["image"],
         response["channels"]
       );
+      break;
+    }
+    case "training-progress": {
+        UI.postMessage({
+          event: "conversion-progress",
+          progress: response.progress,
+          text: response.text,
+        });
+        break;
+    }
+    case "training-results": {
+      generateAlert({
+        type: response.type,
+        autohide: response.autohide,
+        message: response.notice,
+        variables: response.variables,
+      });
       break;
     }
   }
