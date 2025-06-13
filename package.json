@@ -191,7 +191,6 @@
   },
   "dependencies": {
     "@easepick/bundle": "^1.2.1",
-    "fast-csv": "^4.3.5",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@popperjs/core": "^2.9.2",
     "@tensorflow/tfjs": "4.22.0",
@@ -205,6 +204,7 @@
     "electron-log": "4.4.8",
     "electron-settings": "^4.0.2",
     "electron-updater": "6.3.9",
+    "fast-csv": "^4.3.5",
     "fast-png": "^6.1.0",
     "fluent-ffmpeg": "^2.1.2",
     "lodash.merge": "^4.6.2",
