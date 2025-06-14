@@ -505,7 +505,6 @@ async function trainModel(baseModel) {
           });
     },
     onTrainEnd: (logs) => {
-      
       postMessage({
         message: "training-progress", 
         progress: {percent: 100},
@@ -522,11 +521,7 @@ async function trainModel(baseModel) {
     batchSize: 32,
     epochs,
     validationData: val_ds,
-    yieldEvery: 1000,
-    callbacks: [
-      earlyStopping,
-      events
-    ]
+    callbacks: [earlyStopping, events]
   });
 
   if (history.epoch.length < epochs){
