@@ -7,6 +7,7 @@ try {
 }
 const fs = require("node:fs");
 const path = require("node:path");
+const zlib = require("node:zlib");
 let DEBUG = false;
 
 import { BaseModel } from "./BaseModel.js";
@@ -410,8 +411,14 @@ tf.serialization.registerClass(MelSpecLayerSimple);
 // tf.serialization.registerClass(SigmoidLayer);
 
 async function trainModel(baseModel) {
+  const allFiles = getFilesWithLabels('Y:/BirdSounds/XC/European_XC_MP3/XC_CALL_mp3');
+  const labels = [...new Set(allFiles.map(f => f.label))];
+  const labelToIndex = Object.fromEntries(labels.map((l, i) => [l, i]));
+  const tensors = [];
+  const t0 = Date.now();
   const append = false;
   const cacheFolder = "c:/temp/";
+  const saveLocation = "C:/Users/simpo/PycharmProjects/transfer-model/";
   const cacheRecords = true;
   const dropout = 0.25;
   const epochs = 100;
@@ -465,11 +472,11 @@ async function trainModel(baseModel) {
 
   if (! cacheRecords || ! fs.existsSync(trainBin)){
     const { trainFiles, valFiles } = stratifiedSplit(allFiles, 0.2);
-    await writeBinaryGzipDataset(trainFiles, trainBin, labelToIndex, postMessage, "Preparing training data");
+    // await writeBinaryGzipDataset(trainFiles, trainBin, labelToIndex, postMessage, "Preparing training data");
     await writeBinaryGzipDataset(valFiles, valBin, labelToIndex, postMessage, "Preparing validation data");
   }
-  const train_ds = tf.data.generator(() => readBinaryGzipDataset(trainBin)).shuffle(100 /* bufferSize */).batch(32);
-  const val_ds = tf.data.generator(() => readBinaryGzipDataset(valBin)).batch(32);
+  const train_ds = tf.data.generator(() => readBinaryGzipDataset(trainBin, labels)).shuffle(100 /* bufferSize */).batch(32);
+  const val_ds = tf.data.generator(() => readBinaryGzipDataset(valBin, labels)).batch(32);
   const earlyStopping = tf.callbacks.earlyStopping({monitor: 'val_loss', minDelta: 0.0001, patience: 3})
   const events = new tf.CustomCallback({
     onYield: (epoch, batch, _logs) =>{
@@ -539,7 +546,7 @@ async function trainModel(baseModel) {
       });
   }
   // Save the new model
-  const saveLocation = "C:/Users/simpo/PycharmProjects/transfer-model/";
+
   let mergedModel, mergedLabels;
   if (append){
     const combinedOutput = tf.layers.concatenate({ axis: -1 }).apply([originalOutput, newClassifier]);
@@ -595,12 +602,6 @@ function getFilesWithLabels(rootDir) {
   return files;
 }
 
-const allFiles = getFilesWithLabels('C:/Users/simpo/PycharmProjects/Data/missing XC species/XC_SONGS_mp3');
-const labels = [...new Set(allFiles.map(f => f.label))];
-const labelToIndex = Object.fromEntries(labels.map((l, i) => [l, i]));
-const tensors = [];
-const t0 = Date.now();
-const zlib = require('zlib');
 
 /**
  * Writes a compressed binary dataset where each record is:
@@ -621,8 +622,16 @@ async function writeBinaryGzipDataset(fileList, outputPath, labelToIndex, postMe
       progress: { percent: (count / fileList.length) * 100 },
       text: `${description}: `
     });
-
-    let audioArray = await decodeAudioToTensor(filePath);
+    let errored = false;
+    let audioArray = await decodeAudioToTensor(filePath).catch(err => {
+      postMessage({
+        message: "training-results", 
+        notice: `Error loading file:<br> ${err}`,
+        type: 'error'
+      });
+      errored = true
+    });
+    if (errored) continue; // Be robust to errors
     const expectedSamples = 48000 * 3;
     if (audioArray.length !== expectedSamples) {
       const padded = new Float32Array(expectedSamples);
@@ -665,7 +674,7 @@ function stratifiedSplit(allFiles, valRatio = 0.2) {
   return { trainFiles, valFiles };
 }
 
-async function* readBinaryGzipDataset(gzippedPath) {
+async function* readBinaryGzipDataset(gzippedPath, labels) {
   const RECORD_SIZE = 576001; // 144000 * 4 + 1
   const gunzip = zlib.createGunzip();
   const stream = fs.createReadStream(gzippedPath).pipe(gunzip);
