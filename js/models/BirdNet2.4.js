@@ -419,7 +419,7 @@ async function trainModel(baseModel) {
   const append = false;
   const cacheFolder = "c:/temp/";
   const saveLocation = "C:/Users/simpo/PycharmProjects/transfer-model/";
-  const cacheRecords = false;
+  const cacheRecords = true;
   const dropout = 0.25;
   const epochs = 100;
   const hidden = 0;
@@ -475,8 +475,8 @@ async function trainModel(baseModel) {
     // await writeBinaryGzipDataset(trainFiles, trainBin, labelToIndex, postMessage, "Preparing training data");
     await writeBinaryGzipDataset(valFiles, valBin, labelToIndex, postMessage, "Preparing validation data");
   }
-  const train_ds = tf.data.generator(() => readBinaryGzipDataset(trainBin)).shuffle(100 /* bufferSize */).batch(32);
-  const val_ds = tf.data.generator(() => readBinaryGzipDataset(valBin)).batch(32);
+  const train_ds = tf.data.generator(() => readBinaryGzipDataset(trainBin, labels)).shuffle(100 /* bufferSize */).batch(32);
+  const val_ds = tf.data.generator(() => readBinaryGzipDataset(valBin, labels)).batch(32);
   const earlyStopping = tf.callbacks.earlyStopping({monitor: 'val_loss', minDelta: 0.0001, patience: 3})
   const events = new tf.CustomCallback({
     onYield: (epoch, batch, _logs) =>{
@@ -674,7 +674,7 @@ function stratifiedSplit(allFiles, valRatio = 0.2) {
   return { trainFiles, valFiles };
 }
 
-async function* readBinaryGzipDataset(gzippedPath) {
+async function* readBinaryGzipDataset(gzippedPath, labels) {
   const RECORD_SIZE = 576001; // 144000 * 4 + 1
   const gunzip = zlib.createGunzip();
   const stream = fs.createReadStream(gzippedPath).pipe(gunzip);
