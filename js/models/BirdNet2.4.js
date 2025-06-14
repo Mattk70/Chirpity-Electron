@@ -472,7 +472,7 @@ async function trainModel(baseModel) {
 
   if (! cacheRecords || ! fs.existsSync(trainBin)){
     const { trainFiles, valFiles } = stratifiedSplit(allFiles, 0.2);
-    await writeBinaryGzipDataset(trainFiles, trainBin, labelToIndex, postMessage, "Preparing training data");
+    // await writeBinaryGzipDataset(trainFiles, trainBin, labelToIndex, postMessage, "Preparing training data");
     await writeBinaryGzipDataset(valFiles, valBin, labelToIndex, postMessage, "Preparing validation data");
   }
   const train_ds = tf.data.generator(() => readBinaryGzipDataset(trainBin)).shuffle(100 /* bufferSize */).batch(32);
@@ -622,8 +622,16 @@ async function writeBinaryGzipDataset(fileList, outputPath, labelToIndex, postMe
       progress: { percent: (count / fileList.length) * 100 },
       text: `${description}: `
     });
-
-    let audioArray = await decodeAudioToTensor(filePath);
+    let errored = false;
+    let audioArray = await decodeAudioToTensor(filePath).catch(err => {
+      postMessage({
+        message: "training-results", 
+        notice: `Error loading file:<br> ${err}`,
+        type: 'error'
+      });
+      errored = true
+    });
+    if (errored) continue; // Be robust to errors
     const expectedSamples = 48000 * 3;
     if (audioArray.length !== expectedSamples) {
       const padded = new Float32Array(expectedSamples);
