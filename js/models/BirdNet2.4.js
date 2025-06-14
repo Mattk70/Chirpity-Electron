@@ -7,6 +7,7 @@ try {
 }
 const fs = require("node:fs");
 const path = require("node:path");
+const zlib = require("node:zlib");
 let DEBUG = false;
 
 import { BaseModel } from "./BaseModel.js";
@@ -410,9 +411,15 @@ tf.serialization.registerClass(MelSpecLayerSimple);
 // tf.serialization.registerClass(SigmoidLayer);
 
 async function trainModel(baseModel) {
+  const allFiles = getFilesWithLabels('Y:/BirdSounds/XC/European_XC_MP3/XC_CALL_mp3');
+  const labels = [...new Set(allFiles.map(f => f.label))];
+  const labelToIndex = Object.fromEntries(labels.map((l, i) => [l, i]));
+  const tensors = [];
+  const t0 = Date.now();
   const append = false;
   const cacheFolder = "c:/temp/";
-  const cacheRecords = true;
+  const saveLocation = "C:/Users/simpo/PycharmProjects/transfer-model/";
+  const cacheRecords = false;
   const dropout = 0.25;
   const epochs = 100;
   const hidden = 0;
@@ -539,7 +546,7 @@ async function trainModel(baseModel) {
       });
   }
   // Save the new model
-  const saveLocation = "C:/Users/simpo/PycharmProjects/transfer-model/";
+
   let mergedModel, mergedLabels;
   if (append){
     const combinedOutput = tf.layers.concatenate({ axis: -1 }).apply([originalOutput, newClassifier]);
@@ -595,12 +602,6 @@ function getFilesWithLabels(rootDir) {
   return files;
 }
 
-const allFiles = getFilesWithLabels('C:/Users/simpo/PycharmProjects/Data/missing XC species/XC_SONGS_mp3');
-const labels = [...new Set(allFiles.map(f => f.label))];
-const labelToIndex = Object.fromEntries(labels.map((l, i) => [l, i]));
-const tensors = [];
-const t0 = Date.now();
-const zlib = require('zlib');
 
 /**
  * Writes a compressed binary dataset where each record is:
