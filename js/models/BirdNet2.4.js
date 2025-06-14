@@ -414,7 +414,7 @@ async function trainModel(baseModel) {
   const cacheFolder = "c:/temp/";
   const cacheRecords = true;
   const dropout = 0.25;
-  const epochs = 1;
+  const epochs = 100;
   const hidden = 0;
   const loss = tf.losses.sigmoidCrossEntropy;
   const metric = tf.metrics.categoricalAccuracy;
@@ -525,15 +525,15 @@ async function trainModel(baseModel) {
   });
 
   if (history.epoch.length < epochs){
-    const logs = history.history;
+    const {loss, val_loss, categoricalAccuracy, val_categoricalAccuracy} = history.history;
       postMessage({
         message: "training-results", 
         notice: 
         `Training halted at Epoch ${history.epoch.length} due to no further improvement: <br>
-        Loss = ${logs.loss[logs.loss.length -1].toFixed(4)}<br>
-        Accuracy = ${(logs.categoricalAccuracy[logs.categoricalAccuracy.length -1]* 100).toFixed(2)}%<br>
-        Validation Loss = ${logs.val_loss[logs.val_loss.length -1].toFixed(4)}<br>
-        Validation Accuracy = ${(logs.val_categoricalAccuracy[logs.val_categoricalAccuracy.length -1]*100).toFixed(2)}%`,
+        Loss = ${loss[loss.length -1].toFixed(4)}<br>
+        Accuracy = ${(categoricalAccuracy[categoricalAccuracy.length -1]* 100).toFixed(2)}%<br>
+        Validation Loss = ${val_loss[val_loss.length -1].toFixed(4)}<br>
+        Validation Accuracy = ${(val_categoricalAccuracy[val_categoricalAccuracy.length -1]*100).toFixed(2)}%`,
         type: 'warning',
         autohide: false
       });
