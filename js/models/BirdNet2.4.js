@@ -409,8 +409,17 @@ tf.serialization.registerClass(MelSpecLayerSimple);
 
 // tf.serialization.registerClass(SigmoidLayer);
 
-async function trainModel(model) {
-  const baseModel = tf.model({ inputs: model.inputs, outputs: model.outputs });
+async function trainModel(baseModel) {
+  const append = false;
+  const cacheFolder = "c:/temp/";
+  const cacheRecords = true;
+  const dropout = 0.25;
+  const epochs = 1;
+  const hidden = 0;
+  const loss = tf.losses.sigmoidCrossEntropy;
+  const metric = tf.metrics.categoricalAccuracy;
+  const optimizer = tf.train.adam(0.0001);
+
   // Freeze base layers (optional)
   for (const layer of baseModel.layers) {
     layer.trainable = false;
@@ -420,25 +429,29 @@ async function trainModel(model) {
   const input = baseModel.inputs[0];
   const originalOutput = baseModel.outputs[0];
 
-  // Get embeddings from a specific intermediate layer
-  // Replace 'embedding_layer' with the actual name you want
+  // Get embeddings from BirdNET
   const embeddingLayer = baseModel.getLayer('GLOBAL_AVG_POOL');
   const embeddings = embeddingLayer.output;  // This will be input to the new classifier
+  let x = embeddings;
 
-  // Create new classification layers for additional classes
-  const newClassifier = tf.layers.dense({ units: labels.length, activation: 'sigmoid', name: 'new_classes' }).apply(embeddings);
+  if (hidden) {
+    if (dropout) {
+      x = tf.layers.dropout({ rate: dropout, name: 'CUSTOM_DROP_1' }).apply(x);
+    }
+    x = tf.layers.dense({ units: hidden, activation: 'relu', name: 'CUSTOM_HIDDEN' }).apply(x);
+    if (dropout) {
+      x = tf.layers.dropout({ rate: dropout, name: 'CUSTOM_DROP_2' }).apply(x);
+    }
+  }
 
-  // Concatenate the original output with the new classifier's output
-  // const combinedOutput = tf.layers.concatenate({ axis: -1 }).apply([originalOutput, newClassifier]);
+  const newClassifier = tf.layers.dense({ units: labels.length, activation: 'sigmoid', name: 'new_classes' }).apply(x);
 
   // Build a new model
   const transferModel = tf.model({
     inputs: input,
     outputs: newClassifier,
   });
-  const optimizer = tf.train.adam(0.001);
-  const loss = tf.losses.sigmoidCrossEntropy;
-  const metric = tf.metrics.categoricalAccuracy;
+
   // Compile the model
   transferModel.compile({
     optimizer,
@@ -446,19 +459,63 @@ async function trainModel(model) {
     metrics: metric,
   });
 
-  const cacheFolder = "c:/temp/";
-  const trainBin = cacheFolder + "train_ds.bin";
-  const valBin = cacheFolder + "val_ds.bin";
 
-  if (!fs.existsSync(trainBin)){
+  const trainBin = path.join(cacheFolder, "train_ds.bin");
+  const valBin = path.join(cacheFolder, "val_ds.bin");
+
+  if (! cacheRecords || ! fs.existsSync(trainBin)){
     const { trainFiles, valFiles } = stratifiedSplit(allFiles, 0.2);
     await writeBinaryGzipDataset(trainFiles, trainBin, labelToIndex, postMessage, "Preparing training data");
     await writeBinaryGzipDataset(valFiles, valBin, labelToIndex, postMessage, "Preparing validation data");
   }
   const train_ds = tf.data.generator(() => readBinaryGzipDataset(trainBin)).shuffle(100 /* bufferSize */).batch(32);
   const val_ds = tf.data.generator(() => readBinaryGzipDataset(valBin)).batch(32);
-
-  const epochs = 50;
+  const earlyStopping = tf.callbacks.earlyStopping({monitor: 'val_loss', minDelta: 0.0001, patience: 3})
+  const events = new tf.CustomCallback({
+    onYield: (epoch, batch, _logs) =>{
+      batch += 1;
+      const batchesInEpoch = Math.floor(allFiles.length / 32);
+      const progress = (batch / batchesInEpoch) * 100
+      postMessage({
+            message: "training-progress", 
+            progress: {percent: progress},
+            text: `Epoch ${epoch + 1} / ${epochs}: `
+      });
+    },
+    onEpochEnd: (epoch, logs) => {
+      console.log(`Epoch ${epoch + 1}: loss = ${logs.loss.toFixed(4)}, accuracy = ${logs.categoricalAccuracy.toFixed(4)}`);
+      tensors.forEach(t => t.dispose());  // Dispose tensors to free memory
+      tensors.length = 0;  // Clear the array
+      console.log(`Tensors in memory: ${tf.memory().numTensors}`);
+      postMessage({
+        message: "training-progress", 
+        progress: {percent: 100},
+        text: `Epoch ${epoch + 1} / ${epochs}: `
+      });
+      postMessage({
+            message: "training-results", 
+            notice: 
+            `<table class="table table-striped">
+            <tr><th colspan="2">Epoch ${epoch + 1}:</th></tr>
+            <tr><td>Loss</td> <td>${logs.loss.toFixed(4)}</td></tr>
+            <tr><td>Accuracy</td><td>${(logs.categoricalAccuracy*100).toFixed(2)}%</td></tr>
+            <tr><td>Validation Loss</td><td>${logs.val_loss.toFixed(4)}</td></tr>
+            <tr><td>Validation Accuracy</td><td>${(logs.val_categoricalAccuracy*100).toFixed(2)}%</td></tr>
+            </table>`
+          });
+    },
+    onTrainEnd: (logs) => {
+      
+      postMessage({
+        message: "training-progress", 
+        progress: {percent: 100},
+        text: ''
+      });
+      const t1 = Date.now();
+      console.log(`Training completed in ${((t1 - t0) / 1000).toFixed(2)} seconds`);
+      return logs
+    }
+  })
   // Train on your new data
   // Assume `xTrain` and `yTrain` are your input and combined output labels
   const history = await transferModel.fitDataset(train_ds, {
@@ -467,51 +524,8 @@ async function trainModel(model) {
     validationData: val_ds,
     yieldEvery: 1000,
     callbacks: [
-      tf.callbacks.earlyStopping({monitor: 'val_loss', minDelta: 0.0001, patience: 3}),
-      new tf.CustomCallback({
-      onYield: (epoch, batch, _logs) =>{
-        batch += 1;
-        const batchesInEpoch = Math.floor(allFiles.length / 32);
-        const progress = (batch / batchesInEpoch) * 100
-        postMessage({
-              message: "training-progress", 
-              progress: {percent: progress},
-              text: `Epoch ${epoch + 1} / ${epochs}: `
-        });
-      },
-      onEpochEnd: (epoch, logs) => {
-        console.log(`Epoch ${epoch + 1}: loss = ${logs.loss.toFixed(4)}, accuracy = ${logs.categoricalAccuracy.toFixed(4)}`);
-        tensors.forEach(t => t.dispose());  // Dispose tensors to free memory
-        tensors.length = 0;  // Clear the array
-        console.log(`Tensors in memory: ${tf.memory().numTensors}`);
-        postMessage({
-          message: "training-progress", 
-          progress: {percent: 100},
-          text: `Epoch ${epoch + 1} / ${epochs}: `
-        });
-        postMessage({
-              message: "training-results", 
-              notice: 
-              `Epoch ${epoch + 1}: <br>
-              Loss = ${logs.loss.toFixed(4)}<br>
-              Accuracy = ${(logs.categoricalAccuracy*100).toFixed(2)}%<br>
-              Validation Loss = ${logs.val_loss.toFixed(4)}<br>
-              Validation Accuracy = ${(logs.val_categoricalAccuracy*100).toFixed(2)}%`
-            });
-      },
-      onTrainEnd: (logs) => {
-        
-        postMessage({
-          message: "training-progress", 
-          progress: {percent: 100},
-          text: ''
-        });
-        const t1 = Date.now();
-        console.log(`Training completed in ${((t1 - t0) / 1000).toFixed(2)} seconds`);
-        return logs
-      }
-    }
-      )
+      earlyStopping,
+      events
     ]
   });
 
@@ -530,10 +544,27 @@ async function trainModel(model) {
       });
   }
   // Save the new model
-  await transferModel.save('file://C:/Users/simpo/PycharmProjects/transfer-model');
+  const saveLocation = "C:/Users/simpo/PycharmProjects/transfer-model/";
+  let mergedModel, mergedLabels;
+  if (append){
+    const combinedOutput = tf.layers.concatenate({ axis: -1 }).apply([originalOutput, newClassifier]);
+    mergedModel = tf.model({
+      inputs: baseModel.inputs,
+      outputs: combinedOutput,
+      name: 'merged_model'
+    });
+    mergedLabels = myModel.labels.concat(labels);
+  }
+  const finalModel = mergedModel || transferModel;
+  await finalModel.save('file://' + saveLocation);
+  // Save labels
+  const labelData = (mergedLabels || labels).join('\n');
+  // Write to a file
+  fs.writeFileSync(saveLocation + 'labels.txt', labelData, 'utf8');
+
   console.log(`Tensors in memory before: ${tf.memory().numTensors}`);
-  model.dispose()
-  transferModel.layers.forEach(layer => {
+  baseModel.dispose()
+  finalModel.layers.forEach(layer => {
     try{ 
       layer.dispose();
     } catch {
@@ -545,7 +576,6 @@ async function trainModel(model) {
   myModel.model_loaded = false;
   await myModel.loadModel("layers");
   console.log(`Tensors in memory new model: ${JSON.stringify(tf.memory())}`);
-  // await myModel.warmUp(32);
   console.log('new model made')
 }
 
@@ -689,7 +719,7 @@ async function decodeAudioToTensor(filePath) {
       .audioCodec('pcm_s16le')
       .audioChannels(1)
       .audioFrequency(48000)
-      .duration(3.1) // Limit to 3.1 seconds
+      .duration(3.0) // Limit to 3 seconds
       .on('error', reject)
       .on('end', () => {
         const wavBuffer = Buffer.concat(chunks);
