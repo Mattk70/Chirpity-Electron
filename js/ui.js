@@ -1776,6 +1776,10 @@ function updatePrefs(file, data) {
 // Set config defaults
 const defaultConfig = {
   newInstallDate: 0,
+  // training
+  dataset: {location: ''},
+  datasetCache: {location: ''},
+  customModel: {location: '', type: 'replace'},
   library: {
     location: undefined,
     format: "ogg",
@@ -1968,7 +1972,11 @@ window.onload = async () => {
     if (!["birdnet", "chirpity", "nocmig"].includes(config.model)) {
       config.model = "birdnet";
     }
+    // Training locations:
 
+    document.getElementById("dataset-location").value = config.dataset.location;
+    document.getElementById("dataset-cache-location").value = config.datasetCache.location;
+    document.getElementById("model-location").value = config.customModel.location;
     // Map slider value to batch size
     DOM.batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(
       config[config[config.model].backend].batchSize
@@ -3187,6 +3195,15 @@ const gotoTime = (e) => {
 const gotoForm = document.getElementById("gotoForm");
 gotoForm.addEventListener("submit", gotoTime);
 
+/**
+ * Training modal
+ */
+
+// Go to position
+const training = new bootstrap.Modal(document.getElementById("training-modal"));
+const showTraining = () => {
+    training.show();
+};
 /**
  * Handles initialization tasks after the audio model is ready.
  *
@@ -5083,9 +5100,74 @@ async function handleUIClicks(e) {
       showAnalyse();
       break;
     }
-    // Train menu
+    // Training
+    case "open-training": {
+      showTraining();
+      break;
+    }
+    case "dataset-location-select": {
+      (async () => {
+        const files = await window.electron.selectDirectory(
+          config.dataset.location || ""
+        );
+        if (!files.canceled) {
+          const audioFolder = files.filePaths[0];
+          config.dataset.location = audioFolder;
+          document.getElementById("dataset-location").value = audioFolder;
+          updatePrefs("config.json", config);
+        }
+      })();
+      break;
+    }
+    case "dataset-cache-location-select": {
+      (async () => {
+        const files = await window.electron.selectDirectory(
+          config.datasetCache.location || ""
+        );
+        if (!files.canceled) {
+          const audioFolder = files.filePaths[0];
+          config.datasetCache.location = audioFolder;
+          document.getElementById("dataset-cache-location").value = audioFolder;
+          updatePrefs("config.json", config);
+        }
+      })();
+      break;
+    }
+    case "model-type": {
+      config.customModel.type = element.selected.value
+      break
+    }
+    case "model-location-select": {
+      (async () => {
+        const files = await window.electron.selectDirectory(
+          config.customModel.location || ""
+        );
+        if (!files.canceled) {
+          const modelFolder = files.filePaths[0];
+          config.customModel.location = modelFolder;
+          document.getElementById("model-location").value = modelFolder;
+          updatePrefs("config.json", config);
+        }
+      })();
+      break;
+    }
     case "train": {
-      worker.postMessage({action: "train-model"});
+      e.preventDefault();
+      const dataset = document.getElementById("dataset-location").value;
+      const cache = document.getElementById("dataset-cache-location").value;
+      const modelLocation = document.getElementById("model-location").value;
+      const dropout = document.getElementById('dropout').valueAsNumber;
+      const hidden = document.getElementById('hidden-units').valueAsNumber;
+      const lr = document.getElementById('lr').valueAsNumber;
+      const epochs = document.getElementById('epochs').valueAsNumber;
+      const modelType = config.customModel.type;
+      if (!(lr && epochs)) {
+        generateToast({message:'A value for both Epochs and Learning rate is needed', type:'warning'})
+        break;
+      }
+      training.hide();
+
+      worker.postMessage({action: "train-model", dropout, hidden, epochs, lr, dataset, cache, modelLocation, modelType});
       // disableSettingsDuringAnalysis(true)
       break;
     }
@@ -5577,6 +5659,13 @@ document.addEventListener("change", async function (e) {
       }
     } else {
       switch (target) {
+        // -- Custom model type
+        case "replace":
+        case "append":{
+          config.customModel.type = target.value
+          break;
+        }
+
         // --- Backends
         case "tensorflow":
         case "webgl":

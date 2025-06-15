@@ -35,7 +35,8 @@ onmessage = async (e) => {
             "utf8"
           )
         );
-        const appPath = "../../" + location + "/";
+        // const appPath = "../../" + location + "/";
+        const appPath = "/Users/matthew/Documents/transfer-model/";
         const batch = e.data.batchSize;
         const backend = BACKEND || e.data.backend;
         BACKEND = backend;
@@ -84,17 +85,25 @@ onmessage = async (e) => {
             sampleRate: myModel.config.sampleRate,
             chunkLength: myModel.chunkLength,
             backend: BACKEND,
-            labels: labels,
-            worker: worker,
+            labels,
+            worker,
           });
         });
         break;
       }
       case "train-model":{
-          trainModel(myModel.model).then((result) => {
+        const {lr, dropout, epochs, hidden, dataset, cache, modelLocation, modelType} = e.data;
+          trainModel({
+            model: myModel.model,
+            lr,
+            dropout,
+            epochs,
+            hidden, dataset, cache, modelLocation, modelType
+
+          }).then((result) => {
             postMessage({
               message: "training-results", 
-              notice: "Training completed successfully!"
+              notice: "Training completed successfully! Model saved in:<br>" + modelLocation
 
             });
           }).catch((err) => {
@@ -209,6 +218,7 @@ class BirdNETModel extends BaseModel {
   ) {
     DEBUG && console.log("predictCunk begin", tf.memory());
     const [audioBatch, numSamples] = this.createAudioTensorBatch(audioBuffer);
+    const test = audioBatch.arraySync();
     const batchKeys = this.getKeys(numSamples, start);
     const result = await this.predictBatch(
       audioBatch,
@@ -410,22 +420,30 @@ tf.serialization.registerClass(MelSpecLayerSimple);
 
 // tf.serialization.registerClass(SigmoidLayer);
 
-async function trainModel(baseModel) {
-  const allFiles = getFilesWithLabels('Y:/BirdSounds/XC/European_XC_MP3/XC_CALL_mp3');
+let transferModel;
+
+function cosineDecay(initialLearningRate, globalStep, decaySteps) {
+  const step = Math.min(globalStep, decaySteps);
+  const cosineDecay = 0.5 * (1 + Math.cos(Math.PI * step / decaySteps));
+  return initialLearningRate * cosineDecay;
+}
+
+async function trainModel({
+  model:baseModel, 
+  lr:initialLearningRate, 
+  dropout, epochs, hidden,
+  dataset, cache:cacheFolder, modelLocation:saveLocation, modelType}) {
+  const allFiles = getFilesWithLabels(dataset);
+  if (!allFiles.length){
+    throw new Error(`No files found in any label folders in ${dataset}` )
+  }
   const labels = [...new Set(allFiles.map(f => f.label))];
   const labelToIndex = Object.fromEntries(labels.map((l, i) => [l, i]));
-  const tensors = [];
   const t0 = Date.now();
-  const append = false;
-  const cacheFolder = "c:/temp/";
-  const saveLocation = "C:/Users/simpo/PycharmProjects/transfer-model/";
-  const cacheRecords = true;
-  const dropout = 0.25;
-  const epochs = 100;
-  const hidden = 0;
-  const loss = tf.losses.sigmoidCrossEntropy;
-  const metric = tf.metrics.categoricalAccuracy;
-  const optimizer = tf.train.adam(0.0001);
+  const cacheRecords = false;
+  const loss = tf.losses.softmaxCrossEntropy;
+  const metrics = [ tf.metrics.categoricalAccuracy ];
+  const optimizer = tf.train.adam(initialLearningRate);
 
   // Freeze base layers (optional)
   for (const layer of baseModel.layers) {
@@ -454,7 +472,7 @@ async function trainModel(baseModel) {
   const newClassifier = tf.layers.dense({ units: labels.length, activation: 'sigmoid', name: 'new_classes' }).apply(x);
 
   // Build a new model
-  const transferModel = tf.model({
+  transferModel = tf.model({
     inputs: input,
     outputs: newClassifier,
   });
@@ -463,7 +481,7 @@ async function trainModel(baseModel) {
   transferModel.compile({
     optimizer,
     loss,
-    metrics: metric,
+    metrics,
   });
 
 
@@ -472,11 +490,11 @@ async function trainModel(baseModel) {
 
   if (! cacheRecords || ! fs.existsSync(trainBin)){
     const { trainFiles, valFiles } = stratifiedSplit(allFiles, 0.2);
-    // await writeBinaryGzipDataset(trainFiles, trainBin, labelToIndex, postMessage, "Preparing training data");
+    await writeBinaryGzipDataset(trainFiles, trainBin, labelToIndex, postMessage, "Preparing training data");
     await writeBinaryGzipDataset(valFiles, valBin, labelToIndex, postMessage, "Preparing validation data");
   }
-  const train_ds = tf.data.generator(() => readBinaryGzipDataset(trainBin, labels)).shuffle(100 /* bufferSize */).batch(32);
-  const val_ds = tf.data.generator(() => readBinaryGzipDataset(valBin, labels)).batch(32);
+  const train_ds = tf.data.generator(() => readBinaryGzipDataset(trainBin, labels)).batch(8);
+  const val_ds = tf.data.generator(() => readBinaryGzipDataset(valBin, labels)).batch(8);
   const earlyStopping = tf.callbacks.earlyStopping({monitor: 'val_loss', minDelta: 0.0001, patience: 3})
   const events = new tf.CustomCallback({
     onYield: (epoch, batch, _logs) =>{
@@ -485,29 +503,24 @@ async function trainModel(baseModel) {
       const progress = (batch / batchesInEpoch) * 100
       postMessage({
             message: "training-progress", 
-            progress: {percent: progress},
+            progress: {percent: Math.min(progress, 99)},
             text: `Epoch ${epoch + 1} / ${epochs}: `
       });
     },
     onEpochEnd: (epoch, logs) => {
-      console.log(`Epoch ${epoch + 1}: loss = ${logs.loss.toFixed(4)}, accuracy = ${logs.categoricalAccuracy.toFixed(4)}`);
-      tensors.forEach(t => t.dispose());  // Dispose tensors to free memory
-      tensors.length = 0;  // Clear the array
+      // transferModel.optimizer.learningRate = cosineDecay(initialLearningRate, epoch+1, epochs)
+      const {loss, val_loss, val_categoricalAccuracy, precision, recall, val_precision, val_recall, categoricalAccuracy} = logs;
+
       console.log(`Tensors in memory: ${tf.memory().numTensors}`);
-      postMessage({
-        message: "training-progress", 
-        progress: {percent: 100},
-        text: `Epoch ${epoch + 1} / ${epochs}: `
-      });
       postMessage({
             message: "training-results", 
             notice: 
             `<table class="table table-striped">
             <tr><th colspan="2">Epoch ${epoch + 1}:</th></tr>
-            <tr><td>Loss</td> <td>${logs.loss.toFixed(4)}</td></tr>
-            <tr><td>Accuracy</td><td>${(logs.categoricalAccuracy*100).toFixed(2)}%</td></tr>
-            <tr><td>Validation Loss</td><td>${logs.val_loss.toFixed(4)}</td></tr>
-            <tr><td>Validation Accuracy</td><td>${(logs.val_categoricalAccuracy*100).toFixed(2)}%</td></tr>
+            <tr><td>Loss</td> <td>${loss.toFixed(4)}</td></tr>
+            <tr><td>Accuracy</td><td>${(categoricalAccuracy*100).toFixed(2)}%</td></tr>
+            <tr><td>Validation Loss</td><td>${val_loss.toFixed(4)}</td></tr>
+            <tr><td>Validation Accuracy</td><td>${(val_categoricalAccuracy*100).toFixed(2)}%</td></tr>
             </table>`
           });
     },
@@ -530,25 +543,28 @@ async function trainModel(baseModel) {
     validationData: val_ds,
     callbacks: [earlyStopping, events]
   });
-
+  let notice ='', type = '', autohide = true;
   if (history.epoch.length < epochs){
-    const {loss, val_loss, categoricalAccuracy, val_categoricalAccuracy} = history.history;
-      postMessage({
-        message: "training-results", 
-        notice: 
-        `Training halted at Epoch ${history.epoch.length} due to no further improvement: <br>
-        Loss = ${loss[loss.length -1].toFixed(4)}<br>
-        Accuracy = ${(categoricalAccuracy[categoricalAccuracy.length -1]* 100).toFixed(2)}%<br>
-        Validation Loss = ${val_loss[val_loss.length -1].toFixed(4)}<br>
-        Validation Accuracy = ${(val_categoricalAccuracy[val_categoricalAccuracy.length -1]*100).toFixed(2)}%`,
-        type: 'warning',
-        autohide: false
-      });
+      notice += `Training halted at Epoch ${history.epoch.length} due to no further improvement: <br>`;
+      type = 'warning',
+      autohide = false
   }
+  const {loss:l, val_loss, categoricalAccuracy:Acc, val_categoricalAccuracy} = history.history;
+  notice +=
+      `Loss = ${l[l.length -1].toFixed(4)}<br>
+Accuracy = ${(Acc[Acc.length -1]* 100).toFixed(2)}%<br>
+Validation Loss = ${val_loss[val_loss.length -1].toFixed(4)}<br>
+Validation Accuracy = ${(val_categoricalAccuracy[val_categoricalAccuracy.length -1]*100).toFixed(2)}%`,
+  postMessage({
+      message: "training-results", 
+      notice,
+      type,
+      autohide
+      });
   // Save the new model
 
   let mergedModel, mergedLabels;
-  if (append){
+  if (modelType === 'append'){
     const combinedOutput = tf.layers.concatenate({ axis: -1 }).apply([originalOutput, newClassifier]);
     mergedModel = tf.model({
       inputs: baseModel.inputs,
@@ -558,11 +574,34 @@ async function trainModel(baseModel) {
     mergedLabels = myModel.labels.concat(labels);
   }
   const finalModel = mergedModel || transferModel;
+  const bnConfig = await fetch("../../BirdNET_GLOBAL_6K_V2.4_Model_TFJS/static/model/model.json")
+          .then((response) => {
+            if (!response.ok) throw new Error("Network response was not ok");
+            return response.json();
+          })
+  const melSpec1Config = bnConfig.modelTopology.model_config.config.layers[1].config;
+  const melSpec2Config = bnConfig.modelTopology.model_config.config.layers[2].config;
   await finalModel.save('file://' + saveLocation);
+  const custConfig = await fetch(`${saveLocation}/model.json`)
+          .then((response) => {
+            if (!response.ok) throw new Error("Network response was not ok");
+            return response.json();
+          })
+  custConfig.modelTopology.config.layers[1].config = melSpec1Config;
+  custConfig.modelTopology.config.layers[2].config = melSpec2Config;
+  fs.writeFileSync(`${saveLocation}/model.json`, JSON.stringify(custConfig), 'utf8')
   // Save labels
   const labelData = (mergedLabels || labels).join('\n');
   // Write to a file
   fs.writeFileSync(saveLocation + 'labels.txt', labelData, 'utf8');
+  notice += `
+Settings:
+Learning rate: ${initialLearningRate}
+Epochs:${epochs}
+Hidden units:${hidden}
+Dropout: ${dropout}
+`
+  fs.writeFileSync(saveLocation + 'training_metrics.txt', notice.replaceAll('<br>', ''), 'utf8');
 
   console.log(`Tensors in memory before: ${tf.memory().numTensors}`);
   baseModel.dispose()
@@ -587,11 +626,13 @@ function getFilesWithLabels(rootDir) {
   const files = [];
   const folders = fs.readdirSync(rootDir);
   for (const folder of folders) {
+    if (folder.startsWith('.')) continue
     const folderPath = path.join(rootDir, folder);
     const stats = fs.statSync(folderPath);
     if (stats.isDirectory()) {
       const audioFiles = fs.readdirSync(folderPath);
       for (const file of audioFiles) {
+        if (file.startsWith('.')) continue
         files.push({
           filePath: path.join(folderPath, file),
           label: folder
@@ -623,10 +664,10 @@ async function writeBinaryGzipDataset(fileList, outputPath, labelToIndex, postMe
       text: `${description}: `
     });
     let errored = false;
-    let audioArray = await decodeAudioToTensor(filePath).catch(err => {
+    let audioArray = await decodeAudio(filePath).catch(err => {
       postMessage({
         message: "training-results", 
-        notice: `Error loading file:<br> ${err}`,
+        notice: `Error loading file:<br>${filePath}<br> ${err}`,
         type: 'error'
       });
       errored = true
@@ -692,6 +733,7 @@ async function* readBinaryGzipDataset(gzippedPath, labels) {
       const labelByte = record.readUInt8(RECORD_SIZE - 1);
 
       const audio = new Float32Array(audioBuf.buffer, audioBuf.byteOffset, 144000);
+
       yield {
         xs: tf.tensor1d(audio),
         ys: tf.oneHot(labelByte, labels.length)
@@ -712,7 +754,7 @@ async function* readBinaryGzipDataset(gzippedPath, labels) {
  * @param {string} filePath - Path to the audio file (any format supported by ffmpeg)
  * @returns {Promise<tf.Tensor2D>} Tensor of shape [numSamples, numChannels]
  */
-async function decodeAudioToTensor(filePath) {
+async function decodeAudio(filePath) {
   const ffmpeg = require('fluent-ffmpeg');
   return new Promise((resolve, reject) => {
     // Convert audio to WAV PCM 16-bit signed, mono, 16kHz
@@ -723,13 +765,20 @@ async function decodeAudioToTensor(filePath) {
       .audioCodec('pcm_s16le')
       .audioChannels(1)
       .audioFrequency(48000)
+      .seekInput(1)
       .duration(3.0) // Limit to 3 seconds
       .on('error', reject)
       .on('end', () => {
         const wavBuffer = Buffer.concat(chunks);
         try {
-          resolve(wavBuffer); // shape: [samples, 1]
-
+          // Interpret as Int16 values
+          const int16Array = new Int16Array(wavBuffer.buffer, wavBuffer.byteOffset, wavBuffer.length / 2);
+          // Convert to Float32 range [-1, 1]
+          const float32Array = new Float32Array(int16Array.length);
+          for (let i = 0; i < int16Array.length; i++) {
+            float32Array[i] = int16Array[i] / 32768; // or 32767, depending on convention
+          }
+          resolve(float32Array);
         } catch (err) {
           reject(err);
         }

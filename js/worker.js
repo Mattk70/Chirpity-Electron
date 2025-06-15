@@ -633,9 +633,12 @@ async function handleMessage(e) {
     }
     case "train-model":{
       const worker = predictWorkers[0];
+      const {dropout, hidden, epochs, lr, dataset, cache, modelLocation, modelType} = args;
       worker.postMessage({
           message: "train-model",
           batchSize: BATCH_SIZE,
+          dropout, hidden, epochs, lr,
+          dataset, cache, modelLocation, modelType
         });
       break;
     }

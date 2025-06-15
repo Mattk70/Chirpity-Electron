@@ -231,6 +231,90 @@
             </div>
         </div>
     </div>
+    <!-- Training Modal -->
+    <div class="modal fade" id="training-modal" tabindex="-1" aria-labelledby="training-modal-label" aria-modal="true">
+        <div class="modal-dialog  modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content  overflow-visible">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="training-modal-label">Model Training Settings</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="training-form">
+                    <div id="training-modal-body" class="modal-body overflow-visible">
+                        <div class="row pb-3">
+                            <div class="input-group">
+                                <button class="btn btn-secondary col-5" type="button" id="dataset-location-select">
+                                    Training Audio Location:</button>
+                                <input type="text" class="form-control col-7" id="dataset-location" aria-describedby="dataset-location-select" placeholder="Location of the training files" readonly required>
+                            </div>
+                        </div>
+                        <div class="row pb-3">
+                            <div class="input-group">
+                                <button class="btn btn-secondary col-5" type="button" id="dataset-cache-location-select">
+                                    Dataset Cache Location:</button>
+                                <input type="text" class="form-control col-7" id="dataset-cache-location" aria-describedby="dataset-cache-location-select" placeholder="Location of the dataset cache" readonly>
+                            </div>
+                        </div>
+                        <div class="row pb-3">
+                            <div class="input-group">
+                                <button class="btn btn-secondary col-5" type="button" id="model-location-select">
+                                    Model Save Location:</button>
+                                <input type="text" class="form-control col-7" id="model-location" aria-describedby="model-location-select" placeholder="Location to save the model" readonly required>
+                            </div>
+                        </div>
+                        <fieldset class="border rounded p-1">
+                            <legend class="h6">Training parameters</legend>
+                            <div class="form-check form-check-inline pb-3">
+                                <label class="form-check-label" for="replace">Replace labels</label>
+                                <input class="form-check-input" type="radio" name="model-type" id="replace" value="replace" checked>
+                            </div>
+                            <div class="form-check form-check-inline pb-3">
+                                <input class="form-check-input" type="radio" name="model-type" id="append" value="append">
+                                <label class="form-check-label" for="append">Append labels</label>
+                            </div>
+                            
+                            <div class="row ps-2">
+                                <div class="form-floating ps-1 mb-3 col">
+                                    <input type="number" id="epochs" class="form-control" min="1" max="300" value="10" required>
+                                    <label class="mb-2" for="epochs">Training Epochs</label>
+                                </div>
+                                <div class="form-floating ps-1 mb-3 col">
+                                    <input type="number" id="lr" class="form-control" step="0.000001" min="0.000001" max="0.1" value="0.0001">
+                                    <label class="mb-2" for="lr">Learning Rate</label>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="input-group rounded mb-3 col">
+                                    <label class="ps-1 input-group-text" for="hidden-units">Hidden units:</label>
+                                    <select class="form-select mb-0" id="hidden-units">
+                                        <option value="0" selected>0</option>
+                                        <option value="128">128</option>
+                                        <option value="256">256</option>
+                                        <option value="512">512</option>
+                                        <option value="1024">1024</option>
+                                    </select>
+                                </div>
+                                <div class="input-group rounded mb-3 col">
+                                    <label class="ps-1 input-group-text" for="dropout">Dropout rate:</label>
+                                    <select class="form-select mb-0" id="dropout">
+                                        <option value="0" selected>0</option>
+                                        <option value="0.25">0.25</option>
+                                        <option value="0.33">0.33</option>
+                                        <option value="0.5">0.5</option>
+                                        <option value="0.75">0.75</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </fieldset>
+                    </div>
+                    <div class="modal-footer justify-content-center">
+                        <button id="train" type="submit" class="btn btn-success">Start training</button>
+                        <button id="training-dismiss" type="button" class="btn btn-danger" data-bs-dismiss="modal">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
     <!-- Help Modal -->
     <div class="modal fade" id="helpModal" tabindex="-1" aria-labelledby="helpModalLabel" aria-modal="true">
         <div class="modal-dialog  modal-xl modal-dialog-centered modal-dialog-scrollable">
@@ -1539,7 +1623,7 @@
                     <ul class="dropdown-menu" aria-labelledby="navbarTraining">
                         <li>
                             <div class="row ms-0 me-0">
-                                <a class="dropdown-item locked col" id="train" href="#">
+                                <a class="dropdown-item locked col" id="open-training" href="#">
                                 <span class="material-symbols-outlined">model_training</span> Train a Custom Model</a>
                                 <a class="padlock col" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature.">
                                     <span class="pointer locked material-symbols-outlined float-end mt-1">lock</span></a>
