@@ -5167,7 +5167,7 @@ async function handleUIClicks(e) {
     }
     case "train": {
       e.preventDefault();
-      const {customModel, settings, datasetLocation, cacheLocation, modelLocation} = config.training;
+      const {customModel, settings, datasetLocation, cacheLocation} = config.training;
       const dataset = datasetLocation;
       const cache = cacheLocation;
       const dropout = settings.dropout;
@@ -5175,6 +5175,7 @@ async function handleUIClicks(e) {
       const lr = settings.lr;
       const epochs = settings.epochs;
       const modelType = customModel.type;
+      const modelLocation = customModel.location;
       const useCache = settings.useCache;
 
       if (!(lr && epochs)) {

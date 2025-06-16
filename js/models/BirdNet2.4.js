@@ -578,7 +578,7 @@ Validation Accuracy = ${(val_categoricalAccuracy[val_categoricalAccuracy.length 
           .then((response) => {
             if (!response.ok) throw new Error("Network response was not ok");
             return response.json();
-          })
+          })       
   const melSpec1Config = bnConfig.modelTopology.model_config.config.layers[1].config;
   const melSpec2Config = bnConfig.modelTopology.model_config.config.layers[2].config;
   await finalModel.save('file://' + saveLocation);
