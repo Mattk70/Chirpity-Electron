@@ -240,7 +240,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form id="training-form">
-                    <div id="training-modal-body" class="modal-body overflow-visible">
+                    <div id="training-modal-body" style="max-height: 60vh" class="modal-body">
                         <div class="row pb-3">
                             <div class="input-group">
                                 <button class="btn btn-secondary col-5" type="button" id="dataset-location-select">
@@ -272,7 +272,12 @@
                                 <input class="form-check-input" type="radio" name="model-type" id="append" value="append">
                                 <label class="form-check-label" for="append">Append labels</label>
                             </div>
-                            
+                            <div class="form-row pb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch" name="useCache" id="useCache">
+                                    <label class="form-check-label" for="useCache">Use cached dataset</label>
+                                </div>
+                            </div>
                             <div class="row ps-2">
                                 <div class="form-floating ps-1 mb-3 col">
                                     <input type="number" id="epochs" class="form-control" min="1" max="300" value="10" required>

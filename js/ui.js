@@ -1778,9 +1778,12 @@ function updatePrefs(file, data) {
 const defaultConfig = {
   newInstallDate: 0,
   // training
-  dataset: {location: ''},
-  datasetCache: {location: ''},
-  customModel: {location: '', type: 'replace'},
+  training: {
+    datasetLocation: '',
+    cacheLocation: '',
+    customModel: {location:'', type:'replace'},
+    settings: {useCache: false, lr: 0.0001, hidden: 0, dropout: 0, epochs: 10}
+  },
   library: {
     location: undefined,
     format: "ogg",
@@ -1973,11 +1976,17 @@ window.onload = async () => {
     if (!["birdnet", "chirpity", "nocmig"].includes(config.model)) {
       config.model = "birdnet";
     }
-    // Training locations:
-
-    document.getElementById("dataset-location").value = config.dataset.location;
-    document.getElementById("dataset-cache-location").value = config.datasetCache.location;
-    document.getElementById("model-location").value = config.customModel.location;
+    // Training settings:
+    const {datasetLocation, cacheLocation, customModel, settings} = config.training;
+    document.getElementById("dataset-location").value = datasetLocation;
+    document.getElementById("dataset-cache-location").value = cacheLocation;
+    document.getElementById("model-location").value = customModel.location;
+    document.getElementById(customModel.type).checked = true;
+    document.getElementById('hidden-units').value = settings.hidden;
+    document.getElementById('lr').value = settings.lr;
+    document.getElementById('epochs').value = settings.epochs;
+    document.getElementById('dropout').value = settings.dropout;
+    document.getElementById('useCache').checked = settings.useCache;
     // Map slider value to batch size
     DOM.batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(
       config[config[config.model].backend].batchSize
@@ -5110,12 +5119,15 @@ async function handleUIClicks(e) {
     case "dataset-location-select": {
       (async () => {
         const files = await window.electron.selectDirectory(
-          config.dataset.location || ""
+          config.training.datasetLocation || ""
         );
         if (!files.canceled) {
           const audioFolder = files.filePaths[0];
-          config.dataset.location = audioFolder;
+          config.training.datasetLocation = audioFolder;
           document.getElementById("dataset-location").value = audioFolder;
+          // if we change the dataset location, let's not use the old cached data
+          config.training.settings.useCache = false;
+          document.getElementById("useCache").checked = false;
           updatePrefs("config.json", config);
         }
       })();
@@ -5124,11 +5136,11 @@ async function handleUIClicks(e) {
     case "dataset-cache-location-select": {
       (async () => {
         const files = await window.electron.selectDirectory(
-          config.datasetCache.location || ""
+          config.training.cacheLocation || ""
         );
         if (!files.canceled) {
           const audioFolder = files.filePaths[0];
-          config.datasetCache.location = audioFolder;
+          config.training.cacheLocation = audioFolder;
           document.getElementById("dataset-cache-location").value = audioFolder;
           updatePrefs("config.json", config);
         }
@@ -5142,11 +5154,11 @@ async function handleUIClicks(e) {
     case "model-location-select": {
       (async () => {
         const files = await window.electron.selectDirectory(
-          config.customModel.location || ""
+          config.training.customModel.location || ""
         );
         if (!files.canceled) {
           const modelFolder = files.filePaths[0];
-          config.customModel.location = modelFolder;
+          config.training.customModel.location = modelFolder;
           document.getElementById("model-location").value = modelFolder;
           updatePrefs("config.json", config);
         }
@@ -5155,21 +5167,25 @@ async function handleUIClicks(e) {
     }
     case "train": {
       e.preventDefault();
-      const dataset = document.getElementById("dataset-location").value;
-      const cache = document.getElementById("dataset-cache-location").value;
-      const modelLocation = document.getElementById("model-location").value;
-      const dropout = document.getElementById('dropout').valueAsNumber;
-      const hidden = document.getElementById('hidden-units').valueAsNumber;
-      const lr = document.getElementById('lr').valueAsNumber;
-      const epochs = document.getElementById('epochs').valueAsNumber;
-      const modelType = config.customModel.type;
+      const {customModel, settings, datasetLocation, cacheLocation, modelLocation} = config.training;
+      const dataset = datasetLocation;
+      const cache = cacheLocation;
+      const dropout = settings.dropout;
+      const hidden = settings.hidden;
+      const lr = settings.lr;
+      const epochs = settings.epochs;
+      const modelType = customModel.type;
+      const useCache = settings.useCache;
+
       if (!(lr && epochs)) {
         generateToast({message:'A value for both Epochs and Learning rate is needed', type:'warning'})
         break;
       }
       training.hide();
       STATE.training = true
-      worker.postMessage({action: "train-model", dropout, hidden, epochs, lr, dataset, cache, modelLocation, modelType});
+      worker.postMessage({
+        action: "train-model", 
+        dropout, hidden, epochs, lr, dataset, cache, modelLocation, modelType, useCache});
       // disableSettingsDuringAnalysis(true)
       break;
     }
@@ -5661,13 +5677,17 @@ document.addEventListener("change", async function (e) {
       }
     } else {
       switch (target) {
-        // -- Custom model type
+        // -- Training settings
         case "replace":
-        case "append":{
-          config.customModel.type = target.value
-          break;
-        }
-
+        case "append":{config.training.customModel.type = element.value; break}
+        case "dropout": {
+          config.training.settings.dropout = Number(element.value); break}
+        case "lr": {
+          config.training.settings.lr = element.valueAsNumber; break}
+        case "hidden-units": {config.training.settings.hidden = Number(element.value); break}
+        case "epochs": {
+          config.training.settings.epochs = element.valueAsNumber; break}
+        case "useCache": {config.training.settings.useCache = element.checked; break}
         // --- Backends
         case "tensorflow":
         case "webgl":

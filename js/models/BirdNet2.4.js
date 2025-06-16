@@ -92,14 +92,12 @@ onmessage = async (e) => {
         break;
       }
       case "train-model":{
-        const {lr, dropout, epochs, hidden, dataset, cache, modelLocation, modelType} = e.data;
+        const {lr, dropout, epochs, hidden, dataset, cache, 
+          modelLocation, modelType, useCache} = e.data;
           trainModel({
             model: myModel.model,
-            lr,
-            dropout,
-            epochs,
-            hidden, dataset, cache, modelLocation, modelType
-
+            lr, dropout, epochs, hidden, dataset, cache, 
+            modelLocation, modelType, useCache
           }).then((result) => {
             postMessage({
               message: "training-results", 
@@ -434,7 +432,7 @@ async function trainModel({
   model:baseModel, 
   lr:initialLearningRate, 
   dropout, epochs, hidden,
-  dataset, cache:cacheFolder, modelLocation:saveLocation, modelType}) {
+  dataset, cache:cacheFolder, modelLocation:saveLocation, modelType, useCache}) {
   const allFiles = getFilesWithLabels(dataset);
   if (!allFiles.length){
     throw new Error(`No files found in any label folders in ${dataset}` )
@@ -442,7 +440,7 @@ async function trainModel({
   const labels = [...new Set(allFiles.map(f => f.label))];
   const labelToIndex = Object.fromEntries(labels.map((l, i) => [l, i]));
   const t0 = Date.now();
-  const cacheRecords = false;
+  const cacheRecords = useCache;
   const loss = tf.losses.softmaxCrossEntropy;
   const metrics = [ tf.metrics.categoricalAccuracy ];
   const optimizer = tf.train.adam(initialLearningRate);
