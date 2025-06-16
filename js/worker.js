@@ -62,6 +62,7 @@ const generateAlert = ({
   variables,
   file,
   updateFilenamePanel,
+  complete
 }) => {
   UI.postMessage({
     event: "generate-alert",
@@ -71,6 +72,7 @@ const generateAlert = ({
     variables,
     file,
     updateFilenamePanel,
+    complete
   });
 };
 function customURLEncode(str) {
@@ -633,12 +635,12 @@ async function handleMessage(e) {
     }
     case "train-model":{
       const worker = predictWorkers[0];
-      const {dropout, hidden, epochs, lr, dataset, cache, modelLocation, modelType} = args;
+      const {dropout, hidden, epochs, lr, dataset, cache, useCache, modelLocation, modelType} = args;
       worker.postMessage({
           message: "train-model",
           batchSize: BATCH_SIZE,
           dropout, hidden, epochs, lr,
-          dataset, cache, modelLocation, modelType
+          dataset, cache, useCache, modelLocation, modelType
         });
       break;
     }
@@ -1510,6 +1512,7 @@ async function onAnalyse({
  * @param {string} [params.model=STATE.model] - The model identifier to use when restarting prediction workers.
  */
 function onAbort({ model = STATE.model }) {
+  predictWorkers.forEach(worker => worker.postMessage({message: 'terminate'}));
   aborted = true;
   FILE_QUEUE = [];
   predictQueue = [];
@@ -1518,7 +1521,7 @@ function onAbort({ model = STATE.model }) {
   predictionsRequested = {};
   index = 0;
   DEBUG && console.log("abort received");
-  Object.keys(STATE.backlogInterval).forEach((pid) => {
+  Object.keys(STATE.backlogInterval || {}).forEach((pid) => {
     clearInterval(STATE.backlogInterval[pid]);
   });
   //restart the workers
@@ -3433,12 +3436,12 @@ async function parseMessage(e) {
       break;
     }
     case "training-progress": {
-        UI.postMessage({
-          event: "conversion-progress",
-          progress: response.progress,
-          text: response.text,
-        });
-        break;
+      UI.postMessage({
+        event: "conversion-progress", //use this handler to send footer progress updates
+        progress: response.progress,
+        text: response.text,
+      });
+      break;
     }
     case "training-results": {
       generateAlert({
@@ -3446,6 +3449,7 @@ async function parseMessage(e) {
         autohide: response.autohide,
         message: response.notice,
         variables: response.variables,
+        complete: response.complete
       });
       break;
     }

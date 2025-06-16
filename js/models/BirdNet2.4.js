@@ -1,4 +1,4 @@
-let tf, BACKEND;
+let tf, BACKEND, ABORTED;
 try {
   tf = require("@tensorflow/tfjs-node");
 } catch {
@@ -103,14 +103,15 @@ onmessage = async (e) => {
           }).then((result) => {
             postMessage({
               message: "training-results", 
-              notice: "Training completed successfully! Model saved in:<br>" + modelLocation
-
+              notice: "Training completed successfully! Model saved in:<br>" + modelLocation,
+              complete: true
             });
           }).catch((err) => {
             postMessage({
               message: "training-results", 
               notice: `Error during model training: ${err}`,
-              type: 'error'
+              type: 'error',
+              complete: true
             });
             console.error("Error during model training:", err);
           })
@@ -191,6 +192,7 @@ onmessage = async (e) => {
         break;
       }
       case "terminate": {
+        ABORTED = true;
         tf.backend().dispose();
         self.close(); // Terminate the worker
       }
@@ -672,7 +674,11 @@ async function writeBinaryGzipDataset(fileList, outputPath, labelToIndex, postMe
       });
       errored = true
     });
-    if (errored) continue; // Be robust to errors
+    if (errored) continue; // Be robust to errors, respect abort
+    else if (ABORTED) {
+      console.log("Abort received")
+      break;
+    }
     const expectedSamples = 48000 * 3;
     if (audioArray.length !== expectedSamples) {
       const padded = new Float32Array(expectedSamples);

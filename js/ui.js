@@ -173,9 +173,9 @@ const GLOBAL_ACTIONS = {
       insertManualRecord({...HISTORY.pop(), undo: true});
   },
   Escape: () => {
-    if (PREDICTING) {
+    if (PREDICTING || STATE.training) {
       console.log("Operation aborted");
-      PREDICTING = false;
+      PREDICTING = false; STATE.training = false;
       disableSettingsDuringAnalysis(false);
       const summarySpecies = DOM.summaryTable.querySelectorAll(".cname");
       summarySpecies.forEach((row) => row.classList.replace("not-allowed","pointer"));
@@ -189,6 +189,7 @@ const GLOBAL_ACTIONS = {
       STATE.diskHasRecords && utils.enableMenuItem(["explore", "charts"]);
       generateToast({ message: "cancelled" });
       DOM.progressDiv.classList.add("invisible");
+      displayProgress({percent: 100, text:''})
     }
   },
   Home: () => {
@@ -2210,6 +2211,7 @@ const setUpWorkerMessaging = () => {
           break;
         }
         case "generate-alert": {
+          if (args.complete) STATE.training = false;
           if (args.updateFilenamePanel) {
             renderFilenamePanel();
             window.electron.unsavedRecords(false);
@@ -5166,7 +5168,7 @@ async function handleUIClicks(e) {
         break;
       }
       training.hide();
-
+      STATE.training = true
       worker.postMessage({action: "train-model", dropout, hidden, epochs, lr, dataset, cache, modelLocation, modelType});
       // disableSettingsDuringAnalysis(true)
       break;
