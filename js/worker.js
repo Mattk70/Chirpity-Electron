@@ -635,13 +635,7 @@ async function handleMessage(e) {
     }
     case "train-model":{
       const worker = predictWorkers[0];
-      const {dropout, hidden, epochs, lr, dataset, cache, useCache, modelLocation, modelType} = args;
-      worker.postMessage({
-          message: "train-model",
-          batchSize: BATCH_SIZE,
-          dropout, hidden, epochs, lr,
-          dataset, cache, useCache, modelLocation, modelType
-        });
+      worker.postMessage({ message: "train-model", ...args });
       break;
     }
     case "update-buffer": {
@@ -2945,8 +2939,8 @@ function spawnPredictWorkers(model, batchSize, threads) {
     DEBUG && console.log("loading a worker");
     worker.postMessage({
       message: "load",
-      model: model,
-      batchSize: batchSize,
+      model,
+      batchSize,
       backend: STATE.detect.backend,
       worker: i,
     });
@@ -3907,6 +3901,7 @@ async function exportData(result, filename, format, headers) {
             item = { ...item, selection: index + 1 }; // Add a selection number for Raven
             if (item.file !== previousFile) {
               // Positions need to be cumulative across files in Raven
+              // todo?: fix bug where offsets are out due to intervening fles without recorods
               if (previousFile !== null) {
                 cumulativeOffset += result.find(
                   (r) => r.file === previousFile

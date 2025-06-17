@@ -1782,7 +1782,14 @@ const defaultConfig = {
     datasetLocation: '',
     cacheLocation: '',
     customModel: {location:'', type:'replace'},
-    settings: {useCache: false, lr: 0.0001, hidden: 0, dropout: 0, epochs: 10}
+    settings: {
+      useCache: false, 
+      lr: 0.0001, 
+      hidden: 0, 
+      dropout: 0, 
+      epochs: 10,
+      validation: 0.2
+    }
   },
   library: {
     location: undefined,
@@ -1987,6 +1994,7 @@ window.onload = async () => {
     document.getElementById('epochs').value = settings.epochs;
     document.getElementById('dropout').value = settings.dropout;
     document.getElementById('useCache').checked = settings.useCache;
+    document.getElementById('validation-split').value = settings.validation;
     // Map slider value to batch size
     DOM.batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(
       config[config[config.model].backend].batchSize
@@ -2975,6 +2983,8 @@ const loadModel = () => {
     threads: config[config[model].backend].threads,
     backend: config[model].backend,
   });
+  const trainNav = document.getElementById('navbarTraining');
+  trainNav.classList.toggle('disabled', model !== 'birdnet')
 };
 
 const handleModelChange = (model, reload = true) => {
@@ -5177,16 +5187,17 @@ async function handleUIClicks(e) {
       const modelType = customModel.type;
       const modelLocation = customModel.location;
       const useCache = settings.useCache;
+      const validation = settings.validation;
 
       if (!(lr && epochs)) {
         generateToast({message:'A value for both Epochs and Learning rate is needed', type:'warning'})
         break;
       }
       training.hide();
-      STATE.training = true
+      STATE.training = true;
       worker.postMessage({
         action: "train-model", 
-        dropout, hidden, epochs, lr, dataset, cache, modelLocation, modelType, useCache});
+        dropout, hidden, epochs, lr, dataset, cache, modelLocation, modelType, useCache, validation});
       // disableSettingsDuringAnalysis(true)
       break;
     }
@@ -5686,6 +5697,12 @@ document.addEventListener("change", async function (e) {
         case "lr": {
           config.training.settings.lr = element.valueAsNumber; break}
         case "hidden-units": {config.training.settings.hidden = Number(element.value); break}
+        case "validation-split": {
+          config.training.settings.validation = Number(element.value); 
+          config.training.settings.useCache = false;
+          document.getElementById('useCache').checked = false;
+          break
+        }
         case "epochs": {
           config.training.settings.epochs = element.valueAsNumber; break}
         case "useCache": {config.training.settings.useCache = element.checked; break}
@@ -6196,12 +6213,6 @@ async function readLabels(labelFile, updating) {
       labelFile && console.error(error);
     });
 }
-
-// function getI18n(context) {
-//   const locale = config.locale.replace(/_.*$/, "");
-//   return context[locale] || context["en"];
-// }
-
 
 function filterLabels(e) {
   DOM.contextMenu.classList.add("d-none");

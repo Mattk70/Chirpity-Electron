@@ -245,39 +245,41 @@
                             <div class="input-group">
                                 <button class="btn btn-secondary col-5" type="button" id="dataset-location-select">
                                     Training Audio Location:</button>
-                                <input type="text" class="form-control col-7" id="dataset-location" aria-describedby="dataset-location-select" placeholder="Location of the training files" readonly required>
+                                <input type="text" style="font-size: 0.85rem;" class="form-control col-7" id="dataset-location" aria-describedby="dataset-location-select" placeholder="Location of the training files" readonly required>
                             </div>
                         </div>
-                        <div class="row pb-3">
+                        <div class="row pb-1">
                             <div class="input-group">
                                 <button class="btn btn-secondary col-5" type="button" id="dataset-cache-location-select">
                                     Dataset Cache Location:</button>
-                                <input type="text" class="form-control col-7" id="dataset-cache-location" aria-describedby="dataset-cache-location-select" placeholder="Location of the dataset cache" readonly>
+                                <input type="text" style="font-size: 0.85rem" class="form-control col-7" id="dataset-cache-location" aria-describedby="dataset-cache-location-select" placeholder="Location of the dataset cache" readonly>
                             </div>
                         </div>
-                        <div class="row pb-3">
+                        <fieldset class="border rounded p-1 mb-3">
+                            <div class="form-check form-switch d-inline-block">
+                                <input class="form-check-input" type="checkbox" role="switch" name="useCache" id="useCache">
+                                <label class="form-check-label" for="useCache">Use the cached dataset if it exists</label>
+                            </div>
+                        </fieldset>
+                        <div class="row pb-1">
                             <div class="input-group">
                                 <button class="btn btn-secondary col-5" type="button" id="model-location-select">
                                     Model Save Location:</button>
-                                <input type="text" class="form-control col-7" id="model-location" aria-describedby="model-location-select" placeholder="Location to save the model" readonly required>
+                                <input type="text" style="font-size: 0.85rem;" class="form-control col-7" id="model-location" aria-describedby="model-location-select" placeholder="Location to save the model" readonly required>
                             </div>
                         </div>
+                        <fieldset class="border rounded p-1 mb-3">
+                                <div class="form-check form-check-inline">
+                                    <label class="form-check-label" for="replace">Replace labels</label>
+                                    <input class="form-check-input" type="radio" name="model-type" id="replace" value="replace" checked>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="model-type" id="append" value="append">
+                                    <label class="form-check-label" for="append">Append labels</label>
+                                </div>
+                        </fieldset>
                         <fieldset class="border rounded p-1">
                             <legend class="h6">Training parameters</legend>
-                            <div class="form-check form-check-inline pb-3">
-                                <label class="form-check-label" for="replace">Replace labels</label>
-                                <input class="form-check-input" type="radio" name="model-type" id="replace" value="replace" checked>
-                            </div>
-                            <div class="form-check form-check-inline pb-3">
-                                <input class="form-check-input" type="radio" name="model-type" id="append" value="append">
-                                <label class="form-check-label" for="append">Append labels</label>
-                            </div>
-                            <div class="form-row pb-3">
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" role="switch" name="useCache" id="useCache">
-                                    <label class="form-check-label" for="useCache">Use cached dataset</label>
-                                </div>
-                            </div>
                             <div class="row ps-2">
                                 <div class="form-floating ps-1 mb-3 col">
                                     <input type="number" id="epochs" class="form-control" min="1" max="300" value="10" required>
@@ -288,6 +290,18 @@
                                     <label class="mb-2" for="lr">Learning Rate</label>
                                 </div>
                             </div>
+                            <legend class="h6">Audio Dataset</legend>
+                            <div class=" ms-1 pb-3">
+                                <div class="input-group rounded mb-3">
+                                    <label class="ps-1 input-group-text" for="validation-split">Validation split:</label>
+                                    <select class="form-select mb-0" id="validation-split">
+                                        <option value="0">None</option>
+                                        <option value="0.1">10%</option>
+                                        <option value="0.2" selected>20%</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <legend class="h6">Classifier</legend>
                             <div class="row">
                                 <div class="input-group rounded mb-3 col">
                                     <label class="ps-1 input-group-text" for="hidden-units">Hidden units:</label>
@@ -1551,7 +1565,7 @@
                                <div class="row ms-0 me-0">
                                 <a class="dropdown-item locked col" id="import-csv" href="#">
                                 <span class="material-symbols-outlined">place_item</span> Import Results from CSV</a>
-                                <a class="padlock col" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature.">
+                                <a class="padlock col-auto" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature.">
                                     <span class="pointer locked material-symbols-outlined float-end mt-1">lock</span></a>
                                 </div> 
                             </li>
@@ -1629,9 +1643,13 @@
                         <li>
                             <div class="row ms-0 me-0">
                                 <a class="dropdown-item locked col" id="open-training" href="#">
-                                <span class="material-symbols-outlined">model_training</span> Train a Custom Model</a>
-                                <a class="padlock col" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature.">
-                                    <span class="pointer locked material-symbols-outlined float-end mt-1">lock</span></a>
+                                <span class="material-symbols-outlined">model_training</span> Train a Custom Model
+                                <span>
+                                    <a class="padlock col-auto" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a member to unlock this feature.">
+                                        <span class="pointer locked material-symbols-outlined float-end mt-1">lock</span>
+                                    </a>
+                                </span>
+                                </a>
                             </div> 
                         </li>
                     </ul>
