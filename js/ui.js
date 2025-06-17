@@ -1993,6 +1993,7 @@ window.onload = async () => {
     document.getElementById('lr').value = settings.lr;
     document.getElementById('epochs').value = settings.epochs;
     document.getElementById('dropout').value = settings.dropout;
+    dropout.disabled = !config.training.settings.hidden;
     document.getElementById('useCache').checked = settings.useCache;
     document.getElementById('validation-split').value = settings.validation;
     // Map slider value to batch size
@@ -5696,7 +5697,12 @@ document.addEventListener("change", async function (e) {
           config.training.settings.dropout = Number(element.value); break}
         case "lr": {
           config.training.settings.lr = element.valueAsNumber; break}
-        case "hidden-units": {config.training.settings.hidden = Number(element.value); break}
+        case "hidden-units": {
+          config.training.settings.hidden = Number(element.value); 
+          const dropout = document.getElementById('dropout')
+          dropout.disabled = !config.training.settings.hidden
+          break
+        }
         case "validation-split": {
           config.training.settings.validation = Number(element.value); 
           config.training.settings.useCache = false;
