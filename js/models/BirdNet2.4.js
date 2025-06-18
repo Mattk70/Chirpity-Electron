@@ -1,4 +1,4 @@
-let tf, BACKEND, myModel, DEBUG = true;
+let tf, BACKEND, myModel, DEBUG = false;
 try {
   tf = require("@tensorflow/tfjs-node");
 } catch {
