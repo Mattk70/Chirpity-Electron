@@ -289,9 +289,13 @@
                                     <input type="number" id="lr" class="form-control" step="0.000001" min="0.000001" max="0.1" value="0.0001">
                                     <label class="mb-2" for="lr">Learning Rate</label>
                                 </div>
+                                <div class="form-check form-switch col">
+                                    <input class="form-check-input" type="checkbox" role="switch" name="decay" id="decay">
+                                    <label class="form-check-label" for="decay">Use learning rate cosine decay</label>
+                                </div>
                             </div>
                             <legend class="h6">Audio Dataset</legend>
-                            <div class=" ms-1 pb-3">
+                            <div class="ms-1">
                                 <div class="input-group rounded mb-3">
                                     <label class="ps-1 input-group-text" for="validation-split">Validation split:</label>
                                     <select class="form-select mb-0" id="validation-split">
@@ -301,6 +305,17 @@
                                     </select>
                                 </div>
                             </div>
+                            <legend class="h6">Augmentations</legend>
+                            <fieldset class="border rounded p-1">
+                                <div class="form-check form-switch d-inline-block">
+                                    <input class="form-check-input" type="checkbox" role="switch" name="mixup" id="mixup">
+                                    <label class="form-check-label" for="mixup">Mixup</label>
+                                </div>
+                                <div class="form-check form-switch d-inline-block ms-3">
+                                    <input class="form-check-input" type="checkbox" role="switch" name="roll" id="roll">
+                                    <label class="form-check-label" for="roll">Roll</label>
+                                </div>
+                            </fieldset>
                             <legend class="h6">Classifier</legend>
                             <div class="row">
                                 <div class="input-group rounded mb-3 col">

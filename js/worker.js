@@ -62,7 +62,8 @@ const generateAlert = ({
   variables,
   file,
   updateFilenamePanel,
-  complete
+  complete,
+  history
 }) => {
   UI.postMessage({
     event: "generate-alert",
@@ -72,7 +73,8 @@ const generateAlert = ({
     variables,
     file,
     updateFilenamePanel,
-    complete
+    complete,
+    history
   });
 };
 function customURLEncode(str) {
@@ -3451,7 +3453,8 @@ async function parseMessage(e) {
         autohide: response.autohide,
         message: response.notice,
         variables: response.variables,
-        complete: response.complete
+        complete: response.complete,
+        history: response.history
       });
       break;
     }
@@ -5111,7 +5114,7 @@ async function convertFile(
 
 async function onDeleteModel(model){
   let message, type;
-  [memoryDB, diskDB].forEach(async db => {
+  for (const db of [memoryDB, diskDB]){
     const result = await db.runAsync('DELETE FROM models WHERE name = ?', model)
     if (db === memoryDB){
       if (result?.changes) {
@@ -5121,6 +5124,6 @@ async function onDeleteModel(model){
         type = 'error'
       }
     }
-  })
+  }
   generateAlert({message, type})
 }

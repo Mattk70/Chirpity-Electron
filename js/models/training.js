@@ -21,7 +21,8 @@ async function trainModel({
   Model, 
   lr:initialLearningRate, 
   dropout, epochs, hidden,
-  dataset, cache:cacheFolder, modelLocation:saveLocation, modelType, useCache, validation}) {
+  dataset, cache:cacheFolder, modelLocation:saveLocation, modelType, 
+  useCache, validation, mixup, decay, roll:useRoll}) {
   const allFiles = getFilesWithLabels(dataset);
   if (!allFiles.length){
     throw new Error(`No files found in any label folders in ${dataset}` )
@@ -101,7 +102,7 @@ async function trainModel({
       });
     },
     onEpochEnd: (epoch, logs) => {
-      transferModel.optimizer.learningRate = cosineDecay(initialLearningRate, epoch+1, epochs)
+      decay && (transferModel.optimizer.learningRate = cosineDecay(initialLearningRate, epoch+1, epochs) );
       const {loss, val_loss, val_categoricalAccuracy, precision, recall, val_precision, val_recall, categoricalAccuracy} = logs;
       let notice = `<table class="table table-striped">
             <tr><th colspan="2">Epoch ${epoch + 1}:</th></tr>
@@ -125,7 +126,30 @@ async function trainModel({
       return logs
     }
   })
-  const train_ds = tf.data.generator(() => readBinaryGzipDataset(trainBin, labels)).batch(8);
+
+  const createStreamDataset = (useRoll) =>
+      tf.data
+          .generator(() => readBinaryGzipDataset(trainBin, labels))
+          .map(x => useRoll ? roll(x) : x); // optional rolling before mixup
+
+  function createMixupStreamDataset(useRoll, batchSize = 8, alpha = 0.2) {
+      return tf.tidy(() => {
+          const ds1 = createStreamDataset(useRoll).shuffle(50, 42);
+          const ds2 = createStreamDataset(useRoll).shuffle(50, 1337); // new generator instance
+          return tf.data
+              .zip({ a: ds1, b: ds2 })
+              .map(({ a, b }) => {
+              const lambda = tf.randomGamma([1], alpha, alpha).squeeze();
+              const oneMinusLambda = tf.sub(1, lambda);
+              const xMixed = tf.add(tf.mul(lambda, a.xs), tf.mul(oneMinusLambda, b.xs));
+              const yMixed = tf.add(tf.mul(lambda, a.ys), tf.mul(oneMinusLambda, b.ys));
+              return { xs: xMixed, ys: yMixed };
+              })
+              .batch(batchSize);
+      })
+  }
+
+  const train_ds = mixup ? createMixupStreamDataset(useRoll) : createStreamDataset().batch(8);
   let val_ds;
   if (validation){
     val_ds = tf.data.generator(() => readBinaryGzipDataset(valBin, labels)).batch(8);
@@ -207,6 +231,7 @@ Dropout: ${dropout}
   await Model.loadModel("layers");
   console.log(`Tensors in memory new model: ${JSON.stringify(tf.memory())}`);
   console.log('new model made')
+  return history.history
 }
 
 
@@ -385,4 +410,38 @@ async function decodeAudio(filePath) {
   });
 }
 
+function roll(x) {
+    return tf.tidy(() =>{
+        const {xs, ys} = x;
+        const size = xs.shape[0];
+        const maxShift = Math.floor(size / 2);
+        const shift = Math.floor(Math.random() * (maxShift + 1)); // random int from 0 to maxShift
+
+        const [left, right] = tf.split(xs, [size - shift, shift], 0);
+        return {xs:tf.concat([right, left], 0), ys};
+  })
+}
+
+/**
+ * Applies streaming Mixup on two datasets.
+ * Each input dataset should independently shuffle and repeat.
+ * @param {tf.data.Dataset} dataset - Base dataset yielding {xs, ys}
+ * @param {number} alpha - Mixup alpha parameter (not used directly here, lambda is uniform)
+ * @returns {tf.data.Dataset}
+ */
+function createMixupDataset(dataset, alpha = 0.2) {
+  const datasetA = dataset.shuffle(1000).repeat(); // assumes .shuffle() is supported
+  const datasetB = dataset.shuffle(1000).repeat();
+
+  const paired = tf.data.zip({ a: datasetA, b: datasetB });
+
+  return paired.map(({ a, b }) => {
+    const lambda = tf.randomUniform([1], 0, 1).squeeze(); // approx Beta(alpha, alpha)
+
+    const xMixed = tf.add(tf.mul(lambda, a.xs), tf.mul(tf.sub(1, lambda), b.xs));
+    const yMixed = tf.add(tf.mul(lambda, a.ys), tf.mul(tf.sub(1, lambda), b.ys));
+
+    return { xs: xMixed, ys: yMixed };
+  });
+}
 module.exports = {trainModel}

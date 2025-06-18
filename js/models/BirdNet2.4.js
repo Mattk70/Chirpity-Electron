@@ -1,4 +1,4 @@
-let tf, BACKEND, myModel, DEBUG = false;;
+let tf, BACKEND, myModel, DEBUG = true;
 try {
   tf = require("@tensorflow/tfjs-node");
 } catch {
@@ -96,12 +96,13 @@ onmessage = async (e) => {
       case "train-model":{
         const {trainModel} = require('./training.js');
         const args = e.data;
-          trainModel({ ...args, Model: myModel}).then(() => {
+          trainModel({ ...args, Model: myModel}).then((history) => {
             postMessage({
               message: "training-results", 
               notice: "Training completed successfully! Model saved in:<br>" + args.modelLocation,
               complete: true,
-              autohide: false
+              autohide: false,
+              history
             });
           }).catch((err) => {
             postMessage({

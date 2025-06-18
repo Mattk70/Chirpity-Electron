@@ -150,8 +150,6 @@ onmessage = async (e) => {
         }
         const specFile = e.data.file;
         const filepath = e.data.filepath;
-        const spec_height = e.data.height;
-        const spec_width = e.data.width;
         let image;
         image = tf.tidy(() => {
           const signal = tf.tensor1d(buffer, "float32");

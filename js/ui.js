@@ -11,6 +11,7 @@ import {
   trackVisit as _trackVisit,
   trackEvent as _trackEvent,
 } from "./utils/tracking.js";
+import {plotTrainingHistory} from './components/charts.js';
 import { checkMembership } from "./utils/member.js";
 import { DOM } from "./utils/DOMcache.js";
 import { IUCNtaxonomy } from "./utils/IUCNcache.js";
@@ -1788,7 +1789,10 @@ const defaultConfig = {
       hidden: 0, 
       dropout: 0, 
       epochs: 10,
-      validation: 0.2
+      validation: 0.2,
+      decay: false,
+      mixup: false,
+      roll: false
     }
   },
   library: {
@@ -1985,19 +1989,6 @@ window.onload = async () => {
     // Fontsize
     config.fontScale === 1 || setFontSizeScale(true);
 
-    // Training settings:
-    const {datasetLocation, cacheLocation, customModel, settings} = config.training;
-    document.getElementById("dataset-location").value = datasetLocation;
-    document.getElementById("dataset-cache-location").value = cacheLocation;
-    document.getElementById("model-location").value = customModel.location;
-    document.getElementById(customModel.type).checked = true;
-    document.getElementById('hidden-units').value = settings.hidden;
-    document.getElementById('lr').value = settings.lr;
-    document.getElementById('epochs').value = settings.epochs;
-    document.getElementById('dropout').value = settings.dropout;
-    dropout.disabled = !config.training.settings.hidden;
-    document.getElementById('useCache').checked = settings.useCache;
-    document.getElementById('validation-split').value = settings.validation;
     // Map slider value to batch size
     DOM.batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(
       config[config.models[config.selectedModel].backend].batchSize
@@ -2248,6 +2239,9 @@ const setUpWorkerMessaging = () => {
                                 </button>
                             </div>
                             `;
+          }
+          if (args.history){
+            plotTrainingHistory(args.history)
           }
           generateToast(args);
           // This is how we know the database update has completed
@@ -3221,7 +3215,25 @@ gotoForm.addEventListener("submit", gotoTime);
  * Custom model modals
  */
 const training = new bootstrap.Modal(document.getElementById("training-modal"));
-const showTraining = () => training.show();
+const showTraining = () => {
+    // Restore training settings:
+    const {datasetLocation, cacheLocation, customModel, settings} = config.training;
+    document.getElementById("dataset-location").value = datasetLocation;
+    document.getElementById("dataset-cache-location").value = cacheLocation;
+    document.getElementById("model-location").value = customModel.location;
+    document.getElementById(customModel.type).checked = true;
+    document.getElementById('hidden-units').value = settings.hidden;
+    document.getElementById('lr').value = settings.lr;
+    document.getElementById('epochs').value = settings.epochs;
+    document.getElementById('decay').checked = settings.decay;
+    document.getElementById('mixup').checked = settings.mixup;
+    document.getElementById('roll').checked = settings.roll;
+    document.getElementById('dropout').value = settings.dropout;
+    dropout.disabled = !config.training.settings.hidden;
+    document.getElementById('useCache').checked = settings.useCache;
+    document.getElementById('validation-split').value = settings.validation;
+  training.show();
+}
 
 const importModal = new bootstrap.Modal(document.getElementById("import-modal"));
 const showImport = () => importModal.show();
@@ -5202,14 +5214,8 @@ async function handleUIClicks(e) {
       const {customModel, settings, datasetLocation, cacheLocation} = config.training;
       const dataset = datasetLocation;
       const cache = cacheLocation;
-      const dropout = settings.dropout;
-      const hidden = settings.hidden;
-      const lr = settings.lr;
-      const epochs = settings.epochs;
       const modelType = customModel.type;
       const modelLocation = customModel.location;
-      const useCache = settings.useCache;
-      const validation = settings.validation;
 
       if (!(lr && epochs)) {
         generateToast({message:'A value for both Epochs and Learning rate is needed', type:'warning'})
@@ -5236,7 +5242,7 @@ async function handleUIClicks(e) {
       STATE.training = true;
       worker.postMessage({
         action: "train-model", 
-        dropout, hidden, epochs, lr, dataset, cache, modelLocation, modelType, useCache, validation});
+        dataset, cache, modelLocation, modelType, ...settings});
       // disableSettingsDuringAnalysis(true)
       break;
     }
@@ -5270,7 +5276,7 @@ async function handleUIClicks(e) {
         break
       }
       importModal.hide();
-      config.models[modelName] = {backend: config.models.birdnet.backend, displayName, modelPath:modelLocation};
+      config.models[modelName] = {backend: 'tensorflow', displayName, modelPath:modelLocation};
       config.selectedModel = modelName;
       updateModelOptions();
       handleModelChange(modelName);
@@ -5810,6 +5816,9 @@ document.addEventListener("change", async function (e) {
         case "epochs": {
           config.training.settings.epochs = element.valueAsNumber; break}
         case "useCache": {config.training.settings.useCache = element.checked; break}
+        case "mixup": {config.training.settings.mixup = element.checked; break}
+        case "decay": {config.training.settings.decay = element.checked; break}
+        case "roll": {config.training.settings.roll = element.checked; break}
         // --- Backends
         case "tensorflow":
         case "webgl":
