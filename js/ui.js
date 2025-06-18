@@ -182,8 +182,8 @@ const GLOBAL_ACTIONS = {
       STATE.analysisDone = true;
       worker.postMessage({
         action: "abort",
-        model: config.model,
-        threads: config[config[config.model].backend].threads,
+        model: config.selectedModel,
+        threads: config[config.models[config.selectedModel].backend].threads,
         list: config.list,
       });
       STATE.diskHasRecords && utils.enableMenuItem(["explore", "charts"]);
@@ -1818,15 +1818,16 @@ const defaultConfig = {
   },
   timeOfDay: true,
   list: "birds",
-  customListFile: { birdnet: "", chirpity: "", nocmig: "" },
+  models: {
+    birdnet: {displayName: 'BirdNET', backend: 'tensorflow', customListFile: ''},
+    chirpity: {displayName: 'Nocmig', backend: 'tensorflow', customListFile: ''},
+    nocmig: {displayName: 'Nocmig V2 (Beta)', backend: 'tensorflow', customListFile: ''},
+  },
   local: true,
   speciesThreshold: 0.03,
   useWeek: false,
-  model: "birdnet",
+  selectedModel: "birdnet",
   locale: "en",
-  chirpity: { backend: "tensorflow" },
-  nocmig: { backend: "tensorflow" },
-  birdnet: { backend: "tensorflow" },
   latitude: 52.87,
   longitude: 0.89,
   location: "Great Snoring, North Norfolk",
@@ -1853,8 +1854,8 @@ const defaultConfig = {
   warmup: true,
   hasNode: false,
   tensorflow: { threads: DIAGNOSTICS["Cores"], batchSize: 8 },
-  webgpu: { threads: 1, batchSize: 32 },
-  webgl: { threads: 1, batchSize: 32 },
+  webgpu: { threads: 1, batchSize: 8 },
+  webgl: { threads: 1, batchSize: 8 },
   audio: {
     gain: 0,
     format: "mp3",
@@ -1929,16 +1930,17 @@ window.onload = async () => {
     const isMember = await membershipCheck()
       .catch(err => {console.error(err); return false});
     STATE.isMember = isMember;
-    isMember && config.hasNode || (config[config.model].backend = "tensorflow");
+    isMember && config.hasNode || (config.models[config.selectedModel].backend = "tensorflow");
     if (config.detect.combine) document.getElementById('model-icon').classList.remove('d-none')
 
-    const { model, library, database, detect, filters, audio, 
+    const { selectedModel, library, database, detect, filters, audio, 
       limit, locale, speciesThreshold, list, useWeek, UUID, 
       local, debug, fileStartMtime, specDetections } = config;
-
+    
+    updateModelOptions();
     worker.postMessage({
       action: "update-state",
-      model,
+      model: selectedModel,
       library,
       database,
       path: appPath,
@@ -1961,13 +1963,16 @@ window.onload = async () => {
       specDetections,
     });
     t0_warmup = Date.now();
+    const backend = config.models[config.selectedModel].backend;
+    const modelPath = config.models[config.selectedModel].modelPath;
     worker.postMessage({
       action: "_init_",
-      model: model,
-      batchSize: config[config[model].backend].batchSize,
-      threads: config[config[model].backend].threads,
-      backend: config[model].backend,
-      list: list,
+      model: selectedModel,
+      batchSize: config[backend].batchSize,
+      threads: config[backend].threads,
+      backend,
+      list,
+      modelPath
     });
     // Disable SNR
     config.filters.SNR = 0;
@@ -1979,10 +1984,7 @@ window.onload = async () => {
     // Set UI option state
     // Fontsize
     config.fontScale === 1 || setFontSizeScale(true);
-    // Ensure config.model is valid (v1.10.x management)
-    if (!["birdnet", "chirpity", "nocmig"].includes(config.model)) {
-      config.model = "birdnet";
-    }
+
     // Training settings:
     const {datasetLocation, cacheLocation, customModel, settings} = config.training;
     document.getElementById("dataset-location").value = datasetLocation;
@@ -1998,13 +2000,13 @@ window.onload = async () => {
     document.getElementById('validation-split').value = settings.validation;
     // Map slider value to batch size
     DOM.batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(
-      config[config[config.model].backend].batchSize
+      config[config.models[config.selectedModel].backend].batchSize
     );
     DOM.batchSizeSlider.max = (BATCH_SIZE_LIST.length - 1).toString();
     DOM.batchSizeValue.textContent =
-      config[config[config.model].backend].batchSize;
-    DOM.modelToUse.value = config.model;
-    const backendEL = document.getElementById(config[config.model].backend);
+      config[config.models[config.selectedModel].backend].batchSize;
+    DOM.modelToUse.value = config.selectedModel;
+    const backendEL = document.getElementById(config.models[config.selectedModel].backend);
     backendEL.checked = true;
     // Show time of day in results?
     setTimelinePreferences();
@@ -2012,7 +2014,7 @@ window.onload = async () => {
     DOM.listToUse.value = config.list;
     DOM.localSwitch.checked = config.local;
     config.list === "custom" &&
-      readLabels(config.customListFile[config.model], "list");
+      readLabels(config.models[config.selectedModel].customListFile, "list");
     // Show Locale
     DOM.locale.value = config.locale;
     LIST_MAP = i18n.get(i18n.LIST_MAP);
@@ -2028,7 +2030,7 @@ window.onload = async () => {
     // List appearance in settings
     DOM.speciesThreshold.value = config.speciesThreshold;
     document.getElementById("species-week").checked = config.useWeek;
-    DOM.customListFile.value = config.customListFile[config.model];
+    DOM.customListFile.value = config.models[config.selectedModel].customListFile;
     if (!DOM.customListFile.value) delete LIST_MAP.custom;
     // And update the icon
     updateListIcon();
@@ -2086,7 +2088,7 @@ window.onload = async () => {
     document.getElementById("auto-load").checked = config.detect.autoLoad;
     document.getElementById("iucn").checked = config.detect.iucn;
     document.getElementById("iucn-scope").selected = config.detect.iucnScope;
-    handleModelChange(config.model, false)
+    handleModelChange(config.selectedModel, false)
     // Block powersave?
     document.getElementById("power-save-block").checked =
       config.powerSaveBlocker;
@@ -2095,11 +2097,6 @@ window.onload = async () => {
     contextAwareIconDisplay();
     DOM.debugMode.checked = config.debug;
     showThreshold(config.detect.confidence);
-    // SNRSlider.value = config.filters.SNR;
-    // SNRThreshold.textContent = config.filters.SNR;
-    // if (config[config.model].backend === 'webgl' || config[config.model].backend === 'webgpu') {
-    //     SNRSlider.disabled = true;
-    // };
 
     // Filters
     document.getElementById("HP-threshold").textContent = formatHz(config.filters.highPassFrequency);
@@ -2113,10 +2110,10 @@ window.onload = async () => {
     document.getElementById("attenuation-threshold").textContent = DOM.attenuation.value + "dB";
     DOM.sendFilteredAudio.checked = config.filters.sendToModel;
     filterIconDisplay();
-    if (config[config.model].backend.includes("web")) {
+    if (config.models[config.selectedModel].backend.includes("web")) {
       // Force max three threads to prevent severe memory issues
-      config[config[config.model].backend].threads = Math.min(
-        config[config[config.model].backend].threads,
+      config[config.models[config.selectedModel].backend].threads = Math.min(
+        config[config.models[config.selectedModel].backend].threads,
         3
       );
       DOM.threadSlider.max = 3;
@@ -2124,7 +2121,7 @@ window.onload = async () => {
       DOM.threadSlider.max = DIAGNOSTICS["Cores"];
     }
 
-    DOM.threadSlider.value = config[config[config.model].backend].threads;
+    DOM.threadSlider.value = config[config.models[config.selectedModel].backend].threads;
     DOM.numberOfThreads.textContent = DOM.threadSlider.value;
     DOM.defaultLat.value = config.latitude;
     DOM.defaultLon.value = config.longitude;
@@ -2357,11 +2354,11 @@ const setUpWorkerMessaging = () => {
           const changedEnv = config.hasNode !== args.hasNode;
           if (changedEnv && args.hasNode) {
             // If not using tensorflow, switch to the tensorflow backend because this faster under Node
-            config[config.model].backend !== "tensorflow" &&
+            config.models[config.selectedModel].backend !== "tensorflow" &&
               handleBackendChange("tensorflow");
           }
           config.hasNode = args.hasNode;
-          if (!config.hasNode && config[config.model].backend !== "webgpu") {
+          if (!config.hasNode && config.models[config.selectedModel].backend !== "webgpu") {
             // No node? Not using webgpu? Force webgpu
             handleBackendChange("webgpu");
             generateToast({ type: "warning", message: "noNode" });
@@ -2963,7 +2960,7 @@ DOM.customListSelector.addEventListener("click", async () => {
   if (!files.canceled) {
     DOM.customListSelector.classList.remove("btn-outline-danger");
     const customListFile = files.filePaths[0];
-    config.customListFile[config.model] = customListFile;
+    config.models[config.selectedModel].customListFile = customListFile;
     DOM.customListFile.value = customListFile;
     readLabels(customListFile, "list");
     LIST_MAP = i18n.get(i18n.LIST_MAP);
@@ -2975,35 +2972,38 @@ DOM.customListSelector.addEventListener("click", async () => {
 const loadModel = () => {
   PREDICTING = false;
   t0_warmup = Date.now();
-  const {model, warmup} = config;
+  const {selectedModel, warmup} = config;
+  const backend = config.models[selectedModel].backend;
+  const modelPath = config.models[selectedModel].modelPath;
   worker.postMessage({
     action: "load-model",
-    model,
-    batchSize: config[config[model].backend].batchSize,
+    model: selectedModel,
+    batchSize: backend.batchSize,
     warmup,
-    threads: config[config[model].backend].threads,
-    backend: config[model].backend,
+    threads: backend.threads,
+    backend,
+    modelPath
   });
-  const trainNav = document.getElementById('navbarTraining');
-  trainNav.classList.toggle('disabled', model !== 'birdnet')
+
 };
 
 const handleModelChange = (model, reload = true) => {
   modelSettingsDisplay();
-  DOM.customListFile.value = config.customListFile[model];
+  DOM.customListFile.value = config.models[model].customListFile;
   DOM.customListFile.value
     ? (LIST_MAP = i18n.get(i18n.LIST_MAP))
     : delete LIST_MAP.custom;
-  document.getElementById(config[model].backend).checked = true;
+  const backend = config.models[config.selectedModel].backend;
+  document.getElementById(backend).checked = true;
   if (reload) {
-    handleBackendChange(config[model].backend);
+    handleBackendChange(backend);
   }
   updateModelIcon(model);
 }
 
 const handleBackendChange = (backend) => {
   backend = backend instanceof Event ? backend.target.value : backend;
-  config[config.model].backend = backend;
+  config.models[config.selectedModel].backend = backend;
   const backendEL = document.getElementById(backend);
   backendEL.checked = true;
   if (backend === "webgl" || backend === "webgpu") {
@@ -3218,14 +3218,16 @@ const gotoForm = document.getElementById("gotoForm");
 gotoForm.addEventListener("submit", gotoTime);
 
 /**
- * Training modal
+ * Custom model modals
  */
-
-// Go to position
 const training = new bootstrap.Modal(document.getElementById("training-modal"));
-const showTraining = () => {
-    training.show();
-};
+const showTraining = () => training.show();
+
+const importModal = new bootstrap.Modal(document.getElementById("import-modal"));
+const showImport = () => importModal.show();
+
+const expungeModal = new bootstrap.Modal(document.getElementById("expunge-modal"));
+const showExpunge = () => expungeModal.show();
 /**
  * Handles initialization tasks after the audio model is ready.
  *
@@ -3613,25 +3615,25 @@ function onAnalysisComplete({ quiet }) {
 
   trackEvent(
     config.UUID,
-    `${config.model}-${config[config.model].backend}`,
+    `${config.selectedModel}-${config.models[config.selectedModel].backend}`,
     "Audio Duration",
-    config[config.model].backend,
+    config.models[config.selectedModel].backend,
     Math.round(duration)
   );
 
   if (!STATE.selection) {
     trackEvent(
       config.UUID,
-      `${config.model}-${config[config.model].backend}`,
+      `${config.selectedModel}-${config.models[config.selectedModel].backend}`,
       "Analysis Rate",
-      config[config.model].backend,
+      config.models[config.selectedModel].backend,
       parseInt(rate)
     );
     trackEvent(
       config.UUID,
-      `${config.model}-${config[config.model].backend}`,
+      `${config.selectedModel}-${config.models[config.selectedModel].backend}`,
       "Analysis Duration",
-      config[config.model].backend,
+      config.models[config.selectedModel].backend,
       parseInt(analysisTime)
     );
     DIAGNOSTICS["Analysis Duration"] = utils.formatDuration(analysisTime);
@@ -4197,9 +4199,9 @@ const populateSpeciesModal = async (included, excluded) => {
     STATE.week !== -1 && STATE.week
       ? utils.interpolate(i18.week, { week: STATE.week })
       : "";
-  const model = config.model === "birdnet" ? "BirdNET" : "Nocmig";
+  const model = config.selectedModel === "birdnet" ? "BirdNET" : "Nocmig";
   const localBirdsOnly =
-    config.local && config.model === "birdnet" && config.list === "nocturnal"
+    config.local && config.selectedModel === "birdnet" && config.list === "nocturnal"
       ? i18.localBirds
       : "";
   let species_filter_text = "",
@@ -4365,7 +4367,7 @@ const modelSettingsDisplay = () => {
   );
   const noMac = document.querySelectorAll(".no-mac");
   const nodeOnly = document.querySelectorAll(".node-only");
-  if (config.model === "birdnet") {
+  if (!['chirpity', 'nocmig'].includes(config.selectedModel)) {
     // hide chirpity-only features
     chirpityOnly.forEach((element) => {
       // element.classList.add('chirpity-only');
@@ -4390,6 +4392,9 @@ const modelSettingsDisplay = () => {
   } else {
     nodeOnly.forEach((element) => element.classList.add("d-none"));
   }
+  // Hide train unless BirdNET
+  const trainNav = document.getElementById('navbarTraining');
+  trainNav.classList.toggle('disabled', config.selectedModel !== 'birdnet')
 };
 
 const contextAwareIconDisplay = () => {
@@ -4419,17 +4424,10 @@ const toggleContextAwareMode = () => {
     generateToast({ message: "contextBlocked", type: "warning" });
     return;
   }
-  if (config.model !== "birdnet")
+  if (['chirppity', 'nocmig'].includes(config.selectedModel))
     config.detect.contextAware = !config.detect.contextAware;
   DOM.contextAware.checked = config.detect.contextAware;
   contextAwareIconDisplay();
-  // if (config.detect.contextAware) {
-  //     SNRSlider.disabled = true;
-  //     config.filters.SNR = 0;
-  // } else if (config[config.model].backend !== 'webgl'  && config.model !== 'birdnet') {
-  //     SNRSlider.disabled = false;
-  //     config.filters.SNR = parseFloat(SNRSlider.value);
-  // }
   worker.postMessage({
     action: "update-state",
     detect: { contextAware: config.detect.contextAware },
@@ -4440,11 +4438,12 @@ const toggleContextAwareMode = () => {
 
 const diagnosticMenu = document.getElementById("diagnostics");
 diagnosticMenu.addEventListener("click", async function () {
+  const backend = config.models[config.selectedModel].backend;
   DIAGNOSTICS["Model"] =
     DOM.modelToUse.options[DOM.modelToUse.selectedIndex].text;
-  DIAGNOSTICS["Backend"] = config[config.model].backend;
-  DIAGNOSTICS["Batch size"] = config[config[config.model].backend].batchSize;
-  DIAGNOSTICS["Threads"] = config[config[config.model].backend].threads;
+  DIAGNOSTICS["Backend"] = backend;
+  DIAGNOSTICS["Batch size"] = config[backend].batchSize;
+  DIAGNOSTICS["Threads"] = config[backend].threads;
   DIAGNOSTICS["Context"] = config.detect.contextAware;
   DIAGNOSTICS["SNR"] = config.filters.SNR;
   DIAGNOSTICS["List"] = config.list;
@@ -5096,7 +5095,7 @@ async function handleUIClicks(e) {
       break;
     }
     case "clear-custom-list": {
-      config.customListFile[config.model] = "";
+      config.models[config.selectedModel].customListFile = "";
       delete LIST_MAP.custom;
       config.list = "birds";
       DOM.customListFile.value = "";
@@ -5122,9 +5121,19 @@ async function handleUIClicks(e) {
       showAnalyse();
       break;
     }
-    // Training
+    // Custom models
     case "open-training": {
       showTraining();
+      break;
+    }
+    case "import-model": {
+      showImport();
+      break;
+    }
+    case "remove-model": {
+      // Just present custom models to choose from
+      updateModelOptions('customOnly');
+      showExpunge();
       break;
     }
     case "dataset-location-select": {
@@ -5176,6 +5185,18 @@ async function handleUIClicks(e) {
       })();
       break;
     }
+    case "import-location-select": {
+      (async () => {
+        const files = await window.electron.selectDirectory(
+          config.training.customModel.location || ""
+        );
+        if (!files.canceled) {
+          const modelFolder = files.filePaths[0];
+          document.getElementById("import-location").value = modelFolder;
+        }
+      })();
+      break;
+    }
     case "train": {
       e.preventDefault();
       const {customModel, settings, datasetLocation, cacheLocation} = config.training;
@@ -5194,12 +5215,89 @@ async function handleUIClicks(e) {
         generateToast({message:'A value for both Epochs and Learning rate is needed', type:'warning'})
         break;
       }
+      if (modelType === 'append'){
+        function findDuplicateLines(labelFile) {
+          const entries = fs.readdirSync(datasetLocation, { withFileTypes: true });
+          const folders = entries
+            .map(entry => entry.name);
+          const labels = new Set(fs.readFileSync(labelFile, 'utf8').split('\n').map(l => l.trim()));
+          return folders.filter(f => labels.has(f) && f !== '');
+        }
+        const labelFile = p.join(dirname,`labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_${config.locale}.txt`)
+        const duplicates = findDuplicateLines(labelFile);
+        if (duplicates.length){
+          generateToast({message:`There are audio folders which have the same name as BirdNET labels. 
+            When appending labels, the new labels must be unique:<br>
+            <b>${duplicates.join('<br>')}</b>`, type: 'warning', autohide: false})
+          break;
+        }
+      }
       training.hide();
       STATE.training = true;
       worker.postMessage({
         action: "train-model", 
         dropout, hidden, epochs, lr, dataset, cache, modelLocation, modelType, useCache, validation});
       // disableSettingsDuringAnalysis(true)
+      break;
+    }
+    case "import": {
+      e.preventDefault();
+      const form = e.target.form;
+      if (!form.checkValidity()) {
+        form.reportValidity(); // Shows the native browser validation messages
+        break;
+      }
+      const displayName = document.getElementById('model-name').value.trim();
+      const modelName = displayName.toLowerCase();
+      const modelLocation = document.getElementById('import-location').value;
+      const requiredFiles = ['weights.bin', 'labels.txt', 'model.json']
+      if (config[modelName] !== undefined){
+        generateToast({message: 'A model with that name already exists', type:'error'})
+        break;
+      }
+      const missingFiles = [];
+      requiredFiles.forEach(file => {
+        if (!fs.existsSync(p.join(modelLocation, file))) {
+          missingFiles.push(file)
+        }
+      })
+      if (missingFiles.length){ 
+        const files = missingFiles.join(', ')
+        generateToast({message: `
+        The chosen location <br>${modelLocation}<br>is missing required files:
+        <br> <b>${files}</b>.
+        `, type:'error'})
+        break
+      }
+      importModal.hide();
+      config.models[modelName] = {backend: config.models.birdnet.backend, displayName, modelPath:modelLocation};
+      config.selectedModel = modelName;
+      updateModelOptions();
+      handleModelChange(modelName);
+      updatePrefs('config.json', config)
+      break;
+    }
+    case "expunge":{
+      e.preventDefault();
+      const form = e.target.form;
+      if (!form.checkValidity()) {
+        form.reportValidity();
+        break;
+      }
+      const model = document.getElementById('custom-models').value;
+      // if (['birdnet', 'chirpity', 'nocmig'].includes(displayName)){
+      //   generateToast({message: 'Only custom models can be removed', type:'warning'})
+      //   break;
+      // }
+      // if (config.models[displayName] === undefined){
+      //   generateToast({message: 'Model name not found', type:'warning'})
+      //   break;
+      // }
+      worker.postMessage({action:"expunge-model", model})
+      delete config.models[model];
+      updatePrefs('config.json', config);
+      expungeModal.hide();
+
       break;
     }
     // Help Menu
@@ -5508,9 +5606,9 @@ async function handleUIClicks(e) {
       const numberOfOptions = el.options.length;
       const currentListIndex = el.selectedIndex;
       const next = currentListIndex === numberOfOptions - 1 ? 0 : currentListIndex + 1;
-      config.model = el.options[next].value;
+      config.selectedModel = el.options[next].value;
       el.selectedIndex = next;
-      handleModelChange(config.model)
+      handleModelChange(config.selectedModel)
       break;
     }
     case "nocmigMode": {
@@ -5633,7 +5731,7 @@ function updateList() {
   updateListIcon();
   setListUIState(config.list)
   if (config.list === "custom") {
-    readLabels(config.customListFile[config.model], "list");
+    readLabels(config.models[config.selectedModel].customListFile, "list");
   } else {
     worker.postMessage({
       action: "update-list",
@@ -5872,7 +5970,7 @@ document.addEventListener("change", async function (e) {
         case "locale": {
           let labelFile;
           if (element.value === "custom") {
-            labelFile = config.customListFile[config.model];
+            labelFile = config.models[config.selectedModel].customListFile;
             if (!labelFile) {
               generateToast({ type: "warning", message: "labelFileNeeded" });
               return;
@@ -5901,14 +5999,14 @@ document.addEventListener("change", async function (e) {
           break;
         }
         case "model-to-use": {
-          config.model = element.value;
-          handleModelChange(config.model);
+          config.selectedModel = element.value;
+          handleModelChange(config.selectedModel);
           break;
         }
         case "thread-slider": {
           // change number of threads
           DOM.numberOfThreads.textContent = DOM.threadSlider.value;
-          config[config[config.model].backend].threads =
+          config[config.models[config.selectedModel].backend].threads =
             DOM.threadSlider.valueAsNumber;
           worker.postMessage({
             action: "change-threads",
@@ -5919,7 +6017,7 @@ document.addEventListener("change", async function (e) {
         case "batch-size": {
           DOM.batchSizeValue.textContent =
             BATCH_SIZE_LIST[DOM.batchSizeSlider.value].toString();
-          config[config[config.model].backend].batchSize =
+          config[config.models[config.selectedModel].backend].batchSize =
             BATCH_SIZE_LIST[element.value];
           worker.postMessage({
             action: "change-batch-size",
@@ -6153,7 +6251,7 @@ function setListUIState(list) {
     DOM.localSwitchContainer.classList.replace("list-hidden", "list-visible");
   } else if (list === "custom") {
     DOM.customListContainer.classList.replace("list-hidden", "list-visible");
-    if (!config.customListFile[config.model]) {
+    if (!config.models[config.selectedModel].customListFile) {
       generateToast({ type: "warning", message: "listFileNeeded" });
     }
   }
@@ -7723,3 +7821,25 @@ document.addEventListener("filter-labels", (e) => {
     species: isSpeciesViewFiltered(true),
   });
 });
+
+
+function updateModelOptions(customOnly){
+  const formElement = customOnly ? 'custom-models' : 'model-to-use';
+  const select = document.getElementById(formElement);
+  // Update the model selector options
+  select.replaceChildren();
+  // Add options
+  const modelOptions = customOnly 
+    ? Object.fromEntries(Object.entries(config.models)
+    .filter(([model, _]) => !['nocmig', 'chirpity','birdnet'].includes(model)))
+    : config.models;
+  // Add new options from the object
+  for (const [model, opt] of Object.entries(modelOptions)) {
+    const option = document.createElement('option');
+    option.value = model;
+    option.textContent = opt.displayName;
+    select.appendChild(option);
+  }
+  customOnly || (select.selectedValue = config.selectedModel)
+}
+      

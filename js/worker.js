@@ -286,7 +286,7 @@ const getSelectionRange = (file, start, end) => {
  *
  * @returns {Promise<sqlite3.Database>} Resolves with the initialized database instance.
  */
-async function loadDB() {
+async function loadDB(modelPath) {
   const path = STATE.database.location || appPath;
   DEBUG && console.log("Loading db " + path);
   const model = STATE.model;
@@ -301,8 +301,8 @@ async function loadDB() {
     diskDB = new sqlite3.Database(file);
     DEBUG && console.log("Opened and cleaned disk db " + file);
   }
-
-  ([modelID, needsTranslation] = await mergeDbIfNeeded({diskDB, model, appPath, dbMutex }) )
+  const labelsLocation = modelPath ? p.join(modelPath, 'labels.txt') : null;
+  ([modelID, needsTranslation] = await mergeDbIfNeeded({diskDB, model, appPath, dbMutex, labelsLocation }) )
   STATE.modelID = modelID;
   STATE.update({ db: diskDB });
   diskDB.locale = STATE.locale;
@@ -379,18 +379,19 @@ async function handleMessage(e) {
   }
   switch (action) {
     case "_init_": {
-      let { model, batchSize, threads, backend, list } = args;
+      let { model, batchSize, threads, backend, list, modelPath } = args;
       const t0 = Date.now();
       STATE.detect.backend = backend;
       INITIALISED = (async () => {
         LIST_WORKER = await spawnListWorker(); // this can change the backend if tfjs-node isn't available
         DEBUG && console.log("List worker took", Date.now() - t0, "ms to load");
         await onLaunch({
-          model: model,
-          batchSize: batchSize,
-          threads: threads,
-          backend: STATE.detect.backend,
-          list: list,
+          model,
+          batchSize,
+          threads,
+          backend,
+          list,
+          modelPath
         });
       })();
       break;
@@ -595,6 +596,10 @@ async function handleMessage(e) {
         predictWorkers.length && terminateWorkers();
       }
       INITIALISED = onLaunch(args);
+      break;
+    }
+    case "expunge-model": {
+      onDeleteModel(args.model)
       break;
     }
     case "post": {
@@ -840,24 +845,26 @@ async function onLaunch({
   batchSize = 32,
   threads = 1,
   backend = "tensorflow",
+  modelPath,
 }) {
   SEEN_MODEL_READY = false;
   LIST_CACHE = {};
-  sampleRate = model === "birdnet" ? 48_000 : 24_000;
+  sampleRate = ['nocmig', 'chirpity'].includes(model) ? 24_000 : 48_000;
   STATE.detect.backend = backend;
   BATCH_SIZE = batchSize;
-  STATE.update({ model: model });
+  STATE.update({ model, modelPath });
   const result = await diskDB?.getAsync('SELECT id FROM models WHERE NAME = ?', model)
   if (!result){
     // THe model isn't in the db
-    diskDB = await loadDB(); // load the diskdb with the model species added
+    diskDB = await loadDB(modelPath); // load the diskdb with the model species added
   } else {
     STATE.modelID = result.id;
   }
   if (!memoryDB || !STATE.detect.combine){
     memoryDB = await createDB({file: null, diskDB, dbMutex}); // create new memoryDB
   } else if (!result){
-    addNewModel({model, db:memoryDB, dbMutex})
+    const labelsLocation = modelPath ? p.join(modelPath, 'labels.txt') : null;
+    addNewModel({model, db:memoryDB, dbMutex, labelsLocation})
   }
   const db = STATE.mode === 'analyse'
     ? memoryDB
@@ -2929,9 +2936,9 @@ const processQueue = async () => {
  * @param {number} batchSize - Number of items each worker processes per batch.
  * @param {number} threads - Number of worker threads to spawn.
  */
-function spawnPredictWorkers(model, batchSize, threads) {
+function spawnPredictWorkers(model, batchSize, threads, modelPath) {
   for (let i = 0; i < threads; i++) {
-    const workerSrc = model === "birdnet" ? "BirdNet2.4" : model;
+    const workerSrc = ['nocmig', 'chirpity'].includes(model) ? model : "BirdNet2.4";
     const worker = new Worker(`./js/models/${workerSrc}.js`, { type: "module" });
     worker.isAvailable = true;
     worker.isReady = false;
@@ -2940,6 +2947,7 @@ function spawnPredictWorkers(model, batchSize, threads) {
     worker.postMessage({
       message: "load",
       model,
+      modelPath: STATE.modelPath,
       batchSize,
       backend: STATE.detect.backend,
       worker: i,
@@ -3973,7 +3981,9 @@ async function exportData(result, filename, format, headers) {
 }
 
 const sendResult = (index, result, fromDBQuery) => {
-  if (!fromDBQuery) {result.model = STATE.model, result.modelID = STATE.modelID};
+  const model = ['birdnet', 'nocmig', 'chirpity'].includes(STATE.model) ? STATE.model : 'custom';
+  result.model = model;
+  // if (!fromDBQuery) {result.model = model, result.modelID = STATE.modelID};
   UI.postMessage({
     event: "new-result",
     file: result.file,
@@ -5097,4 +5107,20 @@ async function convertFile(
       })
       .run();
   });
+}
+
+async function onDeleteModel(model){
+  let message, type;
+  [memoryDB, diskDB].forEach(async db => {
+    const result = await db.runAsync('DELETE FROM models WHERE name = ?', model)
+    if (db === memoryDB){
+      if (result?.changes) {
+        message = `Model ${model} successfully removed`
+      } else {
+        message =  `Failed to remove model ${model}`;
+        type = 'error'
+      }
+    }
+  })
+  generateAlert({message, type})
 }

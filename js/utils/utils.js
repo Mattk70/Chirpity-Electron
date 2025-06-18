@@ -23,7 +23,9 @@ function syncConfig(config, defaultConfig) {
       config[key] = defaultConfig[key];
     } else if (
       typeof config[key] === "object" &&
-      typeof defaultConfig[key] === "object"
+      typeof defaultConfig[key] === "object" && 
+      // Allow unknown models keys
+      key !== 'models'
     ) {
       // Recursively sync nested objects (but allow key assignment to be empty)
       key === "keyAssignment" || syncConfig(config[key], defaultConfig[key]);

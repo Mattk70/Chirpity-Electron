@@ -24,14 +24,19 @@ onmessage = async (e) => {
       }
       case "load": {
         const version = e.data.model;
+        const isBirdNET = version === 'birdnet';
         DEBUG && console.log("load request to worker");
-        const { height, width, location } = JSON.parse(
-          fs.readFileSync(
-            path.join(__dirname, `../../${version}_model_config.json`),
-            "utf8"
-          )
-        );
-        const appPath = "../../" + location + "/";
+        let appPath = e.data.modelPath;
+        if (isBirdNET){
+          const {location} = JSON.parse(
+            fs.readFileSync(
+              path.join(__dirname, `../../${version}_model_config.json`),
+              "utf8"
+            )
+          );
+          appPath = "../../" + location + "/";
+        }
+        
         // const appPath = "/Users/matthew/Documents/CustomClassifier/";
         const batch = e.data.batchSize;
         const backend = BACKEND || e.data.backend;
@@ -39,22 +44,24 @@ onmessage = async (e) => {
         DEBUG && console.log(`Using backend: ${backend}`);
         backend === "webgpu" && require("@tensorflow/tfjs-backend-webgpu");
         let labels;
-        const labelFile = `../../labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_en.txt`;
-        // const labelFile = path.join(appPath, 'labels.txt')
-        await fetch(labelFile)
-          .then((response) => {
-            if (!response.ok) throw new Error("Network response was not ok");
-            return response.text();
-          })
-          .then((filecontents) => {
-            labels = filecontents.trim().split(/\r?\n/);
-          })
-          .catch((error) => {
-            console.error(
-              "There was a problem fetching the label file:",
-              error
-            );
-          });
+        if (isBirdNET) {
+          const labelFile = `../../labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_en.txt`;
+          // const labelFile = path.join(appPath, 'labels.txt')
+          await fetch(labelFile)
+            .then((response) => {
+              if (!response.ok) throw new Error("Network response was not ok");
+              return response.text();
+            })
+            .then((filecontents) => {
+              labels = filecontents.trim().split(/\r?\n/);
+            })
+            .catch((error) => {
+              console.error(
+                "There was a problem fetching the label file:",
+                error
+              );
+            });
+          }
         DEBUG &&
           console.log(
             `Model received load instruction. Using batch size ${batch}`
@@ -71,9 +78,7 @@ onmessage = async (e) => {
             console.log(tf.env().getFlags());
           }
           myModel = new BirdNETModel(appPath, version);
-          myModel.height = height;
-          myModel.width = width;
-          myModel.labels = labels;
+          isBirdNET && (myModel.labels = labels);
           await myModel.loadModel("layers");
           await myModel.warmUp(batch);
           BACKEND = tf.getBackend();
