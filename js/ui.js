@@ -1118,7 +1118,7 @@ async function sortFilesByTime(fileNames) {
   const fileData = await Promise.all(
     fileNames.map(async (fileName) => {
       const stats = await fs.promises.stat(fileName);
-      return { name: fileName, time: (stats.mtime?.getTime()||stats.mtimeMs) };
+      return { name: fileName, time: stats.mtimeMs };
     })
   );
 
