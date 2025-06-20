@@ -1,5 +1,5 @@
 
-let transferModel, tf;
+let transferModel, tf, DEBUG = true;
 
 const fs = require('node:fs')
 const path = require('node:path')
@@ -132,7 +132,7 @@ async function trainModel({
           .generator(() => readBinaryGzipDataset(trainBin, labels))
           .map(x => useRoll ? roll(x) : x); // optional rolling before mixup
 
-  function createMixupStreamDataset(useRoll, batchSize = 8, alpha = 0.2) {
+  function createMixupStreamDataset(useRoll, batchSize = 8, alpha = 0.4) {
       return tf.tidy(() => {
           const ds1 = createStreamDataset(useRoll).shuffle(50, 42);
           const ds2 = createStreamDataset(useRoll).shuffle(50, 1337); // new generator instance
@@ -141,15 +141,26 @@ async function trainModel({
               .map(({ a, b }) => {
               const lambda = tf.randomGamma([1], alpha, alpha).squeeze();
               const oneMinusLambda = tf.sub(1, lambda);
+
               const xMixed = tf.add(tf.mul(lambda, a.xs), tf.mul(oneMinusLambda, b.xs));
               const yMixed = tf.add(tf.mul(lambda, a.ys), tf.mul(oneMinusLambda, b.ys));
               return { xs: xMixed, ys: yMixed };
               })
-              .batch(batchSize);
+              .batch(8);
       })
   }
 
   const train_ds = mixup ? createMixupStreamDataset(useRoll) : createStreamDataset().batch(8);
+  if (DEBUG){
+    train_ds.take(1).forEachAsync(({ xs, ys }) => {
+      return tf.tidy(() =>{
+        const first = tf.slice(xs, [0, 0], [1, xs.shape[1]]);
+        Model.getSpectrogram({buffer:first, filepath:saveLocation,file:`sample.png`})
+        xs.print();
+        ys.print();
+      })
+    });
+  }
   let val_ds;
   if (validation){
     val_ds = tf.data.generator(() => readBinaryGzipDataset(valBin, labels)).batch(8);
@@ -157,7 +168,7 @@ async function trainModel({
   // Train on your new data
   // Assume `xTrain` and `yTrain` are your input and combined output labels
   const history = await transferModel.fitDataset(train_ds, {
-    batchSize: 32,
+    batchSize: 8,
     epochs,
     validationData: validation ? val_ds : undefined,
     callbacks: [earlyStopping, events]
@@ -226,10 +237,10 @@ Dropout: ${dropout}
     }
   })
   optimizer.dispose();
-  console.log(`Tensors in memory after: ${tf.memory().numTensors}`);
+  // console.log(`Tensors in memory after: ${tf.memory().numTensors}`);
   Model.model_loaded = false;
   await Model.loadModel("layers");
-  console.log(`Tensors in memory new model: ${JSON.stringify(tf.memory())}`);
+  // console.log(`Tensors in memory new model: ${JSON.stringify(tf.memory())}`);
   console.log('new model made')
   return history.history
 }

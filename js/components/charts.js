@@ -430,9 +430,9 @@ function plotTrainingHistory(history) {
         labels,
         datasets: [
           { label: 'Loss', data: history.loss, borderColor: 'red', fill: true, tension: 0.3 },
-          { label: 'Val Loss', data: history.val_loss, borderColor: 'orange', fill: false, tension: 0.3 },
-          { label: 'Accuracy', data: history.categoricalAccuracy, borderColor: 'green', fill: false, tension: 0.3 },
-          { label: 'Val Accuracy', data: history.val_categoricalAccuracy, borderColor: 'blue', fill: false, tension: 0.3 }
+          { label: 'Val Loss', data: history.val_loss, borderColor: 'gold', fill: true, tension: 0.3 },
+          { label: 'Accuracy', data: history.categoricalAccuracy, borderColor: 'green', fill: true, tension: 0.3 },
+          { label: 'Val Accuracy', data: history.val_categoricalAccuracy, borderColor: 'blue', fill: true, tension: 0.3 }
         ]
       },
       options: {

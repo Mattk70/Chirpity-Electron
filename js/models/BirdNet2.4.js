@@ -116,41 +116,7 @@ onmessage = async (e) => {
         break;
       }
       case "get-spectrogram": {
-        const buffer = e.data.buffer;
-        if (buffer.length < myModel.chunkLength) {
-          return;
-        }
-        const specFile = e.data.file;
-        const filepath = e.data.filepath;
-        const image = tf.tidy(() => {
-          // Get the spec layer by name
-          const concat = myModel.model.getLayer("concatenate");
-          // Create a new model that outputs the MEL_SPEC1 layer
-          const intermediateModel = tf.model({
-              inputs: myModel.model.inputs,
-              outputs: concat.output,
-            });
-          const signal = tf.tensor1d(buffer, "float32").reshape([1, 144000]);
-            // Get the output of the MEL_SPEC1 layer
-          
-        let spec = myModel.normalise(intermediateModel.predict(signal));
-        // Add a zero channel to the spectrogram so the resulting png has 3 channels and is in colour 
-        const [b, h, w, _] = spec.shape;
-        const zeroChannel = tf.zeros([b, h, w, 1], spec.dtype);
-          return tf.concat([spec, zeroChannel], -1);
-        });
-        const [batch, height, width, channels] = image.shape;
-        response = {
-          message: "spectrogram",
-          width: width,
-          height: height,
-          channels,
-          image: await image.data(),
-          file: specFile,
-          filepath,
-          worker,
-        };
-        postMessage(response);
+        await this.getSpectrogram(e.data)
         break;
     }
       case "predict": {
@@ -228,6 +194,40 @@ class BirdNETModel extends BaseModel {
     );
     DEBUG && console.log("predictCunk end", tf.memory());
     return [result, file, fileStart];
+  }
+  getSpectrogram(data){
+    const {buffer, file:specFile, filepath} = data;
+    if (buffer.length < myModel.chunkLength) {
+      return;
+    }
+    const image = tf.tidy(() => {
+      // Get the spec layer by name
+      const concat = myModel.model.getLayer("concatenate");
+      // Create a new model that outputs the MEL_SPEC1 layer
+      const intermediateModel = tf.model({
+          inputs: myModel.model.inputs,
+          outputs: concat.output,
+        });
+      const signal = (buffer.shape ? buffer : tf.tensor1d(buffer, "float32")).reshape([1, 144000]);
+        // Get the output of the MEL_SPEC1 layer
+      
+      let spec = myModel.normalise(intermediateModel.predict(signal));
+      // Add a zero channel to the spectrogram so the resulting png has 3 channels and is in colour 
+      const [b, h, w, _] = spec.shape;
+      const zeroChannel = tf.zeros([b, h, w, 1], spec.dtype);
+      return tf.concat([spec, zeroChannel], -1);
+    });
+    const [batch, height, width, channels] = image.shape;
+    const response = {
+      message: "spectrogram",
+      width: width,
+      height: height,
+      channels,
+      image: image.dataSync(),
+      file: specFile,
+      filepath,
+    };
+    postMessage(response);
   }
 }
 
