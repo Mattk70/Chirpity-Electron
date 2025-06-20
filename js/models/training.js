@@ -231,7 +231,6 @@ async function trainModel({
 
 Settings:
   Epochs:${epochs}
-  Training stopped at Epoch: ${history.epoch.length}
   Learning rate: ${initialLearningRate}
   Cosine Learning rate decay: ${decay}
 Classifier:  
