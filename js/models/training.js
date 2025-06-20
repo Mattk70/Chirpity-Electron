@@ -1,5 +1,5 @@
 
-let transferModel, tf, DEBUG = true;
+let transferModel, tf, DEBUG = false;
 
 const fs = require('node:fs')
 const path = require('node:path')
@@ -20,6 +20,7 @@ function cosineDecay(initialLearningRate, globalStep, decaySteps) {
 async function trainModel({
   Model, 
   lr:initialLearningRate, 
+  batchSize = 8,
   dropout, epochs, hidden,
   dataset, cache:cacheFolder, modelLocation:saveLocation, modelType, 
   useCache, validation, mixup, decay, roll:useRoll}) {
@@ -79,21 +80,28 @@ async function trainModel({
   const trainBin = path.join(cacheFolder, "train_ds.bin");
   const valBin = path.join(cacheFolder, "val_ds.bin");
 
-  if (! cacheRecords || ! fs.existsSync(trainBin)){
-    if (validation){
-      const { trainFiles, valFiles } = stratifiedSplit(allFiles, validation);
-      await writeBinaryGzipDataset(trainFiles, trainBin, labelToIndex, postMessage, "Preparing training data");
-      await writeBinaryGzipDataset(valFiles, valBin, labelToIndex, postMessage, "Preparing validation data");
-    } else {
-      await writeBinaryGzipDataset(allFiles, trainBin, labelToIndex, postMessage, "Preparing training data");
-    }
+  let trainFiles, valFiles;
+
+  if (validation) {
+    ({ trainFiles, valFiles } = stratifiedSplit(allFiles, validation));
+  } else {
+    trainFiles = allFiles;
   }
+
+  if (!cacheRecords || !fs.existsSync(trainBin)) {
+    await writeBinaryGzipDataset(trainFiles, trainBin, labelToIndex, postMessage, "Preparing training data");
+  }
+
+  if (validation && (!cacheRecords || !fs.existsSync(valBin))) {
+    await writeBinaryGzipDataset(valFiles, valBin, labelToIndex, postMessage, "Preparing validation data");
+  }
+
   // Callbacks
   const earlyStopping = tf.callbacks.earlyStopping({monitor: 'val_loss', minDelta: 0.0001, patience: 3})
   const events = new tf.CustomCallback({
     onYield: (epoch, batch, _logs) =>{
       batch += 1;
-      const batchesInEpoch = Math.floor(allFiles.length / 32);
+      const batchesInEpoch = Math.floor(trainFiles.length / 32);
       const progress = (batch / batchesInEpoch) * 100
       postMessage({
             message: "training-progress", 
@@ -146,11 +154,11 @@ async function trainModel({
               const yMixed = tf.add(tf.mul(lambda, a.ys), tf.mul(oneMinusLambda, b.ys));
               return { xs: xMixed, ys: yMixed };
               })
-              .batch(8);
+              .batch(batchSize);
       })
   }
 
-  const train_ds = mixup ? createMixupStreamDataset(useRoll) : createStreamDataset().batch(8);
+  const train_ds = mixup ? createMixupStreamDataset(useRoll) : createStreamDataset().batch(batchSize);
   if (DEBUG){
     train_ds.take(1).forEachAsync(({ xs, ys }) => {
       return tf.tidy(() =>{
@@ -168,7 +176,7 @@ async function trainModel({
   // Train on your new data
   // Assume `xTrain` and `yTrain` are your input and combined output labels
   const history = await transferModel.fitDataset(train_ds, {
-    batchSize: 8,
+    batchSize,
     epochs,
     validationData: validation ? val_ds : undefined,
     callbacks: [earlyStopping, events]
@@ -180,10 +188,12 @@ async function trainModel({
       autohide = false
   }
   const {loss:l, val_loss, categoricalAccuracy:Acc, val_categoricalAccuracy} = history.history;
-  notice += `Loss = ${l[l.length -1].toFixed(4)}<br>
-    Accuracy = ${(Acc[Acc.length -1]* 100).toFixed(2)}%`
-  val_loss && (notice += `<br>Validation Loss = ${val_loss[val_loss.length -1].toFixed(4)}<br>
-    Validation Accuracy = ${(val_categoricalAccuracy[val_categoricalAccuracy.length -1]*100).toFixed(2)}%`),
+  notice += `Metrics:
+  Loss = ${l[l.length -1].toFixed(4)}<br>
+  Accuracy = ${(Acc[Acc.length -1]* 100).toFixed(2)}%<br>`
+  val_loss && (notice += `
+  Validation Loss = ${val_loss[val_loss.length -1].toFixed(4)}<br>
+  Validation Accuracy = ${(val_categoricalAccuracy[val_categoricalAccuracy.length -1]*100).toFixed(2)}%`),
   postMessage({
       message: "training-results", 
       notice,
@@ -203,9 +213,8 @@ async function trainModel({
     mergedLabels = Model.labels.concat(labels);
   }
   const finalModel = mergedModel || transferModel;   
-  // Construct absolute path
+  // Read BirdNET config to extract mel_Spec configs to inject into custom model config
   const modelPath = path.resolve(__dirname, '../../BirdNET_GLOBAL_6K_V2.4_Model_TFJS/static/model/model.json');
-  // Read and parse JSON
   const bnConfig = JSON.parse(fs.readFileSync(modelPath, 'utf-8'));
   const melSpec1Config = bnConfig.modelTopology.model_config.config.layers[1].config;
   const melSpec2Config = bnConfig.modelTopology.model_config.config.layers[2].config;
@@ -219,15 +228,22 @@ async function trainModel({
   // Write to a file
   fs.writeFileSync(path.join(saveLocation, 'labels.txt'), labelData, 'utf8');
   notice += `
-Settings:
-Learning rate: ${initialLearningRate}
-Epochs:${epochs}
-Hidden units:${hidden}
-Dropout: ${dropout}
-`
-  fs.writeFileSync(saveLocation + 'training_metrics.txt', notice.replaceAll('<br>', ''), 'utf8');
 
-  console.log(`Tensors in memory before: ${tf.memory().numTensors}`);
+Settings:
+  Epochs:${epochs}
+  Training stopped at Epoch: ${history.epoch.length}
+  Learning rate: ${initialLearningRate}
+  Cosine Learning rate decay: ${decay}
+Classifier:  
+  Hidden units:${hidden}
+  Dropout: ${dropout}
+Augmentations:
+  Mixup: ${mixup}
+  Roll: ${useRoll}
+`
+  fs.writeFileSync(path.join(saveLocation, `training_metrics_${Date.now()}.txt`), notice.replaceAll('<br>', ''), 'utf8');
+
+  DEBUG && console.log(`Tensors in memory before: ${tf.memory().numTensors}`);
   baseModel.dispose()
   finalModel.layers.forEach(layer => {
     try{ 
@@ -276,51 +292,77 @@ function getFilesWithLabels(rootDir) {
  * Total per record: 576001 bytes
  */
 async function writeBinaryGzipDataset(fileList, outputPath, labelToIndex, postMessage, description = "Preparing data") {
+  const t0 = Date.now()
+  const pLimit = require('p-limit');
+  const limit = pLimit(8); // Or whatever your CPU/I/O can handle
+
   const gzip = zlib.createGzip();
+  const { once } = require('node:events');
   const writeStream = fs.createWriteStream(outputPath);
   gzip.pipe(writeStream);
-  let count = 0;
+console.log('test')
+  let completed = 0;
+  const onAbort = () => {
+    console.log("Abort received");
+    gzip.end();
+    fs.unlink(outputPath, () => {});
+  };
 
-  for (const { filePath, label } of fileList) {
-    count++;
-    postMessage({
-      message: "training-progress", 
-      progress: { percent: (count / fileList.length) * 100 },
-      text: `${description}: `
-    });
-    let errored = false;
-    let audioArray = await decodeAudio(filePath).catch(err => {
+  abortController.once('abort', onAbort);
+
+  const tasks = fileList.map(({ filePath, label }) =>
+    limit(async () => {
+      let audioArray;
+      try {
+        audioArray = await decodeAudio(filePath);
+      } catch (err) {
+        postMessage({
+          message: "training-results", 
+          notice: `Error loading file:<br>${filePath}<br>${err}`,
+          type: 'error'
+        });
+        
+        completed++;
+        return;
+      }
+
+      const expectedSamples = 48000 * 3;
+      if (audioArray.length !== expectedSamples) {
+        const padded = new Float32Array(expectedSamples);
+        padded.set(audioArray.slice(0, expectedSamples));
+        audioArray = padded;
+      }
+
+      const audioBuffer = Buffer.from(audioArray.buffer);
+      const labelIndex = labelToIndex[label];
+
+      // Up to 65536 labels
+      const labelBuf = Buffer.alloc(2);
+      labelBuf.writeUInt16LE(labelIndex);
+
+      if (!gzip.write(audioBuffer)) {
+        await once(gzip, 'drain');
+      }
+
+      if (!gzip.write(labelBuf)) {
+        await once(gzip, 'drain');
+      }
+
+      completed++;
       postMessage({
-        message: "training-results", 
-        notice: `Error loading file:<br>${filePath}<br> ${err}`,
-        type: 'error'
+        message: "training-progress", 
+        progress: { percent: (completed / fileList.length) * 100 },
+        text: `${description}: `
       });
-      errored = true
-    });
-    if (errored) continue; // Be robust to errors, respect abort
-    const onAbort = () => {
-        console.log("Abort received");
-        gzip.end();
-        fs.unlink(outputPath, () => {});
-    };
+    })
+  );
 
-    abortController.once('abort', onAbort);
 
-    const expectedSamples = 48000 * 3;
-    if (audioArray.length !== expectedSamples) {
-      const padded = new Float32Array(expectedSamples);
-      padded.set(audioArray.slice(0, expectedSamples));
-      audioArray = padded;
-    }
 
-    const audioBuffer = Buffer.from(audioArray.buffer);
-    gzip.write(audioBuffer);
-
-    const labelIndex = labelToIndex[label];
-    gzip.write(Buffer.from([labelIndex]));
-  }
-
+  await Promise.all(tasks);
   gzip.end();
+  abortController.off('abort', onAbort);
+  console.log(`Dataset preparation took: ${((Date.now() - t0)/ 1000).toFixed(0)} seconds. ${completed} files processed.`)
 }
 
 
@@ -349,7 +391,7 @@ function stratifiedSplit(allFiles, valRatio = 0.2) {
 }
 
 async function* readBinaryGzipDataset(gzippedPath, labels) {
-  const RECORD_SIZE = 576001; // 144000 * 4 + 1
+  const RECORD_SIZE = 576002; // 144000 * 4 + 2 bytes for the label
   const gunzip = zlib.createGunzip();
   const stream = fs.createReadStream(gzippedPath).pipe(gunzip);
 
@@ -363,13 +405,13 @@ async function* readBinaryGzipDataset(gzippedPath, labels) {
     while (offset + RECORD_SIZE <= total) {
       const record = data.subarray(offset, offset + RECORD_SIZE);
       const audioBuf = record.subarray(0, 144000 * 4);
-      const labelByte = record.readUInt8(RECORD_SIZE - 1);
+      const labelIndex = record.readUInt16LE(RECORD_SIZE - 2);
 
       const audio = new Float32Array(audioBuf.buffer, audioBuf.byteOffset, 144000);
 
       yield {
         xs: tf.tensor1d(audio),
-        ys: tf.oneHot(labelByte, labels.length)
+        ys: tf.oneHot(labelIndex, labels.length)
       };
 
       offset += RECORD_SIZE;
@@ -398,7 +440,7 @@ async function decodeAudio(filePath) {
       .audioCodec('pcm_s16le')
       .audioChannels(1)
       .audioFrequency(48000)
-      .seekInput(1)
+      // .seekInput(1)
       .duration(3.0) // Limit to 3 seconds
       .on('error', reject)
       .on('end', () => {

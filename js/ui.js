@@ -1118,7 +1118,7 @@ async function sortFilesByTime(fileNames) {
   const fileData = await Promise.all(
     fileNames.map(async (fileName) => {
       const stats = await fs.promises.stat(fileName);
-      return { name: fileName, time: stats.mtime.getTime() };
+      return { name: fileName, time: (stats.mtime?.getTime()||stats.mtimeMs) };
     })
   );
 
@@ -5220,12 +5220,28 @@ async function handleUIClicks(e) {
       if (!(lr && epochs)) {
         generateToast({message:'A value for both Epochs and Learning rate is needed', type:'warning'})
         break;
+      }      
+      function isDirectory(entry) {
+        const typeSymbol = Object.getOwnPropertySymbols(entry).find(sym => sym.toString().includes('type'));
+        return entry[typeSymbol] === 2;
       }
+      const entries = fs.readdirSync(datasetLocation, { withFileTypes: true }).filter(e => isDirectory(e) && ! e.name.startsWith('.'));
+      const folders = entries.map(entry => entry.name);
+      // Check valid formatting
+      let errors = false
+      for (const f of folders) {
+        const parts = f.split('_');
+        if (parts.length !== 2){
+          generateToast({message:`There are audio folders not in the correct format.<br>
+              <b>"scientific name_common name"</b> is expected but found:<br>
+              <b>${f}</b>`, type: 'warning', autohide: false})
+          errors = true;
+          break
+        }
+      }
+      if (errors) break
       if (modelType === 'append'){
         function findDuplicateLines(labelFile) {
-          const entries = fs.readdirSync(datasetLocation, { withFileTypes: true });
-          const folders = entries
-            .map(entry => entry.name);
           const labels = new Set(fs.readFileSync(labelFile, 'utf8').split('\n').map(l => l.trim()));
           return folders.filter(f => labels.has(f) && f !== '');
         }
