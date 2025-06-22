@@ -7649,6 +7649,7 @@ document.addEventListener("labelsUpdated", (e) => {
  */
 function getFilteredBirds(search, list) {
   if (!search || typeof search !== "string") return [];
+  const collator = new Intl.Collator(config.locale.replace(/_.*$/, ""))
   const sortedList = list
     .filter(bird => bird.toLowerCase().includes(search))
     .map((item) => {
@@ -7657,7 +7658,7 @@ function getFilteredBirds(search, list) {
       return { cname, sname, styled: `${cname} <br/><i>${sname}</i>` };
     })
     .sort((a, b) =>
-      new Intl.Collator(config.locale.replace(/_.*$/, "")).compare(
+      collator.compare(
         a.cname,
         b.cname
       )

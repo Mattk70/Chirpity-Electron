@@ -568,7 +568,6 @@ async function handleMessage(e) {
             tag.id,
             tag.name
           );
-          console.log(query)
         }
         const result = await STATE.db.allAsync("SELECT id, name FROM tags");
         UI.postMessage({ event: "tags", tags: result, init: false });
@@ -2207,7 +2206,7 @@ async function processAudio(
     });
     STREAM.on("end", () => {
       const metaDuration = METADATA[file].duration;
-      if (end === metaDuration && duration < metaDuration) {
+      if (start === 0 && end === metaDuration && duration < metaDuration) {
         // If we have a short file (header duration > processed duration)
         // *and* were looking for the whole file, we'll fix # of expected chunks here
         batchChunksToSend[file] = Math.ceil(
