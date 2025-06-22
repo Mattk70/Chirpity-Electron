@@ -27,9 +27,9 @@ let isWin32 = false;
 const dbMutex = new Mutex();
 const DATASET = false;
 const DATABASE = "archive_test";
-const adding_chirpity_additions = false;
+const adding_chirpity_additions = true;
 const DATASET_SAVE_LOCATION =
-  "/media/matt/36A5CC3B5FA24585/DATASETS/European/call";
+  "C:/Users/simpo/Downloads";
 let ntsuspend;
 if (process.platform === "win32") {
   ntsuspend = require("ntsuspend");
@@ -556,8 +556,8 @@ async function handleMessage(e) {
     case "update-tag": {
       try {
         const tag = args.alteredOrNew;
-        if (tag.id && tag.name) {
-          const query = STATE.db.runAsync(
+        if (tag?.name) {
+          const query = await STATE.db.runAsync(
             `
             INSERT OR REPLACE INTO tags (id, name) VALUES (?, ?)
             ON CONFLICT(id) DO UPDATE SET name = excluded.name
@@ -2191,7 +2191,7 @@ async function processAudio(
     });
     STREAM.on("end", () => {
       const metaDuration = METADATA[file].duration;
-      if (end === metaDuration && duration < metaDuration) {
+      if (start === 0 && end === metaDuration && duration < metaDuration) {
         // If we have a short file (header duration > processed duration)
         // *and* were looking for the whole file, we'll fix # of expected chunks here
         batchChunksToSend[file] = Math.ceil(
@@ -2279,7 +2279,7 @@ function prepareWavForModel(audio, file, end, chunkStart) {
  * @param {number} [params.end] - The end time in seconds.
  * @returns {Promise<Buffer[]>} - The audio buffer and start time.
  */
-const fetchAudioBuffer = async ({ file = "", start = 0, end }) => {
+const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sampleRate = 24_000 }) => {
   if (!fs.existsSync(file)) {
     const result = await getWorkingFile(file);
     if (!result) throw new Error(`Cannot locate ${file}`);
@@ -2311,8 +2311,8 @@ const fetchAudioBuffer = async ({ file = "", start = 0, end }) => {
       file,
       start,
       end,
-      sampleRate: 24000,
-      format: "wav",
+      sampleRate,
+      format,
       channels: 1,
       additionalFilters,
     });
@@ -2511,7 +2511,7 @@ const convertSpecsFromExistingSpecs = async (path) => {
     const [start, end] = time.split("-");
     // const path_to_save = path.replace('New_Dataset', 'New_Dataset_Converted') + p.sep + species;
     let path_to_save =
-      "/media/matt/36A5CC3B5FA24585/DATASETS/ATTENUATED_pngs/converted" +
+      "/Users/matthew/Downloads/converted" +
       p.sep +
       species;
     let file_to_save = p.join(path_to_save, parts.base);
@@ -2653,9 +2653,11 @@ const saveResults2DataSet = ({ species, included }) => {
               );
             else {
               const [AudioBuffer, _] = await fetchAudioBuffer({
-                start: start,
-                end: end,
+                start,
+                end,
                 file: result.file,
+                format: "s16le",
+                sampleRate
               });
               if (AudioBuffer) {
                 // condition to prevent barfing when audio snippet is v short i.e. fetchAudioBUffer false when < 0.1s
@@ -2704,17 +2706,48 @@ const saveResults2DataSet = ({ species, included }) => {
 const onSpectrogram = async (filepath, file, width, height, data, channels) => {
   const { writeFile, mkdir } = require("node:fs/promises");
   const png = require("fast-png");
+  const p = require("path");
+  channels ??= 1; // Default to greyscale if not specified
   await mkdir(filepath, { recursive: true });
-  let image = png.encode({
-    width: 384,
-    height: 256,
-    data: data,
-    channels: channels,
+const colormap = ''; // Default colormap, can be set to 'hot', 'jet', etc.
+  if (colormap){
+    const colors = require("colormap");
+    // Generate a colour map (e.g., "hot", "jet", "viridis", etc.)
+    const map = colors({
+      colormap: colormap,
+      nshades: 256,
+      format: "rgba",
+      alpha: 1,
+    });
+
+    // Assume `data` is Uint8Array or similar with grayscale values from 0–255
+    const rgbData = new Uint8ClampedArray(width * height * 4); // 4 channels (RGBA)
+
+    for (let i = 0; i < data.length; i++) {
+      const grayscale = data[i] ; // 0–255
+      const [r, g, b, a] = map[Math.round(grayscale)];
+      const offset = i * 4;
+      rgbData[offset] = r;
+      rgbData[offset + 1] = g;
+      rgbData[offset + 2] = b;
+      rgbData[offset + 3] = a * 255; // convert alpha from 0–1 to 0–255
+    }
+    data = rgbData; // Use the RGBA data for the image
+    channels = 4; // RGBA
+  }
+
+  const image = png.encode({
+    width,
+    height,
+    data,
+    channels
   });
+
   const file_to_save = p.join(filepath, file);
   await writeFile(file_to_save, image);
   DEBUG && console.log("saved:", file_to_save);
 };
+
 
 async function uploadOpus({ file, start, end, defaultName, metadata, mode }) {
   const blob = await bufferToAudio({
@@ -3239,6 +3272,7 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
 
 
 const parsePredictions = async (response) => {
+  console.log("Fixup", response.fixup);
   const file = response.file;
   AUDIO_BACKLOG--;
   const latestResult = response.result;

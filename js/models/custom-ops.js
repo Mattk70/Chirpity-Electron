@@ -120,36 +120,6 @@ tf.registerKernel({
 
 
 /**
- * Computes the short-time Fourier transform (STFT) of a batched signal using a custom framing kernel and window function.
- *
- * Frames the input signal into overlapping segments, applies a window function to each frame, and computes the real FFT of each windowed frame.
- *
- * @param {tf.Tensor} signal - Input tensor of shape [batchSize, signalLength].
- * @param {number} frameLength - Length of each frame.
- * @param {number} frameStep - Step size between frames.
- * @param {number} [fftLength=frameLength] - Length of the FFT to compute for each frame.
- * @param {function} [windowFn=tf.signal.hannWindow] - Function that generates the window to apply to each frame.
- * @returns {tf.Tensor} Complex tensor containing the STFT of the input signal.
- */
-function custom_stft(
-  signal,                   // shape: [batchSize, signalLength]
-  frameLength,
-  frameStep,
-  fftLength = frameLength,
-  windowFn = tf.signal.hannWindow
-) {
-  const framedSignal = tf.engine().runKernel("batchFrame", {
-    input: signal,
-    frameLength,
-    frameStep,
-  });
-  const window = windowFn(frameLength).reshape([1, 1, frameLength]); // broadcast over batch and frames
-  const windowed = tf.mul(framedSignal, window);
-  return  tf.spectral.rfft(windowed, fftLength);
-}
-
-
-/**
  * Computes the short-time Fourier transform (STFT) of a batched signal tensor using a custom GPU-accelerated FFT kernel.
  * Adapted from https://github.com/georg95/birdnet-web/blob/main/birdnet.js
  * Frames the input signal, applies a window function, and computes the real FFT for each frame. Returns the complex frequency-domain representation for each frame, retaining only the non-redundant half of the spectrum.
@@ -167,13 +137,12 @@ function stft(signal, frameLength, frameStep, fftLength, windowFn) {
     const input = tf.mul(framedSignal, window);
     const shape = input.shape;
     const realValues = tf.engine().runKernel('FFT2', {input: input.reshape([-1, frameLength])})
-    const half = Math.floor(frameLength / 2) + 1;
+    const half = frameLength / 2 + 1; // here we assume that frameLength is a power of 2
     const realComplexConjugate = tf.split(
         realValues, [half, frameLength - half],
         realValues.shape.length - 1);
-    const outputShape = shape.slice();
-    outputShape[shape.length - 1] = half;
-    return tf.reshape(realComplexConjugate[0], outputShape)
+    shape[shape.length - 1] = half;
+    return tf.reshape(realComplexConjugate[0], shape)
 }
 
 // Credit for these 2 FFT kernels goes to https://github.com/georg95
@@ -269,7 +238,7 @@ tf.registerKernel({
         const innerDim = width / 2;
         const workgroupSize = [64, 1, 1]
         const dispatchLayout = flatDispatchLayout([batch, width])
-        const dispatch = computeDispatch(dispatchLayout, [batch, innerDim * 2], workgroupSize, [2, 1, 1])
+        const dispatch = computeDispatch(dispatchLayout, [batch, width], workgroupSize, [2, 1, 1])
         let currentTensor = backend.runWebGPUProgram({
             variableNames: ['X'],
             outputShape: [batch, width],
@@ -356,4 +325,4 @@ tf.registerKernel({
     }
 })
 
-module.exports = {stft, custom_stft}
+module.exports = {stft, flatDispatchLayout, computeDispatch, tf};

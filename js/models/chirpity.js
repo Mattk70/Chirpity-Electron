@@ -52,8 +52,6 @@ function loadModel(params) {
     if (backend === "webgl") {
       tf.env().set("WEBGL_FORCE_F16_TEXTURES", true);
       tf.env().set("WEBGL_EXP_CONV", true);
-      // tf.env().set("TOPK_K_CPU_HANDOFF_THRESHOLD", 128); <- this is the default
-      tf.env().set("TOPK_LAST_DIM_CPU_HANDOFF_SIZE_THRESHOLD", 0);
     } else if (backend === "webgpu") {
       // tf.env().set("WEBGPU_DEFERRED_SUBMIT_BATCH_SIZE", 64); // Affects GPU RAM at expense of speed
       // tf.env().set("WEBGPU_CPU_HANDOFF_SIZE_THRESHOLD", 1000); // MatMulPackedProgram
@@ -136,9 +134,9 @@ onmessage = async (e) => {
         response = {
           message: "prediction",
           file: filename,
-          result: result,
+          result,
           fileStart: startPosition,
-          worker: worker,
+          worker,
           selection: myModel.selection,
         };
         postMessage(response);
@@ -157,27 +155,25 @@ onmessage = async (e) => {
         let image;
         image = tf.tidy(() => {
           const signal = tf.tensor1d(buffer, "float32");
-          const bufferTensor = myModel.normalise_audio_batch(signal);
-          const imageTensor = tf.tidy(() => {
+          const bufferTensor = myModel.normalise_audio_batch(signal).expandDims(0);
+          let imageTensor = tf.tidy(() => {
             return myModel.makeSpectrogram(bufferTensor);
           });
-          let spec = myModel.fixUpSpecBatch(
-            tf.expandDims(imageTensor, 0),
-            spec_height,
-            spec_width
-          );
+
+          let spec = myModel.normalise(imageTensor);
           const spec_max = tf.max(spec);
-          return spec.mul(255).div(spec_max).dataSync();
+          return spec.mul(255).div(spec_max).expandDims(-1).dataSync();
         });
+        const [batch, height, width, channels] = myModel.inputShape;
         response = {
           message: "spectrogram",
-          width: myModel.inputShape[2],
-          height: myModel.inputShape[1],
-          channels: myModel.inputShape[3],
-          image: image,
+          width: 257,// width
+          height: 385, // height,
+          channels,
+          image,
           file: specFile,
-          filepath: filepath,
-          worker: worker,
+          filepath,
+          worker,
         };
         postMessage(response);
         break;
@@ -377,7 +373,7 @@ class ChirpityModel extends BaseModel {
     let specBatch = tf.tidy(() => {
       return this.backend === "tensorflow"
         ? this.fixUpSpecBatch(tf.stack(tf.unstack(bufferList).map((x) => this.makeSpectrogram(x))))
-        : (this.fixUpSpecBatch(this.makeSpectrogram(bufferList)));
+        : this.fixUpSpecBatch(this.makeSpectrogram(bufferList));
     });
 
     bufferList.dispose();
