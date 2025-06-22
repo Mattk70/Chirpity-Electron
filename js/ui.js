@@ -1838,8 +1838,8 @@ const defaultConfig = {
   warmup: true,
   hasNode: false,
   tensorflow: { threads: DIAGNOSTICS["Cores"], batchSize: 8 },
-  webgpu: { threads: 1, batchSize: 32 },
-  webgl: { threads: 1, batchSize: 32 },
+  webgpu: { threads: 1, batchSize: 8 },
+  webgl: { threads: 1, batchSize: 8 },
   audio: {
     gain: 0,
     format: "mp3",
