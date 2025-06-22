@@ -96,14 +96,8 @@ onmessage = async (e) => {
       case "train-model":{
         const {trainModel} = require('./training.js');
         const args = e.data;
-          trainModel({ ...args, Model: myModel}).then((history) => {
-            postMessage({
-              message: "training-results", 
-              notice: "Training completed successfully! Model saved in:<br>" + args.modelLocation,
-              complete: true,
-              autohide: false,
-              history
-            });
+          trainModel({ ...args, Model: myModel}).then((message) => {
+            postMessage({...message})
           }).catch((err) => {
             postMessage({
               message: "training-results", 

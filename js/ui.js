@@ -175,7 +175,7 @@ const GLOBAL_ACTIONS = {
   },
   Escape: () => {
     if (PREDICTING || STATE.training) {
-      console.log("Operation aborted");
+      STATE.training && DOM.trainNav.classList.remove('disabled');
       PREDICTING = false; STATE.training = false;
       disableSettingsDuringAnalysis(false);
       const summarySpecies = DOM.summaryTable.querySelectorAll(".cname");
@@ -2217,7 +2217,13 @@ const setUpWorkerMessaging = () => {
           break;
         }
         case "generate-alert": {
-          if (args.complete) STATE.training = false;
+          if (args.complete) {
+            STATE.training = false;
+            DOM.trainNav.classList.remove('disabled');
+          }
+          if (args.history){
+            plotTrainingHistory(args.history)
+          }
           if (args.updateFilenamePanel) {
             renderFilenamePanel();
             window.electron.unsavedRecords(false);
@@ -2239,9 +2245,6 @@ const setUpWorkerMessaging = () => {
                                 </button>
                             </div>
                             `;
-          }
-          if (args.history){
-            plotTrainingHistory(args.history)
           }
           generateToast(args);
           // This is how we know the database update has completed
@@ -4405,8 +4408,7 @@ const modelSettingsDisplay = () => {
     nodeOnly.forEach((element) => element.classList.add("d-none"));
   }
   // Hide train unless BirdNET
-  const trainNav = document.getElementById('navbarTraining');
-  trainNav.classList.toggle('disabled', config.selectedModel !== 'birdnet')
+  DOM.trainNav.classList.toggle('disabled', config.selectedModel !== 'birdnet')
 };
 
 const contextAwareIconDisplay = () => {
@@ -5254,6 +5256,7 @@ async function handleUIClicks(e) {
           break;
         }
       }
+      DOM.trainNav.classList.add('disabled')
       training.hide();
       STATE.training = true;
       worker.postMessage({

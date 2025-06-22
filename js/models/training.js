@@ -142,23 +142,23 @@ async function trainModel({
 
   function createMixupStreamDataset(useRoll, batchSize = 8, alpha = 0.4) {
       return tf.tidy(() => {
-          const ds1 = createStreamDataset(useRoll).shuffle(50, 42);
-          const ds2 = createStreamDataset(useRoll).shuffle(50, 1337); // new generator instance
-          return tf.data
-              .zip({ a: ds1, b: ds2 })
-              .map(({ a, b }) => {
-              const lambda = tf.randomGamma([1], alpha, alpha).squeeze();
-              const oneMinusLambda = tf.sub(1, lambda);
+        const ds1 = createStreamDataset(useRoll).shuffle(50, 42);
+        const ds2 = createStreamDataset(useRoll).shuffle(50, 1337); // new generator instance
+        return tf.data
+          .zip({ a: ds1, b: ds2 })
+          .map(({ a, b }) => {
+            const lambda = tf.randomGamma([1], alpha, alpha).squeeze();
+            const oneMinusLambda = tf.sub(1, lambda);
 
-              const xMixed = tf.add(tf.mul(lambda, a.xs), tf.mul(oneMinusLambda, b.xs));
-              const yMixed = tf.add(tf.mul(lambda, a.ys), tf.mul(oneMinusLambda, b.ys));
-              return { xs: xMixed, ys: yMixed };
-              })
-              .batch(batchSize);
+            const xMixed = tf.add(tf.mul(lambda, a.xs), tf.mul(oneMinusLambda, b.xs));
+            const yMixed = tf.add(tf.mul(lambda, a.ys), tf.mul(oneMinusLambda, b.ys));
+            return { xs: xMixed, ys: yMixed };
+          })
+          .batch(batchSize);
       })
   }
 
-  const train_ds = mixup ? createMixupStreamDataset(useRoll) : createStreamDataset().batch(batchSize);
+  const train_ds = mixup ? createMixupStreamDataset(useRoll, batchSize).prefetch(1) : createStreamDataset().batch(batchSize);
   if (DEBUG){
     train_ds.take(1).forEachAsync(({ xs, ys }) => {
       return tf.tidy(() =>{
@@ -181,26 +181,23 @@ async function trainModel({
     validationData: validation ? val_ds : undefined,
     callbacks: [earlyStopping, events]
   });
-  let notice ='', type = '', autohide = true;
+  let notice ='', type = '';
   if (history.epoch.length < epochs){
-      notice += `Training halted at Epoch ${history.epoch.length} due to no further improvement: <br>`;
-      type = 'warning',
-      autohide = false
+      notice += `Training halted at Epoch ${history.epoch.length} due to no further improvement. <br>`;
+      type = 'warning';
   }
   const {loss:l, val_loss, categoricalAccuracy:Acc, val_categoricalAccuracy} = history.history;
-  notice += `Metrics:
+  notice += `
+Metrics:<br>
   Loss = ${l[l.length -1].toFixed(4)}<br>
   Accuracy = ${(Acc[Acc.length -1]* 100).toFixed(2)}%<br>`
   val_loss && (notice += `
   Validation Loss = ${val_loss[val_loss.length -1].toFixed(4)}<br>
-  Validation Accuracy = ${(val_categoricalAccuracy[val_categoricalAccuracy.length -1]*100).toFixed(2)}%`),
-  postMessage({
-      message: "training-results", 
-      notice,
-      type,
-      autohide
-    });
-  // Save the new model
+  Validation Accuracy = ${(val_categoricalAccuracy[val_categoricalAccuracy.length -1]*100).toFixed(2)}%<br>
+  <br>Training completed! Model saved in:<br>
+  ${saveLocation}`);
+
+  const message = {message: "training-results", notice, type, autohide:false, complete: true, history: history.history}
 
   let mergedModel, mergedLabels;
   if (modelType === 'append'){
@@ -230,9 +227,9 @@ async function trainModel({
   notice += `
 
 Settings:
-  Epochs:${epochs}
+  Epochs:${epochs} 
   Learning rate: ${initialLearningRate}
-  Cosine Learning rate decay: ${decay}
+  Cosine learning rate decay: ${decay}
 Classifier:  
   Hidden units:${hidden}
   Dropout: ${dropout}
@@ -254,10 +251,11 @@ Augmentations:
   optimizer.dispose();
   // console.log(`Tensors in memory after: ${tf.memory().numTensors}`);
   Model.model_loaded = false;
+  Model.one.dispose(), Model.two.dispose(), Model.scalarFive.dispose();
   await Model.loadModel("layers");
   // console.log(`Tensors in memory new model: ${JSON.stringify(tf.memory())}`);
   console.log('new model made')
-  return history.history
+  return message
 }
 
 
@@ -474,26 +472,4 @@ function roll(x) {
   })
 }
 
-/**
- * Applies streaming Mixup on two datasets.
- * Each input dataset should independently shuffle and repeat.
- * @param {tf.data.Dataset} dataset - Base dataset yielding {xs, ys}
- * @param {number} alpha - Mixup alpha parameter (not used directly here, lambda is uniform)
- * @returns {tf.data.Dataset}
- */
-function createMixupDataset(dataset, alpha = 0.2) {
-  const datasetA = dataset.shuffle(1000).repeat(); // assumes .shuffle() is supported
-  const datasetB = dataset.shuffle(1000).repeat();
-
-  const paired = tf.data.zip({ a: datasetA, b: datasetB });
-
-  return paired.map(({ a, b }) => {
-    const lambda = tf.randomUniform([1], 0, 1).squeeze(); // approx Beta(alpha, alpha)
-
-    const xMixed = tf.add(tf.mul(lambda, a.xs), tf.mul(tf.sub(1, lambda), b.xs));
-    const yMixed = tf.add(tf.mul(lambda, a.ys), tf.mul(tf.sub(1, lambda), b.ys));
-
-    return { xs: xMixed, ys: yMixed };
-  });
-}
 module.exports = {trainModel}
