@@ -565,7 +565,6 @@ async function handleMessage(e) {
             tag.id,
             tag.name
           );
-          console.log(query)
         }
         const result = await STATE.db.allAsync("SELECT id, name FROM tags");
         UI.postMessage({ event: "tags", tags: result, init: false });
