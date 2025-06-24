@@ -23,20 +23,20 @@ async function trainModel({
   batchSize = 8,
   dropout, epochs, hidden,
   dataset, cache:cacheFolder, modelLocation:saveLocation, modelType, 
-  useCache, validation, mixup, decay, roll:useRoll}) {
-  const allFiles = getFilesWithLabels(dataset);
+  useCache, validation, mixup, decay, roll:useRoll, useWeights, useFocal, labelSmoothing}) {
+  const {files:allFiles, classWeights} = getFilesWithLabelsAndWeights(dataset);
   if (!allFiles.length){
     throw new Error(`No files found in any label folders in ${dataset}` )
   }
   const baseModel = Model.model;
-  const labels = [...new Set(allFiles.map(f => f.label))];
+  const labels = Object.keys(classWeights); //[...new Set(allFiles.map(f => f.label))];
   const labelToIndex = Object.fromEntries(labels.map((l, i) => [l, i]));
   const t0 = Date.now();
   const cacheRecords = useCache;
-  const loss = tf.losses.softmaxCrossEntropy;
   const metrics = [ tf.metrics.categoricalAccuracy ];
   const optimizer = tf.train.adam(initialLearningRate);
-
+  // Cache in the dataset folder if not selected
+  cacheFolder = cacheFolder || dataset;
   // Freeze base layers (optional)
   for (const layer of baseModel.layers) {
     layer.trainable = false;
@@ -69,10 +69,28 @@ async function trainModel({
     outputs: newClassifier,
   });
 
+  const classWeightsTensor = tf.tensor1d(
+    Object.entries(classWeights)
+      .sort(([a], [b]) => a.localeCompare(b)) // ensure consistent class order
+      .map(([, weight]) => weight)
+  );
+
+  const lossWithWeights = (labels, preds) => {
+    return tf.tidy(() => {
+      let exampleWeights;
+      if (useWeights && !useFocal){
+        const labelIndices = labels.argMax(-1); // [batch_size]
+        exampleWeights = useWeights ? classWeightsTensor.gather(labelIndices) : undefined; // [batch_size]
+      }
+       return useFocal
+        ? sigmoidFocalCrossentropy(labels, preds)
+        : tf.losses.softmaxCrossEntropy(labels, preds, exampleWeights, labelSmoothing);
+    });
+  };
   // Compile the model
   transferModel.compile({
     optimizer,
-    loss,
+    loss: lossWithWeights,
     metrics,
   });
 
@@ -110,8 +128,8 @@ async function trainModel({
       });
     },
     onEpochEnd: (epoch, logs) => {
-      decay && (transferModel.optimizer.learningRate = cosineDecay(initialLearningRate, epoch+1, epochs) );
-      const {loss, val_loss, val_categoricalAccuracy, precision, recall, val_precision, val_recall, categoricalAccuracy} = logs;
+      decay && (transferModel.optimizer.learningRate = Math.max(1e-6, cosineDecay(initialLearningRate, epoch+1, epochs)) );
+      const {loss, val_loss, val_categoricalAccuracy, categoricalAccuracy} = logs;
       let notice = `<table class="table table-striped">
             <tr><th colspan="2">Epoch ${epoch + 1}:</th></tr>
             <tr><td>Loss</td> <td>${loss.toFixed(4)}</td></tr>
@@ -120,7 +138,7 @@ async function trainModel({
         `<tr><td>Validation Loss</td><td>${val_loss.toFixed(4)}</td></tr>
         <tr><td>Validation Accuracy</td><td>${(val_categoricalAccuracy*100).toFixed(2)}%</td></tr>`)
       notice += "</table>";
-      console.log(`Tensors in memory: ${tf.memory().numTensors}`);
+      DEBUG && console.log(`Tensors in memory: ${tf.memory().numTensors}`);
       postMessage({ message: "training-results", notice });
     },
     onTrainEnd: (logs) => {
@@ -135,30 +153,11 @@ async function trainModel({
     }
   })
 
-  const createStreamDataset = (useRoll) =>
-      tf.data
-          .generator(() => readBinaryGzipDataset(trainBin, labels))
-          .map(x => useRoll ? roll(x) : x); // optional rolling before mixup
+  const train_ds = mixup 
+    ? createMixupStreamDataset(useRoll).batch(batchSize)
+    : createStreamDataset(useRoll).batch(batchSize)
 
-  function createMixupStreamDataset(useRoll, batchSize = 8, alpha = 0.4) {
-      return tf.tidy(() => {
-        const ds1 = createStreamDataset(useRoll).shuffle(50, 42);
-        const ds2 = createStreamDataset(useRoll).shuffle(50, 1337); // new generator instance
-        return tf.data
-          .zip({ a: ds1, b: ds2 })
-          .map(({ a, b }) => {
-            const lambda = tf.randomGamma([1], alpha, alpha).squeeze();
-            const oneMinusLambda = tf.sub(1, lambda);
 
-            const xMixed = tf.add(tf.mul(lambda, a.xs), tf.mul(oneMinusLambda, b.xs));
-            const yMixed = tf.add(tf.mul(lambda, a.ys), tf.mul(oneMinusLambda, b.ys));
-            return { xs: xMixed, ys: yMixed };
-          })
-          .batch(batchSize);
-      })
-  }
-
-  const train_ds = mixup ? createMixupStreamDataset(useRoll, batchSize).prefetch(1) : createStreamDataset().batch(batchSize);
   if (DEBUG){
     train_ds.take(1).forEachAsync(({ xs, ys }) => {
       return tf.tidy(() =>{
@@ -171,7 +170,7 @@ async function trainModel({
   }
   let val_ds;
   if (validation){
-    val_ds = tf.data.generator(() => readBinaryGzipDataset(valBin, labels)).batch(8);
+    val_ds = tf.tidy(() => tf.data.generator(() => readBinaryGzipDataset(valBin, labels)).batch(batchSize));
   }
   // Train on your new data
   // Assume `xTrain` and `yTrain` are your input and combined output labels
@@ -181,6 +180,8 @@ async function trainModel({
     validationData: validation ? val_ds : undefined,
     callbacks: [earlyStopping, events]
   });
+
+
   let notice ='', type = '';
   if (history.epoch.length < epochs){
       notice += `Training halted at Epoch ${history.epoch.length} due to no further improvement. <br>`;
@@ -230,6 +231,7 @@ Settings:
   Epochs:${epochs} 
   Learning rate: ${initialLearningRate}
   Cosine learning rate decay: ${decay}
+  Focal Loss: ${useFocal}
 Classifier:  
   Hidden units:${hidden}
   Dropout: ${dropout}
@@ -241,6 +243,7 @@ Augmentations:
 
   DEBUG && console.log(`Tensors in memory before: ${tf.memory().numTensors}`);
   baseModel.dispose()
+  classWeightsTensor.dispose()
   finalModel.layers.forEach(layer => {
     try{ 
       layer.dispose();
@@ -258,27 +261,44 @@ Augmentations:
   return message
 }
 
+/// UTILITIES ///
 
-// Get all files recursively and associate with label
-function getFilesWithLabels(rootDir) {
+
+function getFilesWithLabelsAndWeights(rootDir) {
   const files = [];
+  const labelCounts = {};
   const folders = fs.readdirSync(rootDir);
+
   for (const folder of folders) {
-    if (folder.startsWith('.')) continue
+    if (folder.startsWith('.')) continue;
     const folderPath = path.join(rootDir, folder);
     const stats = fs.statSync(folderPath);
     if (stats.isDirectory()) {
       const audioFiles = fs.readdirSync(folderPath);
       for (const file of audioFiles) {
-        if (file.startsWith('.')) continue
+        if (file.startsWith('.')) continue;
+        const label = folder;
         files.push({
           filePath: path.join(folderPath, file),
-          label: folder
+          label: label
         });
+
+        labelCounts[label] = (labelCounts[label] || 0) + 1;
       }
     }
   }
-  return files;
+
+  // Compute class weights: inverse frequency normalised to 1
+  const total = files.length;
+  const classWeights = {};
+  for (const [label, count] of Object.entries(labelCounts)) {
+    classWeights[label] = total / (Object.keys(labelCounts).length * count);
+  }
+
+  return {
+    files,         // [{ filePath, label }]
+    classWeights   // { label1: weight1, label2: weight2, ... }
+  };
 }
 
 
@@ -297,7 +317,6 @@ async function writeBinaryGzipDataset(fileList, outputPath, labelToIndex, postMe
   const { once } = require('node:events');
   const writeStream = fs.createWriteStream(outputPath);
   gzip.pipe(writeStream);
-console.log('test')
   let completed = 0;
   const onAbort = () => {
     console.log("Abort received");
@@ -326,24 +345,26 @@ console.log('test')
       const expectedSamples = 48000 * 3;
       if (audioArray.length !== expectedSamples) {
         const padded = new Float32Array(expectedSamples);
-        padded.set(audioArray.slice(0, expectedSamples));
+        const start = Math.max(audioArray.length - expectedSamples, 0);
+        padded.set(audioArray.slice(start), expectedSamples - (audioArray.length - start));
         audioArray = padded;
       }
 
       const audioBuffer = Buffer.from(audioArray.buffer);
       const labelIndex = labelToIndex[label];
+      if (typeof labelIndex !== 'number' || labelIndex < 0 || labelIndex > 65535) {
+        console.error(`Invalid labelIndex for "${label}" → ${labelIndex}`);
+      }
 
       // Up to 65536 labels
       const labelBuf = Buffer.alloc(2);
       labelBuf.writeUInt16LE(labelIndex);
 
-      if (!gzip.write(audioBuffer)) {
+      const recordBuf = Buffer.concat([audioBuffer, labelBuf]);
+      if (!gzip.write(recordBuf)) {
         await once(gzip, 'drain');
       }
 
-      if (!gzip.write(labelBuf)) {
-        await once(gzip, 'drain');
-      }
 
       completed++;
       postMessage({
@@ -406,6 +427,9 @@ async function* readBinaryGzipDataset(gzippedPath, labels) {
 
       const audio = new Float32Array(audioBuf.buffer, audioBuf.byteOffset, 144000);
 
+      if (labelIndex >= labels.length) {
+        console.error(`Invalid label index: ${labelIndex}. Max allowed: ${labels.length - 1}`);
+      }
       yield {
         xs: tf.tensor1d(audio),
         ys: tf.oneHot(labelIndex, labels.length)
@@ -426,10 +450,41 @@ async function* readBinaryGzipDataset(gzippedPath, labels) {
  * @param {string} filePath - Path to the audio file (any format supported by ffmpeg)
  * @returns {Promise<tf.Tensor2D>} Tensor of shape [numSamples, numChannels]
  */
-async function decodeAudio(filePath) {
-  const ffmpeg = require('fluent-ffmpeg');
+
+const ffmpeg = require('fluent-ffmpeg')
+async function getAudioDuration(filePath) {
   return new Promise((resolve, reject) => {
-    // Convert audio to WAV PCM 16-bit signed, mono, 16kHz
+    let gotDuration = false;
+    const command = ffmpeg(filePath)
+      .on('codecData', data => {
+        if (data.duration) {
+          const parts = data.duration.split(':'); // format: HH:MM:SS.xx
+          const seconds =
+            parseInt(parts[0], 10) * 3600 +
+            parseInt(parts[1], 10) * 60 +
+            parseFloat(parts[2]);
+          gotDuration = true;
+          command.kill(); // Stop the process early
+          resolve(seconds);
+        }
+      })
+      .on('error', err => {
+        if (!gotDuration) reject(err);
+      })
+      .on('end', () => {
+        if (!gotDuration) resolve(0); // If no duration was found, assume 0
+      })
+      .format('null') // dummy output
+      .output('-')
+      .run();
+  });
+}
+
+async function decodeAudio(filePath) {
+  const duration = await getAudioDuration(filePath);
+  const seekTime = duration > 3 ? (duration / 2) - 1.5 : 0;
+
+  return new Promise((resolve, reject) => {
     const chunks = [];
 
     ffmpeg(filePath)
@@ -437,18 +492,16 @@ async function decodeAudio(filePath) {
       .audioCodec('pcm_s16le')
       .audioChannels(1)
       .audioFrequency(48000)
-      // .seekInput(1)
-      .duration(3.0) // Limit to 3 seconds
+      .seekInput(seekTime)
+      .duration(3.0)
       .on('error', reject)
       .on('end', () => {
         const wavBuffer = Buffer.concat(chunks);
         try {
-          // Interpret as Int16 values
           const int16Array = new Int16Array(wavBuffer.buffer, wavBuffer.byteOffset, wavBuffer.length / 2);
-          // Convert to Float32 range [-1, 1]
           const float32Array = new Float32Array(int16Array.length);
           for (let i = 0; i < int16Array.length; i++) {
-            float32Array[i] = int16Array[i] / 32768; // or 32767, depending on convention
+            float32Array[i] = int16Array[i] / 32768;
           }
           resolve(float32Array);
         } catch (err) {
@@ -460,16 +513,76 @@ async function decodeAudio(filePath) {
   });
 }
 
-function roll(x) {
-    return tf.tidy(() =>{
-        const {xs, ys} = x;
-        const size = xs.shape[0];
-        const maxShift = Math.floor(size / 2);
-        const shift = Math.floor(Math.random() * (maxShift + 1)); // random int from 0 to maxShift
 
-        const [left, right] = tf.split(xs, [size - shift, shift], 0);
-        return {xs:tf.concat([right, left], 0), ys};
-  })
+function roll(x) {
+  const {xs, ys} = x;
+  const size = xs.shape[0];
+  const maxShift = Math.floor(size / 2);
+  const shift = Math.floor(Math.random() * (maxShift + 1)); // random int from 0 to maxShift
+
+  const [left, right] = tf.split(xs, [size - shift, shift], 0);
+  return {xs:tf.concat([right, left], 0), ys};
 }
 
+/**
+ * Implements the sigmoid focal crossentropy loss function.
+ *
+ * @param {tf.Tensor} yTrue - Ground truth labels.
+ * @param {tf.Tensor} yPred - Predictions (either logits or probabilities).
+ * @param {number} alpha - Balancing factor (default 0.25).
+ * @param {number} gamma - Modulating factor (default 2.0).
+ * @param {boolean} fromLogits - Whether `yPred` is expected to be logits.
+ * @returns {tf.Tensor} - A tensor representing the focal loss per example.
+ */
+function sigmoidFocalCrossentropy(yTrue, yPred, alpha = 0.25, gamma = 2.0, fromLogits = false) {
+  return tf.tidy(() => {
+    const one = tf.scalar(1);
+    const epsilon = tf.scalar(1e-7);
+    // Use tf.losses.sigmoidCrossEntropy with logits if required
+    const ce = fromLogits
+      ? tf.losses.sigmoidCrossEntropy(yTrue, yPred)
+      : tf.losses.sigmoidCrossEntropy(yTrue, tf.log(tf.div(yPred, one.sub(yPred).add(epsilon)))); // logits from probs
+
+    // p_t: prob of the true class
+    const p_t = tf.add(
+      tf.mul(yTrue, yPred),
+      tf.mul(tf.sub(one, yTrue), tf.sub(one, yPred))
+    );
+
+    // alpha factor
+    const alphaScalar = tf.scalar(alpha);
+    const alphaFactor = tf.add(
+      tf.mul(yTrue, alphaScalar),
+      tf.mul(tf.sub(one, yTrue), tf.sub(one, alphaScalar))
+    );
+
+    // modulating factor
+    const gammaScalar = tf.scalar(gamma);
+    const modulatingFactor = tf.pow(tf.sub(one, p_t), gammaScalar);
+
+    const loss = tf.mul(tf.mul(alphaFactor, tf.mul(modulatingFactor, ce)), 1000);
+    return loss;
+  });
+}
+  const createStreamDataset = (useRoll) =>
+      tf.data
+          .generator(() => readBinaryGzipDataset(trainBin, labels))
+          .map(x => useRoll ? roll(x) : x); // optional rolling before mixup
+
+  function createMixupStreamDataset(useRoll, alpha = 0.4) {
+      return tf.tidy(() => {
+        const ds1 = createStreamDataset(useRoll).shuffle(500, 42);
+        const ds2 = createStreamDataset(useRoll).shuffle(500, 1337); // new generator instance
+        return tf.data
+          .zip({ a: ds1, b: ds2 })
+          .map(({ a, b }) => {
+            const lambda = tf.randomGamma([1], alpha, alpha).squeeze();
+            const oneMinusLambda = tf.sub(1, lambda);
+
+            const xMixed = tf.add(tf.mul(lambda, a.xs), tf.mul(oneMinusLambda, b.xs));
+            const yMixed = tf.add(tf.mul(lambda, a.ys), tf.mul(oneMinusLambda, b.ys));
+            return { xs: xMixed, ys: yMixed };
+          })
+      })
+  }
 module.exports = {trainModel}

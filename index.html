@@ -281,17 +281,31 @@
                         <fieldset class="border rounded p-1">
                             <legend class="h6">Training parameters</legend>
                             <div class="row ps-2">
-                                <div class="form-floating ps-1 mb-3 col">
+                                <div class="form-floating ps-1 col">
                                     <input type="number" id="epochs" class="form-control" min="1" max="300" value="10" required>
                                     <label class="mb-2" for="epochs">Training Epochs</label>
                                 </div>
-                                <div class="form-floating ps-1 mb-3 col">
+                                <div class="form-floating ps-1 col">
                                     <input type="number" id="lr" class="form-control" step="0.000001" min="0.000001" max="0.1" value="0.0001">
                                     <label class="mb-2" for="lr">Learning Rate</label>
                                 </div>
-                                <div class="form-check form-switch col">
+                                <div class="form-floating ps-1 col">
+                                    <input type="number" id="label-smoothing" class="form-control" step="0.01" min="0.0" max="0.5" value="0">
+                                    <label class="mb-2" for="label-smooting">Label Smoothing</label>
+                                </div>
+                            </div>
+                            <div class="row mt-2 m-1 border rounded">
+                                <div class="form-check form-switch col ms-1">
+                                    <input class="form-check-input" type="checkbox" role="switch" name="focal" id="focal">
+                                    <label class="form-check-label" for="focal">Use Focal loss</label>
+                                </div>
+                                <div class="form-check form-switch col ms-1">
                                     <input class="form-check-input" type="checkbox" role="switch" name="decay" id="decay">
-                                    <label class="form-check-label" for="decay">Use learning rate cosine decay</label>
+                                    <label class="form-check-label" for="decay">Use learning rate decay</label>
+                                </div>
+                                <div class="form-check form-switch col ms-1">
+                                    <input class="form-check-input" type="checkbox" role="switch" name="weights" id="weights">
+                                    <label class="form-check-label" for="weights">Use class weights</label>
                                 </div>
                             </div>
                             <legend class="h6">Audio Dataset</legend>
@@ -304,6 +318,7 @@
                                         <option value="0.2" selected>20%</option>
                                     </select>
                                 </div>
+
                             </div>
                             <legend class="h6">Augmentations</legend>
                             <fieldset class="border rounded p-1">

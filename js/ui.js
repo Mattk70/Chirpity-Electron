@@ -1792,7 +1792,10 @@ const defaultConfig = {
       validation: 0.2,
       decay: false,
       mixup: false,
-      roll: false
+      roll: false,
+      labelSmoothing: 0,
+      useWeights: false,
+      useFocal: false
     }
   },
   library: {
@@ -3228,7 +3231,10 @@ const showTraining = () => {
     document.getElementById('hidden-units').value = settings.hidden;
     document.getElementById('lr').value = settings.lr;
     document.getElementById('epochs').value = settings.epochs;
+    document.getElementById('label-smoothing').value = settings.labelSmoothing;
     document.getElementById('decay').checked = settings.decay;
+    document.getElementById('weights').checked = settings.useWeights;
+    document.getElementById('focal').checked = settings.useFocal;
     document.getElementById('mixup').checked = settings.mixup;
     document.getElementById('roll').checked = settings.roll;
     document.getElementById('dropout').value = settings.dropout;
@@ -4607,12 +4613,15 @@ document.addEventListener("drop", (event) => {
         (!file.type ||
           file.type.startsWith("audio/") ||
           file.type.startsWith("video/"))
-    )
-    .map((file) => file.path);
-
-  worker.postMessage({ action: "get-valid-files-list", files: fileList });
+    );
+  let audioFiles;
+  if (fileList[0].path){
+    audioFiles = fileList.map((file) => file.path);
+  } else {
   // For electron 32+
-  // const filelist = audioFiles.map(file => window.electron.showFilePath(file));
+    audioFiles = fileList.map(file => window.electron.showFilePath(file));
+  }
+  worker.postMessage({ action: "get-valid-files-list", files: audioFiles });
 });
 
 // Prevent drag for UI elements
@@ -5233,7 +5242,7 @@ async function handleUIClicks(e) {
       let errors = false
       for (const f of folders) {
         const parts = f.split('_');
-        if (parts.length !== 2){
+        if (parts.length !== 2 && f.toLowerCase() !== 'background' ){
           generateToast({message:`There are audio folders not in the correct format.<br>
               <b>"scientific name_common name"</b> is expected but found:<br>
               <b>${f}</b>`, type: 'warning', autohide: false})
@@ -5258,11 +5267,11 @@ async function handleUIClicks(e) {
       }
       DOM.trainNav.classList.add('disabled')
       training.hide();
+      disableSettingsDuringAnalysis(true)
       STATE.training = true;
       worker.postMessage({
         action: "train-model", 
         dataset, cache, modelLocation, modelType, ...settings});
-      // disableSettingsDuringAnalysis(true)
       break;
     }
     case "import": {
@@ -5297,9 +5306,16 @@ async function handleUIClicks(e) {
       importModal.hide();
       config.models[modelName] = {backend: 'tensorflow', displayName, modelPath:modelLocation};
       config.selectedModel = modelName;
+      const select = document.getElementById('model-to-use');
+      const newOption = document.createElement('option');
+      newOption.value = modelName;
+      newOption.textContent = displayName;
+      select.appendChild(newOption);
+      updatePrefs('config.json', config)
       updateModelOptions();
       handleModelChange(modelName);
-      updatePrefs('config.json', config)
+      select.value = modelName;
+      select.dispatchEvent(new Event('change'));
       break;
     }
     case "expunge":{
@@ -5310,19 +5326,11 @@ async function handleUIClicks(e) {
         break;
       }
       const model = document.getElementById('custom-models').value;
-      // if (['birdnet', 'chirpity', 'nocmig'].includes(displayName)){
-      //   generateToast({message: 'Only custom models can be removed', type:'warning'})
-      //   break;
-      // }
-      // if (config.models[displayName] === undefined){
-      //   generateToast({message: 'Model name not found', type:'warning'})
-      //   break;
-      // }
       worker.postMessage({action:"expunge-model", model})
       delete config.models[model];
+      document.querySelector(`#model-to-use option[value="${model}"]`)?.remove();
       updatePrefs('config.json', config);
       expungeModal.hide();
-
       break;
     }
     // Help Menu
@@ -5837,6 +5845,10 @@ document.addEventListener("change", async function (e) {
         case "useCache": {config.training.settings.useCache = element.checked; break}
         case "mixup": {config.training.settings.mixup = element.checked; break}
         case "decay": {config.training.settings.decay = element.checked; break}
+        case "weights": {config.training.settings.useWeights = element.checked; break}
+        case "focal": {config.training.settings.useFocal = element.checked; break}
+        case "label-smoothing": {
+          config.training.settings.labelSmoothing = element.valueAsNumber; break}
         case "roll": {config.training.settings.roll = element.checked; break}
         // --- Backends
         case "tensorflow":
@@ -7562,7 +7574,6 @@ function setKeyAssignment(inputEL, key) {
  * an {@code i18n.Select} parameter to initialize internationalization context.
  */
 function setKeyAssignmentUI(keyAssignments) {
-  const i18 = i18n.get(i18n.Select);
   Object.entries(keyAssignments).forEach(([k, v]) => {
     const input = document.getElementById(k);
     input.value = v.value;

@@ -479,7 +479,7 @@ async function handleMessage(e) {
       break;
     }
     case "export-results": {
-      args.format === 'summary' 
+      args.format === 'summary'
       ? await getSummary(args) 
       : await getResults(args);
       break;
@@ -3288,7 +3288,6 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
 
 
 const parsePredictions = async (response) => {
-  console.log("Fixup", response.fixup);
   const file = response.file;
   AUDIO_BACKLOG--;
   const latestResult = response.result;
@@ -3759,7 +3758,7 @@ const getResults = async ({
             .slice(0, 5)
             .join(" ")
             .replaceAll(":", "_");
-          const filename = `${r.cname}_${dateString}.${STATE.audio.format}`;
+          const filename = `${r.cname.replaceAll('/', '-')}_${dateString}.${STATE.audio.format}`;
           DEBUG &&
             console.log(
               `Exporting from ${r.file}, position ${r.position}, into folder ${path}`
@@ -3774,8 +3773,8 @@ const getResults = async ({
           );
           i === result.length - 1 &&
             generateAlert({
-              message: "goodResultSave",
-              variables: { number: result.length },
+              message: "goodAudioExport",
+              variables: { number: result.length, path },
             });
         }
       } else if (species && STATE.mode !== "explore") {

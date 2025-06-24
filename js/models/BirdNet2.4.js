@@ -44,24 +44,11 @@ onmessage = async (e) => {
         DEBUG && console.log(`Using backend: ${backend}`);
         backend === "webgpu" && require("@tensorflow/tfjs-backend-webgpu");
         let labels;
-        if (isBirdNET) {
-          const labelFile = `../../labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_en.txt`;
-          // const labelFile = path.join(appPath, 'labels.txt')
-          await fetch(labelFile)
-            .then((response) => {
-              if (!response.ok) throw new Error("Network response was not ok");
-              return response.text();
-            })
-            .then((filecontents) => {
-              labels = filecontents.trim().split(/\r?\n/);
-            })
-            .catch((error) => {
-              console.error(
-                "There was a problem fetching the label file:",
-                error
-              );
-            });
-          }
+        const labelFile = isBirdNET 
+          ? path.resolve(__dirname, '../../labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_en.txt')
+          : path.join(appPath, 'labels.txt');
+        const fileContents = fs.readFileSync(labelFile, 'utf-8');
+        labels = fileContents.trim().split(/\r?\n/);
         DEBUG &&
           console.log(
             `Model received load instruction. Using batch size ${batch}`
@@ -78,7 +65,14 @@ onmessage = async (e) => {
             console.log(tf.env().getFlags());
           }
           myModel = new BirdNETModel(appPath, version);
-          isBirdNET && (myModel.labels = labels);
+          myModel.labels = labels;
+          // Prepare a mask to squash 'background' predictions
+          const bgIndex = labels.findIndex(item => item.toLowerCase().includes('background'));
+          if (bgIndex !== -1){
+            const maskArray = new Array(labels.length).fill(1);
+            maskArray[bgIndex] = 0;
+            myModel.bgMask = tf.tensor1d(maskArray)
+          }
           await myModel.loadModel("layers");
           await myModel.warmUp(batch);
           BACKEND = tf.getBackend();
@@ -178,7 +172,6 @@ class BirdNETModel extends BaseModel {
   ) {
     DEBUG && console.log("predictCunk begin", tf.memory());
     const [audioBatch, numSamples] = this.createAudioTensorBatch(audioBuffer);
-    const test = audioBatch.arraySync();
     const batchKeys = this.getKeys(numSamples, start);
     const result = await this.predictBatch(
       audioBatch,
