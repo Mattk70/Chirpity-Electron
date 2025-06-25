@@ -37,14 +37,15 @@ async function trainModel({
   const optimizer = tf.train.adam(initialLearningRate);
   // Cache in the dataset folder if not selected
   cacheFolder = cacheFolder || dataset;
-  // Freeze base layers (optional)
-  for (const layer of baseModel.layers) {
-    layer.trainable = false;
-  }
 
   // Get base model input and outputs
   const input = baseModel.inputs[0];
   const originalOutput = baseModel.outputs[0];
+  // Freeze base layers
+  for (const layer of baseModel.layers) {
+    layer.trainable = false;
+  }
+
 
   // Get embeddings from BirdNET
   const embeddingLayer = baseModel.getLayer('GLOBAL_AVG_POOL');
@@ -138,7 +139,7 @@ async function trainModel({
         `<tr><td>Validation Loss</td><td>${val_loss.toFixed(4)}</td></tr>
         <tr><td>Validation Accuracy</td><td>${(val_categoricalAccuracy*100).toFixed(2)}%</td></tr>`)
       notice += "</table>";
-      DEBUG && console.log(`Tensors in memory: ${tf.memory().numTensors}`);
+      console.log(`Tensors in memory: ${tf.memory().numTensors}`);
       postMessage({ message: "training-results", notice });
     },
     onTrainEnd: (logs) => {
@@ -515,13 +516,15 @@ async function decodeAudio(filePath) {
 
 
 function roll(x) {
-  const {xs, ys} = x;
-  const size = xs.shape[0];
-  const maxShift = Math.floor(size / 2);
-  const shift = Math.floor(Math.random() * (maxShift + 1)); // random int from 0 to maxShift
+  return tf.tidy(() => {
+    const {xs, ys} = x;
+    const size = xs.shape[0];
+    const maxShift = size / 4;
+    const shift = Math.floor(Math.random() * maxShift); // random int from 0 to maxShift
 
-  const [left, right] = tf.split(xs, [size - shift, shift], 0);
-  return {xs:tf.concat([right, left], 0), ys};
+    const [left, right] = tf.split(xs, [size - shift, shift], 0);
+    return {xs:tf.concat([right, left], 0), ys};
+  })
 }
 
 /**
@@ -564,15 +567,17 @@ function sigmoidFocalCrossentropy(yTrue, yPred, alpha = 0.25, gamma = 2.0, fromL
     return loss;
   });
 }
-  const createStreamDataset = (ds, labels, useRoll) =>
-      tf.data
+
+  const createStreamDataset = (ds, labels, useRoll) => 
+    tf.tidy(() => tf.data
           .generator(() => readBinaryGzipDataset(ds, labels))
-          .map(x => useRoll ? roll(x) : x); // optional rolling before mixup
+          .map(x => useRoll ? roll(x) : x)
+  );
 
   function createMixupStreamDataset({useRoll, ds, labels, alpha = 0.4}) {
       return tf.tidy(() => {
-        const ds1 = createStreamDataset(ds, labels, useRoll).shuffle(500, 42);
-        const ds2 = createStreamDataset(ds, labels, useRoll).shuffle(500, 1337); // new generator instance
+        const ds1 = createStreamDataset(ds, labels, useRoll).shuffle(100, 42);
+        const ds2 = createStreamDataset(ds, labels, useRoll).shuffle(100, 1337); // new generator instance
         return tf.data
           .zip({ a: ds1, b: ds2 })
           .map(({ a, b }) => {

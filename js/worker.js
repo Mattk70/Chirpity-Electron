@@ -63,7 +63,8 @@ const generateAlert = ({
   file,
   updateFilenamePanel,
   complete,
-  history
+  history,
+  model
 }) => {
   UI.postMessage({
     event: "generate-alert",
@@ -74,7 +75,8 @@ const generateAlert = ({
     file,
     updateFilenamePanel,
     complete,
-    history
+    history,
+    model
   });
 };
 function customURLEncode(str) {
@@ -309,6 +311,8 @@ async function loadDB(modelPath) {
   STATE.update({ db: diskDB });
   diskDB.locale = STATE.locale;
   await diskDB.runAsync("VACUUM");
+  await diskDB.runAsync("CREATE INDEX IF NOT EXISTS idx_records_modelID ON records(modelID)");
+  await diskDB.runAsync("CREATE INDEX IF NOT EXISTS idx_species_modelID ON species(modelID)");
   await diskDB.runAsync("PRAGMA foreign_keys = ON");
   await diskDB.runAsync("PRAGMA journal_mode = WAL");
   await diskDB.runAsync("PRAGMA busy_timeout = 5000");
@@ -4512,7 +4516,10 @@ async function _updateSpeciesLocale(db, labels) {
     }
 
     // Helper: Extract call type from a string (including the preceding space)
-    const extractCallType = str => str.match(/\s+\(([^)]+)\)$/)?.[0] || "";
+    // const extractCallType = str => str.match(/\s+\(([^)]+)\)$/)?.[0] || "";
+    // Below updated to extract non alpha-numeric chars at the end of the cname
+    const extractCallType = str => str.match(/\s+\([^)]+\)$|[^a-zA-Z0-9\s]+$/)?.[0] || "";
+
     // Helper: Remove any call type from a string
     const stripCallType = str => str.replace(/\s+\([\w\s]+\)$/, '');
 
@@ -4581,6 +4588,9 @@ async function _updateSpeciesLocale(db, labels) {
  * @param {boolean} refreshResults - Whether to refresh results and summary after updating the locale.
  */
 async function onUpdateLocale(locale, labels, refreshResults) {
+  if (!['birdnet', 'chirpity', 'nocmig'].includes(STATE.model)){
+    return
+  }
   if (DEBUG) t0 = Date.now();
   let db;
   try {
@@ -5129,16 +5139,27 @@ async function convertFile(
 
 async function onDeleteModel(model){
   let message, type;
-  for (const db of [memoryDB, diskDB]){
-    const result = await db.runAsync('DELETE FROM models WHERE name = ?', model)
-    if (db === memoryDB){
-      if (result?.changes) {
-        message = `Model ${model} successfully removed`
-      } else {
-        message =  `Failed to remove model ${model}`;
-        type = 'error'
-      }
+  let t0 = Date.now()
+  try {
+    await dbMutex.lock()
+    await diskDB.runAsync('BEGIN')
+    await diskDB.runAsync('DELETE FROM models WHERE name = ?', model)
+    await diskDB.runAsync('COMMIT')
+    console.log('disk done')
+    await memoryDB.runAsync('BEGIN')
+    const result = await memoryDB.runAsync('DELETE FROM models WHERE name = ?', model)
+    await memoryDB.runAsync('COMMIT')
+    console.log(`Removal took ${(Date.now() - t0)/1000} seconds`)
+    if (result?.changes) {
+      message = `Model ${model} successfully removed`
+    } else {
+      message =  `Failed to remove model ${model}`;
+      type = 'error'
     }
+  } catch (error) {
+    console.error(error)
+  } finally {
+    dbMutex.unlock()
+    generateAlert({message, type, model})
   }
-  generateAlert({message, type})
 }

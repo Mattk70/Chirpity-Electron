@@ -2226,6 +2226,7 @@ const setUpWorkerMessaging = () => {
             disableSettingsDuringAnalysis(false)
             DOM.trainNav.classList.remove('disabled');
           }
+          if (args.model) expungeModal.hide();
           if (args.history){
             plotTrainingHistory(args.history)
           }
@@ -5309,7 +5310,7 @@ async function handleUIClicks(e) {
         break
       }
       importModal.hide();
-      config.models[modelName] = {backend: 'tensorflow', displayName, modelPath:modelLocation};
+      config.models[modelName] = {backend: config.models['birdnet'].backend, displayName, modelPath:modelLocation};
       config.selectedModel = modelName;
       const select = document.getElementById('model-to-use');
       const newOption = document.createElement('option');
@@ -5335,7 +5336,6 @@ async function handleUIClicks(e) {
       delete config.models[model];
       document.querySelector(`#model-to-use option[value="${model}"]`)?.remove();
       updatePrefs('config.json', config);
-      expungeModal.hide();
       break;
     }
     // Help Menu
@@ -6042,7 +6042,11 @@ document.addEventListener("change", async function (e) {
           }
           config.locale = element.value;
           STATE.picker.options.lang = element.value.replace("_uk", "");
-          readLabels(labelFile, "locale");
+          if (['birdnet', 'chirpity', 'nocmig'].includes(config.selectedModel)){
+            readLabels(labelFile, "locale");
+          } else {
+            generateToast({message: 'It is not yet possible to translate custom model labels'})
+          }
           break;
         }
         case "local": {
