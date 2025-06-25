@@ -2658,7 +2658,7 @@ const saveResults2DataSet = ({ species, included }) => {
           } else {
             end = Math.min(end, result.duration);
             if (exportType === "audio")
-              saveAudio(
+              await saveAudio(
                 result.file,
                 start,
                 end,
@@ -3748,22 +3748,32 @@ const getResults = async ({
   } else if (format === "Audacity") {
     exportAudacity(result, path);
   } else {
+    let count = 0, test = []
     for (let i = 0; i < result.length; i++) {
+      count++;
       const r = result[i];
       if (format === "audio") {
         if (limit) {
           // Audio export. Format date to YYYY-MM-DD-HH-MM-ss
-          const dateArray = new Date(r.timestamp).toString().split(" ");
+          const date = new Date(r.timestamp);
+          const dateArray = date.toString().split(" ");
           const dateString = dateArray
             .slice(0, 5)
             .join(" ")
-            .replaceAll(":", "_");
+            .replaceAll(":", "_") + '.' + date.getMilliseconds();
+
           const filename = `${r.cname.replaceAll('/', '-')}_${dateString}.${STATE.audio.format}`;
           DEBUG &&
             console.log(
               `Exporting from ${r.file}, position ${r.position}, into folder ${path}`
             );
-          saveAudio(
+          if (test.indexOf(filename) > -1){
+            console.log(`duplicate timestamp: ${filename}`)
+            continue
+          } else {
+            test.push(filename)
+          }
+          await saveAudio(
             r.file,
             r.position,
             r.end,
@@ -3771,6 +3781,13 @@ const getResults = async ({
             { Artist: "Chirpity" },
             path
           );
+          // Progress updates
+          UI.postMessage({
+            event: "conversion-progress", //use this handler to send footer progress updates
+            progress: {percent: (count / result.length)*100},
+            text: 'Saving files:',
+          });
+
           i === result.length - 1 &&
             generateAlert({
               message: "goodAudioExport",

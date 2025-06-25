@@ -1905,6 +1905,7 @@ window.onload = async () => {
 
   // Set footer year
   document.getElementById("year").textContent = new Date().getFullYear();
+  document.getElementById("version").textContent = VERSION;
   await appVersionLoaded;
   const configFile = p.join(appPath, "config.json");
   fs.readFile(configFile, "utf8", async (err, data) => {
@@ -2222,6 +2223,7 @@ const setUpWorkerMessaging = () => {
         case "generate-alert": {
           if (args.complete) {
             STATE.training = false;
+            disableSettingsDuringAnalysis(false)
             DOM.trainNav.classList.remove('disabled');
           }
           if (args.history){
@@ -3233,7 +3235,9 @@ const showTraining = () => {
     document.getElementById('epochs').value = settings.epochs;
     document.getElementById('label-smoothing').value = settings.labelSmoothing;
     document.getElementById('decay').checked = settings.decay;
-    document.getElementById('weights').checked = settings.useWeights;
+    const weights = document.getElementById('weights');
+    weights.checked = settings.useWeights;
+    weights.disabled = settings.useFocal;
     document.getElementById('focal').checked = settings.useFocal;
     document.getElementById('mixup').checked = settings.mixup;
     document.getElementById('roll').checked = settings.roll;
@@ -5267,6 +5271,7 @@ async function handleUIClicks(e) {
       }
       DOM.trainNav.classList.add('disabled')
       training.hide();
+      displayProgress({percent: 0}, 'Starting...')
       disableSettingsDuringAnalysis(true)
       STATE.training = true;
       worker.postMessage({
@@ -5846,7 +5851,15 @@ document.addEventListener("change", async function (e) {
         case "mixup": {config.training.settings.mixup = element.checked; break}
         case "decay": {config.training.settings.decay = element.checked; break}
         case "weights": {config.training.settings.useWeights = element.checked; break}
-        case "focal": {config.training.settings.useFocal = element.checked; break}
+        case "focal": {
+          config.training.settings.useFocal = element.checked; 
+          config.training.settings.useWeights = !element.checked; 
+          // If using focal loss, we don't want class weights too
+          const weights = document.getElementById('weights');
+          weights.disabled = element.checked;
+          element.checked && (weights.checked = false);
+          break
+        }
         case "label-smoothing": {
           config.training.settings.labelSmoothing = element.valueAsNumber; break}
         case "roll": {config.training.settings.roll = element.checked; break}

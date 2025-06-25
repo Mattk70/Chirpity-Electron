@@ -154,8 +154,8 @@ async function trainModel({
   })
 
   const train_ds = mixup 
-    ? createMixupStreamDataset(useRoll).batch(batchSize)
-    : createStreamDataset(useRoll).batch(batchSize)
+    ? createMixupStreamDataset({ds:trainBin, labels, useRoll}).batch(batchSize)
+    : createStreamDataset(trainBin, labels, useRoll).batch(batchSize)
 
 
   if (DEBUG){
@@ -564,15 +564,15 @@ function sigmoidFocalCrossentropy(yTrue, yPred, alpha = 0.25, gamma = 2.0, fromL
     return loss;
   });
 }
-  const createStreamDataset = (useRoll) =>
+  const createStreamDataset = (ds, labels, useRoll) =>
       tf.data
-          .generator(() => readBinaryGzipDataset(trainBin, labels))
+          .generator(() => readBinaryGzipDataset(ds, labels))
           .map(x => useRoll ? roll(x) : x); // optional rolling before mixup
 
-  function createMixupStreamDataset(useRoll, alpha = 0.4) {
+  function createMixupStreamDataset({useRoll, ds, labels, alpha = 0.4}) {
       return tf.tidy(() => {
-        const ds1 = createStreamDataset(useRoll).shuffle(500, 42);
-        const ds2 = createStreamDataset(useRoll).shuffle(500, 1337); // new generator instance
+        const ds1 = createStreamDataset(ds, labels, useRoll).shuffle(500, 42);
+        const ds2 = createStreamDataset(ds, labels, useRoll).shuffle(500, 1337); // new generator instance
         return tf.data
           .zip({ a: ds1, b: ds2 })
           .map(({ a, b }) => {

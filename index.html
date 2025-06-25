@@ -294,19 +294,22 @@
                                     <label class="mb-2" for="label-smooting">Label Smoothing</label>
                                 </div>
                             </div>
-                            <div class="row mt-2 m-1 border rounded">
-                                <div class="form-check form-switch col ms-1">
-                                    <input class="form-check-input" type="checkbox" role="switch" name="focal" id="focal">
-                                    <label class="form-check-label" for="focal">Use Focal loss</label>
+                            <div class="row mt-2 g-0 border rounded">
+                                <div class="col ps-1">
+                                    <div class="form-check form-switch ms-1">
+                                        <input class="form-check-input" type="checkbox" role="switch" name="focal" id="focal">
+                                        <label class="form-check-label" for="focal">Use focal loss</label>
+                                    </div>
+                                    <div class="form-check form-switch ms-1">
+                                        <input class="form-check-input" type="checkbox" role="switch" name="weights" id="weights">
+                                        <label class="form-check-label" for="weights">Use class weights</label>
+                                    </div>
                                 </div>
                                 <div class="form-check form-switch col ms-1">
                                     <input class="form-check-input" type="checkbox" role="switch" name="decay" id="decay">
                                     <label class="form-check-label" for="decay">Use learning rate decay</label>
                                 </div>
-                                <div class="form-check form-switch col ms-1">
-                                    <input class="form-check-input" type="checkbox" role="switch" name="weights" id="weights">
-                                    <label class="form-check-label" for="weights">Use class weights</label>
-                                </div>
+                                
                             </div>
                             <legend class="h6">Audio Dataset</legend>
                             <div class="ms-1">
@@ -1851,7 +1854,7 @@
     <div class="d-none text-sm-start" id="update-progress"><span id="update-progress-text">Downloading update: </span>
         <progress value="0" id="update-progress-bar" max="100" style="width:100px"></progress>
     </div>
-    <small>Chirpity Nocmig &copy; Matthew Kirkland <span id="year"></span><br></small>
+    <small>Chirpity Nocmig <span id="version"></span> &copy; Matthew Kirkland <span id="year"></span></small>
 </footer>
 <audio id="notification">
     <source src="Help/notification.mp3" type="audio/mpeg">
