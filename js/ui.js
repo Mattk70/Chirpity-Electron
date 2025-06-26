@@ -1792,10 +1792,10 @@ const defaultConfig = {
       validation: 0.2,
       decay: false,
       mixup: false,
-      roll: false,
       labelSmoothing: 0,
       useWeights: false,
-      useFocal: false
+      useFocal: false,
+      useRoll: false
     }
   },
   library: {
@@ -3247,9 +3247,9 @@ const showTraining = () => {
     document.getElementById('mixup').checked = settings.mixup;
     // Only allow roll if 'tensorflow' backend (GPU backends leak memory)
     const allowRoll = config.models[config.selectedModel].backend === 'tensorflow';
-    allowRoll || (config.training.settings.roll = false);
+    allowRoll || (config.training.settings.useRoll = false);
     const roll = document.getElementById('roll');
-    roll.checked = allowRoll && settings.roll;
+    roll.checked = allowRoll && settings.useRoll;
     roll.disabled = !allowRoll;
     document.getElementById('dropout').value = settings.dropout;
     dropout.disabled = !config.training.settings.hidden;
@@ -5874,7 +5874,7 @@ document.addEventListener("change", async function (e) {
         }
         case "label-smoothing": {
           config.training.settings.labelSmoothing = element.valueAsNumber; break}
-        case "roll": {config.training.settings.roll = element.checked; break}
+        case "roll": {config.training.settings.useRoll = element.checked; break}
         // --- Backends
         case "tensorflow":
         case "webgl":

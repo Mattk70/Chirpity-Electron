@@ -23,7 +23,7 @@ async function trainModel({
   batchSize = 32,
   dropout, epochs, hidden,
   dataset, cache:cacheFolder, modelLocation:saveLocation, modelType, 
-  useCache, validation, mixup, decay, roll:useRoll, useWeights, useFocal, labelSmoothing}) {
+  useCache, validation, mixup, decay, useRoll, useWeights, useFocal, labelSmoothing}) {
   const {files:allFiles, classWeights} = getFilesWithLabelsAndWeights(dataset);
   if (!allFiles.length){
     throw new Error(`No files found in any label folders in ${dataset}` )
