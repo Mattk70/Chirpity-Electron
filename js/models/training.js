@@ -155,7 +155,8 @@ async function trainModel({
   }
   
   // Callbacks
-  const earlyStopping = tf.callbacks.earlyStopping({monitor: 'val_loss', minDelta: 0.0001, patience: 3})
+  const valueToMonitor = validation ? 'val_loss' : 'loss';
+  const earlyStopping = tf.callbacks.earlyStopping({monitor: valueToMonitor, minDelta: 0.0001, patience: 3})
   const events = new tf.CustomCallback({
     onYield: (epoch, batch, _logs) =>{
       batch += 1;
