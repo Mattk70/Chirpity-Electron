@@ -5137,27 +5137,24 @@ async function onDeleteModel(model){
   await dbMutex.lock()
   try {
     await diskDB.runAsync('BEGIN')
-    await diskDB.runAsync('DELETE FROM models WHERE name = ?', model)
-    await diskDB.runAsync('COMMIT')
-  } catch (e) {
-    await diskDB.runAsync('ROLLBACK')
-    console.error(e)
-  }
-  let result;
-  try {
     await memoryDB.runAsync('BEGIN')
-    result = await memoryDB.runAsync('DELETE FROM models WHERE name = ?', model)
+    await diskDB.runAsync('DELETE FROM models WHERE name = ?', model)
+    const result = await memoryDB.runAsync('DELETE FROM models WHERE name = ?', model)
+    await diskDB.runAsync('COMMIT')
     await memoryDB.runAsync('COMMIT')
     console.info('Custom model', `Model removal took ${(Date.now() - t0)/1000} seconds`)
     if (result?.changes) {
       message = `Model ${model} successfully removed`
     } else {
-      message =  `Failed to remove model ${model}`;
+      message =  `Model ${model} was not found in the database`;
       type = 'error'
     }
   } catch (e) {
     await diskDB.runAsync('ROLLBACK')
+    await memoryDB.runAsync('ROLLBACK')
     console.error(e)
+    message =  `Failed to remove model <b>${model}</b>: ${e.message}`;
+    type = 'error'
   } finally {
     dbMutex.unlock()
     generateAlert({message, type, model})
