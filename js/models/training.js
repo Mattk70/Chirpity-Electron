@@ -115,7 +115,7 @@ async function trainModel({
   if (validation && (!cacheRecords || !fs.existsSync(valBin))) {
     await writeBinaryGzipDataset(valFiles, valBin, labelToIndex, postMessage, "Preparing validation data");
   }
-  let melSpec1Config, melSpec2Config, finalModel;
+  let melSpec1Config, melSpec2Config, finalModel, modelSavePromise;
   const saveModelAsync = async () => {
       let mergedModel, mergedLabels;
       if (modelType === 'append'){
@@ -174,7 +174,7 @@ async function trainModel({
       if (val_loss < bestLoss){
         bestLoss = loss;
         bestAccuracy = val_categoricalAccuracy;
-        saveModelAsync()
+        modelSavePromise = saveModelAsync()
       }
       let notice = `<table class="table table-striped">
             <tr><th colspan="2">Epoch ${epoch + 1}:</th></tr>
@@ -227,7 +227,7 @@ async function trainModel({
     callbacks: [earlyStopping, events],
     verbosity: 0
   });
-
+  await modelSavePromise;
 
   let notice ='', type = '';
   if (history.epoch.length < epochs){
