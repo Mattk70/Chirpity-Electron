@@ -2984,9 +2984,9 @@ const loadModel = () => {
   worker.postMessage({
     action: "load-model",
     model: selectedModel,
-    batchSize: backend.batchSize,
+    batchSize: config[backend].batchSize,
     warmup,
-    threads: backend.threads,
+    threads: config[backend].threads,
     backend,
     modelPath
   });
@@ -5300,7 +5300,7 @@ async function handleUIClicks(e) {
       const modelName = displayName.toLowerCase();
       const modelLocation = document.getElementById('import-location').value;
       const requiredFiles = ['weights.bin', 'labels.txt', 'model.json']
-      if (config[modelName] !== undefined){
+      if (config.models[modelName] !== undefined){
         generateToast({message: 'A model with that name already exists', type:'error'})
         break;
       }
