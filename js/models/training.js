@@ -35,7 +35,7 @@ async function trainModel({
   const cacheRecords = useCache;
   const metrics = [ tf.metrics.categoricalAccuracy ];
   const optimizer = tf.train.adam(initialLearningRate);
-  let bestLoss = Infinity;
+  let bestAccuracy, bestLoss = Infinity;
   // Cache in the dataset folder if not selected
   cacheFolder = cacheFolder || dataset;
 
@@ -136,14 +136,22 @@ async function trainModel({
       // Read BirdNET config to extract mel_Spec configs to inject into custom model config
       if (!melSpec1Config){
         const modelPath = path.resolve(__dirname, '../../BirdNET_GLOBAL_6K_V2.4_Model_TFJS/static/model/model.json');
-        const bnConfig = JSON.parse(fs.readFileSync(modelPath, 'utf-8'));
-        melSpec1Config = bnConfig.modelTopology.model_config.config.layers[1].config;
-        melSpec2Config = bnConfig.modelTopology.model_config.config.layers[2].config;
+        try {
+          const bnConfig = JSON.parse(fs.readFileSync(modelPath, 'utf-8'));
+          melSpec1Config = bnConfig.modelTopology.model_config.config.layers[1].config;
+          melSpec2Config = bnConfig.modelTopology.model_config.config.layers[2].config;
+        } catch (err){
+          throw new Error(`Failed to read BirdNET config: ${err.message}`);
+        }
       }
-      const customConfig = JSON.parse(fs.readFileSync(path.join(saveLocation, 'model.json')))
-      customConfig.modelTopology.config.layers[1].config = melSpec1Config;
-      customConfig.modelTopology.config.layers[2].config = melSpec2Config;
-      fs.writeFileSync(path.join(saveLocation, 'model.json'), JSON.stringify(customConfig), 'utf8')
+      try {
+        const customConfig = JSON.parse(fs.readFileSync(path.join(saveLocation, 'model.json')))
+        customConfig.modelTopology.config.layers[1].config = melSpec1Config;
+        customConfig.modelTopology.config.layers[2].config = melSpec2Config;
+        fs.writeFileSync(path.join(saveLocation, 'model.json'), JSON.stringify(customConfig), 'utf8')
+      } catch (err){
+        throw new Error(`Failed to update custom model config: ${err.message}`);
+      }
   }
   
   // Callbacks
@@ -165,6 +173,7 @@ async function trainModel({
       // Save best weights
       if (val_loss < bestLoss){
         bestLoss = loss;
+        bestAccuracy = val_categoricalAccuracy;
         saveModelAsync()
       }
       let notice = `<table class="table table-striped">
@@ -231,8 +240,8 @@ Metrics:<br>
   Loss = ${l[l.length -1].toFixed(4)}<br>
   Accuracy = ${(Acc[Acc.length -1]* 100).toFixed(2)}%<br>`
   val_loss && (notice += `
-  Validation Loss = ${val_loss[val_loss.length -1].toFixed(4)}<br>
-  Validation Accuracy = ${(val_categoricalAccuracy[val_categoricalAccuracy.length -1]*100).toFixed(2)}%<br>
+  Validation Loss = ${bestLoss.toFixed(4)}<br>
+  Validation Accuracy = ${(bestAccuracy*100).toFixed(2)}%<br>
   <br>Training completed! Model saved in:<br>
   ${saveLocation}`);
 

@@ -3752,7 +3752,7 @@ const getResults = async ({
   } else if (format === "Audacity") {
     exportAudacity(result, path);
   } else {
-    let count = 0, test = []
+    let count = 0;
     for (let i = 0; i < result.length; i++) {
       count++;
       const r = result[i];
@@ -3771,12 +3771,6 @@ const getResults = async ({
             console.log(
               `Exporting from ${r.file}, position ${r.position}, into folder ${path}`
             );
-          if (test.indexOf(filename) > -1){
-            console.log(`duplicate timestamp: ${filename}`)
-            continue
-          } else {
-            test.push(filename)
-          }
           await saveAudio(
             r.file,
             r.position,
@@ -5145,11 +5139,10 @@ async function onDeleteModel(model){
     await diskDB.runAsync('BEGIN')
     await diskDB.runAsync('DELETE FROM models WHERE name = ?', model)
     await diskDB.runAsync('COMMIT')
-    console.log('disk done')
     await memoryDB.runAsync('BEGIN')
     const result = await memoryDB.runAsync('DELETE FROM models WHERE name = ?', model)
     await memoryDB.runAsync('COMMIT')
-    console.log(`Removal took ${(Date.now() - t0)/1000} seconds`)
+    console.info('Custom model', `Model removal took ${(Date.now() - t0)/1000} seconds`)
     if (result?.changes) {
       message = `Model ${model} successfully removed`
     } else {

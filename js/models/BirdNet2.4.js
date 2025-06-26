@@ -104,7 +104,7 @@ onmessage = async (e) => {
         break;
       }
       case "get-spectrogram": {
-        await this.getSpectrogram(e.data)
+        await myModel.getSpectrogram(e.data)
         break;
     }
       case "predict": {

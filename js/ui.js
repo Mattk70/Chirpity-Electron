@@ -175,18 +175,18 @@ const GLOBAL_ACTIONS = {
   },
   Escape: () => {
     if (PREDICTING || STATE.training) {
-      STATE.training && DOM.trainNav.classList.remove('disabled');
-      PREDICTING = false; STATE.training = false;
-      disableSettingsDuringAnalysis(false);
-      const summarySpecies = DOM.summaryTable.querySelectorAll(".cname");
-      summarySpecies.forEach((row) => row.classList.replace("not-allowed","pointer"));
-      STATE.analysisDone = true;
       worker.postMessage({
         action: "abort",
         model: config.selectedModel,
         threads: config[config.models[config.selectedModel].backend].threads,
         list: config.list,
       });
+      STATE.training && DOM.trainNav.classList.remove('disabled');
+      PREDICTING = false; STATE.training = false;
+      disableSettingsDuringAnalysis(false);
+      const summarySpecies = DOM.summaryTable.querySelectorAll(".cname");
+      summarySpecies.forEach(row => row.classList.replace("not-allowed","pointer"));
+      STATE.analysisDone = true;
       STATE.diskHasRecords && utils.enableMenuItem(["explore", "charts"]);
       generateToast({ message: "cancelled" });
       DOM.progressDiv.classList.add("invisible");
@@ -4458,7 +4458,7 @@ const toggleContextAwareMode = () => {
     generateToast({ message: "contextBlocked", type: "warning" });
     return;
   }
-  if (['chirppity', 'nocmig'].includes(config.selectedModel))
+  if (['chirpity', 'nocmig'].includes(config.selectedModel))
     config.detect.contextAware = !config.detect.contextAware;
   DOM.contextAware.checked = config.detect.contextAware;
   contextAwareIconDisplay();
@@ -5242,10 +5242,10 @@ async function handleUIClicks(e) {
       const modelType = customModel.type;
       const modelLocation = customModel.location;
 
-      if (!(lr && epochs)) {
+      if (!(settings.lr && settings.epochs)) {
         generateToast({message:'A value for both Epochs and Learning rate is needed', type:'warning'})
         break;
-      }      
+      }
       function isDirectory(entry) {
         const typeSymbol = Object.getOwnPropertySymbols(entry).find(sym => sym.toString().includes('type'));
         return entry[typeSymbol] === 2;
