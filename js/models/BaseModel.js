@@ -34,10 +34,10 @@ class BaseModel {
     DEBUG && console.log("loading model");
     if (this.model_loaded === false) {
       // Model files must be in a different folder than the js, assets files
-      DEBUG && console.log("loading model from", this.appPath + "model.json");
+      DEBUG && console.log("loading model from", this.appPath + "/model.json");
       const load = type === "layers" ? tf.loadLayersModel : tf.loadGraphModel;
-      this.model = await load(this.appPath + "model.json", {
-        weightPathPrefix: this.appPath,
+      this.model = await load(this.appPath + "/model.json", {
+        weightPathPrefix: this.appPath + '/',
       });
       this.model_loaded = true;
       this.inputShape = [...this.model.inputs[0].shape];
@@ -121,8 +121,14 @@ class BaseModel {
       keys = keys.splice(0, 1);
     }
 
-    const finalPrediction = newPrediction || prediction;
-
+    const unmaskedPrediction = newPrediction || prediction;
+    let maskedPrediction;
+    if (this.bgMask){
+      // Mask out the background class prediction
+      maskedPrediction = tf.tidy(() => unmaskedPrediction.mul(this.bgMask))
+      unmaskedPrediction.dispose()
+    }
+    const finalPrediction = maskedPrediction || unmaskedPrediction;
     const { indices, values } = tf.topk(finalPrediction, 5, true);
     finalPrediction.dispose();
     // The GPU backend is *so* slow with BirdNET, let's not queue up predictions

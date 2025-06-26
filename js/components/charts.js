@@ -393,5 +393,61 @@ function setChartOptions(
 
   return chartOptions;
 }
+function plotTrainingHistory(history) {
+  // Remove existing modal if present
+  const oldModal = document.getElementById('trainingHistoryModal');
+  if (oldModal) oldModal.remove();
 
-module.exports = { onChartRequest };
+  // Create modal HTML
+  const modalHtml = `
+    <div class="modal fade" id="trainingHistoryModal" tabindex="-1" aria-labelledby="trainingHistoryLabel" aria-hidden="true">
+      <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="trainingHistoryLabel">Training History</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <canvas id="historyChart" style="height: 50vh; width: 100%;"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+  const modal = new bootstrap.Modal(document.getElementById('trainingHistoryModal'));
+  modal.show();
+
+  // Wait for modal to be shown before drawing chart
+  document.getElementById('trainingHistoryModal').addEventListener('shown.bs.modal', () => {
+    const ctx = document.getElementById('historyChart').getContext('2d');
+    const labels = history.loss.map((_, i) => `Epoch ${i + 1}`);
+
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Loss', data: history.loss, borderColor: 'red', fill: true, tension: 0.3 },
+          { label: 'Val Loss', data: history.val_loss, borderColor: 'gold', fill: true, tension: 0.3 },
+          { label: 'Accuracy', data: history.categoricalAccuracy, borderColor: 'green', fill: true, tension: 0.3 },
+          { label: 'Val Accuracy', data: history.val_categoricalAccuracy, borderColor: 'blue', fill: true, tension: 0.3 }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          title: {
+            display: true,
+            text: 'Model Training Metrics'
+          }
+        },
+        scales: {
+          y: { beginAtZero: true }
+        }
+      }
+    });
+  }, { once: true });
+}
+export { onChartRequest, plotTrainingHistory };

@@ -46,14 +46,14 @@ function trackVisit(config){
     const {width, height} = window.screen;
     fetch(`https://analytics.mattkirkland.co.uk/matomo.php?idsite=${ID_SITE}&rand=${Date.now()}&rec=1&uid=${config.UUID}&apiv=1
             &res=${width}x${height}
-            &dimension1=${config.model}
+            &dimension1=${config.selectedModel}
             &dimension2=${config.list}
             &dimension3=${config.useWeek}
             &dimension4=${config.locale}
             &dimension5=${config.speciesThreshold}
             &dimension6=${JSON.stringify(config.filters)}
             &dimension7=${JSON.stringify(config.audio)}
-            &dimension8=${JSON.stringify(config[config[config.model].backend])}
+            &dimension8=${JSON.stringify(config.models[config.selectedModel].backend)}
             &dimension9=${JSON.stringify(config.detect)}
             &dimension11=${config.VERSION}
             &dimension12=${config.CPU}

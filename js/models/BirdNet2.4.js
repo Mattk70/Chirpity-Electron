@@ -1,4 +1,4 @@
-let tf, BACKEND;
+let tf, BACKEND, myModel, DEBUG = false;
 try {
   tf = require("@tensorflow/tfjs-node");
 } catch {
@@ -7,13 +7,10 @@ try {
 }
 const fs = require("node:fs");
 const path = require("node:path");
-let DEBUG = false;
-
 import { BaseModel } from "./BaseModel.js";
 const {stft} = require("./custom-ops.js");
+const abortController = require('../utils/abortController.js');
 
-//GLOBALS
-let myModel
 
 onmessage = async (e) => {
   const modelRequest = e.data.message;
@@ -27,35 +24,31 @@ onmessage = async (e) => {
       }
       case "load": {
         const version = e.data.model;
+        const isBirdNET = version === 'birdnet';
         DEBUG && console.log("load request to worker");
-        const { height, width, location } = JSON.parse(
-          fs.readFileSync(
-            path.join(__dirname, `../../${version}_model_config.json`),
-            "utf8"
-          )
-        );
-        const appPath = "../../" + location + "/";
+        let appPath = e.data.modelPath;
+        if (isBirdNET){
+          const {location} = JSON.parse(
+            fs.readFileSync(
+              path.join(__dirname, `../../${version}_model_config.json`),
+              "utf8"
+            )
+          );
+          appPath = "../../" + location + "/";
+        }
+        
+        // const appPath = "/Users/matthew/Documents/CustomClassifier/";
         const batch = e.data.batchSize;
         const backend = BACKEND || e.data.backend;
         BACKEND = backend;
         DEBUG && console.log(`Using backend: ${backend}`);
         backend === "webgpu" && require("@tensorflow/tfjs-backend-webgpu");
         let labels;
-        const labelFile = `../../labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_en.txt`;
-        await fetch(labelFile)
-          .then((response) => {
-            if (!response.ok) throw new Error("Network response was not ok");
-            return response.text();
-          })
-          .then((filecontents) => {
-            labels = filecontents.trim().split(/\r?\n/);
-          })
-          .catch((error) => {
-            console.error(
-              "There was a problem fetching the label file:",
-              error
-            );
-          });
+        const labelFile = isBirdNET 
+          ? path.resolve(__dirname, '../../labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_en.txt')
+          : path.join(appPath, 'labels.txt');
+        const fileContents = fs.readFileSync(labelFile, 'utf-8');
+        labels = fileContents.trim().split(/\r?\n/);
         DEBUG &&
           console.log(
             `Model received load instruction. Using batch size ${batch}`
@@ -72,9 +65,14 @@ onmessage = async (e) => {
             console.log(tf.env().getFlags());
           }
           myModel = new BirdNETModel(appPath, version);
-          myModel.height = height;
-          myModel.width = width;
           myModel.labels = labels;
+          // Prepare a mask to squash 'background' predictions
+          const bgIndex = labels.findIndex(item => item.toLowerCase().includes('background'));
+          if (bgIndex !== -1){
+            const maskArray = new Array(labels.length).fill(1);
+            maskArray[bgIndex] = 0;
+            myModel.bgMask = tf.tensor1d(maskArray)
+          }
           await myModel.loadModel("layers");
           await myModel.warmUp(batch);
           BACKEND = tf.getBackend();
@@ -83,51 +81,30 @@ onmessage = async (e) => {
             sampleRate: myModel.config.sampleRate,
             chunkLength: myModel.chunkLength,
             backend: BACKEND,
-            labels: labels,
-            worker: worker,
+            labels,
+            worker,
           });
         });
         break;
       }
-      case "get-spectrogram": {
-        const buffer = e.data.buffer;
-        if (buffer.length < myModel.chunkLength) {
-          return;
-        }
-        const specFile = e.data.file;
-        const filepath = e.data.filepath;
-        const image = tf.tidy(() => {
-          // Get the spec layer by name
-          const melSpec1Layer = myModel.model.getLayer('MEL_SPEC1');
-          const melSpec2Layer = myModel.model.getLayer('MEL_SPEC2');
-
-          // Create a new model that outputs the MEL_SPEC1 layer
-          function getOutput(layer) {
-            const intermediateModel = tf.model({
-              inputs: myModel.model.inputs,
-              outputs: layer.output,
+      case "train-model":{
+        const {trainModel} = require('./training.js');
+        const args = e.data;
+          trainModel({ ...args, Model: myModel}).then((message) => {
+            postMessage({...message})
+          }).catch((err) => {
+            postMessage({
+              message: "training-results", 
+              notice: `Error during model training: ${err}`,
+              type: 'error',
+              complete: true
             });
-            const signal = tf.tensor1d(buffer, "float32").reshape([1, 144000]);
-            // Get the output of the MEL_SPEC1 layer
-            return intermediateModel.predict(signal);
-          }
-          let spec1 = myModel.normalise(getOutput(melSpec1Layer));
-          let spec2 = myModel.normalise(getOutput(melSpec2Layer));
-          // Concatenate the two spectrograms along the last dimension
-          return tf.concat([spec2, spec1, tf.zerosLike(spec1)], -1);
-        });
-        const [batch, height, width, channels] = image.shape;
-        response = {
-          message: "spectrogram",
-          width: width,
-          height: height,
-          channels,
-          image: await image.data(),
-          file: specFile,
-          filepath,
-          worker,
-        };
-        postMessage(response);
+            console.error("Error during model training:", err);
+          })
+        break;
+      }
+      case "get-spectrogram": {
+        await myModel.getSpectrogram(e.data)
         break;
     }
       case "predict": {
@@ -167,6 +144,7 @@ onmessage = async (e) => {
         break;
       }
       case "terminate": {
+        abortController.abort();
         tf.backend().dispose();
         self.close(); // Terminate the worker
       }
@@ -203,6 +181,40 @@ class BirdNETModel extends BaseModel {
     );
     DEBUG && console.log("predictCunk end", tf.memory());
     return [result, file, fileStart];
+  }
+  getSpectrogram(data){
+    const {buffer, file:specFile, filepath} = data;
+    if (buffer.length < myModel.chunkLength) {
+      return;
+    }
+    const image = tf.tidy(() => {
+      // Get the spec layer by name
+      const concat = myModel.model.getLayer("concatenate");
+      // Create a new model that outputs the MEL_SPEC1 layer
+      const intermediateModel = tf.model({
+          inputs: myModel.model.inputs,
+          outputs: concat.output,
+        });
+      const signal = (buffer.shape ? buffer : tf.tensor1d(buffer, "float32")).reshape([1, 144000]);
+        // Get the output of the MEL_SPEC1 layer
+      
+      let spec = myModel.normalise(intermediateModel.predict(signal));
+      // Add a zero channel to the spectrogram so the resulting png has 3 channels and is in colour 
+      const [b, h, w, _] = spec.shape;
+      const zeroChannel = tf.zeros([b, h, w, 1], spec.dtype);
+      return tf.concat([spec, zeroChannel], -1);
+    });
+    const [batch, height, width, channels] = image.shape;
+    const response = {
+      message: "spectrogram",
+      width: width,
+      height: height,
+      channels,
+      image: image.dataSync(),
+      file: specFile,
+      filepath,
+    };
+    postMessage(response);
   }
 }
 

@@ -429,6 +429,12 @@ const DOM = {
     }
     return this._timelineSetting;
   },
+    get trainNav() {
+    if (!this._trainNav) {
+      this._trainNav = document.getElementById("navbarTraining");
+    }
+    return this._trainNav;
+  },
   get tooltipInstance() {
     if (!this._tooltipInstance) {
       this._tooltipInstance = new bootstrap.Tooltip(

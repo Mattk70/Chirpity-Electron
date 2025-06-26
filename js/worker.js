@@ -62,6 +62,9 @@ const generateAlert = ({
   variables,
   file,
   updateFilenamePanel,
+  complete,
+  history,
+  model
 }) => {
   UI.postMessage({
     event: "generate-alert",
@@ -71,6 +74,9 @@ const generateAlert = ({
     variables,
     file,
     updateFilenamePanel,
+    complete,
+    history,
+    model
   });
 };
 function customURLEncode(str) {
@@ -284,7 +290,7 @@ const getSelectionRange = (file, start, end) => {
  *
  * @returns {Promise<sqlite3.Database>} Resolves with the initialized database instance.
  */
-async function loadDB() {
+async function loadDB(modelPath) {
   const path = STATE.database.location || appPath;
   DEBUG && console.log("Loading db " + path);
   const model = STATE.model;
@@ -299,12 +305,14 @@ async function loadDB() {
     diskDB = new sqlite3.Database(file);
     DEBUG && console.log("Opened and cleaned disk db " + file);
   }
-
-  ([modelID, needsTranslation] = await mergeDbIfNeeded({diskDB, model, appPath, dbMutex }) )
+  const labelsLocation = modelPath ? p.join(modelPath, 'labels.txt') : null;
+  ([modelID, needsTranslation] = await mergeDbIfNeeded({diskDB, model, appPath, dbMutex, labelsLocation }) )
   STATE.modelID = modelID;
   STATE.update({ db: diskDB });
   diskDB.locale = STATE.locale;
   await diskDB.runAsync("VACUUM");
+  await diskDB.runAsync("CREATE INDEX IF NOT EXISTS idx_records_modelID ON records(modelID)");
+  await diskDB.runAsync("CREATE INDEX IF NOT EXISTS idx_species_modelID ON species(modelID)");
   await diskDB.runAsync("PRAGMA foreign_keys = ON");
   await diskDB.runAsync("PRAGMA journal_mode = WAL");
   await diskDB.runAsync("PRAGMA busy_timeout = 5000");
@@ -377,18 +385,19 @@ async function handleMessage(e) {
   }
   switch (action) {
     case "_init_": {
-      let { model, batchSize, threads, backend, list } = args;
+      let { model, batchSize, threads, backend, list, modelPath } = args;
       const t0 = Date.now();
       STATE.detect.backend = backend;
       INITIALISED = (async () => {
         LIST_WORKER = await spawnListWorker(); // this can change the backend if tfjs-node isn't available
         DEBUG && console.log("List worker took", Date.now() - t0, "ms to load");
         await onLaunch({
-          model: model,
-          batchSize: batchSize,
-          threads: threads,
-          backend: STATE.detect.backend,
-          list: list,
+          model,
+          batchSize,
+          threads,
+          backend,
+          list,
+          modelPath
         });
       })();
       break;
@@ -474,7 +483,7 @@ async function handleMessage(e) {
       break;
     }
     case "export-results": {
-      args.format === 'summary' 
+      args.format === 'summary'
       ? await getSummary(args) 
       : await getResults(args);
       break;
@@ -558,10 +567,8 @@ async function handleMessage(e) {
         const tag = args.alteredOrNew;
         if (tag?.name) {
           const query = await STATE.db.runAsync(
-            `
-            INSERT OR REPLACE INTO tags (id, name) VALUES (?, ?)
-            ON CONFLICT(id) DO UPDATE SET name = excluded.name
-            `,
+            `INSERT INTO tags (id, name) VALUES (?, ?)
+            ON CONFLICT(id) DO UPDATE SET name = excluded.name`,
             tag.id,
             tag.name
           );
@@ -594,6 +601,10 @@ async function handleMessage(e) {
         predictWorkers.length && terminateWorkers();
       }
       INITIALISED = onLaunch(args);
+      break;
+    }
+    case "expunge-model": {
+      onDeleteModel(args.model)
       break;
     }
     case "post": {
@@ -630,6 +641,11 @@ async function handleMessage(e) {
     }
     case "set-custom-file-location": {
       onSetCustomLocation(args);
+      break;
+    }
+    case "train-model":{
+      const worker = predictWorkers[0];
+      worker.postMessage({ message: "train-model", ...args });
       break;
     }
     case "update-buffer": {
@@ -834,24 +850,26 @@ async function onLaunch({
   batchSize = 32,
   threads = 1,
   backend = "tensorflow",
+  modelPath,
 }) {
   SEEN_MODEL_READY = false;
   LIST_CACHE = {};
-  sampleRate = model === "birdnet" ? 48_000 : 24_000;
+  sampleRate = ['nocmig', 'chirpity'].includes(model) ? 24_000 : 48_000;
   STATE.detect.backend = backend;
   BATCH_SIZE = batchSize;
-  STATE.update({ model: model });
+  STATE.update({ model, modelPath });
   const result = await diskDB?.getAsync('SELECT id FROM models WHERE NAME = ?', model)
   if (!result){
     // THe model isn't in the db
-    diskDB = await loadDB(); // load the diskdb with the model species added
+    diskDB = await loadDB(modelPath); // load the diskdb with the model species added
   } else {
     STATE.modelID = result.id;
   }
   if (!memoryDB || !STATE.detect.combine){
     memoryDB = await createDB({file: null, diskDB, dbMutex}); // create new memoryDB
   } else if (!result){
-    addNewModel({model, db:memoryDB, dbMutex})
+    const labelsLocation = modelPath ? p.join(modelPath, 'labels.txt') : null;
+    addNewModel({model, db:memoryDB, dbMutex, labelsLocation})
   }
   const db = STATE.mode === 'analyse'
     ? memoryDB
@@ -1500,6 +1518,7 @@ async function onAnalyse({
  * @param {string} [params.model=STATE.model] - The model identifier to use when restarting prediction workers.
  */
 function onAbort({ model = STATE.model }) {
+  predictWorkers.forEach(worker => worker.postMessage({message: 'terminate'}));
   aborted = true;
   FILE_QUEUE = [];
   predictQueue = [];
@@ -1508,7 +1527,7 @@ function onAbort({ model = STATE.model }) {
   predictionsRequested = {};
   index = 0;
   DEBUG && console.log("abort received");
-  Object.keys(STATE.backlogInterval).forEach((pid) => {
+  Object.keys(STATE.backlogInterval || {}).forEach((pid) => {
     clearInterval(STATE.backlogInterval[pid]);
   });
   //restart the workers
@@ -2643,7 +2662,7 @@ const saveResults2DataSet = ({ species, included }) => {
           } else {
             end = Math.min(end, result.duration);
             if (exportType === "audio")
-              saveAudio(
+              await saveAudio(
                 result.file,
                 start,
                 end,
@@ -2922,9 +2941,9 @@ const processQueue = async () => {
  * @param {number} batchSize - Number of items each worker processes per batch.
  * @param {number} threads - Number of worker threads to spawn.
  */
-function spawnPredictWorkers(model, batchSize, threads) {
+function spawnPredictWorkers(model, batchSize, threads, modelPath) {
   for (let i = 0; i < threads; i++) {
-    const workerSrc = model === "birdnet" ? "BirdNet2.4" : model;
+    const workerSrc = ['nocmig', 'chirpity'].includes(model) ? model : "BirdNet2.4";
     const worker = new Worker(`./js/models/${workerSrc}.js`, { type: "module" });
     worker.isAvailable = true;
     worker.isReady = false;
@@ -2932,8 +2951,9 @@ function spawnPredictWorkers(model, batchSize, threads) {
     DEBUG && console.log("loading a worker");
     worker.postMessage({
       message: "load",
-      model: model,
-      batchSize: batchSize,
+      model,
+      modelPath: STATE.modelPath,
+      batchSize,
       backend: STATE.detect.backend,
       worker: i,
     });
@@ -3272,7 +3292,6 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
 
 
 const parsePredictions = async (response) => {
-  console.log("Fixup", response.fixup);
   const file = response.file;
   AUDIO_BACKLOG--;
   const latestResult = response.result;
@@ -3420,6 +3439,25 @@ async function parseMessage(e) {
         response["image"],
         response["channels"]
       );
+      break;
+    }
+    case "training-progress": {
+      UI.postMessage({
+        event: "conversion-progress", //use this handler to send footer progress updates
+        progress: response.progress,
+        text: response.text,
+      });
+      break;
+    }
+    case "training-results": {
+      generateAlert({
+        type: response.type,
+        autohide: response.autohide,
+        message: response.notice,
+        variables: response.variables,
+        complete: response.complete,
+        history: response.history
+      });
       break;
     }
   }
@@ -3714,22 +3752,26 @@ const getResults = async ({
   } else if (format === "Audacity") {
     exportAudacity(result, path);
   } else {
+    let count = 0;
     for (let i = 0; i < result.length; i++) {
+      count++;
       const r = result[i];
       if (format === "audio") {
         if (limit) {
           // Audio export. Format date to YYYY-MM-DD-HH-MM-ss
-          const dateArray = new Date(r.timestamp).toString().split(" ");
+          const date = new Date(r.timestamp);
+          const dateArray = date.toString().split(" ");
           const dateString = dateArray
             .slice(0, 5)
             .join(" ")
-            .replaceAll(":", "_");
-          const filename = `${r.cname}_${dateString}.${STATE.audio.format}`;
+            .replaceAll(":", "_") + '.' + date.getMilliseconds();
+
+          const filename = `${r.cname.replaceAll('/', '-')}_${dateString}.${STATE.audio.format}`;
           DEBUG &&
             console.log(
               `Exporting from ${r.file}, position ${r.position}, into folder ${path}`
             );
-          saveAudio(
+          await saveAudio(
             r.file,
             r.position,
             r.end,
@@ -3737,10 +3779,17 @@ const getResults = async ({
             { Artist: "Chirpity" },
             path
           );
+          // Progress updates
+          UI.postMessage({
+            event: "conversion-progress", //use this handler to send footer progress updates
+            progress: {percent: (count / result.length)*100},
+            text: 'Saving files:',
+          });
+
           i === result.length - 1 &&
             generateAlert({
-              message: "goodResultSave",
-              variables: { number: result.length },
+              message: "goodAudioExport",
+              variables: { number: result.length, path },
             });
         }
       } else if (species && STATE.mode !== "explore") {
@@ -3876,6 +3925,7 @@ async function exportData(result, filename, format, headers) {
             item = { ...item, selection: index + 1 }; // Add a selection number for Raven
             if (item.file !== previousFile) {
               // Positions need to be cumulative across files in Raven
+              // todo?: fix bug where offsets are out due to intervening fles without recorods
               if (previousFile !== null) {
                 cumulativeOffset += result.find(
                   (r) => r.file === previousFile
@@ -3947,7 +3997,9 @@ async function exportData(result, filename, format, headers) {
 }
 
 const sendResult = (index, result, fromDBQuery) => {
-  if (!fromDBQuery) {result.model = STATE.model, result.modelID = STATE.modelID};
+  const model = ['birdnet', 'nocmig', 'chirpity'].includes(STATE.model) ? STATE.model : 'custom';
+  result.model = model;
+  // if (!fromDBQuery) {result.model = model, result.modelID = STATE.modelID};
   UI.postMessage({
     event: "new-result",
     file: result.file,
@@ -4458,7 +4510,10 @@ async function _updateSpeciesLocale(db, labels) {
     }
 
     // Helper: Extract call type from a string (including the preceding space)
-    const extractCallType = str => str.match(/\s+\(([^)]+)\)$/)?.[0] || "";
+    // const extractCallType = str => str.match(/\s+\(([^)]+)\)$/)?.[0] || "";
+    // Below updated to extract non alpha-numeric chars at the end of the cname
+    const extractCallType = str => str.match(/\s+\([^)]+\)$|[^a-zA-Z0-9\s]+$/)?.[0] || "";
+
     // Helper: Remove any call type from a string
     const stripCallType = str => str.replace(/\s+\([\w\s]+\)$/, '');
 
@@ -4527,6 +4582,9 @@ async function _updateSpeciesLocale(db, labels) {
  * @param {boolean} refreshResults - Whether to refresh results and summary after updating the locale.
  */
 async function onUpdateLocale(locale, labels, refreshResults) {
+  if (!['birdnet', 'chirpity', 'nocmig'].includes(STATE.model)){
+    return
+  }
   if (DEBUG) t0 = Date.now();
   let db;
   try {
@@ -5071,4 +5129,34 @@ async function convertFile(
       })
       .run();
   });
+}
+
+async function onDeleteModel(model){
+  let message, type;
+  let t0 = Date.now()
+  await dbMutex.lock()
+  try {
+    await diskDB.runAsync('BEGIN')
+    await memoryDB.runAsync('BEGIN')
+    await diskDB.runAsync('DELETE FROM models WHERE name = ?', model)
+    const result = await memoryDB.runAsync('DELETE FROM models WHERE name = ?', model)
+    await diskDB.runAsync('COMMIT')
+    await memoryDB.runAsync('COMMIT')
+    console.info('Custom model', `Model removal took ${(Date.now() - t0)/1000} seconds`)
+    if (result?.changes) {
+      message = `Model ${model} successfully removed`
+    } else {
+      message =  `Model ${model} was not found in the database`;
+      type = 'error'
+    }
+  } catch (e) {
+    await diskDB.runAsync('ROLLBACK')
+    await memoryDB.runAsync('ROLLBACK')
+    console.error(e)
+    message =  `Failed to remove model <b>${model}</b>: ${e.message}`;
+    type = 'error'
+  } finally {
+    dbMutex.unlock()
+    generateAlert({message, type, model})
+  }
 }

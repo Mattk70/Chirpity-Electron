@@ -397,10 +397,6 @@ class Model {
         .filter((index) => index !== null);
       DEBUG && console.log("filtering took", Date.now() - t0, "ms");
     }
-    this.test = []    
-    includedIDs.forEach(id =>{
-      this.test.push({species: this.labels[id], id})
-    })
     return [includedIDs.sort((a, b) => a - b), messages];
   }
 }

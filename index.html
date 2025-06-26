@@ -231,6 +231,207 @@
             </div>
         </div>
     </div>
+    <!-- Training Modal -->
+    <div class="modal fade" id="training-modal" tabindex="-1" aria-labelledby="training-modal-label" aria-modal="true">
+        <div class="modal-dialog  modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content  overflow-visible">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="training-modal-label">Model Training Settings</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="training-form">
+                    <div id="training-modal-body" style="max-height: 60vh" class="modal-body">
+                        <div class="row pb-3">
+                            <div class="input-group">
+                                <button class="btn btn-secondary col-5" type="button" id="dataset-location-select">
+                                    Training Audio Location:</button>
+                                <input type="text" style="font-size: 0.85rem;" class="form-control col-7" id="dataset-location" aria-describedby="dataset-location-select" placeholder="Location of the training files" readonly required>
+                            </div>
+                        </div>
+                        <div class="row pb-1">
+                            <div class="input-group">
+                                <button class="btn btn-secondary col-5" type="button" id="dataset-cache-location-select">
+                                    Dataset Cache Location:</button>
+                                <input type="text" style="font-size: 0.85rem" class="form-control col-7" id="dataset-cache-location" aria-describedby="dataset-cache-location-select" placeholder="Location of the dataset cache" readonly>
+                            </div>
+                        </div>
+                        <fieldset class="border rounded p-1 mb-3">
+                            <div class="form-check form-switch d-inline-block">
+                                <input class="form-check-input" type="checkbox" role="switch" name="useCache" id="useCache">
+                                <label class="form-check-label" for="useCache">Use the cached dataset if it exists</label>
+                            </div>
+                        </fieldset>
+                        <div class="row pb-1">
+                            <div class="input-group">
+                                <button class="btn btn-secondary col-5" type="button" id="model-location-select">
+                                    Model Save Location:</button>
+                                <input type="text" style="font-size: 0.85rem;" class="form-control col-7" id="model-location" aria-describedby="model-location-select" placeholder="Location to save the model" readonly required>
+                            </div>
+                        </div>
+                        <fieldset class="border rounded p-1 mb-3">
+                                <div class="form-check form-check-inline">
+                                    <label class="form-check-label" for="replace">Replace labels</label>
+                                    <input class="form-check-input" type="radio" name="model-type" id="replace" value="replace" checked>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="model-type" id="append" value="append">
+                                    <label class="form-check-label" for="append">Append labels</label>
+                                </div>
+                        </fieldset>
+                        <fieldset class="border rounded p-1">
+                            <legend class="h6">Training parameters</legend>
+                            <div class="row ps-2">
+                                <div class="form-floating ps-1 col">
+                                    <input type="number" id="epochs" class="form-control" min="1" max="300" value="10" required>
+                                    <label class="mb-2" for="epochs">Training Epochs</label>
+                                </div>
+                                <div class="form-floating ps-1 col">
+                                    <input type="number" id="lr" class="form-control" step="0.00001" min="0.00001" max="0.01" value="0.00001">
+                                    <label class="mb-2" for="lr">Learning Rate</label>
+                                </div>
+                                <div class="form-floating ps-1 col">
+                                    <input type="number" id="label-smoothing" class="form-control" step="0.01" min="0.0" max="0.5" value="0">
+                                    <label class="mb-2" for="label-smooting">Label Smoothing</label>
+                                </div>
+                            </div>
+                            <div class="row mt-2 g-0 border rounded">
+                                <div class="col ps-1">
+                                    <div class="form-check form-switch ms-1">
+                                        <input class="form-check-input" type="checkbox" role="switch" name="focal" id="focal">
+                                        <label class="form-check-label" for="focal">Use focal loss</label>
+                                    </div>
+                                    <div class="form-check form-switch ms-1">
+                                        <input class="form-check-input" type="checkbox" role="switch" name="weights" id="weights">
+                                        <label class="form-check-label" for="weights">Use class weights</label>
+                                    </div>
+                                </div>
+                                <div class="form-check form-switch col ms-1">
+                                    <input class="form-check-input" type="checkbox" role="switch" name="decay" id="decay">
+                                    <label class="form-check-label" for="decay">Use learning rate decay</label>
+                                </div>
+                                
+                            </div>
+                            <legend class="h6">Audio Dataset</legend>
+                            <div class="ms-1">
+                                <div class="input-group rounded mb-3">
+                                    <label class="ps-1 input-group-text" for="validation-split">Validation split:</label>
+                                    <select class="form-select mb-0" id="validation-split">
+                                        <option value="0">None</option>
+                                        <option value="0.1">10%</option>
+                                        <option value="0.2" selected>20%</option>
+                                    </select>
+                                </div>
+
+                            </div>
+                            <legend class="h6">Augmentations</legend>
+                            <fieldset class="border rounded p-1">
+                                <div class="form-check form-switch d-inline-block">
+                                    <input class="form-check-input" type="checkbox" role="switch" name="mixup" id="mixup">
+                                    <label class="form-check-label" for="mixup">Mixup</label>
+                                </div>
+                                <div class="form-check form-switch d-inline-block ms-3">
+                                    <input class="form-check-input" type="checkbox" role="switch" name="roll" id="roll">
+                                    <label class="form-check-label" for="roll">Roll</label>
+                                </div>
+                            </fieldset>
+                            <legend class="h6">Classifier</legend>
+                            <div class="row">
+                                <div class="input-group rounded mb-3 col">
+                                    <label class="ps-1 input-group-text" for="hidden-units">Hidden units:</label>
+                                    <select class="form-select mb-0" id="hidden-units">
+                                        <option value="0" selected>0</option>
+                                        <option value="128">128</option>
+                                        <option value="256">256</option>
+                                        <option value="512">512</option>
+                                        <option value="1024">1024</option>
+                                    </select>
+                                </div>
+                                <div class="input-group rounded mb-3 col">
+                                    <label class="ps-1 input-group-text" for="dropout">Dropout rate:</label>
+                                    <select class="form-select mb-0" id="dropout">
+                                        <option value="0" selected>0</option>
+                                        <option value="0.25">0.25</option>
+                                        <option value="0.33">0.33</option>
+                                        <option value="0.5">0.5</option>
+                                        <option value="0.75">0.75</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </fieldset>
+                    </div>
+                    <div class="modal-footer justify-content-center">
+                        <button id="train" type="submit" class="btn btn-success">Start training</button>
+                        <button id="training-dismiss" type="button" class="btn btn-danger" data-bs-dismiss="modal">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <!-- Model import modal-->
+    <div class="modal fade" id="import-modal" tabindex="-1" aria-labelledby="import-modal-label" aria-modal="true">
+        <div class="modal-dialog  modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="import-modal-label">Import Model</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="import-form">
+                    <div id="import-modal-body" class="modal-body">
+                        <div class="pb-3">
+                            <div class="input-group">
+                                <span class="input-group-text" id="model-name-text">
+                                    Model Name:
+                                </span>
+                                <input type="text" class="form-control" id="model-name" aria-describedby="model-name-text" placeholder="Choose a unique name for the model" required>
+                            </div>
+                        </div>
+                        <div class="pb-3">
+                            <div class="input-group">
+                                <button class="btn btn-secondary input-group-text" type="button" id="import-location-select">
+                                    Model Location:
+                                </button>
+                                <input type="text" style="font-size: 0.85rem" class="form-control" id="import-location" aria-describedby="import-location-select" placeholder="Location of the custom model files" readonly required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer justify-content-center">
+                        <button id="import" type="submit" class="btn btn-success">Import</button>
+                        <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <!-- Model remove modal -->
+    <div class="modal fade" id="expunge-modal" tabindex="-1" aria-labelledby="expunge-modal-label" aria-modal="true">
+        <div class="modal-dialog  modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="expunge-modal-label">Remove Custom Model</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="expunge-form">
+                    <div id="expunge-modal-body" class="modal-body">
+                        <div class="pb-3">
+                            <div class="input-group">
+                                <span class="input-group-text" id="expunge-model">
+                                    Model:
+                                </span>
+                                <select class="form-select mb-0" id="custom-models" required></select>
+                            </div>
+                        </div>
+                        <div class="alert alert-danger" role="alert">
+                            N.B. This will remove the model and all of its associated records from the database. It will take some time. Be patient 🙂
+                        </div>
+                    </div>
+                    <div class="modal-footer justify-content-center">
+                        <button id="expunge" type="submit" class="btn btn-success">Remove Model</button>
+                        <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
     <!-- Help Modal -->
     <div class="modal fade" id="helpModal" tabindex="-1" aria-labelledby="helpModalLabel" aria-modal="true">
         <div class="modal-dialog  modal-xl modal-dialog-centered modal-dialog-scrollable">
@@ -546,9 +747,9 @@
                         <div class="pe-3 input-group rounded p-2 mb-1">
                             <label class="ps-1 input-group-text col-5" for="model-to-use">Model:</label>
                             <select class="form-select mb-0" id="model-to-use">
-                                <option value="birdnet">BirdNet</option>
+                                <!-- <option value="birdnet">BirdNET</option>
                                 <option value="chirpity">Nocmig</option>
-                                <option value="nocmig">Nocmig v2 (beta)</option>
+                                <option value="nocmig">Nocmig v2 (beta)</option> -->
                             </select>
                         </div>
                     </div>
@@ -1462,7 +1663,7 @@
                                <div class="row ms-0 me-0">
                                 <a class="dropdown-item locked col" id="import-csv" href="#">
                                 <span class="material-symbols-outlined">place_item</span> Import Results from CSV</a>
-                                <a class="padlock col" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature.">
+                                <a class="padlock col-auto" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature.">
                                     <span class="pointer locked material-symbols-outlined float-end mt-1">lock</span></a>
                                 </div> 
                             </li>
@@ -1475,8 +1676,7 @@
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="navbarRecords" role="button"
                             data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                            Records
-                        </a>
+                            Records</a>
                         <ul class="dropdown-menu" aria-labelledby="navbarRecords">
                             <li class="dropdown-item disabled" id="save2db">
                                 <span class="material-symbols-outlined">archive</span> Save to Archive
@@ -1500,7 +1700,7 @@
                                 <span class="material-symbols-outlined">unarchive</span> Remove Current File From
                                 Archive
                             </li>
-                            <li class="dropdown-item d-none" id="dataset">
+                            <li class="dropdown-item" id="dataset">
                                 <span class="material-symbols-outlined">dataset</span> Create Dataset
                             </li>
                         </ul>
@@ -1508,89 +1708,129 @@
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="navbarAnalysis" role="button"
                         data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                        Analysis
-                    </a>
+                        Analysis</a>
                     <ul class="dropdown-menu" aria-labelledby="navbarAnalysis">
                         <li><a class="dropdown-item disabled" href="#" id="analyse">
                             <span class="material-symbols-outlined">search</span> Analyse Current File
-                            <span class="shortcut float-end">Ctrl+A</span> </a></li>
-                            <li><a class="dropdown-item disabled" href="#" id="analyseSelection">
-                                <span class="material-symbols-outlined">manage_search</span> Analyse Selected
-                                Interval</a></li>
-                                <li><a class="dropdown-item disabled" href="#" id="analyseAll">
-                                    <span class="material-symbols-outlined">search</span> Analyse All Open
-                                    Files <span class="shortcut float-end">Ctrl+Shift+A</span></a>
-                                </li>
-                                <li class="dropdown-divider"></li>
-                                <li><a class="dropdown-item disabled" href="#" id="reanalyse">
-                                    <span class="material-symbols-outlined">youtube_searched_for</span> Re-analyse
-                                    Current File</a></li>
-                                    <li><a class="dropdown-item disabled" href="#" id="reanalyseAll">
-                                        <span class="material-symbols-outlined">youtube_searched_for</span> Re-analyse All
-                                        Open Files</a></li>
-                                    </ul>
-                                </li>
-                                <li class="nav-item dropdown">
-                                    <a class="nav-link dropdown-toggle" href="#" id="navbarHelp" role="button"
-                                    data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                    Help
-                                </a>
-                                <ul class="dropdown-menu" aria-labelledby="navBarHelp">
-                                    <li><a class="dropdown-item" id="usage" href="#">
-                                        <span class="material-symbols-outlined">help</span> Using Chirpity</a>
-                                    </li>
-                                    <!-- <li>
-                                        <a class="dropdown-item" id="settingsHelp" href="#">
-                                            <span class="material-symbols-outlined">help</span> Settings
-                                        </a>
-                                    </li> -->
-                                    <li><a class="dropdown-item" id="keyboardHelp" href="#">
-                                        <span class="material-symbols-outlined">help</span> Keyboard Shortcuts
+                            <span class="shortcut float-end">Ctrl+A</span> </a>
+                        </li>
+                        <li><a class="dropdown-item disabled" href="#" id="analyseSelection">
+                            <span class="material-symbols-outlined">manage_search</span> Analyse Selected
+                            Interval</a>
+                        </li>
+                        <li><a class="dropdown-item disabled" href="#" id="analyseAll">
+                            <span class="material-symbols-outlined">search</span> Analyse All Open
+                            Files <span class="shortcut float-end">Ctrl+Shift+A</span></a>
+                        </li>
+                        <li class="dropdown-divider"></li>
+                        <li><a class="dropdown-item disabled" href="#" id="reanalyse">
+                            <span class="material-symbols-outlined">youtube_searched_for</span> Re-analyse
+                            Current File</a>
+                        </li>
+                        <li><a class="dropdown-item disabled" href="#" id="reanalyseAll">
+                            <span class="material-symbols-outlined">youtube_searched_for</span> Re-analyse All
+                            Open Files</a>
+                        </li>
+                    </ul>
+                </li>
+                <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarTraining" role="button"
+                        data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Training functions are only available when using the BirdNET model">
+                        Train</a>
+                    <ul class="dropdown-menu" aria-labelledby="navbarTraining">
+                        <li>
+                            <div class="row ms-0 me-0">
+                                <a class="dropdown-item locked col" id="open-training" href="#">
+                                <span class="material-symbols-outlined">model_training</span> Train a Custom Model
+                                <span>
+                                    <a class="padlock col-auto" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a member to unlock this feature.">
+                                        <span class="pointer locked material-symbols-outlined float-end mt-1">lock</span>
                                     </a>
-                                </li>
-                                <li><a class="dropdown-item" id="diagnostics" href="#">
-                                    <span class="material-symbols-outlined">insights</span> Diagnostics
+                                </span>
                                 </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" id="startTour" href="#">
-                                    <span class="material-symbols-outlined">tour</span> Show Tour
+                            </div> 
+                        </li>
+                        <li>
+                            <div class="row ms-0 me-0">
+                                <a class="dropdown-item locked col" id="import-model" href="#">
+                                <span class="material-symbols-outlined">account_circle</span> Import a Custom Model
+                                <span>
+                                    <a class="padlock col-auto" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a member to unlock this feature.">
+                                        <span class="pointer locked material-symbols-outlined float-end mt-1">lock</span>
+                                    </a>
+                                </span>
                                 </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" id="community" href="#">
-                                    <span class="material-symbols-outlined">forum</span> Join the community
+                            </div> 
+                        </li>
+                        <li>
+                            <div class="row ms-0 me-0">
+                                <a class="dropdown-item locked col" id="remove-model" href="#">
+                                <span class="material-symbols-outlined">no_accounts</span> Remove a Custom Model
+                                <span>
+                                    <a class="padlock col-auto" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a member to unlock this feature.">
+                                        <span class="pointer locked material-symbols-outlined float-end mt-1">lock</span>
+                                    </a>
+                                </span>
                                 </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" id="known-issues" href="#">
-                                    <span class="material-symbols-outlined">bug_report</span> Known Issues
-                                </a>
-                            </li>
-                            <div class="dropdown-divider"></div>
-                            <h6 class="fs-6 ps-3" id="FAQ">FAQs</h6>
-                            <li>
-                                <a class="dropdown-item" id="species" href="#">
-                                    <span class="material-symbols-outlined">help</span> What species are detected?
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" id="eBird" href="#">
-                                    <span class="material-symbols-outlined">help</span> What is an eBird Record?
-                                </a>
-                            </li>
-                        </ul>
+                            </div> 
+                        </li>
+                    </ul>
+                </li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarHelp" role="button"
+                    data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    Help</a>
+                <ul class="dropdown-menu" aria-labelledby="navBarHelp">
+                    <li><a class="dropdown-item" id="usage" href="#">
+                        <span class="material-symbols-outlined">help</span> Using Chirpity</a>
                     </li>
-                    <div class="nav-item">
-                        <li class="nav-link text-nowrap"  onclick="placeMap('settingsMap')" id="navbarSettings"
-                        data-bs-toggle="offcanvas" data-bs-target="#settings" aria-controls="settings">Settings</li>
-                    </div>
+                    <!-- <li>
+                        <a class="dropdown-item" id="settingsHelp" href="#">
+                            <span class="material-symbols-outlined">help</span> Settings
+                        </a>
+                    </li> -->
+                    <li><a class="dropdown-item" id="keyboardHelp" href="#">
+                        <span class="material-symbols-outlined">help</span> Keyboard Shortcuts</a>
+                    </li>
+                    <li><a class="dropdown-item" id="diagnostics" href="#">
+                        <span class="material-symbols-outlined">insights</span> Diagnostics</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item" id="startTour" href="#">
+                            <span class="material-symbols-outlined">tour</span> Show Tour</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item" id="community" href="#">
+                            <span class="material-symbols-outlined">forum</span> Join the community</a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item" id="known-issues" href="#">
+                            <span class="material-symbols-outlined">bug_report</span> Known Issues</a>
+                    </li>
+                    <div class="dropdown-divider"></div>
+                    <h6 class="fs-6 ps-3" id="FAQ">FAQs</h6>
+                    <li>
+                        <a class="dropdown-item" id="species" href="#">
+                            <span class="material-symbols-outlined">help</span> What species are detected?
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item" id="eBird" href="#">
+                            <span class="material-symbols-outlined">help</span> What is an eBird Record?
+                        </a>
+                    </li>
                 </ul>
+            </li>
+            <div class="nav-item">
+                <li class="nav-link text-nowrap"  onclick="placeMap('settingsMap')" id="navbarSettings"
+                data-bs-toggle="offcanvas" data-bs-target="#settings" aria-controls="settings">Settings</li>
             </div>
-            <div id="buy-me-coffee" class="d-none"><a href="https://www.buymeacoffee.com/matthew_kirkland" target="_blank"><img src="img/bmc.png" alt="Become a Chirpity supporter on Buy-me-a-coffee" title="Support Chirpity's ongoing development and unlock exclusive features"></a></div>
-            <!-- navbar-collapse.// -->
-            <a href="https://chirpity.mattkirkland.co.uk" title="Visit the Chirpity website" target="_blank"  id="primaryLogoLink"><img id="primaryLogo" src="img/logo/chirpity_logo2.png" alt="Chirpity bird calls: Identifying birds by sound"></a>
+            </ul>
         </div>
+        <div id="buy-me-coffee" class="d-none"><a href="https://www.buymeacoffee.com/matthew_kirkland" target="_blank"><img src="img/bmc.png" alt="Become a Chirpity supporter on Buy-me-a-coffee" title="Support Chirpity's ongoing development and unlock exclusive features"></a></div>
+        <!-- navbar-collapse.// -->
+        <a href="https://chirpity.mattkirkland.co.uk" title="Visit the Chirpity website" target="_blank"  id="primaryLogoLink"><img id="primaryLogo" src="img/logo/chirpity_logo2.png" alt="Chirpity bird calls: Identifying birds by sound"></a>
+    </div>
         <!-- container-fluid.// -->
     </nav>
 </div>
@@ -1614,7 +1854,7 @@
     <div class="d-none text-sm-start" id="update-progress"><span id="update-progress-text">Downloading update: </span>
         <progress value="0" id="update-progress-bar" max="100" style="width:100px"></progress>
     </div>
-    <small>Chirpity Nocmig &copy; Matthew Kirkland <span id="year"></span><br></small>
+    <small>Chirpity Nocmig <span id="version"></span> &copy; Matthew Kirkland <span id="year"></span></small>
 </footer>
 <audio id="notification">
     <source src="Help/notification.mp3" type="audio/mpeg">

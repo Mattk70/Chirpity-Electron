@@ -13,6 +13,8 @@ app.commandLine.appendSwitch("xdg-portal-required-version", "4");
 app.commandLine.appendSwitch("enable-unsafe-webgpu");
 app.commandLine.appendSwitch("enable-features", "Vulkan");
 
+// Set the AppUserModelID (to prevent the two pinned icons bug)
+app.setAppUserModelId('com.electron.chirpity');
 const { autoUpdater } = require("electron-updater");
 const log = require("electron-log");
 
@@ -40,7 +42,6 @@ const SUPPORTED_FILES = [
   ".mp4",
   ".mov",
 ];
-
 
 
 //-------------------------------------------------------------------
@@ -464,7 +465,6 @@ if (!gotTheLock) {
           app.dock.bounce();
       } else {
           // Quit when all windows are closed.
-          app.setAppUserModelId('chirpity')
           app.on('window-all-closed', () => {
               app.quit()
           })

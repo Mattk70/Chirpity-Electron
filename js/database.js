@@ -439,7 +439,7 @@ const createDB = async ({file, diskDB, dbMutex}) => {
 };
 
 
-const addNewModel = async ({model, db = diskDB, dbMutex}) => {
+const addNewModel = async ({model, db = diskDB, dbMutex, labelsLocation}) => {
   let modelID;
   try {
     await dbMutex.lock();
@@ -456,10 +456,15 @@ const addNewModel = async ({model, db = diskDB, dbMutex}) => {
          "BirdNET_GLOBAL_6K_V2.4_Labels_en.txt");
         const fileContents = readFileSync(labelFile, "utf8");
           labels = fileContents.trim().split(/\r?\n/);
-    } else {
+    } else if (['chirpity', 'nocmig'].includes(model)){
       labels = JSON.parse(
         readFileSync(path.join(__dirname, `${model}_model_config.json`), "utf8")
       ).labels;
+    } else {
+      // Custom model
+      const labelFile = labelsLocation
+      const fileContents = readFileSync(labelFile, "utf8");
+      labels = fileContents.trim().split(/\r?\n/);
     }
     // Add Unknown Sp.
     labels.push("Unknown Sp._Unknown Sp.");
@@ -485,7 +490,7 @@ const addNewModel = async ({model, db = diskDB, dbMutex}) => {
   return modelID;
 }
 
-const mergeDbIfNeeded = async ({diskDB, model, appPath, dbMutex}) => {
+const mergeDbIfNeeded = async ({diskDB, model, appPath, dbMutex, labelsLocation}) => {
   // Check if we have this model already
   const modelRow = await diskDB.getAsync(`SELECT id FROM models WHERE name = ?`, model)
   if (modelRow) return [modelRow.id, false]
@@ -500,7 +505,7 @@ const mergeDbIfNeeded = async ({diskDB, model, appPath, dbMutex}) => {
   DEBUG && console.log('isCustomDB:', isCustomDB);
   if (dbNotFound) {
     console.log(`Model database not found: ${legacyDbPath}`);
-    const modelID = await addNewModel({model, db:diskDB, dbMutex})
+    const modelID = await addNewModel({model, db:diskDB, dbMutex, labelsLocation})
     // translation needed
     return [modelID, true]
   }
