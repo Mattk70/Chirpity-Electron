@@ -3239,12 +3239,18 @@ const showTraining = () => {
     document.getElementById('epochs').value = settings.epochs;
     document.getElementById('label-smoothing').value = settings.labelSmoothing;
     document.getElementById('decay').checked = settings.decay;
+    // Only allow class weights if not using focal loss
     const weights = document.getElementById('weights');
     weights.checked = settings.useWeights;
     weights.disabled = settings.useFocal;
     document.getElementById('focal').checked = settings.useFocal;
     document.getElementById('mixup').checked = settings.mixup;
-    document.getElementById('roll').checked = settings.roll;
+    // Only allow roll if 'tensorflow' backend (GPU backends leak memory)
+    const allowRoll = config.models[config.selectedModel].backend === 'tensorflow';
+    allowRoll || (config.training.settings.roll = false);
+    const roll = document.getElementById('roll');
+    roll.checked = allowRoll && settings.roll;
+    roll.disabled = !allowRoll;
     document.getElementById('dropout').value = settings.dropout;
     dropout.disabled = !config.training.settings.hidden;
     document.getElementById('useCache').checked = settings.useCache;
@@ -5277,10 +5283,12 @@ async function handleUIClicks(e) {
       training.hide();
       displayProgress({percent: 0}, 'Starting...')
       disableSettingsDuringAnalysis(true)
+      const backend = config.models[config.selectedModel].backend;
+      const batchSize = config[backend].batchSize;
       STATE.training = true;
       worker.postMessage({
         action: "train-model", 
-        dataset, cache, modelLocation, modelType, ...settings});
+        dataset, cache, modelLocation, modelType, batchSize, ...settings});
       break;
     }
     case "import": {
