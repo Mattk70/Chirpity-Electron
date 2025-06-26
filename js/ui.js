@@ -5253,10 +5253,9 @@ async function handleUIClicks(e) {
       const entries = fs.readdirSync(datasetLocation, { withFileTypes: true }).filter(e => isDirectory(e) && ! e.name.startsWith('.'));
       const folders = entries.map(entry => entry.name);
       // Check valid formatting
-      let errors = false
       for (const f of folders) {
         const parts = f.split('_');
-        if (parts.length !== 2 && f.toLowerCase() !== 'background' ){
+        if (parts.length !== 2 && !f.toLowerCase().includes('background') ){
           generateToast({message:`There are audio folders not in the correct format.<br>
               <b>"scientific name_common name"</b> is expected but found:<br>
               <b>${f}</b>`, type: 'warning', autohide: false})
@@ -5264,7 +5263,6 @@ async function handleUIClicks(e) {
           break
         }
       }
-      if (errors) break
       if (modelType === 'append'){
         function findDuplicateLines(labelFile) {
           const labels = new Set(fs.readFileSync(labelFile, 'utf8').split('\n').map(l => l.trim()));
