@@ -5134,13 +5134,19 @@ async function convertFile(
 async function onDeleteModel(model){
   let message, type;
   let t0 = Date.now()
+  await dbMutex.lock()
   try {
-    await dbMutex.lock()
     await diskDB.runAsync('BEGIN')
     await diskDB.runAsync('DELETE FROM models WHERE name = ?', model)
     await diskDB.runAsync('COMMIT')
+  } catch (e) {
+    await diskDB.runAsync('ROLLBACK')
+    console.error(e)
+  }
+  let result;
+  try {
     await memoryDB.runAsync('BEGIN')
-    const result = await memoryDB.runAsync('DELETE FROM models WHERE name = ?', model)
+    result = await memoryDB.runAsync('DELETE FROM models WHERE name = ?', model)
     await memoryDB.runAsync('COMMIT')
     console.info('Custom model', `Model removal took ${(Date.now() - t0)/1000} seconds`)
     if (result?.changes) {
@@ -5149,8 +5155,9 @@ async function onDeleteModel(model){
       message =  `Failed to remove model ${model}`;
       type = 'error'
     }
-  } catch (error) {
-    console.error(error)
+  } catch (e) {
+    await diskDB.runAsync('ROLLBACK')
+    console.error(e)
   } finally {
     dbMutex.unlock()
     generateAlert({message, type, model})
