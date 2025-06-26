@@ -2226,7 +2226,10 @@ const setUpWorkerMessaging = () => {
             disableSettingsDuringAnalysis(false)
             DOM.trainNav.classList.remove('disabled');
           }
-          if (args.model) expungeModal.hide();
+          if (args.model) {
+            expungeModal.hide();
+            document.getElementById('expunge').classList.remove('disabled');
+          }
           if (args.history){
             plotTrainingHistory(args.history)
           }
@@ -5331,6 +5334,7 @@ async function handleUIClicks(e) {
         form.reportValidity();
         break;
       }
+      element.classList.add('disabled')
       const model = document.getElementById('custom-models').value;
       worker.postMessage({action:"expunge-model", model})
       delete config.models[model];
