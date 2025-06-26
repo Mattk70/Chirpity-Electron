@@ -5205,7 +5205,7 @@ async function handleUIClicks(e) {
       break;
     }
     case "model-type": {
-      config.customModel.type = element.selected.value
+      config.training.customModel.type = element.selected.value
       break
     }
     case "model-location-select": {
@@ -7907,6 +7907,6 @@ function updateModelOptions(customOnly){
     option.textContent = opt.displayName;
     select.appendChild(option);
   }
-  customOnly || (select.selectedValue = config.selectedModel)
+  customOnly || (select.value = config.selectedModel)
 }
       
