@@ -91,7 +91,7 @@ jobs:
       - name: Setup node
         uses: actions/setup-node@v3
         with:
-            node-version: 20.0.x
+            node-version: 22.16.0
       - run: echo "🍏 Node setup status is ${{ job.status }}."
       
       # Step to set up Python 3.11
