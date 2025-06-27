@@ -54,14 +54,6 @@ function interpolate(template, variables) {
   });
 }
 
-function customURLEncode(str) {
-  return encodeURIComponent(str)
-    .replace(/[!'()*]/g, (c) => {
-      // Replacing additional characters not handled by encodeURIComponent
-      return "%" + c.charCodeAt(0).toString(16).toUpperCase();
-    })
-    .replace(/%20/g, "+"); // Replace space with '+' instead of '%20'
-}
 
 function extractFileNameAndFolder(path) {
   const regex = /[\\/]?([^\\/]+)[\\/]?([^\\/]+)$/; // Regular expression to match the parent folder and file name
@@ -278,7 +270,6 @@ export {
   syncConfig,
   hexToRgb,
   interpolate,
-  customURLEncode,
   extractFileNameAndFolder,
   getDatetimeLocalFromEpoch,
   enableMenuItem,

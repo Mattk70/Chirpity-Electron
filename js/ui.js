@@ -8,6 +8,8 @@ const p = window.module.p;
 const uuidv4 = window.module.uuidv4;
 const os = window.module.os;
 import {
+  customURLEncode,
+  installConsoleTracking,
   trackVisit as _trackVisit,
   trackEvent as _trackEvent,
 } from "./utils/tracking.js";
@@ -39,53 +41,11 @@ let LOCATIONS,
 let APPLICATION_LOADED = false;
 let LABELS = [],
   HISTORY = [];
-// Save console.warn and console.error functions
-const originalInfo = console.info;
-const originalWarn = console.warn;
-const originalError = console.error;
-
-// Override console.warn to intercept and track warnings
-console.info = function () {
-  // Call the original console.info to maintain default behavior
-  originalInfo.apply(console, arguments);
-  // Track the warning message using your tracking function
-  trackEvent(
-    config.UUID,
-    "Information",
-    arguments[0],
-    utils.customURLEncode(arguments[1])
-  );
-};
-
-// Override console.warn to intercept and track warnings
-console.warn = function () {
-  originalWarn.apply(console, arguments);
-  trackEvent(
-    config.UUID,
-    "Warnings",
-    arguments[0],
-    utils.customURLEncode(arguments[1])
-  );
-};
-
-// Override console.error to intercept and track errors
-console.error = function () {
-  originalError.apply(console, arguments);
-  trackEvent(
-    config.UUID,
-    "Errors",
-    arguments[0],
-    utils.customURLEncode(arguments[1])
-  );
-};
 
 window.addEventListener("unhandledrejection", function (event) {
+  if (isTestEnv) return
   // Extract the error message and stack trace from the event
   const errorMessage = event.reason.message;
-  // if (errorMessage?.startsWith("The play() request was interrupted by a call to pause()")) {
-  //   // Hack: Reload the audio segment
-  //   postBufferUpdate({file: STATE.currentFile, begin: STATE.windowOffsetSecs, position: 0, play: false, resetSpec: true});
-  // };
   const stackTrace = event.reason.stack;
 
   // Track the unhandled promise rejection
@@ -93,11 +53,12 @@ window.addEventListener("unhandledrejection", function (event) {
     config.UUID,
     "Unhandled UI Promise Rejection",
     errorMessage,
-    utils.customURLEncode(stackTrace)
+    customURLEncode(stackTrace)
   );
 });
 
 window.addEventListener("rejectionhandled", function (event) {
+  if (isTestEnv) return
   // Extract the error message and stack trace from the event
   const errorMessage = event.reason.message;
   const stackTrace = event.reason.stack;
@@ -107,7 +68,7 @@ window.addEventListener("rejectionhandled", function (event) {
     config.UUID,
     "Handled UI Promise Rejection",
     errorMessage,
-    utils.customURLEncode(stackTrace)
+    customURLEncode(stackTrace)
   );
 });
 
@@ -386,6 +347,7 @@ const BATCH_SIZE_LIST = [4, 8, 16, 32, 48, 64, 96];
 // Is this CI / playwright?
 const isTestEnv = window.env.TEST_ENV === "true";
 const trackVisit = isTestEnv ? () => {} : _trackVisit;
+isTestEnv || installConsoleTracking(() => config.UUID, "UI");
 const trackEvent = isTestEnv ? () => {} : _trackEvent;
 isTestEnv && console.log("Running in test environment");
 

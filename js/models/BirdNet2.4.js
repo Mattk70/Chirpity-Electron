@@ -8,6 +8,7 @@ try {
 const fs = require("node:fs");
 const path = require("node:path");
 import { BaseModel } from "./BaseModel.js";
+import {trainModel} from './training.js';
 const {stft} = require("./custom-ops.js");
 const abortController = require('../utils/abortController.js');
 
@@ -65,6 +66,7 @@ onmessage = async (e) => {
             console.log(tf.env().getFlags());
           }
           myModel = new BirdNETModel(appPath, version);
+          myModel.UUID = e.data.UUID
           myModel.labels = labels;
           // Prepare a mask to squash 'background' predictions
           const bgIndex = labels.findIndex(item => item.toLowerCase().includes('background'));
@@ -88,7 +90,6 @@ onmessage = async (e) => {
         break;
       }
       case "train-model":{
-        const {trainModel} = require('./training.js');
         const args = e.data;
           trainModel({ ...args, Model: myModel}).then((message) => {
             postMessage({...message})
