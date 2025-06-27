@@ -278,7 +278,7 @@ Augmentations:
   Model.model_loaded = false;
   Model.one.dispose(), Model.two.dispose(), Model.scalarFive.dispose();
   await Model.loadModel("layers");
-  console.Info('Training: Custom model saved.', `Loss: ${bestLoss.toFixed(4)}, Accuracy: ${bestAccuracy.toFixed(2)}`)
+  console.info('Training: Custom model saved.', `Loss: ${bestLoss.toFixed(4)}, Accuracy: ${bestAccuracy.toFixed(2)}`)
   return message
 }
 
