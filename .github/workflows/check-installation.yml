@@ -50,11 +50,11 @@ jobs:
         if: runner.os == 'Windows'
         run: npx electron-rebuild
 
-      - name: Rebuild tfjs-node bindings
-        if: runner.os == 'Windows'
-        run: npx node-pre-gyp rebuild
+      - name: Rebuild tfjs-node for Electron
+        run: npx electron-rebuild -f -w @tensorflow/tfjs-node
 
-        
+
+
       - name: Set platform-specific ffmpeg path
         shell: bash
         run: |
