@@ -33,6 +33,22 @@ jobs:
             node-version: 22.16.0
       - run: echo "🍏 Node setup status is ${{ job.status }}."
       
+      - name: Install Windows build tools
+        if: runner.os == 'Windows'
+        run: |
+          npm install --global --production windows-build-tools
+          npm install --global node-gyp
+
+      - name: Rebuild native modules for Electron
+        if: runner.os == 'Windows'
+        run: npx electron-rebuild
+
+      - name: Rebuild tfjs-node bindings
+        if: runner.os == 'Windows'
+        run: npx node-pre-gyp rebuild
+
+
+
       # Step to set up Python 3.11
       - name: Set up Python 3.11
         uses: actions/setup-python@v4
