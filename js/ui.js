@@ -3112,7 +3112,9 @@ function disableSettingsDuringAnalysis(bool) {
     if (DOM[el]) DOM[el].disabled = bool;
     else throw new Error(`${el} is not in the DOM cache`);
   });
-  DOM.backendOptions?.forEach((backend) => (backend.disabled = bool));
+  if (STATE.isMember){
+    DOM.backendOptions?.forEach((backend) => (backend.disabled = bool));
+  }
 }
 
 
