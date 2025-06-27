@@ -275,12 +275,10 @@ Augmentations:
     }
   })
   optimizer.dispose();
-  // console.log(`Tensors in memory after: ${tf.memory().numTensors}`);
   Model.model_loaded = false;
   Model.one.dispose(), Model.two.dispose(), Model.scalarFive.dispose();
   await Model.loadModel("layers");
-  // console.log(`Tensors in memory new model: ${JSON.stringify(tf.memory())}`);
-  console.log('new model made')
+  console.Info('Training: Custom model saved.', `Loss: ${bestLoss.toFixed(4)}, Accuracy: ${bestAccuracy.toFixed(2)}`)
   return message
 }
 
@@ -360,7 +358,7 @@ async function writeBinaryGzipDataset(fileList, outputPath, labelToIndex, postMe
           notice: `Error loading file:<br>${filePath}<br>${err}`,
           type: 'error'
         });
-        
+        console.error("Training: decode audio", err)
         completed++;
         return;
       }
@@ -403,7 +401,7 @@ async function writeBinaryGzipDataset(fileList, outputPath, labelToIndex, postMe
   await Promise.all(tasks);
   gzip.end();
   abortController.off('abort', onAbort);
-  console.log(`Dataset preparation took: ${((Date.now() - t0)/ 1000).toFixed(0)} seconds. ${completed} files processed.`)
+  console.info(`Dataset preparation took: ${((Date.now() - t0)/ 1000).toFixed(0)} seconds. ${completed} files processed.`)
 }
 
 
@@ -475,6 +473,9 @@ async function* readBinaryGzipDataset(gzippedPath, labels) {
  */
 
 const ffmpeg = require('fluent-ffmpeg')
+const ffmpegPath = require("@ffmpeg-installer/ffmpeg").path.replace("app.asar","app.asar.unpacked");
+ffmpeg.setFfmpegPath(ffmpegPath);
+
 async function getAudioDuration(filePath) {
   return new Promise((resolve, reject) => {
     let gotDuration = false;

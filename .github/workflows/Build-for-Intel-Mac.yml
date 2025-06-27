@@ -46,9 +46,9 @@ jobs:
         shell: bash
         run: |
           echo "Checking if the latest tag ($LATEST_TAG) is a published release..."
-          
-          RELEASE_INFO=$(gh api repos/${{ github.repository }}/releases/tags/$LATEST_TAG || echo "not_found")
-          
+
+          RELEASE_INFO=$(gh api repos/Mattk70/Chirpity-Electron/releases/tags/$LATEST_TAG 2>/dev/null) || RELEASE_INFO="not_found"
+
           if [[ "$RELEASE_INFO" == "not_found" ]]; then
             echo "No release found for $LATEST_TAG. Assuming it is not published."
             echo "LATEST_TAG_PUBLISHED=false" >> $GITHUB_ENV

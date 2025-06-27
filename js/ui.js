@@ -7460,11 +7460,37 @@ async function membershipCheck() {
         el.classList.replace("locked", "unlocked");
         el.textContent = "lock_open";
       } else {
-        el.classList.remove("locked");
+        el.classList.remove("locked", "disabled");
         el.disabled = false;
       }
     });
   };
+
+  const setLocks = () =>{
+    document.getElementById("buy-me-coffee").classList.remove("d-none");
+
+    config.keyAssignment = {};
+    config.specDetections = false;
+    config.detect.autoLoad = false;
+    config.detect.combine = false;
+    config.detect.merge = false;
+    config.library.clips = false;
+    config.database.location = "";
+    lockedElements.forEach((el) => {
+      el.classList.replace("unlocked", "locked");
+
+      if (el instanceof HTMLSpanElement) {
+        el.textContent = "lock";
+      } else {
+        el.classList.remove("locked"); // remove coral color
+        if (el instanceof HTMLSelectElement) el.selectedIndex = 0;
+        el.classList.add('disabled');
+        el.checked = false;
+        el.disabled = true;
+      }
+    });
+  }
+
   const MEMBERSHIP_API_ENDPOINT =
     await window.electron.MEMBERSHIP_API_ENDPOINT();
   return await checkMembership(config.UUID, MEMBERSHIP_API_ENDPOINT)
@@ -7487,28 +7513,7 @@ async function membershipCheck() {
         localStorage.setItem("isMember", isMember);
         localStorage.setItem("memberTimestamp", now);
       } else {
-        document.getElementById("buy-me-coffee").classList.remove("d-none");
-
-        config.keyAssignment = {};
-        config.specDetections = false;
-        config.detect.autoLoad = false;
-        config.detect.combine = false;
-        config.detect.merge = false;
-        config.library.clips = false;
-        config.database.location = "";
-        lockedElements.forEach((el) => {
-          el.classList.replace("unlocked", "locked");
-
-          if (el instanceof HTMLSpanElement) {
-            el.textContent = "lock";
-          } else {
-            el.classList.remove("locked"); // remove coral color
-            if (el instanceof HTMLSelectElement) el.selectedIndex = 0;
-            el.classList.add('disabled');
-            el.checked = false;
-            el.disabled = true;
-          }
-        });
+        setLocks()
         localStorage.setItem("isMember", false);
       }
 
@@ -7531,7 +7536,7 @@ async function membershipCheck() {
           "img/logo/chirpity_logo_subscriber_bronze.png";
         return true;
       } else {
-        document.getElementById("buy-me-coffee").classList.remove("d-none");
+        setLocks()
       }
     });
 }
