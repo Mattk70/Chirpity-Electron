@@ -475,6 +475,9 @@ async function* readBinaryGzipDataset(gzippedPath, labels) {
  */
 
 const ffmpeg = require('fluent-ffmpeg')
+const ffmpegPath = require("@ffmpeg-installer/ffmpeg").path.replace("app.asar","app.asar.unpacked");
+ffmpeg.setFfmpegPath(ffmpegPath);
+
 async function getAudioDuration(filePath) {
   return new Promise((resolve, reject) => {
     let gotDuration = false;
