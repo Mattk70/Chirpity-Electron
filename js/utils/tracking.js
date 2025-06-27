@@ -42,22 +42,23 @@ function trackEvent(uuid, event, action, name, value){
 }
 
 function trackVisit(config){
-    VISITOR = config.UUID;
+    const {UUID, selectedModel, list, useWeek, locale, speciesThreshold, filters, audio, models, detect, CPU, RAM, VERSION} = config;
+    VISITOR = UUID;
     const {width, height} = window.screen;
-    fetch(`https://analytics.mattkirkland.co.uk/matomo.php?idsite=${ID_SITE}&rand=${Date.now()}&rec=1&uid=${config.UUID}&apiv=1
+    fetch(`https://analytics.mattkirkland.co.uk/matomo.php?idsite=${ID_SITE}&rand=${Date.now()}&rec=1&uid=${UUID}&apiv=1
             &res=${width}x${height}
-            &dimension1=${config.selectedModel}
-            &dimension2=${config.list}
-            &dimension3=${config.useWeek}
-            &dimension4=${config.locale}
-            &dimension5=${config.speciesThreshold}
-            &dimension6=${JSON.stringify(config.filters)}
-            &dimension7=${JSON.stringify(config.audio)}
-            &dimension8=${JSON.stringify(config.models[config.selectedModel].backend)}
-            &dimension9=${JSON.stringify(config.detect)}
-            &dimension11=${config.VERSION}
-            &dimension12=${config.CPU}
-            &dimension13=${config.RAM}`)
+            &dimension1=${selectedModel}
+            &dimension2=${list}
+            &dimension3=${useWeek}
+            &dimension4=${locale}
+            &dimension5=${speciesThreshold}
+            &dimension6=${JSON.stringify(filters)}
+            &dimension7=${JSON.stringify(audio)}
+            &dimension8=${models[selectedModel].backend}
+            &dimension9=${JSON.stringify(detect)}
+            &dimension11=${VERSION}
+            &dimension12=${CPU}
+            &dimension13=${RAM}`)
         .then(response => {
             if (! response.ok) throw new Error('Network response was not ok', response);
         })
@@ -83,4 +84,39 @@ function sendHeartbeat() {
         console.log('Error sending heartbeat:', error);
     });
 }
-export {trackEvent, trackVisit}
+
+function customURLEncode(str) {
+  return encodeURIComponent(str)
+    .replace(/[!'()*]/g, (c) => {
+      // Replacing additional characters not handled by encodeURIComponent
+      return "%" + c.charCodeAt(0).toString(16).toUpperCase();
+    })
+    .replace(/%20/g, "+"); // Replace space with '+' instead of '%20'
+}
+
+/**
+ * Overrides console.info, console.warn, and console.error
+ * @param {Function} getUUID - Function returning the current UUID (e.g. () => STATE.UUID)
+ */
+function installConsoleTracking(getUUID, scriptSrc) {
+    const override = (level, label) => {
+        const original = console[level];
+        console[level] = function (...args) {
+            original.apply(console, args);
+            if (args.length >= 2 && typeof getUUID === 'function') {
+                trackEvent(
+                    getUUID(),
+                    label,
+                    args[0],
+                    customURLEncode(args[1])
+                );
+            }
+        };
+    };
+
+    override('info', `${scriptSrc} Information`);
+    override('warn', `${scriptSrc} Warning`);
+    override('error', `${scriptSrc} Error`);
+}
+
+export {customURLEncode, installConsoleTracking, trackEvent, trackVisit}

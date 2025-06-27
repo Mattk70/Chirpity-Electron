@@ -20,7 +20,7 @@ import {
   mergeDbIfNeeded,
   addNewModel
 } from "./database.js";
-import { trackEvent as _trackEvent } from "./utils/tracking.js";
+import { customURLEncode, installConsoleTracking, trackEvent } from "./utils/tracking.js";
 
 let isWin32 = false;
 
@@ -35,9 +35,6 @@ if (process.platform === "win32") {
   ntsuspend = require("ntsuspend");
   isWin32 = true;
 }
-// Is this CI / playwright? Disable tracking
-const isTestEnv = process.env.TEST_ENV;
-const trackEvent = isTestEnv ? () => {} : _trackEvent;
 
 let DEBUG;
 
@@ -50,10 +47,7 @@ let predictWorkers = [],
 let UI;
 let FILE_QUEUE = [];
 let INITIALISED = null;
-// Save console.warn and console.error functions
-const originalInfo = console.info;
-const originalWarn = console.warn;
-const originalError = console.error;
+
 
 const generateAlert = ({
   message,
@@ -79,58 +73,15 @@ const generateAlert = ({
     model
   });
 };
-function customURLEncode(str) {
-  return encodeURIComponent(str)
-    .replace(/[!'()*]/g, (c) => {
-      // Replacing additional characters not handled by encodeURIComponent
-      return "%" + c.charCodeAt(0).toString(16).toUpperCase();
-    })
-    .replace(/%20/g, "+"); // Replace space with '+' instead of '%20'
-}
 
-// Override console.info to intercept and track information
-console.info = function () {
-  // Call the original console.warn to maintain default behavior
-  originalInfo.apply(console, arguments);
+// // Override console.info to intercept and track information
+// Is this CI / playwright? Disable tracking
+const isTestEnv = process.env.TEST_ENV;
+isTestEnv || installConsoleTracking(() => STATE.UUID, "Worker");
 
-  // Track the warning message using your tracking function
-  trackEvent(
-    STATE.UUID,
-    "Information",
-    arguments[0],
-    customURLEncode(arguments[1])
-  );
-};
-
-// Override console.warn to intercept and track warnings
-console.warn = function () {
-  // Call the original console.warn to maintain default behavior
-  originalWarn.apply(console, arguments);
-
-  // Track the warning message using your tracking function
-  trackEvent(
-    STATE.UUID,
-    "Worker Warning",
-    arguments[0],
-    customURLEncode(arguments[1])
-  );
-};
-
-// Override console.error to intercept and track errors
-console.error = function () {
-  // Call the original console.error to maintain default behavior
-  originalError.apply(console, arguments);
-
-  // Track the error message using your tracking function
-  trackEvent(
-    STATE.UUID,
-    "Worker Handled Errors",
-    arguments[0],
-    customURLEncode(arguments[1])
-  );
-};
 // Implement error handling in the worker
 self.onerror = function (message, file, lineno, colno, error) {
+  if (isTestEnv) return
   trackEvent(
     STATE.UUID,
     "Unhandled Worker Error",
@@ -144,6 +95,7 @@ self.onerror = function (message, file, lineno, colno, error) {
 };
 
 self.addEventListener("unhandledrejection", function (event) {
+  if (isTestEnv) return
   // Extract the error message and stack trace from the event
   const errorMessage = event.reason?.message;
   const stackTrace = event.reason?.stack;
@@ -158,6 +110,7 @@ self.addEventListener("unhandledrejection", function (event) {
 });
 
 self.addEventListener("rejectionhandled", function (event) {
+  if (isTestEnv) return
   // Extract the error message and stack trace from the event
   const errorMessage = event.reason?.message;
   const stackTrace = event.reason?.stack;
@@ -2951,6 +2904,7 @@ function spawnPredictWorkers(model, batchSize, threads, modelPath) {
     DEBUG && console.log("loading a worker");
     worker.postMessage({
       message: "load",
+      UUID: STATE.UUID,
       model,
       modelPath: STATE.modelPath,
       batchSize,

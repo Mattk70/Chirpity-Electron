@@ -1,3 +1,4 @@
+import {installConsoleTracking } from "../utils/tracking.js";
 
 let transferModel, tf, DEBUG = false;
 
@@ -24,6 +25,7 @@ async function trainModel({
   dropout, epochs, hidden,
   dataset, cache:cacheFolder, modelLocation:saveLocation, modelType, 
   useCache, validation, mixup, decay, useRoll, useWeights, useFocal, labelSmoothing}) {
+  installConsoleTracking(() => Model.UUID, "Training");
   const {files:allFiles, classWeights} = getFilesWithLabelsAndWeights(dataset);
   if (!allFiles.length){
     throw new Error(`No files found in any label folders in ${dataset}` )
@@ -278,7 +280,7 @@ Augmentations:
   Model.model_loaded = false;
   Model.one.dispose(), Model.two.dispose(), Model.scalarFive.dispose();
   await Model.loadModel("layers");
-  console.Info('Training: Custom model saved.', `Loss: ${bestLoss.toFixed(4)}, Accuracy: ${bestAccuracy.toFixed(2)}`)
+  console.info('Custom model saved.', `Loss: ${bestLoss.toFixed(4)}, Accuracy: ${bestAccuracy.toFixed(4)}`)
   return message
 }
 
@@ -610,4 +612,4 @@ function createMixupStreamDataset({useRoll, ds, labels, alpha = 0.4}) {
         })
     })
 }
-module.exports = {trainModel}
+export {trainModel};

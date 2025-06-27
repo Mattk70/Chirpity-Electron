@@ -51,14 +51,17 @@ jobs:
 
           if [[ "$RELEASE_INFO" == "not_found" ]]; then
             echo "No release found for $LATEST_TAG. Assuming it is not published."
-            echo "LATEST_TAG_PUBLISHED=false" >> $GITHUB_ENV
+            LATEST_TAG_PUBLISHED=false
+            echo "LATEST_TAG_PUBLISHED=$LATEST_TAG_PUBLISHED" >> $GITHUB_ENV
           else
             IS_DRAFT=$(echo "$RELEASE_INFO" | jq -r '.draft')
             if [[ "$IS_DRAFT" == "true" ]]; then
               echo "Latest tag ($LATEST_TAG) is a draft."
+              LATEST_TAG_PUBLISHED=false
               echo "LATEST_TAG_PUBLISHED=false" >> $GITHUB_ENV
             else
               echo "Latest tag ($LATEST_TAG) is published."
+              LATEST_TAG_PUBLISHED=true
               echo "LATEST_TAG_PUBLISHED=true" >> $GITHUB_ENV
             fi
           fi
