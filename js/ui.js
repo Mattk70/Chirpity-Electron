@@ -7652,9 +7652,10 @@ document.addEventListener("labelsUpdated", (e) => {
  */
 function getFilteredBirds(search, list) {
   if (!search || typeof search !== "string") return [];
+  // console.warn("Non-string list entries:", list.filter(b => typeof b !== "string"));
+
   const collator = new Intl.Collator(config.locale.replace(/_.*$/, ""))
-  const sortedList = list
-    .filter(bird => bird.toLowerCase().includes(search))
+  const sortedList = list.filter(bird => typeof bird === "string" && bird.toLowerCase().includes(search))
     .map((item) => {
       // Flip sname and cname from "sname_cname"
       const [cname, sname] = item.split("_").reverse();

@@ -4453,7 +4453,7 @@ async function _updateSpeciesLocale(db, labels) {
     );
 
     // 3. Helpers
-    const extractCallType = str => str.match(/\s+\([^)]+\)$|[^\p{L}\p{N}\s]+$/u)?.[0] || "";
+    const extractCallType = str => str.match(/\s+\([^)]+\)$|[^\p{L}\p{N}\s.]+$/u)?.[0] || "";
     // const stripCallType = str => str.replace(/\s+\([^)]+\)$|[^\p{L}\p{N}\s]+$/u, "");
 
     // 4. Determine required updates
