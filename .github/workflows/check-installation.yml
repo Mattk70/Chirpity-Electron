@@ -50,10 +50,10 @@ jobs:
         if: runner.os == 'Windows'
         shell: bash
         run: |
+          ls -l ./node_modules/@tensorflow/tfjs-node/lib
+          ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v8
           mv ./node_modules/@tensorflow/tfjs-node/lib/napi-v9/tensorflow.dll \
           ./node_modules/@tensorflow/tfjs-node/lib/napi-v8/tensorflow.dll
-
-          echo "Contents of napi-v8:"
           ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v8
 
 
