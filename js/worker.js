@@ -4428,89 +4428,49 @@ const onFileDelete = async (fileName) => {
  */
 
 async function _updateSpeciesLocale(db, labels) {
-  const updatePromises = [];
   await dbMutex.lock();
 
-  // Prepare statements
-  const updateStmt = db.prepare("UPDATE species SET cname = ? WHERE cname = ? AND modelID = ?");
-  const updateChirpityStmt = db.prepare(
-    "UPDATE species SET cname = ? WHERE sname = ? AND cname LIKE ? AND modelID = ?"
+  const updateStmt = db.prepare(
+    "UPDATE species SET cname = ? WHERE sname = ? AND cname = ? AND modelID = ?"
   );
 
   try {
     await db.runAsync("BEGIN");
-    // 1. Collect unique snames from labels
-    const labelMap = new Map(); // Map sname => array of newCname(s)
+
+    // 1. Build a map: sname => translated cname (label version)
+    const labelMap = new Map();
     for (const label of labels) {
-      const [sname, newCname] = label.split("_");
-      labelMap.has(sname) || labelMap.set(sname, []);
-      labelMap.get(sname).push(newCname);
+      const [sname, translatedCname] = label.split("_");
+      labelMap.set(sname, translatedCname); // only one cname per sname in labels
     }
-    // 2. Batch query species by sname using an IN clause
-    // Note: Adjust the query parameter syntax as needed for your DB library
-    const placeholders =  '?'.repeat(labelMap.size).split("").join(",");
-    const speciesQuery = `
-      SELECT sname, cname, modelID 
-      FROM species 
-      WHERE sname IN (${placeholders}) 
-      ORDER BY sname
-    `;
-    const speciesRows = await db.allAsync(speciesQuery, ...labelMap.keys());
 
-    // Group species rows by sname for easy lookup
-    const speciesBySname = {};
+    // 2. Query all matching species rows
+    const snames = [...labelMap.keys()];
+    const placeholders = snames.map(() => "?").join(",");
+    const speciesRows = await db.allAsync(
+      `SELECT sname, cname, modelID FROM species WHERE sname IN (${placeholders})`,
+      ...snames
+    );
+
+    // 3. Helpers
+    const extractCallType = str => str.match(/\s+\([^)]+\)$|[^\p{L}\p{N}\s.]+$/u)?.[0] || "";
+    // const stripCallType = str => str.replace(/\s+\([^)]+\)$|[^\p{L}\p{N}\s]+$/u, "");
+
+    // 4. Determine required updates
+    const updatePromises = [];
+
     for (const row of speciesRows) {
-      (speciesBySname[row.sname] ||= []).push(row);
-    }
+      const { sname, cname, modelID } = row;
+      const translatedBase = labelMap.get(sname); // cname from labels (no call type)
+      if (!translatedBase) continue;
 
-    // Helper: Extract call type from a string (including the preceding space)
-    // const extractCallType = str => str.match(/\s+\(([^)]+)\)$/)?.[0] || "";
-    // Below updated to extract non alpha-numeric chars at the end of the cname 
-    // (with unicode support for names like "Sizerin flammé")
-    const extractCallType = str => str.match(/\s+\([^)]+\)$|[^\p{L}\p{N}\s]+$/u)?.[0] || "";
+      const existingCallType = extractCallType(cname);
+      const newCname = translatedBase + existingCallType;
 
-
-    // Helper: Remove any call type from a string
-    const stripCallType = str => str.replace(/\s+\([\w\s]+\)$/, '');
-
-    // 3. Process each label and prepare updates
-    for (const [sname, newCnames] of labelMap) {
-      const speciesList = speciesBySname[sname];
-      if (!speciesList) continue; // no species row for this sname
-
-      for (const rawNewCname of newCnames) {
-        // Determine the intended new call type and base cname
-        const newCallType = extractCallType(rawNewCname);
-        
-
-        for (const { cname: existingCname, modelID } of speciesList) {
-          const existingCallType = extractCallType(existingCname);
-          let finalCname = rawNewCname;
-
-          // Decide which update to run based on presence of call types
-          if (existingCallType) {
-            // If new value does not include a call type, append the existing one
-            if (!newCallType) finalCname += existingCallType;
-            else if (newCallType !== existingCallType) continue
-            // Only update if final cname differs from the existing one
-            if (finalCname !== existingCname) {
-              updatePromises.push(
-                updateChirpityStmt.runAsync(finalCname, sname, `%${existingCallType}%`, modelID)
-              );
-            }
-          } else {
-            // Existing species has no call type, so ensure none is included in final value
-            if (newCallType) {
-              // Remove call type if present in new label
-              finalCname = stripCallType(rawNewCname);
-            }
-            if (finalCname !== existingCname) {
-              updatePromises.push(
-                updateStmt.runAsync(finalCname, existingCname, modelID)
-              );
-            }
-          }
-        }
+      if (newCname !== cname) {
+        updatePromises.push(
+          updateStmt.runAsync(newCname, sname, cname, modelID)
+        );
       }
     }
 
@@ -4523,9 +4483,9 @@ async function _updateSpeciesLocale(db, labels) {
   } finally {
     dbMutex.unlock();
     updateStmt.finalize();
-    updateChirpityStmt.finalize();
   }
 }
+
 
 
 /**
@@ -4538,9 +4498,6 @@ async function _updateSpeciesLocale(db, labels) {
  * @param {boolean} refreshResults - Whether to refresh results and summary after updating the locale.
  */
 async function onUpdateLocale(locale, labels, refreshResults) {
-  if (!['birdnet', 'chirpity', 'nocmig'].includes(STATE.model)){
-    return
-  }
   if (DEBUG) t0 = Date.now();
   let db;
   try {

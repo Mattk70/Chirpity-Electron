@@ -46,7 +46,7 @@ jobs:
           echo "Install's status is ${{ job.status }}."
     
 
-      - name: Move tensorflow.dll to napi-v8
+      - name: Copy tensorflow.dll to napi-v8 folder
         if: runner.os == 'Windows'
         shell: bash
         run: |
