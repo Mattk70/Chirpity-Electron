@@ -6016,11 +6016,7 @@ document.addEventListener("change", async function (e) {
           }
           config.locale = element.value;
           STATE.picker.options.lang = element.value.replace("_uk", "");
-          if (['birdnet', 'chirpity', 'nocmig'].includes(config.selectedModel)){
-            readLabels(labelFile, "locale");
-          } else {
-            generateToast({message: 'It is not yet possible to translate custom model labels'})
-          }
+          readLabels(labelFile, "locale");
           break;
         }
         case "local": {

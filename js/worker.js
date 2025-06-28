@@ -4432,9 +4432,9 @@ async function _updateSpeciesLocale(db, labels) {
   await dbMutex.lock();
 
   // Prepare statements
-  const updateStmt = db.prepare("UPDATE species SET cname = ? WHERE sname = ? AND modelID = ?");
+  const updateStmt = db.prepare("UPDATE species SET cname = ? WHERE cname = ? AND modelID = ?");
   const updateChirpityStmt = db.prepare(
-    "UPDATE species SET cname = ? WHERE sname = ? AND cname LIKE ?"
+    "UPDATE species SET cname = ? WHERE sname = ? AND cname LIKE ? AND modelID = ?"
   );
 
   try {
@@ -4465,8 +4465,10 @@ async function _updateSpeciesLocale(db, labels) {
 
     // Helper: Extract call type from a string (including the preceding space)
     // const extractCallType = str => str.match(/\s+\(([^)]+)\)$/)?.[0] || "";
-    // Below updated to extract non alpha-numeric chars at the end of the cname
-    const extractCallType = str => str.match(/\s+\([^)]+\)$|[^a-zA-Z0-9\s]+$/)?.[0] || "";
+    // Below updated to extract non alpha-numeric chars at the end of the cname 
+    // (with unicode support for names like "Sizerin flammé")
+    const extractCallType = str => str.match(/\s+\([^)]+\)$|[^\p{L}\p{N}\s]+$/u)?.[0] || "";
+
 
     // Helper: Remove any call type from a string
     const stripCallType = str => str.replace(/\s+\([\w\s]+\)$/, '');
@@ -4493,7 +4495,7 @@ async function _updateSpeciesLocale(db, labels) {
             // Only update if final cname differs from the existing one
             if (finalCname !== existingCname) {
               updatePromises.push(
-                updateChirpityStmt.runAsync(finalCname, sname, `%${existingCallType}%`)
+                updateChirpityStmt.runAsync(finalCname, sname, `%${existingCallType}%`, modelID)
               );
             }
           } else {
@@ -4504,7 +4506,7 @@ async function _updateSpeciesLocale(db, labels) {
             }
             if (finalCname !== existingCname) {
               updatePromises.push(
-                updateStmt.runAsync(finalCname, sname, modelID)
+                updateStmt.runAsync(finalCname, existingCname, modelID)
               );
             }
           }
