@@ -5046,29 +5046,37 @@ async function convertFile(
 
 async function onDeleteModel(model){
   let message, type;
-  let t0 = Date.now()
-  await dbMutex.lock()
+  let diskTransactionStarted = false;
+  let memoryTransactionStarted = false;
+  await dbMutex.lock();
   try {
-    await diskDB.runAsync('BEGIN')
-    await memoryDB.runAsync('BEGIN')
-    await diskDB.runAsync('DELETE FROM models WHERE name = ?', model)
-    const result = await memoryDB.runAsync('DELETE FROM models WHERE name = ?', model)
-    await diskDB.runAsync('COMMIT')
-    await memoryDB.runAsync('COMMIT')
-    console.info('Custom model', `Model removal took ${(Date.now() - t0)/1000} seconds`)
-    if (result?.changes) {
-      message = `Model ${model} successfully removed`
-    } else {
-      message =  `Model ${model} was not found in the database`;
-      type = 'error'
+    for (const db of  [diskDB, memoryDB]) {
+      let row = await db.getAsync('SELECT id FROM models WHERE name = ?', model);
+      if (row){
+        if (db === diskDB) diskTransactionStarted = true;
+        if (db === memoryDB) memoryTransactionStarted = true;
+        await db.runAsync("PRAGMA foreign_keys = OFF");
+        await db.runAsync('BEGIN');
+        await db.runAsync('DELETE FROM records WHERE modelID = ?', row.id);
+        await db.runAsync('DELETE FROM species WHERE modelID = ?', row.id);
+        await db.runAsync('DELETE FROM models WHERE name = ?', model);
+        await db.runAsync('COMMIT');
+        message = `Model ${model} successfully removed`;
+      } else {
+        message =  `Model ${model} was not found in the database`;
+        type = 'error';
+        break;
+      }
     }
   } catch (e) {
-    await diskDB.runAsync('ROLLBACK')
-    await memoryDB.runAsync('ROLLBACK')
+    if (diskTransactionStarted) await diskDB.runAsync('ROLLBACK');
+    if (memoryTransactionStarted) await memoryDB.runAsync('ROLLBACK');
     console.error(e)
     message =  `Failed to remove model <b>${model}</b>: ${e.message}`;
     type = 'error'
   } finally {
+    if (diskTransactionStarted) await diskDB.runAsync("PRAGMA foreign_keys = ON");
+    if (memoryTransactionStarted) await memoryDB.runAsync("PRAGMA foreign_keys = ON");
     dbMutex.unlock()
     generateAlert({message, type, model})
   }
