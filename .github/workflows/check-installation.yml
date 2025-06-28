@@ -50,9 +50,9 @@ jobs:
         if: runner.os == 'Windows'
         shell: bash
         run: |
-          ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v10
+          ls -l ./node_modules/@tensorflow/tfjs-node/deps/lib
           ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v8
-          mv ./node_modules/@tensorflow/tfjs-node/lib/napi-v10/tensorflow.dll \
+          cp ./node_modules/@tensorflow/tfjs-node/deps/lib/tensorflow.dll \
           ./node_modules/@tensorflow/tfjs-node/lib/napi-v8/tensorflow.dll
           ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v8
 
