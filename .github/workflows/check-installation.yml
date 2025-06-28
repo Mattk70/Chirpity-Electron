@@ -46,13 +46,15 @@ jobs:
           echo "Install's status is ${{ job.status }}."
     
 
-      - name: Rebuild native modules for Electron
+      - name: Move tensorflow.dll to napi-v8
         if: runner.os == 'Windows'
-        run: npx electron-rebuild
+        shell: bash
+        run: |
+          mv ./node_modules\@tensorflow\tfjs-node\lib\napi-v9\tensorflow.dll \
+          ./node_modules\@tensorflow\tfjs-node\lib\napi-v8\tensorflow.dll
 
-      - name: Rebuild tfjs-node for Electron
-        run: npx electron-rebuild -f -w @tensorflow/tfjs-node
-
+          echo "Contents of napi-v8:"
+          ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v8
 
 
       - name: Set platform-specific ffmpeg path

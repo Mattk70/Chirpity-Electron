@@ -3,7 +3,8 @@ try {
   tf = require("@tensorflow/tfjs-node");
   BACKEND = "tensorflow";
   postMessage({ message: "tfjs-node", available: true });
-} catch {
+} catch (e) {
+  console.info(e)
   tf = require("@tensorflow/tfjs");
   require("@tensorflow/tfjs-backend-webgpu");
   BACKEND = "webgpu";
