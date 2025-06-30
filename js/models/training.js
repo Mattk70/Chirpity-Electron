@@ -1,6 +1,6 @@
 import {installConsoleTracking } from "../utils/tracking.js";
 
-let transferModel, tf, DEBUG = true;
+let transferModel, tf, DEBUG = false;
 
 const fs = require('node:fs')
 const path = require('node:path')
