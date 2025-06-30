@@ -1,6 +1,6 @@
 import {installConsoleTracking } from "../utils/tracking.js";
 
-let transferModel, tf, DEBUG = false;
+let transferModel, tf, DEBUG = true;
 
 const fs = require('node:fs')
 const path = require('node:path')
@@ -10,7 +10,7 @@ try {
 } catch {
   tf = require("@tensorflow/tfjs");
 }
-const abortController = require('../utils/abortController.js');
+import abortController from '../utils/abortController.js';
 
 function cosineDecay(initialLearningRate, globalStep, decaySteps) {
   const step = Math.min(globalStep, decaySteps);
@@ -101,14 +101,25 @@ async function trainModel({
 
   const trainBin = path.join(cacheFolder, "train_ds.bin");
   const valBin = path.join(cacheFolder, "val_ds.bin");
+  const noiseBin = path.join(cacheFolder, "background_ds.bin");
 
-  let trainFiles, valFiles;
+
+  let trainFiles, valFiles, noiseFiles;
 
   if (validation) {
     ({ trainFiles, valFiles } = stratifiedSplit(allFiles, validation));
   } else {
     trainFiles = allFiles;
   }
+
+  const useNoise = true;
+
+  if (useNoise && (!fs.existsSync(noiseBin) || !cacheRecords)){
+    noiseFiles = allFiles.filter(file => file.label.toLowerCase().includes('background'))
+    await writeBinaryGzipDataset(noiseFiles, noiseBin, labelToIndex, postMessage, "Preparing noise data");
+
+  }
+  let noise_ds = tf.data.generator(() => readBinaryGzipDataset(noiseBin, labels)).repeat().shuffle(50).batch(batchSize);
 
   if (!cacheRecords || !fs.existsSync(trainBin)) {
     await writeBinaryGzipDataset(trainFiles, trainBin, labelToIndex, postMessage, "Preparing training data");
@@ -158,7 +169,7 @@ async function trainModel({
   
   // Callbacks
   const valueToMonitor = validation ? 'val_loss' : 'loss';
-  const earlyStopping = tf.callbacks.earlyStopping({monitor: valueToMonitor, minDelta: 0.0001, patience: 3})
+  const earlyStopping = tf.callbacks.earlyStopping({monitor: valueToMonitor, minDelta: 0.0001, patience: 5})
   const events = new tf.CustomCallback({
     onYield: (epoch, batch, _logs) =>{
       batch += 1;
@@ -166,7 +177,7 @@ async function trainModel({
       const progress = (batch / batchesInEpoch) * 100
       postMessage({
             message: "training-progress", 
-            progress: {percent: Math.min(progress, 99)},
+            progress: {percent: Math.min(progress, 99.5)},
             text: `Epoch ${epoch + 1} / ${epochs}: `
       });
     },
@@ -175,7 +186,7 @@ async function trainModel({
       const {loss, val_loss, val_categoricalAccuracy, categoricalAccuracy} = logs;
       // Save best weights
       if (val_loss < bestLoss){
-        bestLoss = loss;
+        bestLoss = val_loss;
         bestAccuracy = val_categoricalAccuracy;
         modelSavePromise = saveModelAsync()
       }
@@ -197,15 +208,29 @@ async function trainModel({
         text: ''
       });
       const t1 = Date.now();
-      console.log(`Training completed in ${((t1 - t0) / 1000).toFixed(2)} seconds`);
+      console.info(`Training completed in ${((t1 - t0) / 1000).toFixed(2)} seconds`);
       return logs
     }
   })
 
-  const train_ds = mixup 
+  let train_ds = mixup 
     ? createMixupStreamDataset({ds:trainBin, labels, useRoll}).batch(batchSize)
     : createStreamDataset(trainBin, labels).map(x => useRoll ? roll(x) : x).batch(batchSize)
 
+  if (useNoise){
+      train_ds = tf.data.zip({ clean: train_ds, noise: noise_ds }).mapAsync(({ clean, noise }) => {
+        return tf.tidy(() =>{
+          const cleanBatchSize = clean.xs.shape[0];
+          const noiseBatchSize = noise.xs.shape[0];
+          // Slice noise batch if it’s larger than clean batch
+          const slicedNoiseXs = noiseBatchSize >= cleanBatchSize
+            ? noise.xs.slice([0, 0], [cleanBatchSize, -1])
+            : noise.xs;
+          const noisy_xs = tf.maximum(clean.xs, slicedNoiseXs);
+          return { xs: noisy_xs, ys: clean.ys };
+        })
+    }).prefetch(2);
+  }
 
   if (DEBUG){
     train_ds.take(1).forEachAsync(({ xs, ys }) => {
@@ -257,6 +282,7 @@ Settings:
   Learning rate: ${initialLearningRate}
   Cosine learning rate decay: ${decay}
   Focal Loss: ${useFocal}
+  LabelSmoothing: ${labelSmoothing}
 Classifier:  
   Hidden units:${hidden}
   Dropout: ${dropout}
@@ -367,6 +393,7 @@ async function writeBinaryGzipDataset(fileList, outputPath, labelToIndex, postMe
 
       const expectedSamples = 48000 * 3;
       if (audioArray.length !== expectedSamples) {
+        if (audioArray.length < 72000) return // don't includes samples less than 1.5 seconds        )
         const padded = new Float32Array(expectedSamples);
         const start = Math.max(audioArray.length - expectedSamples, 0);
         padded.set(audioArray.slice(start), expectedSamples - (audioArray.length - start));
@@ -478,27 +505,32 @@ const ffmpeg = require('fluent-ffmpeg')
 const ffmpegPath = require("@ffmpeg-installer/ffmpeg").path.replace("app.asar","app.asar.unpacked");
 ffmpeg.setFfmpegPath(ffmpegPath);
 
-async function getAudioDuration(filePath) {
+async function getAudioMetadata(filePath) {
   return new Promise((resolve, reject) => {
-    let gotDuration = false;
+    let gotDuration = false, seconds = 0, bitrate = 0;
+
     const command = ffmpeg(filePath)
       .on('codecData', data => {
-        if (data.duration) {
-          const parts = data.duration.split(':'); // format: HH:MM:SS.xx
-          const seconds =
+        const {duration, audio_details} = data;
+        if (duration) {
+          const parts = duration.split(':'); // format: HH:MM:SS.xx
+          seconds =
             parseInt(parts[0], 10) * 3600 +
             parseInt(parts[1], 10) * 60 +
             parseFloat(parts[2]);
           gotDuration = true;
           command.kill(); // Stop the process early
-          resolve(seconds);
         }
+        if (audio_details){
+          bitrate = parseInt(audio_details[1].replace('Hz', ''))
+        }
+        resolve({duration:seconds, bitrate});
       })
       .on('error', err => {
         if (!gotDuration) reject(err);
       })
       .on('end', () => {
-        if (!gotDuration) resolve(0); // If no duration was found, assume 0
+        resolve({duration:seconds, bitrate}); // If no duration was found, assume 0
       })
       .format('null') // dummy output
       .output('-')
@@ -507,7 +539,7 @@ async function getAudioDuration(filePath) {
 }
 
 async function decodeAudio(filePath) {
-  const duration = await getAudioDuration(filePath);
+  const duration = await getAudioMetadata(filePath);
   const seekTime = duration > 3 ? (duration / 2) - 1.5 : 0;
 
   return new Promise((resolve, reject) => {
@@ -596,6 +628,8 @@ function categoricalFocalCrossentropy({
 const createStreamDataset = (ds, labels) => 
   tf.data.generator(() => readBinaryGzipDataset(ds, labels))
 
+
+
 function createMixupStreamDataset({useRoll, ds, labels, alpha = 0.4}) {
     return tf.tidy(() => {
       const ds1 = createStreamDataset(ds, labels).map(x => useRoll ? roll(x) : x).shuffle(100, 42);
@@ -612,4 +646,4 @@ function createMixupStreamDataset({useRoll, ds, labels, alpha = 0.4}) {
         })
     })
 }
-export {trainModel};
+export {trainModel, getAudioMetadata};

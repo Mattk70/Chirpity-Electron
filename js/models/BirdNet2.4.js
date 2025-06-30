@@ -10,7 +10,7 @@ const path = require("node:path");
 import { BaseModel } from "./BaseModel.js";
 import {trainModel} from './training.js';
 const {stft} = require("./custom-ops.js");
-const abortController = require('../utils/abortController.js');
+import abortController from '../utils/abortController.js';
 
 
 onmessage = async (e) => {

@@ -21,7 +21,7 @@ import {
   addNewModel
 } from "./database.js";
 import { customURLEncode, installConsoleTracking, trackEvent } from "./utils/tracking.js";
-
+import { getAudioMetadata } from "./models/training.js";
 let isWin32 = false;
 
 const dbMutex = new Mutex();
@@ -173,7 +173,7 @@ let diskDB, memoryDB;
 
 let t0; // Application profiler
 
-const setupFfmpegCommand = ({
+const setupFfmpegCommand = async ({
   file,
   start = 0,
   end = undefined,
@@ -186,19 +186,21 @@ const setupFfmpegCommand = ({
   audioBitrate = null,
   outputOptions = [],
 }) => {
+  let duration = end - start;
   const command = ffmpeg("file:" + file)
     .format(format)
     .audioChannels(channels);
-  // .addOutputOption('-af',
-  //     `aresample=resampler=soxr:filter_type=kaiser:kaiser_beta=12.9846:osr=${sampleRate}`
-  //   )
-  sampleRate && command.audioFrequency(sampleRate);
-  //.audioFilters('aresample=filter_type=kaiser:kaiser_beta=9.90322');
-
-  // Add filters if provided
-  additionalFilters.forEach((filter) => {
-    command.audioFilters(filter);
-  });
+  // Add filters if provided (no additional filters for bats)
+  if (STATE.model === 'bats'){
+    const {bitrate} = await getAudioMetadata(file);
+    if (bitrate <= 48000) console.warn(file, 'has bitrate', bitrate)
+    const rate = Math.floor(bitrate/10)
+    start /=10
+    command.audioFilters([`asetrate=${rate}`]);
+    
+  } else {
+    additionalFilters.forEach(filter => command.audioFilters(filter))
+  }
   if (Object.keys(metadata).length) {
     metadata = Object.entries(metadata).flatMap(([k, v]) => {
       if (typeof v === "string") {
@@ -210,6 +212,7 @@ const setupFfmpegCommand = ({
     command.addOutputOptions(metadata);
   }
 
+  sampleRate && command.audioFrequency(sampleRate);
   // Set codec if provided
   if (audioCodec) command.audioCodec(audioCodec);
 
@@ -219,7 +222,7 @@ const setupFfmpegCommand = ({
   // Add any additional output options
   if (outputOptions.length) command.addOutputOptions(...outputOptions);
 
-  command.seekInput(start).duration(end - start);
+  command.seekInput(start).duration(duration);
   if (DEBUG) {
     command.on("start", function (commandLine) {
       console.log("FFmpeg command: " + commandLine);
@@ -1134,7 +1137,8 @@ const prepResultsStatement = async (
   species,
   noLimit,
   offset,
-  topRankin
+  topRankin,
+  format
 ) => {
   const {mode, explore, limit, resultsMetaSortOrder, resultsSortOrder, labelFilters, detect, locationID, selection} = STATE;
   const partition = detect.merge ? '' : ', r.modelID'; 
@@ -1238,7 +1242,10 @@ const prepResultsStatement = async (
   const metaSort = resultsMetaSortOrder
     ? `${resultsMetaSortOrder}, `
     : "";
-  resultStatement += ` ORDER BY ${metaSort} ${resultsSortOrder} ${limitClause} `;
+  resultStatement += format ==='audio'
+    ? ` ORDER BY RANDOM()  ${limitClause}`
+    : ` ORDER BY ${metaSort} ${resultsSortOrder} ${limitClause} `;
+  
 
   return {sql: resultStatement, params};
 };
@@ -1520,7 +1527,8 @@ const getDuration = async (src) => {
         );
       }
       audio.remove();
-      resolve(duration);
+      const fileDuration = (STATE.model === 'bats') ? duration*10: duration;
+      resolve(fileDuration);
     });
     audio.addEventListener("error", (error) => {
       generateAlert({
@@ -2080,13 +2088,13 @@ async function processAudio(
     const additionalFilters = STATE.filters.sendToModel
       ? setAudioFilters()
       : [];
-    const command = setupFfmpegCommand({
+    setupFfmpegCommand({
       file,
       start,
       end,
       sampleRate,
       additionalFilters,
-    });
+    }).then(command => {
     command.on("error", (error) => {
       if ((error.message === "Output stream closed") & !aborted) {
         console.warn(`processAudio: ${file} ${error}`);
@@ -2194,7 +2202,9 @@ async function processAudio(
     STREAM.on("error", (err) => {
       console.log("stream error: ", err);
       err.code === "ENOENT" && notifyMissingFile(file);
-    });
+    });      
+  })
+
   }).catch((error) => console.log(error));
 }
 
@@ -2257,29 +2267,30 @@ const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sam
     if (!result) throw new Error(`Cannot locate ${file}`);
     file = result;
   }
-
+  
   await setMetadata({ file });
-  end ??= METADATA[file].duration;
+  const fileDuration = METADATA[file].duration// (STATE.model === 'bats') ? METADATA[file].duration*10 : METADATA[file].duration;
+  end ??= fileDuration;
 
   if (start < 0) {
     // Work back from file end
-    start += METADATA[file].duration;
-    end += METADATA[file].duration;
+    start += fileDuration;
+    end += fileDuration;
   }
 
   // Ensure start is a minimum 0.1 seconds from the end of the file, and >= 0
   start =
-    METADATA[file].duration < 0.1
+    fileDuration < 0.1
       ? 0
-      : Math.min(METADATA[file].duration - 0.1, start);
-  end = Math.min(end, METADATA[file].duration);
+      : Math.min(fileDuration - 0.1, start);
+  end = Math.min(end, fileDuration);
 
   // Validate start time
   if (isNaN(start)) throw new Error("fetchAudioBuffer: start is NaN");
 
   return new Promise((resolve, reject) => {
     const additionalFilters = setAudioFilters();
-    const command = setupFfmpegCommand({
+    setupFfmpegCommand({
       file,
       start,
       end,
@@ -2287,9 +2298,8 @@ const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sam
       format,
       channels: 1,
       additionalFilters,
-    });
-
-    const stream = command.pipe();
+    }).then(command => {
+const stream = command.pipe();
     let concatenatedBuffer = Buffer.alloc(0);
 
     command.on("error", (error) => {
@@ -2315,6 +2325,9 @@ const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sam
           : chunk;
       }
     });
+    })
+
+    
   });
 };
 
@@ -2335,11 +2348,14 @@ function setAudioFilters() {
   // === Filter chain logic ===
 
   if (highPass || lowPass < 15_000) {
+    const options = {};
+    if (highPass) options.hp = highPass;
+    if (lowPass < 15_000) options.lp = lowPass;
     // Use sinc + afir
     filters.push(
       {
         filter: 'sinc',
-        options: { lp: lowPass, hp: highPass, att: 40 },
+        options: { ...options, att: 40 },
         outputs: 'ir'
       },
       { filter: 'afir', inputs: ['a', 'ir'] }
@@ -2805,7 +2821,7 @@ const bufferToAudio = async ({
       });
     }
 
-    let command = setupFfmpegCommand({
+    setupFfmpegCommand({
       file,
       start,
       end,
@@ -2817,8 +2833,7 @@ const bufferToAudio = async ({
       channels: downmix ? 1 : -1,
       metadata: meta,
       additionalFilters: filters,
-    });
-
+    }).then(command => {
     const destination = p.join(folder || tempPath, filename);
     command.save(destination);
 
@@ -2832,6 +2847,9 @@ const bufferToAudio = async ({
       DEBUG && console.log(format + " file rendered");
       resolve(destination);
     });
+    })
+
+
   });
 };
 
@@ -3265,7 +3283,7 @@ const parsePredictions = async (response) => {
     const included = await getIncludedIDs(file).catch((error) =>
       console.log("Error getting included IDs", error)
     );
-    const loopConfidence = selection ? 50 : detect.confidence;
+    const loopConfidence =  selection ? 50 : detect.confidence;
     for (let i = 0; i < keysArray.length; i++) {
       let updateUI = false;
       let key = parseFloat(keysArray[i]);
@@ -3697,7 +3715,8 @@ const getResults = async ({
     species,
     limit === Infinity,
     offset,
-    topRankin
+    topRankin,
+    format
   );
 
   const result = await STATE.db.allAsync(sql, ...params);

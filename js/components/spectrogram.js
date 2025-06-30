@@ -372,6 +372,7 @@ export class ChirpityWS {
   formatTimeCallback = (secs) => {
     const config = this.getConfig();
     const STATE = this.getState();
+    config.selectedModel === 'bats' && (secs/=10)
     secs = secs.toFixed(2);
     // Add 500 to deal with overflow errors
     let now = new Date(STATE.bufferStartTime.getTime() + secs * 1000);
@@ -890,17 +891,18 @@ export class ChirpityWS {
     return region;
   }
 
-  formatRegionTooltip(regionLength, start, end) {
-    const length = end - start;
+  formatRegionTooltip(regionLength, start, end, pitchShifted) {
+    let length = end - start;
     if (length === 3) {
       return `${this.formatTimeCallback(start)} -  ${this.formatTimeCallback(
         end
       )}`;
-    } else if (length < 1)
-      return `${regionLength}: ${(length * 1000).toFixed(0)}ms`;
-    else {
-      return `${regionLength}: ${length.toFixed(3)}s`;
     }
+    pitchShifted && (length/=10)
+    if (length < 1){
+      return `${regionLength}: ${(length * 1000).toFixed(0)}ms`;
+    }
+    return `${regionLength}: ${length.toFixed(3)}s`;
   }
 
   specTooltip(event, showHz) {
@@ -917,17 +919,19 @@ export class ChirpityWS {
       const specDimensions = waveElement.getBoundingClientRect();
       const frequencyRange =
         Number(config.audio.frequencyMax) - Number(config.audio.frequencyMin);
+      
       const yPosition =
         Math.round(
           (specDimensions.bottom - event.clientY) *
             (frequencyRange / specDimensions.height)
         ) + Number(config.audio.frequencyMin);
-
-      tooltip.textContent = `${i18.frequency}: ${yPosition}Hz`;
+      const pitchShifted = config.selectedModel === 'bats';
+      const yPos = pitchShifted ? yPosition*10 : yPosition
+      tooltip.textContent = `${i18.frequency}: ${yPos}Hz`;
       if (inRegion) {
         const { start, end } = inRegion;
         const textNode = document.createTextNode(
-          this.formatRegionTooltip(i18.length, start, end)
+          this.formatRegionTooltip(i18.length, start, end, pitchShifted)
         );
         const lineBreak = document.createElement("br");
         tooltip.appendChild(lineBreak); // Add the line break

@@ -5,5 +5,5 @@ class AbortController extends EventEmitter {
     this.emit('abort');
   }
 }
-
-module.exports = new AbortController();
+ const abortController = new AbortController();
+export default abortController;
