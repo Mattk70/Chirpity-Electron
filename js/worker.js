@@ -195,9 +195,8 @@ const setupFfmpegCommand = async ({
     const {bitrate} = await getAudioMetadata(file);
     if (bitrate <= 48000) console.warn(file, 'has bitrate', bitrate)
     const rate = Math.floor(bitrate/10)
-    start /=10
-    command.audioFilters([`asetrate=${rate}`]);
-    
+    command.audioFilters([`asetrate=${rate}`])
+      .audioFilters(['atempo=10'])
   } else {
     additionalFilters.forEach(filter => command.audioFilters(filter))
   }
@@ -1527,8 +1526,8 @@ const getDuration = async (src) => {
         );
       }
       audio.remove();
-      const fileDuration = (STATE.model === 'bats') ? duration*10: duration;
-      resolve(fileDuration);
+      
+      resolve(duration);
     });
     audio.addEventListener("error", (error) => {
       generateAlert({
@@ -3273,6 +3272,9 @@ const parsePredictions = async (response) => {
   }
   DEBUG && console.log("worker being used:", response.worker);
   const [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
+//   speciesIDBatch.forEach((_, i) => {
+//   speciesIDBatch[i] = [1, 1, 1, 1, 1];
+// });
   const {db, modelID, selection, detect} = STATE;
 
   if (!selection)
@@ -3970,7 +3972,7 @@ async function exportData(result, filename, format, headers) {
 }
 
 const sendResult = (index, result, fromDBQuery) => {
-  const model = ['birdnet', 'nocmig', 'chirpity'].includes(STATE.model) ? STATE.model : 'custom';
+  const model = ['birdnet', 'nocmig', 'chirpity', 'bats'].includes(STATE.model) ? STATE.model : 'custom';
   result.model = model;
   // if (!fromDBQuery) {result.model = model, result.modelID = STATE.modelID};
   UI.postMessage({
@@ -4472,7 +4474,7 @@ async function _updateSpeciesLocale(db, labels) {
     );
 
     // 3. Helpers
-    const extractCallType = str => str.match(/\s+\([^)]+\)$|[^\p{L}\p{N}\s.]+$/u)?.[0] || "";
+    const extractCallType = str => str.match(/\s+\([^)]+\)$|-$/u)?.[0] || "";
     // const stripCallType = str => str.replace(/\s+\([^)]+\)$|[^\p{L}\p{N}\s]+$/u, "");
 
     // 4. Determine required updates

@@ -87,7 +87,7 @@ async function trainModel({
         exampleWeights = useWeights ? classWeightsTensor.gather(labelIndices) : undefined; // [batch_size]
       }
        return useFocal
-        ? categoricalFocalCrossentropy({yTrue:labels, yPred:preds})
+        ? categoricalFocalCrossEntropy({yTrue:labels, yPred:preds, labelSmoothing})
         : tf.losses.softmaxCrossEntropy(labels, preds, exampleWeights, labelSmoothing);
     });
   };
@@ -112,7 +112,7 @@ async function trainModel({
     trainFiles = allFiles;
   }
 
-  const useNoise = true;
+  const useNoise = false;
 
   if (useNoise && (!fs.existsSync(noiseBin) || !cacheRecords)){
     noiseFiles = allFiles.filter(file => file.label.toLowerCase().includes('background'))
@@ -223,13 +223,13 @@ async function trainModel({
           const cleanBatchSize = clean.xs.shape[0];
           const noiseBatchSize = noise.xs.shape[0];
           // Slice noise batch if it’s larger than clean batch
-          const slicedNoiseXs = noiseBatchSize >= cleanBatchSize
+          const slicedNoiseXs = noiseBatchSize > cleanBatchSize
             ? noise.xs.slice([0, 0], [cleanBatchSize, -1])
             : noise.xs;
           const noisy_xs = tf.maximum(clean.xs, slicedNoiseXs);
           return { xs: noisy_xs, ys: clean.ys };
         })
-    }).prefetch(2);
+    })
   }
 
   if (DEBUG){
@@ -278,6 +278,7 @@ Metrics:<br>
   notice += `
 
 Settings:
+  Batch Size: ${batchSize}
   Epochs:${epochs} 
   Learning rate: ${initialLearningRate}
   Cosine learning rate decay: ${decay}
@@ -532,7 +533,7 @@ async function getAudioMetadata(filePath) {
       .on('end', () => {
         resolve({duration:seconds, bitrate}); // If no duration was found, assume 0
       })
-      .format('null') // dummy output
+      .format('wav') // dummy output
       .output('-')
       .run();
   });
@@ -597,7 +598,7 @@ function roll(x) {
  * @param {boolean} fromLogits - Whether `yPred` is expected to be logits.
  * @returns {tf.Tensor} - A tensor representing the focal loss per example.
  */
-function categoricalFocalCrossentropy({
+function categoricalFocalCrossEntropy({
   yTrue,
   yPred,
   alpha = 0.25,

@@ -372,7 +372,6 @@ export class ChirpityWS {
   formatTimeCallback = (secs) => {
     const config = this.getConfig();
     const STATE = this.getState();
-    config.selectedModel === 'bats' && (secs/=10)
     secs = secs.toFixed(2);
     // Add 500 to deal with overflow errors
     let now = new Date(STATE.bufferStartTime.getTime() + secs * 1000);
@@ -891,14 +890,13 @@ export class ChirpityWS {
     return region;
   }
 
-  formatRegionTooltip(regionLength, start, end, pitchShifted) {
+  formatRegionTooltip(regionLength, start, end) {
     let length = end - start;
     if (length === 3) {
       return `${this.formatTimeCallback(start)} -  ${this.formatTimeCallback(
         end
       )}`;
     }
-    pitchShifted && (length/=10)
     if (length < 1){
       return `${regionLength}: ${(length * 1000).toFixed(0)}ms`;
     }
@@ -931,7 +929,7 @@ export class ChirpityWS {
       if (inRegion) {
         const { start, end } = inRegion;
         const textNode = document.createTextNode(
-          this.formatRegionTooltip(i18.length, start, end, pitchShifted)
+          this.formatRegionTooltip(i18.length, start, end)
         );
         const lineBreak = document.createElement("br");
         tooltip.appendChild(lineBreak); // Add the line break

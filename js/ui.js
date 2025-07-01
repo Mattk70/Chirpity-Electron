@@ -3318,8 +3318,7 @@ async function onWorkerLoadedAudio({
   const initialTime = config.timeOfDay
     ? fileStart
     : new Date(0, 0, 0, 0, 0, 0, 0).getTime();
-  const offset = config.selectedModel === 'bats' ? windowBegin/10 : windowBegin;
-  STATE.bufferStartTime = new Date(initialTime + offset * 1000);
+  STATE.bufferStartTime = new Date(initialTime + windowBegin * 1000);
 
   if (STATE.windowLength > STATE.currentFileDuration) STATE.windowLength = STATE.currentFileDuration;
 
