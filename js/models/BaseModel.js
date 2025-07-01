@@ -129,7 +129,9 @@ class BaseModel {
       unmaskedPrediction.dispose()
     }
     const finalPrediction = maskedPrediction || unmaskedPrediction;
-    const { indices, values } = tf.topk(finalPrediction, 5, true);
+    const classes = finalPrediction.shape[1];
+    const topN = Math.min(classes, 5);
+    const { indices, values } = tf.topk(finalPrediction, topN, true);
     finalPrediction.dispose();
     // The GPU backend is *so* slow with BirdNET, let's not queue up predictions
     const [topIndices, topValues] = await Promise.all([
