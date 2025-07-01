@@ -28,8 +28,8 @@ Describe the steps taken to reproduce the problem, for example:
 If applicable, share a description of what you expected to happen.
 
 **Screenshots**
-If applicable, add screenshots to help explain your problem. 
+If applicable, add screenshots to help explain your problem. If any errors are reported in the application include those.
 
 
 **Additional context**
-Add any other context about the problem here. If it's an analysis issue, mention the file type and audio duration. Ideally, provide an example audio file that demonstrates the issue (you can attach a zipped versino of the file to your issue)
+Add any other context about the problem here. If it's an analysis issue, mention the file type and audio duration. Ideally, provide an example audio file that demonstrates the issue (you can attach a zipped version of the file to your issue)
