@@ -500,7 +500,7 @@ async function getAudioDuration(filePath) {
       .on('end', () => {
         if (!gotDuration) resolve(0); // If no duration was found, assume 0
       })
-      .format('null') // dummy output
+      .format('wav') // dummy output
       .output('-')
       .run();
   });

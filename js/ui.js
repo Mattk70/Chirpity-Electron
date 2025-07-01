@@ -5223,7 +5223,6 @@ async function handleUIClicks(e) {
           generateToast({message:`There are audio folders not in the correct format.<br>
               <b>"scientific name_common name"</b> is expected but found:<br>
               <b>${f}</b>`, type: 'warning', autohide: false})
-          errors = true;
           break
         }
       }
