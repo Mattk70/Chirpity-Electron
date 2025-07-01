@@ -4198,7 +4198,7 @@ const populateSpeciesModal = async (included, excluded) => {
     STATE.week !== -1 && STATE.week
       ? utils.interpolate(i18.week, { week: STATE.week })
       : "";
-  const model = config.selectedModel === "birdnet" ? "BirdNET" : "Nocmig";
+  const model = config.models[config.selectedModel].displayName;
   const localBirdsOnly =
     config.local && config.selectedModel === "birdnet" && config.list === "nocturnal"
       ? i18.localBirds
