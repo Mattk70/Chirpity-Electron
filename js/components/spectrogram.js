@@ -923,7 +923,7 @@ export class ChirpityWS {
           (specDimensions.bottom - event.clientY) *
             (frequencyRange / specDimensions.height)
         ) + Number(config.audio.frequencyMin);
-      const pitchShifted = config.selectedModel === 'bats';
+      const pitchShifted = config.selectedModel.includes('bats');
       const yPos = pitchShifted ? yPosition*10 : yPosition
       tooltip.textContent = `${i18.frequency}: ${yPos}Hz`;
       if (inRegion) {

@@ -1757,7 +1757,8 @@ const defaultConfig = {
       labelSmoothing: 0,
       useWeights: false,
       useFocal: false,
-      useRoll: false
+      useRoll: false,
+      useNoise: false
     }
   },
   library: {
@@ -2183,6 +2184,11 @@ const setUpWorkerMessaging = () => {
           break;
         }
         case "generate-alert": {
+          if (args.message.includes("archive.sqlite")) {
+            config.database.location = undefined;
+            document.getElementById("database-location").value = '';
+            updatePrefs("config.json", config);
+          }
           if (args.complete) {
             STATE.training = false;
             disableSettingsDuringAnalysis(false)
@@ -3215,6 +3221,7 @@ const showTraining = () => {
     const roll = document.getElementById('roll');
     roll.checked = allowRoll && settings.useRoll;
     roll.disabled = !allowRoll;
+    document.getElementById('use-noise').checked = settings.useNoise;
     document.getElementById('dropout').value = settings.dropout;
     dropout.disabled = !config.training.settings.hidden;
     document.getElementById('useCache').checked = settings.useCache;
@@ -4078,7 +4085,7 @@ const exportAudio = () => {
 async function localiseModal(filename, locale) {
   try {
     // Fetch the HTML file
-    if (["usage", "settings", "ebird"].includes(filename)) {
+    if (["usage", "settings", "ebird", "training"].includes(filename)) {
       filename = `Help/${filename}.${locale}.html`;
       const htmlResponse = await fetch(filename);
       if (!htmlResponse.ok)
@@ -4593,12 +4600,12 @@ document.addEventListener("drop", (event) => {
           file.type.startsWith("video/"))
     );
   let audioFiles;
-  if (fileList[0].path){
-    audioFiles = fileList.map((file) => file.path);
-  } else {
+  // if (fileList[0].path){
+  //   audioFiles = fileList.map((file) => file.path);
+  // } else {
   // For electron 32+
     audioFiles = fileList.map(file => window.electron.showFilePath(file));
-  }
+  // }
   worker.postMessage({ action: "get-valid-files-list", files: audioFiles });
 });
 
@@ -5354,6 +5361,10 @@ async function handleUIClicks(e) {
       (async () => await populateHelpModal("ebird", i18n.Help.eBird[locale]))();
       break;
     }
+    case "training": {
+      (async () => await populateHelpModal("training", i18n.Help.training[locale]))();
+      break;
+    }
     case "copy-uuid": {
       // Get the value from the input element
       const copyText = document
@@ -5821,6 +5832,7 @@ document.addEventListener("change", async function (e) {
         case "epochs": {
           config.training.settings.epochs = element.valueAsNumber; break}
         case "useCache": {config.training.settings.useCache = element.checked; break}
+        case "use-noise": {config.training.settings.useNoise = element.checked; break}
         case "mixup": {config.training.settings.mixup = element.checked; break}
         case "decay": {config.training.settings.decay = element.checked; break}
         case "weights": {config.training.settings.useWeights = element.checked; break}

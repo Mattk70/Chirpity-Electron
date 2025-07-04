@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>Configurações de Treinamento</title>
+</head>
+<body>
+
+<table class="table table-hover p-1">
+    <tr>
+        <td colspan="2" class="text-center text-bg-light"><h5>Configurações de Treinamento</h5></td>
+    </tr>
+    <tr>
+        <td><b>Local dos Áudios de Treinamento</b></td>
+        <td>Os arquivos de áudio para treinamento devem estar organizados em pastas, com cada pasta contendo os áudios de uma única espécie.
+            Os nomes das pastas devem seguir o formato <code>Nome científico_Nome comum</code>, usado pelos modelos BirdNET e Nocmig.</td>
+    </tr>
+    <tr>
+        <td><b>Local de Cache do Conjunto de Dados</b></td>
+        <td>Este é o local onde o Chirpity armazena os arquivos de áudio processados e metadados. Se nenhum valor for definido,
+            o local dos áudios de treinamento será usado. Recomenda-se uma localização em SSD rápido para melhor desempenho.</td>
+    </tr>
+    <tr>
+        <td><b>Usar cache existente se disponível</b></td>
+        <td>
+            <p>A preparação do cache pode levar algum tempo. Quando esta opção estiver marcada, o cache não será recriado toda vez que o treinamento começar.</p>
+            <p>Se você alterar a divisão entre treinamento e validação, esta opção será redefinida.</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Local para Salvar o Modelo</b></td>
+        <td>
+            <p>Local onde o Chirpity irá armazenar os arquivos do modelo treinado.</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Substituir ou Adicionar Rótulos</b></td>
+        <td>
+            <p>Se “Substituir rótulos” estiver selecionado, o modelo salvo terá apenas as classes das pastas do seu conjunto de dados de treinamento.</p>
+            <p>Se “Adicionar rótulos” estiver selecionado, o modelo manterá as classes existentes do BirdNET e adicionará quaisquer novas classes das suas pastas.</p>
+            <p><b>Importante:</b> Novas classes não podem ter o mesmo nome de uma classe existente. Para substituir uma classe existente, adicione um “-” ao final do nome. Exemplo: <i>Turdus iliacus_Pião-europeu-</i></p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Parâmetros de Treinamento</b></td>
+        <td>
+            <p>Esses campos definem os parâmetros básicos do treinamento do modelo.</p>
+            <ul>
+                <li><b>Épocas:</b> Número de vezes que o conjunto de dados passa pelo modelo durante o treinamento.</li>
+                <li><b>Taxa de Aprendizado:</b> Controla o quanto o modelo é ajustado com base no erro estimado a cada atualização dos pesos.</li>
+                <li><b>Label Smoothing:</b> Técnica para evitar que o modelo fique excessivamente confiante em uma única classe.</li>
+                <li><b>Usar perda focal:</b> Técnica para lidar com desbalanceamento entre classes, dando mais peso a exemplos difíceis.</li>
+                <li><b>Usar pesos de classe:</b> Dá mais importância a classes sub-representadas.</li>
+                <li><b>Usar decaimento da taxa de aprendizado:</b> Diminui a taxa de aprendizado ao longo do tempo para ajustes mais finos.</li>
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Conjunto de Dados de Áudio</b></td>
+        <td>
+            Aqui você pode selecionar uma fração do conjunto de dados para usar como validação. Os dados de validação não são usados no treinamento,
+            mas servem para avaliar o desempenho do modelo — sua capacidade de generalização — durante o treinamento.
+        </td>
+    </tr>
+    <tr>
+        <td><b>Aumentações</b></td>
+        <td>
+            <p>Essas opções controlam como os dados de treinamento são aumentados para melhorar a robustez do modelo.</p>
+            <ul>
+                <li><b>Mixup:</b> Combina dois ou mais exemplos para criar um novo exemplo sintético, expondo o modelo a mais variações.</li>
+                <li><b>Rolagem:</b> Desloca os dados de áudio no tempo, criando novos exemplos. 
+                    <b>Disponível apenas quando usando o backend de CPU</b></li>
+                <li><b>Adicionar ruído de fundo:</b> Adiciona ruído aos exemplos de treinamento para tornar o modelo mais robusto a ambientes ruidosos.</li>
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Classificador</b></td>
+        <td>
+            <p>Essas opções controlam a estrutura do classificador para melhorar o desempenho.</p>
+            <ul>
+                <li><b>Unidades Ocultas:</b> Número de neurónios nas camadas ocultas. Mais unidades permitem aprender padrões mais complexos, mas podem causar sobreajuste. Se for 0, não há camadas ocultas.</li>
+                <li><b>Dropout:</b> Técnica que desactiva aleatoriamente unidades de entrada durante o treinamento, ajudando a evitar sobreajuste.</li>
+            </ul>
+        </td>
+    </tr>
+</table>
+
+</body>
+</html>

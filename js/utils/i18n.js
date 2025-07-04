@@ -992,6 +992,19 @@ const Help = {
       zh: 'eBird记录常见问题',
       sv: 'eBird Poster FAQ',        // Swedish
       da: 'eBird Record FAQ'        // Danish
+    },    
+    training: {
+      en: 'Training settings',
+      fr: 'Paramètres d\'entraînement',
+      de: 'Trainingsparameter',
+      es: 'Configuración de entrenamiento',
+      ja: 'トレーニング設定',             // Japanese
+      pt: 'Configurações de Treinamento',
+      ru: 'Настройки обучения',
+      nl: 'Trainingsinstellingen',
+      zh: '训练设置',
+      sv: 'Träningsinställningar',        // Swedish
+      da: 'Træningsindstillinger'        // Danish
     },
     community: {
       en: 'Join the Chirpity Users Community',

@@ -24,8 +24,11 @@ async function trainModel({
   batchSize = 32,
   dropout, epochs, hidden,
   dataset, cache:cacheFolder, modelLocation:saveLocation, modelType, 
-  useCache, validation, mixup, decay, useRoll, useWeights, useFocal, labelSmoothing}) {
+  useCache, validation, mixup, decay, 
+  useRoll, useWeights, useFocal, useNoise, labelSmoothing}) {
+  
   installConsoleTracking(() => Model.UUID, "Training");
+  
   const {files:allFiles, classWeights} = getFilesWithLabelsAndWeights(dataset);
   if (!allFiles.length){
     throw new Error(`No files found in any label folders in ${dataset}` )
@@ -112,16 +115,29 @@ async function trainModel({
     trainFiles = allFiles;
   }
 
-  const useNoise = false;
-
   if (useNoise && (!fs.existsSync(noiseBin) || !cacheRecords)){
     noiseFiles = allFiles.filter(file => file.label.toLowerCase().includes('background'))
     await writeBinaryGzipDataset(noiseFiles, noiseBin, labelToIndex, postMessage, "Preparing noise data");
 
   }
-  let noise_ds = tf.data.generator(() => readBinaryGzipDataset(noiseBin, labels)).repeat().shuffle(50).batch(batchSize);
+  let noise_ds = tf.data.generator(() => readBinaryGzipDataset(noiseBin, labels)).repeat().shuffle(50);
 
   if (!cacheRecords || !fs.existsSync(trainBin)) {
+        // Check same number of classes in train and val data
+    // Step 1: Create sets of labels
+    const labels1 = new Set(trainFiles.map(item => item.label));
+    const labels2 = new Set(valFiles.map(item => item.label));
+
+    // Step 2: Find missing labels from
+    let error;
+    const missing1 = [...labels1].filter(label => !labels2.has(label));
+    if (missing1.length) error = 'Validation set is missing examples of: <b>' + missing1.toString() +'</b>';
+    const missing2 = [...labels2].filter(label => !labels1.has(label));
+    if (missing2.length) error = 'Training set is missing examples of: <b>' + missing2.toString() +'</b>';
+    if (error){
+      postMessage({ message: "training-results", notice: error, type: 'error', autohide:false });
+      return
+    }
     await writeBinaryGzipDataset(trainFiles, trainBin, labelToIndex, postMessage, "Preparing training data");
   }
 
@@ -214,26 +230,13 @@ async function trainModel({
   })
 
   let train_ds = mixup 
-    ? createMixupStreamDataset({ds:trainBin, labels, useRoll}).batch(batchSize)
-    : createStreamDataset(trainBin, labels).map(x => useRoll ? roll(x) : x).batch(batchSize)
+    ? createMixupStreamDataset({ds:trainBin, labels, useRoll})
+    : createStreamDataset(trainBin, labels).map(x => useRoll ? roll(x) : x);
 
-  if (useNoise){
-      train_ds = tf.data.zip({ clean: train_ds, noise: noise_ds }).mapAsync(({ clean, noise }) => {
-        return tf.tidy(() =>{
-          const cleanBatchSize = clean.xs.shape[0];
-          const noiseBatchSize = noise.xs.shape[0];
-          // Slice noise batch if it’s larger than clean batch
-          const slicedNoiseXs = noiseBatchSize > cleanBatchSize
-            ? noise.xs.slice([0, 0], [cleanBatchSize, -1])
-            : noise.xs;
-          const noisy_xs = tf.maximum(clean.xs, slicedNoiseXs);
-          return { xs: noisy_xs, ys: clean.ys };
-        })
-    })
-  }
+  const augmented_ds = useNoise ?  tf.data.generator(() => blendedGenerator(train_ds, noise_ds)).batch(batchSize).prefetch(3) : train_ds.batch(batchSize) ;
 
   if (DEBUG){
-    train_ds.take(1).forEachAsync(({ xs, ys }) => {
+    augmented_ds.take(1).forEachAsync(({ xs, ys }) => {
       return tf.tidy(() =>{
         const first = tf.slice(xs, [0, 0], [1, xs.shape[1]]);
         Model.getSpectrogram({buffer:first, filepath:saveLocation,file:`sample.png`})
@@ -244,11 +247,11 @@ async function trainModel({
   }
   let val_ds;
   if (validation){
-    val_ds = tf.tidy(() => tf.data.generator(() => readBinaryGzipDataset(valBin, labels)).batch(batchSize));
+    val_ds = tf.data.generator(() => readBinaryGzipDataset(valBin, labels)).batch(batchSize).prefetch(1);
   }
   // Train on your new data
   // Assume `xTrain` and `yTrain` are your input and combined output labels
-  const history = await transferModel.fitDataset(train_ds, {
+  const history = await transferModel.fitDataset(augmented_ds, {
     batchSize,
     epochs,
     validationData: validation ? val_ds : undefined,
@@ -547,7 +550,7 @@ async function decodeAudio(filePath) {
     const chunks = [];
 
     ffmpeg(filePath)
-      .format('wav')
+      .format('s16le')
       .audioCodec('pcm_s16le')
       .audioChannels(1)
       .audioFrequency(48000)
@@ -574,18 +577,18 @@ async function decodeAudio(filePath) {
 
 
 function roll(x) {
+  return tf.tidy(() => {
     const {xs, ys} = x;
     const size = xs.shape[0];
     const maxShift = size / 4;
     const shift = Math.floor(Math.random() * maxShift); // random int from 0 to maxShift
-    if (shift === 0) return x;
-
+  if (shift === 0) {console.log('No shift applied'); return x;}
     const [left, right] = tf.split(xs, [size - shift, shift], 0);
     const rolled = tf.concat([right, left], 0)
     left.dispose(), right.dispose();
-    const label = ys.clone();
-    xs.dispose(), ys.dispose();
-    return { xs: rolled, ys: label };
+    xs.dispose();
+    return { xs: rolled, ys };
+  })
 }
 
 /**
@@ -627,9 +630,7 @@ function categoricalFocalCrossEntropy({
 }
 
 const createStreamDataset = (ds, labels) => 
-  tf.data.generator(() => readBinaryGzipDataset(ds, labels))
-
-
+  tf.data.generator(() => readBinaryGzipDataset(ds, labels));
 
 function createMixupStreamDataset({useRoll, ds, labels, alpha = 0.4}) {
     return tf.tidy(() => {
@@ -647,4 +648,33 @@ function createMixupStreamDataset({useRoll, ds, labels, alpha = 0.4}) {
         })
     })
 }
+
+async function* blendedGenerator(train_ds, noise_ds) {
+  const trainIt = await train_ds.iterator();
+  const noiseIt = await noise_ds.iterator();
+
+  while (true) {
+    const clean = await trainIt.next();
+    const noise = await noiseIt.next();
+    if (clean.done) break;
+
+    const result = tf.tidy(() => {
+      const blendedXs = clean.value.xs
+        .add(noise.value.xs)
+        .div(2);
+      return {
+        xs: blendedXs,
+        ys: clean.value.ys,
+      };
+    });
+
+    clean.value.xs.dispose();
+    noise.value.xs.dispose();
+    noise.value.ys.dispose();
+
+    yield result;
+
+  }
+}
+
 export {trainModel, getAudioMetadata};

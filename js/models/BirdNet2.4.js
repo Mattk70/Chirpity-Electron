@@ -303,13 +303,28 @@ normalise_audio_batch = (tensor) => {
           tf.signal.hannWindow
         )
       }
-      return result
+      let interim = result
         .matMul(this.melFilterbank)
         .pow(this.two)
         .pow(tf.div(this.one, tf.add(this.one, tf.exp(this.magScale.read()))))
         .reverse(-1)
         .transpose([0, 2, 1])
         .expandDims(-1);
+      if (myModel.version.includes('masked')){
+        const [batchSize, height, width, channels] = interim.shape;
+        let zeros;
+        if (this.fmax === 15000){
+          // This view has a range 5000Hz - 150kHz
+          zeros = tf.zeros([batchSize, 10, width, channels]);
+          interim = interim.slice([0,0,0,0], [-1, height - 10, -1, -1]);
+        } else {
+          // This view has a range 0Hz - 30kHz
+          zeros = tf.zeros([batchSize, height/2, width, channels]);
+          interim = interim.slice([0,0,0,0], [-1, height/2, -1, -1]);
+        }
+        interim = tf.concat([interim, zeros], 1);
+      }
+      return interim
     });
   }
 

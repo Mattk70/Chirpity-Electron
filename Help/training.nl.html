@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <title>Trainingsinstellingen</title>
+</head>
+<body>
+
+<table class="table table-hover p-1">
+    <tr>
+        <td colspan="2" class="text-center text-bg-light"><h5>Trainingsinstellingen</h5></td>
+    </tr>
+    <tr>
+        <td><b>Locatie van trainingsaudio</b></td>
+        <td>De audiobestanden voor training moeten worden opgeslagen in afzonderlijke mappen voor elke klasse.
+            De mapnamen moeten het formaat <code>LatijnseNaam_EngelseNaam</code> volgen, zoals gebruikt in BirdNET- of Nocmig-modellen.</td>
+    </tr>
+    <tr>
+        <td><b>Cachelocatie van dataset</b></td>
+        <td>De datasetcache is de locatie waar Chirpity de verwerkte audiobestanden en metadata opslaat. Als geen pad is opgegeven, wordt de locatie van de trainingsaudio gebruikt.
+            Voor optimale prestaties wordt een snelle SSD-locatie aanbevolen.</td>
+    </tr>
+    <tr>
+        <td><b>Bestaande cache gebruiken indien beschikbaar</b></td>
+        <td>
+            <p>Het voorbereiden van de cache kan enige tijd duren. Als deze optie is ingeschakeld, wordt de cache niet telkens opnieuw gegenereerd.</p>
+            <p>Als de splitsing tussen training en validatie wordt gewijzigd, wordt deze optie automatisch uitgeschakeld.</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Opslaglocatie voor modellen</b></td>
+        <td>
+            <p>De getrainde modellen worden hier opgeslagen.</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Labels overschrijven of toevoegen</b></td>
+        <td>
+            <p>Als 'Labels overschrijven' is geselecteerd, bevat het opgeslagen model alleen de klassen uit de trainingsset.</p>
+            <p>Als 'Labels toevoegen' is geselecteerd, worden bestaande BirdNET-klassen behouden en worden nieuwe klassen uit de trainingsmap toegevoegd.</p>
+            <p><b>Belangrijk:</b> Nieuwe klassennamen mogen niet identiek zijn aan bestaande namen. Om een bestaande klasse te vervangen, voeg een '-' toe aan het einde van de naam (bijv. <i>Turdus iliacus_Redwing-</i>).</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Trainingsparameters</b></td>
+        <td>
+            <p>Deze instellingen bepalen het gedrag van het trainingsproces.</p>
+            <ul>
+                <li><b>Aantal epochs:</b> Het aantal keren dat het model alle gegevens doorloopt.</li>
+                <li><b>Leersnelheid:</b> De grootte van de stap waarmee het model leert.</li>
+                <li><b>Label smoothing:</b> Voorkomt dat het model te zeker wordt van één klasse.</li>
+                <li><b>Gebruik focal loss:</b> Legt meer nadruk op moeilijke voorbeelden, vooral bij klassen met een onbalans.</li>
+                <li><b>Gebruik klasse-gewichten:</b> Geeft zeldzamere klassen meer gewicht tijdens training.</li>
+                <li><b>Gebruik leersnelheid-verval:</b> Vermindert de leersnelheid geleidelijk tijdens het trainen.</li>
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Datasplitsing</b></td>
+        <td>
+            Hiermee stel je het percentage van de dataset in dat wordt gebruikt voor validatie (en dus niet voor training).
+        </td>
+    </tr>
+    <tr>
+        <td><b>Data-augmentatie</b></td>
+        <td>
+            <p>Deze opties verbeteren de generalisatie van het model door variaties aan de trainingsdata toe te voegen.</p>
+            <ul>
+                <li><b>Mixup:</b> Combineert meerdere voorbeelden om nieuwe te genereren.</li>
+                <li><b>Shift:</b> Verschuift audiogegevens in de tijd om variatie toe te voegen. <b>(Alleen beschikbaar met CPU-backend)</b></li>
+                <li><b>Achtergrondgeluid toevoegen:</b> Voegt ruis toe aan de audio voor robuustere prestaties.</li>
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Classifierinstellingen</b></td>
+        <td>
+            <p>Hier stel je de structuur van de classifier in.</p>
+            <ul>
+                <li><b>Aantal verborgen eenheden:</b> Het aantal neuronen in de verborgen laag. Meer eenheden kunnen complexere patronen leren. Gebruik 0 voor geen verborgen laag.</li>
+                <li><b>Dropout:</b> Schakelt willekeurige eenheden tijdelijk uit om overfitting te voorkomen.</li>
+            </ul>
+        </td>
+    </tr>
+</table>
+
+</body>
+</html>

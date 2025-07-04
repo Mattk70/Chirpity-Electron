@@ -187,19 +187,22 @@ const setupFfmpegCommand = async ({
   outputOptions = [],
 }) => {
   let duration = end - start;
+  STATE.model.includes('slow') && (start/=10);
   const command = ffmpeg("file:" + file)
     .format(format)
     .audioChannels(channels);
   // Add filters if provided (no additional filters for bats)
-  if (STATE.model === 'bats'){
+
+  if (STATE.model.includes('bats')){
     const {bitrate} = await getAudioMetadata(file);
     if (bitrate <= 48000) console.warn(file, 'has bitrate', bitrate)
     const rate = Math.floor(bitrate/10)
-    command.audioFilters([`asetrate=${rate}`])
-      .audioFilters(['atempo=10'])
-  } else {
-    additionalFilters.forEach(filter => command.audioFilters(filter))
-  }
+    command.audioFilters([`asetrate=${rate}`]);
+    STATE.model.includes('slow') || command.audioFilters(['atempo=10'])
+  } 
+  
+  additionalFilters.forEach(filter => command.audioFilters(filter))
+    
   if (Object.keys(metadata).length) {
     metadata = Object.entries(metadata).flatMap(([k, v]) => {
       if (typeof v === "string") {
@@ -253,7 +256,16 @@ async function loadDB(modelPath) {
   const file = p.join(path, `archive.sqlite`);
   if (!fs.existsSync(file)) {
     console.log("No db file: ", file);
-    diskDB = await createDB({file, dbMutex});
+    try {
+        diskDB = await createDB({file, dbMutex});
+    } catch (error) {
+      console.error("Error creating database:", error);
+      generateAlert({
+        type: "error",
+        message: `Database creation failed: ${error.message}`
+      });
+      throw error;
+    }
     console.log("DB created at : ", file);
     STATE.modelID = modelID;
   } else {
@@ -307,20 +319,31 @@ async function loadDB(modelPath) {
  * @param {Object} options
  * @param {boolean} options.regenerate - Whether to force regeneration of the label list from the database.
  */
-async function setLabelState({regenerate}) {
-  if (regenerate || !STATE.allLabels){
+async function setLabelState({ regenerate }) {
+  if (regenerate || !STATE.allLabelsMap) {
     DEBUG && console.log("Getting labels from disk db");
+
     const res = await diskDB.allAsync(
-      "SELECT sname || '_' || cname AS labels, modelID FROM species ORDER BY id"
+      `SELECT id, sname || '_' || cname AS labels, modelID 
+      FROM species WHERE modelID = ? ORDER BY id`, STATE.modelID
     );
-    STATE.allLabels = res.map((obj) => obj.labels ); // these are the labels in the preferred locale
+
+    // Map from species ID to label
+    STATE.allLabelsMap = new Map(res.map(obj => [obj.id, obj.labels]));
+
+    // Also keep a flat list of all labels (optional, if still useful for 'everything')
+    STATE.allLabels = res.map(obj => obj.labels);
   }
-  const included = await getIncludedIDs()
-  STATE.filteredLabels = STATE.list === 'everything' 
+
+  const included = await getIncludedIDs(); // assumes array of species.id values
+
+  STATE.filteredLabels = STATE.list === 'everything'
     ? STATE.allLabels
-    : included.map(i => STATE.allLabels[i-1]); // included is 1 based, list is 0 based
+    : included.map(id => STATE.allLabelsMap.get(id)).filter(Boolean);
+
   UI.postMessage({ event: "labels", labels: STATE.filteredLabels });
 }
+
 
 /**
  * Handles and dispatches worker messages to perform actions such as analysis, file operations, prediction management, database updates, and UI communication.
@@ -831,6 +854,7 @@ async function onLaunch({
     : diskDB;
   STATE.update({ db });
   NUM_WORKERS = threads;
+  setLabelState({regenerate:true})
   spawnPredictWorkers(model, batchSize, NUM_WORKERS);
 }
 
@@ -1526,8 +1550,8 @@ const getDuration = async (src) => {
         );
       }
       audio.remove();
-      
-      resolve(duration);
+      const finalDuration = STATE.model.includes('slow') ? duration*10 : duration;
+      resolve(finalDuration);
     });
     audio.addEventListener("error", (error) => {
       generateAlert({
@@ -2357,7 +2381,7 @@ function setAudioFilters() {
         options: { ...options, att: 40 },
         outputs: 'ir'
       },
-      { filter: 'afir', inputs: ['a', 'ir'] }
+      { filter: 'afir', inputs: ['a', 'ir'], outputs: 'out' }
     );
   }
   // Low shelf filter
@@ -3297,7 +3321,7 @@ const parsePredictions = async (response) => {
         if (confidence < loopConfidence) break;
         const species = speciesIDArray[j]
         let speciesID = STATE.speciesMap.get(modelID).get(species);
-        updateUI = selection || !included.length || included.includes(speciesID);
+        updateUI = selection || !included.length || included.includes(species);
         if (updateUI) {
           let end;
           if (selection) {
@@ -3305,7 +3329,7 @@ const parsePredictions = async (response) => {
               (selection.end - selection.start) / 1000;
             end = key + duration;
           } else { end = key + 3; }
-          const [sname, cname] = STATE.allLabels[speciesID -1].split('_') // Much faster!!
+          const [sname, cname] = STATE.allLabelsMap.get(speciesID).split('_') // Much faster!!
           const result = {
             timestamp: timestamp,
             position: key,
@@ -4127,20 +4151,22 @@ const getDetectedSpecies = async () => {
  * @returns Promise <void>
  */
 const getValidSpecies = async (file) => {
-  const included = await getIncludedIDs(file);
-  let excludedSpecies, includedSpecies;
-  let sql = `SELECT cname, sname FROM species WHERE modelID = ${STATE.modelID}`;
+  const included = await getIncludedIDs(file); // classindex values
 
-  if (filtersApplied(included)) {
-    sql += ` AND id IN (${included.join(",")})`;
+  const includedSpecies = [];
+  const excludedSpecies = [];
+  let i = 1;
+  for (const speciesName of STATE.allLabelsMap.values()) {
+    const [cname, sname] = speciesName.split("_").reverse();
+    if (cname.includes("ackground") || cname.includes("Unknown")) continue; // skip background and unknown species
+    if (included.includes(i)) {
+      includedSpecies.push({cname, sname});
+    } else {
+      excludedSpecies.push({cname, sname});
+    }
+    i++;
   }
-  sql += " GROUP BY cname ORDER BY cname";
-  includedSpecies = await diskDB.allAsync(sql);
 
-  if (filtersApplied(included)) {
-    sql = sql.replace("IN", "NOT IN");
-    excludedSpecies = await diskDB.allAsync(sql);
-  }
   UI.postMessage({
     event: "valid-species-list",
     included: includedSpecies,
@@ -4620,6 +4646,7 @@ async function getLocations({ file, db = STATE.db }) {
  * @returns {Promise<number[]>} Promise resolving to an array of included species IDs for the current filter context.
  */
 async function getIncludedIDs(file) {
+  if (STATE.list === "everything") return [];
   let latitude, longitude, week;
   const {list, local, lat, lon, useWeek, included, model, modelID, speciesMap} = STATE;
   if (
