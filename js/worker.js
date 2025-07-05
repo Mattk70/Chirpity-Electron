@@ -1057,7 +1057,7 @@ async function getSpeciesSQLAsync(){
     DEBUG &&
       console.log("included", included.length, "# labels", allLabels.length);
     // const includedParams = prepParams(included);
-    SQL = ` AND speciesID ${not} IN (${included}) `;
+    SQL = ` AND classIndex + 1 ${not} IN (${included}) `;
     // params.push(...included);
   }
   return SQL
@@ -1070,7 +1070,7 @@ const prepSummaryStatement = async () => {
   const partition = detect.merge ? '' : ', r.modelID';
   let summaryStatement = `
     WITH ranked_records AS (
-        SELECT r.dateTime, r.confidence, f.name as file, f.archiveName, cname, sname, COALESCE(callCount, 1) as callCount, isDaylight, tagID,
+        SELECT r.dateTime, r.confidence, f.name as file, f.archiveName, cname, sname, classIndex, COALESCE(callCount, 1) as callCount, isDaylight, tagID,
         RANK() OVER (PARTITION BY fileID${partition}, dateTime ORDER BY r.confidence DESC) AS rank
         FROM records r
         JOIN files f ON f.id = r.fileID
@@ -1120,9 +1120,10 @@ const getTotal = async ({
       : globalOffset);
   let SQL = ` WITH MaxConfidencePerDateTime AS (
         SELECT confidence,
-        speciesID, f.name as file, tagID,
+        speciesID, classIndex, f.name as file, tagID,
         RANK() OVER (PARTITION BY fileID${partition}, dateTime ORDER BY r.confidence DESC) AS rank
         FROM records r
+        JOIN species s ON r.speciesID = s.id
         JOIN files f ON r.fileID = f.id 
         WHERE confidence >= ${detect.confidence} `;
 
@@ -1177,8 +1178,9 @@ const prepResultsStatement = async (
         r.speciesID,
         models.name as modelName,
         models.id as modelID,
-        s.sname, 
-        s.cname, 
+        s.sname,
+        s.cname,
+        s.classIndex,
         r.confidence as score, 
         tagID,
         tags.name as label, 
@@ -1849,7 +1851,8 @@ async function sendDetections(file, start, end, goToRegion) {
                 confidence,
                 name,
                 dateTime,
-                speciesID
+                speciesID,
+                classIndex
             FROM records r
             JOIN species ON speciesID = species.ID
             JOIN files ON fileID = files.ID
@@ -4162,6 +4165,10 @@ const getValidSpecies = async (file) => {
     }
     i++;
   }
+
+  // Sort both arrays by cname
+  includedSpecies.sort((a, b) => a.cname.localeCompare(b.cname));
+  excludedSpecies.sort((a, b) => a.cname.localeCompare(b.cname));
 
   UI.postMessage({
     event: "valid-species-list",
