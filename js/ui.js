@@ -6627,7 +6627,6 @@ const recordEntryModal = new bootstrap.Modal(recordEntryModalDiv, {
 });
 
 const recordEntryForm = document.getElementById("record-entry-form");
-// let focusBirdList;
 
 /**
  * Displays and populates the record entry modal for adding or updating audio record details.

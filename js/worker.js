@@ -321,7 +321,7 @@ async function setLabelState({ regenerate }) {
     DEBUG && console.log("Getting labels from disk db");
 
     const res = await diskDB.allAsync(
-      `SELECT id, sname || '_' || cname AS labels, modelID 
+      `SELECT classIndex + 1 as id, sname || '_' || cname AS labels, modelID 
       FROM species WHERE modelID = ? ORDER BY id`, STATE.modelID
     );
 
