@@ -28,7 +28,6 @@ async function trainModel({
   useRoll, useWeights, useFocal, useNoise, labelSmoothing}) {
   
   installConsoleTracking(() => Model.UUID, "Training");
-  useRoll = true; // always use roll for now
   const {files:allFiles, classWeights} = getFilesWithLabelsAndWeights(dataset);
   if (!allFiles.length){
     throw new Error(`No files found in any label folders in ${dataset}` )
