@@ -46,15 +46,6 @@ function loadModel(params) {
       `model received load instruction. Using batch size ${batch}`
     );
   tf.setBackend(backend).then(async () => {
-    if (backend === "webgl") {
-      tf.env().set("WEBGL_FORCE_F16_TEXTURES", true);
-      tf.env().set("WEBGL_EXP_CONV", true);
-      tf.env().set("TOPK_K_CPU_HANDOFF_THRESHOLD", 128);
-      tf.env().set("TOPK_LAST_DIM_CPU_HANDOFF_SIZE_THRESHOLD", 128);
-    } else if (backend === "webgpu") {
-      tf.env().set("WEBGPU_DEFERRED_SUBMIT_BATCH_SIZE", 256); // Affects GPU RAM at expense of speed
-      tf.env().set("WEBGPU_CPU_HANDOFF_SIZE_THRESHOLD", 1000); // MatMulPackedProgram
-    }
     tf.enableProdMode();
     //tf.enableDebugMode();
     if (DEBUG) {
@@ -237,15 +228,8 @@ class ChirpityModel extends BaseModel {
     });
   }
   async predictBatch(TensorBatch, keys, threshold, confidence) {
-    let paddedTensorBatch, maskedTensorBatch;
-    if (
-      BACKEND !== "tensorflow" &&
-      TensorBatch.shape[0] < this.batchSize &&
-      !this.selection
-    ) {
-      // WebGL backend works best when all batches are the same size
-      paddedTensorBatch = this.padBatch(TensorBatch); // + 1 tensor
-    } else if (threshold && BACKEND === "tensorflow" && !this.selection) {
+    let maskedTensorBatch;
+    if (threshold && BACKEND === "tensorflow" && !this.selection) {
       threshold *= 4;
       const keysTensor = tf.stack(keys); // + 1 tensor
       const snr = this.getSNR(TensorBatch);
@@ -285,7 +269,7 @@ class ChirpityModel extends BaseModel {
       }
     }
 
-    const tb = paddedTensorBatch || maskedTensorBatch || TensorBatch;
+    const tb = maskedTensorBatch || TensorBatch;
     const rawPrediction = this.model.predict(tb, { batchSize: this.batchSize });
 
     // Zero prediction values for silence
@@ -313,7 +297,6 @@ class ChirpityModel extends BaseModel {
       prediction.dispose();
     }
     TensorBatch.dispose();
-    if (paddedTensorBatch) paddedTensorBatch.dispose();
     if (maskedTensorBatch) maskedTensorBatch.dispose();
 
     const finalPrediction = newPrediction || prediction;

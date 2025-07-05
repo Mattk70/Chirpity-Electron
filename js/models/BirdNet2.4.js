@@ -56,10 +56,6 @@ onmessage = async (e) => {
           );
 
         tf.setBackend(backend).then(async () => {
-          if (backend === "webgl") {
-            tf.env().set("WEBGL_FORCE_F16_TEXTURES", true);
-            tf.env().set("WEBGL_EXP_CONV", true);
-          }
           tf.enableProdMode();
           if (DEBUG) {
             console.log(tf.env());
@@ -310,7 +306,7 @@ normalise_audio_batch = (tensor) => {
         .reverse(-1)
         .transpose([0, 2, 1])
         .expandDims(-1);
-      if (myModel.version.includes('masked')){
+      if (myModel.version.includes('birdnet')){
         const [batchSize, height, width, channels] = interim.shape;
         let zeros;
         if (this.fmax === 15000){

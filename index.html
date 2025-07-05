@@ -279,7 +279,7 @@
                                 </div>
                         </fieldset>
                         <fieldset class="border rounded p-1">
-                            <legend class="h6">Training parameters</legend>
+                            <legend class="h6" id="training-parameters-title">Training parameters</legend>
                             <div class="row ps-2">
                                 <div class="form-floating ps-1 col">
                                     <input type="number" id="epochs" class="form-control" min="1" max="300" value="10" required>
@@ -291,7 +291,7 @@
                                 </div>
                                 <div class="form-floating ps-1 col">
                                     <input type="number" id="label-smoothing" class="form-control" step="0.01" min="0.0" max="0.5" value="0">
-                                    <label class="mb-2" for="label-smooting">Label Smoothing</label>
+                                    <label class="mb-2" for="label-smoothing">Label Smoothing</label>
                                 </div>
                             </div>
                             <div class="row mt-2 g-0 border rounded">
@@ -311,10 +311,9 @@
                                 </div>
                                 
                             </div>
-                            <legend class="h6">Audio Dataset</legend>
                             <div class="ms-1">
-                                <div class="input-group rounded mb-3">
-                                    <label class="ps-1 input-group-text" for="validation-split">Validation split:</label>
+                                <div class="input-group rounded pt-2">
+                                    <label class="input-group-text" for="validation-split">Validation split:</label>
                                     <select class="form-select mb-0" id="validation-split">
                                         <option value="0">None</option>
                                         <option value="0.1">10%</option>
@@ -323,7 +322,7 @@
                                 </div>
 
                             </div>
-                            <legend class="h6">Augmentations</legend>
+                            <legend class="h6 pt-2" id="augmentations-title">Augmentations</legend>
                             <fieldset class="border rounded p-1">
                                 <div class="form-check form-switch d-inline-block">
                                     <input class="form-check-input" type="checkbox" role="switch" name="mixup" id="mixup">
@@ -338,7 +337,7 @@
                                     <label class="form-check-label" for="use-noise">Mix in background noise</label>
                                 </div>
                             </fieldset>
-                            <legend class="h6">Classifier</legend>
+                            <legend class="h6 pt-2" id="classifier-title">Classifier</legend>
                             <div class="row">
                                 <div class="input-group rounded mb-3 col">
                                     <label class="ps-1 input-group-text" for="hidden-units">Hidden units:</label>
@@ -424,7 +423,7 @@
                                 <select class="form-select mb-0" id="custom-models" required></select>
                             </div>
                         </div>
-                        <div class="alert alert-danger" role="alert">
+                        <div class="alert alert-danger" role="alert" id="expunge-warning">
                             N.B. This will remove the model and its associated species and records from the database.
                         </div>
                     </div>
@@ -1071,7 +1070,7 @@
                     <div class="">
                         <div class="p-0 node-only d-none">
                             <div class="form-group rounded p-2 pe-0 mb-2">
-                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Backend" id="Backend-circle-help"  data-bs-content="The webGL/webGPU backends can improve performance and reduce power consumption on some systems.">?</a>
+                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Backend" id="Backend-circle-help"  data-bs-content="The GPU backend can improve performance and reduce power consumption on some systems.">?</a>
                                 <div>
                                     <label class="ps-0 fs-6 text-start form-check" for="backend">Backend: <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature.">
                                 <span class="pointer locked material-symbols-outlined">lock</span></a></label>
@@ -1079,13 +1078,9 @@
                                         <label class="form-check-label" for="tensorflow">CPU</label>
                                         <input class="form-check-input" type="radio" name="backend" id="tensorflow" value="tensorflow" checked="">
                                     </div>
-                                    <div class="form-check form-check-inline ">
-                                        <input class="form-check-input locked" type="radio" name="backend" id="webgl" value="webgl" disabled>
-                                        <label class="form-check-label" for="webgl">WebGL</label>
-                                    </div>
                                     <div class="form-check form-check-inline">
                                         <input class="form-check-input locked" type="radio" name="backend" id="webgpu" value="webgpu" disabled>
-                                        <label class="form-check-label" for="webgpu">WebGPU</label>
+                                        <label class="form-check-label" for="webgpu">GPU</label>
                                     </div>
                                 </div>
                             </div>
@@ -1704,9 +1699,9 @@
                                 <span class="material-symbols-outlined">unarchive</span> Remove Current File From
                                 Archive
                             </li>
-                            <!-- <li class="dropdown-item" id="dataset">
+                            <li class="dropdown-item d-none" id="dataset">
                                 <span class="material-symbols-outlined">dataset</span> Create Dataset
-                            </li> -->
+                            </li>
                         </ul>
                     </li>
                     <li class="nav-item dropdown">
@@ -1747,7 +1742,7 @@
                                 <a class="dropdown-item locked disabled col" id="open-training" href="#">
                                 <span class="material-symbols-outlined">model_training</span> Train a Custom Model
                                 <span>
-                                    <a class="padlock col-auto" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a member to unlock this feature.">
+                                    <a class="padlock col" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a member to unlock this feature.">
                                         <span class="pointer locked material-symbols-outlined float-end mt-1">lock</span>
                                     </a>
                                 </span>
@@ -1756,10 +1751,10 @@
                         </li>
                         <li>
                             <div class="row ms-0 me-0">
-                                <a class="dropdown-item locked disabled col" id="import-model" href="#">
-                                <span class="material-symbols-outlined">account_circle</span> Import a Custom Model
+                                <a class="dropdown-item d-flex locked disabled col" id="import-model" href="#">
+                                <span class="material-symbols-outlined">account_circle </span> Import a Custom Model
                                 <span>
-                                    <a class="padlock col-auto" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a member to unlock this feature.">
+                                    <a class="padlock col" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a member to unlock this feature.">
                                         <span class="pointer locked material-symbols-outlined float-end mt-1">lock</span>
                                     </a>
                                 </span>
@@ -1771,7 +1766,7 @@
                                 <a class="dropdown-item locked disabled col" id="remove-model" href="#">
                                 <span class="material-symbols-outlined">no_accounts</span> Remove a Custom Model
                                 <span>
-                                    <a class="padlock col-auto" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a member to unlock this feature.">
+                                    <a class="padlock col" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a member to unlock this feature.">
                                         <span class="pointer locked material-symbols-outlined float-end mt-1">lock</span>
                                     </a>
                                 </span>
@@ -1797,7 +1792,7 @@
                         <span class="material-symbols-outlined">help</span> Keyboard Shortcuts</a>
                     </li>
                     <li>
-                        <a class="dropdown-item" id="training" href="#">
+                        <a class="dropdown-item" id="trainingHelp" href="#">
                             <span class="material-symbols-outlined">help</span> Training settings
                         </a>
                     </li>

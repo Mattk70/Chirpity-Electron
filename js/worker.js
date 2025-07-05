@@ -20,7 +20,7 @@ import {
   mergeDbIfNeeded,
   addNewModel
 } from "./database.js";
-import { customURLEncode, installConsoleTracking, trackEvent } from "./utils/tracking.js";
+import { customURLEncode, installConsoleTracking, trackEvent as _trackEvent } from "./utils/tracking.js";
 import { getAudioMetadata } from "./models/training.js";
 let isWin32 = false;
 
@@ -78,10 +78,9 @@ const generateAlert = ({
 // Is this CI / playwright? Disable tracking
 const isTestEnv = process.env.TEST_ENV;
 isTestEnv || installConsoleTracking(() => STATE.UUID, "Worker");
-
+const trackEvent = isTestEnv ? () => {} : _trackEvent;
 // Implement error handling in the worker
 self.onerror = function (message, file, lineno, colno, error) {
-  if (isTestEnv) return
   trackEvent(
     STATE.UUID,
     "Unhandled Worker Error",
@@ -95,7 +94,6 @@ self.onerror = function (message, file, lineno, colno, error) {
 };
 
 self.addEventListener("unhandledrejection", function (event) {
-  if (isTestEnv) return
   // Extract the error message and stack trace from the event
   const errorMessage = event.reason?.message;
   const stackTrace = event.reason?.stack;
@@ -110,7 +108,6 @@ self.addEventListener("unhandledrejection", function (event) {
 });
 
 self.addEventListener("rejectionhandled", function (event) {
-  if (isTestEnv) return
   // Extract the error message and stack trace from the event
   const errorMessage = event.reason?.message;
   const stackTrace = event.reason?.stack;
@@ -2571,10 +2568,9 @@ const convertSpecsFromExistingSpecs = async (path) => {
 };
 
 const saveResults2DataSet = ({ species, included }) => {
-  // STATE.specCount = 0; STATE.totalSpecs = 0;
-  const exportType = ""; //audio';
+  const exportType = 'audio';
   const rootDirectory = DATASET_SAVE_LOCATION;
-  sampleRate = STATE.model === "birdnet" ? 48_000 : 24_000;
+  sampleRate = 48_000; //STATE.model === "birdnet" ? 48_000 : 24_000;
   const height = 256,
     width = 384;
   let t0 = Date.now();

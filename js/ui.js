@@ -1825,7 +1825,6 @@ const defaultConfig = {
   hasNode: false,
   tensorflow: { threads: DIAGNOSTICS["Cores"], batchSize: 8 },
   webgpu: { threads: 1, batchSize: 8 },
-  webgl: { threads: 1, batchSize: 8 },
   audio: {
     gain: 0,
     format: "mp3",
@@ -1902,12 +1901,13 @@ window.onload = async () => {
       .catch(err => {console.error(err); return false});
     STATE.isMember = isMember;
     isMember && config.hasNode || (config.models[config.selectedModel].backend = "tensorflow");
-    if (config.detect.combine) document.getElementById('model-icon').classList.remove('d-none')
-
+    
     const { selectedModel, library, database, detect, filters, audio, 
       limit, locale, speciesThreshold, list, useWeek, UUID, 
       local, debug, fileStartMtime, specDetections } = config;
-    
+
+    if (detect.combine) document.getElementById('model-icon').classList.remove('d-none')
+    debug && document.getElementById('dataset').classList.remove('d-none')
     updateModelOptions();
     worker.postMessage({
       action: "update-state",
@@ -2980,7 +2980,7 @@ const handleBackendChange = (backend) => {
   config.models[config.selectedModel].backend = backend;
   const backendEL = document.getElementById(backend);
   backendEL.checked = true;
-  if (backend === "webgl" || backend === "webgpu") {
+  if (backend === "webgpu") {
     DOM.threadSlider.max = 3;
     // SNRSlider.disabled = true;
     // config.filters.SNR = 0;
@@ -3198,42 +3198,132 @@ gotoForm.addEventListener("submit", gotoTime);
  */
 const training = new bootstrap.Modal(document.getElementById("training-modal"));
 const showTraining = () => {
-    // Restore training settings:
-    const {datasetLocation, cacheLocation, customModel, settings} = config.training;
-    document.getElementById("dataset-location").value = datasetLocation;
-    document.getElementById("dataset-cache-location").value = cacheLocation;
-    document.getElementById("model-location").value = customModel.location;
-    document.getElementById(customModel.type).checked = true;
-    document.getElementById('hidden-units').value = settings.hidden;
-    document.getElementById('lr').value = settings.lr;
-    document.getElementById('epochs').value = settings.epochs;
-    document.getElementById('label-smoothing').value = settings.labelSmoothing;
-    document.getElementById('decay').checked = settings.decay;
-    // Only allow class weights if not using focal loss
-    const weights = document.getElementById('weights');
-    weights.checked = settings.useWeights;
-    weights.disabled = settings.useFocal;
-    document.getElementById('focal').checked = settings.useFocal;
-    document.getElementById('mixup').checked = settings.mixup;
-    // Only allow roll if 'tensorflow' backend (GPU backends leak memory)
-    const allowRoll = config.models[config.selectedModel].backend === 'tensorflow';
-    allowRoll || (config.training.settings.useRoll = false);
-    const roll = document.getElementById('roll');
-    roll.checked = allowRoll && settings.useRoll;
-    roll.disabled = !allowRoll;
-    document.getElementById('use-noise').checked = settings.useNoise;
-    document.getElementById('dropout').value = settings.dropout;
-    dropout.disabled = !config.training.settings.hidden;
-    document.getElementById('useCache').checked = settings.useCache;
-    document.getElementById('validation-split').value = settings.validation;
+  const i18 = i18n.get(i18n.Training);
+  const trainingTitle = document.getElementById("training-modal-label");
+  trainingTitle.textContent = i18["training-modal-label"];
+  // Restore training settings:
+  const {datasetLocation, cacheLocation, customModel, settings} = config.training;
+  const datasetLocationInput = document.getElementById("dataset-location");
+  datasetLocationInput.value = datasetLocation;
+  const datasetLocationLabel = document.getElementById('dataset-location-select');
+  datasetLocationLabel.textContent = i18["dataset-location-select"];
+  datasetLocationInput.setAttribute("placeholder", i18["dataset-placeholder"]);
+  const cacheLocationInput = document.getElementById("dataset-cache-location");
+  cacheLocationInput.value = cacheLocation;
+  const cacheLocationLabel = document.getElementById('dataset-cache-location-select');
+  cacheLocationLabel.textContent = i18["dataset-cache-location-select"];
+  cacheLocationInput.setAttribute("placeholder", i18["cache-placeholder"]);
+  const modelLocationInput = document.getElementById("model-location");
+  modelLocationInput.value = customModel.location;
+  const modelLocationLabel = document.getElementById('model-location-select');
+  modelLocationLabel.textContent = i18["model-location-select"];
+  modelLocationInput.setAttribute("placeholder", i18["model-placeholder"]);
+  document.getElementById(customModel.type).checked = true;
+  const replace = document.querySelector('label[for="replace"]');
+  replace.textContent = i18["replace"];
+  const append = document.querySelector('label[for="append"]');
+  append.textContent = i18["append"];
+
+  document.getElementById('training-parameters-title').textContent = i18["training-parameters-title"];
+  document.getElementById('augmentations-title').textContent = i18["augmentations-title"];
+  document.getElementById('classifier-title').textContent = i18["classifier-title"];
+
+
+  const hiddenUnitsInput = document.getElementById('hidden-units');
+  hiddenUnitsInput.value = settings.hidden;
+  const hidden = document.querySelector('label[for="hidden-units"]');
+  hidden.textContent = i18["hidden-units"];
+  const dropout = document.getElementById('dropout');
+  const dropoutLabel = document.querySelector('label[for="dropout"]');
+  dropoutLabel.textContent = i18["dropout"];
+  dropout.value = settings.dropout;
+  dropout.disabled = !config.training.settings.hidden;
+  const lr = document.getElementById('lr');
+  lr.value = settings.lr;
+  const lrLabel = document.querySelector('label[for="lr"]');
+  lrLabel.textContent = i18["lr"];
+  const epochs = document.getElementById('epochs');
+  epochs.value = settings.epochs;
+  const epochsLabel = document.querySelector('label[for="epochs"]');
+  epochsLabel.textContent = i18["epochs"];
+  const labelSmoothing = document.getElementById('label-smoothing');
+  labelSmoothing.value = settings.labelSmoothing;
+  const labelSmoothingLabel = document.querySelector('label[for="label-smoothing"]');
+  labelSmoothingLabel.textContent = i18["label-smoothing"];
+  const decay = document.getElementById('decay');
+  decay.checked = settings.decay;
+  const decayLabel = document.querySelector('label[for="decay"]');
+  decayLabel.textContent = i18["decay"];
+  // Only allow class weights if not using focal loss
+  const weights = document.getElementById('weights');
+  weights.checked = settings.useWeights;
+  weights.disabled = settings.useFocal;
+  const weightsLabel = document.querySelector('label[for="weights"]');
+  weightsLabel.textContent = i18["weights"];
+  document.getElementById('focal').checked = settings.useFocal;
+  const focalLabel = document.querySelector('label[for="focal"]');
+  focalLabel.textContent = i18["focal"];
+  document.getElementById('mixup').checked = settings.mixup;
+  const mixupLabel = document.querySelector('label[for="mixup"]');
+  mixupLabel.textContent = i18["mixup"];
+  // Only allow roll if 'tensorflow' backend (GPU backends leak memory)
+  const allowRoll = config.models[config.selectedModel].backend === 'tensorflow';
+  allowRoll || (config.training.settings.useRoll = false);
+  const roll = document.getElementById('roll');
+  roll.checked = allowRoll && settings.useRoll;
+  roll.disabled = !allowRoll;
+  const rollLabel = document.querySelector('label[for="roll"]');
+  rollLabel.textContent = i18["roll"];
+  document.getElementById('use-noise').checked = settings.useNoise;
+  const useNoiseLabel = document.querySelector('label[for="use-noise"]');
+  useNoiseLabel.textContent = i18["use-noise"];
+  document.getElementById('useCache').checked = settings.useCache;
+  const useCacheLabel = document.querySelector('label[for="useCache"]');
+  useCacheLabel.textContent = i18["useCache"];
+  document.getElementById('validation-split').value = settings.validation;
+  const validationSplitLabel = document.querySelector('label[for="validation-split"]');
+  validationSplitLabel.textContent = i18["validation-split"];
+
+  document.getElementById('train').textContent = i18["train"];
+  document.getElementById('training-dismiss').textContent = i18["training-dismiss"];
+
+
   training.show();
 }
 
 const importModal = new bootstrap.Modal(document.getElementById("import-modal"));
-const showImport = () => importModal.show();
+const showImport = () => {
+  const i18 = i18n.get(i18n.ManageModels);
+  const importTitle = document.getElementById("import-modal-label");
+  importTitle.textContent = i18["import-model-label"];
+  const modelName = document.getElementById("model-name-text");
+  modelName.textContent = i18["model-name-text"];
+  const modelNameInput = document.getElementById("model-name");
+  modelNameInput.value = "";
+  modelNameInput.setAttribute("placeholder", i18["model-name-placeholder"]);
+  const modelFile = document.getElementById("import-location-select");
+  modelFile.textContent = i18["import-location-select"];
+  const importLocation = document.getElementById("import-location");
+  importLocation.setAttribute("placeholder", i18["model-location-placeholder"]);
+  const importBtn = document.getElementById("import");
+  importBtn.textContent = i18["import"];
+
+  importModal.show();
+}
 
 const expungeModal = new bootstrap.Modal(document.getElementById("expunge-modal"));
-const showExpunge = () => expungeModal.show();
+const showExpunge = () => {
+  const i18 = i18n.get(i18n.ManageModels);
+  const expungeTitle = document.getElementById("expunge-modal-label");
+  expungeTitle.textContent = i18["expunge-modal-label"];
+  const expungeModel = document.getElementById("expunge-model");
+  expungeModel.textContent = i18["expunge-model"];
+  const expungeWarning = document.getElementById("expunge-warning");
+  expungeWarning.textContent = i18["expunge-warning"];
+  const expungeBtn = document.getElementById("expunge");
+  expungeBtn.textContent = i18["expunge"];
+  expungeModal.show();
+}
 /**
  * Handles initialization tasks after the audio model is ready.
  *
@@ -5361,7 +5451,7 @@ async function handleUIClicks(e) {
       (async () => await populateHelpModal("ebird", i18n.Help.eBird[locale]))();
       break;
     }
-    case "training": {
+    case "trainingHelp": {
       (async () => await populateHelpModal("training", i18n.Help.training[locale]))();
       break;
     }
@@ -5850,7 +5940,6 @@ document.addEventListener("change", async function (e) {
         case "roll": {config.training.settings.useRoll = element.checked; break}
         // --- Backends
         case "tensorflow":
-        case "webgl":
         case "webgpu": { handleBackendChange(target); break }
         case "species-frequency-threshold": {
           if (isNaN(element.value) || element.value === "") {
