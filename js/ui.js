@@ -142,7 +142,7 @@ const GLOBAL_ACTIONS = {
         threads: config[config.models[config.selectedModel].backend].threads,
         list: config.list,
       });
-      STATE.training && DOM.trainNav.classList.remove('disabled');
+      STATE.training && document.getElementById('train').classList.remove('disabled')
       PREDICTING = false; STATE.training = false;
       disableSettingsDuringAnalysis(false);
       const summarySpecies = DOM.summaryTable.querySelectorAll(".cname");
@@ -2192,7 +2192,7 @@ const setUpWorkerMessaging = () => {
           if (args.complete) {
             STATE.training = false;
             disableSettingsDuringAnalysis(false)
-            DOM.trainNav.classList.remove('disabled');
+            document.getElementById('train').classList.remove('disabled')
           }
           if (args.model) {
             expungeModal.hide();
@@ -5337,7 +5337,7 @@ async function handleUIClicks(e) {
           break;
         }
       }
-      DOM.trainNav.classList.add('disabled')
+      document.getElementById('train').classList.add('disabled')
       training.hide();
       displayProgress({percent: 0}, 'Starting...')
       disableSettingsDuringAnalysis(true)
