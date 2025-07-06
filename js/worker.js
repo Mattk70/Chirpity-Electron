@@ -3319,8 +3319,8 @@ const parsePredictions = async (response) => {
         let confidence = Math.round(confidenceArray[j] * 1000);
         if (confidence < loopConfidence) break;
         const species = speciesIDArray[j]
-        let speciesID = STATE.speciesMap.get(modelID).get(species);
-        updateUI = selection || !included.length || included.includes(species);
+        const speciesID = species + 1; //STATE.speciesMap.get(modelID).get(species);
+        updateUI = selection || !included.length || included.includes(speciesID);
         if (updateUI) {
           let end;
           if (selection) {
@@ -3328,7 +3328,7 @@ const parsePredictions = async (response) => {
               (selection.end - selection.start) / 1000;
             end = key + duration;
           } else { end = key + 3; }
-          const [sname, cname] = STATE.allLabelsMap.get(species+1).split('_') // Much faster!!
+          const [sname, cname] = STATE.allLabels[species].split('_') //STATE.allLabelsMap.get(speciesID).split('_') // Much faster!!
           const result = {
             timestamp: timestamp,
             position: key,
