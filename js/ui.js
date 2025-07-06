@@ -5337,7 +5337,9 @@ async function handleUIClicks(e) {
           break;
         }
       }
-      document.getElementById('train').classList.add('disabled')
+      const trainBtn = document.getElementById('train');
+      trainBtn.classList.add('disabled');
+      trainBtn.blur();
       training.hide();
       displayProgress({percent: 0}, 'Starting...')
       disableSettingsDuringAnalysis(true)

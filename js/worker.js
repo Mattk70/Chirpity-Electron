@@ -190,7 +190,7 @@ const setupFfmpegCommand = async ({
     .audioChannels(channels);
   // Add filters if provided (no additional filters for bats)
 
-  if (STATE.model.includes('bats')){
+  if (STATE.model.includes('bats') && sampleRate){
     const {bitrate} = await getAudioMetadata(file);
     if (bitrate <= 48000) console.warn(file, 'has bitrate', bitrate)
     const rate = Math.floor(bitrate/10)
@@ -3295,10 +3295,7 @@ const parsePredictions = async (response) => {
   }
   DEBUG && console.log("worker being used:", response.worker);
   const [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
-//   speciesIDBatch.forEach((_, i) => {
-//   speciesIDBatch[i] = [1, 1, 1, 1, 1];
-// });
-  const {db, modelID, selection, detect} = STATE;
+  const {modelID, selection, detect} = STATE;
 
   if (!selection)
     await generateInsertQuery(keysArray, speciesIDBatch, confidenceBatch, file, modelID).catch((error) =>

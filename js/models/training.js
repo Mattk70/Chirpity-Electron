@@ -328,7 +328,7 @@ function getFilesWithLabelsAndWeights(rootDir) {
     if (stats.isDirectory()) {
       const audioFiles = fs.readdirSync(folderPath);
       for (const file of audioFiles) {
-        if (file.startsWith('.')) continue;
+        if (file.startsWith('.') || !file.endsWith('.wav')) continue;
         const label = folder;
         files.push({
           filePath: path.join(folderPath, file),
@@ -344,6 +344,8 @@ function getFilesWithLabelsAndWeights(rootDir) {
   const total = files.length;
   const classWeights = {};
   for (const [label, count] of Object.entries(labelCounts)) {
+    console.log(`Label "${label}" has ${count} samples`);
+    // Normalize by total samples and number of classes
     classWeights[label] = total / (Object.keys(labelCounts).length * count);
   }
 
@@ -542,7 +544,7 @@ async function getAudioMetadata(filePath) {
 }
 
 async function decodeAudio(filePath) {
-  const duration = await getAudioMetadata(filePath);
+  const {duration, bitrate:rate} = await getAudioMetadata(filePath);
   const seekTime = duration > 3 ? (duration / 2) - 1.5 : 0;
 
   return new Promise((resolve, reject) => {
@@ -552,6 +554,8 @@ async function decodeAudio(filePath) {
       .format('s16le')
       .audioCodec('pcm_s16le')
       .audioChannels(1)
+      .audioFilters([`asetrate=${rate}`])
+      .audioFilters(['atempo=10'])
       .audioFrequency(48000)
       .seekInput(seekTime)
       .duration(3.0)
