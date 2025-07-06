@@ -3328,7 +3328,7 @@ const parsePredictions = async (response) => {
               (selection.end - selection.start) / 1000;
             end = key + duration;
           } else { end = key + 3; }
-          const [sname, cname] = STATE.allLabelsMap.get(speciesID).split('_') // Much faster!!
+          const [sname, cname] = STATE.allLabelsMap.get(species+1).split('_') // Much faster!!
           const result = {
             timestamp: timestamp,
             position: key,
