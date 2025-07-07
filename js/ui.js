@@ -3266,12 +3266,8 @@ const showTraining = () => {
   document.getElementById('mixup').checked = settings.mixup;
   const mixupLabel = document.querySelector('label[for="mixup"]');
   mixupLabel.textContent = i18["mixup"];
-  // Only allow roll if 'tensorflow' backend (GPU backends leak memory)
-  const allowRoll = config.models[config.selectedModel].backend === 'tensorflow';
-  allowRoll || (config.training.settings.useRoll = false);
   const roll = document.getElementById('roll');
-  roll.checked = allowRoll && settings.useRoll;
-  roll.disabled = !allowRoll;
+  roll.checked = settings.useRoll;
   const rollLabel = document.querySelector('label[for="roll"]');
   rollLabel.textContent = i18["roll"];
   document.getElementById('use-noise').checked = settings.useNoise;

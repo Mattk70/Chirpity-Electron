@@ -26,7 +26,6 @@ async function trainModel({
   dataset, cache:cacheFolder, modelLocation:saveLocation, modelType, 
   useCache, validation, mixup, decay, 
   useRoll, useWeights, useFocal, useNoise, labelSmoothing}) {
-  
   installConsoleTracking(() => Model.UUID, "Training");
   const {files:allFiles, classWeights} = getFilesWithLabelsAndWeights(dataset);
   if (!allFiles.length){
@@ -119,7 +118,7 @@ async function trainModel({
     await writeBinaryGzipDataset(noiseFiles, noiseBin, labelToIndex, postMessage, "Preparing noise data");
 
   }
-  let noise_ds = tf.data.generator(() => readBinaryGzipDataset(noiseBin, labels)).repeat().shuffle(50);
+  let noise_ds = tf.data.generator(() => readBinaryGzipDataset(noiseBin, labels, useRoll)).repeat().shuffle(50).prefetch(3);
 
   if (!cacheRecords || !fs.existsSync(trainBin)) {
         // Check same number of classes in train and val data
@@ -230,9 +229,9 @@ async function trainModel({
 
   let train_ds = mixup 
     ? createMixupStreamDataset({ds:trainBin, labels, useRoll})
-    : createStreamDataset(trainBin, labels).map(x => useRoll ? roll(x) : x);
+    : createStreamDataset(trainBin, labels, useRoll);
 
-  const augmented_ds = useNoise ?  tf.data.generator(() => blendedGenerator(train_ds, noise_ds)).batch(batchSize).prefetch(3) : train_ds.batch(batchSize) ;
+  const augmented_ds = useNoise ?  tf.data.generator(() => blendedGenerator(train_ds, noise_ds)).batch(batchSize).prefetch(3) : train_ds.batch(batchSize).prefetch(3) ;
 
   if (DEBUG){
     augmented_ds.take(1).forEachAsync(({ xs, ys }) => {
@@ -246,7 +245,7 @@ async function trainModel({
   }
   let val_ds;
   if (validation){
-    val_ds = tf.data.generator(() => readBinaryGzipDataset(valBin, labels)).batch(batchSize).prefetch(1);
+    val_ds = tf.data.generator(() => readBinaryGzipDataset(valBin, labels)).batch(batchSize).prefetch(3);
   }
   // Train on your new data
   // Assume `xTrain` and `yTrain` are your input and combined output labels
@@ -463,11 +462,10 @@ function stratifiedSplit(allFiles, valRatio = 0.2) {
   return { trainFiles, valFiles };
 }
 
-async function* readBinaryGzipDataset(gzippedPath, labels) {
+async function* readBinaryGzipDataset(gzippedPath, labels, roll = false) {
   const RECORD_SIZE = 576002; // 144000 * 4 + 2 bytes for the label
   const gunzip = zlib.createGunzip();
   const stream = fs.createReadStream(gzippedPath).pipe(gunzip);
-
   let leftover = Buffer.alloc(0);
 
   for await (const chunk of stream) {
@@ -481,12 +479,12 @@ async function* readBinaryGzipDataset(gzippedPath, labels) {
       const labelIndex = record.readUInt16LE(RECORD_SIZE - 2);
 
       const audio = new Float32Array(audioBuf.buffer, audioBuf.byteOffset, 144000);
-
+      const rolledAudio = roll ? rollFloat32(audio) : audio; // Roll the audio if required
       if (labelIndex >= labels.length) {
         console.error(`Invalid label index: ${labelIndex}. Max allowed: ${labels.length - 1}`);
       }
       yield {
-        xs: tf.tensor1d(audio),
+        xs: tf.tensor1d(rolledAudio),
         ys: tf.oneHot(labelIndex, labels.length)
       };
 
@@ -554,8 +552,6 @@ async function decodeAudio(filePath) {
       .format('s16le')
       .audioCodec('pcm_s16le')
       .audioChannels(1)
-      .audioFilters([`asetrate=${rate}`])
-      .audioFilters(['atempo=10'])
       .audioFrequency(48000)
       .seekInput(seekTime)
       .duration(3.0)
@@ -592,6 +588,22 @@ function roll(x) {
     xs.dispose();
     return { xs: rolled, ys };
   })
+}
+
+function rollFloat32(audio) {
+  const size = audio.length;
+  const maxShift = Math.floor(size / 4);
+  const shift = Math.floor(Math.random() * maxShift);
+
+  if (shift === 0) {
+    console.log('No shift applied');
+    return audio; // or audio.slice() if you want to avoid referencing the same buffer
+  }
+
+  const rolled = new Float32Array(size);
+  rolled.set(audio.subarray(size - shift), 0);        // Copy end chunk to start
+  rolled.set(audio.subarray(0, size - shift), shift); // Copy start chunk to rest
+  return rolled;
 }
 
 /**
@@ -632,13 +644,13 @@ function categoricalFocalCrossEntropy({
   });
 }
 
-const createStreamDataset = (ds, labels) => 
-  tf.data.generator(() => readBinaryGzipDataset(ds, labels));
+const createStreamDataset = (ds, labels, useRoll) => 
+  tf.data.generator(() => readBinaryGzipDataset(ds, labels, useRoll));
 
 function createMixupStreamDataset({useRoll, ds, labels, alpha = 0.4}) {
     return tf.tidy(() => {
-      const ds1 = createStreamDataset(ds, labels).map(x => useRoll ? roll(x) : x).shuffle(100, 42);
-      const ds2 = createStreamDataset(ds, labels).map(x => useRoll ? roll(x) : x).shuffle(100, 1337); // new generator instance
+      const ds1 = createStreamDataset(ds, labels, useRoll).shuffle(100, 42);
+      const ds2 = createStreamDataset(ds, labels, useRoll).shuffle(100, 1337); // new generator instance
       return tf.data
         .zip({ a: ds1, b: ds2 })
         .map(({ a, b }) => {
