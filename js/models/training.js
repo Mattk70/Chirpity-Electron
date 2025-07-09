@@ -60,7 +60,11 @@ async function trainModel({
     if (dropout) {
       x = tf.layers.dropout({ rate: dropout, name: 'CUSTOM_DROP_1' }).apply(x);
     }
-    x = tf.layers.dense({ units: hidden, activation: 'relu', name: 'CUSTOM_HIDDEN' }).apply(x);
+    x = tf.layers.dense({ 
+      units: hidden,
+      activation: 'mish',
+      kernelInitializer: 'heNormal',
+      name: 'CUSTOM_HIDDEN' }).apply(x);
     if (dropout) {
       x = tf.layers.dropout({ rate: dropout, name: 'CUSTOM_DROP_2' }).apply(x);
     }
@@ -118,7 +122,7 @@ async function trainModel({
     await writeBinaryGzipDataset(noiseFiles, noiseBin, labelToIndex, postMessage, "Preparing noise data");
 
   }
-  let noise_ds = tf.data.generator(() => readBinaryGzipDataset(noiseBin, labels, useRoll)).repeat().shuffle(50).prefetch(3);
+  let noise_ds = tf.data.generator(() => readBinaryGzipDataset(noiseBin, labels, useRoll)).repeat();
 
   if (!cacheRecords || !fs.existsSync(trainBin)) {
         // Check same number of classes in train and val data
@@ -212,7 +216,7 @@ async function trainModel({
         `<tr><td>Validation Loss</td><td>${val_loss.toFixed(4)}</td></tr>
         <tr><td>Validation Accuracy</td><td>${(val_categoricalAccuracy*100).toFixed(2)}%</td></tr>`)
       notice += "</table>";
-      console.log(`Tensors in memory: ${tf.memory().numTensors}`);
+      DEBUG && console.log(`Tensors in memory`, tf.memory());
       postMessage({ message: "training-results", notice });
     },
     onTrainEnd: (logs) => {
@@ -231,7 +235,9 @@ async function trainModel({
     ? createMixupStreamDataset({ds:trainBin, labels, useRoll})
     : createStreamDataset(trainBin, labels, useRoll);
 
-  const augmented_ds = useNoise ?  tf.data.generator(() => blendedGenerator(train_ds, noise_ds)).batch(batchSize).prefetch(3) : train_ds.batch(batchSize).prefetch(3) ;
+  const augmented_ds = useNoise 
+    ? tf.data.generator(() => blendedGenerator(train_ds, noise_ds)).batch(batchSize).prefetch(3)
+    : train_ds.batch(batchSize).prefetch(3);
 
   if (DEBUG){
     augmented_ds.take(1).forEachAsync(({ xs, ys }) => {
@@ -245,7 +251,7 @@ async function trainModel({
   }
   let val_ds;
   if (validation){
-    val_ds = tf.data.generator(() => readBinaryGzipDataset(valBin, labels)).batch(batchSize).prefetch(3);
+    val_ds = tf.data.generator(() => readBinaryGzipDataset(valBin, labels)).batch(batchSize);
   }
   // Train on your new data
   // Assume `xTrain` and `yTrain` are your input and combined output labels
@@ -575,28 +581,12 @@ async function decodeAudio(filePath) {
 }
 
 
-function roll(x) {
-  return tf.tidy(() => {
-    const {xs, ys} = x;
-    const size = xs.shape[0];
-    const maxShift = size / 4;
-    const shift = Math.floor(Math.random() * maxShift); // random int from 0 to maxShift
-  if (shift === 0) {console.log('No shift applied'); return x;}
-    const [left, right] = tf.split(xs, [size - shift, shift], 0);
-    const rolled = tf.concat([right, left], 0)
-    left.dispose(), right.dispose();
-    xs.dispose();
-    return { xs: rolled, ys };
-  })
-}
 
 function rollFloat32(audio) {
   const size = audio.length;
-  const maxShift = Math.floor(size / 4);
-  const shift = Math.floor(Math.random() * maxShift);
-
-  if (shift === 0) {
-    console.log('No shift applied');
+  const shift = Math.round(Math.random() * size);
+  if (shift === 0 | shift === size) {
+    DEBUG && console.log('No shift applied');
     return audio; // or audio.slice() if you want to avoid referencing the same buffer
   }
 
