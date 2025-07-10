@@ -642,8 +642,8 @@ const createStreamDataset = (ds, labels, useRoll) =>
   tf.data.generator(() => readBinaryGzipDataset(ds, labels, useRoll));
 
 function createMixupStreamDataset({useRoll, ds, labels, alpha = 0.4}) {
-      const ds1 = createStreamDataset(ds, labels, useRoll).shuffle(100, 42);
-      const ds2 = createStreamDataset(ds, labels, useRoll).shuffle(100, 1337); // new generator instance
+      const ds1 = createStreamDataset(ds, labels, useRoll).shuffle(100, 42).prefetch(1);
+      const ds2 = createStreamDataset(ds, labels, useRoll).shuffle(100, 1337).prefetch(1);
       return tf.data
         .zip({ a: ds1, b: ds2 })
         .map(({ a, b }) => {
@@ -657,14 +657,22 @@ function createMixupStreamDataset({useRoll, ds, labels, alpha = 0.4}) {
 }
 
 async function* blendedGenerator(train_ds, noise_ds) {
-  const trainIt = await train_ds.iterator();
-  const noiseIt = await noise_ds.iterator();
+  const [trainIt, noiseIt] = await Promise.all([
+    train_ds.iterator(),
+    noise_ds.iterator()
+  ]);
 
   while (true) {
-    const clean = await trainIt.next();
-    if (clean.done) break;
+    const [clean, noise] = await Promise.all([
+      trainIt.next(),
+      noiseIt.next()
+    ]);
+    if (clean.done) {
+      noise.value.xs.dispose();
+      noise.value.ys.dispose();
+      break;
+    }
     
-    const noise = await noiseIt.next();
     const result = tf.tidy(() => {
       const blendedXs = clean.value.xs
         .add(noise.value.xs)
