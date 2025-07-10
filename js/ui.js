@@ -143,7 +143,7 @@ const GLOBAL_ACTIONS = {
         list: config.list,
       });
       STATE.training && document.getElementById('train').classList.remove('disabled')
-      PREDICTING = false; STATE.training = false;
+      PREDICTING = false; STATE.training = false; powerSave(false);
       disableSettingsDuringAnalysis(false);
       const summarySpecies = DOM.summaryTable.querySelectorAll(".cname");
       summarySpecies.forEach(row => row.classList.replace("not-allowed","pointer"));
@@ -1228,6 +1228,7 @@ function postAnalyseMessage(args) {
     const filesInScope = args.filesInScope;
     if (!args.fromDB){
       PREDICTING = true;
+      powerSave(config.powerSaveBlocker);
       disableSettingsDuringAnalysis(true);
     }
     if (!selection) {
@@ -2050,7 +2051,6 @@ window.onload = async () => {
     // Block powersave?
     document.getElementById("power-save-block").checked =
       config.powerSaveBlocker;
-    powerSave(config.powerSaveBlocker);
 
     contextAwareIconDisplay();
     DOM.debugMode.checked = config.debug;
@@ -2191,6 +2191,7 @@ const setUpWorkerMessaging = () => {
           }
           if (args.complete) {
             STATE.training = false;
+            powerSave(false);
             disableSettingsDuringAnalysis(false)
             document.getElementById('train').classList.remove('disabled')
           }
@@ -3604,7 +3605,7 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
  * @param {*} [options.select] - Value used to determine the row to activate via a helper function.
  */
 function onResultsComplete({ active = undefined, select = undefined } = {}) {
-  PREDICTING = false;
+  PREDICTING = false; powerSave(false);
   disableSettingsDuringAnalysis(false);
   DOM.resultTable.replaceWith(resultsBuffer.cloneNode(true));
   resultsBuffer.textContent = "";
@@ -3691,7 +3692,7 @@ function getRowFromStart(table, start) {
  * @param {boolean} options.quiet - If true, suppresses diagnostic tracking and notifications.
  */
 function onAnalysisComplete({ quiet }) {
-  PREDICTING = false;
+  PREDICTING = false; powerSave(false);
   disableSettingsDuringAnalysis(false);
   STATE.analysisDone = true;
   STATE.diskHasRecords && utils.enableMenuItem(["explore", "charts"]);
@@ -5342,6 +5343,7 @@ async function handleUIClicks(e) {
       const backend = config.models[config.selectedModel].backend;
       const batchSize = config[backend].batchSize;
       STATE.training = true;
+      powerSave(config.powerSaveBlocker);
       worker.postMessage({
         action: "train-model", 
         dataset, cache, modelLocation, modelType, batchSize, ...settings});
@@ -5708,17 +5710,15 @@ async function handleUIClicks(e) {
       break;
     }
     case "model-icon": {
-      if (PREDICTING) {
-        // generateToast({ message: "changeListBlocked", type: "warning" });
-        return;
+      if (!PREDICTING) {
+        const el = DOM.modelToUse;
+        const numberOfOptions = el.options.length;
+        const currentListIndex = el.selectedIndex;
+        const next = currentListIndex === numberOfOptions - 1 ? 0 : currentListIndex + 1;
+        config.selectedModel = el.options[next].value;
+        el.selectedIndex = next;
+        handleModelChange(config.selectedModel)
       }
-      const el = DOM.modelToUse;
-      const numberOfOptions = el.options.length;
-      const currentListIndex = el.selectedIndex;
-      const next = currentListIndex === numberOfOptions - 1 ? 0 : currentListIndex + 1;
-      config.selectedModel = el.options[next].value;
-      el.selectedIndex = next;
-      handleModelChange(config.selectedModel)
       break;
     }
     case "nocmigMode": {
@@ -6073,7 +6073,6 @@ document.addEventListener("change", async function (e) {
         }
         case "power-save-block": {
           config.powerSaveBlocker = element.checked;
-          powerSave(config.powerSaveBlocker);
           break;
         }
         case "species-week": {
