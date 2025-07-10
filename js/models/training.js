@@ -642,7 +642,6 @@ const createStreamDataset = (ds, labels, useRoll) =>
   tf.data.generator(() => readBinaryGzipDataset(ds, labels, useRoll));
 
 function createMixupStreamDataset({useRoll, ds, labels, alpha = 0.4}) {
-    return tf.tidy(() => {
       const ds1 = createStreamDataset(ds, labels, useRoll).shuffle(100, 42);
       const ds2 = createStreamDataset(ds, labels, useRoll).shuffle(100, 1337); // new generator instance
       return tf.data
@@ -655,7 +654,6 @@ function createMixupStreamDataset({useRoll, ds, labels, alpha = 0.4}) {
           const yMixed = tf.add(tf.mul(lambda, a.ys), tf.mul(oneMinusLambda, b.ys));
           return { xs: xMixed, ys: yMixed };
         })
-    })
 }
 
 async function* blendedGenerator(train_ds, noise_ds) {
