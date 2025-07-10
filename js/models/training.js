@@ -216,7 +216,7 @@ async function trainModel({
         `<tr><td>Validation Loss</td><td>${val_loss.toFixed(4)}</td></tr>
         <tr><td>Validation Accuracy</td><td>${(val_categoricalAccuracy*100).toFixed(2)}%</td></tr>`)
       notice += "</table>";
-      DEBUG && console.log(`Tensors in memory`, tf.memory());
+      console.log(`Tensors in memory`, tf.memory());
       postMessage({ message: "training-results", notice });
     },
     onTrainEnd: (logs) => {
@@ -240,21 +240,17 @@ async function trainModel({
     : train_ds.batch(batchSize).prefetch(3);
 
   if (DEBUG){
-    augmented_ds.take(1).forEachAsync(({ xs, ys }) => {
-      return tf.tidy(() =>{
-        const first = tf.slice(xs, [0, 0], [1, xs.shape[1]]);
-        Model.getSpectrogram({buffer:first, filepath:saveLocation,file:`sample.png`})
-        xs.print();
-        ys.print();
-      })
+    augmented_ds.take(1).forEachAsync(async ({ xs, ys }) => {
+      const first = tf.slice(xs, [0, 0], [1, xs.shape[1]]);
+      await Model.getSpectrogram({buffer:first, filepath:saveLocation,file:`sample.png`})
+      first.dispose();
     });
   }
   let val_ds;
   if (validation){
     val_ds = tf.data.generator(() => readBinaryGzipDataset(valBin, labels)).batch(batchSize);
   }
-  // Train on your new data
-  // Assume `xTrain` and `yTrain` are your input and combined output labels
+  // Train the model
   const history = await transferModel.fitDataset(augmented_ds, {
     batchSize,
     epochs,
@@ -262,6 +258,15 @@ async function trainModel({
     callbacks: [earlyStopping, events],
     verbosity: 0
   });
+  // const profile = await tf.profile(async () => {
+  //   await transferModel.fitDataset(augmented_ds, {epochs: 1, callbacks: [earlyStopping, events], batchesPerEpoch: 1});
+  // });
+  
+// const sortedKernels = profile.kernels
+//   .slice() // copy the array to avoid modifying original
+//   .sort((a, b) => b.kernelTimeMs - a.kernelTimeMs);
+//   console.log(sortedKernels);
+//   return;
   await modelSavePromise;
 
   let notice ='', type = '';
@@ -473,8 +478,8 @@ async function* readBinaryGzipDataset(gzippedPath, labels, roll = false) {
   const gunzip = zlib.createGunzip();
   const stream = fs.createReadStream(gzippedPath).pipe(gunzip);
   let leftover = Buffer.alloc(0);
-
   for await (const chunk of stream) {
+  const t0 = performance.now();
     const data = Buffer.concat([leftover, chunk]);
     const total = Math.floor(data.length / RECORD_SIZE) * RECORD_SIZE;
     let offset = 0;
@@ -493,7 +498,6 @@ async function* readBinaryGzipDataset(gzippedPath, labels, roll = false) {
         xs: tf.tensor1d(rolledAudio),
         ys: tf.oneHot(labelIndex, labels.length)
       };
-
       offset += RECORD_SIZE;
     }
 
@@ -660,25 +664,23 @@ async function* blendedGenerator(train_ds, noise_ds) {
 
   while (true) {
     const clean = await trainIt.next();
-    const noise = await noiseIt.next();
     if (clean.done) break;
-
+    
+    const noise = await noiseIt.next();
     const result = tf.tidy(() => {
       const blendedXs = clean.value.xs
         .add(noise.value.xs)
         .div(2);
       return {
         xs: blendedXs,
-        ys: clean.value.ys,
+        ys: clean.value.ys
       };
     });
 
     clean.value.xs.dispose();
     noise.value.xs.dispose();
     noise.value.ys.dispose();
-
     yield result;
-
   }
 }
 

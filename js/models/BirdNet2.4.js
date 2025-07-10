@@ -179,7 +179,7 @@ class BirdNETModel extends BaseModel {
     DEBUG && console.log("predictCunk end", tf.memory());
     return [result, file, fileStart];
   }
-  getSpectrogram(data){
+  async getSpectrogram(data){
     const {buffer, file:specFile, filepath} = data;
     if (buffer.length < myModel.chunkLength) {
       return;
@@ -202,12 +202,13 @@ class BirdNETModel extends BaseModel {
       return tf.concat([spec, zeroChannel], -1);
     });
     const [batch, height, width, channels] = image.shape;
+    const imageSynced = await image.data();
     const response = {
       message: "spectrogram",
       width: width,
       height: height,
       channels,
-      image: image.dataSync(),
+      image: imageSynced,
       file: specFile,
       filepath,
     };
