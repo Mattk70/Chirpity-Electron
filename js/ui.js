@@ -2051,7 +2051,6 @@ window.onload = async () => {
     // Block powersave?
     document.getElementById("power-save-block").checked =
       config.powerSaveBlocker;
-    powerSave(config.powerSaveBlocker);
 
     contextAwareIconDisplay();
     DOM.debugMode.checked = config.debug;
