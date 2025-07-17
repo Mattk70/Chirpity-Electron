@@ -648,7 +648,7 @@ function categoricalFocalCrossEntropy({
 }
 
 const createStreamDataset = (ds, labels, useRoll) => 
-  tf.data.generator(() => readBinaryGzipDataset(ds, labels, useRoll));
+  tf.data.generator(() => readBinaryGzipDataset(ds, labels, useRoll)).prefetch(3);
 
 function createMixupStreamDataset({useRoll, ds, labels, alpha = 0.4}) {
       const ds1 = createStreamDataset(ds, labels, useRoll).shuffle(100, 42).prefetch(1);
@@ -683,9 +683,12 @@ async function* blendedGenerator(train_ds, noise_ds) {
     }
     
     const result = tf.tidy(() => {
-      const blendedXs = clean.value.xs
-        .add(noise.value.xs)
-        .div(2);
+      // Random weight between 0.5 and 1.0 for the clean signal
+      const cleanWeight = Math.random() * 0.5 + 0.5;
+      const noiseWeight = 1.0 - cleanWeight;
+
+      const blendedXs = clean.value.xs.mul(cleanWeight).add(noise.value.xs.mul(noiseWeight));
+
       return {
         xs: blendedXs,
         ys: clean.value.ys
