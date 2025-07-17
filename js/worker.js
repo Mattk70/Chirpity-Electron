@@ -183,20 +183,27 @@ const setupFfmpegCommand = async ({
   audioBitrate = null,
   outputOptions = [],
 }) => {
-  let duration = end - start;
-  STATE.model.includes('slow') && (start/=10);
   const command = ffmpeg("file:" + file)
     .format(format)
     .audioChannels(channels);
   // Add filters if provided (no additional filters for bats)
-
-  if (STATE.model.includes('bats') && sampleRate){
-    const {bitrate} = await getAudioMetadata(file);
-    if (bitrate <= 48000) console.warn(file, 'has bitrate', bitrate)
-    const rate = Math.floor(bitrate/10)
-    command.audioFilters([`asetrate=${rate}`]);
-    STATE.model.includes('slow') || command.audioFilters(['atempo=10'])
+const training = true
+  if (STATE.model.includes('bats')) { 
+    // No sample rate is supplied when exporting audio.
+    // If the sampleRate is 256k, Wavesurfer will handle the tempo/pitch conversion
+    if ((training || sampleRate) && sampleRate !== 256000) {
+      const {bitrate} = await getAudioMetadata(file);
+      if (bitrate <= 48000) console.warn(file, 'has bitrate', bitrate)
+      const rate = Math.floor(bitrate/10)
+      command.audioFilters([`asetrate=${rate}`]);
+      STATE.model.includes('slow') || command.audioFilters(['atempo=10'])//2,atempo=2,atempo=2,atempo=1.25'])
+    }
+    if (!training && !sampleRate && STATE.model.includes('slow')) {
+      // We'll export native so we need to reset the duration
+      end = (end - start) / 10 + start;
+    }
   } 
+  let duration = end - start;
   
   additionalFilters.forEach(filter => command.audioFilters(filter))
     
@@ -1489,7 +1496,7 @@ async function onAnalyse({
 
   filesBeingProcessed = [...FILE_QUEUE];
   for (let i = 0; i < NUM_WORKERS; i++) {
-    processNextFile({ start: start, end: end, worker: i });
+    processNextFile({ start, end, worker: i });
   }
 }
 
@@ -1549,8 +1556,7 @@ const getDuration = async (src) => {
         );
       }
       audio.remove();
-      const finalDuration = STATE.model.includes('slow') ? duration*10 : duration;
-      resolve(finalDuration);
+      resolve(duration);
     });
     audio.addEventListener("error", (error) => {
       generateAlert({
@@ -1726,7 +1732,6 @@ async function loadAudioFile({
     if (file) {
       fetchAudioBuffer({ file, start, end })
         .then(([audio, start]) => {
-          // let audioArray = getMonoChannelData(audio);
           UI.postMessage(
             {
               event: "worker-loaded-audio",
@@ -1737,9 +1742,7 @@ async function loadAudioFile({
               file: file,
               position: position,
               contents: audio,
-              // fileRegion: region,
               play: play,
-              // goToRegion,
               metadata: METADATA[file].metadata,
             },
             [audio.buffer]
@@ -1927,7 +1930,7 @@ const setMetadata = async ({ file, source_file = file }) => {
           METADATA[file].lon = roundedFloat(lon);
         }
         guanoTimestamp = Date.parse(guano.Timestamp);
-        METADATA[file].fileStart = guanoTimestamp;
+        if (guanoTimestamp) METADATA[file].fileStart = guanoTimestamp;
       }
       if (Object.keys(wavMetadata).length > 0) {
         METADATA[file].metadata = JSON.stringify(wavMetadata);
@@ -2033,12 +2036,20 @@ const getPredictBuffers = async ({ file = "", start = 0, end = undefined }) => {
   }
   // Ensure max and min are within range
   start = Math.max(0, start);
-  end = Math.min(METADATA[file].duration, end);
-  if (start > METADATA[file].duration) {
+  
+  let fileDuration = METADATA[file].duration;
+  const slow = STATE.model.includes("slow");
+  if (slow) {
+    end = (end - start) * 10 + start;
+  } else {
+    end = Math.min(fileDuration, end);
+
+  }
+  if (start > fileDuration) {
     return;
   }
-
   const duration = end - start;
+  
   const EPSILON = 0.025;
   batchChunksToSend[file] = Math.ceil((duration - EPSILON) / (BATCH_SIZE * WINDOW_SIZE));
   predictionsReceived[file] = 0;
@@ -2098,11 +2109,13 @@ async function processAudio(
   return new Promise((resolve, reject) => {
     // Many compressed files start with a small section of silence due to encoder padding, which affects predictions
     // To compensate, we move the start back a small amount, and slice the data to remove the silence
-    let remainingTrim,
-      adjustment = 0.05;
-    if (start > adjustment) {
-      remainingTrim = sampleRate * 2 * adjustment;
-      start -= adjustment;
+    let remainingTrim;
+    if (!(file.endsWith(".wav") || file.endsWith(".flac"))) {
+      const adjustment = 0.05;
+      if (start >= adjustment) {
+        remainingTrim = sampleRate * 2 * adjustment;
+        start -= adjustment;
+      }
     }
     let currentIndex = 0,
       duration = 0,
@@ -2284,13 +2297,13 @@ function prepareWavForModel(audio, file, end, chunkStart) {
  * @param {number} [params.end] - The end time in seconds.
  * @returns {Promise<Buffer[]>} - The audio buffer and start time.
  */
-const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sampleRate = 24_000 }) => {
+const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sampleRate }) => {
   if (!fs.existsSync(file)) {
     const result = await getWorkingFile(file);
     if (!result) throw new Error(`Cannot locate ${file}`);
     file = result;
   }
-  
+  if (!sampleRate) sampleRate = STATE.model.includes("slow") ? 256_000 : 24_000;
   await setMetadata({ file });
   const fileDuration = METADATA[file].duration// (STATE.model === 'bats') ? METADATA[file].duration*10 : METADATA[file].duration;
   end ??= fileDuration;
@@ -2378,10 +2391,10 @@ function setAudioFilters() {
     filters.push(
       {
         filter: 'sinc',
-        options: { ...options, att: 40 },
+        options: { ...options, att: 80 },
         outputs: 'ir'
       },
-      { filter: 'afir', inputs: ['a', 'ir'], outputs: 'out' }
+      { filter: 'afir', inputs: ['a', 'ir'] }
     );
   }
   // Low shelf filter
@@ -2443,7 +2456,7 @@ async function feedChunksToModel(channelData, chunkStart, file, end, worker) {
 async function doPrediction({
   file = "",
   start = 0,
-  end = METADATA[file].duration,
+  end = null,
 }) {
   await getPredictBuffers({ file: file, start: start, end: end }).catch(
     (error) => console.warn(error)
@@ -2798,6 +2811,10 @@ const bufferToAudio = async ({
     const found = await getWorkingFile(file);
     if (!found) return;
     file = found;
+  }
+  const slow = STATE.model.includes("slow");
+  if (slow) {
+    end = (end - start) * 10 + start;
   }
   let padding = STATE.audio.padding;
   let fade = STATE.audio.fade;
@@ -3185,6 +3202,7 @@ const insertDurations = async (file, id) => {
 const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, file, modelID) => {
   const db = STATE.db;
   const { fileStart, metadata, duration } = METADATA[file];
+  const predictionLength = STATE.model.includes("slow") ? 0.3 : 3;
   let fileID;
   await dbMutex.lock();
   try {
@@ -3261,7 +3279,7 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
         if (!speciesID) continue; // Skip unknown species
 
         insertPlaceholders.push("(?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        insertValues.push(timestamp, key, fileID, speciesID, modelID, confidence, key + 3, isDaylight, 0);
+        insertValues.push(timestamp, key, fileID, speciesID, modelID, confidence, key + predictionLength, isDaylight, 0);
       }
     }
 
@@ -3287,6 +3305,7 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
 
 const parsePredictions = async (response) => {
   const file = response.file;
+  const predictionLength = STATE.model.includes("slow") ? 0.3 : 3;
   AUDIO_BACKLOG--;
   const latestResult = response.result;
   if (!latestResult.length) {
@@ -3324,7 +3343,7 @@ const parsePredictions = async (response) => {
             const duration =
               (selection.end - selection.start) / 1000;
             end = key + duration;
-          } else { end = key + 3; }
+          } else { end = key + predictionLength }
           const [sname, cname] = STATE.allLabels[species].split('_') //STATE.allLabelsMap.get(speciesID).split('_') // Much faster!!
           const result = {
             timestamp: timestamp,
@@ -3334,6 +3353,7 @@ const parsePredictions = async (response) => {
             cname: cname,
             sname: sname,
             score: confidence,
+            model: STATE.model,
           };
           sendResult(++index, result, false);
           if (index > 499) {
@@ -3512,8 +3532,6 @@ async function processNextFile({
     });
     if (found) {
       delete STATE.notFound[file];
-      if (end) {
-      }
       let boundaries = [];
       if (start === undefined)
         boundaries = await setStartEnd(file).catch((error) =>
@@ -3759,9 +3777,9 @@ const getResults = async ({
           const dateString = dateArray
             .slice(0, 5)
             .join(" ")
-            .replaceAll(":", "_") + '.' + date.getMilliseconds();
+            .replaceAll(":", "_");
 
-          const filename = `${r.cname.replaceAll('/', '-')}_${dateString}.${STATE.audio.format}`;
+          const filename = `${r.cname.replaceAll('/', '-')}_${dateString}.${count}.${STATE.audio.format}`;
           DEBUG &&
             console.log(
               `Exporting from ${r.file}, position ${r.position}, into folder ${path}`
@@ -3992,7 +4010,7 @@ async function exportData(result, filename, format, headers) {
 }
 
 const sendResult = (index, result, fromDBQuery) => {
-  const model = ['birdnet', 'nocmig', 'chirpity', 'bats'].includes(STATE.model) ? STATE.model : 'custom';
+  const model = ['birdnet', 'nocmig', 'chirpity', 'bats'].includes(result.model) ? result.model : 'custom';
   result.model = model;
   // if (!fromDBQuery) {result.model = model, result.modelID = STATE.modelID};
   UI.postMessage({
@@ -4155,7 +4173,7 @@ const getValidSpecies = async (file) => {
   for (const speciesName of STATE.allLabelsMap.values()) {
     const [cname, sname] = speciesName.split("_").reverse();
     if (cname.includes("ackground") || cname.includes("Unknown")) continue; // skip background and unknown species
-    if (included.includes(i)) {
+    if (!included.length || included.includes(i)) {
       includedSpecies.push({cname, sname});
     } else {
       excludedSpecies.push({cname, sname});

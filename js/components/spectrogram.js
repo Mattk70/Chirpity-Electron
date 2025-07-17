@@ -160,6 +160,9 @@ export class ChirpityWS {
 
   initWavesurfer = (container, plugins) => {
     const config = this.getConfig();
+    config.selectedModel.includes("slow") 
+      ? (this.sampleRate = 256000) 
+      : (this.sampleRate = 24000);
     return WaveSurfer.create({
         container,
         // make waveform transparent
@@ -210,8 +213,13 @@ export class ChirpityWS {
       // this is set to signal whether it was playing up to that point
       if (position < 0.998) wavesurfer.isPaused = true;
     });
-
-    wavesurfer.on("play", () => (wavesurfer.isPaused = false));
+    
+    wavesurfer.on("play", () => {
+      if (config.selectedModel.includes('slow')) {
+        wavesurfer.setPlaybackRate(0.1, false);
+      }
+      wavesurfer.isPaused = false;
+    });
 
     wavesurfer.on("finish", () => {
       const {windowLength, windowOffsetSecs, currentFile, currentFileDuration, openFiles} = STATE;
@@ -299,12 +307,15 @@ export class ChirpityWS {
     // set colormap
     const colorMap = this.createColormap();
     const {windowFn:windowFunc, alpha} = config.customColormap;
-    const {frequencyMin: frequencyMin, frequencyMax: frequencyMax} = config.audio;
+    const scaleFactor = config.selectedModel.includes('slow') ? 10 : 1;
+    const {frequencyMin, frequencyMax} = config.audio;
+    const scaledFrequencyMin = frequencyMin * scaleFactor;
+    const scaledFrequencyMax = frequencyMax * scaleFactor;
     return Spectrogram.create({
       container,
       windowFunc,
-      frequencyMin,
-      frequencyMax,
+      frequencyMin: scaledFrequencyMin,
+      frequencyMax: scaledFrequencyMax,
       // noverlap: 128, Auto (the default) seems fine
       // gainDB: 50, Adjusts spec brightness without increasing volume
       labels: config.specLabels,

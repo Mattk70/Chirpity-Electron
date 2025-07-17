@@ -338,7 +338,7 @@ function getFilesWithLabelsAndWeights(rootDir) {
     if (stats.isDirectory()) {
       const audioFiles = fs.readdirSync(folderPath);
       for (const file of audioFiles) {
-        if (file.startsWith('.') || !file.endsWith('.wav')) continue;
+        if (file.startsWith('.') || file.endsWith('.bin')) continue;
         const label = folder;
         files.push({
           filePath: path.join(folderPath, file),
@@ -588,15 +588,24 @@ async function decodeAudio(filePath) {
 
 function rollFloat32(audio) {
   const size = audio.length;
-  const shift = Math.round(Math.random() * size);
-  if (shift === 0 | shift === size) {
+  const maxShift = Math.floor(size/4);
+  let shift = Math.round(Math.random() * maxShift);
+  if (shift === 0) {
     DEBUG && console.log('No shift applied');
     return audio; // or audio.slice() if you want to avoid referencing the same buffer
   }
 
   const rolled = new Float32Array(size);
-  rolled.set(audio.subarray(size - shift), 0);        // Copy end chunk to start
-  rolled.set(audio.subarray(0, size - shift), shift); // Copy start chunk to rest
+  if (shift > 0) {
+    // Roll right
+    rolled.set(audio.subarray(size - shift, size), 0);       // End to start
+    rolled.set(audio.subarray(0, size - shift), shift);      // Start to shifted position
+  } else {
+    // Roll left
+    shift = -shift;
+    rolled.set(audio.subarray(shift, size), 0);              // Middle to end
+    rolled.set(audio.subarray(0, shift), size - shift);      // Start to end
+  }
   return rolled;
 }
 

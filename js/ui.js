@@ -1228,7 +1228,7 @@ function postAnalyseMessage(args) {
     const filesInScope = args.filesInScope;
     if (!args.fromDB){
       PREDICTING = true;
-      powerSave(config.powerSaveBlocker);
+      powerSave(true);
       disableSettingsDuringAnalysis(true);
     }
     if (!selection) {
@@ -1622,7 +1622,7 @@ async function resultClick(e) {
     // 1. clicked and dragged, 2 no detections in file row 3. clicked a header
     return;
   }
-  const [file, start, end, _, label] = row.getAttribute("name").split("|");
+  const {file, start, end, cname:label} = unpackNameAttr(row);
 
   if (activeRow) activeRow.classList.remove("table-active");
   row.classList.add("table-active");
@@ -1652,7 +1652,7 @@ async function resultClick(e) {
 function setActiveRow(start) {
   const rows = DOM.resultTable.querySelectorAll("tr");
   for (const r of rows) {
-    const [file, rowStart, _end, _, _label] = r.getAttribute("name").split("|");
+    const {file, start:rowStart} = unpackNameAttr(r);
 
     if (file === STATE.currentFile && Number(rowStart) === start) {
       // Clear the active row if there's one
@@ -1841,7 +1841,6 @@ const defaultConfig = {
   limit: 500,
   debug: false,
   VERSION: VERSION,
-  powerSaveBlocker: false,
   fileStartMtime: false,
   keyAssignment: {},
 };
@@ -2048,9 +2047,6 @@ window.onload = async () => {
     document.getElementById("iucn").checked = config.detect.iucn;
     document.getElementById("iucn-scope").selected = config.detect.iucnScope;
     handleModelChange(config.selectedModel, false)
-    // Block powersave?
-    document.getElementById("power-save-block").checked =
-      config.powerSaveBlocker;
 
     contextAwareIconDisplay();
     DOM.debugMode.checked = config.debug;
@@ -2959,7 +2955,7 @@ const loadModel = () => {
     backend,
     modelPath
   });
-
+  flushSpec()
 };
 
 const handleModelChange = (model, reload = true) => {
@@ -3670,11 +3666,7 @@ function onResultsComplete({ active = undefined, select = undefined } = {}) {
 function getRowFromStart(table, start) {
   for (var i = 0; i < table.rows.length; i++) {
     const row = table.rows[i];
-    // Get the value of the name attribute and split it on '|'
-    // Start time is the second value in the name string
-    const nameAttr = row.getAttribute("name");
-    // no nameAttr for start civil twilight row
-    const startTime = nameAttr ? nameAttr.split("|")[1] : 0;
+    const startTime = unpackNameAttr(row).start || 0;
 
     // Check if the second value matches the 'select' variable
     if (parseFloat(startTime) === start) {
@@ -5343,7 +5335,7 @@ async function handleUIClicks(e) {
       const backend = config.models[config.selectedModel].backend;
       const batchSize = config[backend].batchSize;
       STATE.training = true;
-      powerSave(config.powerSaveBlocker);
+      powerSave(true);
       worker.postMessage({
         action: "train-model", 
         dataset, cache, modelLocation, modelType, batchSize, ...settings});
@@ -5501,6 +5493,7 @@ async function handleUIClicks(e) {
     }
     // XC compare play/pause
     case "playComparison": {
+      config.selectedModel.includes("bats") && ws.setPlaybackRate(0.1, false);
       ws.playPause();
       break;
     }
@@ -5651,12 +5644,16 @@ async function handleUIClicks(e) {
     }
     case "reset-spec-frequency": {
       config.audio.frequencyMin = 0;
-      config.audio.frequencyMax = 11950;
+      // config.audio.frequencyMax = config.selectedModel.includes('slow') ? 120000 : 11950;
       const {frequencyMax, frequencyMin} = config.audio;
       DOM.fromInput.value = frequencyMin;
+      // DOM.fromInput.max = frequencyMax;
       DOM.fromSlider.value = frequencyMin;
+      // DOM.fromSlider.max = frequencyMax;
+      // DOM.toInput.max = frequencyMax;
       DOM.toInput.value = frequencyMax;
       DOM.toSlider.value = frequencyMax;
+      // DOM.toSlider.max = frequencyMax;
       fillSlider(
         DOM.fromInput,
         DOM.toInput,
@@ -6071,10 +6068,6 @@ document.addEventListener("change", async function (e) {
           config.audio.notification = element.checked;
           break;
         }
-        case "power-save-block": {
-          config.powerSaveBlocker = element.checked;
-          break;
-        }
         case "species-week": {
           config.useWeek = element.checked;
 
@@ -6342,7 +6335,7 @@ document.addEventListener("change", async function (e) {
 const flushSpec = async () =>{
   DOM.waveElement.replaceChildren();
   DOM.spectrogram.replaceChildren();
-  spec.wavesurfer.destroy();
+  spec.wavesurfer?.destroy();
   spec = new ChirpityWS(
     "#waveform",
     () => STATE, // Returns the current state
@@ -6350,8 +6343,10 @@ const flushSpec = async () =>{
     { postBufferUpdate, trackEvent, setActiveRegion, onStateUpdate: state.update, updatePrefs },
     GLOBAL_ACTIONS
   );
-  await spec.initAll({audio:STATE.currentBuffer, height: STATE.specMaxHeight})
-  spec.reload()
+  if (STATE.currentBuffer){
+    await spec.initAll({audio:STATE.currentBuffer, height: STATE.specMaxHeight})
+    spec.reload()
+  }
 }
 
 /**
@@ -6794,7 +6789,9 @@ const insertManualRecord = ( {
  */
 function checkFilteredFrequency() {
   const resetButton = document.getElementById("reset-spec-frequency");
-  if (config.audio.frequencyMin > 0 || config.audio.frequencyMax < 11950) {
+  // const defaultMax = config.selectedModel.includes('slow') ? 120000 : 11950;
+  const defaultMax = 11950;
+  if (config.audio.frequencyMin > 0 || config.audio.frequencyMax < defaultMax) {
     document.getElementById("frequency-range").classList.add("text-warning");
     resetButton.classList.add("btn-warning");
     resetButton.classList.remove("btn-secondary", "disabled");
@@ -7129,7 +7126,7 @@ function generateToast({
 }
 
 async function getXCComparisons() {
-  let [, , , sname, cname] = activeRow.getAttribute("name").split("|");
+  let {sname, cname} = unpackNameAttr(activeRow);
   cname.includes("call)") ? "call" : "";
   let XCcache;
   try {
@@ -7148,20 +7145,21 @@ async function getXCComparisons() {
     DOM.loading.querySelector("#loadingText").textContent =
       "Loading Xeno-Canto data...";
     DOM.loading.classList.remove("d-none");
+    const bats = config.selectedModel.includes('bats');
     const quality = "+q:%22>C%22";
-    const defaultLength = "+len:3-15";
+    const defaultLength = bats ? "+len:0.5-10" : "+len:3-15";
     sname = XCtaxon[sname] || sname;
-    
-    const types = ["nocturnal flight call", "flight call", "call", "song"];
-    const filteredLists = {
-      "nocturnal flight call": [],
-      "flight call": [],
-      call: [],
-      song: []
-    };
+    const types = bats
+      ? ["distress call", "feeding buzz", "social call", "ecolocation", "song"]
+      : ["nocturnal flight call", "flight call", "call", "song"];
+    const filteredLists = {}
+    types.forEach((type) => {
+      filteredLists[type] = []; // Initialize each type with an empty array
+    });
     
     // Create an array of promises—one for each call type
     const fetchRequests = types.map((type) => {
+      type = type.replaceAll(" ", "%20"); // Replace spaces with underscores for the API query
       // Use a different length parameter for "song"
       const typeLength = type === "song" ? "+len:10-30" : defaultLength;
       const query = `https://xeno-canto.org/api/3/recordings?key=d5e2d2775c7f2b2fb8325ffacc41b9e6aa94679e&query=sp:"${sname}"${quality}${typeLength}+type:"${type}"`;
@@ -7223,12 +7221,7 @@ async function getXCComparisons() {
       });
       
       // If all lists are empty, notify the user
-      if (
-        !filteredLists["nocturnal flight call"].length &&
-        !filteredLists["flight call"].length &&
-        !filteredLists.call.length &&
-        !filteredLists.song.length
-      ) {
+      if (Object.values(filteredLists).every(arr => arr.length === 0)) {
         generateToast({ type: "warning", message: "noComparisons" });
         return;
       }
@@ -7410,8 +7403,10 @@ function renderComparisons(lists, cname) {
 import WaveSurfer from "../node_modules/wavesurfer.js/dist/wavesurfer.esm.js";
 import Spectrogram from "../node_modules/wavesurfer.js/dist/plugins/spectrogram.esm.js";
 let ws;
+
 const createCompareWS = (mediaContainer) => {
   if (ws) ws.destroy();
+  const bats = config.selectedModel.includes('bats');
   ws = WaveSurfer.create({
     container: mediaContainer,
     backgroundColor: "rgba(0,0,0,0)",
@@ -7423,7 +7418,7 @@ const createCompareWS = (mediaContainer) => {
     cursorWidth: 2,
     height: 256,
     minPxPerSec: 195,
-    sampleRate: 24000,
+    sampleRate: bats ? 256000 : 24000,
   });
   // set colormap
   const colors = spec.createColormap(config);
@@ -7432,7 +7427,7 @@ const createCompareWS = (mediaContainer) => {
       Spectrogram.create({
         windowFunc: "hann",
         frequencyMin: 0,
-        frequencyMax: 12_000,
+        frequencyMax: bats ? 120_000 : 12_000,
         labels: true,
         fftSamples: 256,
         height: 256,

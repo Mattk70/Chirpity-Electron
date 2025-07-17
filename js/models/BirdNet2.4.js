@@ -307,7 +307,7 @@ normalise_audio_batch = (tensor) => {
         .reverse(-1)
         .transpose([0, 2, 1])
         .expandDims(-1);
-      if (myModel.version.includes('masked')){
+      if (myModel.version.includes('bats')){
         const [batchSize, height, width, channels] = interim.shape;
         let zeros;
         if (this.fmax === 15000){

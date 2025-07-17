@@ -130,8 +130,8 @@ class BaseModel {
     ]).catch((err) => console.log("Data transfer error:", err));
     indices.dispose();
     values.dispose();
-
-    keys = keys.map((key) => (key / this.config.sampleRate).toFixed(3));
+    const scaleFactor = this.version.includes('slow') ? 10 : 1;
+    keys = keys.map((key) => (key / (this.config.sampleRate * scaleFactor)).toFixed(3));
     return [keys, topIndices, topValues];
   }
 
