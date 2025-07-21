@@ -187,7 +187,7 @@ const setupFfmpegCommand = async ({
     .format(format)
     .audioChannels(channels);
   // Add filters if provided (no additional filters for bats)
-const training = true
+  const training = false
   if (STATE.model.includes('bats')) { 
     // No sample rate is supplied when exporting audio.
     // If the sampleRate is 256k, Wavesurfer will handle the tempo/pitch conversion
@@ -196,9 +196,9 @@ const training = true
       if (bitrate <= 48000) console.warn(file, 'has bitrate', bitrate)
       const rate = Math.floor(bitrate/10)
       command.audioFilters([`asetrate=${rate}`]);
-      STATE.model.includes('slow') || command.audioFilters(['atempo=10'])//2,atempo=2,atempo=2,atempo=1.25'])
+      // STATE.model.includes('slow') || command.audioFilters(['atempo=10'])//2,atempo=2,atempo=2,atempo=1.25'])
     }
-    if (!training && !sampleRate && STATE.model.includes('slow')) {
+    if (!training && !sampleRate){// && STATE.model.includes('slow')) {
       // We'll export native so we need to reset the duration
       end = (end - start) / 10 + start;
     }
@@ -1071,7 +1071,8 @@ async function getSpeciesSQLAsync(){
 }
 
 const prepSummaryStatement = async () => {
-  const {mode, explore, labelFilters, detect, locationID, topRankin, summarySortOrder} = STATE;
+  const {mode, explore, labelFilters, detect, locationID, summarySortOrder} = STATE;
+  const topRankin = detect.topRankin;
   const range = mode === "explore" ? explore.range : undefined;
   const params = [detect.confidence];
   const partition = detect.merge ? '' : ', r.modelID';
@@ -1116,7 +1117,8 @@ const getTotal = async ({
   offset = undefined,
 } = {}) => {
   
-  const {db, mode, explore, filteredOffset, globalOffset, labelFilters, detect, locationID, topRankin} = STATE;
+  const {db, mode, explore, filteredOffset, globalOffset, labelFilters, detect, locationID} = STATE;
+  const topRankin = detect.topRankin;
   let params = [];
   const range = mode === "explore" ? explore.range : undefined;
   const partition = detect.merge ? '' : ', r.modelID';
@@ -2038,7 +2040,7 @@ const getPredictBuffers = async ({ file = "", start = 0, end = undefined }) => {
   start = Math.max(0, start);
   
   let fileDuration = METADATA[file].duration;
-  const slow = STATE.model.includes("slow");
+  const slow = STATE.model.includes("bats");
   if (slow) {
     end = (end - start) * 10 + start;
   } else {
@@ -2303,7 +2305,7 @@ const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sam
     if (!result) throw new Error(`Cannot locate ${file}`);
     file = result;
   }
-  if (!sampleRate) sampleRate = STATE.model.includes("slow") ? 256_000 : 24_000;
+  if (!sampleRate) sampleRate = STATE.model.includes("bats") ? 256_000 : 24_000;
   await setMetadata({ file });
   const fileDuration = METADATA[file].duration// (STATE.model === 'bats') ? METADATA[file].duration*10 : METADATA[file].duration;
   end ??= fileDuration;
@@ -3014,7 +3016,7 @@ async function batchInsertRecords(cname, label, files, originalCname) {
     originalCname,
     true,
     undefined,
-    STATE.topRankin
+    STATE.detect.topRankin
   );
   const records = await STATE.db.allAsync(sql, ...params);
   let count = 0;
@@ -3202,7 +3204,7 @@ const insertDurations = async (file, id) => {
 const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, file, modelID) => {
   const db = STATE.db;
   const { fileStart, metadata, duration } = METADATA[file];
-  const predictionLength = STATE.model.includes("slow") ? 0.3 : 3;
+  const predictionLength = STATE.model.includes("bats") ? 0.3 : 3;
   let fileID;
   await dbMutex.lock();
   try {
@@ -3305,7 +3307,7 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
 
 const parsePredictions = async (response) => {
   const file = response.file;
-  const predictionLength = STATE.model.includes("slow") ? 0.3 : 3;
+  const predictionLength = STATE.model.includes("bats") ? 0.3 : 3;
   AUDIO_BACKLOG--;
   const latestResult = response.result;
   if (!latestResult.length) {
@@ -3728,7 +3730,7 @@ const getResults = async ({
   species = undefined,
   limit = STATE.limit,
   offset = undefined,
-  topRankin = STATE.topRankin,
+  topRankin = STATE.detect.topRankin,
   path = undefined,
   format = undefined,
   active = undefined,
@@ -3836,7 +3838,7 @@ const getResults = async ({
         });
       }
     }
-    (STATE.selection && topRankin !== STATE.topRankin) ||
+    (STATE.selection && topRankin !== STATE.detect.topRankin) ||
       UI.postMessage({
         event: "database-results-complete",
         active,
@@ -4010,7 +4012,11 @@ async function exportData(result, filename, format, headers) {
 }
 
 const sendResult = (index, result, fromDBQuery) => {
-  const model = ['birdnet', 'nocmig', 'chirpity', 'bats'].includes(result.model) ? result.model : 'custom';
+  const model = result.model.includes('bats')  
+  ? 'bats'
+  : ['birdnet', 'nocmig', 'chirpity'].includes(result.model)
+    ? result.model
+    : 'custom';
   result.model = model;
   // if (!fromDBQuery) {result.model = model, result.modelID = STATE.modelID};
   UI.postMessage({

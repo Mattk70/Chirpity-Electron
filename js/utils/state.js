@@ -49,6 +49,7 @@ export class WorkerState {
       combine: true, // Whether to split or merge results from different models
       iucn: false,
       iucnScope: "Global",
+      topRankin: 1
     }),
     (this.chart = {
       range: { start: undefined, end: undefined },
@@ -65,7 +66,6 @@ export class WorkerState {
     (this.modelPath = undefined),
     (this.modelID = null),
     (this.predictionCount = 0),
-    (this.topRankin = 1),
     (this.lat = undefined),
     (this.lon = undefined),
     (this.place = undefined),

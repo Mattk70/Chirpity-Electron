@@ -73,7 +73,6 @@ window.addEventListener("rejectionhandled", function (event) {
 });
 
 
-
 const state = new State();
 let STATE = state.state;
 
@@ -524,6 +523,8 @@ function loadAudioFileSync({ filePath = "", preserveResults = false }) {
   worker.postMessage({
     action: "file-load-request",
     file: filePath,
+    start: 0,
+    end: STATE.windowLength,
     preserveResults: preserveResults,
     position: 0,
     list: config.list, // list and warmup are passed to enable abort if file loaded during predictions
@@ -885,7 +886,8 @@ const FILE_LOCATION_MAP = {};
 const onFileLocationID = ({ file, id }) => (FILE_LOCATION_MAP[file] = id);
 const locationModalDiv = document.getElementById("locationModal");
 locationModalDiv.addEventListener("shown.bs.modal", () => {
-  placeMap("customLocationMap");
+  const locationID = FILE_LOCATION_MAP[STATE.currentFile]
+  placeMap("customLocationMap", locationID);
 });
 //document
 
@@ -923,7 +925,7 @@ const showLocation = async (fromSelect) => {
       (customPlaceEl.value = config.location);
   }
   // make sure the  map is initialised
-  if (!map) placeMap("customLocationMap");
+  if (!map) placeMap("customLocationMap", id);
   updateMap(latEl.value, lonEl.value);
 };
 
@@ -1118,6 +1120,9 @@ async function onOpenFiles(args) {
 
   // Store the file list and Load First audio file
   STATE.openFiles = filePaths;
+  // Reset the buffer playhead and zoom:
+  STATE.windowOffsetSecs = 0;
+  STATE.windowLength = config.selectedModel.includes('bats') ? 5 : 20;
   // Reset the mode
   STATE.mode = 'analyse';
   // If spec was destroyed (when visiting charts) this code allows it to work again
@@ -1143,9 +1148,6 @@ async function onOpenFiles(args) {
   // Clear unsaved records warning
   window.electron.unsavedRecords(false);
   document.getElementById("unsaved-icon").classList.add("d-none");
-  // Reset the buffer playhead and zoom:
-  STATE.windowOffsetSecs = 0;
-  STATE.windowLength = 20;
 }
 
 /**
@@ -1678,9 +1680,10 @@ const loadResultRegion = ({
   start = parseFloat(start);
   end = parseFloat(end);
   // ensure region doesn't spread across the whole window
-  if (STATE.windowLength <= 3.5) STATE.windowLength = 6;
+  STATE.windowLength = Math.max(STATE.windowLength, (end-start) * 1.5);
   let windowOffsetSecs = STATE.windowOffsetSecs;
-  windowOffsetSecs = Math.max(0, start - STATE.windowLength / 2 + 1.5);
+  const middle = (end-start)/2
+  windowOffsetSecs = Math.max(0, start - STATE.windowLength / 2 + middle);
   STATE.activeRegion = {
     start: Math.max(start - windowOffsetSecs, 0),
     end: end - windowOffsetSecs,
@@ -1811,6 +1814,7 @@ const defaultConfig = {
     confidence: 45,
     iucn: true,
     iucnScope: "Global",
+    topRankin: 1
   },
   filters: {
     active: false,
@@ -1897,18 +1901,21 @@ window.onload = async () => {
     //fill in defaults - after updates add new items
     utils.syncConfig(config, defaultConfig);
 
+
     const isMember = await membershipCheck()
       .catch(err => {console.error(err); return false});
     STATE.isMember = isMember;
-    isMember && config.hasNode || (config.models[config.selectedModel].backend = "tensorflow");
+
     
     const { selectedModel, library, database, detect, filters, audio, 
       limit, locale, speciesThreshold, list, useWeek, UUID, 
       local, debug, fileStartMtime, specDetections } = config;
+    isMember && config.hasNode || (config.models[selectedModel].backend = "tensorflow");
 
     if (detect.combine) document.getElementById('model-icon').classList.remove('d-none')
     debug && document.getElementById('dataset').classList.remove('d-none')
-    updateModelOptions();
+    isMember && updateModelOptions();
+
     worker.postMessage({
       action: "update-state",
       model: selectedModel,
@@ -2051,6 +2058,7 @@ window.onload = async () => {
     contextAwareIconDisplay();
     DOM.debugMode.checked = config.debug;
     showThreshold(config.detect.confidence);
+    showTopRankin(config.detect.topRankin)
 
     // Filters
     document.getElementById("HP-threshold").textContent = formatHz(config.filters.highPassFrequency);
@@ -2234,17 +2242,20 @@ const setUpWorkerMessaging = () => {
         case "labels": {
           // Remove duplicate labels
           LABELS = [...new Set(args.labels)];
-          /* Code below to retrieve Red list data
-                        for (let i = 0;i< LABELS.length; i++){
-                            const label = LABELS[i];
-                            let  sname = label.split('_')[0];
-                            sname = IUCNtaxonomy[sname]
-                            if (sname && ! STATE.IUCNcache[sname]) { 
-                                await getIUCNStatus(sname)
-                                await new Promise(resolve => setTimeout(resolve, 500))
-                            }
-                        }
-                        */
+          // Code below to retrieve Red list data
+          // if (!done){
+          //   done = true;
+          //               for (let i = 0;i< LABELS.length; i++){
+          //                   const label = LABELS[i];
+          //                   let  sname = label.split('_')[0];
+          //                   sname = IUCNtaxonomy[sname] || sname;
+          //                   if (sname && ! STATE.IUCNcache[sname]) { 
+          //                       await getIUCNStatus(sname)
+          //                       await new Promise(resolve => setTimeout(resolve, 500))
+          //                   }
+          //               }
+          //               }
+                        
           break;
         }
         case "label-translation-needed": {
@@ -4823,8 +4834,13 @@ function showThreshold(e) {
   filterPanelRangeInput.value = threshold;
   settingsPanelRangeInput.value = threshold;
 }
-// settingsPanelRangeInput.addEventListener("input", showThreshold);
-// filterPanelRangeInput.addEventListener("input", showThreshold);
+
+function showTopRankin(e) {
+  const threshold = e instanceof Event ? e.target.valueAsNumber : e;
+  const topRankinDisplay = document.getElementById('top-rankin-value')
+  topRankinDisplay.innerHTML = `<b>${threshold}</b>`;
+  document.getElementById('top-rankin').value = threshold;
+}
 
 const handleThresholdChange = (e) => {
   const threshold = e.target.valueAsNumber;
@@ -4948,6 +4964,16 @@ document.addEventListener('input', (e) =>{
     case "confidence":
     case "confidenceValue": {
       showThreshold(e)
+      break;
+    }
+    case "top-rankin": {
+      showTopRankin(e);
+      config.detect.topRankin = el.valueAsNumber;
+      updatePrefs('config.json', config)
+      worker.postMessage({
+        action: "update-state",
+        detect: config.detect,
+      });
       break;
     }
     case "thread-slider": {
@@ -5280,6 +5306,8 @@ async function handleUIClicks(e) {
         if (!files.canceled) {
           const modelFolder = files.filePaths[0];
           document.getElementById("import-location").value = modelFolder;
+          const modelNameInput = document.getElementById("model-name");
+          modelNameInput.value = p.basename(modelFolder);
         }
       })();
       break;
@@ -7527,6 +7555,12 @@ async function membershipCheck() {
     config.detect.merge = false;
     config.library.clips = false;
     config.database.location = "";
+    // Set all backends to 'tensorflow'
+    if (config.hasNode){
+      Object.values(config.models).forEach(model => {
+        model.backend = 'tensorflow';
+      });
+    }
     lockedElements.forEach((el) => {
       el.classList.replace("unlocked", "locked");
 
@@ -7566,6 +7600,9 @@ async function membershipCheck() {
       } else {
         setLocks()
         localStorage.setItem("isMember", false);
+        if (!['birdnet', 'nocmig', 'chirpity'].includes(config.selectedModel)) {
+          config.selectedModel = 'birdnet'      
+        }
       }
 
       console.info(

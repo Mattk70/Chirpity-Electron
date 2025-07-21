@@ -160,9 +160,9 @@ export class ChirpityWS {
 
   initWavesurfer = (container, plugins) => {
     const config = this.getConfig();
-    config.selectedModel.includes("slow") 
-      ? (this.sampleRate = 256000) 
-      : (this.sampleRate = 24000);
+    this.sampleRate = config.selectedModel.includes("bats") 
+      ? 256000
+      : 24000;
     return WaveSurfer.create({
         container,
         // make waveform transparent
@@ -215,7 +215,7 @@ export class ChirpityWS {
     });
     
     wavesurfer.on("play", () => {
-      if (config.selectedModel.includes('slow')) {
+      if (config.selectedModel.includes('bats')) {
         wavesurfer.setPlaybackRate(0.1, false);
       }
       wavesurfer.isPaused = false;
@@ -307,7 +307,7 @@ export class ChirpityWS {
     // set colormap
     const colorMap = this.createColormap();
     const {windowFn:windowFunc, alpha} = config.customColormap;
-    const scaleFactor = config.selectedModel.includes('slow') ? 10 : 1;
+    const scaleFactor = config.selectedModel.includes('bats') ? 10 : 1;
     const {frequencyMin, frequencyMax} = config.audio;
     const scaledFrequencyMin = frequencyMin * scaleFactor;
     const scaledFrequencyMax = frequencyMax * scaleFactor;
@@ -546,6 +546,7 @@ export class ChirpityWS {
   zoom(direction) {
     const wavesurfer = this.wavesurfer;
     const STATE = this.getState();
+    const {selectedModel} = this.getConfig();
     const { fileLoaded, currentFileDuration } = STATE;
     let { windowLength, windowOffsetSecs, activeRegion } = STATE;
     if (fileLoaded) {
@@ -558,7 +559,8 @@ export class ChirpityWS {
       let timeNow = windowOffsetSecs + playedSeconds;
       const oldBufferBegin = windowOffsetSecs;
       if (direction === "In") {
-        if (windowLength < 0.5) return;
+        const minZoom = selectedModel.includes('bats') ? 0.05 : 0.5;
+        if (windowLength < minZoom) return;
         windowLength /= 2;
         windowOffsetSecs += windowLength * position;
       } else {

@@ -20404,6 +20404,181 @@ const s = {
     "Picoides nanus": {
       scopes: [{ scope: "Global", status: "LC", url: "22681060/92891080" }],
     },
+    "Barbastella barbastellus": {
+      scopes: [
+        {scope: "Europe", status: "VU", url: "2553/253986248"},
+        {scope: "Global", status: "NT", url: "2553/22029285"},
+        {scope: "Mediterranean", status: "NT", url: "2553/9452972"}
+      ]
+    }, 
+    "Eptesicus nilssonii": {
+      scopes: [
+        {scope: "Europe", status: "LC", url: "7910/216723133"},
+        {scope: "Global", status: "LC", url: "7910/22116204"},
+        {scope: "Mediterranean", status: "NA", url: "7910/12866693"}
+      ]
+    },
+    "Eptesicus serotinus": {
+      scopes: [
+        {scope: "Europe", status: "LC", url: "85199559/210995249"},
+        {scope: "Global", status: "LC", url: "85199559/195834153"}
+      ]
+    },
+    "Hypsugo savii": {
+      scopes: [
+        {scope: "Europe", status: "LC", url: "44856/216728458"},
+        {scope: "Global", status: "LC", url: "44856/22072380"},
+        {scope: "Mediterranean", status: "LC", url: "44856/10955205"}
+      ]
+    }, 
+    "Miniopterus schreibersii": {
+      scopes: [
+        {scope: "Global", status: "VU", url: "230918147/230918550"},
+        {scope: "Europe", status: "VU", url: "230918147/210998206"}
+      ]
+    }, 
+    "Myotis bechsteinii": {
+      scopes: [
+        {scope: "Europe", status: "VU", url: "14123/254039732"},
+        {scope: "Global", status: "NT", url: "14123/22053752"},
+        {scope: "Mediterranean", status: "NT", url: "14123/4395581"}
+      ]
+    }, 
+    "Myotis blythii": {
+      scopes: [
+        {scope: "Europe", status: "VU", url: "14124/216723705"},
+        {scope: "Global", status: "LC", url: "14124/22053297"},
+        {scope: "Mediterranean", status: "NT", url: "14124/4396797"}
+      ]
+    }, 
+    "Myotis brandtii": {
+      scopes: [
+        {scope: "Europe", status: "LC", url: "85566997/254041716"},
+        {scope: "Global", status: "LC", url: "85566997/195857637"}
+      ]
+    }, 
+    "Myotis capaccinii": {
+      scopes: [
+        {scope: "Europe", status: "VU", url: "14126/216724016"},
+        {scope: "Global", status: "VU", url: "14126/22054131"},
+        {scope: "Mediterranean", status: "VU", url: "14126/4399043"}
+      ]
+    }, 
+    "Myotis dasycneme": {
+      scopes: [
+        {scope: "Europe", status: "VU", url: "14127/254043181"},
+        {scope: "Global", status: "NT", url: "14127/22055164"},
+        {scope: "Mediterranean", status: "NA", url: "14127/4400121"}
+      ]
+    }, 
+    "Myotis daubentonii": {
+      scopes: [
+        {scope: "Europe", status: "LC", url: "85342710/211002396"},
+        {scope: "Global", status: "LC", url: "85342710/195858793"}
+      ]
+    }, 
+    "Myotis emarginatus": {
+      scopes: [
+        {scope: "Europe", status: "LC", url: "14129/216724547"},
+        {scope: "Global", status: "LC", url: "14129/22051191"},
+        {scope: "Mediterranean", status: "LC", url: "14129/4402699"}
+      ]
+    }, 
+    "Myotis myotis": {
+      scopes: [
+        {scope: "Europe", status: "LC", url: "14133/216724842"},
+        {scope: "Global", status: "LC", url: "14133/22051759"},
+        {scope: "Mediterranean", status: "LC", url: "14133/4404171"}
+      ]
+    }, 
+    "Myotis mystacinus": {
+      scopes: [
+        {scope: "Europe", status: "LC", url: "14134/216725110"},
+        {scope: "Global", status: "LC", url: "14134/22052250"},
+        {scope: "Mediterranean", status: "LC", url: "14134/4405369"}
+      ]
+    }, 
+    "Myotis nattereri": {
+      scopes: [
+        {scope: "Global", status: "LC", url: "215492021/211005466"},
+        {scope: "Europe", status: "LC", url: "215492021/211005466"}
+      ]
+    }, 
+    "Nyctalus leisleri": {
+      scopes: [
+        {scope: "Europe", status: "LC", url: "14919/254050331"},
+        {scope: "Global", status: "LC", url: "14919/22016159"},
+        {scope: "Mediterranean", status: "LC", url: "14919/4472787"}
+      ]
+    }, 
+    "Nyctalus noctula": {
+      scopes: [
+        {scope: "Europe", status: "LC", url: "14920/254051349"},
+        {scope: "Global", status: "LC", url: "14920/22015682"},
+        {scope: "Mediterranean", status: "LC", url: "14920/4474122"}
+      ]
+    }, 
+    "Pipistrellus kuhlii": {
+      scopes: [
+        {scope: "Europe", status: "LC", url: "17314/216726231"},
+        {scope: "Global", status: "LC", url: "17314/22132946"},
+        {scope: "Mediterranean", status: "LC", url: "17314/6963742"}
+      ]
+    }, 
+    "Pipistrellus nathusii": {
+      scopes: [
+        {scope: "Europe", status: "LC", url: "17316/216726467"},
+        {scope: "Global", status: "LC", url: "17316/22132621"},
+        {scope: "Mediterranean", status: "LC", url: "17316/6966886"}
+      ]
+    }, 
+    "Pipistrellus pipistrellus": {
+      scopes: [
+        {scope: "Europe", status: "LC", url: "85333513/211012245"},
+        {scope: "Global", status: "LC", url: "85333513/196581936"}
+      ]
+    }, 
+    "Pipistrellus pygmaeus": {
+      scopes: [
+        {scope: "Europe", status: "LC", url: "136649/216729008"},
+        {scope: "Global", status: "LC", url: "136649/21990234"},
+        {scope: "Mediterranean", status: "LC", url: "136649/4322928"}
+      ]
+    }, 
+    "Plecotus auritus": {
+      scopes: [
+        {scope: "Global", status: "LC", url: "85535522/211015413"},
+        {scope: "Europe", status: "LC", url: "85535522/211015413"}
+      ]
+    }, 
+    "Rhinolophus ferrumequinum": {
+      scopes: [
+        {scope: "Europe", status: "LC", url: "19517/216727156"},
+        {scope: "Global", status: "LC", url: "19517/21973253"},
+        {scope: "Mediterranean", status: "NT", url: "19517/8947877"}
+      ]
+    }, 
+    "Rhinolophus hipposideros": {
+      scopes: [
+        {scope: "Europe", status: "LC", url: "19518/216727479"},
+        {scope: "Global", status: "LC", url: "19518/21972794"},
+        {scope: "Mediterranean", status: "NT", url: "19518/8950453"}
+      ]
+    }, 
+    "Tadarida teniotis": {
+      scopes: [
+        {scope: "Europe", status: "LC", url: "21311/216727980"},
+        {scope: "Global", status: "LC", url: "21311/22114995"},
+        {scope: "Mediterranean", status: "LC", url: "21311/9267935"}
+      ]
+    }, 
+    "Vespertilio murinus": {
+      scopes: [
+        {scope: "Europe", status: "LC", url: "22947/254077486"},
+        {scope: "Global", status: "LC", url: "22947/22071456"},
+        {scope: "Mediterranean", status: "NA", url: "22947/9401136"}
+      ]
+    },
   },
   o = {
     "Acanthis cabaret": "Acanthis flammea",

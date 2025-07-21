@@ -56,6 +56,10 @@ body {
   filter: hue-rotate(150deg);
 }
 
+.leaflet-marker-icon-current {
+  filter: hue-rotate(270deg);
+}
+
 .navbar {
   z-index: 5;
 }

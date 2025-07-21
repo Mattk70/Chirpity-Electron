@@ -42,20 +42,18 @@ async function trainModel({
   // Cache in the dataset folder if not selected
   cacheFolder = cacheFolder || dataset;
 
-  // Get base model input and outputs
-  const input = baseModel.inputs[0];
-  const originalOutput = baseModel.outputs[0];
   // Freeze base layers
   for (const layer of baseModel.layers) {
     layer.trainable = false;
   }
-
+  // Get base model input and outputs
+  const input = baseModel.inputs[0];
+  const originalOutput = baseModel.outputs[0];
 
   // Get embeddings from BirdNET
   const embeddingLayer = baseModel.getLayer('GLOBAL_AVG_POOL');
   const embeddings = embeddingLayer.output;  // This will be input to the new classifier
   let x = embeddings;
-
   if (hidden) {
     if (dropout) {
       x = tf.layers.dropout({ rate: dropout, name: 'CUSTOM_DROP_1' }).apply(x);
@@ -302,8 +300,20 @@ Classifier:
 Augmentations:
   Mixup: ${mixup}
   Roll: ${useRoll}
+  Background noise: ${useNoise}
 `
   fs.writeFileSync(path.join(saveLocation, `training_metrics_${Date.now()}.txt`), notice.replaceAll('<br>', ''), 'utf8');
+
+  // Generate a LICENSE
+  const license = `This model is derived from BirdNET, developed by the K. Lisa Yang Center for Conservation Bioacoustics 
+at the Cornell Lab of Ornithology in collaboration with Chemnitz University of Technology.
+
+Use of the model is governed by the terms of the 
+Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License 
+(CC BY-NC-SA 4.0) https://creativecommons.org/licenses/by-nc-sa/4.0/.
+`
+
+  fs.writeFileSync(path.join(saveLocation, `LICENSE.txt`), license, 'utf8');
 
   DEBUG && console.log(`Tensors in memory before: ${tf.memory().numTensors}`);
   baseModel.dispose()

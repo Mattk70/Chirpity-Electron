@@ -382,18 +382,18 @@
                     <div id="import-modal-body" class="modal-body">
                         <div class="pb-3">
                             <div class="input-group">
-                                <span class="input-group-text" id="model-name-text">
-                                    Model Name:
-                                </span>
-                                <input type="text" class="form-control" id="model-name" aria-describedby="model-name-text" placeholder="Choose a unique name for the model" required>
-                            </div>
-                        </div>
-                        <div class="pb-3">
-                            <div class="input-group">
                                 <button class="btn btn-secondary input-group-text" type="button" id="import-location-select">
                                     Model Location:
                                 </button>
                                 <input type="text" style="font-size: 0.85rem" class="form-control" id="import-location" aria-describedby="import-location-select" placeholder="Location of the custom model files" readonly required>
+                            </div>
+                        </div>
+                        <div class="pb-3">
+                            <div class="input-group">
+                                <span class="input-group-text" id="model-name-text">
+                                    Model Name:
+                                </span>
+                                <input type="text" class="form-control" id="model-name" aria-describedby="model-name-text" placeholder="Choose a unique name for the model" required>
                             </div>
                         </div>
                     </div>
@@ -750,9 +750,9 @@
                         <div class="pe-3 input-group rounded p-2 mb-1">
                             <label class="ps-1 input-group-text col-5" for="model-to-use">Model:</label>
                             <select class="form-select mb-0" id="model-to-use">
-                                <!-- <option value="birdnet">BirdNET</option>
+                                <option value="birdnet">BirdNET</option>
                                 <option value="chirpity">Nocmig</option>
-                                <option value="nocmig">Nocmig v2 (beta)</option> -->
+                                <option value="nocmig">Nocmig v2 (beta)</option>
                             </select>
                         </div>
                     </div>
@@ -781,6 +781,16 @@
                             <input type="range" class="form-control-range w-75" id="confidence" min="5" max="100" step="5">
                             <div class="input-group-append">
                                 <span class="input-group-text" id="confidence-value">50%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group rounded p-2 pe-0 mb-2">
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Detections Per Segment" id="Detections Per Segment-circle-help"  data-bs-content="Select the maximum number of detections that will be shown in any 3 second period">?</a>
+                        <label for="top-rankin">Detections per segment:</label>
+                        <div class="input-group">
+                            <input type="range" class="form-control-range w-75" id="top-rankin" min="1" max="4" step="1">
+                            <div class="input-group-append">
+                                <span class="input-group-text" id="top-rankin-value">1</span>
                             </div>
                         </div>
                     </div>
@@ -1891,7 +1901,7 @@
         // Stop propagation of the click event to the map
         L.DomEvent.stopPropagation(e);
     }
-    const showMap = (where) => {
+    const showMap = (where, locationID) => {
         if (where === 'customLocationMap' && LOCATIONS.length){
             const markerGroup = L.featureGroup(); // Create a feature group to hold the markers
             const bounds = L.latLngBounds(); // Create bounds to include all markers
@@ -1910,8 +1920,22 @@
                 attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             }).addTo(map);
             markerGroup.addTo(map)
-            const firstMarkerEl = document.querySelector('.leaflet-marker-icon')
-            firstMarkerEl.classList.add('leaflet-marker-icon-default')
+            // Default marker
+            marker._icon.classList.add('leaflet-marker-icon-default')
+            const getCoordinatesById = (id) => {
+                const location = LOCATIONS.find(loc => loc.id === id);
+                return location ? [location.lat, location.lon] : null;
+            };
+            if (locationID){
+                const coords = getCoordinatesById(locationID);
+                if (coords){
+                    const [lat, lon] = coords;
+                    const current = Object.values(markerGroup._layers).find(marker => {
+                        return marker._latlng.lat === lat && marker._latlng.lng === lon;
+                    });
+                    current._icon.classList.add('leaflet-marker-icon-current')
+                }
+            }
             markerGroup.on('click', function (e) {
                 onMapClick(e)
             });
@@ -1944,9 +1968,13 @@
 
     function updateMap(lat,lng){
         try {
+            // remove the previous active marker highlight
+            const activeMarker = document.querySelector('.leaflet-marker-icon-current');
+            if (activeMarker) activeMarker.classList.remove('leaflet-marker-icon-current');
             // Update the marker's position
             if (!marker) marker = L.marker([lat, lng]).addTo(map);
             marker.setLatLng([lat, lng]);
+            marker._icon.classList.add('leaflet-marker-icon-current')
             // Center the map view on the new marker position
             map.setView([lat, lng]);
         } catch (error) {
@@ -1954,7 +1982,7 @@
         }
     }
 
-    async function placeMap(divID){
+    async function placeMap(divID, locationID){
         map?.remove(); marker = undefined;
         map = L.map(divID);
         let latTxt, lonTxt;
@@ -1967,7 +1995,7 @@
         }
         const latEl = document.getElementById(latTxt);
         const lonEl = document.getElementById(lonTxt);
-        showMap(divID);
+        showMap(divID, locationID);
         map.on('click', (e) => {
             clearTimeout(clickTimer);
             //Wait for dblclick
