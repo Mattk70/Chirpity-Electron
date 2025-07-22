@@ -489,7 +489,6 @@ async function* readBinaryGzipDataset(gzippedPath, labels, roll = false) {
   const stream = fs.createReadStream(gzippedPath).pipe(gunzip);
   let leftover = Buffer.alloc(0);
   for await (const chunk of stream) {
-  const t0 = performance.now();
     const data = Buffer.concat([leftover, chunk]);
     const total = Math.floor(data.length / RECORD_SIZE) * RECORD_SIZE;
     let offset = 0;

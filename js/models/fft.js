@@ -273,7 +273,7 @@ function stft(
   windowFn = tf.signal.hannWindow
 ) {
   const engine = tf.engine();
-  if (!["webgl", "webgpu"].includes(engine.backendName)) {
+  if (!["webgpu"].includes(engine.backendName)) {
     return slowStft(signal, frameLength, frameStep, fftLength, windowFn);
   }
   fftLength ??= frameLength;
