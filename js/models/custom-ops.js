@@ -95,16 +95,16 @@ tf.registerKernel({
 
 
 /**
- * Computes the short-time Fourier transform (STFT) of a batched signal tensor using a custom GPU-accelerated FFT kernel.
- * Adapted from https://github.com/georg95/birdnet-web/blob/main/birdnet.js
- * Frames the input signal, applies a window function, and computes the real FFT for each frame. Returns the complex frequency-domain representation for each frame, retaining only the non-redundant half of the spectrum.
+ * Computes the short-time Fourier transform (STFT) of a batched signal tensor using GPU acceleration.
  *
- * @param {tf.Tensor} signal - Input tensor of shape [batch, signalLength].
+ * Frames the input signal, applies a window function to each frame, and computes the real FFT for each frame using a custom WebGPU kernel. Returns the complex-valued frequency-domain representation for each frame, retaining only the non-redundant half of the spectrum.
+ *
+ * @param {tf.Tensor} signal - Input tensor with shape [batch, signalLength].
  * @param {number} frameLength - Length of each frame for STFT.
  * @param {number} frameStep - Step size between consecutive frames.
  * @param {number} fftLength - Length of the FFT to compute for each frame.
- * @param {function} windowFn - Function that generates a window tensor of length {@link frameLength}.
- * @returns {tf.Tensor} STFT output tensor of shape [batch, numFrames, halfFftLength, 2], where the last dimension contains real and imaginary parts.
+ * @param {function} windowFn - Function that generates a window tensor of length `frameLength`.
+ * @returns {tf.Tensor} Output tensor of shape [batch, numFrames, halfFftLength, 2], where the last dimension contains real and imaginary parts.
  */
 function stft(signal, frameLength, frameStep, fftLength, windowFn) {
     const framedSignal = tf.engine().runKernel('batchFrame', {input: signal, frameLength, frameStep })
