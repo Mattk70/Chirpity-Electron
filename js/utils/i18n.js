@@ -1,4 +1,3 @@
-
 let LOCALE;
 
 const Toasts = { // UI.js
@@ -3593,9 +3592,9 @@ const setLocale = (locale) => LOCALE = locale;
 const get = (context) => context[LOCALE] || context["en"];
 
 /**
- * Loads and applies localized UI text for the specified locale.
+ * Dynamically loads and applies localized UI text for the specified locale.
  *
- * Fetches a localization JSON file for the given locale and updates relevant DOM elements—including labels, buttons, tooltips, popovers, form controls, and carousel content—with the corresponding localized strings. If the locale file is unavailable, falls back to English. If neither is found, the UI remains unchanged.
+ * Fetches a localization JSON file for the given locale, falling back to English if unavailable, and updates UI elements—including labels, buttons, tooltips, popovers, form controls, and carousel content—with the corresponding localized strings. If no localization file is found, the UI remains unchanged.
  *
  * @param {string} locale - The locale code (e.g., "en", "de_CA"). Any suffix after an underscore is ignored.
  * @returns {Promise<Object|undefined>} Resolves to the localization data object if successful, or undefined if no localization file is found.

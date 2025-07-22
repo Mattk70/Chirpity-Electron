@@ -509,13 +509,11 @@ function updateProgress(val) {
 }
 
 /**
- * Loads an audio file by dispatching a file-load request to the worker.
+ * Requests the worker to load an audio file for analysis, resetting file state and specifying the initial audio window.
  *
- * This function resets the file status and signals the worker to start processing the file.
- * It is triggered when a user opens a new file or selects a file from the list of open files.
- *
- * @param {string} filePath - The full filesystem path of the audio file.
- * @param {boolean} preserveResults - If true, existing analysis results are retained; otherwise, they are cleared.
+ * @param {Object} params
+ * @param {string} params.filePath - The full filesystem path of the audio file to load.
+ * @param {boolean} params.preserveResults - Whether to retain existing analysis results when loading the new file.
  */
 function loadAudioFileSync({ filePath = "", preserveResults = false }) {
   STATE.fileLoaded = false;
@@ -1091,13 +1089,13 @@ async function sortFilesByTime(fileNames) {
     .map((file) => file.name); // Return sorted file names
 }
 /**
- * Handles opening one or more audio files, updating the UI and application state accordingly.
+ * Opens one or more audio files, resets analysis state, and updates the UI for new input.
  *
- * Loads the selected files, resets analysis and diagnostics, updates menu items, and initiates loading of the first file. If multiple files are selected, sorts them by creation time and enables batch analysis options.
+ * Loads the provided audio files, resets analysis results and diagnostics, updates menu items, and initializes the spectrogram. If multiple files are selected, sorts them by creation time and enables batch analysis options. Begins loading the first file in the list.
  *
- * @param {Object} args - Arguments containing file paths and options.
- * @param {string[]} args.filePaths - List of file paths to open.
- * @param {boolean} [args.preserveResults] - Whether to preserve previous analysis results.
+ * @param {Object} args - Arguments for file opening.
+ * @param {string[]} args.filePaths - Paths of audio files to open.
+ * @param {boolean} [args.preserveResults] - If true, preserves previous analysis results.
  */
 async function onOpenFiles(args) {
   const {filePaths, checkSaved, preserveResults} = args;
@@ -1215,11 +1213,11 @@ const getSelectionResults = (fromDB) => {
 };
 
 /**
- * Initiates an audio analysis operation by sending an analysis request to the worker thread.
+ * Sends an analysis request to the worker thread to initiate audio analysis, managing UI state and preventing concurrent analyses.
  *
- * Disables relevant UI controls during analysis and resets results if not analyzing a selection. If an analysis is already in progress, displays a warning notification.
+ * Disables relevant UI controls and resets results if not analyzing a selection. If an analysis is already in progress, displays a warning notification and does not start a new analysis.
  *
- * @param {Object} args - Analysis parameters, including start/end positions, file scope, reanalysis flag, and source.
+ * @param {Object} args - Parameters for the analysis request, including start and end positions, file scope, reanalysis flag, and source indicator.
  */
 function postAnalyseMessage(args) {
   if (!PREDICTING) {
@@ -1607,9 +1605,9 @@ const selectionTable = document.getElementById("selectionResultTableBody");
 selectionTable.addEventListener("click", debounceClick(resultClick));
 
 /**
- * Handles click events on result table rows to activate and load the corresponding audio region.
+ * Activates a result row and loads the corresponding audio region when a result table row is clicked.
  *
- * Validates that the audio file is loaded and regions are ready, then extracts region details from the clicked row and updates the UI to reflect the active selection. If the clicked element is a "circle", waits for the audio file to finish loading before retrieving selection results.
+ * If the clicked element is a "circle", waits for the audio file to finish loading before retrieving selection results.
  *
  * @param {Event} e - The click event on a result row.
  * @returns {Promise<void>}
@@ -1641,15 +1639,11 @@ async function resultClick(e) {
 }
 
 /**
- * Marks the row corresponding to the specified start time as active in the result table.
+ * Activates the result table row matching the given start time for the current file.
  *
- * Iterates through all table rows within the result table and checks the "name" attribute, which is expected
- * to be a pipe-separated string containing file identifier, start time, and additional details. When a row is found
- * where the file matches the current file (STATE.currentFile) and the start time matches the provided value, any
- * previously active row (if different) is deactivated, the target row is activated by adding the 'table-active'
- * class, and the row is smoothly scrolled into view.
+ * Deactivates any previously active row, highlights the matching row, and scrolls it into view.
  *
- * @param {number} start - The start time to match for activating the corresponding table row.
+ * @param {number} start - The start time identifying the row to activate.
  */
 function setActiveRow(start) {
   const rows = DOM.resultTable.querySelectorAll("tr");
@@ -3365,11 +3359,11 @@ function onModelReady() {
 }
 
 /**
- * Processes audio data loaded by the worker, updates global state, resets regions, and refreshes the spectrogram and UI.
+ * Handles audio data loaded by the worker, updating application state, resetting regions, and refreshing the spectrogram and UI.
  *
- * Assigns the loaded audio buffer and metadata to the application state, updates timing information, resets any existing audio regions, and refreshes the spectrogram display. Also updates the filename panel and enables analysis menu options if a model is ready.
+ * Updates the current audio buffer, file metadata, timing, and UI elements after an audio file is loaded. Resets audio regions, refreshes the spectrogram display, and enables analysis menu options if a model is ready.
  *
- * @param {Object} params - Audio load parameters.
+ * @param {Object} params - Parameters for the loaded audio.
  * @param {*} params.location - Identifier for the audio source location.
  * @param {number} [params.fileStart=0] - Start time of the audio file in milliseconds since the Unix epoch.
  * @param {number} [params.fileDuration=0] - Duration of the audio file in seconds.
@@ -3603,13 +3597,13 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
 };
 
 /**
- * Completes result processing by updating the UI and activating the appropriate result row.
+ * Finalizes result processing by updating the results table UI and activating the appropriate result row.
  *
- * Replaces the results table with the latest content, resets analysis state, and determines which row to activate based on provided options or table state. Ensures the active row is selected, clicked, and scrolled into view, then updates related UI elements.
+ * Replaces the results table with the latest data, resets analysis state, and determines which row to activate based on the provided options or current table state. Ensures the selected row is activated and scrolled into view, updates sorting indicators, and refreshes related UI panels.
  *
- * @param {Object} [options={}] - Options for result row activation.
- * @param {number} [options.active] - Index of the row to activate.
- * @param {*} [options.select] - Value used to determine the row to activate via a helper function.
+ * @param {Object} [options={}] - Options for determining which result row to activate.
+ * @param {number} [options.active] - Index of the row to activate, if specified.
+ * @param {*} [options.select] - Value used to identify the row to activate via a helper function.
  */
 function onResultsComplete({ active = undefined, select = undefined } = {}) {
   PREDICTING = false; powerSave(false);
@@ -3664,15 +3658,11 @@ function onResultsComplete({ active = undefined, select = undefined } = {}) {
 
 
 /**
- * Retrieves the index of a table row whose associated start time matches a specified value.
+ * Returns the index of the first table row whose parsed start time matches the specified value.
  *
- * Iterates over the rows of an HTML table, extracting the start time from each row's "name" attribute.
- * The "name" attribute is expected to be a string with values separated by a "|" character, where the
- * second element represents the start time. If the "name" attribute is absent, a default value of 0 is used.
- *
- * @param {HTMLTableElement} table - The table element containing rows to search.
- * @param {number} start - The target start time to match against the row's parsed start time.
- * @returns {number|undefined} The index of the first row with a matching start time, or undefined if no match is found.
+ * @param {HTMLTableElement} table - The table to search.
+ * @param {number} start - The start time to match.
+ * @returns {number|undefined} The index of the matching row, or undefined if not found.
  */
 function getRowFromStart(table, start) {
   for (var i = 0; i < table.rows.length; i++) {
@@ -3687,9 +3677,9 @@ function getRowFromStart(table, start) {
 }
 
 /**
- * Completes the audio analysis process by updating application state, restoring UI controls, and logging diagnostic metrics.
+ * Finalizes the audio analysis process by updating application state, restoring UI controls, and logging diagnostics.
  *
- * Resets prediction status, re-enables settings, updates analysis state, and manages menu item availability based on disk records. Hides the progress indicator. If not in quiet mode, calculates and logs analysis duration and rate, tracks relevant events, and displays a completion notification.
+ * Resets prediction status, re-enables settings, updates analysis completion state, and manages menu item availability based on whether disk records exist. Hides the progress indicator. If not in quiet mode, logs analysis duration and rate, tracks relevant events, updates diagnostics, and displays a completion notification.
  *
  * @param {Object} options - Analysis completion options.
  * @param {boolean} options.quiet - If true, suppresses diagnostic tracking and notifications.
@@ -4172,6 +4162,15 @@ const exportAudio = () => {
   sendFile("save", result);
 };
 
+/**
+ * Loads and localizes a modal's HTML content based on the specified filename and locale.
+ *
+ * For certain help files ("usage", "settings", "ebird", "training"), loads a locale-specific HTML file directly. For other files, loads the base HTML and applies localization by replacing element contents using a corresponding JSON file if available. Returns the localized HTML as a string, or the original HTML if localization data is missing. Returns null if an error occurs.
+ *
+ * @param {string} filename - The base name of the modal or help file to load.
+ * @param {string} locale - The locale code (e.g., "en", "de") for localization.
+ * @returns {Promise<string|null>} The localized HTML content as a string, or null if loading fails.
+ */
 async function localiseModal(filename, locale) {
   try {
     // Fetch the HTML file
@@ -4827,6 +4826,10 @@ const hideConfidenceSlider = () => {
   confidenceSliderDisplay.classList.add("d-none");
 };
 
+/**
+ * Updates the threshold display and input values in both the filter and settings panels.
+ * @param {Event|number} e - The input event or numeric threshold value to display and set.
+ */
 function showThreshold(e) {
   const threshold = e instanceof Event ? e.target.valueAsNumber : e;
   filterPanelThresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
@@ -4835,6 +4838,11 @@ function showThreshold(e) {
   settingsPanelRangeInput.value = threshold;
 }
 
+/**
+ * Updates the UI to display the current topRankin threshold value.
+ * 
+ * Accepts either an event or a numeric value, updates the display element with the threshold, and sets the input value accordingly.
+ */
 function showTopRankin(e) {
   const threshold = e instanceof Event ? e.target.valueAsNumber : e;
   const topRankinDisplay = document.getElementById('top-rankin-value')
@@ -5084,9 +5092,9 @@ const showRelevantAudioQuality = () => {
 };
 document.addEventListener("click", debounceClick(handleUIClicks));
 /**
- * Central handler for UI click events, dispatching actions based on the clicked element's ID.
+ * Handles all UI click events by dispatching actions based on the clicked element's ID.
  *
- * Routes user interactions to the appropriate application logic, including file operations, analysis commands, menu actions, settings adjustments, help dialogs, sorting, context menu actions, and UI updates. Updates application state, communicates with the worker thread, manages configuration, and triggers relevant UI changes as needed.
+ * Routes user clicks to the appropriate application logic, including file operations, analysis commands, model management, settings adjustments, help dialogs, sorting, context menu actions, and UI updates. Updates application state, communicates with the worker thread, manages configuration, and triggers relevant UI changes as needed.
  *
  * @param {MouseEvent} e - The click event object.
  */
@@ -6809,11 +6817,9 @@ const insertManualRecord = ( {
 };
 
 /**
- * Updates the UI to reflect whether a custom frequency filter is active.
+ * Updates the frequency filter UI to indicate whether a custom frequency range is active.
  *
- * Checks the audio configuration to determine if the frequency range has been altered from its default
- * (frequencyMin > 0 or frequencyMax < 11950). If so, it applies warning styles to the frequency range display
- * and enables the reset button. Otherwise, it restores the default styling.
+ * Applies warning styles and enables the reset button if the frequency range differs from the default; otherwise, restores default styles and disables the reset button.
  */
 function checkFilteredFrequency() {
   const resetButton = document.getElementById("reset-spec-frequency");
@@ -7030,17 +7036,14 @@ function checkForMacUpdates() {
 /**
  * Displays a toast notification in the UI with optional localization, icon, and notification sound.
  *
- * The toast can be customized by type (info, warning, error), message variables, and autohide behavior. For certain messages (e.g., analysis completion), it may also trigger a desktop notification or play a sound if enabled in the configuration.
+ * The toast can be customized by type (info, warning, error), message variables, and autohide behavior. For certain messages, such as analysis completion after a long duration, it may also trigger a desktop notification or play a sound if enabled in the configuration.
  *
  * @param {Object} [options] - Toast configuration options.
  * @param {string} [options.message] - The message key or text to display.
  * @param {string} [options.type] - The type of toast ('info', 'warning', or 'error').
- * @param {boolean} [options.autohide] - Whether the toast should automatically hide.
+ * @param {boolean} [options.autohide] - Whether the toast should automatically hide. Defaults to true unless the type is 'error'.
  * @param {Object} [options.variables] - Variables for message interpolation.
  * @param {string} [options.locate] - Additional HTML or text to append to the message.
- *
- * @remark
- * If the message indicates analysis completion and the analysis duration exceeds 30 seconds, a desktop notification or sound is triggered based on user settings and notification permissions.
  */
 function generateToast({
   message = "",
@@ -7153,6 +7156,11 @@ function generateToast({
   }
 }
 
+/**
+ * Fetches and displays Xeno-Canto audio comparisons for the currently selected species and call type.
+ *
+ * Attempts to load cached comparison data; if unavailable, queries the Xeno-Canto API for relevant recordings, supporting both bird and bat models with appropriate call types and duration filters. Deduplicates and limits results per call type, updates the cache, and renders the comparison UI. Notifies the user if no suitable comparisons are found.
+ */
 async function getXCComparisons() {
   let {sname, cname} = unpackNameAttr(activeRow);
   cname.includes("call)") ? "call" : "";
@@ -7510,14 +7518,11 @@ const IUCNMap = {
 export { config, displayLocationAddress, LOCATIONS, generateToast };
 
 /**
- * Checks the user's membership status and updates the UI to reflect feature access.
+ * Checks the user's membership status via a remote API and updates the UI to reflect feature access.
  *
- * Verifies membership via a remote API using the user's UUID, manages trial period eligibility based on installation date, and caches membership status in localStorage. If the remote check fails, uses a cached status if it is less than one week old. Updates UI elements to lock or unlock features, adjusts button states, and changes the logo for members.
+ * Determines if the user is a member or within a trial period, unlocking or locking premium features accordingly. If the remote check fails, uses a cached membership status if available and less than one week old. Updates UI elements, feature availability, and branding based on membership state.
  *
  * @returns {Promise<boolean|undefined>} Resolves to `true` if the user is a member or within the trial period, `false` if not, or `undefined` if status cannot be determined and no valid cache exists.
- *
- * @remark
- * If the remote membership check fails but a valid cached status exists (less than one week old), the cached status is used to grant access.
  */
 async function membershipCheck() {
   const oneWeek = 7 * 24 * 60 * 60 * 1000; // "It's been one week since you looked at me, cocked your head to the side..."
