@@ -21,11 +21,11 @@ const CONFIG = {
 };
 
 /**
- * Loads and initializes the machine learning model with the specified configuration and TensorFlow backend.
+ * Loads and initializes the machine learning model using the specified configuration and TensorFlow backend.
  *
- * Reads the model configuration file to obtain image dimensions, labels, and model location. Sets up the requested TensorFlow backend with appropriate environment settings, initializes the model instance, warms it up with the given batch size, and notifies the worker when the model is ready.
+ * Reads the model configuration file to obtain image dimensions, labels, and model location. Sets the TensorFlow backend, initializes the model instance, loads model weights, warms up the model with the given batch size, and notifies the worker when the model is ready.
  *
- * @param {Object} params - Parameters for model loading, including model version, batch size, backend, and worker identifier.
+ * @param {Object} params - Contains model version, batch size, backend, and worker identifier.
  */
 function loadModel(params) {
   const version = params.model;

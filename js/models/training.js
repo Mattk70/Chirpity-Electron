@@ -12,12 +12,49 @@ try {
 }
 import abortController from '../utils/abortController.js';
 
+/**
+ * Computes a cosine decay learning rate based on the current training step.
+ *
+ * The learning rate decreases from the initial value to zero following a half-cosine curve over the specified number of decay steps.
+ *
+ * @param {number} initialLearningRate - The starting learning rate before decay.
+ * @param {number} globalStep - The current training step.
+ * @param {number} decaySteps - The total number of steps over which to decay the learning rate.
+ * @return {number} The decayed learning rate for the current step.
+ */
 function cosineDecay(initialLearningRate, globalStep, decaySteps) {
   const step = Math.min(globalStep, decaySteps);
   const cosineDecay = 0.5 * (1 + Math.cos(Math.PI * step / decaySteps));
   return initialLearningRate * cosineDecay;
 }
 
+/**
+ * Trains a transfer learning audio classification model with configurable augmentation, loss, and caching options.
+ *
+ * Freezes the base model, adds a new classifier head, and trains using the provided dataset with support for mixup, noise blending, rolling augmentation, class weighting, focal loss, and label smoothing. Handles dataset preparation, caching, validation split, progress reporting, early stopping, and model saving with updated configuration and license files. Returns a summary message with training metrics and settings.
+ *
+ * @param {Object} options - Training configuration options.
+ * @param {Object} options.Model - The model wrapper object containing the base model and utility methods.
+ * @param {number} options.lr - Initial learning rate.
+ * @param {number} [options.batchSize=32] - Batch size for training.
+ * @param {number} options.dropout - Dropout rate for hidden layers.
+ * @param {number} options.epochs - Number of training epochs.
+ * @param {number} options.hidden - Number of units in the optional hidden dense layer.
+ * @param {string} options.dataset - Path to the dataset directory.
+ * @param {string} options.cache - Path to the cache folder for binary datasets.
+ * @param {string} options.modelLocation - Directory to save the trained model.
+ * @param {string} options.modelType - Model saving mode ('append' to merge outputs).
+ * @param {boolean} options.useCache - Whether to use cached binary datasets if available.
+ * @param {number} options.validation - Validation split ratio (0–1).
+ * @param {boolean} options.mixup - Whether to apply mixup augmentation.
+ * @param {boolean} options.decay - Whether to use cosine learning rate decay.
+ * @param {boolean} options.useRoll - Whether to apply rolling augmentation to audio.
+ * @param {boolean} options.useWeights - Whether to use class weights in the loss function.
+ * @param {boolean} options.useFocal - Whether to use focal loss.
+ * @param {boolean} options.useNoise - Whether to blend background noise into training samples.
+ * @param {number} options.labelSmoothing - Amount of label smoothing to apply in the loss.
+ * @returns {Promise<Object>} A message object summarizing training results, metrics, and settings.
+ */
 async function trainModel({
   Model, 
   lr:initialLearningRate,
@@ -333,7 +370,14 @@ Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License
   return message
 }
 
-/// UTILITIES ///
+/**
+ * Scans a root directory for labeled subfolders, collecting audio file paths and computing normalized class weights.
+ *
+ * Each subfolder is treated as a label, and all non-hidden, non-binary files within are included. Class weights are calculated as the inverse frequency of each label, normalized by the total number of samples and number of classes.
+ *
+ * @param {string} rootDir - Path to the root directory containing labeled subfolders.
+ * @returns {{files: Array<{filePath: string, label: string}>, classWeights: Object<string, number>}} An object containing the list of files with labels and the computed class weights.
+ */
 
 
 function getFilesWithLabelsAndWeights(rootDir) {
@@ -377,10 +421,15 @@ function getFilesWithLabelsAndWeights(rootDir) {
 
 
 /**
- * Writes a compressed binary dataset where each record is:
- *   - audio: Float32Array of 144000 samples (576000 bytes)
- *   - label: UInt8 (1 byte)
- * Total per record: 576001 bytes
+ * Converts a list of labeled audio files into a gzip-compressed binary dataset for efficient training.
+ *
+ * Each record consists of a 3-second (144,000-sample) Float32 audio array and a 2-byte label index. Audio shorter than 1.5 seconds is skipped; shorter samples are left-padded to 3 seconds. Progress is reported via the provided callback, and the process supports aborting.
+ *
+ * @param {Array} fileList - List of objects with `filePath` and `label` properties.
+ * @param {string} outputPath - Destination path for the compressed binary dataset.
+ * @param {Object} labelToIndex - Mapping from label names to numeric indices.
+ * @param {Function} postMessage - Callback for progress and error reporting.
+ * @param {string} [description] - Optional description for progress updates.
  */
 async function writeBinaryGzipDataset(fileList, outputPath, labelToIndex, postMessage, description = "Preparing data") {
   const t0 = Date.now()
@@ -459,6 +508,13 @@ async function writeBinaryGzipDataset(fileList, outputPath, labelToIndex, postMe
 }
 
 
+/**
+ * Splits a list of labeled files into stratified training and validation sets, preserving label proportions.
+ * Ensures each label is represented by at least one sample in the validation set.
+ * @param {Array} allFiles - Array of file objects, each containing a `label` property.
+ * @param {number} [valRatio=0.2] - Fraction of samples per label to allocate to the validation set.
+ * @return {{trainFiles: Array, valFiles: Array}} Object containing shuffled training and validation file arrays.
+ */
 function stratifiedSplit(allFiles, valRatio = 0.2) {
   const byLabel = {};
   for (const item of allFiles) {
@@ -527,6 +583,11 @@ const ffmpeg = require('fluent-ffmpeg')
 const ffmpegPath = require("@ffmpeg-installer/ffmpeg").path.replace("app.asar","app.asar.unpacked");
 ffmpeg.setFfmpegPath(ffmpegPath);
 
+/**
+ * Extracts the duration (in seconds) and bitrate (in Hz) from an audio file using ffmpeg.
+ * @param {string} filePath - Path to the audio file.
+ * @return {Promise<{duration: number, bitrate: number}>} Resolves with the audio duration and bitrate.
+ */
 async function getAudioMetadata(filePath) {
   return new Promise((resolve, reject) => {
     let gotDuration = false, seconds = 0, bitrate = 0;
@@ -544,7 +605,13 @@ async function getAudioMetadata(filePath) {
           command.kill(); // Stop the process early
         }
         if (audio_details){
-          bitrate = parseInt(audio_details[1].replace('Hz', ''))
+          try {
+            if (audio_details[1] && typeof audio_details[1] === 'string') {
+              bitrate = parseInt(audio_details[1].replace(/[^0-9]/g, ''));
+            }
+          } catch (err) {
+            console.warn('Failed to parse bitrate:', err);
+          }
         }
         resolve({duration:seconds, bitrate});
       })
@@ -560,6 +627,14 @@ async function getAudioMetadata(filePath) {
   });
 }
 
+/**
+ * Decodes an audio file to a normalized Float32Array of mono PCM samples at 48kHz for a 3-second segment.
+ *
+ * Extracts a 3-second mono segment from the center of the audio file (or from the start if shorter), resamples to 48kHz, and normalizes the output to the range [-1, 1].
+ *
+ * @param {string} filePath - Path to the audio file to decode.
+ * @returns {Promise<Float32Array>} A promise that resolves to a Float32Array containing the decoded audio samples.
+ */
 async function decodeAudio(filePath) {
   const {duration, bitrate:rate} = await getAudioMetadata(filePath);
   const seekTime = duration > 3 ? (duration / 2) - 1.5 : 0;
@@ -595,6 +670,14 @@ async function decodeAudio(filePath) {
 
 
 
+/**
+ * Randomly shifts the contents of a Float32Array audio buffer by up to one quarter of its length.
+ * 
+ * This augmentation simulates temporal shifts in audio data by rolling the array contents left or right.
+ * If the random shift is zero, the original array is returned.
+ * @param {Float32Array} audio - The audio buffer to roll.
+ * @return {Float32Array} The rolled audio buffer.
+ */
 function rollFloat32(audio) {
   const size = audio.length;
   const maxShift = Math.floor(size/4);
@@ -619,14 +702,18 @@ function rollFloat32(audio) {
 }
 
 /**
- * Computes the categorical focal crossentropy loss.
+ * Calculates the categorical focal cross-entropy loss for multi-class classification tasks.
  *
- * @param {tf.Tensor} yTrue - Ground truth labels.
- * @param {tf.Tensor} yPred - Predictions (either logits or probabilities).
- * @param {number} alpha - Balancing factor (default 0.25).
- * @param {number} gamma - Modulating factor (default 2.0).
- * @param {boolean} fromLogits - Whether `yPred` is expected to be logits.
- * @returns {tf.Tensor} - A tensor representing the focal loss per example.
+ * Supports optional label smoothing and logits input. Returns the focal loss per example as a tensor.
+ *
+ * @param {tf.Tensor} yTrue - One-hot encoded ground truth labels.
+ * @param {tf.Tensor} yPred - Model predictions (probabilities or logits).
+ * @param {number} [alpha=0.25] - Balancing factor for class imbalance.
+ * @param {number} [gamma=2.0] - Modulating factor to focus on hard examples.
+ * @param {boolean} [fromLogits=false] - If true, applies softmax to logits.
+ * @param {number} [labelSmoothing=0.0] - Amount of label smoothing to apply.
+ * @param {number} [axis=-1] - Axis along which to compute the loss.
+ * @returns {tf.Tensor} Tensor of focal loss values for each example.
  */
 function categoricalFocalCrossEntropy({
   yTrue,
@@ -659,6 +746,17 @@ function categoricalFocalCrossEntropy({
 const createStreamDataset = (ds, labels, useRoll) => 
   tf.data.generator(() => readBinaryGzipDataset(ds, labels, useRoll)).prefetch(3);
 
+/**
+ * Creates a TensorFlow.js dataset with mixup augmentation by randomly blending pairs of samples and their labels.
+ * 
+ * Two independently shuffled datasets are zipped and mixed using a gamma-distributed coefficient, producing augmented samples for robust model training.
+ * 
+ * @param {boolean} useRoll - Whether to apply random rolling augmentation to audio samples.
+ * @param {AsyncGenerator} ds - The source dataset generator.
+ * @param {string[]} labels - Array of label names.
+ * @param {number} [alpha=0.4] - Mixup alpha parameter controlling the strength of blending.
+ * @return {tf.data.Dataset} A dataset yielding mixed input-label pairs.
+ */
 function createMixupStreamDataset({useRoll, ds, labels, alpha = 0.4}) {
       const ds1 = createStreamDataset(ds, labels, useRoll).shuffle(100, 42).prefetch(1);
       const ds2 = createStreamDataset(ds, labels, useRoll).shuffle(100, 1337).prefetch(1);

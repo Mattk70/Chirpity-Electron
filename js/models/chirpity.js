@@ -22,11 +22,11 @@ const CONFIG = {
 };
 
 /**
- * Loads the model configuration, sets up the TensorFlow.js backend, and initializes the global model instance for inference.
+ * Loads the model configuration, sets the TensorFlow.js backend, and initializes the global model instance for inference.
  *
- * Reads the model configuration for the specified version, configures the TensorFlow.js backend and environment flags, creates a mask tensor to filter specific prediction indexes, loads the model, and performs a warm-up with the given batch size. Notifies the worker when the model is ready by posting a "model-ready" message with relevant details.
+ * Reads the model configuration for the specified version, configures the backend, creates a mask tensor to filter out specific prediction classes, loads the model, and performs a warm-up with the provided batch size. Posts a "model-ready" message to notify when the model is ready for use.
  *
- * @param {Object} params - Parameters for loading the model, including model version, batch size, optional backend, and worker identifier.
+ * @param {Object} params - Contains model version, batch size, optional backend, and worker identifier.
  */
 function loadModel(params) {
   const version = params.model;
