@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <title>Träningsinställningar</title>
+</head>
+<body>
+
+<div class="w-100 alert alert-warning" role="alert">Träningsfunktioner är endast tillgängliga när BirdNET-modellen används</div>
+<table class="table table-hover p-1">
+    <tr>
+        <td><b>Mapp med träningsljud</b></td>
+        <td>Ljudfiler för träning måste organiseras i mappar, där varje mapp innehåller inspelningar av en enda art.
+            Mappnamnen bör följa formatet <code>Vetenskapligt_namn_Vanligt_namn</code>, som i BirdNET och Nocmig-modellerna.</td>
+    </tr>
+    <tr>
+        <td><b>Mapp för träningscache</b></td>
+        <td>Här lagrar Chirpity förbehandlade ljudfiler och metadata. Om inget anges används mappen med träningsljud.
+            Det är bäst att använda en SSD för denna mapp för bästa prestanda.</td>
+    </tr>
+    <tr>
+        <td><b>Använd befintlig cache om tillgänglig</b></td>
+        <td>
+            <p>Det kan ta tid att bygga upp en cache. Om detta är markerat kommer Chirpity att återanvända befintlig cache istället för att skapa en ny varje gång träningen startas.</p>
+            <p>Om du ändrar fördelningen mellan tränings- och valideringsdata kommer detta alternativ att avmarkeras.</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Mapp för att spara modellen</b></td>
+        <td>
+            <p>Platsen där Chirpity kommer att spara den tränade modellen.</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Ersätt eller lägg till etiketter</b></td>
+        <td>
+            <p>Om "Ersätt etiketter" väljs kommer modellen endast innehålla klasser från dina träningsmappar.</p>
+            <p>Om "Lägg till etiketter" väljs, kommer befintliga BirdNET-klasser att behållas och nya klasser att läggas till.</p>
+            <p><b>Obs:</b> Nya klasser får inte ha samma namn som befintliga. För att ersätta en befintlig klass, lägg till ett bindestreck i slutet av namnet, t.ex. <i>Turdus iliacus_Rödvingetrast-</i></p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Träningsparametrar</b></td>
+        <td>
+            <p>Dessa fält styr de grundläggande parametrarna för modellträningen.</p>
+            <ul>
+                <li><b>Epochs:</b> Hur många gånger hela datasetet används i träningen.</li>
+                <li><b>Lärhastighet:</b> Hur mycket modellen justeras vid varje steg.</li>
+                <li><b>Label smoothing:</b> Förhindrar att modellen blir alltför självsäker i en viss klass.</li>
+                <li><b>Använd fokal förlustfunktion:</b> Hjälper vid obalanserade klasser genom att fokusera på svåra exempel.</li>
+                <li><b>Använd klassvikter:</b> Vägleder träningen när vissa klasser är över- eller underrepresenterade.</li>
+                <li><b>Använd lärhastighetsminskning:</b> Gör att modellen finjusterar träningen när förbättringar avtar.</li>
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Valideringsandel</b></td>
+        <td>
+            Här kan du välja hur stor andel av ljudfilerna som ska användas för validering. Valideringsdata används inte för att träna modellen utan för att utvärdera hur väl den generaliserar.
+        </td>
+    </tr>
+    <tr>
+        <td><b>Augmenteringar</b></td>
+        <td>
+            <p>Dessa alternativ styr hur träningsdata bearbetas för att förbättra modellens robusthet.</p>
+            <ul>
+                <li><b>Mixup:</b> Blandar ihop flera exempel till ett syntetiskt exempel.</li>
+                <li><b>Tidsförskjutning:</b> Flyttar ljudet i tiden.</li>
+                <li><b>Bakgrundsbrus:</b> Lägger till brus i ljudet för att simulera verkliga miljöer.</li>
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Klassificerare</b></td>
+        <td>
+            <p>Dessa fält definierar klassificerarens struktur.</p>
+            <ul>
+                <li><b>Dolda neuroner:</b> Antal neuroner i dolda lager. Ju fler, desto mer komplexitet. 0 innebär inga dolda lager.</li>
+                <li><b>Dropout:</b> Slumpmässigt inaktiverar neuroner under träning för att minska <a href="https://developers.google.com/machine-learning/crash-course/overfitting/overfitting" target="_blank">överanpassning</a>.</li>
+            </ul>
+        </td>
+    </tr>
+</table>
+
+</body>
+</html>

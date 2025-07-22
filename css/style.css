@@ -52,8 +52,12 @@ body {
   padding-bottom: 0;
 }
 
-.leaflet-marker-icon-default {
+.leaflet-icon-default {
   filter: hue-rotate(150deg);
+}
+
+.leaflet-icon-current {
+  filter: hue-rotate(270deg);
 }
 
 .navbar {
@@ -162,7 +166,8 @@ select {
 }
 
 .dropdown-menu {
-  min-width: 320px;
+  min-width: 25rem;
+
 }
 
 .shortcut {
@@ -539,7 +544,6 @@ input[type="range"].vertical {
   margin: 3px;
   appearance: auto;
   writing-mode: vertical-lr;
-  -webkit-appearance: slider-vertical;
   direction: rtl;
   top: -160px;
   right: 15px;

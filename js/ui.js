@@ -73,7 +73,6 @@ window.addEventListener("rejectionhandled", function (event) {
 });
 
 
-
 const state = new State();
 let STATE = state.state;
 
@@ -142,8 +141,8 @@ const GLOBAL_ACTIONS = {
         threads: config[config.models[config.selectedModel].backend].threads,
         list: config.list,
       });
-      STATE.training && DOM.trainNav.classList.remove('disabled');
-      PREDICTING = false; STATE.training = false;
+      STATE.training && document.getElementById('train').classList.remove('disabled')
+      PREDICTING = false; STATE.training = false; powerSave(false);
       disableSettingsDuringAnalysis(false);
       const summarySpecies = DOM.summaryTable.querySelectorAll(".cname");
       summarySpecies.forEach(row => row.classList.replace("not-allowed","pointer"));
@@ -510,13 +509,11 @@ function updateProgress(val) {
 }
 
 /**
- * Loads an audio file by dispatching a file-load request to the worker.
+ * Requests the worker to load an audio file for analysis, resetting file state and specifying the initial audio window.
  *
- * This function resets the file status and signals the worker to start processing the file.
- * It is triggered when a user opens a new file or selects a file from the list of open files.
- *
- * @param {string} filePath - The full filesystem path of the audio file.
- * @param {boolean} preserveResults - If true, existing analysis results are retained; otherwise, they are cleared.
+ * @param {Object} params
+ * @param {string} params.filePath - The full filesystem path of the audio file to load.
+ * @param {boolean} params.preserveResults - Whether to retain existing analysis results when loading the new file.
  */
 function loadAudioFileSync({ filePath = "", preserveResults = false }) {
   STATE.fileLoaded = false;
@@ -524,6 +521,8 @@ function loadAudioFileSync({ filePath = "", preserveResults = false }) {
   worker.postMessage({
     action: "file-load-request",
     file: filePath,
+    start: 0,
+    end: STATE.windowLength,
     preserveResults: preserveResults,
     position: 0,
     list: config.list, // list and warmup are passed to enable abort if file loaded during predictions
@@ -885,7 +884,8 @@ const FILE_LOCATION_MAP = {};
 const onFileLocationID = ({ file, id }) => (FILE_LOCATION_MAP[file] = id);
 const locationModalDiv = document.getElementById("locationModal");
 locationModalDiv.addEventListener("shown.bs.modal", () => {
-  placeMap("customLocationMap");
+  const locationID = FILE_LOCATION_MAP[STATE.currentFile]
+  placeMap("customLocationMap", locationID);
 });
 //document
 
@@ -923,7 +923,7 @@ const showLocation = async (fromSelect) => {
       (customPlaceEl.value = config.location);
   }
   // make sure the  map is initialised
-  if (!map) placeMap("customLocationMap");
+  if (!map) placeMap("customLocationMap", id);
   updateMap(latEl.value, lonEl.value);
 };
 
@@ -1089,13 +1089,13 @@ async function sortFilesByTime(fileNames) {
     .map((file) => file.name); // Return sorted file names
 }
 /**
- * Handles opening one or more audio files, updating the UI and application state accordingly.
+ * Opens one or more audio files, resets analysis state, and updates the UI for new input.
  *
- * Loads the selected files, resets analysis and diagnostics, updates menu items, and initiates loading of the first file. If multiple files are selected, sorts them by creation time and enables batch analysis options.
+ * Loads the provided audio files, resets analysis results and diagnostics, updates menu items, and initializes the spectrogram. If multiple files are selected, sorts them by creation time and enables batch analysis options. Begins loading the first file in the list.
  *
- * @param {Object} args - Arguments containing file paths and options.
- * @param {string[]} args.filePaths - List of file paths to open.
- * @param {boolean} [args.preserveResults] - Whether to preserve previous analysis results.
+ * @param {Object} args - Arguments for file opening.
+ * @param {string[]} args.filePaths - Paths of audio files to open.
+ * @param {boolean} [args.preserveResults] - If true, preserves previous analysis results.
  */
 async function onOpenFiles(args) {
   const {filePaths, checkSaved, preserveResults} = args;
@@ -1118,6 +1118,9 @@ async function onOpenFiles(args) {
 
   // Store the file list and Load First audio file
   STATE.openFiles = filePaths;
+  // Reset the buffer playhead and zoom:
+  STATE.windowOffsetSecs = 0;
+  STATE.windowLength = config.selectedModel.includes('bats') ? 5 : 20;
   // Reset the mode
   STATE.mode = 'analyse';
   // If spec was destroyed (when visiting charts) this code allows it to work again
@@ -1143,9 +1146,6 @@ async function onOpenFiles(args) {
   // Clear unsaved records warning
   window.electron.unsavedRecords(false);
   document.getElementById("unsaved-icon").classList.add("d-none");
-  // Reset the buffer playhead and zoom:
-  STATE.windowOffsetSecs = 0;
-  STATE.windowLength = 20;
 }
 
 /**
@@ -1213,11 +1213,11 @@ const getSelectionResults = (fromDB) => {
 };
 
 /**
- * Initiates an audio analysis operation by sending an analysis request to the worker thread.
+ * Sends an analysis request to the worker thread to initiate audio analysis, managing UI state and preventing concurrent analyses.
  *
- * Disables relevant UI controls during analysis and resets results if not analyzing a selection. If an analysis is already in progress, displays a warning notification.
+ * Disables relevant UI controls and resets results if not analyzing a selection. If an analysis is already in progress, displays a warning notification and does not start a new analysis.
  *
- * @param {Object} args - Analysis parameters, including start/end positions, file scope, reanalysis flag, and source.
+ * @param {Object} args - Parameters for the analysis request, including start and end positions, file scope, reanalysis flag, and source indicator.
  */
 function postAnalyseMessage(args) {
   if (!PREDICTING) {
@@ -1228,6 +1228,7 @@ function postAnalyseMessage(args) {
     const filesInScope = args.filesInScope;
     if (!args.fromDB){
       PREDICTING = true;
+      powerSave(true);
       disableSettingsDuringAnalysis(true);
     }
     if (!selection) {
@@ -1604,9 +1605,9 @@ const selectionTable = document.getElementById("selectionResultTableBody");
 selectionTable.addEventListener("click", debounceClick(resultClick));
 
 /**
- * Handles click events on result table rows to activate and load the corresponding audio region.
+ * Activates a result row and loads the corresponding audio region when a result table row is clicked.
  *
- * Validates that the audio file is loaded and regions are ready, then extracts region details from the clicked row and updates the UI to reflect the active selection. If the clicked element is a "circle", waits for the audio file to finish loading before retrieving selection results.
+ * If the clicked element is a "circle", waits for the audio file to finish loading before retrieving selection results.
  *
  * @param {Event} e - The click event on a result row.
  * @returns {Promise<void>}
@@ -1621,7 +1622,7 @@ async function resultClick(e) {
     // 1. clicked and dragged, 2 no detections in file row 3. clicked a header
     return;
   }
-  const [file, start, end, _, label] = row.getAttribute("name").split("|");
+  const {file, start, end, cname:label} = unpackNameAttr(row);
 
   if (activeRow) activeRow.classList.remove("table-active");
   row.classList.add("table-active");
@@ -1638,20 +1639,16 @@ async function resultClick(e) {
 }
 
 /**
- * Marks the row corresponding to the specified start time as active in the result table.
+ * Activates the result table row matching the given start time for the current file.
  *
- * Iterates through all table rows within the result table and checks the "name" attribute, which is expected
- * to be a pipe-separated string containing file identifier, start time, and additional details. When a row is found
- * where the file matches the current file (STATE.currentFile) and the start time matches the provided value, any
- * previously active row (if different) is deactivated, the target row is activated by adding the 'table-active'
- * class, and the row is smoothly scrolled into view.
+ * Deactivates any previously active row, highlights the matching row, and scrolls it into view.
  *
- * @param {number} start - The start time to match for activating the corresponding table row.
+ * @param {number} start - The start time identifying the row to activate.
  */
 function setActiveRow(start) {
   const rows = DOM.resultTable.querySelectorAll("tr");
   for (const r of rows) {
-    const [file, rowStart, _end, _, _label] = r.getAttribute("name").split("|");
+    const {file, start:rowStart} = unpackNameAttr(r);
 
     if (file === STATE.currentFile && Number(rowStart) === start) {
       // Clear the active row if there's one
@@ -1677,9 +1674,10 @@ const loadResultRegion = ({
   start = parseFloat(start);
   end = parseFloat(end);
   // ensure region doesn't spread across the whole window
-  if (STATE.windowLength <= 3.5) STATE.windowLength = 6;
+  STATE.windowLength = Math.max(STATE.windowLength, (end-start) * 1.5);
   let windowOffsetSecs = STATE.windowOffsetSecs;
-  windowOffsetSecs = Math.max(0, start - STATE.windowLength / 2 + 1.5);
+  const middle = (end-start)/2
+  windowOffsetSecs = Math.max(0, start - STATE.windowLength / 2 + middle);
   STATE.activeRegion = {
     start: Math.max(start - windowOffsetSecs, 0),
     end: end - windowOffsetSecs,
@@ -1757,7 +1755,8 @@ const defaultConfig = {
       labelSmoothing: 0,
       useWeights: false,
       useFocal: false,
-      useRoll: false
+      useRoll: false,
+      useNoise: false
     }
   },
   library: {
@@ -1809,6 +1808,7 @@ const defaultConfig = {
     confidence: 45,
     iucn: true,
     iucnScope: "Global",
+    topRankin: 1
   },
   filters: {
     active: false,
@@ -1824,7 +1824,6 @@ const defaultConfig = {
   hasNode: false,
   tensorflow: { threads: DIAGNOSTICS["Cores"], batchSize: 8 },
   webgpu: { threads: 1, batchSize: 8 },
-  webgl: { threads: 1, batchSize: 8 },
   audio: {
     gain: 0,
     format: "mp3",
@@ -1840,7 +1839,6 @@ const defaultConfig = {
   limit: 500,
   debug: false,
   VERSION: VERSION,
-  powerSaveBlocker: false,
   fileStartMtime: false,
   keyAssignment: {},
 };
@@ -1897,17 +1895,21 @@ window.onload = async () => {
     //fill in defaults - after updates add new items
     utils.syncConfig(config, defaultConfig);
 
+
     const isMember = await membershipCheck()
       .catch(err => {console.error(err); return false});
     STATE.isMember = isMember;
-    isMember && config.hasNode || (config.models[config.selectedModel].backend = "tensorflow");
-    if (config.detect.combine) document.getElementById('model-icon').classList.remove('d-none')
 
+    
     const { selectedModel, library, database, detect, filters, audio, 
       limit, locale, speciesThreshold, list, useWeek, UUID, 
       local, debug, fileStartMtime, specDetections } = config;
-    
-    updateModelOptions();
+    isMember && config.hasNode || (config.models[selectedModel].backend = "tensorflow");
+
+    if (detect.combine) document.getElementById('model-icon').classList.remove('d-none')
+    debug && document.getElementById('dataset').classList.remove('d-none')
+    isMember && updateModelOptions();
+
     worker.postMessage({
       action: "update-state",
       model: selectedModel,
@@ -2046,14 +2048,11 @@ window.onload = async () => {
     document.getElementById("iucn").checked = config.detect.iucn;
     document.getElementById("iucn-scope").selected = config.detect.iucnScope;
     handleModelChange(config.selectedModel, false)
-    // Block powersave?
-    document.getElementById("power-save-block").checked =
-      config.powerSaveBlocker;
-    powerSave(config.powerSaveBlocker);
 
     contextAwareIconDisplay();
     DOM.debugMode.checked = config.debug;
     showThreshold(config.detect.confidence);
+    showTopRankin(config.detect.topRankin)
 
     // Filters
     document.getElementById("HP-threshold").textContent = formatHz(config.filters.highPassFrequency);
@@ -2183,10 +2182,16 @@ const setUpWorkerMessaging = () => {
           break;
         }
         case "generate-alert": {
+          if (args.message.includes("archive.sqlite")) {
+            config.database.location = undefined;
+            document.getElementById("database-location").value = '';
+            updatePrefs("config.json", config);
+          }
           if (args.complete) {
             STATE.training = false;
+            powerSave(false);
             disableSettingsDuringAnalysis(false)
-            DOM.trainNav.classList.remove('disabled');
+            document.getElementById('train').classList.remove('disabled')
           }
           if (args.model) {
             expungeModal.hide();
@@ -2231,17 +2236,20 @@ const setUpWorkerMessaging = () => {
         case "labels": {
           // Remove duplicate labels
           LABELS = [...new Set(args.labels)];
-          /* Code below to retrieve Red list data
-                        for (let i = 0;i< LABELS.length; i++){
-                            const label = LABELS[i];
-                            let  sname = label.split('_')[0];
-                            sname = IUCNtaxonomy[sname]
-                            if (sname && ! STATE.IUCNcache[sname]) { 
-                                await getIUCNStatus(sname)
-                                await new Promise(resolve => setTimeout(resolve, 500))
-                            }
-                        }
-                        */
+          // Code below to retrieve Red list data
+          // if (!done){
+          //   done = true;
+          //               for (let i = 0;i< LABELS.length; i++){
+          //                   const label = LABELS[i];
+          //                   let  sname = label.split('_')[0];
+          //                   sname = IUCNtaxonomy[sname] || sname;
+          //                   if (sname && ! STATE.IUCNcache[sname]) { 
+          //                       await getIUCNStatus(sname)
+          //                       await new Promise(resolve => setTimeout(resolve, 500))
+          //                   }
+          //               }
+          //               }
+                        
           break;
         }
         case "label-translation-needed": {
@@ -2894,6 +2902,9 @@ const updateModelIcon = (model) => {
     case 'nocmig':
       title = "Nocmig (beta)";
       break;
+    case 'bats':
+      title = "Bats";
+      break;
     default:
       title = i18n.get(i18n.Lists).custom;
       model = "custom"
@@ -2952,7 +2963,7 @@ const loadModel = () => {
     backend,
     modelPath
   });
-
+  flushSpec()
 };
 
 const handleModelChange = (model, reload = true) => {
@@ -2974,7 +2985,7 @@ const handleBackendChange = (backend) => {
   config.models[config.selectedModel].backend = backend;
   const backendEL = document.getElementById(backend);
   backendEL.checked = true;
-  if (backend === "webgl" || backend === "webgpu") {
+  if (backend === "webgpu") {
     DOM.threadSlider.max = 3;
     // SNRSlider.disabled = true;
     // config.filters.SNR = 0;
@@ -3192,41 +3203,128 @@ gotoForm.addEventListener("submit", gotoTime);
  */
 const training = new bootstrap.Modal(document.getElementById("training-modal"));
 const showTraining = () => {
-    // Restore training settings:
-    const {datasetLocation, cacheLocation, customModel, settings} = config.training;
-    document.getElementById("dataset-location").value = datasetLocation;
-    document.getElementById("dataset-cache-location").value = cacheLocation;
-    document.getElementById("model-location").value = customModel.location;
-    document.getElementById(customModel.type).checked = true;
-    document.getElementById('hidden-units').value = settings.hidden;
-    document.getElementById('lr').value = settings.lr;
-    document.getElementById('epochs').value = settings.epochs;
-    document.getElementById('label-smoothing').value = settings.labelSmoothing;
-    document.getElementById('decay').checked = settings.decay;
-    // Only allow class weights if not using focal loss
-    const weights = document.getElementById('weights');
-    weights.checked = settings.useWeights;
-    weights.disabled = settings.useFocal;
-    document.getElementById('focal').checked = settings.useFocal;
-    document.getElementById('mixup').checked = settings.mixup;
-    // Only allow roll if 'tensorflow' backend (GPU backends leak memory)
-    const allowRoll = config.models[config.selectedModel].backend === 'tensorflow';
-    allowRoll || (config.training.settings.useRoll = false);
-    const roll = document.getElementById('roll');
-    roll.checked = allowRoll && settings.useRoll;
-    roll.disabled = !allowRoll;
-    document.getElementById('dropout').value = settings.dropout;
-    dropout.disabled = !config.training.settings.hidden;
-    document.getElementById('useCache').checked = settings.useCache;
-    document.getElementById('validation-split').value = settings.validation;
+  const i18 = i18n.get(i18n.Training);
+  const trainingTitle = document.getElementById("training-modal-label");
+  trainingTitle.textContent = i18["training-modal-label"];
+  // Restore training settings:
+  const {datasetLocation, cacheLocation, customModel, settings} = config.training;
+  const datasetLocationInput = document.getElementById("dataset-location");
+  datasetLocationInput.value = datasetLocation;
+  const datasetLocationLabel = document.getElementById('dataset-location-select');
+  datasetLocationLabel.textContent = i18["dataset-location-select"];
+  datasetLocationInput.setAttribute("placeholder", i18["dataset-placeholder"]);
+  const cacheLocationInput = document.getElementById("dataset-cache-location");
+  cacheLocationInput.value = cacheLocation;
+  const cacheLocationLabel = document.getElementById('dataset-cache-location-select');
+  cacheLocationLabel.textContent = i18["dataset-cache-location-select"];
+  cacheLocationInput.setAttribute("placeholder", i18["cache-placeholder"]);
+  const modelLocationInput = document.getElementById("model-location");
+  modelLocationInput.value = customModel.location;
+  const modelLocationLabel = document.getElementById('model-location-select');
+  modelLocationLabel.textContent = i18["model-location-select"];
+  modelLocationInput.setAttribute("placeholder", i18["model-placeholder"]);
+  document.getElementById(customModel.type).checked = true;
+  const replace = document.querySelector('label[for="replace"]');
+  replace.textContent = i18["replace"];
+  const append = document.querySelector('label[for="append"]');
+  append.textContent = i18["append"];
+
+  document.getElementById('training-parameters-title').textContent = i18["training-parameters-title"];
+  document.getElementById('augmentations-title').textContent = i18["augmentations-title"];
+  document.getElementById('classifier-title').textContent = i18["classifier-title"];
+
+
+  const hiddenUnitsInput = document.getElementById('hidden-units');
+  hiddenUnitsInput.value = settings.hidden;
+  const hidden = document.querySelector('label[for="hidden-units"]');
+  hidden.textContent = i18["hidden-units"];
+  const dropout = document.getElementById('dropout');
+  const dropoutLabel = document.querySelector('label[for="dropout"]');
+  dropoutLabel.textContent = i18["dropout"];
+  dropout.value = settings.dropout;
+  dropout.disabled = !settings.hidden;
+  const lr = document.getElementById('lr');
+  lr.value = settings.lr;
+  const lrLabel = document.querySelector('label[for="lr"]');
+  lrLabel.textContent = i18["lr"];
+  const epochs = document.getElementById('epochs');
+  epochs.value = settings.epochs;
+  const epochsLabel = document.querySelector('label[for="epochs"]');
+  epochsLabel.textContent = i18["epochs"];
+  const labelSmoothing = document.getElementById('label-smoothing');
+  labelSmoothing.value = settings.labelSmoothing;
+  const labelSmoothingLabel = document.querySelector('label[for="label-smoothing"]');
+  labelSmoothingLabel.textContent = i18["label-smoothing"];
+  const decay = document.getElementById('decay');
+  decay.checked = settings.decay;
+  const decayLabel = document.querySelector('label[for="decay"]');
+  decayLabel.textContent = i18["decay"];
+  // Only allow class weights if not using focal loss
+  const weights = document.getElementById('weights');
+  weights.checked = settings.useWeights;
+  weights.disabled = settings.useFocal;
+  const weightsLabel = document.querySelector('label[for="weights"]');
+  weightsLabel.textContent = i18["weights"];
+  document.getElementById('focal').checked = settings.useFocal;
+  const focalLabel = document.querySelector('label[for="focal"]');
+  focalLabel.textContent = i18["focal"];
+  document.getElementById('mixup').checked = settings.mixup;
+  const mixupLabel = document.querySelector('label[for="mixup"]');
+  mixupLabel.textContent = i18["mixup"];
+  const roll = document.getElementById('roll');
+  roll.checked = settings.useRoll;
+  const rollLabel = document.querySelector('label[for="roll"]');
+  rollLabel.textContent = i18["roll"];
+  document.getElementById('use-noise').checked = settings.useNoise;
+  const useNoiseLabel = document.querySelector('label[for="use-noise"]');
+  useNoiseLabel.textContent = i18["use-noise"];
+  document.getElementById('useCache').checked = settings.useCache;
+  const useCacheLabel = document.querySelector('label[for="useCache"]');
+  useCacheLabel.textContent = i18["useCache"];
+  document.getElementById('validation-split').value = settings.validation;
+  const validationSplitLabel = document.querySelector('label[for="validation-split"]');
+  validationSplitLabel.textContent = i18["validation-split"];
+
+  document.getElementById('train').textContent = i18["train"];
+  document.getElementById('training-dismiss').textContent = i18["training-dismiss"];
+
+
   training.show();
 }
 
 const importModal = new bootstrap.Modal(document.getElementById("import-modal"));
-const showImport = () => importModal.show();
+const showImport = () => {
+  const i18 = i18n.get(i18n.ManageModels);
+  const importTitle = document.getElementById("import-modal-label");
+  importTitle.textContent = i18["import-model-label"];
+  const modelName = document.getElementById("model-name-text");
+  modelName.textContent = i18["model-name-text"];
+  const modelNameInput = document.getElementById("model-name");
+  modelNameInput.value = "";
+  modelNameInput.setAttribute("placeholder", i18["model-name-placeholder"]);
+  const modelFile = document.getElementById("import-location-select");
+  modelFile.textContent = i18["import-location-select"];
+  const importLocation = document.getElementById("import-location");
+  importLocation.setAttribute("placeholder", i18["model-location-placeholder"]);
+  const importBtn = document.getElementById("import");
+  importBtn.textContent = i18["import"];
+
+  importModal.show();
+}
 
 const expungeModal = new bootstrap.Modal(document.getElementById("expunge-modal"));
-const showExpunge = () => expungeModal.show();
+const showExpunge = () => {
+  const i18 = i18n.get(i18n.ManageModels);
+  const expungeTitle = document.getElementById("expunge-modal-label");
+  expungeTitle.textContent = i18["expunge-modal-label"];
+  const expungeModel = document.getElementById("expunge-model");
+  expungeModel.textContent = i18["expunge-model"];
+  const expungeWarning = document.getElementById("expunge-warning");
+  expungeWarning.textContent = i18["expunge-warning"];
+  const expungeBtn = document.getElementById("expunge");
+  expungeBtn.textContent = i18["expunge"];
+  expungeModal.show();
+}
 /**
  * Handles initialization tasks after the audio model is ready.
  *
@@ -3264,11 +3362,11 @@ function onModelReady() {
 }
 
 /**
- * Processes audio data loaded by the worker, updates global state, resets regions, and refreshes the spectrogram and UI.
+ * Handles audio data loaded by the worker, updating application state, resetting regions, and refreshing the spectrogram and UI.
  *
- * Assigns the loaded audio buffer and metadata to the application state, updates timing information, resets any existing audio regions, and refreshes the spectrogram display. Also updates the filename panel and enables analysis menu options if a model is ready.
+ * Updates the current audio buffer, file metadata, timing, and UI elements after an audio file is loaded. Resets audio regions, refreshes the spectrogram display, and enables analysis menu options if a model is ready.
  *
- * @param {Object} params - Audio load parameters.
+ * @param {Object} params - Parameters for the loaded audio.
  * @param {*} params.location - Identifier for the audio source location.
  * @param {number} [params.fileStart=0] - Start time of the audio file in milliseconds since the Unix epoch.
  * @param {number} [params.fileDuration=0] - Duration of the audio file in seconds.
@@ -3316,9 +3414,9 @@ async function onWorkerLoadedAudio({
   }
 
   const initialTime = config.timeOfDay
-    ? new Date(fileStart)
-    : new Date(0, 0, 0, 0, 0, 0, 0);
-  STATE.bufferStartTime = new Date(initialTime.getTime() + windowBegin * 1000);
+    ? fileStart
+    : new Date(0, 0, 0, 0, 0, 0, 0).getTime();
+  STATE.bufferStartTime = new Date(initialTime + windowBegin * 1000);
 
   if (STATE.windowLength > STATE.currentFileDuration) STATE.windowLength = STATE.currentFileDuration;
 
@@ -3502,16 +3600,16 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
 };
 
 /**
- * Completes result processing by updating the UI and activating the appropriate result row.
+ * Finalizes result processing by updating the results table UI and activating the appropriate result row.
  *
- * Replaces the results table with the latest content, resets analysis state, and determines which row to activate based on provided options or table state. Ensures the active row is selected, clicked, and scrolled into view, then updates related UI elements.
+ * Replaces the results table with the latest data, resets analysis state, and determines which row to activate based on the provided options or current table state. Ensures the selected row is activated and scrolled into view, updates sorting indicators, and refreshes related UI panels.
  *
- * @param {Object} [options={}] - Options for result row activation.
- * @param {number} [options.active] - Index of the row to activate.
- * @param {*} [options.select] - Value used to determine the row to activate via a helper function.
+ * @param {Object} [options={}] - Options for determining which result row to activate.
+ * @param {number} [options.active] - Index of the row to activate, if specified.
+ * @param {*} [options.select] - Value used to identify the row to activate via a helper function.
  */
 function onResultsComplete({ active = undefined, select = undefined } = {}) {
-  PREDICTING = false;
+  PREDICTING = false; powerSave(false);
   disableSettingsDuringAnalysis(false);
   DOM.resultTable.replaceWith(resultsBuffer.cloneNode(true));
   resultsBuffer.textContent = "";
@@ -3563,24 +3661,16 @@ function onResultsComplete({ active = undefined, select = undefined } = {}) {
 
 
 /**
- * Retrieves the index of a table row whose associated start time matches a specified value.
+ * Returns the index of the first table row whose parsed start time matches the specified value.
  *
- * Iterates over the rows of an HTML table, extracting the start time from each row's "name" attribute.
- * The "name" attribute is expected to be a string with values separated by a "|" character, where the
- * second element represents the start time. If the "name" attribute is absent, a default value of 0 is used.
- *
- * @param {HTMLTableElement} table - The table element containing rows to search.
- * @param {number} start - The target start time to match against the row's parsed start time.
- * @returns {number|undefined} The index of the first row with a matching start time, or undefined if no match is found.
+ * @param {HTMLTableElement} table - The table to search.
+ * @param {number} start - The start time to match.
+ * @returns {number|undefined} The index of the matching row, or undefined if not found.
  */
 function getRowFromStart(table, start) {
   for (var i = 0; i < table.rows.length; i++) {
     const row = table.rows[i];
-    // Get the value of the name attribute and split it on '|'
-    // Start time is the second value in the name string
-    const nameAttr = row.getAttribute("name");
-    // no nameAttr for start civil twilight row
-    const startTime = nameAttr ? nameAttr.split("|")[1] : 0;
+    const startTime = unpackNameAttr(row).start || 0;
 
     // Check if the second value matches the 'select' variable
     if (parseFloat(startTime) === start) {
@@ -3590,15 +3680,15 @@ function getRowFromStart(table, start) {
 }
 
 /**
- * Completes the audio analysis process by updating application state, restoring UI controls, and logging diagnostic metrics.
+ * Finalizes the audio analysis process by updating application state, restoring UI controls, and logging diagnostics.
  *
- * Resets prediction status, re-enables settings, updates analysis state, and manages menu item availability based on disk records. Hides the progress indicator. If not in quiet mode, calculates and logs analysis duration and rate, tracks relevant events, and displays a completion notification.
+ * Resets prediction status, re-enables settings, updates analysis completion state, and manages menu item availability based on whether disk records exist. Hides the progress indicator. If not in quiet mode, logs analysis duration and rate, tracks relevant events, updates diagnostics, and displays a completion notification.
  *
  * @param {Object} options - Analysis completion options.
  * @param {boolean} options.quiet - If true, suppresses diagnostic tracking and notifications.
  */
 function onAnalysisComplete({ quiet }) {
-  PREDICTING = false;
+  PREDICTING = false; powerSave(false);
   disableSettingsDuringAnalysis(false);
   STATE.analysisDone = true;
   STATE.diskHasRecords && utils.enableMenuItem(["explore", "charts"]);
@@ -4075,10 +4165,19 @@ const exportAudio = () => {
   sendFile("save", result);
 };
 
+/**
+ * Loads and localizes a modal's HTML content based on the specified filename and locale.
+ *
+ * For certain help files ("usage", "settings", "ebird", "training"), loads a locale-specific HTML file directly. For other files, loads the base HTML and applies localization by replacing element contents using a corresponding JSON file if available. Returns the localized HTML as a string, or the original HTML if localization data is missing. Returns null if an error occurs.
+ *
+ * @param {string} filename - The base name of the modal or help file to load.
+ * @param {string} locale - The locale code (e.g., "en", "de") for localization.
+ * @returns {Promise<string|null>} The localized HTML content as a string, or null if loading fails.
+ */
 async function localiseModal(filename, locale) {
   try {
     // Fetch the HTML file
-    if (["usage", "settings", "ebird"].includes(filename)) {
+    if (["usage", "settings", "ebird", "training"].includes(filename)) {
       filename = `Help/${filename}.${locale}.html`;
       const htmlResponse = await fetch(filename);
       if (!htmlResponse.ok)
@@ -4592,13 +4691,7 @@ document.addEventListener("drop", (event) => {
           file.type.startsWith("audio/") ||
           file.type.startsWith("video/"))
     );
-  let audioFiles;
-  if (fileList[0].path){
-    audioFiles = fileList.map((file) => file.path);
-  } else {
-  // For electron 32+
-    audioFiles = fileList.map(file => window.electron.showFilePath(file));
-  }
+  const audioFiles = fileList.map(file => window.electron.showFilePath(file));
   worker.postMessage({ action: "get-valid-files-list", files: audioFiles });
 });
 
@@ -4730,6 +4823,10 @@ const hideConfidenceSlider = () => {
   confidenceSliderDisplay.classList.add("d-none");
 };
 
+/**
+ * Updates the threshold display and input values in both the filter and settings panels.
+ * @param {Event|number} e - The input event or numeric threshold value to display and set.
+ */
 function showThreshold(e) {
   const threshold = e instanceof Event ? e.target.valueAsNumber : e;
   filterPanelThresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
@@ -4737,8 +4834,18 @@ function showThreshold(e) {
   filterPanelRangeInput.value = threshold;
   settingsPanelRangeInput.value = threshold;
 }
-// settingsPanelRangeInput.addEventListener("input", showThreshold);
-// filterPanelRangeInput.addEventListener("input", showThreshold);
+
+/**
+ * Updates the UI to display the current topRankin threshold value.
+ * 
+ * Accepts either an event or a numeric value, updates the display element with the threshold, and sets the input value accordingly.
+ */
+function showTopRankin(e) {
+  const threshold = e instanceof Event ? e.target.valueAsNumber : e;
+  const topRankinDisplay = document.getElementById('top-rankin-value')
+  topRankinDisplay.innerHTML = `<b>${threshold}</b>`;
+  document.getElementById('top-rankin').value = threshold;
+}
 
 const handleThresholdChange = (e) => {
   const threshold = e.target.valueAsNumber;
@@ -4864,6 +4971,16 @@ document.addEventListener('input', (e) =>{
       showThreshold(e)
       break;
     }
+    case "top-rankin": {
+      showTopRankin(e);
+      config.detect.topRankin = el.valueAsNumber;
+      updatePrefs('config.json', config)
+      worker.postMessage({
+        action: "update-state",
+        detect: config.detect,
+      });
+      break;
+    }
     case "thread-slider": {
       DOM.numberOfThreads.textContent = DOM.threadSlider.value;
       break;
@@ -4972,9 +5089,9 @@ const showRelevantAudioQuality = () => {
 };
 document.addEventListener("click", debounceClick(handleUIClicks));
 /**
- * Central handler for UI click events, dispatching actions based on the clicked element's ID.
+ * Handles all UI click events by dispatching actions based on the clicked element's ID.
  *
- * Routes user interactions to the appropriate application logic, including file operations, analysis commands, menu actions, settings adjustments, help dialogs, sorting, context menu actions, and UI updates. Updates application state, communicates with the worker thread, manages configuration, and triggers relevant UI changes as needed.
+ * Routes user clicks to the appropriate application logic, including file operations, analysis commands, model management, settings adjustments, help dialogs, sorting, context menu actions, and UI updates. Updates application state, communicates with the worker thread, manages configuration, and triggers relevant UI changes as needed.
  *
  * @param {MouseEvent} e - The click event object.
  */
@@ -5194,6 +5311,8 @@ async function handleUIClicks(e) {
         if (!files.canceled) {
           const modelFolder = files.filePaths[0];
           document.getElementById("import-location").value = modelFolder;
+          const modelNameInput = document.getElementById("model-name");
+          modelNameInput.value = p.basename(modelFolder);
         }
       })();
       break;
@@ -5240,13 +5359,16 @@ async function handleUIClicks(e) {
           break;
         }
       }
-      DOM.trainNav.classList.add('disabled')
+      const trainBtn = document.getElementById('train');
+      trainBtn.classList.add('disabled');
+      trainBtn.blur();
       training.hide();
       displayProgress({percent: 0}, 'Starting...')
       disableSettingsDuringAnalysis(true)
       const backend = config.models[config.selectedModel].backend;
       const batchSize = config[backend].batchSize;
       STATE.training = true;
+      powerSave(true);
       worker.postMessage({
         action: "train-model", 
         dataset, cache, modelLocation, modelType, batchSize, ...settings});
@@ -5354,6 +5476,10 @@ async function handleUIClicks(e) {
       (async () => await populateHelpModal("ebird", i18n.Help.eBird[locale]))();
       break;
     }
+    case "trainingHelp": {
+      (async () => await populateHelpModal("training", i18n.Help.training[locale]))();
+      break;
+    }
     case "copy-uuid": {
       // Get the value from the input element
       const copyText = document
@@ -5400,6 +5526,7 @@ async function handleUIClicks(e) {
     }
     // XC compare play/pause
     case "playComparison": {
+      config.selectedModel.includes("bats") && ws.setPlaybackRate(0.1, false);
       ws.playPause();
       break;
     }
@@ -5553,9 +5680,13 @@ async function handleUIClicks(e) {
       config.audio.frequencyMax = 11950;
       const {frequencyMax, frequencyMin} = config.audio;
       DOM.fromInput.value = frequencyMin;
+      // DOM.fromInput.max = frequencyMax;
       DOM.fromSlider.value = frequencyMin;
+      // DOM.fromSlider.max = frequencyMax;
+      // DOM.toInput.max = frequencyMax;
       DOM.toInput.value = frequencyMax;
       DOM.toSlider.value = frequencyMax;
+      // DOM.toSlider.max = frequencyMax;
       fillSlider(
         DOM.fromInput,
         DOM.toInput,
@@ -5609,17 +5740,15 @@ async function handleUIClicks(e) {
       break;
     }
     case "model-icon": {
-      if (PREDICTING) {
-        // generateToast({ message: "changeListBlocked", type: "warning" });
-        return;
+      if (!PREDICTING) {
+        const el = DOM.modelToUse;
+        const numberOfOptions = el.options.length;
+        const currentListIndex = el.selectedIndex;
+        const next = currentListIndex === numberOfOptions - 1 ? 0 : currentListIndex + 1;
+        config.selectedModel = el.options[next].value;
+        el.selectedIndex = next;
+        handleModelChange(config.selectedModel)
       }
-      const el = DOM.modelToUse;
-      const numberOfOptions = el.options.length;
-      const currentListIndex = el.selectedIndex;
-      const next = currentListIndex === numberOfOptions - 1 ? 0 : currentListIndex + 1;
-      config.selectedModel = el.options[next].value;
-      el.selectedIndex = next;
-      handleModelChange(config.selectedModel)
       break;
     }
     case "nocmigMode": {
@@ -5821,6 +5950,7 @@ document.addEventListener("change", async function (e) {
         case "epochs": {
           config.training.settings.epochs = element.valueAsNumber; break}
         case "useCache": {config.training.settings.useCache = element.checked; break}
+        case "use-noise": {config.training.settings.useNoise = element.checked; break}
         case "mixup": {config.training.settings.mixup = element.checked; break}
         case "decay": {config.training.settings.decay = element.checked; break}
         case "weights": {config.training.settings.useWeights = element.checked; break}
@@ -5838,7 +5968,6 @@ document.addEventListener("change", async function (e) {
         case "roll": {config.training.settings.useRoll = element.checked; break}
         // --- Backends
         case "tensorflow":
-        case "webgl":
         case "webgpu": { handleBackendChange(target); break }
         case "species-frequency-threshold": {
           if (isNaN(element.value) || element.value === "") {
@@ -5970,11 +6099,6 @@ document.addEventListener("change", async function (e) {
         }
         case "audio-notification": {
           config.audio.notification = element.checked;
-          break;
-        }
-        case "power-save-block": {
-          config.powerSaveBlocker = element.checked;
-          powerSave(config.powerSaveBlocker);
           break;
         }
         case "species-week": {
@@ -6244,7 +6368,7 @@ document.addEventListener("change", async function (e) {
 const flushSpec = async () =>{
   DOM.waveElement.replaceChildren();
   DOM.spectrogram.replaceChildren();
-  spec.wavesurfer.destroy();
+  spec.wavesurfer?.destroy();
   spec = new ChirpityWS(
     "#waveform",
     () => STATE, // Returns the current state
@@ -6252,8 +6376,10 @@ const flushSpec = async () =>{
     { postBufferUpdate, trackEvent, setActiveRegion, onStateUpdate: state.update, updatePrefs },
     GLOBAL_ACTIONS
   );
-  await spec.initAll({audio:STATE.currentBuffer, height: STATE.specMaxHeight})
-  spec.reload()
+  if (STATE.currentBuffer){
+    await spec.initAll({audio:STATE.currentBuffer, height: STATE.specMaxHeight})
+    spec.reload()
+  }
 }
 
 /**
@@ -6526,7 +6652,6 @@ const recordEntryModal = new bootstrap.Modal(recordEntryModalDiv, {
 });
 
 const recordEntryForm = document.getElementById("record-entry-form");
-// let focusBirdList;
 
 /**
  * Displays and populates the record entry modal for adding or updating audio record details.
@@ -6689,15 +6814,15 @@ const insertManualRecord = ( {
 };
 
 /**
- * Updates the UI to reflect whether a custom frequency filter is active.
+ * Updates the frequency filter UI to indicate whether a custom frequency range is active.
  *
- * Checks the audio configuration to determine if the frequency range has been altered from its default
- * (frequencyMin > 0 or frequencyMax < 11950). If so, it applies warning styles to the frequency range display
- * and enables the reset button. Otherwise, it restores the default styling.
+ * Applies warning styles and enables the reset button if the frequency range differs from the default; otherwise, restores default styles and disables the reset button.
  */
 function checkFilteredFrequency() {
   const resetButton = document.getElementById("reset-spec-frequency");
-  if (config.audio.frequencyMin > 0 || config.audio.frequencyMax < 11950) {
+  // const defaultMax = config.selectedModel.includes('slow') ? 120000 : 11950;
+  const defaultMax = 11950;
+  if (config.audio.frequencyMin > 0 || config.audio.frequencyMax < defaultMax) {
     document.getElementById("frequency-range").classList.add("text-warning");
     resetButton.classList.add("btn-warning");
     resetButton.classList.remove("btn-secondary", "disabled");
@@ -6908,17 +7033,14 @@ function checkForMacUpdates() {
 /**
  * Displays a toast notification in the UI with optional localization, icon, and notification sound.
  *
- * The toast can be customized by type (info, warning, error), message variables, and autohide behavior. For certain messages (e.g., analysis completion), it may also trigger a desktop notification or play a sound if enabled in the configuration.
+ * The toast can be customized by type (info, warning, error), message variables, and autohide behavior. For certain messages, such as analysis completion after a long duration, it may also trigger a desktop notification or play a sound if enabled in the configuration.
  *
  * @param {Object} [options] - Toast configuration options.
  * @param {string} [options.message] - The message key or text to display.
  * @param {string} [options.type] - The type of toast ('info', 'warning', or 'error').
- * @param {boolean} [options.autohide] - Whether the toast should automatically hide.
+ * @param {boolean} [options.autohide] - Whether the toast should automatically hide. Defaults to true unless the type is 'error'.
  * @param {Object} [options.variables] - Variables for message interpolation.
  * @param {string} [options.locate] - Additional HTML or text to append to the message.
- *
- * @remark
- * If the message indicates analysis completion and the analysis duration exceeds 30 seconds, a desktop notification or sound is triggered based on user settings and notification permissions.
  */
 function generateToast({
   message = "",
@@ -7031,8 +7153,13 @@ function generateToast({
   }
 }
 
+/**
+ * Fetches and displays Xeno-Canto audio comparisons for the currently selected species and call type.
+ *
+ * Attempts to load cached comparison data; if unavailable, queries the Xeno-Canto API for relevant recordings, supporting both bird and bat models with appropriate call types and duration filters. Deduplicates and limits results per call type, updates the cache, and renders the comparison UI. Notifies the user if no suitable comparisons are found.
+ */
 async function getXCComparisons() {
-  let [, , , sname, cname] = activeRow.getAttribute("name").split("|");
+  let {sname, cname} = unpackNameAttr(activeRow);
   cname.includes("call)") ? "call" : "";
   let XCcache;
   try {
@@ -7051,20 +7178,21 @@ async function getXCComparisons() {
     DOM.loading.querySelector("#loadingText").textContent =
       "Loading Xeno-Canto data...";
     DOM.loading.classList.remove("d-none");
+    const bats = config.selectedModel.includes('bats');
     const quality = "+q:%22>C%22";
-    const defaultLength = "+len:3-15";
+    const defaultLength = bats ? "+len:0.5-10" : "+len:3-15";
     sname = XCtaxon[sname] || sname;
-    
-    const types = ["nocturnal flight call", "flight call", "call", "song"];
-    const filteredLists = {
-      "nocturnal flight call": [],
-      "flight call": [],
-      call: [],
-      song: []
-    };
+    const types = bats
+      ? ["distress call", "feeding buzz", "social call", "ecolocation", "song"]
+      : ["nocturnal flight call", "flight call", "call", "song"];
+    const filteredLists = {}
+    types.forEach((type) => {
+      filteredLists[type] = []; // Initialize each type with an empty array
+    });
     
     // Create an array of promises—one for each call type
     const fetchRequests = types.map((type) => {
+      type = type.replaceAll(" ", "%20"); // Replace spaces with underscores for the API query
       // Use a different length parameter for "song"
       const typeLength = type === "song" ? "+len:10-30" : defaultLength;
       const query = `https://xeno-canto.org/api/3/recordings?key=d5e2d2775c7f2b2fb8325ffacc41b9e6aa94679e&query=sp:"${sname}"${quality}${typeLength}+type:"${type}"`;
@@ -7126,12 +7254,7 @@ async function getXCComparisons() {
       });
       
       // If all lists are empty, notify the user
-      if (
-        !filteredLists["nocturnal flight call"].length &&
-        !filteredLists["flight call"].length &&
-        !filteredLists.call.length &&
-        !filteredLists.song.length
-      ) {
+      if (Object.values(filteredLists).every(arr => arr.length === 0)) {
         generateToast({ type: "warning", message: "noComparisons" });
         return;
       }
@@ -7313,8 +7436,10 @@ function renderComparisons(lists, cname) {
 import WaveSurfer from "../node_modules/wavesurfer.js/dist/wavesurfer.esm.js";
 import Spectrogram from "../node_modules/wavesurfer.js/dist/plugins/spectrogram.esm.js";
 let ws;
+
 const createCompareWS = (mediaContainer) => {
-  if (ws) ws.destroy();
+  ws?.destroy();
+  const bats = config.selectedModel.includes('bats');
   ws = WaveSurfer.create({
     container: mediaContainer,
     backgroundColor: "rgba(0,0,0,0)",
@@ -7326,7 +7451,7 @@ const createCompareWS = (mediaContainer) => {
     cursorWidth: 2,
     height: 256,
     minPxPerSec: 195,
-    sampleRate: 24000,
+    sampleRate: bats ? 256000 : 24000,
   });
   // set colormap
   const colors = spec.createColormap(config);
@@ -7335,7 +7460,7 @@ const createCompareWS = (mediaContainer) => {
       Spectrogram.create({
         windowFunc: "hann",
         frequencyMin: 0,
-        frequencyMax: 12_000,
+        frequencyMax: bats ? 120_000 : 12_000,
         labels: true,
         fftSamples: 256,
         height: 256,
@@ -7390,14 +7515,11 @@ const IUCNMap = {
 export { config, displayLocationAddress, LOCATIONS, generateToast };
 
 /**
- * Checks the user's membership status and updates the UI to reflect feature access.
+ * Checks the user's membership status via a remote API and updates the UI to reflect feature access.
  *
- * Verifies membership via a remote API using the user's UUID, manages trial period eligibility based on installation date, and caches membership status in localStorage. If the remote check fails, uses a cached status if it is less than one week old. Updates UI elements to lock or unlock features, adjusts button states, and changes the logo for members.
+ * Determines if the user is a member or within a trial period, unlocking or locking premium features accordingly. If the remote check fails, uses a cached membership status if available and less than one week old. Updates UI elements, feature availability, and branding based on membership state.
  *
  * @returns {Promise<boolean|undefined>} Resolves to `true` if the user is a member or within the trial period, `false` if not, or `undefined` if status cannot be determined and no valid cache exists.
- *
- * @remark
- * If the remote membership check fails but a valid cached status exists (less than one week old), the cached status is used to grant access.
  */
 async function membershipCheck() {
   const oneWeek = 7 * 24 * 60 * 60 * 1000; // "It's been one week since you looked at me, cocked your head to the side..."
@@ -7435,6 +7557,12 @@ async function membershipCheck() {
     config.detect.merge = false;
     config.library.clips = false;
     config.database.location = "";
+    // Set all backends to 'tensorflow'
+    if (config.hasNode){
+      Object.values(config.models).forEach(model => {
+        model.backend = 'tensorflow';
+      });
+    }
     lockedElements.forEach((el) => {
       el.classList.replace("unlocked", "locked");
 
@@ -7474,6 +7602,9 @@ async function membershipCheck() {
       } else {
         setLocks()
         localStorage.setItem("isMember", false);
+        if (!['birdnet', 'nocmig', 'chirpity'].includes(config.selectedModel)) {
+          config.selectedModel = 'birdnet'      
+        }
       }
 
       console.info(

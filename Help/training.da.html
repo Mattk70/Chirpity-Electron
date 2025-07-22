@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <title>Træningsindstillinger</title>
+</head>
+<body>
+<div class="w-100 alert alert-warning" role="alert">Træningsfunktioner er kun tilgængelige, når du bruger BirdNET-modellen</div>
+<table class="table table-hover p-1">
+    <tr>
+        <td><b>Placering af træningslyd</b></td>
+        <td>Lydfiler til træning skal organiseres i mapper, hvor hver mappe indeholder lydfiler for en enkelt art.
+            Mappenavnene skal være artsnavnet i formatet <code>Videnskabeligt navn_Almindeligt navn</code>, som anvendt af BirdNET- og Nocmig-modellerne.</td>
+    </tr>
+    <tr>
+        <td><b>Placering af datasæt-cache</b></td>
+        <td>Datasæt-cachen er det sted, hvor Chirpity gemmer behandlede lydfiler og metadata. Hvis ingen placering er valgt,
+            bruges træningslydplaceringen. Det anbefales at vælge en placering på en hurtig SSD for optimal ydeevne.</td>
+    </tr>
+    <tr>
+        <td><b>Brug cachet datasæt hvis det findes</b></td>
+        <td>
+            <p>Det tager noget tid at forberede datasæt-cachen. Når denne mulighed er valgt, vil cachen ikke blive genskabt
+                hver gang træningen startes.</p>
+            <p>Hvis du ændrer trænings-/valideringsopdelingen, nulstilles denne mulighed.</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Placering for at gemme model</b></td>
+        <td>
+            <p>Her gemmer Chirpity de trænede modelfiler.</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Erstat eller tilføj etiketter</b></td>
+        <td>
+            <p>Hvis &quot;Erstat etiketter&quot; er valgt, vil den gemte model have klasserne fra mapperne i dit træningsdatasæt.</p>
+            <p>Hvis &quot;Tilføj etiketter&quot; er valgt, bevarer den gemte model de eksisterende klasser fra BirdNET og tilføjer eventuelle nye klasser fra mapperne i dit træningsdatasæt.</p>
+            <p><b>Vigtigt:</b> Nye klasser må ikke have samme navn som en eksisterende klasse. For at tilsidesætte en eksisterende klasse, bør du tilføje et &quot;-&quot; til klassens navn. For eksempel: <i>Turdus iliacus_Redwing-</i></p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Træningsparametre</b></td>
+        <td>
+            <p>Disse felter angiver de grundlæggende træningsparametre for modellen.</p>
+            <ul>
+                <li><b>Epochs:</b> Antallet af gange dit datasæt bliver kørt igennem modellen under træningen.</li>
+                <li><b>Læringsrate:</b> Kontrollerer hvor meget modellen ændres som reaktion på den anslåede fejl hver gang vægtene opdateres.</li>
+                <li><b>Etikette-udjævning:</b> En teknik, der gør modellen mere robust ved at forhindre overdreven selvtillid i en enkelt klasse.</li>
+                <li><b>Brug fokustab:</b> En teknik, der håndterer klasseskævhed ved at fokusere mere på svære eksempler.</li>
+                <li><b>Brug klassevægte:</b> En teknik, der giver mere vægt til underrepræsenterede klasser under træning.</li>
+                <li><b>Brug faldende læringsrate:</b> En teknik, der reducerer læringsraten over tid, hvilket tillader mere præcise justeringer af modellen efterhånden som træningen skrider frem.</li>
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Lyddatasæt</b></td>
+        <td>
+            Her kan du vælge en del af datasættet til validering. Valideringsdata bruges ikke til at træne modellen,
+            men til at evaluere modellens præstation – dens evne til at generalisere – under træning.
+        </td>
+    </tr>
+    <tr>
+        <td><b>Augmenteringer</b></td>
+        <td>
+            <p>Disse muligheder styrer, hvordan træningsdata bliver ændret for at forbedre modellens robusthed.</p>
+            <ul>
+                <li><b>Mixup:</b> En teknik der kombinerer to eller flere træningseksempler for at skabe et nyt syntetisk eksempel. Det kan hjælpe modellen med at generalisere bedre ved at udsætte den for en større variation.</li>
+                <li><b>Rul:</b> En teknik der forskyder lyddata langs tidsaksen og skaber nye træningseksempler. Det kan gøre modellen mere tolerant over for små tidsmæssige forskydninger.</li>
+                <li><b>Bland baggrundsstøj ind:</b> En teknik der tilføjer baggrundsstøj til træningseksemplerne, hvilket gør modellen mere robust i støjende omgivelser.</li>
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Klassifikator</b></td>
+        <td>
+            <p>Disse indstillinger styrer, hvordan klassifikatoren er struktureret for at forbedre præstationen.</p>
+            <ul>
+                <li><b>Skjulte enheder:</b> Antallet af neuroner i klassifikatorens skjulte lag. Flere skjulte enheder gør det muligt for modellen at lære mere komplekse mønstre, men kan også føre til <a href="https://developers.google.com/machine-learning/crash-course/overfitting/overfitting" target="_blank">overfitting</a>. Hvis 0, bruges ingen skjulte lag.</li>
+                <li><b>Dropout:</b> En teknik hvor en del af inputenhederne sættes tilfældigt til 0 under træning, hvilket hjælper med at forhindre overfitting.</li>
+            </ul>
+        </td>
+    </tr>
+</table>
+
+</body>
+</html>

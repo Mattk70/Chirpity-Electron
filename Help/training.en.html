@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Training Settings</title>
+</head>
+<body>
+
+<div class="w-100 alert alert-warning" role="alert">Training functions are only available when using the BirdNET model</div>
+
+<table class="table table-hover p-1">
+    <tr>
+        <td><b>Training Audio Location</b></td>
+        <td>Audio files for training should be organised into folders, with each folder containing audio files for a single species. 
+            The folder names should be the species name, in the format <code>Scientific name_Common name</code> used by the BirdNET and Nocmig models.
+        </td>
+    </tr>
+    <tr>
+        <td><b>Dataset Cache Location</b></td>
+        <td>The dataset cache location is where Chirpity stores processed audio files and metadata. If no value is selected, 
+            the training audio location is used. It is best to choose a location on a fast SSD for optimal performance.</td>
+    </tr>
+    <tr>
+        <td><b>Use the cached dataset if it exists</b></td>
+        <td>
+            <p>It takes some time to prepare the dataset cache. When this option is checked, the cache will not be recreated 
+                each time training is started.</p>
+            <p>If you change the training / validation split, this option will be reset.</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Model Save Location</b></td>
+        <td>
+            <p>The model save location is where Chirpity will store the trained model files.</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Replace or Append labels</b></td>
+        <td>
+            <p>If &quot;Replace labels&quot; is selected, the saved model will have the classes from the folders in your training dataset.</p>
+            <p>If &quot;Append labels&quot; is selected, the saved model will keep the existing classes from BirdNET and add any new classes from the folders in your training dataset.</p>
+            <p><b>Important:</b> New classes cannot share the same name as an existing class. To override an existing class, you should append a &quot;-&quot; to the class name. For example: <i>Turdus iliacus_Redwing-</i></p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Training Parameters</b></td>
+        <td>
+            <p>These fields set the basic training parameters for the model.</p>
+            <ul>
+                <li><b>Epochs:</b> This is the number of times your dataset is passed through the model during training.</li>
+                <li><b>Learning Rate:</b> This controls how much to change the model in response to the estimated error each time the model weights are updated.</li>
+                <li><b>Label Smoothing:</b> This is a technique used to make the model more robust by preventing it from becoming too confident about a single class.</li>
+                <li><b>Use focal loss:</b> This is a technique used to address class imbalance by putting more focus on hard-to-classify examples.</li>
+                <li><b>Use class weights:</b> This is a technique used to give more importance to under-represented classes during training.</li>
+                <li><b>Use learning rate decay:</b> This is a technique used to reduce the learning rate over time, allowing for more fine-grained updates to the model as training progresses.</li>
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Audio Dataset</b></td>
+        <td>
+            Here you can select a fraction of the dataset to set aside for validation. Validation data is not used to train the model, 
+            but is used to evaluate the model's performance - its ability to generalise - during training.
+        </td>
+    </tr>
+    <tr>
+        <td><b>Augmentations</b></td>
+        <td>
+            <p>These options control how the training data is augmented to improve model robustness.</p>
+            <ul>
+                <li><b>Mixup:</b> This is a technique that combines two or more training examples to create a new, synthetic example. This can help the model generalise better by exposing it to a wider variety of inputs.</li>
+                <li><b>Roll:</b> This is a technique that shifts the audio data along the time axis, creating new training examples by rolling the audio signal. This can help the model become more invariant to small shifts in the input. 
+                    </li>
+                <li><b>Mix in background noise:</b> This is a technique that adds background noise to the training examples, making the model more robust to noisy environments.</li>
+    
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Classifier</b></td>
+        <td>
+            <p>These options control how the classifier is structured to improve performance.</p>
+            <ul>
+                <li><b>Hidden Units:</b> This refers to the number of neurons in the hidden layers of the classifier. Increasing the number of hidden units can allow the model to learn more complex patterns, but may also lead to 
+                    <a href="https://developers.google.com/machine-learning/crash-course/overfitting/overfitting" target="_blank">overfitting</a>. 
+                    If 0, no hidden layers are used.</li>
+                <li><b>Dropout:</b> This is a technique that randomly sets a fraction of the input units to 0 at each update during training time, which helps prevent overfitting.</li>
+    
+            </ul>
+        </td>
+    </tr>
+</table>
+
+</body>
+</html>

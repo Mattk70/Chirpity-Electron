@@ -22,11 +22,11 @@ const CONFIG = {
 };
 
 /**
- * Loads the model configuration, sets up the TensorFlow.js backend, and initializes the global model instance for inference.
+ * Loads the model configuration, sets the TensorFlow.js backend, and initializes the global model instance for inference.
  *
- * Reads the model configuration for the specified version, configures the TensorFlow.js backend and environment flags, creates a mask tensor to filter specific prediction indexes, loads the model, and performs a warm-up with the given batch size. Notifies the worker when the model is ready by posting a "model-ready" message with relevant details.
+ * Reads the model configuration for the specified version, configures the backend, creates a mask tensor to filter out specific prediction classes, loads the model, and performs a warm-up with the provided batch size. Posts a "model-ready" message to notify when the model is ready for use.
  *
- * @param {Object} params - Parameters for loading the model, including model version, batch size, optional backend, and worker identifier.
+ * @param {Object} params - Contains model version, batch size, optional backend, and worker identifier.
  */
 function loadModel(params) {
   const version = params.model;
@@ -49,13 +49,6 @@ function loadModel(params) {
     );
   }
   tf.setBackend(backend).then(async () => {
-    if (backend === "webgl") {
-      tf.env().set("WEBGL_FORCE_F16_TEXTURES", true);
-      tf.env().set("WEBGL_EXP_CONV", true);
-    } else if (backend === "webgpu") {
-      // tf.env().set("WEBGPU_DEFERRED_SUBMIT_BATCH_SIZE", 64); // Affects GPU RAM at expense of speed
-      // tf.env().set("WEBGPU_CPU_HANDOFF_SIZE_THRESHOLD", 1000); // MatMulPackedProgram
-    }
     tf.enableProdMode();
     //tf.enableDebugMode();
     if (DEBUG) {
@@ -250,15 +243,8 @@ class ChirpityModel extends BaseModel {
   async predictBatch(TensorBatch, keys, threshold, confidence) {
     // const TensorBatch = this.fixUpSpecBatch(specs); // + 1 tensor
     // specs.dispose(); // - 1 tensor
-    let paddedTensorBatch, maskedTensorBatch;
-    if (
-      BACKEND === "webgl" &&
-      TensorBatch.shape[0] < this.batchSize &&
-      !this.selection
-    ) {
-      // WebGL backend works best when all batches are the same size
-      paddedTensorBatch = this.padBatch(TensorBatch); // + 1 tensor
-    } else if (threshold && BACKEND === "tensorflow" && !this.selection) {
+    let maskedTensorBatch;
+    if (threshold && BACKEND === "tensorflow" && !this.selection) {
     // This whole block is for SNR and currently unused
       if (this.version !== "v1") threshold *= 4;
       const keysTensor = tf.stack(keys); // + 1 tensor
@@ -299,7 +285,7 @@ class ChirpityModel extends BaseModel {
       }
     }
 
-    const tb = paddedTensorBatch || maskedTensorBatch || TensorBatch;
+    const tb =  maskedTensorBatch || TensorBatch;
     const rawPrediction = this.model.predict(tb, { batchSize: this.batchSize });
 
     // Zero prediction values for silence
@@ -327,7 +313,6 @@ class ChirpityModel extends BaseModel {
       prediction.dispose();
     }
     TensorBatch.dispose();
-    if (paddedTensorBatch) paddedTensorBatch.dispose();
     if (maskedTensorBatch) maskedTensorBatch.dispose();
 
     const finalRawPrediction = newPrediction || prediction;

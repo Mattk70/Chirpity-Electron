@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Configuración de Entrenamiento</title>
+</head>
+<body>
+
+<div class="w-100 alert alert-warning" role="alert">Las funciones de entrenamiento solo están disponibles cuando se utiliza el modelo BirdNET</div>
+<table class="table table-hover p-1">
+    <tr>
+        <td><b>Ubicación del Audio de Entrenamiento</b></td>
+        <td>Los archivos de audio para el entrenamiento deben estar organizados en carpetas, y cada carpeta debe contener archivos de audio de una sola especie.
+            Los nombres de las carpetas deben ser el nombre de la especie, en el formato <code>Nombre científico_Nombre común</code> utilizado por los modelos BirdNET y Nocmig.</td>
+    </tr>
+    <tr>
+        <td><b>Ubicación de la Caché del Conjunto de Datos</b></td>
+        <td>La ubicación de la caché del conjunto de datos es donde Chirpity guarda los archivos de audio procesados y los metadatos. Si no se selecciona ningún valor,
+            se utilizará la ubicación del audio de entrenamiento. Es recomendable elegir una ubicación en un SSD rápido para un rendimiento óptimo.</td>
+    </tr>
+    <tr>
+        <td><b>Usar la caché del conjunto de datos si existe</b></td>
+        <td>
+            <p>Preparar la caché del conjunto de datos lleva algo de tiempo. Cuando esta opción está seleccionada, la caché no se volverá a crear
+                cada vez que se inicie el entrenamiento.</p>
+            <p>Si cambias la división entre entrenamiento y validación, esta opción se restablecerá.</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Ubicación para Guardar el Modelo</b></td>
+        <td>
+            <p>La ubicación para guardar el modelo es donde Chirpity almacenará los archivos del modelo entrenado.</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Reemplazar o Añadir Etiquetas</b></td>
+        <td>
+            <p>Si se selecciona &quot;Reemplazar etiquetas&quot;, el modelo guardado tendrá las clases de las carpetas de tu conjunto de entrenamiento.</p>
+            <p>Si se selecciona &quot;Añadir etiquetas&quot;, el modelo guardado conservará las clases existentes de BirdNET y añadirá cualquier clase nueva de las carpetas de tu conjunto de entrenamiento.</p>
+            <p><b>Importante:</b> Las nuevas clases no pueden compartir el mismo nombre que una clase existente. Para sobrescribir una clase existente, debes añadir un &quot;-&quot; al nombre de la clase. Por ejemplo: <i>Turdus iliacus_Zorzal alirrojo-</i></p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Parámetros de Entrenamiento</b></td>
+        <td>
+            <p>Estos campos configuran los parámetros básicos de entrenamiento del modelo.</p>
+            <ul>
+                <li><b>Épocas:</b> Número de veces que tu conjunto de datos pasa por el modelo durante el entrenamiento.</li>
+                <li><b>Tasa de Aprendizaje:</b> Controla cuánto se ajusta el modelo en respuesta al error estimado cada vez que se actualizan los pesos.</li>
+                <li><b>Suavizado de Etiquetas:</b> Técnica para hacer que el modelo sea más robusto evitando que se vuelva demasiado confiado en una sola clase.</li>
+                <li><b>Usar pérdida focal:</b> Técnica para abordar el desequilibrio de clases enfocando más en ejemplos difíciles de clasificar.</li>
+                <li><b>Usar pesos por clase:</b> Técnica para dar más importancia a las clases subrepresentadas durante el entrenamiento.</li>
+                <li><b>Usar decaimiento de la tasa de aprendizaje:</b> Técnica para reducir la tasa de aprendizaje con el tiempo, permitiendo ajustes más finos conforme avanza el entrenamiento.</li>
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Conjunto de Datos de Audio</b></td>
+        <td>
+            Aquí puedes seleccionar una fracción del conjunto de datos para reservarla como validación. Los datos de validación no se usan para entrenar el modelo,
+            sino para evaluar su rendimiento — su capacidad de generalizar — durante el entrenamiento.
+        </td>
+    </tr>
+    <tr>
+        <td><b>Aumentaciones</b></td>
+        <td>
+            <p>Estas opciones controlan cómo se aumenta el conjunto de datos de entrenamiento para mejorar la robustez del modelo.</p>
+            <ul>
+                <li><b>Mixup:</b> Técnica que combina dos o más ejemplos de entrenamiento para crear un nuevo ejemplo sintético. Esto puede ayudar al modelo a generalizar mejor al exponerlo a una mayor variedad de entradas.</li>
+                <li><b>Desplazamiento (Roll):</b> Técnica que desplaza los datos de audio a lo largo del eje del tiempo, creando nuevos ejemplos de entrenamiento al mover la señal de audio.
+                    </li>
+                <li><b>Mezclar con ruido de fondo:</b> Técnica que añade ruido de fondo a los ejemplos de entrenamiento, haciendo que el modelo sea más robusto en entornos ruidosos.</li>
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Clasificador</b></td>
+        <td>
+            <p>Estas opciones controlan cómo se estructura el clasificador para mejorar el rendimiento.</p>
+            <ul>
+                <li><b>Unidades Ocultas:</b> Se refiere al número de neuronas en las capas ocultas del clasificador. Aumentar este número permite al modelo aprender patrones más complejos, aunque también puede provocar <a href="https://developers.google.com/machine-learning/crash-course/overfitting/overfitting" target="_blank">sobreajuste</a>.
+                    Si es 0, no se usan capas ocultas.</li>
+                <li><b>Dropout:</b> Técnica que pone aleatoriamente a cero una fracción de las unidades de entrada en cada actualización durante el entrenamiento, lo que ayuda a prevenir el sobreajuste.</li>
+            </ul>
+        </td>
+    </tr>
+</table>
+
+</body>
+</html>

@@ -10,7 +10,7 @@ const path = require("node:path");
 import { BaseModel } from "./BaseModel.js";
 import {trainModel} from './training.js';
 const {stft} = require("./custom-ops.js");
-const abortController = require('../utils/abortController.js');
+import abortController from '../utils/abortController.js';
 
 
 onmessage = async (e) => {
@@ -56,10 +56,6 @@ onmessage = async (e) => {
           );
 
         tf.setBackend(backend).then(async () => {
-          if (backend === "webgl") {
-            tf.env().set("WEBGL_FORCE_F16_TEXTURES", true);
-            tf.env().set("WEBGL_EXP_CONV", true);
-          }
           tf.enableProdMode();
           if (DEBUG) {
             console.log(tf.env());
@@ -183,7 +179,7 @@ class BirdNETModel extends BaseModel {
     DEBUG && console.log("predictCunk end", tf.memory());
     return [result, file, fileStart];
   }
-  getSpectrogram(data){
+  async getSpectrogram(data){
     const {buffer, file:specFile, filepath} = data;
     if (buffer.length < myModel.chunkLength) {
       return;
@@ -206,12 +202,13 @@ class BirdNETModel extends BaseModel {
       return tf.concat([spec, zeroChannel], -1);
     });
     const [batch, height, width, channels] = image.shape;
+    const imageSynced = await image.data();
     const response = {
       message: "spectrogram",
       width: width,
       height: height,
       channels,
-      image: image.dataSync(),
+      image: imageSynced,
       file: specFile,
       filepath,
     };
@@ -303,13 +300,29 @@ normalise_audio_batch = (tensor) => {
           tf.signal.hannWindow
         )
       }
-      return result
+      let interim = result
         .matMul(this.melFilterbank)
         .pow(this.two)
         .pow(tf.div(this.one, tf.add(this.one, tf.exp(this.magScale.read()))))
         .reverse(-1)
         .transpose([0, 2, 1])
         .expandDims(-1);
+      // TODO: check whether this ever improves things
+      // if (myModel.version.includes('---')){
+      //   const [batchSize, height, width, channels] = interim.shape;
+      //   let zeros;
+      //   if (this.fmax === 15000){
+      //     // This view has a range 5000Hz - 150kHz
+      //     zeros = tf.zeros([batchSize, 10, width, channels]);
+      //     interim = interim.slice([0,0,0,0], [-1, height - 10, -1, -1]);
+      //   } else {
+      //     // This view has a range 0Hz - 30kHz
+      //     zeros = tf.zeros([batchSize, height/2, width, channels]);
+      //     interim = interim.slice([0,0,0,0], [-1, height/2, -1, -1]);
+      //   }
+      //   interim = tf.concat([interim, zeros], 1);
+      // }
+      return interim
     });
   }
 

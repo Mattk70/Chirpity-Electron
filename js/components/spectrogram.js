@@ -160,6 +160,9 @@ export class ChirpityWS {
 
   initWavesurfer = (container, plugins) => {
     const config = this.getConfig();
+    this.sampleRate = config.selectedModel.includes("bats") 
+      ? 256000
+      : 24000;
     return WaveSurfer.create({
         container,
         // make waveform transparent
@@ -210,8 +213,13 @@ export class ChirpityWS {
       // this is set to signal whether it was playing up to that point
       if (position < 0.998) wavesurfer.isPaused = true;
     });
-
-    wavesurfer.on("play", () => (wavesurfer.isPaused = false));
+    
+    wavesurfer.on("play", () => {
+      if (config.selectedModel.includes('bats')) {
+        wavesurfer.setPlaybackRate(0.1, false);
+      }
+      wavesurfer.isPaused = false;
+    });
 
     wavesurfer.on("finish", () => {
       const {windowLength, windowOffsetSecs, currentFile, currentFileDuration, openFiles} = STATE;
@@ -299,12 +307,15 @@ export class ChirpityWS {
     // set colormap
     const colorMap = this.createColormap();
     const {windowFn:windowFunc, alpha} = config.customColormap;
-    const {frequencyMin: frequencyMin, frequencyMax: frequencyMax} = config.audio;
+    const scaleFactor = config.selectedModel.includes('bats') ? 10 : 1;
+    const {frequencyMin, frequencyMax} = config.audio;
+    const scaledFrequencyMin = frequencyMin * scaleFactor;
+    const scaledFrequencyMax = frequencyMax * scaleFactor;
     return Spectrogram.create({
       container,
       windowFunc,
-      frequencyMin,
-      frequencyMax,
+      frequencyMin: scaledFrequencyMin,
+      frequencyMax: scaledFrequencyMax,
       // noverlap: 128, Auto (the default) seems fine
       // gainDB: 50, Adjusts spec brightness without increasing volume
       labels: config.specLabels,
@@ -535,6 +546,7 @@ export class ChirpityWS {
   zoom(direction) {
     const wavesurfer = this.wavesurfer;
     const STATE = this.getState();
+    const {selectedModel} = this.getConfig();
     const { fileLoaded, currentFileDuration } = STATE;
     let { windowLength, windowOffsetSecs, activeRegion } = STATE;
     if (fileLoaded) {
@@ -547,7 +559,8 @@ export class ChirpityWS {
       let timeNow = windowOffsetSecs + playedSeconds;
       const oldBufferBegin = windowOffsetSecs;
       if (direction === "In") {
-        if (windowLength < 0.5) return;
+        const minZoom = selectedModel.includes('bats') ? 0.05 : 0.5;
+        if (windowLength < minZoom) return;
         windowLength /= 2;
         windowOffsetSecs += windowLength * position;
       } else {
@@ -891,16 +904,16 @@ export class ChirpityWS {
   }
 
   formatRegionTooltip(regionLength, start, end) {
-    const length = end - start;
+    let length = end - start;
     if (length === 3) {
       return `${this.formatTimeCallback(start)} -  ${this.formatTimeCallback(
         end
       )}`;
-    } else if (length < 1)
-      return `${regionLength}: ${(length * 1000).toFixed(0)}ms`;
-    else {
-      return `${regionLength}: ${length.toFixed(3)}s`;
     }
+    if (length < 1){
+      return `${regionLength}: ${(length * 1000).toFixed(0)}ms`;
+    }
+    return `${regionLength}: ${length.toFixed(3)}s`;
   }
 
   specTooltip(event, showHz) {
@@ -917,13 +930,15 @@ export class ChirpityWS {
       const specDimensions = waveElement.getBoundingClientRect();
       const frequencyRange =
         Number(config.audio.frequencyMax) - Number(config.audio.frequencyMin);
+      
       const yPosition =
         Math.round(
           (specDimensions.bottom - event.clientY) *
             (frequencyRange / specDimensions.height)
         ) + Number(config.audio.frequencyMin);
-
-      tooltip.textContent = `${i18.frequency}: ${yPosition}Hz`;
+      const pitchShifted = config.selectedModel.includes('bats');
+      const yPos = pitchShifted ? yPosition*10 : yPosition
+      tooltip.textContent = `${i18.frequency}: ${yPos}Hz`;
       if (inRegion) {
         const { start, end } = inRegion;
         const textNode = document.createTextNode(

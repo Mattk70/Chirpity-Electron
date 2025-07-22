@@ -52,17 +52,7 @@ class BaseModel {
 
     // Parallel compilation for faster warmup
     // https://github.com/tensorflow/tfjs/pull/7755/files#diff-a70aa640d286e39c922aa79fc636e610cae6e3a50dd75b3960d0acbe543c3a49R316
-    if (tf.getBackend() === "webgl") {
-      // tf.env().set("ENGINE_COMPILE_ONLY", true);
-      const compileRes = this.model.predict(input, {
-        batchSize: this.batchSize,
-      });
-      // tf.env().set("ENGINE_COMPILE_ONLY", false);
-      await tf.backend().checkCompileCompletionAsync();
-      tf.backend().getUniformLocations();
-      tf.dispose(compileRes);
-      input.dispose();
-    } else if (tf.getBackend() === "webgpu") {
+    if (tf.getBackend() === "webgpu") {
       // tf.env().set("WEBGPU_ENGINE_COMPILE_ONLY", true);
       const compileRes = this.model.predict(input, {
         batchSize: this.batchSize,
@@ -140,8 +130,8 @@ class BaseModel {
     ]).catch((err) => console.log("Data transfer error:", err));
     indices.dispose();
     values.dispose();
-
-    keys = keys.map((key) => (key / this.config.sampleRate).toFixed(3));
+    const scaleFactor = this.version.includes('bats') ? 10 : 1;
+    keys = keys.map((key) => (key / (this.config.sampleRate * scaleFactor)).toFixed(3));
     return [keys, topIndices, topValues];
   }
 

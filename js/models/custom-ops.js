@@ -93,43 +93,18 @@ tf.registerKernel({
   },
 });
 
-tf.registerKernel({
-  kernelName: "batchFrame",
-  backendName: "webgl",
-  kernelFunc: ({ inputs: { input, frameLength, frameStep }, backend }) => {
-    const [batchSize, signalLength] = input.shape;
-    const outputLength = (signalLength - frameLength + frameStep) / frameStep | 0;
-    const outputShape = [batchSize, outputLength, frameLength];
-    const userCode = `void main() {
-        ivec3 coords = getOutputCoords(); // [batch, frame, sample]
-        int b = coords.x;
-        int f = coords.y;
-        int l = coords.z;
-
-        int signalIndex = f * ${frameStep} + l;
-        float value = getX(b, signalIndex);
-        setOutput(value);
-      }`;
-    return backend.compileAndRun({
-        variableNames: ["x"],
-        outputShape,
-        userCode,
-      }, [input]);
-  },
-});
-
 
 /**
- * Computes the short-time Fourier transform (STFT) of a batched signal tensor using a custom GPU-accelerated FFT kernel.
- * Adapted from https://github.com/georg95/birdnet-web/blob/main/birdnet.js
- * Frames the input signal, applies a window function, and computes the real FFT for each frame. Returns the complex frequency-domain representation for each frame, retaining only the non-redundant half of the spectrum.
+ * Computes the short-time Fourier transform (STFT) of a batched signal tensor using GPU acceleration.
  *
- * @param {tf.Tensor} signal - Input tensor of shape [batch, signalLength].
+ * Frames the input signal, applies a window function to each frame, and computes the real FFT for each frame using a custom WebGPU kernel. Returns the complex-valued frequency-domain representation for each frame, retaining only the non-redundant half of the spectrum.
+ *
+ * @param {tf.Tensor} signal - Input tensor with shape [batch, signalLength].
  * @param {number} frameLength - Length of each frame for STFT.
  * @param {number} frameStep - Step size between consecutive frames.
  * @param {number} fftLength - Length of the FFT to compute for each frame.
- * @param {function} windowFn - Function that generates a window tensor of length {@link frameLength}.
- * @returns {tf.Tensor} STFT output tensor of shape [batch, numFrames, halfFftLength, 2], where the last dimension contains real and imaginary parts.
+ * @param {function} windowFn - Function that generates a window tensor of length `frameLength`.
+ * @returns {tf.Tensor} Output tensor of shape [batch, numFrames, halfFftLength, 2], where the last dimension contains real and imaginary parts.
  */
 function stft(signal, frameLength, frameStep, fftLength, windowFn) {
     const framedSignal = tf.engine().runKernel('batchFrame', {input: signal, frameLength, frameStep })
@@ -145,89 +120,7 @@ function stft(signal, frameLength, frameStep, fftLength, windowFn) {
     return tf.reshape(realComplexConjugate[0], shape)
 }
 
-// Credit for these 2 FFT kernels goes to https://github.com/georg95
-tf.registerKernel({
-    kernelName: 'FFT2',
-    backendName: 'webgl',
-    kernelFunc: ({ backend, inputs: { input } }) => {
-      const [batch, width] = input.shape;
-      const innerDim = width / 2;
-      let currentTensor = backend.runWebGLProgram({
-          variableNames: ['mapvalue'],
-          outputShape: [batch, width],
-          userCode: `
-            void main() {
-              ivec2 coords = getOutputCoords();
-              int p = coords[1] % ${innerDim};
-              int k = 0;
-              for (int i = 0; i < ${Math.log2(innerDim)}; ++i) {
-                if ((p & (1 << i)) != 0) { k |= (1 << (${Math.log2(innerDim) - 1} - i)); }
-              }
-              if (coords[1] < ${innerDim}) {
-                setOutput(getMapvalue(coords[0], 2 * k));
-              } else {
-                setOutput(getMapvalue(coords[0], 2 * (k % ${innerDim}) + 1));
-              }
-            }`
-      }, [input], 'float32')
-      for (let len = 1; len < innerDim; len *= 2) {
-          let prevTensor = currentTensor
-          currentTensor = backend.runWebGLProgram({
-            variableNames: [`x`],
-            outputShape: [batch, innerDim * 2],
-            userCode: `
-              void main() {
-                ivec2 coords = getOutputCoords();
-                int batch = coords[0];
-                int i = coords[1];
-                int k = i % ${innerDim};
-                int isHigh = (k % ${len * 2}) / ${len};
-                int highSign = (1 - isHigh * 2);
-                int baseIndex = k - isHigh * ${len};
-                float t = ${Math.PI / len} * float(k % ${len});
-                float a = cos(t);
-                float b = sin(-t);
-                float oddK_re = getX(batch, baseIndex + ${len});
-                float oddK_im = getX(batch, baseIndex + ${len + innerDim});
-                if (i / ${innerDim} == 0) { // real
-                    float evenK_re = getX(batch, baseIndex);
-                    float outp = evenK_re + (oddK_re * a - oddK_im * b) * float(highSign);
-                    setOutput(outp);
-                } else { // imaginary
-                    float evenK_im = getX(batch, baseIndex + ${innerDim});
-                    float outp = evenK_im + (oddK_re * b + oddK_im * a) * float(highSign);
-                    setOutput(outp);
-                }
-              }` 
-            }, [currentTensor], 'float32')
-          backend.disposeIntermediateTensorInfo(prevTensor)
-      }
-
-      let prevTensor = currentTensor
-      currentTensor = backend.runWebGLProgram({
-        variableNames: ['x'],
-        outputShape: [batch, width],
-        userCode: `
-          void main() {
-              ivec2 coords = getOutputCoords();
-              int i = coords[1];
-              int batch = coords[0];
-
-              int k = i <= ${innerDim} ? i : ${width} - i;
-              int zI = k % ${innerDim};
-              int conjI = (${innerDim} - k) % ${innerDim};
-              float Zk0 = getX(batch, zI);
-              float Zk_conj0 = getX(batch, conjI);
-              float t = ${-2 * Math.PI} * float(k) / float(${width});
-              float result = (Zk0 + Zk_conj0 + cos(t) * (getX(batch, zI+${innerDim}) + getX(batch, conjI+${innerDim})) + sin(t) * (Zk0 - Zk_conj0)) * 0.5;
-              setOutput(result);
-          }`
-      }, 
-      [currentTensor], 'float32')
-      backend.disposeIntermediateTensorInfo(prevTensor)
-      return currentTensor
-    }
-})
+// Credit for this FFT kernel goes to https://github.com/georg95
 
 tf.registerKernel({
     kernelName: 'FFT2',

@@ -279,7 +279,7 @@
                                 </div>
                         </fieldset>
                         <fieldset class="border rounded p-1">
-                            <legend class="h6">Training parameters</legend>
+                            <legend class="h6" id="training-parameters-title">Training parameters</legend>
                             <div class="row ps-2">
                                 <div class="form-floating ps-1 col">
                                     <input type="number" id="epochs" class="form-control" min="1" max="300" value="10" required>
@@ -291,7 +291,7 @@
                                 </div>
                                 <div class="form-floating ps-1 col">
                                     <input type="number" id="label-smoothing" class="form-control" step="0.01" min="0.0" max="0.5" value="0">
-                                    <label class="mb-2" for="label-smooting">Label Smoothing</label>
+                                    <label class="mb-2" for="label-smoothing">Label Smoothing</label>
                                 </div>
                             </div>
                             <div class="row mt-2 g-0 border rounded">
@@ -311,10 +311,9 @@
                                 </div>
                                 
                             </div>
-                            <legend class="h6">Audio Dataset</legend>
                             <div class="ms-1">
-                                <div class="input-group rounded mb-3">
-                                    <label class="ps-1 input-group-text" for="validation-split">Validation split:</label>
+                                <div class="input-group rounded pt-2">
+                                    <label class="input-group-text" for="validation-split">Validation split:</label>
                                     <select class="form-select mb-0" id="validation-split">
                                         <option value="0">None</option>
                                         <option value="0.1">10%</option>
@@ -323,7 +322,7 @@
                                 </div>
 
                             </div>
-                            <legend class="h6">Augmentations</legend>
+                            <legend class="h6 pt-2" id="augmentations-title">Augmentations</legend>
                             <fieldset class="border rounded p-1">
                                 <div class="form-check form-switch d-inline-block">
                                     <input class="form-check-input" type="checkbox" role="switch" name="mixup" id="mixup">
@@ -333,8 +332,12 @@
                                     <input class="form-check-input" type="checkbox" role="switch" name="roll" id="roll">
                                     <label class="form-check-label" for="roll">Roll</label>
                                 </div>
+                                <div class="form-check form-switch d-inline-block ms-3">
+                                    <input class="form-check-input" type="checkbox" role="switch" name="use-noise" id="use-noise">
+                                    <label class="form-check-label" for="use-noise">Mix in background noise</label>
+                                </div>
                             </fieldset>
-                            <legend class="h6">Classifier</legend>
+                            <legend class="h6 pt-2" id="classifier-title">Classifier</legend>
                             <div class="row">
                                 <div class="input-group rounded mb-3 col">
                                     <label class="ps-1 input-group-text" for="hidden-units">Hidden units:</label>
@@ -379,18 +382,18 @@
                     <div id="import-modal-body" class="modal-body">
                         <div class="pb-3">
                             <div class="input-group">
-                                <span class="input-group-text" id="model-name-text">
-                                    Model Name:
-                                </span>
-                                <input type="text" class="form-control" id="model-name" aria-describedby="model-name-text" placeholder="Choose a unique name for the model" required>
-                            </div>
-                        </div>
-                        <div class="pb-3">
-                            <div class="input-group">
                                 <button class="btn btn-secondary input-group-text" type="button" id="import-location-select">
                                     Model Location:
                                 </button>
                                 <input type="text" style="font-size: 0.85rem" class="form-control" id="import-location" aria-describedby="import-location-select" placeholder="Location of the custom model files" readonly required>
+                            </div>
+                        </div>
+                        <div class="pb-3">
+                            <div class="input-group">
+                                <span class="input-group-text" id="model-name-text">
+                                    Model Name:
+                                </span>
+                                <input type="text" class="form-control" id="model-name" aria-describedby="model-name-text" placeholder="Choose a unique name for the model" required>
                             </div>
                         </div>
                     </div>
@@ -420,7 +423,7 @@
                                 <select class="form-select mb-0" id="custom-models" required></select>
                             </div>
                         </div>
-                        <div class="alert alert-danger" role="alert">
+                        <div class="alert alert-danger" role="alert" id="expunge-warning">
                             N.B. This will remove the model and its associated species and records from the database.
                         </div>
                     </div>
@@ -747,9 +750,9 @@
                         <div class="pe-3 input-group rounded p-2 mb-1">
                             <label class="ps-1 input-group-text col-5" for="model-to-use">Model:</label>
                             <select class="form-select mb-0" id="model-to-use">
-                                <!-- <option value="birdnet">BirdNET</option>
+                                <option value="birdnet">BirdNET</option>
                                 <option value="chirpity">Nocmig</option>
-                                <option value="nocmig">Nocmig v2 (beta)</option> -->
+                                <option value="nocmig">Nocmig v2 (beta)</option>
                             </select>
                         </div>
                     </div>
@@ -778,6 +781,16 @@
                             <input type="range" class="form-control-range w-75" id="confidence" min="5" max="100" step="5">
                             <div class="input-group-append">
                                 <span class="input-group-text" id="confidence-value">50%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group rounded p-2 pe-0 mb-2">
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Detections Per Segment" id="Detections Per Segment-circle-help"  data-bs-content="Select the maximum number of detections that will be shown in any 3 second period">?</a>
+                        <label for="top-rankin">Detections per segment:</label>
+                        <div class="input-group">
+                            <input type="range" class="form-control-range w-75" id="top-rankin" min="1" max="4" step="1">
+                            <div class="input-group-append">
+                                <span class="input-group-text" id="top-rankin-value">1</span>
                             </div>
                         </div>
                     </div>
@@ -1067,7 +1080,7 @@
                     <div class="">
                         <div class="p-0 node-only d-none">
                             <div class="form-group rounded p-2 pe-0 mb-2">
-                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Backend" id="Backend-circle-help"  data-bs-content="The webGL/webGPU backends can improve performance and reduce power consumption on some systems.">?</a>
+                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Backend" id="Backend-circle-help"  data-bs-content="The GPU backend can improve performance and reduce power consumption on some systems.">?</a>
                                 <div>
                                     <label class="ps-0 fs-6 text-start form-check" for="backend">Backend: <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature.">
                                 <span class="pointer locked material-symbols-outlined">lock</span></a></label>
@@ -1075,13 +1088,9 @@
                                         <label class="form-check-label" for="tensorflow">CPU</label>
                                         <input class="form-check-input" type="radio" name="backend" id="tensorflow" value="tensorflow" checked="">
                                     </div>
-                                    <div class="form-check form-check-inline ">
-                                        <input class="form-check-input locked" type="radio" name="backend" id="webgl" value="webgl" disabled>
-                                        <label class="form-check-label" for="webgl">WebGL</label>
-                                    </div>
                                     <div class="form-check form-check-inline">
                                         <input class="form-check-input locked" type="radio" name="backend" id="webgpu" value="webgpu" disabled>
-                                        <label class="form-check-label" for="webgpu">WebGPU</label>
+                                        <label class="form-check-label" for="webgpu">GPU</label>
                                     </div>
                                 </div>
                             </div>
@@ -1120,7 +1129,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div>
+                        <!-- <div>
                             <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Prevent system sleep" id="Prevent system sleep-circle-help"  data-bs-content="When enabled, prevent the system from suspending whilst Chirpity is in use.">?</a>
                             <div class="pe-3 form-group rounded p-2 mb-2">
                                 <div class="form-check form-switch">
@@ -1128,7 +1137,7 @@
                                     <label class="form-check-label" for="power-save-block">Prevent system sleep</label>
                                 </div>
                             </div>
-                        </div>
+                        </div> -->
                         <div>
                             <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="File timestamp marks recording start" id="File-timestamp-circle-help"  data-bs-content="Some audio recorders, for example the Zoom H1 Essential, can set the file saved date and time to the beginning of the recording, rather than the end. 
                                     If you have such a recorder selecting this option will fix the times shown for your detections.">?</a>
@@ -1700,7 +1709,7 @@
                                 <span class="material-symbols-outlined">unarchive</span> Remove Current File From
                                 Archive
                             </li>
-                            <li class="dropdown-item" id="dataset">
+                            <li class="dropdown-item d-none" id="dataset">
                                 <span class="material-symbols-outlined">dataset</span> Create Dataset
                             </li>
                         </ul>
@@ -1743,7 +1752,7 @@
                                 <a class="dropdown-item locked disabled col" id="open-training" href="#">
                                 <span class="material-symbols-outlined">model_training</span> Train a Custom Model
                                 <span>
-                                    <a class="padlock col-auto" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a member to unlock this feature.">
+                                    <a class="padlock col" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a member to unlock this feature.">
                                         <span class="pointer locked material-symbols-outlined float-end mt-1">lock</span>
                                     </a>
                                 </span>
@@ -1752,10 +1761,10 @@
                         </li>
                         <li>
                             <div class="row ms-0 me-0">
-                                <a class="dropdown-item locked disabled col" id="import-model" href="#">
-                                <span class="material-symbols-outlined">account_circle</span> Import a Custom Model
+                                <a class="dropdown-item d-flex locked disabled col" id="import-model" href="#">
+                                <span class="material-symbols-outlined pe-1">account_circle</span> Import a Custom Model
                                 <span>
-                                    <a class="padlock col-auto" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a member to unlock this feature.">
+                                    <a class="padlock col" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a member to unlock this feature.">
                                         <span class="pointer locked material-symbols-outlined float-end mt-1">lock</span>
                                     </a>
                                 </span>
@@ -1767,7 +1776,7 @@
                                 <a class="dropdown-item locked disabled col" id="remove-model" href="#">
                                 <span class="material-symbols-outlined">no_accounts</span> Remove a Custom Model
                                 <span>
-                                    <a class="padlock col-auto" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a member to unlock this feature.">
+                                    <a class="padlock col" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a member to unlock this feature.">
                                         <span class="pointer locked material-symbols-outlined float-end mt-1">lock</span>
                                     </a>
                                 </span>
@@ -1792,22 +1801,28 @@
                     <li><a class="dropdown-item" id="keyboardHelp" href="#">
                         <span class="material-symbols-outlined">help</span> Keyboard Shortcuts</a>
                     </li>
-                    <li><a class="dropdown-item" id="diagnostics" href="#">
-                        <span class="material-symbols-outlined">insights</span> Diagnostics</a>
+                    <li>
+                        <a class="dropdown-item" id="trainingHelp" href="#">
+                            <span class="material-symbols-outlined">help</span> Training settings
+                        </a>
                     </li>
                     <li>
                         <a class="dropdown-item" id="startTour" href="#">
                             <span class="material-symbols-outlined">tour</span> Show Tour</a>
                     </li>
-                    <li>
-                        <a class="dropdown-item" id="community" href="#">
-                            <span class="material-symbols-outlined">forum</span> Join the community</a>
+                    <li class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" id="diagnostics" href="#">
+                        <span class="material-symbols-outlined">insights</span> Diagnostics</a>
                     </li>
                     <li>
                         <a class="dropdown-item" id="known-issues" href="#">
                             <span class="material-symbols-outlined">bug_report</span> Known Issues</a>
                     </li>
-                    <div class="dropdown-divider"></div>
+                    <li>
+                        <a class="dropdown-item" id="community" href="#">
+                            <span class="material-symbols-outlined">forum</span> Join the community</a>
+                    </li>
+                    <li class="dropdown-divider"></li>
                     <h6 class="fs-6 ps-3" id="FAQ">FAQs</h6>
                     <li>
                         <a class="dropdown-item" id="species" href="#">
@@ -1863,6 +1878,7 @@
 <script type="module" defer>
     import { config, displayLocationAddress, LOCATIONS, generateToast } from './js/ui.js';
     let map, marker, clickTimer = 0;
+    let currentTileLayer = null;
     async function onMapClick(e) {
         const {lat, lng} = e.latlng;
         const target = map.getContainer().id;
@@ -1886,47 +1902,63 @@
         // Stop propagation of the click event to the map
         L.DomEvent.stopPropagation(e);
     }
-    const showMap = (where) => {
-        if (where === 'customLocationMap' && LOCATIONS.length){
-            const markerGroup = L.featureGroup(); // Create a feature group to hold the markers
-            const bounds = L.latLngBounds(); // Create bounds to include all markers
-            // Add default location
-            const marker = L.marker([config.latitude, config.longitude]).addTo(markerGroup);
-            bounds.extend(marker.getLatLng()); // Extend the bounds to include this marker
-            LOCATIONS.forEach(markerData => {
-                const { lat, lon } = markerData;
-                const marker = L.marker([lat, lon]).addTo(markerGroup);
-                bounds.extend(marker.getLatLng()); // Extend the bounds to include this marker
-            });
-            map.fitBounds(bounds)
-            const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 15,
-                minZoom: 2,
-                attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            }).addTo(map);
-            markerGroup.addTo(map)
-            const firstMarkerEl = document.querySelector('.leaflet-marker-icon')
-            firstMarkerEl.classList.add('leaflet-marker-icon-default')
-            markerGroup.on('click', function (e) {
-                onMapClick(e)
-            });
-        } else{
-            try {
-                map.setView([config.latitude, config.longitude], 2);
-                const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    maxZoom: 15,
-                    minZoom: 3,
-                    attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                }).addTo(map);
-                if (!marker) marker = L.marker([config.latitude, config.longitude]).addTo(map);
-                const firstMarkerEl = document.querySelector('.leaflet-marker-icon')
-                firstMarkerEl.classList.add('leaflet-marker-icon-default')
-                marker.on('click', onMapClick);
-            } catch (error) {
-                generateToast({message: 'leafletError' , variables: {error: error.message}})
+const showMap = (where, locationID) => {
+    const createTileLayer = () =>
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 15,
+            minZoom: 2,
+            attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        });
+
+    const addClassToMarkerIcon = (marker, className) => {
+        marker.on('add', () => {
+            const el = marker.getElement();
+            if (el) el.classList.add(className);
+        });
+    };
+    currentTileLayer && map.removeLayer(currentTileLayer);
+    
+    try {
+        if (where === 'customLocationMap' && LOCATIONS.length) {
+            const markerGroup = L.featureGroup();
+            const bounds = L.latLngBounds();
+
+            const defaultIcon = new L.Icon.Default({ className: 'leaflet-icon-default' });
+            const defaultMarker = L.marker([config.latitude, config.longitude], { icon: defaultIcon }).addTo(markerGroup);
+            bounds.extend(defaultMarker.getLatLng());
+
+            const markersByID = {};
+            const sharedIcon = new L.Icon.Default();
+
+            for (const { id, lat, lon } of LOCATIONS) {
+                const marker = L.marker([lat, lon], { icon: sharedIcon }).addTo(markerGroup);
+                bounds.extend(marker.getLatLng());
+                markersByID[id] = marker;
+
+                if (id === locationID) {
+                    addClassToMarkerIcon(marker, 'leaflet-icon-current');
+                }
             }
+
+            markerGroup.addTo(map);
+            map.fitBounds(bounds);
+            createTileLayer().addTo(map);
+            markerGroup.on('click', onMapClick);
+        } else {
+            map.setView([config.latitude, config.longitude], 2);
+            createTileLayer().addTo(map);
+
+            const fallbackMarker = L.marker([config.latitude, config.longitude]).addTo(map);
+            fallbackMarker.on('click', onMapClick);
+
+            const iconEl = fallbackMarker.getElement();
+            if (iconEl) iconEl.classList.add('leaflet-marker-icon-default');
         }
+    } catch (error) {
+        generateToast({ message: 'leafletError', variables: { error: error.message } });
     }
+};
+
     const latLonElements = ['latitude', 'longitude', 'customLat', 'customLon'];
     latLonElements.forEach(el => {
         const where = el.indexOf('custom') > -1 ? 'customLocationMap' : 'settingsMap';
@@ -1939,8 +1971,13 @@
 
     function updateMap(lat,lng){
         try {
+            // remove the previous active marker highlight
+            const activeMarker = document.querySelector('.leaflet-icon-current');
+            if (activeMarker) activeMarker.classList.remove('leaflet-icon-current');
+
+            const currentIcon = new L.Icon.Default({className: 'leaflet-icon-current'});
             // Update the marker's position
-            if (!marker) marker = L.marker([lat, lng]).addTo(map);
+            if (!marker) marker = L.marker([lat, lng], {icon: currentIcon}).addTo(map);
             marker.setLatLng([lat, lng]);
             // Center the map view on the new marker position
             map.setView([lat, lng]);
@@ -1949,7 +1986,7 @@
         }
     }
 
-    async function placeMap(divID){
+    async function placeMap(divID, locationID){
         map?.remove(); marker = undefined;
         map = L.map(divID);
         let latTxt, lonTxt;
@@ -1962,7 +1999,7 @@
         }
         const latEl = document.getElementById(latTxt);
         const lonEl = document.getElementById(lonTxt);
-        showMap(divID);
+        showMap(divID, locationID);
         map.on('click', (e) => {
             clearTimeout(clickTimer);
             //Wait for dblclick

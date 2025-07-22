@@ -8,6 +8,7 @@ const {
   powerSaveBlocker,
 } = require("electron");
 app.commandLine.appendSwitch("disable-renderer-backgrounding");
+app.commandLine.appendSwitch("force-high-performance-gpu");
 app.commandLine.appendSwitch("xdg-portal-required-version", "4");
 // WebGPU flags needed for Linux
 app.commandLine.appendSwitch("enable-unsafe-webgpu");

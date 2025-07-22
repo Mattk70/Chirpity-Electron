@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Paramètres d'entraînement</title>
+</head>
+<body>
+
+<div class="w-100 alert alert-warning" role="alert">Les fonctions d'entraînement ne sont disponibles que lorsque le modèle BirdNET est utilisé</div>
+<table class="table table-hover p-1">
+    <tr>
+        <td><b>Emplacement des sons d'entraînement</b></td>
+        <td>Les fichiers audio utilisés pour l'entraînement doivent être organisés en dossiers, chacun contenant les sons d'une seule espèce.
+            Le nom de chaque dossier doit suivre le format <code>Nom scientifique_Nom commun</code>, comme utilisé par les modèles BirdNET et Nocmig.</td>
+    </tr>
+    <tr>
+        <td><b>Emplacement du cache du jeu de données</b></td>
+        <td>Le cache du jeu de données est l'endroit où Chirpity stocke les fichiers audio et les métadonnées traités. Si aucun emplacement n'est spécifié,
+            celui des sons d'entraînement est utilisé. Il est recommandé de choisir un emplacement sur un SSD rapide pour des performances optimales.</td>
+    </tr>
+    <tr>
+        <td><b>Utiliser le cache existant s’il existe</b></td>
+        <td>
+            <p>La préparation du cache peut prendre un certain temps. Si cette option est cochée, le cache ne sera pas régénéré
+                à chaque lancement de l'entraînement.</p>
+            <p>Si vous modifiez la répartition entraînement/validation, cette option sera réinitialisée.</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Emplacement de sauvegarde du modèle</b></td>
+        <td>
+            <p>C’est ici que Chirpity enregistrera les fichiers du modèle entraîné.</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Remplacer ou ajouter des étiquettes</b></td>
+        <td>
+            <p>Si « Remplacer les étiquettes » est sélectionné, le modèle enregistré contiendra uniquement les classes présentes dans les dossiers de votre jeu de données d'entraînement.</p>
+            <p>Si « Ajouter des étiquettes » est sélectionné, le modèle conservera les classes existantes de BirdNET et ajoutera toutes les nouvelles classes issues de vos dossiers d'entraînement.</p>
+            <p><b>Important :</b> Les nouvelles classes ne doivent pas avoir le même nom qu'une classe existante. Pour remplacer une classe existante, ajoutez un &quot;-&quot; à la fin de son nom. Par exemple : <i>Turdus iliacus_Mauvis-</i></p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Paramètres d'entraînement</b></td>
+        <td>
+            <p>Ces champs définissent les paramètres d'entraînement de base du modèle.</p>
+            <ul>
+                <li><b>Époques :</b> Nombre de fois que le jeu de données complet est passé à travers le modèle.</li>
+                <li><b>Taux d’apprentissage :</b> Contrôle à quel point le modèle ajuste ses poids à chaque mise à jour.</li>
+                <li><b>Lissage des étiquettes :</b> Technique pour rendre le modèle plus robuste en évitant la surconfiance dans une seule classe.</li>
+                <li><b>Utiliser la perte focale :</b> Aide à gérer le déséquilibre des classes en accordant plus d’importance aux exemples difficiles.</li>
+                <li><b>Utiliser les pondérations de classe :</b> Donne plus de poids aux classes sous-représentées pendant l'entraînement.</li>
+                <li><b>Utiliser un taux d’apprentissage décroissant :</b> Réduit progressivement le taux d’apprentissage pour affiner les ajustements du modèle au fil du temps.</li>
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Jeu de données audio</b></td>
+        <td>
+            Ici, vous pouvez sélectionner une partie du jeu de données à utiliser pour la validation. Les données de validation ne sont pas utilisées pour entraîner le modèle,
+            mais pour évaluer ses performances pendant l'entraînement.
+        </td>
+    </tr>
+    <tr>
+        <td><b>Augmentations</b></td>
+        <td>
+            <p>Ces options contrôlent la façon dont les données d'entraînement sont modifiées pour améliorer la robustesse du modèle.</p>
+            <ul>
+                <li><b>Mixup :</b> Combine plusieurs exemples d'entraînement pour en créer un nouveau synthétique, aidant le modèle à mieux généraliser.</li>
+                <li><b>Décalage :</b> Décale les données audio dans le temps pour créer de nouveaux exemples. Cela rend le modèle plus tolérant aux petits décalages temporels. 
+                    </li>
+                <li><b>Ajouter du bruit de fond :</b> Ajoute du bruit aux exemples d'entraînement, rendant le modèle plus robuste en environnement bruyant.</li>
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Classifieur</b></td>
+        <td>
+            <p>Ces paramètres définissent la structure du classifieur pour améliorer ses performances.</p>
+            <ul>
+                <li><b>Unités cachées :</b> Nombre de neurones dans la couche cachée du classifieur. Plus il y a d’unités, plus le modèle peut apprendre de motifs complexes, mais le risque de <a href="https://developers.google.com/machine-learning/crash-course/overfitting/overfitting" target="_blank">surapprentissage</a> augmente. Si 0, aucune couche cachée n’est utilisée.</li>
+                <li><b>Abandon :</b> Technique consistant à désactiver aléatoirement une partie des neurones pendant l'entraînement pour éviter le surapprentissage.</li>
+            </ul>
+        </td>
+    </tr>
+</table>
+
+</body>
+</html>

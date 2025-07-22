@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Trainingseinstellungen</title>
+</head>
+<body>
+<div class="w-100 alert alert-warning" role="alert">Die Trainingsfunktionen sind nur verfügbar, wenn das BirdNET-Modell verwendet wird</div>
+<table class="table table-hover p-1">
+    <tr>
+        <td><b>Trainings-Audio-Speicherort</b></td>
+        <td>Audiodateien für das Training sollten in Ordnern organisiert sein, wobei jeder Ordner Audiodateien einer einzelnen Art enthält. 
+            Die Ordnernamen sollten dem Artnamen im Format <code>WissenschaftlicherName_Trivialname</code> entsprechen, wie er in den BirdNET- und Nocmig-Modellen verwendet wird.</td>
+    </tr>
+    <tr>
+        <td><b>Speicherort für Datensatz-Cache</b></td>
+        <td>Der Datensatz-Cache ist der Ort, an dem Chirpity verarbeitete Audiodateien und Metadaten speichert. Wenn kein Wert ausgewählt ist, 
+            wird der Speicherort für Trainingsdaten verwendet. Am besten wählt man einen Ort auf einer schnellen SSD für optimale Leistung.</td>
+    </tr>
+    <tr>
+        <td><b>Vorhandenen Cache verwenden, falls vorhanden</b></td>
+        <td>
+            <p>Es dauert eine Weile, bis der Datensatz-Cache vorbereitet ist. Wenn diese Option aktiviert ist, wird der Cache beim Start des Trainings nicht jedes Mal neu erstellt.</p>
+            <p>Wenn Sie die Aufteilung in Training / Validierung ändern, wird diese Option zurückgesetzt.</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Speicherort für Modell</b></td>
+        <td>
+            <p>Der Speicherort für das Modell ist der Ort, an dem Chirpity die trainierten Modelldateien speichert.</p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Labels ersetzen oder anhängen</b></td>
+        <td>
+            <p>Wenn &quot;Labels ersetzen&quot; ausgewählt ist, enthält das gespeicherte Modell nur die Klassen aus den Ordnern Ihres Trainingsdatensatzes.</p>
+            <p>Wenn &quot;Labels anhängen&quot; ausgewählt ist, behält das gespeicherte Modell die vorhandenen Klassen aus BirdNET bei und fügt neue Klassen aus den Ordnern Ihres Trainingsdatensatzes hinzu.</p>
+            <p><b>Wichtig:</b> Neue Klassen dürfen nicht denselben Namen wie bestehende Klassen haben. Um eine bestehende Klasse zu überschreiben, sollten Sie dem Klassennamen ein &quot;-&quot; anhängen. Zum Beispiel: <i>Turdus iliacus_Redwing-</i></p>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Trainingsparameter</b></td>
+        <td>
+            <p>Diese Felder legen die grundlegenden Trainingsparameter für das Modell fest.</p>
+            <ul>
+                <li><b>Epochen:</b> Gibt an, wie oft Ihr Datensatz während des Trainings durch das Modell geleitet wird.</li>
+                <li><b>Lernrate:</b> Bestimmt, wie stark das Modell bei jedem Update der Gewichte angepasst wird.</li>
+                <li><b>Label-Smoothing:</b> Eine Technik, die das Modell robuster macht, indem sie verhindert, dass es sich zu stark auf eine einzelne Klasse verlässt.</li>
+                <li><b>Focal Loss verwenden:</b> Eine Technik zur Behandlung unausgewogener Klassenverteilungen, indem schwer zu klassifizierende Beispiele stärker gewichtet werden.</li>
+                <li><b>Klassengewichte verwenden:</b> Eine Technik, um unterrepräsentierten Klassen während des Trainings mehr Gewicht zu verleihen.</li>
+                <li><b>Lernraten-Dekrement verwenden:</b> Eine Technik, bei der die Lernrate mit der Zeit verringert wird, um feinere Modellanpassungen zu ermöglichen.</li>
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Audio-Datensatz</b></td>
+        <td>
+            Hier können Sie einen Teil des Datensatzes für die Validierung zurückhalten. Validierungsdaten werden nicht zum Trainieren verwendet, 
+            sondern zur Bewertung der Leistungsfähigkeit und Generalisierung des Modells während des Trainings.
+        </td>
+    </tr>
+    <tr>
+        <td><b>Augmentierungen</b></td>
+        <td>
+            <p>Diese Optionen steuern, wie die Trainingsdaten erweitert werden, um die Robustheit des Modells zu verbessern.</p>
+            <ul>
+                <li><b>Mixup:</b> Eine Technik, bei der zwei oder mehr Trainingsbeispiele zu einem neuen, synthetischen Beispiel kombiniert werden. Dies kann dem Modell helfen, besser zu generalisieren.</li>
+                <li><b>Roll:</b> Eine Technik, bei der die Audiodaten auf der Zeitachse verschoben werden. So entstehen neue Trainingsbeispiele, die das Modell unempfindlicher gegenüber leichten Zeitverschiebungen machen.</li>
+                <li><b>Hintergrundgeräusche hinzufügen:</b> Eine Technik, bei der Hintergrundgeräusche zu den Trainingsbeispielen hinzugefügt werden, um das Modell robuster gegenüber lauten Umgebungen zu machen.</li>
+            </ul>
+        </td>
+    </tr>
+    <tr>
+        <td><b>Klassifikator</b></td>
+        <td>
+            <p>Diese Optionen steuern den Aufbau des Klassifikators zur Leistungsverbesserung.</p>
+            <ul>
+                <li><b>Verborgene Einheiten:</b> Anzahl der Neuronen in den versteckten Schichten des Klassifikators. Mehr verborgene Einheiten erlauben komplexere Muster, erhöhen aber das Risiko von <a href="https://developers.google.com/machine-learning/crash-course/overfitting/overfitting" target="_blank">Overfitting</a>. 
+                    Wenn 0, werden keine versteckten Schichten verwendet.</li>
+                <li><b>Dropout:</b> Eine Technik, bei der zufällig ein Teil der Eingabeneuronen bei jedem Trainingsdurchlauf deaktiviert wird, um Overfitting zu verhindern.</li>
+            </ul>
+        </td>
+    </tr>
+</table>
+
+</body>
+</html>
