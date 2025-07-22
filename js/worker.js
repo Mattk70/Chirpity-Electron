@@ -187,14 +187,15 @@ const setupFfmpegCommand = async ({
   const command = ffmpeg("file:" + file)
     .format(format)
     .audioChannels(channels);
-  // Add filters if provided (no additional filters for bats)
+  // todo: consider whether to exponse bat model training
   const training = false
   if (STATE.model.includes('bats')) { 
     // No sample rate is supplied when exporting audio.
     // If the sampleRate is 256k, Wavesurfer will handle the tempo/pitch conversion
     if ((training || sampleRate) && sampleRate !== 256000) {
       const {bitrate} = await getAudioMetadata(file);
-      if (bitrate <= 48000) console.warn(file, 'has bitrate', bitrate)
+      const MIN_EXPECTED_BITRATE = 96000; // Lower bitrates aren't capturing ultrasonic frequencies
+      if (bitrate < MIN_EXPECTED_BITRATE) console.warn(file, 'has bitrate', bitrate)
       const rate = Math.floor(bitrate/10)
       command.audioFilters([`asetrate=${rate}`]);
       // STATE.model.includes('slow') || command.audioFilters(['atempo=10'])//2,atempo=2,atempo=2,atempo=1.25'])
@@ -219,7 +220,7 @@ const setupFfmpegCommand = async ({
     command.addOutputOptions(metadata);
   }
 
-  sampleRate && command.audioFrequency(sampleRate);
+  sampleRate && command.audioFilters([`aresample=${sampleRate}`]);
   // Set codec if provided
   if (audioCodec) command.audioCodec(audioCodec);
 
@@ -2368,8 +2369,8 @@ function setAudioFilters() {
   const filters = [];
 
   // === Filter chain logic ===
-
-  if (highPass || lowPass < 15_000) {
+  const batModel = STATE.model === 'bats';
+  if (!batModel && (highPass || lowPass < 15_000)) {
     const options = {};
     if (highPass) options.hp = highPass;
     if (lowPass < 15_000) options.lp = lowPass;

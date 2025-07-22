@@ -2902,6 +2902,9 @@ const updateModelIcon = (model) => {
     case 'nocmig':
       title = "Nocmig (beta)";
       break;
+    case 'bats':
+      title = "Bats";
+      break;
     default:
       title = i18n.get(i18n.Lists).custom;
       model = "custom"

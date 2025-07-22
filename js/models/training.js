@@ -157,7 +157,8 @@ async function trainModel({
     await writeBinaryGzipDataset(noiseFiles, noiseBin, labelToIndex, postMessage, "Preparing noise data");
 
   }
-  let noise_ds = tf.data.generator(() => readBinaryGzipDataset(noiseBin, labels, useRoll)).repeat();
+  let noise_ds;
+  if (useNoise) noise_ds = tf.data.generator(() => readBinaryGzipDataset(noiseBin, labels, useRoll)).repeat();
 
   if (!cacheRecords || !fs.existsSync(trainBin)) {
         // Check same number of classes in train and val data
@@ -251,7 +252,7 @@ async function trainModel({
         `<tr><td>Validation Loss</td><td>${val_loss.toFixed(4)}</td></tr>
         <tr><td>Validation Accuracy</td><td>${(val_categoricalAccuracy*100).toFixed(2)}%</td></tr>`)
       notice += "</table>";
-      console.log(`Tensors in memory`, tf.memory());
+      // console.log(`Tensors in memory`, tf.memory());
       postMessage({ message: "training-results", notice });
     },
     onTrainEnd: (logs) => {
