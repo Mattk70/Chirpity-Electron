@@ -545,7 +545,13 @@ async function getAudioMetadata(filePath) {
           command.kill(); // Stop the process early
         }
         if (audio_details){
-          bitrate = parseInt(audio_details[1].replace('Hz', ''))
+          try {
+            if (audio_details[1] && typeof audio_details[1] === 'string') {
+              bitrate = parseInt(audio_details[1].replace(/[^0-9]/g, ''));
+            }
+          } catch (err) {
+            console.warn('Failed to parse bitrate:', err);
+          }
         }
         resolve({duration:seconds, bitrate});
       })
