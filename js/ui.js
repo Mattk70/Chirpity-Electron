@@ -5683,7 +5683,7 @@ async function handleUIClicks(e) {
     }
     case "reset-spec-frequency": {
       config.audio.frequencyMin = 0;
-      // config.audio.frequencyMax = config.selectedModel.includes('slow') ? 120000 : 11950;
+      config.audio.frequencyMax = 11950;
       const {frequencyMax, frequencyMin} = config.audio;
       DOM.fromInput.value = frequencyMin;
       // DOM.fromInput.max = frequencyMax;
@@ -7444,7 +7444,7 @@ import Spectrogram from "../node_modules/wavesurfer.js/dist/plugins/spectrogram.
 let ws;
 
 const createCompareWS = (mediaContainer) => {
-  if (ws) ws.destroy();
+  ws?.destroy();
   const bats = config.selectedModel.includes('bats');
   ws = WaveSurfer.create({
     container: mediaContainer,
