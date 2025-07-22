@@ -11,6 +11,7 @@ const ffmpeg = require("fluent-ffmpeg");
 
 const merge = require("lodash.merge");
 import { WorkerState as State } from "./utils/state.js";
+import { onChartRequest } from "./components/charts.js";
 import {
   sqlite3,
   createDB,
@@ -434,7 +435,6 @@ async function handleMessage(e) {
     }
     case "chart": {
       Object.assign(args, { diskDB, state: STATE, UI });
-      const { onChartRequest } = require("./js/components/charts.js");
       await onChartRequest(args);
       break;
     }

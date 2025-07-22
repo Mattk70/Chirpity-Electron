@@ -1878,6 +1878,7 @@
 <script type="module" defer>
     import { config, displayLocationAddress, LOCATIONS, generateToast } from './js/ui.js';
     let map, marker, clickTimer = 0;
+    let currentTileLayer = null;
     async function onMapClick(e) {
         const {lat, lng} = e.latlng;
         const target = map.getContainer().id;
@@ -1915,7 +1916,8 @@ const showMap = (where, locationID) => {
             if (el) el.classList.add(className);
         });
     };
-
+    currentTileLayer && map.removeLayer(currentTileLayer);
+    
     try {
         if (where === 'customLocationMap' && LOCATIONS.length) {
             const markerGroup = L.featureGroup();
