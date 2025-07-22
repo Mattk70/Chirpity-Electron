@@ -1,5 +1,5 @@
 /**
- * @file Backbone of the app. Functions to process audio, manage database interaction
+* @file Backbone of the app. Functions to process audio, manage database interaction
  * and interact with the AI models
  */
 
@@ -198,9 +198,8 @@ const setupFfmpegCommand = async ({
       if (bitrate < MIN_EXPECTED_BITRATE) console.warn(file, 'has bitrate', bitrate)
       const rate = Math.floor(bitrate/10)
       command.audioFilters([`asetrate=${rate}`]);
-      // STATE.model.includes('slow') || command.audioFilters(['atempo=10'])//2,atempo=2,atempo=2,atempo=1.25'])
     }
-    if (!training && !sampleRate){// && STATE.model.includes('slow')) {
+    if (!training && !sampleRate){
       // We'll export native so we need to reset the duration
       end = (end - start) / 10 + start;
     }
@@ -424,7 +423,7 @@ async function handleMessage(e) {
       } else {
         for (let i = delta; i < 0; i++) {
           const worker = predictWorkers.pop();
-          worker.terminate(); //postMessage({message: 'terminate'})
+          worker.terminate();
         }
       }
       break;
@@ -645,8 +644,7 @@ async function handleMessage(e) {
         args.list === "custom" ? args.customLabels : STATE.customLabels;
       const { lat, lon, week } = STATE;
       // Clear the LIST_CACHE & STATE.included keys to force list regeneration
-      LIST_CACHE = {}; //[`${lat}-${lon}-${week}-${STATE.model}-${STATE.list}`];
-      // delete STATE.included?.[STATE.model]?.[STATE.list];
+      LIST_CACHE = {};
       STATE.included = {}
       await INITIALISED;
       LIST_WORKER && (await getIncludedIDs());
