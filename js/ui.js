@@ -3245,7 +3245,7 @@ const showTraining = () => {
   const dropoutLabel = document.querySelector('label[for="dropout"]');
   dropoutLabel.textContent = i18["dropout"];
   dropout.value = settings.dropout;
-  dropout.disabled = !config.training.settings.hidden;
+  dropout.disabled = !settings.hidden;
   const lr = document.getElementById('lr');
   lr.value = settings.lr;
   const lrLabel = document.querySelector('label[for="lr"]');

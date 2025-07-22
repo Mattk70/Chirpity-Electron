@@ -1901,61 +1901,62 @@
         // Stop propagation of the click event to the map
         L.DomEvent.stopPropagation(e);
     }
-    const showMap = (where, locationID) => {
-        if (where === 'customLocationMap' && LOCATIONS.length){
-            const markerGroup = L.featureGroup(); // Create a feature group to hold the markers
-            const bounds = L.latLngBounds(); // Create bounds to include all markers
-            // Add default location
-            const marker = L.marker([config.latitude, config.longitude]).addTo(markerGroup);
-            bounds.extend(marker.getLatLng()); // Extend the bounds to include this marker
-            LOCATIONS.forEach(markerData => {
-                const { lat, lon } = markerData;
-                const marker = L.marker([lat, lon]).addTo(markerGroup);
-                bounds.extend(marker.getLatLng()); // Extend the bounds to include this marker
-            });
-            map.fitBounds(bounds)
-            const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 15,
-                minZoom: 2,
-                attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            }).addTo(map);
-            markerGroup.addTo(map)
-            // Default marker
-            marker._icon.classList.add('leaflet-marker-icon-default')
-            const getCoordinatesById = (id) => {
-                const location = LOCATIONS.find(loc => loc.id === id);
-                return location ? [location.lat, location.lon] : null;
-            };
-            if (locationID){
-                const coords = getCoordinatesById(locationID);
-                if (coords){
-                    const [lat, lon] = coords;
-                    const current = Object.values(markerGroup._layers).find(marker => {
-                        return marker._latlng.lat === lat && marker._latlng.lng === lon;
-                    });
-                    current._icon.classList.add('leaflet-marker-icon-current')
+const showMap = (where, locationID) => {
+    const createTileLayer = () =>
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 15,
+            minZoom: 2,
+            attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        });
+
+    const addClassToMarkerIcon = (marker, className) => {
+        marker.on('add', () => {
+            const el = marker.getElement();
+            if (el) el.classList.add(className);
+        });
+    };
+
+    try {
+        if (where === 'customLocationMap' && LOCATIONS.length) {
+            const markerGroup = L.featureGroup();
+            const bounds = L.latLngBounds();
+
+            const defaultIcon = new L.Icon.Default({ className: 'leaflet-icon-default' });
+            const defaultMarker = L.marker([config.latitude, config.longitude], { icon: defaultIcon }).addTo(markerGroup);
+            bounds.extend(defaultMarker.getLatLng());
+
+            const markersByID = {};
+            const sharedIcon = new L.Icon.Default();
+
+            for (const { id, lat, lon } of LOCATIONS) {
+                const marker = L.marker([lat, lon], { icon: sharedIcon }).addTo(markerGroup);
+                bounds.extend(marker.getLatLng());
+                markersByID[id] = marker;
+
+                if (id === locationID) {
+                    addClassToMarkerIcon(marker, 'leaflet-icon-current');
                 }
             }
-            markerGroup.on('click', function (e) {
-                onMapClick(e)
-            });
-        } else{
-            try {
-                map.setView([config.latitude, config.longitude], 2);
-                const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    maxZoom: 15,
-                    minZoom: 3,
-                    attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                }).addTo(map);
-                if (!marker) marker = L.marker([config.latitude, config.longitude]).addTo(map);
-                const firstMarkerEl = document.querySelector('.leaflet-marker-icon')
-                firstMarkerEl.classList.add('leaflet-marker-icon-default')
-                marker.on('click', onMapClick);
-            } catch (error) {
-                generateToast({message: 'leafletError' , variables: {error: error.message}})
-            }
+
+            markerGroup.addTo(map);
+            map.fitBounds(bounds);
+            createTileLayer().addTo(map);
+            markerGroup.on('click', onMapClick);
+        } else {
+            map.setView([config.latitude, config.longitude], 2);
+            createTileLayer().addTo(map);
+
+            const fallbackMarker = L.marker([config.latitude, config.longitude]).addTo(map);
+            fallbackMarker.on('click', onMapClick);
+
+            const iconEl = fallbackMarker.getElement();
+            if (iconEl) iconEl.classList.add('leaflet-marker-icon-default');
         }
+    } catch (error) {
+        generateToast({ message: 'leafletError', variables: { error: error.message } });
     }
+};
+
     const latLonElements = ['latitude', 'longitude', 'customLat', 'customLon'];
     latLonElements.forEach(el => {
         const where = el.indexOf('custom') > -1 ? 'customLocationMap' : 'settingsMap';
@@ -1969,12 +1970,13 @@
     function updateMap(lat,lng){
         try {
             // remove the previous active marker highlight
-            const activeMarker = document.querySelector('.leaflet-marker-icon-current');
-            if (activeMarker) activeMarker.classList.remove('leaflet-marker-icon-current');
+            const activeMarker = document.querySelector('.leaflet-icon-current');
+            if (activeMarker) activeMarker.classList.remove('leaflet-icon-current');
+
+            const currentIcon = new L.Icon.Default({className: 'leaflet-icon-current'});
             // Update the marker's position
-            if (!marker) marker = L.marker([lat, lng]).addTo(map);
+            if (!marker) marker = L.marker([lat, lng], {icon: currentIcon}).addTo(map);
             marker.setLatLng([lat, lng]);
-            marker._icon.classList.add('leaflet-marker-icon-current')
             // Center the map view on the new marker position
             map.setView([lat, lng]);
         } catch (error) {

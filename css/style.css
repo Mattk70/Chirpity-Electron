@@ -52,11 +52,11 @@ body {
   padding-bottom: 0;
 }
 
-.leaflet-marker-icon-default {
+.leaflet-icon-default {
   filter: hue-rotate(150deg);
 }
 
-.leaflet-marker-icon-current {
+.leaflet-icon-current {
   filter: hue-rotate(270deg);
 }
 
