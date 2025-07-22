@@ -4691,13 +4691,7 @@ document.addEventListener("drop", (event) => {
           file.type.startsWith("audio/") ||
           file.type.startsWith("video/"))
     );
-  let audioFiles;
-  // if (fileList[0].path){
-  //   audioFiles = fileList.map((file) => file.path);
-  // } else {
-  // For electron 32+
-    audioFiles = fileList.map(file => window.electron.showFilePath(file));
-  // }
+  const audioFiles = fileList.map(file => window.electron.showFilePath(file));
   worker.postMessage({ action: "get-valid-files-list", files: audioFiles });
 });
 
