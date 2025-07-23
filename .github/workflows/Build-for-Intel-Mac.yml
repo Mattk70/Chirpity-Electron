@@ -132,7 +132,7 @@ jobs:
 
       - name: Patch media.play() to catch AbortError
         run: |
-          sed -i '' $'s|return this\.media\.play();|try {\n   return this.media.play();\n} catch (err) {\n  if (err instanceof DOMException && err.name === '\''AbortError'\'') return\n  throw err\n}|g' ./node_modules/wavesurfer.js/dist/player.js
+          sed -i '' $'s|return this\.media\.play();|try { return this.media.play() } catch (err) { if (err instanceof DOMException && err.name === '\''AbortError'\'') return;  throw err}|g' ./node_modules/wavesurfer.js/dist/player.js
           cat ./node_modules/wavesurfer.js/dist/player.js
         shell: bash
 
