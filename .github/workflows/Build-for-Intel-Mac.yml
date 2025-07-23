@@ -153,6 +153,7 @@ jobs:
                 }
             }
           }xms' ./node_modules/wavesurfer.js/dist/player.js
+          cat ./node_modules/wavesurfer.js/dist/player.js
         shell: bash
 
       - name: Modify tracking code
