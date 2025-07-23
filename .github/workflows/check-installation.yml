@@ -56,21 +56,31 @@ jobs:
           ./node_modules/@tensorflow/tfjs-node/lib/napi-v8/tensorflow.dll
           ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v8
 
-      - name: Patch media.play() to catch AbortError (macOS-safe)
+      - name: Patch wavesurfer.js play() to handle AbortError
         run: |
-          sed -i '' '/return this\.media\.play()/ {
-            s/return this\.media\.play()/try {\
-                  return this.media.play();\
-                } catch (err) {\
-                  if (err instanceof DOMException && err.name === '\''AbortError'\'') return;\
-                  throw err;\
-                }/
-              }' ./node_modules/wavesurfer.js/dist/player.js
+          node <<'EOF'
+          const fs = require('fs');
+          const path = require('path');
 
-          echo "--- Patched output:"
-          grep -A 5 'play()' ./node_modules/wavesurfer.js/dist/player.js
-        shell: bash
-        
+          const filePath = path.resolve('./node_modules/wavesurfer.js/dist/player.js');
+          let contents = fs.readFileSync(filePath, 'utf8');
+
+          contents = contents.replace(
+            /return this\.media\.play\(\);/,
+            `try {
+                      return this.media.play();
+                    } catch (err) {
+                      if (err instanceof DOMException && err.name === 'AbortError') return;
+                      throw err;
+                    }`
+          );
+
+          fs.writeFileSync(filePath, contents);
+          console.log('✅ Patched wavesurfer.js play()');
+          EOF
+
+          grep -A 10 'play()' ./node_modules/wavesurfer.js/dist/player.js
+
       - name: Set platform-specific ffmpeg path
         shell: bash
         run: |

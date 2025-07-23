@@ -141,11 +141,11 @@ jobs:
           contents = contents.replace(
             /return this\.media\.play\(\);/,
             `try {
-              return this.media.play();
-            } catch (err) {
-              if (err instanceof DOMException && err.name === 'AbortError') return;
-              throw err;
-            }`
+                      return this.media.play();
+                    } catch (err) {
+                      if (err instanceof DOMException && err.name === 'AbortError') return;
+                      throw err;
+                    }`
           );
 
           fs.writeFileSync(filePath, contents);
