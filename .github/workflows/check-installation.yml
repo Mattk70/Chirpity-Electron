@@ -57,6 +57,7 @@ jobs:
           ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v8
 
       - name: Patch wavesurfer.js play() to handle AbortError
+        shell: bash
         run: |
           node <<'EOF'
           const fs = require('fs');
