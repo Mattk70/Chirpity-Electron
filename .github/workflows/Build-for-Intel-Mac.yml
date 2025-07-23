@@ -129,6 +129,12 @@ jobs:
           cat ./node_modules/fluent-ffmpeg/lib/processor.js
         shell: bash
 
+      - name: Patch wavesurfer.js player.js play() method (macOS compatible)
+        run: |
+          sed -i '' $'s|play() {\\n *return __awaiter(this, void 0, void 0, function\\*.*{[^}]*});\\n *}|play() {\n        try {\n        return __awaiter(this, void 0, void 0, function* () {\n            return this.media.play();\n        });\n       } catch (err) {\n            if (err instanceof DOMException && err.name === '\''AbortError'\'') {\n              return\n            }\n            throw err\n       } \n    }|' ./node_modules/wavesurfer.js/dist/player.js
+          cat ./node_modules/wavesurfer.js/dist/player.js
+        shell: bash
+
       - name: Modify tracking code
         run: |
           # Replace development tracking ID with production ID
