@@ -56,6 +56,33 @@ jobs:
           ./node_modules/@tensorflow/tfjs-node/lib/napi-v8/tensorflow.dll
           ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v8
 
+      - name: Patch wavesurfer.js play() to handle AbortError
+        run: |
+          node <<'EOF'
+          const fs = require('fs');
+          const path = require('path');
+
+          const filePath = path.resolve('./node_modules/wavesurfer.js/dist/player.js');
+          let contents = fs.readFileSync(filePath, 'utf8');
+
+          const patched = contents.replace(
+            /return this\.media\.play\(\);/,
+            `try {
+                        return this.media.play();
+                      } catch (err) {
+                        if (err instanceof DOMException && err.name === 'AbortError') return;
+                        throw err;
+                      }`
+          );
+          if (patched === contents) {
+            console.error('❌ Wavesurfer patch failed – pattern not found');
+            process.exit(1);
+          }
+          fs.writeFileSync(filePath, contents);
+          console.log('✅ Patched wavesurfer.js play()');
+          EOF
+
+          grep -A 10 'play()' ./node_modules/wavesurfer.js/dist/player.js
 
       - name: Set platform-specific ffmpeg path
         shell: bash
