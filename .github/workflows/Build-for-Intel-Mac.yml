@@ -130,11 +130,21 @@ jobs:
         shell: bash
 
 
-      - name: Patch media.play() to catch AbortError
+      - name: Patch media.play() to catch AbortError (macOS-safe)
         run: |
-          sed -i '' $'s|return this\.media\.play()|try { return this.media.play() } catch (err) { if (err instanceof DOMException && err.name === '\''AbortError'\'') return\;  throw err}|' ./node_modules/wavesurfer.js/dist/player.js
-          cat ./node_modules/wavesurfer.js/dist/player.js
+          sed -i '' '/return this\.media\.play()/ {
+            s/return this\.media\.play()/try {\
+          return this.media.play();\
+          } catch (err) {\
+          if (err instanceof DOMException && err.name === '\''AbortError'\'') return;\
+          throw err;\
+          }/
+              }' ./node_modules/wavesurfer.js/dist/player.js
+
+          echo "--- Patched output:"
+          grep -A 5 'play()' ./node_modules/wavesurfer.js/dist/player.js
         shell: bash
+
 
       - name: Modify tracking code
         run: |
