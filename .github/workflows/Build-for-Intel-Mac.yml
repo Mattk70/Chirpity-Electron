@@ -130,21 +130,10 @@ jobs:
         shell: bash
 
 
-      - name: Patch media.play() to catch AbortError (macOS-safe)
+      - name: Patch wavesurfer.js player.js play() method
         run: |
-          sed -i '' '/return this\.media\.play()/ {
-            s/return this\.media\.play()/try {\
-          return this.media.play();\
-          } catch (err) {\
-          if (err instanceof DOMException && err.name === '\''AbortError'\'') return;\
-          throw err;\
-          }/
-              }' ./node_modules/wavesurfer.js/dist/player.js
-
-          echo "--- Patched output:"
-          grep -A 5 'play()' ./node_modules/wavesurfer.js/dist/player.js
-        shell: bash
-
+          node ../scripts/patch-wavesurfer.js
+          grep -A 10 'play()' node_modules/wavesurfer.js/dist/player.js
 
       - name: Modify tracking code
         run: |
