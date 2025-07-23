@@ -138,7 +138,7 @@ jobs:
             const filePath = path.resolve('./node_modules/wavesurfer.js/dist/player.js');
             let contents = fs.readFileSync(filePath, 'utf8');
             contents = contents.replace(
-              /return this\\.media\\.play\\(\\);/,
+              /return this\.media\.play\(\);/,
               `try {
                 return this.media.play();
               } catch (err) {
