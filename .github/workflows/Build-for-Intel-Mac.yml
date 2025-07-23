@@ -132,7 +132,7 @@ jobs:
 
       - name: Patch wavesurfer.js player.js play() method
         run: |
-          node ../scripts/patch-wavesurfer.js
+          node .github/scripts/patch-wavesurfer.js
           grep -A 10 'play()' node_modules/wavesurfer.js/dist/player.js
 
       - name: Modify tracking code
