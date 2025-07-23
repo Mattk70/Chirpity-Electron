@@ -129,27 +129,30 @@ jobs:
           cat ./node_modules/fluent-ffmpeg/lib/processor.js
         shell: bash
 
-
-      - name: Patch wavesurfer.js player.js play() method
+      - name: Patch wavesurfer.js play() to handle AbortError
         run: |
-            node -e "
-            const fs = require('fs');
-            const path = require('path');
-            const filePath = path.resolve('./node_modules/wavesurfer.js/dist/player.js');
-            let contents = fs.readFileSync(filePath, 'utf8');
-            contents = contents.replace(
-              /return this\.media\.play\(\);/,
-              `try {
-                return this.media.play();
-              } catch (err) {
-                if (err instanceof DOMException && err.name === 'AbortError') return;
-                throw err;
-              }`
-            );
-            fs.writeFileSync(filePath, contents);
-            console.log('✅ Patched wavesurfer.js play()');
-            "
-            grep -A 10 'play()' ./node_modules/wavesurfer.js/dist/player.js
+          node <<'EOF'
+          const fs = require('fs');
+          const path = require('path');
+
+          const filePath = path.resolve('./node_modules/wavesurfer.js/dist/player.js');
+          let contents = fs.readFileSync(filePath, 'utf8');
+
+          contents = contents.replace(
+            /return this\.media\.play\(\);/,
+            `try {
+              return this.media.play();
+            } catch (err) {
+              if (err instanceof DOMException && err.name === 'AbortError') return;
+              throw err;
+            }`
+          );
+
+          fs.writeFileSync(filePath, contents);
+          console.log('✅ Patched wavesurfer.js play()');
+          EOF
+
+          grep -A 10 'play()' ./node_modules/wavesurfer.js/dist/player.js
 
       - name: Modify tracking code
         run: |
