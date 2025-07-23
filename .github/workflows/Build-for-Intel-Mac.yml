@@ -152,7 +152,7 @@ jobs:
                     throw err;
                 }
             }
-          }xms' node_modules/wavesurfer.js/dist/player.js
+          }xms' ./node_modules/wavesurfer.js/dist/player.js
         shell: bash
 
       - name: Modify tracking code
