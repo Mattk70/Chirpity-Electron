@@ -126,7 +126,7 @@ jobs:
           #               ffmpegProc.kill();\
           #             }\
           #           }, 5000);' ./node_modules/fluent-ffmpeg/lib/processor.js
-          cat ./node_modules/fluent-ffmpeg/lib/processor.js
+          grep -A 10 '5000' ./node_modules/fluent-ffmpeg/lib/processor.js
         shell: bash
 
       - name: Patch wavesurfer.js play() to handle AbortError
@@ -151,7 +151,7 @@ jobs:
             console.error('❌ Wavesurfer patch failed – pattern not found');
             process.exit(1);
           }
-          fs.writeFileSync(filePath, contents);
+          fs.writeFileSync(filePath, patched);
           console.log('✅ Patched wavesurfer.js play()');
           EOF
 
@@ -161,7 +161,7 @@ jobs:
         run: |
           # Replace development tracking ID with production ID
           sed -i.bak '1,30s/const ID_SITE = 3;/const ID_SITE = 2;/' ./js/utils/tracking.js && rm -f ./js/utils/tracking.js.bak
-          cat ./js/utils/tracking.js
+          grep -A 10 'ID_SITE'  ./js/utils/tracking.js
       
         shell: bash
 
