@@ -550,7 +550,7 @@ async function handleMessage(e) {
         if (tag?.name) {
           const query = await STATE.db.runAsync(
             `INSERT INTO tags (id, name) VALUES (?, ?)
-            ON CONFLICT(name) DO NOTHING`,
+            ON CONFLICT(id) DO UPDATE SET name = excluded.name`,
             tag.id,
             tag.name
           );
