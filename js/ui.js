@@ -2286,6 +2286,7 @@ const setUpWorkerMessaging = () => {
               break;
             }
           }
+          renderFilenamePanel()
           config.debug && console.log("Mode changed to: " + mode);
           if (["archive", "explore"].includes(mode)) {
             utils.enableMenuItem(["purge-file"]);
@@ -6691,9 +6692,13 @@ async function showRecordEntryForm(mode, batch) {
   speciesDisplay.className = "border rounded w-100";
   if (cname) {
     const species = LABELS.find(sp => sp.split('_')[1] === cname);
-    const [sciName, commonName] = species.split('_');
-    const styled = `${commonName}<br/><i>${sciName}</i>`;
-    selectedBird.innerHTML = styled;
+    if (species) {
+      const [sciName, commonName] = species.split('_');
+      const styled = `${commonName}<br/><i>${sciName}</i>`;
+      selectedBird.innerHTML = styled;
+    } else {
+      selectedBird.innerHTML = i18.searchPrompt;
+    }
   } else {
     selectedBird.innerHTML = i18.searchPrompt;
   }
