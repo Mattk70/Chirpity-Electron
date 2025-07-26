@@ -4034,13 +4034,12 @@ const getSavedFileInfo = async (file) => {
         file,
         archiveFile
       );
-      if (!row) {
-        const baseName = file.replace(/^(.*)\..*$/g, "$1%");
-        row = await diskDB.getAsync(
-          "SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name LIKE  (?)",
-          baseName
-        );
-      }
+      row = await diskDB.getAsync(
+        `SELECT * FROM files 
+        LEFT JOIN locations ON files.locationID = locations.id 
+        WHERE SUBSTR(name, 1, LENGTH(name) - LENGTH(substr(name, -INSTR(REVERSE(name), '.')) + 1)) = ?`,
+        baseName
+      );
     } catch (error) {
       console.warn(error);
     }
