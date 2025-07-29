@@ -4095,7 +4095,7 @@ const onSave2DiskDB = async ({ file }) => {
   } catch (error) {
     await memoryDB.runAsync("ROLLBACK");
     errorOccurred = true;
-    console.log("Transaction error:", error);
+    console.error("Transaction error:", error);
   } finally {
     dbMutex.unlock();
     if (!errorOccurred) {

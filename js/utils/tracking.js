@@ -54,7 +54,7 @@ function trackVisit(config){
             &dimension5=${speciesThreshold}
             &dimension6=${JSON.stringify(filters)}
             &dimension7=${JSON.stringify(audio)}
-            &dimension8=${models[selectedModel].backend}
+            &dimension8=${JSON.stringify(config[models[selectedModel].backend])}
             &dimension9=${JSON.stringify(detect)}
             &dimension11=${VERSION}
             &dimension12=${CPU}

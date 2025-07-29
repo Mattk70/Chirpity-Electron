@@ -69,7 +69,7 @@ const Toasts = { // UI.js
         badModel: 'Model "${model}" was not found in the database.',
         noModel: 'The necessary model column was not found in the file',
 
-
+        noBackground: "You have selected 'Mix in background noise', but there is no folder named 'background' in your dataset."
     },
     da: {
         info: 'Besked', warning: 'Advarsel', error: 'Fejl',
@@ -137,8 +137,9 @@ const Toasts = { // UI.js
         conversionComplete: "Konvertering fuldført, ${successTotal} lykkedes, ${failedTotal} fejlede.",
         libraryUpToDate: "Biblioteket er opdateret. Ingen handling nødvendig",
         badModel: 'Modellen "${model}" blev ikke fundet i databasen.',
-        noModel: "Den nødvendige modelkolonne blev ikke fundet i filen"
+        noModel: "Den nødvendige modelkolonne blev ikke fundet i filen",
 
+        noBackground: "Du har valgt 'Bland baggrundsstøj', men der er ingen mappe med navnet 'background' i dit datasæt."
     },
     de: {
         info: 'Hinweis', warning: 'Warnung', error: 'Fehler',
@@ -206,9 +207,9 @@ const Toasts = { // UI.js
         conversionComplete: "Konvertierung abgeschlossen, ${successTotal} erfolgreich, ${failedTotal} fehlgeschlagen.",
         libraryUpToDate: "Die Bibliothek ist auf dem neuesten Stand. Keine Aktion erforderlich",
         badModel: 'Modell "${model}" wurde nicht in der Datenbank gefunden.',
-        noModel: "Die erforderliche Modellspalte wurde in der Datei nicht gefunden"
+        noModel: "Die erforderliche Modellspalte wurde in der Datei nicht gefunden",
 
-
+        noBackground: "Du hast 'Hintergrundgeräusche mischen' ausgewählt, aber es gibt keinen Ordner namens 'background' in deinem Datensatz."
     },
     es: {
         info: 'Aviso', warning: 'Advertencia', error: 'Error',
@@ -276,8 +277,9 @@ const Toasts = { // UI.js
         conversionComplete: "Conversión completada, ${successTotal} exitosas, ${failedTotal} fallidas.",
         libraryUpToDate: "La biblioteca está actualizada. No hay nada que hacer",
         badModel: 'El modelo "${model}" no se encontró en la base de datos.',
-        noModel: "La columna de modelo necesaria no se encontró en el archivo"
+        noModel: "La columna de modelo necesaria no se encontró en el archivo",
 
+        noBackground: "Has seleccionado 'Mezclar con ruido de fondo', pero no hay ninguna carpeta llamada 'background' en tu conjunto de datos."
 
     },
     fr: {
@@ -346,7 +348,9 @@ const Toasts = { // UI.js
         conversionComplete: "Conversion terminée, ${successTotal} réussie(s), ${failedTotal} échouée(s).",
         libraryUpToDate: "La bibliothèque est à jour. Aucune action nécessaire",
         badModel: 'Le modèle "${model}" n’a pas été trouvé dans la base de données.',
-        noModel: "La colonne de modèle requise n’a pas été trouvée dans le fichier"
+        noModel: "La colonne de modèle requise n’a pas été trouvée dans le fichier",
+
+        noBackground: "Vous avez sélectionné 'Mélanger avec le bruit de fond', mais il n'y a pas de dossier nommé 'background' dans votre jeu de données."
 
     },
     ja: {
@@ -414,9 +418,9 @@ const Toasts = { // UI.js
         conversionComplete: '変換が完了しました。成功: ${successTotal}、失敗: ${failedTotal}',
         libraryUpToDate: 'ライブラリは最新です。何もすることはありません',
         badModel: 'モデル "${model}" はデータベースに見つかりませんでした。',
-        noModel: "必要なモデル列がファイルに見つかりませんでした"
+        noModel: "必要なモデル列がファイルに見つかりませんでした",
 
-
+        noBackground: "「背景ノイズを混ぜる」を選択しましたが、データセットに「background」という名前のフォルダがありません。"
     },
     nl: {
         info: 'Kennisgeving', warning: 'Waarschuwing', error: 'Fout',
@@ -484,7 +488,9 @@ const Toasts = { // UI.js
         conversionComplete: "Conversie voltooid, ${successTotal} succesvol, ${failedTotal} mislukt.",
         libraryUpToDate: "De bibliotheek is up-to-date. Niets te doen",
         badModel: 'Model "${model}" is niet gevonden in de database.',
-        noModel: "De vereiste modelkolom is niet gevonden in het bestand"
+        noModel: "De vereiste modelkolom is niet gevonden in het bestand",
+
+        noBackground: "Je hebt 'Achtergrondgeluid mengen' geselecteerd, maar er is geen map genaamd 'background' in je dataset."
 
 
     },
@@ -554,7 +560,9 @@ const Toasts = { // UI.js
         conversionComplete: "Conversão concluída, ${successTotal} bem-sucedida(s), ${failedTotal} falhada(s).",
         libraryUpToDate: "A biblioteca está atualizada. Nada a fazer",
         badModel: 'O modelo "${model}" não foi encontrado na base de dados.',
-        noModel: "A coluna de modelo necessária não foi encontrada no ficheiro"
+        noModel: "A coluna de modelo necessária não foi encontrada no ficheiro",
+
+        noBackground: "Você selecionou 'Misturar com ruído de fundo', mas não há uma pasta chamada 'background' no seu conjunto de dados."
 
 
     },
@@ -624,7 +632,9 @@ const Toasts = { // UI.js
         conversionComplete: "Конвертация завершена: ${successTotal} успешно, ${failedTotal} с ошибками.",
         libraryUpToDate: "Библиотека актуальна. Действий не требуется",
         badModel: 'Модель "${model}" не найдена в базе данных.',
-        noModel: "Необходимый столбец модели не найден в файле"
+        noModel: "Необходимый столбец модели не найден в файле",
+
+        noBackground: "Вы выбрали 'Смешать с фоновым шумом', но в вашем наборе данных нет папки с названием 'background'."
 
 
     },
@@ -694,7 +704,9 @@ const Toasts = { // UI.js
         conversionComplete: "Konvertering klar, ${successTotal} lyckades, ${failedTotal} misslyckades.",
         libraryUpToDate: "Biblioteket är uppdaterat. Inget att göra",
         badModel: 'Modellen "${model}" hittades inte i databasen.',
-        noModel: "Den nödvändiga modellkolumnen hittades inte i filen"
+        noModel: "Den nödvändiga modellkolumnen hittades inte i filen",
+
+        noBackground: "Du har valt 'Blanda in bakgrundsljud', men det finns ingen mapp som heter 'background' i ditt dataset."
 
 
     },
@@ -764,7 +776,9 @@ const Toasts = { // UI.js
         conversionComplete: "转换完成，成功：${successTotal}，失败：${failedTotal}。",
         libraryUpToDate: "资料库已是最新，无需操作",
         badModel: '模型 "${model}" 未在数据库中找到。',
-        noModel: "文件中未找到所需的模型列"
+        noModel: "文件中未找到所需的模型列",
+
+        noBackground: "你已选择“混合背景噪声”，但在你的数据集中找不到名为“background”的文件夹。"
 
     }
     
