@@ -4087,8 +4087,15 @@ const onSave2DiskDB = async ({ file }) => {
       console.log(response.changes + " date durations added to disk database");
     // now update records
     response = await memoryDB.runAsync(`
-            INSERT OR IGNORE INTO disk.records 
-            SELECT * FROM records
+            INSERT OR IGNORE INTO disk.records (
+              dateTime, position, fileID, speciesID, modelID, confidence, 
+              comment, end, callCount, isDaylight, reviewed, tagID
+            )
+            SELECT 
+                r.dateTime, r.position, r.fileID, r.speciesID, r.modelID, r.confidence, 
+                r.comment, r.end, r.callCount, r.isDaylight, r.reviewed, r.tagID
+            FROM records r
+            JOIN species s ON r.speciesID = s.id  
             WHERE confidence >= ${STATE.detect.confidence} ${filterClause}`);
     DEBUG && console.log(response?.changes + " records added to disk database");
     await memoryDB.runAsync("END");
