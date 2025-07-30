@@ -4038,7 +4038,7 @@ const getSavedFileInfo = async (file) => {
         `SELECT * FROM files 
         LEFT JOIN locations ON files.locationID = locations.id 
         WHERE SUBSTR(name, 1, LENGTH(name) - LENGTH(substr(name, -INSTR(REVERSE(name), '.')) + 1)) = ?`,
-        baseName
+        file
       );
     } catch (error) {
       console.warn(error);

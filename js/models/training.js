@@ -154,7 +154,7 @@ async function trainModel({
 
   if (useNoise && (!fs.existsSync(noiseBin) || !cacheRecords)){
     noiseFiles = allFiles.filter(file => file.label.toLowerCase().includes('background'))
-    if (!noiseFiles){
+    if (!noiseFiles || noiseFiles.length === 0){
       const notice = 'noBackground' 
       postMessage({ message: "training-results", notice, type:'error' });
       return
