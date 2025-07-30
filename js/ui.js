@@ -4491,8 +4491,9 @@ const modelSettingsDisplay = () => {
   } else {
     nodeOnly.forEach((element) => element.classList.add("d-none"));
   }
-  // Hide train unless BirdNET
-  DOM.trainNav.classList.toggle('disabled', config.selectedModel !== 'birdnet')
+  // Hide train unless BirdNET (and a member)
+  const blockTrain = config.selectedModel !== 'birdnet' || ! STATE.isMember;
+  DOM.trainNav.classList.toggle('disabled', blockTrain);
 };
 
 const contextAwareIconDisplay = () => {
