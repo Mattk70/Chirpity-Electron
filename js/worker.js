@@ -199,8 +199,8 @@ const setupFfmpegCommand = async ({
       const rate = Math.floor(bitrate/10)
       command.audioFilters([`asetrate=${rate}`]);
     }
-    if (!training && !sampleRate){
-      // We'll export native so we need to reset the duration
+    if (training && !sampleRate){
+      // We'll export dilated so we need to reset the duration:needs testing
       end = (end - start) / 10 + start;
     }
   } 
@@ -4034,12 +4034,13 @@ const getSavedFileInfo = async (file) => {
         file,
         archiveFile
       );
-      row = await diskDB.getAsync(
-        `SELECT * FROM files 
-        LEFT JOIN locations ON files.locationID = locations.id 
-        WHERE SUBSTR(name, 1, LENGTH(name) - LENGTH(substr(name, -INSTR(REVERSE(name), '.')) + 1)) = ?`,
-        file
-      );
+      if (!row) {
+        const baseName = file.replace(/^(.*)\..*$/g, "$1%");
+        row = await diskDB.getAsync(
+          "SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name LIKE  (?)",
+          baseName
+        );
+      }
     } catch (error) {
       console.warn(error);
     }
