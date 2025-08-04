@@ -12,7 +12,7 @@ const fs = require("node:fs");
  * @returns {Promise<object|null>} - The extracted metadata or null if not found.
  */
 function extractWaveMetadata(filePath) {
-  let metadata = {};
+  let metadata = {}, guanoText = "";
   return new Promise((resolve, reject) => {
     // Open the file
     fs.open(filePath, "r", (err, fd) => {
@@ -67,7 +67,7 @@ function extractWaveMetadata(filePath) {
                 }
 
                 // GUANO data is UTF-8 encoded
-                const guanoText = guanoBuffer.toString("utf-8");
+                guanoText += guanoBuffer.toString("utf-8");
                 const guano = _parseMetadataText(guanoText);
                 metadata["guano"] = guano;
               });
@@ -156,7 +156,6 @@ function _parseMetadataText(text) {
         .slice(colonIndex + 1)
         .trim()
         .replaceAll("\uFFFF", "\n");
-
       try {
         // Attempt to parse JSON-like values
         if (
@@ -164,8 +163,8 @@ function _parseMetadataText(text) {
           (value.startsWith("{") && value.endsWith("}"))
         ) {
           metadata[key] = JSON.parse(value);
-        } else {
-          metadata[key] = value;
+        } else if (!key.includes('Signature')){
+          metadata[key] = metadata[key] && value !== metadata[key] ? metadata[key] + ',' + value : value;
         }
       } catch {
         metadata[key] = value;
@@ -175,5 +174,58 @@ function _parseMetadataText(text) {
 
   return metadata;
 }
+
+// // Uncomment to add GUANO metadata to a file
+// function addGuano(file) {
+//   // Define GUANO metadata
+//   const guanoMetadata = `What might we want to write here???`;
+
+//   const inputPath = file;
+//   const outputPath = file;
+
+//   const inputBuffer = fs.readFileSync(inputPath);
+
+//   // GUANO chunk
+//   const guanoChunkId = Buffer.from('guan'); // 4 bytes
+//   const guanoPayload = Buffer.from(guanoMetadata, 'utf8');
+//   const guanoSize = Buffer.alloc(4);
+//   guanoSize.writeUInt32LE(guanoPayload.length);
+
+//   // Align chunk size to even number of bytes
+//   const padding = guanoPayload.length % 2 === 1 ? Buffer.from([0]) : Buffer.alloc(0);
+
+//   // Create the full GUANO chunk
+//   const guanoChunk = Buffer.concat([guanoChunkId, guanoSize, guanoPayload, padding]);
+
+//   // Locate RIFF header and file size
+//   const riffHeader = inputBuffer.slice(0, 12); // 'RIFF....WAVE'
+
+//   // Get the rest of the chunks
+//   const chunks = [];
+//   let offset = 12;
+
+//   while (offset < inputBuffer.length) {
+//     const id = inputBuffer.slice(offset, offset + 4);
+//     const size = inputBuffer.readUInt32LE(offset + 4);
+//     const chunkSize = size + (size % 2); // pad to even
+
+//     chunks.push(inputBuffer.slice(offset, offset + 8 + chunkSize));
+//     offset += 8 + chunkSize;
+//   }
+
+//   // Optional: insert after 'data' chunk or at end
+//   chunks.push(guanoChunk);
+
+//   // Recompute RIFF size: total - 8
+//   const totalSize = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+//   const riffSize = Buffer.alloc(4);
+//   riffSize.writeUInt32LE(totalSize + 4); // +4 for "WAVE"
+
+//   const output = Buffer.concat([riffHeader.slice(0, 4), riffSize, riffHeader.slice(8), ...chunks]);
+
+//   fs.writeFileSync(outputPath, output);
+//   console.log(`Wrote GUANO metadata to ${outputPath}`);
+
+// }
 
 module.exports = { extractWaveMetadata };

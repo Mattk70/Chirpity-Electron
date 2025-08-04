@@ -234,6 +234,33 @@ function parseDuration(durationString) {
 }
 
 
+function requestFromWorker(worker, action, payload = {}) {
+  return new Promise((resolve, reject) => {
+    const messageId = crypto.randomUUID(); //  unique string 
+    let timeoutId
+    function handleMessage(event) {
+      const { id, data, error } = event.data;
+      if (id !== messageId) return;
+
+      worker.removeEventListener("message", handleMessage);
+      clearTimeout(timeoutId); // Clear the timeout if we got a response
+      if (error) {
+        reject(new Error(error));
+      } else {
+        resolve(data);
+      }
+    }
+    // Set timeout to clean up listener and reject promise
+   timeoutId = setTimeout(() => {
+      worker.removeEventListener("message", handleMessage);
+      reject(new Error(`Worker request timed out for action: ${action}`));
+    }, 60000); // 60 second timeout
+
+    worker.addEventListener("message", handleMessage);
+    worker.postMessage({ id: messageId, action, ...payload });
+  });
+}
+
 /**
  * Returns a Promise that resolves when the provided check function returns a truthy value or after a maximum number of retries.
  *
@@ -281,6 +308,7 @@ export {
   waitForFinalEvent,
   formatDuration,
   parseDuration,
+  requestFromWorker,
   waitFor,
   shuffle,
 };
