@@ -234,6 +234,27 @@ function parseDuration(durationString) {
 }
 
 
+function requestFromWorker(worker, action, payload = {}) {
+  return new Promise((resolve, reject) => {
+    const messageId = crypto.randomUUID(); // or any unique string generator
+
+    function handleMessage(event) {
+      const { id, data, error } = event.data;
+      if (id !== messageId) return;
+
+      worker.removeEventListener("message", handleMessage);
+      if (error) {
+        reject(new Error(error));
+      } else {
+        resolve(data);
+      }
+    }
+
+    worker.addEventListener("message", handleMessage);
+    worker.postMessage({ id: messageId, action, ...payload });
+  });
+}
+
 /**
  * Returns a Promise that resolves when the provided check function returns a truthy value or after a maximum number of retries.
  *
@@ -281,6 +302,7 @@ export {
   waitForFinalEvent,
   formatDuration,
   parseDuration,
+  requestFromWorker,
   waitFor,
   shuffle,
 };

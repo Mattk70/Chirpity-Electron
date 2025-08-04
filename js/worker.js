@@ -524,7 +524,7 @@ async function handleMessage(e) {
       break;
     }
     case "get-locations": {
-      getLocations({ file: args.file });
+      getLocations(args);
       break;
     }
     case "get-tags": {
@@ -2876,6 +2876,11 @@ const bufferToAudio = async ({
     });
     command.on("end", function () {
       DEBUG && console.log(format + " file rendered");
+      // ToDo: do we want to write guano metadata?
+      // if (format === 'wav'){
+      //   const { addGuano } = require("./js/utils/metadata.js");
+      //   addGuano(destination)
+      // }
       resolve(destination);
     });
     })
@@ -4648,12 +4653,13 @@ async function onSetCustomLocation({
   await getLocations({ file: files[0] });
 }
 
-async function getLocations({ file, db = STATE.db }) {
+async function getLocations({ file, db = STATE.db, id }) {
   let locations = await db.allAsync("SELECT * FROM locations ORDER BY place");
   locations ??= [];
   UI.postMessage({
+    id,
     event: "location-list",
-    locations: locations,
+    data: locations,
     currentLocation: METADATA[file]?.locationID,
   });
 }

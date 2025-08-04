@@ -867,9 +867,9 @@ async function generateLocationList(id) {
   const i18 = i18n.get(i18n.All);
   const defaultText = id === "savedLocations" ? i18[0] : i18[1];
   const el = document.getElementById(id);
-  LOCATIONS = undefined;
-  worker.postMessage({ action: "get-locations", file: STATE.currentFile });
-  await utils.waitFor(() => LOCATIONS);
+  LOCATIONS = await utils.requestFromWorker(worker, "get-locations", {
+    file: STATE.currentFile
+  });
   el.innerHTML = `<option value="">${defaultText}</option>`; // clear options
   LOCATIONS.forEach((loc) => {
     const option = document.createElement("option");
@@ -1277,11 +1277,9 @@ async function fetchLocationAddress(lat, lon, pushLocations) {
     openStreetMapTimer = setTimeout(async () => {
       try {
         if (!LOCATIONS) {
-          worker.postMessage({
-            action: "get-locations",
-            file: STATE.currentFile,
-          });
-          await utils.waitFor(() => LOCATIONS); // Ensure this is awaited
+            LOCATIONS = await utils.requestFromWorker(worker, "get-locations", {
+              file: STATE.currentFile
+            });
         }
         const response = await fetch(
           `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=14`
@@ -5431,6 +5429,8 @@ async function handleUIClicks(e) {
       const model = document.getElementById('custom-models').value;
       worker.postMessage({action:"expunge-model", model})
       delete config.models[model];
+      config.selectedModel ===  model && (config.selectedModel = 'birdnet');
+      updateModelOptions();
       document.querySelector(`#model-to-use option[value="${model}"]`)?.remove();
       updatePrefs('config.json', config);
       break;
