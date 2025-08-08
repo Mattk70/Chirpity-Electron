@@ -4157,7 +4157,7 @@ const iconizeScore = (score) => {
 
 const exportAudio = () => {
   let result;
-  if (STATE.activeRegion.label) {
+  if (activeRow && STATE.activeRegion.label) {
     setClickedIndex(activeRow);
     result = predictions.get(clickedIndex);
   }
