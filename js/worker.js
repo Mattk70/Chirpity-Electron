@@ -2873,7 +2873,8 @@ const bufferToAudio = async ({
     });
     if (format === "mp3" && ! STATE.audio.downmix) {
       command.on("codecData", function (data) {
-        if (Number(data.audio_details[2]) > 2 ){
+        const channels = data.audio_details[2].toLowerCase();
+        if (!['mono', 'stereo', '1.0', '2.0', 'dual mono'].includes(channels) ){
           const i18n = {
             en: "Cannot export multichannel audio to MP3. Either enable downmixing, or choose a different export format.",
             da: "Kan ikke eksportere multikanalslyd til MP3. Aktiver enten nedmiksning, eller vælg et andet eksportformat.",
