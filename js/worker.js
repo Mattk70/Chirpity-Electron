@@ -4200,7 +4200,13 @@ const getDetectedSpecies = async () => {
  */
 const getValidSpecies = async (file) => {
   const included = await getIncludedIDs(file); // classindex values
-
+  const locationID = METADATA[file]?.locationID || STATE.locationID;
+  const {place} = locationID
+    ? await STATE.db.getAsync(
+        "SELECT place FROM locations WHERE id = ?",
+        locationID
+      )
+    : { place: STATE.place };
   const includedSpecies = [];
   const excludedSpecies = [];
   let i = 1;
@@ -4223,6 +4229,7 @@ const getValidSpecies = async (file) => {
     event: "valid-species-list",
     included: includedSpecies,
     excluded: excludedSpecies,
+    place
   });
 };
 

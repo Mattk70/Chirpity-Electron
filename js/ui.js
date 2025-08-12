@@ -2346,7 +2346,7 @@ const setUpWorkerMessaging = () => {
           break;
         }
         case "valid-species-list": {
-          populateSpeciesModal(args.included, args.excluded);
+          populateSpeciesModal(args);
 
           break;
         }
@@ -4290,7 +4290,7 @@ function replaceCtrlWithCommand() {
   }
 }
 
-const populateSpeciesModal = async (included, excluded) => {
+const populateSpeciesModal = async ({included, excluded, place}) => {
   const i18 = i18n.get(i18n.SpeciesList);
   const current_file_text =
     STATE.week !== -1 && STATE.week
@@ -4310,7 +4310,7 @@ const populateSpeciesModal = async (included, excluded) => {
       speciesThreshold: config.speciesThreshold,
     });
     location_filter_text = utils.interpolate(i18.location, {
-      place: place.textContent.replace("fmd_good", ""),
+      place: place,
       current_file_text: current_file_text,
       species_filter_text: species_filter_text,
     });
