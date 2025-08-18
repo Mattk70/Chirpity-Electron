@@ -51,7 +51,7 @@ window.addEventListener("unhandledrejection", function (event) {
   // Track the unhandled promise rejection
   trackEvent(
     config.UUID,
-    "Unhandled UI Promise Rejection",
+    "Unhandled UI PR",
     errorMessage,
     customURLEncode(stackTrace)
   );
@@ -66,7 +66,7 @@ window.addEventListener("rejectionhandled", function (event) {
   // Track the unhandled promise rejection
   trackEvent(
     config.UUID,
-    "Handled UI Promise Rejection",
+    "Handled UI PR",
     errorMessage,
     customURLEncode(stackTrace)
   );

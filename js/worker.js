@@ -102,7 +102,7 @@ self.addEventListener("unhandledrejection", function (event) {
   // Track the unhandled promise rejection
   trackEvent(
     STATE.UUID,
-    "Unhandled Worker Promise Rejections",
+    "Unhandled Worker PR",
     errorMessage,
     customURLEncode(stackTrace)
   );
@@ -116,7 +116,7 @@ self.addEventListener("rejectionhandled", function (event) {
   // Track the unhandled promise rejection
   trackEvent(
     STATE.UUID,
-    "Handled Worker Promise Rejections",
+    "Handled Worker PR",
     errorMessage,
     customURLEncode(stackTrace)
   );
@@ -1468,7 +1468,7 @@ async function onAnalyse({
       filesBeingProcessed = [];
       if (circleClicked) {
         // handle circle here
-        await getResults({ topRankin: 5 });
+        await getResults({ topRankin: 5, offset: 0 });
       } else {
         await onChangeMode("archive");
         FILE_QUEUE.forEach((file) =>
