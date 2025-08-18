@@ -846,7 +846,8 @@ async function onLaunch({
   } else {
     STATE.modelID = result.id;
   }
-  if (!memoryDB || !STATE.detect.combine){
+  const {combine, merge} = STATE.detect;
+  if (!memoryDB || !(combine || merge)){
     memoryDB = await createDB({file: null, diskDB, dbMutex}); // create new memoryDB
   } else if (!result){
     const labelsLocation = modelPath ? p.join(modelPath, 'labels.txt') : null;
@@ -1421,8 +1422,9 @@ async function onAnalyse({
   STATE.backlogInterval = {};
 
   if (!STATE.selection) {
+    const {combine, merge} = STATE.detect;
     // Clear records from the memory db
-    if (!STATE.detect.combine){
+    if (!(combine || merge)){
       await memoryDB.runAsync("DELETE FROM records; VACUUM");
     }
     // Clear any location filters set in explore/charts
