@@ -5583,7 +5583,8 @@ async function handleUIClicks(e) {
     }
     case "sort-label":
     case "sort-comment":
-    case "sort-reviewed": {
+    case "sort-reviewed":
+    case "sort-model": {
       if (!PREDICTING) {
         const sort = target.slice(5);
         const state = STATE.resultsMetaSortOrder;
