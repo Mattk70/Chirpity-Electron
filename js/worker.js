@@ -1084,10 +1084,15 @@ async function getSpeciesSQLAsync(){
       included = getExcluded(included);
       not = "NOT";
     }
+    // Get the speciesID for all models
+    const result = await STATE.db.allAsync(`SELECT sname FROM species WHERE classIndex + 1 IN (${included}) AND modelID = ${STATE.modelID}`);
+    const snames = result.map(row => row.sname);
+    included = await STATE.db.allAsync(`SELECT id FROM species WHERE sname IN (${prepParams(snames)})`, ...snames);
+    included = included.map(row => row.id);
     DEBUG &&
       console.log("included", included.length, "# labels", allLabels.length);
     // const includedParams = prepParams(included);
-    SQL = ` AND classIndex + 1 ${not} IN (${included}) `;
+    SQL = ` AND s.id ${not} IN (${included}) `;
     // params.push(...included);
   }
   return SQL
@@ -1864,7 +1869,7 @@ async function sendDetections(file, start, end, goToRegion) {
                 speciesID,
                 classIndex
             FROM records r
-            JOIN species ON speciesID = species.ID
+            JOIN species s ON speciesID = s.ID
             JOIN files ON fileID = files.ID
             WHERE confidence >= ?
             AND name = ? 
@@ -2157,10 +2162,6 @@ async function processAudio(
         clearInterval(STATE.backlogInterval[pid]);
       }
 
-      let lastBacklog = AUDIO_BACKLOG;
-      let stalledCounter = 0;
-      const MAX_STALLED = 200; // number of interval ticks before forcing resume
-
       STATE.backlogInterval[pid] = setInterval(() => {
         console.log(`[${pid}] backlog check: AUDIO_BACKLOG=${AUDIO_BACKLOG}`);
 
@@ -2172,21 +2173,6 @@ async function processAudio(
           return;
         }
 
-        // Check if backlog hasn't decreased
-        if (AUDIO_BACKLOG >= lastBacklog) {
-          stalledCounter++;
-          if (stalledCounter >= MAX_STALLED) {
-            console.warn(`[${pid}] backlog stalled at ${AUDIO_BACKLOG}, forcing resume`);
-            resumeFfmpeg(command, pid);
-            clearInterval(STATE.backlogInterval[pid]);
-            STATE.backlogInterval[pid] = null;
-            return;
-          }
-        } else {
-          stalledCounter = 0; // backlog decreased, reset counter
-        }
-
-        lastBacklog = AUDIO_BACKLOG;
       }, 50); // 50ms interval
     }
 
@@ -3401,7 +3387,7 @@ const parsePredictions = async (response) => {
     );
   if (index < 500) {
     const included = await getIncludedIDs(file).catch((error) =>
-      console.log("Error getting included IDs", error)
+      console.warn("Error getting included IDs", error)
     );
     const loopConfidence =  selection ? 50 : detect.confidence;
     for (let i = 0; i < keysArray.length; i++) {

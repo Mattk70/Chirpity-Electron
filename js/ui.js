@@ -6,7 +6,7 @@
 const fs = window.module.fs;
 const p = window.module.p;
 const uuidv4 = window.module.uuidv4;
-const os = window.module.os;
+const si = window.module.si;
 import {
   customURLEncode,
   installConsoleTracking,
@@ -464,10 +464,25 @@ Analysis Rate: x real time performance
 */
 // Timers
 let t0_warmup, t1_warmup, t0_analysis, t1_analysis;
-DIAGNOSTICS["CPU"] = os.cpus()[0].model;
-DIAGNOSTICS["Cores"] = os.cpus().length;
-DIAGNOSTICS["System Memory"] =
-  (os.totalmem() / (1024 ** 2 * 1000)).toFixed(0) + " GB";
+// DIAGNOSTICS["CPU"] = os.cpu()[0].model;
+// DIAGNOSTICS["Cores"] = os.cpus().length;
+// DIAGNOSTICS["System Memory"] =
+//   (os.totalmem() / (1024 ** 2 * 1000)).toFixed(0) + " GB";
+
+let diagnosticsReady = (async () => {
+  const [cpuInfo, memInfo, graphics] = await Promise.all([
+    si.cpu(),
+    si.mem(),
+    si.graphics()
+  ]);
+
+  DIAGNOSTICS["CPU"] = cpuInfo.brand;
+  DIAGNOSTICS["Cores"] = cpuInfo.cores;
+  DIAGNOSTICS["Physical Cores"] = cpuInfo.physicalCores;
+  DIAGNOSTICS["System Memory"] =
+    (memInfo.total / (1024 ** 3)).toFixed(0) + " GB";
+  DIAGNOSTICS["GPUs"] = graphics.controllers.map(gpu => gpu.model).join(", ");
+})();
 
 /**
  * Resets the results display and related UI components to their initial state.
@@ -1820,7 +1835,7 @@ const defaultConfig = {
   },
   warmup: true,
   hasNode: false,
-  tensorflow: { threads: DIAGNOSTICS["Cores"], batchSize: 8 },
+  tensorflow: { threads: null, batchSize: 8 },
   webgpu: { threads: 1, batchSize: 8 },
   audio: {
     gain: 0,
@@ -1843,6 +1858,8 @@ const defaultConfig = {
 let dirname, appPath, tempPath, systemLocale, isMac;
 window.onload = async () => {
   window.electron.requestWorkerChannel();
+  await diagnosticsReady;
+  defaultConfig.tensorflow.threads = DIAGNOSTICS["Physical Cores"];
   isMac = await window.electron.isMac();
   if (isMac) replaceCtrlWithCommand();
   DOM.contentWrapper.classList.add("loaded");
@@ -2986,23 +3003,11 @@ const handleBackendChange = (backend) => {
   backendEL.checked = true;
   if (backend === "webgpu") {
     DOM.threadSlider.max = 3;
-    // SNRSlider.disabled = true;
-    // config.filters.SNR = 0;
   } else {
     DOM.threadSlider.max = DIAGNOSTICS["Cores"];
     DOM.contextAware.disabled = false;
     if (DOM.contextAware.checked) {
       config.detect.contextAware = true;
-      // SNRSlider.disabled = true;
-      // config.filters.SNR = 0;
-    } else {
-      // SNRSlider.disabled = false;
-      // config.filters.SNR = parseFloat(SNRSlider.value);
-      // if (config.filters.SNR) {
-      //     DOM.contextAware.disabled = true;
-      //     config.detect.contextAware = false;
-      //     contextAwareIconDisplay();
-      // }
     }
   }
   // Update threads and batch Size in UI
