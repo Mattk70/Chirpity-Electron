@@ -4665,7 +4665,6 @@ function showSummarySortIcon() {
 const setSortOrder = (field, order) => {
   STATE[field] = order;
   worker.postMessage({ action: "update-state", [field]: order });
-  // resetResults({clearSummary: false, clearPagination: false, clearResults: true});
   filterResults();
 };
 
