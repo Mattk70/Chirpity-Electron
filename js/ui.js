@@ -2138,6 +2138,7 @@ window.onload = async () => {
     // Add cpu model & memory to config
     config.CPU = DIAGNOSTICS["CPU"];
     config.RAM = DIAGNOSTICS["System Memory"];
+    config.GPUs = DIAGNOSTICS["GPUs"];
     trackVisit(config);
   });
 };
