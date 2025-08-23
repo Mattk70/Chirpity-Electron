@@ -464,7 +464,7 @@ const addNewModel = async ({model, db = diskDB, dbMutex, labelsLocation}) => {
       // Custom model
       const labelFile = labelsLocation
       const fileContents = readFileSync(labelFile, "utf8");
-      labels = fileContents.trim().split(/\r?\n/);
+      labels = fileContents.split(/\r?\n/).map(line => line.trim()).filter(line => line.length);
     }
     // Add Unknown Sp.
     labels.push("Unknown Sp._Unknown Sp.");
@@ -484,6 +484,7 @@ const addNewModel = async ({model, db = diskDB, dbMutex, labelsLocation}) => {
   } catch (err) {
     await db.runAsync('ROLLBACK');
     console.error(`Error adding model species for "${model}":`, err.message);
+    modelID = err;
   } finally {
     dbMutex.unlock();
   }

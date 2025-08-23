@@ -648,7 +648,7 @@ async function handleMessage(e) {
       STATE.included = {}
       await INITIALISED;
       LIST_WORKER && (await getIncludedIDs());
-      setLabelState({regenerate:false});
+      setLabelState({regenerate:true});
       args.refreshResults && (await Promise.all([getResults(), getSummary(), getTotal()]));
       break;
     }
@@ -752,14 +752,22 @@ async function savedFileCheck(fileList) {
     let totalFilesChecked = 0;
     for (let i = 0; i < fileList.length; i += batchSize) {
       const fileSlice = fileList.slice(i, i + batchSize);
-
-      // Construct a parameterized query to count matching files in the database
-      const query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${prepParams(
-        fileSlice
-      )})`;
+      let query; const library = STATE.library.location + p.sep;
+      const newList = fileSlice.map(file => file.replace(library, ''));
+      // detect if any changes were made
+      const changed = fileSlice.some((item, i) => item !== newList[i]);
+      const params = prepParams(newList)
+      let countResult;
+      if (changed) {
+        query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${params}) or archiveName IN (${params})`;
+        countResult = await diskDB.getAsync(query, ...newList, ...newList);
+      } else {
+        query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${params})`;
+        countResult = await diskDB.getAsync(query, ...newList);
+      }
 
       // Execute the query with the slice as parameters
-      const countResult = await diskDB.getAsync(query, ...fileSlice);
+      
       const count = countResult?.count || 0;
 
       if (count < fileSlice.length) {
@@ -851,7 +859,22 @@ async function onLaunch({
     memoryDB = await createDB({file: null, diskDB, dbMutex}); // create new memoryDB
   } else if (!result){
     const labelsLocation = modelPath ? p.join(modelPath, 'labels.txt') : null;
-    addNewModel({model, db:memoryDB, dbMutex, labelsLocation})
+    addNewModel({model, db:memoryDB, dbMutex, labelsLocation}).then(modelID => {
+      if (!Number.isInteger(modelID) ) {
+        let message;
+        if (modelID.code === "SQLITE_CONSTRAINT"){
+          message = 'Model addition failed: There are duplicate species in the label file. Remove the model to prevent further errors';
+        } else {
+          message = `Model addition failed: ${modelID.message}`;
+        }
+        // Show an error alert        
+        generateAlert({
+          type: "error",
+          message
+        });
+        console.error(message);
+      }
+    });
   }
   const db = STATE.mode === 'analyse'
     ? memoryDB
@@ -1061,10 +1084,15 @@ async function getSpeciesSQLAsync(){
       included = getExcluded(included);
       not = "NOT";
     }
+    // Get the speciesID for all models
+    const result = await STATE.db.allAsync(`SELECT sname FROM species WHERE classIndex + 1 IN (${included}) AND modelID = ${STATE.modelID}`);
+    const snames = result.map(row => row.sname);
+    included = await STATE.db.allAsync(`SELECT id FROM species WHERE sname IN (${prepParams(snames)})`, ...snames);
+    included = included.map(row => row.id);
     DEBUG &&
       console.log("included", included.length, "# labels", allLabels.length);
     // const includedParams = prepParams(included);
-    SQL = ` AND classIndex + 1 ${not} IN (${included}) `;
+    SQL = ` AND s.id ${not} IN (${included}) `;
     // params.push(...included);
   }
   return SQL
@@ -1841,7 +1869,7 @@ async function sendDetections(file, start, end, goToRegion) {
                 speciesID,
                 classIndex
             FROM records r
-            JOIN species ON speciesID = species.ID
+            JOIN species s ON speciesID = s.ID
             JOIN files ON fileID = files.ID
             WHERE confidence >= ?
             AND name = ? 
@@ -2127,15 +2155,27 @@ async function processAudio(
       const pid = command.ffmpegProc?.pid;
       duration += chunk.length / bytesPerSecond;
       if (!STATE.processingPaused[pid] && AUDIO_BACKLOG >= MAX_CHUNKS) {
-        //console.log(`Backlog for pid: ${pid}`, AUDIO_BACKLOG)
-        pauseFfmpeg(command, pid);
-        STATE.backlogInterval[pid] = setInterval(() => {
-          if (AUDIO_BACKLOG < NUM_WORKERS * 2) {
-            resumeFfmpeg(command, pid);
-            clearInterval(STATE.backlogInterval[pid]);
-          }
-        }, 10);
+      pauseFfmpeg(command, pid);
+
+      // avoid creating multiple intervals for the same pid
+      if (STATE.backlogInterval[pid]) {
+        clearInterval(STATE.backlogInterval[pid]);
       }
+
+      STATE.backlogInterval[pid] = setInterval(() => {
+        console.log(`[${pid}] backlog check: AUDIO_BACKLOG=${AUDIO_BACKLOG}`);
+
+        if (AUDIO_BACKLOG <= NUM_WORKERS * 2) {
+          console.log(`[${pid}] resuming ffmpeg (normal), backlog=${AUDIO_BACKLOG}`);
+          resumeFfmpeg(command, pid);
+          clearInterval(STATE.backlogInterval[pid]);
+          STATE.backlogInterval[pid] = null;
+          return;
+        }
+
+      }, 50); // 50ms interval
+    }
+
       if (aborted) {
         STREAM.destroy();
         return;
@@ -3347,7 +3387,7 @@ const parsePredictions = async (response) => {
     );
   if (index < 500) {
     const included = await getIncludedIDs(file).catch((error) =>
-      console.log("Error getting included IDs", error)
+      console.warn("Error getting included IDs", error)
     );
     const loopConfidence =  selection ? 50 : detect.confidence;
     for (let i = 0; i < keysArray.length; i++) {

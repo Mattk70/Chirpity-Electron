@@ -4,7 +4,7 @@ const colormap = require("colormap");
 const p = require("node:path");
 const SunCalc = require("suncalc");
 const { v4: uuidv4 } = require("uuid");
-const os = require("node:os");
+const si = require('systeminformation');
 
 // We need to wait until the UI  is ready to receive the message before
 // sending the port. We create this promise in the preload, so it's guaranteed
@@ -72,14 +72,7 @@ contextBridge.exposeInMainWorld("electron", {
 
 
 
-contextBridge.exposeInMainWorld("module", {
-  fs: fs,
-  colormap: colormap,
-  p: p,
-  SunCalc: SunCalc,
-  uuidv4: uuidv4,
-  os: os,
-});
+contextBridge.exposeInMainWorld("module", {fs, colormap, p, SunCalc, uuidv4, si});
 
 // Expose only specific environment variables
 contextBridge.exposeInMainWorld("env", {
