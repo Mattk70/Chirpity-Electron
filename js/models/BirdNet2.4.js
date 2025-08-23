@@ -231,6 +231,7 @@ class MelSpecLayerSimple extends tf.layers.Layer {
     this.fmin = config.fmin;
     this.fmax = config.fmax;
     this.melFilterbank = tf.tensor2d(config.melFilterbank);
+    this.mels = config.melFilterbank;
     this.two = tf.scalar(2);
     this.one = tf.scalar(1);
   }
@@ -252,11 +253,11 @@ class MelSpecLayerSimple extends tf.layers.Layer {
     return [inputShape[0], this.specShape[0], this.specShape[1], 1];
   }
 
-normalise_audio_batch = (tensor) => {
-  return tf.tidy(() => {
-    const sigMax = tf.max(tensor, -1, true);
-    const sigMin = tf.min(tensor, -1, true);
-    const range = sigMax.sub(sigMin);
+  normalise_audio_batch = (tensor) => {
+    return tf.tidy(() => {
+      const sigMax = tf.max(tensor, -1, true);
+      const sigMin = tf.min(tensor, -1, true);
+      const range = sigMax.sub(sigMin);
     return tensor
       .sub(sigMin)
       .divNoNan(range)
@@ -307,21 +308,6 @@ normalise_audio_batch = (tensor) => {
         .reverse(-1)
         .transpose([0, 2, 1])
         .expandDims(-1);
-      // TODO: check whether this ever improves things
-      // if (myModel.version.includes('---')){
-      //   const [batchSize, height, width, channels] = interim.shape;
-      //   let zeros;
-      //   if (this.fmax === 15000){
-      //     // This view has a range 5000Hz - 150kHz
-      //     zeros = tf.zeros([batchSize, 10, width, channels]);
-      //     interim = interim.slice([0,0,0,0], [-1, height - 10, -1, -1]);
-      //   } else {
-      //     // This view has a range 0Hz - 30kHz
-      //     zeros = tf.zeros([batchSize, height/2, width, channels]);
-      //     interim = interim.slice([0,0,0,0], [-1, height/2, -1, -1]);
-      //   }
-      //   interim = tf.concat([interim, zeros], 1);
-      // }
       return interim
     });
   }
@@ -329,6 +315,18 @@ normalise_audio_batch = (tensor) => {
   // Optionally, include the `className` method to provide a machine-readable name for the layer
   static get className() {
     return "MelSpecLayerSimple";
+  }
+    getConfig() {
+    const baseConfig = super.getConfig();
+    return Object.assign(baseConfig, {
+      sampleRate: this.sampleRate,
+      specShape: this.specShape,
+      frameStep: this.frameStep,
+      frameLength: this.frameLength,
+      fmin: this.fmin,
+      fmax: this.fmax,
+      melFilterbank: this.mels,
+    });
   }
 }
 

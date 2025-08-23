@@ -1768,7 +1768,7 @@ const defaultConfig = {
       labelSmoothing: 0,
       useWeights: false,
       useFocal: false,
-      useRoll: false,
+      // useRoll: false,
       useNoise: false
     }
   },
@@ -1909,7 +1909,6 @@ window.onload = async () => {
     };
     //fill in defaults - after updates add new items
     utils.syncConfig(config, defaultConfig);
-
 
     const isMember = await membershipCheck()
       .catch(err => {console.error(err); return false});
@@ -3275,10 +3274,10 @@ const showTraining = () => {
   document.getElementById('mixup').checked = settings.mixup;
   const mixupLabel = document.querySelector('label[for="mixup"]');
   mixupLabel.textContent = i18["mixup"];
-  const roll = document.getElementById('roll');
-  roll.checked = settings.useRoll;
-  const rollLabel = document.querySelector('label[for="roll"]');
-  rollLabel.textContent = i18["roll"];
+  // const roll = document.getElementById('roll');
+  // roll.checked = settings.useRoll;
+  // const rollLabel = document.querySelector('label[for="roll"]');
+  // rollLabel.textContent = i18["roll"];
   document.getElementById('use-noise').checked = settings.useNoise;
   const useNoiseLabel = document.querySelector('label[for="use-noise"]');
   useNoiseLabel.textContent = i18["use-noise"];
@@ -5100,6 +5099,7 @@ document.addEventListener("click", debounceClick(handleUIClicks));
  * @param {MouseEvent} e - The click event object.
  */
 async function handleUIClicks(e) {
+  if (!APPLICATION_LOADED) return;
   const element = e.target;
   const target = element.closest("[id]")?.id;
   const locale = config.locale.replace(/_.*$/, "");
@@ -5972,7 +5972,7 @@ document.addEventListener("change", async function (e) {
         }
         case "label-smoothing": {
           config.training.settings.labelSmoothing = element.valueAsNumber; break}
-        case "roll": {config.training.settings.useRoll = element.checked; break}
+        // case "roll": {config.training.settings.useRoll = element.checked; break}
         // --- Backends
         case "tensorflow":
         case "webgpu": { handleBackendChange(target); break }
