@@ -42,7 +42,7 @@ function trackEvent(uuid, event, action, name, value){
 }
 
 function trackVisit(config){
-    const {UUID, selectedModel, list, useWeek, locale, speciesThreshold, filters, audio, models, detect, CPU, RAM, VERSION} = config;
+    const {UUID, selectedModel, list, useWeek, locale, speciesThreshold, filters, audio, models, detect, CPU, RAM, GPUs, VERSION} = config;
     VISITOR = UUID;
     const {width, height} = window.screen;
     fetch(`https://analytics.mattkirkland.co.uk/matomo.php?idsite=${ID_SITE}&rand=${Date.now()}&rec=1&uid=${UUID}&apiv=1
@@ -58,7 +58,8 @@ function trackVisit(config){
             &dimension9=${JSON.stringify(detect)}
             &dimension11=${VERSION}
             &dimension12=${CPU}
-            &dimension13=${RAM}`)
+            &dimension13=${RAM}
+            &dimension14=${GPUs}`)
         .then(response => {
             if (! response.ok) throw new Error('Network response was not ok', response);
         })
