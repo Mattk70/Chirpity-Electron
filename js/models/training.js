@@ -328,10 +328,11 @@ async function trainModel({
     onEpochEnd: (epoch, logs) => {
       decay && (transferModel.optimizer.learningRate = Math.max(1e-6, cosineDecay(initialLearningRate, epoch+1, epochs)) );
       const {loss, val_loss, val_categoricalAccuracy, categoricalAccuracy} = logs;
+      const monitoredLoss = val_loss || loss;
       // Save best weights
-      if (val_loss < bestLoss){
-        bestLoss = val_loss;
-        bestAccuracy = val_categoricalAccuracy;
+      if (monitoredLoss < bestLoss){
+        bestLoss = monitoredLoss;
+        bestAccuracy = val_categoricalAccuracy || categoricalAccuracy;
         modelSavePromise = saveModelAsync()
       }
       let notice = `<table class="table table-striped">
