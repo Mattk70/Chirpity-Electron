@@ -1,6 +1,6 @@
 import {installConsoleTracking } from "../utils/tracking.js";
 
-let transferModel, tf, DEBUG = false;
+let tf, DEBUG = false;
 
 const fs = require('node:fs')
 const path = require('node:path')
@@ -11,6 +11,119 @@ try {
   tf = require("@tensorflow/tfjs");
 }
 import abortController from '../utils/abortController.js';
+
+// Define custom layer for computing mel spectrograms
+class MelSpecLayerSimple extends tf.layers.Layer {
+  constructor(config) {
+    super(config);
+
+    // Initialize parameters
+    this.sampleRate = config.sampleRate;
+    this.specShape = config.specShape;
+    this.frameStep = config.frameStep;
+    this.frameLength = config.frameLength;
+    this.fmin = config.fmin;
+    this.fmax = config.fmax;
+    this.melFilterbank = tf.tensor2d(config.melFilterbank);
+    this.mels = config.melFilterbank;
+    this.two = tf.scalar(2);
+    this.one = tf.scalar(1);
+  }
+
+  build(inputShape) {
+    // Initialize trainable weights, for example:
+    this.magScale = this.addWeight(
+      "magnitude_scaling",
+      [],
+      "float32",
+      tf.initializers.constant({ value: 1.23 })
+    );
+
+    super.build(inputShape);
+  }
+
+  // Compute the output shape of the layer
+  computeOutputShape(inputShape) {
+    return [inputShape[0], this.specShape[0], this.specShape[1], 1];
+  }
+
+normalise_audio_batch = (tensor) => {
+  return tf.tidy(() => {
+    const sigMax = tf.max(tensor, -1, true);
+    const sigMin = tf.min(tensor, -1, true);
+    const range = sigMax.sub(sigMin);
+    return tensor
+      .sub(sigMin)
+      .divNoNan(range)
+      .mul(this.two)
+      .sub(this.one);
+  });
+};
+
+  // Define the layer's forward pass
+  call(inputs) {
+    return tf.tidy(() => {
+      // inputs is a tensor representing the input data
+      inputs = inputs[0];
+      let result;
+      if (BACKEND === 'tensorflow') {
+        result = tf.stack(
+          inputs.split(inputs.shape[0]).map((input) => {
+            input = input.squeeze();
+            
+            // Normalize values between -1 and 1
+            input = this.normalise_audio_batch(input);
+            // Perform STFT and cast result to float
+            return tf.signal.stft(
+              input,
+              this.frameLength,
+              this.frameStep,
+              this.frameLength,
+              tf.signal.hannWindow
+            ).cast("float32");
+          })
+        )
+      } else {
+        // Normalise batch
+        inputs = this.normalise_audio_batch(inputs);
+        //Custom optimized and batch-capable stft
+        result = stft(
+          inputs,
+          this.frameLength,
+          this.frameStep,
+          this.frameLength,
+          tf.signal.hannWindow
+        )
+      }
+      let interim = result
+        .matMul(this.melFilterbank)
+        .pow(this.two)
+        .pow(tf.div(this.one, tf.add(this.one, tf.exp(this.magScale.read()))))
+        .reverse(-1)
+        .transpose([0, 2, 1])
+        .expandDims(-1);
+      return interim
+    });
+  }
+
+  // Optionally, include the `className` method to provide a machine-readable name for the layer
+  static get className() {
+    return "MelSpecLayerSimple";
+  }
+
+  getConfig() {
+    const baseConfig = super.getConfig();
+    return Object.assign(baseConfig, {
+      sampleRate: this.sampleRate,
+      specShape: this.specShape,
+      frameStep: this.frameStep,
+      frameLength: this.frameLength,
+      fmin: this.fmin,
+      fmax: this.fmax,
+      melFilterbank: this.mels,
+    });
+  }
+}
 
 /**
  * Computes a cosine decay learning rate based on the current training step.
@@ -48,7 +161,6 @@ function cosineDecay(initialLearningRate, globalStep, decaySteps) {
  * @param {number} options.validation - Validation split ratio (0–1).
  * @param {boolean} options.mixup - Whether to apply mixup augmentation.
  * @param {boolean} options.decay - Whether to use cosine learning rate decay.
- * @param {boolean} options.useRoll - Whether to apply rolling augmentation to audio.
  * @param {boolean} options.useWeights - Whether to use class weights in the loss function.
  * @param {boolean} options.useFocal - Whether to use focal loss.
  * @param {boolean} options.useNoise - Whether to blend background noise into training samples.
@@ -56,19 +168,20 @@ function cosineDecay(initialLearningRate, globalStep, decaySteps) {
  * @returns {Promise<Object>} A message object summarizing training results, metrics, and settings.
  */
 async function trainModel({
-  Model, 
-  lr:initialLearningRate,
-  batchSize = 32,
-  dropout, epochs, hidden,
-  dataset, cache:cacheFolder, modelLocation:saveLocation, modelType, 
-  useCache, validation, mixup, decay, 
-  useRoll, useWeights, useFocal, useNoise, labelSmoothing}) {
+      Model, 
+      lr:initialLearningRate,
+      batchSize = 32,
+      dropout, epochs, hidden,
+      dataset, cache:cacheFolder, modelLocation:saveLocation, modelType, 
+      useCache, validation, mixup, decay, 
+      useWeights, useFocal, useNoise, labelSmoothing}) {
   installConsoleTracking(() => Model.UUID, "Training");
   const {files:allFiles, classWeights} = getFilesWithLabelsAndWeights(dataset);
   if (!allFiles.length){
     throw new Error(`No files found in any label folders in ${dataset}` )
   }
   const baseModel = Model.model;
+
   const labels = Object.keys(classWeights); //[...new Set(allFiles.map(f => f.label))];
   const labelToIndex = Object.fromEntries(labels.map((l, i) => [l, i]));
   const t0 = Date.now();
@@ -79,39 +192,30 @@ async function trainModel({
   // Cache in the dataset folder if not selected
   cacheFolder = cacheFolder || dataset;
 
-  // Freeze base layers
-  for (const layer of baseModel.layers) {
-    layer.trainable = false;
-  }
-  // Get base model input and outputs
-  const input = baseModel.inputs[0];
-  const originalOutput = baseModel.outputs[0];
-
   // Get embeddings from BirdNET
-  const embeddingLayer = baseModel.getLayer('GLOBAL_AVG_POOL');
-  const embeddings = embeddingLayer.output;  // This will be input to the new classifier
-  let x = embeddings;
+  let embeddingModel = tf.model({
+    inputs: baseModel.inputs,
+    outputs: baseModel.getLayer('GLOBAL_AVG_POOL').output,
+    name: baseModel.name + "_embeddings"
+  });
+
+  // Create the new classifier head
+  const transferModel = tf.sequential();
+  transferModel.add(tf.layers.inputLayer({inputShape: [1024]}));
+  transferModel.add(tf.layers.batchNormalization({name:'CUSTOM_BN_1'}));
+  // L2 regularization
+  const regularizer = tf.regularizers.l2({l2: 1e-5});
   if (hidden) {
-    if (dropout) {
-      x = tf.layers.dropout({ rate: dropout, name: 'CUSTOM_DROP_1' }).apply(x);
+    if (dropout){
+      transferModel.add(tf.layers.dropout({rate: dropout, name:'CUSTOM_DROP_1'}));
     }
-    x = tf.layers.dense({ 
-      units: hidden,
-      activation: 'mish',
-      kernelInitializer: 'heNormal',
-      name: 'CUSTOM_HIDDEN' }).apply(x);
+    transferModel.add(tf.layers.dense({units: hidden, activation: 'mish', kernelRegularizer: regularizer, kernelInitializer: 'heNormal', name: 'CUSTOM_HIDDEN' }));
     if (dropout) {
-      x = tf.layers.dropout({ rate: dropout, name: 'CUSTOM_DROP_2' }).apply(x);
+      transferModel.add(tf.layers.dropout({rate: dropout, name:'CUSTOM_DROP_2'}));
     }
   }
-
-  const newClassifier = tf.layers.dense({ units: labels.length, activation: 'sigmoid', name: 'new_classes' }).apply(x);
-
-  // Build a new model
-  transferModel = tf.model({
-    inputs: input,
-    outputs: newClassifier,
-  });
+  transferModel.add(tf.layers.dense({units: labels.length, kernelRegularizer: regularizer, kernelInitializer: 'glorotUniform', name: 'CUSTOM_CLASSES' }));
+  transferModel.add(tf.layers.activation({activation: 'sigmoid', name: 'CUSTOM_SIGMOID'}));
 
   const classWeightsTensor = tf.tensor1d(
     Object.entries(classWeights)
@@ -123,8 +227,8 @@ async function trainModel({
     return tf.tidy(() => {
       let exampleWeights;
       if (useWeights && !useFocal){
-        const labelIndices = labels.argMax(-1); // [batch_size]
-        exampleWeights = useWeights ? classWeightsTensor.gather(labelIndices) : undefined; // [batch_size]
+        const labelIndices = labels.argMax(-1);
+        exampleWeights = useWeights ? classWeightsTensor.gather(labelIndices) : undefined;
       }
        return useFocal
         ? categoricalFocalCrossEntropy({yTrue:labels, yPred:preds, labelSmoothing})
@@ -159,11 +263,10 @@ async function trainModel({
       postMessage({ message: "training-results", notice, type:'error' });
       return
     }
-    await writeBinaryGzipDataset(noiseFiles, noiseBin, labelToIndex, postMessage, "Preparing noise data");
-
+    await writeBinaryGzipDataset(embeddingModel, noiseFiles, noiseBin, labelToIndex, postMessage, "Preparing noise data");
   }
   let noise_ds;
-  if (useNoise) noise_ds = tf.data.generator(() => readBinaryGzipDataset(noiseBin, labels, useRoll)).repeat();
+  if (useNoise) noise_ds = tf.data.generator(() => readBinaryGzipDataset(noiseBin, labels)).repeat();
 
   if (!cacheRecords || !fs.existsSync(trainBin)) {
         // Check same number of classes in train and val data
@@ -181,49 +284,31 @@ async function trainModel({
       postMessage({ message: "training-results", notice: error, type: 'error', autohide:false });
       return
     }
-    await writeBinaryGzipDataset(trainFiles, trainBin, labelToIndex, postMessage, "Preparing training data");
+    await writeBinaryGzipDataset(embeddingModel, trainFiles, trainBin, labelToIndex, postMessage, "Preparing training data");
   }
 
   if (validation && (!cacheRecords || !fs.existsSync(valBin))) {
-    await writeBinaryGzipDataset(valFiles, valBin, labelToIndex, postMessage, "Preparing validation data");
+    await writeBinaryGzipDataset(embeddingModel, valFiles, valBin, labelToIndex, postMessage, "Preparing validation data");
   }
-  let melSpec1Config, melSpec2Config, finalModel, modelSavePromise;
+  let mergedModel, modelSavePromise;
   const saveModelAsync = async () => {
-      let mergedModel, mergedLabels;
+      let mergedLabels = labels;
+      const intermediate = transferModel.apply(baseModel.getLayer('GLOBAL_AVG_POOL').output);
+      let output = intermediate;
       if (modelType === 'append'){
-        const combinedOutput = tf.layers.concatenate({ axis: -1 }).apply([originalOutput, newClassifier]);
-        mergedModel = tf.model({
-          inputs: baseModel.inputs,
-          outputs: combinedOutput,
-          name: 'merged_model'
-        });
+        output = tf.layers.concatenate({ axis: -1 }).apply([baseModel.output, intermediate]);
         mergedLabels = Model.labels.concat(labels);
       }
-      // Save labels
-      const labelData = (mergedLabels || labels).join('\n');
-      // Write to a file
+      mergedModel = tf.model({
+          inputs: baseModel.inputs,
+          outputs: output,
+          name: 'transfer_model'
+        });
+      // Write labels to a file
+      const labelData = mergedLabels.join('\n');
       fs.writeFileSync(path.join(saveLocation, 'labels.txt'), labelData, 'utf8');
-      finalModel =  mergedModel || transferModel;  
-      await finalModel.save('file://' + saveLocation);
-      // Read BirdNET config to extract mel_Spec configs to inject into custom model config
-      if (!melSpec1Config){
-        const modelPath = path.resolve(__dirname, '../../BirdNET_GLOBAL_6K_V2.4_Model_TFJS/static/model/model.json');
-        try {
-          const bnConfig = JSON.parse(fs.readFileSync(modelPath, 'utf-8'));
-          melSpec1Config = bnConfig.modelTopology.model_config.config.layers[1].config;
-          melSpec2Config = bnConfig.modelTopology.model_config.config.layers[2].config;
-        } catch (err){
-          throw new Error(`Failed to read BirdNET config: ${err.message}`);
-        }
-      }
-      try {
-        const customConfig = JSON.parse(fs.readFileSync(path.join(saveLocation, 'model.json')))
-        customConfig.modelTopology.config.layers[1].config = melSpec1Config;
-        customConfig.modelTopology.config.layers[2].config = melSpec2Config;
-        fs.writeFileSync(path.join(saveLocation, 'model.json'), JSON.stringify(customConfig), 'utf8')
-      } catch (err){
-        throw new Error(`Failed to update custom model config: ${err.message}`);
-      }
+      // Save the model
+      await mergedModel.save('file://' + saveLocation);
   }
   
   // Callbacks
@@ -243,10 +328,11 @@ async function trainModel({
     onEpochEnd: (epoch, logs) => {
       decay && (transferModel.optimizer.learningRate = Math.max(1e-6, cosineDecay(initialLearningRate, epoch+1, epochs)) );
       const {loss, val_loss, val_categoricalAccuracy, categoricalAccuracy} = logs;
+      const monitoredLoss = val_loss || loss;
       // Save best weights
-      if (val_loss < bestLoss){
-        bestLoss = val_loss;
-        bestAccuracy = val_categoricalAccuracy;
+      if (monitoredLoss < bestLoss){
+        bestLoss = monitoredLoss;
+        bestAccuracy = val_categoricalAccuracy || categoricalAccuracy;
         modelSavePromise = saveModelAsync()
       }
       let notice = `<table class="table table-striped">
@@ -273,8 +359,8 @@ async function trainModel({
   })
 
   let train_ds = mixup 
-    ? createMixupStreamDataset({ds:trainBin, labels, useRoll})
-    : createStreamDataset(trainBin, labels, useRoll);
+    ? createMixupStreamDataset({ds:trainBin, labels})
+    : createStreamDataset(trainBin, labels);
 
   const augmented_ds = useNoise 
     ? tf.data.generator(() => blendedGenerator(train_ds, noise_ds)).batch(batchSize).prefetch(3)
@@ -299,15 +385,6 @@ async function trainModel({
     callbacks: [earlyStopping, events],
     verbosity: 0
   });
-  // const profile = await tf.profile(async () => {
-  //   await transferModel.fitDataset(augmented_ds, {epochs: 1, callbacks: [earlyStopping, events], batchesPerEpoch: 1});
-  // });
-  
-// const sortedKernels = profile.kernels
-//   .slice() // copy the array to avoid modifying original
-//   .sort((a, b) => b.kernelTimeMs - a.kernelTimeMs);
-//   console.log(sortedKernels);
-//   return;
   await modelSavePromise;
 
   let notice ='', type = '';
@@ -336,13 +413,13 @@ Settings:
   Learning rate: ${initialLearningRate}
   Cosine learning rate decay: ${decay}
   Focal Loss: ${useFocal}
+  Class Weights: ${useWeights}
   LabelSmoothing: ${labelSmoothing}
 Classifier:  
   Hidden units:${hidden}
   Dropout: ${dropout}
 Augmentations:
   Mixup: ${mixup}
-  Roll: ${useRoll}
   Background noise: ${useNoise}
 `
   fs.writeFileSync(path.join(saveLocation, `training_metrics_${Date.now()}.txt`), notice.replaceAll('<br>', ''), 'utf8');
@@ -357,20 +434,23 @@ Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License
 `
 
   fs.writeFileSync(path.join(saveLocation, `LICENSE.txt`), license, 'utf8');
-
-  DEBUG && console.log(`Tensors in memory before: ${tf.memory().numTensors}`);
   baseModel.dispose()
   classWeightsTensor.dispose()
-  finalModel.layers.forEach(layer => {
+  mergedModel.layers.forEach(layer => {
     try{ 
+      if (layer.getClassName() === 'MelSpecLayerSimple') {
+        layer.one.dispose(), layer.two.dispose(), layer.melFilterbank.dispose();
+      }
       layer.dispose();
     } catch {
       // Skip previously disposed layers
     }
   })
+  transferModel.layers.forEach(layer => layer.dispose());
   optimizer.dispose();
   Model.model_loaded = false;
   Model.one.dispose(), Model.two.dispose(), Model.scalarFive.dispose();
+  DEBUG && console.log(`Tensors in memory after: ${tf.memory().numTensors}`);
   await Model.loadModel("layers");
   console.info('Custom model saved.', `Loss: ${bestLoss.toFixed(4)}, Accuracy: ${bestAccuracy.toFixed(4)}`)
   return message
@@ -437,7 +517,7 @@ function getFilesWithLabelsAndWeights(rootDir) {
  * @param {Function} postMessage - Callback for progress and error reporting.
  * @param {string} [description] - Optional description for progress updates.
  */
-async function writeBinaryGzipDataset(fileList, outputPath, labelToIndex, postMessage, description = "Preparing data") {
+async function writeBinaryGzipDataset(embeddingModel, fileList, outputPath, labelToIndex, postMessage, description = "Preparing data") {
   const t0 = Date.now()
   const pLimit = require('p-limit');
   const limit = pLimit(8); // Or whatever your CPU/I/O can handle
@@ -479,18 +559,21 @@ async function writeBinaryGzipDataset(fileList, outputPath, labelToIndex, postMe
         padded.set(audioArray.slice(start), expectedSamples - (audioArray.length - start));
         audioArray = padded;
       }
-
-      const audioBuffer = Buffer.from(audioArray.buffer);
+      // Get embeddings from BirdNET
+      const input = tf.tensor2d(audioArray, [1, audioArray.length]);
+      const embeddingTensor = await embeddingModel.predict(input);
+      const embeddings = await embeddingTensor.data();
+      const embeddingsBuffer = Buffer.from(embeddings.buffer);
       const labelIndex = labelToIndex[label];
       if (typeof labelIndex !== 'number' || labelIndex < 0 || labelIndex > 65535) {
         console.error(`Invalid labelIndex for "${label}" → ${labelIndex}`);
       }
 
-      // Up to 65536 labels
-      const labelBuf = Buffer.alloc(2);
-      labelBuf.writeUInt16LE(labelIndex);
+      // Write labels
+      const labelBuf = Buffer.alloc(4);
+      labelBuf.writeFloatLE(labelIndex);
 
-      const recordBuf = Buffer.concat([audioBuffer, labelBuf]);
+      const recordBuf = Buffer.concat([embeddingsBuffer, labelBuf]);
       if (!gzip.write(recordBuf)) {
         await once(gzip, 'drain');
       }
@@ -546,7 +629,7 @@ function stratifiedSplit(allFiles, valRatio = 0.2) {
 }
 
 async function* readBinaryGzipDataset(gzippedPath, labels, roll = false) {
-  const RECORD_SIZE = 576002; // 144000 * 4 + 2 bytes for the label
+  const RECORD_SIZE = 4100; // 1024 * 4 + 4 bytes for the label
   const gunzip = zlib.createGunzip();
   const stream = fs.createReadStream(gzippedPath).pipe(gunzip);
   let leftover = Buffer.alloc(0);
@@ -557,16 +640,15 @@ async function* readBinaryGzipDataset(gzippedPath, labels, roll = false) {
 
     while (offset + RECORD_SIZE <= total) {
       const record = data.subarray(offset, offset + RECORD_SIZE);
-      const audioBuf = record.subarray(0, 144000 * 4);
-      const labelIndex = record.readUInt16LE(RECORD_SIZE - 2);
+      const audioBuf = record.subarray(0, 1024 * 4);
+      const labelIndex = record.readFloatLE(RECORD_SIZE - 4);
 
-      const audio = new Float32Array(audioBuf.buffer, audioBuf.byteOffset, 144000);
-      const rolledAudio = roll ? rollFloat32(audio) : audio; // Roll the audio if required
+      const embedding = new Float32Array(audioBuf.buffer, audioBuf.byteOffset, 1024);
       if (labelIndex >= labels.length) {
         console.error(`Invalid label index: ${labelIndex}. Max allowed: ${labels.length - 1}`);
       }
       yield {
-        xs: tf.tensor1d(rolledAudio),
+        xs: tf.tensor1d(embedding),
         ys: tf.oneHot(labelIndex, labels.length)
       };
       offset += RECORD_SIZE;
@@ -749,23 +831,22 @@ function categoricalFocalCrossEntropy({
   });
 }
 
-const createStreamDataset = (ds, labels, useRoll) => 
-  tf.data.generator(() => readBinaryGzipDataset(ds, labels, useRoll)).prefetch(3);
+const createStreamDataset = (ds, labels) => 
+  tf.data.generator(() => readBinaryGzipDataset(ds, labels)).prefetch(3);
 
 /**
  * Creates a TensorFlow.js dataset with mixup augmentation by randomly blending pairs of samples and their labels.
  * 
  * Two independently shuffled datasets are zipped and mixed using a gamma-distributed coefficient, producing augmented samples for robust model training.
  * 
- * @param {boolean} useRoll - Whether to apply random rolling augmentation to audio samples.
  * @param {AsyncGenerator} ds - The source dataset generator.
  * @param {string[]} labels - Array of label names.
  * @param {number} [alpha=0.4] - Mixup alpha parameter controlling the strength of blending.
  * @return {tf.data.Dataset} A dataset yielding mixed input-label pairs.
  */
-function createMixupStreamDataset({useRoll, ds, labels, alpha = 0.4}) {
-      const ds1 = createStreamDataset(ds, labels, useRoll).shuffle(100, 42).prefetch(1);
-      const ds2 = createStreamDataset(ds, labels, useRoll).shuffle(100, 1337).prefetch(1);
+function createMixupStreamDataset({ds, labels, alpha = 0.4}) {
+      const ds1 = createStreamDataset(ds, labels).shuffle(100, 42).prefetch(1);
+      const ds2 = createStreamDataset(ds, labels).shuffle(100, 1337).prefetch(1);
       return tf.data
         .zip({ a: ds1, b: ds2 })
         .map(({ a, b }) => {

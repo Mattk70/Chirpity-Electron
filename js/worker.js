@@ -102,7 +102,7 @@ self.addEventListener("unhandledrejection", function (event) {
   // Track the unhandled promise rejection
   trackEvent(
     STATE.UUID,
-    "Unhandled Worker Promise Rejections",
+    "Unhandled Worker PR",
     errorMessage,
     customURLEncode(stackTrace)
   );
@@ -116,7 +116,7 @@ self.addEventListener("rejectionhandled", function (event) {
   // Track the unhandled promise rejection
   trackEvent(
     STATE.UUID,
-    "Handled Worker Promise Rejections",
+    "Handled Worker PR",
     errorMessage,
     customURLEncode(stackTrace)
   );
@@ -440,10 +440,12 @@ async function handleMessage(e) {
     }
     case "check-all-files-saved": {
       const allSaved = await savedFileCheck(args.files);
-      if (STATE.detect.autoLoad && allSaved) {
-        STATE.filesToAnalyse = args.files;
+      if (allSaved) {
         await onChangeMode("archive");
-        await Promise.all([getResults(), getSummary(), getTotal()]);
+        if (STATE.detect.autoLoad){
+          STATE.filesToAnalyse = args.files;
+          await Promise.all([getResults(), getSummary(), getTotal()]);
+        }
       }
       break;
     }
@@ -648,7 +650,7 @@ async function handleMessage(e) {
       STATE.included = {}
       await INITIALISED;
       LIST_WORKER && (await getIncludedIDs());
-      setLabelState({regenerate:false});
+      setLabelState({regenerate:true});
       args.refreshResults && (await Promise.all([getResults(), getSummary(), getTotal()]));
       break;
     }
@@ -752,14 +754,22 @@ async function savedFileCheck(fileList) {
     let totalFilesChecked = 0;
     for (let i = 0; i < fileList.length; i += batchSize) {
       const fileSlice = fileList.slice(i, i + batchSize);
-
-      // Construct a parameterized query to count matching files in the database
-      const query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${prepParams(
-        fileSlice
-      )})`;
+      let query; const library = STATE.library.location + p.sep;
+      const newList = fileSlice.map(file => file.replace(library, ''));
+      // detect if any changes were made
+      const changed = fileSlice.some((item, i) => item !== newList[i]);
+      const params = prepParams(newList)
+      let countResult;
+      if (changed) {
+        query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${params}) or archiveName IN (${params})`;
+        countResult = await diskDB.getAsync(query, ...newList, ...newList);
+      } else {
+        query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${params})`;
+        countResult = await diskDB.getAsync(query, ...newList);
+      }
 
       // Execute the query with the slice as parameters
-      const countResult = await diskDB.getAsync(query, ...fileSlice);
+      
       const count = countResult?.count || 0;
 
       if (count < fileSlice.length) {
@@ -795,17 +805,15 @@ function setGetSummaryQueryInterval(threads) {
  * @param {string} mode - The new mode to activate.
  */
 async function onChangeMode(mode) {
-  if (STATE.mode !== mode) {
-    if (!memoryDB){
-      memoryDB = await createDB({file: null, diskDB, dbMutex});
-    }
-    STATE.changeMode({
-      mode: mode,
-      disk: diskDB,
-      memory: memoryDB,
-    });
-    UI.postMessage({ event: "mode-changed", mode: mode });
+  if (!memoryDB){
+    memoryDB = await createDB({file: null, diskDB, dbMutex});
   }
+  STATE.changeMode({
+    mode: mode,
+    disk: diskDB,
+    memory: memoryDB,
+  });
+  UI.postMessage({ event: "mode-changed", mode: mode });
 }
 
 const filtersApplied = (list) => {
@@ -846,11 +854,27 @@ async function onLaunch({
   } else {
     STATE.modelID = result.id;
   }
-  if (!memoryDB || !STATE.detect.combine){
+  const {combine, merge} = STATE.detect;
+  if (!memoryDB || !(combine || merge)){
     memoryDB = await createDB({file: null, diskDB, dbMutex}); // create new memoryDB
   } else if (!result){
     const labelsLocation = modelPath ? p.join(modelPath, 'labels.txt') : null;
-    addNewModel({model, db:memoryDB, dbMutex, labelsLocation})
+    addNewModel({model, db:memoryDB, dbMutex, labelsLocation}).then(modelID => {
+      if (!Number.isInteger(modelID) ) {
+        let message;
+        if (modelID.code === "SQLITE_CONSTRAINT"){
+          message = 'Model addition failed: There are duplicate species in the label file. Remove the model to prevent further errors';
+        } else {
+          message = `Model addition failed: ${modelID.message}`;
+        }
+        // Show an error alert        
+        generateAlert({
+          type: "error",
+          message
+        });
+        console.error(message);
+      }
+    });
   }
   const db = STATE.mode === 'analyse'
     ? memoryDB
@@ -1060,10 +1084,15 @@ async function getSpeciesSQLAsync(){
       included = getExcluded(included);
       not = "NOT";
     }
+    // Get the speciesID for all models
+    const result = await STATE.db.allAsync(`SELECT sname FROM species WHERE classIndex + 1 IN (${included}) AND modelID = ${STATE.modelID}`);
+    const snames = result.map(row => row.sname);
+    included = await STATE.db.allAsync(`SELECT id FROM species WHERE sname IN (${prepParams(snames)})`, ...snames);
+    included = included.map(row => row.id);
     DEBUG &&
       console.log("included", included.length, "# labels", allLabels.length);
     // const includedParams = prepParams(included);
-    SQL = ` AND classIndex + 1 ${not} IN (${included}) `;
+    SQL = ` AND s.id ${not} IN (${included}) `;
     // params.push(...included);
   }
   return SQL
@@ -1301,15 +1330,20 @@ async function updateMetadata(fileNames) {
   const batchSize = 10000;
   const batches = chunkArray(fileNames, batchSize);
   const finalResult = {};
-  for (const batch of batches) {
+  for (let batch of batches) {
     // Build placeholders (?, ?, ?) dynamically based on number of file names
     const placeholders = prepParams(batch);
+    if (STATE.library.location) {
+      const prefix = STATE.library.location + p.sep;
+      batch = batch.map(fileName => fileName.replace(prefix, '')  );
+    }
 
     // 1. Get files and locations
     const fileQuery = `
         SELECT 
             f.id,
             f.name,
+            f.archiveName,
             f.duration,
             f.filestart as fileStart,
             f.metadata,
@@ -1318,10 +1352,10 @@ async function updateMetadata(fileNames) {
             l.lon
         FROM files f
         LEFT JOIN locations l ON f.locationID = l.id
-        WHERE f.name IN (${placeholders})
+        WHERE f.name IN (${placeholders}) OR f.archiveName IN (${placeholders})
     `;
 
-    const fileRows = await diskDB.allAsync(fileQuery, ...batch);
+    const fileRows = await diskDB.allAsync(fileQuery, ...batch, ...batch);
 
     if (fileRows.length === 0) {
         continue
@@ -1349,9 +1383,11 @@ async function updateMetadata(fileNames) {
     // 4. Build object keyed by file name
 
     fileRows.forEach(row => {
-      const {name, duration, fileStart, metadata, locationID, lat, lon} = row;
+      let {name, archiveName, duration, fileStart, metadata, locationID, lat, lon} = row;
+
       const complete = !!duration && !!fileStart;
       finalResult[name] = {
+            archiveName,
             duration,
             fileStart,
             metadata,
@@ -1421,8 +1457,9 @@ async function onAnalyse({
   STATE.backlogInterval = {};
 
   if (!STATE.selection) {
+    const {combine, merge} = STATE.detect;
     // Clear records from the memory db
-    if (!STATE.detect.combine){
+    if (!(combine || merge)){
       await memoryDB.runAsync("DELETE FROM records; VACUUM");
     }
     // Clear any location filters set in explore/charts
@@ -1455,7 +1492,20 @@ async function onAnalyse({
     let allCached = true;
     METADATA = await updateMetadata(FILE_QUEUE)
     for (let i = 0; i < FILE_QUEUE.length; i++) {
-      const file = FILE_QUEUE[i];
+      let file = FILE_QUEUE[i];
+      if (STATE.library.location) {
+        const prefix = STATE.library.location + p.sep;
+        const newFile = file.replace(prefix, '');
+        if (file !== newFile) {
+          const match = Object.values(METADATA).find(
+            entry => entry.archiveName === newFile
+          );
+          if (match && !METADATA[file]){
+            METADATA[file] = match;
+          }
+        }
+      }
+
       const meta = METADATA[file];
       if (!meta?.isComplete || !meta?.isSaved){
         allCached = false;
@@ -1468,7 +1518,7 @@ async function onAnalyse({
       filesBeingProcessed = [];
       if (circleClicked) {
         // handle circle here
-        await getResults({ topRankin: 5 });
+        await getResults({ topRankin: 5, offset: 0 });
       } else {
         await onChangeMode("archive");
         FILE_QUEUE.forEach((file) =>
@@ -1839,7 +1889,7 @@ async function sendDetections(file, start, end, goToRegion) {
                 speciesID,
                 classIndex
             FROM records r
-            JOIN species ON speciesID = species.ID
+            JOIN species s ON speciesID = s.ID
             JOIN files ON fileID = files.ID
             WHERE confidence >= ?
             AND name = ? 
@@ -2125,15 +2175,27 @@ async function processAudio(
       const pid = command.ffmpegProc?.pid;
       duration += chunk.length / bytesPerSecond;
       if (!STATE.processingPaused[pid] && AUDIO_BACKLOG >= MAX_CHUNKS) {
-        //console.log(`Backlog for pid: ${pid}`, AUDIO_BACKLOG)
-        pauseFfmpeg(command, pid);
-        STATE.backlogInterval[pid] = setInterval(() => {
-          if (AUDIO_BACKLOG < NUM_WORKERS * 2) {
-            resumeFfmpeg(command, pid);
-            clearInterval(STATE.backlogInterval[pid]);
-          }
-        }, 10);
+      pauseFfmpeg(command, pid);
+
+      // avoid creating multiple intervals for the same pid
+      if (STATE.backlogInterval[pid]) {
+        clearInterval(STATE.backlogInterval[pid]);
       }
+
+      STATE.backlogInterval[pid] = setInterval(() => {
+        DEBUG && console.log(`[${pid}] backlog check: AUDIO_BACKLOG=${AUDIO_BACKLOG}`);
+
+        if (AUDIO_BACKLOG <= NUM_WORKERS * 2) {
+          DEBUG && console.log(`[${pid}] resuming ffmpeg (normal), backlog=${AUDIO_BACKLOG}`);
+          resumeFfmpeg(command, pid);
+          clearInterval(STATE.backlogInterval[pid]);
+          STATE.backlogInterval[pid] = null;
+          return;
+        }
+
+      }, 50); // 50ms interval
+    }
+
       if (aborted) {
         STREAM.destroy();
         return;
@@ -2851,7 +2913,7 @@ const bufferToAudio = async ({
         return ["-metadata", `${k}=${v}`];
       });
     }
-
+    let errorHandled = false
     setupFfmpegCommand({
       file,
       start,
@@ -2871,8 +2933,34 @@ const bufferToAudio = async ({
     command.on("start", function (commandLine) {
       DEBUG && console.log("FFmpeg command: " + commandLine);
     });
+    if (format === "mp3" && ! STATE.audio.downmix) {
+      command.on("codecData", function (data) {
+        const channels = data.audio_details[2].toLowerCase();
+        if (!['mono', 'stereo', '1.0', '2.0', 'dual mono'].includes(channels) ){
+          const i18n = {
+            en: "Cannot export multichannel audio to MP3. Either enable downmixing, or choose a different export format.",
+            da: "Kan ikke eksportere multikanalslyd til MP3. Aktiver enten nedmiksning, eller vælg et andet eksportformat.",
+            de: "Mehrkanal-Audio kann nicht als MP3 exportiert werden. Aktivieren Sie entweder das Downmixing oder wählen Sie ein anderes Exportformat.",
+            es: "No se puede exportar audio multicanal a MP3. Active la mezcla descendente o elija un formato de exportación diferente.",
+            fr: "Impossible d’exporter un audio multicanal en MP3. Activez le mixage vers le bas ou choisissez un autre format d’exportation.",
+            ja: "マルチチャンネル音声をMP3に書き出すことはできません。ダウンミックスを有効にするか、別の書き出し形式を選択してください。",
+            nl: "Kan geen meerkanaalsaudio exporteren naar MP3. Schakel downmixen in of kies een ander exportformaat.",
+            pt: "Não é possível exportar áudio multicanal para MP3. Ative a mixagem para baixo ou escolha um formato de exportação diferente.",
+            ru: "Невозможно экспортировать многоканальное аудио в MP3. Включите даунмиксинг или выберите другой формат экспорта.",
+            sv: "Kan inte exportera flerkanalsljud till MP3. Aktivera antingen nedmixning eller välj ett annat exportformat.",
+            zh: "无法将多声道音频导出为 MP3。请启用混缩，或选择其他导出格式。"
+          };
+          const error = i18n[STATE.locale] || i18n["en"];
+          generateAlert({ type: "error", message: "ffmpeg", variables: {error}});
+          errorHandled = true;
+          return reject(console.warn("Export polyWAV to mp3 attempted."))
+        }
+      });
+    }
     command.on("error", (err) => {
-      reject(console.error("An error occurred: " + err.message));
+      if (errorHandled) return; // Prevent multiple error handling
+      generateAlert({ type: "error", message: "ffmpeg", variables: { error: err.message } });
+      reject(console.error("An ffmpeg error occurred: ", err.message));
     });
     command.on("end", function () {
       DEBUG && console.log(format + " file rendered");
@@ -3319,7 +3407,7 @@ const parsePredictions = async (response) => {
     );
   if (index < 500) {
     const included = await getIncludedIDs(file).catch((error) =>
-      console.log("Error getting included IDs", error)
+      console.warn("Error getting included IDs", error)
     );
     const loopConfidence =  selection ? 50 : detect.confidence;
     for (let i = 0; i < keysArray.length; i++) {
@@ -4174,7 +4262,13 @@ const getDetectedSpecies = async () => {
  */
 const getValidSpecies = async (file) => {
   const included = await getIncludedIDs(file); // classindex values
-
+  const locationID = METADATA[file]?.locationID || STATE.locationID;
+  const {place} = locationID
+    ? await STATE.db.getAsync(
+        "SELECT place FROM locations WHERE id = ?",
+        locationID
+      )
+    : { place: STATE.place };
   const includedSpecies = [];
   const excludedSpecies = [];
   let i = 1;
@@ -4197,6 +4291,7 @@ const getValidSpecies = async (file) => {
     event: "valid-species-list",
     included: includedSpecies,
     excluded: excludedSpecies,
+    place
   });
 };
 

@@ -188,14 +188,6 @@ onmessage = async (e) => {
         const { model, listType, useWeek, customLabels, labels } = e.data;
         listModel.customLabels = customLabels;
         listModel.model = model;
-        // if (model !== "birdnet" && ! labels) {
-        //   listModel.modelLabels[model] ??= JSON.parse(
-        //     fs.readFileSync(
-        //       path.join(__dirname, `../../${model}_model_config.json`),
-        //       "utf8"
-        //     )
-        //   ).labels;
-        // }
         listModel.labels = labels; // || model === "birdnet" ? BIRDNET_LABELS : listModel.modelLabels[model];
         let lat = parseFloat(e.data.lat);
         let lon = parseFloat(e.data.lon);
@@ -264,54 +256,40 @@ class Model {
       const mdata_prediction = this.metadata_model.predict(this.mdata_input);
       const mdata_probs = await mdata_prediction.data();
       let count = 0;
-      // if (this.model === "birdnet" && this.useBirdnet) {
-      //   for (let i = 0; i < mdata_probs.length; i++) {
-      //     if (mdata_probs[i] > threshold) {
-      //       count++;
-      //       includedIDs.push(i);
-      //       DEBUG &&
-      //         console.log("including:", this.labels[i] + ": " + mdata_probs[i]);
-      //     } else {
-      //       DEBUG &&
-      //         console.log("Excluding:", this.labels[i] + ": " + mdata_probs[i]);
-      //     }
-      //   }
-      // } else {
-        for (let i = 0; i < mdata_probs.length; i++) {
-          const index = i; // mdata_probs.indexOf(mdata_probs_sorted[i]);
-          if (mdata_probs[index] < threshold) {
+      for (let i = 0; i < mdata_probs.length; i++) {
+        const index = i; // mdata_probs.indexOf(mdata_probs_sorted[i]);
+        if (mdata_probs[index] < threshold) {
+          DEBUG &&
+            console.log(
+              "Excluding:",
+              this.mdata_labels[index] + ": " + mdata_probs[index]
+            );
+        } else {
+          count++;
+          const latin = this.mdata_labels[index].split("_")[0];
+          // Use the reduce() method to accumulate the indices of species containing the latin name
+          const foundIndices = this.labels.reduce(
+            (indices, element, index) => {
+              element.includes(latin) && indices.push(index);
+              return indices;
+            },
+            []
+          );
+          foundIndices.forEach((index) => {
+            // If we want an override list...=>
+            //if (! ['Dotterel', 'Stone-curlew', 'Spotted Crake'].some(this.labels[index])) BLOCKED_IDS.push(index)
+            includedIDs.push(index + 1);
             DEBUG &&
               console.log(
-                "Excluding:",
-                this.mdata_labels[index] + ": " + mdata_probs[index]
+                "Including: ",
+                index,
+                "name",
+                this.labels[index],
+                "probability",
+                mdata_probs[i].toFixed(5)
               );
-          } else {
-            count++;
-            const latin = this.mdata_labels[index].split("_")[0];
-            // Use the reduce() method to accumulate the indices of species containing the latin name
-            const foundIndices = this.labels.reduce(
-              (indices, element, index) => {
-                element.includes(latin) && indices.push(index);
-                return indices;
-              },
-              []
-            );
-            foundIndices.forEach((index) => {
-              // If we want an override list...=>
-              //if (! ['Dotterel', 'Stone-curlew', 'Spotted Crake'].some(this.labels[index])) BLOCKED_IDS.push(index)
-              includedIDs.push(index + 1);
-              DEBUG &&
-                console.log(
-                  "Including: ",
-                  index,
-                  "name",
-                  this.labels[index],
-                  "probability",
-                  mdata_probs[i].toFixed(5)
-                );
-            });
-          }
-        // }
+          });
+        }
       }
       DEBUG &&
         console.log("Total species considered at this location: ", count);
@@ -356,12 +334,13 @@ class Model {
             let selectedIndexes = [];
             if (indexes.length > 1) {
               for (let idx of indexes) {
+                const labelOverride = this.customLabels[i].endsWith("-");
                 // Extract word in brackets from current index of this.labels
-                const wordInBrackets = this.labels[idx].match(/\((.*?)\)/);
-                if (wordInBrackets) {
-                  const wordToMatch = wordInBrackets[0];
+                const match = this.labels[idx].match(/\((.*?)\)/);
+                const qualifier = match ? match[0] : labelOverride ? '-' : null;
+                if (qualifier) {
                   // Check if the word in brackets exists in the custom list at the same index position
-                  if (this.customLabels[i].includes(wordToMatch)) {
+                  if (this.customLabels[i].endsWith(qualifier)) {
                     selectedIndexes.push(idx + 1);
                   }
                 } else {

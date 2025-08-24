@@ -6,7 +6,7 @@
 const fs = window.module.fs;
 const p = window.module.p;
 const uuidv4 = window.module.uuidv4;
-const os = window.module.os;
+const si = window.module.si;
 import {
   customURLEncode,
   installConsoleTracking,
@@ -51,7 +51,7 @@ window.addEventListener("unhandledrejection", function (event) {
   // Track the unhandled promise rejection
   trackEvent(
     config.UUID,
-    "Unhandled UI Promise Rejection",
+    "Unhandled UI PR",
     errorMessage,
     customURLEncode(stackTrace)
   );
@@ -66,7 +66,7 @@ window.addEventListener("rejectionhandled", function (event) {
   // Track the unhandled promise rejection
   trackEvent(
     config.UUID,
-    "Handled UI Promise Rejection",
+    "Handled UI PR",
     errorMessage,
     customURLEncode(stackTrace)
   );
@@ -464,10 +464,36 @@ Analysis Rate: x real time performance
 */
 // Timers
 let t0_warmup, t1_warmup, t0_analysis, t1_analysis;
-DIAGNOSTICS["CPU"] = os.cpus()[0].model;
-DIAGNOSTICS["Cores"] = os.cpus().length;
-DIAGNOSTICS["System Memory"] =
-  (os.totalmem() / (1024 ** 2 * 1000)).toFixed(0) + " GB";
+// DIAGNOSTICS["CPU"] = os.cpu()[0].model;
+// DIAGNOSTICS["Cores"] = os.cpus().length;
+// DIAGNOSTICS["System Memory"] =
+//   (os.totalmem() / (1024 ** 2 * 1000)).toFixed(0) + " GB";
+
+let diagnosticsReady = (async () => {
+  try {
+    const [cpuInfo, memInfo, graphics] = await Promise.all([
+      si?.cpu?.() ?? Promise.reject(new Error("si.cpu unavailable")),
+      si?.mem?.() ?? Promise.reject(new Error("si.mem unavailable")),
+      si?.graphics?.() ?? Promise.reject(new Error("si.graphics unavailable")),
+    ]);
+    DIAGNOSTICS["CPU"] = cpuInfo?.brand ?? "Unknown";
+    DIAGNOSTICS["Cores"] = cpuInfo?.cores ?? (navigator.hardwareConcurrency || 1);
+    DIAGNOSTICS["Physical Cores"] = cpuInfo?.physicalCores ?? "Unknown";
+    DIAGNOSTICS["System Memory"] =
+      (((memInfo?.total ?? 0) / (1024 ** 3)) || 0).toFixed(0) + " GB";
+    DIAGNOSTICS["GPUs"] = (graphics?.controllers ?? [])
+      .map(gpu => gpu?.model)
+      .filter(Boolean)
+      .join(", ");
+  } catch (err) {
+    console.warn("Diagnostics collection failed:", err);
+    DIAGNOSTICS["CPU"] = "Unknown";
+    DIAGNOSTICS["Cores"] = navigator.hardwareConcurrency || "Unknown";
+    DIAGNOSTICS["Physical Cores"] = DIAGNOSTICS["Cores"];
+    DIAGNOSTICS["System Memory"] = "Unknown";
+    DIAGNOSTICS["GPUs"] = "Unknown";
+  }
+})();
 
 /**
  * Resets the results display and related UI components to their initial state.
@@ -614,17 +640,17 @@ const openFileInList = async (e) => {
 };
 
 const buildFileMenu = (e) => {
-  //e.preventDefault();
   e.stopImmediatePropagation();
+  const disabled = PREDICTING ? "disabled" : "";
   const menu = DOM.contextMenu;
   const i18 = i18n.get(i18n.Context);
   menu.innerHTML = `
-    <a class="dropdown-item" id="setCustomLocation"><span
-    class="material-symbols-outlined align-bottom pointer">edit_location_alt</span> ${i18.location}</a>
-    <a class="dropdown-item" id="setFileStart"><span
-    class="material-symbols-outlined align-bottom pointer">edit_calendar</span> ${i18.time}
-    `;
-  positionMenu(menu, e);
+      <a class="dropdown-item ${disabled}" id="setCustomLocation"><span
+      class="material-symbols-outlined align-bottom pointer">edit_location_alt</span> ${i18.location}</a>
+      <a class="dropdown-item ${disabled}" id="setFileStart"><span
+      class="material-symbols-outlined align-bottom pointer">edit_calendar</span> ${i18.time}
+      `;
+    positionMenu(menu, e);
 };
 
 /**
@@ -1753,7 +1779,6 @@ const defaultConfig = {
       labelSmoothing: 0,
       useWeights: false,
       useFocal: false,
-      useRoll: false,
       useNoise: false
     }
   },
@@ -1820,7 +1845,7 @@ const defaultConfig = {
   },
   warmup: true,
   hasNode: false,
-  tensorflow: { threads: DIAGNOSTICS["Cores"], batchSize: 8 },
+  tensorflow: { threads: null, batchSize: 8 },
   webgpu: { threads: 1, batchSize: 8 },
   audio: {
     gain: 0,
@@ -1843,6 +1868,8 @@ const defaultConfig = {
 let dirname, appPath, tempPath, systemLocale, isMac;
 window.onload = async () => {
   window.electron.requestWorkerChannel();
+  await diagnosticsReady;
+  defaultConfig.tensorflow.threads = DIAGNOSTICS["Physical Cores"] || 2;
   isMac = await window.electron.isMac();
   if (isMac) replaceCtrlWithCommand();
   DOM.contentWrapper.classList.add("loaded");
@@ -1892,7 +1919,6 @@ window.onload = async () => {
     };
     //fill in defaults - after updates add new items
     utils.syncConfig(config, defaultConfig);
-
 
     const isMember = await membershipCheck()
       .catch(err => {console.error(err); return false});
@@ -2121,6 +2147,7 @@ window.onload = async () => {
     // Add cpu model & memory to config
     config.CPU = DIAGNOSTICS["CPU"];
     config.RAM = DIAGNOSTICS["System Memory"];
+    config.GPUs = DIAGNOSTICS["GPUs"];
     trackVisit(config);
   });
 };
@@ -2346,7 +2373,7 @@ const setUpWorkerMessaging = () => {
           break;
         }
         case "valid-species-list": {
-          populateSpeciesModal(args.included, args.excluded);
+          populateSpeciesModal(args);
 
           break;
         }
@@ -2986,23 +3013,11 @@ const handleBackendChange = (backend) => {
   backendEL.checked = true;
   if (backend === "webgpu") {
     DOM.threadSlider.max = 3;
-    // SNRSlider.disabled = true;
-    // config.filters.SNR = 0;
   } else {
     DOM.threadSlider.max = DIAGNOSTICS["Cores"];
     DOM.contextAware.disabled = false;
     if (DOM.contextAware.checked) {
       config.detect.contextAware = true;
-      // SNRSlider.disabled = true;
-      // config.filters.SNR = 0;
-    } else {
-      // SNRSlider.disabled = false;
-      // config.filters.SNR = parseFloat(SNRSlider.value);
-      // if (config.filters.SNR) {
-      //     DOM.contextAware.disabled = true;
-      //     config.detect.contextAware = false;
-      //     contextAwareIconDisplay();
-      // }
     }
   }
   // Update threads and batch Size in UI
@@ -3270,10 +3285,6 @@ const showTraining = () => {
   document.getElementById('mixup').checked = settings.mixup;
   const mixupLabel = document.querySelector('label[for="mixup"]');
   mixupLabel.textContent = i18["mixup"];
-  const roll = document.getElementById('roll');
-  roll.checked = settings.useRoll;
-  const rollLabel = document.querySelector('label[for="roll"]');
-  rollLabel.textContent = i18["roll"];
   document.getElementById('use-noise').checked = settings.useNoise;
   const useNoiseLabel = document.querySelector('label[for="use-noise"]');
   useNoiseLabel.textContent = i18["use-noise"];
@@ -4157,7 +4168,7 @@ const iconizeScore = (score) => {
 
 const exportAudio = () => {
   let result;
-  if (STATE.activeRegion.label) {
+  if (activeRow && STATE.activeRegion.label) {
     setClickedIndex(activeRow);
     result = predictions.get(clickedIndex);
   }
@@ -4290,7 +4301,7 @@ function replaceCtrlWithCommand() {
   }
 }
 
-const populateSpeciesModal = async (included, excluded) => {
+const populateSpeciesModal = async ({included, excluded, place}) => {
   const i18 = i18n.get(i18n.SpeciesList);
   const current_file_text =
     STATE.week !== -1 && STATE.week
@@ -4310,7 +4321,7 @@ const populateSpeciesModal = async (included, excluded) => {
       speciesThreshold: config.speciesThreshold,
     });
     location_filter_text = utils.interpolate(i18.location, {
-      place: place.textContent.replace("fmd_good", ""),
+      place: place,
       current_file_text: current_file_text,
       species_filter_text: species_filter_text,
     });
@@ -4665,7 +4676,6 @@ function showSummarySortIcon() {
 const setSortOrder = (field, order) => {
   STATE[field] = order;
   worker.postMessage({ action: "update-state", [field]: order });
-  // resetResults({clearSummary: false, clearPagination: false, clearResults: true});
   filterResults();
 };
 
@@ -5096,6 +5106,7 @@ document.addEventListener("click", debounceClick(handleUIClicks));
  * @param {MouseEvent} e - The click event object.
  */
 async function handleUIClicks(e) {
+  if (!APPLICATION_LOADED) return;
   const element = e.target;
   const target = element.closest("[id]")?.id;
   const locale = config.locale.replace(/_.*$/, "");
@@ -5583,7 +5594,8 @@ async function handleUIClicks(e) {
     }
     case "sort-label":
     case "sort-comment":
-    case "sort-reviewed": {
+    case "sort-reviewed":
+    case "sort-model": {
       if (!PREDICTING) {
         const sort = target.slice(5);
         const state = STATE.resultsMetaSortOrder;
@@ -5967,7 +5979,6 @@ document.addEventListener("change", async function (e) {
         }
         case "label-smoothing": {
           config.training.settings.labelSmoothing = element.valueAsNumber; break}
-        case "roll": {config.training.settings.useRoll = element.checked; break}
         // --- Backends
         case "tensorflow":
         case "webgpu": { handleBackendChange(target); break }
@@ -6368,9 +6379,9 @@ document.addEventListener("change", async function (e) {
 });
 
 const flushSpec = async () =>{
+  spec.wavesurfer?.destroy();
   DOM.waveElement.replaceChildren();
   DOM.spectrogram.replaceChildren();
-  spec.wavesurfer?.destroy();
   spec = new ChirpityWS(
     "#waveform",
     () => STATE, // Returns the current state
