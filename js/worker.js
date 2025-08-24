@@ -440,10 +440,12 @@ async function handleMessage(e) {
     }
     case "check-all-files-saved": {
       const allSaved = await savedFileCheck(args.files);
-      if (STATE.detect.autoLoad && allSaved) {
-        STATE.filesToAnalyse = args.files;
+      if (allSaved) {
         await onChangeMode("archive");
-        await Promise.all([getResults(), getSummary(), getTotal()]);
+        if (STATE.detect.autoLoad){
+          STATE.filesToAnalyse = args.files;
+          await Promise.all([getResults(), getSummary(), getTotal()]);
+        }
       }
       break;
     }
@@ -803,17 +805,15 @@ function setGetSummaryQueryInterval(threads) {
  * @param {string} mode - The new mode to activate.
  */
 async function onChangeMode(mode) {
-  if (STATE.mode !== mode) {
-    if (!memoryDB){
-      memoryDB = await createDB({file: null, diskDB, dbMutex});
-    }
-    STATE.changeMode({
-      mode: mode,
-      disk: diskDB,
-      memory: memoryDB,
-    });
-    UI.postMessage({ event: "mode-changed", mode: mode });
+  if (!memoryDB){
+    memoryDB = await createDB({file: null, diskDB, dbMutex});
   }
+  STATE.changeMode({
+    mode: mode,
+    disk: diskDB,
+    memory: memoryDB,
+  });
+  UI.postMessage({ event: "mode-changed", mode: mode });
 }
 
 const filtersApplied = (list) => {
@@ -1330,15 +1330,20 @@ async function updateMetadata(fileNames) {
   const batchSize = 10000;
   const batches = chunkArray(fileNames, batchSize);
   const finalResult = {};
-  for (const batch of batches) {
+  for (let batch of batches) {
     // Build placeholders (?, ?, ?) dynamically based on number of file names
     const placeholders = prepParams(batch);
+    if (STATE.library.location) {
+      const prefix = STATE.library.location + p.sep;
+      batch = batch.map(fileName => fileName.replace(prefix, '')  );
+    }
 
     // 1. Get files and locations
     const fileQuery = `
         SELECT 
             f.id,
             f.name,
+            f.archiveName,
             f.duration,
             f.filestart as fileStart,
             f.metadata,
@@ -1347,10 +1352,10 @@ async function updateMetadata(fileNames) {
             l.lon
         FROM files f
         LEFT JOIN locations l ON f.locationID = l.id
-        WHERE f.name IN (${placeholders})
+        WHERE f.name IN (${placeholders}) OR f.archiveName IN (${placeholders})
     `;
 
-    const fileRows = await diskDB.allAsync(fileQuery, ...batch);
+    const fileRows = await diskDB.allAsync(fileQuery, ...batch, ...batch);
 
     if (fileRows.length === 0) {
         continue
@@ -1378,9 +1383,11 @@ async function updateMetadata(fileNames) {
     // 4. Build object keyed by file name
 
     fileRows.forEach(row => {
-      const {name, duration, fileStart, metadata, locationID, lat, lon} = row;
+      let {name, archiveName, duration, fileStart, metadata, locationID, lat, lon} = row;
+
       const complete = !!duration && !!fileStart;
       finalResult[name] = {
+            archiveName,
             duration,
             fileStart,
             metadata,
@@ -1485,7 +1492,20 @@ async function onAnalyse({
     let allCached = true;
     METADATA = await updateMetadata(FILE_QUEUE)
     for (let i = 0; i < FILE_QUEUE.length; i++) {
-      const file = FILE_QUEUE[i];
+      let file = FILE_QUEUE[i];
+      if (STATE.library.location) {
+        const prefix = STATE.library.location + p.sep;
+        const newFile = file.replace(prefix, '');
+        if (file !== newFile) {
+          const match = Object.values(METADATA).find(
+            entry => entry.archiveName === newFile
+          );
+          if (match && !METADATA[file]){
+            METADATA[file] = match;
+          }
+        }
+      }
+
       const meta = METADATA[file];
       if (!meta?.isComplete || !meta?.isSaved){
         allCached = false;

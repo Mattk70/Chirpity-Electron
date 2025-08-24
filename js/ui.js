@@ -1768,7 +1768,6 @@ const defaultConfig = {
       labelSmoothing: 0,
       useWeights: false,
       useFocal: false,
-      // useRoll: false,
       useNoise: false
     }
   },
@@ -3275,10 +3274,6 @@ const showTraining = () => {
   document.getElementById('mixup').checked = settings.mixup;
   const mixupLabel = document.querySelector('label[for="mixup"]');
   mixupLabel.textContent = i18["mixup"];
-  // const roll = document.getElementById('roll');
-  // roll.checked = settings.useRoll;
-  // const rollLabel = document.querySelector('label[for="roll"]');
-  // rollLabel.textContent = i18["roll"];
   document.getElementById('use-noise').checked = settings.useNoise;
   const useNoiseLabel = document.querySelector('label[for="use-noise"]');
   useNoiseLabel.textContent = i18["use-noise"];
@@ -5973,7 +5968,6 @@ document.addEventListener("change", async function (e) {
         }
         case "label-smoothing": {
           config.training.settings.labelSmoothing = element.valueAsNumber; break}
-        // case "roll": {config.training.settings.useRoll = element.checked; break}
         // --- Backends
         case "tensorflow":
         case "webgpu": { handleBackendChange(target); break }

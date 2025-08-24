@@ -161,7 +161,6 @@ function cosineDecay(initialLearningRate, globalStep, decaySteps) {
  * @param {number} options.validation - Validation split ratio (0–1).
  * @param {boolean} options.mixup - Whether to apply mixup augmentation.
  * @param {boolean} options.decay - Whether to use cosine learning rate decay.
- * @param {boolean} options.useRoll - Whether to apply rolling augmentation to audio.
  * @param {boolean} options.useWeights - Whether to use class weights in the loss function.
  * @param {boolean} options.useFocal - Whether to use focal loss.
  * @param {boolean} options.useNoise - Whether to blend background noise into training samples.
@@ -175,7 +174,7 @@ async function trainModel({
       dropout, epochs, hidden,
       dataset, cache:cacheFolder, modelLocation:saveLocation, modelType, 
       useCache, validation, mixup, decay, 
-      useRoll, useWeights, useFocal, useNoise, labelSmoothing}) {
+      useWeights, useFocal, useNoise, labelSmoothing}) {
   installConsoleTracking(() => Model.UUID, "Training");
   const {files:allFiles, classWeights} = getFilesWithLabelsAndWeights(dataset);
   if (!allFiles.length){
@@ -267,7 +266,7 @@ async function trainModel({
     await writeBinaryGzipDataset(embeddingModel, noiseFiles, noiseBin, labelToIndex, postMessage, "Preparing noise data");
   }
   let noise_ds;
-  if (useNoise) noise_ds = tf.data.generator(() => readBinaryGzipDataset(noiseBin, labels, useRoll)).repeat();
+  if (useNoise) noise_ds = tf.data.generator(() => readBinaryGzipDataset(noiseBin, labels)).repeat();
 
   if (!cacheRecords || !fs.existsSync(trainBin)) {
         // Check same number of classes in train and val data
@@ -359,8 +358,8 @@ async function trainModel({
   })
 
   let train_ds = mixup 
-    ? createMixupStreamDataset({ds:trainBin, labels, useRoll})
-    : createStreamDataset(trainBin, labels, useRoll);
+    ? createMixupStreamDataset({ds:trainBin, labels})
+    : createStreamDataset(trainBin, labels);
 
   const augmented_ds = useNoise 
     ? tf.data.generator(() => blendedGenerator(train_ds, noise_ds)).batch(batchSize).prefetch(3)
@@ -413,13 +412,13 @@ Settings:
   Learning rate: ${initialLearningRate}
   Cosine learning rate decay: ${decay}
   Focal Loss: ${useFocal}
+  Class Weights: ${useWeights}
   LabelSmoothing: ${labelSmoothing}
 Classifier:  
   Hidden units:${hidden}
   Dropout: ${dropout}
 Augmentations:
   Mixup: ${mixup}
-  Roll: ${useRoll}
   Background noise: ${useNoise}
 `
   fs.writeFileSync(path.join(saveLocation, `training_metrics_${Date.now()}.txt`), notice.replaceAll('<br>', ''), 'utf8');
@@ -831,23 +830,22 @@ function categoricalFocalCrossEntropy({
   });
 }
 
-const createStreamDataset = (ds, labels, useRoll) => 
-  tf.data.generator(() => readBinaryGzipDataset(ds, labels, useRoll)).prefetch(3);
+const createStreamDataset = (ds, labels) => 
+  tf.data.generator(() => readBinaryGzipDataset(ds, labels)).prefetch(3);
 
 /**
  * Creates a TensorFlow.js dataset with mixup augmentation by randomly blending pairs of samples and their labels.
  * 
  * Two independently shuffled datasets are zipped and mixed using a gamma-distributed coefficient, producing augmented samples for robust model training.
  * 
- * @param {boolean} useRoll - Whether to apply random rolling augmentation to audio samples.
  * @param {AsyncGenerator} ds - The source dataset generator.
  * @param {string[]} labels - Array of label names.
  * @param {number} [alpha=0.4] - Mixup alpha parameter controlling the strength of blending.
  * @return {tf.data.Dataset} A dataset yielding mixed input-label pairs.
  */
-function createMixupStreamDataset({useRoll, ds, labels, alpha = 0.4}) {
-      const ds1 = createStreamDataset(ds, labels, useRoll).shuffle(100, 42).prefetch(1);
-      const ds2 = createStreamDataset(ds, labels, useRoll).shuffle(100, 1337).prefetch(1);
+function createMixupStreamDataset({ds, labels, alpha = 0.4}) {
+      const ds1 = createStreamDataset(ds, labels).shuffle(100, 42).prefetch(1);
+      const ds2 = createStreamDataset(ds, labels).shuffle(100, 1337).prefetch(1);
       return tf.data
         .zip({ a: ds1, b: ds2 })
         .map(({ a, b }) => {
