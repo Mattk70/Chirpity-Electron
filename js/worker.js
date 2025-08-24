@@ -2183,10 +2183,10 @@ async function processAudio(
       }
 
       STATE.backlogInterval[pid] = setInterval(() => {
-        console.log(`[${pid}] backlog check: AUDIO_BACKLOG=${AUDIO_BACKLOG}`);
+        DEBUG && console.log(`[${pid}] backlog check: AUDIO_BACKLOG=${AUDIO_BACKLOG}`);
 
         if (AUDIO_BACKLOG <= NUM_WORKERS * 2) {
-          console.log(`[${pid}] resuming ffmpeg (normal), backlog=${AUDIO_BACKLOG}`);
+          DEBUG && console.log(`[${pid}] resuming ffmpeg (normal), backlog=${AUDIO_BACKLOG}`);
           resumeFfmpeg(command, pid);
           clearInterval(STATE.backlogInterval[pid]);
           STATE.backlogInterval[pid] = null;

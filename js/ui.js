@@ -629,17 +629,18 @@ const openFileInList = async (e) => {
 };
 
 const buildFileMenu = (e) => {
-  //e.preventDefault();
   e.stopImmediatePropagation();
-  const menu = DOM.contextMenu;
-  const i18 = i18n.get(i18n.Context);
-  menu.innerHTML = `
-    <a class="dropdown-item" id="setCustomLocation"><span
-    class="material-symbols-outlined align-bottom pointer">edit_location_alt</span> ${i18.location}</a>
-    <a class="dropdown-item" id="setFileStart"><span
-    class="material-symbols-outlined align-bottom pointer">edit_calendar</span> ${i18.time}
-    `;
-  positionMenu(menu, e);
+  if (!PREDICTING) {
+    const menu = DOM.contextMenu;
+    const i18 = i18n.get(i18n.Context);
+    menu.innerHTML = `
+      <a class="dropdown-item" id="setCustomLocation"><span
+      class="material-symbols-outlined align-bottom pointer">edit_location_alt</span> ${i18.location}</a>
+      <a class="dropdown-item" id="setFileStart"><span
+      class="material-symbols-outlined align-bottom pointer">edit_calendar</span> ${i18.time}
+      `;
+    positionMenu(menu, e);
+  }
 };
 
 /**
