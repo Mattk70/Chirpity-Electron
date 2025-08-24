@@ -470,18 +470,29 @@ let t0_warmup, t1_warmup, t0_analysis, t1_analysis;
 //   (os.totalmem() / (1024 ** 2 * 1000)).toFixed(0) + " GB";
 
 let diagnosticsReady = (async () => {
-  const [cpuInfo, memInfo, graphics] = await Promise.all([
-    si.cpu(),
-    si.mem(),
-    si.graphics()
-  ]);
-
-  DIAGNOSTICS["CPU"] = cpuInfo.brand;
-  DIAGNOSTICS["Cores"] = cpuInfo.cores;
-  DIAGNOSTICS["Physical Cores"] = cpuInfo.physicalCores;
-  DIAGNOSTICS["System Memory"] =
-    (memInfo.total / (1024 ** 3)).toFixed(0) + " GB";
-  DIAGNOSTICS["GPUs"] = graphics.controllers.map(gpu => gpu.model).join(", ");
+  try {
+    const [cpuInfo, memInfo, graphics] = await Promise.all([
+      si?.cpu?.() ?? Promise.reject(new Error("si.cpu unavailable")),
+      si?.mem?.() ?? Promise.reject(new Error("si.mem unavailable")),
+      si?.graphics?.() ?? Promise.reject(new Error("si.graphics unavailable")),
+    ]);
+    DIAGNOSTICS["CPU"] = cpuInfo?.brand ?? "Unknown";
+    DIAGNOSTICS["Cores"] = cpuInfo?.cores ?? (navigator.hardwareConcurrency || 1);
+    DIAGNOSTICS["Physical Cores"] = cpuInfo?.physicalCores ?? "Unknown";
+    DIAGNOSTICS["System Memory"] =
+      (((memInfo?.total ?? 0) / (1024 ** 3)) || 0).toFixed(0) + " GB";
+    DIAGNOSTICS["GPUs"] = (graphics?.controllers ?? [])
+      .map(gpu => gpu?.model)
+      .filter(Boolean)
+      .join(", ");
+  } catch (err) {
+    console.warn("Diagnostics collection failed:", err);
+    DIAGNOSTICS["CPU"] = "Unknown";
+    DIAGNOSTICS["Cores"] = navigator.hardwareConcurrency || "Unknown";
+    DIAGNOSTICS["Physical Cores"] = DIAGNOSTICS["Cores"];
+    DIAGNOSTICS["System Memory"] = "Unknown";
+    DIAGNOSTICS["GPUs"] = "Unknown";
+  }
 })();
 
 /**
