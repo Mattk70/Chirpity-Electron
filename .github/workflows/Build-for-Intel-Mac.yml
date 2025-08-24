@@ -104,6 +104,11 @@ jobs:
         run: |
           npm install
           echo "Install's status is ${{ job.status }}."
+
+      - name: Audit fix
+        run: |
+          npm audit fix
+          echo "Audit fix applied, status is ${{ job.status }}."
           
       - name: Set platform-specific ffmpeg path
         shell: bash
