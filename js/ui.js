@@ -1869,7 +1869,7 @@ let dirname, appPath, tempPath, systemLocale, isMac;
 window.onload = async () => {
   window.electron.requestWorkerChannel();
   await diagnosticsReady;
-  defaultConfig.tensorflow.threads = DIAGNOSTICS["Physical Cores"];
+  defaultConfig.tensorflow.threads = DIAGNOSTICS["Physical Cores"] || 2;
   isMac = await window.electron.isMac();
   if (isMac) replaceCtrlWithCommand();
   DOM.contentWrapper.classList.add("loaded");
