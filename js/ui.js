@@ -2328,6 +2328,7 @@ const setUpWorkerMessaging = () => {
               "text-bg-secondary"
             );
           }
+          spec?.adjustDims();
           break;
         }
         case "summary-complete": {
