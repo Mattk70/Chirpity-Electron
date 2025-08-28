@@ -4271,16 +4271,13 @@ const getValidSpecies = async (file) => {
     : { place: STATE.place };
   const includedSpecies = [];
   const excludedSpecies = [];
-  let i = 1;
-  for (const speciesName of STATE.allLabelsMap.values()) {
+  for (const [index, speciesName] of STATE.allLabels.entries()) {
+    const i = index + 1;
     const [cname, sname] = speciesName.split("_").reverse();
     if (cname.includes("ackground") || cname.includes("Unknown")) continue; // skip background and unknown species
-    if (!included.length || included.includes(i)) {
-      includedSpecies.push({cname, sname});
-    } else {
-      excludedSpecies.push({cname, sname});
-    }
-    i++;
+    (!included.length || included.includes(i)) 
+      ? includedSpecies.push({cname, sname})
+      : excludedSpecies.push({cname, sname});
   }
 
   // Sort both arrays by cname
