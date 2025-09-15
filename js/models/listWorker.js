@@ -326,21 +326,24 @@ class Model {
         const labelsScientificNames = this.labels.map(getFirstElement);
         const customScienticNames = this.customLabels.map(getFirstElement);
         let line = 0;
+        // Go through each custom label
         for (let i = 0; i < customScienticNames.length; i++) {
           const sname = customScienticNames[i];
           line++;
+          // Find all indices in this model's labels that match the current custom label
           const indexes = findAllIndexes(labelsScientificNames, sname);
           if (indexes.length) {
             let selectedIndexes = [];
             if (indexes.length > 1) {
+              // Multiple matches
+              const labelOverride = this.customLabels[i].endsWith("-");
               for (let idx of indexes) {
-                const labelOverride = this.customLabels[i].endsWith("-");
                 // Extract word in brackets from current index of this.labels
                 const match = this.labels[idx].match(/\((.*?)\)/);
                 const qualifier = match ? match[0] : labelOverride ? '-' : null;
                 if (qualifier) {
                   // Check if the word in brackets exists in the custom list at the same index position
-                  if (this.customLabels[i].endsWith(qualifier)) {
+                  if (this.labels[idx].endsWith(qualifier)) {
                     selectedIndexes.push(idx + 1);
                   }
                 } else {
@@ -348,6 +351,7 @@ class Model {
                 }
               }
             } else {
+              // Only one match, so add it
               const idx = indexes.map(num => num + 1)
               selectedIndexes.push(...idx);
             }

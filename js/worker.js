@@ -757,15 +757,16 @@ async function savedFileCheck(fileList) {
       let query; const library = STATE.library.location + p.sep;
       const newList = fileSlice.map(file => file.replace(library, ''));
       // detect if any changes were made
-      const changed = fileSlice.some((item, i) => item !== newList[i]);
-      const params = prepParams(newList)
+      const libraryFiles = newList.filter((item, i) => item !== fileSlice[i]);
+      const params = prepParams(newList);
       let countResult;
-      if (changed) {
-        query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${params}) or archiveName IN (${params})`;
-        countResult = await diskDB.getAsync(query, ...newList, ...newList);
+      if (libraryFiles.length) {
+        const archiveParams = prepParams(libraryFiles);
+        query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${params}) or archiveName IN (${archiveParams})`;
+        countResult = await diskDB.getAsync(query, ...fileSlice, ...libraryFiles);
       } else {
         query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${params})`;
-        countResult = await diskDB.getAsync(query, ...newList);
+        countResult = await diskDB.getAsync(query, ...fileSlice);
       }
 
       // Execute the query with the slice as parameters
@@ -4020,7 +4021,7 @@ async function exportData(result, filename, format, headers) {
       const processedBatch = await Promise.all(
         batch.map(async (item, index) => {
           if (format === "Raven") {
-            item = { ...item, selection: index + 1 }; // Add a selection number for Raven
+            item = { ...item, selection: index + i +  1 }; // Add a selection number for Raven
             if (item.file !== previousFile) {
               // Positions need to be cumulative across files in Raven
               // todo?: fix bug where offsets are out due to intervening fles without recorods
@@ -4079,7 +4080,7 @@ async function exportData(result, filename, format, headers) {
   // Create a write stream for the CSV file
   writeToPath(filePath, formattedValues, {
     headers: true,
-    writeBOM: true,
+    writeBOM: format !== "Raven", // Raven doesn't like BOM
     delimiter: format === "Raven" ? "\t" : ",",
   })
     .on("error", (_err) =>
@@ -4271,16 +4272,13 @@ const getValidSpecies = async (file) => {
     : { place: STATE.place };
   const includedSpecies = [];
   const excludedSpecies = [];
-  let i = 1;
-  for (const speciesName of STATE.allLabelsMap.values()) {
+  for (const [index, speciesName] of STATE.allLabels.entries()) {
+    const i = index + 1;
     const [cname, sname] = speciesName.split("_").reverse();
     if (cname.includes("ackground") || cname.includes("Unknown")) continue; // skip background and unknown species
-    if (!included.length || included.includes(i)) {
-      includedSpecies.push({cname, sname});
-    } else {
-      excludedSpecies.push({cname, sname});
-    }
-    i++;
+    (!included.length || included.includes(i)) 
+      ? includedSpecies.push({cname, sname})
+      : excludedSpecies.push({cname, sname});
   }
 
   // Sort both arrays by cname
