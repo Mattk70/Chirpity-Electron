@@ -758,9 +758,10 @@ async function savedFileCheck(fileList) {
       const newList = fileSlice.map(file => file.replace(library, ''));
       // detect if any changes were made
       const libraryFiles = newList.filter((item, i) => item !== fileSlice[i]);
-      const params = prepParams(newList)
+      const params = prepParams(newList);
       let countResult;
       if (libraryFiles.length) {
+        const archiveParams = prepParams(libraryFiles);
         query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${params}) or archiveName IN (${archiveParams})`;
         countResult = await diskDB.getAsync(query, ...fileSlice, ...libraryFiles);
       } else {
@@ -4016,7 +4017,7 @@ async function exportData(result, filename, format, headers) {
     const locationMap = await formatter.getAllLocations();
     // CSV export. Format the values
     for (let i = 0; i < result.length; i += BATCH_SIZE) {
-      const batch = result.slice(i, i + BATCH_SIZE);``
+      const batch = result.slice(i, i + BATCH_SIZE);
       const processedBatch = await Promise.all(
         batch.map(async (item, index) => {
           if (format === "Raven") {
