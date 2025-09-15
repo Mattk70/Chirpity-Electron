@@ -4016,11 +4016,11 @@ async function exportData(result, filename, format, headers) {
     const locationMap = await formatter.getAllLocations();
     // CSV export. Format the values
     for (let i = 0; i < result.length; i += BATCH_SIZE) {
-      const batch = result.slice(i, i + BATCH_SIZE);
+      const batch = result.slice(i, i + BATCH_SIZE);``
       const processedBatch = await Promise.all(
         batch.map(async (item, index) => {
           if (format === "Raven") {
-            item = { ...item, selection: index + 1 }; // Add a selection number for Raven
+            item = { ...item, selection: index + i +  1 }; // Add a selection number for Raven
             if (item.file !== previousFile) {
               // Positions need to be cumulative across files in Raven
               // todo?: fix bug where offsets are out due to intervening fles without recorods
@@ -4079,7 +4079,7 @@ async function exportData(result, filename, format, headers) {
   // Create a write stream for the CSV file
   writeToPath(filePath, formattedValues, {
     headers: true,
-    writeBOM: true,
+    writeBOM: format !== "Raven", // Raven doesn't like BOM
     delimiter: format === "Raven" ? "\t" : ",",
   })
     .on("error", (_err) =>
