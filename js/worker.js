@@ -757,15 +757,15 @@ async function savedFileCheck(fileList) {
       let query; const library = STATE.library.location + p.sep;
       const newList = fileSlice.map(file => file.replace(library, ''));
       // detect if any changes were made
-      const changed = fileSlice.some((item, i) => item !== newList[i]);
+      const libraryFiles = newList.filter((item, i) => item !== fileSlice[i]);
       const params = prepParams(newList)
       let countResult;
-      if (changed) {
-        query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${params}) or archiveName IN (${params})`;
-        countResult = await diskDB.getAsync(query, ...newList, ...newList);
+      if (libraryFiles.length) {
+        query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${params}) or archiveName IN (${archiveParams})`;
+        countResult = await diskDB.getAsync(query, ...fileSlice, ...libraryFiles);
       } else {
         query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${params})`;
-        countResult = await diskDB.getAsync(query, ...newList);
+        countResult = await diskDB.getAsync(query, ...fileSlice);
       }
 
       // Execute the query with the slice as parameters
