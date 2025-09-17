@@ -336,12 +336,12 @@ class Model {
             let selectedIndexes = [];
             if (indexes.length > 1) { // Multiple matches
               const labelOverride = this.customLabels[i].endsWith("-");
-              // Extract word in brackets from current index of this.labels
+              // Extract word in brackets from current index of this.customLabels
               const match = this.customLabels[i].match(/\((.*?)\)/);
               const callType = match ? match[0] : labelOverride ? '-' : null;
               for (let idx of indexes) {
                 if (callType) {
-                  // Check if the word in brackets exists in the custom list at the same index position
+                  // Check if the word in brackets exists in this label
                   if (this.labels[idx].endsWith(callType)) {
                     selectedIndexes.push(idx + 1);
                   }
