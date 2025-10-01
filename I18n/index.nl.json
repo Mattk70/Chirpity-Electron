@@ -96,7 +96,7 @@
     "record-add": ["Toevoegen"],
     "record-dismiss": ["Afwijzen"],
     "help-modal-close": ["Sluiten"],
-    "export-list": ["Lijst exporteren"],
+    "export-list": ["De meegeleverde lijst exporteren"],
     "go": ["Ga"],
     "set-location": ["Locatie instellen"],
     "reset-spec-frequency": ["Reset"],
