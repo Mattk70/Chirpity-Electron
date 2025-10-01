@@ -1047,11 +1047,11 @@ function getFileSQLAndParams(range) {
   return [SQL, params];
 }
 /**
- * Returns an array of indices not present in the sorted `included` list up to a specified range.
+ * Compute indices between 1 and fullRange (inclusive) that are not present in the sorted `included` list.
  *
  * @param {number[]} included - Sorted array of indices to include.
- * @param {number} [fullRange=STATE.allLabels.length] - The exclusive upper bound for indices to check.
- * @returns {number[]} Array of indices from 0 to {@link fullRange} - 1 that are not in {@link included}.
+ * @param {number} [fullRange=STATE.allLabels.length] - Maximum index to check (inclusive).
+ * @returns {number[]} Array of indices between 1 and `fullRange` (inclusive) that are not in `included`.
  */
 function getExcluded(included, fullRange = STATE.allLabels.length) {
   const missing = [];
@@ -1070,7 +1070,11 @@ function getExcluded(included, fullRange = STATE.allLabels.length) {
 }
 
 
-// helper to extract base + suffix from a cname
+/**
+ * Convert an array of CNAMES into objects containing the original name, the base name with any trailing parenthesized suffix removed, and a flag indicating presence of that suffix.
+ * @param {string[]} cnames - Array of names which may include a trailing parenthesized suffix (e.g., "Species (call)").
+ * @returns {{full: string, base: string, hasSuffix: boolean}[]} Array of objects each with `full` (original cname), `base` (trimmed name without a trailing parenthesized suffix), and `hasSuffix` (`true` if a parenthesized suffix was present).
+ */
 function parseCnames(cnames) {
   return cnames.map(cname => {
     const match = cname.match(/^(.*?)(\s*\(.*\))?$/);
@@ -1083,6 +1087,11 @@ function parseCnames(cnames) {
 }
 
 
+/**
+ * Map a list of CNAMES (possibly containing suffixes) to species IDs for the current model.
+ * @param {string[]} cnames - Array of CNAMES; elements may include suffixes such as " (call)" or " (fc)".
+ * @returns {number[]} Array of matching species IDs for STATE.modelID, empty if no matches.
+ */
 async function getMatchingIds(cnames) {
   const parsed = parseCnames(cnames);
 
@@ -1110,11 +1119,14 @@ async function getMatchingIds(cnames) {
   return rows.map(r => r.id);
 }
 /**
- * Asynchronously constructs an SQL fragment to filter species by the current list selection.
+ * Build an SQL fragment that filters species according to the current STATE.list selection.
  *
- * Returns a SQL clause that restricts or excludes species based on the active list in state. If the list is "everything", no filtering is applied.
+ * When STATE.list is "everything" the function returns an empty string. For other lists it resolves the set
+ * of included species IDs (handling the special "birds" exclusion case and CNAMES with suffixes) and
+ * returns an SQL snippet that restricts s.id to that set.
  *
- * @returns {Promise<string>} SQL fragment for species filtering, or an empty string if no filter is needed.
+ * @returns {Promise<string>} An SQL fragment restricting species by id (for example " AND s.id IN (1,2) "),
+ * or an empty string when no filtering is required.
  */
 async function getSpeciesSQLAsync(){
   let not = "", SQL = "";
