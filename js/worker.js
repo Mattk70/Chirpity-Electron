@@ -1047,17 +1047,17 @@ function getFileSQLAndParams(range) {
   return [SQL, params];
 }
 /**
- * Returns an array of indices not present in the sorted `included` list up to a specified range.
+ * Compute indices between 1 and fullRange (inclusive) that are not present in the sorted `included` list.
  *
  * @param {number[]} included - Sorted array of indices to include.
- * @param {number} [fullRange=STATE.allLabels.length] - The exclusive upper bound for indices to check.
- * @returns {number[]} Array of indices from 0 to {@link fullRange} - 1 that are not in {@link included}.
+ * @param {number} [fullRange=STATE.allLabels.length] - Maximum index to check (inclusive).
+ * @returns {number[]} Array of indices between 1 and `fullRange` (inclusive) that are not in `included`.
  */
 function getExcluded(included, fullRange = STATE.allLabels.length) {
   const missing = [];
   let currentIndex = 0;
 
-  for (let i = 0; i < fullRange; i++) {
+  for (let i = 1; i <= fullRange; i++) {
     // If the current value in the sorted list matches `i`, move to the next list item
     if (currentIndex < included.length && included[currentIndex] === i) {
       currentIndex++;
@@ -1069,12 +1069,64 @@ function getExcluded(included, fullRange = STATE.allLabels.length) {
   return missing;
 }
 
+
 /**
- * Asynchronously constructs an SQL fragment to filter species by the current list selection.
+ * Convert an array of CNAMES into objects containing the original name, the base name with any trailing parenthesized suffix removed, and a flag indicating presence of that suffix.
+ * @param {string[]} cnames - Array of names which may include a trailing parenthesized suffix (e.g., "Species (call)").
+ * @returns {{full: string, base: string, hasSuffix: boolean}[]} Array of objects each with `full` (original cname), `base` (trimmed name without a trailing parenthesized suffix), and `hasSuffix` (`true` if a parenthesized suffix was present).
+ */
+function parseCnames(cnames) {
+  return cnames.map(cname => {
+    const match = cname.match(/^(.*?)(\s*\(.*\))?$/);
+    return {
+      full: cname,
+      base: match[1].trim(),
+      hasSuffix: !!match[2]
+    };
+  });
+}
+
+
+/**
+ * Map a list of CNAMES (possibly containing suffixes) to species IDs for the current model.
+ * @param {string[]} cnames - Array of CNAMES; elements may include suffixes such as " (call)" or " (fc)".
+ * @returns {number[]} Array of matching species IDs for STATE.modelID, empty if no matches.
+ */
+async function getMatchingIds(cnames) {
+  const parsed = parseCnames(cnames);
+
+  // Build WHERE clauses
+  const conditions = [];
+  const params = [];
+
+  for (const { full, base, hasSuffix } of parsed) {
+    if (hasSuffix) {
+      conditions.push("(cname = ? OR cname = ?)");
+      params.push(full, base);
+    } else {
+      conditions.push("cname = ?");
+      params.push(full);
+    }
+  }
+
+  const sql = `
+    SELECT id FROM species
+    WHERE modelID = ?
+      AND (${conditions.join(" OR ")})
+  `;
+
+  const rows = await STATE.db.allAsync(sql, STATE.modelID, ...params);
+  return rows.map(r => r.id);
+}
+/**
+ * Build an SQL fragment that filters species according to the current STATE.list selection.
  *
- * Returns a SQL clause that restricts or excludes species based on the active list in state. If the list is "everything", no filtering is applied.
+ * When STATE.list is "everything" the function returns an empty string. For other lists it resolves the set
+ * of included species IDs (handling the special "birds" exclusion case and CNAMES with suffixes) and
+ * returns an SQL snippet that restricts s.id to that set.
  *
- * @returns {Promise<string>} SQL fragment for species filtering, or an empty string if no filter is needed.
+ * @returns {Promise<string>} An SQL fragment restricting species by id (for example " AND s.id IN (1,2) "),
+ * or an empty string when no filtering is required.
  */
 async function getSpeciesSQLAsync(){
   let not = "", SQL = "";
@@ -1083,13 +1135,15 @@ async function getSpeciesSQLAsync(){
     let included = await getIncludedIDs();
     if (list === "birds") {
       included = getExcluded(included);
+      if (!included.length) return SQL; // nothing filtered out
       not = "NOT";
     }
     // Get the speciesID for all models
-    const result = await STATE.db.allAsync(`SELECT sname FROM species WHERE classIndex + 1 IN (${included}) AND modelID = ${STATE.modelID}`);
-    const snames = result.map(row => row.sname);
-    included = await STATE.db.allAsync(`SELECT id FROM species WHERE sname IN (${prepParams(snames)})`, ...snames);
-    included = included.map(row => row.id);
+    const result = await STATE.db.allAsync(`SELECT cname FROM species WHERE classIndex + 1 IN (${included}) AND modelID = ${STATE.modelID}`);
+    const cnames = result.map(row => row.cname);
+    // included = await STATE.db.allAsync(`SELECT id FROM species WHERE cname IN (${prepParams(cnames)})`, ...cnames);
+    // included = included.map(row => row.id);
+    included = cnames.length ? await getMatchingIds(cnames) : [-1];
     DEBUG &&
       console.log("included", included.length, "# labels", allLabels.length);
     // const includedParams = prepParams(included);
@@ -1585,7 +1639,7 @@ const getDuration = async (src) => {
     audio = new Audio();
 
     audio.src = src.replaceAll("#", "%23").replaceAll("?", "%3F"); // allow hash and ? in the path (https://github.com/Mattk70/Chirpity-Electron/issues/98)
-    audio.addEventListener("loadedmetadata", function () {
+    audio.addEventListener("durationchange", function () {
       const duration = audio.duration;
       if (duration === Infinity || !duration || isNaN(duration)) {
         const i18n = {

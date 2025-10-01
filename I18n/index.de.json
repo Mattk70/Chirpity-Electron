@@ -96,7 +96,7 @@
     "record-add": ["Hinzufügen"],
     "record-dismiss": ["Verwerfen"],
     "help-modal-close": ["Schließen"],
-    "export-list": ["Liste exportieren"],
+    "export-list": ["Die enthaltene Liste exportieren"],
     "go": ["Los"],
     "set-location": ["Standort festlegen"],
     "reset-spec-frequency": ["Zurücksetzen"],
