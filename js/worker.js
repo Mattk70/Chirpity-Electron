@@ -75,7 +75,6 @@ const generateAlert = ({
   });
 };
 
-// // Override console.info to intercept and track information
 // Is this CI / playwright? Disable tracking
 const isTestEnv = process.env.TEST_ENV;
 isTestEnv || installConsoleTracking(() => STATE.UUID, "Worker");
@@ -1648,7 +1647,8 @@ function onAbort({ model = STATE.model }) {
   );
 }
 
-const measureDurationWithFfmpeg = (src) => {
+const measureDurationWithFfmpeg = (src, type) => {
+  console.info('Measuring duration', `${src}: ${type}`);
   return new Promise((resolve, reject) => {
     const { PassThrough } = require("node:stream");
     const stream = new PassThrough();
@@ -1697,7 +1697,7 @@ const getDuration = async (src) => {
       const duration = audio.duration;
       if (duration === Infinity || !duration || isNaN(duration)) {
         // Fallback: decode entire file with ffmpeg
-        measureDurationWithFfmpeg(src)
+        measureDurationWithFfmpeg(src, duration)
           .then((realDuration) => resolve(realDuration))
           .catch((err) => reject(err, src) );
       } else {
@@ -1706,7 +1706,7 @@ const getDuration = async (src) => {
       audio.remove();
     });
     audio.addEventListener("error", (error) => {
-      measureDurationWithFfmpeg(src)
+      measureDurationWithFfmpeg(src, 'error')
           .then((realDuration) => resolve(realDuration))
           .catch((err) => reject(err, src));
       audio.remove();
