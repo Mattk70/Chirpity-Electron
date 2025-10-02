@@ -279,6 +279,7 @@ async function loadDB(modelPath) {
   }
   const labelsLocation = modelPath ? p.join(modelPath, 'labels.txt') : null;
   ([modelID, needsTranslation] = await mergeDbIfNeeded({diskDB, model, appPath, dbMutex, labelsLocation }) )
+  checkNewModel(modelID);
   STATE.modelID = modelID;
   STATE.update({ db: diskDB });
   diskDB.locale = STATE.locale;
@@ -861,20 +862,7 @@ async function onLaunch({
   } else if (!result){
     const labelsLocation = modelPath ? p.join(modelPath, 'labels.txt') : null;
     addNewModel({model, db:memoryDB, dbMutex, labelsLocation}).then(modelID => {
-      if (!Number.isInteger(modelID) ) {
-        let message;
-        if (modelID.code === "SQLITE_CONSTRAINT"){
-          message = 'Model addition failed: There are duplicate species in the label file. Remove the model to prevent further errors';
-        } else {
-          message = `Model addition failed: ${modelID.message}`;
-        }
-        // Show an error alert        
-        generateAlert({
-          type: "error",
-          message
-        });
-        console.error(message);
-      }
+      checkNewModel(modelID)
     });
   }
   const db = STATE.mode === 'analyse'
@@ -884,6 +872,23 @@ async function onLaunch({
   NUM_WORKERS = threads;
   setLabelState({regenerate:true})
   spawnPredictWorkers(model, batchSize, NUM_WORKERS);
+}
+
+function checkNewModel(modelID){
+  if (!Number.isInteger(modelID) ) {
+    let message;
+    if (modelID.code === "SQLITE_CONSTRAINT"){
+      message = 'Model addition failed: There are duplicate species in the label file. Remove the model to prevent further errors';
+    } else {
+      message = `Cannot load model: ${modelID.message}`;
+    }
+    // Show an error alert        
+    generateAlert({
+      type: "error",
+      message
+    });
+    console.error(message);
+  }
 }
 
 /**

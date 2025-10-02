@@ -464,6 +464,7 @@ const addNewModel = async ({model, db = diskDB, dbMutex, labelsLocation}) => {
       // Custom model
       const labelFile = labelsLocation
       const fileContents = readFileSync(labelFile, "utf8");
+      // Trim whitespace and split by new lines, ignoring empty lines
       labels = fileContents.split(/\r?\n/).map(line => line.trim()).filter(line => line.length);
     }
     // Add Unknown Sp.
@@ -473,6 +474,10 @@ const addNewModel = async ({model, db = diskDB, dbMutex, labelsLocation}) => {
     const params = [];
       labels.forEach((entry, index) => {
         const [sname, cname] = entry.split("_");
+        if (! cname) {
+          const err = `Invalid label: '${entry}' on line ${index + 1} <br> Each line in the label file must be in the format 'scientific name_common name'`;
+          throw new Error(err);
+        }
         // console.log(cname)
         insertQuery += '(?, ?, ?, ?),';
         params.push(sname, cname, modelID, index);
@@ -483,7 +488,7 @@ const addNewModel = async ({model, db = diskDB, dbMutex, labelsLocation}) => {
     await db.runAsync('COMMIT');
   } catch (err) {
     await db.runAsync('ROLLBACK');
-    console.error(`Error adding model species for "${model}":`, err.message);
+    console.error(`Error inserting species for "${model}":`, err.message);
     modelID = err;
   } finally {
     dbMutex.unlock();
