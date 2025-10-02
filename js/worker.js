@@ -1670,11 +1670,6 @@ const measureDurationWithFfmpeg = (src) => {
             });
             reject(err);
       })
-      .on("end", () => {
-        // Processing finished
-        const duration = totalBytes / bytesPerSecond;
-        resolve(duration);
-  })
       .pipe(stream);
 
     stream.on("data", (chunk) => {
