@@ -1684,6 +1684,15 @@ const measureDurationWithFfmpeg = (src, type) => {
       stream.destroy();
       resolve(duration);
     });
+    stream.on("error", (err) => {
+      generateAlert({
+        type: "error",
+        message: "badMetadata",
+        variables: { src },
+      });
+      stream.destroy();
+      reject(err);
+    });
   });
 };
 
