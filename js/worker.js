@@ -247,11 +247,10 @@ const getSelectionRange = (file, start, end) => {
 
 
 /**
- * Loads and initializes the application's SQLite database for audio records and metadata.
+ * Load and initialize the application's SQLite archive database and prepare species mappings for the current model.
  *
- * Opens or creates the main database file, applies schema migrations, sets PRAGMA options, and prepares species ID mappings for the current model. Notifies the UI if label translation is required and updates the global state with the loaded database instance.
- *
- * @returns {Promise<sqlite3.Database>} Resolves with the initialized database instance.
+ * @param {string} [modelPath] - Path to the active model folder; if provided, its `labels.txt` is used to align database labels.
+ * @returns {sqlite3.Database} The initialized archive database instance.
  */
 async function loadDB(modelPath) {
   const path = STATE.database.location || appPath;
@@ -822,17 +821,16 @@ const filtersApplied = (list) => {
 };
 
 /**
- * Launches the application with the specified model, configuring databases, state, and prediction workers.
+ * Initialize application state, databases, and prediction workers for the specified model.
  *
- * Sets the sample rate based on the model, loads or updates the disk and memory databases as needed, updates global state, and spawns prediction workers for audio analysis.
+ * Loads or creates the disk and memory databases as needed, sets the runtime sample rate and detection backend, updates global STATE with model and database info, regenerates label state, and spawns prediction workers.
  *
- * @param {Object} options - Configuration for launching the application.
- * @param {string} [options.model="chirpity"] - The model to use; determines sample rate.
+ * @param {Object} options - Launch configuration.
+ * @param {string} [options.model="chirpity"] - Model identifier; determines sample rate and which labels/species to load.
  * @param {number} [options.batchSize=32] - Number of audio samples per prediction batch.
- * @param {number} [options.threads=1] - Number of prediction worker threads.
- * @param {string} [options.backend="tensorflow"] - Prediction backend to use.
- * @param {string} [options.modelPath] - Path to the model files.
- * @returns {Promise<void>}
+ * @param {number} [options.threads=1] - Number of prediction worker threads to spawn.
+ * @param {string} [options.backend="tensorflow"] - Detection backend to use.
+ * @param {string} [options.modelPath] - Filesystem path containing model files and label definitions; used when adding a new model.
  */
 
 async function onLaunch({
@@ -873,6 +871,14 @@ async function onLaunch({
   spawnPredictWorkers(model, batchSize, NUM_WORKERS);
 }
 
+/**
+ * Validate a model load result and emit an error alert if loading failed.
+ *
+ * If `modelID` is not an integer, posts an error alert (with a specific message when
+ * `modelID.code === "SQLITE_CONSTRAINT"`) and logs the message to the console.
+ *
+ * @param {number|Object} modelID - The model identifier on success, or an error-like object on failure.
+ */
 function checkNewModel(modelID){
   if (!Number.isInteger(modelID) ) {
     let message;
