@@ -1646,6 +1646,48 @@ function onAbort({ model = STATE.model }) {
   );
 }
 
+const measureDurationWithFfmpeg = (src) => {
+  return new Promise((resolve, reject) => {
+    const { PassThrough } = require("node:stream");
+    const stream = new PassThrough();
+    let totalBytes = 0;
+
+    const sampleRate = 24000; // Hz
+    const channels = 1;       // mono
+    const bytesPerSample = 2; // s16le = 2 bytes
+
+    const bytesPerSecond = sampleRate * channels * bytesPerSample;
+
+    ffmpeg(src)
+      .format("s16le") // raw PCM
+      .audioChannels(channels)
+      .audioFrequency(sampleRate)
+      .on("error", (err) => {
+        generateAlert({
+              type: "error",
+              message: "badMetadata",
+              variables: { src },
+            });
+            reject(err);
+      })
+      .on("end", () => {
+        // Processing finished
+        const duration = totalBytes / bytesPerSecond;
+        resolve(duration);
+  })
+      .pipe(stream);
+
+    stream.on("data", (chunk) => {
+      totalBytes += chunk.length;
+    });
+
+    stream.on("end", () => {
+      const duration = totalBytes / bytesPerSecond;
+      resolve(duration);
+    });
+  });
+};
+
 const getDuration = async (src) => {
   let audio;
   return new Promise(function (resolve, reject) {
@@ -1655,35 +1697,20 @@ const getDuration = async (src) => {
     audio.addEventListener("durationchange", function () {
       const duration = audio.duration;
       if (duration === Infinity || !duration || isNaN(duration)) {
-        const i18n = {
-          en: "File duration",
-          en_uk: "File duration",
-          da: "Filens varighed",
-          de: "Dateidauer",
-          es: "Duración del archivo",
-          fr: "Durée du fichier",
-          ja: "ファイルの長さ",
-          nl: "Bestandsduur",
-          pt: "Duração do arquivo",
-          ru: "Длительность файла",
-          sv: "Filens varaktighet",
-          zh: "文件时长",
-        };
-        const message = i18n[STATE.locale] || i18n["en"];
-        return reject(
-          `${message} <span style="color: red">${duration}</span> (${src})`
-        );
+        // Fallback: decode entire file with ffmpeg
+        measureDurationWithFfmpeg(src)
+          .then((realDuration) => resolve(realDuration))
+          .catch((err) => reject(err, src) );
+      } else {
+        resolve(duration);
       }
       audio.remove();
-      resolve(duration);
     });
     audio.addEventListener("error", (error) => {
-      generateAlert({
-        type: "error",
-        message: "badMetadata",
-        variables: { src },
-      });
-      reject(error, src);
+      measureDurationWithFfmpeg(src)
+          .then((realDuration) => resolve(realDuration))
+          .catch((err) => reject(err, src));
+      audio.remove();
     });
   });
 };
