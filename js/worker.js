@@ -1620,10 +1620,12 @@ async function onAnalyse({
 }
 
 /**
- * Aborts ongoing audio processing and prediction tasks, clears related queues and state, terminates active workers, and restarts prediction workers for the specified model.
+ * Abort all in-progress audio processing and prediction work, clear related queues and transient state, and restart prediction workers for the specified model.
  *
- * @param {Object} params - Parameters for aborting processing.
- * @param {string} [params.model=STATE.model] - The model identifier to use when restarting prediction workers.
+ * This cancels active prediction jobs, clears in-memory queues and tracking structures, terminates existing worker processes, and spawns a fresh set of prediction workers for the provided model.
+ *
+ * @param {Object} params - Options for aborting and restarting.
+ * @param {string} [params.model=STATE.model] - Model identifier to use when restarting prediction workers; defaults to the current STATE.model.
  */
 function onAbort({ model = STATE.model }) {
   predictWorkers.forEach(worker => worker.postMessage({message: 'terminate'}));
