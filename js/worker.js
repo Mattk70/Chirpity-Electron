@@ -75,7 +75,6 @@ const generateAlert = ({
   });
 };
 
-// // Override console.info to intercept and track information
 // Is this CI / playwright? Disable tracking
 const isTestEnv = process.env.TEST_ENV;
 isTestEnv || installConsoleTracking(() => STATE.UUID, "Worker");
@@ -1620,10 +1619,12 @@ async function onAnalyse({
 }
 
 /**
- * Aborts ongoing audio processing and prediction tasks, clears related queues and state, terminates active workers, and restarts prediction workers for the specified model.
+ * Abort all in-progress audio processing and prediction work, clear related queues and transient state, and restart prediction workers for the specified model.
  *
- * @param {Object} params - Parameters for aborting processing.
- * @param {string} [params.model=STATE.model] - The model identifier to use when restarting prediction workers.
+ * This cancels active prediction jobs, clears in-memory queues and tracking structures, terminates existing worker processes, and spawns a fresh set of prediction workers for the provided model.
+ *
+ * @param {Object} params - Options for aborting and restarting.
+ * @param {string} [params.model=STATE.model] - Model identifier to use when restarting prediction workers; defaults to the current STATE.model.
  */
 function onAbort({ model = STATE.model }) {
   predictWorkers.forEach(worker => worker.postMessage({message: 'terminate'}));
@@ -1646,6 +1647,55 @@ function onAbort({ model = STATE.model }) {
   );
 }
 
+const measureDurationWithFfmpeg = (src, type) => {
+  console.info('Measuring duration', `${src}: ${type}`);
+  return new Promise((resolve, reject) => {
+    const { PassThrough } = require("node:stream");
+    const stream = new PassThrough();
+    let totalBytes = 0;
+
+    const sampleRate = 24000; // Hz
+    const channels = 1;       // mono
+    const bytesPerSample = 2; // s16le = 2 bytes
+
+    const bytesPerSecond = sampleRate * channels * bytesPerSample;
+
+    ffmpeg(src)
+      .format("s16le") // raw PCM
+      .audioChannels(channels)
+      .audioFrequency(sampleRate)
+      .on("error", (err) => {
+        generateAlert({
+              type: "error",
+              message: "badMetadata",
+              variables: { src },
+            });
+        stream.destroy();
+        reject(err);
+      })
+      .pipe(stream);
+
+    stream.on("data", (chunk) => {
+      totalBytes += chunk.length;
+    });
+
+    stream.on("end", () => {
+      const duration = totalBytes / bytesPerSecond;
+      stream.destroy();
+      resolve(duration);
+    });
+    stream.on("error", (err) => {
+      generateAlert({
+        type: "error",
+        message: "badMetadata",
+        variables: { src },
+      });
+      stream.destroy();
+      reject(err);
+    });
+  });
+};
+
 const getDuration = async (src) => {
   let audio;
   return new Promise(function (resolve, reject) {
@@ -1655,35 +1705,26 @@ const getDuration = async (src) => {
     audio.addEventListener("durationchange", function () {
       const duration = audio.duration;
       if (duration === Infinity || !duration || isNaN(duration)) {
-        const i18n = {
-          en: "File duration",
-          en_uk: "File duration",
-          da: "Filens varighed",
-          de: "Dateidauer",
-          es: "Duración del archivo",
-          fr: "Durée du fichier",
-          ja: "ファイルの長さ",
-          nl: "Bestandsduur",
-          pt: "Duração do arquivo",
-          ru: "Длительность файла",
-          sv: "Filens varaktighet",
-          zh: "文件时长",
-        };
-        const message = i18n[STATE.locale] || i18n["en"];
-        return reject(
-          `${message} <span style="color: red">${duration}</span> (${src})`
-        );
+        // Fallback: decode entire file with ffmpeg
+        measureDurationWithFfmpeg(src, duration)
+          .then((realDuration) => resolve(realDuration))
+          .catch((err) => {
+            err.message = `${err.message} (file: ${src})`;
+            return reject(err)
+          });
+      } else {
+        resolve(duration);
       }
       audio.remove();
-      resolve(duration);
     });
     audio.addEventListener("error", (error) => {
-      generateAlert({
-        type: "error",
-        message: "badMetadata",
-        variables: { src },
-      });
-      reject(error, src);
+      measureDurationWithFfmpeg(src, 'error')
+          .then((realDuration) => resolve(realDuration))
+          .catch((err) => {
+            err.message = `${err.message} (file: ${src})`;
+            return reject(err)
+          });
+      audio.remove();
     });
   });
 };
