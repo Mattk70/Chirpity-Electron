@@ -279,8 +279,7 @@ async function loadDB(modelPath) {
   }
   const labelsLocation = modelPath ? p.join(modelPath, 'labels.txt') : null;
   ([modelID, needsTranslation] = await mergeDbIfNeeded({diskDB, model, appPath, dbMutex, labelsLocation }) )
-  checkNewModel(modelID);
-  STATE.modelID = modelID;
+  checkNewModel(modelID) && (STATE.modelID = modelID);
   STATE.update({ db: diskDB });
   diskDB.locale = STATE.locale;
   await diskDB.runAsync("VACUUM");
@@ -878,17 +877,20 @@ function checkNewModel(modelID){
   if (!Number.isInteger(modelID) ) {
     let message;
     if (modelID.code === "SQLITE_CONSTRAINT"){
-      message = 'Model addition failed: There are duplicate species in the label file. Remove the model to prevent further errors';
+      message = 'Model addition failed: There are duplicate species in the label file.';
     } else {
-      message = `Cannot load model: ${modelID.message}`;
+      message = `Cannot load model: ${modelID.message}.`;
     }
+    message += ' <b>Remove the model to prevent further errors</b>.';
     // Show an error alert        
     generateAlert({
       type: "error",
       message
     });
     console.error(message);
+    return false
   }
+  return true
 }
 
 /**
