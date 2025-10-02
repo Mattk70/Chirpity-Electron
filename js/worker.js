@@ -1670,7 +1670,8 @@ const measureDurationWithFfmpeg = (src) => {
               message: "badMetadata",
               variables: { src },
             });
-            reject(err);
+        stream.destroy();
+        reject(err);
       })
       .pipe(stream);
 
@@ -1680,6 +1681,7 @@ const measureDurationWithFfmpeg = (src) => {
 
     stream.on("end", () => {
       const duration = totalBytes / bytesPerSecond;
+      stream.destroy();
       resolve(duration);
     });
   });
