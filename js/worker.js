@@ -1708,7 +1708,10 @@ const getDuration = async (src) => {
         // Fallback: decode entire file with ffmpeg
         measureDurationWithFfmpeg(src, duration)
           .then((realDuration) => resolve(realDuration))
-          .catch((err) => reject(err, src) );
+          .catch((err) => {
+            err.message = `${err.message} (file: ${src})`;
+            return reject(err)
+          });
       } else {
         resolve(duration);
       }
@@ -1717,7 +1720,10 @@ const getDuration = async (src) => {
     audio.addEventListener("error", (error) => {
       measureDurationWithFfmpeg(src, 'error')
           .then((realDuration) => resolve(realDuration))
-          .catch((err) => reject(err, src));
+          .catch((err) => {
+            err.message = `${err.message} (file: ${src})`;
+            return reject(err)
+          });
       audio.remove();
     });
   });
