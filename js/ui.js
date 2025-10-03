@@ -3405,7 +3405,12 @@ async function onWorkerLoadedAudio({
   // Clear the loading animation
   DOM.loading.classList.add("d-none");
   const resetSpec = !STATE.currentFile;
-  STATE.currentFileDuration = fileDuration;
+  if (fileDuration) {STATE.currentFileDuration = fileDuration}
+  else { 
+    generateToast({message: `The file ${file} has zero length`, type: 'warning'});
+    console.warn(`The file ${file} has zero length`);
+    return
+  }
   //if (preserveResults) completeDiv.hide();
   config.debug &&
     console.log(
