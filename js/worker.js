@@ -1089,11 +1089,11 @@ function getExcluded(included, fullRange = STATE.allLabels.length) {
  */
 function parseCnames(cnames) {
   return cnames.map(cname => {
-    const match = cname.match(/^(.*?)(\s*\(.*\))?$/);
+    const match = cname.match(/^(.*?)(\s*\(.*\)|-)?$/);
     return {
       full: cname,
       base: match[1].trim(),
-      hasSuffix: !!match[2]
+      suffix: match[2]
     };
   });
 }
@@ -1107,29 +1107,35 @@ function parseCnames(cnames) {
 async function getMatchingIds(cnames) {
   const parsed = parseCnames(cnames);
 
-  // Build WHERE clauses
-  const conditions = [];
-  const params = [];
-
-  for (const { full, base, hasSuffix } of parsed) {
-    if (hasSuffix) {
-      conditions.push("(cname = ? OR cname = ?)");
-      params.push(full, base);
-    } else {
-      conditions.push("cname = ?");
-      params.push(full);
-    }
+  // Collect all possible cname values
+  const nameSet = new Set();
+  for (const { full, base, suffix } of parsed) {
+    nameSet.add(full);
+    if (suffix && suffix !== "-") nameSet.add(base);
   }
 
-  const sql = `
-    SELECT id FROM species
-    WHERE modelID = ?
-      AND (${conditions.join(" OR ")})
-  `;
+  const names = [...nameSet];
+  if (names.length === 0) return [];
 
-  const rows = await STATE.db.allAsync(sql, STATE.modelID, ...params);
-  return rows.map(r => r.id);
+  // Chunk if too many parameters (SQLite has a 999 parameter limit)
+  const chunkSize = 999;
+  const results = [];
+
+  for (let i = 0; i < names.length; i += chunkSize) {
+    const chunk = names.slice(i, i + chunkSize);
+    const placeholders = chunk.map(() => "?").join(",");
+    const sql = `
+      SELECT id FROM species
+      WHERE modelID = ?
+        AND cname IN (${placeholders})
+    `;
+    const rows = await STATE.db.allAsync(sql, STATE.modelID, ...chunk);
+    results.push(...rows.map(r => r.id));
+  }
+
+  return results;
 }
+
 /**
  * Build an SQL fragment that filters species according to the current STATE.list selection.
  *
@@ -1814,8 +1820,10 @@ async function locateFile(file) {
       generateAlert({
         type: "error",
         message: "noDirectory",
-        variables: { match },
+        variables: { match: match[0] },
       });
+      // generateAlert({ type: "info", message: "cancelled" });
+      onAbort({ model: STATE.model })
     }
     console.warn(error.message + " - Disk removed?"); // Expected that this happens when the directory doesn't exist
   }
@@ -2364,7 +2372,10 @@ async function processAudio(
         );
 
         const diff = Math.abs(metaDuration - duration);
-        if (diff > 3) console.warn("File duration mismatch", diff);
+        if (diff > 3) {
+          if (fs.existsSync(file)) console.warn("File duration mismatch", diff)
+          else console.warn("File duration mismatch", "File missing");
+        }
 
         METADATA[file].duration = duration;
       }
