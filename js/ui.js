@@ -5346,11 +5346,15 @@ async function handleUIClicks(e) {
         generateToast({message:'A value for both Epochs and Learning rate is needed', type:'warning'})
         break;
       }
+      if (!dataset) {
+        generateToast({message:'A location for the training audio is needed', type:'warning'})
+        break;
+      }
       function isDirectory(entry) {
         const typeSymbol = Object.getOwnPropertySymbols(entry).find(sym => sym.toString().includes('type'));
         return entry[typeSymbol] === 2;
       }
-      const entries = fs.readdirSync(datasetLocation, { withFileTypes: true }).filter(e => isDirectory(e) && ! e.name.startsWith('.'));
+      const entries = fs.readdirSync(dataset, { withFileTypes: true }).filter(e => isDirectory(e) && ! e.name.startsWith('.'));
       const folders = entries.map(entry => entry.name);
       // Check valid formatting
       for (const f of folders) {
