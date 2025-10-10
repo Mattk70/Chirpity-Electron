@@ -4699,6 +4699,7 @@ document.addEventListener("dragover", (event) => {
 document.addEventListener("drop", (event) => {
   event.preventDefault();
   event.stopPropagation();
+  if (!modelReady) return;
   const fileList = Array.from(event.dataTransfer.files)
     .filter(
       (file) =>
