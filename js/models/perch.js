@@ -94,6 +94,12 @@ function handleStdoutLine(line) {
   }
 }
 
+/**
+ * Send a JSON-serializable payload to the spawned perch-infer process via stdin.
+ *
+ * @param {any} payload - The value to serialize and send; must be JSON-serializable and will be written with a trailing newline.
+ * @throws {Error} If the underlying child process or its stdin is not available or has been destroyed.
+ */
 function sendPayload(payload) {
   if (!proc || !proc.stdin || proc.stdin.destroyed) throw new Error('process not running');
   const t0 = Date.now();
@@ -102,6 +108,18 @@ function sendPayload(payload) {
   proc.stdin.write(test, 'utf8');
 }
 
+/**
+ * Send an audio payload to the running inference process and wait for its matching response.
+ *
+ * @param {Array<number>|Uint8Array|Float32Array} audio - A contiguous audio buffer to be sent for inference; must represent samples matching the model's expected format.
+ * @param {Object} [opts] - Optional request controls and metadata.
+ * @param {string} [opts.requestId] - Custom id for this request; a timestamp-based id is generated when omitted.
+ * @param {number} [opts.timeoutMs=300000] - Milliseconds to wait for a response before rejecting.
+ * @param {string} [opts.file] - Optional file identifier associated with this request, included in responses.
+ * @param {number} [opts.fileStart] - Optional file-offset timestamp included in responses.
+ * @param {number} [opts.start] - Optional sample index (start) used to compute result timestamps.
+ * @returns {Promise<any>} Resolves with the parsed inference response object when the process returns a matching result; rejects if the process is not running, sending fails, or the request times out.
+ */
 function requestResponse(audio, opts = {}) {
   return new Promise((resolve, reject) => {
     if (!proc) return reject(new Error('process not running'));
