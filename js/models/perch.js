@@ -98,7 +98,7 @@ function sendPayload(payload) {
   if (!proc || !proc.stdin || proc.stdin.destroyed) throw new Error('process not running');
   const t0 = Date.now();
   const test = JSON.stringify(payload) + '\n';
-  console.log('perch sendPayload', { timeMs: Date.now() - t0, length: test.length });
+  DEBUG && console.log('perch sendPayload', { timeMs: Date.now() - t0, length: test.length });
   proc.stdin.write(test, 'utf8');
 }
 
@@ -114,7 +114,14 @@ function requestResponse(audio, opts = {}) {
     }, timeoutMs);
 
     pending.push({ id, resolve, reject, timer, file: opts.file, fileStart: opts.fileStart, start: opts.start });
-    try { sendPayload({ input: audio }); } catch (err) { clearTimeout(timer); const idx = pending.findIndex(x => x.id === id); if (idx >= 0) pending.splice(idx,1); reject(err); }
+    try { 
+        sendPayload({ input: audio }); 
+    } catch (err) { 
+        clearTimeout(timer); 
+        const idx = pending.findIndex(x => x.id === id);
+        if (idx >= 0) pending.splice(idx,1); 
+        reject(err); 
+    }
   });
 }
 
@@ -126,7 +133,7 @@ onmessage = async (e) => {
       case 'load': {
         const r = startProcess(modelPath);
         workerId = worker;
-        console.log('start', r);
+        DEBUG && console.log('start', r);
         break;
       }
       case 'predict': {
@@ -148,8 +155,7 @@ onmessage = async (e) => {
             for (let i = 0; i < audio.length; i += chunkLength) {
                 chunked.push(Array.from(audio.slice(i, i + chunkLength)));
             }
-            const resp = await requestResponse(chunked, {fileStart, file, start});
-            // console.log('requestResponse', { response: resp });
+            await requestResponse(chunked, {fileStart, file, start});
         } catch (err) {
           console.error('requestResponse', { error: String(err) });
         }
