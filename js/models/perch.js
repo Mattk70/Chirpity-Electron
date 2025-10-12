@@ -149,7 +149,7 @@ onmessage = async (e) => {
                 chunked.push(Array.from(audio.slice(i, i + chunkLength)));
             }
             const resp = await requestResponse(chunked, {fileStart, file, start});
-            console.log('requestResponse', { response: resp });
+            // console.log('requestResponse', { response: resp });
         } catch (err) {
           console.error('requestResponse', { error: String(err) });
         }
