@@ -16,7 +16,7 @@ const DEBUG = false;
 function startProcess(exePath) {
   if (proc) return { ok: true };
   if (!exePath) return { ok: false, error: 'perch exe not found; pass exePath or bundle dist/perch-infer' };
-  const exe = path.join(exePath, 'perch-infer.exe');
+  const exe = path.join(exePath, 'perch-infer');
 
   proc = spawn(exe, [], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, env: Object.assign({}, process.env, { TF_CPP_MIN_LOG_LEVEL: '2' }) });
 
