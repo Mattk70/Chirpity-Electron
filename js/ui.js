@@ -2929,6 +2929,10 @@ const updateModelIcon = (model) => {
     case 'nocmig':
       title = "Nocmig (beta)";
       break;
+    case 'perch v2':
+      title = "Perch V2";
+      model = 'perch';
+      break;
     case 'bats':
       title = "Bats";
       break;
@@ -5406,7 +5410,7 @@ async function handleUIClicks(e) {
       const displayName = document.getElementById('model-name').value.trim();
       const modelName = displayName.toLowerCase();
       const modelLocation = document.getElementById('import-location').value;
-      const requiredFiles = ['weights.bin', 'labels.txt', 'model.json']
+      const requiredFiles = displayName === 'Perch v2' ? ['perch-infer.exe', '_internal'] : ['weights.bin', 'labels.txt', 'model.json'];
       if (config.models[modelName] !== undefined){
         generateToast({message: 'A model with that name already exists', type:'error'})
         break;

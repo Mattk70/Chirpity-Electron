@@ -456,6 +456,14 @@ const addNewModel = async ({model, db = diskDB, dbMutex, labelsLocation}) => {
          "BirdNET_GLOBAL_6K_V2.4_Labels_en.txt");
         const fileContents = readFileSync(labelFile, "utf8");
           labels = fileContents.trim().split(/\r?\n/);
+    } else if (model === "perch v2") {
+      const labelFile = labelsLocation;
+      const fileContents = readFileSync(labelFile, "utf8").replaceAll('_', '~');
+      labels = fileContents.trim().split(/\r?\n/);
+      // remove header row
+      labels.shift();
+      // Hack to ensure Perch labels are in the correct format
+      labels = labels.map(line => `${line}_${line}`);
     } else if (['chirpity', 'nocmig'].includes(model)){
       labels = JSON.parse(
         readFileSync(path.join(__dirname, `${model}_model_config.json`), "utf8")
@@ -469,22 +477,30 @@ const addNewModel = async ({model, db = diskDB, dbMutex, labelsLocation}) => {
     }
     // Add Unknown Sp.
     labels.push("Unknown Sp._Unknown Sp.");
-    // Fill species table with this model's labels (will be default lingo)
-    let insertQuery = `INSERT INTO species (sname, cname, modelID, classIndex) VALUES `;
-    const params = [];
-      labels.forEach((entry, index) => {
+
+    // Insert labels in batches to avoid exceeding SQLite parameter limits
+    const MAX_PARAMS = 25000;
+    const PARAMS_PER_ROW = 4;
+    const MAX_ROWS_PER_BATCH = Math.floor(MAX_PARAMS / PARAMS_PER_ROW);
+    for (let i = 0; i < labels.length; i += MAX_ROWS_PER_BATCH) {
+      const batch = labels.slice(i, i + MAX_ROWS_PER_BATCH);
+
+      let insertQuery = `INSERT INTO species (sname, cname, modelID, classIndex) VALUES `;
+      const params = [];
+
+      batch.forEach((entry, index) => {
         const [sname, cname] = entry.split("_");
-        if (! cname) {
-          const err = `Invalid label: '${entry}' on line ${index + 1} <br> Each line in the label file must be in the format 'scientific name_common name'`;
+        if (!cname) {
+          const err = `Invalid label: '${entry}' on line ${i + index + 1}. Each line must be 'scientific name_common name'`;
           throw new Error(err);
         }
-        // console.log(cname)
         insertQuery += '(?, ?, ?, ?),';
-        params.push(sname, cname, modelID, index);
+        params.push(sname, cname, modelID, i + index);
       });
-    // Remove trailing comma
-    insertQuery = insertQuery.slice(0, -1);
-    await db.runAsync(insertQuery, ...params);
+
+      insertQuery = insertQuery.slice(0, -1); // Remove trailing comma
+      await db.runAsync(insertQuery, ...params);
+    }
     await db.runAsync('COMMIT');
   } catch (err) {
     await db.runAsync('ROLLBACK');

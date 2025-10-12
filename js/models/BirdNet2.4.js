@@ -38,7 +38,6 @@ onmessage = async (e) => {
           appPath = "../../" + location + "/";
         }
         
-        // const appPath = "/Users/matthew/Documents/CustomClassifier/";
         const batch = e.data.batchSize;
         const backend = BACKEND || e.data.backend;
         BACKEND = backend;
