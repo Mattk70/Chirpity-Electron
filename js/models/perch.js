@@ -164,7 +164,7 @@ onmessage = async (e) => {
         break;
       }
       default:
-        console.error('error', { message: 'unknown cmd ' + cmd });
+        console.error('error', { message: 'unknown cmd ' + message });
     }
   } catch (err) {
     console.error('error', { message: String(err) });
