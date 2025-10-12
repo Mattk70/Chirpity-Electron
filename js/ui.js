@@ -2929,6 +2929,10 @@ const updateModelIcon = (model) => {
     case 'nocmig':
       title = "Nocmig (beta)";
       break;
+    case 'perch v2':
+      title = "Perch V2";
+      model = 'perch';
+      break;
     case 'bats':
       title = "Bats";
       break;
@@ -4699,6 +4703,7 @@ document.addEventListener("dragover", (event) => {
 document.addEventListener("drop", (event) => {
   event.preventDefault();
   event.stopPropagation();
+  if (!modelReady) return;
   const fileList = Array.from(event.dataTransfer.files)
     .filter(
       (file) =>
@@ -5346,11 +5351,15 @@ async function handleUIClicks(e) {
         generateToast({message:'A value for both Epochs and Learning rate is needed', type:'warning'})
         break;
       }
+      if (!dataset) {
+        generateToast({message:'A location for the training audio is needed', type:'warning'})
+        break;
+      }
       function isDirectory(entry) {
         const typeSymbol = Object.getOwnPropertySymbols(entry).find(sym => sym.toString().includes('type'));
         return entry[typeSymbol] === 2;
       }
-      const entries = fs.readdirSync(datasetLocation, { withFileTypes: true }).filter(e => isDirectory(e) && ! e.name.startsWith('.'));
+      const entries = fs.readdirSync(dataset, { withFileTypes: true }).filter(e => isDirectory(e) && ! e.name.startsWith('.'));
       const folders = entries.map(entry => entry.name);
       // Check valid formatting
       for (const f of folders) {
@@ -5401,7 +5410,7 @@ async function handleUIClicks(e) {
       const displayName = document.getElementById('model-name').value.trim();
       const modelName = displayName.toLowerCase();
       const modelLocation = document.getElementById('import-location').value;
-      const requiredFiles = ['weights.bin', 'labels.txt', 'model.json']
+      const requiredFiles = displayName === 'Perch v2' ? [] : ['weights.bin', 'labels.txt', 'model.json'];
       if (config.models[modelName] !== undefined){
         generateToast({message: 'A model with that name already exists', type:'error'})
         break;

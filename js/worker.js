@@ -275,7 +275,8 @@ async function loadDB(modelPath) {
     diskDB = new sqlite3.Database(file);
     DEBUG && console.log("Opened and cleaned disk db " + file);
   }
-  const labelsLocation = modelPath ? p.join(modelPath, 'labels.txt') : null;
+  const labelsFile = modelPath?.endsWith('Perch v2') ? '_internal/Perchv2cpu/assets/labels.csv' : 'labels.txt';
+  const labelsLocation = modelPath ? p.join(modelPath, labelsFile) : null;
   ([modelID, needsTranslation] = await mergeDbIfNeeded({diskDB, model, appPath, dbMutex, labelsLocation }) )
   checkNewModel(modelID) && (STATE.modelID = modelID);
   STATE.update({ db: diskDB });
@@ -841,7 +842,13 @@ async function onLaunch({
 }) {
   SEEN_MODEL_READY = false;
   LIST_CACHE = {};
-  sampleRate = ['nocmig', 'chirpity'].includes(model) ? 24_000 : 48_000;
+  const sampleRates = {
+    chirpity: 24_000,
+    nocmig: 24_000,
+    'perch v2': 32_000,
+  };
+  WINDOW_SIZE = model === 'perch v2' ? 5 : 3;
+  sampleRate = sampleRates[model] || 48_000;
   STATE.detect.backend = backend;
   BATCH_SIZE = batchSize;
   STATE.update({ model, modelPath });
@@ -2827,7 +2834,7 @@ const saveResults2DataSet = ({ species, included }) => {
               : `${sname}~${species}`;
           // get start and end from timestamp
           const start = result.position;
-          let end = start + 3;
+          let end = start + WINDOW_SIZE;
 
           // filename format: <source file>_<confidence>_<start>.png
           const file = `${p
@@ -2975,7 +2982,7 @@ async function uploadOpus({ file, start, end, defaultName, metadata, mode }) {
 const bufferToAudio = async ({
   file = "",
   start = 0,
-  end = 3,
+  end = WINDOW_SIZE,
   meta = {},
   format = STATE.audio.format,
   folder = undefined,
@@ -3156,9 +3163,13 @@ const processQueue = async () => {
  * @param {number} batchSize - Number of items each worker processes per batch.
  * @param {number} threads - Number of worker threads to spawn.
  */
-function spawnPredictWorkers(model, batchSize, threads, modelPath) {
+function spawnPredictWorkers(model, batchSize, threads) {
+  if (model === 'perch v2') {
+    model = 'perch';
+    // threads = 1; // perch v2 only works with 1 thread
+  }
   for (let i = 0; i < threads; i++) {
-    const workerSrc = ['nocmig', 'chirpity'].includes(model) ? model : "BirdNet2.4";
+    const workerSrc = ['nocmig', 'chirpity', 'perch'].includes(model) ? model : "BirdNet2.4";
     const worker = new Worker(`./js/models/${workerSrc}.js`, { type: "module" });
     worker.isAvailable = true;
     worker.isReady = false;
@@ -3407,7 +3418,7 @@ const insertDurations = async (file, id) => {
 const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, file, modelID) => {
   const db = STATE.db;
   const { fileStart, metadata, duration } = METADATA[file];
-  const predictionLength = STATE.model.includes("bats") ? 0.3 : 3;
+  const predictionLength = STATE.model.includes("bats") ? 0.3 : WINDOW_SIZE;
   let fileID;
   await dbMutex.lock();
   try {
@@ -3510,7 +3521,7 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
 
 const parsePredictions = async (response) => {
   const file = response.file;
-  const predictionLength = STATE.model.includes("bats") ? 0.3 : 3;
+  const predictionLength = STATE.model.includes("bats") ? 0.3 : WINDOW_SIZE;
   AUDIO_BACKLOG--;
   const latestResult = response.result;
   if (!latestResult.length) {
@@ -3612,8 +3623,9 @@ async function parseMessage(e) {
   const response = e.data;
   switch (response["message"]) {
     case "model-ready": {
-      predictWorkers[response.worker].isReady = true;
-      predictWorkers[response.worker].isAvailable = true;
+      const worker = response.worker || 0;
+      predictWorkers[worker].isReady = true;
+      predictWorkers[worker].isAvailable = true;
       if (!SEEN_MODEL_READY) {
         SEEN_MODEL_READY = true;
         sampleRate = response["sampleRate"];
@@ -4217,10 +4229,10 @@ async function exportData(result, filename, format, headers) {
 const sendResult = (index, result, fromDBQuery) => {
   const model = result.model.includes('bats')  
   ? 'bats'
-  : ['birdnet', 'nocmig', 'chirpity'].includes(result.model)
+  : ['birdnet', 'nocmig', 'chirpity', 'perch v2'].includes(result.model)
     ? result.model
     : 'custom';
-  result.model = model;
+  result.model = model.replace(' v2','');
   // if (!fromDBQuery) {result.model = model, result.modelID = STATE.modelID};
   UI.postMessage({
     event: "new-result",
