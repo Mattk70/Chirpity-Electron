@@ -3,7 +3,6 @@
 // parses newline-delimited JSON responses and resolves pending requests.
 
 const { spawn } = require('child_process');
-const { file } = require('electron-settings');
 const path = require('node:path');
 let proc = null;
 let stdoutRemainder = '';
@@ -68,9 +67,7 @@ function handleStdoutLine(line) {
     return; 
 }
   try {
-    const t0 = Date.now();
     let obj = JSON.parse(line);
-    console.log('perch response', { timeMs: Date.now() - t0 });
     if (pending.length) {
         const p = pending.shift();
         const numSamples = obj.label_topk_indices.length;
@@ -133,24 +130,19 @@ onmessage = async (e) => {
         break;
       }
       case 'predict': {
-        const {
+        let {
           chunks,
           start,
           fileStart,
           file,
-          snr,
-          confidence,
-          context,
-          resetResults,
         } = e.data;
-        const payload = e.data;
         try {
-            let audio = payload.chunks;
+            let audio = chunks;
             const remainder = audio.length % chunkLength;
-            if (remainder !== 0) {;
-              payload.chunks = new Float32Array(audio.length + (chunkLength - remainder));
-              payload.chunks.set(audio);
-              audio = payload.chunks;
+            if (remainder !== 0) {
+              chunks = new Float32Array(audio.length + (chunkLength - remainder));
+              chunks.set(audio);
+              audio = chunks;
             }
             const chunked = [];
             for (let i = 0; i < audio.length; i += chunkLength) {
