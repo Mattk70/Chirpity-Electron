@@ -73,19 +73,8 @@ function handleStdoutLine(line) {
     console.log('perch response', { timeMs: Date.now() - t0 });
     if (pending.length) {
         const p = pending.shift();
-        const image = {
-          message: "spectrogram",
-          file: 'test.png',
-          width: 500,
-          height: 128,
-          image: obj.spectrogram[0].flat().map(x => Math.abs(x) * 255),
-          channels: 1,
-          filepath: "C:/users/simpo/Downloads"
-        };
-        postMessage(image);
         const numSamples = obj.label_topk_indices.length;
         const keys = Array.from({ length: numSamples }, (_, i) => (p.start + chunkLength * i) / sampleRate);
-
         obj.keys = keys;
         const result = [obj.keys, obj.label_topk_indices, obj.label_topk_scores];
         obj = null; // free memory
