@@ -1,11 +1,12 @@
 {
   "name": "Chirpity",
-  "version": "5.3.0",
-  "description": "Chirpity Nocmig",
+  "version": "5.3.1",
+  "description": "Chirpity is a bioacoustics platform for the analysis of bird song and other wildlife sounds. It uses machine learning models to identify bird species from audio recordings.",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "docs": "jsdoc -c jsdoc.json",
+    "package": "electron-builder build -m --publish never",
     "prebuild": "node prebuild.js",
     "preexport": "node prebuild.js",
     "preAppImage": "node prebuild.js",
@@ -24,7 +25,8 @@
     "url": "git+https://github.com/mattk70/Chirpity-Electron.git"
   },
   "build": {
-    "appId": "com.electron.chirpity",
+    "productName": "Chirpity",
+    "appId": "uk.co.mattkirkland.chirpity.Chirpity",
     "pkg": {
       "license": "LICENSE.txt"
     },
@@ -118,11 +120,17 @@
     ],
     "mac": {
       "target": {
-        "target": "pkg",
-        "arch": "arm64"
+        "target": "default",
+        "arch": ["universal"]
       },
+      "artifactName": "${productName}.${ext}",
       "icon": "img/icon/icon.icns",
-      "category": "public.app-category.utilities",
+      "category": "public.app-category.productivity",
+      "type": "distribution",
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "gatekeeperAssess": false,
       "fileAssociations": [
         {
           "ext": [
@@ -138,6 +146,20 @@
           ],
           "description": "Audio files",
           "role": "Viewer"
+        }
+      ]
+    },
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
         }
       ]
     },
@@ -175,6 +197,7 @@
   },
   "homepage": "https://chirpity.mattkirkland.co.uk",
   "devDependencies": {
+    "@electron/notarize": "^3.1.0",
     "@playwright/test": "^1.48.2",
     "@types/node": "^22.9.0",
     "docdash": "^2.0.2",
