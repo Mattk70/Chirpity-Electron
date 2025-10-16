@@ -275,7 +275,7 @@ async function loadDB(modelPath) {
     diskDB = new sqlite3.Database(file);
     DEBUG && console.log("Opened and cleaned disk db " + file);
   }
-  const labelsFile = modelPath?.endsWith('Perch v2') ? '_internal/Perchv2cpu/assets/labels.csv' : 'labels.txt';
+  const labelsFile = 'labels.txt';
   const labelsLocation = modelPath ? p.join(modelPath, labelsFile) : null;
   ([modelID, needsTranslation] = await mergeDbIfNeeded({diskDB, model, appPath, dbMutex, labelsLocation }) )
   checkNewModel(modelID) && (STATE.modelID = modelID);
