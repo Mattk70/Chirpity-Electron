@@ -2266,7 +2266,7 @@ const setUpWorkerMessaging = () => {
           //   done = true;
           //               for (let i = 0;i< LABELS.length; i++){
           //                   const label = LABELS[i];
-          //                   let  sname = label.split('_')[0];
+          //                   let  sname = label.split(getSplitChar())[0];
           //                   sname = IUCNtaxonomy[sname] || sname;
           //                   if (sname && ! STATE.IUCNcache[sname]) { 
           //                       await getIUCNStatus(sname)
@@ -5122,6 +5122,11 @@ async function handleUIClicks(e) {
   const target = element.closest("[id]")?.id;
   const locale = config.locale.replace(/_.*$/, "");
   switch (target) {
+    // Spec outside of region
+    case "waveform": {
+      resetRegions(false);
+      break;
+    }
     // File menu
     case "open-file": {
       showOpenDialog("openFile");
@@ -6681,6 +6686,7 @@ const recordEntryModal = new bootstrap.Modal(recordEntryModalDiv, {
 
 const recordEntryForm = document.getElementById("record-entry-form");
 
+const getSplitChar = () => config.selectedModel.includes('perch') ? '~' : '_';
 /**
  * Displays and populates the record entry modal for adding or updating audio record details.
  *
@@ -6718,9 +6724,9 @@ async function showRecordEntryForm(mode, batch) {
   const speciesDisplay = document.createElement("div");
   speciesDisplay.className = "border rounded w-100";
   if (cname) {
-    const species = LABELS.find(sp => sp.split('_')[1] === cname);
+    const species = LABELS.find(sp => sp.split(getSplitChar())[1] === cname);
     if (species) {
-      const [sciName, commonName] = species.split('_');
+      const [sciName, commonName] = species.split(getSplitChar());
       const styled = `${commonName}<br/><i>${sciName}</i>`;
       selectedBird.innerHTML = styled;
     } else {

@@ -314,7 +314,7 @@ async function loadDB(modelPath) {
   return diskDB;
 }
 
-
+const getSplitChar = () => STATE.model.includes('perch') ? '~' : '_';
 /**
  * Updates the application's species label list based on current inclusion filters.
  *
@@ -326,9 +326,9 @@ async function loadDB(modelPath) {
 async function setLabelState({ regenerate }) {
   if (regenerate || !STATE.allLabelsMap) {
     DEBUG && console.log("Getting labels from disk db");
-
+    const splitChar = getSplitChar();
     const res = await diskDB.allAsync(
-      `SELECT classIndex + 1 as id, sname || '_' || cname AS labels, modelID 
+      `SELECT classIndex + 1 as id, sname || '${splitChar}' || cname AS labels, modelID 
       FROM species WHERE modelID = ? ORDER BY id`, STATE.modelID
     );
 
@@ -3560,7 +3560,8 @@ const parsePredictions = async (response) => {
               (selection.end - selection.start) / 1000;
             end = key + duration;
           } else { end = key + predictionLength }
-          const [sname, cname] = STATE.allLabels[species].split('_') //STATE.allLabelsMap.get(speciesID).split('_') // Much faster!!
+
+          const [sname, cname] = STATE.allLabels[species].split(getSplitChar()) 
           const result = {
             timestamp: timestamp,
             position: key,
@@ -4366,7 +4367,8 @@ const filterLocation = () =>
 const getDetectedSpecies = async () => {
   const range = STATE.explore.range;
   const confidence = STATE.detect.confidence;
-  let sql = `SELECT sname || '_' || cname as label, locationID
+  const splitChar = getSplitChar();
+  let sql = `SELECT sname || '${splitChar}' || cname as label, locationID
     FROM records
     JOIN species ON species.id = records.speciesID 
     JOIN files on records.fileID = files.id`;
@@ -4405,7 +4407,7 @@ const getValidSpecies = async (file) => {
   const excludedSpecies = [];
   for (const [index, speciesName] of STATE.allLabels.entries()) {
     const i = index + 1;
-    const [cname, sname] = speciesName.split("_").reverse();
+    const [cname, sname] = speciesName.split(getSplitChar()).reverse();
     if (cname.includes("ackground") || cname.includes("Unknown")) continue; // skip background and unknown species
     (!included.length || included.includes(i)) 
       ? includedSpecies.push({cname, sname})
@@ -4737,7 +4739,7 @@ async function _updateSpeciesLocale(db, labels) {
     // 1. Build a map: sname => translated cname (label version)
     const labelMap = new Map();
     for (const label of labels) {
-      const [sname, translatedCname] = label.split("_");
+      const [sname, translatedCname] = label.split(getSplitChar());
       labelMap.set(sname, translatedCname); // only one cname per sname in labels
     }
 
