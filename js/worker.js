@@ -4648,6 +4648,9 @@ async function onDeleteSpecies({
   } else if (STATE.mode === "explore") {
     const { start, end } = STATE.explore.range;
     if (start) SQL += ` AND dateTime BETWEEN ${start} AND ${end}`;
+    if (STATE.locationID) {
+      SQL += ` AND fileID IN (SELECT id FROM files WHERE locationID = ${STATE.locationID})`;
+    }
   }
   let { changes } = await db.runAsync(SQL, ...params);
   if (changes) {
