@@ -1925,9 +1925,24 @@ window.onload = async () => {
     STATE.isMember = isMember;
 
     
-    const { selectedModel, library, database, detect, filters, audio, 
+    const { library, database, detect, filters, audio, 
       limit, locale, speciesThreshold, list, useWeek, UUID, 
       local, debug, fileStartMtime, specDetections } = config;
+    
+    let modelPath = config.models[config.selectedModel].modelPath;
+    if (modelPath){
+      if (!fs.existsSync(modelPath)) {
+        generateToast({ type: "error", message: "modelPathNotFound", variables: {modelPath} });
+        worker.postMessage({action: "update-state",
+          modelPath: undefined,
+          model: 'birdnet'
+        });
+        config.selectedModel = 'birdnet';
+        modelPath = undefined;
+      }
+    }
+    const selectedModel = config.selectedModel;
+    
     isMember && config.hasNode || (config.models[selectedModel].backend = "tensorflow");
 
     if (detect.combine) document.getElementById('model-icon').classList.remove('d-none')
@@ -1960,7 +1975,7 @@ window.onload = async () => {
     });
     t0_warmup = Date.now();
     const backend = config.models[config.selectedModel].backend;
-    const modelPath = config.models[config.selectedModel].modelPath;
+
     worker.postMessage({
       action: "_init_",
       model: selectedModel,
@@ -7473,6 +7488,7 @@ function renderComparisons(lists, cname) {
 }
 import WaveSurfer from "../node_modules/wavesurfer.js/dist/wavesurfer.esm.js";
 import Spectrogram from "../node_modules/wavesurfer.js/dist/plugins/spectrogram.esm.js";
+
 let ws;
 
 const createCompareWS = (mediaContainer) => {
@@ -7546,6 +7562,7 @@ const IUCNMap = {
   EN: "text-bg-danger",
   CR: "text-bg-danger",
   EW: "text-bg-dark",
+  RE: "text-bg-dark",
   EX: "text-bg-dark",
 };
 

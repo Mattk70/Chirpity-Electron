@@ -198,12 +198,13 @@ const setupFfmpegCommand = async ({
       const rate = Math.floor(bitrate/10)
       command.audioFilters([`asetrate=${rate}`]);
     }
-    if (training && !sampleRate){
-      // We'll export dilated so we need to reset the duration:needs testing
-      end = (end - start) / 10 + start;
-    }
+    // if (training && !sampleRate){
+    //   // We'll export dilated so we need to reset the duration:needs testing
+    //   end = (end - start) / 10 + start;
+    // }
   } 
   let duration = end - start;
+  if (training) duration *= 10 // Dilate 10x for bat training
   
   additionalFilters.forEach(filter => command.audioFilters(filter))
     
