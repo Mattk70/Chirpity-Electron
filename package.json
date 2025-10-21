@@ -6,7 +6,6 @@
   "scripts": {
     "start": "electron .",
     "docs": "jsdoc -c jsdoc.json",
-    "package": "electron-builder build -m --publish never",
     "prebuild": "node prebuild.js",
     "preexport": "node prebuild.js",
     "preAppImage": "node prebuild.js",
@@ -25,8 +24,7 @@
     "url": "git+https://github.com/mattk70/Chirpity-Electron.git"
   },
   "build": {
-    "productName": "Chirpity",
-    "appId": "uk.co.mattkirkland.chirpity.Chirpity",
+    "appId": "com.electron.chirpity",
     "pkg": {
       "license": "LICENSE.txt"
     },
@@ -120,17 +118,11 @@
     ],
     "mac": {
       "target": {
-        "target": "default",
-        "arch": ["universal"]
+        "target": "pkg",
+        "arch": "arm64"
       },
-      "artifactName": "${productName}.${ext}",
       "icon": "img/icon/icon.icns",
-      "category": "public.app-category.productivity",
-      "type": "distribution",
-      "hardenedRuntime": true,
-      "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac.plist",
-      "gatekeeperAssess": false,
+      "category": "public.app-category.utilities",
       "fileAssociations": [
         {
           "ext": [
@@ -146,20 +138,6 @@
           ],
           "description": "Audio files",
           "role": "Viewer"
-        }
-      ]
-    },
-    "dmg": {
-      "contents": [
-        {
-          "x": 130,
-          "y": 220
-        },
-        {
-          "x": 410,
-          "y": 220,
-          "type": "link",
-          "path": "/Applications"
         }
       ]
     },
@@ -197,7 +175,6 @@
   },
   "homepage": "https://chirpity.mattkirkland.co.uk",
   "devDependencies": {
-    "@electron/notarize": "^3.1.0",
     "@playwright/test": "^1.48.2",
     "@types/node": "^22.9.0",
     "docdash": "^2.0.2",
