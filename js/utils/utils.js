@@ -46,24 +46,11 @@ function hexToRgb(hex) {
   return [r, g, b];
 }
 
-function escapeHTML(str) {
-  return String(str).replace(/[&<>"'`=\/]/g, s => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;',
-    '`': '&#96;',
-    '=': '&#61;',
-    '/': '&#47;'
-  }[s]));
-}
-
 function interpolate(template, variables) {
   return template.replace(/\$\{(.*?)\}/g, (match, key) => {
     const value = variables[key.trim()];
-    if (value == null) return escapeHTML(match);
-    else return escapeHTML(value);
+    if (value == null) return match;
+    else return value;
   });
 }
 
