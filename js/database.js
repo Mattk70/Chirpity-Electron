@@ -481,11 +481,12 @@ const addNewModel = async ({model, db = diskDB, dbMutex, labelsLocation}) => {
       let insertQuery = `INSERT INTO species (sname, cname, modelID, classIndex) VALUES `;
       const params = [];
       batch.forEach((entry, index) => {
-        const [sname, cname, others] = entry.split(splitChar);
-        if (!cname || others) {
-          const err = `Invalid label: '${entry}' on line ${i + index + 1}. Each line must be 'scientific name_common name'`;
+        const parts = entry.split(splitChar);
+        if (parts.length !== 2) {
+          const err = `Invalid label: '${entry}' on line ${i + index + 1}. Expected 'scientific name${splitChar}common name'`;
           throw new Error(err);
         }
+        const [sname, cname] = parts.map(s => s.trim());
         insertQuery += '(?, ?, ?, ?),';
         params.push(sname, cname, modelID, i + index);
       });
