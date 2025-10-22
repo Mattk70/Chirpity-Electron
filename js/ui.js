@@ -4409,7 +4409,7 @@ function exportSpeciesList() {
   const included = STATE.includedList;
   // Create a blob containing the content of included array
   const content = included
-    .map((item) => `${item.sname}_${item.cname}`)
+    .map((item) => `${item.sname}${getSplitChar()}${item.cname}`)
     .join("\n");
   const blob = new Blob([content], { type: "text/plain" });
   const url = URL.createObjectURL(blob);
@@ -6492,8 +6492,8 @@ async function readLabels(labelFile, updating) {
     .then((filecontents) => {
       const labels = filecontents.trim().split(/\r?\n/);
       // Add unknown species
-      !labels.includes("Unknown Sp._Unknown Sp.") &&
-        labels.push("Unknown Sp._Unknown Sp.");
+      const unknown = `Unknown Sp.${getSplitChar()}Unknown Sp.`;
+      if (!labels.includes(unknown)) labels.push(unknown);
       if (updating === "list") {
         worker.postMessage({
           action: "update-list",
@@ -7842,8 +7842,8 @@ function getFilteredBirds(search, list) {
   const collator = new Intl.Collator(config.locale.replace(/_.*$/, ""))
   const sortedList = list.filter(bird => typeof bird === "string" && bird.toLowerCase().includes(search))
     .map((item) => {
-      // Flip sname and cname from "sname_cname"
-      const [cname, sname] = item.split("_").reverse();
+      // Flip sname and cname from "sname_/~cname"
+      const [cname, sname] = item.split(getSplitChar()).reverse();
       return { cname, sname, styled: `${cname} <br/><i>${sname}</i>` };
     })
     .sort((a, b) =>
