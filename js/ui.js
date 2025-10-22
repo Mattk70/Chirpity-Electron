@@ -1925,9 +1925,24 @@ window.onload = async () => {
     STATE.isMember = isMember;
 
     
-    const { selectedModel, library, database, detect, filters, audio, 
+    const { library, database, detect, filters, audio, 
       limit, locale, speciesThreshold, list, useWeek, UUID, 
       local, debug, fileStartMtime, specDetections } = config;
+    
+    let modelPath = config.models[config.selectedModel].modelPath;
+    if (modelPath){
+      if (!fs.existsSync(modelPath)) {
+        generateToast({ type: "error", message: "modelPathNotFound", variables: {modelPath} });
+        worker.postMessage({action: "update-state",
+          modelPath: undefined,
+          model: 'birdnet'
+        });
+        config.selectedModel = 'birdnet';
+        modelPath = undefined;
+      }
+    }
+    const selectedModel = config.selectedModel;
+    
     isMember && config.hasNode || (config.models[selectedModel].backend = "tensorflow");
 
     if (detect.combine) document.getElementById('model-icon').classList.remove('d-none')
@@ -1960,7 +1975,7 @@ window.onload = async () => {
     });
     t0_warmup = Date.now();
     const backend = config.models[config.selectedModel].backend;
-    const modelPath = config.models[config.selectedModel].modelPath;
+
     worker.postMessage({
       action: "_init_",
       model: selectedModel,
@@ -2266,7 +2281,7 @@ const setUpWorkerMessaging = () => {
           //   done = true;
           //               for (let i = 0;i< LABELS.length; i++){
           //                   const label = LABELS[i];
-          //                   let  sname = label.split('_')[0];
+          //                   let  sname = label.split(getSplitChar())[0];
           //                   sname = IUCNtaxonomy[sname] || sname;
           //                   if (sname && ! STATE.IUCNcache[sname]) { 
           //                       await getIUCNStatus(sname)
@@ -4394,7 +4409,7 @@ function exportSpeciesList() {
   const included = STATE.includedList;
   // Create a blob containing the content of included array
   const content = included
-    .map((item) => `${item.sname}_${item.cname}`)
+    .map((item) => `${item.sname}${getSplitChar()}${item.cname}`)
     .join("\n");
   const blob = new Blob([content], { type: "text/plain" });
   const url = URL.createObjectURL(blob);
@@ -5122,6 +5137,11 @@ async function handleUIClicks(e) {
   const target = element.closest("[id]")?.id;
   const locale = config.locale.replace(/_.*$/, "");
   switch (target) {
+    // Spec outside of region
+    case "waveform": {
+      resetRegions(false);
+      break;
+    }
     // File menu
     case "open-file": {
       showOpenDialog("openFile");
@@ -6472,8 +6492,8 @@ async function readLabels(labelFile, updating) {
     .then((filecontents) => {
       const labels = filecontents.trim().split(/\r?\n/);
       // Add unknown species
-      !labels.includes("Unknown Sp._Unknown Sp.") &&
-        labels.push("Unknown Sp._Unknown Sp.");
+      const unknown = `Unknown Sp.${getSplitChar()}Unknown Sp.`;
+      if (!labels.includes(unknown)) labels.push(unknown);
       if (updating === "list") {
         worker.postMessage({
           action: "update-list",
@@ -6681,6 +6701,7 @@ const recordEntryModal = new bootstrap.Modal(recordEntryModalDiv, {
 
 const recordEntryForm = document.getElementById("record-entry-form");
 
+const getSplitChar = () => config.selectedModel.includes('perch') ? '~' : '_';
 /**
  * Displays and populates the record entry modal for adding or updating audio record details.
  *
@@ -6718,9 +6739,9 @@ async function showRecordEntryForm(mode, batch) {
   const speciesDisplay = document.createElement("div");
   speciesDisplay.className = "border rounded w-100";
   if (cname) {
-    const species = LABELS.find(sp => sp.split('_')[1] === cname);
+    const species = LABELS.find(sp => sp.split(getSplitChar())[1] === cname);
     if (species) {
-      const [sciName, commonName] = species.split('_');
+      const [sciName, commonName] = species.split(getSplitChar());
       const styled = `${commonName}<br/><i>${sciName}</i>`;
       selectedBird.innerHTML = styled;
     } else {
@@ -7467,6 +7488,7 @@ function renderComparisons(lists, cname) {
 }
 import WaveSurfer from "../node_modules/wavesurfer.js/dist/wavesurfer.esm.js";
 import Spectrogram from "../node_modules/wavesurfer.js/dist/plugins/spectrogram.esm.js";
+
 let ws;
 
 const createCompareWS = (mediaContainer) => {
@@ -7540,6 +7562,7 @@ const IUCNMap = {
   EN: "text-bg-danger",
   CR: "text-bg-danger",
   EW: "text-bg-dark",
+  RE: "text-bg-dark",
   EX: "text-bg-dark",
 };
 
@@ -7819,8 +7842,8 @@ function getFilteredBirds(search, list) {
   const collator = new Intl.Collator(config.locale.replace(/_.*$/, ""))
   const sortedList = list.filter(bird => typeof bird === "string" && bird.toLowerCase().includes(search))
     .map((item) => {
-      // Flip sname and cname from "sname_cname"
-      const [cname, sname] = item.split("_").reverse();
+      // Flip sname and cname from "sname_/~cname"
+      const [cname, sname] = item.split(getSplitChar()).reverse();
       return { cname, sname, styled: `${cname} <br/><i>${sname}</i>` };
     })
     .sort((a, b) =>

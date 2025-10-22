@@ -456,14 +456,6 @@ const addNewModel = async ({model, db = diskDB, dbMutex, labelsLocation}) => {
          "BirdNET_GLOBAL_6K_V2.4_Labels_en.txt");
         const fileContents = readFileSync(labelFile, "utf8");
           labels = fileContents.trim().split(/\r?\n/);
-    } else if (model === "perch v2") {
-      const labelFile = labelsLocation;
-      const fileContents = readFileSync(labelFile, "utf8").replaceAll('_', '~');
-      labels = fileContents.trim().split(/\r?\n/);
-      // remove header row
-      labels.shift();
-      // Hack to ensure Perch labels are in the correct format
-      labels = labels.map(line => `${line}_${line}`);
     } else if (['chirpity', 'nocmig'].includes(model)){
       labels = JSON.parse(
         readFileSync(path.join(__dirname, `${model}_model_config.json`), "utf8")
@@ -475,8 +467,9 @@ const addNewModel = async ({model, db = diskDB, dbMutex, labelsLocation}) => {
       // Trim whitespace and split by new lines, ignoring empty lines
       labels = fileContents.split(/\r?\n/).map(line => line.trim()).filter(line => line.length);
     }
+    const splitChar = model === 'perch v2' ? '~' : '_'; // Perch uses ~, others use _
     // Add Unknown Sp.
-    labels.push("Unknown Sp._Unknown Sp.");
+    labels.push(`Unknown Sp.${splitChar}Unknown Sp.`);
 
     // Insert labels in batches to avoid exceeding SQLite parameter limits
     const MAX_PARAMS = 25000;
@@ -487,13 +480,13 @@ const addNewModel = async ({model, db = diskDB, dbMutex, labelsLocation}) => {
 
       let insertQuery = `INSERT INTO species (sname, cname, modelID, classIndex) VALUES `;
       const params = [];
-
       batch.forEach((entry, index) => {
-        const [sname, cname] = entry.split("_");
-        if (!cname) {
-          const err = `Invalid label: '${entry}' on line ${i + index + 1}. Each line must be 'scientific name_common name'`;
+        const parts = entry.split(splitChar);
+        if (parts.length !== 2) {
+          const err = `Invalid label: '${entry}' on line ${i + index + 1}. Expected 'scientific name${splitChar}common name'`;
           throw new Error(err);
         }
+        const [sname, cname] = parts.map(s => s.trim());
         insertQuery += '(?, ?, ?, ?),';
         params.push(sname, cname, modelID, i + index);
       });

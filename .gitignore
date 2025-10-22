@@ -129,3 +129,7 @@ scratchpad.txt
 /blob-report/
 /playwright/.cache/
 .DS_Store
+
+# secrets
+/build/secret/
+certificate.p12

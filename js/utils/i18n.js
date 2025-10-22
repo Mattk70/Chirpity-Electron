@@ -28,6 +28,7 @@ const Toasts = { // UI.js
         noComparisons: "The Xeno-canto site has no comparisons available",
         noIUCNRecord: "There is no record of <b>${sname}</b> on the IUCN Red List.",
         membershipExpiry: "Your membership is due to expire in ${expiresIn} days, you can visit <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>the membership page</a> to renew",
+        modelPathNotFound: "The model path specified (${modelPath}) could not be found. Reverting to BirdNET model.",
 
         badMetadata: "Unable to extract essential metadata from ${src}",
         noLoad: 'The ${model} model is not loaded. Restart Chirpity to continue. If you see this message repeatedly, it is likely your computer does not support AVX2 and Chirpity will not run on your system.',
@@ -98,6 +99,8 @@ const Toasts = { // UI.js
         noComparisons: "Xeno-canto-webstedet har ingen sammenligninger tilgængelige",
         noIUCNRecord: "Der er ingen registrering af <b>${sname}</b> på IUCN's rødliste.",
         membershipExpiry: "Dit medlemskab udløber om ${expiresIn} dage, du kan besøge <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>medlemskabsiden</a> for at forny",
+        modelPathNotFound: "Den angivne modelsti (${modelPath}) blev ikke fundet. Skifter tilbage til BirdNET-modellen.",
+        
 
         badMetadata: "Kan ikke udtrække væsentlige metadata fra ${src}",
         noLoad: 'Modellen ${model} er ikke indlæst. Genstart Chirpity for at fortsætte. Hvis du ser denne besked gentagne gange, er det sandsynligt, at din computer ikke understøtter AVX2, og Chirpity vil ikke køre på dit system.',
@@ -168,6 +171,7 @@ const Toasts = { // UI.js
         noComparisons: "Auf der Xeno-canto-Website sind keine Vergleiche verfügbar.",
         noIUCNRecord: "Es gibt keinen Eintrag für <b>${sname}</b> auf der Roten Liste der IUCN.",
         membershipExpiry: "Ihre Mitgliedschaft läuft in ${expiresIn} Tagen ab, Sie können die <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>Mitgliedsseite</a> besuchen, um sie zu verlängern",
+        modelPathNotFound: "Der angegebene Modellpfad (${modelPath}) wurde nicht gefunden. Es wird auf das BirdNET-Modell zurückgegriffen.",
 
         badMetadata: "Kann wesentliche Metadaten aus ${src} nicht extrahieren",
         noLoad: 'Das Modell ${model} wurde nicht geladen. Starten Sie Chirpity neu, um fortzufahren. Wenn diese Nachricht wiederholt angezeigt wird, unterstützt Ihr Computer möglicherweise kein AVX2, und Chirpity wird auf Ihrem System nicht ausgeführt.',
@@ -238,6 +242,7 @@ const Toasts = { // UI.js
         noComparisons: "Parece que l sitio de Xeno-canto no tiene comparaciones disponibles.",
         noIUCNRecord: "No hay registro de <b>${sname}</b> en la Lista Roja de la UICN.",
         membershipExpiry: "Su membresía vencerá en ${expiresIn} días, puede visitar <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>la página de membresía</a> para renovarla",
+        modelPathNotFound: "La ruta del modelo especificada (${modelPath}) no se pudo encontrar. Volviendo al modelo BirdNET.",
 
         badMetadata: "No se pueden extraer los metadatos esenciales de ${src}",
         noLoad: 'El modelo ${model} no está cargado. Reinicie Chirpity para continuar. Si ve este mensaje repetidamente es probable que su ordenador no sea compatible con AVX2 y que Chirpity no pueda ejecutarse en su sistema.',
@@ -309,6 +314,7 @@ const Toasts = { // UI.js
         noComparisons: "Le site Xeno-canto ne propose aucune comparaison disponible.",
         noIUCNRecord: "Il n'y a aucun enregistrement de <b>${sname}</b> sur la Liste Rouge de l'UICN.",
         membershipExpiry: "Votre abonnement expire dans ${expiresIn} jours, vous pouvez visiter <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>la page d'abonnement</a> pour le renouveler",
+        modelPathNotFound: "Le chemin du modèle spécifié (${modelPath}) est introuvable. Retour au modèle BirdNET.",
         
         badMetadata: "Impossible d'extraire les métadonnées essentielles de ${src}",
         noLoad: 'Le modèle ${model} n\'est pas chargé. Redémarrez Chirpity pour continuer. Si vous voyez ce message à plusieurs reprises, il est probable que votre ordinateur ne prenne pas en charge AVX2 et Chirpity ne fonctionnera pas sur votre système.',
@@ -380,6 +386,7 @@ const Toasts = { // UI.js
         noComparisons: "Xeno-cantoサイトには比較可能なデータがありません",
         noIUCNRecord: "IUCNレッドリストに<b>${sname}</b>の記録がありません。",
         membershipExpiry: "会員期限が${expiresIn}日後に迫っています。<a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>会員ページ</a>にアクセスして更新してください",
+        modelPathNotFound: "指定されたモデルパス (${modelPath}) が見つかりません。BirdNETモデルに戻します。",
 
         badMetadata: "${src}から重要なメタデータを抽出できません",
         noLoad: '${model}モデルがロードされていません。Chirpityを再起動して続行してください。このメッセージが繰り返し表示される場合、お使いのコンピュータがAVX2をサポートしていない可能性があります。',
@@ -449,6 +456,7 @@ const Toasts = { // UI.js
         noComparisons: "De Xeno-canto-site heeft geen vergelijkingen beschikbaar.",
         noIUCNRecord: "Er is geen record van <b>${sname}</b> op de IUCN Rode Lijst.",
         membershipExpiry: "Je lidmaatschap verloopt over ${expiresIn} dagen, je kunt de <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>lidmaatschaps pagina</a> bezoeken om het te verlengen",
+        modelPathNotFound: "Het opgegeven modelpad (${modelPath}) is niet gevonden. Terugschakelen naar het BirdNET-model.",
 
         badMetadata: "Kan essentiële metadata niet extraheren uit ${src}",
         noLoad: 'Het ${model} model is niet geladen. Herstart Chirpity om door te gaan. Als je dit bericht herhaaldelijk ziet, ondersteunt je computer waarschijnlijk geen AVX2 en zal Chirpity niet op je systeem werken.',
@@ -521,6 +529,7 @@ const Toasts = { // UI.js
         noComparisons: "O site Xeno-canto não tem comparações disponíveis.",
         noIUCNRecord: "Não há registro de <b>${sname}</b> na Lista Vermelha da IUCN.",
         membershipExpiry: "Sua adesão vai expirar em ${expiresIn} dias, você pode visitar <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>a página de adesão</a> para renová-la",
+        modelPathNotFound: "O caminho do modelo especificado (${modelPath}) não foi encontrado. Revertendo para o modelo BirdNET.",
 
         badMetadata: "Não foi possível extrair os metadados essenciais de ${src}",
         noLoad: 'O modelo ${model} não está carregado. Reinicie o Chirpity para continuar. Se você ver esta mensagem repetidamente, é provável que seu computador não suporte AVX2 e o Chirpity não funcionará no seu sistema.',
@@ -593,6 +602,7 @@ const Toasts = { // UI.js
         noComparisons: "На сайте Xeno-canto нет доступных сравнений.",
         noIUCNRecord: "Нет записи о <b>${sname}</b> в Красном списке IUCH.",
         membershipExpiry: "Ваша подписка истекает через ${expiresIn} дней, вы можете посетить <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>страницу подписки</a>, чтобы продлить её",
+        modelPathNotFound: "Указанный путь к модели (${modelPath}) не найден. Возврат к модели BirdNET.",
 
         badMetadata: "Не удалось извлечь необходимые метаданные из ${src}",
         noLoad: 'Модель ${model} не загружена. Для продолжения работы перезапустите Chirpity. Если вы постоянно видите это сообщение, скорее всего, ваш компьютер не поддерживает AVX2 и Chirpity не будет работать в вашей системе.',
@@ -665,6 +675,7 @@ const Toasts = { // UI.js
         noComparisons: "Xeno-canto-sajten har inga jämförelser tillgängliga.",
         noIUCNRecord: "Det finns ingen post om <b>${sname}</b> i IUCN Röda listan.",
         membershipExpiry: "Ditt medlemskap löper ut om ${expiresIn} dagar, du kan besöka <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>medlemssidan</a> för att förnya",
+        modelPathNotFound: "Den angivna modellsökvägen (${modelPath}) kunde inte hittas. Återgår till BirdNET-modellen.",
 
         badMetadata: "Kunde inte extrahera nödvändig metadata från ${src}",
         noLoad: 'Modellen ${model} är inte laddad. Starta om Chirpity för att fortsätta. Om du ser detta meddelande upprepade gånger, är det troligt att din dator inte stöder AVX2 och Chirpity kommer inte att fungera på ditt system.',
@@ -737,6 +748,7 @@ const Toasts = { // UI.js
         noComparisons: "Xeno-canto 网站没有可用的比较。",
         noIUCNRecord: "在 IUCN 红色名录中没有关于 <b>${sname}</b> 的记录。",
         membershipExpiry: "您的会员资格将在${expiresIn}天后到期，您可以访问<a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>会员页面</a>进行续订",
+        modelPathNotFound: "指定的模型路径 (${modelPath}) 未找到。正在恢复为 BirdNET 模型。",
 
         badMetadata: "无法从 ${src} 提取必要的元数据",
         noLoad: '模型 ${model} 未加载。请重新启动 Chirpity 以继续。如果您重复看到此消息，可能是您的计算机不支持 AVX2，Chirpity 将无法在您的系统上运行。',
@@ -3393,7 +3405,8 @@ const IUCNLabel = {
         'EN': 'Truet',
         'CR': 'Kritisk truet',
         'EW': 'Uddød i naturen',
-        'EX': 'Uddød'
+        'EX': 'Uddød',
+        'RE': 'Regionalt uddød'
     },
     de: {
         'NA': 'Keine Daten',
@@ -3404,7 +3417,8 @@ const IUCNLabel = {
         'EN': 'Stark gefährdet',
         'CR': 'Vom Aussterben bedroht',
         'EW': 'In der Natur ausgestorben',
-        'EX': 'Ausgestorben'
+        'EX': 'Ausgestorben',
+        'RE': 'Regional ausgestorben'
     },
     en: {
         'NA': 'No Data',
@@ -3415,7 +3429,8 @@ const IUCNLabel = {
         'EN': 'Endangered',
         'CR': 'Critically Endangered',
         'EW': 'Extinct in the Wild',
-        'EX': 'Extinct'
+        'EX': 'Extinct',
+        'RE': 'Regionally Extinct'
     },
     es: {
         'NA': 'Sin datos',
@@ -3426,7 +3441,8 @@ const IUCNLabel = {
         'EN': 'En peligro',
         'CR': 'En peligro crítico',
         'EW': 'Extinto en estado silvestre',
-        'EX': 'Extinto'
+        'EX': 'Extinto',
+        'RE': 'Regionalmente extinto'
     },
     fr: {
         'NA': 'Pas de données',
@@ -3437,7 +3453,8 @@ const IUCNLabel = {
         'EN': 'En danger',
         'CR': 'En danger critique',
         'EW': 'Éteint à l’état sauvage',
-        'EX': 'Éteint'
+        'EX': 'Éteint',
+        'RE': 'Régionalement éteint'
     },
     ja: {
         'NA': 'データなし',
@@ -3448,7 +3465,8 @@ const IUCNLabel = {
         'EN': '絶滅危惧',
         'CR': '深刻な絶滅危惧',
         'EW': '野生絶滅',
-        'EX': '絶滅'
+        'EX': '絶滅',
+        'RE': '地域絶滅'
     },
     nl: {
         'NA': 'Geen gegevens',
@@ -3459,7 +3477,8 @@ const IUCNLabel = {
         'EN': 'Bedreigd',
         'CR': 'Kritiek bedreigd',
         'EW': 'Uitgestorven in het wild',
-        'EX': 'Uitgestorven'
+        'EX': 'Uitgestorven',
+        'RE': 'Regionaal uitgestorven'
     },
     pt: {
         'NA': 'Sem dados',
@@ -3470,7 +3489,8 @@ const IUCNLabel = {
         'EN': 'Em perigo',
         'CR': 'Criticamente em perigo',
         'EW': 'Extinto na natureza',
-        'EX': 'Extinto'
+        'EX': 'Extinto',
+        'RE': 'Regionalmente extinto'
     },
     ru: {
         'NA': 'Нет данных',
@@ -3481,7 +3501,8 @@ const IUCNLabel = {
         'EN': 'Находится под угрозой',
         'CR': 'Находится на грани исчезновения',
         'EW': 'Вымерший в дикой природе',
-        'EX': 'Вымерший'
+        'EX': 'Вымерший',
+        'RE': 'Регионально вымерший'
     },
     sv: {
         'NA': 'Inga data',
@@ -3492,7 +3513,8 @@ const IUCNLabel = {
         'EN': 'Hotad',
         'CR': 'Kritiskt hotad',
         'EW': 'Utrotad i det vilda',
-        'EX': 'Utrotad'
+        'EX': 'Utrotad',
+        'RE': 'Regionalt utrotad'
     },
     zh: {
         'NA': '没有数据',
@@ -3503,7 +3525,8 @@ const IUCNLabel = {
         'EN': '濒危',
         'CR': '极危',
         'EW': '野外灭绝',
-        'EX': '灭绝'
+        'EX': '灭绝',
+        'RE': '区域灭绝'
     },
     // it: {
     //     'NA': 'Nessun dato',
