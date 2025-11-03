@@ -187,6 +187,9 @@ onmessage = async (e) => {
         console.log('stopped', {});
         break;
       }
+      case 'change-batch-size': {
+        break;
+      }
       default:
         console.error('error', { message: 'unknown cmd ' + message });
     }

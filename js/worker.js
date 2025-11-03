@@ -2608,8 +2608,8 @@ function isDuringDaylight(datetime, lat, lon) {
 }
 
 async function feedChunksToModel(channelData, chunkStart, file, end, worker) {
-  // pick a worker - this method is faster than looking for available workers
-  if (++workerInstance >= NUM_WORKERS) workerInstance = 0;
+  // pick a worker - this round robin method is faster than looking for available workers
+  if (++workerInstance >= predictWorkers.length) workerInstance = 0;
   worker = workerInstance;
 
   const objData = {
