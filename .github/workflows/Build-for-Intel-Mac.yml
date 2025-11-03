@@ -9,7 +9,7 @@ concurrency:
 
 jobs:
   Build-Chirpity:
-    runs-on: macos-13
+    runs-on: macos-15-intel
     env: 
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
       CI: true
