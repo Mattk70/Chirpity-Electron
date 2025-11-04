@@ -2607,11 +2607,11 @@ function isDuringDaylight(datetime, lat, lon) {
   return datetime >= dawn && datetime <= dusk;
 }
 
-async function feedChunksToModel(channelData, chunkStart, file, end, worker) {
+async function feedChunksToModel(channelData, chunkStart, file, end) {
   // pick a worker - this round robin method is faster than looking for available workers
   if (++workerInstance >= predictWorkers.length) workerInstance = 0;
-  worker = workerInstance;
-
+  const worker = workerInstance;
+  predictWorkers[worker].isAvailable = false;
   const objData = {
     message: "predict",
     worker: worker,
@@ -2625,7 +2625,7 @@ async function feedChunksToModel(channelData, chunkStart, file, end, worker) {
     confidence: STATE.detect.confidence,
     chunks: channelData,
   };
-  predictWorkers[worker].isAvailable = false;
+  
   predictWorkers[worker].postMessage(objData, [channelData.buffer]);
 }
 /**

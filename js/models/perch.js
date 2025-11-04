@@ -94,19 +94,6 @@ function handleStdoutLine(line) {
   }
 }
 
-/**
- * Send a JSON-serializable payload to the spawned perch-infer process via stdin.
- *
- * @param {any} payload - The value to serialize and send; must be JSON-serializable and will be written with a trailing newline.
- * @throws {Error} If the underlying child process or its stdin is not available or has been destroyed.
- */
-function sendPayload(payload) {
-  if (!proc || !proc.stdin || proc.stdin.destroyed) throw new Error('process not running');
-  const t0 = Date.now();
-  const test = JSON.stringify(payload) + '\n';
-  DEBUG && console.log('perch sendPayload', { timeMs: Date.now() - t0, length: test.length });
-  proc.stdin.write(test, 'utf8');
-}
 
 /**
  * Send an audio payload to the running inference process and wait for its matching response.
