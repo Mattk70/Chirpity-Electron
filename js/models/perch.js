@@ -70,10 +70,10 @@ function handleStdoutLine(line) {
     let obj = JSON.parse(line);
     if (pending.length) {
         const p = pending.shift();
-        const numSamples = obj.label_topk_indices.length;
+        const numSamples = obj.indices.length;
         const keys = Array.from({ length: numSamples }, (_, i) => (p.start + chunkLength * i) / sampleRate);
         obj.keys = keys;
-        const result = [obj.keys, obj.label_topk_indices, obj.label_topk_scores];
+        const result = [obj.keys, obj.indices, obj.scores];
         obj = null; // free memory
         clearTimeout(p.timer);
         p.resolve(obj);
@@ -133,7 +133,7 @@ function requestResponse(audio, opts = {}) {
 
     pending.push({ id, resolve, reject, timer, file: opts.file, fileStart: opts.fileStart, start: opts.start });
     try { 
-        sendPayload({ input: audio }); 
+        sendAudio(audio); 
     } catch (err) { 
         clearTimeout(timer); 
         const idx = pending.findIndex(x => x.id === id);
@@ -143,6 +143,18 @@ function requestResponse(audio, opts = {}) {
   });
 }
 
+/**
+ * Send raw Float32Array audio to the Python worker.
+ * @param {Float32Array} audio
+ */
+function sendAudio(audio) {
+  const byteLength = audio.byteLength;
+  const header = Buffer.allocUnsafe(4);
+  header.writeUInt32LE(byteLength, 0);
+  const payload = Buffer.from(audio.buffer, audio.byteOffset, byteLength);
+  proc.stdin.write(header);
+  proc.stdin.write(payload);
+}
 
 onmessage = async (e) => {
   const { modelPath, message, worker } = e.data;
@@ -169,11 +181,12 @@ onmessage = async (e) => {
               chunks.set(audio);
               audio = chunks;
             }
-            const chunked = [];
-            for (let i = 0; i < audio.length; i += chunkLength) {
-                chunked.push(Array.from(audio.slice(i, i + chunkLength)));
-            }
-            await requestResponse(chunked, {fileStart, file, start});
+            requestResponse(audio, {fileStart, file, start});
+            // const chunked = [];
+            // for (let i = 0; i < audio.length; i += chunkLength) {
+            //     chunked.push(Array.from(audio.slice(i, i + chunkLength)));
+            // }
+            // await requestResponse(chunked, {fileStart, file, start});
         } catch (err) {
           console.error('requestResponse', { error: String(err) });
         }
@@ -188,7 +201,7 @@ onmessage = async (e) => {
         break;
       }
       case 'change-batch-size': {
-        break;
+        break; // Avoid errors for unsupported commands
       }
       default:
         console.error('error', { message: 'unknown cmd ' + message });
