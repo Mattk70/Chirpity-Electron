@@ -29,7 +29,9 @@ function startProcess(exePath) {
 
   proc.stderr.on('data', (chunk) => {
     const text = chunk.toString('utf8');
-    text.startsWith('WARNING') || console.error('perch-webworker stderr', text);
+    text.startsWith('WARNING') 
+    || text.includes('XLA!')
+    || console.error('perch-webworker stderr', text);
   });
 
   proc.on('exit', (code, sig) => {

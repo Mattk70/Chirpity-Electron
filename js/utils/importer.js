@@ -66,7 +66,7 @@ async function countLines(filePath) {
                 
                 if (percent !== lastPercentReported ) {
                   lastPercentReported = percent;
-                  UI.postMessage({event: 'conversion-progress', progress: {percent}, text: 'Importing' });
+                  UI.postMessage({event: 'footer-progress', progress: {percent}, text: 'Importing' });
                 }
             } catch (error) {
                 return reject(error)

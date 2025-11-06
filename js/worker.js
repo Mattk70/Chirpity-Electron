@@ -38,7 +38,7 @@ if (process.platform === "win32") {
 }
 
 let DEBUG;
-
+let SEEN_MODEL_READY = false;
 let METADATA = {};
 let index = 0,
   predictionStart;
@@ -48,8 +48,8 @@ let predictWorkers = [],
 let UI;
 let FILE_QUEUE = [];
 let INITIALISED = null;
-
-
+const EPSILON = 0.025;
+let t0_analysis = 0;
 const generateAlert = ({
   message,
   type,
@@ -1010,8 +1010,34 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true}) => {
   const fileOrFolder = folderDropped ? "Open Folder(s)" : "Open Files(s)";
   trackEvent(STATE.UUID, "UI", "Drop", fileOrFolder, filePaths.length);
   UI.postMessage({ event: "files", filePaths, preserveResults, checkSaved });
+  // Start gathering metadata for new files
+  STATE.totalDuration = 0;
+  await processFilesInBatches(filePaths, 10);
   return filePaths;
 };
+
+async function processFilesInBatches(filePaths, batchSize = 20) {
+  for (let i = 0; i < filePaths.length; i += batchSize) {
+    const batch = filePaths.slice(i, i + batchSize);
+
+    // Run the batch in parallel
+    const results = await Promise.all(
+      batch.map(file =>
+        setMetadata({ file }).then(fileMetadata => {
+          const duration = fileMetadata.duration || 0;
+          STATE.totalDuration += Math.ceil(duration / (BATCH_SIZE * WINDOW_SIZE)) * (BATCH_SIZE * WINDOW_SIZE);
+          return fileMetadata;
+        }).catch ((error) => {
+          console.error(`Error processing file ${file}:`, error);
+          return null; // or handle the error as needed
+        }
+      ))
+    );
+    console.log(`Processed ${i + results.length} of ${filePaths.length}`);
+
+  }
+  console.log('All files processed');
+}
 
 const getFilesInDirectory = async (dir) => {
   const files = [];
@@ -1627,6 +1653,7 @@ async function onAnalyse({
   STATE.selection || await onChangeMode("analyse");
 
   filesBeingProcessed = [...FILE_QUEUE];
+  t0_analysis = Date.now();
   for (let i = 0; i < NUM_WORKERS; i++) {
     processNextFile({ start, end, worker: i });
   }
@@ -2207,7 +2234,6 @@ const getPredictBuffers = async ({ file = "", start = 0, end = undefined }) => {
   }
   const duration = end - start;
   
-  const EPSILON = 0.025;
   batchChunksToSend[file] = Math.ceil((duration - EPSILON) / (BATCH_SIZE * WINDOW_SIZE));
   predictionsReceived[file] = 0;
   predictionsRequested[file] = 0;
@@ -2258,7 +2284,6 @@ async function processAudio(
 ) {
   // Find a balance between performance and memory usage
   const MAX_CHUNKS = Math.max(12, Math.min(NUM_WORKERS * 2, 36));
-  const EPSILON = 0.025;
   return new Promise((resolve, reject) => {
     // Many compressed files start with a small section of silence due to encoder padding, which affects predictions
     // To compensate, we move the start back a small amount, and slice the data to remove the silence
@@ -3590,10 +3615,8 @@ const parsePredictions = async (response) => {
   }
   predictionsReceived[file]++;
   const received = sumObjectValues(predictionsReceived);
-  const total = sumObjectValues(batchChunksToSend);
-  const progress = received / total;
+  selection || estimateTimeRemaining(received, file);
   const fileProgress = predictionsReceived[file] / batchChunksToSend[file];
-  UI.postMessage({ event: "progress", progress: progress, file: file });
   if (fileProgress === 1) {
     if (index === 0) {
       generateAlert({
@@ -3614,13 +3637,46 @@ const parsePredictions = async (response) => {
       );
   }
   if (!selection && STATE.increment() === 0) {
-    if (fileProgress < 1) getSummary({ interim: true });
+    getSummary({ interim: true });
     getTotal();
   }
   return response.worker;
 };
 
-let SEEN_MODEL_READY = false;
+
+async function estimateTimeRemaining(batchesReceived, currentFile) {
+  const totalBatches = Math.ceil(STATE.totalDuration / (BATCH_SIZE * WINDOW_SIZE));
+  const progress = batchesReceived / totalBatches;
+  const elapsedMinutes = (Date.now() - t0_analysis) / 60_000;
+  const estimatedTime = elapsedMinutes / progress;
+  const remaining = estimatedTime - elapsedMinutes;
+  const i18n = {
+    en: { less: 'Less than a minute remaining', min: 'minutes remaining' },
+    da: { less: 'Mindre end et minut tilbage', min: 'minutter tilbage' },
+    de: { less: 'Weniger als eine Minute verbleibend', min: 'Minuten verbleibend' },
+    es: { less: 'Queda menos de un minuto', min: 'minutos restantes' },
+    fr: { less: 'Moins d’une minute restante', min: 'minutes restantes' },
+    ja: { less: '残り1分未満', min: '分残り' },
+    nl: { less: 'Minder dan een minuut resterend', min: 'minuten resterend' },
+    pt: { less: 'Menos de um minuto restante', min: 'minutos restantes' },
+    ru: { less: 'Осталось меньше минуты', min: 'минут осталось' },
+    sv: { less: 'Mindre än en minut kvar', min: 'minuter kvar' },
+    zh: { less: '剩余不到一分钟', min: '分钟剩余' }
+  }  
+  const locale = STATE.locale in i18n ? STATE.locale : 'en';
+  const text =
+    remaining < 1
+      ? i18n[locale].less
+      : `${remaining.toFixed(0)} ${i18n[locale].min}`;
+
+  UI.postMessage({
+    event: 'footer-progress',
+    progress: { percent: progress * 100 },
+    text
+  });
+  UI.postMessage({ event: "progress", progress: progress, file: currentFile });
+}
+
 async function parseMessage(e) {
   const response = e.data;
   switch (response["message"]) {
@@ -3676,7 +3732,7 @@ async function parseMessage(e) {
     }
     case "training-progress": {
       UI.postMessage({
-        event: "conversion-progress", //use this handler to send footer progress updates
+        event: "footer-progress", //use this handler to send footer progress updates
         progress: response.progress,
         text: response.text,
       });
@@ -3763,7 +3819,8 @@ async function processNextFile({
           // Nothing to do for this file
           updateFilesBeingProcessed(file);
           generateAlert({ message: "noNight", variables: { file } });
-
+          const duration = METADATA[file].duration;
+          STATE.totalDuration -= Math.ceil(duration / (BATCH_SIZE * WINDOW_SIZE)) * (BATCH_SIZE * WINDOW_SIZE);
           DEBUG && console.log("Recursion: start = end");
           await processNextFile(arguments[0]).catch((error) =>
             console.warn("Error in processNextFile call", error)
@@ -3771,9 +3828,9 @@ async function processNextFile({
         } else {
           if (!sumObjectValues(predictionsReceived)) {
             UI.postMessage({
-              event: "progress",
-              text: "yes",
-              file: file,
+              event: "footer-progress",
+              text: "Awaiting detections...",
+              progress: {percent: 0},
             });
           }
           await doPrediction({
@@ -4013,7 +4070,7 @@ const getResults = async ({
           );
           // Progress updates
           UI.postMessage({
-            event: "conversion-progress", //use this handler to send footer progress updates
+            event: "footer-progress", //use this handler to send footer progress updates
             progress: {percent: (count / result.length)*100},
             text: 'Saving files:',
           });
@@ -5192,7 +5249,7 @@ async function convertAndOrganiseFiles(threadLimit = 4) {
   Promise.allSettled(conversions).then((results) => {
     // Oftentimes, the final percent.progress reported is < 100. So when finished, send 100 so the progress panel can be hidden
     UI.postMessage({
-      event: "conversion-progress",
+      event: "footer-progress",
       progress: { percent: 100 },
       text: "",
     });
@@ -5343,7 +5400,7 @@ async function convertFile(
           );
           const average = sum / values.length;
           UI.postMessage({
-            event: `conversion-progress`,
+            event: `footer-progress`,
             progress: { percent: average },
             text: `Archive file conversion progress: ${average.toFixed(1)}%`,
           });

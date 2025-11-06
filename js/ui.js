@@ -2195,7 +2195,7 @@ const setUpWorkerMessaging = () => {
           DOM.loadingScreen.classList.add('d-none')
           break;
         }
-        case "conversion-progress": {
+        case "footer-progress": {
           displayProgress(args.progress, args.text);
           break;
         }
@@ -3764,7 +3764,7 @@ function onAnalysisComplete({ quiet }) {
     DIAGNOSTICS["Analysis Rate"] =
       rate.toFixed(0) + "x faster than real time performance.";
     generateToast({ message: "complete" });
-    // activateResultSort();
+    displayProgress({percent: 100});
   }
   worker.postMessage({ action: "update-state", selection: false });
 }
