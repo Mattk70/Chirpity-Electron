@@ -2071,29 +2071,27 @@ const roundedFloat = (string) => Math.round(parseFloat(string) * 10000) / 10000;
  * @returns {Promise<unknown>}
  */
 const setMetadata = async ({ file, source_file = file }) => {
-  if (METADATA[file]?.isComplete) return METADATA[file];
-
+  const fileMeta = METADATA[file] || {};
+  if (fileMeta.isComplete) return fileMeta;
+  console.log('in setmetadata for', file);
   // CHeck the database first, so we honour any manual updates.
   const savedMeta = await getSavedFileInfo(file).catch((error) =>
     console.warn("getSavedFileInfo error", error)
   );
   if (savedMeta) {
-    METADATA[file] = savedMeta;
+    fileMeta = savedMeta;
     if (savedMeta.locationID)
       UI.postMessage({
         event: "file-location-id",
         file,
         id: savedMeta.locationID,
       });
-    METADATA[file].isSaved = true; // Queried by UI to establish saved state of file.
-  } else {
-    METADATA[file] = {};
-  }
-
+    fileMeta.isSaved = true; // Queried by UI to establish saved state of file.
+  } 
   let guanoTimestamp;
   // savedMeta may just have a locationID if it was set by onSetCUstomLocation
   if (!savedMeta?.duration) {
-    METADATA[file].duration = await getDuration(file);
+    fileMeta.duration = await getDuration(file);
     if (file.toLowerCase().endsWith("wav")) {
       const { extractWaveMetadata } = require("./js/utils/metadata.js");
       const t0 = Date.now();
@@ -2110,17 +2108,17 @@ const setMetadata = async ({ file, source_file = file }) => {
             files: [file],
             overwritePlaceName: false,
           });
-          METADATA[file].lat = roundedFloat(lat);
-          METADATA[file].lon = roundedFloat(lon);
+          fileMeta.lat = roundedFloat(lat);
+          fileMeta.lon = roundedFloat(lon);
         }
         guanoTimestamp = Date.parse(guano.Timestamp);
-        if (guanoTimestamp) METADATA[file].fileStart = guanoTimestamp;
+        if (guanoTimestamp) fileMeta.fileStart = guanoTimestamp;
         if (guano.Length){
-          METADATA[file].duration = parseFloat(guano.Length);
+          fileMeta.duration = parseFloat(guano.Length);
         }
       }
       if (Object.keys(wavMetadata).length > 0) {
-        METADATA[file].metadata = JSON.stringify(wavMetadata);
+        fileMeta.metadata = JSON.stringify(wavMetadata);
       }
       DEBUG &&
         console.log(`GUANO search took: ${(Date.now() - t0) / 1000} seconds`);
@@ -2131,52 +2129,52 @@ const setMetadata = async ({ file, source_file = file }) => {
   if (savedMeta?.fileStart) {
     // Saved timestamps have the highest priority allowing for an override of Guano timestamp/file mtime
     fileStart = new Date(savedMeta.fileStart);
-    fileEnd = new Date(fileStart.getTime() + METADATA[file].duration * 1000);
+    fileEnd = new Date(fileStart.getTime() + fileMeta.duration * 1000);
   } else if (guanoTimestamp) {
     // Guano has second priority
     fileStart = new Date(guanoTimestamp);
-    fileEnd = new Date(guanoTimestamp + METADATA[file].duration * 1000);
+    fileEnd = new Date(guanoTimestamp + fileMeta.duration * 1000);
   } else {
     // Least preferred
     const stat = fs.statSync(source_file);
-    const meta = METADATA[file].metadata
-      ? JSON.parse(METADATA[file].metadata)
+    const meta = fileMeta.metadata
+      ? JSON.parse(fileMeta.metadata)
       : {};
     const H1E = meta.bext?.Originator?.includes("H1essential");
     if (STATE.fileStartMtime || H1E) {
       // Zoom H1E apparently sets mtime to be the start of the recording
       fileStart = new Date(stat.mtimeMs);
-      METADATA[file].fileStart = fileStart.getTime();
-      fileEnd = new Date(stat.mtimeMs + METADATA[file].duration * 1000);
+      fileMeta.fileStart = fileStart.getTime();
+      fileEnd = new Date(stat.mtimeMs + fileMeta.duration * 1000);
     } else {
       fileEnd = new Date(stat.mtimeMs);
-      fileStart = new Date(stat.mtimeMs - METADATA[file].duration * 1000);
-      METADATA[file].fileStart = fileStart.getTime();
+      fileStart = new Date(stat.mtimeMs - fileMeta.duration * 1000);
+      fileMeta.fileStart = fileStart.getTime();
     }
   }
 
   // split  the duration of this file across any dates it spans
-  METADATA[file].dateDuration = {};
+  fileMeta.dateDuration = {};
   const key = new Date(fileStart);
   key.setHours(0, 0, 0, 0);
   const keyCopy = addDays(key, 0).getTime();
   if (fileStart.getDate() === fileEnd.getDate()) {
-    METADATA[file].dateDuration[keyCopy] = METADATA[file].duration;
+    fileMeta.dateDuration[keyCopy] = fileMeta.duration;
   } else {
     const key2 = addDays(key, 1);
     const key2Copy = addDays(key2, 0).getTime();
-    METADATA[file].dateDuration[keyCopy] = (key2Copy - fileStart) / 1000;
-    METADATA[file].dateDuration[key2Copy] =
-      METADATA[file].duration - METADATA[file].dateDuration[keyCopy];
+    fileMeta.dateDuration[keyCopy] = (key2Copy - fileStart) / 1000;
+    fileMeta.dateDuration[key2Copy] =
+      fileMeta.duration - fileMeta.dateDuration[keyCopy];
   }
   // If we haven't set METADATA.file.fileStart by now we need to create it from a Date
-  METADATA[file].fileStart ??= fileStart.getTime();
-  if (METADATA[file].duration) {
+  fileMeta.fileStart ??= fileStart.getTime();
+  if (fileMeta.duration) {
     // Set complete flag
-    METADATA[file].isComplete = true;
+    fileMeta.isComplete = true;
   }
-  
-  return METADATA[file];
+  METADATA[file] = fileMeta;
+  return fileMeta;
 };
 
 function pauseFfmpeg(ffmpegCommand, pid) {
