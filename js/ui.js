@@ -1871,8 +1871,8 @@ window.onload = async () => {
 
   // Set footer year
   document.getElementById("year").textContent = new Date().getFullYear();
-  document.getElementById("version").textContent = VERSION;
   await appVersionLoaded;
+  document.getElementById("version").textContent = VERSION;
   const configFile = p.join(appPath, "config.json");
   fs.readFile(configFile, "utf8", async (err, data) => {
     if (err) {

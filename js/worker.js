@@ -2240,7 +2240,8 @@ const getPredictBuffers = async ({ file = "", start = 0, end = undefined }) => {
   }
   const duration = end - start;
   
-  batchChunksToSend[file] = Math.ceil((duration - EPSILON) / (BATCH_SIZE * WINDOW_SIZE));
+  const rawChunks = Math.ceil((duration - EPSILON) / (BATCH_SIZE * WINDOW_SIZE));
+  batchChunksToSend[file] = Math.max(1, rawChunks);
   predictionsReceived[file] = 0;
   predictionsRequested[file] = 0;
 
@@ -3651,6 +3652,7 @@ const parsePredictions = async (response) => {
 
 
 async function estimateTimeRemaining(batchesReceived) {
+  if (! STATE.totalDuration) return;
   const totalBatches = Math.ceil(STATE.totalDuration / (BATCH_SIZE * WINDOW_SIZE));
   const progress = batchesReceived / totalBatches;
   const elapsedMinutes = (Date.now() - t0_analysis) / 60_000;
