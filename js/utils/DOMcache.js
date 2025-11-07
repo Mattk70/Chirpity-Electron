@@ -37,7 +37,6 @@ const DOM = {
   get defaultLon() { return this._defaultLon ??= document.getElementById("longitude") },
   get exploreLink() { return this._exploreLink ??= document.getElementById("explore") },
   get exploreWrapper() { return this._exploreWrapper ??= document.getElementById("exploreWrapper") },
-  get fileNumber() { return this._fileNumber ??= document.getElementById("fileNumber") },
   get footer() {return this._footer ??= document.querySelector("footer")},
   get HPSlider() { return this._HPSlider ??= document.getElementById("highPassFrequency") },
   get LPSlider() { return this._LPSlider ??= document.getElementById("lowPassFrequency") },
@@ -71,8 +70,6 @@ const DOM = {
   get nocmigButton() { return this._nocmigButton ??= document.getElementById("nocmigMode") },
   get numberOfThreads() { return this._numberOfThreads ??= document.getElementById("threads-value") },
   get place() { return this._place ??= document.getElementById("place") },
-  get progressDiv() { return this._progressDiv ??= document.getElementById("progressDiv") },
-  get progressBar() { return this._progressBar ??= document.getElementById("progress-bar") },
   get resultTableElement() { return this._resultTableElement ??= 
     document.getElementById("resultTableContainer")},
   get settingsForm() { return this._settingsForm ??= document.getElementById("settingsForm") },

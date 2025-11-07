@@ -1743,7 +1743,7 @@ const getDuration = async (src) => {
     audio = new Audio();
 
     audio.src = src.replaceAll("#", "%23").replaceAll("?", "%3F"); // allow hash and ? in the path (https://github.com/Mattk70/Chirpity-Electron/issues/98)
-    audio.addEventListener("durationchange", function () {
+    audio.addEventListener("loadedmetadata", function () {
       const duration = audio.duration;
       if (duration === Infinity || !duration || isNaN(duration)) {
         // Fallback: decode entire file with ffmpeg
@@ -2115,6 +2115,9 @@ const setMetadata = async ({ file, source_file = file }) => {
         }
         guanoTimestamp = Date.parse(guano.Timestamp);
         if (guanoTimestamp) METADATA[file].fileStart = guanoTimestamp;
+        if (guano.Length){
+          METADATA[file].duration = parseFloat(guano.Length);
+        }
       }
       if (Object.keys(wavMetadata).length > 0) {
         METADATA[file].metadata = JSON.stringify(wavMetadata);
@@ -2142,11 +2145,13 @@ const setMetadata = async ({ file, source_file = file }) => {
     const H1E = meta.bext?.Originator?.includes("H1essential");
     if (STATE.fileStartMtime || H1E) {
       // Zoom H1E apparently sets mtime to be the start of the recording
-      fileStart = new Date(stat.mtime);
-      fileEnd = new Date(stat.mtime + METADATA[file].duration * 1000);
+      fileStart = new Date(stat.mtimeMs);
+      METADATA[file].fileStart = fileStart.getTime();
+      fileEnd = new Date(stat.mtimeMs + METADATA[file].duration * 1000);
     } else {
-      fileEnd = new Date(stat.mtime);
-      fileStart = new Date(stat.mtime - METADATA[file].duration * 1000);
+      fileEnd = new Date(stat.mtimeMs);
+      fileStart = new Date(stat.mtimeMs - METADATA[file].duration * 1000);
+      METADATA[file].fileStart = fileStart.getTime();
     }
   }
 
@@ -2166,8 +2171,11 @@ const setMetadata = async ({ file, source_file = file }) => {
   }
   // If we haven't set METADATA.file.fileStart by now we need to create it from a Date
   METADATA[file].fileStart ??= fileStart.getTime();
-  // Set complete flag
-  METADATA[file].isComplete = true;
+  if (METADATA[file].duration) {
+    // Set complete flag
+    METADATA[file].isComplete = true;
+  }
+  
   return METADATA[file];
 };
 
@@ -2397,7 +2405,7 @@ async function processAudio(
     });
     STREAM.on("end", () => {
       const metaDuration = METADATA[file].duration;
-      if (start === 0 && end === metaDuration && duration < metaDuration) {
+      if (start === 0 && end === metaDuration && isFinite(duration) && duration + EPSILON < metaDuration) {
         // If we have a short file (header duration > processed duration)
         // *and* were looking for the whole file, we'll fix # of expected chunks here
         batchChunksToSend[file] = Math.ceil(
@@ -3615,7 +3623,7 @@ const parsePredictions = async (response) => {
   }
   predictionsReceived[file]++;
   const received = sumObjectValues(predictionsReceived);
-  selection || estimateTimeRemaining(received, file);
+  if (!selection) estimateTimeRemaining(received);
   const fileProgress = predictionsReceived[file] / batchChunksToSend[file];
   if (fileProgress === 1) {
     if (index === 0) {
@@ -3644,7 +3652,7 @@ const parsePredictions = async (response) => {
 };
 
 
-async function estimateTimeRemaining(batchesReceived, currentFile) {
+async function estimateTimeRemaining(batchesReceived) {
   const totalBatches = Math.ceil(STATE.totalDuration / (BATCH_SIZE * WINDOW_SIZE));
   const progress = batchesReceived / totalBatches;
   const elapsedMinutes = (Date.now() - t0_analysis) / 60_000;
@@ -3674,7 +3682,6 @@ async function estimateTimeRemaining(batchesReceived, currentFile) {
     progress: { percent: progress * 100 },
     text
   });
-  UI.postMessage({ event: "progress", progress: progress, file: currentFile });
 }
 
 async function parseMessage(e) {
@@ -3827,9 +3834,21 @@ async function processNextFile({
           );
         } else {
           if (!sumObjectValues(predictionsReceived)) {
+            const awaiting = {
+              en: "Awaiting detections",
+              da: "Afventer detektioner",
+              de: "Warten auf Erkennungen",
+              es: "Esperando detecciones",
+              fr: "En attente des détections",
+              nl: "Wachten op detecties",
+              pt: "Aguardando detecções",
+              ru: "Ожидание обнаружений",
+              sv: "Väntar på detektioner",
+              zh: "等待检测",
+            };
             UI.postMessage({
               event: "footer-progress",
-              text: "Awaiting detections...",
+              text: awaiting[STATE.locale] || awaiting["en"],
               progress: {percent: 0},
             });
           }

@@ -149,7 +149,6 @@ const GLOBAL_ACTIONS = {
       STATE.analysisDone = true;
       STATE.diskHasRecords && utils.enableMenuItem(["explore", "charts"]);
       generateToast({ message: "cancelled" });
-      DOM.progressDiv.classList.add("invisible");
       displayProgress({percent: 100, text:''})
     }
   },
@@ -516,22 +515,6 @@ function resetResults({
     DOM.resultHeader.textContent = "";
   }
   predictions.clear();
-  DOM.progressDiv.classList.add("invisible");
-  updateProgress(0);
-}
-
-/***
- *
- * @param val: float between 0 and 100
- */
-function updateProgress(val) {
-  if (val) {
-    DOM.progressBar.value = val;
-    val = val.toString();
-    DOM.progressBar.textContent = val + "%";
-  } else {
-    DOM.progressBar.removeAttribute("value");
-  }
 }
 
 /**
@@ -1197,9 +1180,7 @@ function resetDiagnostics() {
  */
 function analyseReset() {
   clearActive();
-  DOM.fileNumber.textContent = "";
   resetDiagnostics();
-  DOM.progressDiv.classList.remove("invisible");
 }
 
 /**
@@ -2354,10 +2335,6 @@ const setUpWorkerMessaging = () => {
           renderResult(args);
           break;
         }
-        case "progress": {
-          onProgress(args);
-          break;
-        }
         // called when an analysis ends, or when the filesbeingprocessed list is empty
         case "processing-complete": {
           STATE.analysisDone = true;
@@ -3470,61 +3447,7 @@ async function onWorkerLoadedAudio({
   }
 }
 
-const i18nFile = {
-  en: "File ${count} of ${fileCount}",
-  da: "Fil ${count} af ${fileCount}",
-  de: "Datei ${count} von ${fileCount}",
-  es: "Archivo ${count} de ${fileCount}",
-  fr: "Fichier ${count} sur ${fileCount}",
-  nl: "Bestand ${count} van ${fileCount}",
-  pt: "Arquivo ${count} de ${fileCount}",
-  ru: "Файл ${count} из ${fileCount}",
-  sv: "Fil ${count} av ${fileCount}",
-  zh: "文件 ${count} / ${fileCount}",
-};
-const awaiting = {
-  en: "Awaiting detections",
-  da: "Afventer detektioner",
-  de: "Warten auf Erkennungen",
-  es: "Esperando detecciones",
-  fr: "En attente des détections",
-  nl: "Wachten op detecties",
-  pt: "Aguardando detecções",
-  ru: "Ожидание обнаружений",
-  sv: "Väntar på detektioner",
-  zh: "等待检测",
-};
-/**
- * Updates the UI progress elements during file loading.
- *
- * Removes the "invisible" class from the progress indicator, then either displays a localized
- * loading message (when the "text" flag is provided) or shows the current file's position within the
- * queue of open files. If a progress value is provided, it calculates the percentage (with one-decimal
- * precision) and updates the progress bar accordingly.
- *
- * @param {Object} args - Object containing details for the progress update.
- * @param {boolean} [args.text] - When truthy, displays a localized "awaiting" message instead of file count.
- * @param {File} [args.file] - The file whose loading progress is being updated.
- * @param {number} [args.progress] - A value between 0 and 1 representing the load progress.
- */
-function onProgress(args) {
-  DOM.progressDiv.classList.remove("invisible");
-  if (args.text) {
-    DOM.fileNumber.innerHTML = `<span class='loading text-nowrap'>${i18n.get(
-      awaiting
-    )}</span>`;
-  } else {
-    const count = STATE.openFiles.indexOf(args.file) + 1;
-    DOM.fileNumber.textContent = utils.interpolate(i18n.get(i18nFile), {
-      count: count,
-      fileCount: STATE.openFiles.length,
-    });
-  }
-  if (args.progress) {
-    let progress = Math.round(args.progress * 1000) / 10;
-    updateProgress(progress);
-  }
-}
+
 
 /**
  * Updates the pagination controls based on the total number of items.
@@ -3688,8 +3611,6 @@ function onResultsComplete({ active = undefined, select = undefined } = {}) {
     utils.waitFor(() => STATE.fileLoaded).then(() => activeRow.click());
     activeRow.scrollIntoView({ behavior: "instant", block: "center" });
   }
-  // hide progress div
-  DOM.progressDiv.classList.add("invisible");
   renderFilenamePanel();
   activateResultSort();
 }
@@ -3727,7 +3648,6 @@ function onAnalysisComplete({ quiet }) {
   disableSettingsDuringAnalysis(false);
   STATE.analysisDone = true;
   STATE.diskHasRecords && utils.enableMenuItem(["explore", "charts"]);
-  DOM.progressDiv.classList.add("invisible");
   if (quiet) return;
   // DIAGNOSTICS:
   t1_analysis = Date.now();

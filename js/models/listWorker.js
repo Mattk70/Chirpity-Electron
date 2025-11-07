@@ -270,7 +270,14 @@ class Model {
           // Use the reduce() method to accumulate the indices of species containing the latin name
           const foundIndices = this.labels.reduce(
             (indices, element, index) => {
-              element.includes(latin) && indices.push(index);
+              let latinName;
+              const parts = element.split("_");
+              if (parts.length === 2) {
+                latinName = parts[0];
+              } else {
+                latinName = element.split("~")[0];
+              }
+              if (latinName === latin) indices.push(index);
               return indices;
             },
             []
