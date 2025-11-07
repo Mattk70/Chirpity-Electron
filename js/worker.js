@@ -38,7 +38,7 @@ if (process.platform === "win32") {
 }
 
 let DEBUG;
-
+let SEEN_MODEL_READY = false;
 let METADATA = {};
 let index = 0,
   predictionStart;
@@ -48,8 +48,8 @@ let predictWorkers = [],
 let UI;
 let FILE_QUEUE = [];
 let INITIALISED = null;
-
-
+const EPSILON = 0.025;
+let t0_analysis = 0;
 const generateAlert = ({
   message,
   type,
@@ -259,7 +259,7 @@ async function loadDB(modelPath) {
   let modelID, needsTranslation;
   const file = p.join(path, `archive.sqlite`);
   if (!fs.existsSync(file)) {
-    console.log("No db file: ", file);
+    DEBUG && console.log("No db file: ", file);
     try {
         diskDB = await createDB({file, dbMutex});
     } catch (error) {
@@ -270,7 +270,7 @@ async function loadDB(modelPath) {
       });
       throw error;
     }
-    console.log("DB created at : ", file);
+    DEBUG && console.log("DB created at : ", file);
     STATE.modelID = modelID;
   } else {
     diskDB = new sqlite3.Database(file);
@@ -1010,8 +1010,34 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true}) => {
   const fileOrFolder = folderDropped ? "Open Folder(s)" : "Open Files(s)";
   trackEvent(STATE.UUID, "UI", "Drop", fileOrFolder, filePaths.length);
   UI.postMessage({ event: "files", filePaths, preserveResults, checkSaved });
+  // Start gathering metadata for new files
+  STATE.totalDuration = 0;
+  await processFilesInBatches(filePaths, 10);
   return filePaths;
 };
+
+async function processFilesInBatches(filePaths, batchSize = 20) {
+  for (let i = 0; i < filePaths.length; i += batchSize) {
+    const batch = filePaths.slice(i, i + batchSize);
+
+    // Run the batch in parallel
+    const results = await Promise.all(
+      batch.map(file =>
+        setMetadata({ file }).then(fileMetadata => {
+          const duration = fileMetadata.duration || 0;
+          STATE.totalDuration += Math.ceil(duration / (BATCH_SIZE * WINDOW_SIZE)) * (BATCH_SIZE * WINDOW_SIZE);
+          return fileMetadata;
+        }).catch ((error) => {
+          console.error(`Error processing file ${file}:`, error);
+          return null; // or handle the error as needed
+        }
+      ))
+    );
+    DEBUG && console.log(`Processed ${i + results.length} of ${filePaths.length}`);
+
+  }
+  DEBUG && console.log('All files processed');
+}
 
 const getFilesInDirectory = async (dir) => {
   const files = [];
@@ -1627,6 +1653,7 @@ async function onAnalyse({
   STATE.selection || await onChangeMode("analyse");
 
   filesBeingProcessed = [...FILE_QUEUE];
+  t0_analysis = Date.now();
   for (let i = 0; i < NUM_WORKERS; i++) {
     processNextFile({ start, end, worker: i });
   }
@@ -1716,7 +1743,7 @@ const getDuration = async (src) => {
     audio = new Audio();
 
     audio.src = src.replaceAll("#", "%23").replaceAll("?", "%3F"); // allow hash and ? in the path (https://github.com/Mattk70/Chirpity-Electron/issues/98)
-    audio.addEventListener("durationchange", function () {
+    audio.addEventListener("loadedmetadata", function () {
       const duration = audio.duration;
       if (duration === Infinity || !duration || isNaN(duration)) {
         // Fallback: decode entire file with ffmpeg
@@ -2044,29 +2071,26 @@ const roundedFloat = (string) => Math.round(parseFloat(string) * 10000) / 10000;
  * @returns {Promise<unknown>}
  */
 const setMetadata = async ({ file, source_file = file }) => {
-  if (METADATA[file]?.isComplete) return METADATA[file];
-
+  let fileMeta = METADATA[file] || {};
+  if (fileMeta.isComplete) return fileMeta;
   // CHeck the database first, so we honour any manual updates.
   const savedMeta = await getSavedFileInfo(file).catch((error) =>
     console.warn("getSavedFileInfo error", error)
   );
   if (savedMeta) {
-    METADATA[file] = savedMeta;
+    fileMeta = savedMeta;
     if (savedMeta.locationID)
       UI.postMessage({
         event: "file-location-id",
         file,
         id: savedMeta.locationID,
       });
-    METADATA[file].isSaved = true; // Queried by UI to establish saved state of file.
-  } else {
-    METADATA[file] = {};
-  }
-
+    fileMeta.isSaved = true; // Queried by UI to establish saved state of file.
+  } 
   let guanoTimestamp;
   // savedMeta may just have a locationID if it was set by onSetCUstomLocation
   if (!savedMeta?.duration) {
-    METADATA[file].duration = await getDuration(file);
+    fileMeta.duration = await getDuration(file);
     if (file.toLowerCase().endsWith("wav")) {
       const { extractWaveMetadata } = require("./js/utils/metadata.js");
       const t0 = Date.now();
@@ -2083,14 +2107,17 @@ const setMetadata = async ({ file, source_file = file }) => {
             files: [file],
             overwritePlaceName: false,
           });
-          METADATA[file].lat = roundedFloat(lat);
-          METADATA[file].lon = roundedFloat(lon);
+          fileMeta.lat = roundedFloat(lat);
+          fileMeta.lon = roundedFloat(lon);
         }
         guanoTimestamp = Date.parse(guano.Timestamp);
-        if (guanoTimestamp) METADATA[file].fileStart = guanoTimestamp;
+        if (guanoTimestamp) fileMeta.fileStart = guanoTimestamp;
+        if (guano.Length){
+          fileMeta.duration = parseFloat(guano.Length);
+        }
       }
       if (Object.keys(wavMetadata).length > 0) {
-        METADATA[file].metadata = JSON.stringify(wavMetadata);
+        fileMeta.metadata = JSON.stringify(wavMetadata);
       }
       DEBUG &&
         console.log(`GUANO search took: ${(Date.now() - t0) / 1000} seconds`);
@@ -2101,47 +2128,52 @@ const setMetadata = async ({ file, source_file = file }) => {
   if (savedMeta?.fileStart) {
     // Saved timestamps have the highest priority allowing for an override of Guano timestamp/file mtime
     fileStart = new Date(savedMeta.fileStart);
-    fileEnd = new Date(fileStart.getTime() + METADATA[file].duration * 1000);
+    fileEnd = new Date(fileStart.getTime() + fileMeta.duration * 1000);
   } else if (guanoTimestamp) {
     // Guano has second priority
     fileStart = new Date(guanoTimestamp);
-    fileEnd = new Date(guanoTimestamp + METADATA[file].duration * 1000);
+    fileEnd = new Date(guanoTimestamp + fileMeta.duration * 1000);
   } else {
     // Least preferred
     const stat = fs.statSync(source_file);
-    const meta = METADATA[file].metadata
-      ? JSON.parse(METADATA[file].metadata)
+    const meta = fileMeta.metadata
+      ? JSON.parse(fileMeta.metadata)
       : {};
     const H1E = meta.bext?.Originator?.includes("H1essential");
     if (STATE.fileStartMtime || H1E) {
       // Zoom H1E apparently sets mtime to be the start of the recording
-      fileStart = new Date(stat.mtime);
-      fileEnd = new Date(stat.mtime + METADATA[file].duration * 1000);
+      fileStart = new Date(stat.mtimeMs);
+      fileMeta.fileStart = fileStart.getTime();
+      fileEnd = new Date(stat.mtimeMs + fileMeta.duration * 1000);
     } else {
-      fileEnd = new Date(stat.mtime);
-      fileStart = new Date(stat.mtime - METADATA[file].duration * 1000);
+      fileEnd = new Date(stat.mtimeMs);
+      fileStart = new Date(stat.mtimeMs - fileMeta.duration * 1000);
+      fileMeta.fileStart = fileStart.getTime();
     }
   }
 
   // split  the duration of this file across any dates it spans
-  METADATA[file].dateDuration = {};
+  fileMeta.dateDuration = {};
   const key = new Date(fileStart);
   key.setHours(0, 0, 0, 0);
   const keyCopy = addDays(key, 0).getTime();
   if (fileStart.getDate() === fileEnd.getDate()) {
-    METADATA[file].dateDuration[keyCopy] = METADATA[file].duration;
+    fileMeta.dateDuration[keyCopy] = fileMeta.duration;
   } else {
     const key2 = addDays(key, 1);
     const key2Copy = addDays(key2, 0).getTime();
-    METADATA[file].dateDuration[keyCopy] = (key2Copy - fileStart) / 1000;
-    METADATA[file].dateDuration[key2Copy] =
-      METADATA[file].duration - METADATA[file].dateDuration[keyCopy];
+    fileMeta.dateDuration[keyCopy] = (key2Copy - fileStart) / 1000;
+    fileMeta.dateDuration[key2Copy] =
+      fileMeta.duration - fileMeta.dateDuration[keyCopy];
   }
   // If we haven't set METADATA.file.fileStart by now we need to create it from a Date
-  METADATA[file].fileStart ??= fileStart.getTime();
-  // Set complete flag
-  METADATA[file].isComplete = true;
-  return METADATA[file];
+  fileMeta.fileStart ??= fileStart.getTime();
+  if (fileMeta.duration) {
+    // Set complete flag
+    fileMeta.isComplete = true;
+  }
+  METADATA[file] = fileMeta;
+  return fileMeta;
 };
 
 function pauseFfmpeg(ffmpegCommand, pid) {
@@ -2155,7 +2187,7 @@ function pauseFfmpeg(ffmpegCommand, pid) {
       DEBUG && console.log(message);
     } else {
       ffmpegCommand.kill("SIGSTOP");
-      console.log("paused ", pid);
+      DEBUG && console.log("paused ", pid);
     }
     STATE.processingPaused[pid] = true;
   }
@@ -2172,7 +2204,7 @@ function resumeFfmpeg(ffmpegCommand, pid) {
       DEBUG && console.log(message);
     } else {
       ffmpegCommand.kill("SIGCONT");
-      console.log("resumed ", pid);
+      DEBUG && console.log("resumed ", pid);
     }
     STATE.processingPaused[pid] = false;
   }
@@ -2207,8 +2239,8 @@ const getPredictBuffers = async ({ file = "", start = 0, end = undefined }) => {
   }
   const duration = end - start;
   
-  const EPSILON = 0.025;
-  batchChunksToSend[file] = Math.ceil((duration - EPSILON) / (BATCH_SIZE * WINDOW_SIZE));
+  const rawChunks = Math.ceil((duration - EPSILON) / (BATCH_SIZE * WINDOW_SIZE));
+  batchChunksToSend[file] = Math.max(1, rawChunks);
   predictionsReceived[file] = 0;
   predictionsRequested[file] = 0;
 
@@ -2258,7 +2290,6 @@ async function processAudio(
 ) {
   // Find a balance between performance and memory usage
   const MAX_CHUNKS = Math.max(12, Math.min(NUM_WORKERS * 2, 36));
-  const EPSILON = 0.025;
   return new Promise((resolve, reject) => {
     // Many compressed files start with a small section of silence due to encoder padding, which affects predictions
     // To compensate, we move the start back a small amount, and slice the data to remove the silence
@@ -2289,7 +2320,7 @@ async function processAudio(
         console.warn(`processAudio: ${file} ${error}`);
       } else {
         if (error.message.includes("SIGKILL"))
-          console.log("FFMPEG process shut down at user request");
+          DEBUG && console.log("FFMPEG process shut down at user request");
         reject(error);
       }
     });
@@ -2372,7 +2403,7 @@ async function processAudio(
     });
     STREAM.on("end", () => {
       const metaDuration = METADATA[file].duration;
-      if (start === 0 && end === metaDuration && duration < metaDuration) {
+      if (start === 0 && end === metaDuration && isFinite(duration) && duration + EPSILON < metaDuration) {
         // If we have a short file (header duration > processed duration)
         // *and* were looking for the whole file, we'll fix # of expected chunks here
         batchChunksToSend[file] = Math.ceil(
@@ -2404,12 +2435,12 @@ async function processAudio(
     });
 
     STREAM.on("error", (err) => {
-      console.log("stream error: ", err);
+      DEBUG && console.log("stream error: ", err);
       err.code === "ENOENT" && notifyMissingFile(file);
     });      
   })
 
-  }).catch((error) => console.log(error));
+  }).catch((error) => console.error(error));
 }
 
 function getMonoChannelData(audio) {
@@ -2679,7 +2710,7 @@ function findFile(pathParts, filename, species) {
     const folder = p.join(baseDir, species);
     const filePath = p.join(folder, filename + ".mp3");
     if (fs.existsSync(filePath)) {
-      console.log(`File found: ${filePath}`);
+      DEBUG && console.log(`File found: ${filePath}`);
       return [filePath, species];
     }
   }
@@ -2691,13 +2722,13 @@ function findFile(pathParts, filename, species) {
     const folder = p.join(baseDir, found_calltype);
     const filePath = p.join(folder, filename + ".mp3");
     if (fs.existsSync(filePath)) {
-      console.log(`File found: ${filePath}`);
+      DEBUG && console.log(`File found: ${filePath}`);
 
       return [filePath, found_calltype];
     }
   }
 
-  console.log("File not found in any directory");
+  DEBUG && console.log("File not found in any directory");
   return [null, null];
 }
 const convertSpecsFromExistingSpecs = async (path) => {
@@ -3018,7 +3049,7 @@ const bufferToAudio = async ({
 
   if (padding) {
     start = Math.max(0, start - 1);
-    METADATA[file] ??= await setMetadata({ file });
+    await setMetadata({ file });
 
     end = Math.min(METADATA[file].duration, end + 1);
   }
@@ -3521,15 +3552,14 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
 
 
 const parsePredictions = async (response) => {
-  const file = response.file;
+  const {file, worker, result:latestResult} = response;
   const predictionLength = STATE.model.includes("bats") ? 0.3 : WINDOW_SIZE;
   AUDIO_BACKLOG--;
-  const latestResult = response.result;
   if (!latestResult.length) {
     predictionsReceived[file]++;
-    return response.worker;
+    return worker;
   }
-  DEBUG && console.log("worker being used:", response.worker);
+  DEBUG && console.log("worker being used:", worker);
   const [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
   const {modelID, selection, detect} = STATE;
 
@@ -3590,10 +3620,8 @@ const parsePredictions = async (response) => {
   }
   predictionsReceived[file]++;
   const received = sumObjectValues(predictionsReceived);
-  const total = sumObjectValues(batchChunksToSend);
-  const progress = received / total;
+  if (!selection && worker === 0) estimateTimeRemaining(received);
   const fileProgress = predictionsReceived[file] / batchChunksToSend[file];
-  UI.postMessage({ event: "progress", progress: progress, file: file });
   if (fileProgress === 1) {
     if (index === 0) {
       generateAlert({
@@ -3614,13 +3642,48 @@ const parsePredictions = async (response) => {
       );
   }
   if (!selection && STATE.increment() === 0) {
-    if (fileProgress < 1) getSummary({ interim: true });
+    getSummary({ interim: true });
     getTotal();
   }
-  return response.worker;
+  return worker;
 };
 
-let SEEN_MODEL_READY = false;
+
+async function estimateTimeRemaining(batchesReceived) {
+  if (! STATE.totalDuration) return;
+  const totalBatches = Math.ceil(STATE.totalDuration / (BATCH_SIZE * WINDOW_SIZE));
+  const progress = batchesReceived / totalBatches;
+  const elapsedMinutes = (Date.now() - t0_analysis) / 60_000;
+  const estimatedTime = elapsedMinutes / progress;
+  const processedMinutes = (STATE.totalDuration / 60) * progress;
+  const remaining = estimatedTime - elapsedMinutes;
+  const speed = (processedMinutes / elapsedMinutes).toFixed(0);
+  const i18n = {
+    en: { less: 'Less than a minute remaining', min: 'minutes remaining' },
+    da: { less: 'Mindre end et minut tilbage', min: 'minutter tilbage' },
+    de: { less: 'Weniger als eine Minute verbleibend', min: 'Minuten verbleibend' },
+    es: { less: 'Queda menos de un minuto', min: 'minutos restantes' },
+    fr: { less: 'Moins d’une minute restante', min: 'minutes restantes' },
+    ja: { less: '残り1分未満', min: '分残り' },
+    nl: { less: 'Minder dan een minuut resterend', min: 'minuten resterend' },
+    pt: { less: 'Menos de um minuto restante', min: 'minutos restantes' },
+    ru: { less: 'Осталось меньше минуты', min: 'минут осталось' },
+    sv: { less: 'Mindre än en minut kvar', min: 'minuter kvar' },
+    zh: { less: '剩余不到一分钟', min: '分钟剩余' }
+  }  
+  const locale = STATE.locale in i18n ? STATE.locale : 'en';
+  const text =
+    remaining < 1
+      ? `${i18n[locale].less} (${speed}x)`
+      : `${remaining.toFixed(0)} ${i18n[locale].min} (${speed}x)`;
+
+  UI.postMessage({
+    event: 'footer-progress',
+    progress: { percent: progress * 100 },
+    text
+  });
+}
+
 async function parseMessage(e) {
   const response = e.data;
   switch (response["message"]) {
@@ -3644,7 +3707,7 @@ async function parseMessage(e) {
       if (!aborted) {
         predictWorkers[response.worker].isAvailable = true;
         let worker = await parsePredictions(response).catch((error) =>
-          console.log("Error parsing predictions", error)
+        DEBUG &&  console.log("Error parsing predictions", error)
         );
         DEBUG &&
           console.log(
@@ -3676,7 +3739,7 @@ async function parseMessage(e) {
     }
     case "training-progress": {
       UI.postMessage({
-        event: "conversion-progress", //use this handler to send footer progress updates
+        event: "footer-progress", //use this handler to send footer progress updates
         progress: response.progress,
         text: response.text,
       });
@@ -3763,17 +3826,30 @@ async function processNextFile({
           // Nothing to do for this file
           updateFilesBeingProcessed(file);
           generateAlert({ message: "noNight", variables: { file } });
-
+          const duration = METADATA[file].duration;
+          STATE.totalDuration -= Math.ceil(duration / (BATCH_SIZE * WINDOW_SIZE)) * (BATCH_SIZE * WINDOW_SIZE);
           DEBUG && console.log("Recursion: start = end");
           await processNextFile(arguments[0]).catch((error) =>
             console.warn("Error in processNextFile call", error)
           );
         } else {
           if (!sumObjectValues(predictionsReceived)) {
+            const awaiting = {
+              en: "Awaiting detections",
+              da: "Afventer detektioner",
+              de: "Warten auf Erkennungen",
+              es: "Esperando detecciones",
+              fr: "En attente des détections",
+              nl: "Wachten op detecties",
+              pt: "Aguardando detecções",
+              ru: "Ожидание обнаружений",
+              sv: "Väntar på detektioner",
+              zh: "等待检测",
+            };
             UI.postMessage({
-              event: "progress",
-              text: "yes",
-              file: file,
+              event: "footer-progress",
+              text: awaiting[STATE.locale] || awaiting["en"],
+              progress: {percent: 0},
             });
           }
           await doPrediction({
@@ -4013,7 +4089,7 @@ const getResults = async ({
           );
           // Progress updates
           UI.postMessage({
-            event: "conversion-progress", //use this handler to send footer progress updates
+            event: "footer-progress", //use this handler to send footer progress updates
             progress: {percent: (count / result.length)*100},
             text: 'Saving files:',
           });
@@ -4385,7 +4461,7 @@ const getDetectedSpecies = async () => {
   sql += " GROUP BY cname ORDER BY cname";
   diskDB.all(sql, (err, rows) => {
     err
-      ? console.log(err)
+      ? console.error(err)
       : UI.postMessage({ event: "seen-species-list", list: rows });
   });
 };
@@ -4473,7 +4549,7 @@ const onUpdateFileStart = async (args) => {
     // Update dateDuration
     let result;
     result = await db.runAsync("DELETE FROM duration WHERE fileID = ?", id);
-    console.log(result.changes, " entries deleted from duration");
+    DEBUG && console.log(result.changes, " entries deleted from duration");
     await insertDurations(file, id);
     try {
       // Begin transaction
@@ -5002,7 +5078,7 @@ async function setIncludedIDs(lat, lon, week) {
     // If a promise is in the cache, return it
     return await LIST_CACHE[key];
   }
-  console.log("calling for a new list");
+  DEBUG && console.log("calling for a new list");
   // Store the promise in the cache immediately
   LIST_CACHE[key] = (async () => {
     const { result, messages } = await LIST_WORKER({
@@ -5123,7 +5199,7 @@ async function convertAndOrganiseFiles(threadLimit = 4) {
   if (!STATE.library.backfill) query += " WHERE f.archiveName is NULL";
   t0 = Date.now();
   const rows = await db.allAsync(query);
-  console.log(`db query took ${Date.now() - t0}ms`);
+  DEBUG && console.log(`db query took ${Date.now() - t0}ms`);
   const ext = "." + STATE.library.format;
   for (const row of rows) {
     row.place ??= STATE.place;
@@ -5192,7 +5268,7 @@ async function convertAndOrganiseFiles(threadLimit = 4) {
   Promise.allSettled(conversions).then((results) => {
     // Oftentimes, the final percent.progress reported is < 100. So when finished, send 100 so the progress panel can be hidden
     UI.postMessage({
-      event: "conversion-progress",
+      event: "footer-progress",
       progress: { percent: 100 },
       text: "",
     });
@@ -5260,7 +5336,7 @@ async function convertFile(
   dbArchiveName,
   fileProgressMap
 ) {
-  METADATA[inputFilePath] || (await setMetadata({ file: inputFilePath }));
+  await setMetadata({ file: inputFilePath });
   const boundaries = await setStartEnd(inputFilePath);
 
   return new Promise((resolve, reject) => {
@@ -5343,7 +5419,7 @@ async function convertFile(
           );
           const average = sum / values.length;
           UI.postMessage({
-            event: `conversion-progress`,
+            event: `footer-progress`,
             progress: { percent: average },
             text: `Archive file conversion progress: ${average.toFixed(1)}%`,
           });

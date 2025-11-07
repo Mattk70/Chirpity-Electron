@@ -558,31 +558,6 @@ input[type="range"].vertical {
   border-radius: 1rem;
 }
 
-/* Animate Ellipsis */
-
-.loading:after {
-  overflow: hidden;
-  display: inline-block;
-  vertical-align: bottom;
-  -webkit-animation: ellipsis steps(4, end) 1500ms infinite;
-  animation: ellipsis steps(4, end) 1500ms infinite;
-  content: "\2026";
-  /* ascii code for the ellipsis character */
-  width: 0px;
-}
-
-@keyframes ellipsis {
-  to {
-    width: 15px;
-  }
-}
-
-@-webkit-keyframes ellipsis {
-  to {
-    width: 15px;
-  }
-}
-
 #loading {
   position: absolute;
   top: 20vh;
@@ -680,7 +655,7 @@ input[type="range"].vertical {
 }
 
 #update-progress-bar {
-  width: 100px;
+  /* width: 40%; */
   height: calc(10px * var(--font-size-scale));
   border: 1px solid #ccc;
   border-radius: 5px;
