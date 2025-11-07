@@ -2071,7 +2071,7 @@ const roundedFloat = (string) => Math.round(parseFloat(string) * 10000) / 10000;
  * @returns {Promise<unknown>}
  */
 const setMetadata = async ({ file, source_file = file }) => {
-  const fileMeta = METADATA[file] || {};
+  let fileMeta = METADATA[file] || {};
   if (fileMeta.isComplete) return fileMeta;
   console.log('in setmetadata for', file);
   // CHeck the database first, so we honour any manual updates.
@@ -3049,7 +3049,7 @@ const bufferToAudio = async ({
 
   if (padding) {
     start = Math.max(0, start - 1);
-    METADATA[file] ??= await setMetadata({ file });
+    await setMetadata({ file });
 
     end = Math.min(METADATA[file].duration, end + 1);
   }
@@ -5334,7 +5334,7 @@ async function convertFile(
   dbArchiveName,
   fileProgressMap
 ) {
-  METADATA[inputFilePath] || (await setMetadata({ file: inputFilePath }));
+  await setMetadata({ file: inputFilePath });
   const boundaries = await setStartEnd(inputFilePath);
 
   return new Promise((resolve, reject) => {
