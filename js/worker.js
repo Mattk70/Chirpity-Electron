@@ -3553,15 +3553,14 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
 
 
 const parsePredictions = async (response) => {
-  const file = response.file;
+  const {file, worker, result:latestResult} = response;
   const predictionLength = STATE.model.includes("bats") ? 0.3 : WINDOW_SIZE;
   AUDIO_BACKLOG--;
-  const latestResult = response.result;
   if (!latestResult.length) {
     predictionsReceived[file]++;
-    return response.worker;
+    return worker;
   }
-  DEBUG && console.log("worker being used:", response.worker);
+  DEBUG && console.log("worker being used:", worker);
   const [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
   const {modelID, selection, detect} = STATE;
 
@@ -3622,7 +3621,7 @@ const parsePredictions = async (response) => {
   }
   predictionsReceived[file]++;
   const received = sumObjectValues(predictionsReceived);
-  if (!selection) estimateTimeRemaining(received);
+  if (!selection && worker === 0) estimateTimeRemaining(received);
   const fileProgress = predictionsReceived[file] / batchChunksToSend[file];
   if (fileProgress === 1) {
     if (index === 0) {
@@ -3647,7 +3646,7 @@ const parsePredictions = async (response) => {
     getSummary({ interim: true });
     getTotal();
   }
-  return response.worker;
+  return worker;
 };
 
 
@@ -3657,7 +3656,9 @@ async function estimateTimeRemaining(batchesReceived) {
   const progress = batchesReceived / totalBatches;
   const elapsedMinutes = (Date.now() - t0_analysis) / 60_000;
   const estimatedTime = elapsedMinutes / progress;
+  const processedMinutes = (STATE.totalDuration / 60) * progress;
   const remaining = estimatedTime - elapsedMinutes;
+  const speed = (processedMinutes / elapsedMinutes).toFixed(0);
   const i18n = {
     en: { less: 'Less than a minute remaining', min: 'minutes remaining' },
     da: { less: 'Mindre end et minut tilbage', min: 'minutter tilbage' },
@@ -3674,8 +3675,8 @@ async function estimateTimeRemaining(batchesReceived) {
   const locale = STATE.locale in i18n ? STATE.locale : 'en';
   const text =
     remaining < 1
-      ? i18n[locale].less
-      : `${remaining.toFixed(0)} ${i18n[locale].min}`;
+      ? `${i18n[locale].less} (${speed}x)`
+      : `${remaining.toFixed(0)} ${i18n[locale].min} (${speed}x)`;
 
   UI.postMessage({
     event: 'footer-progress',
