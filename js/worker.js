@@ -259,7 +259,7 @@ async function loadDB(modelPath) {
   let modelID, needsTranslation;
   const file = p.join(path, `archive.sqlite`);
   if (!fs.existsSync(file)) {
-    console.log("No db file: ", file);
+    DEBUG && console.log("No db file: ", file);
     try {
         diskDB = await createDB({file, dbMutex});
     } catch (error) {
@@ -270,7 +270,7 @@ async function loadDB(modelPath) {
       });
       throw error;
     }
-    console.log("DB created at : ", file);
+    DEBUG && console.log("DB created at : ", file);
     STATE.modelID = modelID;
   } else {
     diskDB = new sqlite3.Database(file);
@@ -1033,10 +1033,10 @@ async function processFilesInBatches(filePaths, batchSize = 20) {
         }
       ))
     );
-    console.log(`Processed ${i + results.length} of ${filePaths.length}`);
+    DEBUG && console.log(`Processed ${i + results.length} of ${filePaths.length}`);
 
   }
-  console.log('All files processed');
+  DEBUG && console.log('All files processed');
 }
 
 const getFilesInDirectory = async (dir) => {
@@ -2073,7 +2073,6 @@ const roundedFloat = (string) => Math.round(parseFloat(string) * 10000) / 10000;
 const setMetadata = async ({ file, source_file = file }) => {
   let fileMeta = METADATA[file] || {};
   if (fileMeta.isComplete) return fileMeta;
-  console.log('in setmetadata for', file);
   // CHeck the database first, so we honour any manual updates.
   const savedMeta = await getSavedFileInfo(file).catch((error) =>
     console.warn("getSavedFileInfo error", error)
@@ -2188,7 +2187,7 @@ function pauseFfmpeg(ffmpegCommand, pid) {
       DEBUG && console.log(message);
     } else {
       ffmpegCommand.kill("SIGSTOP");
-      console.log("paused ", pid);
+      DEBUG && console.log("paused ", pid);
     }
     STATE.processingPaused[pid] = true;
   }
@@ -2205,7 +2204,7 @@ function resumeFfmpeg(ffmpegCommand, pid) {
       DEBUG && console.log(message);
     } else {
       ffmpegCommand.kill("SIGCONT");
-      console.log("resumed ", pid);
+      DEBUG && console.log("resumed ", pid);
     }
     STATE.processingPaused[pid] = false;
   }
@@ -2321,7 +2320,7 @@ async function processAudio(
         console.warn(`processAudio: ${file} ${error}`);
       } else {
         if (error.message.includes("SIGKILL"))
-          console.log("FFMPEG process shut down at user request");
+          DEBUG && console.log("FFMPEG process shut down at user request");
         reject(error);
       }
     });
@@ -2436,12 +2435,12 @@ async function processAudio(
     });
 
     STREAM.on("error", (err) => {
-      console.log("stream error: ", err);
+      DEBUG && console.log("stream error: ", err);
       err.code === "ENOENT" && notifyMissingFile(file);
     });      
   })
 
-  }).catch((error) => console.log(error));
+  }).catch((error) => console.error(error));
 }
 
 function getMonoChannelData(audio) {
@@ -2711,7 +2710,7 @@ function findFile(pathParts, filename, species) {
     const folder = p.join(baseDir, species);
     const filePath = p.join(folder, filename + ".mp3");
     if (fs.existsSync(filePath)) {
-      console.log(`File found: ${filePath}`);
+      DEBUG && console.log(`File found: ${filePath}`);
       return [filePath, species];
     }
   }
@@ -2723,13 +2722,13 @@ function findFile(pathParts, filename, species) {
     const folder = p.join(baseDir, found_calltype);
     const filePath = p.join(folder, filename + ".mp3");
     if (fs.existsSync(filePath)) {
-      console.log(`File found: ${filePath}`);
+      DEBUG && console.log(`File found: ${filePath}`);
 
       return [filePath, found_calltype];
     }
   }
 
-  console.log("File not found in any directory");
+  DEBUG && console.log("File not found in any directory");
   return [null, null];
 }
 const convertSpecsFromExistingSpecs = async (path) => {
@@ -3708,7 +3707,7 @@ async function parseMessage(e) {
       if (!aborted) {
         predictWorkers[response.worker].isAvailable = true;
         let worker = await parsePredictions(response).catch((error) =>
-          console.log("Error parsing predictions", error)
+        DEBUG &&  console.log("Error parsing predictions", error)
         );
         DEBUG &&
           console.log(
@@ -4462,7 +4461,7 @@ const getDetectedSpecies = async () => {
   sql += " GROUP BY cname ORDER BY cname";
   diskDB.all(sql, (err, rows) => {
     err
-      ? console.log(err)
+      ? console.error(err)
       : UI.postMessage({ event: "seen-species-list", list: rows });
   });
 };
@@ -4550,7 +4549,7 @@ const onUpdateFileStart = async (args) => {
     // Update dateDuration
     let result;
     result = await db.runAsync("DELETE FROM duration WHERE fileID = ?", id);
-    console.log(result.changes, " entries deleted from duration");
+    DEBUG && console.log(result.changes, " entries deleted from duration");
     await insertDurations(file, id);
     try {
       // Begin transaction
@@ -5079,7 +5078,7 @@ async function setIncludedIDs(lat, lon, week) {
     // If a promise is in the cache, return it
     return await LIST_CACHE[key];
   }
-  console.log("calling for a new list");
+  DEBUG && console.log("calling for a new list");
   // Store the promise in the cache immediately
   LIST_CACHE[key] = (async () => {
     const { result, messages } = await LIST_WORKER({
@@ -5200,7 +5199,7 @@ async function convertAndOrganiseFiles(threadLimit = 4) {
   if (!STATE.library.backfill) query += " WHERE f.archiveName is NULL";
   t0 = Date.now();
   const rows = await db.allAsync(query);
-  console.log(`db query took ${Date.now() - t0}ms`);
+  DEBUG && console.log(`db query took ${Date.now() - t0}ms`);
   const ext = "." + STATE.library.format;
   for (const row of rows) {
     row.place ??= STATE.place;
