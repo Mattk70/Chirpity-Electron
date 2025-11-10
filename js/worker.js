@@ -3833,7 +3833,7 @@ async function processNextFile({
             console.warn("Error in processNextFile call", error)
           );
         } else {
-          if (!sumObjectValues(predictionsReceived)) {
+          if (!STATE.selection && !sumObjectValues(predictionsReceived)) {
             const awaiting = {
               en: "Awaiting detections",
               da: "Afventer detektioner",

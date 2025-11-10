@@ -108,35 +108,18 @@ const NOT_BIRDS = [
   "Spea bombifrons_Plains Spadefoot",
   "Tamias striatus_Eastern Chipmunk",
   "Tamiasciurus hudsonicus_Red Squirrel",
+  "Vulpes vulpes_Red Fox",
+  
   "Human vocal_Human vocal",
   "Human non-vocal_Human non-vocal",
   "Human whistle_Human whistle",
-  "Dog_Dog",
   "Power tools_Power tools",
   "Siren_Siren",
   "Engine_Engine",
-  "Gun_Gun",
-  "Fireworks_Fireworks",
-  "Environmental_Environmental",
-  "Noise_Noise",
   "Ambient Noise_Ambient Noise",
-  "Animal_Animal",
-  "Cat_Cat",
   "Church Bells_Church Bells",
-  "Cough_Cough",
-  "Dog_Dog",
-  "Human_Human",
-  "Laugh_Laugh",
   "No call_No call",
-  "Rain_Rain",
-  "Red Fox_Red Fox",
-  "Sneeze_Sneeze",
-  "Snoring_Snoring",
-  "Thunder_Thunder",
-  "Vehicle_Vehicle",
   "Water Drops_Water Drops",
-  "Waves_Waves",
-  "Wind_Wind",
 ];
 
 const birdnetlabelFile = `../../labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_en.txt`;
@@ -172,6 +155,7 @@ const ACTIVITY_INDEX = JSON.parse(
 
 const BIRDNET_LABELS = await loadLabels();
 
+
 /* USAGE EXAMPLES:
 listWorker.postMessage({message: 'load'})
 listWorker.postMessage({message: 'get-list', model: 'chirpity', listType: 'location', useWeek: true, lat: 52.0, lon: -0.5, week: 40, threshold: 0.01 })
@@ -188,6 +172,7 @@ onmessage = async (e) => {
         const { model, listType, useWeek, customLabels, labels } = e.data;
         listModel.customLabels = customLabels;
         listModel.model = model;
+        listModel.splitChar = model === "perch v2" ? "~" : "_";
         listModel.labels = labels; // || model === "birdnet" ? BIRDNET_LABELS : listModel.modelLabels[model];
         let lat = parseFloat(e.data.lat);
         let lon = parseFloat(e.data.lon);
@@ -236,6 +221,7 @@ class Model {
     }
   }
 
+  getFirstElement = (label) => label.split(this.splitChar)[0];
   async setList({
     lat,
     lon,
@@ -330,8 +316,8 @@ class Model {
     } else if (listType === "custom") {
       if (this.customLabels) {
         // hack: why it gets called first without customLabels I don't know! But it will be called a second time with one.
-        const labelsScientificNames = this.labels.map(getFirstElement);
-        const customScienticNames = this.customLabels.map(getFirstElement);
+        const labelsScientificNames = this.labels.map(this.getFirstElement);
+        const customScienticNames = this.customLabels.map(this.getFirstElement);
         let line = 0;
         // Go through each custom label
         for (let i = 0; i < customScienticNames.length; i++) {
@@ -375,12 +361,13 @@ class Model {
 
       // Create a list of included labels' indices
       const t0 = Date.now();
-      const notBirdsFirstParts = NOT_BIRDS.map(getFirstElement);
+      const notBirdsFirstParts = NOT_BIRDS.map(this.getFirstElement);
 
       includedIDs = this.labels
         .map((label, index) => {
-          const firstPart = getFirstElement(label);
-          const found = notBirdsFirstParts.includes(firstPart)
+          const firstPart = this.getFirstElement(label);
+          // Check if the first part is in the notBirdsFirstParts array, or if it lacks spaces or contains underscores
+          const found = notBirdsFirstParts.includes(firstPart) || firstPart.indexOf(" ") === -1 || firstPart.indexOf("_") !== -1;
           return found ? null : index + 1;
         })
         .filter((index) => index !== null);
@@ -404,7 +391,7 @@ function findAllIndexes(array, value) {
     return acc;
   }, []);
 }
-const getFirstElement = (label) => label.split("_")[0];
+
 /**
  * Initializes TensorFlow.js with the specified backend and loads the bird identification model.
  *
