@@ -1393,6 +1393,11 @@ const LIST_MAP = {
         nocturnal: 'Searching for nocturnal calls',
         birds: 'Searching for all birds',
         everything: 'Searching for everything',
+        Mammalia: 'Searching for Mammals',
+        Reptilia: 'Searching for Reptiles',
+        Insecta: 'Searching for Insects',
+        Animalia: 'Excluding Environmental Noise',
+        Amphibia: 'Searching for Amphibians',
         custom: 'Using a custom list'
     },
     da: {
@@ -1734,7 +1739,12 @@ const Titles = {
         Europe: "Europe",
         Mediterranean: "Mediterranean",
         customListPH: 'No custom list set',
-        libraryLocationPH: 'No location set'
+        libraryLocationPH: 'No location set',
+        Mammalia: 'Mammals',
+        Reptilia: 'Reptiles',
+        Insecta: 'Insects',
+        Animalia: 'Exclude Environmental Noise',
+        Amphibia: 'Amphibians'
     },
     da: {
         location: 'Lokale fugle',

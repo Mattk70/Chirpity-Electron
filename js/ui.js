@@ -1775,7 +1775,7 @@ const defaultConfig = {
   seenTour: false,
   lastUpdateCheck: 0,
   UUID: uuidv4(),
-  colormap: "inferno",
+  colormap: "roseus",
   specMaxHeight: 260,
   specLabels: true,
   specDetections: true,
@@ -1791,9 +1791,9 @@ const defaultConfig = {
   timeOfDay: true,
   list: "birds",
   models: {
-    birdnet: {displayName: 'BirdNET', backend: 'tensorflow', customListFile: ''},
-    chirpity: {displayName: 'Nocmig', backend: 'tensorflow', customListFile: ''},
-    nocmig: {displayName: 'Nocmig V2 (Beta)', backend: 'tensorflow', customListFile: ''},
+    birdnet: {displayName: 'BirdNET', backend: 'webgpu', customListFile: ''},
+    chirpity: {displayName: 'Nocmig', backend: 'webgpu', customListFile: ''},
+    nocmig: {displayName: 'Nocmig V2 (Beta)', backend: 'webgpu', customListFile: ''},
   },
   local: true,
   speciesThreshold: 0.03,
@@ -2006,14 +2006,7 @@ window.onload = async () => {
     DOM.audioNotification.checked = config.audio.notification;
     // Zoom H1E filestart handling:
     document.getElementById("file-timestamp").checked = config.fileStartMtime;
-    // List appearance in settings
-    DOM.speciesThreshold.value = config.speciesThreshold;
-    document.getElementById("species-week").checked = config.useWeek;
-    DOM.customListFile.value = config.models[config.selectedModel].customListFile;
-    if (!DOM.customListFile.value) delete LIST_MAP.custom;
-    // And update the icon
-    updateListIcon();
-    setListUIState(list)
+
     // timeline
     DOM.timelineSetting.value = config.timeOfDay ? "timeOfDay" : "timecode";
     // Spectrogram colour
@@ -2068,7 +2061,14 @@ window.onload = async () => {
     document.getElementById("iucn").checked = config.detect.iucn;
     document.getElementById("iucn-scope").selected = config.detect.iucnScope;
     handleModelChange(config.selectedModel, false)
-
+    // List appearance in settings
+    DOM.speciesThreshold.value = config.speciesThreshold;
+    document.getElementById("species-week").checked = config.useWeek;
+    DOM.customListFile.value = config.models[config.selectedModel].customListFile;
+    if (!DOM.customListFile.value) delete LIST_MAP.custom;
+    // And update the icon
+    updateListIcon();
+    setListUIState(list)
     contextAwareIconDisplay();
     DOM.debugMode.checked = config.debug;
     showThreshold(config.detect.confidence);
@@ -2888,18 +2888,41 @@ let spec = new ChirpityWS(
   GLOBAL_ACTIONS
 );
 
+const updateListOptions = (model) => {
+  const select = document.getElementById('list-to-use');
+  select.replaceChildren();
+  let options;
+  if (/perch/i.test(model)) {
+    options = ["birds", "Amphibia", "Insecta", "Mammalia", "Reptilia", "Animalia", "everything"]
+  } else  {
+    options = ["location", "nocturnal", "birds", "everything", "custom"];
+  }
+  options.forEach(option => {
+    const opt = document.createElement("option");
+    opt.value = option;
+    opt.textContent = i18n.get(i18n.Lists)[option] || option;
+    select.appendChild(opt);
+  });
+}
 
 const updateListIcon = () => {
   const LIST_MAP = i18n.get(i18n.LIST_MAP);
   const {list} = config;
   let node;
-  if (list === "custom"){
+  if (["custom", "Mammalia", "Insecta", "Animalia"].includes(list)) {
+    const iconName = {
+      custom: "fact_check",
+      Mammalia: "pets",
+      Insecta: "bug_report",
+      Animalia: "voice_over_off"
+    }
     node = document.createElement("span");
     node.className = "material-symbols-outlined mt-1";
     node.style.width =  "1.8rem";
-    node.textContent = "fact_check";
+    node.style.height =  "1.6rem";
+    node.textContent = iconName[list];
   } else {
-    if (!['location', 'birds', 'nocturnal', 'everything'].includes(list)) return
+    if (!['location', 'birds', 'nocturnal', 'everything', 'Amphibia', "Reptilia"].includes(list)) return
     node = document.createElement("img");
     node.className = "icon filter";
     node.setAttribute("src", `img/${list}.png`);
@@ -2925,12 +2948,15 @@ const updateModelIcon = (model) => {
       title = "Perch V2";
       model = 'perch';
       break;
-    case 'bats':
-      title = "Bats";
-      break;
     default:
-      title = i18n.get(i18n.Lists).custom;
-      model = "custom"
+      if (/bats/i.test(model)) {
+        title = "Bats";
+        model = "bats";
+      } else {
+        title = i18n.get(i18n.Lists).custom;
+        model = "custom"
+      }
+      
   }
   const img = document.createElement("img");
   img.className = "icon";
@@ -2945,7 +2971,7 @@ DOM.listIcon.addEventListener("click", () => {
     generateToast({ message: "changeListBlocked", type: "warning" });
     return;
   }
-  const keys = Object.keys(LIST_MAP);
+  const keys = config.selectedModel !== 'perch v2' ? ["location", "nocturnal", "birds", "everything", "custom"] : ["birds", "Amphibia", "Insecta", "Mammalia", "Reptilia", "Animalia", "everything"];
   const currentListIndex = keys.indexOf(config.list);
   const next = currentListIndex === keys.length - 1 ? 0 : currentListIndex + 1;
   config.list = keys[next];
@@ -3000,6 +3026,7 @@ const handleModelChange = (model, reload = true) => {
   if (reload) {
     handleBackendChange(backend);
   }
+  updateListOptions(model);
   updateModelIcon(model);
 }
 

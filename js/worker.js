@@ -503,7 +503,7 @@ async function handleMessage(e) {
       if (!preserveResults) {
         // Clear records from the memory db
         await memoryDB.runAsync("DELETE FROM records; VACUUM");
-        const mode = METADATA[file].isSaved ? "archive" : "analyse";
+        const mode = METADATA[file]?.isSaved ? "archive" : "analyse";
         await onChangeMode(mode);
       }
       break;
@@ -1185,7 +1185,7 @@ async function getSpeciesSQLAsync(){
   const {list, allLabels} = STATE;
   if (list !== 'everything') {
     let included = await getIncludedIDs();
-    if (list === "birds") {
+    if (["birds", 'Animalia'].includes(list)) {
       included = getExcluded(included);
       if (!included.length) return SQL; // nothing filtered out
       not = "NOT";
@@ -3622,6 +3622,10 @@ const parsePredictions = async (response) => {
   const received = sumObjectValues(predictionsReceived);
   if (!selection && worker === 0) estimateTimeRemaining(received);
   const fileProgress = predictionsReceived[file] / batchChunksToSend[file];
+  if (!selection && STATE.increment() === 0) {
+    getSummary({ interim: true });
+    getTotal();
+  }
   if (fileProgress === 1) {
     if (index === 0) {
       generateAlert({
@@ -3641,10 +3645,7 @@ const parsePredictions = async (response) => {
         } seconds: ${filesBeingProcessed.length} files to go`
       );
   }
-  if (!selection && STATE.increment() === 0) {
-    getSummary({ interim: true });
-    getTotal();
-  }
+
   return worker;
 };
 
@@ -5081,18 +5082,20 @@ async function setIncludedIDs(lat, lon, week) {
   DEBUG && console.log("calling for a new list");
   // Store the promise in the cache immediately
   LIST_CACHE[key] = (async () => {
+    const { model, modelPath, allLabels:labels, list:listType, customLabels, local:localBirdsOnly, speciesThreshold:threshold, useWeek } = STATE;
     const { result, messages } = await LIST_WORKER({
       message: "get-list",
-      model: STATE.model,
-      labels: STATE.allLabels,
-      listType: STATE.list,
-      customLabels: STATE.customLabels,
+      model,
+      modelPath,
+      labels,
+      listType,
+      customLabels: customLabels,
       lat: lat || STATE.lat,
       lon: lon || STATE.lon,
       week: week || STATE.week,
-      useWeek: STATE.useWeek,
-      localBirdsOnly: STATE.local,
-      threshold: STATE.speciesThreshold,
+      useWeek,
+      localBirdsOnly,
+      threshold,
     });
     // // Add the *label* id of "Unknown Sp." to all lists
     STATE.list !== "everything" 

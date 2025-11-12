@@ -109,43 +109,53 @@ const NOT_BIRDS = [
   "Tamias striatus_Eastern Chipmunk",
   "Tamiasciurus hudsonicus_Red Squirrel",
   "Vulpes vulpes_Red Fox",
-  
+
   "Human vocal_Human vocal",
   "Human non-vocal_Human non-vocal",
   "Human whistle_Human whistle",
   "Power tools_Power tools",
-  "Siren_Siren",
-  "Engine_Engine",
   "Ambient Noise_Ambient Noise",
   "Church Bells_Church Bells",
   "No call_No call",
   "Water Drops_Water Drops",
 ];
 
-const birdnetlabelFile = `../../labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_en.txt`;
+const birdnetlabelFile = path.resolve('labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_en.txt');
+
 
 /**
- * Asynchronously loads and returns bird labels from a file.
+ * Loads and returns bird labels from a file.
  *
- * This function fetches the text content from the file specified by the global variable
- * `birdnetlabelFile`. The content is trimmed and split by newline characters into an array of label strings.
- * If the fetch operation fails or returns a non-ok response, the error is logged and the function returns undefined.
+ * This function reads the text content from the file specified by `filePath`.
+ * The content is trimmed and split by newline characters into an array of label strings.
+ * If the read operation fails, the error is logged and the function returns undefined.
  *
  * @returns {Promise<string[]|undefined>} A promise that resolves to an array of label strings on success, or undefined if an error occurs.
  */
-async function loadLabels(){
-  return  fetch(birdnetlabelFile)
+function loadLabels(filePath) {
+  try {
+    const fileContents = fs.readFileSync(filePath, 'utf8');
+    return fileContents.trim().split(/\r?\n/);
+  } catch (error) {
+    console.error(`There was a problem reading the label file at ${filePath}:`, error);
+  }
+}
+
+async function updateLabels(labelsPath) {
+  return fetch("https://github.com/Mattk70/Chirpity-Website/releases/download/v2.0.0/newLabels.txt")
     .then((response) => {
       if (!response.ok) throw new Error("Network response was not ok");
       return response.text();
     })
     .then((filecontents) => {
+      fs.writeFileSync(labelsPath, filecontents);
       return filecontents.trim().split(/\r?\n/);
     })
     .catch((error) => {
-      console.error("There was a problem fetching the label file:", error);
+      console.error("There was a problem fetching the Perch label file:", error);
     });
 }
+
 const ACTIVITY_INDEX = JSON.parse(
   fs.readFileSync(
     path.join(__dirname, "../../nocturnal_activity_index.json"),
@@ -153,7 +163,8 @@ const ACTIVITY_INDEX = JSON.parse(
   )
 );
 
-const BIRDNET_LABELS = await loadLabels();
+const BIRDNET_LABELS = loadLabels(birdnetlabelFile);
+let PERCH_LABELS;
 
 
 /* USAGE EXAMPLES:
@@ -169,16 +180,30 @@ onmessage = async (e) => {
     switch (message) {
       case "get-list": {
         // labels here is every label in the database
-        const { model, listType, useWeek, customLabels, labels } = e.data;
+        const { model, modelPath, listType, useWeek, customLabels, labels, localBirdsOnly } = e.data;
+        let { lat, lon, week, threshold } = e.data;
         listModel.customLabels = customLabels;
         listModel.model = model;
-        listModel.splitChar = model === "perch v2" ? "~" : "_";
-        listModel.labels = labels; // || model === "birdnet" ? BIRDNET_LABELS : listModel.modelLabels[model];
-        let lat = parseFloat(e.data.lat);
-        let lon = parseFloat(e.data.lon);
-        let week = parseInt(e.data.week);
-        let threshold = parseFloat(e.data.threshold);
-        let localBirdsOnly = e.data.localBirdsOnly;
+        const perch = model === "perch v2";
+        listModel.perch = perch;
+        listModel.splitChar = perch ? "~" : "_";
+        if (perch) {
+          PERCH_LABELS ??= loadLabels(path.join(modelPath, 'labels.txt'));
+          const parts = PERCH_LABELS && PERCH_LABELS[0]?.split("~");
+          if (!parts || parts.length < 3) {
+            // Missing / Old format, so try to update
+            const updatedLabels = await updateLabels(path.join(modelPath, 'labels.txt'));
+            listModel.labels = updatedLabels;
+          } else {
+            listModel.labels = PERCH_LABELS;
+          }
+        } else {
+          listModel.labels = labels;
+        }
+        lat = parseFloat(lat);
+        lon = parseFloat(lon);
+        week = parseInt(week);
+        threshold = parseFloat(threshold);
         DEBUG && console.log(`Setting list to ${listType}`);
         const [includedIDs, messages] = await listModel.setList({
           lat,
@@ -217,7 +242,7 @@ class Model {
       if (DEBUG) console.log("loading model from", this.appPath);
       this.metadata_model = await tf.loadGraphModel(this.appPath);
       // const mdata_label_path = path.join(__dirname, '..','BirdNET_GLOBAL_6K_V2.4_Model_TFJS','static','model','labels.json')
-      this.mdata_labels = BIRDNET_LABELS; //JSON.parse(fs.readFileSync(mdata_label_path, "utf8")); // Labels used in the metadata model
+      this.mdata_labels = BIRDNET_LABELS;
     }
   }
 
@@ -366,9 +391,18 @@ class Model {
       includedIDs = this.labels
         .map((label, index) => {
           const firstPart = this.getFirstElement(label);
-          // Check if the first part is in the notBirdsFirstParts array, or if it lacks spaces or contains underscores
-          const found = notBirdsFirstParts.includes(firstPart) || firstPart.indexOf(" ") === -1 || firstPart.indexOf("_") !== -1;
-          return found ? null : index + 1;
+          if (this.perch) {
+            listType === "Animalia" && (listType = "None");
+            // Perch has different format, so we need to check differently
+            const list = listType === "birds" ? "~Aves" : '~' + listType;
+            // None type means exclude these labels
+            if (listType === "None") return label.indexOf(list) === -1 ? index + 1 : null;
+            return label.indexOf(list) !== -1 ? index + 1 : null;
+          } else {
+            // Check if the first part is in the notBirdsFirstParts array, or if it lacks spaces or contains underscores
+            const found = notBirdsFirstParts.includes(firstPart) || firstPart.indexOf(" ") === -1 || firstPart.indexOf("_") !== -1;
+            return found ? null : index + 1;
+          }
         })
         .filter((index) => index !== null);
       DEBUG && console.log("filtering took", Date.now() - t0, "ms");
