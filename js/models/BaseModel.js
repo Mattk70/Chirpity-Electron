@@ -28,6 +28,7 @@ class BaseModel {
     this.scalarFive = tf.scalar(5);
     this.two  = tf.scalar(2);
     this.one = tf.scalar(1);
+    this.backend = tf.getBackend();
   }
 
   async loadModel(type) {
@@ -123,7 +124,7 @@ class BaseModel {
     const topN = Math.min(classes, 5);
     const { indices, values } = tf.topk(finalPrediction, topN, true);
     finalPrediction.dispose();
-    // The GPU backend is *so* slow with BirdNET, let's not queue up predictions
+    
     const [topIndices, topValues] = await Promise.all([
       indices.array(),
       values.array(),
@@ -168,11 +169,12 @@ class BaseModel {
   }
 
   padAudio = (audio) => {
-    const remainder = audio.length % this.chunkLength;
+    const samples = this.backend === 'webgpu' ? this.chunkLength * this.batchSize : this.chunkLength;
+    const remainder = audio.length % samples;
     if (remainder) {
       // Create a new array with the desired length
       const paddedAudio = new Float32Array(
-        audio.length + (this.chunkLength - remainder)
+        audio.length + (samples - remainder)
       );
       // Copy the existing values into the new array
       paddedAudio.set(audio);

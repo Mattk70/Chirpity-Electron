@@ -23,6 +23,7 @@ import {
 } from "./database.js";
 import { customURLEncode, installConsoleTracking, trackEvent as _trackEvent } from "./utils/tracking.js";
 import { getAudioMetadata } from "./models/training.js";
+
 let isWin32 = false;
 
 const dbMutex = new Mutex();
@@ -5135,6 +5136,7 @@ async function setIncludedIDs(lat, lon, week) {
           sname: message.sname,
           line: message.line,
           model: message.model,
+          splitChar: getSplitChar(),
         },
       });
     });

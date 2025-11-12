@@ -166,7 +166,7 @@ class BirdNETModel extends BaseModel {
     threshold,
     confidence
   ) {
-    DEBUG && console.log("predictCunk begin", tf.memory());
+    DEBUG && console.log("predictChunk begin", tf.memory().numTensors);
     const [audioBatch, numSamples] = this.createAudioTensorBatch(audioBuffer);
     const batchKeys = this.getKeys(numSamples, start);
     const result = await this.predictBatch(
@@ -175,7 +175,7 @@ class BirdNETModel extends BaseModel {
       threshold,
       confidence
     );
-    DEBUG && console.log("predictCunk end", tf.memory());
+    DEBUG && console.log("predictChunk end", tf.memory().numTensors);
     return [result, file, fileStart];
   }
   async getSpectrogram(data){

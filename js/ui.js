@@ -1924,8 +1924,11 @@ window.onload = async () => {
     }
     const selectedModel = config.selectedModel;
     
-    isMember && config.hasNode || (config.models[selectedModel].backend = "tensorflow");
+    if (!(isMember && config.hasNode) || isTestEnv) {
+      config.models[selectedModel].backend = "tensorflow";
+    }
 
+    updateListOptions(selectedModel);
     if (detect.combine) document.getElementById('model-icon').classList.remove('d-none')
     debug && document.getElementById('dataset').classList.remove('d-none')
     isMember && updateModelOptions();
@@ -2893,7 +2896,7 @@ const updateListOptions = (model) => {
   select.replaceChildren();
   let options;
   if (/perch/i.test(model)) {
-    options = ["birds", "Amphibia", "Insecta", "Mammalia", "Reptilia", "Animalia", "everything"]
+    options = ["birds", "Amphibia", "Insecta", "Mammalia", "Reptilia", "Animalia", "everything", "custom"]
   } else  {
     options = ["location", "nocturnal", "birds", "everything", "custom"];
   }
@@ -2903,6 +2906,12 @@ const updateListOptions = (model) => {
     opt.textContent = i18n.get(i18n.Lists)[option] || option;
     select.appendChild(opt);
   });
+  if (!options.includes(config.list)) {
+    config.list = "birds";
+    updatePrefs("config.json", config);
+    select.value = config.list;
+    select.click();
+  }
 }
 
 const updateListIcon = () => {
@@ -2971,7 +2980,7 @@ DOM.listIcon.addEventListener("click", () => {
     generateToast({ message: "changeListBlocked", type: "warning" });
     return;
   }
-  const keys = config.selectedModel !== 'perch v2' ? ["location", "nocturnal", "birds", "everything", "custom"] : ["birds", "Amphibia", "Insecta", "Mammalia", "Reptilia", "Animalia", "everything"];
+  const keys = config.selectedModel !== 'perch v2' ? ["location", "nocturnal", "birds", "everything", "custom"] : ["birds", "Amphibia", "Insecta", "Mammalia", "Reptilia", "Animalia", "everything", "custom"];
   const currentListIndex = keys.indexOf(config.list);
   const next = currentListIndex === keys.length - 1 ? 0 : currentListIndex + 1;
   config.list = keys[next];
@@ -3028,6 +3037,7 @@ const handleModelChange = (model, reload = true) => {
   }
   updateListOptions(model);
   updateModelIcon(model);
+  updateListIcon();
 }
 
 const handleBackendChange = (backend) => {
