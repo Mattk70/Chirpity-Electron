@@ -1925,6 +1925,7 @@ window.onload = async () => {
     const selectedModel = config.selectedModel;
     
     if (!(isMember && config.hasNode) || isTestEnv) {
+      alert(`Using TensorFlow.js backend - Node.js backend is a Pro feature. isMember: ${isMember}, hasNode: ${config.hasNode}, isTestEnv: ${isTestEnv} `);
       config.models[selectedModel].backend = "tensorflow";
     }
 
