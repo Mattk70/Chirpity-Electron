@@ -3037,6 +3037,9 @@ const handleModelChange = (model, reload = true) => {
 }
 
 const handleBackendChange = (backend) => {
+  if (backend === config.models[config.selectedModel].backend) {
+    return; // No change
+  }
   backend = backend instanceof Event ? backend.target.value : backend;
   config.models[config.selectedModel].backend = backend;
   const backendEL = document.getElementById(backend);
