@@ -120,7 +120,7 @@ const NOT_BIRDS = [
   "Water Drops_Water Drops",
 ];
 
-const birdnetlabelFile = path.resolve('labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_en.txt');
+const birdnetlabelFile = path.resolve(__dirname, '../../labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_en.txt');
 
 
 /**
