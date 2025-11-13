@@ -94,7 +94,9 @@ export class WorkerState {
     (this.fileStartMtime = false),
     (this.specDetections = false),
     (this.labelFilters = []),
-    (this.speciesMap = new Map());
+    (this.speciesMap = new Map()),
+    (this.totalDuration = 0),
+    (this.allFilesDuration = 0);
   }
 
   update(updates) {

@@ -1923,11 +1923,6 @@ window.onload = async () => {
       }
     }
     const selectedModel = config.selectedModel;
-    
-    if (!(isMember && config.hasNode) || isTestEnv) {
-      alert(`Using TensorFlow.js backend - Node.js backend is a Pro feature. isMember: ${isMember}, hasNode: ${config.hasNode}, isTestEnv: ${isTestEnv} `);
-      config.models[selectedModel].backend = "tensorflow";
-    }
 
     updateListOptions(selectedModel);
     if (detect.combine) document.getElementById('model-icon').classList.remove('d-none')
@@ -1959,6 +1954,9 @@ window.onload = async () => {
       specDetections,
     });
     t0_warmup = Date.now();
+    if (isTestEnv) {
+      config.models[selectedModel].backend = "tensorflow";
+    }
     const backend = config.models[config.selectedModel].backend;
 
     worker.postMessage({
@@ -2351,7 +2349,7 @@ const setUpWorkerMessaging = () => {
         case "tfjs-node": {
           // Have we gone from a no-node setting to a node one?
           const changedEnv = config.hasNode !== args.hasNode;
-          if (changedEnv && args.hasNode) {
+          if ((changedEnv || !STATE.isMember) && args.hasNode) {
             // If not using tensorflow, switch to the tensorflow backend because this faster under Node
             config.models[config.selectedModel].backend !== "tensorflow" &&
               handleBackendChange("tensorflow");
@@ -2361,10 +2359,7 @@ const setUpWorkerMessaging = () => {
             // No node? Not using webgpu? Force webgpu
             handleBackendChange("webgpu");
             generateToast({ type: "warning", message: "noNode" });
-            console.warn(
-              "tfjs-node could not be loaded, webGPU backend forced. CPU is",
-              DIAGNOSTICS["CPU"]
-            );
+            console.warn("tfjs-node could not be loaded, CPU is:", DIAGNOSTICS["CPU"]);
           }
           modelSettingsDisplay();
           break;
@@ -3693,7 +3688,7 @@ function onAnalysisComplete({ quiet }) {
   const duration = STATE.selection
     ? STATE.selection.end - STATE.selection.start
     : DIAGNOSTICS["Audio Duration"];
-  const rate = duration / analysisTime;
+  const rate = duration / parseFloat(analysisTime);
 
   trackEvent(
     config.UUID,
