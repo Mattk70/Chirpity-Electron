@@ -1954,6 +1954,9 @@ window.onload = async () => {
       specDetections,
     });
     t0_warmup = Date.now();
+    if (isTestEnv) {
+      config.models[selectedModel].backend = "tensorflow";
+    }
     const backend = config.models[config.selectedModel].backend;
 
     worker.postMessage({
