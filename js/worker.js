@@ -1013,6 +1013,7 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true}) => {
   UI.postMessage({ event: "files", filePaths, preserveResults, checkSaved });
   // Start gathering metadata for new files
   STATE.totalDuration = 0;
+  STATE.allFilesDuration = 0;
   await processFilesInBatches(filePaths, 10);
   return filePaths;
 };
@@ -1026,6 +1027,7 @@ async function processFilesInBatches(filePaths, batchSize = 20) {
       batch.map(file =>
         setMetadata({ file }).then(fileMetadata => {
           const duration = fileMetadata.duration || 0;
+          STATE.allFilesDuration += duration;
           STATE.totalDuration += Math.ceil(duration / (BATCH_SIZE * WINDOW_SIZE)) * (BATCH_SIZE * WINDOW_SIZE);
           return fileMetadata;
         }).catch ((error) => {
@@ -1563,7 +1565,7 @@ async function onAnalyse({
   AUDIO_BACKLOG = 0;
   STATE.processingPaused = {};
   STATE.backlogInterval = {};
-
+  t0_analysis = Date.now();
   if (!STATE.selection) {
     const {combine, merge} = STATE.detect;
     // Clear records from the memory db
@@ -1654,7 +1656,7 @@ async function onAnalyse({
   STATE.selection || await onChangeMode("analyse");
 
   filesBeingProcessed = [...FILE_QUEUE];
-  t0_analysis = Date.now();
+  
   for (let i = 0; i < NUM_WORKERS; i++) {
     processNextFile({ start, end, worker: i });
   }
@@ -3657,7 +3659,7 @@ async function estimateTimeRemaining(batchesReceived) {
   const progress = batchesReceived / totalBatches;
   const elapsedMinutes = (Date.now() - t0_analysis) / 60_000;
   const estimatedTime = elapsedMinutes / progress;
-  const processedMinutes = (STATE.totalDuration / 60) * progress;
+  const processedMinutes = (STATE.allFilesDuration / 60) * progress;
   const remaining = estimatedTime - elapsedMinutes;
   const speed = (processedMinutes / elapsedMinutes).toFixed(0);
   const i18n = {
@@ -3830,6 +3832,7 @@ async function processNextFile({
           generateAlert({ message: "noNight", variables: { file } });
           const duration = METADATA[file].duration;
           STATE.totalDuration -= Math.ceil(duration / (BATCH_SIZE * WINDOW_SIZE)) * (BATCH_SIZE * WINDOW_SIZE);
+          STATE.allFilesDuration -= duration;
           DEBUG && console.log("Recursion: start = end");
           await processNextFile(arguments[0]).catch((error) =>
             console.warn("Error in processNextFile call", error)

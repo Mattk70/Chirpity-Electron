@@ -3688,7 +3688,7 @@ function onAnalysisComplete({ quiet }) {
   const duration = STATE.selection
     ? STATE.selection.end - STATE.selection.start
     : DIAGNOSTICS["Audio Duration"];
-  const rate = duration / analysisTime;
+  const rate = duration / parseFloat(analysisTime);
 
   trackEvent(
     config.UUID,
