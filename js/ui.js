@@ -477,7 +477,7 @@ let diagnosticsReady = (async () => {
     DIAGNOSTICS["System Memory"] =
       (((memInfo?.total ?? 0) / (1024 ** 3)) || 0).toFixed(0) + " GB";
     DIAGNOSTICS["GPUs"] = (graphics?.controllers ?? [])
-      .map(gpu => gpu?.model)
+      .map(gpu => `${gpu?.model} (${(gpu?.vram/1024).toFixed(0) ?? "Unknown"} GB)` )
       .filter(Boolean)
       .join(", ");
   } catch (err) {
@@ -2080,13 +2080,13 @@ window.onload = async () => {
     document.getElementById("attenuation-threshold").textContent = DOM.attenuation.value + "dB";
     DOM.sendFilteredAudio.checked = config.filters.sendToModel;
     filterIconDisplay();
-    if (config.models[config.selectedModel].backend.includes("web")) {
+    if (isMac && config.models[config.selectedModel].backend.includes("web")) {
       // Force max three threads to prevent severe memory issues
       config[config.models[config.selectedModel].backend].threads = Math.min(
         config[config.models[config.selectedModel].backend].threads,
         3
       );
-      DOM.threadSlider.max = 6;
+      DOM.threadSlider.max = 3;
     } else {
       DOM.threadSlider.max = DIAGNOSTICS["Cores"];
     }
