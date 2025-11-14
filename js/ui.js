@@ -337,10 +337,6 @@ window.electron.onFileOpen((filePath) => {
   else OS_FILE_QUEUE.push(filePath);
 });
 
-// Batch size map for slider
-const BATCH_SIZE_LIST = [4, 8, 16, 32, 48, 64, 96];
-
-
 
 // Is this CI / playwright?
 const isTestEnv = window.env.TEST_ENV === "true";
@@ -1980,10 +1976,8 @@ window.onload = async () => {
     config.fontScale === 1 || setFontSizeScale(true);
 
     // Map slider value to batch size
-    DOM.batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(
-      config[config.models[config.selectedModel].backend].batchSize
-    );
-    DOM.batchSizeSlider.max = (BATCH_SIZE_LIST.length - 1).toString();
+    DOM.batchSizeSlider.value = 
+      config[config.models[config.selectedModel].backend].batchSize;
     DOM.batchSizeValue.textContent =
       config[config.models[config.selectedModel].backend].batchSize;
     DOM.modelToUse.value = config.selectedModel;
@@ -1994,8 +1988,6 @@ window.onload = async () => {
     // Show the list in use
     DOM.listToUse.value = config.list;
     DOM.localSwitch.checked = config.local;
-    config.list === "custom" &&
-      readLabels(config.models[config.selectedModel].customListFile, "list");
     // Show Locale
     DOM.locale.value = config.locale;
     LIST_MAP = i18n.get(i18n.LIST_MAP);
@@ -2094,7 +2086,7 @@ window.onload = async () => {
         config[config.models[config.selectedModel].backend].threads,
         3
       );
-      DOM.threadSlider.max = 3;
+      DOM.threadSlider.max = 6;
     } else {
       DOM.threadSlider.max = DIAGNOSTICS["Cores"];
     }
@@ -2906,7 +2898,6 @@ const updateListOptions = (model) => {
     config.list = "birds";
     updatePrefs("config.json", config);
     select.value = config.list;
-    select.click();
   }
 }
 
@@ -3020,7 +3011,7 @@ const loadModel = () => {
   flushSpec()
 };
 
-const handleModelChange = (model, reload = true) => {
+const handleModelChange = async (model, reload = true) => {
   modelSettingsDisplay();
   DOM.customListFile.value = config.models[model].customListFile;
   DOM.customListFile.value
@@ -3042,7 +3033,7 @@ const handleBackendChange = (backend) => {
   const backendEL = document.getElementById(backend);
   backendEL.checked = true;
   if (backend === "webgpu") {
-    DOM.threadSlider.max = 3;
+    DOM.threadSlider.max = 6;
   } else {
     DOM.threadSlider.max = DIAGNOSTICS["Cores"];
     DOM.contextAware.disabled = false;
@@ -3053,11 +3044,8 @@ const handleBackendChange = (backend) => {
   // Update threads and batch Size in UI
   DOM.threadSlider.value = config[backend].threads;
   DOM.numberOfThreads.textContent = config[backend].threads;
-  DOM.batchSizeSlider.value = BATCH_SIZE_LIST.indexOf(
-    config[backend].batchSize
-  );
-  DOM.batchSizeValue.textContent =
-    BATCH_SIZE_LIST[DOM.batchSizeSlider.value].toString();
+  DOM.batchSizeSlider.value = config[backend].batchSize;
+  DOM.batchSizeValue.textContent = DOM.batchSizeSlider.value
   updatePrefs("config.json", config);
   loadModel();
 };
@@ -3372,6 +3360,7 @@ const showExpunge = () => {
  */
 function onModelReady() {
   modelReady = true;
+  updateList();
   if (STATE.fileLoaded) {
     utils.enableMenuItem(["analyse"]);
     if (STATE.openFiles.length > 1)
@@ -4952,7 +4941,7 @@ document.addEventListener('input', (e) =>{
       break;
     }
     case "batch-size":{
-      DOM.batchSizeValue.textContent = BATCH_SIZE_LIST[DOM.batchSizeSlider.value];
+      DOM.batchSizeValue.textContent = DOM.batchSizeSlider.value;
       break;
     }
     case "confidence":
@@ -5869,11 +5858,11 @@ function changeSettingsMode(target) {
  *
  * If a custom list is selected, loads labels from the specified custom list file. Otherwise, notifies the worker to update the list and optionally refresh results based on analysis state.
  */
-function updateList() {
+async function updateList() {
   updateListIcon();
   setListUIState(config.list)
   if (config.list === "custom") {
-    readLabels(config.models[config.selectedModel].customListFile, "list");
+    await readLabels(config.models[config.selectedModel].customListFile, "list");
   } else {
     worker.postMessage({
       action: "update-list",
@@ -6166,13 +6155,12 @@ document.addEventListener("change", async function (e) {
           break;
         }
         case "batch-size": {
-          DOM.batchSizeValue.textContent =
-            BATCH_SIZE_LIST[DOM.batchSizeSlider.value].toString();
+          DOM.batchSizeValue.textContent = DOM.batchSizeSlider.value;
           config[config.models[config.selectedModel].backend].batchSize =
-            BATCH_SIZE_LIST[element.value];
+            DOM.batchSizeSlider.valueAsNumber;
           worker.postMessage({
             action: "change-batch-size",
-            batchSize: BATCH_SIZE_LIST[element.value],
+            batchSize: DOM.batchSizeSlider.valueAsNumber,
           });
           break;
         }
@@ -6422,7 +6410,7 @@ function setListUIState(list) {
  * @throws {Error} If the label file cannot be fetched or read.
  */
 async function readLabels(labelFile, updating) {
-  fs.promises.readFile(labelFile,"utf8")
+  await fs.promises.readFile(labelFile,"utf8")
     .catch((error) => {
       if (error.message.startsWith('ENOENT')) {
         generateToast({

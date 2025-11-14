@@ -407,12 +407,7 @@ async function handleMessage(e) {
     }
     case "change-batch-size": {
       BATCH_SIZE = args.batchSize;
-      predictWorkers.forEach((worker) => {
-        worker.postMessage({
-          message: "change-batch-size",
-          batchSize: BATCH_SIZE,
-        });
-      });
+      onAbort({});
       break;
     }
     case "change-threads": {
@@ -650,8 +645,9 @@ async function handleMessage(e) {
       LIST_CACHE = {};
       STATE.included = {}
       await INITIALISED;
+      await setLabelState({regenerate:true});
       LIST_WORKER && (await getIncludedIDs());
-      setLabelState({regenerate:true});
+      
       args.refreshResults && (await Promise.all([getResults(), getSummary(), getTotal()]));
       break;
     }
@@ -875,7 +871,6 @@ async function onLaunch({
     : diskDB;
   STATE.update({ db });
   NUM_WORKERS = threads;
-  setLabelState({regenerate:true})
   spawnPredictWorkers(model, batchSize, NUM_WORKERS);
 }
 
