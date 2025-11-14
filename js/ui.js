@@ -3016,7 +3016,7 @@ const handleModelChange = async (model, reload = true) => {
   DOM.customListFile.value
     ? (LIST_MAP = i18n.get(i18n.LIST_MAP))
     : delete LIST_MAP.custom;
-  const backend = config.models[config.selectedModel].backend;
+  const backend = config.models[model].backend;
   document.getElementById(backend).checked = true;
   if (reload) {
     handleBackendChange(backend);
@@ -6409,53 +6409,44 @@ function setListUIState(list) {
  * @throws {Error} If the label file cannot be fetched or read.
  */
 async function readLabels(labelFile, updating) {
-  await fs.promises.readFile(labelFile,"utf8")
-    .catch((error) => {
-      if (error.message.startsWith('ENOENT')) {
-        generateToast({
-          type: "error",
-          message: "listNotFound",
-          variables: { file: labelFile },
-        });
-        DOM.customListSelector.classList.add("btn-outline-danger");
-        if (!document.getElementById("settings").classList.contains("show")) {
-          document.getElementById("navbarSettings").click();
-        }
-        document.getElementById("list-file-selector").focus();
-        throw new Error(`Missing label file: ${labelFile}`);
-      } else {
-        throw new Error(
-          `There was a problem reading the label file: ${labelFile}`
-        );
+  try {
+    const filecontents = await fs.promises.readFile(labelFile, "utf8");
+    const labels = filecontents.trim().split(/\r?\n/);
+    const unknown = `Unknown Sp.${getSplitChar()}Unknown Sp.`;
+    if (!labels.includes(unknown)) labels.push(unknown);
+    if (updating === "list") {
+      worker.postMessage({
+        action: "update-list",
+        list: config.list,
+        customLabels: labels,
+        refreshResults: STATE.analysisDone,
+      });
+      trackEvent(config.UUID, "UI", "Create", "Custom list", labels.length);
+    } else {
+      LABELS = labels;
+      worker.postMessage({
+        action: "update-locale",
+        locale: config.locale,
+        labels: LABELS,
+        refreshResults: STATE.analysisDone,
+      });
+    }
+  } catch (error) {
+    if (error?.message?.startsWith("ENOENT")) {
+      generateToast({
+        type: "error",
+        message: "listNotFound",
+        variables: { file: labelFile },
+      });
+      DOM.customListSelector.classList.add("btn-outline-danger");
+      if (!document.getElementById("settings").classList.contains("show")) {
+        document.getElementById("navbarSettings").click();
       }
-    })
-    .then((filecontents) => {
-      const labels = filecontents.trim().split(/\r?\n/);
-      // Add unknown species
-      const unknown = `Unknown Sp.${getSplitChar()}Unknown Sp.`;
-      if (!labels.includes(unknown)) labels.push(unknown);
-      if (updating === "list") {
-        worker.postMessage({
-          action: "update-list",
-          list: config.list,
-          customLabels: labels,
-          refreshResults: STATE.analysisDone,
-        });
-        trackEvent(config.UUID, "UI", "Create", "Custom list", LABELS.length);
-      } else {
-        LABELS = labels;
-        worker.postMessage({
-          action: "update-locale",
-          locale: config.locale,
-          labels: LABELS,
-          refreshResults: STATE.analysisDone,
-        });
-      }
-    })
-    .catch((error) => {
-      // No need to record the error if it's just that the label file wasn't entered in the form
-      labelFile && console.error(error);
-    });
+      document.getElementById("list-file-selector").focus();
+    } else {
+      console.error(`Error reading label file ${labelFile}:`, error);
+    }
+  }
 }
 
 function filterLabels(e) {
