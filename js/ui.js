@@ -459,10 +459,8 @@ Analysis Rate: x real time performance
 */
 // Timers
 let t0_warmup, t1_warmup, t0_analysis, t1_analysis;
-// DIAGNOSTICS["CPU"] = os.cpu()[0].model;
-// DIAGNOSTICS["Cores"] = os.cpus().length;
-// DIAGNOSTICS["System Memory"] =
-//   (os.totalmem() / (1024 ** 2 * 1000)).toFixed(0) + " GB";
+
+let GPU_RAM = 0;
 
 let diagnosticsReady = (async () => {
   try {
@@ -480,6 +478,11 @@ let diagnosticsReady = (async () => {
       .map(gpu => `${gpu?.model} (${(gpu?.vram/1024).toFixed(0) ?? "Unknown"} GB)` )
       .filter(Boolean)
       .join(", ");
+    // Pick the card with the highest VRAM
+    GPU_RAM = graphics.controllers
+      .filter(c => typeof c.vram === 'number')  // ensure valid number
+      .sort((a, b) => b.vram - a.vram)[0].vram || undefined; 
+    GPU_RAM ??= memInfo?.total || 2048; // Fallback to total system RAM or 2GB
   } catch (err) {
     console.warn("Diagnostics collection failed:", err);
     DIAGNOSTICS["CPU"] = "Unknown";
@@ -2080,17 +2083,12 @@ window.onload = async () => {
     document.getElementById("attenuation-threshold").textContent = DOM.attenuation.value + "dB";
     DOM.sendFilteredAudio.checked = config.filters.sendToModel;
     filterIconDisplay();
-    if (isMac && config.models[config.selectedModel].backend.includes("web")) {
-      // Force max three threads to prevent severe memory issues
-      config[config.models[config.selectedModel].backend].threads = Math.min(
-        config[config.models[config.selectedModel].backend].threads,
-        3
-      );
-      DOM.threadSlider.max = 3;
+    if (config.models[config.selectedModel].backend === "webgpu") {
+      DOM.threadSlider.max = 6;
     } else {
       DOM.threadSlider.max = DIAGNOSTICS["Cores"];
     }
-
+    DOM.batchSizeSlider.max = Math.max(parseInt(256 / (24576 / GPU_RAM)), 32);
     DOM.threadSlider.value = config[config.models[config.selectedModel].backend].threads;
     DOM.numberOfThreads.textContent = DOM.threadSlider.value;
     DOM.defaultLat.value = config.latitude;
