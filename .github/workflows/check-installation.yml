@@ -45,10 +45,10 @@ jobs:
           npm install
           echo "Install's status is ${{ job.status }}."
 
-      - name: Audit fix
-        run: |
-          npm audit fix
-          echo "Audit fix applied, status is ${{ job.status }}."
+      # - name: Audit fix
+      #   run: |
+      #     npm audit fix
+      #     echo "Audit fix applied, status is ${{ job.status }}."
     
 
       - name: Copy tensorflow.dll to napi-v8 folder
