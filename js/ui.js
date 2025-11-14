@@ -481,8 +481,9 @@ let diagnosticsReady = (async () => {
     // Pick the card with the highest VRAM
     GPU_RAM = graphics.controllers
       .filter(c => typeof c.vram === 'number')  // ensure valid number
-      .sort((a, b) => b.vram - a.vram)[0].vram || undefined; 
-    GPU_RAM ??= memInfo?.total || 2048; // Fallback to total system RAM or 2GB
+      .sort((a, b) => b.vram - a.vram)
+    if (GPU_RAM.length > 0) GPU_RAM = GPU_RAM[0].vram;
+    else GPU_RAM = memInfo?.total /1024**2 - 2048 || 2048; // Fallback to total system RAM or 2GB
   } catch (err) {
     console.warn("Diagnostics collection failed:", err);
     DIAGNOSTICS["CPU"] = "Unknown";
@@ -2088,7 +2089,7 @@ window.onload = async () => {
     } else {
       DOM.threadSlider.max = DIAGNOSTICS["Cores"];
     }
-    DOM.batchSizeSlider.max = Math.max(parseInt(256 / (24576 / GPU_RAM)), 32);
+    DOM.batchSizeSlider.max = Math.max(parseInt(160 / (24576 / GPU_RAM)), 32);
     DOM.threadSlider.value = config[config.models[config.selectedModel].backend].threads;
     DOM.numberOfThreads.textContent = DOM.threadSlider.value;
     DOM.defaultLat.value = config.latitude;
