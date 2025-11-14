@@ -1084,7 +1084,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div>
+                        <div class="advanced">
                             <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Threads" id="Threads-circle-help"  data-bs-content="The number of parallel analyses to run. By default, 
                             this is set to the number of CPU cores on the machine for fastest performance. With the GPU backend, a lower number works better e.g. 1-3">?</a>
                             <div class="form-group rounded p-2 pe-0 mb-2">
@@ -1097,14 +1097,14 @@
                                 </div>
                             </div>
                         </div>
-                        <div>
+                        <div class="advanced">
                             <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Batch Size" id="Batch Size-circle-help"  data-bs-content="Optimising the batch size can increase processing speed on longer files.">?</a>
                             <div class="form-group rounded p-2 pe-0 mb-2">
                                 <label for="batch-size">Batch Size:</label>
                                 <div class="input-group">
-                                    <input type="range" class="form-control-range w-75" id="batch-size" min="0" max="7">
+                                    <input type="range" class="form-control-range w-75" id="batch-size" min="1" max="256">
                                     <div class="input-group-append">
-                                        <span class="input-group-text" id="batch-size-value">2</span>
+                                        <span class="input-group-text" id="batch-size-value"></span>
                                     </div>
                                 </div>
                             </div>

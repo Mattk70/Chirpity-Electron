@@ -54,7 +54,7 @@ class BaseModel {
     // Parallel compilation for faster warmup
     // https://github.com/tensorflow/tfjs/pull/7755/files#diff-a70aa640d286e39c922aa79fc636e610cae6e3a50dd75b3960d0acbe543c3a49R316
     if (tf.getBackend() === "webgpu") {
-      // tf.env().set("WEBGPU_ENGINE_COMPILE_ONLY", true);
+      // tf.env().set("WEBGPU_ENGINE_COMPILE_ONLY", true); <- this is literally 40% slower for some reason
       const compileRes = this.model.predict(input, {
         batchSize: this.batchSize,
       });
