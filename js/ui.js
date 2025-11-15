@@ -1825,7 +1825,7 @@ const defaultConfig = {
     sendToModel: false,
   },
   warmup: true,
-  hasNode: false,
+  hasNode: true,
   tensorflow: { threads: null, batchSize: 8 },
   webgpu: { threads: 2, batchSize: 8 },
   audio: {
