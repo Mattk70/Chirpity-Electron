@@ -4650,7 +4650,7 @@ Pionus maximiliani_Maximilianpapagei
 Pionus menstruus_Schwarzohrpapagei
 Pionus senilis_Weißstirnpapagei
 Pionus sordidus_Dunenkopfpapagei
-Pionus tumultuosus_Greisenkopf-/Purpurstirnpapagei
+Pionus tumultuosus_Greisenkopf/Purpurstirnpapagei
 Pipile cujubi_Rotkehlguan
 Pipile cumanensis_Blaukehlguan
 Pipilo chlorurus_Grünschwanz-Grundammer

@@ -4049,7 +4049,8 @@ function sendFile(mode, result) {
     end = result.end || start + 3;
     const dateArray = new Date(result.timestamp).toString().split(" ");
     const datetime = dateArray.slice(0, 5).join(" ");
-    filename = `${result.cname}_${datetime}.${config.audio.format}`;
+    const species = result.cname.replaceAll("/", " - ");
+    filename = `${species}_${datetime}.${config.audio.format}`;
   } else if (start === undefined) {
     if (STATE.activeRegion.start) {
       start = STATE.activeRegion.start + STATE.windowOffsetSecs;
