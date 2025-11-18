@@ -434,17 +434,6 @@ async function handleMessage(e) {
       await onChartRequest(args);
       break;
     }
-    case "check-all-files-saved": {
-      const allSaved = await savedFileCheck(args.files);
-      if (allSaved) {
-        await onChangeMode("archive");
-        if (STATE.detect.autoLoad){
-          STATE.filesToAnalyse = args.files;
-          await Promise.all([getResults(), getSummary(), getTotal()]);
-        }
-      }
-      break;
-    }
     case "convert-dataset": {
       convertSpecsFromExistingSpecs();
       break;
@@ -747,8 +736,9 @@ ipcRenderer.on("close-database", async () => {
 async function savedFileCheck(fileList) {
   if (diskDB) {
     // Slice the list into a # of params SQLITE can handle
-    const batchSize = 25_000;
+    const batchSize = 10_000;
     let totalFilesChecked = 0;
+    fileList = fileList.map(f => (METADATA[f].name || f));
     for (let i = 0; i < fileList.length; i += batchSize) {
       const fileSlice = fileList.slice(i, i + batchSize);
       let query; const library = STATE.library.location + p.sep;
@@ -783,10 +773,16 @@ async function savedFileCheck(fileList) {
 
     const allSaved = totalFilesChecked === fileList.length;
     UI.postMessage({ event: "all-files-saved-check-result", result: allSaved });
-    return allSaved;
+    if (allSaved) {
+      await onChangeMode("archive");
+      if (STATE.detect.autoLoad){
+        STATE.filesToAnalyse = fileList;
+        STATE.originalFiles = fileList
+        await Promise.all([getResults(), getSummary(), getTotal()]);
+      }
+    }
   } else {
     generateAlert({ type: "error", message: "dbNotLoaded" });
-    return undefined;
   }
 }
 
@@ -1034,6 +1030,7 @@ async function processFilesInBatches(filePaths, batchSize = 20) {
     DEBUG && console.log(`Processed ${i + results.length} of ${filePaths.length}`);
 
   }
+  savedFileCheck(filePaths);
   DEBUG && console.log('All files processed');
 }
 
@@ -1082,7 +1079,8 @@ function getFileSQLAndParams(range) {
   } else {
     const fileParams = prepParams(STATE.filesToAnalyse);
     SQL += ` AND ( file IN  (${fileParams}) `;
-    params.push(...STATE.filesToAnalyse);
+    STATE.originalFiles ??= STATE.filesToAnalyse.map((item) => (METADATA[item].name || item));
+    params.push(...STATE.originalFiles);
     SQL += ` OR archiveName IN  (${fileParams}) ) `;
     const archivePath = STATE.library.location + p.sep;
     const archive_names = STATE.filesToAnalyse.map((item) => item.replace(archivePath, ""));

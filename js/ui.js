@@ -1134,13 +1134,7 @@ async function onOpenFiles(args) {
   STATE.mode = 'analyse';
   // If spec was destroyed (when visiting charts) this code allows it to work again
   spec.reInitSpec(config.specMaxHeight)
-  // We don't check if all files are saved when results are imported
-  if (checkSaved){
-    worker.postMessage({
-      action: "check-all-files-saved",
-      files: STATE.openFiles,
-    });
-  }
+
   // Reset analysis status - when importing, we want to set analysis done = true
   STATE.analysisDone = !checkSaved;
 

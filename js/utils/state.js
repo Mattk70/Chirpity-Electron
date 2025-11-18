@@ -96,7 +96,8 @@ export class WorkerState {
     (this.labelFilters = []),
     (this.speciesMap = new Map()),
     (this.totalDuration = 0),
-    (this.allFilesDuration = 0);
+    (this.allFilesDuration = 0),
+    (this.originalFiles = undefined);
   }
 
   update(updates) {
@@ -136,6 +137,7 @@ export class WorkerState {
     // Reset pagination offsets
     this.globalOffset = 0;
     this.filteredOffset = {};
+    this.originalFiles = undefined;
   }
 
   setFiles(files) {
