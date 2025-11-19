@@ -1106,8 +1106,7 @@ async function sortFilesByTime(fileNames) {
  * @param {string[]} args.filePaths - Paths of audio files to open.
  * @param {boolean} [args.preserveResults] - If true, preserves previous analysis results.
  */
-async function onOpenFiles(args) {
-  const {filePaths, checkSaved, preserveResults} = args;
+async function onOpenFiles({filePaths, checkSaved, preserveResults}) {
   if (!filePaths.length) return;
   DOM.loading.querySelector("#loadingText").textContent = "Loading files...";
   DOM.loading.classList.remove("d-none");
@@ -1127,6 +1126,7 @@ async function onOpenFiles(args) {
 
   // Store the file list and Load First audio file
   STATE.openFiles = filePaths;
+  STATE.currentFile = STATE.openFiles[0];
   // Reset the buffer playhead and zoom:
   STATE.windowOffsetSecs = 0;
   STATE.windowLength = config.selectedModel.includes('bats') ? 5 : 20;
@@ -7509,9 +7509,11 @@ async function membershipCheck() {
   const cachedTimestamp = Number(localStorage.getItem("memberTimestamp"));
   const now = Date.now();
   let installDate = Number(localStorage.getItem("installDate"));
+  localStorage.removeItem("installDate");
   if (!installDate) {
-    localStorage.setItem("installDate", now);
-    installDate = now;
+      installDate = await window.electron.getInstallDate();
+      installDate = new Date(installDate).getTime();
+
   }
   const trialPeriod = await window.electron.trialPeriod();
   const inTrial = Date.now() - installDate < trialPeriod;

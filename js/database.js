@@ -489,7 +489,7 @@ const addNewModel = async ({model, db = diskDB, dbMutex, labelsLocation}) => {
           const err = `Invalid label: '${entry}' on line ${i + index + 1}. Expected 'scientific name${splitChar}common name'`;
           throw new Error(err);
         }
-        const [sname, cname] = parts.map(s => s.trim());
+        const [sname, cname] = parts.map(s => s.trim());  // taxon (3rd part) not currently in DB schema
         insertQuery += '(?, ?, ?, ?),';
         params.push(sname, cname, modelID, i + index);
       });

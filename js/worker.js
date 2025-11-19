@@ -1005,11 +1005,11 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true}) => {
   // Start gathering metadata for new files
   STATE.totalDuration = 0;
   STATE.allFilesDuration = 0;
-  await processFilesInBatches(filePaths, 10);
+  await processFilesInBatches(filePaths, 10, checkSaved);
   return filePaths;
 };
 
-async function processFilesInBatches(filePaths, batchSize = 20) {
+async function processFilesInBatches(filePaths, batchSize = 20, checkSaved = true) {
   for (let i = 0; i < filePaths.length; i += batchSize) {
     const batch = filePaths.slice(i, i + batchSize);
 
@@ -1030,7 +1030,7 @@ async function processFilesInBatches(filePaths, batchSize = 20) {
     DEBUG && console.log(`Processed ${i + results.length} of ${filePaths.length}`);
 
   }
-  savedFileCheck(filePaths);
+  if (checkSaved) savedFileCheck(filePaths);
   DEBUG && console.log('All files processed');
 }
 

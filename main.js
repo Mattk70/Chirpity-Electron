@@ -22,6 +22,28 @@ const log = require("electron-log");
 const fs = require("node:fs");
 const path = require("node:path");
 const settings = require("electron-settings");
+const keytar = require('keytar');
+const SERVICE = 'Chirpity';
+const ACCOUNT = 'install-info';
+
+async function getInstallInfo() {
+  // Try to load data from the OS keychain
+  const raw = await keytar.getPassword(SERVICE, ACCOUNT);
+
+  if (raw) {
+    // Parse and return the stored JSON
+    return JSON.parse(raw).installedAt;
+  }
+
+  // Nothing stored yet → create it now
+  const installInfo = {
+    appId: crypto.randomUUID(),
+    installedAt: new Date().toISOString(),
+  };
+
+  await keytar.setPassword(SERVICE, ACCOUNT, JSON.stringify(installInfo));
+  return installInfo.installedAt;
+}
 process.env["TF_ENABLE_ONEDNN_OPTS"] = "1";
 
 //require('update-electron-app')();
@@ -407,6 +429,9 @@ if (!gotTheLock) {
 
   // This method will be called when Electron has finished loading
   app.whenReady().then(async () => {
+      const installedAt = await getInstallInfo();
+
+    DEBUG && console.log('Install info:', installedAt);
     // Update the userData path for portable app
     if (process.env.PORTABLE_EXECUTABLE_DIR) {
       app.setPath(
@@ -419,6 +444,7 @@ if (!gotTheLock) {
     }
 
       ipcMain.handle('getPath', () => app.getPath('userData'));
+      ipcMain.handle('getInstallDate', () => installedAt);
       ipcMain.handle('getAppPath', () => app.getAppPath());
       ipcMain.handle('trialPeriod', () => 14*24*3600*1000); // 14 days
       ipcMain.handle('getLocale', () => app.getLocale());
