@@ -331,9 +331,9 @@ function WSPlayPause(){
 }
 
 //Open Files from OS "open with"
-const OS_FILE_QUEUE = [];
+let OS_FILE_QUEUE = [];
 window.electron.onFileOpen((filePath) => {
-  if (APPLICATION_LOADED) onOpenFiles({ filePaths: [filePath] });
+  if (APPLICATION_LOADED) onOpenFiles({ filePaths: [filePath], checkSaved: true });
   else OS_FILE_QUEUE.push(filePath);
 });
 
@@ -1106,8 +1106,7 @@ async function sortFilesByTime(fileNames) {
  * @param {string[]} args.filePaths - Paths of audio files to open.
  * @param {boolean} [args.preserveResults] - If true, preserves previous analysis results.
  */
-async function onOpenFiles(args) {
-  const {filePaths, checkSaved, preserveResults} = args;
+async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults } = {}) {
   if (!filePaths.length) return;
   DOM.loading.querySelector("#loadingText").textContent = "Loading files...";
   DOM.loading.classList.remove("d-none");
@@ -1127,6 +1126,8 @@ async function onOpenFiles(args) {
 
   // Store the file list and Load First audio file
   STATE.openFiles = filePaths;
+  STATE.currentFile = STATE.openFiles[0];
+
   // Reset the buffer playhead and zoom:
   STATE.windowOffsetSecs = 0;
   STATE.windowLength = config.selectedModel.includes('bats') ? 5 : 20;
@@ -1134,13 +1135,7 @@ async function onOpenFiles(args) {
   STATE.mode = 'analyse';
   // If spec was destroyed (when visiting charts) this code allows it to work again
   spec.reInitSpec(config.specMaxHeight)
-  // We don't check if all files are saved when results are imported
-  if (checkSaved){
-    worker.postMessage({
-      action: "check-all-files-saved",
-      files: STATE.openFiles,
-    });
-  }
+
   // Reset analysis status - when importing, we want to set analysis done = true
   STATE.analysisDone = !checkSaved;
 
@@ -1742,7 +1737,6 @@ function updatePrefs(file, data) {
 /////////////////////////  Window Handlers ////////////////////////////
 // Set config defaults
 const defaultConfig = {
-  newInstallDate: 0,
   // training
   training: {
     datasetLocation: '',
@@ -1827,7 +1821,7 @@ const defaultConfig = {
   warmup: true,
   hasNode: true,
   tensorflow: { threads: null, batchSize: 8 },
-  webgpu: { threads: 2, batchSize: 8 },
+  webgpu: { threads: 1, batchSize: 8 },
   audio: {
     gain: 0,
     format: "mp3",
@@ -3385,8 +3379,10 @@ function onModelReady() {
     config.seenTour = true;
     prepTour();
   }
-  if (OS_FILE_QUEUE.length)
-    onOpenFiles({ filePaths: OS_FILE_QUEUE }) && OS_FILE_QUEUE.shift();
+  if (OS_FILE_QUEUE.length) {
+    onOpenFiles({ filePaths: OS_FILE_QUEUE, checkSaved: true });
+    OS_FILE_QUEUE = []; // Clear the queue
+  }
 }
 
 /**
@@ -5372,7 +5368,7 @@ async function handleUIClicks(e) {
       const displayName = document.getElementById('model-name').value.trim();
       const modelName = displayName.toLowerCase();
       const modelLocation = document.getElementById('import-location').value;
-      const requiredFiles = displayName === 'Perch v2' ? [] : ['weights.bin', 'labels.txt', 'model.json'];
+      const requiredFiles = modelName.includes('perch') ? [] : ['weights.bin', 'labels.txt', 'model.json'];
       if (config.models[modelName] !== undefined){
         generateToast({message: 'A model with that name already exists', type:'error'})
         break;
@@ -7509,15 +7505,17 @@ export { config, displayLocationAddress, LOCATIONS, generateToast };
  * @returns {Promise<boolean|undefined>} Resolves to `true` if the user is a member or within the trial period, `false` if not, or `undefined` if status cannot be determined and no valid cache exists.
  */
 async function membershipCheck() {
-  const oneWeek = 7 * 24 * 60 * 60 * 1000; // "It's been one week since you looked at me, cocked your head to the side..."
+  const twoWeeks = 14 * 24 * 60 * 60 * 1000; // "It's been one week since you looked at me, cocked your head to the side..."
   const cachedStatus = localStorage.getItem("isMember") === 'true';
   config.debug && console.log('cached membership is', cachedStatus)
   const cachedTimestamp = Number(localStorage.getItem("memberTimestamp"));
   const now = Date.now();
   let installDate = Number(localStorage.getItem("installDate"));
+  localStorage.removeItem("installDate");
   if (!installDate) {
-    localStorage.setItem("installDate", now);
-    installDate = now;
+      installDate = await window.electron.getInstallDate();
+      installDate = new Date(installDate).getTime();
+
   }
   const trialPeriod = await window.electron.trialPeriod();
   const inTrial = Date.now() - installDate < trialPeriod;
@@ -7605,7 +7603,7 @@ async function membershipCheck() {
       if (
         cachedStatus === true &&
         cachedTimestamp &&
-        now - cachedTimestamp < oneWeek
+        now - cachedTimestamp < twoWeeks
       ) {
         console.warn("Using cached membership status during error.", error);
         unlockElements();

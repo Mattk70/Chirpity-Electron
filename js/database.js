@@ -467,9 +467,12 @@ const addNewModel = async ({model, db = diskDB, dbMutex, labelsLocation}) => {
       // Trim whitespace and split by new lines, ignoring empty lines
       labels = fileContents.split(/\r?\n/).map(line => line.trim()).filter(line => line.length);
     }
-    const splitChar = model === 'perch v2' ? '~' : '_'; // Perch uses ~, others use _
+    const perch = model === 'perch v2';
+    const splitChar = perch ? '~' : '_'; // Perch uses ~, others use _
+    const expectedParts = perch ? 3 : 2; // Perch labels include Taxon
     // Add Unknown Sp.
-    labels.push(`Unknown Sp.${splitChar}Unknown Sp.`);
+    if (perch) labels.push(`Unknown Sp.${splitChar}Unknown Sp.${splitChar}None`);
+    else labels.push(`Unknown Sp.${splitChar}Unknown Sp.`);
 
     // Insert labels in batches to avoid exceeding SQLite parameter limits
     const MAX_PARAMS = 25000;
@@ -482,11 +485,11 @@ const addNewModel = async ({model, db = diskDB, dbMutex, labelsLocation}) => {
       const params = [];
       batch.forEach((entry, index) => {
         const parts = entry.split(splitChar);
-        if (parts.length !== 2) {
-          const err = `Invalid label: '${entry}' on line ${i + index + 1}. Expected 'scientific name${splitChar}common name'`;
+        if (parts.length < 2 || parts.length > expectedParts) {
+          const err = `Invalid label: '${entry}' on line ${i + index + 1}. Expected 'scientific name${splitChar}common name[${splitChar}taxon]' format.`;
           throw new Error(err);
         }
-        const [sname, cname] = parts.map(s => s.trim());
+        const [sname, cname] = parts.map(s => s.trim());  // taxon (3rd part) not currently in DB schema
         insertQuery += '(?, ?, ?, ?),';
         params.push(sname, cname, modelID, i + index);
       });

@@ -22,6 +22,39 @@ const log = require("electron-log");
 const fs = require("node:fs");
 const path = require("node:path");
 const settings = require("electron-settings");
+const keytar = require('keytar');
+const SERVICE = 'Chirpity';
+const ACCOUNT = 'install-info';
+
+async function getInstallInfo() {
+  try {
+    const raw = await keytar.getPassword(SERVICE, ACCOUNT);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed.installedAt === "string") {
+        // This is an ISO date string
+        return parsed.installedAt;
+      }
+      console.warn("getInstallInfo: keychain entry missing valid installedAt, recreating.");
+    }
+  } catch (error) {
+    console.warn("getInstallInfo: keychain read/parse failed, recreating:", error.message);
+  }
+
+  const crypto = require("node:crypto");
+  const installInfo = {
+    appId: crypto.randomUUID(),
+    installedAt: new Date().toISOString(),
+  };
+
+  try {
+    await keytar.setPassword(SERVICE, ACCOUNT, JSON.stringify(installInfo));
+  } catch (error) {
+    console.warn("getInstallInfo: keychain write failed (using in‑memory date only):", error.message);
+  }
+
+  return installInfo.installedAt;
+}
 process.env["TF_ENABLE_ONEDNN_OPTS"] = "1";
 
 //require('update-electron-app')();
@@ -186,6 +219,9 @@ if (!isMac) {
 
 process.stdin.resume(); //so the program will not close instantly
 
+function getFileFromArgs(args) {
+    return args.find(arg => SUPPORTED_FILES.some(ext => arg.toLowerCase().endsWith(ext)));
+}
 async function exitHandler(options, exitCode) {
   if (options.cleanup) {
     // clean up settings.json litter
@@ -407,6 +443,13 @@ if (!gotTheLock) {
 
   // This method will be called when Electron has finished loading
   app.whenReady().then(async () => {
+      const installedAt = await getInstallInfo().catch((error) => {
+          console.error("Error getting install info:", error.message);
+          const now = new Date();
+          const thirteenDaysAgo = new Date(now.getTime() - 13 * 24 * 60 * 60 * 1000);
+          return thirteenDaysAgo.toISOString(); // Fallback to 13 days prior (1 day trial)
+      });
+
     // Update the userData path for portable app
     if (process.env.PORTABLE_EXECUTABLE_DIR) {
       app.setPath(
@@ -419,6 +462,7 @@ if (!gotTheLock) {
     }
 
       ipcMain.handle('getPath', () => app.getPath('userData'));
+      ipcMain.handle('getInstallDate', () => installedAt);
       ipcMain.handle('getAppPath', () => app.getAppPath());
       ipcMain.handle('trialPeriod', () => 14*24*3600*1000); // 14 days
       ipcMain.handle('getLocale', () => app.getLocale());
@@ -528,9 +572,6 @@ if (!gotTheLock) {
    * @param {string[]} args - An array of command line arguments potentially containing file paths.
    * @returns {string|undefined} The first matching file path with a supported extension, or `undefined` if none is found.
    */
-  function getFileFromArgs(args) {
-      return args.find(arg => SUPPORTED_FILES.some(ext => arg.toLowerCase().endsWith(ext)));
-  }
     
     ipcMain.handle('selectDirectory', async (_e, path) => {
         // Show file dialog to select a directory
