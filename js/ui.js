@@ -7514,7 +7514,6 @@ async function membershipCheck() {
       installDate = new Date(installDate).getTime();
 
   }
-  console.log('install date is', new Date(installDate))
   const trialPeriod = await window.electron.trialPeriod();
   const inTrial = Date.now() - installDate < trialPeriod;
   const lockedElements = document.querySelectorAll(".locked, .unlocked");
