@@ -184,7 +184,6 @@
     "electron-playwright-helpers": "^1.7.1",
     "esbuild": "^0.25.0",
     "jest": "^29.7.0",
-    "jest-playwright-preset": "^4.0.0",
     "jimp": "^1.6.0",
     "jsdoc": "^4.0.4",
     "playwright": "^1.48.2"

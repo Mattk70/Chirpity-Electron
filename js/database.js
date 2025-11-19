@@ -485,8 +485,8 @@ const addNewModel = async ({model, db = diskDB, dbMutex, labelsLocation}) => {
       const params = [];
       batch.forEach((entry, index) => {
         const parts = entry.split(splitChar);
-        if (parts.length !== expectedParts) {
-          const err = `Invalid label: '${entry}' on line ${i + index + 1}. Expected 'scientific name${splitChar}common name'`;
+        if (parts.length < 2 || parts.length > expectedParts) {
+          const err = `Invalid label: '${entry}' on line ${i + index + 1}. Expected 'scientific name${splitChar}common name[${splitChar}taxon]' format.`;
           throw new Error(err);
         }
         const [sname, cname] = parts.map(s => s.trim());  // taxon (3rd part) not currently in DB schema
