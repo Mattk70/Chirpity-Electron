@@ -1736,7 +1736,6 @@ function updatePrefs(file, data) {
 /////////////////////////  Window Handlers ////////////////////////////
 // Set config defaults
 const defaultConfig = {
-  newInstallDate: 0,
   // training
   training: {
     datasetLocation: '',
