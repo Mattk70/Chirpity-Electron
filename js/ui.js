@@ -7505,7 +7505,7 @@ export { config, displayLocationAddress, LOCATIONS, generateToast };
  * @returns {Promise<boolean|undefined>} Resolves to `true` if the user is a member or within the trial period, `false` if not, or `undefined` if status cannot be determined and no valid cache exists.
  */
 async function membershipCheck() {
-  const oneWeek = 7 * 24 * 60 * 60 * 1000; // "It's been one week since you looked at me, cocked your head to the side..."
+  const twoWeeks = 14 * 24 * 60 * 60 * 1000; // "It's been one week since you looked at me, cocked your head to the side..."
   const cachedStatus = localStorage.getItem("isMember") === 'true';
   config.debug && console.log('cached membership is', cachedStatus)
   const cachedTimestamp = Number(localStorage.getItem("memberTimestamp"));
@@ -7603,7 +7603,7 @@ async function membershipCheck() {
       if (
         cachedStatus === true &&
         cachedTimestamp &&
-        now - cachedTimestamp < oneWeek
+        now - cachedTimestamp < twoWeeks
       ) {
         console.warn("Using cached membership status during error.", error);
         unlockElements();
