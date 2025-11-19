@@ -1047,7 +1047,7 @@ const getFilesInDirectory = async (dir) => {
         stack.push(path);
       } else {
         const filename = p.basename(path);
-        filename.startsWith("._") || files.push(path);
+        filename.startsWith(".") || files.push(path);
       }
     }
   }

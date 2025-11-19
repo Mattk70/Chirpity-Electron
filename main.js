@@ -431,7 +431,7 @@ if (!gotTheLock) {
   // This method will be called when Electron has finished loading
   app.whenReady().then(async () => {
       const installedAt = await getInstallInfo().catch((error) => {
-          console.error("Error getting install info:", error);
+          console.error("Error getting install info:", error.message);
           const now = new Date();
           const thirteenDaysAgo = new Date(now.getTime() - 13 * 24 * 60 * 60 * 1000);
           return thirteenDaysAgo.toISOString(); // Fallback to 13 days prior (1 day trial)
