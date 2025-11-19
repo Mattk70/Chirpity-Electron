@@ -209,6 +209,9 @@ if (!isMac) {
 
 process.stdin.resume(); //so the program will not close instantly
 
+function getFileFromArgs(args) {
+    return args.find(arg => SUPPORTED_FILES.some(ext => arg.toLowerCase().endsWith(ext)));
+}
 async function exitHandler(options, exitCode) {
   if (options.cleanup) {
     // clean up settings.json litter
@@ -559,9 +562,6 @@ if (!gotTheLock) {
    * @param {string[]} args - An array of command line arguments potentially containing file paths.
    * @returns {string|undefined} The first matching file path with a supported extension, or `undefined` if none is found.
    */
-  function getFileFromArgs(args) {
-      return args.find(arg => SUPPORTED_FILES.some(ext => arg.toLowerCase().endsWith(ext)));
-  }
     
     ipcMain.handle('selectDirectory', async (_e, path) => {
         // Show file dialog to select a directory

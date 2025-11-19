@@ -331,7 +331,7 @@ function WSPlayPause(){
 }
 
 //Open Files from OS "open with"
-const OS_FILE_QUEUE = [];
+let OS_FILE_QUEUE = [];
 window.electron.onFileOpen((filePath) => {
   if (APPLICATION_LOADED) onOpenFiles({ filePaths: [filePath], checkSaved: true });
   else OS_FILE_QUEUE.push(filePath);
@@ -3379,9 +3379,10 @@ function onModelReady() {
     config.seenTour = true;
     prepTour();
   }
-  if (OS_FILE_QUEUE.length)
+  if (OS_FILE_QUEUE.length) {
     onOpenFiles({ filePaths: OS_FILE_QUEUE, checkSaved: true });
     OS_FILE_QUEUE = []; // Clear the queue
+  }
 }
 
 /**
