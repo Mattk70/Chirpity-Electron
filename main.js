@@ -22,6 +22,7 @@ const log = require("electron-log");
 const fs = require("node:fs");
 const path = require("node:path");
 const settings = require("electron-settings");
+const crypto = require('node:crypto');
 const keytar = require('keytar');
 const SERVICE = 'Chirpity';
 const ACCOUNT = 'install-info';
@@ -431,7 +432,6 @@ if (!gotTheLock) {
   app.whenReady().then(async () => {
       const installedAt = await getInstallInfo();
 
-    DEBUG && console.log('Install info:', installedAt);
     // Update the userData path for portable app
     if (process.env.PORTABLE_EXECUTABLE_DIR) {
       app.setPath(
