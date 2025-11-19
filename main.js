@@ -27,22 +27,32 @@ const SERVICE = 'Chirpity';
 const ACCOUNT = 'install-info';
 
 async function getInstallInfo() {
-  // Try to load data from the OS keychain
-  const raw = await keytar.getPassword(SERVICE, ACCOUNT);
-
-  if (raw) {
-    // Parse and return the stored JSON
-    return JSON.parse(raw).installedAt;
+  try {
+    const raw = await keytar.getPassword(SERVICE, ACCOUNT);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed.installedAt === "string") {
+        // This is an ISO date string
+        return parsed.installedAt;
+      }
+      console.warn("getInstallInfo: keychain entry missing valid installedAt, recreating.");
+    }
+  } catch (error) {
+    console.warn("getInstallInfo: keychain read/parse failed, recreating:", error.message);
   }
 
-  // Nothing stored yet → create it now  
-  const crypto = require('node:crypto');
+  const crypto = require("node:crypto");
   const installInfo = {
     appId: crypto.randomUUID(),
     installedAt: new Date().toISOString(),
   };
 
-  await keytar.setPassword(SERVICE, ACCOUNT, JSON.stringify(installInfo));
+  try {
+    await keytar.setPassword(SERVICE, ACCOUNT, JSON.stringify(installInfo));
+  } catch (error) {
+    console.warn("getInstallInfo: keychain write failed (using in‑memory date only):", error.message);
+  }
+
   return installInfo.installedAt;
 }
 process.env["TF_ENABLE_ONEDNN_OPTS"] = "1";
