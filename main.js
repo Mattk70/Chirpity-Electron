@@ -22,7 +22,6 @@ const log = require("electron-log");
 const fs = require("node:fs");
 const path = require("node:path");
 const settings = require("electron-settings");
-const crypto = require('node:crypto');
 const keytar = require('keytar');
 const SERVICE = 'Chirpity';
 const ACCOUNT = 'install-info';
@@ -36,7 +35,8 @@ async function getInstallInfo() {
     return JSON.parse(raw).installedAt;
   }
 
-  // Nothing stored yet → create it now
+  // Nothing stored yet → create it now  
+  const crypto = require('node:crypto');
   const installInfo = {
     appId: crypto.randomUUID(),
     installedAt: new Date().toISOString(),
