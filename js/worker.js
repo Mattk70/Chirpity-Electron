@@ -4449,10 +4449,10 @@ const getDetectedSpecies = async () => {
     JOIN files on records.fileID = files.id`;
 
   if (STATE.mode === "explore") sql += ` WHERE confidence >= ${confidence}`;
-  if (!["location", "everything"].includes(STATE.list)) {
-    const included = await getIncludedIDs();
-    sql += ` AND speciesID IN (${included.join(",")})`;
-  }
+  // if (!["location", "everything"].includes(STATE.list)) {
+    // const included = await getIncludedIDs();
+    // sql += ` AND speciesID IN (${included.join(",")})`;
+  // }
   if (range?.start)
     sql += ` AND datetime BETWEEN ${range.start} AND ${range.end}`;
   sql += filterLocation();
