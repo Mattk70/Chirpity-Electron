@@ -3197,7 +3197,7 @@ function spawnPredictWorkers(model, batchSize, threads) {
     // threads = 1; // perch v2 only works with 1 thread
   }
   for (let i = 0; i < threads; i++) {
-    const workerSrc = ['nocmig', 'chirpity', 'perch'].includes(model) ? model : "BirdNet2.4";
+    const workerSrc = ['nocmig', 'chirpity', 'perch'].includes(model) ? model : "birdnet-onnx";
     const worker = new Worker(`./js/models/${workerSrc}.js`, { type: "module" });
     worker.isAvailable = true;
     worker.isReady = false;

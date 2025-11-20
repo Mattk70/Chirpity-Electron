@@ -6124,7 +6124,7 @@ document.addEventListener("change", async function (e) {
             initialiseDatePicker(STATE, worker, config, resetResults, filterResults, generateToast);
           }
           config.locale = element.value;
-          STATE.picker.options.lang = element.value.replace("_uk", "");
+          STATE.picker.options.lang = element.value.replace(/_.*$/, "");
           readLabels(labelFile, "locale");
           break;
         }
