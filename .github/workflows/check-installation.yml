@@ -93,7 +93,7 @@ jobs:
       - name: Patch locale error for Portuguese in easepick
         shell: bash
         run: |
-          sed -i.bak "s/toLocaleString(this.picker.options.lang/toLocaleString(this.picker.options.lang.replace(\/_.*$\/,'')/" ./node_modules/@easepick/bundle/dist/index.umd.js && rm -f ./node_modules/@easepick/bundle/dist/index.umd.js.bak
+          sed -i.bak "s/toLocaleString(this.picker.options.lang/toLocaleString(this.picker.options.lang.replace(\/_.*$\/,'')/g" ./node_modules/@easepick/bundle/dist/index.umd.js && rm -f ./node_modules/@easepick/bundle/dist/index.umd.js.bak
           grep -A 10 'replace' ./node_modules/@easepick/bundle/dist/index.umd.js          
       - name: Set platform-specific ffmpeg path
         shell: bash
