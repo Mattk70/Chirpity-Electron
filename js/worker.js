@@ -404,14 +404,14 @@ async function handleMessage(e) {
       predictionsRequested = {};
       await onAnalyse(args);
       break;
-    }
+    } 
     case "change-batch-size": {
       BATCH_SIZE = args.batchSize;
-      onAbort({});
+      STATE.model === 'perch v2' || onAbort({});
       break;
     }
     case "change-threads": {
-      const threads = e.data.threads;
+      if (STATE.model.includes('perch')) break; // perch v2 only works with 1 thread
       const delta = threads - predictWorkers.length;
       NUM_WORKERS += delta;
       if (delta > 0) {
@@ -564,12 +564,17 @@ async function handleMessage(e) {
       break;
     }
     case "load-model": {
-      if (filesBeingProcessed.length) {
-        onAbort(args);
+      if (STATE.model === 'perch v2') {
+        STATE.backend = args.backend;
+        predictWorkers[0].postMessage({ message: "terminate", backend: args.backend });
       } else {
-        predictWorkers.length && terminateWorkers();
+        if (filesBeingProcessed.length) {
+          onAbort(args);
+        } else {
+          predictWorkers.length && terminateWorkers();
+        }
       }
-      INITIALISED = onLaunch(args);
+      if (!INITIALISED) INITIALISED = onLaunch(args);
       break;
     }
     case "expunge-model": {
@@ -841,7 +846,10 @@ async function onLaunch({
     nocmig: 24_000,
     'perch v2': 32_000,
   };
-  WINDOW_SIZE = model === 'perch v2' ? 5 : 3;
+  const perch = model.includes('perch');
+  WINDOW_SIZE = perch ? 5 : 3;
+  threads = perch ? 1 : threads;
+
   sampleRate = sampleRates[model] || 48_000;
   STATE.detect.backend = backend;
   BATCH_SIZE = batchSize;
@@ -1677,11 +1685,13 @@ function onAbort({ model = STATE.model }) {
     clearInterval(STATE.backlogInterval[pid]);
   });
   //restart the workers
-  terminateWorkers();
-  setTimeout(
-    () => spawnPredictWorkers(model, BATCH_SIZE, NUM_WORKERS),
-    20
-  );
+  if (model !== 'perch v2'){
+    terminateWorkers();
+    setTimeout(
+      () => spawnPredictWorkers(model, BATCH_SIZE, NUM_WORKERS),
+      200
+    );
+  }
 }
 
 const measureDurationWithFfmpeg = (src, type) => {
@@ -3192,12 +3202,9 @@ const processQueue = async () => {
  * @param {number} threads - Number of worker threads to spawn.
  */
 function spawnPredictWorkers(model, batchSize, threads) {
-  if (model === 'perch v2') {
-    model = 'perch';
-    // threads = 1; // perch v2 only works with 1 thread
-  }
+
   for (let i = 0; i < threads; i++) {
-    const workerSrc = ['nocmig', 'chirpity', 'perch'].includes(model) ? model : "birdnet-onnx";
+    const workerSrc = ['nocmig', 'chirpity', 'perch v2'].includes(model) ? model : "birdnet-onnx";
     const worker = new Worker(`./js/models/${workerSrc}.js`, { type: "module" });
     worker.isAvailable = true;
     worker.isReady = false;
@@ -3222,7 +3229,7 @@ function spawnPredictWorkers(model, batchSize, threads) {
     };
     worker.onerror = (e) => {
       console.warn(
-        `Worker ${i} is suffering, shutting it down. THe error was:`,
+        `Worker ${i} is suffering, shutting it down. The error was:`,
         e
       );
       predictWorkers.splice(i, 1);
