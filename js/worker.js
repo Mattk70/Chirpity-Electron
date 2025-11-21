@@ -3207,7 +3207,7 @@ const processQueue = async () => {
 function spawnPredictWorkers(model, batchSize, threads) {
 
   for (let i = 0; i < threads; i++) {
-    const workerSrc = ['nocmig', 'chirpity', 'perch v2'].includes(model) ? model : "birdnet-onnx";
+    const workerSrc = ['nocmig', 'chirpity', 'perch v2'].includes(model) ? model : "BirdNet2.4";
     const worker = new Worker(`./js/models/${workerSrc}.js`, { type: "module" });
     worker.isAvailable = true;
     worker.isReady = false;
