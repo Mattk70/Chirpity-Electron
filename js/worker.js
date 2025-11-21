@@ -407,7 +407,7 @@ async function handleMessage(e) {
     } 
     case "change-batch-size": {
       BATCH_SIZE = args.batchSize;
-      STATE.model === 'perch v2' || onAbort({});
+      onAbort({});
       break;
     }
     case "change-threads": {
@@ -1672,7 +1672,10 @@ async function onAnalyse({
  * @param {string} [params.model=STATE.model] - Model identifier to use when restarting prediction workers; defaults to the current STATE.model.
  */
 function onAbort({ model = STATE.model }) {
-  predictWorkers.forEach(worker => worker.postMessage({message: 'terminate'}));
+  predictWorkers.forEach(worker => worker.postMessage({
+    message: 'terminate', 
+    batchSize: BATCH_SIZE,
+    backend: STATE.detect.backend}));
   aborted = true;
   FILE_QUEUE = [];
   predictQueue = [];

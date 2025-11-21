@@ -12,6 +12,12 @@ let batchSize = 1;
 const sampleRate = 32000;
 const numClasses = 14795;
 const DEBUG = false;
+
+async function loadModel(backend) {
+    const provider = backend === 'tensorflow' ? 'cpu' : 'webgpu';
+    const sessionOptions = { executionProviders: [provider] };
+    session = await ort.InferenceSession.create(modelPath, sessionOptions);
+}
 onmessage = async (e) => {
   const modelRequest = e.data.message;
   const worker = e.data.worker;
@@ -19,17 +25,17 @@ onmessage = async (e) => {
   try {
     switch (modelRequest) {
       case 'terminate': {
-        DEBUG && console.log("terminating worker");
-        session.release();
-        backend = e.data.backend === 'tensorflow' ? 'cpu' : 'webgpu';
-        const sessionOptions = { executionProviders: [backend] };
-        session = await ort.InferenceSession.create(modelPath, sessionOptions);
+        batchSize = e.data.batchSize || batchSize;
+        if (e.data.backend) {
+            session.release();
+            backend = e.data.backend;
+            await loadModel(backend);
+        }        
         break;
       }
       case "load": {
-        backend = e.data.backend === 'tensorflow' ? 'cpu' : 'webgpu';
-        const sessionOptions = { executionProviders: [backend] };
-        session = await ort.InferenceSession.create(modelPath, sessionOptions);
+        backend = e.data.backend;
+        await loadModel(backend);
         batchSize = e.data.batchSize;
         DEBUG && console.log(`Using backend: ${backend}`);
 
@@ -125,6 +131,8 @@ async function predictChunk(
 const K = 5; // top-K
 const topValuesBuf = new Float32Array(K);
 const topIndicesBuf = new Int32Array(K);
+const batchedIndices = Array.from({ length: batchSize });
+const batchedProbs   = Array.from({ length: batchSize });
 
 /**
  * Predict batch post-process: returns [keys, batchedIndices, batchedProbs]
@@ -134,13 +142,11 @@ const topIndicesBuf = new Int32Array(K);
 async function predictBatch(audio, keys) {
   const prediction = await session.run({ inputs: audio });
   const flat = prediction.label.cpuData; // assume Float32Array
-  const nBatches = batchSize;
 
-  const batchedIndices = new Array(nBatches);
-  const batchedProbs   = new Array(nBatches);
+
 
   // reuse arrays per batch to avoid allocating inside hot loop
-  for (let b = 0; b < nBatches; b++) {
+  for (let b = 0; b < batchSize; b++) {
     const offset = b * numClasses;
     // pass 1: find max and top-K indices on logits
     // initialise top-K buffers (lowest-first so values[K-1] is smallest)
@@ -190,14 +196,13 @@ async function predictBatch(audio, keys) {
     }
 
     // compute final probabilities for top-K
-    const probs = new Array(K);
-    const indices = new Array(K);
+    const probs = Array.from({ length: K });
+    const indices = Array.from({ length: K });
     const invSum = 1 / sumExp;
     for (let t = 0; t < K; t++) {
       indices[t] = topIndicesBuf[t];
       probs[t] = topExp[t] * invSum;
     }
-
     batchedIndices[b] = indices;
     batchedProbs[b] = probs;
   }
