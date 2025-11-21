@@ -7,7 +7,7 @@ try {
 }
 
 // Import override for tf.signal.stft
-require("./fft.js");
+require("./fft.js"); 
 
 const DEBUG = false;
 class BaseModel {
