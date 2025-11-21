@@ -574,7 +574,7 @@ async function handleMessage(e) {
           predictWorkers.length && terminateWorkers();
         }
       }
-      if (!INITIALISED) INITIALISED = onLaunch(args);
+      INITIALISED = onLaunch(args);
       break;
     }
     case "expunge-model": {
@@ -846,7 +846,7 @@ async function onLaunch({
     nocmig: 24_000,
     'perch v2': 32_000,
   };
-  const perch = model.includes('perch');
+  const perch = model === 'perch v2';
   WINDOW_SIZE = perch ? 5 : 3;
   threads = perch ? 1 : threads;
 

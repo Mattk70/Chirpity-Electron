@@ -29,7 +29,9 @@ onmessage = async (e) => {
       case 'terminate': {
         batchSize = e.data.batchSize || batchSize;
         if (e.data.backend) {
-            session.release();
+            if (session) {
+              try { session.release(); } catch {}
+            }
             backend = e.data.backend;
             await loadModel(modelPath, backend);
         }        
