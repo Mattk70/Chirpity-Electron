@@ -2,8 +2,7 @@ let ort = require ("onnxruntime-node");
 
 const fs = require("node:fs");
 const path = require("node:path");
-// Load the model and create InferenceSession
-const modelPath = "BirdNET_GLOBAL_6K_V2.4_Model_TFJS/perch_v2.onnx";
+
 let session;
 let labels;
 let backend;
@@ -13,14 +12,17 @@ const sampleRate = 32000;
 const numClasses = 14795;
 const DEBUG = false;
 
-async function loadModel(backend) {
+
+async function loadModel(mpath, backend) {
     const provider = backend === 'tensorflow' ? 'cpu' : 'webgpu';
-    const sessionOptions = { executionProviders: [provider] };
+    const sessionOptions = { executionProviders: [provider], enableGraphCapture: true };
+    const modelPath = path.join(mpath, 'perch_v2.onnx')
     session = await ort.InferenceSession.create(modelPath, sessionOptions);
 }
 onmessage = async (e) => {
   const modelRequest = e.data.message;
   const worker = e.data.worker;
+  const modelPath = e.data.modelPath;
   let response;
   try {
     switch (modelRequest) {
@@ -29,17 +31,17 @@ onmessage = async (e) => {
         if (e.data.backend) {
             session.release();
             backend = e.data.backend;
-            await loadModel(backend);
+            await loadModel(modelPath, backend);
         }        
         break;
       }
       case "load": {
         backend = e.data.backend;
-        await loadModel(backend);
+        await loadModel(modelPath, backend);
         batchSize = e.data.batchSize;
         DEBUG && console.log(`Using backend: ${backend}`);
 
-        const labelFile = "BirdNET_GLOBAL_6K_V2.4_Model_TFJS/labels.txt";
+        const labelFile = path.join(modelPath,"labels.txt");
         const fileContents = fs.readFileSync(labelFile, 'utf-8');
         labels = fileContents.trim().split(/\r?\n/);
         DEBUG && console.log(
