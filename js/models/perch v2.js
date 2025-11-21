@@ -11,7 +11,7 @@ let batchSize = 1;
 const sampleRate = 32000;
 const numClasses = 14795;
 const DEBUG = false;
-
+let modelPath;
 
 async function loadModel(mpath, backend) {
     const provider = backend === 'tensorflow' ? 'cpu' : 'webgpu';
@@ -22,7 +22,7 @@ async function loadModel(mpath, backend) {
 onmessage = async (e) => {
   const modelRequest = e.data.message;
   const worker = e.data.worker;
-  const modelPath = e.data.modelPath;
+  modelPath = e.data.modelPath ?? modelPath;
   let response;
   try {
     switch (modelRequest) {
