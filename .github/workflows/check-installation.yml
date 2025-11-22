@@ -51,15 +51,15 @@ jobs:
       #     echo "Audit fix applied, status is ${{ job.status }}."
     
 
-      - name: Copy tensorflow.dll to napi-v8 folder
-        if: runner.os == 'Windows'
-        shell: bash
-        run: |
-          ls -l ./node_modules/@tensorflow/tfjs-node/deps/lib
-          ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v8
-          cp ./node_modules/@tensorflow/tfjs-node/deps/lib/tensorflow.dll \
-          ./node_modules/@tensorflow/tfjs-node/lib/napi-v8/tensorflow.dll
-          ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v8
+      # - name: Copy tensorflow.dll to napi-v8 folder
+      #   if: runner.os == 'Windows'
+      #   shell: bash
+      #   run: |
+      #     ls -l ./node_modules/@tensorflow/tfjs-node/deps/lib
+      #     ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v8
+      #     cp ./node_modules/@tensorflow/tfjs-node/deps/lib/tensorflow.dll \
+      #     ./node_modules/@tensorflow/tfjs-node/lib/napi-v8/tensorflow.dll
+      #     ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v8
 
       - name: Patch wavesurfer.js play() to handle AbortError
         shell: bash
@@ -94,7 +94,8 @@ jobs:
         shell: bash
         run: |
           sed -i.bak "s/toLocaleString(this.picker.options.lang/toLocaleString(this.picker.options.lang.replace(\/_.*$\/,'')/g" ./node_modules/@easepick/bundle/dist/index.umd.js && rm -f ./node_modules/@easepick/bundle/dist/index.umd.js.bak
-          grep -A 10 'replace' ./node_modules/@easepick/bundle/dist/index.umd.js          
+          grep -A 10 'replace' ./node_modules/@easepick/bundle/dist/index.umd.js
+
       - name: Set platform-specific ffmpeg path
         shell: bash
         run: |

@@ -102,9 +102,10 @@ function initialiseDatePicker(state, worker, config, resetResults, filterResults
   ["chartRange", "exploreRange"].forEach(function (element) {
     const i18 = get(Context);
     element = document.getElementById(element);
+    const lang = config.locale.replace(/_.*$/, "");
     state.picker = new easepick.create({
       element: element,
-      lang: config.locale.replace(/_.*$/, ""),
+      lang,
       locale: {
         cancel: i18.cancel,
         apply: i18.apply,

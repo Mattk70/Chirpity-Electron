@@ -560,10 +560,7 @@ const postBufferUpdate = ({
     goToRegion: goToRegion,
   });
   // In case it takes a while:
-  loadingTimeout = setTimeout(() => {
-    DOM.loading.querySelector("#loadingText").textContent = "Loading file...";
-    DOM.loading.classList.remove("d-none");
-  }, 500);
+  loadingFiles({hide:false})
 };
 
 const resetRegions = (clearActive) => {
@@ -1108,11 +1105,9 @@ async function sortFilesByTime(fileNames) {
  */
 async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults } = {}) {
   if (!filePaths.length) return;
-  DOM.loading.querySelector("#loadingText").textContent = "Loading files...";
-  DOM.loading.classList.remove("d-none");
+  loadingFiles({hide:false})
   // Store the sanitised file list and Load First audio file
-  utils.hideAll();
-  utils.showElement(["spectrogramWrapper"], false);
+  // utils.hideAll();
   resetResults();
   resetDiagnostics();
   utils.disableMenuItem([
@@ -1126,16 +1121,12 @@ async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults 
 
   // Store the file list and Load First audio file
   STATE.openFiles = filePaths;
-  STATE.currentFile = STATE.openFiles[0];
 
   // Reset the buffer playhead and zoom:
   STATE.windowOffsetSecs = 0;
   STATE.windowLength = config.selectedModel.includes('bats') ? 5 : 20;
   // Reset the mode
   STATE.mode = 'analyse';
-  // If spec was destroyed (when visiting charts) this code allows it to work again
-  spec.reInitSpec(config.specMaxHeight)
-
   // Reset analysis status - when importing, we want to set analysis done = true
   STATE.analysisDone = !checkSaved;
 
@@ -2160,6 +2151,7 @@ const setUpWorkerMessaging = () => {
           break;
         }
         case "clear-loading": {
+          loadingFiles({hide:true})
           DOM.loadingScreen.classList.add('d-none')
           break;
         }
@@ -2215,8 +2207,7 @@ const setUpWorkerMessaging = () => {
           }
           if (args.file) {
             // Clear the file loading overlay:
-            clearTimeout(loadingTimeout);
-            DOM.loading.classList.add("d-none");
+            loadingFiles({hide: true})
             MISSING_FILE = args.file;
             const i18 = i18n.get(i18n.Locate);
             args.locate = `
@@ -3001,7 +2992,6 @@ const loadModel = () => {
     backend,
     modelPath
   });
-  flushSpec()
 };
 
 const handleModelChange = async (model, reload = true) => {
@@ -3406,7 +3396,7 @@ function onModelReady() {
 async function onWorkerLoadedAudio({
   location,
   fileStart = 0,
-  fileDuration = 0,
+  fileDuration,
   windowBegin = 0,
   file = "",
   position = 0,
@@ -3414,16 +3404,15 @@ async function onWorkerLoadedAudio({
   play = false,
   metadata,
 }) {
-  clearTimeout(loadingTimeout);
-  // Clear the loading animation
-  DOM.loading.classList.add("d-none");
+  loadingFiles({hide:true})
   const resetSpec = !STATE.currentFile;
   if (fileDuration) {STATE.currentFileDuration = fileDuration}
-  else { 
+  else if (fileDuration === 0) { 
     generateToast({message: `The file ${file} has zero length`, type: 'warning'});
     console.warn(`The file ${file} has zero length`);
     return
-  }
+    // Else undefined or null - exit
+  } else { return }
   //if (preserveResults) completeDiv.hide();
   config.debug &&
     console.log(
@@ -6124,7 +6113,7 @@ document.addEventListener("change", async function (e) {
             initialiseDatePicker(STATE, worker, config, resetResults, filterResults, generateToast);
           }
           config.locale = element.value;
-          STATE.picker.options.lang = element.value.replace("_uk", "");
+          STATE.picker.options.lang = element.value.replace(/_.*$/, "");
           readLabels(labelFile, "locale");
           break;
         }
@@ -7010,7 +6999,18 @@ function checkForMacUpdates() {
   }
 }
 
-
+const loadingFiles = ({hide, content}) => {
+  content ??= "Loading file...";
+  if (hide){
+    clearTimeout(loadingTimeout);
+    DOM.loading.classList.add("d-none");
+  } else {
+    loadingTimeout = setTimeout(() => {
+      DOM.loading.querySelector("#loadingText").textContent = content;
+      DOM.loading.classList.remove("d-none");
+    }, 500);
+  }
+}
 /**
  * Displays a toast notification in the UI with optional localization, icon, and notification sound.
  *
@@ -7034,8 +7034,8 @@ function generateToast({
   autohide = autohide === undefined ? type !== "error" : autohide;
   // i18n
   const i18 = i18n.get(i18n.Toasts);
+  loadingFiles({hide:true})
   if (message === "noFile") {
-    clearTimeout(loadingTimeout) && DOM.loading.classList.add("d-none");
     // Alow further interactions!!
     STATE.currentFile && (STATE.fileLoaded = true);
   }
@@ -7156,9 +7156,8 @@ async function getXCComparisons() {
 
   if (XCcache[sname]) renderComparisons(XCcache[sname], cname);
   else {
-    DOM.loading.querySelector("#loadingText").textContent =
-      "Loading Xeno-Canto data...";
-    DOM.loading.classList.remove("d-none");
+    const content = "Loading Xeno-Canto data...";
+    loadingFiles({hide:false, content})
     const bats = config.selectedModel.includes('bats');
     const quality = "+q:%22>C%22";
     const defaultLength = bats ? "+len:0.5-10" : "+len:3-15";
@@ -7182,7 +7181,7 @@ async function getXCComparisons() {
         .then((response) =>
           response.json().then((payload) => {
             if (!response.ok) {
-              DOM.loading.classList.add("d-none");
+              loadingFiles({hide:true})
               generateToast({ type: "error", message: payload.message || "noXC" });
               return null;
             }
@@ -7207,7 +7206,7 @@ async function getXCComparisons() {
           return recordings;
         })
         .catch((error) => {
-          DOM.loading.classList.add("d-none");
+          loadingFiles({hide:true})
           console.warn("Error getting XC data for type", type, error);
           return [];
         });
@@ -7215,7 +7214,7 @@ async function getXCComparisons() {
     
     // Wait for all four requests to complete
     Promise.all(fetchRequests).then((results) => {
-      DOM.loading.classList.add("d-none");
+      loadingFiles({hide:true})
       // Use a Set to track unique records by a chosen key, here we use 'file'
       const seenRecords = new Set();
     
@@ -7594,7 +7593,7 @@ async function membershipCheck() {
 
       console.info(
         `Version: ${VERSION}. Trial: ${inTrial} subscriber: ${isMember}, All detections: ${config.specDetections}`,
-        expiresIn
+        expiresIn || "Not a subscriber"
       );
       return isMember || inTrial;
     })

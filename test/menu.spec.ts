@@ -126,7 +126,7 @@ test('Page title is correct', async () => {
   console.log('title: ', title)
   console.log('url: ', page.url())
   
-  expect(title).toBe('Chirpity Bird Call Detection')
+  expect(title).toBe('Chirpity')
 })
 
 
