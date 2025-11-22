@@ -6,7 +6,7 @@ const path = require("node:path");
 let session;
 let labels;
 let backend;
-const chunkLength = 160000; // 3 seconds at 32kHz
+const chunkLength = 160000; // 5 seconds at 32kHz
 let batchSize = 1;
 const sampleRate = 32000;
 const numClasses = 14795;
@@ -14,8 +14,8 @@ const DEBUG = false;
 let modelPath;
 
 async function loadModel(mpath, backend) {
-    const provider = backend === 'tensorflow' ? 'cpu' : 'webgpu';
-    const sessionOptions = { executionProviders: [provider], enableGraphCapture: true };
+    const providers = backend === 'tensorflow' ? ['cpu'] : ['webgpu', 'cpu'];
+    const sessionOptions = { executionProviders: providers, enableGraphCapture: true };
     const modelPath = path.join(mpath, 'perch_v2.onnx')
     session = await ort.InferenceSession.create(modelPath, sessionOptions);
 }
@@ -29,8 +29,10 @@ onmessage = async (e) => {
       case 'terminate': {
         batchSize = e.data.batchSize || batchSize;
         if (e.data.backend) {
-
             if (backend !== e.data.backend) {
+              if (session) {
+                try { session.release(); } catch { /* ignore */ }
+              }
               backend = e.data.backend;
               await loadModel(modelPath, backend);
             }

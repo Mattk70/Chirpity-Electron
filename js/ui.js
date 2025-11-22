@@ -7593,7 +7593,7 @@ async function membershipCheck() {
 
       console.info(
         `Version: ${VERSION}. Trial: ${inTrial} subscriber: ${isMember}, All detections: ${config.specDetections}`,
-        expiresIn
+        expiresIn || "Not a subscriber"
       );
       return isMember || inTrial;
     })

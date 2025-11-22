@@ -2382,7 +2382,7 @@ async function processAudio(
           return;
         }
 
-      }, 50); // 50ms interval
+      }, 200); // 200ms interval
     }
 
       if (aborted) {
@@ -3230,7 +3230,9 @@ const processQueue = async () => {
  * @param {number} threads - Number of worker threads to spawn.
  */
 function spawnPredictWorkers(model, batchSize, threads) {
-  if (model === 'perch v2' && predictWorkers.length) {
+  STATE.perchWorker = predictWorkers.filter(w => w.name === 'perch v2');
+  if (model === 'perch v2' && STATE.perchWorker?.length) {
+    predictWorkers = STATE.perchWorker;
     setLabelState({regenerate: true})
     return
   }
@@ -3275,7 +3277,8 @@ const terminateWorkers = () => {
     worker.postMessage({message: 'terminate'})
     if (worker.name !== 'perch v2') worker.terminate()
   });
-  predictWorkers = predictWorkers.filter(w => w.name === 'perch v2');
+  STATE.perchWorker = predictWorkers.filter(w => w.name === 'perch v2');
+  predictWorkers = []
 };
 
 /**
