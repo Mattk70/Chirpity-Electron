@@ -29,27 +29,29 @@ onmessage = async (e) => {
       case 'terminate': {
         batchSize = e.data.batchSize || batchSize;
         if (e.data.backend) {
-            if (session) {
-              try { session.release(); } catch {}
+
+            if (backend !== e.data.backend) {
+              backend = e.data.backend;
+              await loadModel(modelPath, backend);
             }
-            backend = e.data.backend;
-            await loadModel(modelPath, backend);
-        }        
+        }
         break;
       }
       case "load": {
-        backend = e.data.backend;
-        await loadModel(modelPath, backend);
-        batchSize = e.data.batchSize;
-        DEBUG && console.log(`Using backend: ${backend}`);
+        if (!session) {
+          backend = e.data.backend;
+          await loadModel(modelPath, backend);
+          batchSize = e.data.batchSize;
+          DEBUG && console.log(`Using backend: ${backend}`);
 
-        const labelFile = path.join(modelPath,"labels.txt");
-        const fileContents = fs.readFileSync(labelFile, 'utf-8');
-        labels = fileContents.trim().split(/\r?\n/);
-        DEBUG && console.log(
-            `Model received load instruction. Using batch size ${batchSize}`
-          );
+          const labelFile = path.join(modelPath,"labels.txt");
+          const fileContents = fs.readFileSync(labelFile, 'utf-8');
+          labels = fileContents.trim().split(/\r?\n/);
+          DEBUG && console.log(
+              `Model received load instruction. Using batch size ${batchSize}`
+            );
 
+        }
         postMessage({
         message: "model-ready",
         sampleRate,

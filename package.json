@@ -1,6 +1,6 @@
 {
   "name": "Chirpity",
-  "version": "5.4.2",
+  "version": "5.5.0",
   "description": "Chirpity is a bioacoustics platform for the analysis of bird song and other wildlife sounds. It uses machine learning models to identify bird species from audio recordings.",
   "main": "main.js",
   "scripts": {
@@ -69,7 +69,12 @@
       "!README.md",
       "!saved_model$(/*)",
       "!**/*.*js.map",
-      "!**/*.*.md"
+      "!**/*.*.md",
+      "!node_modules/onnxruntime-node/bin/napi-v6/**/*",
+      "node_modules/onnxruntime-node/bin/napi-v6/${platform}/${arch}/**/*",
+      "!node_modules/onnxruntime-node/bin/napi-v6/${platform}/${arch}/[Dd]*",
+      "!node_modules/@tensorflow/tfjs-node/deps/lib/**/*",
+      "!node_modules/@tensorflow/tfjs-node/lib/napi-v9/**/*"
     ],
     "extraResources": [
       "./Help/example.mp3"
@@ -186,6 +191,7 @@
     "jest": "^29.7.0",
     "jimp": "^1.6.0",
     "jsdoc": "^4.0.4",
+    "node-abi": "^4.24.0",
     "playwright": "^1.48.2"
   },
   "dependencies": {

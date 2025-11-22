@@ -856,7 +856,7 @@ async function onLaunch({
   STATE.update({ model, modelPath });
   const result = await diskDB?.getAsync('SELECT id FROM models WHERE NAME = ?', model)
   if (!result){
-    // THe model isn't in the db
+    // The model isn't in the db
     diskDB = await loadDB(modelPath); // load the diskdb with the model species added
   } else {
     STATE.modelID = result.id;
@@ -3230,12 +3230,16 @@ const processQueue = async () => {
  * @param {number} threads - Number of worker threads to spawn.
  */
 function spawnPredictWorkers(model, batchSize, threads) {
-
+  if (model === 'perch v2' && predictWorkers.length) {
+    setLabelState({regenerate: true})
+    return
+  }
   for (let i = 0; i < threads; i++) {
     const workerSrc = ['nocmig', 'chirpity', 'perch v2'].includes(model) ? model : "BirdNet2.4";
     const worker = new Worker(`./js/models/${workerSrc}.js`, { type: "module" });
     worker.isAvailable = true;
     worker.isReady = false;
+    worker.name = model;
     predictWorkers.push(worker);
     DEBUG && console.log("loading a worker");
     worker.postMessage({
@@ -3258,7 +3262,7 @@ function spawnPredictWorkers(model, batchSize, threads) {
     worker.onerror = (e) => {
       console.warn(
         `Worker ${i} is suffering, shutting it down. The error was:`,
-        e
+        e.message
       );
       predictWorkers.splice(i, 1);
       worker.terminate();
@@ -3268,9 +3272,10 @@ function spawnPredictWorkers(model, batchSize, threads) {
 
 const terminateWorkers = () => {
   predictWorkers.forEach((worker) => {
-    worker.terminate(); //postMessage({message: 'terminate'})
+    worker.postMessage({message: 'terminate'})
+    if (worker.name !== 'perch v2') worker.terminate()
   });
-  predictWorkers = [];
+  predictWorkers = predictWorkers.filter(w => w.name === 'perch v2');
 };
 
 /**
