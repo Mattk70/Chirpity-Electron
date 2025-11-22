@@ -51,15 +51,15 @@ jobs:
       #     echo "Audit fix applied, status is ${{ job.status }}."
     
 
-      # - name: Copy tensorflow.dll to napi-v8 folder
-      #   if: runner.os == 'Windows'
-      #   shell: bash
-      #   run: |
-      #     ls -l ./node_modules/@tensorflow/tfjs-node/deps/lib
-      #     ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v8
-      #     cp ./node_modules/@tensorflow/tfjs-node/deps/lib/tensorflow.dll \
-      #     ./node_modules/@tensorflow/tfjs-node/lib/napi-v8/tensorflow.dll
-      #     ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v8
+      - name: Copy tensorflow.dll to napi-v8 folder
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          ls -l ./node_modules/@tensorflow/tfjs-node/deps/lib
+          ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v8
+          mv ./node_modules/@tensorflow/tfjs-node/deps/lib/tensorflow.dll \
+          ./node_modules/@tensorflow/tfjs-node/lib/napi-v8/tensorflow.dll
+          ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v8
 
       - name: Patch wavesurfer.js play() to handle AbortError
         shell: bash
