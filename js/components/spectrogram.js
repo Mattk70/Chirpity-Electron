@@ -193,7 +193,7 @@ export class ChirpityWS {
     this.wavesurfer = this.initWavesurfer(container, plugins);
 
     if (audio) {
-      this.loadBuffer(audio);
+      await this.loadBuffer(audio);
     }
     DOM.colourmap.value = config.colormap;
     // Set click event that removes all REGIONS

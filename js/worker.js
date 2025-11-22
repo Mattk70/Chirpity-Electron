@@ -743,7 +743,7 @@ async function savedFileCheck(fileList) {
     // Slice the list into a # of params SQLITE can handle
     const batchSize = 10_000;
     let totalFilesChecked = 0;
-    fileList = fileList.map(f => (METADATA[f].name || f));
+    fileList = fileList.map(f => (METADATA[f]?.name || f));
     for (let i = 0; i < fileList.length; i += batchSize) {
       const fileSlice = fileList.slice(i, i + batchSize);
       let query; const library = STATE.library.location + p.sep;
@@ -1925,6 +1925,9 @@ async function loadAudioFile({
     if (file) {
       fetchAudioBuffer({ file, start, end })
         .then(([audio, start]) => {
+          if (!audio) {
+            return reject('no file duration') 
+          }
           UI.postMessage(
             {
               event: "worker-loaded-audio",
@@ -1964,7 +1967,6 @@ async function loadAudioFile({
               variables: { error },
               file,
             });
-            //reject(error)
           } else {
             const size = fs.statSync(file).size === 0 ? "0 bytes" : "";
             const message = error.message || `${file}: ${size}`;
@@ -2079,111 +2081,133 @@ const roundedFloat = (string) => Math.round(parseFloat(string) * 10000) / 10000;
  * @param source_file: the file that exists ( will be different after compression)
  * @returns {Promise<unknown>}
  */
+
+const metadataLocks = {}; // file -> Promise
+
 const setMetadata = async ({ file, source_file = file }) => {
-  let fileMeta = METADATA[file] || {};
-  if (fileMeta.isComplete) return fileMeta;
-  // CHeck the database first, so we honour any manual updates.
-  const savedMeta = await getSavedFileInfo(file).catch((error) =>
-    console.warn("getSavedFileInfo error", error)
-  );
-  if (savedMeta) {
-    fileMeta = savedMeta;
-    if (savedMeta.locationID)
-      UI.postMessage({
-        event: "file-location-id",
-        file,
-        id: savedMeta.locationID,
-      });
-    fileMeta.isSaved = true; // Queried by UI to establish saved state of file.
-  } 
-  let guanoTimestamp;
-  // savedMeta may just have a locationID if it was set by onSetCUstomLocation
-  if (!savedMeta?.duration) {
-    fileMeta.duration = await getDuration(file);
-    if (file.toLowerCase().endsWith("wav")) {
-      const { extractWaveMetadata } = require("./js/utils/metadata.js");
-      const t0 = Date.now();
-      const wavMetadata = await extractWaveMetadata(file); //.catch(error => console.warn("Error extracting GUANO", error));
-      if (Object.keys(wavMetadata).includes("guano")) {
-        const guano = wavMetadata.guano;
-        const location = guano["Loc Position"];
-        if (location) {
-          const [lat, lon] = location.split(" ");
-          await onSetCustomLocation({
-            lat: roundedFloat(lat),
-            lon: roundedFloat(lon),
-            place: location,
-            files: [file],
-            overwritePlaceName: false,
-          });
-          fileMeta.lat = roundedFloat(lat);
-          fileMeta.lon = roundedFloat(lon);
-        }
-        guanoTimestamp = Date.parse(guano.Timestamp);
-        if (guanoTimestamp) fileMeta.fileStart = guanoTimestamp;
-        if (guano.Length){
-          fileMeta.duration = parseFloat(guano.Length);
-        }
-      }
-      if (Object.keys(wavMetadata).length > 0) {
-        fileMeta.metadata = JSON.stringify(wavMetadata);
-      }
-      DEBUG &&
-        console.log(`GUANO search took: ${(Date.now() - t0) / 1000} seconds`);
-    }
-  }
-  let fileStart, fileEnd;
-  // Prepare to set dateDurations
-  if (savedMeta?.fileStart) {
-    // Saved timestamps have the highest priority allowing for an override of Guano timestamp/file mtime
-    fileStart = new Date(savedMeta.fileStart);
-    fileEnd = new Date(fileStart.getTime() + fileMeta.duration * 1000);
-  } else if (guanoTimestamp) {
-    // Guano has second priority
-    fileStart = new Date(guanoTimestamp);
-    fileEnd = new Date(guanoTimestamp + fileMeta.duration * 1000);
-  } else {
-    // Least preferred
-    const stat = fs.statSync(source_file);
-    const meta = fileMeta.metadata
-      ? JSON.parse(fileMeta.metadata)
-      : {};
-    const H1E = meta.bext?.Originator?.includes("H1essential");
-    if (STATE.fileStartMtime || H1E) {
-      // Zoom H1E apparently sets mtime to be the start of the recording
-      fileStart = new Date(stat.mtimeMs);
-      fileMeta.fileStart = fileStart.getTime();
-      fileEnd = new Date(stat.mtimeMs + fileMeta.duration * 1000);
-    } else {
-      fileEnd = new Date(stat.mtimeMs);
-      fileStart = new Date(stat.mtimeMs - fileMeta.duration * 1000);
-      fileMeta.fileStart = fileStart.getTime();
-    }
+  // If another call is already running for this file, wait for it
+  if (metadataLocks[file]) {
+    return metadataLocks[file];
   }
 
-  // split  the duration of this file across any dates it spans
-  fileMeta.dateDuration = {};
-  const key = new Date(fileStart);
-  key.setHours(0, 0, 0, 0);
-  const keyCopy = addDays(key, 0).getTime();
-  if (fileStart.getDate() === fileEnd.getDate()) {
-    fileMeta.dateDuration[keyCopy] = fileMeta.duration;
-  } else {
-    const key2 = addDays(key, 1);
-    const key2Copy = addDays(key2, 0).getTime();
-    fileMeta.dateDuration[keyCopy] = (key2Copy - fileStart) / 1000;
-    fileMeta.dateDuration[key2Copy] =
-      fileMeta.duration - fileMeta.dateDuration[keyCopy];
+    ``// Create a promise for the current run and store it
+    const run = (async () => {
+    let fileMeta = METADATA[file] || {};
+    if (fileMeta.isComplete) return fileMeta;
+    // CHeck the database first, so we honour any manual updates.
+    const savedMeta = await getSavedFileInfo(file).catch((error) =>
+      console.warn("getSavedFileInfo error", error)
+    );
+    if (savedMeta) {
+      fileMeta = savedMeta;
+      if (savedMeta.locationID)
+        UI.postMessage({
+          event: "file-location-id",
+          file,
+          id: savedMeta.locationID,
+        });
+      fileMeta.isSaved = true; // Queried by UI to establish saved state of file.
+    } 
+    let guanoTimestamp;
+    // savedMeta may just have a locationID if it was set by onSetCUstomLocation
+    if (!savedMeta?.duration) {
+      fileMeta.duration = await getDuration(file);
+      if (file.toLowerCase().endsWith("wav")) {
+        const { extractWaveMetadata } = require("./js/utils/metadata.js");
+        const t0 = Date.now();
+        const wavMetadata = await extractWaveMetadata(file).catch(error => console.warn("Error extracting GUANO", error.message));
+        if (wavMetadata && Object.keys(wavMetadata).includes("guano")) {
+          const guano = wavMetadata.guano;
+          const location = guano["Loc Position"];
+          if (location) {
+            const [lat, lon] = location.split(" ");
+            await onSetCustomLocation({
+              lat: roundedFloat(lat),
+              lon: roundedFloat(lon),
+              place: location,
+              files: [file],
+              overwritePlaceName: false,
+            });
+            fileMeta.lat = roundedFloat(lat);
+            fileMeta.lon = roundedFloat(lon);
+          }
+          guanoTimestamp = Date.parse(guano.Timestamp);
+          if (guanoTimestamp) fileMeta.fileStart = guanoTimestamp;
+          if (guano.Length){
+            fileMeta.duration = parseFloat(guano.Length);
+          }
+        }
+        if (wavMetadata && Object.keys(wavMetadata).length > 0) {
+          fileMeta.metadata = JSON.stringify(wavMetadata);
+        }
+        DEBUG &&
+          console.log(`GUANO search took: ${(Date.now() - t0) / 1000} seconds`);
+      }
+    }
+    let fileStart, fileEnd;
+    // Prepare to set dateDurations
+    if (savedMeta?.fileStart) {
+      // Saved timestamps have the highest priority allowing for an override of Guano timestamp/file mtime
+      fileStart = new Date(savedMeta.fileStart);
+      fileEnd = new Date(fileStart.getTime() + fileMeta.duration * 1000);
+    } else if (guanoTimestamp) {
+      // Guano has second priority
+      fileStart = new Date(guanoTimestamp);
+      fileEnd = new Date(guanoTimestamp + fileMeta.duration * 1000);
+    } else {
+      // Least preferred
+      const stat = fs.statSync(source_file);
+      const meta = fileMeta.metadata
+        ? JSON.parse(fileMeta.metadata)
+        : {};
+      const H1E = meta.bext?.Originator?.includes("H1essential");
+      if (STATE.fileStartMtime || H1E) {
+        // Zoom H1E apparently sets mtime to be the start of the recording
+        fileStart = new Date(stat.mtimeMs);
+        fileMeta.fileStart = fileStart.getTime();
+        fileEnd = new Date(stat.mtimeMs + fileMeta.duration * 1000);
+      } else {
+        fileEnd = new Date(stat.mtimeMs);
+        fileStart = new Date(stat.mtimeMs - fileMeta.duration * 1000);
+        fileMeta.fileStart = fileStart.getTime();
+      }
+    }
+
+    // split  the duration of this file across any dates it spans
+    fileMeta.dateDuration = {};
+    const key = new Date(fileStart);
+    key.setHours(0, 0, 0, 0);
+    const keyCopy = addDays(key, 0).getTime();
+    if (fileStart.getDate() === fileEnd.getDate()) {
+      fileMeta.dateDuration[keyCopy] = fileMeta.duration;
+    } else {
+      const key2 = addDays(key, 1);
+      const key2Copy = addDays(key2, 0).getTime();
+      fileMeta.dateDuration[keyCopy] = (key2Copy - fileStart) / 1000;
+      fileMeta.dateDuration[key2Copy] =
+        fileMeta.duration - fileMeta.dateDuration[keyCopy];
+    }
+    // If we haven't set METADATA.file.fileStart by now we need to create it from a Date
+    fileMeta.fileStart ??= fileStart.getTime();
+    if (fileMeta.duration) {
+      // Set complete flag
+      fileMeta.isComplete = true;
+    }
+    METADATA[file] = fileMeta;
+    return fileMeta;
+    })();
+
+  metadataLocks[file] = run;
+
+  try {
+    const result = await run;
+    return result;
+  } finally {
+    // Free the lock once finished
+    delete metadataLocks[file];
   }
-  // If we haven't set METADATA.file.fileStart by now we need to create it from a Date
-  fileMeta.fileStart ??= fileStart.getTime();
-  if (fileMeta.duration) {
-    // Set complete flag
-    fileMeta.isComplete = true;
-  }
-  METADATA[file] = fileMeta;
-  return fileMeta;
 };
+
 
 function pauseFfmpeg(ffmpegCommand, pid) {
   if (!STATE.processingPaused[pid]) {
@@ -2514,6 +2538,7 @@ const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sam
   if (!sampleRate) sampleRate = STATE.model.includes("bats") ? 256_000 : 24_000;
   await setMetadata({ file });
   const fileDuration = METADATA[file].duration// (STATE.model === 'bats') ? METADATA[file].duration*10 : METADATA[file].duration;
+  if (!fileDuration) return [null, start]
   end ??= fileDuration;
 
   if (start < 0) {
