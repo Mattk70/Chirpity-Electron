@@ -1087,7 +1087,7 @@ function getFileSQLAndParams(range) {
   } else {
     const fileParams = prepParams(STATE.filesToAnalyse);
     SQL += ` AND ( file IN  (${fileParams}) `;
-    STATE.originalFiles ??= STATE.filesToAnalyse.map((item) => (METADATA[item].name || item));
+    STATE.originalFiles ??= STATE.filesToAnalyse.map((item) => (METADATA[item]?.name || item));
     params.push(...STATE.originalFiles);
     SQL += ` OR archiveName IN  (${fileParams}) ) `;
     const archivePath = STATE.library.location + p.sep;
