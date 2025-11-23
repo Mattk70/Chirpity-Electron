@@ -691,10 +691,10 @@ export class ChirpityWS {
    * @param {AudioBuffer|*} options.buffer - The audio buffer to be visualized.
    * @param {boolean} [options.play=false] - If true, starts playback immediately after the update.
    * @param {number} [options.position=0] - Normalized playback position (between 0 and 1) to seek to.
-   * @param {boolean} [options.resetSpec=false] - If true, resets the spectrogram dimensions before loading the buffer.
    * @returns {Promise<void>} A promise that resolves once the spectrogram and timeline update process is complete.
    */
   async updateSpec({ buffer, play = false, position = 0 }) {
+    
     DOM.spectrogramWrapper.classList.remove("d-none");
     if (!this.wavesurfer) await this.adjustDims(true);
     else {

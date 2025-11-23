@@ -16,7 +16,7 @@ import {
 import {plotTrainingHistory} from './components/charts.js';
 import { checkMembership } from "./utils/member.js";
 import { DOM } from "./utils/DOMcache.js";
-import { IUCNtaxonomy } from "./utils/IUCNcache.js";
+import { IUCNtaxonomy, IUCNCache } from "./utils/IUCNcache.js";
 import { XCtaxonomy as XCtaxon } from "./utils/XCtaxonomy.js";
 import { CustomSelect } from "./components/custom-select.js";
 import createFilterDropdown from "./components/custom-filter.js";
@@ -3510,7 +3510,7 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
 
     if (showIUCN) {
       const species = IUCNtaxonomy[item.sname] || item.sname;
-      const record = STATE.IUCNcache[species];
+      const record = IUCNCache[species];
       // there might not be a record...
       const iucn = record?.scopes.find(
         (obj) => obj.scope === config.detect.iucnScope
@@ -4654,8 +4654,25 @@ document.addEventListener("drop", (event) => {
           file.type.startsWith("audio/") ||
           file.type.startsWith("video/"))
     );
-  const audioFiles = fileList.map(file => window.electron.showFilePath(file));
-  worker.postMessage({ action: "get-valid-files-list", files: audioFiles });
+  if (fileList.length){
+    const audioFiles = fileList.map(file => window.electron.showFilePath(file));
+    worker.postMessage({ action: "get-valid-files-list", files: audioFiles });
+  } else {
+    const noSupport = {
+        en: 'File type not supported',
+        da: 'Filtype understøttes ikke',
+        de: 'Dateityp wird nicht unterstützt',
+        es: 'Tipo de archivo no admitido',
+        fr: 'Type de fichier non pris en charge',
+        ja: 'ファイル形式はサポートされていません',
+        nl: 'Bestandstype wordt niet ondersteund',
+        pt: 'Tipo de ficheiro não suportado',
+        ru: 'Тип файла не поддерживается',
+        sv: 'Filtypen stöds inte',
+        zh: '不支持的文件类型'
+    };
+    generateToast({message: 'noFile', variables:{error:i18n.get(noSupport)}})
+  }
 });
 
 // Prevent drag for UI elements

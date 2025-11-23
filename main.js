@@ -672,13 +672,13 @@ ipcMain.handle("saveFile", async (event, arg) => {
       });
 });
 
-let powerSaveID;
+let powerSaveID = null;
 ipcMain.handle("powerSaveControl", (e, on) => {
   if (on) {
     powerSaveID = powerSaveBlocker.start("prevent-app-suspension");
     //DEBUG && console.log(powerSaveBlocker.isStarted(powerSaveID), powerSaveID)
   } else {
-    powerSaveBlocker.stop(powerSaveID);
+    if (powerSaveID !== null) powerSaveBlocker.stop(powerSaveID);
     //DEBUG && console.log(powerSaveBlocker.isStarted(powerSaveID), powerSaveID)
   }
 });

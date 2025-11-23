@@ -1,4 +1,4 @@
-import { IUCNCache } from "../utils/IUCNcache.js";
+
 const DEBUG = false;
 
 export class UIState {
@@ -50,7 +50,6 @@ export class UIState {
         bufferStartTime: 0,
         fileLoaded: false,
         activeRegion: null,
-        IUCNcache: IUCNCache,
         translations: ["da", "de", "es", "fr", "ja", "nl", "pt", "ru", "sv", "zh"],
         regionColour: "rgba(255, 255, 255, 0.1)",
         regionActiveColour: "rgba(255, 255, 0, 0.1)",
