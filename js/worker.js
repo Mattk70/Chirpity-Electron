@@ -412,7 +412,7 @@ async function handleMessage(e) {
     }
     case "change-threads": {
       if (STATE.model.includes('perch')) break; // perch v2 only works with 1 thread
-      const delta = threads - predictWorkers.length;
+      const delta = args.threads - predictWorkers.length;
       NUM_WORKERS += delta;
       if (delta > 0) {
         spawnPredictWorkers(STATE.model, BATCH_SIZE, delta);

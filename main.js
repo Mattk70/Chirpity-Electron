@@ -472,6 +472,19 @@ if (!gotTheLock) {
       ipcMain.handle('exitApplication', () => app.quit()); 
       
 
+      // Debug mode
+
+      try {
+          // Specify the file path
+          filePath = path.join(app.getPath('userData'), 'config.json');
+          // Read the contents of the file synchronously
+          fileContent = fs.readFileSync(filePath, 'utf8');
+          config = JSON.parse(fileContent);
+          DEBUG =   process.env.CI === 'e2e' ? false : config.debug;
+      } catch (error) {
+        console.warn('CONFIG: Error reading file:', error.message);
+      }
+      
       DEBUG && console.log('CI mode' , process.env.CI)
 
       await createWorker();
