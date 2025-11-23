@@ -847,7 +847,18 @@ async function onLaunch({
     nocmig: 24_000,
     'perch v2': 32_000,
   };
-  const perch = model === 'perch v2';
+  let perch = model === 'perch v2';
+  // Check correct perch model being used
+  if (perch && ! fs.existsSync(p.join(modelPath, 'perch_v2.onnx'))) {
+    let message = `<b>'perch_v2.onnx'</b> was not found in ${modelPath}. `;
+    if (fs.existsSync(p.join(modelPath, '_internal'))){
+      message += 'The version of Perch you have is not compatible with this version of Chirpity. '
+    } 
+    message += `You can download a working version from the <a href="https://chirpity.mattkirkland.co.uk#classifiers" target='_blank'>website</a>.
+    For now, the BirdNET model will be loaded instead.`
+    model = 'birdnet'; perch = false; modelPath = null;
+    generateAlert({message, type:'error'})
+  }
   WINDOW_SIZE = perch ? 5 : 3;
   threads = perch ? 1 : threads;
 

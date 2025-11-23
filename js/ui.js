@@ -5378,7 +5378,7 @@ async function handleUIClicks(e) {
 
       const modelName = displayName.toLowerCase();
       const modelLocation = document.getElementById('import-location').value;
-      const requiredFiles = modelName.includes('perch') ? ['perch_v2.onnx', 'labels.txt'] : ['weights.bin', 'labels.txt', 'model.json'];
+      const requiredFiles = modelName === 'perch v2' ? ['perch_v2.onnx', 'labels.txt'] : ['weights.bin', 'labels.txt', 'model.json'];
       if (config.models[modelName] !== undefined){
         generateToast({message: 'A model with that name already exists', type:'error'})
         break;
@@ -5390,7 +5390,7 @@ async function handleUIClicks(e) {
         }
       })
       if (missingFiles.length){ 
-        const files = missingFiles.join(', ')
+        const files = missingFiles.join(', ');
         generateToast({message: `
         The chosen location <br>${modelLocation}<br>is missing required files:
         <br> <b>${files}</b>.
@@ -5398,7 +5398,12 @@ async function handleUIClicks(e) {
         break
       }
       importModal.hide();
-      config.models[modelName] = {backend: config.models['birdnet'].backend, displayName, modelPath:modelLocation};
+      config.models[modelName] = {
+        backend: modelName === 'perch v2' 
+          ? 'tensorflow' 
+          : config.models['birdnet'].backend, 
+          displayName, 
+          modelPath:modelLocation};
       config.selectedModel = modelName;
       const select = document.getElementById('model-to-use');
       const newOption = document.createElement('option');
