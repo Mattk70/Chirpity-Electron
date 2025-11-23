@@ -243,23 +243,7 @@ async function exitHandler(options, exitCode) {
         }
       });
     });
-    // Remove old logs - commented out as logs are rotated
-    // const logs = path.join(app.getPath('userData'), 'logs');
-    // fs.readdir(logs, (err, files) => {
-    //     if (err) {
-    //         console.error('Error reading folder:', err);
-    //         return;
-    //     }
-    //     files.forEach((file) => {
-    //         fs.unlink(path.join(logs, file), (err) => {
-    //             if (err) {
-    //                 console.error('Error deleting file:', err);
-    //             } else {
-    //                 DEBUG && console.log('Deleted file:', file);
-    //             }
-    //         });
-    //     });
-    // });
+
     // Disable debug mode here?
   } else {
     DEBUG && console.log("no clean");
@@ -282,12 +266,20 @@ process.on("SIGUSR2", exitHandler.bind(undefined, { exit: true }));
 //catches uncaught exceptions
 process.on("uncaughtException", exitHandler.bind(undefined, { exit: true }));
 
+ipcMain.handle('getPath', () => app.getPath('userData'));
+ipcMain.handle('getAppPath', () => app.getAppPath());
+ipcMain.handle('trialPeriod', () => 14*24*3600*1000); // 14 days
+ipcMain.handle('getLocale', () => app.getLocale());
+ipcMain.handle('getTemp', () => app.getPath('temp'));
+ipcMain.handle('isMac', () => process.platform === 'darwin');
+ipcMain.handle('getAudio', () => path.join(__dirname.replace('app.asar', ''), 'Help', 'example.mp3'));
+ipcMain.handle('exitApplication', () => app.quit()); 
+
 let mainWindow;
 let workerWindow;
 
 async function windowStateKeeper(windowName) {
   let window, windowState;
-
   async function setBounds() {
     // Restore from settings
     if (await settings.has(`windowState.${windowName}`)) {
@@ -302,7 +294,6 @@ async function windowStateKeeper(windowName) {
       };
     }
   }
-
   async function saveState() {
     if (!windowState.isMaximized) {
       windowState = window.getBounds();
@@ -313,17 +304,16 @@ async function windowStateKeeper(windowName) {
       await settings.set(`windowState.${windowName}`, windowState);
     } catch {} // do nothing
   }
-
   function track(win) {
     window = win;
     ["resize", "move", "close", "maximize", "unmaximize"].forEach((event) => {
       win.on(event, saveState);
     });
   }
-
   await setBounds();
   return { ...windowState, track };
 }
+
 
 async function createWindow() {
   // Create the browser window.
@@ -461,19 +451,9 @@ if (!gotTheLock) {
       ipcMain.handle("getVersion", () => app.getVersion());
     }
 
-      ipcMain.handle('getPath', () => app.getPath('userData'));
       ipcMain.handle('getInstallDate', () => installedAt);
-      ipcMain.handle('getAppPath', () => app.getAppPath());
-      ipcMain.handle('trialPeriod', () => 14*24*3600*1000); // 14 days
-      ipcMain.handle('getLocale', () => app.getLocale());
-      ipcMain.handle('getTemp', () => app.getPath('temp'));
-      ipcMain.handle('isMac', () => process.platform === 'darwin');
-      ipcMain.handle('getAudio', () => path.join(__dirname.replace('app.asar', ''), 'Help', 'example.mp3'));
-      ipcMain.handle('exitApplication', () => app.quit()); 
       
-
       // Debug mode
-
       try {
           // Specify the file path
           filePath = path.join(app.getPath('userData'), 'config.json');
@@ -692,8 +672,7 @@ ipcMain.handle("saveFile", async (event, arg) => {
       });
 });
 
-let powerSaveID = powerSaveBlocker.start("prevent-app-suspension");
-powerSaveBlocker.stop(powerSaveID);
+let powerSaveID;
 ipcMain.handle("powerSaveControl", (e, on) => {
   if (on) {
     powerSaveID = powerSaveBlocker.start("prevent-app-suspension");
