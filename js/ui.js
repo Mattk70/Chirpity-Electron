@@ -5295,10 +5295,12 @@ async function handleUIClicks(e) {
           config.training.customModel.location || ""
         );
         if (!files.canceled) {
-          const modelFolder = files.filePaths[0];
+          const modelFolder = files.filePaths[0]
           document.getElementById("import-location").value = modelFolder;
           const modelNameInput = document.getElementById("model-name");
-          modelNameInput.value = p.basename(modelFolder);
+          // Prevent people changing Perch v2 name
+          modelNameInput.value = p.basename(modelFolder).replace(/^perch v2.*$/i, 'Perch v2');
+          modelNameInput.disabled = modelNameInput.value === 'Perch v2';
         }
       })();
       break;
@@ -5371,7 +5373,9 @@ async function handleUIClicks(e) {
         form.reportValidity(); // Shows the native browser validation messages
         break;
       }
-      const displayName = document.getElementById('model-name').value.trim();
+      let displayName = document.getElementById('model-name').value.trim();
+      displayName = displayName.replace(/^perch v2.*$/i, 'Perch v2')
+
       const modelName = displayName.toLowerCase();
       const modelLocation = document.getElementById('import-location').value;
       const requiredFiles = modelName.includes('perch') ? ['perch_v2.onnx', 'labels.txt'] : ['weights.bin', 'labels.txt', 'model.json'];
