@@ -472,33 +472,6 @@ if (!gotTheLock) {
       ipcMain.handle('exitApplication', () => app.quit()); 
       
 
-      // Debug mode
-      function hexToUtf8(hex) {
-          return hex
-              .match(/.{1,2}/g) // Split the hex string into pairs
-              .map(byte => String.fromCharCode(parseInt(byte, 16))) // Convert each pair to a character
-              .join('');
-      }
-      try {
-          // Specify the file path
-          filePath = path.join(app.getPath('userData'), 'config.json');
-          
-          // Read the contents of the file synchronously
-          fileContent = fs.readFileSync(filePath, 'utf8');
-          config = JSON.parse(fileContent);
-          DEBUG =   process.env.CI === 'e2e' ? false : config.debug;
-      }
-      catch (error) {
-          console.warn('CONFIG: ASCII read attempt failed:', error.message);
-          // Handle errors, for example, file not found
-          try {
-              const jsonData = hexToUtf8(fileContent);
-              config = JSON.parse(jsonData);
-              DEBUG =   process.env.CI === 'e2e' ? false : config.debug;
-          } catch {
-              console.warn('CONFIG: Error reading Hex file:', error.message);
-          }
-      }
       DEBUG && console.log('CI mode' , process.env.CI)
 
       await createWorker();
