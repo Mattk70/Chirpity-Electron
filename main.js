@@ -42,12 +42,15 @@ async function getInstallInfo(date) {
   }
 
   const crypto = require("node:crypto");
-  if (date) date = new Date(date);
-  else date = new Date();
+  let effectiveDate = date ? new Date(date) : new Date();
+  if (Number.isNaN(effectiveDate.getTime())) {
+    console.warn("getInstallInfo: invalid date provided, falling back to now.");
+    effectiveDate = new Date();
+  }
 
   const installInfo = {
     appId: crypto.randomUUID(),
-    installedAt: date.toISOString(),
+    installedAt: effectiveDate.toISOString(),
   };
 
   try {

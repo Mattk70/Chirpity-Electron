@@ -8,7 +8,8 @@ on:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
+permissions:
+  contents: read
 jobs:
   Build-Chirpity:
     runs-on: ${{ matrix.os }}
@@ -235,14 +236,17 @@ jobs:
         run: |
           curl -L -o Perch.v2.7z \
             https://github.com/Mattk70/Chirpity-Website/releases/download/v3.0.0/Perch.v2.7z
+        shell: bash
 
       - name: Extract Perch Model into "Perch v2"
         run: |
           7z x Perch.v2.7z 
+        shell: bash
 
       - name: Make model available to Playwright
         run: echo "PERCH_MODEL_PATH=$PWD/Perch v2" >> $GITHUB_ENV
-
+        shell: bash
+        
       - name: Test packaged application
         if: runner.os != 'Linux'
         run: npm test
