@@ -6,7 +6,8 @@ on:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
+permissions:
+  contents: read
 jobs:
   Build-Chirpity:
     runs-on: macos-15-intel
