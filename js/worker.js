@@ -676,7 +676,7 @@ async function handleMessage(e) {
       // Call new db functions when not initial state update (where UUID is sent)
       if (args.database && !args.UUID) {
         // load a new database
-        diskDB = await loadDB()
+        diskDB = await loadDB(STATE.modelPath)
         // Create a fresh memoryDB to attach to it
         memoryDB = await createDB({file: null, diskDB, dbMutex})
       }
