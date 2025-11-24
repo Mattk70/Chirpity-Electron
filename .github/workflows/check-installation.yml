@@ -238,15 +238,31 @@ jobs:
             https://github.com/Mattk70/Chirpity-Website/releases/download/v3.0.0/Perch.v2.7z
         shell: bash
 
-      - name: Extract Perch Model into "Perch v2"
-        run: |
-          7z x Perch.v2.7z 
+      - name: Extract Perch Model
         shell: bash
+        run: |
+          echo "Extracting Perch model on $RUNNER_OS"
+
+          # Windows does NOT have 7z by default → install it
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            echo "Installing p7zip via chocolatey..."
+            choco install p7zip -y
+          fi
+
+          # Create output folder if needed
+          mkdir -p "Perch v2"
+
+          echo "Running 7z extraction..."
+          7z x "Perch.v2.7z" -o"Perch v2"
+
+          echo "Extraction complete. Contents:"
+          ls -R "Perch v2"
+
 
       - name: Make model available to Playwright
         run: echo "PERCH_MODEL_PATH=$PWD/Perch v2" >> $GITHUB_ENV
         shell: bash
-        
+
       - name: Test packaged application
         if: runner.os != 'Linux'
         run: npm test

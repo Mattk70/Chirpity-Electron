@@ -48,7 +48,7 @@ sqlite3.Statement.prototype.runAsync = function (...params) {
   if (DEBUG) console.log("SQL\n", this.sql, "\nParams\n", params);
   return new Promise((resolve, reject) => {
     this.run(params, (err) => {
-      if (err) return reject(err, console.log(err, this.sql));
+      if (err) return reject(err, console.log(err, this.sql, params));
       // if (DEBUG) console.log('\nRows:', rows)
       resolve(this);
     });
@@ -274,6 +274,13 @@ async function upgrade_to_v1(diskDB, dbMutex) {
   }
 }
 
+/**
+ * Migrates the database schema to version 2 by adding a unique constraint on the `species` table.
+ *
+ * Recreates the `species` table with a unique constraint on the combination of `cname` and `sname`, updates the schema version, and performs integrity checks. The migration is executed within a mutex lock to ensure concurrency safety.
+ *
+ * @remark Rolls back the transaction if an error occurs during migration.
+ */
 async function upgrade_to_v2(diskDB, dbMutex) {
   let t0 = Date.now();
   try {
@@ -302,13 +309,454 @@ async function upgrade_to_v2(diskDB, dbMutex) {
   }
 }
 
+const createDB = async ({file, diskDB, dbMutex}) => {
+  const archiveMode = !!file;
+  let memoryDB;
+  if (archiveMode) {
+    const {openSync} = require('node:fs');
+    openSync(file, "w");
+    diskDB = new sqlite3.Database(file);
+    DEBUG &amp;&amp; console.log("Created disk database", diskDB.filename);
+  } else {
+    memoryDB = new sqlite3.Database(":memory:");
+    DEBUG &amp;&amp; console.log("Created new in-memory database");
+  }
+  const db = archiveMode ? diskDB : memoryDB;
+
+  await dbMutex.lock();
+  try {
+    await db.runAsync("BEGIN");
+    await db.runAsync(
+      `CREATE TABLE tags(
+        id INTEGER PRIMARY KEY, 
+        name TEXT NOT NULL, 
+        UNIQUE(name)
+      )`
+    );
+    await db.runAsync("INSERT INTO tags VALUES(0, 'Nocmig'), (1, 'Local')");
+    await db.runAsync(`
+      CREATE TABLE models (
+        id INTEGER PRIMARY KEY, 
+        name TEXT NOT NULL, UNIQUE(name)
+      )`
+    );
+    await db.runAsync("INSERT INTO models VALUES(0, 'user')");
+    await db.runAsync(
+      `CREATE TABLE species(
+        id INTEGER PRIMARY KEY, 
+        sname TEXT NOT NULL, 
+        cname TEXT NOT NULL, 
+        modelID INTEGER NOT NULL,
+        classIndex INTEGER NOT NULL,
+        UNIQUE (modelID, classIndex),
+        UNIQUE (modelID, sname, cname),
+        FOREIGN KEY (modelID) REFERENCES models(id) ON DELETE CASCADE
+      )`
+    );
+    // await db.runAsync(
+    //   `CREATE TABLE species_translations (
+    //       id INTEGER PRIMARY KEY,
+    //       sname TEXT NOT NULL,
+    //       language TEXT NOT NULL,
+    //       cname TEXT NOT NULL,
+    //       UNIQUE (cname, sname), -- Ensure one cname / sname combo. Start with en
+    //       FOREIGN KEY (sname) REFERENCES species(sname) ON DELETE CASCADE
+    //   );`
+    // );
+    await db.runAsync(
+      `CREATE TABLE locations(
+        id INTEGER PRIMARY KEY, 
+        lat REAL NOT NULL,
+        lon REAL NOT NULL,
+        place TEXT NOT NULL, 
+        UNIQUE (lat, lon)
+      )`
+    );
+    await db.runAsync(
+      `CREATE TABLE files(
+        id INTEGER PRIMARY KEY, 
+        name TEXT NOT NULL, 
+        duration REAL, 
+        filestart INTEGER, 
+        locationID INTEGER, 
+        archiveName TEXT, 
+        metadata TEXT, 
+        UNIQUE (name),
+        CONSTRAINT fk_locations FOREIGN KEY (locationID) REFERENCES locations(id) ON DELETE SET NULL
+      )`
+    );
+
+    await db.runAsync(
+      `CREATE TABLE records( 
+        dateTime INTEGER, 
+        position INTEGER,
+        fileID INTEGER, 
+        speciesID INTEGER,
+        modelID INTEGER,
+        confidence INTEGER, 
+        comment TEXT,
+        end INTEGER,
+        callCount INTEGER, 
+        isDaylight INTEGER, 
+        reviewed INTEGER, 
+        tagID INTEGER,
+        UNIQUE (dateTime, fileID, speciesID, modelID), 
+        CONSTRAINT fk_models FOREIGN KEY (modelID) REFERENCES models(id) ON DELETE CASCADE,
+        CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,
+        CONSTRAINT fk_species FOREIGN KEY (speciesID) REFERENCES species(id),
+        CONSTRAINT fk_tags FOREIGN KEY (tagID) REFERENCES tags(id) ON DELETE SET NULL
+      )`
+    );
+    await db.runAsync(
+      `CREATE TABLE duration(
+        day INTEGER, 
+        duration INTEGER, 
+        fileID INTEGER, 
+        UNIQUE (day, fileID), 
+        CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE
+      )`
+    );
+    await db.runAsync("CREATE INDEX idx_species_sname ON species(sname)");
+    await db.runAsync("CREATE INDEX idx_species_cname ON species(cname)");
+    if (archiveMode) {
+      await diskDB.runAsync(
+        `CREATE TABLE schema_version(
+          version INTEGER NOT NULL
+        )`
+      );
+      await diskDB.runAsync("INSERT INTO schema_version (version) VALUES (3)");
+      console.log('version table created')
+    } else {
+      const filename = diskDB?.filename;
+      await db.runAsync("ATTACH ? as disk", filename);
+      let response = await db.runAsync(
+        "INSERT INTO files SELECT * FROM disk.files"
+      );
+      DEBUG &amp;&amp;
+        console.log(response.changes + " files added to memory database");
+      response = await db.runAsync(
+        "INSERT INTO locations SELECT * FROM disk.locations"
+      );
+      DEBUG &amp;&amp;
+        console.log(response.changes + " locations added to memory database");
+      response = await db.runAsync(
+        "INSERT INTO species SELECT * FROM disk.species"
+      );
+      DEBUG &amp;&amp;
+        console.log(response.changes + " species added to memory database");
+
+      response = await db.runAsync(
+        "INSERT OR IGNORE INTO tags SELECT * FROM disk.tags"
+      );
+      DEBUG &amp;&amp; console.log(response.changes + " tags added to memory database");
+
+      response = await db.runAsync(
+        "INSERT OR IGNORE INTO models SELECT * FROM disk.models"
+      );
+      DEBUG &amp;&amp; console.log(response.changes + " models added to memory database");
+    }
+    await db.runAsync("END");
+  } catch (error) {
+    console.error("Error during DB transaction:", error);
+    await db.runAsync("ROLLBACK"); // Rollback the transaction in case of error
+  } finally {
+    //insertTranslations(diskDB)
+    dbMutex.unlock();
+  }
+  return db;
+};
+
+
+const addNewModel = async ({model, db = diskDB, dbMutex, labelsLocation}) => {
+  let modelID;
+  try {
+    await dbMutex.lock();
+    await db.runAsync('BEGIN');
+    let result = await db.runAsync('INSERT INTO models (name) VALUES (?)', model)
+    modelID = result.lastID;
+    // We need to get the default labels from the config file
+    // There may not be a db, or the db may not have the labels required 
+    let labels;
+    const {readFileSync} = require('node:fs');
+    const path = require('node:path');
+    if (model === "birdnet") {
+      const labelFile = path.join(__dirname, "labels", "V2.4",
+         "BirdNET_GLOBAL_6K_V2.4_Labels_en.txt");
+        const fileContents = readFileSync(labelFile, "utf8");
+          labels = fileContents.trim().split(/\r?\n/);
+    } else if (['chirpity', 'nocmig'].includes(model)){
+      labels = JSON.parse(
+        readFileSync(path.join(__dirname, `${model}_model_config.json`), "utf8")
+      ).labels;
+    } else {
+      // Custom model
+      const labelFile = labelsLocation
+      const fileContents = readFileSync(labelFile, "utf8");
+      // Trim whitespace and split by new lines, ignoring empty lines
+      labels = fileContents.split(/\r?\n/).map(line => line.trim()).filter(line => line.length);
+    }
+    const perch = model === 'perch v2';
+    const splitChar = perch ? '~' : '_'; // Perch uses ~, others use _
+    const expectedParts = perch ? 3 : 2; // Perch labels include Taxon
+    // Add Unknown Sp.
+    if (perch) labels.push(`Unknown Sp.${splitChar}Unknown Sp.${splitChar}None`);
+    else labels.push(`Unknown Sp.${splitChar}Unknown Sp.`);
+
+    // Insert labels in batches to avoid exceeding SQLite parameter limits
+    const MAX_PARAMS = 25000;
+    const PARAMS_PER_ROW = 4;
+    const MAX_ROWS_PER_BATCH = Math.floor(MAX_PARAMS / PARAMS_PER_ROW);
+    for (let i = 0; i &lt; labels.length; i += MAX_ROWS_PER_BATCH) {
+      const batch = labels.slice(i, i + MAX_ROWS_PER_BATCH);
+
+      let insertQuery = `INSERT INTO species (sname, cname, modelID, classIndex) VALUES `;
+      const params = [];
+      batch.forEach((entry, index) => {
+        const parts = entry.split(splitChar);
+        if (parts.length &lt; 2 || parts.length > expectedParts) {
+          const err = `Invalid label: '${entry}' on line ${i + index + 1}. Expected 'scientific name${splitChar}common name[${splitChar}taxon]' format.`;
+          throw new Error(err);
+        }
+        const [sname, cname] = parts.map(s => s.trim());  // taxon (3rd part) not currently in DB schema
+        insertQuery += '(?, ?, ?, ?),';
+        params.push(sname, cname, modelID, i + index);
+      });
+
+      insertQuery = insertQuery.slice(0, -1); // Remove trailing comma
+      await db.runAsync(insertQuery, ...params);
+    }
+    await db.runAsync('COMMIT');
+  } catch (err) {
+    await db.runAsync('ROLLBACK');
+    console.error(`Error inserting species for "${model}":`, err.message);
+    modelID = err;
+  } finally {
+    dbMutex.unlock();
+  }
+  return modelID;
+}
+
+const mergeDbIfNeeded = async ({diskDB, model, appPath, dbMutex, labelsLocation}) => {
+  // Check if we have this model already
+  const modelRow = await diskDB.getAsync(`SELECT id FROM models WHERE name = ?`, model)
+  if (modelRow) return [modelRow.id, false]
+  // If not, let's look for a legacy database
+  const models = {birdnet: '6523', chirpity: '409', nocmig: '432'}
+  const p = require('node:path');
+  const legacyDbPath = p.join(appPath, 'archive' + models[model] + '.sqlite')
+  // Check if model DB exists
+  const {existsSync} = require('node:fs');
+  const dbNotFound = !existsSync(legacyDbPath);
+  const isCustomDB = !diskDB.filename.includes(appPath);
+  DEBUG &amp;&amp; console.log('isCustomDB:', isCustomDB);
+  if (dbNotFound) {
+    console.log(`Model database not found: ${legacyDbPath}`);
+    const modelID = await addNewModel({model, db:diskDB, dbMutex, labelsLocation})
+    // translation needed
+    return [modelID, true]
+  }
+  let modelID;
+  // Migration. Step 1: Attach the old model db
+  try {
+    // Run schema update on existing database if needed
+    const legacyDB = new sqlite3.Database(legacyDbPath)
+    // Add empty version table if not exists
+    await legacyDB.runAsync(
+      "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)"
+    );
+    const row = await legacyDB.getAsync(`SELECT version FROM schema_version`);
+    let user_version;
+    if (!row) {
+      let res = await legacyDB.getAsync("PRAGMA user_version");
+      user_version =  res?.version || 0;
+      await legacyDB.runAsync(
+        "INSERT INTO schema_version (version) VALUES (?)",
+        user_version
+      );
+    } else {
+      user_version = row.version;
+    }
+    if (user_version &lt; 1) {
+      await upgrade_to_v1(legacyDB, dbMutex);
+    }
+    if (user_version &lt; 2) {
+      await upgrade_to_v2(legacyDB, dbMutex);
+    }
+    await dbMutex.lock();
+    await diskDB.runAsync('BEGIN');
+    await diskDB.runAsync('ATTACH DATABASE ? AS modelDb', legacyDbPath)
+    let result = await diskDB.runAsync('INSERT INTO models (name) VALUES (?)', model)
+    modelID = result.lastID;
+    // Copy species across
+    await diskDB.runAsync(`
+      INSERT INTO species (sname, cname, modelID, classIndex)
+      SELECT sname, cname, ?, id
+      FROM modelDb.species
+      `,  modelID);
+    if (!isCustomDB){
+      // Migrate and de-duplicate tags
+      await diskDB.runAsync(`
+        INSERT OR IGNORE INTO tags (name)
+        SELECT name FROM modelDb.tags
+      `)
+
+      // Create temporary mapping table for tags
+      await diskDB.runAsync(`
+          CREATE TEMP TABLE tag_map AS
+          SELECT modelDb.tags.id AS oldID, unified.id AS newID
+          FROM modelDb.tags
+          JOIN tags AS unified
+            ON modelDb.tags.name = unified.name
+        `);
+
+      // Migrate and de-duplicate locations
+      await diskDB.runAsync(`
+        INSERT OR IGNORE INTO locations (lat, lon, place)
+        SELECT lat, lon, place FROM modelDb.locations
+      `);
+
+      // Create temporary mapping table for locations
+      await diskDB.runAsync(`
+        CREATE TEMP TABLE location_map AS
+        SELECT modelDb.locations.id AS oldID, unified.id AS newID
+        FROM modelDb.locations
+        JOIN locations AS unified
+          ON modelDb.locations.lat = unified.lat
+        AND modelDb.locations.lon = unified.lon
+      `);
+
+      // Migrate and de-duplicate files
+      await diskDB.runAsync(`
+        INSERT OR IGNORE INTO files (name, duration, filestart, locationID, archiveName, metadata)
+        SELECT f.name, f.duration, f.filestart, lm.newID, f.archiveName, f.metadata
+        FROM modelDb.files f
+        LEFT JOIN location_map lm ON f.locationID = lm.oldID
+      `);
+
+      // Create temporary mapping table for files
+      await diskDB.runAsync(`
+        CREATE TEMP TABLE file_map AS
+        SELECT modelDb.files.id AS oldID, unified.id AS newID
+        FROM modelDb.files
+        JOIN files AS unified
+          ON modelDb.files.name = unified.name
+      `);
+
+
+
+      // Create temporary mapping table for species
+      await diskDB.runAsync(`
+        CREATE TEMP TABLE species_map AS
+        SELECT modelDb.species.id AS oldID, unified.id AS newID
+        FROM modelDb.species
+        JOIN species AS unified
+          ON modelDb.species.sname = unified.sname
+          AND modelDb.species.cname = unified.cname
+          AND unified.modelID = ?
+        `, modelID);
+
+
+      // Migrate records with updated foreign keys
+      await diskDB.runAsync(`
+        INSERT INTO records (dateTime, position, fileID, speciesID, modelID, confidence, comment, end, callCount, isDaylight, reviewed, tagID)
+        SELECT r.dateTime, r.position, fm.newID, sm.newID, ?, r.confidence, r.comment, r.end, r.callCount, r.isDaylight, r.reviewed, tm.newID
+        FROM modelDb.records r
+        JOIN file_map fm ON r.fileID = fm.oldID
+        JOIN species_map sm ON r.speciesID = sm.oldID
+        LEFT JOIN tag_map tm ON r.tagID = tm.oldID
+      `, modelID);
+
+      // Tidy up
+      await diskDB.runAsync(`DROP TABLE location_map`);
+      await diskDB.runAsync(`DROP TABLE file_map`);
+      await diskDB.runAsync(`DROP TABLE tag_map`);
+      await diskDB.runAsync(`DROP TABLE species_map`);
+    }
+    await diskDB.runAsync('END');
+    await diskDB.runAsync(`DETACH DATABASE modelDb`);
+  } catch (err) {
+    console.error(`Error migrating model "${model}":`, err.message);
+    await diskDB.runAsync('ROLLBACK');
+  } finally {
+    dbMutex.unlock()
+  }
+  // Set the local to English after migration so all labels will get the translation treatment
+  diskDB.locale = 'en'
+  return [modelID, false]
+}
+
+/**
+ * Inserts species name translations from label files into the database.
+ *
+ * Reads translation files from the `labels/V2.4` directory, parses each file for language-specific species names, and inserts them into the `species_translations` table. Skips files with unexpected formats and malformed lines.
+ *
+ * @remark Assumes the existence of a `species_translations` table with columns `(sname, language, cname)`. Foreign key constraints are temporarily disabled during insertion.
+ *
+ * @param {object} db - The SQLite database instance supporting `runAsync`.
+ */
+async function insertTranslations(db){
+  let t0 = Date.now()
+  const fs = require("fs");
+  const path = require("path");
+  const labelsDir = 'labels/V2.4';
+  const files = fs.readdirSync(labelsDir)
+  .filter(file => file.endsWith(".txt"))
+  // Make sure we start with birdnet en
+  .sort((a, b) => (a === "BirdNET_GLOBAL_6K_V2.4_Labels_en.txt" ? -1 : (b === "BirdNET_GLOBAL_6K_V2.4_Labels_en.txt" ? 1 : 0)));
+  
+  try{
+    await db.runAsync('PRAGMA FOREIGN_KEYS=OFF')
+    // await db.runAsync('BEGIN')
+    for (const file of files) {
+      let insertStmt = "INSERT OR IGNORE INTO species_translations (sname, language, cname) VALUES ";
+      const params = [];
+      const match = file.match(/Labels_([a-z]{2}(?:_[a-zA-Z]{2})?)\.txt$/);
+      if (!match) {
+        console.warn(`Skipping file with unexpected format: ${file}`);
+        continue;
+      }
+
+      const language = match[1]; // Extract language code (e.g., "fi", "pt_BR")
+      const filePath = path.join(labelsDir, file);
+      const content = fs.readFileSync(filePath, "utf8");
+
+
+
+      const lines = content.split("\n").map(line => line.trim()).filter(line => line);
+      for (const line of lines) {
+        const [sname, cname] = line.split("_");
+        if (!sname || !cname) {
+          console.warn(`Skipping malformed line in ${file}: ${line}`);
+          continue;
+        }
+        params.push(sname, language, cname)
+        insertStmt+="(?,?,?),"
+      }
+      insertStmt = insertStmt.slice(0,-1)
+
+      await db.runAsync(insertStmt, ...params)
+      console.log(`Inserted translations from ${file}`);
+
+    }
+  } catch (error) {
+    console.error("Error inserting translations:", error);
+    // await db.runAsync('ROLLBACK')
+  } finally {
+    console.log(`filling translations took ${Date.now() - t0}ms`)
+    // await db.runAsync('COMMIT')
+    // await db.runAsync('PRAGMA FOREIGN_KEYS=ON')
+  }
+}
+
+
 export {
   sqlite3,
+  createDB,
   closeDatabase,
   checkpoint,
-  upgrade_to_v1,
-  upgrade_to_v2,
   Mutex,
+  mergeDbIfNeeded,
+  addNewModel
 };
 </code></pre>
         </article>
@@ -320,13 +768,13 @@ export {
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#LIST_CACHE">LIST_CACHE</a></li><li><a href="global.html#_updateSpeciesLocale">_updateSpeciesLocale</a></li><li><a href="global.html#activateResultSort">activateResultSort</a></li><li><a href="global.html#addDays">addDays</a></li><li><a href="global.html#addToHistory">addToHistory</a></li><li><a href="global.html#analyseReset">analyseReset</a></li><li><a href="global.html#batchInsertRecords">batchInsertRecords</a></li><li><a href="global.html#changeInputElement">changeInputElement</a></li><li><a href="global.html#checkFilteredFrequency">checkFilteredFrequency</a></li><li><a href="global.html#checkpoint">checkpoint</a></li><li><a href="global.html#clearActive">clearActive</a></li><li><a href="global.html#closeDatabase">closeDatabase</a></li><li><a href="global.html#convertAndOrganiseFiles">convertAndOrganiseFiles</a></li><li><a href="global.html#convertFile">convertFile</a></li><li><a href="global.html#createContextMenu">createContextMenu</a></li><li><a href="global.html#customAnalysisAllMenu">customAnalysisAllMenu</a></li><li><a href="global.html#customiseAnalysisMenu">customiseAnalysisMenu</a></li><li><a href="global.html#fetchAudioBuffer">fetchAudioBuffer</a></li><li><a href="global.html#filterResults">filterResults</a></li><li><a href="global.html#filterValidFiles">filterValidFiles</a></li><li><a href="global.html#formatAsBootstrapTable">formatAsBootstrapTable</a></li><li><a href="global.html#generateBirdIDList">generateBirdIDList</a></li><li><a href="global.html#getDetectedSpecies">getDetectedSpecies</a></li><li><a href="global.html#getFileSQLAndParams">getFileSQLAndParams</a></li><li><a href="global.html#getFiles">getFiles</a></li><li><a href="global.html#getFilteredBirds">getFilteredBirds</a></li><li><a href="global.html#getIncludedIDs">getIncludedIDs</a></li><li><a href="global.html#getResults">getResults</a></li><li><a href="global.html#getRowFromStart">getRowFromStart</a></li><li><a href="global.html#getValidSpecies">getValidSpecies</a></li><li><a href="global.html#getWorkingFile">getWorkingFile</a></li><li><a href="global.html#handleKeyDown">handleKeyDown</a></li><li><a href="global.html#handleKeyDownDeBounce">handleKeyDownDeBounce</a></li><li><a href="global.html#handleMessage">handleMessage</a></li><li><a href="global.html#loadAudioFile">loadAudioFile</a></li><li><a href="global.html#loadAudioFileSync">loadAudioFileSync</a></li><li><a href="global.html#loadDB">loadDB</a></li><li><a href="global.html#locateFile">locateFile</a></li><li><a href="global.html#membershipCheck">membershipCheck</a></li><li><a href="global.html#notifyMissingFile">notifyMissingFile</a></li><li><a href="global.html#onAnalysisComplete">onAnalysisComplete</a></li><li><a href="global.html#onChartData">onChartData</a></li><li><a href="global.html#onLaunch">onLaunch</a></li><li><a href="global.html#onModelReady">onModelReady</a></li><li><a href="global.html#onProgress">onProgress</a></li><li><a href="global.html#onResultsComplete">onResultsComplete</a></li><li><a href="global.html#onSave2DiskDB">onSave2DiskDB</a></li><li><a href="global.html#onSaveAudio">onSaveAudio</a></li><li><a href="global.html#onSummaryComplete">onSummaryComplete</a></li><li><a href="global.html#onUpdateLocale">onUpdateLocale</a></li><li><a href="global.html#onWorkerLoadedAudio">onWorkerLoadedAudio</a></li><li><a href="global.html#playRegion">playRegion</a></li><li><a href="global.html#recordUpdate">recordUpdate</a></li><li><a href="global.html#refreshResultsView">refreshResultsView</a></li><li><a href="global.html#refreshSummary">refreshSummary</a></li><li><a href="global.html#renderResult">renderResult</a></li><li><a href="global.html#resetDiagnostics">resetDiagnostics</a></li><li><a href="global.html#resultClick">resultClick</a></li><li><a href="global.html#savedFileCheck">savedFileCheck</a></li><li><a href="global.html#sendDetections">sendDetections</a></li><li><a href="global.html#setActiveRegion">setActiveRegion</a></li><li><a href="global.html#setActiveRow">setActiveRow</a></li><li><a href="global.html#setClickedIndex">setClickedIndex</a></li><li><a href="global.html#setKeyAssignment">setKeyAssignment</a></li><li><a href="global.html#setKeyAssignmentUI">setKeyAssignmentUI</a></li><li><a href="global.html#setMetadata">setMetadata</a></li><li><a href="global.html#showAnalyse">showAnalyse</a></li><li><a href="global.html#showCharts">showCharts</a></li><li><a href="global.html#showDatePicker">showDatePicker</a></li><li><a href="global.html#showExplore">showExplore</a></li><li><a href="global.html#showRecordEntryForm">showRecordEntryForm</a></li><li><a href="global.html#showSummarySortIcon">showSummarySortIcon</a></li><li><a href="global.html#showWindowDetections">showWindowDetections</a></li><li><a href="global.html#speciesFilter">speciesFilter</a></li><li><a href="global.html#t0_warmup">t0_warmup</a></li><li><a href="global.html#updateFilesBeingProcessed">updateFilesBeingProcessed</a></li><li><a href="global.html#updatePagination">updatePagination</a></li><li><a href="global.html#updateSuggestions">updateSuggestions</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#LIST_CACHE">LIST_CACHE</a></li><li><a href="global.html#WSPlayPause">WSPlayPause</a></li><li><a href="global.html#_updateSpeciesLocale">_updateSpeciesLocale</a></li><li><a href="global.html#activateResultSort">activateResultSort</a></li><li><a href="global.html#addDays">addDays</a></li><li><a href="global.html#addToHistory">addToHistory</a></li><li><a href="global.html#analyseReset">analyseReset</a></li><li><a href="global.html#batchExportAudio">batchExportAudio</a></li><li><a href="global.html#batchInsertRecords">batchInsertRecords</a></li><li><a href="global.html#changeInputElement">changeInputElement</a></li><li><a href="global.html#changeSettingsMode">changeSettingsMode</a></li><li><a href="global.html#checkFilteredFrequency">checkFilteredFrequency</a></li><li><a href="global.html#checkNewModel">checkNewModel</a></li><li><a href="global.html#checkpoint">checkpoint</a></li><li><a href="global.html#clearActive">clearActive</a></li><li><a href="global.html#closeDatabase">closeDatabase</a></li><li><a href="global.html#convertAndOrganiseFiles">convertAndOrganiseFiles</a></li><li><a href="global.html#convertFile">convertFile</a></li><li><a href="global.html#createContextMenu">createContextMenu</a></li><li><a href="global.html#customAnalysisAllMenu">customAnalysisAllMenu</a></li><li><a href="global.html#customiseAnalysisMenu">customiseAnalysisMenu</a></li><li><a href="global.html#deepMergeLists">deepMergeLists</a></li><li><a href="global.html#doPrediction">doPrediction</a></li><li><a href="global.html#exportAudacity">exportAudacity</a></li><li><a href="global.html#exportData">exportData</a></li><li><a href="global.html#fetchAudioBuffer">fetchAudioBuffer</a></li><li><a href="global.html#filterResults">filterResults</a></li><li><a href="global.html#filterValidFiles">filterValidFiles</a></li><li><a href="global.html#formatAsBootstrapTable">formatAsBootstrapTable</a></li><li><a href="global.html#generateBirdIDList">generateBirdIDList</a></li><li><a href="global.html#generateToast">generateToast</a></li><li><a href="global.html#getDetectedSpecies">getDetectedSpecies</a></li><li><a href="global.html#getExcluded">getExcluded</a></li><li><a href="global.html#getFileSQLAndParams">getFileSQLAndParams</a></li><li><a href="global.html#getFiles">getFiles</a></li><li><a href="global.html#getFilteredBirds">getFilteredBirds</a></li><li><a href="global.html#getIncludedIDs">getIncludedIDs</a></li><li><a href="global.html#getMatchingIds">getMatchingIds</a></li><li><a href="global.html#getResults">getResults</a></li><li><a href="global.html#getRowFromStart">getRowFromStart</a></li><li><a href="global.html#getSpecies">getSpecies</a></li><li><a href="global.html#getSpeciesSQLAsync">getSpeciesSQLAsync</a></li><li><a href="global.html#getValidSpecies">getValidSpecies</a></li><li><a href="global.html#getWorkingFile">getWorkingFile</a></li><li><a href="global.html#getXCComparisons">getXCComparisons</a></li><li><a href="global.html#handleKeyDown">handleKeyDown</a></li><li><a href="global.html#handleKeyDownDeBounce">handleKeyDownDeBounce</a></li><li><a href="global.html#handleMessage">handleMessage</a></li><li><a href="global.html#handleUIClicks">handleUIClicks</a></li><li><a href="global.html#importData">importData</a></li><li><a href="global.html#insertTranslations">insertTranslations</a></li><li><a href="global.html#loadAudioFile">loadAudioFile</a></li><li><a href="global.html#loadAudioFileSync">loadAudioFileSync</a></li><li><a href="global.html#loadDB">loadDB</a></li><li><a href="global.html#localiseModal">localiseModal</a></li><li><a href="global.html#locateFile">locateFile</a></li><li><a href="global.html#membershipCheck">membershipCheck</a></li><li><a href="global.html#metadataLocks">metadataLocks</a></li><li><a href="global.html#notifyMissingFile">notifyMissingFile</a></li><li><a href="global.html#onAbort">onAbort</a></li><li><a href="global.html#onAnalyse">onAnalyse</a></li><li><a href="global.html#onAnalysisComplete">onAnalysisComplete</a></li><li><a href="global.html#onChangeMode">onChangeMode</a></li><li><a href="global.html#onChartData">onChartData</a></li><li><a href="global.html#onDelete">onDelete</a></li><li><a href="global.html#onDeleteSpecies">onDeleteSpecies</a></li><li><a href="global.html#onLaunch">onLaunch</a></li><li><a href="global.html#onModelReady">onModelReady</a></li><li><a href="global.html#onOpenFiles">onOpenFiles</a></li><li><a href="global.html#onResultsComplete">onResultsComplete</a></li><li><a href="global.html#onSave2DiskDB">onSave2DiskDB</a></li><li><a href="global.html#onSaveAudio">onSaveAudio</a></li><li><a href="global.html#onSetCustomLocation">onSetCustomLocation</a></li><li><a href="global.html#onSummaryComplete">onSummaryComplete</a></li><li><a href="global.html#onUpdateLocale">onUpdateLocale</a></li><li><a href="global.html#onWorkerLoadedAudio">onWorkerLoadedAudio</a></li><li><a href="global.html#parseCnames">parseCnames</a></li><li><a href="global.html#playRegion">playRegion</a></li><li><a href="global.html#positionMenu">positionMenu</a></li><li><a href="global.html#postAnalyseMessage">postAnalyseMessage</a></li><li><a href="global.html#processAudio">processAudio</a></li><li><a href="global.html#processNextFile">processNextFile</a></li><li><a href="global.html#readLabels">readLabels</a></li><li><a href="global.html#recordUpdate">recordUpdate</a></li><li><a href="global.html#refreshResultsView">refreshResultsView</a></li><li><a href="global.html#refreshSummary">refreshSummary</a></li><li><a href="global.html#renderFilenamePanel">renderFilenamePanel</a></li><li><a href="global.html#renderResult">renderResult</a></li><li><a href="global.html#resetDiagnostics">resetDiagnostics</a></li><li><a href="global.html#resetResults">resetResults</a></li><li><a href="global.html#resultClick">resultClick</a></li><li><a href="global.html#savedFileCheck">savedFileCheck</a></li><li><a href="global.html#sendDetections">sendDetections</a></li><li><a href="global.html#setActiveRegion">setActiveRegion</a></li><li><a href="global.html#setActiveRow">setActiveRow</a></li><li><a href="global.html#setAudioFilters">setAudioFilters</a></li><li><a href="global.html#setClickedIndex">setClickedIndex</a></li><li><a href="global.html#setIncludedIDs">setIncludedIDs</a></li><li><a href="global.html#setKeyAssignment">setKeyAssignment</a></li><li><a href="global.html#setKeyAssignmentUI">setKeyAssignmentUI</a></li><li><a href="global.html#setLabelState">setLabelState</a></li><li><a href="global.html#setListUIState">setListUIState</a></li><li><a href="global.html#setStartEnd">setStartEnd</a></li><li><a href="global.html#showAnalyse">showAnalyse</a></li><li><a href="global.html#showCharts">showCharts</a></li><li><a href="global.html#showDatePicker">showDatePicker</a></li><li><a href="global.html#showExplore">showExplore</a></li><li><a href="global.html#showRecordEntryForm">showRecordEntryForm</a></li><li><a href="global.html#showSummarySortIcon">showSummarySortIcon</a></li><li><a href="global.html#showThreshold">showThreshold</a></li><li><a href="global.html#showTopRankin">showTopRankin</a></li><li><a href="global.html#showWindowDetections">showWindowDetections</a></li><li><a href="global.html#spawnListWorker">spawnListWorker</a></li><li><a href="global.html#spawnPredictWorkers">spawnPredictWorkers</a></li><li><a href="global.html#speciesFilter">speciesFilter</a></li><li><a href="global.html#t0_warmup">t0_warmup</a></li><li><a href="global.html#training">training</a></li><li><a href="global.html#unpackNameAttr">unpackNameAttr</a></li><li><a href="global.html#updateFilesBeingProcessed">updateFilesBeingProcessed</a></li><li><a href="global.html#updateList">updateList</a></li><li><a href="global.html#updateMetadata">updateMetadata</a></li><li><a href="global.html#updatePagination">updatePagination</a></li><li><a href="global.html#updateSuggestions">updateSuggestions</a></li><li><a href="global.html#upgrade_to_v2">upgrade_to_v2</a></li><li><a href="global.html#waitForWavesurferReady">waitForWavesurferReady</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Sun Mar 16 2025 17:29:59 GMT+0000 (Greenwich Mean Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Mon Nov 24 2025 17:05:02 GMT+0000 (Greenwich Mean Time)
 </footer>
 
 <script> prettyPrint(); </script>
