@@ -170,12 +170,6 @@ jobs:
           grep -A 10 'ID_SITE'  ./js/utils/tracking.js
       
         shell: bash
-      - name: Install electron-rebuild
-        run: npm install --save-dev electron-rebuild
-
-      - name: Rebuild native modules for Electron
-        run: |
-          npx electron-rebuild --arch=x64 --force
 
       - name: Build Electron application
         shell: bash
@@ -201,6 +195,24 @@ jobs:
 
       # Tests
 
+      # Download Perch
+      - name: Install p7zip
+        run: brew install p7zip
+
+      - name: Download Perch Sound Model
+        run: |
+          curl -L -o Perch.v2.7z \
+            https://github.com/Mattk70/Chirpity-Website/releases/download/v3.0.0/Perch.v2.7z
+
+
+      - name: Extract Perch Model
+        run: |
+          mkdir -p 'Perch v2'
+          7z x Perch.v2.7z -o'Perch v2'
+
+      - name: Make model available to Playwright
+        run: echo "PERCH_MODEL_PATH=$PWD/Perch v2" >> $GITHUB_ENV
+        
       - name: Test packaged application
         if: runner.os != 'Linux'
         run: npm test
