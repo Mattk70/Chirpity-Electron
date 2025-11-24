@@ -159,7 +159,8 @@ test(`Perch works and second result is 35%`, async () => {
   await page.waitForTimeout(300);
   await page.locator('#import-model').click();
   await page.waitForTimeout(750);
-  const modelPath =  'C:\\Users\\simpo\\Downloads\\Perch v2';
+  const modelPath = process.env.PERCH_MODEL_PATH;
+  console.log(`model path is:${modelPath}`);
   await page.locator('#import-location').fill(modelPath, { force: true });
   await page.locator('#model-name').fill('Perch v2', { force: true });
   await page.locator('#import').click();
