@@ -21,8 +21,8 @@ import {
   addNewModel
 } from "./database.js";
 import { customURLEncode, installConsoleTracking, trackEvent as _trackEvent } from "./utils/tracking.js";
-
-
+import { onChartRequest }  from "./components/charts.js";
+import { getAudioMetadata } from "./models/training.js";
 let isWin32 = false;
 
 const dbMutex = new Mutex();
@@ -192,7 +192,6 @@ const setupFfmpegCommand = async ({
     // No sample rate is supplied when exporting audio.
     // If the sampleRate is 256k, Wavesurfer will handle the tempo/pitch conversion
     if ((training || sampleRate) && sampleRate !== 256000) {
-      const { getAudioMetadata } = require("./models/training.js");
       const {bitrate} = await getAudioMetadata(file);
       const MIN_EXPECTED_BITRATE = 96000; // Lower bitrates aren't capturing ultrasonic frequencies
       if (bitrate < MIN_EXPECTED_BITRATE) console.warn(file, 'has bitrate', bitrate)
@@ -430,7 +429,7 @@ async function handleMessage(e) {
       break;
     }
     case "chart": {
-      const { onChartRequest } = require("./components/charts.js");
+
       Object.assign(args, { diskDB, state: STATE, UI });
       await onChartRequest(args);
       break;
