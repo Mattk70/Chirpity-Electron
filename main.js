@@ -26,7 +26,7 @@ const keytar = require('keytar');
 const SERVICE = 'Chirpity';
 const ACCOUNT = 'install-info';
 
-async function getInstallInfo() {
+async function getInstallInfo(date) {
   try {
     const raw = await keytar.getPassword(SERVICE, ACCOUNT);
     if (raw) {
@@ -42,9 +42,12 @@ async function getInstallInfo() {
   }
 
   const crypto = require("node:crypto");
+  if (date) date = new Date(date);
+  else date = new Date();
+
   const installInfo = {
     appId: crypto.randomUUID(),
-    installedAt: new Date().toISOString(),
+    installedAt: date.toISOString(),
   };
 
   try {
@@ -178,7 +181,7 @@ if (!isMac) {
     }
   });
 
-  autoUpdater.on("update-not-available", function (info) {
+  autoUpdater.on("update-not-available", function (_info) {
     logUpdateStatus("Update not available.");
   });
 
@@ -433,13 +436,6 @@ if (!gotTheLock) {
 
   // This method will be called when Electron has finished loading
   app.whenReady().then(async () => {
-      const installedAt = await getInstallInfo().catch((error) => {
-          console.error("Error getting install info:", error.message);
-          const now = new Date();
-          const thirteenDaysAgo = new Date(now.getTime() - 13 * 24 * 60 * 60 * 1000);
-          return thirteenDaysAgo.toISOString(); // Fallback to 13 days prior (1 day trial)
-      });
-
     // Update the userData path for portable app
     if (process.env.PORTABLE_EXECUTABLE_DIR) {
       app.setPath(
@@ -451,7 +447,7 @@ if (!gotTheLock) {
       ipcMain.handle("getVersion", () => app.getVersion());
     }
 
-      ipcMain.handle('getInstallDate', () => installedAt);
+      ipcMain.handle('getInstallDate', (_e, date) => getInstallInfo(date));
       
       // Debug mode
       try {

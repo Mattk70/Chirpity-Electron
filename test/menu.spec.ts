@@ -11,6 +11,8 @@ import {
   // ipcMainEmit,
   stubMultipleDialogs
 } from 'electron-playwright-helpers';
+import fs from 'fs';
+import path from 'path';
 import { ElectronApplication, Page } from 'playwright';
 import {changeSettings, openExampleFile, runExampleAnalysis} from './helpers'
 //import {Jimp} from 'jimp';
@@ -132,7 +134,7 @@ test('Page title is correct', async () => {
 
 test(`BirdNET analyse works and second result is 34%`, async () => {
   // Set a custom timeout for this specific test (in milliseconds)
-  test.setTimeout(60000); // 60 seconds
+
   await runExampleAnalysis(page, 'birdnet');
   const callID = page.locator('#speciesFilter').getByText('Redwing (call)');
   expect(callID).not.toBe(undefined)
@@ -151,6 +153,38 @@ test(`Nocmig analyse works and second result is 61%`, async () => {
   // console.log(secondResult, 'second result');
   expect(secondResult).toBe('61%');
 })
+
+test(`Perch works and second result is 35%`, async () => {
+  // Import perch
+  await  page.locator('#navbarTraining').click()
+  // deal with debounce timer
+  await page.waitForTimeout(300);
+  await page.locator('#import-model').click();
+  await page.waitForTimeout(750);
+  const modelPath = process.env.PERCH_MODEL_PATH;
+  console.log(`model path is:${modelPath}`);
+  try {
+    const files = fs.readdirSync(modelPath);
+    console.log('Folder contents:', files);
+
+    // If you want full paths:
+    const fullPaths = files.map(f => path.join(modelPath, f));
+    console.log('Full paths:', fullPaths);
+  } catch (err) {
+    console.error('Error reading folder:', err);
+  }
+  await page.locator('#import-location').fill(modelPath, { force: true });
+  await page.locator('#model-name').fill('Perch v2', { force: true });
+  await page.locator('#import').click();
+  await page.waitForTimeout(3000);
+  await runExampleAnalysis(page,'perch v2');
+  const callID = page.locator('#speciesFilter').getByText('Redwing (call)');
+  expect(callID).not.toBe(undefined)
+  const secondResult = await (await page.waitForSelector('#result2 span.confidence-row > span')).textContent()
+  // console.log(secondResult, 'second result');
+  expect(secondResult).toBe('35%');
+})
+
 
 
 // test(`Audacity labels work`, async () => {

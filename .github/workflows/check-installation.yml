@@ -31,6 +31,7 @@ jobs:
         uses: actions/setup-node@v3
         with:
             node-version: 22.16.0
+            cache: 'npm' 
       - run: echo "🍏 Node setup status is ${{ job.status }}."
 
 
@@ -42,7 +43,7 @@ jobs:
        
       - name: Install dependencies
         run: |
-          npm install
+          npm ci
           echo "Install's status is ${{ job.status }}."
 
       # - name: Audit fix
@@ -219,6 +220,28 @@ jobs:
       - run: echo "File check status is ${{ job.status }}."
 
       # Tests
+          
+      # Download Perch
+
+      - name: Cache Perch model archive
+        id: cache-perch
+        uses: actions/cache@v4
+        with:
+          path: Perch.v2.7z
+          key: perch-model-v2-7z
+
+      - name: Download Perch Sound Model
+        if: steps.cache-perch.outputs.cache-hit != 'true'
+        run: |
+          curl -L -o Perch.v2.7z \
+            https://github.com/Mattk70/Chirpity-Website/releases/download/v3.0.0/Perch.v2.7z
+
+      - name: Extract Perch Model into "Perch v2"
+        run: |
+          7z x Perch.v2.7z 
+
+      - name: Make model available to Playwright
+        run: echo "PERCH_MODEL_PATH=$PWD/Perch v2" >> $GITHUB_ENV
 
       - name: Test packaged application
         if: runner.os != 'Linux'
