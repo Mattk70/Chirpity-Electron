@@ -7591,7 +7591,7 @@ async function membershipCheck() {
   const MEMBERSHIP_API_ENDPOINT =
     await window.electron.MEMBERSHIP_API_ENDPOINT();
   return await checkMembership(config.UUID, MEMBERSHIP_API_ENDPOINT)
-    .then(([isMember, expiresIn]) => {
+    .then(([isMember, level, expiresIn]) => {
       if (isMember || inTrial) {
         if (expiresIn && expiresIn < 30) {
           generateToast({
@@ -7603,7 +7603,7 @@ async function membershipCheck() {
         unlockElements();
         if (isMember) {
           document.getElementById("primaryLogo").src =
-            "img/logo/chirpity_logo_subscriber_bronze.png"; // Silver & Gold available
+            `img/logo/chirpity_logo_subscriber_${level}.png`; // bronze / Silver (& Gold) available
         } else {
           document.getElementById("buy-me-coffee").classList.remove("d-none");
         }
@@ -7618,8 +7618,7 @@ async function membershipCheck() {
       }
 
       console.info(
-        `Version: ${VERSION}. Trial: ${inTrial} subscriber: ${isMember}, All detections: ${config.specDetections}`,
-        expiresIn || "Not a subscriber"
+        `Version: ${VERSION}. T: ${inTrial} S: ${isMember}, AD: ${config.specDetections}`
       );
       return isMember || inTrial;
     })
