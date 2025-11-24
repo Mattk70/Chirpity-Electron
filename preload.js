@@ -56,7 +56,7 @@ contextBridge.exposeInMainWorld("electron", {
   selectDirectory: (path) => ipcRenderer.invoke("selectDirectory", path),
   openDialog: (method, config) =>
     ipcRenderer.invoke("openFiles", method, config),
-  getInstallDate: () => ipcRenderer.invoke("getInstallDate"),
+  getInstallDate: (date) => ipcRenderer.invoke("getInstallDate", date),
   getPath: () => ipcRenderer.invoke("getPath"),
   getAppPath: () => ipcRenderer.invoke("getAppPath"),
   getLocale: () => ipcRenderer.invoke("getLocale"),

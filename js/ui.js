@@ -7530,18 +7530,16 @@ export { config, displayLocationAddress, LOCATIONS, generateToast };
  * @returns {Promise<boolean|undefined>} Resolves to `true` if the user is a member or within the trial period, `false` if not, or `undefined` if status cannot be determined and no valid cache exists.
  */
 async function membershipCheck() {
-  const twoWeeks = 14 * 24 * 60 * 60 * 1000; // "It's been one week since you looked at me, cocked your head to the side..."
+  const twoWeeks = 14 * 24 * 60 * 60 * 1000; // "It's been two weeks since you looked at me..."
   const cachedStatus = localStorage.getItem("isMember") === 'true';
   config.debug && console.log('cached membership is', cachedStatus)
   const cachedTimestamp = Number(localStorage.getItem("memberTimestamp"));
   const now = Date.now();
-  let installDate = Number(localStorage.getItem("installDate"));
-  localStorage.removeItem("installDate");
-  if (!installDate) {
-      installDate = await window.electron.getInstallDate();
-      installDate = new Date(installDate).getTime();
-
-  }
+  let installDate = Number(localStorage.getItem("installDate"))
+  installDate = await window.electron.getInstallDate(installDate);
+  installDate = new Date(installDate).getTime();
+  // Fallback if access to keychain denied
+  window.localStorage.setItem("installDate", installDate);
   const trialPeriod = await window.electron.trialPeriod();
   const inTrial = Date.now() - installDate < trialPeriod;
   const lockedElements = document.querySelectorAll(".locked, .unlocked");

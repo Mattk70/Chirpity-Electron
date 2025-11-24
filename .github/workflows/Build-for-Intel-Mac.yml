@@ -9,7 +9,7 @@ concurrency:
 
 jobs:
   Build-Chirpity:
-    runs-on: macos-13
+    runs-on: macos-15-intel
     env: 
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
       CI: true
@@ -170,6 +170,12 @@ jobs:
           grep -A 10 'ID_SITE'  ./js/utils/tracking.js
       
         shell: bash
+      - name: Install electron-rebuild
+        run: npm install --save-dev electron-rebuild
+
+      - name: Rebuild native modules for Electron
+        run: |
+          npx electron-rebuild --arch=x64 --force
 
       - name: Build Electron application
         shell: bash
