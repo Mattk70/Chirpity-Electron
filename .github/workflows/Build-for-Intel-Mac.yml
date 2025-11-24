@@ -213,8 +213,7 @@ jobs:
 
       - name: Extract Perch Model into "Perch v2"
         run: |
-          mkdir -p "Perch v2"
-          7z x Perch.v2.7z -o"Perch v2"
+          7z x Perch.v2.7z 
 
       - name: Make model available to Playwright
         run: echo "PERCH_MODEL_PATH=$PWD/Perch v2" >> $GITHUB_ENV
