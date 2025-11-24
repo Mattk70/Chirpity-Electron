@@ -7586,8 +7586,7 @@ async function membershipCheck() {
     });
   }
 
-  const MEMBERSHIP_API_ENDPOINT =
-    await window.electron.MEMBERSHIP_API_ENDPOINT();
+  const MEMBERSHIP_API_ENDPOINT = await window.electron.MEMBERSHIP_API_ENDPOINT();
   return await checkMembership(config.UUID, MEMBERSHIP_API_ENDPOINT)
     .then(([isMember, level, expiresIn]) => {
       if (isMember || inTrial) {
@@ -7615,9 +7614,7 @@ async function membershipCheck() {
         }
       }
 
-      console.info(
-        `Version: ${VERSION}. T: ${inTrial} S: ${isMember}, AD: ${config.specDetections}`
-      );
+      console.info(`Version: ${VERSION}. Trial: ${inTrial} Subscriber: ${isMember}`, null); // null forces tracking event to matomo
       return isMember || inTrial;
     })
     .catch((error) => {
