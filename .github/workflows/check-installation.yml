@@ -31,6 +31,7 @@ jobs:
         uses: actions/setup-node@v3
         with:
             node-version: 22.16.0
+            cache: 'npm' 
       - run: echo "🍏 Node setup status is ${{ job.status }}."
 
 
@@ -42,7 +43,7 @@ jobs:
        
       - name: Install dependencies
         run: |
-          npm install
+          npm ci
           echo "Install's status is ${{ job.status }}."
 
       # - name: Audit fix

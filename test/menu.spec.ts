@@ -11,6 +11,8 @@ import {
   // ipcMainEmit,
   stubMultipleDialogs
 } from 'electron-playwright-helpers';
+import fs from 'fs';
+import path from 'path';
 import { ElectronApplication, Page } from 'playwright';
 import {changeSettings, openExampleFile, runExampleAnalysis} from './helpers'
 //import {Jimp} from 'jimp';
@@ -161,6 +163,16 @@ test(`Perch works and second result is 35%`, async () => {
   await page.waitForTimeout(750);
   const modelPath = process.env.PERCH_MODEL_PATH;
   console.log(`model path is:${modelPath}`);
+  try {
+    const files = fs.readdirSync(modelPath);
+    console.log('Folder contents:', files);
+
+    // If you want full paths:
+    const fullPaths = files.map(f => path.join(modelPath, f));
+    console.log('Full paths:', fullPaths);
+  } catch (err) {
+    console.error('Error reading folder:', err);
+  }
   await page.locator('#import-location').fill(modelPath, { force: true });
   await page.locator('#model-name').fill('Perch v2', { force: true });
   await page.locator('#import').click();

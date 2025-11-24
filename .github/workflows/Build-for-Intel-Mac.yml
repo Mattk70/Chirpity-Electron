@@ -95,6 +95,7 @@ jobs:
         uses: actions/setup-node@v3
         with:
             node-version: 22.16.0
+            cache: 'npm' 
       - run: echo "🍏 Node setup status is ${{ job.status }}."
       
       # Step to set up Python 3.11
@@ -105,7 +106,7 @@ jobs:
        
       - name: Install dependencies
         run: |
-          npm install
+          npm ci
           echo "Install's status is ${{ job.status }}."
 
       # - name: Audit fix
@@ -133,7 +134,7 @@ jobs:
         shell: bash
         run: |
           sed -i.bak "s/toLocaleString(this.picker.options.lang/toLocaleString(this.picker.options.lang.replace(\/_.*$\/,'')/g" ./node_modules/@easepick/bundle/dist/index.umd.js && rm -f ./node_modules/@easepick/bundle/dist/index.umd.js.bak
-          grep -A 10 'replace' ./node_modules/@easepick/bundle/dist/index.umd.js
+
 
       - name: Patch wavesurfer.js play() to handle AbortError
         run: |
