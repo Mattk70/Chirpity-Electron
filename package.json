@@ -12,6 +12,7 @@
     "prebuild-mac-x64-pkg": "node prebuild.js",
     "minify": "esbuild ./js/*.js --minify --sourcemap --outdir=./js --allow-overwrite",
     "export": "electron-builder build --m -p always",
+    "buildMac": "electron-builder build --m -p never",
     "build-mac-x64-pkg": "electron-builder --mac pkg --x64 --config.mac.target=pkg -p always",
     "AppImage": "electron-builder build --linux --x64  -p always",
     "build": "electron-builder --win --x64 -p always",
@@ -24,7 +25,7 @@
     "url": "git+https://github.com/mattk70/Chirpity-Electron.git"
   },
   "build": {
-    "appId": "com.electron.chirpity",
+    "appId": "uk.co.mattkirkland.chirpity.Chirpity",
     "pkg": {
       "license": "LICENSE.txt"
     },
@@ -74,7 +75,6 @@
       "node_modules/onnxruntime-node/bin/napi-v6/${platform}/${arch}/**/*",
       "!node_modules/onnxruntime-node/bin/napi-v6/${platform}/${arch}/[Dd]*",
       "!node_modules/onnxruntime-node/bin/napi-v6/${platform}/${arch}/libonnxruntime_providers*"
-
     ],
     "extraResources": [
       "./Help/example.mp3"
@@ -123,10 +123,16 @@
     ],
     "mac": {
       "target": {
-        "target": "pkg",
-        "arch": "arm64"
+        "target": "default",
+        "arch": ["arm64"]
       },
-      "icon": "img/icon/icon.icns",
+      "artifactName": "${productName}.${ext}",
+      "type": "distribution",
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "gatekeeperAssess": false,
+      "icon": "img/icon/icon.png",
       "category": "public.app-category.utilities",
       "fileAssociations": [
         {
@@ -148,6 +154,7 @@
     },
     "linux": {
       "icon": "./build/icon.icns",
+      "artifactName": "${productName}-${arch}.${ext}",
       "target": [
         "AppImage"
       ]
@@ -160,6 +167,7 @@
         "nsis",
         "portable"
       ],
+      "artifactName": "${productName}.${ext}",
       "verifyUpdateCodeSignature": false,
       "asar": true,
       "icon": "./img/icon/icon.png"
