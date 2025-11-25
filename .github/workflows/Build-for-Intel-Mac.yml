@@ -178,7 +178,7 @@ jobs:
         env:
           ELECTRON_BUILD_ARCH: x64
         run: |
-          npm run build-mac-x64-pkg
+          npm run build-mac-x64
       - run: echo "Build status is ${{ job.status }}."
       - name: Check installer exists
         shell: bash
@@ -186,7 +186,7 @@ jobs:
           # Retrieve the version from package.json
           VERSION=$(jq -r '.version' package.json)
           # Construct the filename
-          FILENAME="Chirpity-$VERSION.pkg"
+          FILENAME="Chirpity.dmg"
           # Check if the file exists
           if [ -f "./dist/$FILENAME" ]; then
             echo "Executable $FILENAME found in ./dist"
