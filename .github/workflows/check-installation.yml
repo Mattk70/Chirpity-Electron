@@ -221,16 +221,12 @@ jobs:
       - name: Make model available to Playwright
         shell: bash
         run: |
-          # Use $PWD for Linux/Mac
-          MODEL_PATH="$PWD/Perch v2"
-
-          # On Windows runners, convert to Windows-style path
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            MODEL_PATH=$(wslpath -w "$MODEL_PATH" 2>/dev/null || echo "$MODEL_PATH")
-          fi
+          # Cross-platform: use GITHUB_WORKSPACE for Windows paths
+          MODEL_PATH="$GITHUB_WORKSPACE/Perch v2"
 
           echo "PERCH_MODEL_PATH=$MODEL_PATH" >> $GITHUB_ENV
           echo "Model path set to: $MODEL_PATH"
+
 
       # Conditional build command for each OS
       - name: Build Electron application
