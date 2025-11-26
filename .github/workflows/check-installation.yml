@@ -253,7 +253,7 @@ jobs:
           # Windows does NOT have 7z by default → install it
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             echo "Installing p7zip via chocolatey..."
-            choco install p7zip -y
+            choco install 7zip -y
           fi
 
           # Create output folder if needed
