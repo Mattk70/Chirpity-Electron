@@ -184,6 +184,53 @@ jobs:
             echo "skip_build=true" >> $GITHUB_ENV
           fi
 
+      # Download Perch
+
+      - name: Cache Perch model archive
+        id: cache-perch
+        uses: actions/cache@v4
+        with:
+          path: Perch.v2.7z
+          key: perch-model-v2-7z
+
+      - name: Download Perch Sound Model
+        if: steps.cache-perch.outputs.cache-hit != 'true'
+        run: |
+          curl -L -o Perch.v2.7z \
+            https://github.com/Mattk70/Chirpity-Website/releases/download/v3.0.0/Perch.v2.7z
+        shell: bash
+
+      - name: Extract Perch Model
+        shell: bash
+        run: |
+          echo "Extracting Perch model on $RUNNER_OS"
+
+          # Windows does NOT have 7z by default → install it
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            echo "Installing p7zip via chocolatey..."
+            choco install 7zip -y
+          fi
+
+          echo "Running 7z extraction..."
+          7z x "Perch.v2.7z" -o"$PWD"
+
+          echo "Extraction complete. Contents:"
+          ls -R "Perch v2"
+
+
+      - name: Make model available to Playwright
+        shell: bash
+        run: |
+          # Use $PWD for Linux/Mac
+          MODEL_PATH="$PWD/Perch v2"
+
+          # On Windows runners, convert to Windows-style path
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            MODEL_PATH=$(wslpath -w "$MODEL_PATH" 2>/dev/null || echo "$MODEL_PATH")
+          fi
+
+          echo "PERCH_MODEL_PATH=$MODEL_PATH" >> $GITHUB_ENV
+          echo "Model path set to: $MODEL_PATH"
 
       # Conditional build command for each OS
       - name: Build Electron application
@@ -229,43 +276,6 @@ jobs:
 
       # Tests
           
-      # Download Perch
-
-      - name: Cache Perch model archive
-        id: cache-perch
-        uses: actions/cache@v4
-        with:
-          path: Perch.v2.7z
-          key: perch-model-v2-7z
-
-      - name: Download Perch Sound Model
-        if: steps.cache-perch.outputs.cache-hit != 'true'
-        run: |
-          curl -L -o Perch.v2.7z \
-            https://github.com/Mattk70/Chirpity-Website/releases/download/v3.0.0/Perch.v2.7z
-        shell: bash
-
-      - name: Extract Perch Model
-        shell: bash
-        run: |
-          echo "Extracting Perch model on $RUNNER_OS"
-
-          # Windows does NOT have 7z by default → install it
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            echo "Installing p7zip via chocolatey..."
-            choco install 7zip -y
-          fi
-
-          echo "Running 7z extraction..."
-          7z x "Perch.v2.7z" -o"$PWD"
-
-          echo "Extraction complete. Contents:"
-          ls -R "Perch v2"
-
-
-      - name: Make model available to Playwright
-        run: echo "PERCH_MODEL_PATH=$PWD/Perch v2" >> $GITHUB_ENV
-        shell: bash
 
       - name: Test packaged application
         if: runner.os != 'Linux'
