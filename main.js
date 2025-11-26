@@ -279,7 +279,7 @@ ipcMain.handle('getAppPath', () => app.getAppPath());
 ipcMain.handle('trialPeriod', () => 14*24*3600*1000); // 14 days
 ipcMain.handle('getLocale', () => app.getLocale());
 ipcMain.handle('getTemp', () => app.getPath('temp'));
-ipcMain.handle('isMac', () => process.platform === 'darwin');
+ipcMain.handle('isMac', () => isMac);
 ipcMain.handle('getAudio', () => path.join(__dirname.replace('app.asar', ''), 'Help', 'example.mp3'));
 ipcMain.handle('exitApplication', () => app.quit()); 
 
