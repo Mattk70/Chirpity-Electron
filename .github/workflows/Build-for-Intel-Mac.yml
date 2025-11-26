@@ -191,7 +191,7 @@ jobs:
           # Retrieve the version from package.json
           VERSION=$(jq -r '.version' package.json)
           # Construct the filename
-          FILENAME="Chirpity.dmg"
+          FILENAME="Chirpity-x64.dmg"
           # Check if the file exists
           if [ -f "./dist/$FILENAME" ]; then
             echo "Executable $FILENAME found in ./dist"

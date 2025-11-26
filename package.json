@@ -162,7 +162,6 @@
         "nsis",
         "portable"
       ],
-      "artifactName": "${productName}.${ext}",
       "verifyUpdateCodeSignature": false,
       "asar": true,
       "icon": "./img/icon/icon.png"

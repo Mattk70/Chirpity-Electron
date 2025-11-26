@@ -61,6 +61,7 @@ async function getInstallInfo(date) {
 
   return installInfo.installedAt;
 }
+
 process.env["TF_ENABLE_ONEDNN_OPTS"] = "1";
 
 //require('update-electron-app')();
