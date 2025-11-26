@@ -162,69 +162,67 @@ async function fetchReleaseNotes(version) {
   return "Release notes not available.";
 }
 
-if (!isMac) {
-  // The auto updater doesn't work for .pkg installers
-  autoUpdater.on("checking-for-update", function () {
-    logUpdateStatus("Checking for update...");
-    if (process.env.PORTABLE_EXECUTABLE_DIR) {
-      logUpdateStatus("This is a portable exe");
-    }
-  });
 
-  autoUpdater.on("update-available", async function (info) {
-    if (!process.env.PORTABLE_EXECUTABLE_DIR) {
-      autoUpdater.downloadUpdate();
-    } else {
-      // Fetch release notes from GitHub API
-      const releaseNotes = await fetchReleaseNotes(info.version);
-      dialog.showMessageBox({
-        type: "info",
-        title: "Update Available",
-        message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}`,
-        buttons: ["OK"],
-        defaultId: 1,
-        noLink: true,
-      });
-    }
-  });
+autoUpdater.on("checking-for-update", function () {
+  logUpdateStatus("Checking for update...");
+  if (process.env.PORTABLE_EXECUTABLE_DIR) {
+    logUpdateStatus("This is a portable exe");
+  }
+});
 
-  autoUpdater.on("update-not-available", function (_info) {
-    logUpdateStatus("Update not available.");
-  });
-
-  autoUpdater.on("error", function (err) {
-    logUpdateStatus("Error in auto-updater:" + err);
-  });
-
-  autoUpdater.on("download-progress", function (progressObj) {
-    mainWindow.webContents.send("download-progress", progressObj);
-  });
-
-  autoUpdater.on("update-downloaded", async function (info) {
+autoUpdater.on("update-available", async function (info) {
+  if (!process.env.PORTABLE_EXECUTABLE_DIR) {
+    autoUpdater.downloadUpdate();
+  } else {
     // Fetch release notes from GitHub API
     const releaseNotes = await fetchReleaseNotes(info.version);
-    log.info(JSON.stringify(info));
-    // Display dialog to the user with release notes
-    dialog
-      .showMessageBox({
-        type: "info",
-        title: "Update Available",
-        message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}\n\nDo you want to install it now?`,
-        buttons: ["Quit and Install", "Install after Exit"],
-        defaultId: 1,
-        noLink: true,
-      })
-      .then((result) => {
-        if (result.response === 0) {
-          // User clicked 'Yes', start the download
-          autoUpdater.quitAndInstall();
-        }
-      });
-  });
-
-  function logUpdateStatus(message) {
-    console.log(message);
+    dialog.showMessageBox({
+      type: "info",
+      title: "Update Available",
+      message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}`,
+      buttons: ["OK"],
+      defaultId: 1,
+      noLink: true,
+    });
   }
+});
+
+autoUpdater.on("update-not-available", function (_info) {
+  logUpdateStatus("Update not available.");
+});
+
+autoUpdater.on("error", function (err) {
+  logUpdateStatus("Error in auto-updater:" + err);
+});
+
+autoUpdater.on("download-progress", function (progressObj) {
+  mainWindow.webContents.send("download-progress", progressObj);
+});
+
+autoUpdater.on("update-downloaded", async function (info) {
+  // Fetch release notes from GitHub API
+  const releaseNotes = await fetchReleaseNotes(info.version);
+  log.info(JSON.stringify(info));
+  // Display dialog to the user with release notes
+  dialog
+    .showMessageBox({
+      type: "info",
+      title: "Update Available",
+      message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}\n\nDo you want to install it now?`,
+      buttons: ["Quit and Install", "Install after Exit"],
+      defaultId: 1,
+      noLink: true,
+    })
+    .then((result) => {
+      if (result.response === 0) {
+        // User clicked 'Yes', start the download
+        autoUpdater.quitAndInstall();
+      }
+    });
+});
+
+function logUpdateStatus(message) {
+  console.log(message);
 }
 
 process.stdin.resume(); //so the program will not close instantly
