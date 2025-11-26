@@ -35,7 +35,7 @@ async function getInstallInfo(date) {
         // This is an ISO date string
         return parsed.installedAt;
       }
-      console.warn("getInstallInfo: keychain entry missing valid installedAt, recreating.");
+      console.warn("getInstallInfo: keychain entry missing valid installedAt, recreating with", date);
     }
   } catch (error) {
     console.warn("getInstallInfo: keychain read/parse failed, recreating:", error.message);
