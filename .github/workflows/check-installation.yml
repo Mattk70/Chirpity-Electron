@@ -256,15 +256,8 @@ jobs:
             choco install 7zip -y
           fi
 
-          # Create output folder if needed
-          mkdir -p "Perch v2"
-
           echo "Running 7z extraction..."
-          7z x "Perch.v2.7z" -o"Perch v2"
-
-          echo "Extraction complete. Contents:"
-          ls -R "Perch v2"
-
+          7z x "Perch.v2.7z"
 
       - name: Make model available to Playwright
         run: echo "PERCH_MODEL_PATH=$PWD/Perch v2" >> $GITHUB_ENV
