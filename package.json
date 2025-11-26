@@ -126,7 +126,7 @@
         "target": "default",
         "arch": ["arm64"]
       },
-      "artifactName": "${productName}.${ext}",
+      "artifactName": "${productName}-${arch}.${ext}",
       "type": "distribution",
       "hardenedRuntime": true,
       "entitlements": "build/entitlements.mac.plist",
