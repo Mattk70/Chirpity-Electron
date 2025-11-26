@@ -115,7 +115,10 @@
         "name": "MPEG4 File",
         "role": "Editor"
       }
-    ],
+    ],      
+    "dmg":{
+        "internetEnabled": true
+      },
     "mac": {
       "target": {
         "target": "default",
