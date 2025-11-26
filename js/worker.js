@@ -8,7 +8,12 @@ const fs = require("node:fs");
 const p = require("node:path");
 const SunCalc = require("suncalc");
 const ffmpeg = require("fluent-ffmpeg");
-
+const ffmpegPath = require("@ffmpeg-installer/ffmpeg").path.replace(
+  "app.asar",
+  "app.asar.unpacked"
+);
+console.log("cwd", __dirname)
+ffmpeg.setFfmpegPath(ffmpegPath);
 const merge = require("lodash.merge");
 import { WorkerState as State } from "./utils/state.js";
 import {
@@ -158,11 +163,7 @@ Date.prototype.getWeekNumber = function () {
   return Math.ceil((((d - yearStart) / 86400000 + 1) / 7) * (48 / 52));
 };
 
-const ffmpegPath = require("@ffmpeg-installer/ffmpeg").path.replace(
-  "app.asar",
-  "app.asar.unpacked"
-);
-ffmpeg.setFfmpegPath(ffmpegPath);
+
 let predictionsRequested = {},
   predictionsReceived = {},
   filesBeingProcessed = [];
