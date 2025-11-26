@@ -2113,11 +2113,6 @@ window.onload = async () => {
       (popoverTriggerEl) =>
         new bootstrap.Popover(popoverTriggerEl, { allowList: myAllowList })
     );
-
-    // check for new version on mac platform. pkg containers are not an auto-updatable target
-    // https://www.electron.build/auto-update#auto-updatable-targets
-    isMac && !isTestEnv && checkForMacUpdates();
-
     // Add cpu model & memory to config
     config.CPU = DIAGNOSTICS["CPU"];
     config.RAM = DIAGNOSTICS["System Memory"];
@@ -6973,57 +6968,7 @@ window.electron.onDownloadProgress((_event, progressObj) =>
   displayProgress(progressObj, "Downloading the latest update: ")
 );
 
-// Update checking for Mac
 
-function checkForMacUpdates() {
-  // Do this at most daily
-  const latestCheck = Date.now();
-  const checkDue = latestCheck - config.lastUpdateCheck > 86_400_000;
-  if (checkDue) {
-    fetch(
-      "https://api.github.com/repos/Mattk70/Chirpity-Electron/releases/latest"
-    )
-      .then((response) => response.json())
-      .then((data) => {
-        const latestVersion = data.tag_name;
-        const latest = parseSemVer(latestVersion);
-        const current = parseSemVer(VERSION);
-
-        if (isNewVersion(latest, current)) {
-          const alertPlaceholder = document.getElementById("updateAlert");
-          const alert = (message, type) => {
-            const wrapper = document.createElement("div");
-            wrapper.innerHTML = [
-              `<div class="alert alert-${type} alert-dismissible" role="alert">`,
-              `   <div>${message}</div>`,
-              '   <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>',
-              "</div>",
-            ].join("");
-            alertPlaceholder.append(wrapper);
-          };
-          const link = `<a href="https://chirpity.mattkirkland.co.uk?fromVersion=${VERSION}" target="_blank">`;
-          const message = utils.interpolate(i18n.get(i18n.UpdateMessage), {
-            link: link,
-          });
-          alert(
-            `<svg class="bi flex-shrink-0 me-2" width="20" height="20" role="img" aria-label="Info:"><use xlink:href="#info-fill"/></svg>${message}`,
-            "warning"
-          );
-          trackEvent(
-            config.UUID,
-            "Update message",
-            `From ${VERSION}`,
-            `To: ${latestVersion}`
-          );
-        }
-        config.lastUpdateCheck = latestCheck;
-        updatePrefs("config.json", config);
-      })
-      .catch((error) => {
-        console.warn("Error checking for updates:", error);
-      });
-  }
-}
 
 const loadingFiles = ({hide, content}) => {
   content ??= "Loading file...";
