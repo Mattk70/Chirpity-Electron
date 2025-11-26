@@ -13,7 +13,7 @@
     "minify": "esbuild ./js/*.js --minify --sourcemap --outdir=./js --allow-overwrite",
     "export": "electron-builder build --m -p always",
     "buildMac": "electron-builder build --m -p never",
-    "build-mac-x64": "electron-builder --mac --x64 -p always",
+    "build-mac-x64-pkg": "electron-builder --mac dmg --x64 --config.mac.target=dmg -p always",
     "AppImage": "electron-builder build --linux --x64 -p always",
     "build": "electron-builder --win --x64 -p always",
     "testBuild": "electron-builder --win",
