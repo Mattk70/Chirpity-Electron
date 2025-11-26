@@ -257,7 +257,11 @@ jobs:
           fi
 
           echo "Running 7z extraction..."
-          7z x "Perch.v2.7z"
+          7z x "Perch.v2.7z" -o"$PWD"
+
+          echo "Extraction complete. Contents:"
+          ls -R "Perch v2"
+
 
       - name: Make model available to Playwright
         run: echo "PERCH_MODEL_PATH=$PWD/Perch v2" >> $GITHUB_ENV
