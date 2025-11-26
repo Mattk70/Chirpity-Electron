@@ -187,6 +187,13 @@ jobs:
 
       # Conditional build command for each OS
       - name: Build Electron application
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          
         # if: env.skip_build != 'true'  # Only run this if the tag comparison was true
         shell: bash
         run: |
@@ -208,9 +215,9 @@ jobs:
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             FILENAME="Chirpity Setup $VERSION.exe"
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            FILENAME="Chirpity-$VERSION-arm64.pkg"
+            FILENAME="Chirpity-arm64.pkg"
           else
-            FILENAME="Chirpity-$VERSION.AppImage"
+            FILENAME="Chirpity-x64.AppImage"
           fi
           # Check if the file exists
           if [ -f "./dist/$FILENAME" ]; then

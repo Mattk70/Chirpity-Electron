@@ -13,6 +13,11 @@ jobs:
     runs-on: macos-15-intel
     env: 
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      CSC_LINK: ${{ secrets.CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
       CI: true
     steps:
       - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
@@ -178,7 +183,7 @@ jobs:
         env:
           ELECTRON_BUILD_ARCH: x64
         run: |
-          npm run build-mac-x64-pkg
+          npm run build-mac-x64
       - run: echo "Build status is ${{ job.status }}."
       - name: Check installer exists
         shell: bash
@@ -186,7 +191,7 @@ jobs:
           # Retrieve the version from package.json
           VERSION=$(jq -r '.version' package.json)
           # Construct the filename
-          FILENAME="Chirpity-$VERSION.pkg"
+          FILENAME="Chirpity-x64.dmg"
           # Check if the file exists
           if [ -f "./dist/$FILENAME" ]; then
             echo "Executable $FILENAME found in ./dist"

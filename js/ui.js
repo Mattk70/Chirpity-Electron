@@ -7616,7 +7616,7 @@ async function membershipCheck() {
       }
 
       console.info(
-        `Version: ${VERSION}. T: ${inTrial} S: ${isMember}, AD: ${config.specDetections}`
+        `Version: ${VERSION}. Trial: ${inTrial} Subscriber: ${isMember}`, null
       );
       return isMember || inTrial;
     })
