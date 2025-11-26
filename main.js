@@ -97,6 +97,9 @@ console.warn = log.warn;
 console.error = log.error;
 autoUpdater.logger = log;
 autoUpdater.logger.transports.file.level = "info";
+
+autoUpdater.allowPrerelease = true; 
+
 // Define the menu template
 const isMac = process.platform === "darwin"; // macOS check
 // Set membership URL here
