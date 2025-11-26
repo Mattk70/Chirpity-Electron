@@ -66,6 +66,7 @@
       "!README.md",
       "!**/*.*js.map",
       "!**/*.*.md",
+      "!Perch*${/*}",
       "!node_modules/onnxruntime-node/bin/napi-v6/**/*",
       "node_modules/onnxruntime-node/bin/napi-v6/${platform}/${arch}/**/*",
       "!node_modules/onnxruntime-node/bin/napi-v6/${platform}/${arch}/[Dd]*",
