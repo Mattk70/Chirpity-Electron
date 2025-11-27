@@ -640,7 +640,11 @@ app.on('before-quit', async (event) => {
   if (DB_CLOSED || QUITTING) return
   event.preventDefault(); // Prevent default quit until cleanup is done
   QUITTING = true
-  workerWindow.webContents.postMessage("close-database", null);
+  try{
+    workerWindow.webContents.postMessage("close-database", null);
+  } catch {
+    console.log('workerWindow closed before DB close call')
+  }
   // Add timeout to force quit after 5 seconds
   setTimeout(() => {
     if (!DB_CLOSED) {
