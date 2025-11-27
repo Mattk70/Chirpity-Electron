@@ -119,7 +119,8 @@
       }
     ],      
     "dmg":{
-        "internetEnabled": true
+        "internetEnabled": true,
+        "mergeASARs": false
       },
     "mac": {
       "target": {

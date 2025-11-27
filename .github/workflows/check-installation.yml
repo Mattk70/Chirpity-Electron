@@ -232,6 +232,7 @@ jobs:
       # Download Perch
 
       - name: Cache Perch model archive
+        if: runner.os != 'Linux'
         id: cache-perch
         uses: actions/cache@v4
         with:
@@ -239,13 +240,14 @@ jobs:
           key: perch-model-v2-7z
 
       - name: Download Perch Sound Model
-        if: steps.cache-perch.outputs.cache-hit != 'true'
+        if: runner.os != 'Linux' &&  steps.cache-perch.outputs.cache-hit != 'true' 
         run: |
           curl -L -o Perch.v2.7z \
             https://github.com/Mattk70/Chirpity-Website/releases/download/v3.0.0/Perch.v2.7z
         shell: bash
 
       - name: Extract Perch Model
+        if: runner.os != 'Linux'
         shell: bash
         run: |
           echo "Extracting Perch model on $RUNNER_OS"
@@ -264,6 +266,7 @@ jobs:
 
 
       - name: Make model available to Playwright
+        if: runner.os != 'Linux'
         shell: bash
         run: |
           # Cross-platform: use GITHUB_WORKSPACE for Windows paths
