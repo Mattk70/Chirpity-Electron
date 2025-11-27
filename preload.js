@@ -3,7 +3,6 @@ const fs = require("node:fs");
 const colormap = require("colormap");
 const p = require("node:path");
 const SunCalc = require("suncalc");
-const { v4: uuidv4 } = require("uuid");
 const si = require('systeminformation');
 
 // We need to wait until the UI  is ready to receive the message before
@@ -63,6 +62,7 @@ contextBridge.exposeInMainWorld("electron", {
   getTemp: () => ipcRenderer.invoke("getTemp"),
   getVersion: () => ipcRenderer.invoke("getVersion"),
   getAudio: () => ipcRenderer.invoke("getAudio"),
+  getUUID: () => ipcRenderer.invoke("getUUID"),
   trialPeriod: () => ipcRenderer.invoke("trialPeriod"),
   isMac: () => ipcRenderer.invoke("isMac"),
   exitApplication: () => ipcRenderer.invoke("exitApplication"),
@@ -73,7 +73,7 @@ contextBridge.exposeInMainWorld("electron", {
 
 
 
-contextBridge.exposeInMainWorld("module", {fs, colormap, p, SunCalc, uuidv4, si});
+contextBridge.exposeInMainWorld("module", {fs, colormap, p, SunCalc, si});
 
 // Expose only specific environment variables
 contextBridge.exposeInMainWorld("env", {
