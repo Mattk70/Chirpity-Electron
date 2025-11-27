@@ -112,7 +112,7 @@ jobs:
        
       - name: Install dependencies
         run: |
-          npm ci
+          npm install
           echo "Install's status is ${{ job.status }}."
 
       # - name: Audit fix
