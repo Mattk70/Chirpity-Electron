@@ -121,10 +121,9 @@
     "mac": {
       "target": {
         "target": "dmg",
-        "arch": ["universal"]
+        "arch": ["arm64"]
       },
-      "singleArchFiles": "*",
-      "artifactName": "${productName}.${ext}",
+      "artifactName": "${productName}-${arch.${ext}",
       "type": "distribution",
       "hardenedRuntime": true,
       "entitlements": "build/entitlements.mac.plist",
