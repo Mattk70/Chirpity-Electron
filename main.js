@@ -231,7 +231,11 @@ autoUpdater.on("error", function (err) {
 });
 
 autoUpdater.on("download-progress", function (progressObj) {
-  mainWindow.webContents.send("download-progress", progressObj);
+  try{
+    mainWindow.webContents.send("download-progress", progressObj);
+  } catch {
+    logUpdateStatus('mainwindow progress update failed')
+  }
 });
 
 autoUpdater.on("update-downloaded", async function (info) {
