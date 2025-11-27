@@ -119,15 +119,11 @@
       }
     ],      
     "mac": {
-      "mergeASARs":false,
-      "dmg":{
-        "internetEnabled": true
-      },
       "target": {
         "target": "universal",
         "arch": ["arm64"]
       },
-      "artifactName": "${productName}-${arch}.${ext}",
+      "artifactName": "${productName}.${ext}",
       "type": "distribution",
       "hardenedRuntime": true,
       "entitlements": "build/entitlements.mac.plist",
@@ -152,6 +148,22 @@
           "role": "Viewer"
         }
       ]
+    },
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "internetEnabled": true,
+      "mergeASARs":false
     },
     "linux": {
       "icon": "./build/icon.icns",
