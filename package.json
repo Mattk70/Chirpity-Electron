@@ -162,7 +162,7 @@
           "path": "/Applications"
         }
       ],
-      "format": "ULMO",
+      "format": "ULFO",
       "internetEnabled": true
     },
     "linux": {
