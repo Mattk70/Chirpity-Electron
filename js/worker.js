@@ -12,7 +12,6 @@ const ffmpegPath = require("@ffmpeg-installer/ffmpeg").path.replace(
   "app.asar",
   "app.asar.unpacked"
 );
-console.log("cwd", __dirname)
 ffmpeg.setFfmpegPath(ffmpegPath);
 const merge = require("lodash.merge");
 import { WorkerState as State } from "./utils/state.js";
