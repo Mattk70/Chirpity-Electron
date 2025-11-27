@@ -118,12 +118,13 @@
         "role": "Editor"
       }
     ],      
-    "dmg":{
+    "mac": {
+      "mergeASARs":false,
+      "dmg":{
         "internetEnabled": true
       },
-    "mac": {
       "target": {
-        "target": "default",
+        "target": "universal",
         "arch": ["arm64"]
       },
       "artifactName": "${productName}-${arch}.${ext}",
