@@ -123,7 +123,7 @@
         "target": "dmg",
         "arch": ["arm64"]
       },
-      "artifactName": "${productName}-${arch.${ext}",
+      "artifactName": "${productName}-${arch}.${ext}",
       "type": "distribution",
       "hardenedRuntime": true,
       "entitlements": "build/entitlements.mac.plist",
