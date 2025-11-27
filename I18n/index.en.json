@@ -29,7 +29,7 @@
     "Send Filtered Audio-circle-help": ["Sending High Pass or Low Shelf filtered audio to a model will usually have a negative impact on its accuracy. Use this option with caution!"],
     "Show frequency labels-circle-help": ["When enabled, the spectrogram will display the frequency on the left side."],
     "Show all detections-circle-help": "When enabled, the spectrogram will highlight all the detections on screen.",
-    "padlock": ["Feature Locked","Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature permanently."],
+    "padlock": ["Member Feature","<a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>Members</a> have access to this premium feature."], 
     "unsaved-link": ["Unsaved Edits", "There are changes to the results that haven't been saved"],
     "Clip Library-circle-help": ["When enabled, only audio files containing saved records are added to the library. If you set your recorder to auto-increment files after a short period of time, enabling this setting will dramatically reduce the storage required if there are long periods without activity"],
     "Signal to Noise Ratio-circle-help": ["The SNR filter, when enabled, will skip over portions of audio where any audio event is below the threshold. Higher values skip increasingly noisy segments. whilst this will result in faster processing it must be considered <b><i>experimental</i></b> and any non-zero value may miss detections. <b>Tip:</b> To find a workable SNR value, run analysis on a short file with the faintest detections you can confidently identify. Increase the SNR value until the detection is not picked up. Once you find this threshold, back it off to the highest level that picks up the detection."],
