@@ -123,7 +123,6 @@
         "target": "dmg",
         "arch": ["universal"]
       },
-      "mergeASARs":false,
       "artifactName": "${productName}.${ext}",
       "type": "distribution",
       "hardenedRuntime": true,
