@@ -123,6 +123,7 @@
         "target": "dmg",
         "arch": ["universal"]
       },
+      "singleArchFiles": "*",
       "artifactName": "${productName}.${ext}",
       "type": "distribution",
       "hardenedRuntime": true,
