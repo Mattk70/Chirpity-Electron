@@ -25,7 +25,7 @@ const settings = require("electron-settings");
 const keytar = require('keytar');
 const SERVICE = 'Chirpity';
 const ACCOUNT = 'install-info';
-let DEBUG = true;
+let DEBUG = false;
 
 async function getInstallInfo(date) {
   try {
