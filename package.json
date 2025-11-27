@@ -1,6 +1,6 @@
 {
   "name": "Chirpity",
-  "version": "5.5.3",
+  "version": "5.5.4",
   "description": "Chirpity is a bioacoustics platform for the analysis of bird song and other wildlife sounds. It uses machine learning models to identify bird species from audio recordings.",
   "main": "main.js",
   "scripts": {
@@ -118,12 +118,13 @@
         "role": "Editor"
       }
     ],      
-    "dmg":{
+    "mac": {
+      "mergeASARs":false,
+      "dmg":{
         "internetEnabled": true
       },
-    "mac": {
       "target": {
-        "target": "default",
+        "target": "universal",
         "arch": ["arm64"]
       },
       "artifactName": "${productName}-${arch}.${ext}",
