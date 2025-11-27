@@ -176,90 +176,89 @@ const menu = Menu.buildFromTemplate(template);
 
 Menu.setApplicationMenu(menu);
 // Updates
-// Function to fetch release notes from GitHub API
-async function fetchReleaseNotes(version) {
-  try {
-    const response = await fetch(
-      "https://api.github.com/repos/Mattk70/Chirpity-Electron/releases/latest"
-    );
+// // Function to fetch release notes from GitHub API
+// async function fetchReleaseNotes(version) {
+//   try {
+//     const response = await fetch(
+//       "https://api.github.com/repos/Mattk70/Chirpity-Electron/releases/latest"
+//     );
 
-    if (response.ok) {
-      const data = await response.json();
-      if (data && data.body) {
-        return data.body;
-      }
-    } else {
-      console.error("Error fetching release notes:", response.statusText);
-    }
-  } catch (error) {
-    console.error("Error fetching release notes:", error);
-  }
-  return "Release notes not available.";
-}
+//     if (response.ok) {
+//       const data = await response.json();
+//       if (data && data.body) {
+//         return data.body;
+//       }
+//     } else {
+//       console.error("Error fetching release notes:", response.statusText);
+//     }
+//   } catch (error) {
+//     console.error("Error fetching release notes:", error);
+//   }
+//   return "Release notes not available.";
+// }
 
 
-autoUpdater.on("checking-for-update", function () {
-  logUpdateStatus("Checking for update...");
-  if (process.env.PORTABLE_EXECUTABLE_DIR) {
-    logUpdateStatus("This is a portable exe");
-  }
-});
+// autoUpdater.on("checking-for-update", function () {
+//   logUpdateStatus("Checking for update...");
+//   if (process.env.PORTABLE_EXECUTABLE_DIR) {
+//     logUpdateStatus("This is a portable exe");
+//   }
+// });
 
-autoUpdater.on("update-available", async function (info) {
-  if (!process.env.PORTABLE_EXECUTABLE_DIR) {
-    autoUpdater.downloadUpdate();
-  } else {
-    // Fetch release notes from GitHub API
-    const releaseNotes = await fetchReleaseNotes(info.version);
-    dialog.showMessageBox({
-      type: "info",
-      title: "Update Available",
-      message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}`,
-      buttons: ["OK"],
-      defaultId: 1,
-      noLink: true,
-    });
-  }
-});
+// autoUpdater.on("update-available", async function (info) {
+//   if (!process.env.PORTABLE_EXECUTABLE_DIR) {
+//     autoUpdater.downloadUpdate();
+//   } else {
+//     // Fetch release notes from GitHub API
+//     const releaseNotes = await fetchReleaseNotes(info.version);
+//     dialog.showMessageBox({
+//       type: "info",
+//       title: "Update Available",
+//       message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}`,
+//       buttons: ["OK"],
+//       defaultId: 1,
+//       noLink: true,
+//     });
+//   }
+// });
 
-autoUpdater.on("update-not-available", function (_info) {
-  logUpdateStatus("Update not available.");
-});
+// autoUpdater.on("update-not-available", function (_info) {
+//   logUpdateStatus("Update not available.");
+// });
 
-autoUpdater.on("error", function (err) {
-  logUpdateStatus("Error in auto-updater:" + err);
-});
+// autoUpdater.on("error", function (err) {
+//   logUpdateStatus("Error in auto-updater:" + err);
+// });
 
-autoUpdater.on("download-progress", function (progressObj) {
-  try{
-    mainWindow.webContents.send("download-progress", progressObj);
-  } catch {
-    logUpdateStatus('mainwindow progress update failed')
-  }
-});
+// autoUpdater.on("download-progress", function (progressObj) {
+//   try{
+//     mainWindow.webContents.send("download-progress", progressObj);
+//   } catch {
+//     logUpdateStatus('mainwindow progress update failed')
+//   }
+// });
 
-autoUpdater.on("update-downloaded", async function (info) {
-  if (isMac) {autoUpdater.quitAndInstall();return}
-  // Fetch release notes from GitHub API
-  const releaseNotes = await fetchReleaseNotes(info.version);
-  log.info(JSON.stringify(info));
-  // Display dialog to the user with release notes
-  dialog
-    .showMessageBox({
-      type: "info",
-      title: "Update Available",
-      message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}\n\nDo you want to install it now?`,
-      buttons: ["Quit and Install", "Install after Exit"],
-      defaultId: 1,
-      noLink: true,
-    })
-    .then((result) => {
-      if (result.response === 0) {
-        // User clicked 'Yes', start the download
-        autoUpdater.quitAndInstall();
-      }
-    });
-});
+// autoUpdater.on("update-downloaded", async function (info) {
+//   // Fetch release notes from GitHub API
+//   const releaseNotes = await fetchReleaseNotes(info.version);
+//   log.info(JSON.stringify(info));
+//   // Display dialog to the user with release notes
+//   dialog
+//     .showMessageBox({
+//       type: "info",
+//       title: "Update Available",
+//       message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}\n\nDo you want to install it now?`,
+//       buttons: ["Quit and Install", "Install after Exit"],
+//       defaultId: 1,
+//       noLink: true,
+//     })
+//     .then((result) => {
+//       if (result.response === 0) {
+//         // User clicked 'Yes', start the download
+//         autoUpdater.quitAndInstall();
+//       }
+//     });
+// });
 
 function logUpdateStatus(message) {
   console.log(message);
@@ -621,7 +620,7 @@ if (!gotTheLock) {
     if (process.env.CI) {
         console.log('Auto-updater disabled in CI environment.');
     } else {
-        autoUpdater.autoDownload = false;
+        // autoUpdater.autoDownload = false;
         autoUpdater.checkForUpdatesAndNotify().catch(error => console.warn('Error checking for updates', error))
     }
 });
