@@ -5,7 +5,7 @@
 // Get the modules loaded in preload.js
 const fs = window.module.fs;
 const p = window.module.p;
-const uuidv4 = window.module.uuidv4;
+
 const si = window.module.si;
 import {
   customURLEncode,
@@ -1759,7 +1759,7 @@ const defaultConfig = {
   fontScale: 1,
   seenTour: false,
   lastUpdateCheck: 0,
-  UUID: uuidv4(),
+  UUID: null,
   colormap: "roseus",
   specMaxHeight: 260,
   specLabels: true,
@@ -1871,7 +1871,7 @@ window.onload = async () => {
     } else {
       config = JSON.parse(data);
     }
-
+    config.UUID ??= await window.electron.getUUID();
     // Attach an error event listener to the window object
     window.onerror = function (message, file, lineno, colno, error) {
       trackEvent(

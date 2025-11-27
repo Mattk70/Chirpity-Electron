@@ -18,17 +18,19 @@ app.commandLine.appendSwitch("enable-features", "Vulkan");
 app.setAppUserModelId('com.electron.chirpity');
 const { autoUpdater } = require("electron-updater");
 const log = require("electron-log");
-
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 const settings = require("electron-settings");
 const keytar = require('keytar');
 const SERVICE = 'Chirpity';
 const ACCOUNT = 'install-info';
+let DEBUG = false;
 
 async function getInstallInfo(date) {
   try {
     const raw = await keytar.getPassword(SERVICE, ACCOUNT);
+
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed.installedAt === "string") {
@@ -41,7 +43,6 @@ async function getInstallInfo(date) {
     console.warn("getInstallInfo: keychain read/parse failed, recreating:", error.message);
   }
 
-  const crypto = require("node:crypto");
   let effectiveDate = date ? new Date(date) : new Date();
   if (Number.isNaN(effectiveDate.getTime())) {
     console.warn("getInstallInfo: invalid date provided, falling back to now.");
@@ -66,7 +67,6 @@ process.env["TF_ENABLE_ONEDNN_OPTS"] = "1";
 
 //require('update-electron-app')();
 let files = [];
-let DEBUG = false;
 let unsavedRecords = false;
 
 // List of supported file for opening:
@@ -279,6 +279,7 @@ ipcMain.handle('getAppPath', () => app.getAppPath());
 ipcMain.handle('trialPeriod', () => 14*24*3600*1000); // 14 days
 ipcMain.handle('getLocale', () => app.getLocale());
 ipcMain.handle('getTemp', () => app.getPath('temp'));
+ipcMain.handle('getUUID', () => crypto.randomUUID())
 ipcMain.handle('isMac', () => isMac);
 ipcMain.handle('getAudio', () => path.join(__dirname.replace('app.asar', ''), 'Help', 'example.mp3'));
 ipcMain.handle('exitApplication', () => app.quit()); 
