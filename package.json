@@ -123,6 +123,7 @@
         "target": "universal",
         "arch": ["arm64"]
       },
+      "mergeASARs":false,
       "artifactName": "${productName}.${ext}",
       "type": "distribution",
       "hardenedRuntime": true,
@@ -162,8 +163,7 @@
           "path": "/Applications"
         }
       ],
-      "internetEnabled": true,
-      "mergeASARs":false
+      "internetEnabled": true
     },
     "linux": {
       "icon": "./build/icon.icns",
