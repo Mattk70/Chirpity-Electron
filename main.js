@@ -239,6 +239,7 @@ autoUpdater.on("download-progress", function (progressObj) {
 });
 
 autoUpdater.on("update-downloaded", async function (info) {
+  if (isMac) {autoUpdater.autoInstallOnAppQuit();return}
   // Fetch release notes from GitHub API
   const releaseNotes = await fetchReleaseNotes(info.version);
   log.info(JSON.stringify(info));
