@@ -133,7 +133,7 @@ console.error = log.error;
 autoUpdater.logger = log;
 autoUpdater.logger.transports.file.level = "info";
 
-autoUpdater.allowPrerelease = false; 
+autoUpdater.allowPrerelease = true; 
 
 // Define the menu template
 
@@ -503,10 +503,10 @@ app.whenReady().then(async () => {
     // Debug mode
     try {
         // Specify the file path
-        filePath = path.join(userData, 'config.json');
+        const filePath = path.join(userData, 'config.json');
         // Read the contents of the file synchronously
-        fileContent = fs.readFileSync(filePath, 'utf8');
-        config = JSON.parse(fileContent);
+        const fileContent = fs.readFileSync(filePath, 'utf8');
+        const config = JSON.parse(fileContent);
         DEBUG =   process.env.CI === 'e2e' ? false : config.debug;
     } catch (error) {
       console.warn('CONFIG: Error reading file:', error.message);
@@ -534,7 +534,7 @@ app.whenReady().then(async () => {
         }
     }
     
-    app.on('activate', async () => {
+    app.on("activate", async () => {
         const windowsOpen = BrowserWindow.getAllWindows().length
         if (!windowsOpen) {
             await createWorker();
@@ -555,7 +555,7 @@ app.whenReady().then(async () => {
         let options;
         if (type === 'audio') {
             options = {
-                properties: [fileOrFolder, multi] ,
+                properties: [fileOrFolder, multi].filter(Boolean),
                 buttonLabel: buttonLabel,
                 title: title
             }
@@ -632,15 +632,6 @@ app.whenReady().then(async () => {
 });
 
 
-app.on("activate", async () => {
-  if (mainWindow === null) {
-    await createWindow();
-  }
-
-  if (workerWindow == undefined) {
-    await createWorker();
-  }
-});
 let DB_CLOSED = false, QUITTING = false;
 app.on('before-quit', async (event) => {
   if (DB_CLOSED || QUITTING) return
