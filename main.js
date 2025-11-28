@@ -622,8 +622,8 @@ if (!gotTheLock) {
         })
     });
     //Update handling
-    if (process.env.CI) {
-        console.log('Auto-updater disabled in CI environment.');
+    if (isMac || process.env.CI) {
+        console.log("Auto-updater disabled in CI environment. And doesn't work for mac");
     } else {
         autoUpdater.autoDownload = false;
         autoUpdater.checkForUpdates().catch(error => console.warn('Error checking for updates', error))
