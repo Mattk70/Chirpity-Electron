@@ -1,3 +1,7 @@
+
+const fs = require("node:fs");
+const path = require("node:path");
+const isMac = process.platform === "darwin"; // macOS check
 const {
   app,
   Menu,
@@ -16,11 +20,42 @@ app.commandLine.appendSwitch("enable-features", "Vulkan");
 
 // Set the AppUserModelID (to prevent the two pinned icons bug)
 app.setAppUserModelId('com.electron.chirpity');
+
+function copyFilesOnly(srcDir, destDir) {
+  for (const item of fs.readdirSync(srcDir)) {
+    if (['config.json', 
+      'archive.sqlite', 
+      'archive.sqlite.shm', 
+      'archive.sqlite.wal', 
+      'XCcache.json', 
+      'settings.json'].includes(item)){
+      const srcPath = path.join(srcDir, item);
+      const destPath = path.join(destDir, item);
+      // Copy files
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
+// When dmg is installed over a pkg installation, the app crashes, so...
+const userData = app.getPath("userData");
+if (isMac && ! fs.existsSync(path.join(userData, 'pkg2dmg')) && fs.existsSync(path.join(userData, 'config.json'))){
+  console.log(`existing config found`)
+  try {
+    const movedSettings = userData+' old'
+    fs.renameSync(userData, movedSettings);
+    fs.mkdirSync(userData)
+    copyFilesOnly(movedSettings, userData)
+    fs.writeFileSync(path.join(userData, 'pkg2dmg'), "");
+    console.log('Migration done')
+  } catch (err) {
+    console.error(err);
+  }
+}
+
 const { autoUpdater } = require("electron-updater");
 const log = require("electron-log");
 const crypto = require("node:crypto");
-const fs = require("node:fs");
-const path = require("node:path");
+
 const settings = require("electron-settings");
 const keytar = require('keytar');
 const SERVICE = 'Chirpity';
@@ -101,7 +136,7 @@ autoUpdater.logger.transports.file.level = "info";
 autoUpdater.allowPrerelease = true; 
 
 // Define the menu template
-const isMac = process.platform === "darwin"; // macOS check
+
 // Set membership URL here
 process.env.MEMBERSHIP_API_ENDPOINT = 'https://subscriber.mattkirkland.co.uk/check-uuid_v2';
 const template = [
@@ -141,91 +176,95 @@ const menu = Menu.buildFromTemplate(template);
 
 Menu.setApplicationMenu(menu);
 // Updates
-// Function to fetch release notes from GitHub API
-async function fetchReleaseNotes(version) {
-  try {
-    const response = await fetch(
-      "https://api.github.com/repos/Mattk70/Chirpity-Electron/releases/latest"
-    );
+// // Function to fetch release notes from GitHub API
+// async function fetchReleaseNotes(version) {
+//   try {
+//     const response = await fetch(
+//       "https://api.github.com/repos/Mattk70/Chirpity-Electron/releases/latest"
+//     );
 
-    if (response.ok) {
-      const data = await response.json();
-      if (data && data.body) {
-        return data.body;
-      }
-    } else {
-      console.error("Error fetching release notes:", response.statusText);
-    }
-  } catch (error) {
-    console.error("Error fetching release notes:", error);
-  }
-  return "Release notes not available.";
-}
+//     if (response.ok) {
+//       const data = await response.json();
+//       if (data && data.body) {
+//         return data.body;
+//       }
+//     } else {
+//       console.error("Error fetching release notes:", response.statusText);
+//     }
+//   } catch (error) {
+//     console.error("Error fetching release notes:", error);
+//   }
+//   return "Release notes not available.";
+// }
 
 
-autoUpdater.on("checking-for-update", function () {
-  logUpdateStatus("Checking for update...");
-  if (process.env.PORTABLE_EXECUTABLE_DIR) {
-    logUpdateStatus("This is a portable exe");
-  }
-});
+// autoUpdater.on("checking-for-update", function () {
+//   logUpdateStatus("Checking for update...");
+//   if (process.env.PORTABLE_EXECUTABLE_DIR) {
+//     logUpdateStatus("This is a portable exe");
+//   }
+// });
 
-autoUpdater.on("update-available", async function (info) {
-  if (!process.env.PORTABLE_EXECUTABLE_DIR) {
-    autoUpdater.downloadUpdate();
-  } else {
-    // Fetch release notes from GitHub API
-    const releaseNotes = await fetchReleaseNotes(info.version);
-    dialog.showMessageBox({
-      type: "info",
-      title: "Update Available",
-      message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}`,
-      buttons: ["OK"],
-      defaultId: 1,
-      noLink: true,
-    });
-  }
-});
+// autoUpdater.on("update-available", async function (info) {
+//   if (!process.env.PORTABLE_EXECUTABLE_DIR) {
+//     autoUpdater.downloadUpdate();
+//   } else {
+//     // Fetch release notes from GitHub API
+//     const releaseNotes = await fetchReleaseNotes(info.version);
+//     dialog.showMessageBox({
+//       type: "info",
+//       title: "Update Available",
+//       message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}`,
+//       buttons: ["OK"],
+//       defaultId: 1,
+//       noLink: true,
+//     });
+//   }
+// });
 
-autoUpdater.on("update-not-available", function (_info) {
-  logUpdateStatus("Update not available.");
-});
+// autoUpdater.on("update-not-available", function (_info) {
+//   logUpdateStatus("Update not available.");
+// });
 
-autoUpdater.on("error", function (err) {
-  logUpdateStatus("Error in auto-updater:" + err);
-});
+// autoUpdater.on("error", function (err) {
+//   logUpdateStatus("Error in auto-updater:" + err);
+// });
 
-autoUpdater.on("download-progress", function (progressObj) {
-  mainWindow.webContents.send("download-progress", progressObj);
-});
+// autoUpdater.on("download-progress", function (progressObj) {
+//   try{
+//     mainWindow.webContents.send("download-progress", progressObj);
+//   } catch {
+//     logUpdateStatus('mainwindow progress update failed')
+//   }
+// });
 
-autoUpdater.on("update-downloaded", async function (info) {
-  // Fetch release notes from GitHub API
-  const releaseNotes = await fetchReleaseNotes(info.version);
-  log.info(JSON.stringify(info));
-  // Display dialog to the user with release notes
-  dialog
-    .showMessageBox({
-      type: "info",
-      title: "Update Available",
-      message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}\n\nDo you want to install it now?`,
-      buttons: ["Quit and Install", "Install after Exit"],
-      defaultId: 1,
-      noLink: true,
-    })
-    .then((result) => {
-      if (result.response === 0) {
-        // User clicked 'Yes', start the download
-        autoUpdater.quitAndInstall();
-      }
-    });
-});
+// autoUpdater.on("update-downloaded", async function (info) {
+//   // Fetch release notes from GitHub API
+//   const releaseNotes = await fetchReleaseNotes(info.version);
+//   log.info(JSON.stringify(info));
+//   // Display dialog to the user with release notes
+//   dialog
+//     .showMessageBox({
+//       type: "info",
+//       title: "Update Available",
+//       message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}\n\nDo you want to install it now?`,
+//       buttons: ["Quit and Install", "Install after Exit"],
+//       defaultId: 1,
+//       noLink: true,
+//     })
+//     .then((result) => {
+//       if (result.response === 0) {
+//         // User clicked 'Yes', start the download
+//         autoUpdater.quitAndInstall();
+//       }
+//     });
+// });
 
 function logUpdateStatus(message) {
   console.log(message);
 }
 
-process.stdin.resume(); //so the program will not close instantly
+// process.stdin.resume(); //so the program will not close instantly
 
 function getFileFromArgs(args) {
     return args.find(arg => SUPPORTED_FILES.some(ext => arg.toLowerCase().endsWith(ext)));
@@ -233,7 +272,7 @@ function getFileFromArgs(args) {
 async function exitHandler(options, exitCode) {
   if (options.cleanup) {
     // clean up settings.json litter
-    const conf = app.getPath("userData");
+    const conf = userData;
     fs.readdir(conf, (err, files) => {
       if (err) {
         console.error("Error reading folder:", err);
@@ -265,7 +304,7 @@ async function exitHandler(options, exitCode) {
 }
 
 //do something when app is closing
-process.on("exit", exitHandler.bind(undefined, { cleanup: true }));
+// process.on("exit", exitHandler.bind(undefined, { cleanup: true }));
 //catches ctrl+c event (but not in main process!)
 process.on("SIGINT", exitHandler.bind(undefined, { exit: true }));
 // catches "kill pid" (for example: nodemon restart)
@@ -274,7 +313,7 @@ process.on("SIGUSR2", exitHandler.bind(undefined, { exit: true }));
 //catches uncaught exceptions
 process.on("uncaughtException", exitHandler.bind(undefined, { exit: true }));
 
-ipcMain.handle('getPath', () => app.getPath('userData'));
+ipcMain.handle('getPath', () => userData);
 ipcMain.handle('getAppPath', () => app.getAppPath());
 ipcMain.handle('trialPeriod', () => 14*24*3600*1000); // 14 days
 ipcMain.handle('getLocale', () => app.getLocale());
@@ -315,7 +354,7 @@ async function windowStateKeeper(windowName) {
   }
   function track(win) {
     window = win;
-    ["resize", "move", "close", "maximize", "unmaximize"].forEach((event) => {
+    ["resize", "move", "maximize", "unmaximize"].forEach((event) => {
       win.on(event, saveState);
     });
   }
@@ -373,20 +412,20 @@ async function createWindow() {
     });
   }
 
-  mainWindow.on("close", (e) => {
-    if (unsavedRecords && !process.env.CI) {
-      const choice = dialog.showMessageBoxSync(mainWindow, {
-        type: "warning",
-        buttons: ["Yes", "No"],
-        title: "Unsaved Records",
-        message: "There are unsaved records, are you sure you want to exit?",
-      });
+  // mainWindow.on("close", (e) => {
+  //   if (unsavedRecords && !process.env.CI) {
+  //     const choice = dialog.showMessageBoxSync(mainWindow, {
+  //       type: "warning",
+  //       buttons: ["Yes", "No"],
+  //       title: "Unsaved Records",
+  //       message: "There are unsaved records, are you sure you want to exit?",
+  //     });
 
-      if (choice === 1) {
-        e.preventDefault(); // Prevent the app from closing
-      }
-    }
-  });
+  //     if (choice === 1) {
+  //       e.preventDefault(); // Prevent the app from closing
+  //     }
+  //   }
+  // });
 }
 
 async function createWorker() {
@@ -411,9 +450,9 @@ async function createWorker() {
   workerWindow.setIcon(__dirname + "/img/icon/icon.png");
   await workerWindow.loadFile("worker.html");
 
-  workerWindow.on("closed", () => {
-    workerWindow = undefined;
-  });
+  // workerWindow.on("closed", () => {
+  //   workerWindow = undefined;
+  // });
   workerWindow.once("ready-to-show", () => {
     if (DEBUG) {
       workerWindow.show();
@@ -458,7 +497,7 @@ if (!gotTheLock) {
       // Debug mode
       try {
           // Specify the file path
-          filePath = path.join(app.getPath('userData'), 'config.json');
+          filePath = path.join(userData, 'config.json');
           // Read the contents of the file synchronously
           fileContent = fs.readFileSync(filePath, 'utf8');
           config = JSON.parse(fileContent);
@@ -581,7 +620,7 @@ if (!gotTheLock) {
     if (process.env.CI) {
         console.log('Auto-updater disabled in CI environment.');
     } else {
-        autoUpdater.autoDownload = false;
+        // autoUpdater.autoDownload = false;
         autoUpdater.checkForUpdatesAndNotify().catch(error => console.warn('Error checking for updates', error))
     }
 });
@@ -597,20 +636,24 @@ app.on("activate", async () => {
   }
 });
 let DB_CLOSED = false, QUITTING = false;
-app.on('before-quit', async (event) => {
-  if (DB_CLOSED || QUITTING) return
-  event.preventDefault(); // Prevent default quit until cleanup is done
-  QUITTING = true
-  workerWindow.webContents.postMessage("close-database", null);
-  // Add timeout to force quit after 5 seconds
-  setTimeout(() => {
-    if (!DB_CLOSED) {
-      console.warn('Database closure timed out after 5 seconds, forcing quit...');
-      DB_CLOSED = true;
-      app.quit();
-    }
-  }, 5000);
-});
+// app.on('before-quit', async (event) => {
+//   if (DB_CLOSED || QUITTING) return
+//   event.preventDefault(); // Prevent default quit until cleanup is done
+//   QUITTING = true
+//   try{
+//     workerWindow.webContents.postMessage("close-database", null);
+//   } catch {
+//     console.log('workerWindow closed before DB close call')
+//   }
+//   // Add timeout to force quit after 5 seconds
+//   setTimeout(() => {
+//     if (!DB_CLOSED) {
+//       console.warn('Database closure timed out after 5 seconds, forcing quit...');
+//       DB_CLOSED = true;
+//       app.quit();
+//     }
+//   }, 5000);
+// });
   
 ipcMain.on('database-closed', () =>{
   DB_CLOSED = true;

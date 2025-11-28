@@ -2976,7 +2976,7 @@ const loadModel = () => {
   PREDICTING = false;
   t0_warmup = Date.now();
   const {selectedModel, warmup} = config;
-  const backend = config.models[selectedModel].backend;
+  const backend = isTestEnv ? 'tensorflow' : config.models[selectedModel].backend;
   const modelPath = config.models[selectedModel].modelPath;
   worker.postMessage({
     action: "load-model",

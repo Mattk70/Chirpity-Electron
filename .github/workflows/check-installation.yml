@@ -215,7 +215,7 @@ jobs:
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             FILENAME="Chirpity Setup $VERSION.exe"
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            FILENAME="Chirpity-arm64.pkg"
+            FILENAME="Chirpity-${arch}.dmg"
           else
             FILENAME="Chirpity-x64.AppImage"
           fi
@@ -240,7 +240,7 @@ jobs:
           key: perch-model-v2-7z
 
       - name: Download Perch Sound Model
-        if: runner.os != 'Linux' &&  steps.cache-perch.outputs.cache-hit != 'true' 
+        if: runner.os != 'Linux' && steps.cache-perch.outputs.cache-hit != 'true'
         run: |
           curl -L -o Perch.v2.7z \
             https://github.com/Mattk70/Chirpity-Website/releases/download/v3.0.0/Perch.v2.7z
@@ -280,12 +280,4 @@ jobs:
       - name: Test packaged application
         if: runner.os != 'Linux'
         run: npm test
-
-      # - name: Set locale to de_DE.UTF-8 for Mac, before testing application
-      #   if: runner.os == 'macOS'
-      #   run: |
-      #       export LC_ALL=de_DE.UTF-8
-      #       export LANG=de_DE.UTF-8
-      #       python -c "import locale; locale.setlocale(locale.LC_ALL, locale.getlocale()[0]); print(locale.localeconv())"
-      #       LANG=de_DE.UTF-8 LC_ALL=de_DE.UTF-8 npm test
 
