@@ -118,6 +118,10 @@
         "role": "Editor"
       }
     ],      
+    "dmg":{
+        "internetEnabled": true,
+        "mergeASARs": false
+      },
     "mac": {
       "target": {
         "target": "default",
