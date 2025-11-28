@@ -176,95 +176,100 @@ const menu = Menu.buildFromTemplate(template);
 
 Menu.setApplicationMenu(menu);
 // Updates
-// // Function to fetch release notes from GitHub API
-// async function fetchReleaseNotes(version) {
-//   try {
-//     const response = await fetch(
-//       "https://api.github.com/repos/Mattk70/Chirpity-Electron/releases/latest"
-//     );
+// Function to fetch release notes from GitHub API
+async function fetchReleaseNotes(version) {
+  try {
+    const response = await fetch(
+      "https://api.github.com/repos/Mattk70/Chirpity-Electron/releases/latest"
+    );
 
-//     if (response.ok) {
-//       const data = await response.json();
-//       if (data && data.body) {
-//         return data.body;
-//       }
-//     } else {
-//       console.error("Error fetching release notes:", response.statusText);
-//     }
-//   } catch (error) {
-//     console.error("Error fetching release notes:", error);
-//   }
-//   return "Release notes not available.";
-// }
+    if (response.ok) {
+      const data = await response.json();
+      if (data && data.body) {
+        return data.body;
+      }
+    } else {
+      console.error("Error fetching release notes:", response.statusText);
+    }
+  } catch (error) {
+    console.error("Error fetching release notes:", error);
+  }
+  return "Release notes not available.";
+}
 
 
-// autoUpdater.on("checking-for-update", function () {
-//   logUpdateStatus("Checking for update...");
-//   if (process.env.PORTABLE_EXECUTABLE_DIR) {
-//     logUpdateStatus("This is a portable exe");
-//   }
-// });
+autoUpdater.on("checking-for-update", function () {
+  logUpdateStatus("Checking for update...");
+  if (process.env.PORTABLE_EXECUTABLE_DIR) {
+    logUpdateStatus("This is a portable exe");
+  }
+});
 
-// autoUpdater.on("update-available", async function (info) {
-//   if (!process.env.PORTABLE_EXECUTABLE_DIR) {
-//     autoUpdater.downloadUpdate();
-//   } else {
-//     // Fetch release notes from GitHub API
-//     const releaseNotes = await fetchReleaseNotes(info.version);
-//     dialog.showMessageBox({
-//       type: "info",
-//       title: "Update Available",
-//       message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}`,
-//       buttons: ["OK"],
-//       defaultId: 1,
-//       noLink: true,
-//     });
-//   }
-// });
+autoUpdater.on("update-available", async function (info) {
+  if (!process.env.PORTABLE_EXECUTABLE_DIR) {
+    autoUpdater.downloadUpdate();
+  } else {
+    // Fetch release notes from GitHub API
+    const releaseNotes = await fetchReleaseNotes(info.version);
+    dialog.showMessageBox({
+      type: "info",
+      title: "Update Available",
+      message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}`,
+      buttons: ["OK"],
+      defaultId: 1,
+      noLink: true,
+    });
+  }
+});
 
-// autoUpdater.on("update-not-available", function (_info) {
-//   logUpdateStatus("Update not available.");
-// });
+autoUpdater.on("update-not-available", function (_info) {
+  logUpdateStatus("Update not available.");
+});
 
-// autoUpdater.on("error", function (err) {
-//   logUpdateStatus("Error in auto-updater:" + err);
-// });
+autoUpdater.on("error", function (err) {
+  logUpdateStatus("Error in auto-updater:" + err);
+});
 
-// autoUpdater.on("download-progress", function (progressObj) {
-//   try{
-//     mainWindow.webContents.send("download-progress", progressObj);
-//   } catch {
-//     logUpdateStatus('mainwindow progress update failed')
-//   }
-// });
+autoUpdater.on("download-progress", function (progressObj) {
+  try{
+    mainWindow.webContents.send("download-progress", progressObj);
+  } catch {
+    logUpdateStatus('mainwindow progress update failed')
+  }
+});
 
-// autoUpdater.on("update-downloaded", async function (info) {
-//   // Fetch release notes from GitHub API
-//   const releaseNotes = await fetchReleaseNotes(info.version);
-//   log.info(JSON.stringify(info));
-//   // Display dialog to the user with release notes
-//   dialog
-//     .showMessageBox({
-//       type: "info",
-//       title: "Update Available",
-//       message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}\n\nDo you want to install it now?`,
-//       buttons: ["Quit and Install", "Install after Exit"],
-//       defaultId: 1,
-//       noLink: true,
-//     })
-//     .then((result) => {
-//       if (result.response === 0) {
-//         // User clicked 'Yes', start the download
-//         autoUpdater.quitAndInstall();
-//       }
-//     });
-// });
+autoUpdater.on("update-downloaded", async function (info) {
+  // Fetch release notes from GitHub API
+  const releaseNotes = await fetchReleaseNotes(info.version);
+  log.info(JSON.stringify(info));
+  // Display dialog to the user with release notes
+  setTimeout(() =>{
+    dialog
+      .showMessageBox({
+        type: "info",
+        title: "Update Available",
+        message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}\n\nDo you want to install it now?`,
+        buttons: ["Quit and Install", "Install after Exit"],
+        defaultId: 1,
+        noLink: true,
+      })
+      .then((result) => {
+        if (result.response === 0) {
+          // User clicked 'Yes', start the download
+          autoUpdater.quitAndInstall();
+        }
+      }) }, 
+      // 60 second delay before notification
+      60_000
+    )
+     
+});
 
 function logUpdateStatus(message) {
   console.log(message);
 }
 
-// process.stdin.resume(); //so the program will not close instantly
+process.stdin.resume(); //so the program will not close instantly
 
 function getFileFromArgs(args) {
     return args.find(arg => SUPPORTED_FILES.some(ext => arg.toLowerCase().endsWith(ext)));
@@ -304,7 +309,7 @@ async function exitHandler(options, exitCode) {
 }
 
 //do something when app is closing
-// process.on("exit", exitHandler.bind(undefined, { cleanup: true }));
+process.on("exit", exitHandler.bind(undefined, { cleanup: true }));
 //catches ctrl+c event (but not in main process!)
 process.on("SIGINT", exitHandler.bind(undefined, { exit: true }));
 // catches "kill pid" (for example: nodemon restart)
@@ -412,20 +417,20 @@ async function createWindow() {
     });
   }
 
-  // mainWindow.on("close", (e) => {
-  //   if (unsavedRecords && !process.env.CI) {
-  //     const choice = dialog.showMessageBoxSync(mainWindow, {
-  //       type: "warning",
-  //       buttons: ["Yes", "No"],
-  //       title: "Unsaved Records",
-  //       message: "There are unsaved records, are you sure you want to exit?",
-  //     });
+  mainWindow.on("close", (e) => {
+    if (unsavedRecords && !process.env.CI) {
+      const choice = dialog.showMessageBoxSync(mainWindow, {
+        type: "warning",
+        buttons: ["Yes", "No"],
+        title: "Unsaved Records",
+        message: "There are unsaved records, are you sure you want to exit?",
+      });
 
-  //     if (choice === 1) {
-  //       e.preventDefault(); // Prevent the app from closing
-  //     }
-  //   }
-  // });
+      if (choice === 1) {
+        e.preventDefault(); // Prevent the app from closing
+      }
+    }
+  });
 }
 
 async function createWorker() {
@@ -620,8 +625,8 @@ if (!gotTheLock) {
     if (process.env.CI) {
         console.log('Auto-updater disabled in CI environment.');
     } else {
-        // autoUpdater.autoDownload = false;
-        autoUpdater.checkForUpdatesAndNotify().catch(error => console.warn('Error checking for updates', error))
+        autoUpdater.autoDownload = false;
+        autoUpdater.checkForUpdates().catch(error => console.warn('Error checking for updates', error))
     }
 });
 }
@@ -636,24 +641,24 @@ app.on("activate", async () => {
   }
 });
 let DB_CLOSED = false, QUITTING = false;
-// app.on('before-quit', async (event) => {
-//   if (DB_CLOSED || QUITTING) return
-//   event.preventDefault(); // Prevent default quit until cleanup is done
-//   QUITTING = true
-//   try{
-//     workerWindow.webContents.postMessage("close-database", null);
-//   } catch {
-//     console.log('workerWindow closed before DB close call')
-//   }
-//   // Add timeout to force quit after 5 seconds
-//   setTimeout(() => {
-//     if (!DB_CLOSED) {
-//       console.warn('Database closure timed out after 5 seconds, forcing quit...');
-//       DB_CLOSED = true;
-//       app.quit();
-//     }
-//   }, 5000);
-// });
+app.on('before-quit', async (event) => {
+  if (DB_CLOSED || QUITTING) return
+  event.preventDefault(); // Prevent default quit until cleanup is done
+  QUITTING = true
+  try{
+    workerWindow.webContents.postMessage("close-database", null);
+  } catch {
+    console.log('workerWindow closed before DB close call')
+  }
+  // Add timeout to force quit after 5 seconds
+  setTimeout(() => {
+    if (!DB_CLOSED) {
+      console.warn('Database closure timed out after 5 seconds, forcing quit...');
+      DB_CLOSED = true;
+      app.quit();
+    }
+  }, 5000);
+});
   
 ipcMain.on('database-closed', () =>{
   DB_CLOSED = true;
