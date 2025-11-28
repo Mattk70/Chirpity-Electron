@@ -264,7 +264,7 @@ function logUpdateStatus(message) {
   console.log(message);
 }
 
-process.stdin.resume(); //so the program will not close instantly
+// process.stdin.resume(); //so the program will not close instantly
 
 function getFileFromArgs(args) {
     return args.find(arg => SUPPORTED_FILES.some(ext => arg.toLowerCase().endsWith(ext)));
@@ -304,7 +304,7 @@ async function exitHandler(options, exitCode) {
 }
 
 //do something when app is closing
-process.on("exit", exitHandler.bind(undefined, { cleanup: true }));
+// process.on("exit", exitHandler.bind(undefined, { cleanup: true }));
 //catches ctrl+c event (but not in main process!)
 process.on("SIGINT", exitHandler.bind(undefined, { exit: true }));
 // catches "kill pid" (for example: nodemon restart)
@@ -354,7 +354,7 @@ async function windowStateKeeper(windowName) {
   }
   function track(win) {
     window = win;
-    ["resize", "move", "close", "maximize", "unmaximize"].forEach((event) => {
+    ["resize", "move", "maximize", "unmaximize"].forEach((event) => {
       win.on(event, saveState);
     });
   }
@@ -412,20 +412,20 @@ async function createWindow() {
     });
   }
 
-  mainWindow.on("close", (e) => {
-    if (unsavedRecords && !process.env.CI) {
-      const choice = dialog.showMessageBoxSync(mainWindow, {
-        type: "warning",
-        buttons: ["Yes", "No"],
-        title: "Unsaved Records",
-        message: "There are unsaved records, are you sure you want to exit?",
-      });
+  // mainWindow.on("close", (e) => {
+  //   if (unsavedRecords && !process.env.CI) {
+  //     const choice = dialog.showMessageBoxSync(mainWindow, {
+  //       type: "warning",
+  //       buttons: ["Yes", "No"],
+  //       title: "Unsaved Records",
+  //       message: "There are unsaved records, are you sure you want to exit?",
+  //     });
 
-      if (choice === 1) {
-        e.preventDefault(); // Prevent the app from closing
-      }
-    }
-  });
+  //     if (choice === 1) {
+  //       e.preventDefault(); // Prevent the app from closing
+  //     }
+  //   }
+  // });
 }
 
 async function createWorker() {
@@ -450,9 +450,9 @@ async function createWorker() {
   workerWindow.setIcon(__dirname + "/img/icon/icon.png");
   await workerWindow.loadFile("worker.html");
 
-  workerWindow.on("closed", () => {
-    workerWindow = undefined;
-  });
+  // workerWindow.on("closed", () => {
+  //   workerWindow = undefined;
+  // });
   workerWindow.once("ready-to-show", () => {
     if (DEBUG) {
       workerWindow.show();
@@ -636,24 +636,24 @@ app.on("activate", async () => {
   }
 });
 let DB_CLOSED = false, QUITTING = false;
-app.on('before-quit', async (event) => {
-  if (DB_CLOSED || QUITTING) return
-  event.preventDefault(); // Prevent default quit until cleanup is done
-  QUITTING = true
-  try{
-    workerWindow.webContents.postMessage("close-database", null);
-  } catch {
-    console.log('workerWindow closed before DB close call')
-  }
-  // Add timeout to force quit after 5 seconds
-  setTimeout(() => {
-    if (!DB_CLOSED) {
-      console.warn('Database closure timed out after 5 seconds, forcing quit...');
-      DB_CLOSED = true;
-      app.quit();
-    }
-  }, 5000);
-});
+// app.on('before-quit', async (event) => {
+//   if (DB_CLOSED || QUITTING) return
+//   event.preventDefault(); // Prevent default quit until cleanup is done
+//   QUITTING = true
+//   try{
+//     workerWindow.webContents.postMessage("close-database", null);
+//   } catch {
+//     console.log('workerWindow closed before DB close call')
+//   }
+//   // Add timeout to force quit after 5 seconds
+//   setTimeout(() => {
+//     if (!DB_CLOSED) {
+//       console.warn('Database closure timed out after 5 seconds, forcing quit...');
+//       DB_CLOSED = true;
+//       app.quit();
+//     }
+//   }, 5000);
+// });
   
 ipcMain.on('database-closed', () =>{
   DB_CLOSED = true;
