@@ -2118,6 +2118,10 @@ window.onload = async () => {
     config.RAM = DIAGNOSTICS["System Memory"];
     config.GPUs = DIAGNOSTICS["GPUs"];
     trackVisit(config);
+
+    // check for new version on mac platform. dmg auto-update not yet working
+    isMac && !isTestEnv && checkForMacUpdates();
+
   });
 };
 
@@ -7957,4 +7961,55 @@ function updateModelOptions(customOnly){
   }
   customOnly || (select.value = config.selectedModel)
 }
-      
+
+// Update checking for Mac
+
+function checkForMacUpdates() {
+  // Do this at most daily
+  const latestCheck = Date.now();
+  const checkDue = latestCheck - config.lastUpdateCheck > 86_400_000;
+  if (checkDue) {
+    fetch(
+      "https://api.github.com/repos/Mattk70/Chirpity-Electron/releases/latest"
+    )
+      .then((response) => response.json())
+      .then((data) => {
+        const latestVersion = data.tag_name;
+        const latest = parseSemVer(latestVersion);
+        const current = parseSemVer(VERSION);
+
+        if (isNewVersion(latest, current)) {
+          const alertPlaceholder = document.getElementById("updateAlert");
+          const alert = (message, type) => {
+            const wrapper = document.createElement("div");
+            wrapper.innerHTML = [
+              `<div class="alert alert-${type} alert-dismissible" role="alert">`,
+              `   <div>${message}</div>`,
+              '   <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>',
+              "</div>",
+            ].join("");
+            alertPlaceholder.append(wrapper);
+          };
+          const link = `<a href="https://chirpity.mattkirkland.co.uk?fromVersion=${VERSION}" target="_blank">`;
+          const message = utils.interpolate(i18n.get(i18n.UpdateMessage), {
+            link: link,
+          });
+          alert(
+            `<svg class="bi flex-shrink-0 me-2" width="20" height="20" role="img" aria-label="Info:"><use xlink:href="#info-fill"/></svg>${message}`,
+            "warning"
+          );
+          trackEvent(
+            config.UUID,
+            "Update message",
+            `From ${VERSION}`,
+            `To: ${latestVersion}`
+          );
+        }
+        config.lastUpdateCheck = latestCheck;
+        updatePrefs("config.json", config);
+      })
+      .catch((error) => {
+        console.warn("Error checking for updates:", error);
+      });
+  }
+}

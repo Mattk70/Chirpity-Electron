@@ -23,6 +23,22 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mattk70/Chirpity-Electron.git"
+  },    
+  "dmg": {
+    "contents": [
+      {
+        "x": 130,
+        "y": 220
+      },
+      {
+        "x": 410,
+        "y": 220,
+        "type": "link",
+        "path": "/Applications"
+      }
+    ],
+    "format": "ULFO",
+    "internetEnabled": true
   },
   "build": {
     "appId": "uk.co.mattkirkland.chirpity.Chirpity",
@@ -117,11 +133,7 @@
         "name": "MPEG4 File",
         "role": "Editor"
       }
-    ],      
-    "dmg":{
-        "internetEnabled": true,
-        "mergeASARs": false
-      },
+    ],
     "mac": {
       "target": {
         "target": "default",
@@ -152,22 +164,6 @@
           "role": "Viewer"
         }
       ]
-    },
-    "dmg": {
-      "contents": [
-        {
-          "x": 130,
-          "y": 220
-        },
-        {
-          "x": 410,
-          "y": 220,
-          "type": "link",
-          "path": "/Applications"
-        }
-      ],
-      "format": "ULFO",
-      "internetEnabled": true
     },
     "linux": {
       "icon": "./build/icon.icns",
