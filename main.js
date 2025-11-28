@@ -483,96 +483,97 @@ if (!gotTheLock) {
       }
     }
   });
+}
 
-  // This method will be called when Electron has finished loading
-  app.whenReady().then(async () => {
-    // Update the userData path for portable app
-    if (process.env.PORTABLE_EXECUTABLE_DIR) {
-      app.setPath(
-        "userData",
-        path.join(process.env.PORTABLE_EXECUTABLE_DIR, "chirpity-data")
-      );
-      ipcMain.handle("getVersion", () => app.getVersion() + " (Portable)");
-    } else {
-      ipcMain.handle("getVersion", () => app.getVersion());
+// This method will be called when Electron has finished loading
+app.whenReady().then(async () => {
+  // Update the userData path for portable app
+  if (process.env.PORTABLE_EXECUTABLE_DIR) {
+    app.setPath(
+      "userData",
+      path.join(process.env.PORTABLE_EXECUTABLE_DIR, "chirpity-data")
+    );
+    ipcMain.handle("getVersion", () => app.getVersion() + " (Portable)");
+  } else {
+    ipcMain.handle("getVersion", () => app.getVersion());
+  }
+
+    ipcMain.handle('getInstallDate', (_e, date) => getInstallInfo(date));
+    
+    // Debug mode
+    try {
+        // Specify the file path
+        filePath = path.join(userData, 'config.json');
+        // Read the contents of the file synchronously
+        fileContent = fs.readFileSync(filePath, 'utf8');
+        config = JSON.parse(fileContent);
+        DEBUG =   process.env.CI === 'e2e' ? false : config.debug;
+    } catch (error) {
+      console.warn('CONFIG: Error reading file:', error.message);
     }
+    
+    DEBUG && console.log('CI mode' , process.env.CI)
 
-      ipcMain.handle('getInstallDate', (_e, date) => getInstallInfo(date));
-      
-      // Debug mode
-      try {
-          // Specify the file path
-          filePath = path.join(userData, 'config.json');
-          // Read the contents of the file synchronously
-          fileContent = fs.readFileSync(filePath, 'utf8');
-          config = JSON.parse(fileContent);
-          DEBUG =   process.env.CI === 'e2e' ? false : config.debug;
-      } catch (error) {
-        console.warn('CONFIG: Error reading file:', error.message);
-      }
-      
-      DEBUG && console.log('CI mode' , process.env.CI)
+    await createWorker();
+    await createWindow();
 
-      await createWorker();
-      await createWindow();
+    if (process.platform === 'darwin') {
+        //const appIcon = new Tray('./img/icon/icon.png')
+        app.dock.setIcon(__dirname + '/img/icon/icon.png');
+        app.dock.bounce();
+    } else {
+        // Quit when all windows are closed.
+        app.on('window-all-closed', () => {
+            app.quit()
+        })
+        const filePath = getFileFromArgs(process.argv);
+        if (filePath) {
+            mainWindow.webContents.once('did-finish-load', () => {
+                mainWindow.webContents.send('open-file', filePath);
+            });
+        }
+    }
+    
+    app.on('activate', async () => {
+        const windowsOpen = BrowserWindow.getAllWindows().length
+        if (!windowsOpen) {
+            await createWorker();
+            await createWindow();
+        } else if (windowsOpen === 1) {
+            await createWindow();
+        }
+    });
 
-      if (process.platform === 'darwin') {
-          //const appIcon = new Tray('./img/icon/icon.png')
-          app.dock.setIcon(__dirname + '/img/icon/icon.png');
-          app.dock.bounce();
-      } else {
-          // Quit when all windows are closed.
-          app.on('window-all-closed', () => {
-              app.quit()
-          })
-          const filePath = getFileFromArgs(process.argv);
-          if (filePath) {
-              mainWindow.webContents.once('did-finish-load', () => {
-                  mainWindow.webContents.send('open-file', filePath);
-              });
-          }
-      }
-      
-      app.on('activate', async () => {
-          const windowsOpen = BrowserWindow.getAllWindows().length
-          if (!windowsOpen) {
-              await createWorker();
-              await createWindow();
-          } else if (windowsOpen === 1) {
-              await createWindow();
-          }
-      });
-
-      
-      app.on('open-file', (event, path) => {
-          files.push(path);
-          DEBUG && console.log('file passed to open:', path)
-      });
-      
-      ipcMain.handle('openFiles', async (_event, _method, config) => {
-          const {type, fileOrFolder, multi, buttonLabel, title} = config;
-          let options;
-          if (type === 'audio') {
-              options = {
-                  properties: [fileOrFolder, multi] ,
-                  buttonLabel: buttonLabel,
-                  title: title
-              }
-              if (fileOrFolder === 'openFile' ){
-                  options.filters = [{ name: 'Audio Files', extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg', 'mp4', 'opus', 'mov'] } ]
-              }
-          } else {
-            const ext = type === 'Text' ? 'txt' : 'csv';
+    
+    app.on('open-file', (event, path) => {
+        files.push(path);
+        DEBUG && console.log('file passed to open:', path)
+    });
+    
+    ipcMain.handle('openFiles', async (_event, _method, config) => {
+        const {type, fileOrFolder, multi, buttonLabel, title} = config;
+        let options;
+        if (type === 'audio') {
             options = {
-                filters: [
-                    { name: `${type} Files`, extensions: [ext] }
-                ],
-                properties: ['openFile']
+                properties: [fileOrFolder, multi] ,
+                buttonLabel: buttonLabel,
+                title: title
             }
+            if (fileOrFolder === 'openFile' ){
+                options.filters = [{ name: 'Audio Files', extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg', 'mp4', 'opus', 'mov'] } ]
+            }
+        } else {
+          const ext = type === 'Text' ? 'txt' : 'csv';
+          options = {
+              filters: [
+                  { name: `${type} Files`, extensions: [ext] }
+              ],
+              properties: ['openFile']
           }
-          // Show file dialog 
-          return await dialog.showOpenDialog(mainWindow, options);
-      })
+        }
+        // Show file dialog 
+        return await dialog.showOpenDialog(mainWindow, options);
+    })
         
     /**
    * Retrieves the first file path from the given arguments that matches a supported file extension.
@@ -629,7 +630,7 @@ if (!gotTheLock) {
         autoUpdater.checkForUpdates().catch(error => console.warn('Error checking for updates', error))
     }
 });
-}
+
 
 app.on("activate", async () => {
   if (mainWindow === null) {
