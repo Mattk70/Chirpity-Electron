@@ -623,7 +623,7 @@ app.whenReady().then(async () => {
         })
     });
     //Update handling
-    if (isMac || process.env.CI) {
+    if (process.env.CI) {
         console.log("Auto-updater disabled in CI environment. And doesn't work for mac");
     } else {
         autoUpdater.autoDownload = false;
