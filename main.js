@@ -243,7 +243,6 @@ autoUpdater.on("update-downloaded", async function (info) {
   const releaseNotes = await fetchReleaseNotes(info.version);
   log.info(JSON.stringify(info));
   // Display dialog to the user with release notes
-  setTimeout(() =>{
     dialog
       .showMessageBox({
         type: "info",
@@ -255,14 +254,10 @@ autoUpdater.on("update-downloaded", async function (info) {
       })
       .then((result) => {
         if (result.response === 0) {
-          // User clicked 'Yes', start the download
+          // User clicked 'Yes', start the installation
           autoUpdater.quitAndInstall();
         }
-      }) }, 
-      // 60 second delay before notification
-      60_000
-    )
-     
+      })
 });
 
 function logUpdateStatus(message) {
@@ -308,15 +303,15 @@ async function exitHandler(options, exitCode) {
   }
 }
 
-//do something when app is closing
-process.on("exit", exitHandler.bind(undefined, { cleanup: true }));
-//catches ctrl+c event (but not in main process!)
-process.on("SIGINT", exitHandler.bind(undefined, { exit: true }));
-// catches "kill pid" (for example: nodemon restart)
-process.on("SIGUSR1", exitHandler.bind(undefined, { exit: true }));
-process.on("SIGUSR2", exitHandler.bind(undefined, { exit: true }));
-//catches uncaught exceptions
-process.on("uncaughtException", exitHandler.bind(undefined, { exit: true }));
+// //do something when app is closing
+// process.on("exit", exitHandler.bind(undefined, { cleanup: true }));
+// //catches ctrl+c event (but not in main process!)
+// process.on("SIGINT", exitHandler.bind(undefined, { exit: true }));
+// // catches "kill pid" (for example: nodemon restart)
+// process.on("SIGUSR1", exitHandler.bind(undefined, { exit: true }));
+// process.on("SIGUSR2", exitHandler.bind(undefined, { exit: true }));
+// //catches uncaught exceptions
+// process.on("uncaughtException", exitHandler.bind(undefined, { exit: true }));
 
 ipcMain.handle('getPath', () => userData);
 ipcMain.handle('getAppPath', () => app.getAppPath());
@@ -632,25 +627,25 @@ app.whenReady().then(async () => {
 });
 
 
-let DB_CLOSED = false, QUITTING = false;
-app.on('before-quit', async (event) => {
-  if (DB_CLOSED || QUITTING) return
-  event.preventDefault(); // Prevent default quit until cleanup is done
-  QUITTING = true
-  try{
-    workerWindow.webContents.postMessage("close-database", null);
-  } catch {
-    console.log('workerWindow closed before DB close call')
-  }
-  // Add timeout to force quit after 5 seconds
-  setTimeout(() => {
-    if (!DB_CLOSED) {
-      console.warn('Database closure timed out after 5 seconds, forcing quit...');
-      DB_CLOSED = true;
-      app.quit();
-    }
-  }, 5000);
-});
+// let DB_CLOSED = false, QUITTING = false;
+// app.on('before-quit', async (event) => {
+//   if (DB_CLOSED || QUITTING) return
+//   event.preventDefault(); // Prevent default quit until cleanup is done
+//   QUITTING = true
+//   try{
+//     workerWindow.webContents.postMessage("close-database", null);
+//   } catch {
+//     console.log('workerWindow closed before DB close call')
+//   }
+//   // Add timeout to force quit after 5 seconds
+//   setTimeout(() => {
+//     if (!DB_CLOSED) {
+//       console.warn('Database closure timed out after 5 seconds, forcing quit...');
+//       DB_CLOSED = true;
+//       app.quit();
+//     }
+//   }, 5000);
+// });
   
 ipcMain.on('database-closed', () =>{
   DB_CLOSED = true;
