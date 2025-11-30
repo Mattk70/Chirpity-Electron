@@ -16,7 +16,7 @@ jobs:
     strategy:
       matrix:
         # Use macos-13 so Perch will work on old macs (Ventura+)
-        os: [windows-latest, macos-14-large, ubuntu-latest] 
+        os: [windows-latest, macos-latest, ubuntu-latest] 
     env: 
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
       CI: true
