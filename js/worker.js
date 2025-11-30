@@ -478,6 +478,7 @@ async function handleMessage(e) {
       break;
     }
     case "file-load-request": {
+      STATE.corruptFiles = [];
       const {preserveResults, file, model} = args;
       index = 0;
       filesBeingProcessed.length && onAbort({model});
@@ -1560,6 +1561,7 @@ async function onAnalyse({
   // Now we've asked for a new analysis, clear the aborted flag
   aborted = false;
   STATE.incrementor = 1;
+  STATE.corruptFiles = [];
   predictionStart = new Date();
   // Set the appropriate selection range if this is a selection analysis
   STATE.update({
@@ -1726,11 +1728,13 @@ const measureDurationWithFfmpeg = (src, type) => {
       .audioChannels(channels)
       .audioFrequency(sampleRate)
       .on("error", (err) => {
-        generateAlert({
-              type: "error",
-              message: "badMetadata",
-              variables: { src },
-            });
+        STATE.corruptFiles.push(src);
+        if (STATE.corruptFiles.length === 1){
+          generateAlert({
+            type: "error",
+            message: "corruptFile"
+          });
+        }
         stream.destroy();
         reject(err);
       })
@@ -1748,8 +1752,7 @@ const measureDurationWithFfmpeg = (src, type) => {
     stream.on("error", (err) => {
       generateAlert({
         type: "error",
-        message: "badMetadata",
-        variables: { src },
+        message: `Audio stream error: ${err.message}`,
       });
       stream.destroy();
       reject(err);
