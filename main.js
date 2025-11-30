@@ -628,11 +628,14 @@ app.whenReady().then(async () => {
 });
 
 
-let DB_CLOSED = false, QUITTING = false;
+let DB_CLOSED = false;
+let DB_CLOSE_REQUESTED = false;
 app.on('before-quit', async (event) => {
-  if (DB_CLOSED || QUITTING) return
-  event.preventDefault(); // Prevent default quit until cleanup is done
-  QUITTING = true
+  if (DB_CLOSED) return;
+  // Always block quit while DB is still open
+  event.preventDefault();
+  if (DB_CLOSE_REQUESTED) return;
+  DB_CLOSE_REQUESTED = true;
   try{
     workerWindow.webContents.postMessage("close-database", null);
   } catch {
