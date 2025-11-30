@@ -255,7 +255,7 @@ autoUpdater.on("update-downloaded", async function (info) {
       .then((result) => {
         if (result.response === 0) {
           // User clicked 'Yes', start the installation
-          autoUpdater.quitAndInstall();
+          autoUpdater.quitAndInstall(true, true);
         }
       })
 });
