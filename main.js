@@ -134,7 +134,7 @@ console.warn = log.warn;
 console.error = log.error;
 autoUpdater.logger = log;
 autoUpdater.logger.transports.file.level = "info";
-autoUpdater.allowPrerelease = false; 
+autoUpdater.allowPrerelease = true; 
 autoUpdater.channel = `latest-${arch}`;
 
 
