@@ -2,7 +2,8 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const isMac = process.platform === "darwin"; // macOS check
-const isIntelMac = isMac && process.arch === 'x64';
+const arch = process.arch
+const isIntelMac = isMac && arch === 'x64';
 const {
   app,
   Menu,
@@ -134,6 +135,7 @@ console.error = log.error;
 autoUpdater.logger = log;
 autoUpdater.logger.transports.file.level = "info";
 autoUpdater.allowPrerelease = false; 
+autoUpdater.channel = `latest-${arch}`;
 
 
 // Set membership URL here
