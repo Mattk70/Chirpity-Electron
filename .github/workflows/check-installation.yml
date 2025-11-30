@@ -200,8 +200,11 @@ jobs:
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             npm run build
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            # Fix autoUpdater for mac - failing due to no write permissions
+            chmod -R u+w ./node_modules
             npm run export
           else
+            chmod -R u+w ./node_modules
             npx electron-builder build --linux --x64  -p always
           fi
       - run: echo "Build status is ${{ job.status }}."
