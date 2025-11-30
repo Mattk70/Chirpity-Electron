@@ -131,9 +131,8 @@ console.log = log.log;
 console.warn = log.warn;
 console.error = log.error;
 autoUpdater.logger = log;
-autoUpdater.logger.transports.file.level = "debug";
-
-autoUpdater.allowPrerelease = true; 
+autoUpdater.logger.transports.file.level = "info";
+autoUpdater.allowPrerelease = false; 
 
 
 // Set membership URL here
@@ -297,22 +296,22 @@ async function exitHandler(options, exitCode) {
     DEBUG && console.log("no clean");
   }
   if (exitCode || exitCode === 0) {
-    DEBUG && console.log(exitCode);
-  }
-  if (options.exit) {
-    process.exit();
+    DEBUG && console.log(`App closed with code: ${exitCode}`);
   }
 }
 
-// //do something when app is closing
-// process.on("exit", exitHandler.bind(undefined, { cleanup: true }));
-// //catches ctrl+c event (but not in main process!)
-// process.on("SIGINT", exitHandler.bind(undefined, { exit: true }));
-// // catches "kill pid" (for example: nodemon restart)
-// process.on("SIGUSR1", exitHandler.bind(undefined, { exit: true }));
-// process.on("SIGUSR2", exitHandler.bind(undefined, { exit: true }));
-// //catches uncaught exceptions
-// process.on("uncaughtException", exitHandler.bind(undefined, { exit: true }));
+//do something when app is closing
+process.on("exit", exitHandler.bind(undefined, { cleanup: true }));
+process.on("SIGINT", () => {
+  exitHandler({ cleanup: true });
+  app.quit(); // Triggers before-quit handler
+});
+process.on("SIGUSR1", () => app.quit());
+process.on("SIGUSR2", () => app.quit());
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught exception:", err);
+  app.quit();
+});
 
 ipcMain.handle('getPath', () => userData);
 ipcMain.handle('getAppPath', () => app.getAppPath());
@@ -407,26 +406,27 @@ async function createWindow() {
   });
   DEBUG && console.log("main window created");
   // Emitted when the window is closed.
-  if (process.platform !== "darwin") {
-    mainWindow.on("closed", () => {
-      app.quit();
-    });
-  }
-
-  mainWindow.on("close", (e) => {
-    if (unsavedRecords && !process.env.CI) {
-      const choice = dialog.showMessageBoxSync(mainWindow, {
-        type: "warning",
-        buttons: ["Yes", "No"],
-        title: "Unsaved Records",
-        message: "There are unsaved records, are you sure you want to exit?",
-      });
-
-      if (choice === 1) {
-        e.preventDefault(); // Prevent the app from closing
-      }
-    }
+  mainWindow.on("closed", () => {
+    app.quit();
   });
+
+
+  if (!isMac) {
+    mainWindow.on("close", (e) => {
+      if (unsavedRecords && !process.env.CI) {
+        const choice = dialog.showMessageBoxSync(mainWindow, {
+          type: "warning",
+          buttons: ["Yes", "No"],
+          title: "Unsaved Records",
+          message: "There are unsaved records, are you sure you want to exit?",
+        });
+
+        if (choice === 1) {
+          e.preventDefault(); // Prevent the app from closing
+        }
+      }
+    })
+  }
 }
 
 async function createWorker() {
@@ -451,9 +451,10 @@ async function createWorker() {
   workerWindow.setIcon(__dirname + "/img/icon/icon.png");
   await workerWindow.loadFile("worker.html");
 
-  // workerWindow.on("closed", () => {
-  //   workerWindow = undefined;
-  // });
+  workerWindow.on("closed", () => {
+    workerWindow = undefined;
+  });
+
   workerWindow.once("ready-to-show", () => {
     if (DEBUG) {
       workerWindow.show();
@@ -513,7 +514,7 @@ app.whenReady().then(async () => {
     await createWorker();
     await createWindow();
 
-    if (process.platform === 'darwin') {
+    if (isMac) {
         //const appIcon = new Tray('./img/icon/icon.png')
         app.dock.setIcon(__dirname + '/img/icon/icon.png');
         app.dock.bounce();
@@ -628,25 +629,41 @@ app.whenReady().then(async () => {
 });
 
 
-// let DB_CLOSED = false, QUITTING = false;
-// app.on('before-quit', async (event) => {
-//   if (DB_CLOSED || QUITTING) return
-//   event.preventDefault(); // Prevent default quit until cleanup is done
-//   QUITTING = true
-//   try{
-//     workerWindow.webContents.postMessage("close-database", null);
-//   } catch {
-//     console.log('workerWindow closed before DB close call')
-//   }
-//   // Add timeout to force quit after 5 seconds
-//   setTimeout(() => {
-//     if (!DB_CLOSED) {
-//       console.warn('Database closure timed out after 5 seconds, forcing quit...');
-//       DB_CLOSED = true;
-//       app.quit();
-//     }
-//   }, 5000);
-// });
+let DB_CLOSED = false;
+let DB_CLOSE_REQUESTED = false;
+app.on('before-quit', async (event) => {
+  if (!DB_CLOSE_REQUESTED && unsavedRecords && !process.env.CI) {
+    const choice = dialog.showMessageBoxSync(mainWindow, {
+      type: "warning",
+      buttons: ["Yes", "No"],
+      title: "Unsaved Records",
+      message: "There are unsaved records, are you sure you want to exit?",
+    });
+
+    if (choice === 1) {
+      event.preventDefault(); // Prevent the app from closing
+      return
+    }
+  }
+  if (DB_CLOSED) return;
+  // Always block quit while DB is still open
+  event.preventDefault();
+  if (DB_CLOSE_REQUESTED) return;
+  DB_CLOSE_REQUESTED = true;
+  try{
+    workerWindow.webContents.postMessage("close-database", null);
+  } catch {
+    console.log('workerWindow closed before DB close call')
+  }
+  // Add timeout to force quit after 5 seconds
+  setTimeout(() => {
+    if (!DB_CLOSED) {
+      console.warn('Database closure timed out after 5 seconds, forcing quit...');
+      DB_CLOSED = true;
+      app.quit();
+    }
+  }, 5000);
+});
   
 ipcMain.on('database-closed', () =>{
   DB_CLOSED = true;
@@ -665,7 +682,7 @@ ipcMain.handle("request-worker-channel", async (_event) => {
   // without going through the main process!
 });
 
-ipcMain.handle("unsaved-records", (_event, data) => {
+ipcMain.on("unsaved-records", (_event, data) => {
   unsavedRecords = data.newValue; // Update the variable with the new value
 });
 
@@ -711,7 +728,7 @@ ipcMain.handle("saveFile", async (event, arg) => {
 });
 
 let powerSaveID = null;
-ipcMain.handle("powerSaveControl", (e, on) => {
+ipcMain.on("powerSaveControl", (e, on) => {
   if (on) {
     powerSaveID = powerSaveBlocker.start("prevent-app-suspension");
     //DEBUG && console.log(powerSaveBlocker.isStarted(powerSaveID), powerSaveID)
