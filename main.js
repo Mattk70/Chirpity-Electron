@@ -406,13 +406,12 @@ async function createWindow() {
   });
   DEBUG && console.log("main window created");
   // Emitted when the window is closed.
-  if (process.platform !== "darwin") {
-    mainWindow.on("closed", () => {
-      app.quit();
-    });
-  }
+  mainWindow.on("closed", () => {
+    app.quit();
+  });
 
-  if (process.platform !== "darwin") {
+
+  if (!isMac) {
     mainWindow.on("close", (e) => {
       if (unsavedRecords && !process.env.CI) {
         const choice = dialog.showMessageBoxSync(mainWindow, {
@@ -515,7 +514,7 @@ app.whenReady().then(async () => {
     await createWorker();
     await createWindow();
 
-    if (process.platform === 'darwin') {
+    if (isMac) {
         //const appIcon = new Tray('./img/icon/icon.png')
         app.dock.setIcon(__dirname + '/img/icon/icon.png');
         app.dock.bounce();
@@ -633,7 +632,7 @@ app.whenReady().then(async () => {
 let DB_CLOSED = false;
 let DB_CLOSE_REQUESTED = false;
 app.on('before-quit', async (event) => {
-  if (!DB_CLOSE_REQUESTED && unsavedRecords && !process.env.CI && process.platform === "darwin") {
+  if (!DB_CLOSE_REQUESTED && unsavedRecords && !process.env.CI) {
     const choice = dialog.showMessageBoxSync(mainWindow, {
       type: "warning",
       buttons: ["Yes", "No"],
