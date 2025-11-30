@@ -43,6 +43,10 @@ ipcRenderer.on("error", (event, errorMessage) => {
   alert("Uncaught Exception from main process:", errorMessage);
 });
 
+
+// capture intel mac
+const isIntelMac = process.platform === 'darwin' && process.arch === 'x64';
+
 contextBridge.exposeInMainWorld("electron", {
   showFilePath: (file) => webUtils.getPathForFile(file),
   requestWorkerChannel: () => ipcRenderer.invoke("request-worker-channel"),
@@ -65,12 +69,12 @@ contextBridge.exposeInMainWorld("electron", {
   getUUID: () => ipcRenderer.invoke("getUUID"),
   trialPeriod: () => ipcRenderer.invoke("trialPeriod"),
   isMac: () => ipcRenderer.invoke("isMac"),
+  isIntelMac: () => isIntelMac,
   exitApplication: () => ipcRenderer.invoke("exitApplication"),
   powerSaveBlocker: (onOff) => ipcRenderer.send("powerSaveControl", onOff),
   onFileOpen: (callback) => ipcRenderer.on('open-file', (event, filePath) => callback(filePath)),
   MEMBERSHIP_API_ENDPOINT: () => process.env.MEMBERSHIP_API_ENDPOINT
 });
-
 
 
 contextBridge.exposeInMainWorld("module", {fs, colormap, p, SunCalc, si});

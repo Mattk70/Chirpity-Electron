@@ -97,6 +97,7 @@ export class WorkerState {
     (this.speciesMap = new Map()),
     (this.totalDuration = 0),
     (this.allFilesDuration = 0),
+    (this.corruptFiles = []),
     (this.originalFiles = undefined);
   }
 

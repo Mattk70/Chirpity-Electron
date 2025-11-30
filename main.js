@@ -2,6 +2,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const isMac = process.platform === "darwin"; // macOS check
+const isIntelMac = isMac && process.arch === 'x64';
 const {
   app,
   Menu,
@@ -620,8 +621,8 @@ app.whenReady().then(async () => {
         })
     });
     //Update handling
-    if (process.env.CI) {
-        console.log("Auto-updater disabled in CI environment. And doesn't work for mac");
+    if (process.env.CI || isIntelMac) {
+        console.log("Auto-updater disabled in CI environment. And doesn't work for Intel mac");
     } else {
         autoUpdater.autoDownload = false;
         autoUpdater.checkForUpdates().catch(error => console.warn('Error checking for updates', error))
