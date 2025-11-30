@@ -623,7 +623,7 @@ app.whenReady().then(async () => {
         })
     });
     //Update handling
-    if (process.env.CI || isIntelMac) {
+    if (process.env.CI) {
         console.log("Auto-updater disabled in CI environment. And doesn't work for Intel mac");
     } else {
         autoUpdater.autoDownload = false;
