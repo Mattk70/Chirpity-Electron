@@ -47,7 +47,7 @@ contextBridge.exposeInMainWorld("electron", {
   showFilePath: (file) => webUtils.getPathForFile(file),
   requestWorkerChannel: () => ipcRenderer.invoke("request-worker-channel"),
   unsavedRecords: (isTrue) =>
-    ipcRenderer.invoke("unsaved-records", { newValue: isTrue }),
+    ipcRenderer.send("unsaved-records", { newValue: isTrue }),
   onDownloadProgress: (callback) =>
     ipcRenderer.on("download-progress", callback),
   saveFile: (args) => ipcRenderer.invoke("saveFile", args),
@@ -66,7 +66,7 @@ contextBridge.exposeInMainWorld("electron", {
   trialPeriod: () => ipcRenderer.invoke("trialPeriod"),
   isMac: () => ipcRenderer.invoke("isMac"),
   exitApplication: () => ipcRenderer.invoke("exitApplication"),
-  powerSaveBlocker: (onOff) => ipcRenderer.invoke("powerSaveControl", onOff),
+  powerSaveBlocker: (onOff) => ipcRenderer.send("powerSaveControl", onOff),
   onFileOpen: (callback) => ipcRenderer.on('open-file', (event, filePath) => callback(filePath)),
   MEMBERSHIP_API_ENDPOINT: () => process.env.MEMBERSHIP_API_ENDPOINT
 });

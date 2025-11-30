@@ -682,7 +682,7 @@ ipcMain.handle("request-worker-channel", async (_event) => {
   // without going through the main process!
 });
 
-ipcMain.handle("unsaved-records", (_event, data) => {
+ipcMain.on("unsaved-records", (_event, data) => {
   unsavedRecords = data.newValue; // Update the variable with the new value
 });
 
@@ -728,7 +728,7 @@ ipcMain.handle("saveFile", async (event, arg) => {
 });
 
 let powerSaveID = null;
-ipcMain.handle("powerSaveControl", (e, on) => {
+ipcMain.on("powerSaveControl", (e, on) => {
   if (on) {
     powerSaveID = powerSaveBlocker.start("prevent-app-suspension");
     //DEBUG && console.log(powerSaveBlocker.isStarted(powerSaveID), powerSaveID)
