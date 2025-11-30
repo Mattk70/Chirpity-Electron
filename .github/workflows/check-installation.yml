@@ -147,8 +147,6 @@ jobs:
       - name: Start Xvfb
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb
           Xvfb :99 -screen 0 1280x1024x24 &
           # Set DISPLAY environment variable
           echo "DISPLAY=:99" >> $GITHUB_ENV
@@ -282,6 +280,6 @@ jobs:
 
 
       - name: Test packaged application
-        if: runner.os != 'Linux'
+        # if: runner.os != 'Linux'
         run: npm test
 
