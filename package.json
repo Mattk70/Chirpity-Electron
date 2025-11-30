@@ -55,7 +55,8 @@
       {
         "provider": "github",
         "owner": "Mattk70",
-        "repo": "Chirpity-Electron"
+        "repo": "Chirpity-Electron",
+        "channel": "latest-${arch}"
       }
     ],
     "files": [
@@ -142,7 +143,7 @@
     "mac": {
       "target": {
         "target": "default",
-        "arch": ["arm64"]
+        "arch": ["arm64", "x64"]
       },
       "artifactName": "${productName}-${arch}.${ext}",
       "type": "distribution",
@@ -178,9 +179,9 @@
       ]
     },
     "win": {
-      "publish": [
-        "github"
-      ],
+      "publish": [{
+        "channel": "latest"
+      }],
       "target": [
         "nsis",
         "portable"

@@ -173,13 +173,22 @@ jobs:
       
         shell: bash
 
+      - name: Override electron-builder updateInfo
+        run: |
+          cat << 'EOF' > builder-override.yml
+          mac:
+            updateInfo:
+              # Give this runner a unique update file so it does NOT overwrite latest-mac.yml
+              file: "latest-mac-x64.yml"
+          EOF
+
       - name: Build Electron application
         shell: bash
         env:
           ELECTRON_BUILD_ARCH: x64
         run: |
           chmod -Rv u+w ./node_modules
-          npm run build-mac-x64
+          npm run build-mac-x64 -- --config builder-override.yml
       - run: echo "Build status is ${{ job.status }}."
       - name: Check installer exists
         shell: bash
