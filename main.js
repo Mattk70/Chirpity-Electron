@@ -412,20 +412,22 @@ async function createWindow() {
     });
   }
 
-  // mainWindow.on("close", (e) => {
-  //   if (unsavedRecords && !process.env.CI) {
-  //     const choice = dialog.showMessageBoxSync(mainWindow, {
-  //       type: "warning",
-  //       buttons: ["Yes", "No"],
-  //       title: "Unsaved Records",
-  //       message: "There are unsaved records, are you sure you want to exit?",
-  //     });
+  if (process.platform !== "darwin") {
+    mainWindow.on("close", (e) => {
+      if (unsavedRecords && !process.env.CI) {
+        const choice = dialog.showMessageBoxSync(mainWindow, {
+          type: "warning",
+          buttons: ["Yes", "No"],
+          title: "Unsaved Records",
+          message: "There are unsaved records, are you sure you want to exit?",
+        });
 
-  //     if (choice === 1) {
-  //       e.preventDefault(); // Prevent the app from closing
-  //     }
-  //   }
-  // });
+        if (choice === 1) {
+          e.preventDefault(); // Prevent the app from closing
+        }
+      }
+    })
+  }
 }
 
 async function createWorker() {
@@ -631,7 +633,7 @@ app.whenReady().then(async () => {
 let DB_CLOSED = false;
 let DB_CLOSE_REQUESTED = false;
 app.on('before-quit', async (event) => {
-  if (!DB_CLOSE_REQUESTED && unsavedRecords && !process.env.CI) {
+  if (!DB_CLOSE_REQUESTED && unsavedRecords && !process.env.CI && process.platform === "darwin") {
     const choice = dialog.showMessageBoxSync(mainWindow, {
       type: "warning",
       buttons: ["Yes", "No"],
