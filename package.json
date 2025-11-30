@@ -13,7 +13,7 @@
     "minify": "esbuild ./js/*.js --minify --sourcemap --outdir=./js --allow-overwrite",
     "export": "electron-builder build --m -p always",
     "buildMac": "electron-builder build --m -p never",
-    "build-mac-x64": "electron-builder --mac --x64 --config.mac.target=default --directories.output=./dist/intel -p always",
+    "build-mac-x64": "electron-builder --mac --x64 --config.mac.target=default -p always",
     "AppImage": "electron-builder build --linux --x64 -p always",
     "build": "electron-builder --win --x64 -p always",
     "testBuild": "electron-builder --win",
@@ -81,7 +81,12 @@
       "!prebuild.js",
       "!README.md",
       "!**/*.*js.map",
+      "!**/*.*.c",
+      "!**/*.*.cc",
+      "!**/*.*.h",
       "!**/*.*.md",
+      "!**/*.*.o",
+      "!**/*.*.ts",
       "!Perch*${/*}",
       "!Perch*",
       "!node_modules/onnxruntime-node/bin/napi-v6/**/*",
@@ -137,9 +142,7 @@
     "mac": {
       "target": {
         "target": "default",
-        "arch": [
-          "arm64", "x64"
-        ]
+        "arch": ["arm64"]
       },
       "artifactName": "${productName}-${arch}.${ext}",
       "type": "distribution",

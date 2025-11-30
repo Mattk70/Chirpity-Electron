@@ -2119,8 +2119,8 @@ window.onload = async () => {
     config.GPUs = DIAGNOSTICS["GPUs"];
     trackVisit(config);
 
-    // check for new version on mac platform. dmg auto-update not yet working
-    isMac && !isTestEnv && checkForMacUpdates();
+    // check for new version on Intel mac platform. dmg auto-update not yet working
+    window.electron.isIntelMac() && !isTestEnv && checkForIntelMacUpdates();
 
   });
 };
@@ -7962,9 +7962,9 @@ function updateModelOptions(customOnly){
   customOnly || (select.value = config.selectedModel)
 }
 
-// Update checking for Mac
+// Update checking for Intel Mac
 
-function checkForMacUpdates() {
+function checkForIntelMacUpdates() {
   // Do this at most daily
   const latestCheck = Date.now();
   const checkDue = latestCheck - config.lastUpdateCheck > 86_400_000;
