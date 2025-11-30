@@ -296,22 +296,22 @@ async function exitHandler(options, exitCode) {
     DEBUG && console.log("no clean");
   }
   if (exitCode || exitCode === 0) {
-    DEBUG && console.log(exitCode);
-  }
-  if (options.exit) {
-    process.exit();
+    DEBUG && console.log(`App closed with code: ${exitCode}`);
   }
 }
 
 //do something when app is closing
 process.on("exit", exitHandler.bind(undefined, { cleanup: true }));
-//catches ctrl+c event (but not in main process!)
-process.on("SIGINT", exitHandler.bind(undefined, { exit: true }));
-// catches "kill pid" (for example: nodemon restart)
-process.on("SIGUSR1", exitHandler.bind(undefined, { exit: true }));
-process.on("SIGUSR2", exitHandler.bind(undefined, { exit: true }));
-//catches uncaught exceptions
-process.on("uncaughtException", exitHandler.bind(undefined, { exit: true }));
+process.on("SIGINT", () => {
+  exitHandler({ cleanup: true });
+  app.quit(); // Triggers before-quit handler
+});
+process.on("SIGUSR1", () => app.quit());
+process.on("SIGUSR2", () => app.quit());
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught exception:", err);
+  app.quit();
+});
 
 ipcMain.handle('getPath', () => userData);
 ipcMain.handle('getAppPath', () => app.getAppPath());
