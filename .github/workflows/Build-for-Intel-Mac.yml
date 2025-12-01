@@ -188,7 +188,7 @@ jobs:
           ELECTRON_BUILD_ARCH: x64
         run: |
           chmod -Rv u+w ./node_modules
-          npm run build-mac-x64 --config ./builder-override.yml
+          npm run build-mac-x64 -- --config ./builder-override.yml
       - run: echo "Build status is ${{ job.status }}."
       - name: Check installer exists
         shell: bash
