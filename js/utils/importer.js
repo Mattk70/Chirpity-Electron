@@ -99,7 +99,7 @@ async function countLines(filePath) {
    * @throws {Error} If the species specified in the row does not exist for the given model.
    */
   async function prepInsertParams({ db, row, defaultLocation, METADATA, setMetadata, caches }) {
-    let { file, time, endTime, cname, confidence, label, comment, callCount, position, lat, lon, place, model } = row;
+    let { file, time, endTime, cname, sname, confidence, label, comment, callCount, position, lat, lon, place, model } = row;
     const {defaultLat, defaultLon, defaultPlace} = defaultLocation;
     lat = parseFloat(lat);
     lon = parseFloat(lon);
@@ -138,16 +138,32 @@ async function countLines(filePath) {
     }
   
     // Get speciesID from cache or DB
-    const speciesKey = `${cname}_${modelID}`;
+    const speciesKey = `${sname}_${modelID}`;
     let speciesID = caches.species.get(speciesKey);
     if (!speciesID) {
-      const res = await db.getAsync('SELECT id FROM species WHERE cname = ? AND modelID = ?', cname, modelID);
-      if (!res) {
+      const res = await db.getAsync('SELECT id FROM species WHERE sname = ? AND modelID = ?', sname, modelID);
+      if (res) {
+          speciesID = res.id;
+      } else {
+        // Otherwise try all other models
+        for (const [_name, otherModelID] of caches.models) {
+            if (otherModelID === modelID) continue; // skip the one already tested
+            const altRes = await db.getAsync(
+                'SELECT id FROM species WHERE sname = ? AND modelID = ?',
+                sname,
+                otherModelID
+            );
+            if (altRes) {
+                speciesID = altRes.id;
+                break;
+            }
+        }
+      }
+      if (!speciesID) { // No species found
         const error = new Error('noSpecies');
-        error.variables = { cname };
+        error.variables = { cname: `${cname} (<i>${sname}</i>)` };
         throw error;
       }
-      speciesID = res.id;
       caches.species.set(speciesKey, speciesID);
     }
   
