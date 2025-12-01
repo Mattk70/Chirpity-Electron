@@ -1,7 +1,9 @@
 name: Build Intel Mac version 
 run-name: ${{ github.actor }} is building Chirpity for Intel Mac
-on: 
-  - push
+on:
+  push:
+    branches:
+        - 'Development'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
