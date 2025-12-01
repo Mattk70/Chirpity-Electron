@@ -135,7 +135,10 @@ console.error = log.error;
 autoUpdater.logger = log;
 autoUpdater.logger.transports.file.level = "info";
 autoUpdater.allowPrerelease = false; 
-autoUpdater.channel = `latest-${arch}`;
+const channel = `latest-${arch}`;
+log.info('channel:', channel)
+autoUpdater.channel = channel;
+log.info('App starting...');
 
 
 // Set membership URL here
