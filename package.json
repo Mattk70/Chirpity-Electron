@@ -41,6 +41,7 @@
     "internetEnabled": true
   },
   "build": {
+    "generateUpdatesFilesForAllChannels": true,
     "appId": "uk.co.mattkirkland.chirpity.Chirpity",
     "pkg": {
       "license": "LICENSE.txt"
@@ -55,7 +56,8 @@
       {
         "provider": "github",
         "owner": "Mattk70",
-        "repo": "Chirpity-Electron"
+        "repo": "Chirpity-Electron",
+        "channel": "latest-${arch}"
       }
     ],
     "files": [
