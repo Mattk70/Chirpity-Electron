@@ -135,7 +135,7 @@ console.error = log.error;
 autoUpdater.logger = log;
 autoUpdater.logger.transports.file.level = "info";
 autoUpdater.allowPrerelease = true; 
-autoUpdater.channel = `latest-${arch}`;
+// autoUpdater.channel = `latest-${arch}`;
 
 
 // Set membership URL here
@@ -623,7 +623,7 @@ app.whenReady().then(async () => {
         })
     });
     //Update handling
-    if (process.env.CI) {
+    if (process.env.CI || isIntelMac) {
         console.log("Auto-updater disabled in CI environment. And doesn't work for Intel mac");
     } else {
         autoUpdater.autoDownload = false;

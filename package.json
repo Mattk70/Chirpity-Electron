@@ -1,6 +1,6 @@
 {
   "name": "Chirpity",
-  "version": "5.8.0",
+  "version": "5.5.4",
   "description": "Chirpity is a bioacoustics platform for the analysis of bird song and other wildlife sounds. It uses machine learning models to identify bird species from audio recordings.",
   "main": "main.js",
   "scripts": {
@@ -55,8 +55,7 @@
       {
         "provider": "github",
         "owner": "Mattk70",
-        "repo": "Chirpity-Electron",
-        "channel": "latest-${arch}"
+        "repo": "Chirpity-Electron"
       }
     ],
     "files": [
@@ -102,48 +101,48 @@
       {
         "ext": "mp3",
         "name": "MP3 File",
-        "role": "Editor"
+        "role": "Viewer"
       },
       {
         "ext": "wav",
         "name": "WAVE File",
-        "role": "Editor"
+        "role": "Viewer"
       },
       {
         "ext": "ogg",
         "name": "WAVE File",
-        "role": "Editor"
+        "role": "Viewer"
       },
       {
         "ext": "mpga",
         "name": "MPEG Audio File",
-        "role": "Editor"
+        "role": "Viewer"
       },
       {
         "ext": "aac",
         "name": "AAC File",
-        "role": "Editor"
+        "role": "Viewer"
       },
       {
         "ext": "mpa",
         "name": "MPA File",
-        "role": "Editor"
+        "role": "Viewer"
       },
       {
         "ext": "flac",
         "name": "FLAC File",
-        "role": "Editor"
+        "role": "Viewer"
       },
       {
         "ext": "mp4",
         "name": "MPEG4 File",
-        "role": "Editor"
+        "role": "Viewer"
       }
     ],
     "mac": {
       "target": {
         "target": "default",
-        "arch": ["arm64", "x64"]
+        "arch": ["arm64"]
       },
       "artifactName": "${productName}-${arch}.${ext}",
       "type": "distribution",
