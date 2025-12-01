@@ -2120,7 +2120,7 @@ window.onload = async () => {
     trackVisit(config);
 
     // check for new version on Intel mac platform. dmg auto-update not yet working
-    window.electron.isIntelMac() && !isTestEnv && checkForIntelMacUpdates();
+    // window.electron.isIntelMac() && !isTestEnv && checkForIntelMacUpdates();
 
   });
 };
