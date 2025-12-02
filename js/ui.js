@@ -7490,7 +7490,9 @@ async function membershipCheck() {
   // Fallback if access to keychain denied
   window.localStorage.setItem("installDate", installDate);
   const trialPeriod = await window.electron.trialPeriod();
-  const inTrial = Date.now() - installDate < trialPeriod;
+  const installPeriod = Date.now() - installDate;
+  const trialDaysLeft = Math.max(Math.ceil((trialPeriod - installPeriod)/86_400_000), 0)
+  const inTrial = installPeriod < trialPeriod;
   const lockedElements = document.querySelectorAll(".locked, .unlocked");
   const unlockElements = () => {
     lockedElements.forEach((el) => {
@@ -7565,7 +7567,7 @@ async function membershipCheck() {
       }
 
       console.info(
-        `Version: ${VERSION}. Trial: ${inTrial} Subscriber: ${isMember}`, null
+        `Version: ${VERSION}. Trial: ${inTrial} Subscriber: ${isMember}`, trialDaysLeft
       );
       return isMember || inTrial;
     })

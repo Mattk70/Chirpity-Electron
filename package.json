@@ -58,13 +58,9 @@
         "owner": "Mattk70",
         "repo": "Chirpity-Electron",
         "channel": "latest-${arch}"
-      },
-      {
-        "provider": "github",
-        "owner": "Mattk70",
-        "repo": "Chirpity-Electron"
       }
     ],
+    "afterAllArtifactBuild": "./build/createLegacyYML.js",
     "files": [
       "**/*",
       "!test*${/*}",
