@@ -229,7 +229,9 @@ jobs:
           fi
       - run: echo "File check status is ${{ job.status }}."
       - name: GH Release - upload legacy latest.yml file for windows 
+
         uses: softprops/action-gh-release@v2.5.0
+        if: github.ref_type == 'tag'
         with:
           files: ./dist/latest.yml
             
