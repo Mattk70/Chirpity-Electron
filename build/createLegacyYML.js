@@ -4,7 +4,9 @@ const crypto = require("crypto");
 exports.default = async function (context) {
     const {outDir, artifactPaths} = context;
     const dest = path.join(outDir, `latest.yml`);
-    const filePath = artifactPaths.find(path => path.includes('Setup')).replace('.blockmap', '')
+    let filePath = artifactPaths.find(path => path.includes('Setup'))
+    if (!filePath) return;
+    filePath = filePath.replace('.blockmap', '');
     console.log(filePath);
     const baseName = path.basename(filePath); // e.g. "Chirpity Setup 5.6.2.exe"
 
