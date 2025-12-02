@@ -228,7 +228,11 @@ jobs:
             echo "Executable $FILENAME not found in ./dist" && exit 1
           fi
       - run: echo "File check status is ${{ job.status }}."
-
+      - name: GH Release - upload legacy latest.yml file for windows 
+        uses: softprops/action-gh-release@v2.5.0
+        with:
+          files: ./dist/latest.yml
+            
       # Tests
           
       # Download Perch
