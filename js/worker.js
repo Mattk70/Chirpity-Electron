@@ -1060,13 +1060,17 @@ const getFilesInDirectory = async (dir) => {
   const { readdir } = require("node:fs/promises");
   while (stack.length) {
     const currentDir = stack.pop();
+    let dirents;
     try {
       dirents = await readdir(currentDir, { withFileTypes: true });
-    } catch (_e) {
-      // Skip folders we cannot read
-      console.warn(`Skipping unreadable folder: ${currentDir}`);
-      continue;
-    }
+    } catch (err) {
+      if (err.code === "EPERM" || err.code === "EACCES") {
+        console.warn(`Skipping unreadable folder due to permissions: ${currentDir}`);
+        continue; // skip this folder and move on
+      } else {
+        throw err; // rethrow other errors
+      }
+    }    
     for (const dirent of dirents) {
       const path = p.join(currentDir, dirent.name);
       if (dirent.isDirectory()) {
@@ -1077,7 +1081,6 @@ const getFilesInDirectory = async (dir) => {
       }
     }
   }
-
   return files;
 };
 
