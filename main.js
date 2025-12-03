@@ -39,7 +39,7 @@ app.setAppUserModelId('com.electron.chirpity');
 //   }
 // }
 // // When dmg is installed over a pkg installation, the app crashes, so...
-// const userData = app.getPath("userData");
+const userData = app.getPath("userData");
 // if (isMac && ! fs.existsSync(path.join(userData, 'pkg2dmg')) && fs.existsSync(path.join(userData, 'config.json'))){
 //   console.log(`existing config found`)
 //   try {
