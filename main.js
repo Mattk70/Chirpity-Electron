@@ -23,36 +23,36 @@ app.commandLine.appendSwitch("enable-features", "Vulkan");
 // Set the AppUserModelID (to prevent the two pinned icons bug)
 app.setAppUserModelId('com.electron.chirpity');
 
-function copyFilesOnly(srcDir, destDir) {
-  for (const item of fs.readdirSync(srcDir)) {
-    if (['config.json', 
-      'archive.sqlite', 
-      'archive.sqlite.shm', 
-      'archive.sqlite.wal', 
-      'XCcache.json', 
-      'settings.json'].includes(item)){
-      const srcPath = path.join(srcDir, item);
-      const destPath = path.join(destDir, item);
-      // Copy files
-      fs.copyFileSync(srcPath, destPath);
-    }
-  }
-}
-// When dmg is installed over a pkg installation, the app crashes, so...
-const userData = app.getPath("userData");
-if (isMac && ! fs.existsSync(path.join(userData, 'pkg2dmg')) && fs.existsSync(path.join(userData, 'config.json'))){
-  console.log(`existing config found`)
-  try {
-    const movedSettings = userData+' old'
-    fs.renameSync(userData, movedSettings);
-    fs.mkdirSync(userData)
-    copyFilesOnly(movedSettings, userData)
-    fs.writeFileSync(path.join(userData, 'pkg2dmg'), "");
-    console.log('Migration done')
-  } catch (err) {
-    console.error(err);
-  }
-}
+// function copyFilesOnly(srcDir, destDir) {
+//   for (const item of fs.readdirSync(srcDir)) {
+//     if (['config.json', 
+//       'archive.sqlite', 
+//       'archive.sqlite.shm', 
+//       'archive.sqlite.wal', 
+//       'XCcache.json', 
+//       'settings.json'].includes(item)){
+//       const srcPath = path.join(srcDir, item);
+//       const destPath = path.join(destDir, item);
+//       // Copy files
+//       fs.copyFileSync(srcPath, destPath);
+//     }
+//   }
+// }
+// // When dmg is installed over a pkg installation, the app crashes, so...
+// const userData = app.getPath("userData");
+// if (isMac && ! fs.existsSync(path.join(userData, 'pkg2dmg')) && fs.existsSync(path.join(userData, 'config.json'))){
+//   console.log(`existing config found`)
+//   try {
+//     const movedSettings = userData+' old'
+//     fs.renameSync(userData, movedSettings);
+//     fs.mkdirSync(userData)
+//     copyFilesOnly(movedSettings, userData)
+//     fs.writeFileSync(path.join(userData, 'pkg2dmg'), "");
+//     console.log('Migration done')
+//   } catch (err) {
+//     console.error(err);
+//   }
+// }
 
 const { autoUpdater } = require("electron-updater");
 const log = require("electron-log");
