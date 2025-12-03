@@ -738,7 +738,7 @@ export class ChirpityWS {
     const wavesurfer = this.wavesurfer;
     // Validate input parameters
     if (typeof start !== "number" || typeof end !== "number" || start >= end) {
-      console.error("Invalid region parameters:", { start, end });
+      console.error("Invalid region parameters", `start: ${start}, end: ${end}`);
       return;
     }
     // Check for an existing region with the same start/end
