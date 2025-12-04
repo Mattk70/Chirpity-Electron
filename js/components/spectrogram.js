@@ -1,6 +1,6 @@
 import WaveSurfer from "../../node_modules/wavesurfer.js/dist/wavesurfer.esm.js";
 import RegionsPlugin from "../../node_modules/wavesurfer.js/dist/plugins/regions.esm.js";
-import Spectrogram from "../../node_modules/wavesurfer.js/dist/plugins/spectrogram.esm.js";
+import Spectrogram from "../../node_modules/wavesurfer.js/dist/plugins/spectrogram-windowed.esm.js";
 import TimelinePlugin from "../../node_modules/wavesurfer.js/dist/plugins/timeline.esm.js";
 import { hexToRgb, showElement, clamp } from "../utils/utils.js";
 import { DOM } from "../utils/DOMcache.js";
