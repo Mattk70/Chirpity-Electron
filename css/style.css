@@ -75,6 +75,15 @@ body {
   cursor: pointer;
 }
 
+/* Wavesurfer custom styles */
+#waveform ::part(canvases) {
+        display:none;
+}
+
+#waveform ::part(timeline) {
+        z-index: 5;
+}
+
 .spec-labels {
   width: 55px !important;
 }
@@ -652,6 +661,10 @@ input[type="range"].vertical {
 #tourModal .carousel-control-next,
 #tourModal .carousel-control-prev {
   top: 8rem;
+}
+
+my-canvasses::part(label) {
+  font-weight: bold;
 }
 
 #update-progress-bar {

@@ -185,11 +185,11 @@ export class ChirpityWS {
 
     this.wavesurfer && this.wavesurfer.destroy();
     this.REGIONS = this.initRegion();
-    this.spectrogram = this.initSpectrogram('#spectrogram', height);
+    const container = document.getElementById("waveform");
+    this.spectrogram = this.initSpectrogram(container, height);
     this.timeline = this.createTimeline(windowLength);
     // Setup waveform and spec views
     const plugins = [this.spectrogram, this.timeline, this.REGIONS];
-    const container = document.getElementById("waveform");
     this.wavesurfer = this.initWavesurfer(container, plugins);
 
     if (audio) {

@@ -145,7 +145,9 @@
     "mac": {
       "target": {
         "target": "default",
-        "arch": ["arm64"]
+        "arch": [
+          "arm64"
+        ]
       },
       "artifactName": "${productName}-${arch}.${ext}",
       "type": "distribution",
@@ -245,7 +247,7 @@
     "suncalc": "^1.9.0",
     "systeminformation": "^5.14.11",
     "utimes": "^5.2.1",
-    "wavesurfer.js": "7.9.5"
+    "wavesurfer.js": "^7.12.0"
   },
   "optionalDependencies": {
     "ntsuspend": "^1.0.2"
