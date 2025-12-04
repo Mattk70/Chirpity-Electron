@@ -326,6 +326,7 @@ export class ChirpityWS {
       scale: "linear",
       colorMap,
       alpha,
+      useWebWorker: true,
     });
   }
 
