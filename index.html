@@ -579,7 +579,7 @@
         <div class="container-fluid">
             <div class="row p-1 g-1 justify-content-evenly">
                 <div class="col-3 pt-4">
-                    <div class="col d-none">
+                    <div class="col pt-2">
                         <div class="btn btn-light pt-3 mb-2" id="chartRange">
                             <span class="material-symbols-outlined align-bottom">date_range</span>&nbsp;
                             <span id="chart-datefilter">Apply a date filter</span> <span
@@ -598,32 +598,32 @@
                             <ul id="bird-suggestions-chart" class="suggestions list-group"></ul>
                         </div>
                     </div>
-                    <div class="col d-none">
+                    <div class="col ">
                         <div id="chart-location-list" class="form-floating">
                             <select spellcheck="false" class="input form-select mb-3" aria-label=".form-select"
                             id="chart-locations"></select>
                             <label for="explore-locations">Location</label>
                         </div>
                     </div>
-                    <div class="col d-none">
+                    <div class="col">
                         <fieldset class="border border rounded bg-light p-2">
                             <legend class="h6">Sum Detections by:</legend>
                             <div class="form-row">
                                 <div class="form-check-inline">
-                                    <input class="form-check-input" type="radio" name="showTotals" id="hourTotal" value="Hour">
+                                    <input class="form-check-input" type="radio" name="showTotals" id="hour" value="Hour">
                                     <label class="form-check-label" for="hourTotal">Hour</label>
                                 </div>
                                 <div class="form-check-inline">
-                                    <input class="form-check-input" type="radio" name="showTotals" id="dayTotal" value="Day">
+                                    <input class="form-check-input" type="radio" name="showTotals" id="day" value="Day">
                                     <label class="form-check-label" for="dayTotal">Day</label>
                                 </div>
                                 <div class="form-check-inline pb-3">
-                                    <input class="form-check-input" type="radio" name="showTotals" id="weekTotal" value="Week">
+                                    <input class="form-check-input" type="radio" name="showTotals" id="week" value="Week">
                                     <label class="form-check-label" for="weekTotal">Week</label>
                                 </div>
                             </div>
-                            <legend class="h6">Group Detections by:</legend>
-                            <div class="form-row">
+                            <legend class="h6 d-none">Group Detections by:</legend>
+                            <div class="form-row d-none">
                                 <div class="form-check-inline">
                                     <input class="form-check-input" type="radio" name="groupTotals" id="dayGroup" value="Day">
                                     <label class="form-check-label" for="dayGroup">Day</label>
@@ -639,9 +639,12 @@
                             </div>
                             <div class="form-row pt-3">
                                 <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" role="switch" name="stackYears" id="stackYears" checked>
-                                    <label class="form-check-label" for="stackYears">Stack Years</label>
+                                    <input class="form-check-input" type="checkbox" role="switch" name="stackYears" id="stackYears">
+                                    <label class="form-check-label" for="stackYears">Split results by year</label>
                                 </div>
+                            </div>
+                            <div class="form-row pt-3">
+                                <button id="downloadChart" class="btn btn-primary w-100">Export Chart Image</button>
                             </div>
                         </fieldset>
                     </div>
@@ -1118,15 +1121,6 @@
                                 </div>
                             </div>
                         </div>
-                        <!-- <div>
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Prevent system sleep" id="Prevent system sleep-circle-help"  data-bs-content="When enabled, prevent the system from suspending whilst Chirpity is in use.">?</a>
-                            <div class="pe-3 form-group rounded p-2 mb-2">
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" role="switch" id="power-save-block">
-                                    <label class="form-check-label" for="power-save-block">Prevent system sleep</label>
-                                </div>
-                            </div>
-                        </div> -->
                         <div>
                             <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="File timestamp marks recording start" id="File-timestamp-circle-help"  data-bs-content="Some audio recorders, for example the Zoom H1 Essential, can set the file saved date and time to the beginning of the recording, rather than the end. 
                                     If you have such a recorder selecting this option will fix the times shown for your detections.">?</a>
