@@ -8,9 +8,9 @@ assignees: ''
 ---
 
 **First steps**
-Let us know a little about your setup. Ideally, provide your UUID for the application. Choose  Help > Diagnostics from the menu, and copy your UUID from that screen. If you cannot do this, please let us know:
+Let us know a little about your setup. 
 *Chirpity version:*
-*Operating system (PC/Mac):*
+*Operating system (PC/Mac/Linux):*
 
 
 **Describe the bug**

@@ -1485,11 +1485,7 @@ async function showCharts() {
   utils.hideAll();
  
   utils.showElement(["recordsContainer"]);
-  worker.postMessage({
-    action: "chart",
-    species: undefined,
-    range: STATE.chart.range,
-  });
+  callForChart();
 }
 
 
@@ -1825,6 +1821,7 @@ const defaultConfig = {
     frequencyMin: 0,
     frequencyMax: 11950,
   },
+  charts: {aggregation: "week"},
   limit: 500,
   debug: false,
   VERSION: VERSION,
@@ -2521,11 +2518,17 @@ function getDateOfISOWeek(w) {
  * @param {number} args.dataPoints - The number of data points to generate date labels for the x-axis.
  * @param {number} args.rate - A data rate value included in the arguments (currently unused in chart rendering).
  */
+
+let chartInstance;
+
 function onChartData(args) {
-  if (args.species) {
+  const {records, aggregation, pointStart, results, rate, startX} = args;
+  const dataPoints = Object.values(results)[0]?.length;
+  const species = args.species || "";
+  if (species) {
     utils.showElement(["recordsTableBody"], false);
     const title = document.getElementById("speciesName");
-    title.textContent = args.species;
+    title.textContent = species;
   } else {
     utils.hideElement(["recordsTableBody"]);
   }
@@ -2538,7 +2541,6 @@ function onChartData(args) {
   // Get the Chart.js canvas
   const chartCanvas = document.getElementById("chart-week");
 
-  const records = args.records;
   for (const [key, value] of Object.entries(records)) {
     const element = document.getElementById(key);
     if (value?.constructor === Array) {
@@ -2561,16 +2563,13 @@ function onChartData(args) {
     }
   }
 
-  const aggregation = args.aggregation;
-  const results = args.results;
   const total = args.total;
-  const dataPoints = args.dataPoints;
   // start hourly charts at midday if no filter applied
-  const pointStart =
+  const start =
     STATE.chart.range.start || aggregation !== "Hour"
-      ? args.pointStart
-      : args.pointStart + 12 * 60 * 60 * 1000;
-  const dateLabels = generateDateLabels(aggregation, dataPoints, pointStart);
+      ? pointStart
+      : pointStart + 12 * 60 * 60 * 1000;
+  const dateLabels = generateDateLabels(aggregation, dataPoints, start, startX);
 
   // Initialize Chart.js
   const plugin = {
@@ -2592,9 +2591,9 @@ function onChartData(args) {
         label: year,
         //shift data to midday - midday rather than nidnight to midnight if hourly chart and filter not set
         data:
-          aggregation !== "Hour"
-            ? data
-            : data.slice(12).join(data.slice(0, 12)),
+          aggregation === "Hour"
+            ? data.slice(12).concat(data.slice(0, 12))
+            : data,
         //backgroundColor: 'rgba(255, 0, 64, 0.5)',
         borderWidth: 1,
         //borderColor: 'rgba(255, 0, 64, 0.9)',
@@ -2616,7 +2615,7 @@ function onChartData(args) {
       plugins: {
         title: {
           display: true,
-          text: args.species ? `${args.species} Detections` : "",
+          text: `Number of ${species} Detections`,
         },
         customCanvasBackgroundColor: {
           color: "GhostWhite",
@@ -2647,13 +2646,15 @@ function onChartData(args) {
       title: { display: true, text: "Week in Year" },
     };
   }
-  new Chart(chartCanvas, chartOptions);
+  chartInstance = new Chart(chartCanvas, chartOptions);
 }
 
-function generateDateLabels(aggregation, datapoints, pointstart) {
+function generateDateLabels(aggregation, datapoints, pointstart, startX) {
   const dateLabels = [];
   const startDate = new Date(pointstart);
-
+  if (aggregation === "Week") {
+    return Array.from({length: datapoints }, (_, i) => startX + i);
+  }
   for (let i = 0; i < datapoints; i++) {
     // Push the formatted date label to the array
     dateLabels.push(formatDate(startDate, aggregation));
@@ -2663,11 +2664,8 @@ function generateDateLabels(aggregation, datapoints, pointstart) {
       startDate.setTime(startDate.getTime() + 60 * 60 * 1000); // Add 1 hour
     } else if (aggregation === "Day") {
       startDate.setDate(startDate.getDate() + 1); // Add 1 day
-    } else if (aggregation === "Week") {
-      startDate.setDate(startDate.getDate() + 7); // Add 7 days (1 week)
     }
   }
-
   return dateLabels;
 }
 
@@ -2677,16 +2675,16 @@ function formatDate(date, aggregation) {
   let formattedDate = "";
   if (aggregation === "Week") {
     // Add 1 day to the startDate
-    date.setHours(date.getDate() + 1);
+    date.setHours(date.getDate() );
     const year = date.getFullYear();
     const oneJan = new Date(year, 0, 1);
     const weekNumber = Math.ceil(
-      ((date - oneJan) / (24 * 60 * 60 * 1000) + oneJan.getDay() + 1) / 7
+      ((date - oneJan) / (24 * 60 * 60 * 1000) + oneJan.getDay() ) / 7
     );
     return weekNumber;
   } else if (aggregation === "Day") {
     options.day = "numeric";
-    options.weekday = "short";
+    // options.weekday = "short";
     options.month = "short";
   } else if (aggregation === "Hour") {
     const hour = date.getHours();
@@ -2694,8 +2692,8 @@ function formatDate(date, aggregation) {
     const formattedHour = hour % 12 || 12; // Convert 0 to 12
     return `${formattedHour}${period}`;
   }
-
-  return formattedDate + date.toLocaleDateString("en-GB", options);
+  const locale = config.locale.replace("en_uk", "en");
+  return formattedDate + date.toLocaleDateString(locale, options);
 }
 
 
@@ -5145,6 +5143,16 @@ async function handleUIClicks(e) {
       showCharts();
       break;
     }
+    case "downloadChart": {
+      // Download the chart
+      const imageURL = chartInstance.toBase64Image();
+      const a = document.createElement('a');
+      a.href = imageURL;
+      a.download = 'chart.png';
+      a.click();
+      a.remove();
+      break;
+    }
     case "explore": {
       showExplore();
       break;
@@ -6085,10 +6093,26 @@ document.addEventListener("change", async function (e) {
           handlePassFilterchange(DOM.LPSlider);
           break;
         }
-        // case "snrValue": {
-        //   handleSNRchange(e);
-        //   break;
-        // }
+        // Charts
+        case "hour":
+        case "day":
+        case "week": {
+          STATE.chart.aggregation = element.value;
+          callForChart();
+          break;
+        }
+        case "stackYears": {
+          STATE.chart.stackYears = element.checked;
+          callForChart();
+          break;
+        }
+        case "chart-locations": {
+          const location = element.value ? Number(element.value) : null;
+          STATE.chart.location = location;
+          callForChart();
+          break;
+        }
+
         case "file-timestamp": {
           config.fileStartMtime = element.checked;
           worker.postMessage({
@@ -6381,6 +6405,17 @@ const flushSpec = async () =>{
   }
 }
 
+function callForChart() {
+  const {species, range, location, aggregation, stackYears: byYear} = STATE.chart;
+  worker.postMessage({
+    action: "chart",
+    species,
+    range,
+    location,
+    aggregation,
+    byYear,
+  });
+}
 /**
  * Updates the UI to reflect the selected species list type and displays relevant controls.
  *
@@ -7796,6 +7831,9 @@ function updateSuggestions(input, element, preserveInput) {
     span.textContent = ` (${list.length})`; // Update existing span
   }
   if (search.length < 2) {
+    const oldSpecies = STATE.chart.species;
+    STATE.chart.species = null;
+    if (oldSpecies) callForChart();
     element.style.display = "none";
     return;
   }
@@ -7840,11 +7878,8 @@ function updateSuggestions(input, element, preserveInput) {
           clearResults: false,
         });
       } else if (input.id === "bird-autocomplete-chart") {
-        worker.postMessage({
-          action: "chart",
-          species: item.cname,
-          range: STATE.chart.range,
-        });
+        STATE.chart.species = item.cname;
+        callForChart();
       }
       input.dispatchEvent(new Event("change", { bubbles: true })); // fire the change event
       element.style.display = "none";
