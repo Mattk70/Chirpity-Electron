@@ -411,27 +411,28 @@ let predictions = new Map(),
   clickedIndex;
 // Set content container height
 DOM.contentWrapper.style.height = document.body.clientHeight - 80 + "px";
-
+let animating = false;
 // Mouse down event to start dragging
 DOM.controlsWrapper.addEventListener("mousedown", (e) => {
   if (e.target.tagName !== "DIV") return;
   const startY = e.clientY;
   const initialHeight = DOM.spectrogram.offsetHeight;
   let newHeight;
-  let debounceTimer;
 
   const onMouseMove = (e) => {
-    clearTimeout(debounceTimer);
     // Calculate the delta y (drag distance)
     newHeight = initialHeight + e.clientY - startY;
     // Clamp newHeight to ensure it doesn't exceed the available height
     newHeight = Math.min(newHeight, spec.maxHeight(DOM));
     // Adjust the spectrogram dimensions accordingly
-    debounceTimer = setTimeout(() => {
-      spec.adjustDims(true, config.FFT, newHeight);
-    }, 100);
+    if (!animating) {
+      animating = true;
+      requestAnimationFrame(() => {
+        spec.adjustDims(true, config.FFT, newHeight);
+        animating = false;
+      });
+    }
   };
-
   // Remove event listener on mouseup
   const onMouseUp = () => {
     document.removeEventListener("mousemove", onMouseMove);
@@ -441,6 +442,32 @@ DOM.controlsWrapper.addEventListener("mousedown", (e) => {
   document.addEventListener("mousemove", onMouseMove);
   document.addEventListener("mouseup", onMouseUp, { once: true });
 });
+
+//Drag to resize chart
+const chartContainer = document.getElementById("chart-outer");
+chartContainer.addEventListener("mousedown", (e) => {
+  if (e.target.tagName !== "CANVAS") return;
+  document.body.style.cursor = "ns-resize";
+  const startY = e.clientY;
+  const initialHeight = chartContainer.offsetHeight;
+  let newHeight;
+  const onMouseMove = (e) => {
+    newHeight = initialHeight + e.clientY - startY;
+    // Clamp newHeight to ensure it doesn't exceed the available height
+    newHeight = Math.min(newHeight, document.body.clientHeight - 300);
+    chartContainer.style.height = newHeight + "px";
+};
+  // Remove event listener on mouseup
+  const onMouseUp = () => {
+    document.body.style.cursor = "default";
+    document.removeEventListener("mousemove", onMouseMove);
+    trackEvent(config.UUID, "Drag", "Chart Resize", newHeight);
+  };
+  // Attach event listeners for mousemove and mouseup
+  document.addEventListener("mousemove", onMouseMove);
+  document.addEventListener("mouseup", onMouseUp, { once: true });
+});
+
 
 // Set default Options
 let config;

@@ -1,4 +1,6 @@
 const DEBUG = false;
+
+const ZERO = new Date(1970, 0, 1)
 const filterLocation = (location) =>
   location ? ` AND files.locationID = ${location}` : "";
 
@@ -9,14 +11,14 @@ const getSeasonRecords = async (diskDB, location, species, season) => {
   const seasonMonth = { spring: "< '07'", autumn: " > '06'" };
   return new Promise(function (resolve, reject) {
     const stmt = diskDB.prepare(`
-          SELECT MAX(SUBSTR(DATE(records.dateTime/1000, 'unixepoch', 'localtime'), 6)) AS maxDate,
-          MIN(SUBSTR(DATE(records.dateTime/1000, 'unixepoch', 'localtime'), 6)) AS minDate
-          FROM records
-          JOIN species ON species.id = records.speciesID
-          JOIN files ON files.id = records.fileID
+          SELECT MAX(SUBSTR(DATE(r.dateTime/1000, 'unixepoch', 'localtime'), 6)) AS maxDate,
+          MIN(SUBSTR(DATE(r.dateTime/1000, 'unixepoch', 'localtime'), 6)) AS minDate
+          FROM records r
+          JOIN species ON species.id = r.speciesID
+          JOIN files ON files.id = r.fileID
           WHERE species.cname = (?) ${locationFilter}
           AND STRFTIME('%m',
-          DATETIME(records.dateTime / 1000, 'unixepoch', 'localtime'))
+          DATETIME(r.dateTime / 1000, 'unixepoch', 'localtime'))
           ${seasonMonth[season]}`);
     stmt.get(species, (err, row) => {
       if (err) {
@@ -36,14 +38,14 @@ const getMostCalls = (diskDB, location, species) => {
     const locationFilter = filterLocation(location);
     diskDB.get(
       `SELECT COUNT(*) as count,
-      DATE(dateTime/1000, 'unixepoch', 'localtime') as date
-      FROM records 
-      JOIN species on species.id = records.speciesID
-      JOIN files ON files.id = records.fileID
+      DATE(r.dateTime/1000, 'unixepoch', 'localtime') as date
+      FROM records r
+      JOIN species on species.id = r.speciesID
+      JOIN files ON files.id = r.fileID
       WHERE species.cname = ? ${locationFilter}
-      GROUP BY STRFTIME('%Y', DATETIME(dateTime/1000, 'unixepoch', 'localtime')),
-      STRFTIME('%W', DATETIME(dateTime/1000, 'unixepoch', 'localtime')),
-      STRFTIME('%d', DATETIME(dateTime/1000, 'unixepoch', 'localtime'))
+      GROUP BY STRFTIME('%Y', DATETIME(r.dateTime/1000, 'unixepoch', 'localtime')),
+      STRFTIME('%W', DATETIME(r.dateTime/1000, 'unixepoch', 'localtime')),
+      STRFTIME('%d', DATETIME(r.dateTime/1000, 'unixepoch', 'localtime'))
       ORDER BY count DESC LIMIT 1`,
       species,
       (err, row) => {
@@ -91,7 +93,7 @@ const getChartTotals = ({
     const date =
       range.start !== undefined
         ? new Date(range.start)
-        : new Date(Date.UTC(2020, 0, 0, 0, 0, 0));
+        : new Date(ZERO);
     startX = Math.floor(
       (date - new Date(date.getFullYear(), 0, 0, 0, 0, 0)) / 1000 / 60 / 60 / 24
     );
@@ -103,7 +105,7 @@ const getChartTotals = ({
     const date =
       range.start !== undefined
         ? new Date(range.start)
-        : new Date(Date.UTC(2020, 0, 0, 0, 0, 0));
+        : new Date(ZERO);
     startX = Math.floor(
       (date - new Date(date.getFullYear(), 0, 0, 0, 0, 0)) / 1000 / 60 / 60 / 24
     );
@@ -253,7 +255,7 @@ async function onChartRequest(args) {
       const j = week - startX;
       results[groupYear][j] = (results[groupYear][j] ?? 0) + count;
     } else if (aggregation === "Day") {
-      const j = day - (startX + 1);
+      const j = day - startX;
       results[groupYear][j] = (results[groupYear][j] ?? 0) + count;
     } else {
       results[groupYear][hour] = (results[groupYear][hour] ?? 0) + count;
@@ -264,7 +266,7 @@ async function onChartRequest(args) {
   // If we have a years worth of data add total recording duration and rate
   let total, rate;
   if (dataPoints === 53) [total, rate] = await getRate(diskDB, location, species);
-  const pointStart = (range.start ??= Date.UTC(2020, 0, 0, 0, 0, 0));
+  const pointStart = (range.start ??= ZERO);
   UI.postMessage({
     event: "chart-data", // Restore species name
     species,
