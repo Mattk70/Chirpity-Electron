@@ -2617,10 +2617,7 @@ function onChartData(args) {
       datasets: Object.entries(results).map(([year, data]) => ({
         label: year,
         //shift data to midday - midday rather than nidnight to midnight if hourly chart and filter not set
-        data:
-          aggregation === "Hour"
-            ? data.slice(12).concat(data.slice(0, 12))
-            : data,
+        data,
         //backgroundColor: 'rgba(255, 0, 64, 0.5)',
         borderWidth: 1,
         //borderColor: 'rgba(255, 0, 64, 0.9)',

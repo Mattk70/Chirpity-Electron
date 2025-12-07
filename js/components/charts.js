@@ -4,6 +4,27 @@ const ZERO = new Date(1970, 0, 1)
 const filterLocation = (location) =>
   location ? ` AND files.locationID = ${location}` : "";
 
+
+function getWeekAndDayOfYearAndLeapLocal(ts) {
+    const date = new Date(ts);
+    const year = date.getFullYear();
+    const startOfYear = new Date(year, 0, 1);
+    // ----- Leap year? -----
+    const leapYear = (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+    // ----- Day of year -----
+    const dayOfYear = Math.floor((date - startOfYear) / 86400000) + 1;
+    // ----- ISO week number (local time) -----
+    const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    // ISO: Monday = 1, Sunday = 7
+    const dayNum = d.getDay() === 0 ? 7 : d.getDay();
+    // Move to Thursday of this ISO week
+    d.setDate(d.getDate() + 4 - dayNum);
+    // First day of that ISO week-year
+    const yearStart = new Date(d.getFullYear(), 0, 1);
+    const week = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+    return { week, dayOfYear, leapYear };
+}
+
 const getSeasonRecords = async (diskDB, location, species, season) => {
   // Add Location filter
   const locationFilter = filterLocation(location);
@@ -68,9 +89,9 @@ const getChartTotals = ({
 }) => {
   // Add Location filter
   const locationFilter = filterLocation(location);
-
+  const useRange = range.start !== undefined;
   // Work out sensible aggregations from hours difference in date range
-  const intervalHours = range.start
+  const intervalHours = useRange
     ? Math.round((range.end - range.start) / (1000 * 60 * 60))
     : Infinity;
   DEBUG && console.log(intervalHours, "difference in hours");
@@ -82,33 +103,37 @@ const getChartTotals = ({
   // Default values for grouping
   let groupBy = "week";
   let orderBy = "year";
-  let dataPoints = Math.min(53, Math.ceil(intervalHours / (24 * 7)));
-  let startX = range.start ? _getISOWeekFromEpoch(range.start) : 1;
-
-  // Update grouping based on aggregation parameter
-  if (aggregation === "Day") {
-    groupBy += ", day";
-    orderBy = "year, week";
-    dataPoints = Math.min(365,Math.ceil(intervalHours / 24));
-    const date =
-      range.start !== undefined
-        ? new Date(range.start)
-        : new Date(ZERO);
-    startX = Math.floor(
-      (date - new Date(date.getFullYear(), 0, 0, 0, 0, 0)) / 1000 / 60 / 60 / 24
-    );
-    startX = startX % 365;
-  } else if (aggregation === "Hour") {
-    groupBy = "hour";
-    orderBy = "CASE WHEN hour >= 12 THEN hour - 12 ELSE hour + 12 END";
-    dataPoints = 24;
-    const date =
-      range.start !== undefined
-        ? new Date(range.start)
-        : new Date(ZERO);
-    startX = Math.floor(
-      (date - new Date(date.getFullYear(), 0, 0, 0, 0, 0)) / 1000 / 60 / 60 / 24
-    );
+  let dataPoints = 53;
+  let startIndex = 1;
+  switch (aggregation) {
+    case "week": {
+      dataPoints = Math.min(53, Math.ceil(intervalHours / 168));
+      const {week} = useRange ? getWeekAndDayOfYearAndLeapLocal(range.start) : {week:1} 
+      startIndex = week;
+      break;
+    }
+    case "Day": {
+      groupBy += ", day";
+      orderBy += ", week";
+      let yearDays = 365;
+      let startDay = 0;
+      if (useRange) {
+          const { leapYear, dayOfYear } = getWeekAndDayOfYearAndLeapLocal(range.start);
+          yearDays = leapYear ? 366 : 365;
+          startDay = dayOfYear;
+      }
+      dataPoints = Math.min(yearDays, Math.ceil(intervalHours / 24));
+      startIndex = startDay;
+      break;
+    }
+    case "Hour": {
+      groupBy = "hour";
+      orderBy = "CASE WHEN hour >= 12 THEN hour - 12 ELSE hour + 12 END";
+      dataPoints = Math.min(24, intervalHours);
+      const date = useRange ? new Date(range.start) : new Date(ZERO);
+      startIndex = date.getHours();
+      break;
+    }
   }
 
   return new Promise(function (resolve, reject) {
@@ -128,7 +153,7 @@ const getChartTotals = ({
         if (err) {
           reject(err);
         } else {
-          resolve([rows, dataPoints, aggregation, startX]);
+          resolve([rows, dataPoints, aggregation, startIndex]);
         }
       }
     );
@@ -242,23 +267,26 @@ async function onChartRequest(args) {
       });
   }
 
-  const [rows, dataPoints, aggregation, startX] = await getChartTotals(args)
+  const [rows, dataPoints, aggregation, startIndex] = await getChartTotals(args)
     .catch((error) => console.log(error));
+  const years = [...new Set(rows.map(o => o.year))];
+  const hasMultipleYears = years.length > 1;
   for (let i = 0; i < rows.length; i++) {
     const { year, week, day, hour, count } = rows[i];
     // stack years
-    const groupYear = byYear || startX > 1 ? year : "All years";
+    const groupYear = !byYear && hasMultipleYears ? "All years" : year;
     if (!(groupYear in results)) {
       results[groupYear] = Array.from({ length: dataPoints }).fill(0);
     }
     if (aggregation === "Week") {
-      const j = week - startX;
+      const j = week - startIndex;
       results[groupYear][j] = (results[groupYear][j] ?? 0) + count;
     } else if (aggregation === "Day") {
-      const j = day - startX;
+      const j = day - startIndex;
       results[groupYear][j] = (results[groupYear][j] ?? 0) + count;
     } else {
-      results[groupYear][hour] = (results[groupYear][hour] ?? 0) + count;
+      const j = hour - startIndex;
+      results[groupYear][j] = (results[groupYear][j] ?? 0) + count;
     }
   }
   
@@ -277,7 +305,7 @@ async function onChartRequest(args) {
     dataPoints,
     pointStart,
     aggregation,
-    startX
+    startX: startIndex
   });
 }
 

@@ -14,6 +14,7 @@ const DEBUG = false;
 let modelPath;
 
 async function loadModel(mpath, backend) {
+  console.log('EPs available:', ort.listSupportedBackends());
     const providers = backend === 'tensorflow' ? ['cpu'] : ['webgpu', 'cpu'];
     const sessionOptions = { executionProviders: providers, enableGraphCapture: true };
     const modelPath = path.join(mpath, 'perch_v2.onnx')
