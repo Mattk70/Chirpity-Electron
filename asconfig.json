@@ -7,21 +7,13 @@
       "debug": true
     },
     "release": {
-      "outFile": "build/release.wasm",
-      "textFile": "build/release.wat",
+      "outFile": "build/topK.wasm",
+      "textFile": "build/topK.wat",
       "sourceMap": true,
       "optimizeLevel": 3,
       "shrinkLevel": 0,
       "converge": false,
       "noAssert": false
     }
-  },
-  "options": {
-
-    "exportRuntime": true,
-    "runtime": "incremental",
-    "initialMemory": 2,
-    "bindings":"stub"
   }
-
 }
