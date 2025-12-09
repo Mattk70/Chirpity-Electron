@@ -410,7 +410,7 @@ async function handleMessage(e) {
       break;
     }
     case "change-threads": {
-      if (STATE.model.includes('perch')) break; // perch v2 only works with 1 thread
+      // if (STATE.model.includes('perch')) break; // perch v2 only works with 1 thread
       const delta = args.threads - predictWorkers.length;
       NUM_WORKERS += delta;
       if (delta > 0) {
@@ -445,6 +445,10 @@ async function handleMessage(e) {
     }
     case "delete": {
       await onDelete(args);
+      break;
+    }
+    case "delete-confidence": {
+      await onDeleteConfidence(args);
       break;
     }
     case "delete-species": {
@@ -860,7 +864,7 @@ async function onLaunch({
     generateAlert({message, type:'error'})
   }
   WINDOW_SIZE = perch ? 5 : 3;
-  threads = perch ? 1 : threads;
+  // threads = perch ? 1 : threads;
 
   sampleRate = sampleRates[model] || 48_000;
   STATE.detect.backend = backend;
@@ -886,8 +890,8 @@ async function onLaunch({
     ? memoryDB
     : diskDB;
   STATE.update({ db });
-  NUM_WORKERS = threads;
-  spawnPredictWorkers(model, batchSize, NUM_WORKERS);
+  NUM_WORKERS = perch ? 1 : threads;
+  spawnPredictWorkers(model, batchSize, threads);
 }
 
 /**
@@ -1218,23 +1222,45 @@ async function getSpeciesSQLAsync(){
     // Get the speciesID for all models
     const result = await STATE.db.allAsync(`SELECT cname FROM species WHERE classIndex + 1 IN (${included}) AND modelID = ${STATE.modelID}`);
     const cnames = result.map(row => row.cname);
-    // included = await STATE.db.allAsync(`SELECT id FROM species WHERE cname IN (${prepParams(cnames)})`, ...cnames);
-    // included = included.map(row => row.id);
     included = cnames.length ? await getMatchingIds(cnames) : [-1];
     DEBUG &&
       console.log("included", included.length, "# labels", allLabels.length);
-    // const includedParams = prepParams(included);
     SQL = ` AND s.id ${not} IN (${included}) `;
-    // params.push(...included);
   }
   return SQL
 }
 
+async function addQueryQualifiers(stmt, range, caller) {
+  const {mode, explore, labelFilters, detect, locationID, selection} = STATE;
+  let params = [detect.confidence];
+  range ??= mode === "explore" ? explore.range : undefined;
+  if (mode === 'archive' || range?.start){
+    const [SQLtext, fileParams] = getFileSQLAndParams(range);
+    (stmt += SQLtext), params.push(...fileParams);
+  }
+  if (labelFilters.length) {
+    stmt += ` AND tagID in (${prepParams(labelFilters)}) `;
+    params.push(...labelFilters);
+  }
+  if (selection && caller === 'results') {
+    stmt += ` AND file = ? `;
+    params.push(FILE_QUEUE[0]);
+  } else {
+    stmt += await getSpeciesSQLAsync()
+  }
+  if (detect.nocmig) stmt += " AND COALESCE(isDaylight, 0) != 1 ";
+  if (locationID !== undefined) {
+    stmt += locationID === 0 ? " AND locationID IS NULL " : " AND locationID = ? ";
+    locationID !== 0 && params.push(locationID);
+  }
+  return [stmt, params];
+}
+
 const prepSummaryStatement = async () => {
-  const {mode, explore, labelFilters, detect, locationID, summarySortOrder} = STATE;
+  const { detect, summarySortOrder} = STATE;
   const topRankin = detect.topRankin;
-  const range = mode === "explore" ? explore.range : undefined;
-  const params = [detect.confidence];
+  // const range = mode === "explore" ? explore.range : undefined;
+  // let params = [detect.confidence];
   const partition = detect.merge ? '' : ', r.modelID';
   let summaryStatement = `
     WITH ranked_records AS (
@@ -1244,24 +1270,9 @@ const prepSummaryStatement = async () => {
         JOIN files f ON f.id = r.fileID
         JOIN species s ON s.id = r.speciesID
         WHERE confidence >=  ? `;
-  if (STATE.mode === 'archive' || range?.start){
-    const [SQLtext, fileParams] = getFileSQLAndParams(range);
-    (summaryStatement += SQLtext), params.push(...fileParams);
-  }
-  if (labelFilters.length) {
-    summaryStatement += ` AND tagID in (${prepParams(labelFilters)}) `;
-    params.push(...labelFilters);
-  }
-  summaryStatement += await getSpeciesSQLAsync();
-  
-  if (detect.nocmig) {
-    summaryStatement += " AND COALESCE(isDaylight, 0) != 1 ";
-  }
 
-  if (locationID) {
-    summaryStatement += " AND locationID = ? ";
-    params.push(locationID);
-  }
+  let [stmt, params] = await addQueryQualifiers(summaryStatement);
+  summaryStatement = stmt;
   summaryStatement += `
     )
     SELECT cname, sname, COUNT(cname) as count, SUM(callcount) as calls, MAX(ranked_records.confidence) as max
@@ -1277,16 +1288,12 @@ const getTotal = async ({
   offset = undefined,
 } = {}) => {
   
-  const {db, mode, explore, filteredOffset, globalOffset, labelFilters, detect, locationID} = STATE;
+  const {db, mode, explore, filteredOffset, globalOffset, detect} = STATE;
   const topRankin = detect.topRankin;
-  let params = [];
   const range = mode === "explore" ? explore.range : undefined;
   const partition = detect.merge ? '' : ', r.modelID';
-  offset =
-    offset ??
-    (species !== undefined
-      ? filteredOffset[species]
-      : globalOffset);
+  offset ?? (species !== undefined ? filteredOffset[species] : globalOffset);
+
   let SQL = ` WITH MaxConfidencePerDateTime AS (
         SELECT confidence,
         speciesID, classIndex, f.name as file, tagID,
@@ -1294,19 +1301,10 @@ const getTotal = async ({
         FROM records r
         JOIN species s ON r.speciesID = s.id
         JOIN files f ON r.fileID = f.id 
-        WHERE confidence >= ${detect.confidence} `;
+        WHERE confidence >= ? `;
 
-  SQL += await getSpeciesSQLAsync();
-  if (labelFilters.length) {
-    SQL += ` AND tagID in (${prepParams(labelFilters)}) `;
-    params.push(...labelFilters);
-  }
-  if (detect.nocmig) SQL += " AND NOT isDaylight";
-  if (locationID) SQL += ` AND locationID =  ${locationID}`;
-  if (mode === 'archive' || range?.start){
-    const [SQLtext, fileParams] = getFileSQLAndParams(range);
-    (SQL += SQLtext), params.push(...fileParams);
-  }
+  let [stmt, params] = await addQueryQualifiers(SQL, range, 'results');
+  SQL = stmt;
   SQL += " ) ";
   SQL += `SELECT COUNT(confidence) AS total FROM MaxConfidencePerDateTime WHERE rank <= ${topRankin}`;
 
@@ -1330,9 +1328,8 @@ const prepResultsStatement = async (
   topRankin,
   format
 ) => {
-  const {mode, explore, limit, resultsMetaSortOrder, resultsSortOrder, labelFilters, detect, locationID, selection} = STATE;
+  const {mode, explore, limit, resultsMetaSortOrder, resultsSortOrder, detect, selection} = STATE;
   const partition = detect.merge ? '' : ', r.modelID'; 
-  const params = [detect.confidence];
   let resultStatement = `
     WITH ranked_records AS (
         SELECT 
@@ -1371,30 +1368,10 @@ const prepResultsStatement = async (
     ? selection
     : mode === "explore"
     ? explore.range
-    : false;
+    : null;
 
-  // If you're using the memory db, you're either analysing one,  or all of the files
-  if (mode === 'archive' || range?.start){
-    const [SQLtext, fileParams] = getFileSQLAndParams(range);
-    (resultStatement += SQLtext), params.push(...fileParams);
-  }
-  if (labelFilters.length) {
-    resultStatement += ` AND tagID in (${prepParams(STATE.labelFilters)}) `;
-    params.push(...STATE.labelFilters);
-  }
-  if (selection) {
-    resultStatement += ` AND file = ? `;
-    params.push(FILE_QUEUE[0]);
-  } else {
-    resultStatement += await getSpeciesSQLAsync()
-  }
-  if (locationID) {
-    resultStatement += ` AND locationID = ? `;
-    params.push(locationID);
-  }
-  if (detect.nocmig) {
-    resultStatement += " AND COALESCE(isDaylight, 0) != 1 "; // Backward compatibility for < v0.9.
-  }
+  let [stmt, params] = await addQueryQualifiers(resultStatement, range, 'results');
+  resultStatement = stmt;
 
   resultStatement += ` )
     SELECT 
@@ -1437,7 +1414,6 @@ const prepResultsStatement = async (
     ? ` ORDER BY RANDOM()  ${limitClause}`
     : ` ORDER BY ${metaSort} ${resultsSortOrder} ${limitClause} `;
   
-
   return {sql: resultStatement, params};
 };
 
@@ -3253,13 +3229,22 @@ const processQueue = async () => {
  * @param {number} threads - Number of worker threads to spawn.
  */
 function spawnPredictWorkers(model, batchSize, threads) {
+  const isPerch = model === 'perch v2';
   STATE.perchWorker = predictWorkers.filter(w => w.name === 'perch v2');
-  if (model === 'perch v2' && STATE.perchWorker?.length) {
+  if (isPerch && STATE.perchWorker?.length) {
     predictWorkers = STATE.perchWorker;
+    predictWorkers[0].postMessage({
+      message: "change-threads",
+      threads: threads + 1,
+      batchSize,
+      backend: STATE.detect.backend,
+      modelPath: STATE.modelPath
+    });
     setLabelState({regenerate: true})
     return
   }
   for (let i = 0; i < threads; i++) {
+    if (isPerch && i > 0) break; // Perch v2 only needs one worker, even if multiple threads requested
     const workerSrc = ['nocmig', 'chirpity', 'perch v2'].includes(model) ? model : "BirdNet2.4";
     const worker = new Worker(`./js/models/${workerSrc}.js`, { type: "module" });
     worker.isAvailable = true;
@@ -3273,6 +3258,7 @@ function spawnPredictWorkers(model, batchSize, threads) {
       model,
       modelPath: STATE.modelPath,
       batchSize,
+      threads,
       backend: STATE.detect.backend,
       worker: i,
     });
@@ -4807,6 +4793,37 @@ async function onDeleteSpecies({
   }
 }
 
+async function onDeleteConfidence({start, end, species, confidence, modelID}) {
+  // Implement the logic for deleting by confidence here
+  const db = STATE.db;
+  let SQL = "DELETE FROM records WHERE confidence <= ?";
+  const params = [confidence];
+  if (start && end) {
+    SQL += " AND dateTime BETWEEN ? AND ?";
+    params.push(start, end);
+  }
+  if (species) {
+    SQL += " AND speciesID IN (SELECT id FROM species WHERE cname = ?)";
+    params.push(species);
+  }
+  if (modelID) {
+    SQL += " AND modelID = ?";
+    params.push(modelID);
+  }
+  if (STATE.locationID){
+    SQL += ` AND fileID IN (SELECT id FROM files WHERE locationID = ?)`;
+    params.push(STATE.locationID);
+  }
+  let { changes } = await db.runAsync(SQL, ...params);
+  if (changes) {
+    if (db === diskDB) {
+      // Update the seen species list
+      getDetectedSpecies();
+    } else {
+      UI.postMessage({ event: "unsaved-records" });
+    }
+  }
+}
 async function onFileUpdated(oldName, newName) {
   const newDuration = Math.round(await getDuration(newName));
   try {
@@ -4985,6 +5002,10 @@ async function onSetCustomLocation({
   db = STATE.db,
   overwritePlaceName = true,
 }) {
+  if (lat === STATE.lat && lon === STATE.lon && place.trim() === STATE.place.trim()) {
+    // Don't add default location
+    return;
+  }
   if (!place) {
     // Delete the location
     const row = await db.getAsync(
@@ -5030,6 +5051,8 @@ async function onSetCustomLocation({
 async function getLocations({ file, db = STATE.db, id }) {
   let locations = await db.allAsync("SELECT * FROM locations ORDER BY place");
   locations ??= [];
+  // Default location
+  locations.unshift({ id: 0, lat: STATE.lat, lon: STATE.lon, place: STATE.place.trim() });
   UI.postMessage({
     id,
     event: "location-list",

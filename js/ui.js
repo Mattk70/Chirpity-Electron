@@ -290,8 +290,8 @@ const GLOBAL_ACTIONS = {
       }
     }
   },
-  Delete: () => STATE.fileLoaded && activeRow && deleteRecord(activeRow),
-  Backspace: () => STATE.fileLoaded && activeRow && deleteRecord(activeRow),
+  Delete: (e) => STATE.fileLoaded && activeRow && deleteRecord(e),
+  Backspace: (e) => STATE.fileLoaded && activeRow && deleteRecord(e),
 };
 
 /**
@@ -1437,7 +1437,8 @@ async function exportData(
 }
 
 const handleLocationFilterChange = (e) => {
-  const location = parseInt(e.target.value) || undefined;
+  const value = e.target.value;
+  const location = value === "" ? undefined : parseInt(value, 10);
   worker.postMessage({ action: "update-state", locationID: location });
   // Update the seen species list
   worker.postMessage({ action: "get-detected-species-list" });
@@ -2617,7 +2618,10 @@ function onChartData(args) {
       datasets: Object.entries(results).map(([year, data]) => ({
         label: year,
         //shift data to midday - midday rather than nidnight to midnight if hourly chart and filter not set
-        data,
+        data:
+          aggregation === "Hour"
+            ? data.slice(12).concat(data.slice(0, 12))
+            : data,
         //backgroundColor: 'rgba(255, 0, 64, 0.5)',
         borderWidth: 1,
         //borderColor: 'rgba(255, 0, 64, 0.9)',
@@ -4008,13 +4012,37 @@ function setClickedIndex(target) {
   clickedIndex = clickedNode?.rowIndex;
 }
 
-const deleteRecord = (target) => {
-  if (! STATE.fileLoaded ) return;
-  if (target instanceof PointerEvent) target = activeRow;
+const deleteSpeciesByConfidence = (species, confidence, modelID) => {
+  if (STATE.resultsSortOrder !== "score DESC " || ! isSpeciesViewFiltered()) return;
+  const { start, end } = STATE.mode === "explore" ? STATE.explore.range : {};
+  worker.postMessage({
+    action: "delete-confidence",
+    start,
+    end,
+    species,
+    confidence,
+    modelID
+  });
+  // const currentRow = activeRow.rowIndex;
+  // const table = document.getElementById("resultTableBody");
+  // for (let i = table.rows.length - 1; i >= currentRow; i--) {
+  //   table.deleteRow(i);
+  // }
+  filterResults();
+}
+
+
+const deleteRecord = (e) => {
+  if (! (STATE.fileLoaded && activeRow)) return;
+  let target = activeRow;
   setClickedIndex(target);
   // If there is no row (deleted last record and hit delete again):
   if (clickedIndex === -1 || clickedIndex === undefined) return;
-  const { species, start, end, file, setting, modelID } = addToHistory(target);
+  const { species, start, end, confidence, file, setting, modelID } = addToHistory(target);
+  if (e.shiftKey) {
+    deleteSpeciesByConfidence(species, confidence, modelID);
+    return;
+  }
   worker.postMessage({
     action: "delete",
     file,
@@ -6131,7 +6159,7 @@ document.addEventListener("change", async function (e) {
           break;
         }
         case "chart-locations": {
-          const location = element.value ? Number(element.value) : null;
+          const location = element.value ? Number(element.value) : undefined;
           STATE.chart.location = location;
           callForChart();
           break;
@@ -6601,32 +6629,34 @@ async function createContextMenu(e) {
 
   DOM.contextMenu.innerHTML = `
     <div id="${inSummary ? "inSummary" : "inResults"}">
-        <a class="dropdown-item ${hideInSummary}" id="play-region"><span class='material-symbols-outlined'>play_circle</span> ${
+      <ul class="list-unstyled mb-1">
+        <li class="dropdown-item ${hideInSummary}" id="play-region"><span class='material-symbols-outlined'>play_circle</span> ${
     i18.play
-  }</a>
-        <a class="dropdown-item ${hideInSummary} ${hideInSelection}" href="#" id="context-analyse-selection">
+  }</li>
+        <li class="dropdown-item ${hideInSummary} ${hideInSelection}" id="context-analyse-selection">
         <span class="material-symbols-outlined">search</span> ${i18.analyse}
-        </a>
+        </li>
         <div class="dropdown-divider ${hideInSummary}"></div>
-        <a class="dropdown-item" id="create-manual-record" href="#">
+        <li class="dropdown-item" id="create-manual-record">
         <span class="material-symbols-outlined">edit_document</span> ${createOrEdit} ${
     i18.record
   }
-        </a>
-        <a class="dropdown-item" id="context-create-clip" href="#">
+        </li>
+        <li class="dropdown-item" id="context-create-clip">
         <span class="material-symbols-outlined">music_note</span> ${i18.export}
-        </a>
-        <span class="dropdown-item" id="context-xc" href='#' target="xc">
+        </li>
+        <span class="dropdown-item" id="context-xc" target="xc">
         <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> ${
           i18.compare
         }
         </span>
         <div class="dropdown-divider ${hideInSelection}"></div>
-        <a class="dropdown-item ${hideInSelection}" id="context-delete" href="#">
+        <li class="dropdown-item ${hideInSelection}" id="context-delete">
         <span class='delete material-symbols-outlined'>delete_forever</span> ${
           i18.delete
         }
-        </a>
+        </li>
+        </ul>
     </div>
     `;
   const modalTitle = document.getElementById("record-entry-modal-label");

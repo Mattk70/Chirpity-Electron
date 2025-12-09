@@ -1,8 +1,12 @@
 const DEBUG = false;
 
 const ZERO = new Date(1970, 0, 1)
-const filterLocation = (location) =>
-  location ? ` AND files.locationID = ${location}` : "";
+const filterLocation = (location) => {
+  if (location !== undefined) {
+    return location === 0 ? " AND files.locationID IS NULL " : ` AND files.locationID = ${location}`;
+  }
+  return "";
+};
 
 
 function getWeekAndDayOfYearAndLeapLocal(ts) {
@@ -83,32 +87,52 @@ const getMostCalls = (diskDB, location, species) => {
 const getChartTotals = ({
   diskDB,
   location,
-  species = undefined,
+  species,
   range = {},
   aggregation = "Week",
 }) => {
-  // Add Location filter
   const locationFilter = filterLocation(location);
   const useRange = range.start !== undefined;
-  // Work out sensible aggregations from hours difference in date range
+
   const intervalHours = useRange
     ? Math.round((range.end - range.start) / (1000 * 60 * 60))
     : Infinity;
+
   DEBUG && console.log(intervalHours, "difference in hours");
-  const speciesSQL = species ? ` AND species.cname = '${species}' ` : "";
-  const dateFilter = range.start
-    ? ` AND dateTime BETWEEN ${range.start} AND ${range.end} `
-    : "";
-  const whereSQL = speciesSQL || dateFilter || locationFilter ? "WHERE 1 " : "";
-  // Default values for grouping
+
+  // Build WHERE conditions
+  const whereParts = [];
+
+  if (locationFilter) {
+    whereParts.push(locationFilter.replace(" AND ", ""));
+  }
+  if (species) {
+    whereParts.push("species.cname = ?");
+  }
+
+  if (range.start) {
+    whereParts.push(`dateTime BETWEEN ${range.start} AND ${range.end}`);
+  }
+
+
+  const whereSQL = whereParts.length ? `WHERE ${whereParts.join(" AND ")}` : "";
+
+  // Parameters for sqlite3
+  const params = [];
+  if (species) params.push(species);
+
+  // Aggregation logic unchanged
   let groupBy = "week";
   let orderBy = "year";
   let dataPoints = 53;
   let startIndex = 1;
+
   switch (aggregation) {
     case "week": {
       dataPoints = Math.min(53, Math.ceil(intervalHours / 168));
-      const {week} = useRange ? getWeekAndDayOfYearAndLeapLocal(range.start) : {week:1} 
+      const { week } = useRange
+        ? getWeekAndDayOfYearAndLeapLocal(range.start)
+        : { week: 1 };
       startIndex = week;
       break;
     }
@@ -117,11 +141,14 @@ const getChartTotals = ({
       orderBy += ", week";
       let yearDays = 365;
       let startDay = 0;
+
       if (useRange) {
-          const { leapYear, dayOfYear } = getWeekAndDayOfYearAndLeapLocal(range.start);
-          yearDays = leapYear ? 366 : 365;
-          startDay = dayOfYear;
+        const { leapYear, dayOfYear } =
+          getWeekAndDayOfYearAndLeapLocal(range.start);
+        yearDays = leapYear ? 366 : 365;
+        startDay = dayOfYear;
       }
+
       dataPoints = Math.min(yearDays, Math.ceil(intervalHours / 24));
       startIndex = startDay;
       break;
@@ -136,29 +163,31 @@ const getChartTotals = ({
     }
   }
 
-  return new Promise(function (resolve, reject) {
+  return new Promise((resolve, reject) => {
     diskDB.all(
-      `SELECT CAST(STRFTIME('%Y', DATETIME(dateTime / 1000, 'unixepoch', 'localtime')) AS INTEGER) AS year, 
-          CAST(STRFTIME('%W', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS INTEGER) AS week,
-          CAST(STRFTIME('%j', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS INTEGER) AS day, 
-          CAST(STRFTIME('%H', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS INTEGER) AS hour,    
-          COUNT(*) as count
-          FROM records
-          JOIN species ON species.id = speciesID
-          JOIN files ON files.id = fileID
-          ${whereSQL} ${speciesSQL} ${dateFilter} ${locationFilter}
-          GROUP BY ${groupBy}
-          ORDER BY ${orderBy}`,
+      `
+      SELECT
+        CAST(STRFTIME('%Y', DATETIME(dateTime / 1000, 'unixepoch', 'localtime')) AS INTEGER) AS year,
+        CAST(STRFTIME('%W', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS INTEGER) AS week,
+        CAST(STRFTIME('%j', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS INTEGER) AS day,
+        CAST(STRFTIME('%H', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS INTEGER) AS hour,
+        COUNT(*) as count
+      FROM records
+      JOIN species ON species.id = speciesID
+      JOIN files ON files.id = fileID
+      ${whereSQL}
+      GROUP BY ${groupBy}
+      ORDER BY ${orderBy}
+      `,
+      params,
       (err, rows) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve([rows, dataPoints, aggregation, startIndex]);
-        }
+        if (err) return reject(err);
+        resolve([rows, dataPoints, aggregation, startIndex]);
       }
     );
   });
 };
+
 
 const getRate = (diskDB, location, species) => {
   return new Promise(function (resolve, reject) {
@@ -169,18 +198,22 @@ const getRate = (diskDB, location, species) => {
 
     diskDB.all(
       `select STRFTIME('%W', DATE(dateTime / 1000, 'unixepoch', 'localtime')) as week, COUNT(*) as calls
-          from records
-          JOIN species ON species.id = records.speciesID
-          JOIN files ON files.id = records.fileID
-          WHERE species.cname = ? ${locationFilter}
+          from records r
+          JOIN species s ON s.id = r.speciesID
+          JOIN files ON files.id = r.fileID
+          WHERE s.cname = ? ${locationFilter}
           group by week;`,
       species,
       (err, rows) => {
         for (let i = 0; i < rows.length; i++) {
           calls[parseInt(rows[i].week) - 1] = rows[i].calls;
         }
+        let locationSQL = '';
+        if (locationFilter) {
+          locationSQL = ` JOIN files ON files.id = duration.fileID  WHERE ${locationFilter.replace(" AND ", "")} `;
+        }
         diskDB.all(
-          "select STRFTIME('%W', DATE(duration.day / 1000, 'unixepoch', 'localtime')) as week, cast(sum(duration) as real)/3600  as total from duration group by week;",
+          `select STRFTIME('%W', DATE(duration.day / 1000, 'unixepoch', 'localtime')) as week, cast(sum(duration.duration) as real)/3600  as total from duration ${locationSQL} group by week;`,
           (err, rows) => {
             for (let i = 0; i < rows.length; i++) {
               // Round the total to 2 dp
