@@ -5197,12 +5197,14 @@ async function handleUIClicks(e) {
     }
     case "downloadChart": {
       // Download the chart
+      element.disabled = true;
       const imageURL = chartInstance.toBase64Image();
       const a = document.createElement('a');
       a.href = imageURL;
       a.download = 'chart.png';
       a.click();
       a.remove();
+      element.disabled = false;
       break;
     }
     case "explore": {
