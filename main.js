@@ -22,37 +22,52 @@ app.commandLine.appendSwitch("enable-features", "Vulkan");
 
 // Set the AppUserModelID (to prevent the two pinned icons bug)
 app.setAppUserModelId('com.electron.chirpity');
-
-// function copyFilesOnly(srcDir, destDir) {
-//   for (const item of fs.readdirSync(srcDir)) {
-//     if (['config.json', 
-//       'archive.sqlite', 
-//       'archive.sqlite.shm', 
-//       'archive.sqlite.wal', 
-//       'XCcache.json', 
-//       'settings.json'].includes(item)){
-//       const srcPath = path.join(srcDir, item);
-//       const destPath = path.join(destDir, item);
-//       // Copy files
-//       fs.copyFileSync(srcPath, destPath);
-//     }
-//   }
-// }
+const version = app.getVersion();
+function copyFilesOnly(srcDir, destDir) {
+  for (const item of fs.readdirSync(srcDir)) {
+    if (['config.json', 
+      'archive.sqlite', 
+      'archive.sqlite.shm', 
+      'archive.sqlite.wal', 
+      'XCcache.json', 
+      'settings.json'].includes(item)){
+      const srcPath = path.join(srcDir, item);
+      const destPath = path.join(destDir, item);
+      // Copy files
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
 // // When dmg is installed over a pkg installation, the app crashes, so...
 const userData = app.getPath("userData");
-// if (isMac && ! fs.existsSync(path.join(userData, 'pkg2dmg')) && fs.existsSync(path.join(userData, 'config.json'))){
-//   console.log(`existing config found`)
-//   try {
-//     const movedSettings = userData+' old'
-//     fs.renameSync(userData, movedSettings);
-//     fs.mkdirSync(userData)
-//     copyFilesOnly(movedSettings, userData)
-//     fs.writeFileSync(path.join(userData, 'pkg2dmg'), "");
-//     console.log('Migration done')
-//   } catch (err) {
-//     console.error(err);
-//   }
-// }
+const CONFIG_FILE = path.join(userData, 'config.json');
+    
+function checkForMigration() {
+  if (isMac && ! fs.existsSync(path.join(userData, 'pkg2dmg')) && fs.existsSync(CONFIG_FILE)){
+    console.log(`existing config found`)
+    try {
+      const data = fs.readFileSync(CONFIG_FILE);
+      const semver = require('semver');
+      const {VERSION} = JSON.parse(data);
+      if (semver.gt(VERSION, '5.6.1')) {
+        console.log(`No migrating needed for version ${VERSION}`)
+        fs.writeFileSync(path.join(userData, 'pkg2dmg'), "");
+        return; // no migration needed
+      }
+      console.log(`migrating settings from version ${VERSION}`)
+
+      const movedSettings = userData+' old'
+      fs.renameSync(userData, movedSettings);
+      fs.mkdirSync(userData)
+      copyFilesOnly(movedSettings, userData)
+      fs.writeFileSync(path.join(userData, 'pkg2dmg'), "");
+      console.log('Migration done')
+    } catch (err) {
+      console.error(err);
+    }
+  }
+}
+checkForMigration();
 
 const { autoUpdater } = require("electron-updater");
 const log = require("electron-log");
@@ -496,9 +511,9 @@ app.whenReady().then(async () => {
       "userData",
       path.join(process.env.PORTABLE_EXECUTABLE_DIR, "chirpity-data")
     );
-    ipcMain.handle("getVersion", () => app.getVersion() + " (Portable)");
+    ipcMain.handle("getVersion", () => version + " (Portable)");
   } else {
-    ipcMain.handle("getVersion", () => app.getVersion());
+    ipcMain.handle("getVersion", () => version);
   }
 
     ipcMain.handle('getInstallDate', (_e, date) => getInstallInfo(date));

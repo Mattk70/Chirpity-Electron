@@ -66,6 +66,7 @@ onmessage = async (e) => {
       case "change-threads": {
         const {threads} = e.data;
         await loadModel(modelPath, backend, batchSize, threads);
+        break;
       }
       case "load": {
         if (!session) {
