@@ -12,23 +12,14 @@ const sampleRate = 32000;
 const numClasses = 14795;
 const DEBUG = false;
 let modelPath;
-const imports = {
-  env: {
-    abort: (msg, file, line, col) => {
-      throw new Error(`wasm abort at ${file}:${line}:${col}`);
-    }
-  }
-};
-
-
-
 
 async function loadModel(mpath, backend, batchSize, threads) {
   if (session) {
     try { session.release(); } catch { /* ignore */ }
     session = null;
   }
-  const providers = backend === 'tensorflow' ? ['cpu'] : [ 'webgpu'];
+  const gpu = backend === 'webgpu';
+  const providers = gpu ? [ 'webgpu', 'cpu'] : ['cpu'];
   const freeDimensionOverrides = { 'batch': batchSize };
   const   preferredOutputLocation = {
     'label': 'cpu',         // keep label on CPU. This is the only output we use.
@@ -36,12 +27,13 @@ async function loadModel(mpath, backend, batchSize, threads) {
     'spatial_embedding': 'gpu-buffer',   
     'spectrogram': 'gpu-buffer'
   }
-
+  const threadOptions = gpu ? { intraOpNumThreads: 1, interOpNumThreads: 1 } : {};
+//  const executionProviderConfig = gpu ? { webgpu: {  preferredLayout: 'NHWC',  validationMode: 'wgpuOnly' } } : {};
   const sessionOptions = { 
-    executionProviders: providers, 
+    executionProviders: providers,
+    // executionProviderConfig,
     enableGraphCapture: true, 
-    intraOpNumThreads: threads || 0, 
-    interOpNumThreads: threads || 0, 
+    ...threadOptions,
     freeDimensionOverrides,
     preferredOutputLocation,
     // enableProfiling: true,
@@ -50,12 +42,6 @@ async function loadModel(mpath, backend, batchSize, threads) {
   const modelPath = path.join(mpath, 'perch_v2.onnx')
   session = await ort.InferenceSession.create(modelPath, sessionOptions);
 
-    // fetches = {
-    //   'label': createGPUTensor([batchSize,14795]),
-    //   'embedding': createGPUTensor([batchSize,1536]),
-    //   'spatial_embedding': createGPUTensor([batchSize,16,4,1536]),
-    //   'spectrogram': createGPUTensor([batchSize,500,128]),
-    // }
 }
 onmessage = async (e) => {
   const modelRequest = e.data.message;
@@ -179,11 +165,15 @@ async function predictChunk(
 }
 
 // Configure once (reuse these across calls)
-const K = 5; // top-K
-const topValuesBuf = new Float32Array(K);
-const topIndicesBuf = new Int16Array(K);
 const batchedIndices = Array.from({ length: batchSize });
 const batchedProbs   = Array.from({ length: batchSize });
+
+async function disposeGPUTensors(prediction) {
+  const {spectrogram, embedding, spatial_embedding} = prediction;
+  spectrogram.dispose();
+  embedding.dispose();
+  spatial_embedding.dispose();
+}
 
 /**
  * Predict batch post-process: returns [keys, batchedIndices, batchedProbs]
@@ -191,80 +181,24 @@ const batchedProbs   = Array.from({ length: batchSize });
  * - batchSize, numClasses, sampleRate available in outer scope / params
  */
 async function predictBatch(audio, keys) {
-  const prediction = await session.run({ inputs: audio });
-  const flat = prediction.label.cpuData; // assume Float32Array
-
-  for (let b = 0; b < batchSize; b++) {
-    const offset = b * numClasses;
-    const logits = flat.subarray(offset, offset + numClasses);
-    const {probs, idx} = topK(logits);
-
-    // // pass 1: find max and top-K indices on logits
-    // // initialise top-K buffers (lowest-first so values[K-1] is smallest)
-    // for (let i = 0; i < K; i++) {
-    //   topValuesBuf[i] = -Infinity;
-    //   topIndicesBuf[i] = -1;
-    // }
-
-    // let max = -Infinity;
-    // for (let i = 0; i < numClasses; i++) {
-    //   const v = flat[offset + i];
-    //   if (v > max) max = v;
-
-    //   // insert into top-K if better than current smallest
-    //   if (v > topValuesBuf[K - 1]) {
-    //     topValuesBuf[K - 1] = v;
-    //     topIndicesBuf[K - 1] = i;
-    //     // bubble up
-    //     for (let j = K - 1; j > 0 && topValuesBuf[j] > topValuesBuf[j - 1]; j--) {
-    //       const tv = topValuesBuf[j];
-    //       const ti = topIndicesBuf[j];
-    //       topValuesBuf[j] = topValuesBuf[j - 1];
-    //       topIndicesBuf[j] = topIndicesBuf[j - 1];
-    //       topValuesBuf[j - 1] = tv;
-    //       topIndicesBuf[j - 1] = ti;
-    //     }
-    //   }
-    // }
-
-    // // pass 2: compute sumExp and capture exponentials for top-K
-    // let sumExp = 0;
-    // // temp to store exp for top-k; index order matches topIndicesBuf
-    // const topExp = new Float32Array(K);
-
-    // for (let i = 0; i < numClasses; i++) {
-    //   const e = Math.exp(flat[offset + i] - max);
-    //   sumExp += e;
-
-    //   // if 'i' is one of topIndicesBuf, store its exp
-    //   // K is small -> linear scan across K is cheap
-    //   for (let t = 0; t < K; t++) {
-    //     if (topIndicesBuf[t] === i) {
-    //       topExp[t] = e;
-    //       break;
-    //     }
-    //   }
-    // }
-
-    // // compute final probabilities for top-K
-    // const probs = Array.from({ length: K });
-    // const indices = Array.from({ length: K });
-    // const invSum = 1 / sumExp;
-    // for (let t = 0; t < K; t++) {
-    //   indices[t] = topIndicesBuf[t];
-    //   probs[t] = topExp[t] * invSum;
-    // }
-    batchedIndices[b] = idx;
-    batchedProbs[b] = probs;
-  }
-
-  // convert keys to time strings once (not in the inner loop)
-  const scale = sampleRate; // or sampleRate * scaleFactor
-  for (let i = 0; i < keys.length; i++) {
-    keys[i] = (keys[i] / scale).toFixed(3);
-  }
-
-  return [keys, batchedIndices, batchedProbs];
+  return new Promise((resolve) => {
+    session.run({ inputs: audio }).then((prediction) => {
+      const flat = prediction.label.cpuData; // Float32Array
+      for (let b = 0; b < batchSize; b++) {
+        const offset = b * numClasses;
+        const logits = flat.subarray(offset, offset + numClasses);
+        const {probs, idx} = topK(logits);
+        batchedIndices[b] = idx;
+        batchedProbs[b] = probs;
+      }
+      resolve([keys, batchedIndices, batchedProbs]);
+      disposeGPUTensors(prediction)
+      })
+    // convert keys to time strings once (not in the inner loop)
+    for (let i = 0; i < keys.length; i++) {
+      keys[i] = (keys[i] / sampleRate).toFixed(3);
+    }
+  });
 }
 
 
@@ -274,4 +208,4 @@ function getKeys(numSamples, start) {
 
 const loadTopK = require("../utils/topKWASM.js");
 const { topK } = await loadTopK();
-// topkWasm.allocBuffers(numClasses);
+

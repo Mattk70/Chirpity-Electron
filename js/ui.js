@@ -1162,9 +1162,9 @@ async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults 
     if (modelReady) utils.enableMenuItem(["analyseAll", "reanalyseAll"]);
     STATE.openFiles = await sortFilesByTime(STATE.openFiles);
   }
-
+  utils.hideAll();
+  utils.showElement(["spectrogramWrapper"], false);
   loadAudioFileSync({ filePath: STATE.openFiles[0], preserveResults });
-
   // Clear unsaved records warning
   window.electron.unsavedRecords(false);
   document.getElementById("unsaved-icon").classList.add("d-none");
@@ -2815,6 +2815,7 @@ function debounceClick(handler, delay = 250) {
  */
 function handleKeyDown(e) {
   let action = e.key;
+  if (!config) return;
   config.debug && console.log(`${action} key pressed`);
   if (action in GLOBAL_ACTIONS) {
     DOM.contextMenu.classList.add("d-none");

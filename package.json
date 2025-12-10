@@ -66,6 +66,8 @@
     "afterAllArtifactBuild": "./build/createLegacyYML.js",
     "files": [
       "**/*",
+      "!assembly*${/*}",
+      "!asconfig.json",
       "!test*${/*}",
       "!build*${/*}",
       "!docs*${/*}",

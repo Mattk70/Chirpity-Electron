@@ -1,7 +1,6 @@
 // ---------------------------------------------------------
 // SIMD utilities
 // ---------------------------------------------------------
-// import { v128, f32x4 } from "../node_modules/assemblyscript/std/portable/";
 
 @inline
 function readF32(ptr: usize, i: i32): f32 {

@@ -48,9 +48,6 @@ async function loadTopK(path = "topK.wasm") {
     const idxPtr    = allocInt32(K);
   function topK(logits) {
     // const num = logits.length;
-
-
-
     writeFloat32(logitsPtr, logits);
 
     wasm.topk_softmax(logitsPtr, CLASSES, K, probsPtr, idxPtr);

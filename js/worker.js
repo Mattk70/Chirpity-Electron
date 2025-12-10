@@ -2373,7 +2373,7 @@ async function processAudio(
       STATE.backlogInterval[pid] = setInterval(() => {
         DEBUG && console.log(`[${pid}] backlog check: AUDIO_BACKLOG=${AUDIO_BACKLOG}`);
 
-        if (AUDIO_BACKLOG <= NUM_WORKERS * 2) {
+        if (AUDIO_BACKLOG <= 4) {
           DEBUG && console.log(`[${pid}] resuming ffmpeg (normal), backlog=${AUDIO_BACKLOG}`);
           resumeFfmpeg(command, pid);
           clearInterval(STATE.backlogInterval[pid]);
@@ -2480,37 +2480,28 @@ function getMonoChannelData(audio) {
     generateAlert({message: `WAV audio sample length must be even, got ${audio.length}`, type: 'error'})
     throw new Error(`Audio length must be even, got ${audio.length}`);
   }
-  const sampleCount = audio.length / 2;
-  const channelData = new Float32Array(sampleCount);
-  const dataView = new DataView(
-    audio.buffer,
-    audio.byteOffset,
-    audio.byteLength
-  );
-
-  // Process in blocks of 4 samples at a time for loop unrolling (optional)
+  const int16 = new Int16Array(audio.buffer, audio.byteOffset, audio.byteLength / 2);
+  const out = new Float32Array(int16.length);
+  const s = 1 / 32768;
+  const n = int16.length;
+  const end = n - (n % 8);
   let i = 0;
-  let j = 0;
-  const end = sampleCount - (sampleCount % 8); // Ensure we don’t overshoot the buffer
-
-  for (; i < end; i += 8, j += 16) {
-    // Unrolled loop
-    channelData[i] = dataView.getInt16(j, true) / 32768;
-    channelData[i + 1] = dataView.getInt16(j + 2, true) / 32768;
-    channelData[i + 2] = dataView.getInt16(j + 4, true) / 32768;
-    channelData[i + 3] = dataView.getInt16(j + 6, true) / 32768;
-    channelData[i + 4] = dataView.getInt16(j + 8, true) / 32768;
-    channelData[i + 5] = dataView.getInt16(j + 10, true) / 32768;
-    channelData[i + 6] = dataView.getInt16(j + 12, true) / 32768;
-    channelData[i + 7] = dataView.getInt16(j + 14, true) / 32768;
+  // Unroll for speed
+  for (; i < end; i += 8) {
+    out[i]     = int16[i]     * s;
+    out[i + 1] = int16[i + 1] * s;
+    out[i + 2] = int16[i + 2] * s;
+    out[i + 3] = int16[i + 3] * s;
+    out[i + 4] = int16[i + 4] * s;
+    out[i + 5] = int16[i + 5] * s;
+    out[i + 6] = int16[i + 6] * s;
+    out[i + 7] = int16[i + 7] * s;
   }
-
-  // Process remaining samples (if any)
-  for (; i < sampleCount; i++, j += 2) {
-    channelData[i] = dataView.getInt16(j, true) / 32768;
+  // Deal with remainder
+  for (; i < n; i++) {
+    out[i] = int16[i] * s;
   }
-
-  return channelData;
+  return out;
 }
 
 function prepareWavForModel(audio, file, end, chunkStart) {
