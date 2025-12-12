@@ -2754,34 +2754,6 @@ function formatDate(date, aggregation) {
   return formattedDate + date.toLocaleDateString(locale, options);
 }
 
-
-function getTooltipTitle(date, aggregation) {
-  if (aggregation === "week") {
-    // Customize for week view
-    return `Week ${getISOWeek(date)} (${getDateOfISOWeek(
-      getISOWeek(date)
-    )} - ${getDateOfISOWeek(getISOWeek(date) + 1)})`;
-  } else if (aggregation === "day") {
-    // Customize for day view
-    return date.toLocaleDateString("en-GB", {
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    });
-  } else {
-    // Customize for hour view
-    return (
-      date.toLocaleDateString("en-GB", { month: "short", day: "numeric" }) +
-      ", " +
-      date.toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "numeric",
-        hour12: true,
-      })
-    );
-  }
-}
-
 window.addEventListener("resize", function () {
   utils.waitForFinalEvent(
     async function () {
