@@ -1,7 +1,8 @@
 // topKWASM.js
 const fs = require("fs");
+const p = require('node:path');
 
-async function loadTopK(path = "topK.wasm") {
+async function loadTopK(path = p.join(__dirname, "../../topK.wasm")) {
   const bytes = fs.readFileSync(path);
 
   const imports = {
