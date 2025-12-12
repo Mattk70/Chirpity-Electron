@@ -89,6 +89,7 @@
   "delete": [
     "Slet aktuel post"
   ],
+  "shift-delete": ["Når resultaterne filtreres efter art <b>og</b> sorteres efter sikkerhed, vil dette slette den valgte post og alle poster med lavere sikkerhed"],
   "undo": [
     "Gendan slettede post(er)"
   ],
