@@ -74,7 +74,7 @@ function isValidUUID(uuid) {
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const timeoutId = setTimeout(() => controller.abort(`Request timed out after ${REQUEST_TIMEOUT_MS} ms`), REQUEST_TIMEOUT_MS);
 
     const response = await fetch(MEMBERSHIP_API_ENDPOINT, {
        method: 'POST',

@@ -1,6 +1,6 @@
 {
   "name": "Chirpity",
-  "version": "5.6.2",
+  "version": "5.7.0",
   "description": "Chirpity is a bioacoustics platform for the analysis of bird song and other wildlife sounds. It uses machine learning models to identify bird species from audio recordings.",
   "main": "main.js",
   "scripts": {
@@ -18,7 +18,10 @@
     "build": "electron-builder --win --x64 -p always",
     "testBuild": "electron-builder --win",
     "postinstall": "electron-builder install-app-deps",
-    "test": "playwright test"
+    "test": "playwright test",
+    "asbuild:debug": "asc assembly/index.ts --target debug",
+    "asbuild:release": "asc assembly/index.ts --target release",
+    "asbuild": "npm run asbuild:debug && npm run asbuild:release"
   },
   "repository": {
     "type": "git",
@@ -63,6 +66,8 @@
     "afterAllArtifactBuild": "./build/createLegacyYML.js",
     "files": [
       "**/*",
+      "!assembly*${/*}",
+      "!asconfig.json",
       "!test*${/*}",
       "!build*${/*}",
       "!docs*${/*}",
@@ -145,7 +150,9 @@
     "mac": {
       "target": {
         "target": "default",
-        "arch": ["arm64"]
+        "arch": [
+          "arm64"
+        ]
       },
       "artifactName": "${productName}-${arch}.${ext}",
       "type": "distribution",
@@ -207,6 +214,7 @@
   "devDependencies": {
     "@playwright/test": "^1.48.2",
     "@types/node": "^22.9.0",
+    "assemblyscript": "^0.28.9",
     "docdash": "^2.0.2",
     "electron": "^39.2.4",
     "electron-builder": "26.0.12",

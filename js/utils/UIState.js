@@ -14,7 +14,7 @@ export class UIState {
         analysisDone: false,
         openFiles: [],
         chart: {
-          aggregation: "Week",
+          aggregation: "week",
           species: undefined,
           range: { start: undefined, end: undefined },
         },

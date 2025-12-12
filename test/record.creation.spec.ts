@@ -121,7 +121,8 @@ test('Can create/edit a manual record', async () => {
   await page.locator('#bird-autocomplete').fill('ring o');
 
   // Locate and click the first suggestion in the list
-  await page.locator('#contentWrapper li:nth-of-type(1)').click();
+  await page.locator('#bird-suggestions li.list-group-item').first().click();
+
 
   // Check that div#selected-bird innerText starts with "Ring Ouzel"
   await expect(selectedBird).toHaveText(/^Ring Ouzel/);

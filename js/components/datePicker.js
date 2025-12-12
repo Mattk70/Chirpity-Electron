@@ -148,7 +148,6 @@ function initialiseDatePicker(state, worker, config, resetResults, filterResults
       if (element.id === "chartRange") {
         state.chart.range = { start: start.getTime(), end: end.getTime() };
         worker.postMessage({ action: "update-state", chart: state.chart });
-        t0 = Date.now();
         worker.postMessage({
           action: "chart",
           species: state.chart.species,
@@ -179,7 +178,6 @@ function initialiseDatePicker(state, worker, config, resetResults, filterResults
       if (element.id === "chartRange") {
         state.chart.range = { start: undefined, end: undefined };
         worker.postMessage({ action: "update-state", chart: state.chart });
-        t0 = Date.now();
         worker.postMessage({
           action: "chart",
           species: state.chart.species,

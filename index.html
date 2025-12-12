@@ -578,8 +578,8 @@
     <div class="d-none h-100 overflow-auto" id="recordsContainer">
         <div class="container-fluid">
             <div class="row p-1 g-1 justify-content-evenly">
-                <div class="col-3 pt-4">
-                    <div class="col d-none">
+                <div class="col-3 pt-4" style="max-width: 25rem;" >
+                    <div class="col pt-2">
                         <div class="btn btn-light pt-3 mb-2" id="chartRange">
                             <span class="material-symbols-outlined align-bottom">date_range</span>&nbsp;
                             <span id="chart-datefilter">Apply a date filter</span> <span
@@ -598,56 +598,45 @@
                             <ul id="bird-suggestions-chart" class="suggestions list-group"></ul>
                         </div>
                     </div>
-                    <div class="col d-none">
+                    <div class="col">
                         <div id="chart-location-list" class="form-floating">
-                            <select spellcheck="false" class="input form-select mb-3" aria-label=".form-select"
+                            <select spellcheck="false" class="input form-select mb-3 locked" aria-label=".form-select"
                             id="chart-locations"></select>
-                            <label for="explore-locations">Location</label>
+                            <label for="chart-locations">Location <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature.">
+                                <span class="pointer locked material-symbols-outlined">lock</span></a></label>
                         </div>
                     </div>
-                    <div class="col d-none">
+                    <div class="col">
                         <fieldset class="border border rounded bg-light p-2">
-                            <legend class="h6">Sum Detections by:</legend>
+                            <legend class="h6" id="GroupBy">Group detections by:</legend>
                             <div class="form-row">
                                 <div class="form-check-inline">
-                                    <input class="form-check-input" type="radio" name="showTotals" id="hourTotal" value="Hour">
-                                    <label class="form-check-label" for="hourTotal">Hour</label>
+                                    <input class="form-check-input" type="radio" name="showTotals" id="hour" value="hour">
+                                    <label class="form-check-label" for="hour">Hour</label>
                                 </div>
                                 <div class="form-check-inline">
-                                    <input class="form-check-input" type="radio" name="showTotals" id="dayTotal" value="Day">
-                                    <label class="form-check-label" for="dayTotal">Day</label>
+                                    <input class="form-check-input" type="radio" name="showTotals" id="day" value="day">
+                                    <label class="form-check-label" for="day">Day</label>
                                 </div>
                                 <div class="form-check-inline pb-3">
-                                    <input class="form-check-input" type="radio" name="showTotals" id="weekTotal" value="Week">
-                                    <label class="form-check-label" for="weekTotal">Week</label>
-                                </div>
-                            </div>
-                            <legend class="h6">Group Detections by:</legend>
-                            <div class="form-row">
-                                <div class="form-check-inline">
-                                    <input class="form-check-input" type="radio" name="groupTotals" id="dayGroup" value="Day">
-                                    <label class="form-check-label" for="dayGroup">Day</label>
-                                </div>
-                                <div class="form-check-inline">
-                                    <input class="form-check-input" type="radio" name="groupTotals" id="weekGroup" value="Week">
-                                    <label class="form-check-label" for="weekGroup">Week</label>
-                                </div>
-                                <div class="form-check-inline">
-                                    <input class="form-check-input" type="radio" name="groupTotals" id="monthGroup" value="Month">
-                                    <label class="form-check-label" for="monthGroup">Month</label>
+                                    <input class="form-check-input" type="radio" name="showTotals" id="week" value="week" checked>
+                                    <label class="form-check-label" for="week">Week</label>
                                 </div>
                             </div>
                             <div class="form-row pt-3">
                                 <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" role="switch" name="stackYears" id="stackYears" checked>
-                                    <label class="form-check-label" for="stackYears">Stack Years</label>
+                                    <input class="form-check-input" type="checkbox" role="switch" name="stackYears" id="stackYears">
+                                    <label class="form-check-label" for="stackYears">Split results by year</label>
                                 </div>
+                            </div>
+                            <div class="form-row pt-3">
+                                <button id="downloadChart" class="btn btn-primary w-100">Export Chart Image</button>
                             </div>
                         </fieldset>
                     </div>
                 </div>                            
                 <div class="col-9">
-                    <div class="chart-outer position-relative">
+                    <div class="chart-outer position-relative" id="chart-outer">
                         <span class="material-symbols-outlined text-muted" style="z-index: 2;position: absolute; top: 40px; left: 30px" title="View Fullscreen" onclick="goFullscreen()">fullscreen</span>
                         <canvas class="border border-dark rounded-3 w-100" id="chart-week"></canvas>
                     </div>
@@ -662,11 +651,11 @@
                                 <th id="speciesName" class="text-center" colspan="6"></th>
                             </tr>
                             <tr>
-                                <th>Earliest Spring Record</th>
-                                <th>Latest Spring Record</th>
-                                <th>Earliest Autumn Record</th>
-                                <th>Latest Autumn Record</th>
-                                <th>Most Calls in 24 hours</th>
+                                <th id="ESR">Earliest Spring Record</th>
+                                <th id="LSR">Latest Spring Record</th>
+                                <th id="EAR">Earliest Autumn Record</th>
+                                <th id="LAR">Latest Autumn Record</th>
+                                <th id="MC">Most Calls in 24 hours</th>
                             </tr>
                             <tr>
                                 <td id="earliestSpring"></td>
@@ -1118,15 +1107,6 @@
                                 </div>
                             </div>
                         </div>
-                        <!-- <div>
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Prevent system sleep" id="Prevent system sleep-circle-help"  data-bs-content="When enabled, prevent the system from suspending whilst Chirpity is in use.">?</a>
-                            <div class="pe-3 form-group rounded p-2 mb-2">
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" role="switch" id="power-save-block">
-                                    <label class="form-check-label" for="power-save-block">Prevent system sleep</label>
-                                </div>
-                            </div>
-                        </div> -->
                         <div>
                             <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="File timestamp marks recording start" id="File-timestamp-circle-help"  data-bs-content="Some audio recorders, for example the Zoom H1 Essential, can set the file saved date and time to the beginning of the recording, rather than the end. 
                                     If you have such a recorder selecting this option will fix the times shown for your detections.">?</a>
@@ -1621,53 +1601,52 @@
             <div id="main_nav">
                 <ul class="navbar-nav">
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="navBarFile" data-bs-toggle="dropdown">
+                        <a class="nav-link dropdown-toggle" id="navBarFile" data-bs-toggle="dropdown">
                             File
                         </a>
                         <ul class="dropdown-menu">
-                            <li><a id="open-file" class="dropdown-item" href="#">
+                            <li id="open-file" class="dropdown-item">
                                 <span class="material-symbols-outlined">file_open</span> Open Audio
-                                File(s) <span class="shortcut float-end">Ctrl+O</span></a>
+                                File(s) <span class="shortcut float-end">Ctrl+O</span>
                             </li>
-                            <li><a id="open-folder" class="dropdown-item" href="#">
+                            <li id="open-folder" class="dropdown-item">
                                 <span class="material-symbols-outlined">folder_open</span> Open 
-                                Folder(s)</a>
+                                Folder(s)
                             </li>
                             <div class="dropdown-divider"></div>
-                            <li><a class="dropdown-item disabled" id="saveCSV" href="#">
+                            <li class="dropdown-item disabled" id="saveCSV">
                                 <span class="material-symbols-outlined">ios_share</span> Export Results
-                                to CSV</a>
+                                to CSV
                             </li>
-                            <li><a class="dropdown-item disabled" id="save-summary" href="#">
+                            <li class="dropdown-item disabled" id="save-summary">
                                 <span class="material-symbols-outlined">ios_share</span> Export Summary
-                                to CSV</a>
+                                to CSV
                             </li>
-                            <li><a class="dropdown-item disabled" id="save-eBird" href="#">
-                                <span class="material-symbols-outlined">ios_share</span> Export eBird Record file</a>
+                            <li class="dropdown-item disabled" id="save-eBird">
+                                <span class="material-symbols-outlined">ios_share</span> Export eBird Record file
                             </li>
-                            <li><a class="dropdown-item disabled" id="save-Raven" href="#">
-                                <span class="material-symbols-outlined">ios_share</span> Export Raven Selection Table</a>
+                            <li class="dropdown-item disabled" id="save-Raven">
+                                <span class="material-symbols-outlined">ios_share</span> Export Raven Selection Table
                             </li>
-                            <li><a class="dropdown-item disabled" id="export-audio" href="#">
+                            <li class="dropdown-item disabled" id="export-audio">
                                 <span class="material-symbols-outlined">music_note</span> Export Selected
-                                Audio <span class="shortcut float-end">Ctrl+E</span></a>
+                                Audio <span class="shortcut float-end">Ctrl+E</span>
                             </li>
-                            <li><a class="dropdown-item disabled" id="saveLabels" href="#">
+                            <li class="dropdown-item disabled" id="saveLabels">
                                 <span class="material-symbols-outlined">label</span> Save Audacity
-                                Labels</a>
+                                Labels
                             </li>
                             <div class="dropdown-divider"></div>
-                            <li>
-                               <div class="row ms-0 me-0">
-                                <a class="dropdown-item locked disabled col" id="import-csv" href="#">
-                                <span class="material-symbols-outlined">place_item</span> Import Results from CSV</a>
-                                <a class="padlock col-auto" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a member via &quot;Buy Me a Coffee&quot; to unlock this feature.">
-                                    <span class="pointer locked material-symbols-outlined float-end mt-1">lock</span></a>
-                                </div> 
-                            </li>
+                            <div class="row ms-0 me-0">
+                                <li class="dropdown-item locked disabled col" id="import-csv">
+                                    <span class="material-symbols-outlined">place_item</span> Import Results from CSV
+                                    <span class="padlock col-auto" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a member via &quot;Buy Me a Coffee&quot; to unlock this feature.">
+                                        <span class="pointer locked material-symbols-outlined float-end mt-1">lock</span></span>
+                                </li>
+                            </div> 
                             <li><div class="dropdown-divider"></div></li>
-                            <li><a class="dropdown-item" href="#" id="exit">
-                                <span class="material-symbols-outlined">highlight_off</span> Exit</a>
+                            <li class="dropdown-item" id="exit">
+                                <span class="material-symbols-outlined">highlight_off</span> Exit
                             </li>
                         </ul>
                         </li>
@@ -1708,26 +1687,26 @@
                         data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                         Analysis</a>
                     <ul class="dropdown-menu" aria-labelledby="navbarAnalysis">
-                        <li><a class="dropdown-item disabled" href="#" id="analyse">
+                        <li class="dropdown-item disabled" id="analyse">
                             <span class="material-symbols-outlined">search</span> Analyse Current File
-                            <span class="shortcut float-end">Ctrl+A</span> </a>
+                            <span class="shortcut float-end">Ctrl+A</span>
                         </li>
-                        <li><a class="dropdown-item disabled" href="#" id="analyseSelection">
+                        <li class="dropdown-item disabled" id="analyseSelection">
                             <span class="material-symbols-outlined">manage_search</span> Analyse Selected
-                            Interval</a>
+                            Interval
                         </li>
-                        <li><a class="dropdown-item disabled" href="#" id="analyseAll">
+                        <li class="dropdown-item disabled" id="analyseAll">
                             <span class="material-symbols-outlined">search</span> Analyse All Open
-                            Files <span class="shortcut float-end">Ctrl+Shift+A</span></a>
+                            Files <span class="shortcut float-end">Ctrl+Shift+A</span>
                         </li>
                         <li class="dropdown-divider"></li>
-                        <li><a class="dropdown-item disabled" href="#" id="reanalyse">
+                        <li class="dropdown-item disabled" id="reanalyse">
                             <span class="material-symbols-outlined">youtube_searched_for</span> Re-analyse
-                            Current File</a>
+                            Current File
                         </li>
-                        <li><a class="dropdown-item disabled" href="#" id="reanalyseAll">
+                        <li class="dropdown-item disabled" id="reanalyseAll">
                             <span class="material-symbols-outlined">youtube_searched_for</span> Re-analyse All
-                            Open Files</a>
+                            Open Files
                         </li>
                     </ul>
                 </li>
@@ -1736,92 +1715,71 @@
                         data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Training functions are only available when using the BirdNET model">
                         Train</a>
                     <ul class="dropdown-menu" aria-labelledby="navbarTraining">
-                        <li>
-                            <div class="row ms-0 me-0">
-                                <a class="dropdown-item locked disabled col" id="open-training" href="#">
+                        <div class="row ms-0 me-0">
+                            <li class="dropdown-item locked disabled col" id="open-training">
                                 <span class="material-symbols-outlined">model_training</span> Train a Custom Model
-                                <span>
-                                    <a class="padlock col" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a member to unlock this feature.">
+                                <span class="padlock col" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a member to unlock this feature.">
                                         <span class="pointer locked material-symbols-outlined float-end mt-1">lock</span>
-                                    </a>
                                 </span>
-                                </a>
-                            </div> 
-                        </li>
-                        <li>
-                            <div class="row ms-0 me-0">
-                                <a class="dropdown-item d-flex locked disabled col" id="import-model" href="#">
+                            </li>
+                        </div> 
+                        <div class="row ms-0 me-0">
+                            <li class="dropdown-item d-flex locked disabled col" id="import-model">
                                 <span class="material-symbols-outlined pe-1">account_circle</span> Import a Custom Model
-                                <span>
-                                    <a class="padlock col" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a member to unlock this feature.">
+                                <span class="padlock col" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a member to unlock this feature.">
                                         <span class="pointer locked material-symbols-outlined float-end mt-1">lock</span>
-                                    </a>
                                 </span>
-                                </a>
-                            </div> 
-                        </li>
-                        <li>
-                            <div class="row ms-0 me-0">
-                                <a class="dropdown-item locked disabled col" id="remove-model" href="#">
+                            </li>
+                        </div> 
+                        <div class="row ms-0 me-0">
+                            <li class="dropdown-item locked disabled col" id="remove-model">
                                 <span class="material-symbols-outlined">no_accounts</span> Remove a Custom Model
                                 <span>
                                     <a class="padlock col" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a member to unlock this feature.">
                                         <span class="pointer locked material-symbols-outlined float-end mt-1">lock</span>
                                     </a>
                                 </span>
-                                </a>
-                            </div> 
-                        </li>
+                            </li>
+                        </div> 
                     </ul>
                 </li>
                 <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="navbarHelp" role="button"
+                    <span class="nav-link dropdown-toggle" id="navbarHelp" role="button"
                     data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                    Help</a>
+                    Help</span>
                 <ul class="dropdown-menu" aria-labelledby="navBarHelp">
-                    <li><a class="dropdown-item" id="usage" href="#">
-                        <span class="material-symbols-outlined">help</span> Using Chirpity</a>
+                    <li class="dropdown-item" id="usage">
+                        <span class="material-symbols-outlined">help</span> Using Chirpity
                     </li>
-                    <!-- <li>
-                        <a class="dropdown-item" id="settingsHelp" href="#">
+                    <!-- <li class="dropdown-item" id="settingsHelp">
                             <span class="material-symbols-outlined">help</span> Settings
-                        </a>
                     </li> -->
-                    <li><a class="dropdown-item" id="keyboardHelp" href="#">
-                        <span class="material-symbols-outlined">help</span> Keyboard Shortcuts</a>
+                    <li class="dropdown-item" id="keyboardHelp">
+                        <span class="material-symbols-outlined">help</span> Keyboard Shortcuts
                     </li>
-                    <li>
-                        <a class="dropdown-item" id="trainingHelp" href="#">
-                            <span class="material-symbols-outlined">help</span> Training settings
-                        </a>
+                    <li class="dropdown-item" id="trainingHelp">
+                        <span class="material-symbols-outlined">help</span> Training settings
                     </li>
-                    <li>
-                        <a class="dropdown-item" id="startTour" href="#">
-                            <span class="material-symbols-outlined">tour</span> Show Tour</a>
+                    <li class="dropdown-item" id="startTour">
+                        <span class="material-symbols-outlined">tour</span> Show Tour</li>
                     </li>
                     <li class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" id="diagnostics" href="#">
-                        <span class="material-symbols-outlined">insights</span> Diagnostics</a>
+                    <li class="dropdown-item" id="diagnostics">
+                        <span class="material-symbols-outlined">insights</span> Diagnostics
                     </li>
-                    <li>
-                        <a class="dropdown-item" id="known-issues" href="#">
-                            <span class="material-symbols-outlined">bug_report</span> Known Issues</a>
+                    <li class="dropdown-item" id="known-issues">
+                        <span class="material-symbols-outlined">bug_report</span> Known Issues
                     </li>
-                    <li>
-                        <a class="dropdown-item" id="community" href="#">
-                            <span class="material-symbols-outlined">forum</span> Join the community</a>
+                    <li class="dropdown-item" id="community">
+                            <span class="material-symbols-outlined">forum</span> Join the community
                     </li>
                     <li class="dropdown-divider"></li>
                     <h6 class="fs-6 ps-3" id="FAQ">FAQs</h6>
-                    <li>
-                        <a class="dropdown-item" id="species" href="#">
+                    <li class="dropdown-item" id="species">
                             <span class="material-symbols-outlined">help</span> What species are detected?
-                        </a>
                     </li>
-                    <li>
-                        <a class="dropdown-item" id="eBird" href="#">
+                    <li class="dropdown-item" id="eBird">
                             <span class="material-symbols-outlined">help</span> What is an eBird Record?
-                        </a>
                     </li>
                 </ul>
             </li>

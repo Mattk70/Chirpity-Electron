@@ -290,8 +290,8 @@ const GLOBAL_ACTIONS = {
       }
     }
   },
-  Delete: () => STATE.fileLoaded && activeRow && deleteRecord(activeRow),
-  Backspace: () => STATE.fileLoaded && activeRow && deleteRecord(activeRow),
+  Delete: (e) => STATE.fileLoaded && activeRow && deleteRecord(e),
+  Backspace: (e) => STATE.fileLoaded && activeRow && deleteRecord(e),
 };
 
 /**
@@ -411,27 +411,28 @@ let predictions = new Map(),
   clickedIndex;
 // Set content container height
 DOM.contentWrapper.style.height = document.body.clientHeight - 80 + "px";
-
+let animating = false;
 // Mouse down event to start dragging
 DOM.controlsWrapper.addEventListener("mousedown", (e) => {
   if (e.target.tagName !== "DIV") return;
   const startY = e.clientY;
   const initialHeight = DOM.spectrogram.offsetHeight;
   let newHeight;
-  let debounceTimer;
 
   const onMouseMove = (e) => {
-    clearTimeout(debounceTimer);
     // Calculate the delta y (drag distance)
     newHeight = initialHeight + e.clientY - startY;
     // Clamp newHeight to ensure it doesn't exceed the available height
     newHeight = Math.min(newHeight, spec.maxHeight(DOM));
     // Adjust the spectrogram dimensions accordingly
-    debounceTimer = setTimeout(() => {
-      spec.adjustDims(true, config.FFT, newHeight);
-    }, 100);
+    if (!animating) {
+      animating = true;
+      requestAnimationFrame(() => {
+        spec.adjustDims(true, config.FFT, newHeight);
+        animating = false;
+      });
+    }
   };
-
   // Remove event listener on mouseup
   const onMouseUp = () => {
     document.removeEventListener("mousemove", onMouseMove);
@@ -441,6 +442,32 @@ DOM.controlsWrapper.addEventListener("mousedown", (e) => {
   document.addEventListener("mousemove", onMouseMove);
   document.addEventListener("mouseup", onMouseUp, { once: true });
 });
+
+//Drag to resize chart
+const chartContainer = document.getElementById("chart-outer");
+chartContainer.addEventListener("mousedown", (e) => {
+  if (e.target.tagName !== "CANVAS") return;
+  document.body.style.cursor = "ns-resize";
+  const startY = e.clientY;
+  const initialHeight = chartContainer.offsetHeight;
+  let newHeight;
+  const onMouseMove = (e) => {
+    newHeight = initialHeight + e.clientY - startY;
+    // Clamp newHeight to ensure it doesn't exceed the available height
+    newHeight = Math.min(newHeight, document.body.clientHeight - 300);
+    chartContainer.style.height = newHeight + "px";
+};
+  // Remove event listener on mouseup
+  const onMouseUp = () => {
+    document.body.style.cursor = "default";
+    document.removeEventListener("mousemove", onMouseMove);
+    trackEvent(config.UUID, "Drag", "Chart Resize", newHeight);
+  };
+  // Attach event listeners for mousemove and mouseup
+  document.addEventListener("mousemove", onMouseMove);
+  document.addEventListener("mouseup", onMouseUp, { once: true });
+});
+
 
 // Set default Options
 let config;
@@ -1135,9 +1162,9 @@ async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults 
     if (modelReady) utils.enableMenuItem(["analyseAll", "reanalyseAll"]);
     STATE.openFiles = await sortFilesByTime(STATE.openFiles);
   }
-
+  utils.hideAll();
+  utils.showElement(["spectrogramWrapper"], false);
   loadAudioFileSync({ filePath: STATE.openFiles[0], preserveResults });
-
   // Clear unsaved records warning
   window.electron.unsavedRecords(false);
   document.getElementById("unsaved-icon").classList.add("d-none");
@@ -1410,7 +1437,9 @@ async function exportData(
 }
 
 const handleLocationFilterChange = (e) => {
-  const location = parseInt(e.target.value) || undefined;
+  const value = e.target.value;
+  const parsed = value === "" ? undefined : parseInt(value, 10);
+  const location = Number.isFinite(parsed) ? parsed : undefined;
   worker.postMessage({ action: "update-state", locationID: location });
   // Update the seen species list
   worker.postMessage({ action: "get-detected-species-list" });
@@ -1485,11 +1514,7 @@ async function showCharts() {
   utils.hideAll();
  
   utils.showElement(["recordsContainer"]);
-  worker.postMessage({
-    action: "chart",
-    species: undefined,
-    range: STATE.chart.range,
-  });
+  callForChart();
 }
 
 
@@ -1858,271 +1883,271 @@ window.onload = async () => {
   document.getElementById("year").textContent = new Date().getFullYear();
   await appVersionLoaded;
   document.getElementById("version").textContent = VERSION;
-  const configFile = p.join(appPath, "config.json");
-  fs.readFile(configFile, "utf8", async (err, data) => {
-    if (err) {
-      console.log("Config not loaded, using defaults");
-      // Use defaults if no config file
-      if (!fs.existsSync(configFile)) config = defaultConfig;
-      else {
-        generateToast({ type: "error", message: "configReadError" });
-        config = defaultConfig;
-      }
-    } else {
-      config = JSON.parse(data);
-    }
-    config.UUID ??= await window.electron.getUUID();
-    // Attach an error event listener to the window object
-    window.onerror = function (message, file, lineno, colno, error) {
-      trackEvent(
-        config.UUID,
-        "Error",
-        error.message,
-        encodeURIComponent(error.stack)
-      );
-      // Return false not to inhibit the default error handling
-      return false;
-    };
+  const configPath = p.join(appPath, "config.json");
+  const configFile = await fs.promises.readFile(configPath, "utf8").catch(err =>{
+    console.log("Config not found, using defaults", err);
+    config = defaultConfig
+  });
+  
+  if (configFile) {
+    config = JSON.parse(configFile);
     //fill in defaults - after updates add new items
     utils.syncConfig(config, defaultConfig);
+  }
 
-    const isMember = await membershipCheck()
-      .catch(err => {console.error(err); return false});
-    STATE.isMember = isMember;
-
-    
-    const { library, database, detect, filters, audio, 
-      limit, locale, speciesThreshold, list, useWeek, UUID, 
-      local, debug, fileStartMtime, specDetections } = config;
-    
-    let modelPath = config.models[config.selectedModel].modelPath;
-    if (modelPath){
-      if (!fs.existsSync(modelPath)) {
-        generateToast({ type: "error", message: "modelPathNotFound", variables: {modelPath} });
-        worker.postMessage({action: "update-state",
-          modelPath: undefined,
-          model: 'birdnet'
-        });
-        config.selectedModel = 'birdnet';
-        modelPath = undefined;
-      }
-    }
-    const selectedModel = config.selectedModel;
-
-    updateListOptions(selectedModel);
-    if (detect.combine) document.getElementById('model-icon').classList.remove('d-none')
-    debug && document.getElementById('dataset').classList.remove('d-none')
-    isMember && updateModelOptions();
-
-    worker.postMessage({
-      action: "update-state",
-      model: selectedModel,
-      library,
-      database,
-      path: appPath,
-      temp: tempPath,
-      lat: config.latitude,
-      lon: config.longitude,
-      place: config.location,
-      detect,
-      filters,
-      audio,
-      limit,
-      locale,
-      speciesThreshold,
-      list,
-      useWeek,
-      local,
-      UUID,
-      debug,
-      fileStartMtime,
-      specDetections,
-    });
-    t0_warmup = Date.now();
-    if (isTestEnv) {
-      config.models[selectedModel].backend = "tensorflow";
-    }
-    const backend = config.models[config.selectedModel].backend;
-
-    worker.postMessage({
-      action: "_init_",
-      model: selectedModel,
-      batchSize: config[backend].batchSize,
-      threads: config[backend].threads,
-      backend,
-      list,
-      modelPath
-    });
-    // Disable SNR
-    config.filters.SNR = 0;
-
-    // set version
-    config.VERSION = VERSION;
-    DIAGNOSTICS["UUID"] = config.UUID;
-
-    // Set UI option state
-    // Fontsize
-    config.fontScale === 1 || setFontSizeScale(true);
-
-    // Map slider value to batch size
-    DOM.batchSizeSlider.value = 
-      config[config.models[config.selectedModel].backend].batchSize;
-    DOM.batchSizeValue.textContent =
-      config[config.models[config.selectedModel].backend].batchSize;
-    DOM.modelToUse.value = config.selectedModel;
-    const backendEL = document.getElementById(config.models[config.selectedModel].backend);
-    backendEL.checked = true;
-    // Show time of day in results?
-    setTimelinePreferences();
-    // Show the list in use
-    DOM.listToUse.value = config.list;
-    DOM.localSwitch.checked = config.local;
-    // Show Locale
-    DOM.locale.value = config.locale;
-    LIST_MAP = i18n.get(i18n.LIST_MAP);
-    // Localise UI
-    i18n.localiseUI(DOM.locale.value).then((result) => (STATE.i18n = result));
-    initialiseDatePicker(STATE, worker, config, resetResults, filterResults, generateToast);
-    STATE.picker.options.lang = DOM.locale.value.replace("_uk", "");
-
-    // remember audio notification setting
-    DOM.audioNotification.checked = config.audio.notification;
-    // Zoom H1E filestart handling:
-    document.getElementById("file-timestamp").checked = config.fileStartMtime;
-
-    // timeline
-    DOM.timelineSetting.value = config.timeOfDay ? "timeOfDay" : "timecode";
-    // Spectrogram colour
-    if (config.colormap === "igreys") config.colormap = "gray";
-    DOM.colourmap.value = config.colormap;
-
-    // Spectrogram labels
-    DOM.specLabels.checked = config.specLabels;
-    // Show all detections
-    DOM.specDetections.checked = config.specDetections;
-    // Spectrogram frequencies
-    DOM.fromInput.value = config.audio.frequencyMin;
-    DOM.fromSlider.value = config.audio.frequencyMin;
-    DOM.toInput.value = config.audio.frequencyMax;
-    DOM.toSlider.value = config.audio.frequencyMax;
-    fillSlider(DOM.fromInput, DOM.toInput, "#C6C6C6", "#0d6efd", DOM.toSlider);
-    checkFilteredFrequency();
-    // Window function & colormap
-    document.getElementById("window-function").value =
-      config.customColormap.windowFn;
-    config.customColormap.windowFn === "gauss" &&
-      document.getElementById("alpha").classList.remove("d-none");
-    config.colormap === "custom" &&
-      document.getElementById("colormap-fieldset").classList.remove("d-none");
-    const {loud, mid, quiet, quietThreshold, midThreshold, alpha} = config.customColormap;
-    document.getElementById("quiet-color-threshold").textContent = quietThreshold;
-    document.getElementById("quiet-color-threshold-slider").value = quietThreshold;
-    document.getElementById("mid-color-threshold").textContent = midThreshold;
-    document.getElementById("mid-color-threshold-slider").value = midThreshold;
-    document.getElementById("loud-color").value = loud;
-    document.getElementById("mid-color").value = mid;
-    document.getElementById("quiet-color").value = quiet;
-    document.getElementById("alpha-slider").value = alpha;
-    document.getElementById("alpha-value").textContent = alpha;
-    
-    // Audio preferences:
-    DOM.gain.value = config.audio.gain;
-    DOM.gainAdjustment.textContent = config.audio.gain + "dB";
-    DOM.normalise.checked = config.filters.normalise;
-    DOM.audioFormat.value = config.audio.format;
-    DOM.audioBitrate.value = config.audio.bitrate;
-    DOM.audioQuality.value = config.audio.quality;
-    showRelevantAudioQuality();
-    DOM.audioFade.checked = config.audio.fade;
-    DOM.audioPadding.checked = config.audio.padding;
-    DOM.audioFade.disabled = !DOM.audioPadding.checked;
-    DOM.audioDownmix.checked = config.audio.downmix;
-    setNocmig(config.detect.nocmig);
-    document.getElementById("merge-detections").checked = config.detect.merge;
-    document.getElementById("combine-detections").checked = config.detect.combine;
-    document.getElementById("auto-load").checked = config.detect.autoLoad;
-    document.getElementById("iucn").checked = config.detect.iucn;
-    document.getElementById("iucn-scope").selected = config.detect.iucnScope;
-    handleModelChange(config.selectedModel, false)
-    // List appearance in settings
-    DOM.speciesThreshold.value = config.speciesThreshold;
-    document.getElementById("species-week").checked = config.useWeek;
-    DOM.customListFile.value = config.models[config.selectedModel].customListFile;
-    if (!DOM.customListFile.value) delete LIST_MAP.custom;
-    // And update the icon
-    updateListIcon();
-    setListUIState(list)
-    contextAwareIconDisplay();
-    DOM.debugMode.checked = config.debug;
-    showThreshold(config.detect.confidence);
-    showTopRankin(config.detect.topRankin)
-
-    // Filters
-    document.getElementById("HP-threshold").textContent = formatHz(config.filters.highPassFrequency);
-    document.getElementById("highPassFrequency").value = config.filters.highPassFrequency;
-    const lowPass = document.getElementById("lowPassFrequency")
-    lowPass.value = Number(lowPass.max) - config.filters.lowPassFrequency;
-    document.getElementById("LP-threshold").textContent = formatHz(config.filters.lowPassFrequency);
-    document.getElementById("lowShelfFrequency").value = config.filters.lowShelfFrequency;
-    document.getElementById("LowShelf-threshold").textContent = formatHz(config.filters.lowShelfFrequency);
-    DOM.attenuation.value = -config.filters.lowShelfAttenuation;
-    document.getElementById("attenuation-threshold").textContent = DOM.attenuation.value + "dB";
-    DOM.sendFilteredAudio.checked = config.filters.sendToModel;
-    filterIconDisplay();
-    if (config.models[config.selectedModel].backend === "webgpu") {
-      DOM.threadSlider.max = 6;
-    } else {
-      DOM.threadSlider.max = DIAGNOSTICS["Cores"];
-    }
-    DOM.batchSizeSlider.max = Math.max(parseInt(160 / (24576 / GPU_RAM)), 32);
-    DOM.threadSlider.value = config[config.models[config.selectedModel].backend].threads;
-    DOM.numberOfThreads.textContent = DOM.threadSlider.value;
-    DOM.defaultLat.value = config.latitude;
-    DOM.defaultLon.value = config.longitude;
-    place.innerHTML =
-      '<span class="material-symbols-outlined">fmd_good</span>' +
-      config.location;
-    if (config.library.location) {
-      document.getElementById("library-location").value =
-        config.library.location;
-      document.getElementById("library-format").value = config.library.format;
-      document.getElementById("library-trim").checked = config.library.trim;
-      document.getElementById("library-clips").checked = config.library.clips;
-      const autoArchive = document.getElementById("auto-library");
-      autoArchive.checked = config.library.auto;
-    }
-    if (config.database.location) {
-      document.getElementById("database-location").value =
-        config.database.location;
-    }
-    
-
-
-    // Enable popovers
-    const myAllowList = bootstrap.Tooltip.Default.allowList;
-    myAllowList.table = []; // Allow <table> element with no attributes
-    myAllowList.thead = [];
-    myAllowList.tbody = [];
-    myAllowList.tr = [];
-    myAllowList.td = [];
-    myAllowList.th = [];
-    const popoverTriggerList = document.querySelectorAll(
-      '[data-bs-toggle="popover"]'
+  const installDate = localStorage.getItem("installDate")
+  const {appId, installedAt} = await window.electron.getInstallInfo(installDate);
+  config.UUID ??= appId;
+  config.installedAt = installedAt;
+  if (isTestEnv) console.log(`UUID: ${config.UUID}, `)
+  // Attach an error event listener to the window object
+  window.onerror = function (message, file, lineno, colno, error) {
+    trackEvent(
+      config.UUID,
+      "Error",
+      error.message,
+      encodeURIComponent(error.stack)
     );
-    const _ = [...popoverTriggerList].map(
-      (popoverTriggerEl) =>
-        new bootstrap.Popover(popoverTriggerEl, { allowList: myAllowList })
-    );
-    // Add cpu model & memory to config
-    config.CPU = DIAGNOSTICS["CPU"];
-    config.RAM = DIAGNOSTICS["System Memory"];
-    config.GPUs = DIAGNOSTICS["GPUs"];
-    trackVisit(config);
+    // Return false not to inhibit the default error handling
+    return false;
+  };
 
-    // check for new version on Intel mac platform. dmg auto-update not yet working
-    // window.electron.isIntelMac() && !isTestEnv && checkForIntelMacUpdates();
 
+  const isMember = await membershipCheck()
+    .catch(err => {console.error(err); return false});
+  STATE.isMember = isMember;
+
+  
+  const { library, database, detect, filters, audio, 
+    limit, locale, speciesThreshold, list, useWeek, 
+    local, debug, fileStartMtime, specDetections, UUID } = config;
+  
+  let modelPath = config.models[config.selectedModel].modelPath;
+  if (modelPath){
+    if (!fs.existsSync(modelPath)) {
+      generateToast({ type: "error", message: "modelPathNotFound", variables: {modelPath} });
+      worker.postMessage({action: "update-state",
+        modelPath: undefined,
+        model: 'birdnet'
+      });
+      config.selectedModel = 'birdnet';
+      modelPath = undefined;
+    }
+  }
+  const selectedModel = config.selectedModel;
+
+  updateListOptions(selectedModel);
+  if (detect.combine) document.getElementById('model-icon').classList.remove('d-none')
+  debug && document.getElementById('dataset').classList.remove('d-none')
+  isMember && updateModelOptions();
+
+  worker.postMessage({
+    action: "update-state",
+    model: selectedModel,
+    library,
+    database,
+    path: appPath,
+    temp: tempPath,
+    lat: config.latitude,
+    lon: config.longitude,
+    place: config.location,
+    detect,
+    filters,
+    audio,
+    limit,
+    locale,
+    speciesThreshold,
+    list,
+    useWeek,
+    local,
+    UUID,
+    debug,
+    fileStartMtime,
+    specDetections,
   });
+  t0_warmup = Date.now();
+  if (isTestEnv) {
+    config.models[selectedModel].backend = "tensorflow";
+  }
+  const backend = config.models[config.selectedModel].backend;
+
+  worker.postMessage({
+    action: "_init_",
+    model: selectedModel,
+    batchSize: config[backend].batchSize,
+    threads: config[backend].threads,
+    backend,
+    list,
+    modelPath
+  });
+  // Disable SNR
+  config.filters.SNR = 0;
+
+  // set version
+  config.VERSION = VERSION;
+  DIAGNOSTICS["UUID"] = config.UUID;
+
+  // Set UI option state
+  // Fontsize
+  config.fontScale === 1 || setFontSizeScale(true);
+
+  // Map slider value to batch size
+  DOM.batchSizeSlider.value = 
+    config[config.models[config.selectedModel].backend].batchSize;
+  DOM.batchSizeValue.textContent =
+    config[config.models[config.selectedModel].backend].batchSize;
+  DOM.modelToUse.value = config.selectedModel;
+  const backendEL = document.getElementById(config.models[config.selectedModel].backend);
+  backendEL.checked = true;
+  // Show time of day in results?
+  setTimelinePreferences();
+  // Show the list in use
+  DOM.listToUse.value = config.list;
+  DOM.localSwitch.checked = config.local;
+  // Show Locale
+  DOM.locale.value = config.locale;
+  LIST_MAP = i18n.get(i18n.LIST_MAP);
+  // Localise UI
+  i18n.localiseUI(DOM.locale.value).then((result) => (STATE.i18n = result));
+  initialiseDatePicker(STATE, worker, config, resetResults, filterResults, generateToast);
+  STATE.picker.options.lang = DOM.locale.value.replace("_uk", "");
+
+  // remember audio notification setting
+  DOM.audioNotification.checked = config.audio.notification;
+  // Zoom H1E filestart handling:
+  document.getElementById("file-timestamp").checked = config.fileStartMtime;
+
+  // timeline
+  DOM.timelineSetting.value = config.timeOfDay ? "timeOfDay" : "timecode";
+  // Spectrogram colour
+  if (config.colormap === "igreys") config.colormap = "gray";
+  DOM.colourmap.value = config.colormap;
+
+  // Spectrogram labels
+  DOM.specLabels.checked = config.specLabels;
+  // Show all detections
+  DOM.specDetections.checked = config.specDetections;
+  // Spectrogram frequencies
+  DOM.fromInput.value = config.audio.frequencyMin;
+  DOM.fromSlider.value = config.audio.frequencyMin;
+  DOM.toInput.value = config.audio.frequencyMax;
+  DOM.toSlider.value = config.audio.frequencyMax;
+  fillSlider(DOM.fromInput, DOM.toInput, "#C6C6C6", "#0d6efd", DOM.toSlider);
+  checkFilteredFrequency();
+  // Window function & colormap
+  document.getElementById("window-function").value =
+    config.customColormap.windowFn;
+  config.customColormap.windowFn === "gauss" &&
+    document.getElementById("alpha").classList.remove("d-none");
+  config.colormap === "custom" &&
+    document.getElementById("colormap-fieldset").classList.remove("d-none");
+  const {loud, mid, quiet, quietThreshold, midThreshold, alpha} = config.customColormap;
+  document.getElementById("quiet-color-threshold").textContent = quietThreshold;
+  document.getElementById("quiet-color-threshold-slider").value = quietThreshold;
+  document.getElementById("mid-color-threshold").textContent = midThreshold;
+  document.getElementById("mid-color-threshold-slider").value = midThreshold;
+  document.getElementById("loud-color").value = loud;
+  document.getElementById("mid-color").value = mid;
+  document.getElementById("quiet-color").value = quiet;
+  document.getElementById("alpha-slider").value = alpha;
+  document.getElementById("alpha-value").textContent = alpha;
+  
+  // Audio preferences:
+  DOM.gain.value = config.audio.gain;
+  DOM.gainAdjustment.textContent = config.audio.gain + "dB";
+  DOM.normalise.checked = config.filters.normalise;
+  DOM.audioFormat.value = config.audio.format;
+  DOM.audioBitrate.value = config.audio.bitrate;
+  DOM.audioQuality.value = config.audio.quality;
+  showRelevantAudioQuality();
+  DOM.audioFade.checked = config.audio.fade;
+  DOM.audioPadding.checked = config.audio.padding;
+  DOM.audioFade.disabled = !DOM.audioPadding.checked;
+  DOM.audioDownmix.checked = config.audio.downmix;
+  setNocmig(config.detect.nocmig);
+  document.getElementById("merge-detections").checked = config.detect.merge;
+  document.getElementById("combine-detections").checked = config.detect.combine;
+  document.getElementById("auto-load").checked = config.detect.autoLoad;
+  document.getElementById("iucn").checked = config.detect.iucn;
+  document.getElementById("iucn-scope").selected = config.detect.iucnScope;
+  handleModelChange(config.selectedModel, false)
+  // List appearance in settings
+  DOM.speciesThreshold.value = config.speciesThreshold;
+  document.getElementById("species-week").checked = config.useWeek;
+  DOM.customListFile.value = config.models[config.selectedModel].customListFile;
+  if (!DOM.customListFile.value) delete LIST_MAP.custom;
+  // And update the icon
+  updateListIcon();
+  setListUIState(list)
+  contextAwareIconDisplay();
+  DOM.debugMode.checked = config.debug;
+  showThreshold(config.detect.confidence);
+  showTopRankin(config.detect.topRankin)
+
+  // Filters
+  document.getElementById("HP-threshold").textContent = formatHz(config.filters.highPassFrequency);
+  document.getElementById("highPassFrequency").value = config.filters.highPassFrequency;
+  const lowPass = document.getElementById("lowPassFrequency")
+  lowPass.value = Number(lowPass.max) - config.filters.lowPassFrequency;
+  document.getElementById("LP-threshold").textContent = formatHz(config.filters.lowPassFrequency);
+  document.getElementById("lowShelfFrequency").value = config.filters.lowShelfFrequency;
+  document.getElementById("LowShelf-threshold").textContent = formatHz(config.filters.lowShelfFrequency);
+  DOM.attenuation.value = -config.filters.lowShelfAttenuation;
+  document.getElementById("attenuation-threshold").textContent = DOM.attenuation.value + "dB";
+  DOM.sendFilteredAudio.checked = config.filters.sendToModel;
+  filterIconDisplay();
+  if (config.models[config.selectedModel].backend === "webgpu") {
+    DOM.threadSlider.max = 6;
+  } else {
+    DOM.threadSlider.max = DIAGNOSTICS["Cores"];
+  }
+  DOM.batchSizeSlider.max = Math.max(parseInt(160 / (24576 / GPU_RAM)), 32);
+  DOM.threadSlider.value = config[config.models[config.selectedModel].backend].threads;
+  DOM.numberOfThreads.textContent = DOM.threadSlider.value;
+  DOM.defaultLat.value = config.latitude;
+  DOM.defaultLon.value = config.longitude;
+  place.innerHTML =
+    '<span class="material-symbols-outlined">fmd_good</span>' +
+    config.location;
+  if (config.library.location) {
+    document.getElementById("library-location").value =
+      config.library.location;
+    document.getElementById("library-format").value = config.library.format;
+    document.getElementById("library-trim").checked = config.library.trim;
+    document.getElementById("library-clips").checked = config.library.clips;
+    const autoArchive = document.getElementById("auto-library");
+    autoArchive.checked = config.library.auto;
+  }
+  if (config.database.location) {
+    document.getElementById("database-location").value =
+      config.database.location;
+  }
+  
+
+
+  // Enable popovers
+  const myAllowList = bootstrap.Tooltip.Default.allowList;
+  myAllowList.table = []; // Allow <table> element with no attributes
+  myAllowList.thead = [];
+  myAllowList.tbody = [];
+  myAllowList.tr = [];
+  myAllowList.td = [];
+  myAllowList.th = [];
+  const popoverTriggerList = document.querySelectorAll(
+    '[data-bs-toggle="popover"]'
+  );
+  const _ = [...popoverTriggerList].map(
+    (popoverTriggerEl) =>
+      new bootstrap.Popover(popoverTriggerEl, { allowList: myAllowList })
+  );
+  // Add cpu model & memory to config
+  config.CPU = DIAGNOSTICS["CPU"];
+  config.RAM = DIAGNOSTICS["System Memory"];
+  config.GPUs = DIAGNOSTICS["GPUs"];
+  trackVisit(config);
+
+  // check for new version on Intel mac platform. dmg auto-update not yet working
+  // window.electron.isIntelMac() && !isTestEnv && checkForIntelMacUpdates();
 };
 
 let MISSING_FILE;
@@ -2488,17 +2513,7 @@ async function onSaveAudio({ file, filename, extension }) {
   });
 }
 
-// Chart functions
-function getDateOfISOWeek(w) {
-  const options = { month: "long", day: "numeric" };
-  const y = new Date().getFullYear();
-  const simple = new Date(y, 0, 1 + (w - 1) * 7);
-  const dow = simple.getDay();
-  const ISOweekStart = simple;
-  if (dow <= 4) ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
-  else ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
-  return ISOweekStart.toLocaleDateString("en-GB", options);
-}
+
 
 /**
  * Processes chart data to update the UI and render a new Chart.js chart.
@@ -2521,11 +2536,52 @@ function getDateOfISOWeek(w) {
  * @param {number} args.dataPoints - The number of data points to generate date labels for the x-axis.
  * @param {number} args.rate - A data rate value included in the arguments (currently unused in chart rendering).
  */
+
+let chartInstance;
+
+function getDateOfISOWeek(week, year) {
+  const simple = new Date(year, 0, 1 + (week - 1) * 7);
+  const dayOfWeek = simple.getDay();
+  const isoWeekStart = new Date(simple);
+  const diff = (dayOfWeek === 0 ? -6 : 1) - dayOfWeek;
+  isoWeekStart.setDate(simple.getDate() + diff);
+  return isoWeekStart;
+}
+
+function formatWeekRange(week, year) {
+  const locale = config.locale.replace("en_uk", "en-GB").replace('_', '-');
+
+  const start = getDateOfISOWeek(week, year);
+  if (isNaN(start.getTime())) return week;
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+
+  const monthOpts = { month: 'long' };
+
+  const startStr = `${start.toLocaleDateString(locale, { day: 'numeric' })}`;
+  const endStr =
+    end.toLocaleDateString(locale, { day: 'numeric', ...monthOpts });
+
+  // If start and end are in different months, show both
+  if (start.getMonth() !== end.getMonth()) {
+    const startFull =
+      `${start.toLocaleDateString(locale, { day: 'numeric', ...monthOpts })}`;
+    return `${startFull} – ${endStr}`;
+  }
+
+  // Same month → “5–11 February”
+  return `${startStr}–${endStr}`;
+}
+
 function onChartData(args) {
-  if (args.species) {
+  const i18 = i18n.get(i18n.ChartUI)
+  const {records, aggregation, pointStart, results, rate, startX} = args;
+  const dataPoints = Object.values(results)[0]?.length;
+  const species = args.species || "";
+  if (species) {
     utils.showElement(["recordsTableBody"], false);
     const title = document.getElementById("speciesName");
-    title.textContent = args.species;
+    title.textContent = species;
   } else {
     utils.hideElement(["recordsTableBody"]);
   }
@@ -2538,11 +2594,10 @@ function onChartData(args) {
   // Get the Chart.js canvas
   const chartCanvas = document.getElementById("chart-week");
 
-  const records = args.records;
   for (const [key, value] of Object.entries(records)) {
     const element = document.getElementById(key);
     if (value?.constructor === Array) {
-      if (isNaN(value[0])) element.textContent = "N/A";
+      if (isNaN(value[0])) element.textContent = i18.NR
       else {
         element.textContent =
           value[0].toString() +
@@ -2557,20 +2612,17 @@ function onChartData(args) {
             month: "short",
             day: "numeric",
           })
-        : "No Records";
+        : i18.NR;
     }
   }
 
-  const aggregation = args.aggregation;
-  const results = args.results;
   const total = args.total;
-  const dataPoints = args.dataPoints;
   // start hourly charts at midday if no filter applied
-  const pointStart =
-    STATE.chart.range.start || aggregation !== "Hour"
-      ? args.pointStart
-      : args.pointStart + 12 * 60 * 60 * 1000;
-  const dateLabels = generateDateLabels(aggregation, dataPoints, pointStart);
+  const start =
+    STATE.chart.range.start || aggregation !== "hour"
+      ? pointStart
+      : pointStart + 12 * 60 * 60 * 1000;
+  const dateLabels = generateDateLabels(aggregation, dataPoints, start, startX);
 
   // Initialize Chart.js
   const plugin = {
@@ -2589,15 +2641,11 @@ function onChartData(args) {
     data: {
       labels: dateLabels,
       datasets: Object.entries(results).map(([year, data]) => ({
-        label: year,
-        //shift data to midday - midday rather than nidnight to midnight if hourly chart and filter not set
-        data:
-          aggregation !== "Hour"
-            ? data
-            : data.slice(12).join(data.slice(0, 12)),
-        //backgroundColor: 'rgba(255, 0, 64, 0.5)',
+        label: isNaN(year) ? i18.AY : year,
+        data,
+        // backgroundColor: 'rgba(255, 0, 64, 0.5)',
         borderWidth: 1,
-        //borderColor: 'rgba(255, 0, 64, 0.9)',
+        // borderColor: 'rgba(255, 0, 64, 0.9)',
         borderSkipped: "bottom", // Lines will appear to rise from the bottom
       })),
     },
@@ -2616,18 +2664,28 @@ function onChartData(args) {
       plugins: {
         title: {
           display: true,
-          text: args.species ? `${args.species} Detections` : "",
+          text: utils.interpolate(i18.NoD, {species}).replace("()", ""),
         },
         customCanvasBackgroundColor: {
           color: "GhostWhite",
         },
+        tooltip: aggregation === "week" ? { 
+        callbacks: {
+          title: (items) => {
+            const week = items[0].label;
+            const key = items[0].dataset.label;
+            const year = isNaN(parseInt(key)) ? new Date().getFullYear() : parseInt(key);
+            return formatWeekRange(week, year);
+          }
+        }
+      } : undefined
       },
     },
     plugins: [plugin],
   };
   if (total) {
     chartOptions.data.datasets.unshift({
-      label: "Hours Recorded",
+      label: i18.HR,
       type: "line",
       data: total,
       fill: true,
@@ -2640,34 +2698,33 @@ function onChartData(args) {
     });
     chartOptions.options.scales["y1"] = {
       position: "right",
-      title: { display: true, text: "Hours of Recordings" },
+      title: { display: true, text: i18.HoR },
     };
     chartOptions.options.scales.x = {
       max: 53,
-      title: { display: true, text: "Week in Year" },
+      title: { display: true, text: i18.WiY },
     };
   }
-  new Chart(chartCanvas, chartOptions);
+  chartInstance = new Chart(chartCanvas, chartOptions);
 }
 
-function generateDateLabels(aggregation, datapoints, pointstart) {
+function generateDateLabels(aggregation, datapoints, pointstart, startX) {
   const dateLabels = [];
   const startDate = new Date(pointstart);
-
+  if (aggregation === "week") {
+    return Array.from({length: datapoints }, (_, i) => startX + i);
+  }
   for (let i = 0; i < datapoints; i++) {
     // Push the formatted date label to the array
     dateLabels.push(formatDate(startDate, aggregation));
 
     // Increment the startDate based on the aggregation
-    if (aggregation === "Hour") {
+    if (aggregation === "hour") {
       startDate.setTime(startDate.getTime() + 60 * 60 * 1000); // Add 1 hour
-    } else if (aggregation === "Day") {
+    } else if (aggregation === "day") {
       startDate.setDate(startDate.getDate() + 1); // Add 1 day
-    } else if (aggregation === "Week") {
-      startDate.setDate(startDate.getDate() + 7); // Add 7 days (1 week)
     }
   }
-
   return dateLabels;
 }
 
@@ -2675,55 +2732,33 @@ function generateDateLabels(aggregation, datapoints, pointstart) {
 function formatDate(date, aggregation) {
   const options = {};
   let formattedDate = "";
-  if (aggregation === "Week") {
+  const locale = config.locale.replace("en_uk", "en-GB").replace('_', '-');
+  if (aggregation === "week") {
     // Add 1 day to the startDate
-    date.setHours(date.getDate() + 1);
+    date.setHours(date.getDate() );
     const year = date.getFullYear();
     const oneJan = new Date(year, 0, 1);
     const weekNumber = Math.ceil(
-      ((date - oneJan) / (24 * 60 * 60 * 1000) + oneJan.getDay() + 1) / 7
+      ((date - oneJan) / (24 * 60 * 60 * 1000) + oneJan.getDay() ) / 7
     );
     return weekNumber;
-  } else if (aggregation === "Day") {
+  } else if (aggregation === "day") {
     options.day = "numeric";
-    options.weekday = "short";
+    // options.weekday = "short";
     options.month = "short";
-  } else if (aggregation === "Hour") {
-    const hour = date.getHours();
-    const period = hour >= 12 ? "PM" : "AM";
-    const formattedHour = hour % 12 || 12; // Convert 0 to 12
-    return `${formattedHour}${period}`;
+  } else if (aggregation === "hour") {
+    const timeString = new Intl.DateTimeFormat(locale, {
+      hour: 'numeric',
+      hour12: true
+    }).format(date);
+    // const hour = date.getHours();
+    // const period = hour >= 12 ? "PM" : "AM";
+    // const formattedHour = hour % 12 || 12; // Convert 0 to 12
+    // return `${formattedHour}${period}`;
+    return timeString;
   }
-
-  return formattedDate + date.toLocaleDateString("en-GB", options);
-}
-
-
-function getTooltipTitle(date, aggregation) {
-  if (aggregation === "Week") {
-    // Customize for week view
-    return `Week ${getISOWeek(date)} (${getDateOfISOWeek(
-      getISOWeek(date)
-    )} - ${getDateOfISOWeek(getISOWeek(date) + 1)})`;
-  } else if (aggregation === "Day") {
-    // Customize for day view
-    return date.toLocaleDateString("en-GB", {
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    });
-  } else {
-    // Customize for hour view
-    return (
-      date.toLocaleDateString("en-GB", { month: "short", day: "numeric" }) +
-      ", " +
-      date.toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "numeric",
-        hour12: true,
-      })
-    );
-  }
+  
+  return formattedDate + date.toLocaleDateString(locale, options);
 }
 
 window.addEventListener("resize", function () {
@@ -2789,6 +2824,7 @@ function debounceClick(handler, delay = 250) {
  */
 function handleKeyDown(e) {
   let action = e.key;
+  if (!config) return;
   config.debug && console.log(`${action} key pressed`);
   if (action in GLOBAL_ACTIONS) {
     DOM.contextMenu.classList.add("d-none");
@@ -3986,13 +4022,37 @@ function setClickedIndex(target) {
   clickedIndex = clickedNode?.rowIndex;
 }
 
-const deleteRecord = (target) => {
-  if (! STATE.fileLoaded ) return;
-  if (target instanceof PointerEvent) target = activeRow;
+const deleteSpeciesByConfidence = (species, confidence, modelID) => {
+  if (STATE.resultsSortOrder !== "score DESC " || ! isSpeciesViewFiltered()) return;
+  const { start, end } = STATE.mode === "explore" ? STATE.explore.range : {};
+  worker.postMessage({
+    action: "delete-confidence",
+    start,
+    end,
+    species,
+    confidence,
+    modelID
+  });
+  // const currentRow = activeRow.rowIndex;
+  // const table = document.getElementById("resultTableBody");
+  // for (let i = table.rows.length - 1; i >= currentRow; i--) {
+  //   table.deleteRow(i);
+  // }
+  filterResults();
+}
+
+
+const deleteRecord = (e) => {
+  if (! (STATE.fileLoaded && activeRow)) return;
+  let target = activeRow;
   setClickedIndex(target);
   // If there is no row (deleted last record and hit delete again):
   if (clickedIndex === -1 || clickedIndex === undefined) return;
-  const { species, start, end, file, setting, modelID } = addToHistory(target);
+  const { species, start, end, confidence, file, setting, modelID } = addToHistory(target);
+  if (e?.shiftKey) {
+    deleteSpeciesByConfidence(species, confidence, modelID);
+    return;
+  }
   worker.postMessage({
     action: "delete",
     file,
@@ -5145,6 +5205,18 @@ async function handleUIClicks(e) {
       showCharts();
       break;
     }
+    case "downloadChart": {
+      // Download the chart
+      element.disabled = true;
+      const imageURL = chartInstance.toBase64Image();
+      const a = document.createElement('a');
+      a.href = imageURL;
+      a.download = 'chart.png';
+      a.click();
+      a.remove();
+      element.disabled = false;
+      break;
+    }
     case "explore": {
       showExplore();
       break;
@@ -6085,10 +6157,26 @@ document.addEventListener("change", async function (e) {
           handlePassFilterchange(DOM.LPSlider);
           break;
         }
-        // case "snrValue": {
-        //   handleSNRchange(e);
-        //   break;
-        // }
+        // Charts
+        case "hour":
+        case "day":
+        case "week": {
+          STATE.chart.aggregation = element.value;
+          callForChart();
+          break;
+        }
+        case "stackYears": {
+          STATE.chart.stackYears = element.checked;
+          callForChart();
+          break;
+        }
+        case "chart-locations": {
+          const location = element.value ? Number(element.value) : undefined;
+          STATE.chart.location = location;
+          callForChart();
+          break;
+        }
+
         case "file-timestamp": {
           config.fileStartMtime = element.checked;
           worker.postMessage({
@@ -6381,6 +6469,17 @@ const flushSpec = async () =>{
   }
 }
 
+function callForChart() {
+  const {species, range, location, aggregation, stackYears: byYear} = STATE.chart;
+  worker.postMessage({
+    action: "chart",
+    species,
+    range,
+    location,
+    aggregation,
+    byYear,
+  });
+}
 /**
  * Updates the UI to reflect the selected species list type and displays relevant controls.
  *
@@ -6439,7 +6538,7 @@ async function readLabels(labelFile, updating) {
         action: "update-locale",
         locale: config.locale,
         labels: LABELS,
-        refreshResults: STATE.analysisDone,
+        refreshResults: STATE.analysisDone && STATE.mode !== 'chart',
       });
     }
   } catch (error) {
@@ -6542,32 +6641,34 @@ async function createContextMenu(e) {
 
   DOM.contextMenu.innerHTML = `
     <div id="${inSummary ? "inSummary" : "inResults"}">
-        <a class="dropdown-item ${hideInSummary}" id="play-region"><span class='material-symbols-outlined'>play_circle</span> ${
+      <ul class="list-unstyled mb-1">
+        <li class="dropdown-item ${hideInSummary}" id="play-region"><span class='material-symbols-outlined'>play_circle</span> ${
     i18.play
-  }</a>
-        <a class="dropdown-item ${hideInSummary} ${hideInSelection}" href="#" id="context-analyse-selection">
+  }</li>
+        <li class="dropdown-item ${hideInSummary} ${hideInSelection}" id="context-analyse-selection">
         <span class="material-symbols-outlined">search</span> ${i18.analyse}
-        </a>
+        </li>
         <div class="dropdown-divider ${hideInSummary}"></div>
-        <a class="dropdown-item" id="create-manual-record" href="#">
+        <li class="dropdown-item" id="create-manual-record">
         <span class="material-symbols-outlined">edit_document</span> ${createOrEdit} ${
     i18.record
   }
-        </a>
-        <a class="dropdown-item" id="context-create-clip" href="#">
+        </li>
+        <li class="dropdown-item" id="context-create-clip">
         <span class="material-symbols-outlined">music_note</span> ${i18.export}
-        </a>
-        <span class="dropdown-item" id="context-xc" href='#' target="xc">
+        </li>
+        <span class="dropdown-item" id="context-xc" target="xc">
         <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> ${
           i18.compare
         }
         </span>
         <div class="dropdown-divider ${hideInSelection}"></div>
-        <a class="dropdown-item ${hideInSelection}" id="context-delete" href="#">
+        <li class="dropdown-item ${hideInSelection}" id="context-delete">
         <span class='delete material-symbols-outlined'>delete_forever</span> ${
           i18.delete
         }
-        </a>
+        </li>
+        </ul>
     </div>
     `;
   const modalTitle = document.getElementById("record-entry-modal-label");
@@ -7484,13 +7585,9 @@ async function membershipCheck() {
   config.debug && console.log('cached membership is', cachedStatus)
   const cachedTimestamp = Number(localStorage.getItem("memberTimestamp"));
   const now = Date.now();
-  let installDate = Number(localStorage.getItem("installDate"))
-  installDate = await window.electron.getInstallDate(installDate);
-  installDate = new Date(installDate).getTime();
-  // Fallback if access to keychain denied
-  window.localStorage.setItem("installDate", installDate);
+  const installDate = new Date(config.installedAt ?? 0).getTime();
   const trialPeriod = await window.electron.trialPeriod();
-  const installPeriod = Date.now() - installDate;
+  const installPeriod = now - installDate;
   const trialDaysLeft = Math.max(Math.ceil((trialPeriod - installPeriod)/86_400_000), 0)
   const inTrial = installPeriod < trialPeriod;
   const lockedElements = document.querySelectorAll(".locked, .unlocked");
@@ -7796,6 +7893,9 @@ function updateSuggestions(input, element, preserveInput) {
     span.textContent = ` (${list.length})`; // Update existing span
   }
   if (search.length < 2) {
+    const oldSpecies = STATE.chart.species;
+    STATE.chart.species = null;
+    if (oldSpecies) callForChart();
     element.style.display = "none";
     return;
   }
@@ -7840,11 +7940,8 @@ function updateSuggestions(input, element, preserveInput) {
           clearResults: false,
         });
       } else if (input.id === "bird-autocomplete-chart") {
-        worker.postMessage({
-          action: "chart",
-          species: item.cname,
-          range: STATE.chart.range,
-        });
+        STATE.chart.species = item.cname;
+        callForChart();
       }
       input.dispatchEvent(new Event("change", { bubbles: true })); // fire the change event
       element.style.display = "none";

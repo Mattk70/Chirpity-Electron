@@ -178,6 +178,20 @@
         "label-unknown": "Ikke angivet",
         "record-comment": "Kommentarer",
         "record-add": "Tilføj"
+      },
+      "ChartUI": {
+        "chart-locations": "Placering",
+        "GroupBy":"Gruppér registreringer efter:",
+        "hour": "Time",
+        "day": "Dag",
+        "week": "Uge",
+        "stackYears": "Opdel resultater efter år",
+        "downloadChart": "Eksportér diagrambillede",
+        "ESR": "Tidligste forårsregistrering",
+        "LSR": "Seneste forårsregistrering",
+        "EAR": "Tidligste efterårsregistrering",
+        "LAR": "Seneste efterårsregistrering",
+        "MC": "Flest kald på 24 timer"
     },
       "headings": ["Indstillinger","Detektioner", "Tastaturtildelinger",
         "Standardplacering",

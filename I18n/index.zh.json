@@ -178,7 +178,21 @@
     "label-unknown": "未指定",
     "record-comment": "评论",
     "record-add": "添加"
-},
+  },
+  "ChartUI": {
+    "chart-locations": "位置",
+    "GroupBy": "按以下方式分组检测：",
+    "hour": "小时",
+    "day": "天",
+    "week": "周",
+    "stackYears": "按年份划分结果",
+    "downloadChart": "导出图表图片",
+    "ESR": "最早春季记录",
+    "LSR": "最晚春季记录",
+    "EAR": "最早秋季记录",
+    "LAR": "最晚秋季记录",
+    "MC": "24小时内最多鸣叫"
+  },
   "headings": ["设置","检测", "键盘分配",
     "默认位置",
     "系统",

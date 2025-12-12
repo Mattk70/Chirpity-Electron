@@ -178,7 +178,21 @@
       "label-unknown": "Non spécifié",
       "record-comment": "Commentaires",
       "record-add": "Ajouter"
-  },
+    },
+    "ChartUI": {
+      "chart-locations": "Emplacement",
+      "GroupBy": "Grouper les détections par :",
+      "hour": "Heure",
+      "day": "Jour",
+      "week": "Semaine",
+      "stackYears": "Séparer les résultats par année",
+      "downloadChart": "Exporter l’image du graphique",
+      "ESR": "Premier enregistrement du printemps",
+      "LSR": "Dernier enregistrement du printemps",
+      "EAR": "Premier enregistrement de l’automne",
+      "LAR": "Dernier enregistrement de l’automne",
+      "MC": "Appels les plus nombreux en 24 heures"
+   },
     "headings": ["Paramètres","Détections", "Assignations de clavier",
       "Emplacement par défaut",
       "Système",

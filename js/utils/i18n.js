@@ -3618,7 +3618,98 @@ const Select = {
       enterNewLabel: "输入新标签",
       removeLabel: "删除标签"
     }
-  };
+}
+const ChartUI = {
+  en: {
+    "NoD": "Number of detections (${species})",
+    "NR": "No Records",
+    "HoR": "Hours of Recordings",
+    "HR": "Hours Recorded",
+    "AY": "All Years",
+    "WiY": "Week in Year"
+  },
+  da: {
+    "NoD": "Antal registreringer (${species})",
+    "NR": "Ingen registreringer",
+    "HoR": "Optagede timer",
+    "HR": "Timer optaget",
+    "AY": "Alle år",
+    "WiY": "Uge i året"
+  },
+  de: {
+    "NoD": "Anzahl der Erkennungen (${species})",
+    "NR": "Keine Aufzeichnungen",
+    "HoR": "Aufnahmestunden",
+    "HR": "Stunden aufgenommen",
+    "AY": "Alle Jahre",
+    "WiY": "Woche im Jahr"
+  },
+  es: {
+    "NoD": "Número de detecciones (${species})",
+    "NR": "Sin registros",
+    "HoR": "Horas de grabaciones",
+    "HR": "Horas grabadas",
+    "AY": "Todos los años",
+    "WiY": "Semana del año"
+  },
+  fr: {
+    "NoD": "Nombre de détections (${species})",
+    "NR": "Aucun enregistrement",
+    "HoR": "Heures d’enregistrements",
+    "HR": "Heures enregistrées",
+    "AY": "Toutes les années",
+    "WiY": "Semaine de l’année"
+  },
+  ja: {
+    "NoD": "検出数（${species}）",
+    "NR": "記録なし",
+    "HoR": "録音時間（時間）",
+    "HR": "録音された時間",
+    "AY": "すべての年",
+    "WiY": "年内の週"
+  },
+  nl: {
+    "NoD": "Aantal detecties (${species})",
+    "NR": "Geen gegevens",
+    "HoR": "Uren aan opnames",
+    "HR": "Uren opgenomen",
+    "AY": "Alle jaren",
+    "WiY": "Week in het jaar"
+  },
+  pt: {
+    "NoD": "Número de detecções (${species})",
+    "NR": "Sem registos",
+    "HoR": "Horas de gravações",
+    "HR": "Horas gravadas",
+    "AY": "Todos os anos",
+    "WiY": "Semana do ano"
+  },
+  ru: {
+    "NoD": "Количество обнаружений (${species})",
+    "NR": "Нет записей",
+    "HoR": "Часы записей",
+    "HR": "Записанные часы",
+    "AY": "Все годы",
+    "WiY": "Неделя в году"
+  },
+  sv: {
+    "NoD": "Antal detektioner (${species})",
+    "NR": "Inga poster",
+    "HoR": "Inspelningstimmar",
+    "HR": "Timmar inspelade",
+    "AY": "Alla år",
+    "WiY": "Vecka i året"
+  },
+  zh: {
+    "NoD": "检测数量（${species}）",
+    "NR": "无记录",
+    "HoR": "录音小时数",
+    "HR": "已录制小时数",
+    "AY": "所有年份",
+    "WiY": "一年中的周"
+  }
+};
+
   
 
   const UpdateMessage = {
@@ -3713,6 +3804,16 @@ async function localiseUI(locale) {
                 label.textContent = settings[id]
             }
         })
+        // Chart form
+        const chartForm = document.getElementById('recordsContainer').querySelectorAll('legend, label, button, th')
+        settings = localisationData['ChartUI'];
+        chartForm.forEach(label => {
+            const id = label.getAttribute('for') || label.id;
+            if (settings[id]){
+                if (id === 'chart-locations') label.innerHTML = label.innerHTML.replace(/^[^<]+/, settings[id]);
+                else label.textContent = settings[id]
+            }
+        })
         // Padlock items
         const padlocks = document.querySelectorAll('#unsaved-icon, .padlock')
         padlocks.forEach(lock => {
@@ -3792,4 +3893,4 @@ async function localiseUI(locale) {
 }
 
 export {All, SpeciesList,Headings, Context, Location, Form, Help, Toasts, Titles, Training, ManageModels,
-     LIST_MAP, Lists, IUCNLabel, Locate,Select, UpdateMessage, localiseUI, get}
+     LIST_MAP, Lists, IUCNLabel, ChartUI, Locate,Select, UpdateMessage, localiseUI, get}
