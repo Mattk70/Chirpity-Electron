@@ -3224,13 +3224,6 @@ function spawnPredictWorkers(model, batchSize, threads) {
   STATE.perchWorker = predictWorkers.filter(w => w.name === 'perch v2');
   if (isPerch && STATE.perchWorker?.length) {
     predictWorkers = STATE.perchWorker;
-    predictWorkers[0].postMessage({
-      message: "change-threads",
-      threads: threads + 1,
-      batchSize,
-      backend: STATE.detect.backend,
-      modelPath: STATE.modelPath
-    });
     setLabelState({regenerate: true})
     return
   }
