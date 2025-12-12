@@ -213,7 +213,7 @@ jobs:
         if: steps.cache-perch.outputs.cache-hit != 'true'
         run: |
           curl -L -o Perch.v2.7z \
-            https://github.com/Mattk70/Chirpity-Website/releases/download/v3.0.0/Perch.v2.7z
+            https://github.com/Mattk70/Chirpity-Website/releases/download/v4.0.0/Perch.v2.7z
 
       - name: Extract Perch Model into "Perch v2"
         run: |
