@@ -77,7 +77,6 @@ const settings = require("electron-settings");
 const keytar = require('keytar');
 const SERVICE = 'Chirpity';
 const ACCOUNT = 'install-info';
-let UUID;
 let DEBUG = false;
 
 async function getInstallInfo(date) {
@@ -87,9 +86,7 @@ async function getInstallInfo(date) {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed.installedAt === "string") {
-        console.log("raw keytar info", parsed)
-        UUID = parsed.appId;
-        return parsed.installedAt;
+        return parsed;
       }
       console.warn("getInstallInfo: keychain entry missing valid installedAt, recreating with", date);
     }
@@ -107,14 +104,13 @@ async function getInstallInfo(date) {
     appId: crypto.randomUUID(),
     installedAt: effectiveDate.toISOString(),
   };
-  UUID = installInfo.appId;
+  
   try {
     await keytar.setPassword(SERVICE, ACCOUNT, JSON.stringify(installInfo));
   } catch (error) {
     console.warn("getInstallInfo: keychain write failed (using in‑memory date only):", error.message);
   }
-
-  return installInfo.installedAt;
+  return installInfo;
 }
 
 process.env["TF_ENABLE_ONEDNN_OPTS"] = "1";
@@ -341,10 +337,10 @@ ipcMain.handle('getAppPath', () => app.getAppPath());
 ipcMain.handle('trialPeriod', () => 14*24*3600*1000); // 14 days
 ipcMain.handle('getLocale', () => app.getLocale());
 ipcMain.handle('getTemp', () => app.getPath('temp'));
-ipcMain.handle('getUUID', () => UUID)
 ipcMain.handle('isMac', () => isMac);
 ipcMain.handle('getAudio', () => path.join(__dirname.replace('app.asar', ''), 'Help', 'example.mp3'));
 ipcMain.handle('exitApplication', () => app.quit()); 
+ipcMain.handle('getInstallInfo', (_e, date) => getInstallInfo(date));
 
 let mainWindow;
 let workerWindow;
@@ -518,7 +514,7 @@ app.whenReady().then(async () => {
     ipcMain.handle("getVersion", () => version);
   }
 
-    ipcMain.handle('getInstallDate', (_e, date) => getInstallInfo(date));
+
     
     // Debug mode
     try {

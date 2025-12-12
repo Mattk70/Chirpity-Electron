@@ -1882,272 +1882,275 @@ window.onload = async () => {
   document.getElementById("year").textContent = new Date().getFullYear();
   await appVersionLoaded;
   document.getElementById("version").textContent = VERSION;
-  const configFile = p.join(appPath, "config.json");
-  fs.readFile(configFile, "utf8", async (err, data) => {
-    if (err) {
-      console.log("Config not loaded, using defaults");
-      // Use defaults if no config file
-      if (!fs.existsSync(configFile)) config = defaultConfig;
-      else {
-        generateToast({ type: "error", message: "configReadError" });
-        config = defaultConfig;
-      }
-    } else {
-      config = JSON.parse(data);
+  const configPath = p.join(appPath, "config.json");
+  const configFile = fs.readFileSync(configPath, "utf8");
+  if (!configFile) {
+    console.log("Config not loaded, using defaults");
+    // Use defaults if no config file
+    if (!fs.existsSync(configFile)) config = defaultConfig;
+    else {
+      generateToast({ type: "error", message: "configReadError" });
+      config = defaultConfig;
     }
-    config.UUID ??= await window.electron.getUUID();
-    if (isTestEnv) console.log(`UUID: ${config.UUID}`)
-    // Attach an error event listener to the window object
-    window.onerror = function (message, file, lineno, colno, error) {
-      trackEvent(
-        config.UUID,
-        "Error",
-        error.message,
-        encodeURIComponent(error.stack)
-      );
-      // Return false not to inhibit the default error handling
-      return false;
-    };
-    //fill in defaults - after updates add new items
-    utils.syncConfig(config, defaultConfig);
+  } else {
+    config = JSON.parse(configFile);
+  }
+  //fill in defaults - after updates add new items
+  utils.syncConfig(config, defaultConfig);
 
-    const isMember = await membershipCheck()
-      .catch(err => {console.error(err); return false});
-    STATE.isMember = isMember;
-
-    
-    const { library, database, detect, filters, audio, 
-      limit, locale, speciesThreshold, list, useWeek, UUID, 
-      local, debug, fileStartMtime, specDetections } = config;
-    
-    let modelPath = config.models[config.selectedModel].modelPath;
-    if (modelPath){
-      if (!fs.existsSync(modelPath)) {
-        generateToast({ type: "error", message: "modelPathNotFound", variables: {modelPath} });
-        worker.postMessage({action: "update-state",
-          modelPath: undefined,
-          model: 'birdnet'
-        });
-        config.selectedModel = 'birdnet';
-        modelPath = undefined;
-      }
-    }
-    const selectedModel = config.selectedModel;
-
-    updateListOptions(selectedModel);
-    if (detect.combine) document.getElementById('model-icon').classList.remove('d-none')
-    debug && document.getElementById('dataset').classList.remove('d-none')
-    isMember && updateModelOptions();
-
-    worker.postMessage({
-      action: "update-state",
-      model: selectedModel,
-      library,
-      database,
-      path: appPath,
-      temp: tempPath,
-      lat: config.latitude,
-      lon: config.longitude,
-      place: config.location,
-      detect,
-      filters,
-      audio,
-      limit,
-      locale,
-      speciesThreshold,
-      list,
-      useWeek,
-      local,
-      UUID,
-      debug,
-      fileStartMtime,
-      specDetections,
-    });
-    t0_warmup = Date.now();
-    if (isTestEnv) {
-      config.models[selectedModel].backend = "tensorflow";
-    }
-    const backend = config.models[config.selectedModel].backend;
-
-    worker.postMessage({
-      action: "_init_",
-      model: selectedModel,
-      batchSize: config[backend].batchSize,
-      threads: config[backend].threads,
-      backend,
-      list,
-      modelPath
-    });
-    // Disable SNR
-    config.filters.SNR = 0;
-
-    // set version
-    config.VERSION = VERSION;
-    DIAGNOSTICS["UUID"] = config.UUID;
-
-    // Set UI option state
-    // Fontsize
-    config.fontScale === 1 || setFontSizeScale(true);
-
-    // Map slider value to batch size
-    DOM.batchSizeSlider.value = 
-      config[config.models[config.selectedModel].backend].batchSize;
-    DOM.batchSizeValue.textContent =
-      config[config.models[config.selectedModel].backend].batchSize;
-    DOM.modelToUse.value = config.selectedModel;
-    const backendEL = document.getElementById(config.models[config.selectedModel].backend);
-    backendEL.checked = true;
-    // Show time of day in results?
-    setTimelinePreferences();
-    // Show the list in use
-    DOM.listToUse.value = config.list;
-    DOM.localSwitch.checked = config.local;
-    // Show Locale
-    DOM.locale.value = config.locale;
-    LIST_MAP = i18n.get(i18n.LIST_MAP);
-    // Localise UI
-    i18n.localiseUI(DOM.locale.value).then((result) => (STATE.i18n = result));
-    initialiseDatePicker(STATE, worker, config, resetResults, filterResults, generateToast);
-    STATE.picker.options.lang = DOM.locale.value.replace("_uk", "");
-
-    // remember audio notification setting
-    DOM.audioNotification.checked = config.audio.notification;
-    // Zoom H1E filestart handling:
-    document.getElementById("file-timestamp").checked = config.fileStartMtime;
-
-    // timeline
-    DOM.timelineSetting.value = config.timeOfDay ? "timeOfDay" : "timecode";
-    // Spectrogram colour
-    if (config.colormap === "igreys") config.colormap = "gray";
-    DOM.colourmap.value = config.colormap;
-
-    // Spectrogram labels
-    DOM.specLabels.checked = config.specLabels;
-    // Show all detections
-    DOM.specDetections.checked = config.specDetections;
-    // Spectrogram frequencies
-    DOM.fromInput.value = config.audio.frequencyMin;
-    DOM.fromSlider.value = config.audio.frequencyMin;
-    DOM.toInput.value = config.audio.frequencyMax;
-    DOM.toSlider.value = config.audio.frequencyMax;
-    fillSlider(DOM.fromInput, DOM.toInput, "#C6C6C6", "#0d6efd", DOM.toSlider);
-    checkFilteredFrequency();
-    // Window function & colormap
-    document.getElementById("window-function").value =
-      config.customColormap.windowFn;
-    config.customColormap.windowFn === "gauss" &&
-      document.getElementById("alpha").classList.remove("d-none");
-    config.colormap === "custom" &&
-      document.getElementById("colormap-fieldset").classList.remove("d-none");
-    const {loud, mid, quiet, quietThreshold, midThreshold, alpha} = config.customColormap;
-    document.getElementById("quiet-color-threshold").textContent = quietThreshold;
-    document.getElementById("quiet-color-threshold-slider").value = quietThreshold;
-    document.getElementById("mid-color-threshold").textContent = midThreshold;
-    document.getElementById("mid-color-threshold-slider").value = midThreshold;
-    document.getElementById("loud-color").value = loud;
-    document.getElementById("mid-color").value = mid;
-    document.getElementById("quiet-color").value = quiet;
-    document.getElementById("alpha-slider").value = alpha;
-    document.getElementById("alpha-value").textContent = alpha;
-    
-    // Audio preferences:
-    DOM.gain.value = config.audio.gain;
-    DOM.gainAdjustment.textContent = config.audio.gain + "dB";
-    DOM.normalise.checked = config.filters.normalise;
-    DOM.audioFormat.value = config.audio.format;
-    DOM.audioBitrate.value = config.audio.bitrate;
-    DOM.audioQuality.value = config.audio.quality;
-    showRelevantAudioQuality();
-    DOM.audioFade.checked = config.audio.fade;
-    DOM.audioPadding.checked = config.audio.padding;
-    DOM.audioFade.disabled = !DOM.audioPadding.checked;
-    DOM.audioDownmix.checked = config.audio.downmix;
-    setNocmig(config.detect.nocmig);
-    document.getElementById("merge-detections").checked = config.detect.merge;
-    document.getElementById("combine-detections").checked = config.detect.combine;
-    document.getElementById("auto-load").checked = config.detect.autoLoad;
-    document.getElementById("iucn").checked = config.detect.iucn;
-    document.getElementById("iucn-scope").selected = config.detect.iucnScope;
-    handleModelChange(config.selectedModel, false)
-    // List appearance in settings
-    DOM.speciesThreshold.value = config.speciesThreshold;
-    document.getElementById("species-week").checked = config.useWeek;
-    DOM.customListFile.value = config.models[config.selectedModel].customListFile;
-    if (!DOM.customListFile.value) delete LIST_MAP.custom;
-    // And update the icon
-    updateListIcon();
-    setListUIState(list)
-    contextAwareIconDisplay();
-    DOM.debugMode.checked = config.debug;
-    showThreshold(config.detect.confidence);
-    showTopRankin(config.detect.topRankin)
-
-    // Filters
-    document.getElementById("HP-threshold").textContent = formatHz(config.filters.highPassFrequency);
-    document.getElementById("highPassFrequency").value = config.filters.highPassFrequency;
-    const lowPass = document.getElementById("lowPassFrequency")
-    lowPass.value = Number(lowPass.max) - config.filters.lowPassFrequency;
-    document.getElementById("LP-threshold").textContent = formatHz(config.filters.lowPassFrequency);
-    document.getElementById("lowShelfFrequency").value = config.filters.lowShelfFrequency;
-    document.getElementById("LowShelf-threshold").textContent = formatHz(config.filters.lowShelfFrequency);
-    DOM.attenuation.value = -config.filters.lowShelfAttenuation;
-    document.getElementById("attenuation-threshold").textContent = DOM.attenuation.value + "dB";
-    DOM.sendFilteredAudio.checked = config.filters.sendToModel;
-    filterIconDisplay();
-    if (config.models[config.selectedModel].backend === "webgpu") {
-      DOM.threadSlider.max = 6;
-    } else {
-      DOM.threadSlider.max = DIAGNOSTICS["Cores"];
-    }
-    DOM.batchSizeSlider.max = Math.max(parseInt(160 / (24576 / GPU_RAM)), 32);
-    DOM.threadSlider.value = config[config.models[config.selectedModel].backend].threads;
-    DOM.numberOfThreads.textContent = DOM.threadSlider.value;
-    DOM.defaultLat.value = config.latitude;
-    DOM.defaultLon.value = config.longitude;
-    place.innerHTML =
-      '<span class="material-symbols-outlined">fmd_good</span>' +
-      config.location;
-    if (config.library.location) {
-      document.getElementById("library-location").value =
-        config.library.location;
-      document.getElementById("library-format").value = config.library.format;
-      document.getElementById("library-trim").checked = config.library.trim;
-      document.getElementById("library-clips").checked = config.library.clips;
-      const autoArchive = document.getElementById("auto-library");
-      autoArchive.checked = config.library.auto;
-    }
-    if (config.database.location) {
-      document.getElementById("database-location").value =
-        config.database.location;
-    }
-    
-
-
-    // Enable popovers
-    const myAllowList = bootstrap.Tooltip.Default.allowList;
-    myAllowList.table = []; // Allow <table> element with no attributes
-    myAllowList.thead = [];
-    myAllowList.tbody = [];
-    myAllowList.tr = [];
-    myAllowList.td = [];
-    myAllowList.th = [];
-    const popoverTriggerList = document.querySelectorAll(
-      '[data-bs-toggle="popover"]'
+  const installDate = localStorage.getItem("installDate")
+  const {appId, installedAt} = await window.electron.getInstallInfo(installDate);
+  config.UUID ??= appId;
+  config.installedAt = installedAt;
+  if (isTestEnv) console.log(`UUID: ${config.UUID}, `)
+  // Attach an error event listener to the window object
+  window.onerror = function (message, file, lineno, colno, error) {
+    trackEvent(
+      config.UUID,
+      "Error",
+      error.message,
+      encodeURIComponent(error.stack)
     );
-    const _ = [...popoverTriggerList].map(
-      (popoverTriggerEl) =>
-        new bootstrap.Popover(popoverTriggerEl, { allowList: myAllowList })
-    );
-    // Add cpu model & memory to config
-    config.CPU = DIAGNOSTICS["CPU"];
-    config.RAM = DIAGNOSTICS["System Memory"];
-    config.GPUs = DIAGNOSTICS["GPUs"];
-    trackVisit(config);
+    // Return false not to inhibit the default error handling
+    return false;
+  };
 
-    // check for new version on Intel mac platform. dmg auto-update not yet working
-    // window.electron.isIntelMac() && !isTestEnv && checkForIntelMacUpdates();
 
+  const isMember = await membershipCheck()
+    .catch(err => {console.error(err); return false});
+  STATE.isMember = isMember;
+
+  
+  const { library, database, detect, filters, audio, 
+    limit, locale, speciesThreshold, list, useWeek, 
+    local, debug, fileStartMtime, specDetections, UUID } = config;
+  
+  let modelPath = config.models[config.selectedModel].modelPath;
+  if (modelPath){
+    if (!fs.existsSync(modelPath)) {
+      generateToast({ type: "error", message: "modelPathNotFound", variables: {modelPath} });
+      worker.postMessage({action: "update-state",
+        modelPath: undefined,
+        model: 'birdnet'
+      });
+      config.selectedModel = 'birdnet';
+      modelPath = undefined;
+    }
+  }
+  const selectedModel = config.selectedModel;
+
+  updateListOptions(selectedModel);
+  if (detect.combine) document.getElementById('model-icon').classList.remove('d-none')
+  debug && document.getElementById('dataset').classList.remove('d-none')
+  isMember && updateModelOptions();
+
+  worker.postMessage({
+    action: "update-state",
+    model: selectedModel,
+    library,
+    database,
+    path: appPath,
+    temp: tempPath,
+    lat: config.latitude,
+    lon: config.longitude,
+    place: config.location,
+    detect,
+    filters,
+    audio,
+    limit,
+    locale,
+    speciesThreshold,
+    list,
+    useWeek,
+    local,
+    UUID,
+    debug,
+    fileStartMtime,
+    specDetections,
   });
+  t0_warmup = Date.now();
+  if (isTestEnv) {
+    config.models[selectedModel].backend = "tensorflow";
+  }
+  const backend = config.models[config.selectedModel].backend;
+
+  worker.postMessage({
+    action: "_init_",
+    model: selectedModel,
+    batchSize: config[backend].batchSize,
+    threads: config[backend].threads,
+    backend,
+    list,
+    modelPath
+  });
+  // Disable SNR
+  config.filters.SNR = 0;
+
+  // set version
+  config.VERSION = VERSION;
+  DIAGNOSTICS["UUID"] = config.UUID;
+
+  // Set UI option state
+  // Fontsize
+  config.fontScale === 1 || setFontSizeScale(true);
+
+  // Map slider value to batch size
+  DOM.batchSizeSlider.value = 
+    config[config.models[config.selectedModel].backend].batchSize;
+  DOM.batchSizeValue.textContent =
+    config[config.models[config.selectedModel].backend].batchSize;
+  DOM.modelToUse.value = config.selectedModel;
+  const backendEL = document.getElementById(config.models[config.selectedModel].backend);
+  backendEL.checked = true;
+  // Show time of day in results?
+  setTimelinePreferences();
+  // Show the list in use
+  DOM.listToUse.value = config.list;
+  DOM.localSwitch.checked = config.local;
+  // Show Locale
+  DOM.locale.value = config.locale;
+  LIST_MAP = i18n.get(i18n.LIST_MAP);
+  // Localise UI
+  i18n.localiseUI(DOM.locale.value).then((result) => (STATE.i18n = result));
+  initialiseDatePicker(STATE, worker, config, resetResults, filterResults, generateToast);
+  STATE.picker.options.lang = DOM.locale.value.replace("_uk", "");
+
+  // remember audio notification setting
+  DOM.audioNotification.checked = config.audio.notification;
+  // Zoom H1E filestart handling:
+  document.getElementById("file-timestamp").checked = config.fileStartMtime;
+
+  // timeline
+  DOM.timelineSetting.value = config.timeOfDay ? "timeOfDay" : "timecode";
+  // Spectrogram colour
+  if (config.colormap === "igreys") config.colormap = "gray";
+  DOM.colourmap.value = config.colormap;
+
+  // Spectrogram labels
+  DOM.specLabels.checked = config.specLabels;
+  // Show all detections
+  DOM.specDetections.checked = config.specDetections;
+  // Spectrogram frequencies
+  DOM.fromInput.value = config.audio.frequencyMin;
+  DOM.fromSlider.value = config.audio.frequencyMin;
+  DOM.toInput.value = config.audio.frequencyMax;
+  DOM.toSlider.value = config.audio.frequencyMax;
+  fillSlider(DOM.fromInput, DOM.toInput, "#C6C6C6", "#0d6efd", DOM.toSlider);
+  checkFilteredFrequency();
+  // Window function & colormap
+  document.getElementById("window-function").value =
+    config.customColormap.windowFn;
+  config.customColormap.windowFn === "gauss" &&
+    document.getElementById("alpha").classList.remove("d-none");
+  config.colormap === "custom" &&
+    document.getElementById("colormap-fieldset").classList.remove("d-none");
+  const {loud, mid, quiet, quietThreshold, midThreshold, alpha} = config.customColormap;
+  document.getElementById("quiet-color-threshold").textContent = quietThreshold;
+  document.getElementById("quiet-color-threshold-slider").value = quietThreshold;
+  document.getElementById("mid-color-threshold").textContent = midThreshold;
+  document.getElementById("mid-color-threshold-slider").value = midThreshold;
+  document.getElementById("loud-color").value = loud;
+  document.getElementById("mid-color").value = mid;
+  document.getElementById("quiet-color").value = quiet;
+  document.getElementById("alpha-slider").value = alpha;
+  document.getElementById("alpha-value").textContent = alpha;
+  
+  // Audio preferences:
+  DOM.gain.value = config.audio.gain;
+  DOM.gainAdjustment.textContent = config.audio.gain + "dB";
+  DOM.normalise.checked = config.filters.normalise;
+  DOM.audioFormat.value = config.audio.format;
+  DOM.audioBitrate.value = config.audio.bitrate;
+  DOM.audioQuality.value = config.audio.quality;
+  showRelevantAudioQuality();
+  DOM.audioFade.checked = config.audio.fade;
+  DOM.audioPadding.checked = config.audio.padding;
+  DOM.audioFade.disabled = !DOM.audioPadding.checked;
+  DOM.audioDownmix.checked = config.audio.downmix;
+  setNocmig(config.detect.nocmig);
+  document.getElementById("merge-detections").checked = config.detect.merge;
+  document.getElementById("combine-detections").checked = config.detect.combine;
+  document.getElementById("auto-load").checked = config.detect.autoLoad;
+  document.getElementById("iucn").checked = config.detect.iucn;
+  document.getElementById("iucn-scope").selected = config.detect.iucnScope;
+  handleModelChange(config.selectedModel, false)
+  // List appearance in settings
+  DOM.speciesThreshold.value = config.speciesThreshold;
+  document.getElementById("species-week").checked = config.useWeek;
+  DOM.customListFile.value = config.models[config.selectedModel].customListFile;
+  if (!DOM.customListFile.value) delete LIST_MAP.custom;
+  // And update the icon
+  updateListIcon();
+  setListUIState(list)
+  contextAwareIconDisplay();
+  DOM.debugMode.checked = config.debug;
+  showThreshold(config.detect.confidence);
+  showTopRankin(config.detect.topRankin)
+
+  // Filters
+  document.getElementById("HP-threshold").textContent = formatHz(config.filters.highPassFrequency);
+  document.getElementById("highPassFrequency").value = config.filters.highPassFrequency;
+  const lowPass = document.getElementById("lowPassFrequency")
+  lowPass.value = Number(lowPass.max) - config.filters.lowPassFrequency;
+  document.getElementById("LP-threshold").textContent = formatHz(config.filters.lowPassFrequency);
+  document.getElementById("lowShelfFrequency").value = config.filters.lowShelfFrequency;
+  document.getElementById("LowShelf-threshold").textContent = formatHz(config.filters.lowShelfFrequency);
+  DOM.attenuation.value = -config.filters.lowShelfAttenuation;
+  document.getElementById("attenuation-threshold").textContent = DOM.attenuation.value + "dB";
+  DOM.sendFilteredAudio.checked = config.filters.sendToModel;
+  filterIconDisplay();
+  if (config.models[config.selectedModel].backend === "webgpu") {
+    DOM.threadSlider.max = 6;
+  } else {
+    DOM.threadSlider.max = DIAGNOSTICS["Cores"];
+  }
+  DOM.batchSizeSlider.max = Math.max(parseInt(160 / (24576 / GPU_RAM)), 32);
+  DOM.threadSlider.value = config[config.models[config.selectedModel].backend].threads;
+  DOM.numberOfThreads.textContent = DOM.threadSlider.value;
+  DOM.defaultLat.value = config.latitude;
+  DOM.defaultLon.value = config.longitude;
+  place.innerHTML =
+    '<span class="material-symbols-outlined">fmd_good</span>' +
+    config.location;
+  if (config.library.location) {
+    document.getElementById("library-location").value =
+      config.library.location;
+    document.getElementById("library-format").value = config.library.format;
+    document.getElementById("library-trim").checked = config.library.trim;
+    document.getElementById("library-clips").checked = config.library.clips;
+    const autoArchive = document.getElementById("auto-library");
+    autoArchive.checked = config.library.auto;
+  }
+  if (config.database.location) {
+    document.getElementById("database-location").value =
+      config.database.location;
+  }
+  
+
+
+  // Enable popovers
+  const myAllowList = bootstrap.Tooltip.Default.allowList;
+  myAllowList.table = []; // Allow <table> element with no attributes
+  myAllowList.thead = [];
+  myAllowList.tbody = [];
+  myAllowList.tr = [];
+  myAllowList.td = [];
+  myAllowList.th = [];
+  const popoverTriggerList = document.querySelectorAll(
+    '[data-bs-toggle="popover"]'
+  );
+  const _ = [...popoverTriggerList].map(
+    (popoverTriggerEl) =>
+      new bootstrap.Popover(popoverTriggerEl, { allowList: myAllowList })
+  );
+  // Add cpu model & memory to config
+  config.CPU = DIAGNOSTICS["CPU"];
+  config.RAM = DIAGNOSTICS["System Memory"];
+  config.GPUs = DIAGNOSTICS["GPUs"];
+  trackVisit(config);
+
+  // check for new version on Intel mac platform. dmg auto-update not yet working
+  // window.electron.isIntelMac() && !isTestEnv && checkForIntelMacUpdates();
 };
 
 let MISSING_FILE;
@@ -7607,13 +7610,10 @@ async function membershipCheck() {
   config.debug && console.log('cached membership is', cachedStatus)
   const cachedTimestamp = Number(localStorage.getItem("memberTimestamp"));
   const now = Date.now();
-  let installDate = Number(localStorage.getItem("installDate"))
-  installDate = await window.electron.getInstallDate(installDate);
-  installDate = new Date(installDate).getTime();
-  // Fallback if access to keychain denied
-  window.localStorage.setItem("installDate", installDate);
+  const installDate = new Date(config.installedAt).getTime();
+  console.log(`InstallDate: ${installDate}`);
   const trialPeriod = await window.electron.trialPeriod();
-  const installPeriod = Date.now() - installDate;
+  const installPeriod = now - installDate;
   const trialDaysLeft = Math.max(Math.ceil((trialPeriod - installPeriod)/86_400_000), 0)
   const inTrial = installPeriod < trialPeriod;
   const lockedElements = document.querySelectorAll(".locked, .unlocked");
