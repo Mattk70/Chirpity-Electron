@@ -6538,7 +6538,7 @@ async function readLabels(labelFile, updating) {
         action: "update-locale",
         locale: config.locale,
         labels: LABELS,
-        refreshResults: STATE.analysisDone,
+        refreshResults: STATE.analysisDone && STATE.mode !== 'chart',
       });
     }
   } catch (error) {
