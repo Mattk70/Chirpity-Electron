@@ -402,22 +402,4 @@ function plotTrainingHistory(history) {
   }, { once: true });
 }
 
-function _getISOWeekFromEpoch(epochMs) {
-    const date = new Date(epochMs);
-
-    // Copy date so we don’t modify the original
-    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-
-    // ISO week date weeks start on Monday (1) — shift Sunday (0) to 7
-    const dayNum = d.getUTCDay() || 7;
-
-    // Move the date to the Thursday of this week
-    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-
-    // Calculate week number
-    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    const weekNo = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
-
-    return weekNo;
-}
 export { onChartRequest, plotTrainingHistory };

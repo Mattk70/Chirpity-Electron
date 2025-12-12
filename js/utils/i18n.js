@@ -3810,7 +3810,8 @@ async function localiseUI(locale) {
         chartForm.forEach(label => {
             const id = label.getAttribute('for') || label.id;
             if (settings[id]){
-                label.textContent = settings[id]
+                if (id === 'chart-locations') label.innerHTML = label.innerHTML.replace(/^[^<]+/, settings[id]);
+                else label.textContent = settings[id]
             }
         })
         // Padlock items

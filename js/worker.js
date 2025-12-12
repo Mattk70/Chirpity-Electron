@@ -1292,7 +1292,7 @@ const getTotal = async ({
   const topRankin = detect.topRankin;
   const range = mode === "explore" ? explore.range : undefined;
   const partition = detect.merge ? '' : ', r.modelID';
-  offset ?? (species !== undefined ? filteredOffset[species] : globalOffset);
+  offset ??= (species !== undefined ? filteredOffset[species] : globalOffset);
 
   let SQL = ` WITH MaxConfidencePerDateTime AS (
         SELECT confidence,

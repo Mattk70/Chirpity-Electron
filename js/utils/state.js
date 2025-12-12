@@ -54,7 +54,7 @@ export class WorkerState {
     (this.chart = {
       range: { start: undefined, end: undefined },
       species: undefined,
-      aggregation: "Week",
+      aggregation: "week",
       stackYears: false,
     }),
     (this.explore = {

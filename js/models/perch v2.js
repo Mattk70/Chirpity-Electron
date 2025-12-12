@@ -13,7 +13,7 @@ const numClasses = 14795;
 const DEBUG = false;
 let modelPath;
 
-async function loadModel(mpath, backend, batchSize, threads) {
+async function loadModel(mpath, backend, batchSize) {
   const gpu = backend === 'webgpu';
   const providers = gpu ? [ 'webgpu', 'cpu'] : ['cpu'];
   const freeDimensionOverrides = { 'batch': batchSize };
@@ -53,21 +53,19 @@ onmessage = async (e) => {
                 try { session.release(); } catch { /* ignore */ }
               }
               backend = e.data.backend;
-              await loadModel(modelPath, backend);
+              await loadModel(modelPath, backend, batchSize);
             }
         }
         break;
       }
       case "change-threads": {
-        const {threads} = e.data;
-        await loadModel(modelPath, backend, batchSize, threads);
+        // Optimal threads are set - can ignore this message
         break;
       }
       case "load": {
         if (!session) {
           backend = e.data.backend;
-          const threads = e.data.threads;
-          await loadModel(modelPath, backend, batchSize, threads);
+          await loadModel(modelPath, backend, batchSize);
           batchSize = e.data.batchSize;
           DEBUG && console.log(`Using backend: ${backend}`);
 
