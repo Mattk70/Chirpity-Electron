@@ -7585,8 +7585,7 @@ async function membershipCheck() {
   config.debug && console.log('cached membership is', cachedStatus)
   const cachedTimestamp = Number(localStorage.getItem("memberTimestamp"));
   const now = Date.now();
-  const installDate = new Date(config.installedAt).getTime();
-  console.log(`InstallDate: ${installDate}`);
+  const installDate = new Date(config.installedAt ?? 0).getTime();
   const trialPeriod = await window.electron.trialPeriod();
   const installPeriod = now - installDate;
   const trialDaysLeft = Math.max(Math.ceil((trialPeriod - installPeriod)/86_400_000), 0)
