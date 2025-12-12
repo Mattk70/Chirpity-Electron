@@ -1883,20 +1883,16 @@ window.onload = async () => {
   await appVersionLoaded;
   document.getElementById("version").textContent = VERSION;
   const configPath = p.join(appPath, "config.json");
-  const configFile = fs.readFileSync(configPath, "utf8");
-  if (!configFile) {
-    console.log("Config not loaded, using defaults");
-    // Use defaults if no config file
-    if (!fs.existsSync(configFile)) config = defaultConfig;
-    else {
-      generateToast({ type: "error", message: "configReadError" });
-      config = defaultConfig;
-    }
-  } else {
+  const configFile = await fs.promises.readFile(configPath, "utf8").catch(err =>{
+    console.log("Config not found, using defaults", err);
+    config = defaultConfig
+  });
+  
+  if (configFile) {
     config = JSON.parse(configFile);
+    //fill in defaults - after updates add new items
+    utils.syncConfig(config, defaultConfig);
   }
-  //fill in defaults - after updates add new items
-  utils.syncConfig(config, defaultConfig);
 
   const installDate = localStorage.getItem("installDate")
   const {appId, installedAt} = await window.electron.getInstallInfo(installDate);
