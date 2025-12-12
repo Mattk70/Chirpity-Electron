@@ -65,8 +65,8 @@ onmessage = async (e) => {
       case "load": {
         if (!session) {
           backend = e.data.backend;
-          await loadModel(modelPath, backend, batchSize);
           batchSize = e.data.batchSize;
+          await loadModel(modelPath, backend, batchSize);
           DEBUG && console.log(`Using backend: ${backend}`);
 
           const labelFile = path.join(modelPath,"labels.txt");
