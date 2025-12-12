@@ -1896,6 +1896,7 @@ window.onload = async () => {
       config = JSON.parse(data);
     }
     config.UUID ??= await window.electron.getUUID();
+    if (isTestEnv) console.log(`UUID: ${config.UUID}`)
     // Attach an error event listener to the window object
     window.onerror = function (message, file, lineno, colno, error) {
       trackEvent(
