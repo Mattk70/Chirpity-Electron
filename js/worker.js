@@ -4986,7 +4986,7 @@ async function onSetCustomLocation({
   db = STATE.db,
   overwritePlaceName = true,
 }) {
-  if (lat === STATE.lat && lon === STATE.lon && place.trim() === STATE.place.trim()) {
+  if (lat === STATE.lat && lon === STATE.lon && place && place.trim() === STATE.place.trim()) {
     // Don't add default location
     return;
   }

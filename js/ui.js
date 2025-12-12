@@ -1438,7 +1438,8 @@ async function exportData(
 
 const handleLocationFilterChange = (e) => {
   const value = e.target.value;
-  const location = value === "" ? undefined : parseInt(value, 10);
+  const parsed = value === "" ? undefined : parseInt(value, 10);
+  const location = Number.isFinite(parsed) ? parsed : undefined;
   worker.postMessage({ action: "update-state", locationID: location });
   // Update the seen species list
   worker.postMessage({ action: "get-detected-species-list" });
@@ -2548,7 +2549,7 @@ function getDateOfISOWeek(week, year) {
 }
 
 function formatWeekRange(week, year) {
-  const locale = navigator.language;
+  const locale = config.locale.replace("en_uk", "en-GB").replace('_', '-');
 
   const start = getDateOfISOWeek(week, year);
   if (isNaN(start.getTime())) return week;
@@ -4042,7 +4043,7 @@ const deleteRecord = (e) => {
   // If there is no row (deleted last record and hit delete again):
   if (clickedIndex === -1 || clickedIndex === undefined) return;
   const { species, start, end, confidence, file, setting, modelID } = addToHistory(target);
-  if (e.shiftKey) {
+  if (e?.shiftKey) {
     deleteSpeciesByConfidence(species, confidence, modelID);
     return;
   }
