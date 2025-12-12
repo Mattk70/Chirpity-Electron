@@ -1849,7 +1849,6 @@ const defaultConfig = {
     frequencyMin: 0,
     frequencyMax: 11950,
   },
-  charts: {aggregation: "week"},
   limit: 500,
   debug: false,
   VERSION: VERSION,
@@ -2513,17 +2512,7 @@ async function onSaveAudio({ file, filename, extension }) {
   });
 }
 
-// Chart functions
-function getDateOfISOWeek(w) {
-  const options = { month: "long", day: "numeric" };
-  const y = new Date().getFullYear();
-  const simple = new Date(y, 0, 1 + (w - 1) * 7);
-  const dow = simple.getDay();
-  const ISOweekStart = simple;
-  if (dow <= 4) ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
-  else ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
-  return ISOweekStart.toLocaleDateString("en-GB", options);
-}
+
 
 /**
  * Processes chart data to update the UI and render a new Chart.js chart.
@@ -2549,7 +2538,42 @@ function getDateOfISOWeek(w) {
 
 let chartInstance;
 
+function getDateOfISOWeek(week, year) {
+  const simple = new Date(year, 0, 1 + (week - 1) * 7);
+  const dayOfWeek = simple.getDay();
+  const isoWeekStart = new Date(simple);
+  const diff = (dayOfWeek === 0 ? -6 : 1) - dayOfWeek;
+  isoWeekStart.setDate(simple.getDate() + diff);
+  return isoWeekStart;
+}
+
+function formatWeekRange(week, year) {
+  const locale = navigator.language;
+
+  const start = getDateOfISOWeek(week, year);
+  if (isNaN(start.getTime())) return week;
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+
+  const monthOpts = { month: 'long' };
+
+  const startStr = `${start.toLocaleDateString(locale, { day: 'numeric' })}`;
+  const endStr =
+    end.toLocaleDateString(locale, { day: 'numeric', ...monthOpts });
+
+  // If start and end are in different months, show both
+  if (start.getMonth() !== end.getMonth()) {
+    const startFull =
+      `${start.toLocaleDateString(locale, { day: 'numeric', ...monthOpts })}`;
+    return `${startFull} – ${endStr}`;
+  }
+
+  // Same month → “5–11 February”
+  return `${startStr}–${endStr}`;
+}
+
 function onChartData(args) {
+  const i18 = i18n.get(i18n.ChartUI)
   const {records, aggregation, pointStart, results, rate, startX} = args;
   const dataPoints = Object.values(results)[0]?.length;
   const species = args.species || "";
@@ -2572,7 +2596,7 @@ function onChartData(args) {
   for (const [key, value] of Object.entries(records)) {
     const element = document.getElementById(key);
     if (value?.constructor === Array) {
-      if (isNaN(value[0])) element.textContent = "N/A";
+      if (isNaN(value[0])) element.textContent = i18.NR
       else {
         element.textContent =
           value[0].toString() +
@@ -2587,14 +2611,14 @@ function onChartData(args) {
             month: "short",
             day: "numeric",
           })
-        : "No Records";
+        : i18.NR;
     }
   }
 
   const total = args.total;
   // start hourly charts at midday if no filter applied
   const start =
-    STATE.chart.range.start || aggregation !== "Hour"
+    STATE.chart.range.start || aggregation !== "hour"
       ? pointStart
       : pointStart + 12 * 60 * 60 * 1000;
   const dateLabels = generateDateLabels(aggregation, dataPoints, start, startX);
@@ -2616,15 +2640,11 @@ function onChartData(args) {
     data: {
       labels: dateLabels,
       datasets: Object.entries(results).map(([year, data]) => ({
-        label: year,
-        //shift data to midday - midday rather than nidnight to midnight if hourly chart and filter not set
-        data:
-          aggregation === "Hour"
-            ? data.slice(12).concat(data.slice(0, 12))
-            : data,
-        //backgroundColor: 'rgba(255, 0, 64, 0.5)',
+        label: isNaN(year) ? i18.AY : year,
+        data,
+        // backgroundColor: 'rgba(255, 0, 64, 0.5)',
         borderWidth: 1,
-        //borderColor: 'rgba(255, 0, 64, 0.9)',
+        // borderColor: 'rgba(255, 0, 64, 0.9)',
         borderSkipped: "bottom", // Lines will appear to rise from the bottom
       })),
     },
@@ -2643,18 +2663,28 @@ function onChartData(args) {
       plugins: {
         title: {
           display: true,
-          text: `Number of ${species} Detections`,
+          text: utils.interpolate(i18.NoD, {species}).replace(/\(\s*\)/, ""),
         },
         customCanvasBackgroundColor: {
           color: "GhostWhite",
         },
+        tooltip: {
+        callbacks: {
+          title: (items) => {
+            const week = items[0].label;
+            const key = items[0].dataset.label;
+            const year = isNaN(parseInt(key)) ? new Date().getFullYear() : parseInt(key);
+            return formatWeekRange(week, year);
+          }
+        }
+      }
       },
     },
     plugins: [plugin],
   };
   if (total) {
     chartOptions.data.datasets.unshift({
-      label: "Hours Recorded",
+      label: i18.HR,
       type: "line",
       data: total,
       fill: true,
@@ -2667,11 +2697,11 @@ function onChartData(args) {
     });
     chartOptions.options.scales["y1"] = {
       position: "right",
-      title: { display: true, text: "Hours of Recordings" },
+      title: { display: true, text: i18.HoR },
     };
     chartOptions.options.scales.x = {
       max: 53,
-      title: { display: true, text: "Week in Year" },
+      title: { display: true, text: i18.WiY },
     };
   }
   chartInstance = new Chart(chartCanvas, chartOptions);
@@ -2680,7 +2710,7 @@ function onChartData(args) {
 function generateDateLabels(aggregation, datapoints, pointstart, startX) {
   const dateLabels = [];
   const startDate = new Date(pointstart);
-  if (aggregation === "Week") {
+  if (aggregation === "week") {
     return Array.from({length: datapoints }, (_, i) => startX + i);
   }
   for (let i = 0; i < datapoints; i++) {
@@ -2688,9 +2718,9 @@ function generateDateLabels(aggregation, datapoints, pointstart, startX) {
     dateLabels.push(formatDate(startDate, aggregation));
 
     // Increment the startDate based on the aggregation
-    if (aggregation === "Hour") {
+    if (aggregation === "hour") {
       startDate.setTime(startDate.getTime() + 60 * 60 * 1000); // Add 1 hour
-    } else if (aggregation === "Day") {
+    } else if (aggregation === "day") {
       startDate.setDate(startDate.getDate() + 1); // Add 1 day
     }
   }
@@ -2701,7 +2731,7 @@ function generateDateLabels(aggregation, datapoints, pointstart, startX) {
 function formatDate(date, aggregation) {
   const options = {};
   let formattedDate = "";
-  if (aggregation === "Week") {
+  if (aggregation === "week") {
     // Add 1 day to the startDate
     date.setHours(date.getDate() );
     const year = date.getFullYear();
@@ -2710,11 +2740,11 @@ function formatDate(date, aggregation) {
       ((date - oneJan) / (24 * 60 * 60 * 1000) + oneJan.getDay() ) / 7
     );
     return weekNumber;
-  } else if (aggregation === "Day") {
+  } else if (aggregation === "day") {
     options.day = "numeric";
     // options.weekday = "short";
     options.month = "short";
-  } else if (aggregation === "Hour") {
+  } else if (aggregation === "hour") {
     const hour = date.getHours();
     const period = hour >= 12 ? "PM" : "AM";
     const formattedHour = hour % 12 || 12; // Convert 0 to 12
@@ -2726,12 +2756,12 @@ function formatDate(date, aggregation) {
 
 
 function getTooltipTitle(date, aggregation) {
-  if (aggregation === "Week") {
+  if (aggregation === "week") {
     // Customize for week view
     return `Week ${getISOWeek(date)} (${getDateOfISOWeek(
       getISOWeek(date)
     )} - ${getDateOfISOWeek(getISOWeek(date) + 1)})`;
-  } else if (aggregation === "Day") {
+  } else if (aggregation === "day") {
     // Customize for day view
     return date.toLocaleDateString("en-GB", {
       month: "long",

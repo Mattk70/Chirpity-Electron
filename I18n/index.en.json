@@ -183,6 +183,18 @@
       "record-comment": "Comments",
       "record-add": "Add"
     },
+    "ChartUI": {
+        "chart-locations": "Location",
+        "GroupBy": "Group detections by:",
+        "hour": "Hour", "day": "Day", "week": "Week",
+        "stackYears": "Split results by year",
+        "downloadChart": "Export Chart Image",
+        "ESR": "Earliest Spring Record",
+        "LSR": "Latest Spring Record",
+        "EAR": "Earliest Autumn Record",
+        "LAR": "Latest Autumn Record",
+        "MC": "Most Calls in 24 hours"
+    },
 
     "headings": ["Settings","Detections", "Keyboard Assignments",
       "Default Location",
@@ -193,5 +205,6 @@
       "Audio Library",
       "Spectrogram Preferences",
       "Advanced"
-    ]    
+    ]
   }
+

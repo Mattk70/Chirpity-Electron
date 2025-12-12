@@ -89,7 +89,8 @@ const getChartTotals = ({
   location,
   species,
   range = {},
-  aggregation = "Week",
+  aggregation,
+  byYear
 }) => {
   const locationFilter = filterLocation(location);
   const useRange = range.start !== undefined;
@@ -122,13 +123,14 @@ const getChartTotals = ({
   if (species) params.push(species);
 
   // Aggregation logic unchanged
-  let groupBy = "week";
+  let groupBy;
   let orderBy = "year";
   let dataPoints = 53;
   let startIndex = 1;
 
   switch (aggregation) {
     case "week": {
+      groupBy = byYear ? "year, week" : "week";
       dataPoints = Math.min(53, Math.ceil(intervalHours / 168));
       const { week } = useRange
         ? getWeekAndDayOfYearAndLeapLocal(range.start)
@@ -136,11 +138,11 @@ const getChartTotals = ({
       startIndex = week;
       break;
     }
-    case "Day": {
-      groupBy += ", day";
-      orderBy += ", week";
+    case "day": {
+      groupBy = byYear ? "year, day" : "day";
+      orderBy += ", day";
       let yearDays = 365;
-      let startDay = 0;
+      let startDay = 1;
 
       if (useRange) {
         const { leapYear, dayOfYear } =
@@ -153,8 +155,8 @@ const getChartTotals = ({
       startIndex = startDay;
       break;
     }
-    case "Hour": {
-      groupBy = "hour";
+    case "hour": {
+      groupBy = byYear ? "year,hour" : "hour";
       orderBy = "CASE WHEN hour >= 12 THEN hour - 12 ELSE hour + 12 END";
       dataPoints = Math.min(24, intervalHours);
       const date = useRange ? new Date(range.start) : new Date(ZERO);
@@ -311,10 +313,10 @@ async function onChartRequest(args) {
     if (!(groupYear in results)) {
       results[groupYear] = Array.from({ length: dataPoints }).fill(0);
     }
-    if (aggregation === "Week") {
+    if (aggregation === "week") {
       const j = week - startIndex;
       results[groupYear][j] = (results[groupYear][j] ?? 0) + count;
-    } else if (aggregation === "Day") {
+    } else if (aggregation === "day") {
       const j = day - startIndex;
       results[groupYear][j] = (results[groupYear][j] ?? 0) + count;
     } else {

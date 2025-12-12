@@ -179,6 +179,20 @@
         "record-comment": "Opmerkingen",
         "record-add": "Toevoegen"
     },
+    "ChartUI": {
+        "chart-locations": "Locatie",
+        "GroupBy": "Detecties groeperen op:",
+        "hour": "Uur",
+        "day": "Dag",
+        "week": "Week",
+        "stackYears": "Resultaten per jaar splitsen",
+        "downloadChart": "Grafiekafbeelding exporteren",
+        "ESR": "Vroegste lente-observatie",
+        "LSR": "Laatste lente-observatie",
+        "EAR": "Vroegste herfst-observatie",
+        "LAR": "Laatste herfst-observatie",
+        "MC": "Meeste oproepen in 24 uur"
+    },
     "headings": ["Instellingen","Detecties", "Toetsenbordtoewijzingen",
         "Standaardlocatie",
         "Systeem",

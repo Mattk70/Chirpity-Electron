@@ -578,7 +578,7 @@
     <div class="d-none h-100 overflow-auto" id="recordsContainer">
         <div class="container-fluid">
             <div class="row p-1 g-1 justify-content-evenly">
-                <div class="col-3 pt-4">
+                <div class="col-3 pt-4" style="max-width: 25rem;" >
                     <div class="col pt-2">
                         <div class="btn btn-light pt-3 mb-2" id="chartRange">
                             <span class="material-symbols-outlined align-bottom">date_range</span>&nbsp;
@@ -598,43 +598,29 @@
                             <ul id="bird-suggestions-chart" class="suggestions list-group"></ul>
                         </div>
                     </div>
-                    <div class="col ">
+                    <div class="col">
                         <div id="chart-location-list" class="form-floating">
-                            <select spellcheck="false" class="input form-select mb-3" aria-label=".form-select"
+                            <select spellcheck="false" class="input form-select mb-3 locked" aria-label=".form-select"
                             id="chart-locations"></select>
-                            <label for="explore-locations">Location</label>
+                            <label for="chart-locations">Location <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature.">
+                                <span class="pointer locked material-symbols-outlined">lock</span></a></label>
                         </div>
                     </div>
                     <div class="col">
                         <fieldset class="border border rounded bg-light p-2">
-                            <legend class="h6">Sum Detections by:</legend>
+                            <legend class="h6" id="GroupBy">Group detections by:</legend>
                             <div class="form-row">
                                 <div class="form-check-inline">
-                                    <input class="form-check-input" type="radio" name="showTotals" id="hour" value="Hour">
-                                    <label class="form-check-label" for="hourTotal">Hour</label>
+                                    <input class="form-check-input" type="radio" name="showTotals" id="hour" value="hour">
+                                    <label class="form-check-label" for="hour">Hour</label>
                                 </div>
                                 <div class="form-check-inline">
-                                    <input class="form-check-input" type="radio" name="showTotals" id="day" value="Day">
-                                    <label class="form-check-label" for="dayTotal">Day</label>
+                                    <input class="form-check-input" type="radio" name="showTotals" id="day" value="day">
+                                    <label class="form-check-label" for="day">Day</label>
                                 </div>
                                 <div class="form-check-inline pb-3">
-                                    <input class="form-check-input" type="radio" name="showTotals" id="week" value="Week" checked>
-                                    <label class="form-check-label" for="weekTotal">Week</label>
-                                </div>
-                            </div>
-                            <legend class="h6 d-none">Group Detections by:</legend>
-                            <div class="form-row d-none">
-                                <div class="form-check-inline">
-                                    <input class="form-check-input" type="radio" name="groupTotals" id="dayGroup" value="Day">
-                                    <label class="form-check-label" for="dayGroup">Day</label>
-                                </div>
-                                <div class="form-check-inline">
-                                    <input class="form-check-input" type="radio" name="groupTotals" id="weekGroup" value="Week">
-                                    <label class="form-check-label" for="weekGroup">Week</label>
-                                </div>
-                                <div class="form-check-inline">
-                                    <input class="form-check-input" type="radio" name="groupTotals" id="monthGroup" value="Month">
-                                    <label class="form-check-label" for="monthGroup">Month</label>
+                                    <input class="form-check-input" type="radio" name="showTotals" id="week" value="week" checked>
+                                    <label class="form-check-label" for="week">Week</label>
                                 </div>
                             </div>
                             <div class="form-row pt-3">
@@ -665,11 +651,11 @@
                                 <th id="speciesName" class="text-center" colspan="6"></th>
                             </tr>
                             <tr>
-                                <th>Earliest Spring Record</th>
-                                <th>Latest Spring Record</th>
-                                <th>Earliest Autumn Record</th>
-                                <th>Latest Autumn Record</th>
-                                <th>Most Calls in 24 hours</th>
+                                <th id="ESR">Earliest Spring Record</th>
+                                <th id="LSR">Latest Spring Record</th>
+                                <th id="EAR">Earliest Autumn Record</th>
+                                <th id="LAR">Latest Autumn Record</th>
+                                <th id="MC">Most Calls in 24 hours</th>
                             </tr>
                             <tr>
                                 <td id="earliestSpring"></td>

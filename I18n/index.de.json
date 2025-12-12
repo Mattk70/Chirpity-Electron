@@ -179,6 +179,20 @@
       "record-comment": "Kommentare",
       "record-add": "Hinzufügen"
   },
+      "ChartUI": {
+        "chart-locations": "Ort",
+        "GroupBy": "Erkennungen gruppieren nach:",
+        "hour": "Stunde",
+        "day": "Tag",
+        "week": "Woche",
+        "stackYears": "Ergebnisse nach Jahr aufteilen",
+        "downloadChart": "Diagrammbild exportieren",
+        "ESR": "Früheste Frühlingsbeobachtung",
+        "LSR": "Späteste Frühlingsbeobachtung",
+        "EAR": "Früheste Herbstbeobachtung",
+        "LAR": "Späteste Herbstbeobachtung",
+        "MC": "Meiste Rufe in 24 Stunden"
+    },
     "headings": ["Einstellungen","Erkennungen", "Tastaturzuweisungen",
       "Standardstandort",
       "System",

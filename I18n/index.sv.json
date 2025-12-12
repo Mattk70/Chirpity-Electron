@@ -179,6 +179,20 @@
         "record-comment": "Kommentarer",
         "record-add": "Lägg till"
     },
+    "ChartUI": {
+        "chart-locations": "Plats",
+        "GroupBy": "Gruppera detektioner efter:",
+        "hour": "Timme",
+        "day": "Dag",
+        "week": "Vecka",
+        "stackYears": "Dela upp resultat per år",
+        "downloadChart": "Exportera diagrambild",
+        "ESR": "Tidigaste vårregistrering",
+        "LSR": "Senaste vårregistrering",
+        "EAR": "Tidigaste höstregistrering",
+        "LAR": "Senaste höstregistrering",
+        "MC": "Flest läten på 24 timmar"
+    },
     "headings": ["Inställningar","Detektioner", "Tangentbordsuppdrag",
         "Standardplats",
         "System",

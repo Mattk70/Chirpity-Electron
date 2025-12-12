@@ -178,7 +178,22 @@
       "label-unknown": "No especificado",
       "record-comment": "Comentarios",
       "record-add": "Agregar"
-  },
+    },
+    "ChartUI": {
+      "chart-locations": "Ubicación",
+      "GroupBy": "Agrupar detecciones por:",
+      "hour": "Hora",
+      "day": "Día",
+      "week": "Semana",
+      "stackYears": "Dividir resultados por año",
+      "downloadChart": "Exportar imagen del gráfico",
+      "ESR": "Registro más temprano de primavera",
+      "LSR": "Registro más tardío de primavera",
+      "EAR": "Registro más temprano de otoño",
+      "LAR": "Registro más tardío de otoño",
+      "MC": "Mayor número de cantos en 24 horas"
+    },
+
     "headings": ["Configuración","Detecciones", "Asignaciones de teclado",
       "Ubicación predeterminada",
       "Sistema",

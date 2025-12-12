@@ -14,10 +14,6 @@ const DEBUG = false;
 let modelPath;
 
 async function loadModel(mpath, backend, batchSize, threads) {
-  if (session) {
-    try { session.release(); } catch { /* ignore */ }
-    session = null;
-  }
   const gpu = backend === 'webgpu';
   const providers = gpu ? [ 'webgpu', 'cpu'] : ['cpu'];
   const freeDimensionOverrides = { 'batch': batchSize };
@@ -28,10 +24,9 @@ async function loadModel(mpath, backend, batchSize, threads) {
     'spectrogram': 'gpu-buffer'
   }
   const threadOptions = gpu ? { intraOpNumThreads: 1, interOpNumThreads: 1 } : {};
-//  const executionProviderConfig = gpu ? { webgpu: {  preferredLayout: 'NHWC',  validationMode: 'wgpuOnly' } } : {};
+//  const executionProviderConfig = gpu ? { webgpu: {  preferredLayout: 'NCHW',  validationMode: 'wgpuOnly' } } : {};
   const sessionOptions = { 
     executionProviders: providers,
-    // executionProviderConfig,
     enableGraphCapture: true, 
     ...threadOptions,
     freeDimensionOverrides,
