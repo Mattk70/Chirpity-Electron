@@ -9,6 +9,11 @@ const filterLocation = (location) => {
 };
 
 
+/**
+ * Compute the local ISO week number, the 1-based day-of-year, and whether the date's year is a leap year.
+ * @param {(number|string|Date)} ts - Value convertible to a Date (milliseconds since epoch, ISO string, or Date object).
+ * @returns {{week: number, dayOfYear: number, leapYear: boolean}} An object containing `week` (ISO week number in local time), `dayOfYear` (1-based day of year), and `leapYear` (`true` if the year is a leap year, `false` otherwise).
+ */
 function getWeekAndDayOfYearAndLeapLocal(ts) {
     const date = new Date(ts);
     const year = date.getFullYear();
@@ -240,29 +245,18 @@ const getRate = (diskDB, location, species) => {
   });
 };
 /**
- * Handles chart data requests by gathering seasonal records, call detections, and aggregated chart totals for a given species and date range, then sending the compiled data to the UI.
+ * Assembles chart data for a species over a given date range and sends the compiled payload to the UI.
  *
- * This function performs multiple asynchronous database queries to:
- * - Retrieve the earliest and latest record dates for "spring" and "autumn" seasons.
- * - Determine the date with the highest number of detections.
- * - Aggregate record counts based on the provided date range and aggregation type.
- * - Optionally compute total recording duration and call rate when weekly data (53 data points) is available.
+ * Performs the necessary queries to collect seasonal bounds, the date with the most detections,
+ * and aggregated counts according to the requested aggregation (week/day/hour). When weekly
+ * data for a full year is produced, also computes total recording duration and per-week call rate.
  *
- * The compiled data is then sent to the UI via a postMessage call.
- *
- * @example
- * onChartRequest({
- *   diskDB,
- *   location,
- *   species: 'sparrow',
- *   range: { start: '2020-01-01', end: '2020-12-31' },
- *   UI
- * });
- *
- * @param {object} args - Request parameters that must include:
- *   - species {string} The species identifier for which to query records.
- *   - range {object} An object specifying the query date range (with at least a start property).
- * Note: Other properties like diskDB, location, and UI are used internally.
+ * @param {object} args - Request parameters.
+ * @param {string} args.species - Species identifier to query.
+ * @param {object} args.range - Date range for the query; should include at least a `start` property.
+ * @param {boolean} [args.byYear] - If true, keep series separated by year; otherwise aggregate across years.
+ * @param {number|undefined} [args.location] - Optional location filter; when provided limits queries to that location.
+ * Note: args also must include `diskDB` (database) and `UI` (message target) which are used internally.
  */
 async function onChartRequest(args) {
   const { diskDB, species, UI, byYear, location } = args;
@@ -344,6 +338,17 @@ async function onChartRequest(args) {
   });
 }
 
+/**
+ * Display a Bootstrap modal showing a Chart.js line chart of model training metrics.
+ *
+ * Renders a modal with id "trainingHistoryModal" and plots four series (loss, val_loss,
+ * categoricalAccuracy, val_categoricalAccuracy) on a per-epoch x-axis.
+ * @param {Object} history - Training history arrays produced during model training.
+ * @param {number[]} history.loss - Training loss per epoch.
+ * @param {number[]} history.val_loss - Validation loss per epoch.
+ * @param {number[]} history.categoricalAccuracy - Training categorical accuracy per epoch.
+ * @param {number[]} history.val_categoricalAccuracy - Validation categorical accuracy per epoch.
+ */
 function plotTrainingHistory(history) {
   // Remove existing modal if present
   const oldModal = document.getElementById('trainingHistoryModal');
@@ -402,6 +407,12 @@ function plotTrainingHistory(history) {
   }, { once: true });
 }
 
+/**
+ * Compute the ISO week number for the given epoch milliseconds using UTC.
+ *
+ * @param {number} epochMs - Milliseconds since the Unix epoch (UTC) representing the date to evaluate.
+ * @returns {number} The ISO week number (1–53) for the date's ISO week-year.
+ */
 function _getISOWeekFromEpoch(epochMs) {
     const date = new Date(epochMs);
 

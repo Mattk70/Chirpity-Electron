@@ -3,11 +3,24 @@
 // ---------------------------------------------------------
 
 @inline
+/**
+ * Reads a single-precision (32-bit) floating-point value from linear memory at the address `ptr` plus `i` 32-bit-element offsets.
+ *
+ * @param ptr - Base memory address (byte offset) of the float array
+ * @param i - Index of the 32-bit float element to read (number of elements from `ptr`)
+ * @returns The 32-bit float stored at the computed address
+ */
 function readF32(ptr: usize, i: i32): f32 {
   return load<f32>(ptr + (<usize>i << 2));
 }
 
 @inline
+/**
+ * Computes the exponential of a 32-bit float.
+ *
+ * @param x - The input value
+ * @returns The exponential of `x` as an `f32`
+ */
 function exp_f32(x: f32): f32 {
   return <f32>Mathf.exp(x);   // AS always promotes → explicit cast required
 }
@@ -15,7 +28,17 @@ function exp_f32(x: f32): f32 {
 export {__alloc}
 // ---------------------------------------------------------
 // main
-// ---------------------------------------------------------
+/**
+ * Computes the top-k softmax over a logits array and writes the top indices and probabilities to provided memory.
+ *
+ * Performs a three-phase routine: (1) identifies the top k logits and their indices while tracking the maximum logit for numerical stability, (2) computes the normalization constant using a 4-lane SIMD accumulator for exp(logit - max), and (3) writes the top-k indices and corresponding softmax probabilities to the output pointers in descending-score order.
+ *
+ * @param logitsPtr - Pointer to the input logits buffer (contiguous f32 values)
+ * @param numClasses - Number of logits in the input buffer
+ * @param k - Number of top elements to select (assumes 0 < k <= numClasses)
+ * @param probsPtr - Pointer to the output buffer for probabilities (will be written as contiguous f32 values)
+ * @param idxPtr - Pointer to the output buffer for indices (will be written as contiguous i32 values)
+ */
 export function topk_softmax(
   logitsPtr: usize,
   numClasses: i32,

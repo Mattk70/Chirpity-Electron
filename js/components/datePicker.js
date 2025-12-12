@@ -14,15 +14,16 @@
 import {Context, get} from '../utils/i18n.js';
 
 /**
- * Initializes and configures date picker elements for both chart and explore UI controls.
+ * Initialize the date picker controls for chart and explore views and wire their UI events to application state and worker messages.
  *
- * This function destroys any existing date picker instance held in the global state, computes preset date ranges
- * (e.g., this week, last month, last night), and creates a new easepick date picker with range, preset, and time
- * selection capabilities. It attaches event listeners to handle selection, clearing, clicks (for setting midnight or noon),
- * and visibility changes, updating the relevant state and communicating with a worker thread for subsequent processing.
+ * Sets up preset ranges, time presets (midnight/noon), and event handlers that update state.chart/state.explore, invoke provided callbacks, and post messages to the worker when ranges are selected or cleared.
  *
- * @param {Function} resetResults - Callback to reset the results UI by clearing summaries and pagination.
- * @param {Function} filterResults - Callback to update filtered results based on the newly selected date range.
+ * @param {Object} state - Application state object containing properties like chart, explore, picker, mode, and i18n.
+ * @param {Worker} worker - Worker thread used for background processing and state updates; receives posted messages describing actions to perform.
+ * @param {Object} config - Configuration object; used for locale and other picker options.
+ * @param {Function} resetResults - Callback to clear or reset result UI (accepts an options object, e.g., {clearSummary, clearPagination, clearResults}).
+ * @param {Function} filterResults - Callback to apply filters or refresh result listings (called with an object containing range and/or species).
+ * @param {Function} generateToast - Callback to show user-facing toasts (called with an object like {type, message}).
  */
 function initialiseDatePicker(state, worker, config, resetResults, filterResults, generateToast) {
   let midnight = false;

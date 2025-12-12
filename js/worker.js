@@ -351,12 +351,12 @@ async function setLabelState({ regenerate }) {
 
 
 /**
- * Handles and dispatches worker messages to perform actions such as analysis, file operations, prediction management, database updates, and UI communication.
+ * Dispatches incoming worker messages to perform audio processing, model control, database operations, and UI communication.
  *
- * Processes incoming event messages containing an `action` field and delegates tasks accordingly, including model initialization, audio analysis, prediction worker management, database record manipulation, file loading and saving, exporting, importing, and updating application state. Waits for initialization to complete before handling most actions. Supports a wide range of commands for audio processing, data management, and UI updates.
+ * Waits for initialization before handling non-initial messages and delegates action-specific work (for example: initialization, analysis, model loading, file I/O, dataset import/export, tag/location management, and state updates) to the appropriate internal handlers.
  *
- * @param {Object} e - The message event containing an `action` and associated parameters.
- * @returns {Promise<void>} Resolves when the requested action is completed.
+ * @param {Object} e - Message event whose `data` contains an `action` string and action-specific parameters.
+ * @returns {Promise<void>} Resolves when the requested action has been handled.
  */
 async function handleMessage(e) {
   const args = e.data;
@@ -825,17 +825,14 @@ const filtersApplied = (list) => {
 };
 
 /**
- * Initialize application state, databases, and prediction workers for the specified model.
- *
- * Loads or creates the disk and memory databases as needed, sets the runtime sample rate and detection backend, updates global STATE with model and database info, regenerates label state, and spawns prediction workers.
+ * Prepare and initialize the app for a detection model: load/create databases, set runtime sample rate and backend, update global STATE, refresh labels, and start prediction workers.
  *
  * @param {Object} options - Launch configuration.
- * @param {string} [options.model="chirpity"] - Model identifier; determines sample rate and which labels/species to load.
+ * @param {string} [options.model="chirpity"] - Model identifier to use.
  * @param {number} [options.batchSize=32] - Number of audio samples per prediction batch.
  * @param {number} [options.threads=1] - Number of prediction worker threads to spawn.
  * @param {string} [options.backend="tensorflow"] - Detection backend to use.
- * @param {string} [options.modelPath] - Filesystem path containing model files and label definitions; used when adding a new model.
- */
+ * @param {string} [options.modelPath] - Filesystem path containing model artifacts and label definitions; used when adding or validating a model.
 
 async function onLaunch({
   model = "chirpity",
@@ -1200,14 +1197,13 @@ async function getMatchingIds(cnames) {
 }
 
 /**
- * Build an SQL fragment that filters species according to the current STATE.list selection.
+ * Produce an SQL fragment that restricts species rows according to the current STATE.list selection.
  *
- * When STATE.list is "everything" the function returns an empty string. For other lists it resolves the set
- * of included species IDs (handling the special "birds" exclusion case and CNAMES with suffixes) and
- * returns an SQL snippet that restricts s.id to that set.
+ * For list "everything" returns an empty string. For other lists it resolves the set of included species
+ * IDs (handling the special "birds"/"Animalia" exclusion case and CNAMES with suffixes) and returns an
+ * SQL snippet that filters s.id to that set.
  *
- * @returns {Promise<string>} An SQL fragment restricting species by id (for example " AND s.id IN (1,2) "),
- * or an empty string when no filtering is required.
+ * @returns {string} An SQL fragment restricting species by id (for example ` AND s.id IN (1,2) `), or an empty string when no filtering is required.
  */
 async function getSpeciesSQLAsync(){
   let not = "", SQL = "";
@@ -1230,6 +1226,13 @@ async function getSpeciesSQLAsync(){
   return SQL
 }
 
+/**
+ * Augments an SQL statement with application-specific qualifiers (file/time range, label filters, species constraints, nocmig/daylight exclusion, and location) derived from current STATE and the supplied range/caller context.
+ * @param {string} stmt - SQL fragment to append qualifiers to (for example a WHERE clause or CTE qualifier).
+ * @param {{start?: number, end?: number}|undefined} range - Optional file/time range to restrict results; if undefined and STATE.mode is "explore", the explore range is used.
+ * @param {string} [caller] - Caller context that can alter behavior (when 'results', the file is restricted to the active file queue entry).
+ * @returns {[string, Array]} A tuple where the first element is the augmented SQL string and the second is an array of parameter values. The parameters array begins with the detection confidence threshold from STATE and includes any additional values required by the appended qualifiers.
+ */
 async function addQueryQualifiers(stmt, range, caller) {
   const {mode, explore, labelFilters, detect, locationID, selection} = STATE;
   let params = [detect.confidence];
@@ -2300,14 +2303,14 @@ const getPredictBuffers = async ({ file = "", start = 0, end = undefined }) => {
 };
 
 /**
- * Streams audio data from a file, splits it into chunks, and queues each chunk for AI model prediction.
+ * Read audio from a file and time range, split it into fixed-size buffers, and enqueue each buffer for model prediction.
  *
- * Extracts audio from the specified file and time range, applies optional audio filters, and manages chunked buffering to optimize parallel processing. Handles encoder padding for compressed formats, manages backpressure by pausing/resuming ffmpeg as needed, and limits the backlog of audio chunks to control memory usage. Updates metadata and expected chunk counts based on actual processed duration. Resolves when all audio chunks have been processed and queued.
+ * Compensates for encoder padding on compressed formats, manages ffmpeg backpressure and an internal backlog limit, and updates per-file metadata (expected chunk counts) based on the actual processed duration.
  *
  * @param {string} file - Path to the audio file to process.
- * @param {number} start - Start time in seconds for audio extraction.
- * @param {number} end - End time in seconds for audio extraction.
- * @param {number} chunkStart - Initial sample index for chunking.
+ * @param {number} start - Start time in seconds for extraction.
+ * @param {number} end - End time in seconds for extraction.
+ * @param {number} chunkStart - Initial sample index used when assigning chunks to prediction batches.
  * @param {number} highWaterMark - Buffer size in bytes for each audio chunk.
  * @param {number} samplesInBatch - Number of audio samples per batch sent to the model.
  * @returns {Promise<void>} Resolves when all audio chunks have been processed and queued for prediction.
@@ -2475,6 +2478,16 @@ async function processAudio(
   }).catch((error) => console.error(error));
 }
 
+/**
+ * Convert interleaved 16-bit PCM audio bytes into a Float32Array of normalized samples.
+ *
+ * Converts the provided byte buffer (interpreted as little-endian signed 16-bit PCM) into
+ * a Float32Array where each sample is scaled to the range [-1, 1).
+ *
+ * @param {Uint8Array} audio - Interleaved 16-bit PCM audio bytes.
+ * @returns {Float32Array} Normalized float samples corresponding to the input PCM16 data.
+ * @throws {Error} If `audio.length` is not an even number (incomplete 16-bit samples).
+ */
 function getMonoChannelData(audio) {
   if (audio.length % 2 !== 0) {
     generateAlert({message: `WAV audio sample length must be even, got ${audio.length}`, type: 'error'})
@@ -2504,6 +2517,17 @@ function getMonoChannelData(audio) {
   return out;
 }
 
+/**
+ * Queue mono channel audio data for model prediction for a specific file segment.
+ *
+ * Increments the pending-predictions counter for the given file and enqueues
+ * the segment's mono channel PCM data for processing by the prediction pipeline.
+ *
+ * @param {AudioBuffer|Object} audio - Decoded audio buffer containing one or more channels of PCM samples.
+ * @param {string} file - Identifier or filename for the source audio file.
+ * @param {number} end - End time (in seconds) of the audio segment.
+ * @param {number} chunkStart - Start time (in seconds) of the audio segment.
+ */
 function prepareWavForModel(audio, file, end, chunkStart) {
   predictionsRequested[file]++;
   const channelData = getMonoChannelData(audio);
@@ -3211,13 +3235,13 @@ const processQueue = async () => {
 };
 
 /**
- * Spawns multiple Web Workers for parallel AI model prediction.
+ * Spawn prediction workers to run the specified AI model in parallel.
  *
- * Initializes the specified number of prediction worker threads, each loading the given AI model (using "BirdNet2.4" for "birdnet"). Workers are configured with batch size and backend settings, and set up for asynchronous communication and error handling.
+ * Creates and initializes worker threads that load the given model and accept prediction work. For models named "nocmig", "chirpity", or "perch v2" the corresponding worker script with the same name is used; other model names load the "BirdNet2.4" worker. When "perch v2" is used, at most one worker is created and existing perch workers are reused and informed of thread/size changes.
  *
- * @param {string} model - The AI model to load for prediction; "birdnet" uses the "BirdNet2.4" worker script.
- * @param {number} batchSize - Number of items each worker processes per batch.
- * @param {number} threads - Number of worker threads to spawn.
+ * @param {string} model - Model identifier (e.g., "birdnet", "perch v2", "nocmig", "chirpity"); determines which worker script is loaded.
+ * @param {number} batchSize - Number of items each worker should process per batch.
+ * @param {number} threads - Desired number of worker threads to spawn or inform the existing worker about.
  */
 function spawnPredictWorkers(model, batchSize, threads) {
   const isPerch = model === 'perch v2';
@@ -4784,6 +4808,18 @@ async function onDeleteSpecies({
   }
 }
 
+/**
+ * Delete detection records with confidence less than or equal to the given threshold, optionally restricted by time range, species, model, and current location.
+ *
+ * When records are removed from the persistent disk database this refreshes the detected-species list; when removed from the in-memory database it notifies the UI of unsaved changes.
+ *
+ * @param {Object} params - Function parameters.
+ * @param {string|Date} [params.start] - Start of the time range (inclusive); accepted as a Date or a string suitable for the database `dateTime` column.
+ * @param {string|Date} [params.end] - End of the time range (inclusive); accepted as a Date or a string suitable for the database `dateTime` column.
+ * @param {string} [params.species] - Species canonical name (`cname`) to restrict deletions to a specific species.
+ * @param {number} params.confidence - Confidence threshold; records with confidence <= this value will be deleted.
+ * @param {number} [params.modelID] - Model identifier to restrict deletions to records produced by a specific model.
+ */
 async function onDeleteConfidence({start, end, species, confidence, modelID}) {
   // Implement the logic for deleting by confidence here
   const db = STATE.db;
@@ -4815,6 +4851,16 @@ async function onDeleteConfidence({start, end, species, confidence, modelID}) {
     }
   }
 }
+/**
+ * Update a file record's name in the database when the underlying file has been renamed.
+ *
+ * Finds the file row with the given old name that has a duration within ±1 second of the
+ * actual duration of the renamed file, updates its name to the new name, and posts UI alerts
+ * describing the outcome.
+ *
+ * @param {string} oldName - The previous filename stored in the database.
+ * @param {string} newName - The new filename on disk to update the record to.
+ */
 async function onFileUpdated(oldName, newName) {
   const newDuration = Math.round(await getDuration(newName));
   try {
@@ -5039,6 +5085,18 @@ async function onSetCustomLocation({
   await getLocations({ file: files[0] });
 }
 
+/**
+ * Fetches location entries, prepends the current in-app default location, and sends them to the UI.
+ *
+ * Retrieves all rows from the `locations` table ordered by `place`, inserts a default entry
+ * (id 0) using the application's current lat/lon/place, and posts a message with event
+ * `"location-list"` containing the assembled list and the `currentLocation` for the given file.
+ *
+ * @param {Object} params
+ * @param {string} params.file - File identifier used to look up the file's stored location ID.
+ * @param {Object} [params.db=STATE.db] - Database client with an `allAsync(sql)` method.
+ * @param {string|number} params.id - Message id used when posting the UI message.
+ */
 async function getLocations({ file, db = STATE.db, id }) {
   let locations = await db.allAsync("SELECT * FROM locations ORDER BY place");
   locations ??= [];

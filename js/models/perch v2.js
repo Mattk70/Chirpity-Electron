@@ -13,6 +13,18 @@ const numClasses = 14795;
 const DEBUG = false;
 let modelPath;
 
+/**
+ * Initialize an ONNX InferenceSession for the Perch model and configure execution options.
+ *
+ * Creates an InferenceSession for the file "perch_v2.onnx" located in the provided model directory,
+ * configures execution providers, batch-size override, preferred output locations, and thread options,
+ * and stores the created session in the module-level `session` variable.
+ *
+ * @param {string} mpath - Path to the directory containing `perch_v2.onnx`.
+ * @param {string} backend - Execution backend identifier; use `'webgpu'` to enable GPU providers, otherwise CPU-only providers are used.
+ * @param {number} batchSize - Batch size to apply to the model's free `batch` dimension.
+ * @param {number} threads - Requested thread count for session configuration (applied to session thread options when supported).
+ */
 async function loadModel(mpath, backend, batchSize, threads) {
   const gpu = backend === 'webgpu';
   const providers = gpu ? [ 'webgpu', 'cpu'] : ['cpu'];
@@ -145,6 +157,14 @@ const createAudioTensorBatch = (audio) => {
     const numSamples = audio.length / chunkLength;
     return [new ort.Tensor('float32', audio, [numSamples, chunkLength]), numSamples];
 };
+/**
+ * Prepare an audio buffer as a batched tensor, run batched prediction, and return the prediction alongside file metadata.
+ * @param {Float32Array} audioBuffer - Raw audio samples for prediction; may be padded to fill batch-aligned chunks.
+ * @param {number} start - Start position in samples used to compute time keys for each chunk in the batch.
+ * @param {number} fileStart - Original file-relative start position in samples associated with this buffer.
+ * @param {string} file - The source filename associated with the audioBuffer.
+ * @returns {Array} A tuple [predictionResult, file, fileStart] where `predictionResult` is the value returned by predictBatch (keys and top-k indices/probabilities), `file` is the source filename, and `fileStart` is the file-relative start position in samples.
+ */
 async function predictChunk(
     audioBuffer,
     start,
@@ -164,6 +184,12 @@ async function predictChunk(
 const batchedIndices = Array.from({ length: batchSize });
 const batchedProbs   = Array.from({ length: batchSize });
 
+/**
+ * Release GPU-backed tensors produced by a model prediction.
+ *
+ * @param {Object} prediction - Model output object that contains GPU-backed tensors.
+ *   Must include `spectrogram`, `embedding`, and `spatial_embedding`, each exposing a `dispose()` method.
+ */
 async function disposeGPUTensors(prediction) {
   const {spectrogram, embedding, spatial_embedding} = prediction;
   spectrogram.dispose();
@@ -172,9 +198,10 @@ async function disposeGPUTensors(prediction) {
 }
 
 /**
- * Predict batch post-process: returns [keys, batchedIndices, batchedProbs]
- * - flat: Float32Array of length batchSize * numClasses (logits)
- * - batchSize, numClasses, sampleRate available in outer scope / params
+ * Run the model on a batched audio tensor and produce the top prediction index and probability for each batch entry.
+ * @param {object} audio - Batched audio tensor passed to the session (shape [numSamples, chunkLength]).
+ * @param {Array<number|string>} keys - Array of start positions (in samples). This array is mutated in-place to contain time strings in seconds with three decimal places.
+ * @returns {[Array<string>, Int32Array, Float32Array]} A tuple: `[keys, batchedIndices, batchedProbs]` where `keys` are the formatted time strings, `batchedIndices` is an Int32Array of top class indices for each batch entry, and `batchedProbs` is a Float32Array of the corresponding probabilities.
  */
 async function predictBatch(audio, keys) {
   return new Promise((resolve) => {
@@ -198,10 +225,15 @@ async function predictBatch(audio, keys) {
 }
 
 
+/**
+ * Compute sample-offset keys for a sequence of audio chunks.
+ * @param {number} numSamples - Number of chunk keys to generate.
+ * @param {number} start - Starting sample index used as the base offset.
+ * @returns {number[]} An array of sample indices for each chunk; each entry equals `start + chunkLength * i` for i from 0 to numSamples-1.
+ */
 function getKeys(numSamples, start) {
     return [...Array(numSamples).keys()].map((i) => start + chunkLength * i);
 }
 
 const loadTopK = require("../utils/topKWASM.js");
 const { topK } = await loadTopK();
-

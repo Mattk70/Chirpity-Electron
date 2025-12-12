@@ -1,6 +1,12 @@
 // topKWASM.js
 const fs = require("fs");
 
+/**
+ * Load and instantiate the topK WebAssembly module and prepare helpers to compute top-K softmax.
+ *
+ * @param {string} path - Filesystem path to the WebAssembly binary (defaults to "topK.wasm").
+ * @returns {{wasm: Object, memory: WebAssembly.Memory, topK: function(Array|Float32Array): {probs: number[], idx: number[]}}} An object with the module exports (`wasm`), the module memory (`memory`), and `topK`, a function that accepts logits and returns an object with `probs` (top-K probabilities) and `idx` (top-K indices).
+ */
 async function loadTopK(path = "topK.wasm") {
   const bytes = fs.readFileSync(path);
 

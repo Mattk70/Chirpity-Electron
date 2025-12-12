@@ -41,31 +41,12 @@ function isValidUUID(uuid) {
 }
 
  /**
-  * Checks the membership status for a given UUID by sending a POST request to the membership API.
+  * Check membership status for the given UUID by calling the membership API.
   *
-  * The function first validates the UUID format. If the UUID is invalid, it throws an error.
-  * It then sends a POST request to the specified API endpoint with the UUID in a JSON payload.
-  * An AbortController enforces a timeout (REQUEST_TIMEOUT_MS) to cancel the request if it takes too long.
-  * On a successful response, the JSON payload is parsed to extract:
-  * - A boolean indicating membership status (mapped from the "result" property).
-  * - A number representing the expiration days (mapped from the "ExpiresIn" property).
-  * These values are returned as an array.
-  *
-  * @example
-  * // Example usage:
-  * checkMembership("123e4567-e89b-12d3-a456-426614174000", "https://api.example.com/membership")
-  *   .then(([isMember, expiresInDays]) => {
-  *     console.log("Membership status:", isMember);
-  *     console.log("Expires in days:", expiresInDays);
-  *   })
-  *   .catch(error => console.error("Error:", error));
-  *
-  * @param {string} uuid - The user's UUID string to validate.
-  * @param {string} MEMBERSHIP_API_ENDPOINT - The URL of the membership API endpoint.
-  * @returns {Promise<[boolean, number]>} Promise resolving to an array where the first element is the membership status
-  * and the second element is the number of days until expiration.
-  *
-  * @throws {Error} If the UUID is invalid, the HTTP request fails, or the response status is not successful.
+  * @param {string} uuid - UUID to validate and check.
+  * @param {string} MEMBERSHIP_API_ENDPOINT - Membership API endpoint URL to POST the UUID to.
+  * @returns {[boolean, string|false, number|undefined]} `true` if the UUID is a member, otherwise `false`; the membership level as a string or `false` when not a member; and the number of days until expiration if provided.
+  * @throws {Error} If the UUID is invalid, the HTTP response is not ok, the request times out, or the response JSON cannot be parsed.
   */
  export async function checkMembership(uuid, MEMBERSHIP_API_ENDPOINT) {
    try {

@@ -5,6 +5,16 @@
 
 export var lastOutLength: i32 = 0;
 
+/**
+ * Convert little-endian 16-bit PCM bytes at `ptr` into a newly allocated mono Float32Array and return its data pointer.
+ *
+ * The function sets `lastOutLength` to the number of output samples produced.
+ *
+ * @param ptr - Pointer to the input buffer of 16-bit little-endian PCM bytes
+ * @param byteLength - Length in bytes of the input buffer; must be even (2 bytes per sample)
+ * @returns Pointer to the start of the returned Float32Array's underlying data (32-bit float elements)
+ * @throws Traps (unreachable) if `byteLength` is not an even number
+ */
 export function getMonoChannelData(ptr: usize, byteLength: i32): usize {
   // Ensure even number of bytes (16-bit samples)
   if ((byteLength & 1) != 0) {

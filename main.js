@@ -1,4 +1,3 @@
-
 const fs = require("node:fs");
 const path = require("node:path");
 const isMac = process.platform === "darwin"; // macOS check
@@ -23,6 +22,15 @@ app.commandLine.appendSwitch("enable-features", "Vulkan");
 // Set the AppUserModelID (to prevent the two pinned icons bug)
 app.setAppUserModelId('com.electron.chirpity');
 const version = app.getVersion();
+/**
+ * Copy a predefined set of user-data files from one directory to another.
+ *
+ * Only the following filenames are copied when present: `config.json`, `archive.sqlite`,
+ * `archive.sqlite.shm`, `archive.sqlite.wal`, `XCcache.json`, and `settings.json`.
+ *
+ * @param {string} srcDir - Source directory containing the files to copy.
+ * @param {string} destDir - Destination directory where files will be copied.
+ */
 function copyFilesOnly(srcDir, destDir) {
   for (const item of fs.readdirSync(srcDir)) {
     if (['config.json', 
@@ -42,6 +50,17 @@ function copyFilesOnly(srcDir, destDir) {
 const userData = app.getPath("userData");
 const CONFIG_FILE = path.join(userData, 'config.json');
     
+/**
+ * Checks whether a macOS-specific migration is required and performs it when necessary.
+ *
+ * If running on macOS and a config file exists but the migration marker file `pkg2dmg` is absent,
+ * this function reads the config's `VERSION`. If the version is greater than 5.6.1, it creates
+ * the `pkg2dmg` marker to indicate no migration is needed. If the version is 5.6.1 or earlier,
+ * it renames the existing userData directory to a backup, recreates userData, copies selected
+ * files from the backup into the new userData, and writes the `pkg2dmg` marker.
+ *
+ * The function logs progress and catches errors; it does not throw.
+ */
 function checkForMigration() {
   if (isMac && ! fs.existsSync(path.join(userData, 'pkg2dmg')) && fs.existsSync(CONFIG_FILE)){
     console.log(`existing config found`)
@@ -79,6 +98,12 @@ const SERVICE = 'Chirpity';
 const ACCOUNT = 'install-info';
 let DEBUG = false;
 
+/**
+ * Retrieve the application's install information from the system keychain, creating and persisting a new record if none exists or the stored record is invalid.
+ *
+ * If a new record is created, `installedAt` will be set to the provided `date` (if valid) or the current time. The created record is persisted to the keychain when possible; failures to persist fall back to returning the record in memory.
+ * @param {string|Date} [date] - Optional install date (Date object or ISO date string) to use for `installedAt` when creating a new record.
+ * @returns {{appId: string, installedAt: string}} An object containing `appId` (UUID) and `installedAt` (ISO 8601 string).
 async function getInstallInfo(date) {
   try {
     const raw = await keytar.getPassword(SERVICE, ACCOUNT);

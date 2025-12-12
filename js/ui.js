@@ -1122,13 +1122,14 @@ async function sortFilesByTime(fileNames) {
     .map((file) => file.name); // Return sorted file names
 }
 /**
- * Opens one or more audio files, resets analysis state, and updates the UI for new input.
+ * Open audio files, reset analysis and diagnostics state, update UI controls, and start loading the first file.
  *
- * Loads the provided audio files, resets analysis results and diagnostics, updates menu items, and initializes the spectrogram. If multiple files are selected, sorts them by creation time and enables batch analysis options. Begins loading the first file in the list.
+ * If multiple files are provided, the list is sorted by creation time and batch analysis menu options are enabled.
  *
- * @param {Object} args - Arguments for file opening.
- * @param {string[]} args.filePaths - Paths of audio files to open.
- * @param {boolean} [args.preserveResults] - If true, preserves previous analysis results.
+ * @param {Object} args - Arguments for opening files.
+ * @param {string[]} args.filePaths - File system paths of the audio files to open.
+ * @param {boolean} [args.checkSaved=true] - When false, mark analysis as already done (used when importing saved results).
+ * @param {boolean} [args.preserveResults] - When true, retain previous analysis results for the incoming file.
  */
 async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults } = {}) {
   if (!filePaths.length) return;
@@ -1381,14 +1382,14 @@ async function importData(format){
 }
 
 /**
- * Exports detection results or summaries in the specified format.
+ * Export detection results or a summary in the specified format.
  *
- * Depending on the chosen format, prompts the user to select a directory or file location, then sends an export request to the worker with the relevant parameters and headers. Updates the last used save folder in local storage.
+ * Prompts the user for a destination when required, queues an export request to the worker with the chosen options, and updates the stored last-save folder.
  *
- * @param {string} format - The export format (e.g., "Audacity", "audio", "summary", "Raven").
- * @param {string|string[]} [species] - Species or list of species to include in the export. Defaults to the current species filter.
- * @param {number} [limit=Infinity] - Maximum number of results to export.
- * @param {number} [duration] - Optional duration filter for exported results.
+ * @param {string} format - Export format identifier (e.g., "Audacity", "audio", "summary", "Raven").
+ * @param {string|string[]} [species] - Species name or array of species to include; when omitted uses the current species filter.
+ * @param {number} [limit=Infinity] - Maximum number of results to include in the export.
+ * @param {number} [duration] - Optional duration filter (seconds) to apply to exported results.
  */
 async function exportData(
   format,
@@ -1474,13 +1475,12 @@ const clearLocationFilter = () =>   // Clear any species/location filters from e
   });
 
 /**
- * Activates chart visualization mode in the UI.
+ * Switches the UI into chart visualization mode and initiates chart generation.
  *
- * This asynchronous function transitions the application into chart mode by saving the current
- * analysis state, updating menu items to reflect the mode change, and instructing the worker to
- * adjust its mode and fetch detected species. It sets up a location filter with an associated event
- * handler, destroys any existing spectrogram to prevent conflicts, and updates the display to show
- * the records container for chart visualization.
+ * Updates menu availability for charting, saves current analysis state, requests the worker
+ * to prepare chart-related data (including detected species), sets up the location filter and its
+ * change handler, destroys any active spectrogram to avoid conflicts, reveals the records/chart
+ * container, and triggers a chart data request.
  *
  * @async
  */
@@ -2497,12 +2497,12 @@ function getSpecies(target) {
 
 
 /**
- * Asynchronously saves an audio clip using Electron's file system API.
+ * Save an audio clip to disk using the Electron file-save API.
  *
  * @param {Object} options - Parameters for saving the audio clip.
- * @param {*} options.file - The audio file data to be saved.
- * @param {string} options.filename - The name under which to save the audio file.
- * @param {string} options.extension - The file extension to use for the saved file.
+ * @param {Blob|Buffer|Uint8Array} options.file - Binary audio data to write to disk.
+ * @param {string} options.filename - Desired file name (without path).
+ * @param {string} options.extension - File extension (for example, "wav" or "mp3").
  */
 async function onSaveAudio({ file, filename, extension }) {
   await window.electron.saveFile({
@@ -2538,6 +2538,13 @@ async function onSaveAudio({ file, filename, extension }) {
 
 let chartInstance;
 
+/**
+ * Compute the Date for the Monday that starts the given ISO week of a year.
+ *
+ * @param {number} week - ISO week number (1-53).
+ * @param {number} year - Year for which the ISO week is requested.
+ * @returns {Date} A Date object set to the start (Monday) of the specified ISO week in the given year.
+ */
 function getDateOfISOWeek(week, year) {
   const simple = new Date(year, 0, 1 + (week - 1) * 7);
   const dayOfWeek = simple.getDay();
@@ -2547,6 +2554,13 @@ function getDateOfISOWeek(week, year) {
   return isoWeekStart;
 }
 
+/**
+ * Format an ISO week (week number + year) as a localized date range string.
+ *
+ * @param {number} week - ISO week number.
+ * @param {number} year - Four-digit year.
+ * @returns {string} A localized date range covering the ISO week's Monday–Sunday span (e.g. "5–11 February" or "28 February – 6 March"), or the original `week` value if the week cannot be resolved.
+ */
 function formatWeekRange(week, year) {
   const locale = navigator.language;
 
@@ -2572,6 +2586,23 @@ function formatWeekRange(week, year) {
   return `${startStr}–${endStr}`;
 }
 
+/**
+ * Render and update the main chart and related UI elements based on provided chart data.
+ *
+ * Updates the species title and records table visibility, destroys any existing Chart.js instances,
+ * formats and inserts record summary values into the DOM, generates axis labels, and creates a new
+ * Chart.js instance showing the aggregated results (with an optional total line overlay).
+ *
+ * @param {Object} args - Chart payload and display options.
+ * @param {Object<string, (number|Array|Date)>} args.records - DOM-mapped record summary values keyed by element id; values are dates or arrays [count, timestamp].
+ * @param {"hour"|"day"|"week"|"month"} args.aggregation - Time aggregation used for the chart.
+ * @param {number} args.pointStart - Unix-ms timestamp for the first data point.
+ * @param {Object<string, number[]>} args.results - Year-keyed series of numeric datapoints for the chart.
+ * @param {number} [args.rate] - Optional sampling rate or density metric (not always used).
+ * @param {number} [args.startX] - Optional X-axis start offset used by label generation.
+ * @param {string} [args.species] - Species name to display in the chart header; when falsy the records table is hidden.
+ * @param {number[]|undefined} [args.total] - Optional series to plot as a filled line (total hours) over the bar datasets.
+ */
 function onChartData(args) {
   const i18 = i18n.get(i18n.ChartUI)
   const {records, aggregation, pointStart, results, rate, startX} = args;
@@ -2707,6 +2738,19 @@ function onChartData(args) {
   chartInstance = new Chart(chartCanvas, chartOptions);
 }
 
+/**
+ * Produce x-axis labels for chart data based on the aggregation interval.
+ *
+ * For aggregation "week" returns a numeric sequence starting at `startX` with length `datapoints`.
+ * For other aggregations returns an array of formatted date strings beginning at `pointstart`
+ * and advanced by one hour for "hour" or one day for "day" per step.
+ *
+ * @param {string} aggregation - Time aggregation: e.g. "week", "day", or "hour".
+ * @param {number} datapoints - Number of labels to generate.
+ * @param {number|Date|string} pointstart - Start time for label generation (epoch ms, Date, or date string).
+ * @param {number} [startX] - Starting numeric x value used only when `aggregation` is "week".
+ * @returns {(string|number)[]} Array of labels: numbers for "week", formatted date strings for other aggregations.
+ */
 function generateDateLabels(aggregation, datapoints, pointstart, startX) {
   const dateLabels = [];
   const startDate = new Date(pointstart);
@@ -2727,7 +2771,17 @@ function generateDateLabels(aggregation, datapoints, pointstart, startX) {
   return dateLabels;
 }
 
-// Helper function to format the date as desired
+/**
+ * Format a Date for display according to the requested aggregation.
+ *
+ * For aggregation "week" returns the week number within the year.
+ * For aggregation "hour" returns a 12-hour clock label with AM/PM (e.g. "3PM").
+ * For aggregation "day" (or any other value) returns a localized date string using the configured locale (with "en_uk" mapped to "en") and showing month (short) and day.
+ *
+ * @param {Date} date - The date to format.
+ * @param {string} aggregation - One of "week", "day", or "hour" controlling the output format.
+ * @returns {number|string} The formatted value: week number (number) for "week", hour label (string) for "hour", or localized date string for "day"/other.
+ */
 function formatDate(date, aggregation) {
   const options = {};
   let formattedDate = "";
@@ -2755,6 +2809,17 @@ function formatDate(date, aggregation) {
 }
 
 
+/**
+ * Build a human-readable tooltip title for a given date according to the aggregation level.
+ *
+ * For `week` aggregation returns a string like "Week N (startDate - endDate)". For `day`
+ * aggregation returns a long date (e.g., "January 2, 2006"). For other values (hour)
+ * returns a short date and 12-hour time (e.g., "Jan 2, 12:34 PM").
+ *
+ * @param {Date} date - The date to format for the tooltip.
+ * @param {string} aggregation - Granularity of the tooltip: `"week"`, `"day"`, or other (treated as hour).
+ * @returns {string} The formatted tooltip title.
+ */
 function getTooltipTitle(date, aggregation) {
   if (aggregation === "week") {
     // Customize for week view
@@ -2833,12 +2898,11 @@ function debounceClick(handler, delay = 250) {
 }
 
 /**
- * Responds to keydown events by dispatching configured global actions.
+ * Dispatches a configured global action for the given keydown event.
  *
- * Logs the pressed key when debugging is enabled. If the pressed key exists in the global actions mapping,
- * hides the context menu, determines the active modifier key (Shift, Control, or Alt; defaults to "no"),
- * tracks the key press event with its modifier via a tracking function, and executes the corresponding action callback.
- * If the key is not mapped, invokes the fallback handler for number keys.
+ * Hides the context menu, determines the active modifier key (Shift, Control, Alt, or "no"),
+ * records the key press for tracking, and invokes the mapped action callback from GLOBAL_ACTIONS.
+ * If the key has no direct mapping, delegates to the number-key fallback handler.
  *
  * @param {KeyboardEvent} e - The keyboard event triggered on key press.
  * @returns {void}
@@ -5149,11 +5213,9 @@ const showRelevantAudioQuality = () => {
 };
 document.addEventListener("click", debounceClick(handleUIClicks));
 /**
- * Handles all UI click events by dispatching actions based on the clicked element's ID.
+ * Dispatches UI click actions by inspecting the clicked element's closest id and invoking the corresponding application handler.
  *
- * Routes user clicks to the appropriate application logic, including file operations, analysis commands, model management, settings adjustments, help dialogs, sorting, context menu actions, and UI updates. Updates application state, communicates with the worker thread, manages configuration, and triggers relevant UI changes as needed.
- *
- * @param {MouseEvent} e - The click event object.
+ * @param {MouseEvent} e - The click event whose target determines which UI action to run.
  */
 async function handleUIClicks(e) {
   if (!APPLICATION_LOADED) return;
@@ -6490,6 +6552,12 @@ const flushSpec = async () =>{
   }
 }
 
+/**
+ * Request chart data for the current chart state from the analysis worker.
+ *
+ * Sends a message to the background worker containing the chart parameters (species, range,
+ * location, aggregation, and year-stacking flag) taken from STATE.chart.
+ */
 function callForChart() {
   const {species, range, location, aggregation, stackYears: byYear} = STATE.chart;
   worker.postMessage({
@@ -6593,28 +6661,14 @@ function filterLabels(e) {
 }
 
 /**
- * Creates and displays a custom context menu based on the event target.
+ * Build, attach event handlers for, and display a context menu appropriate to the clicked UI element.
  *
- * This asynchronous function handles user interactions for generating a context menu
- * in the spectrogram interface. It performs the following actions:
- * - Pauses any ongoing audio playback via the spec.wavesurfer instance to prevent interference.
- * - Stops the propagation of the triggering event.
- * - Checks and adjusts for region detection within the spectrogram.
- * - Determines the context (e.g., summary, selection, or results) of the click and sets
- *   visibility flags for specific menu items.
- * - If necessary, triggers a click on the target element to load or update the active row
- *   and awaits the file load completion.
- * - Constructs the HTML for the context menu with options such as playing a region,
- *   analyzing a selection, creating/editing a manual record, exporting a clip, comparing,
- *   or deleting records.
- * - Sets the modal title based on whether the action is to create or edit a record.
- * - Attaches event listeners to handle deletion and record entry actions based on the context.
- * - Adjusts certain menu items' visibility depending on the active context.
- * - Positions the context menu at the event coordinates.
+ * The created menu reflects the click context (summary, selection, or results), exposes actions
+ * such as play, analyse selection, create/edit manual record, export clip, compare, and delete,
+ * and wires the appropriate click handlers for those actions before positioning the menu.
  *
- * @async
- * @param {Event} e - The event object that triggers the context menu (typically a MouseEvent).
- * @returns {Promise<void>} Resolves once the context menu is setup and positioned.
+ * @param {Event} e - The event that triggered the context menu (typically a MouseEvent).
+ * @returns {Promise<void>} Resolves when the context menu has been created, handlers attached, and positioned.
  */
 async function createContextMenu(e) {
   e.stopPropagation();
@@ -7594,11 +7648,11 @@ const IUCNMap = {
 export { config, displayLocationAddress, LOCATIONS, generateToast };
 
 /**
- * Checks the user's membership status via a remote API and updates the UI to reflect feature access.
+ * Determine current membership or trial status and update UI feature availability and branding accordingly.
  *
- * Determines if the user is a member or within a trial period, unlocking or locking premium features accordingly. If the remote check fails, uses a cached membership status if available and less than one week old. Updates UI elements, feature availability, and branding based on membership state.
+ * Uses the remote membership API and falls back to a cached status if the remote check fails and the cache is less than two weeks old. Unlocks premium UI elements and updates branding when the user is a member or still within the trial period; locks or disables premium features otherwise. Also triggers a near-expiry warning when membership is close to expiring.
  *
- * @returns {Promise<boolean|undefined>} Resolves to `true` if the user is a member or within the trial period, `false` if not, or `undefined` if status cannot be determined and no valid cache exists.
+ * @returns {Promise<boolean|undefined>} `true` if the user is a member or within the trial period, `false` if not, or `undefined` if the status cannot be determined and no valid cache exists.
  */
 async function membershipCheck() {
   const twoWeeks = 14 * 24 * 60 * 60 * 1000; // "It's been two weeks since you looked at me..."
@@ -7878,18 +7932,17 @@ function getFilteredBirds(search, list) {
 }
 
 /**
- * Updates the suggestions list  based on the input search query.
+ * Update the visible bird suggestion list to match the input's query.
  *
- * Uses the lowercase value of the provided input element to filter bird suggestions via the global
- * getFilteredBirds function. If the search query is shorter than 2 characters, the suggestion element
- * is hidden. Otherwise, a list of matching suggestions is created where each suggestion, when clicked,
- * updates the selected bird display (the element with ID "selected-bird"), conditionally modifies the
- * input value based on the preserveInput flag, dispatches a change event on the input, and hides the
- * suggestion element.
+ * Filters available bird labels using the input's lowercase value; if the query has fewer than
+ * 2 characters the suggestion element is hidden and chart species is cleared. When a suggestion
+ * is selected the displayed selected-bird element is replaced, the input value is either kept
+ * or cleared depending on `preserveInput`, relevant state (results or chart) is updated, and a
+ * change event is dispatched on the input.
  *
- * @param {HTMLInputElement} input - The input element containing the current search query.
- * @param {HTMLElement} element - The DOM element that displays the list of filtered suggestions.
- * @param {boolean} preserveInput - Determines whether to keep the input’s value after a suggestion is selected.
+ * @param {HTMLInputElement} input - The text input containing the search query.
+ * @param {HTMLElement} element - Container element where suggestion entries are rendered.
+ * @param {boolean} preserveInput - If true, keep the selected common name in the input; if false, clear it.
  */
 function updateSuggestions(input, element, preserveInput) {
   const search = input.value.toLowerCase();
