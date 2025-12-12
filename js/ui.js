@@ -2664,12 +2664,12 @@ function onChartData(args) {
       plugins: {
         title: {
           display: true,
-          text: utils.interpolate(i18.NoD, {species}).replace(/\(\s*\)/, ""),
+          text: utils.interpolate(i18.NoD, {species}).replace("()", ""),
         },
         customCanvasBackgroundColor: {
           color: "GhostWhite",
         },
-        tooltip: {
+        tooltip: aggregation === "week" ? { 
         callbacks: {
           title: (items) => {
             const week = items[0].label;
@@ -2678,7 +2678,7 @@ function onChartData(args) {
             return formatWeekRange(week, year);
           }
         }
-      }
+      } : undefined
       },
     },
     plugins: [plugin],
@@ -2732,6 +2732,7 @@ function generateDateLabels(aggregation, datapoints, pointstart, startX) {
 function formatDate(date, aggregation) {
   const options = {};
   let formattedDate = "";
+  const locale = config.locale.replace("en_uk", "en-GB").replace('_', '-');
   if (aggregation === "week") {
     // Add 1 day to the startDate
     date.setHours(date.getDate() );
@@ -2746,12 +2747,17 @@ function formatDate(date, aggregation) {
     // options.weekday = "short";
     options.month = "short";
   } else if (aggregation === "hour") {
-    const hour = date.getHours();
-    const period = hour >= 12 ? "PM" : "AM";
-    const formattedHour = hour % 12 || 12; // Convert 0 to 12
-    return `${formattedHour}${period}`;
+    const timeString = new Intl.DateTimeFormat(locale, {
+      hour: 'numeric',
+      hour12: true
+    }).format(date);
+    // const hour = date.getHours();
+    // const period = hour >= 12 ? "PM" : "AM";
+    // const formattedHour = hour % 12 || 12; // Convert 0 to 12
+    // return `${formattedHour}${period}`;
+    return timeString;
   }
-  const locale = config.locale.replace("en_uk", "en");
+  
   return formattedDate + date.toLocaleDateString(locale, options);
 }
 
