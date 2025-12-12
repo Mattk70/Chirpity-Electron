@@ -90,6 +90,7 @@
   "delete": [
     "Aktuellen Datensatz löschen"
   ],
+  "shift-delete": ["Wenn Ergebnisse nach Art <b>und</b> nach Konfidenz sortiert werden, löscht dies den ausgewählten Eintrag und alle Einträge mit geringerer Konfidenz"],
   "undo": [
     "Gelöschte(n) Datensatz/Datensätze wiederherstellen"
   ],

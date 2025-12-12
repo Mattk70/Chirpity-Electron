@@ -89,6 +89,7 @@
   "delete": [
     "Excluir o registro atual"
   ],
+  "shift-delete": ["Quando os resultados são filtrados por espécie <b>e</b> ordenados por confiança, isto eliminará o registo seleccionado e todos os registos com menor confiança"],
   "undo": [
     "Restaurar o(s) registro(s) excluído(s)"
   ],

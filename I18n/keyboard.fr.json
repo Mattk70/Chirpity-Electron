@@ -90,6 +90,7 @@
     "delete": [
       "Supprimer l'enregistrement actuel"
     ],
+    "shift-delete": ["Lorsque les résultats sont filtrés par espèce <b>et</b> triés par confiance, cela supprimera l’enregistrement sélectionné ainsi que tous les enregistrements ayant une confiance inférieure"],
     "undo": [
       "Restaurer l'enregistrement supprimé(s)"
     ],

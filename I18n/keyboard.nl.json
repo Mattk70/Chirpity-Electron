@@ -89,6 +89,7 @@
   "delete": [
     "Verwijder huidig record"
   ],
+  "shift-delete": ["Wanneer resultaten worden gefilterd op soort <b>en</b> gesorteerd op betrouwbaarheid, wordt het geselecteerde record en alle records met een lagere betrouwbaarheid verwijderd"],
   "undo": [
     "Herstel verwijderde record(s)"
   ],

@@ -4023,7 +4023,7 @@ function setClickedIndex(target) {
 }
 
 const deleteSpeciesByConfidence = (species, confidence, modelID) => {
-  if (STATE.resultsSortOrder !== "score DESC " || ! isSpeciesViewFiltered()) return;
+  if (!(STATE.resultsSortOrder.includes("score") && isSpeciesViewFiltered())) return;
   const { start, end } = STATE.mode === "explore" ? STATE.explore.range : {};
   worker.postMessage({
     action: "delete-confidence",

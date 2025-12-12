@@ -89,6 +89,7 @@
     "delete": [
       "Eliminar el registro actual"
     ],
+    "shift-delete": ["Cuando los resultados se filtran por especie <b>y</b> se ordenan por confianza, esto eliminará el registro seleccionado y todos los registros con menor confianza"],
     "undo": [
       "Restaurar el/los registro(s) eliminado(s)"
     ],
