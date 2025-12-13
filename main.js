@@ -76,7 +76,7 @@ const crypto = require("node:crypto");
 const settings = require("electron-settings");
 const keytar = require('keytar');
 const SERVICE = 'Chirpity';
-const ACCOUNT = 'install-info';
+const ACCOUNT = 'new-install-info';
 let DEBUG = false;
 
 async function getInstallInfo(date) {
@@ -86,6 +86,7 @@ async function getInstallInfo(date) {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed.installedAt === "string") {
+        // await keytar.deletePassword(SERVICE, ACCOUNT);
         return parsed;
       }
       console.warn("getInstallInfo: keychain entry missing valid installedAt, recreating with", date);
@@ -96,14 +97,14 @@ async function getInstallInfo(date) {
 
   let effectiveDate = date ? new Date(date) : new Date();
   if (Number.isNaN(effectiveDate.getTime())) {
-    console.warn("getInstallInfo: invalid date provided, falling back to now.");
+    console.warn("getInstallInfo: invalid date provided, falling back to now. Date:", effectiveDate);
     effectiveDate = new Date();
   }
-
   const installInfo = {
     appId: crypto.randomUUID(),
     installedAt: effectiveDate.toISOString(),
   };
+  console.log('attempt to set new service pawwword, using ', installInfo)
   
   try {
     await keytar.setPassword(SERVICE, ACCOUNT, JSON.stringify(installInfo));
