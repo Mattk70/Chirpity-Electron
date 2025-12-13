@@ -1895,8 +1895,19 @@ window.onload = async () => {
     utils.syncConfig(config, defaultConfig);
   }
 
-  const installDate = localStorage.getItem("installDate")
+  const installDate = localStorage.getItem("installDate");
   const {appId, installedAt} = await window.electron.getInstallInfo(installDate);
+  if (!installDate || ! isNaN(Number(installDate))) {
+    let effectiveDate = installedAt;
+    if (installDate) {
+      const localDate = Number(installDate);
+      if (!isNaN(localDate) && localDate < new Date(installedAt).getTime())  {
+        effectiveDate = new Date(localDate).toISOString();
+      }
+      console.log('converting install date to', effectiveDate)
+    } 
+    localStorage.setItem("installDate", effectiveDate)
+  }
   config.UUID ??= appId;
   config.installedAt = installedAt;
   if (isTestEnv) console.log(`UUID: ${config.UUID}, `)
