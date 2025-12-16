@@ -34,10 +34,10 @@ function trackEvent(uuid, event, action, name, value){
     value = value ? `&e_v=${value}` : '';
     fetch(`https://analytics.mattkirkland.co.uk/matomo.php?h=${t.getHours()}&m=${t.getMinutes()}&s=${t.getSeconds()}
         &action_name=Settings%20Change&idsite=${ID_SITE}&rand=${Date.now()}&rec=1&uid=${uuid}&apiv=1
-        &e_c=${event}&e_a=${action}${name}${value}`)
+        &e_c=${event}&e_a=${action}${name}${value}`, {method: "POST" })
         .then(response => {
             if (! response.ok) throw new Error('Network response was not ok', response);
-                    })
+        })
         .catch(error => console.log('Error posting tracking:', error))
 }
 
@@ -59,7 +59,7 @@ function trackVisit(config){
             &dimension11=${VERSION}
             &dimension12=${CPU}
             &dimension13=${RAM}
-            &dimension14=${GPUs}`)
+            &dimension14=${GPUs}`, { method: "POST"})
         .then(response => {
             if (! response.ok) throw new Error('Network response was not ok', response);
         })

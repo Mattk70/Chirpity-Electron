@@ -1248,7 +1248,11 @@ async function addQueryQualifiers(stmt, range, caller) {
   } else {
     stmt += await getSpeciesSQLAsync()
   }
-  if (detect.nocmig) stmt += " AND COALESCE(isDaylight, 0) != 1 ";
+  if (detect.nocmig) {
+    const condition = detect.nocmig === 'day';
+    stmt += ` AND isDaylight = ${condition} `;
+  }
+  // if (detect.nocmig) stmt += " AND COALESCE(isDaylight, 0) != 1 ";
   if (locationID !== undefined) {
     stmt += locationID === 0 ? " AND locationID IS NULL " : " AND locationID = ? ";
     locationID !== 0 && params.push(locationID);
@@ -1696,7 +1700,6 @@ function onAbort({ model = STATE.model }) {
 }
 
 const measureDurationWithFfmpeg = (src, type) => {
-  console.info('Measuring duration', `${src}: ${type}`);
   return new Promise((resolve, reject) => {
     const { PassThrough } = require("node:stream");
     const stream = new PassThrough();
@@ -3625,13 +3628,17 @@ const parsePredictions = async (response) => {
           } else { end = key + predictionLength }
 
           const [sname, cname] = STATE.allLabels[species].split(getSplitChar()) 
+          const lat = METADATA[file].lat || STATE.lat;
+          const lon = METADATA[file].lon || STATE.lon;
+          const isDaylight = isDuringDaylight(timestamp, lat, lon);
           const result = {
-            timestamp: timestamp,
+            timestamp,
             position: key,
-            end: end,
-            file: file,
-            cname: cname,
-            sname: sname,
+            end,
+            file,
+            cname,
+            sname,
+            isDaylight,
             score: confidence,
             model: STATE.model,
           };
@@ -3860,8 +3867,8 @@ async function processNextFile({
           updateFilesBeingProcessed(file);
           generateAlert({ message: "noNight", variables: { file } });
           const duration = METADATA[file].duration;
-          STATE.totalDuration -= Math.ceil(duration / (BATCH_SIZE * WINDOW_SIZE)) * (BATCH_SIZE * WINDOW_SIZE);
-          STATE.allFilesDuration -= duration;
+          //STATE.totalDuration -= Math.ceil(duration / (BATCH_SIZE * WINDOW_SIZE)) * (BATCH_SIZE * WINDOW_SIZE);
+          //STATE.allFilesDuration -= duration;
           DEBUG && console.log("Recursion: start = end");
           await processNextFile(arguments[0]).catch((error) =>
             console.warn("Error in processNextFile call", error)
@@ -3925,58 +3932,71 @@ function sumObjectValues(obj) {
 
 // Function to calculate the active intervals for an audio file in nocmig mode
 
-function calculateNighttimeBoundaries(fileStart, fileEnd, latitude, longitude) {
-  const activeIntervals = [];
-  const maxFileOffset = (fileEnd - fileStart) / 1000;
-  const dayNightBoundaries = [];
+function calculateTimeBoundaries(
+  fileStart,
+  fileEnd,
+  latitude,
+  longitude,
+  period
+) {
+  const intervals = [];
+  const fileStartMs = fileStart;
+  const fileEndMs = fileEnd;
 
-  const endTime = new Date(fileEnd);
-  endTime.setHours(23, 59, 59, 999);
+  const startDay = new Date(fileStartMs);
+  startDay.setUTCHours(0, 0, 0, 0);
+  if (period !== 'day') {
+    startDay.setDate(startDay.getDate() - 1);
+  }
+  const endDay = new Date(fileEndMs);
+  endDay.setUTCHours(0, 0, 0, 0);
+
   for (
-    let currentDay = new Date(fileStart);
-    currentDay <= endTime;
-    currentDay.setDate(currentDay.getDate() + 1)
+    let day = new Date(startDay);
+    day <= endDay;
+    day.setUTCDate(day.getUTCDate() + 1)
   ) {
-    const { dawn, dusk } = SunCalc.getTimes(currentDay, latitude, longitude);
-    dayNightBoundaries.push(dawn.getTime(), dusk.getTime());
+    const today = SunCalc.getTimes(day, latitude, longitude);
+
+    let periodStart, periodEnd;
+
+    if (period === 'day') {
+      // day
+      periodStart = today.dawn.getTime();
+      periodEnd = today.dusk.getTime();
+    } else {
+      const nextDay = new Date(day);
+      nextDay.setUTCDate(day.getDate() + 1);
+      const tomorrow = SunCalc.getTimes(nextDay, latitude, longitude);
+      periodStart = today.dusk.getTime();
+      periodEnd = tomorrow.dawn.getTime();
+    }
+
+    // Clip to file range
+    const clippedStart = Math.max(periodStart, fileStartMs);
+    const clippedEnd = Math.min(periodEnd, fileEndMs);
+
+    if (clippedStart < clippedEnd) {
+      intervals.push({
+        start: (clippedStart - fileStartMs) / 1000,
+        end: (clippedEnd - fileStartMs) / 1000,
+      });
+    }
   }
 
-  for (let i = 0; i < dayNightBoundaries.length; i++) {
-    const offset = (dayNightBoundaries[i] - fileStart) / 1000;
-    // negative offsets are boundaries before the file starts.
-    // If the file starts during daylight, we move on
-    if (offset < 0) {
-      if (!isDuringDaylight(fileStart, latitude, longitude) && i > 0) {
-        activeIntervals.push({ start: 0 });
-      }
-      continue;
-    }
-    // Now handle 'all daylight' files
-    if (offset >= maxFileOffset) {
-      if (isDuringDaylight(fileEnd, latitude, longitude)) {
-        if (!activeIntervals.length) {
-          activeIntervals.push({ start: 0, end: 0 });
-          return activeIntervals;
-        }
-      }
-    }
-    // The list pattern is [dawn, dusk, dawn, dusk,...]
-    // So every second item is a start trigger
-    if (i % 2 !== 0) {
-      if (offset > maxFileOffset) break;
-      activeIntervals.push({ start: Math.max(offset, 0) });
-      // and the others are a stop trigger
-    } else {
-      activeIntervals.length || activeIntervals.push({ start: 0 });
-      activeIntervals[activeIntervals.length - 1].end = Math.min(
-        offset,
-        maxFileOffset
-      );
-    }
+  // Handle files entirely outside the requested period
+  if (
+    !intervals.length &&
+    isDuringDaylight(fileStartMs, latitude, longitude) ===
+      (period === 'day')
+  ) {
+    return [{ start: 0, end: 0 }];
   }
-  activeIntervals[activeIntervals.length - 1].end ??= maxFileOffset;
-  return activeIntervals;
+
+  return intervals.length ? intervals : [{ start: 0, end: 0 }];
 }
+
+
 
 /**
  * Determines the active time boundaries for a given audio file based on its metadata and detection mode.
@@ -3988,9 +4008,10 @@ function calculateNighttimeBoundaries(fileStart, fileEnd, latitude, longitude) {
  */
 async function setStartEnd(file) {
   const meta = METADATA[file];
-  let boundaries;
+  const nocmig = STATE.detect.nocmig;
+  let boundaries; 
   //let start, end;
-  if (STATE.detect.nocmig) {
+  if (nocmig) {
     const fileEnd = meta.fileStart + meta.duration * 1000;
     // Note diskDB used here
     const result = await STATE.db.getAsync(
@@ -4000,11 +4021,12 @@ async function setStartEnd(file) {
     const { lat, lon } = result
       ? { lat: result.lat, lon: result.lon }
       : { lat: STATE.lat, lon: STATE.lon };
-    boundaries = calculateNighttimeBoundaries(
+    boundaries = calculateTimeBoundaries(
       meta.fileStart,
       fileEnd,
       lat,
-      lon
+      lon,
+      nocmig
     );
   } else {
     boundaries = [{ start: 0, end: meta.duration }];
@@ -4157,7 +4179,25 @@ const getResults = async ({
         generateAlert({ message: "noDetections" });
       } else {
         species = species || "";
-        const nocmig = STATE.detect.nocmig ? "<b>nocturnal</b>" : "";
+        const i18 = {
+          en: { night: 'nocturnal', day: 'diurnal' },
+          da: { night: 'nataktiv', day: 'dagaktiv' },
+          de: { night: 'nachtaktiv', day: 'tagaktiv' },
+          es: { night: 'nocturno', day: 'diurno' },
+          fr: { night: 'nocturne', day: 'diurne' },
+          ja: { night: '夜行性', day: '昼行性' },
+          nl: { night: 'nachtactief', day: 'dagactief' },
+          pt: { night: 'noturno', day: 'diurno' },
+          ru: { night: 'ночной', day: 'дневной' },
+          sv: { night: 'nattaktiv', day: 'dagaktiv' },
+          zh: { night: '夜行性', day: '昼行性' }
+        };
+        let period, nocmigMode = STATE.detect.nocmig;
+        if (nocmigMode) {
+          period = nocmigMode === true ? 'night' : 'day';
+          period = (i18[STATE.locale] || i18["en"])[period];
+        }
+        const nocmig = STATE.detect.nocmig ? `<b>${period}</b>` : "";
         const archive = STATE.mode === "explore" ? "in the Archive" : "";
         generateAlert({
           message: `noDetectionsDetailed`,
@@ -4400,7 +4440,10 @@ const onSave2DiskDB = async ({ file }) => {
   }
   let filterClause = await getSpeciesSQLAsync();
 
-  if (STATE.detect.nocmig) filterClause += " AND isDaylight = FALSE ";
+  if (STATE.detect.nocmig) {
+    const condition = STATE.detect.nocmig === 'day';
+    filterClause += ` AND isDaylight = ${condition} `;
+  }
   let response,
     errorOccurred = false;
   await dbMutex.lock();

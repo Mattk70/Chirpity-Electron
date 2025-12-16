@@ -3924,9 +3924,8 @@ async function renderResult({
       model,
       modelID
     } = result;
+
     const dayNight = isDaylight ? "daytime" : "nighttime";
-    // Todo: move this logic so pre dark sections of file are not even analysed
-    if (config.detect.nocmig && !selection && dayNight === "daytime") return;
 
     const commentHTML = comment
       ? `<span title="${comment.replaceAll(
@@ -4421,27 +4420,39 @@ function exportSpeciesList() {
 
 function setNocmig(on) {
   const i18 = i18n.get(i18n.Titles);
-  if (on) {
-    DOM.nocmigButton.textContent = "nights_stay";
-    DOM.nocmigButton.title = i18.nocmigOn;
-    DOM.nocmigButton.classList.add("text-info");
+  const btn = DOM.nocmigButton;
+  if (on === 'day') {
+    btn.textContent = "wb_sunny";
+    btn.title = i18.nocmigOn;
+    btn.classList.add("text-warning");
+    btn.classList.remove("text-info");
+  } else if (on) {
+    btn.textContent = "nights_stay";
+    btn.title = i18.nocmigOn;
+    btn.classList.add("text-info");
+    btn.classList.remove("text-warning");
   } else {
-    DOM.nocmigButton.textContent = "bedtime_off";
-    DOM.nocmigButton.title = i18.nocmigOff;
-    DOM.nocmigButton.classList.remove("text-info");
+    btn.textContent = "bedtime_off";
+    btn.title = i18.nocmigOff;
+    btn.classList.remove("text-info","text-warning");
   }
-  DOM.nocmig.checked = config.detect.nocmig;
+  const checked = on === true;
+  DOM.nocmig.checked = checked;
 }
 
 const changeNocmigMode = () => {
-  config.detect.nocmig = !config.detect.nocmig;
-  setNocmig(config.detect.nocmig);
+  const modes = [true, 'day', false]
+  let nocmigMode = config.detect.nocmig;
+  const index = (modes.indexOf(nocmigMode) + 1) % modes.length
+  nocmigMode = modes[index]
+  setNocmig(nocmigMode);
   worker.postMessage({
     action: "update-state",
-    detect: { nocmig: config.detect.nocmig },
+    detect: { nocmig: nocmigMode },
     globalOffset: 0,
     filteredOffset: {},
   });
+  config.detect.nocmig = nocmigMode;
   updatePrefs("config.json", config);
   if (STATE.analysisDone) {
     resetResults({
