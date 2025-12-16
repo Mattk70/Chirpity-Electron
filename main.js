@@ -86,7 +86,6 @@ async function getInstallInfo(date) {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed.installedAt === "string") {
-        // await keytar.deletePassword(SERVICE, ACCOUNT);
         return parsed;
       }
       console.warn("getInstallInfo: keychain entry missing valid installedAt, recreating with", date);
