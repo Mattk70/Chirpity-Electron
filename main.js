@@ -76,7 +76,7 @@ const crypto = require("node:crypto");
 const settings = require("electron-settings");
 const keytar = require('keytar');
 const SERVICE = 'Chirpity';
-const ACCOUNT = 'new-install-info';
+const ACCOUNT = 'uuid';
 let DEBUG = false;
 
 async function getInstallInfo(date) {
