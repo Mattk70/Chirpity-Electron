@@ -4538,6 +4538,8 @@ const modelSettingsDisplay = () => {
   // Hide train unless BirdNET (and a member)
   const blockTrain = config.selectedModel !== 'birdnet' || ! STATE.isMember;
   DOM.trainNav.classList.toggle('disabled', blockTrain);
+  const isPerch = config.selectedModel === 'perch v2';
+  DOM.threadSlider.disabled = isPerch;
 };
 
 const contextAwareIconDisplay = () => {
