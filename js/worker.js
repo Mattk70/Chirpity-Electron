@@ -1031,6 +1031,17 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true}) => {
   return filePaths;
 };
 
+/**
+ * Process a list of files in concurrent batches to gather metadata and update aggregate state.
+ *
+ * Processes filePaths in groups of up to batchSize, invoking setMetadata for each file and accumulating
+ * per-file durations into STATE.allFilesDuration and estimated batch counts into STATE.totalBatches.
+ * Files that fail metadata extraction are skipped; optionally runs savedFileCheck after processing.
+ *
+ * @param {string[]} filePaths - Array of file paths to process.
+ * @param {number} [batchSize=20] - Maximum number of files to process concurrently per batch.
+ * @param {boolean} [checkSaved=true] - If true, call savedFileCheck(filePaths) after processing completes.
+ */
 async function processFilesInBatches(filePaths, batchSize = 20, checkSaved = true) {
   STATE.totalBatches = 0;
   STATE.allFilesDuration = 0;
@@ -1230,6 +1241,14 @@ async function getSpeciesSQLAsync(){
   return SQL
 }
 
+/**
+ * Append SQL qualifiers to a WHERE clause based on current application STATE (file range, species/tags, selection, location, and daylight filters).
+ *
+ * @param {string} stmt - Initial SQL text to augment (typically a WHERE or subquery fragment).
+ * @param {Object} [range] - Optional time range to constrain results; when omitted in explore mode the explore.range is used.
+ * @param {string} [caller] - Caller context that can alter behavior (e.g., when 'results' and a selection exists a file filter is applied).
+ * @returns {[string, any[]]} A two-element array: the augmented SQL string and an ordered array of parameters for prepared statements.
+ */
 async function addQueryQualifiers(stmt, range, caller) {
   const {mode, explore, labelFilters, detect, locationID, selection} = STATE;
   let params = [detect.confidence];
@@ -1529,16 +1548,16 @@ async function updateMetadata(fileNames) {
 }
 
 /**
- * Initiates analysis of a set of audio files, handling selection state, caching, and dispatching processing tasks to workers.
+ * Start analysis of the provided audio files: prepare selection and global state, decide whether to reuse cached results or perform fresh analysis, and dispatch files to worker processors.
  *
- * If all files are already analyzed and cached, retrieves results from the database or summary as needed. Otherwise, prepares files for analysis, updates relevant state, and distributes processing tasks to available workers.
+ * If all files are cached in the disk database (or when `circleClicked` is true), this function will retrieve results/summary instead of reprocessing. Otherwise it clears/sets analysis state, updates metadata, populates the processing queue, and starts worker-driven processing.
  *
  * @param {Object} params - Analysis parameters.
- * @param {string[]} [params.filesInScope=[]] - List of audio files to analyze.
- * @param {number} [params.start] - Optional start time for analysis (in seconds).
- * @param {number} [params.end] - Optional end time for analysis (in seconds).
- * @param {boolean} [params.reanalyse=false] - If true, forces reanalysis even if results are cached.
- * @param {boolean} [params.circleClicked=false] - If true, triggers a special retrieval mode for results.
+ * @param {string[]} [params.filesInScope=[]] - Array of file paths to include in the analysis.
+ * @param {number} [params.start] - Optional start time (seconds) to limit analysis range for the first file.
+ * @param {number} [params.end] - Optional end time (seconds) to limit analysis range for the first file.
+ * @param {boolean} [params.reanalyse=false] - When true, forces reanalysis even if results appear cached.
+ * @param {boolean} [params.circleClicked=false] - When true, trigger retrieval mode (fetch top results/summary) instead of running a full analysis.
  */
 async function onAnalyse({
   filesInScope = [],
@@ -1667,13 +1686,12 @@ async function onAnalyse({
 }
 
 /**
- * Abort all in-progress audio processing and prediction work, clear related queues and transient state, and restart prediction workers for the specified model.
+ * Stop ongoing audio processing and prediction, clear in-memory queues and transient tracking state, and (unless the model is "perch v2") restart prediction workers using the specified model.
  *
- * This cancels active prediction jobs, clears in-memory queues and tracking structures, terminates existing worker processes, and spawns a fresh set of prediction workers for the provided model.
+ * This sets the abort flag, clears file and prediction queues, cancels backlog intervals, terminates existing prediction workers, and spawns a fresh set of workers for the provided model identifier.
  *
  * @param {Object} params - Options for aborting and restarting.
- * @param {string} [params.model=STATE.model] - Model identifier to use when restarting prediction workers; defaults to the current STATE.model.
- */
+ * @param {string} [params.model=STATE.model] - Model identifier to use when restarting prediction workers; if equal to `"perch v2"`, workers are not restarted.
 function onAbort({ model = STATE.model }) {
   predictWorkers.forEach(worker => worker.postMessage({
     message: 'terminate', 
@@ -2077,6 +2095,13 @@ async function sendDetections(file, start, end, goToRegion) {
 
 const roundedFloat = (string) => Math.round(parseFloat(string) * 10000) / 10000;
 
+/**
+ * Parse BExt origination date and time strings into a local timestamp.
+ * 
+ * @param {string} originationDate - Date string in "YYYY-MM-DD" format from BExt metadata.
+ * @param {string} originationTime - Time string in "HH:MM:SS" format from BExt metadata.
+ * @returns {number|undefined} The local epoch timestamp (milliseconds) corresponding to the parsed date/time, or `undefined` if parsing fails.
+ */
 function parseBextLocalDate(originationDate, originationTime) {
   const [year, month, day] = originationDate.split('-').map(Number);
   const [hour, minute, second] = originationTime.split(':').map(Number);
@@ -2320,18 +2345,17 @@ const getPredictBuffers = async ({ file = "", start = 0, end = undefined }) => {
 };
 
 /**
- * Streams audio data from a file, splits it into chunks, and queues each chunk for AI model prediction.
+ * Stream audio from a file, split it into model-sized chunks, and queue those chunks for prediction.
  *
- * Extracts audio from the specified file and time range, applies optional audio filters, and manages chunked buffering to optimize parallel processing. Handles encoder padding for compressed formats, manages backpressure by pausing/resuming ffmpeg as needed, and limits the backlog of audio chunks to control memory usage. Updates metadata and expected chunk counts based on actual processed duration. Resolves when all audio chunks have been processed and queued.
+ * Processes the specified time range of the file into byte-aligned buffers, applies configured audio filters, handles encoder padding for compressed formats, and manages backpressure to limit in-memory backlog while feeding prepared batches to the prediction queue.
  *
  * @param {string} file - Path to the audio file to process.
- * @param {number} start - Start time in seconds for audio extraction.
- * @param {number} end - End time in seconds for audio extraction.
- * @param {number} chunkStart - Initial sample index for chunking.
- * @param {number} highWaterMark - Buffer size in bytes for each audio chunk.
- * @param {number} samplesInBatch - Number of audio samples per batch sent to the model.
- * @returns {Promise<void>} Resolves when all audio chunks have been processed and queued for prediction.
- */
+ * @param {number} start - Start time in seconds for extraction (may be adjusted slightly to compensate encoder padding).
+ * @param {number} end - End time in seconds for extraction.
+ * @param {number} chunkStart - Index (in samples) of the first sample for the first chunk produced from this stream.
+ * @param {number} highWaterMark - Number of bytes per chunk buffer used to accumulate PCM before sending to the model.
+ * @param {number} samplesInBatch - Number of audio samples contained in each batch sent to the model.
+ * @returns {Promise<void>} Resolves when all audio chunks for the requested range have been prepared and queued for prediction.
 async function processAudio(
   file,
   start,
@@ -2704,11 +2728,12 @@ async function feedChunksToModel(channelData, chunkStart, file, end) {
   predictWorkers[worker].postMessage(objData, [channelData.buffer]);
 }
 /**
- * Initiates AI prediction on a specified audio file segment and updates the UI with the audio duration.
- * @param {Object} params - Parameters for prediction.
- * @param {string} params.file - The path to the audio file.
- * @param {number} [params.start=0] - The start time (in seconds) of the segment to analyze.
- * @param {number|null} [params.end=null] - The end time (in seconds) of the segment to analyze.
+ * Start prediction for a segment of an audio file and notify the UI of the segment duration.
+ *
+ * @param {Object} params - Prediction parameters.
+ * @param {string} params.file - Path to the audio file.
+ * @param {number} [params.start=0] - Segment start time in seconds.
+ * @param {number|null} [params.end=null] - Segment end time in seconds, or `null` to indicate the file's end.
  */
 async function doPrediction({
   file = "",
@@ -3706,6 +3731,14 @@ const parsePredictions = async (response) => {
 };
 
 
+/**
+ * Estimate remaining analysis time from processed batches and post localized progress to the UI footer.
+ *
+ * Computes progress, estimated minutes remaining, and processing speed based on the global analysis start
+ * timestamp and STATE counters, then sends a `footer-progress` message to the UI with percent and localized text.
+ *
+ * @param {number} batchesReceived - Number of analysis batches processed so far for the current run.
+ */
 async function estimateTimeRemaining(batchesReceived) {
   if (! STATE.totalBatches) return;
   const {totalBatches, clippedBatches} = STATE;
@@ -3742,6 +3775,18 @@ async function estimateTimeRemaining(batchesReceived) {
   });
 }
 
+/**
+ * Dispatches and handles messages received from worker threads, updating worker state,
+ * forwarding results to parsers, emitting UI events, and generating alerts as appropriate.
+ *
+ * Accepts messages with a `data.message` field such as `"model-ready"`, `"prediction"`,
+ * `"spectrogram"`, `"training-progress"`, and `"training-results"` and performs the
+ * corresponding application updates (marking workers ready/available, parsing predictions
+ * and advancing file processing, producing spectrogram files, posting footer progress,
+ * and creating alerts).
+ *
+ * @param {MessageEvent} e - Worker message event whose `data` object contains the message type and payload.
+ */
 async function parseMessage(e) {
   const response = e.data;
   switch (response["message"]) {
@@ -3818,9 +3863,13 @@ async function parseMessage(e) {
 }
 
 /**
- * Called when a files processing is finished, removes it from the filesBeingProcessed list and sends
- *  a complete message to the UI when that list is empty
- * @param {*} file
+ * Mark a file as finished processing and notify the UI when all files are complete.
+ *
+ * Removes the given file from the internal filesBeingProcessed list; if the list becomes
+ * empty, triggers a summary update when no selection is active and posts an
+ * "analysis-complete" message to the UI.
+ *
+ * @param {string|object} file - File identifier (file path or file record) to remove from the processing list.
  */
 function updateFilesBeingProcessed(file) {
   // This method to determine batch complete
@@ -3839,14 +3888,14 @@ function updateFilesBeingProcessed(file) {
 }
 
 /**
- * Processes the next audio file in the prediction queue, handling file retrieval, analysis boundaries, and error conditions.
+ * Dequeues the next file from the prediction queue, determines analysis time boundaries, and schedules prediction for each boundary segment.
  *
- * Attempts to retrieve the next file for analysis, determines the appropriate analysis boundaries, and invokes prediction. If a file is missing or cannot be processed, generates a warning and continues to the next file. Recursively processes all files in the queue until none remain.
+ * If a file cannot be located or processed, posts a warning and continues with the next file. Updates UI progress state and internal counters as segments are dispatched.
  *
- * @param {Object} [options] - Optional arguments.
- * @param {number} [options.start] - Start time for analysis, if specified.
- * @param {number} [options.end] - End time for analysis, if specified.
- * @param {Worker} [options.worker] - Prediction worker to use, if specified.
+ * @param {Object} [options] - Options to override default boundary selection and worker assignment.
+ * @param {number} [options.start] - Explicit start time (seconds) for analysis on the dequeued file; when provided, a single boundary segment from `start` to `end` is used.
+ * @param {number} [options.end] - Explicit end time (seconds) for analysis on the dequeued file; used together with `start`.
+ * @param {Worker} [options.worker] - Prediction worker to handle the scheduled prediction, if a specific worker is required.
  */
 async function processNextFile({
   start = undefined,
@@ -3935,7 +3984,19 @@ function sumObjectValues(obj) {
   return total;
 }
 
-// Function to calculate the active intervals for an audio file in nocmig mode
+/**
+ * Compute active time intervals within a file for a given daylight period ("day" or "night") and update batching/clipping state.
+ *
+ * Calculates one or more intervals (in seconds, relative to the file start) where the requested period is active inside the file's time range. Clips day/night boundaries to the file start/end, records how much time was excluded, updates STATE.clippedBatches and STATE.clippedFilesDuration, and sets batchesToSend[file] to the number of processing batches for the kept intervals.
+ *
+ * @param {string} file - Identifier or path of the file used as key in batchesToSend.
+ * @param {number} fileStart - File start timestamp in milliseconds (local time).
+ * @param {number} fileEnd - File end timestamp in milliseconds (local time).
+ * @param {number} latitude - Latitude used for sunrise/sunset calculations.
+ * @param {number} longitude - Longitude used for sunrise/sunset calculations.
+ * @param {'day'|'night'} period - Period to compute intervals for; "day" returns dawn→dusk intervals, "night" returns dusk→next dawn intervals.
+ * @returns {Array<{start: number, end: number}>} Array of intervals in seconds relative to the file start; returns [{start:0, end:0}] when no active period is found.
+ */
 
 function calculateTimeBoundaries(
   file,
@@ -4014,13 +4075,12 @@ function calculateTimeBoundaries(
 
 
 /**
- * Determines the active time boundaries for a given audio file based on its metadata and detection mode.
+ * Compute active time intervals for an audio file based on its metadata and detection mode.
  *
- * If nocturnal migration detection is enabled, calculates nighttime intervals using the file's start time, duration, and associated location coordinates. Otherwise, returns the full duration of the file as a single interval.
+ * When nocturnal-migration mode is enabled, returns intervals clipped to the computed day/night boundaries for the file (using file start/end and location). When nocturnal-migration is disabled, returns a single interval covering the entire file duration and updates batchesToSend[file] with the number of processing batches (at least 1).
  *
- * @param {string} file - The file name or identifier for which to compute boundaries.
- * @returns {Promise<Array<{start: number, end: number}>>} An array of time interval objects representing active boundaries in seconds.
- */
+ * @param {string} file - Key or filename used to look up the file's metadata in METADATA.
+ * @returns {Promise<Array<{start: number, end: number}>>} An array of intervals with `start` and `end` expressed in seconds relative to the file.
 async function setStartEnd(file) {
   const meta = METADATA[file];
   const nocmig = STATE.detect.nocmig;
