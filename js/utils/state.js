@@ -92,13 +92,16 @@ export class WorkerState {
       clips: false,
     }),
     (this.useGUANO = true),
+    (this.recorderModel = null),
     (this.debug = false),
     (this.fileStartMtime = false),
     (this.specDetections = false),
     (this.labelFilters = []),
     (this.speciesMap = new Map()),
-    (this.totalDuration = 0),
+    (this.totalBatches = 0),
     (this.allFilesDuration = 0),
+    (this.clippedFilesDuration = 0),
+    (this.clippedBatches = 0),
     (this.corruptFiles = []),
     (this.originalFiles = undefined);
   }

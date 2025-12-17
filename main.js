@@ -2,8 +2,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const isMac = process.platform === "darwin"; // macOS check
-const arch = process.arch
-const isIntelMac = isMac && arch === 'x64';
+const arch = process.arch;
 const {
   app,
   Menu,
@@ -19,6 +18,7 @@ app.commandLine.appendSwitch("xdg-portal-required-version", "4");
 // WebGPU flags needed for Linux
 app.commandLine.appendSwitch("enable-unsafe-webgpu");
 app.commandLine.appendSwitch("enable-features", "Vulkan");
+process.env["TF_ENABLE_ONEDNN_OPTS"] = "1";
 
 // Set the AppUserModelID (to prevent the two pinned icons bug)
 app.setAppUserModelId('com.electron.chirpity');
@@ -113,7 +113,6 @@ async function getInstallInfo(date) {
   return installInfo;
 }
 
-process.env["TF_ENABLE_ONEDNN_OPTS"] = "1";
 
 //require('update-electron-app')();
 let files = [];
@@ -639,8 +638,8 @@ app.whenReady().then(async () => {
         })
     });
     //Update handling
-    if (process.env.CI || isIntelMac) {
-        console.log("Auto-updater disabled in CI environment. And doesn't work for Intel mac");
+    if (process.env.CI) {
+        console.log("Auto-updater disabled in CI environment");
     } else {
         autoUpdater.autoDownload = false;
         autoUpdater.checkForUpdates().catch(error => console.warn('Error checking for updates', error))

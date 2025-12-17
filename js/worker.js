@@ -148,7 +148,7 @@ let workerInstance = 0;
 let appPath,
   tempPath,
   BATCH_SIZE,
-  batchChunksToSend = {};
+  batchesToSend = {};
 let LIST_WORKER;
 
 // Adapted from https://stackoverflow.com/questions/6117814/get-week-of-year-in-javascript-like-in-php
@@ -1027,13 +1027,13 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true}) => {
   trackEvent(STATE.UUID, "UI", "Drop", fileOrFolder, filePaths.length);
   UI.postMessage({ event: "files", filePaths, preserveResults, checkSaved });
   // Start gathering metadata for new files
-  STATE.totalDuration = 0;
-  STATE.allFilesDuration = 0;
   await processFilesInBatches(filePaths, 10, checkSaved);
   return filePaths;
 };
 
 async function processFilesInBatches(filePaths, batchSize = 20, checkSaved = true) {
+  STATE.totalBatches = 0;
+  STATE.allFilesDuration = 0;
   for (let i = 0; i < filePaths.length; i += batchSize) {
     const batch = filePaths.slice(i, i + batchSize);
 
@@ -1043,7 +1043,7 @@ async function processFilesInBatches(filePaths, batchSize = 20, checkSaved = tru
         setMetadata({ file }).then(fileMetadata => {
           const duration = fileMetadata.duration || 0;
           STATE.allFilesDuration += duration;
-          STATE.totalDuration += Math.ceil(duration / (BATCH_SIZE * WINDOW_SIZE)) * (BATCH_SIZE * WINDOW_SIZE);
+          STATE.totalBatches += Math.ceil(duration / (BATCH_SIZE * WINDOW_SIZE));
           return fileMetadata;
         }).catch ((error) => {
           console.error(`Error processing file ${file}:`, error);
@@ -1551,6 +1551,8 @@ async function onAnalyse({
   aborted = false;
   STATE.incrementor = 1;
   STATE.corruptFiles = [];
+  STATE.clippedBatches = 0;
+  STATE.clippedFilesDuration = 0;
   predictionStart = new Date();
   // Set the appropriate selection range if this is a selection analysis
   STATE.update({
@@ -1563,7 +1565,7 @@ async function onAnalyse({
     );
   //Reset GLOBAL variables
   index = 0;
-  batchChunksToSend = {};
+  batchesToSend = {};
   FILE_QUEUE = filesInScope;
   AUDIO_BACKLOG = 0;
   STATE.processingPaused = {};
@@ -1659,7 +1661,6 @@ async function onAnalyse({
   STATE.selection || await onChangeMode("analyse");
 
   filesBeingProcessed = [...FILE_QUEUE];
-  
   for (let i = 0; i < NUM_WORKERS; i++) {
     processNextFile({ start, end, worker: i });
   }
@@ -2076,6 +2077,15 @@ async function sendDetections(file, start, end, goToRegion) {
 
 const roundedFloat = (string) => Math.round(parseFloat(string) * 10000) / 10000;
 
+function parseBextLocalDate(originationDate, originationTime) {
+  const [year, month, day] = originationDate.split('-').map(Number);
+  const [hour, minute, second] = originationTime.split(':').map(Number);
+  // month is 0-based in JS
+  const parsedDate =  new Date(year, month - 1, day, hour, minute, second);
+  const timestamp = parsedDate.getTime()
+  return isNaN(timestamp) ? undefined : timestamp;
+}
+
 /**
  * Called by getWorkingFile, setCustomLocation
  * Assigns file metadata to a metadata cache object. file is the key, and is the source file
@@ -2110,7 +2120,7 @@ const setMetadata = async ({ file, source_file = file }) => {
         });
       fileMeta.isSaved = true; // Queried by UI to establish saved state of file.
     } 
-    let guanoTimestamp;
+    let guanoTimestamp, bextTimestamp, recorderModel;
     // savedMeta may just have a locationID if it was set by onSetCUstomLocation
     if (!savedMeta?.duration) {
       fileMeta.duration = await getDuration(file);
@@ -2120,6 +2130,7 @@ const setMetadata = async ({ file, source_file = file }) => {
         const wavMetadata = await extractWaveMetadata(file).catch(error => console.warn("Error extracting GUANO", error.message));
         if (wavMetadata && Object.keys(wavMetadata).includes("guano")) {
           const guano = wavMetadata.guano;
+          recorderModel = guano.Model;
           const location = guano["Loc Position"];
           if (location) {
             const [lat, lon] = location.split(" ");
@@ -2139,9 +2150,15 @@ const setMetadata = async ({ file, source_file = file }) => {
             fileMeta.duration = parseFloat(guano.Length);
           }
         }
-        if (wavMetadata && Object.keys(wavMetadata).length > 0) {
-          fileMeta.metadata = JSON.stringify(wavMetadata);
+        else if (wavMetadata && wavMetadata.bext) {
+          const {Originator, OriginationDate, OriginationTime} = wavMetadata.bext;
+          // Remove trailing null chars
+          recorderModel = Originator.replace(/\0+$/, '');
+          if (OriginationDate && OriginationTime){
+            bextTimestamp = parseBextLocalDate(OriginationDate, OriginationTime)
+          }
         }
+        if (Object.keys(wavMetadata).length) fileMeta.metadata = JSON.stringify(wavMetadata);
         DEBUG &&
           console.log(`GUANO search took: ${(Date.now() - t0) / 1000} seconds`);
       }
@@ -2156,25 +2173,32 @@ const setMetadata = async ({ file, source_file = file }) => {
       // Guano has second priority
       fileStart = new Date(guanoTimestamp);
       fileEnd = new Date(guanoTimestamp + fileMeta.duration * 1000);
+    } else if (bextTimestamp) {
+      // Then BEXT 3rd
+      if (recorderModel?.includes("ZOOM")){
+        fileStart = new Date(bextTimestamp);
+        fileEnd = new Date(bextTimestamp + fileMeta.duration * 1000);
+      } else {
+        fileEnd = new Date(bextTimestamp);
+        fileStart = new Date(bextTimestamp - fileMeta.duration * 1000);
+      }
     } else {
       // Least preferred
       const stat = fs.statSync(source_file);
-      const meta = fileMeta.metadata
-        ? JSON.parse(fileMeta.metadata)
-        : {};
-      const H1E = meta.bext?.Originator?.includes("H1essential");
-      if (STATE.fileStartMtime || H1E) {
-        // Zoom H1E apparently sets mtime to be the start of the recording
+      if (STATE.fileStartMtime) {
         fileStart = new Date(stat.mtimeMs);
-        fileMeta.fileStart = fileStart.getTime();
         fileEnd = new Date(stat.mtimeMs + fileMeta.duration * 1000);
       } else {
         fileEnd = new Date(stat.mtimeMs);
         fileStart = new Date(stat.mtimeMs - fileMeta.duration * 1000);
-        fileMeta.fileStart = fileStart.getTime();
       }
     }
-
+    
+    fileMeta.fileStart = fileStart.getTime();
+    if (recorderModel !== STATE.recorderModel) {
+      STATE.recorderModel = recorderModel;
+      console.info('Recorder model', recorderModel);
+    } 
     // split  the duration of this file across any dates it spans
     fileMeta.dateDuration = {};
     const key = new Date(fileStart);
@@ -2272,13 +2296,6 @@ const getPredictBuffers = async ({ file = "", start = 0, end = undefined }) => {
   if (start > fileDuration) {
     return;
   }
-  const duration = end - start;
-  
-  const rawChunks = Math.ceil((duration - EPSILON) / (BATCH_SIZE * WINDOW_SIZE));
-  batchChunksToSend[file] = Math.max(1, rawChunks);
-  predictionsReceived[file] = 0;
-  predictionsRequested[file] = 0;
-
   const batchDuration = BATCH_SIZE * WINDOW_SIZE;
   //reduce highWaterMark for small analyses
   const samplesInWindow = sampleRate * WINDOW_SIZE;
@@ -2441,7 +2458,7 @@ async function processAudio(
       if (start === 0 && end === metaDuration && isFinite(duration) && duration + EPSILON < metaDuration) {
         // If we have a short file (header duration > processed duration)
         // *and* were looking for the whole file, we'll fix # of expected chunks here
-        batchChunksToSend[file] = Math.ceil(
+        batchesToSend[file] = Math.ceil(
           (duration - EPSILON) / (BATCH_SIZE * WINDOW_SIZE)
         );
 
@@ -2704,7 +2721,7 @@ async function doPrediction({
 
   UI.postMessage({
     event: "update-audio-duration",
-    value: METADATA[file].duration,
+    value: end - start,
   });
 }
 
@@ -3660,7 +3677,7 @@ const parsePredictions = async (response) => {
   predictionsReceived[file]++;
   const received = sumObjectValues(predictionsReceived);
   if (!selection && worker === 0) estimateTimeRemaining(received);
-  const fileProgress = predictionsReceived[file] / batchChunksToSend[file];
+  const fileProgress = predictionsReceived[file] / batchesToSend[file];
   if (!selection && STATE.increment() === 0) {
     getSummary({ interim: true });
     getTotal();
@@ -3690,12 +3707,13 @@ const parsePredictions = async (response) => {
 
 
 async function estimateTimeRemaining(batchesReceived) {
-  if (! STATE.totalDuration) return;
-  const totalBatches = Math.ceil(STATE.totalDuration / (BATCH_SIZE * WINDOW_SIZE));
-  const progress = batchesReceived / totalBatches;
+  if (! STATE.totalBatches) return;
+  const {totalBatches, clippedBatches} = STATE;
+  const remainingBatches = totalBatches - clippedBatches;
+  const progress = remainingBatches > 0 ? batchesReceived / remainingBatches : 0;
   const elapsedMinutes = (Date.now() - t0_analysis) / 60_000;
   const estimatedTime = elapsedMinutes / progress;
-  const processedMinutes = (STATE.allFilesDuration / 60) * progress;
+  const processedMinutes = ((STATE.allFilesDuration - STATE.clippedFilesDuration) / 60) * progress;
   const remaining = estimatedTime - elapsedMinutes;
   const speed = (processedMinutes / elapsedMinutes).toFixed(0);
   const i18n = {
@@ -3753,11 +3771,11 @@ async function parseMessage(e) {
           console.log(
             "predictions left for",
             response.file,
-            batchChunksToSend[response.file] -
+            batchesToSend[response.file] -
               predictionsReceived[response.file]
           );
         const remaining =
-          predictionsReceived[response.file] - batchChunksToSend[response.file];
+          predictionsReceived[response.file] - batchesToSend[response.file];
         if (remaining === 0) {
           if (filesBeingProcessed.length) {
             processNextFile({ worker: worker });
@@ -3800,7 +3818,8 @@ async function parseMessage(e) {
 }
 
 /**
- * Called when a files processing is finished
+ * Called when a files processing is finished, removes it from the filesBeingProcessed list and sends
+ *  a complete message to the UI when that list is empty
  * @param {*} file
  */
 function updateFilesBeingProcessed(file) {
@@ -3808,9 +3827,7 @@ function updateFilesBeingProcessed(file) {
   const fileIndex = filesBeingProcessed.indexOf(file);
   if (fileIndex !== -1) {
     filesBeingProcessed.splice(fileIndex, 1);
-    DEBUG &&
-      console.log(
-        "filesbeingprocessed updated length now :",
+    if (DEBUG) console.log("filesbeingprocessed length is:",
         filesBeingProcessed.length
       );
   }
@@ -3838,6 +3855,8 @@ async function processNextFile({
 } = {}) {
   if (FILE_QUEUE.length) {
     let file = FILE_QUEUE.shift();
+    predictionsReceived[file] = 0;
+    predictionsRequested[file] = 0;
     const found = await getWorkingFile(file).catch((error) => {
       if (error instanceof Event)
         error = `Event passed ${error.type}, attached to ${error.currentTarget}`;
@@ -3859,16 +3878,17 @@ async function processNextFile({
         boundaries = await setStartEnd(file).catch((error) =>
           console.warn("Error in setStartEnd", error)
         );
-      else boundaries.push({ start: start, end: end });
+      else {
+        boundaries.push({ start: start, end: end });
+        const batches = Math.ceil((end-start) / (BATCH_SIZE * WINDOW_SIZE));
+        batchesToSend[file] = batches;
+      }
       for (let i = 0; i < boundaries.length; i++) {
         const { start, end } = boundaries[i];
         if (start === end) {
           // Nothing to do for this file
           updateFilesBeingProcessed(file);
           generateAlert({ message: "noNight", variables: { file } });
-          const duration = METADATA[file].duration;
-          //STATE.totalDuration -= Math.ceil(duration / (BATCH_SIZE * WINDOW_SIZE)) * (BATCH_SIZE * WINDOW_SIZE);
-          //STATE.allFilesDuration -= duration;
           DEBUG && console.log("Recursion: start = end");
           await processNextFile(arguments[0]).catch((error) =>
             console.warn("Error in processNextFile call", error)
@@ -3893,23 +3913,8 @@ async function processNextFile({
               progress: {percent: 0},
             });
           }
-          await doPrediction({
-            start: start,
-            end: end,
-            file: file,
-            worker: worker,
-          }).catch((error) =>
-            console.warn(
-              "Error in doPrediction",
-              error,
-              "file",
-              file,
-              "start",
-              start,
-              "end",
-              end
-            )
-          );
+          await doPrediction({start, end, file, worker})
+            .catch((error) => console.warn("Error in doPrediction", error.message));
         }
       }
     } else {
@@ -3933,6 +3938,7 @@ function sumObjectValues(obj) {
 // Function to calculate the active intervals for an audio file in nocmig mode
 
 function calculateTimeBoundaries(
+  file,
   fileStart,
   fileEnd,
   latitude,
@@ -3944,17 +3950,17 @@ function calculateTimeBoundaries(
   const fileEndMs = fileEnd;
 
   const startDay = new Date(fileStartMs);
-  startDay.setUTCHours(0, 0, 0, 0);
+  startDay.setHours(12, 0, 0, 0);
   if (period !== 'day') {
     startDay.setDate(startDay.getDate() - 1);
   }
   const endDay = new Date(fileEndMs);
-  endDay.setUTCHours(0, 0, 0, 0);
-
+  endDay.setHours(12, 0, 0, 0);
+  console.log('diff =', startDay - endDay)
   for (
     let day = new Date(startDay);
     day <= endDay;
-    day.setUTCDate(day.getUTCDate() + 1)
+    day.setDate(day.getDate() + 1)
   ) {
     const today = SunCalc.getTimes(day, latitude, longitude);
 
@@ -3966,7 +3972,7 @@ function calculateTimeBoundaries(
       periodEnd = today.dusk.getTime();
     } else {
       const nextDay = new Date(day);
-      nextDay.setUTCDate(day.getDate() + 1);
+      nextDay.setDate(day.getDate() + 1);
       const tomorrow = SunCalc.getTimes(nextDay, latitude, longitude);
       periodStart = today.dusk.getTime();
       periodEnd = tomorrow.dawn.getTime();
@@ -3975,7 +3981,6 @@ function calculateTimeBoundaries(
     // Clip to file range
     const clippedStart = Math.max(periodStart, fileStartMs);
     const clippedEnd = Math.min(periodEnd, fileEndMs);
-
     if (clippedStart < clippedEnd) {
       intervals.push({
         start: (clippedStart - fileStartMs) / 1000,
@@ -3990,9 +3995,19 @@ function calculateTimeBoundaries(
     isDuringDaylight(fileStartMs, latitude, longitude) ===
       (period === 'day')
   ) {
-    return [{ start: 0, end: 0 }];
+    intervals.push({ start: 0, end: 0 });
   }
 
+  const fileDurationSeconds = (fileEndMs - fileStartMs) / 1000;
+  // Sum kept (active) time
+  const keptSeconds = intervals.reduce((sum, i) => sum + (i.end - i.start), 0);
+  // Amount clipped from the file
+  const clippedSeconds = Math.max(0, fileDurationSeconds - keptSeconds);
+  // Update global state
+  STATE.clippedBatches += Math.ceil(clippedSeconds / (BATCH_SIZE * WINDOW_SIZE));
+  STATE.clippedFilesDuration += clippedSeconds;
+  const batches = Math.ceil(keptSeconds / (BATCH_SIZE * WINDOW_SIZE));
+  batchesToSend[file] = batches;
   return intervals.length ? intervals : [{ start: 0, end: 0 }];
 }
 
@@ -4022,6 +4037,7 @@ async function setStartEnd(file) {
       ? { lat: result.lat, lon: result.lon }
       : { lat: STATE.lat, lon: STATE.lon };
     boundaries = calculateTimeBoundaries(
+      file,
       meta.fileStart,
       fileEnd,
       lat,
@@ -4030,6 +4046,8 @@ async function setStartEnd(file) {
     );
   } else {
     boundaries = [{ start: 0, end: meta.duration }];
+    const batches = Math.ceil((meta.duration - EPSILON) / (BATCH_SIZE * WINDOW_SIZE));
+    batchesToSend[file] = Math.max(1, batches);
   }
   return boundaries;
 }
