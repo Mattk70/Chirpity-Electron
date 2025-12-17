@@ -1692,6 +1692,7 @@ async function onAnalyse({
  *
  * @param {Object} params - Options for aborting and restarting.
  * @param {string} [params.model=STATE.model] - Model identifier to use when restarting prediction workers; if equal to `"perch v2"`, workers are not restarted.
+ */
 function onAbort({ model = STATE.model }) {
   predictWorkers.forEach(worker => worker.postMessage({
     message: 'terminate', 
@@ -2356,6 +2357,7 @@ const getPredictBuffers = async ({ file = "", start = 0, end = undefined }) => {
  * @param {number} highWaterMark - Number of bytes per chunk buffer used to accumulate PCM before sending to the model.
  * @param {number} samplesInBatch - Number of audio samples contained in each batch sent to the model.
  * @returns {Promise<void>} Resolves when all audio chunks for the requested range have been prepared and queued for prediction.
+ */
 async function processAudio(
   file,
   start,
@@ -4081,6 +4083,7 @@ function calculateTimeBoundaries(
  *
  * @param {string} file - Key or filename used to look up the file's metadata in METADATA.
  * @returns {Promise<Array<{start: number, end: number}>>} An array of intervals with `start` and `end` expressed in seconds relative to the file.
+ */
 async function setStartEnd(file) {
   const meta = METADATA[file];
   const nocmig = STATE.detect.nocmig;
