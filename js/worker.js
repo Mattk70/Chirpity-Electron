@@ -1056,8 +1056,7 @@ async function processFilesInBatches(filePaths, batchSize = 20, checkSaved = tru
           STATE.allFilesDuration += duration;
           STATE.totalBatches += Math.ceil(duration / (BATCH_SIZE * WINDOW_SIZE));
           return fileMetadata;
-        }).catch ((error) => {
-          console.error(`Error processing file ${file}:`, error);
+        }).catch ((_e) => {
           return null; // or handle the error as needed
         }
       ))
@@ -2153,7 +2152,10 @@ const setMetadata = async ({ file, source_file = file }) => {
       if (file.toLowerCase().endsWith("wav")) {
         const { extractWaveMetadata } = require("./js/utils/metadata.js");
         const t0 = Date.now();
-        const wavMetadata = await extractWaveMetadata(file).catch(error => console.warn("Error extracting GUANO", error.message));
+        const wavMetadata = await extractWaveMetadata(file).catch(error => {
+          if (error.code !== 'ENOENT') console.warn("Error extracting GUANO", error.message);
+          return
+        });
         if (wavMetadata && Object.keys(wavMetadata).includes("guano")) {
           const guano = wavMetadata.guano;
           recorderModel = guano.Model;
