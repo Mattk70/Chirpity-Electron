@@ -83,6 +83,8 @@ let DEBUG = false;
  * Attempts to read an existing record from the keychain; if none exists or it lacks a valid `installedAt`, a new record is generated and persisted. If a provided `date` is invalid, the current time is used. Keychain read/write failures are logged and the new record is returned (but may not be persisted).
  * @param {string|Date|number} [date] - Optional install timestamp (ISO string, Date object, or epoch milliseconds) to use when creating a new record.
  * @returns {{appId: string, installedAt: string}} An object containing `appId` (a UUID) and `installedAt` (an ISO 8601 timestamp).
+ */
+
 async function getInstallInfo(date) {
   // First, try the current key (ACCOUNT = 'uuid')
   try {
