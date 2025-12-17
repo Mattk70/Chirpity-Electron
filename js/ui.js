@@ -5,7 +5,6 @@
 // Get the modules loaded in preload.js
 const fs = window.module.fs;
 const p = window.module.p;
-
 const si = window.module.si;
 import {
   customURLEncode,
@@ -1895,8 +1894,19 @@ window.onload = async () => {
     utils.syncConfig(config, defaultConfig);
   }
 
-  const installDate = localStorage.getItem("installDate")
+  const installDate = localStorage.getItem("installDate");
   const {appId, installedAt} = await window.electron.getInstallInfo(installDate);
+  if (!installDate || ! isNaN(Number(installDate))) {
+    let effectiveDate = installedAt;
+    if (installDate) {
+      const localDate = Number(installDate);
+      if (!isNaN(localDate) && localDate < new Date(installedAt).getTime())  {
+        effectiveDate = new Date(localDate).toISOString();
+      }
+      console.log('converting install date to', effectiveDate)
+    } 
+    localStorage.setItem("installDate", effectiveDate)
+  }
   config.UUID ??= appId;
   config.installedAt = installedAt;
   if (isTestEnv) console.log(`UUID: ${config.UUID}, `)
@@ -2260,14 +2270,16 @@ const setUpWorkerMessaging = () => {
           // Remove duplicate labels
           LABELS = [...new Set(args.labels)];
           // Code below to retrieve Red list data
-          // if (!done){
+          // if (!done && LABELS.length){
+          //   STATE.IUCNcache = {};
           //   done = true;
           //               for (let i = 0;i< LABELS.length; i++){
           //                   const label = LABELS[i];
           //                   let  sname = label.split(getSplitChar())[0];
           //                   sname = IUCNtaxonomy[sname] || sname;
-          //                   if (sname && ! STATE.IUCNcache[sname]) { 
-          //                       await getIUCNStatus(sname)
+          //                   if (sname && !  STATE.IUCNcache[sname]) { 
+          //                       const result = await getIUCNStatus(sname)
+          //                       if (!result) break
           //                       await new Promise(resolve => setTimeout(resolve, 500))
           //                   }
           //               }
@@ -3831,20 +3843,16 @@ function setAutocomplete(species) {
 }
 
 /**
- * Renders a detection result row in the results table, updating headers, pagination, and UI as needed.
- *
- * For the first result, resets the table and sets up localized headers. Handles pagination and result limits for non-database results. Formats and displays detection details including timestamps, species, call counts, labels, comments, review status, and model information. Stores results for feedback and updates the UI accordingly.
+ * Render a single detection row into the results table and update related headers, pagination, and UI state.
  *
  * @param {Object} options - Rendering options.
- * @param {number} [options.index=1] - The sequential index of the detection result.
- * @param {Object} [options.result={}] - Detection result data, including timestamp, position, species, score, label, and related fields.
- * @param {*} [options.file=undefined] - The audio file reference for the detection.
- * @param {boolean} [options.isFromDB=false] - Whether the result is from the database.
- * @param {boolean} [options.selection=false] - Whether rendering is for a selection-specific view.
+ * @param {number} [options.index=1] - Sequential index of the detection result within the current result set.
+ * @param {Object} [options.result={}] - Detection data (timestamp, position, species, score, label, review status, model info, etc.).
+ * @param {*} [options.file=undefined] - Associated audio file reference for the detection.
+ * @param {boolean} [options.isFromDB=false] - True when the result originates from the database (affects pagination and rendering).
+ * @param {boolean} [options.selection=false] - True when rendering into a selection-specific view (hides some UI elements).
  *
- * @returns {Promise<void>} Resolves when the result has been rendered and the UI updated.
- *
- * @remark Results detected as daytime are skipped if nocturnal migration detection is enabled and not in selection mode.
+ * @returns {Promise<void>} Nothing.
  */
 
 async function renderResult({
@@ -3913,9 +3921,8 @@ async function renderResult({
       model,
       modelID
     } = result;
+
     const dayNight = isDaylight ? "daytime" : "nighttime";
-    // Todo: move this logic so pre dark sections of file are not even analysed
-    if (config.detect.nocmig && !selection && dayNight === "daytime") return;
 
     const commentHTML = comment
       ? `<span title="${comment.replaceAll(
@@ -4408,29 +4415,46 @@ function exportSpeciesList() {
   URL.revokeObjectURL(url);
 }
 
-function setNocmig(on) {
+/**
+ * Update the nocmig control's icon, tooltip, and checked state to reflect the given mode.
+ *
+ * @param {boolean|'day'} on - Mode to set: `true` enables nocmig (night mode), `false` disables it, `'day'` enables day mode styling.
+ */
+function setNocmig(on = config.detect.nocmig) {
   const i18 = i18n.get(i18n.Titles);
-  if (on) {
-    DOM.nocmigButton.textContent = "nights_stay";
-    DOM.nocmigButton.title = i18.nocmigOn;
-    DOM.nocmigButton.classList.add("text-info");
+  const btn = DOM.nocmigButton;
+  if (on === 'day') {
+    btn.textContent = "wb_sunny";
+    btn.title = i18.nocmigOn;
+    btn.classList.add("text-warning");
+    btn.classList.remove("text-info");
+  } else if (on) {
+    btn.textContent = "nights_stay";
+    btn.title = i18.nocmigOn;
+    btn.classList.add("text-info");
+    btn.classList.remove("text-warning");
   } else {
-    DOM.nocmigButton.textContent = "bedtime_off";
-    DOM.nocmigButton.title = i18.nocmigOff;
-    DOM.nocmigButton.classList.remove("text-info");
+    btn.textContent = "bedtime_off";
+    btn.title = i18.nocmigOff;
+    btn.classList.remove("text-info","text-warning");
   }
-  DOM.nocmig.checked = config.detect.nocmig;
+  const checked = on === true;
+  DOM.nocmig.checked = checked;
 }
 
 const changeNocmigMode = () => {
-  config.detect.nocmig = !config.detect.nocmig;
-  setNocmig(config.detect.nocmig);
+  const modes = [true, 'day', false]
+  let nocmigMode = config.detect.nocmig;
+  const index = (modes.indexOf(nocmigMode) + 1) % modes.length
+  nocmigMode = modes[index]
+  setNocmig(nocmigMode);
   worker.postMessage({
     action: "update-state",
-    detect: { nocmig: config.detect.nocmig },
+    detect: { nocmig: nocmigMode },
     globalOffset: 0,
     filteredOffset: {},
   });
+  config.detect.nocmig = nocmigMode;
   updatePrefs("config.json", config);
   if (STATE.analysisDone) {
     resetResults({
@@ -6219,7 +6243,7 @@ document.addEventListener("change", async function (e) {
               .localiseUI(DOM.locale.value)
               .then((result) => (STATE.i18n = result));
             config.locale = element.value;
-            setNocmig();
+            setNocmig(config.detect.nocmig);
             contextAwareIconDisplay();
             updateListIcon();
             filterIconDisplay();
@@ -8061,7 +8085,12 @@ function updateModelOptions(customOnly){
   customOnly || (select.value = config.selectedModel)
 }
 
-// Update checking for Intel Mac
+/**
+ * Checks GitHub for a newer release of the Intel Mac build and, if one exists, shows an in-app update alert.
+ *
+ * Performs the check at most once per day; when a newer release is detected it appends a warning alert to the
+ * "updateAlert" element, records an analytics event, updates config.lastUpdateCheck, and persists the config.
+ */
 
 function checkForIntelMacUpdates() {
   // Do this at most daily
@@ -8112,3 +8141,111 @@ function checkForIntelMacUpdates() {
       });
   }
 }
+
+// async function getIUCNStatus(sname = "Anser anser") {
+//   if (!Object.keys(STATE.IUCNcache).length) {
+//     const path = p.join(appPath, 'IUCNcache.json');
+//     // const path = window.location.pathname
+//     //   .replace(/^\/(\w:)/, "$1")
+//     //   .replace("index.html", "IUCNcache.json");
+//     // window.electron.getPath()
+//     if (fs.existsSync(path)) {
+//       const data = await fs.promises.readFile(path, "utf8").catch((err) => {});
+//       STATE.IUCNcache = JSON.parse(data);
+//     } else {
+//       STATE.IUCNcache = {};
+//     }
+//   }
+//   Object.entries(STATE.IUCNcache).forEach(([key, entry]) => {
+//     if (
+//         !Array.isArray(entry.scopes) ||
+//         entry.scopes.length === 0 ||
+//         entry.scopes.some(scope => scope.url == null)
+//     ) {
+//         delete STATE.IUCNcache[key];
+//     }
+// });
+
+//     updatePrefs("IUCNcache.json", STATE.IUCNcache);
+//     return true; // Optionally return the data if you need to use it elsewhere
+
+//   // return STATE.IUCNcache[sname];
+
+//   /* The following code should not be called in the packaged app */
+
+//   const [genus, species] = sname.split(" ");
+
+//   const headers = {
+//     Accept: "application/json",
+//     Authorization:"API_KEY", // Replace with the actual API key
+//     keepalive: true,
+//   };
+
+//   try {
+//     const response = await fetch(
+//       `https://api.iucnredlist.org/api/v4/taxa/scientific_name?genus_name=${genus}&species_name=${species}`,
+//       { headers }
+//     );
+
+//     if (!response.ok) {
+//       throw new Error(
+//         `Network error: code ${response.status} fetching IUCN data.`
+//       );
+//     }
+
+//     const data = await response.json();
+
+//     // Filter out all but the latest assessments
+//     const filteredAssessments = data.assessments.filter(
+//       (assessment) => assessment.latest
+//     );
+//     const speciesData = { scopes: [] };
+
+//     // Fetch all the assessments concurrently
+//     const assessmentResults = await Promise.all(
+//       filteredAssessments.map(async (item) => {
+//         const response = await fetch(
+//           `https://api.iucnredlist.org/api/v4/assessment/${item.assessment_id}`,
+//           { headers }
+//         );
+//         if (!response.ok) {
+//           throw new Error(
+//             `Network error: code ${response.status} fetching IUCN data.`
+//           );
+//         }
+//         const data = await response.json();
+//         await new Promise((resolve) => setTimeout(resolve, 500));
+//         return data;
+//       })
+//     );
+
+//     // Process each result
+//     for (let item of assessmentResults) {
+//       const scope = item.scopes?.[0]?.description?.en || "Unknown";
+//       const status = item.red_list_category?.code || "Unknown";
+//       const url = item.url.replace('https://www.iucnredlist.org/species/', '') || "No URL provided";
+//       speciesData.scopes.push({ scope, status, url });
+//     }
+
+//     console.log(speciesData);
+//     STATE.IUCNcache[sname] = speciesData;
+//     updatePrefs("IUCNcache.json", STATE.IUCNcache);
+//     return true; // Optionally return the data if you need to use it elsewhere
+//   } catch (error) {
+//     if (error.message.includes("404")) {
+//       generateToast({
+//         message: "noIUCNRecord",
+//         variables: { sname: sname },
+//         type: "warning",
+//       });
+//       STATE.IUCNcache[sname] = {
+//         scopes: [{ scope: "Global", status: "NA", url: null }],
+//       };
+//       updatePrefs("IUCNcache.json", STATE.IUCNcache);
+//       return true;
+//     }
+//     console.error("Error fetching IUCN data:", error.message);
+//     throw error
+    
+//   }
+// }

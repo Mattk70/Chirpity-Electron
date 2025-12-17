@@ -148,7 +148,7 @@ let workerInstance = 0;
 let appPath,
   tempPath,
   BATCH_SIZE,
-  batchChunksToSend = {};
+  batchesToSend = {};
 let LIST_WORKER;
 
 // Adapted from https://stackoverflow.com/questions/6117814/get-week-of-year-in-javascript-like-in-php
@@ -1027,13 +1027,24 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true}) => {
   trackEvent(STATE.UUID, "UI", "Drop", fileOrFolder, filePaths.length);
   UI.postMessage({ event: "files", filePaths, preserveResults, checkSaved });
   // Start gathering metadata for new files
-  STATE.totalDuration = 0;
-  STATE.allFilesDuration = 0;
   await processFilesInBatches(filePaths, 10, checkSaved);
   return filePaths;
 };
 
+/**
+ * Process a list of files in concurrent batches to gather metadata and update aggregate state.
+ *
+ * Processes filePaths in groups of up to batchSize, invoking setMetadata for each file and accumulating
+ * per-file durations into STATE.allFilesDuration and estimated batch counts into STATE.totalBatches.
+ * Files that fail metadata extraction are skipped; optionally runs savedFileCheck after processing.
+ *
+ * @param {string[]} filePaths - Array of file paths to process.
+ * @param {number} [batchSize=20] - Maximum number of files to process concurrently per batch.
+ * @param {boolean} [checkSaved=true] - If true, call savedFileCheck(filePaths) after processing completes.
+ */
 async function processFilesInBatches(filePaths, batchSize = 20, checkSaved = true) {
+  STATE.totalBatches = 0;
+  STATE.allFilesDuration = 0;
   for (let i = 0; i < filePaths.length; i += batchSize) {
     const batch = filePaths.slice(i, i + batchSize);
 
@@ -1043,7 +1054,7 @@ async function processFilesInBatches(filePaths, batchSize = 20, checkSaved = tru
         setMetadata({ file }).then(fileMetadata => {
           const duration = fileMetadata.duration || 0;
           STATE.allFilesDuration += duration;
-          STATE.totalDuration += Math.ceil(duration / (BATCH_SIZE * WINDOW_SIZE)) * (BATCH_SIZE * WINDOW_SIZE);
+          STATE.totalBatches += Math.ceil(duration / (BATCH_SIZE * WINDOW_SIZE));
           return fileMetadata;
         }).catch ((error) => {
           console.error(`Error processing file ${file}:`, error);
@@ -1230,6 +1241,14 @@ async function getSpeciesSQLAsync(){
   return SQL
 }
 
+/**
+ * Append SQL qualifiers to a WHERE clause based on current application STATE (file range, species/tags, selection, location, and daylight filters).
+ *
+ * @param {string} stmt - Initial SQL text to augment (typically a WHERE or subquery fragment).
+ * @param {Object} [range] - Optional time range to constrain results; when omitted in explore mode the explore.range is used.
+ * @param {string} [caller] - Caller context that can alter behavior (e.g., when 'results' and a selection exists a file filter is applied).
+ * @returns {[string, any[]]} A two-element array: the augmented SQL string and an ordered array of parameters for prepared statements.
+ */
 async function addQueryQualifiers(stmt, range, caller) {
   const {mode, explore, labelFilters, detect, locationID, selection} = STATE;
   let params = [detect.confidence];
@@ -1248,7 +1267,11 @@ async function addQueryQualifiers(stmt, range, caller) {
   } else {
     stmt += await getSpeciesSQLAsync()
   }
-  if (detect.nocmig) stmt += " AND COALESCE(isDaylight, 0) != 1 ";
+  if (detect.nocmig) {
+    const condition = detect.nocmig === 'day';
+    stmt += ` AND isDaylight = ${condition ? 1 : 0} `;
+  }
+  // if (detect.nocmig) stmt += " AND COALESCE(isDaylight, 0) != 1 ";
   if (locationID !== undefined) {
     stmt += locationID === 0 ? " AND locationID IS NULL " : " AND locationID = ? ";
     locationID !== 0 && params.push(locationID);
@@ -1525,16 +1548,16 @@ async function updateMetadata(fileNames) {
 }
 
 /**
- * Initiates analysis of a set of audio files, handling selection state, caching, and dispatching processing tasks to workers.
+ * Start analysis of the provided audio files: prepare selection and global state, decide whether to reuse cached results or perform fresh analysis, and dispatch files to worker processors.
  *
- * If all files are already analyzed and cached, retrieves results from the database or summary as needed. Otherwise, prepares files for analysis, updates relevant state, and distributes processing tasks to available workers.
+ * If all files are cached in the disk database (or when `circleClicked` is true), this function will retrieve results/summary instead of reprocessing. Otherwise it clears/sets analysis state, updates metadata, populates the processing queue, and starts worker-driven processing.
  *
  * @param {Object} params - Analysis parameters.
- * @param {string[]} [params.filesInScope=[]] - List of audio files to analyze.
- * @param {number} [params.start] - Optional start time for analysis (in seconds).
- * @param {number} [params.end] - Optional end time for analysis (in seconds).
- * @param {boolean} [params.reanalyse=false] - If true, forces reanalysis even if results are cached.
- * @param {boolean} [params.circleClicked=false] - If true, triggers a special retrieval mode for results.
+ * @param {string[]} [params.filesInScope=[]] - Array of file paths to include in the analysis.
+ * @param {number} [params.start] - Optional start time (seconds) to limit analysis range for the first file.
+ * @param {number} [params.end] - Optional end time (seconds) to limit analysis range for the first file.
+ * @param {boolean} [params.reanalyse=false] - When true, forces reanalysis even if results appear cached.
+ * @param {boolean} [params.circleClicked=false] - When true, trigger retrieval mode (fetch top results/summary) instead of running a full analysis.
  */
 async function onAnalyse({
   filesInScope = [],
@@ -1547,6 +1570,8 @@ async function onAnalyse({
   aborted = false;
   STATE.incrementor = 1;
   STATE.corruptFiles = [];
+  STATE.clippedBatches = 0;
+  STATE.clippedFilesDuration = 0;
   predictionStart = new Date();
   // Set the appropriate selection range if this is a selection analysis
   STATE.update({
@@ -1559,7 +1584,7 @@ async function onAnalyse({
     );
   //Reset GLOBAL variables
   index = 0;
-  batchChunksToSend = {};
+  batchesToSend = {};
   FILE_QUEUE = filesInScope;
   AUDIO_BACKLOG = 0;
   STATE.processingPaused = {};
@@ -1655,19 +1680,18 @@ async function onAnalyse({
   STATE.selection || await onChangeMode("analyse");
 
   filesBeingProcessed = [...FILE_QUEUE];
-  
   for (let i = 0; i < NUM_WORKERS; i++) {
     processNextFile({ start, end, worker: i });
   }
 }
 
 /**
- * Abort all in-progress audio processing and prediction work, clear related queues and transient state, and restart prediction workers for the specified model.
+ * Stop ongoing audio processing and prediction, clear in-memory queues and transient tracking state, and (unless the model is "perch v2") restart prediction workers using the specified model.
  *
- * This cancels active prediction jobs, clears in-memory queues and tracking structures, terminates existing worker processes, and spawns a fresh set of prediction workers for the provided model.
+ * This sets the abort flag, clears file and prediction queues, cancels backlog intervals, terminates existing prediction workers, and spawns a fresh set of workers for the provided model identifier.
  *
  * @param {Object} params - Options for aborting and restarting.
- * @param {string} [params.model=STATE.model] - Model identifier to use when restarting prediction workers; defaults to the current STATE.model.
+ * @param {string} [params.model=STATE.model] - Model identifier to use when restarting prediction workers; if equal to `"perch v2"`, workers are not restarted.
  */
 function onAbort({ model = STATE.model }) {
   predictWorkers.forEach(worker => worker.postMessage({
@@ -1696,7 +1720,6 @@ function onAbort({ model = STATE.model }) {
 }
 
 const measureDurationWithFfmpeg = (src, type) => {
-  console.info('Measuring duration', `${src}: ${type}`);
   return new Promise((resolve, reject) => {
     const { PassThrough } = require("node:stream");
     const stream = new PassThrough();
@@ -2074,6 +2097,22 @@ async function sendDetections(file, start, end, goToRegion) {
 const roundedFloat = (string) => Math.round(parseFloat(string) * 10000) / 10000;
 
 /**
+ * Parse BExt origination date and time strings into a local timestamp.
+ * 
+ * @param {string} originationDate - Date string in "YYYY-MM-DD" format from BExt metadata.
+ * @param {string} originationTime - Time string in "HH:MM:SS" format from BExt metadata.
+ * @returns {number|undefined} The local epoch timestamp (milliseconds) corresponding to the parsed date/time, or `undefined` if parsing fails.
+ */
+function parseBextLocalDate(originationDate, originationTime) {
+  const [year, month, day] = originationDate.split('-').map(Number);
+  const [hour, minute, second] = originationTime.split(':').map(Number);
+  // month is 0-based in JS
+  const parsedDate =  new Date(year, month - 1, day, hour, minute, second);
+  const timestamp = parsedDate.getTime()
+  return isNaN(timestamp) ? undefined : timestamp;
+}
+
+/**
  * Called by getWorkingFile, setCustomLocation
  * Assigns file metadata to a metadata cache object. file is the key, and is the source file
  * @param file: the file name passed to the worker
@@ -2107,7 +2146,7 @@ const setMetadata = async ({ file, source_file = file }) => {
         });
       fileMeta.isSaved = true; // Queried by UI to establish saved state of file.
     } 
-    let guanoTimestamp;
+    let guanoTimestamp, bextTimestamp, recorderModel;
     // savedMeta may just have a locationID if it was set by onSetCUstomLocation
     if (!savedMeta?.duration) {
       fileMeta.duration = await getDuration(file);
@@ -2117,6 +2156,7 @@ const setMetadata = async ({ file, source_file = file }) => {
         const wavMetadata = await extractWaveMetadata(file).catch(error => console.warn("Error extracting GUANO", error.message));
         if (wavMetadata && Object.keys(wavMetadata).includes("guano")) {
           const guano = wavMetadata.guano;
+          recorderModel = guano.Model;
           const location = guano["Loc Position"];
           if (location) {
             const [lat, lon] = location.split(" ");
@@ -2136,9 +2176,15 @@ const setMetadata = async ({ file, source_file = file }) => {
             fileMeta.duration = parseFloat(guano.Length);
           }
         }
-        if (wavMetadata && Object.keys(wavMetadata).length > 0) {
-          fileMeta.metadata = JSON.stringify(wavMetadata);
+        else if (wavMetadata && wavMetadata.bext) {
+          const {Originator, OriginationDate, OriginationTime} = wavMetadata.bext;
+          // Remove trailing null chars
+          recorderModel = Originator.replace(/\0+$/, '');
+          if (OriginationDate && OriginationTime){
+            bextTimestamp = parseBextLocalDate(OriginationDate, OriginationTime)
+          }
         }
+        if (Object.keys(wavMetadata).length) fileMeta.metadata = JSON.stringify(wavMetadata);
         DEBUG &&
           console.log(`GUANO search took: ${(Date.now() - t0) / 1000} seconds`);
       }
@@ -2153,25 +2199,32 @@ const setMetadata = async ({ file, source_file = file }) => {
       // Guano has second priority
       fileStart = new Date(guanoTimestamp);
       fileEnd = new Date(guanoTimestamp + fileMeta.duration * 1000);
+    } else if (bextTimestamp) {
+      // Then BEXT 3rd
+      if (recorderModel?.includes("ZOOM")){
+        fileStart = new Date(bextTimestamp);
+        fileEnd = new Date(bextTimestamp + fileMeta.duration * 1000);
+      } else {
+        fileEnd = new Date(bextTimestamp);
+        fileStart = new Date(bextTimestamp - fileMeta.duration * 1000);
+      }
     } else {
       // Least preferred
       const stat = fs.statSync(source_file);
-      const meta = fileMeta.metadata
-        ? JSON.parse(fileMeta.metadata)
-        : {};
-      const H1E = meta.bext?.Originator?.includes("H1essential");
-      if (STATE.fileStartMtime || H1E) {
-        // Zoom H1E apparently sets mtime to be the start of the recording
+      if (STATE.fileStartMtime) {
         fileStart = new Date(stat.mtimeMs);
-        fileMeta.fileStart = fileStart.getTime();
         fileEnd = new Date(stat.mtimeMs + fileMeta.duration * 1000);
       } else {
         fileEnd = new Date(stat.mtimeMs);
         fileStart = new Date(stat.mtimeMs - fileMeta.duration * 1000);
-        fileMeta.fileStart = fileStart.getTime();
       }
     }
-
+    
+    fileMeta.fileStart = fileStart.getTime();
+    if (recorderModel !== STATE.recorderModel) {
+      STATE.recorderModel = recorderModel;
+      console.info('Recorder model', recorderModel);
+    } 
     // split  the duration of this file across any dates it spans
     fileMeta.dateDuration = {};
     const key = new Date(fileStart);
@@ -2269,13 +2322,6 @@ const getPredictBuffers = async ({ file = "", start = 0, end = undefined }) => {
   if (start > fileDuration) {
     return;
   }
-  const duration = end - start;
-  
-  const rawChunks = Math.ceil((duration - EPSILON) / (BATCH_SIZE * WINDOW_SIZE));
-  batchChunksToSend[file] = Math.max(1, rawChunks);
-  predictionsReceived[file] = 0;
-  predictionsRequested[file] = 0;
-
   const batchDuration = BATCH_SIZE * WINDOW_SIZE;
   //reduce highWaterMark for small analyses
   const samplesInWindow = sampleRate * WINDOW_SIZE;
@@ -2300,17 +2346,17 @@ const getPredictBuffers = async ({ file = "", start = 0, end = undefined }) => {
 };
 
 /**
- * Streams audio data from a file, splits it into chunks, and queues each chunk for AI model prediction.
+ * Stream audio from a file, split it into model-sized chunks, and queue those chunks for prediction.
  *
- * Extracts audio from the specified file and time range, applies optional audio filters, and manages chunked buffering to optimize parallel processing. Handles encoder padding for compressed formats, manages backpressure by pausing/resuming ffmpeg as needed, and limits the backlog of audio chunks to control memory usage. Updates metadata and expected chunk counts based on actual processed duration. Resolves when all audio chunks have been processed and queued.
+ * Processes the specified time range of the file into byte-aligned buffers, applies configured audio filters, handles encoder padding for compressed formats, and manages backpressure to limit in-memory backlog while feeding prepared batches to the prediction queue.
  *
  * @param {string} file - Path to the audio file to process.
- * @param {number} start - Start time in seconds for audio extraction.
- * @param {number} end - End time in seconds for audio extraction.
- * @param {number} chunkStart - Initial sample index for chunking.
- * @param {number} highWaterMark - Buffer size in bytes for each audio chunk.
- * @param {number} samplesInBatch - Number of audio samples per batch sent to the model.
- * @returns {Promise<void>} Resolves when all audio chunks have been processed and queued for prediction.
+ * @param {number} start - Start time in seconds for extraction (may be adjusted slightly to compensate encoder padding).
+ * @param {number} end - End time in seconds for extraction.
+ * @param {number} chunkStart - Index (in samples) of the first sample for the first chunk produced from this stream.
+ * @param {number} highWaterMark - Number of bytes per chunk buffer used to accumulate PCM before sending to the model.
+ * @param {number} samplesInBatch - Number of audio samples contained in each batch sent to the model.
+ * @returns {Promise<void>} Resolves when all audio chunks for the requested range have been prepared and queued for prediction.
  */
 async function processAudio(
   file,
@@ -2438,7 +2484,7 @@ async function processAudio(
       if (start === 0 && end === metaDuration && isFinite(duration) && duration + EPSILON < metaDuration) {
         // If we have a short file (header duration > processed duration)
         // *and* were looking for the whole file, we'll fix # of expected chunks here
-        batchChunksToSend[file] = Math.ceil(
+        batchesToSend[file] = Math.ceil(
           (duration - EPSILON) / (BATCH_SIZE * WINDOW_SIZE)
         );
 
@@ -2684,11 +2730,12 @@ async function feedChunksToModel(channelData, chunkStart, file, end) {
   predictWorkers[worker].postMessage(objData, [channelData.buffer]);
 }
 /**
- * Initiates AI prediction on a specified audio file segment and updates the UI with the audio duration.
- * @param {Object} params - Parameters for prediction.
- * @param {string} params.file - The path to the audio file.
- * @param {number} [params.start=0] - The start time (in seconds) of the segment to analyze.
- * @param {number|null} [params.end=null] - The end time (in seconds) of the segment to analyze.
+ * Start prediction for a segment of an audio file and notify the UI of the segment duration.
+ *
+ * @param {Object} params - Prediction parameters.
+ * @param {string} params.file - Path to the audio file.
+ * @param {number} [params.start=0] - Segment start time in seconds.
+ * @param {number|null} [params.end=null] - Segment end time in seconds, or `null` to indicate the file's end.
  */
 async function doPrediction({
   file = "",
@@ -2701,7 +2748,7 @@ async function doPrediction({
 
   UI.postMessage({
     event: "update-audio-duration",
-    value: METADATA[file].duration,
+    value: end - start,
   });
 }
 
@@ -3625,13 +3672,17 @@ const parsePredictions = async (response) => {
           } else { end = key + predictionLength }
 
           const [sname, cname] = STATE.allLabels[species].split(getSplitChar()) 
+          const lat = METADATA[file].lat || STATE.lat;
+          const lon = METADATA[file].lon || STATE.lon;
+          const isDaylight = isDuringDaylight(timestamp, lat, lon);
           const result = {
-            timestamp: timestamp,
+            timestamp,
             position: key,
-            end: end,
-            file: file,
-            cname: cname,
-            sname: sname,
+            end,
+            file,
+            cname,
+            sname,
+            isDaylight,
             score: confidence,
             model: STATE.model,
           };
@@ -3653,7 +3704,8 @@ const parsePredictions = async (response) => {
   predictionsReceived[file]++;
   const received = sumObjectValues(predictionsReceived);
   if (!selection && worker === 0) estimateTimeRemaining(received);
-  const fileProgress = predictionsReceived[file] / batchChunksToSend[file];
+  const batches = batchesToSend[file] || 1;
+  const fileProgress = predictionsReceived[file] / batches;
   if (!selection && STATE.increment() === 0) {
     getSummary({ interim: true });
     getTotal();
@@ -3682,13 +3734,23 @@ const parsePredictions = async (response) => {
 };
 
 
+/**
+ * Estimate remaining analysis time from processed batches and post localized progress to the UI footer.
+ *
+ * Computes progress, estimated minutes remaining, and processing speed based on the global analysis start
+ * timestamp and STATE counters, then sends a `footer-progress` message to the UI with percent and localized text.
+ *
+ * @param {number} batchesReceived - Number of analysis batches processed so far for the current run.
+ */
 async function estimateTimeRemaining(batchesReceived) {
-  if (! STATE.totalDuration) return;
-  const totalBatches = Math.ceil(STATE.totalDuration / (BATCH_SIZE * WINDOW_SIZE));
-  const progress = batchesReceived / totalBatches;
+  if (! STATE.totalBatches) return;
+  const {totalBatches, clippedBatches} = STATE;
+  const remainingBatches = totalBatches - clippedBatches;
+  const progress = remainingBatches > 0 ? batchesReceived / remainingBatches : 0;
+  if (progress === 0 || remainingBatches === 0) return; // No batches to process
   const elapsedMinutes = (Date.now() - t0_analysis) / 60_000;
   const estimatedTime = elapsedMinutes / progress;
-  const processedMinutes = (STATE.allFilesDuration / 60) * progress;
+  const processedMinutes = ((STATE.allFilesDuration - STATE.clippedFilesDuration) / 60) * progress;
   const remaining = estimatedTime - elapsedMinutes;
   const speed = (processedMinutes / elapsedMinutes).toFixed(0);
   const i18n = {
@@ -3717,6 +3779,18 @@ async function estimateTimeRemaining(batchesReceived) {
   });
 }
 
+/**
+ * Dispatches and handles messages received from worker threads, updating worker state,
+ * forwarding results to parsers, emitting UI events, and generating alerts as appropriate.
+ *
+ * Accepts messages with a `data.message` field such as `"model-ready"`, `"prediction"`,
+ * `"spectrogram"`, `"training-progress"`, and `"training-results"` and performs the
+ * corresponding application updates (marking workers ready/available, parsing predictions
+ * and advancing file processing, producing spectrogram files, posting footer progress,
+ * and creating alerts).
+ *
+ * @param {MessageEvent} e - Worker message event whose `data` object contains the message type and payload.
+ */
 async function parseMessage(e) {
   const response = e.data;
   switch (response["message"]) {
@@ -3746,11 +3820,11 @@ async function parseMessage(e) {
           console.log(
             "predictions left for",
             response.file,
-            batchChunksToSend[response.file] -
+            batchesToSend[response.file] -
               predictionsReceived[response.file]
           );
         const remaining =
-          predictionsReceived[response.file] - batchChunksToSend[response.file];
+          predictionsReceived[response.file] - batchesToSend[response.file];
         if (remaining === 0) {
           if (filesBeingProcessed.length) {
             processNextFile({ worker: worker });
@@ -3793,17 +3867,20 @@ async function parseMessage(e) {
 }
 
 /**
- * Called when a files processing is finished
- * @param {*} file
+ * Mark a file as finished processing and notify the UI when all files are complete.
+ *
+ * Removes the given file from the internal filesBeingProcessed list; if the list becomes
+ * empty, triggers a summary update when no selection is active and posts an
+ * "analysis-complete" message to the UI.
+ *
+ * @param {string|object} file - File identifier (file path or file record) to remove from the processing list.
  */
 function updateFilesBeingProcessed(file) {
   // This method to determine batch complete
   const fileIndex = filesBeingProcessed.indexOf(file);
   if (fileIndex !== -1) {
     filesBeingProcessed.splice(fileIndex, 1);
-    DEBUG &&
-      console.log(
-        "filesbeingprocessed updated length now :",
+    if (DEBUG) console.log("filesbeingprocessed length is:",
         filesBeingProcessed.length
       );
   }
@@ -3815,14 +3892,14 @@ function updateFilesBeingProcessed(file) {
 }
 
 /**
- * Processes the next audio file in the prediction queue, handling file retrieval, analysis boundaries, and error conditions.
+ * Dequeues the next file from the prediction queue, determines analysis time boundaries, and schedules prediction for each boundary segment.
  *
- * Attempts to retrieve the next file for analysis, determines the appropriate analysis boundaries, and invokes prediction. If a file is missing or cannot be processed, generates a warning and continues to the next file. Recursively processes all files in the queue until none remain.
+ * If a file cannot be located or processed, posts a warning and continues with the next file. Updates UI progress state and internal counters as segments are dispatched.
  *
- * @param {Object} [options] - Optional arguments.
- * @param {number} [options.start] - Start time for analysis, if specified.
- * @param {number} [options.end] - End time for analysis, if specified.
- * @param {Worker} [options.worker] - Prediction worker to use, if specified.
+ * @param {Object} [options] - Options to override default boundary selection and worker assignment.
+ * @param {number} [options.start] - Explicit start time (seconds) for analysis on the dequeued file; when provided, a single boundary segment from `start` to `end` is used.
+ * @param {number} [options.end] - Explicit end time (seconds) for analysis on the dequeued file; used together with `start`.
+ * @param {Worker} [options.worker] - Prediction worker to handle the scheduled prediction, if a specific worker is required.
  */
 async function processNextFile({
   start = undefined,
@@ -3831,6 +3908,8 @@ async function processNextFile({
 } = {}) {
   if (FILE_QUEUE.length) {
     let file = FILE_QUEUE.shift();
+    predictionsReceived[file] = 0;
+    predictionsRequested[file] = 0;
     const found = await getWorkingFile(file).catch((error) => {
       if (error instanceof Event)
         error = `Event passed ${error.type}, attached to ${error.currentTarget}`;
@@ -3852,16 +3931,17 @@ async function processNextFile({
         boundaries = await setStartEnd(file).catch((error) =>
           console.warn("Error in setStartEnd", error)
         );
-      else boundaries.push({ start: start, end: end });
+      else {
+        boundaries.push({ start: start, end: end });
+        const batches = Math.ceil((end - start - EPSILON) / (BATCH_SIZE * WINDOW_SIZE));
+        batchesToSend[file] = batches;
+      }
       for (let i = 0; i < boundaries.length; i++) {
         const { start, end } = boundaries[i];
         if (start === end) {
           // Nothing to do for this file
           updateFilesBeingProcessed(file);
           generateAlert({ message: "noNight", variables: { file } });
-          const duration = METADATA[file].duration;
-          STATE.totalDuration -= Math.ceil(duration / (BATCH_SIZE * WINDOW_SIZE)) * (BATCH_SIZE * WINDOW_SIZE);
-          STATE.allFilesDuration -= duration;
           DEBUG && console.log("Recursion: start = end");
           await processNextFile(arguments[0]).catch((error) =>
             console.warn("Error in processNextFile call", error)
@@ -3886,23 +3966,8 @@ async function processNextFile({
               progress: {percent: 0},
             });
           }
-          await doPrediction({
-            start: start,
-            end: end,
-            file: file,
-            worker: worker,
-          }).catch((error) =>
-            console.warn(
-              "Error in doPrediction",
-              error,
-              "file",
-              file,
-              "start",
-              start,
-              "end",
-              end
-            )
-          );
+          await doPrediction({start, end, file, worker})
+            .catch((error) => console.warn("Error in doPrediction", error.message));
         }
       }
     } else {
@@ -3923,74 +3988,109 @@ function sumObjectValues(obj) {
   return total;
 }
 
-// Function to calculate the active intervals for an audio file in nocmig mode
+/**
+ * Compute active time intervals within a file for a given daylight period ("day" or "night") and update batching/clipping state.
+ *
+ * Calculates one or more intervals (in seconds, relative to the file start) where the requested period is active inside the file's time range. Clips day/night boundaries to the file start/end, records how much time was excluded, updates STATE.clippedBatches and STATE.clippedFilesDuration, and sets batchesToSend[file] to the number of processing batches for the kept intervals.
+ *
+ * @param {string} file - Identifier or path of the file used as key in batchesToSend.
+ * @param {number} fileStart - File start timestamp in milliseconds (local time).
+ * @param {number} fileEnd - File end timestamp in milliseconds (local time).
+ * @param {number} latitude - Latitude used for sunrise/sunset calculations.
+ * @param {number} longitude - Longitude used for sunrise/sunset calculations.
+ * @param {'day'|'night'} period - Period to compute intervals for; "day" returns dawn→dusk intervals, "night" returns dusk→next dawn intervals.
+ * @returns {Array<{start: number, end: number}>} Array of intervals in seconds relative to the file start; returns [{start:0, end:0}] when no active period is found.
+ */
 
-function calculateNighttimeBoundaries(fileStart, fileEnd, latitude, longitude) {
-  const activeIntervals = [];
-  const maxFileOffset = (fileEnd - fileStart) / 1000;
-  const dayNightBoundaries = [];
+function calculateTimeBoundaries(
+  file,
+  fileStart,
+  fileEnd,
+  latitude,
+  longitude,
+  period
+) {
+  const intervals = [];
+  const fileStartMs = fileStart;
+  const fileEndMs = fileEnd;
 
-  const endTime = new Date(fileEnd);
-  endTime.setHours(23, 59, 59, 999);
+  const startDay = new Date(fileStartMs);
+  startDay.setHours(12, 0, 0, 0);
+  if (period !== 'day') {
+    startDay.setDate(startDay.getDate() - 1);
+  }
+  const endDay = new Date(fileEndMs);
+  endDay.setHours(12, 0, 0, 0);
   for (
-    let currentDay = new Date(fileStart);
-    currentDay <= endTime;
-    currentDay.setDate(currentDay.getDate() + 1)
+    let day = new Date(startDay);
+    day <= endDay;
+    day.setDate(day.getDate() + 1)
   ) {
-    const { dawn, dusk } = SunCalc.getTimes(currentDay, latitude, longitude);
-    dayNightBoundaries.push(dawn.getTime(), dusk.getTime());
+    const today = SunCalc.getTimes(day, latitude, longitude);
+
+    let periodStart, periodEnd;
+
+    if (period === 'day') {
+      // day
+      periodStart = today.dawn.getTime();
+      periodEnd = today.dusk.getTime();
+    } else {
+      const nextDay = new Date(day);
+      nextDay.setDate(day.getDate() + 1);
+      const tomorrow = SunCalc.getTimes(nextDay, latitude, longitude);
+      periodStart = today.dusk.getTime();
+      periodEnd = tomorrow.dawn.getTime();
+    }
+
+    // Clip to file range
+    const clippedStart = Math.max(periodStart, fileStartMs);
+    const clippedEnd = Math.min(periodEnd, fileEndMs);
+    if (clippedStart < clippedEnd) {
+      intervals.push({
+        start: (clippedStart - fileStartMs) / 1000,
+        end: (clippedEnd - fileStartMs) / 1000,
+      });
+    }
   }
 
-  for (let i = 0; i < dayNightBoundaries.length; i++) {
-    const offset = (dayNightBoundaries[i] - fileStart) / 1000;
-    // negative offsets are boundaries before the file starts.
-    // If the file starts during daylight, we move on
-    if (offset < 0) {
-      if (!isDuringDaylight(fileStart, latitude, longitude) && i > 0) {
-        activeIntervals.push({ start: 0 });
-      }
-      continue;
-    }
-    // Now handle 'all daylight' files
-    if (offset >= maxFileOffset) {
-      if (isDuringDaylight(fileEnd, latitude, longitude)) {
-        if (!activeIntervals.length) {
-          activeIntervals.push({ start: 0, end: 0 });
-          return activeIntervals;
-        }
-      }
-    }
-    // The list pattern is [dawn, dusk, dawn, dusk,...]
-    // So every second item is a start trigger
-    if (i % 2 !== 0) {
-      if (offset > maxFileOffset) break;
-      activeIntervals.push({ start: Math.max(offset, 0) });
-      // and the others are a stop trigger
-    } else {
-      activeIntervals.length || activeIntervals.push({ start: 0 });
-      activeIntervals[activeIntervals.length - 1].end = Math.min(
-        offset,
-        maxFileOffset
-      );
-    }
+  // Handle files entirely outside the requested period
+  if (
+    !intervals.length &&
+    isDuringDaylight(fileStartMs, latitude, longitude) ===
+      (period === 'day')
+  ) {
+    intervals.push({ start: 0, end: 0 });
   }
-  activeIntervals[activeIntervals.length - 1].end ??= maxFileOffset;
-  return activeIntervals;
+
+  const fileDurationSeconds = (fileEndMs - fileStartMs) / 1000;
+  // Sum kept (active) time
+  const keptSeconds = intervals.reduce((sum, i) => sum + (i.end - i.start), 0);
+  // Amount clipped from the file
+  const clippedSeconds = Math.max(0, fileDurationSeconds - keptSeconds);
+  // Update global state
+  STATE.clippedBatches += Math.ceil(clippedSeconds / (BATCH_SIZE * WINDOW_SIZE));
+  STATE.clippedFilesDuration += clippedSeconds;
+  const batches = Math.ceil((keptSeconds - EPSILON) / (BATCH_SIZE * WINDOW_SIZE));
+  batchesToSend[file] = batches;
+  return intervals.length ? intervals : [{ start: 0, end: 0 }];
 }
 
+
+
 /**
- * Determines the active time boundaries for a given audio file based on its metadata and detection mode.
+ * Compute active time intervals for an audio file based on its metadata and detection mode.
  *
- * If nocturnal migration detection is enabled, calculates nighttime intervals using the file's start time, duration, and associated location coordinates. Otherwise, returns the full duration of the file as a single interval.
+ * When nocturnal-migration mode is enabled, returns intervals clipped to the computed day/night boundaries for the file (using file start/end and location). When nocturnal-migration is disabled, returns a single interval covering the entire file duration and updates batchesToSend[file] with the number of processing batches (at least 1).
  *
- * @param {string} file - The file name or identifier for which to compute boundaries.
- * @returns {Promise<Array<{start: number, end: number}>>} An array of time interval objects representing active boundaries in seconds.
+ * @param {string} file - Key or filename used to look up the file's metadata in METADATA.
+ * @returns {Promise<Array<{start: number, end: number}>>} An array of intervals with `start` and `end` expressed in seconds relative to the file.
  */
 async function setStartEnd(file) {
   const meta = METADATA[file];
-  let boundaries;
+  const nocmig = STATE.detect.nocmig;
+  let boundaries; 
   //let start, end;
-  if (STATE.detect.nocmig) {
+  if (nocmig) {
     const fileEnd = meta.fileStart + meta.duration * 1000;
     // Note diskDB used here
     const result = await STATE.db.getAsync(
@@ -4000,14 +4100,18 @@ async function setStartEnd(file) {
     const { lat, lon } = result
       ? { lat: result.lat, lon: result.lon }
       : { lat: STATE.lat, lon: STATE.lon };
-    boundaries = calculateNighttimeBoundaries(
+    boundaries = calculateTimeBoundaries(
+      file,
       meta.fileStart,
       fileEnd,
       lat,
-      lon
+      lon,
+      nocmig
     );
   } else {
     boundaries = [{ start: 0, end: meta.duration }];
+    const batches = Math.ceil((meta.duration - EPSILON) / (BATCH_SIZE * WINDOW_SIZE));
+    batchesToSend[file] = Math.max(1, batches);
   }
   return boundaries;
 }
@@ -4157,7 +4261,25 @@ const getResults = async ({
         generateAlert({ message: "noDetections" });
       } else {
         species = species || "";
-        const nocmig = STATE.detect.nocmig ? "<b>nocturnal</b>" : "";
+        const i18 = {
+          en: { night: 'nocturnal', day: 'diurnal' },
+          da: { night: 'nataktiv', day: 'dagaktiv' },
+          de: { night: 'nachtaktiv', day: 'tagaktiv' },
+          es: { night: 'nocturno', day: 'diurno' },
+          fr: { night: 'nocturne', day: 'diurne' },
+          ja: { night: '夜行性', day: '昼行性' },
+          nl: { night: 'nachtactief', day: 'dagactief' },
+          pt: { night: 'noturno', day: 'diurno' },
+          ru: { night: 'ночной', day: 'дневной' },
+          sv: { night: 'nattaktiv', day: 'dagaktiv' },
+          zh: { night: '夜行性', day: '昼行性' }
+        };
+        let period, nocmigMode = STATE.detect.nocmig;
+        if (nocmigMode) {
+          period = nocmigMode === true ? 'night' : 'day';
+          period = (i18[STATE.locale] || i18["en"])[period];
+        }
+        const nocmig = STATE.detect.nocmig ? `<b>${period}</b>` : "";
         const archive = STATE.mode === "explore" ? "in the Archive" : "";
         generateAlert({
           message: `noDetectionsDetailed`,
@@ -4400,7 +4522,10 @@ const onSave2DiskDB = async ({ file }) => {
   }
   let filterClause = await getSpeciesSQLAsync();
 
-  if (STATE.detect.nocmig) filterClause += " AND isDaylight = FALSE ";
+  if (STATE.detect.nocmig) {
+    const condition = STATE.detect.nocmig === 'day';
+    filterClause += ` AND isDaylight = ${condition} `;
+  }
   let response,
     errorOccurred = false;
   await dbMutex.lock();

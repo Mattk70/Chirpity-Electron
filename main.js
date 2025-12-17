@@ -1,9 +1,7 @@
-
 const fs = require("node:fs");
 const path = require("node:path");
 const isMac = process.platform === "darwin"; // macOS check
-const arch = process.arch
-const isIntelMac = isMac && arch === 'x64';
+const arch = process.arch;
 const {
   app,
   Menu,
@@ -19,6 +17,7 @@ app.commandLine.appendSwitch("xdg-portal-required-version", "4");
 // WebGPU flags needed for Linux
 app.commandLine.appendSwitch("enable-unsafe-webgpu");
 app.commandLine.appendSwitch("enable-features", "Vulkan");
+process.env["TF_ENABLE_ONEDNN_OPTS"] = "1";
 
 // Set the AppUserModelID (to prevent the two pinned icons bug)
 app.setAppUserModelId('com.electron.chirpity');
@@ -76,34 +75,93 @@ const crypto = require("node:crypto");
 const settings = require("electron-settings");
 const keytar = require('keytar');
 const SERVICE = 'Chirpity';
-const ACCOUNT = 'install-info';
+const ACCOUNT = 'uuid';
 let DEBUG = false;
 
+/**
+ * Ensure and return persistent install information, creating and storing it in the system keychain if missing or invalid.
+ * Attempts to read an existing record from the keychain; if none exists or it lacks a valid `installedAt`, a new record is generated and persisted. If a provided `date` is invalid, the current time is used. Keychain read/write failures are logged and the new record is returned (but may not be persisted).
+ * @param {string|Date|number} [date] - Optional install timestamp (ISO string, Date object, or epoch milliseconds) to use when creating a new record.
+ * @returns {{appId: string, installedAt: string}} An object containing `appId` (a UUID) and `installedAt` (an ISO 8601 timestamp).
+ */
+
 async function getInstallInfo(date) {
+  // First, try the current key (ACCOUNT = 'uuid')
   try {
     const raw = await keytar.getPassword(SERVICE, ACCOUNT);
 
     if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed.installedAt === "string") {
-        return parsed;
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed.installedAt === "string") {
+          return parsed;
+        }
+        console.warn("getInstallInfo: keychain entry missing valid installedAt, will attempt migration or recreate", date);
+      } catch (e) {
+        console.warn("getInstallInfo: failed to parse current keychain entry, will attempt migration or recreate", e.message);
       }
-      console.warn("getInstallInfo: keychain entry missing valid installedAt, recreating with", date);
     }
   } catch (error) {
-    console.warn("getInstallInfo: keychain read/parse failed, recreating:", error.message);
+    console.warn("getInstallInfo: keychain read failed for current key, will attempt migration or recreate:", error.message);
+  }
+
+  // If no current entry, try legacy key 'install-info' and migrate it if present
+  try {
+    const legacyRaw = await keytar.getPassword(SERVICE, 'install-info');
+    if (legacyRaw) {
+      let migratedDateStr = null;
+      let legacyAppId = null;
+      try {
+        const legacyParsed = JSON.parse(legacyRaw);
+        // Accept either { installedAt: '...' } or { installedAt: '...', appId: '...' }
+        if (legacyParsed && typeof legacyParsed.installedAt === 'string') {
+          migratedDateStr = legacyParsed.installedAt;
+          if (legacyParsed.appId) legacyAppId = legacyParsed.appId;
+        }
+      } catch (e) {
+        // Not JSON — maybe it's a raw date string
+        const maybeDate = new Date(legacyRaw);
+        if (!Number.isNaN(maybeDate.getTime())) {
+          migratedDateStr = maybeDate.toISOString();
+        }
+      }
+
+      if (migratedDateStr) {
+        const installInfo = {
+          appId: legacyAppId || crypto.randomUUID(),
+          installedAt: migratedDateStr,
+        };
+        try {
+          await keytar.setPassword(SERVICE, ACCOUNT, JSON.stringify(installInfo));
+          try {
+            // Remove legacy key to avoid confusion; ignore failures
+            await keytar.deletePassword(SERVICE, 'install-info');
+          } catch (delErr) {
+            console.warn('getInstallInfo: failed to delete legacy install-info key:', delErr.message);
+          }
+          console.info('getInstallInfo: migrated legacy install-info to', ACCOUNT);
+        } catch (writeErr) {
+          console.warn('getInstallInfo: failed to write migrated installInfo to keychain:', writeErr.message);
+        }
+        return installInfo;
+      } else {
+        console.warn('getInstallInfo: legacy install-info found but no usable date; will recreate.');
+      }
+    }
+  } catch (legacyErr) {
+    console.warn('getInstallInfo: error reading legacy install-info key:', legacyErr.message);
   }
 
   let effectiveDate = date ? new Date(date) : new Date();
   if (Number.isNaN(effectiveDate.getTime())) {
-    console.warn("getInstallInfo: invalid date provided, falling back to now.");
+    console.warn("getInstallInfo: invalid date provided, falling back to now. Date:", effectiveDate);
     effectiveDate = new Date();
   }
-
   const installInfo = {
     appId: crypto.randomUUID(),
     installedAt: effectiveDate.toISOString(),
   };
+  console.log('attempt to set new service password, using ', installInfo)
   
   try {
     await keytar.setPassword(SERVICE, ACCOUNT, JSON.stringify(installInfo));
@@ -113,7 +171,6 @@ async function getInstallInfo(date) {
   return installInfo;
 }
 
-process.env["TF_ENABLE_ONEDNN_OPTS"] = "1";
 
 //require('update-electron-app')();
 let files = [];
@@ -639,8 +696,8 @@ app.whenReady().then(async () => {
         })
     });
     //Update handling
-    if (process.env.CI || isIntelMac) {
-        console.log("Auto-updater disabled in CI environment. And doesn't work for Intel mac");
+    if (process.env.CI) {
+        console.log("Auto-updater disabled in CI environment");
     } else {
         autoUpdater.autoDownload = false;
         autoUpdater.checkForUpdates().catch(error => console.warn('Error checking for updates', error))
