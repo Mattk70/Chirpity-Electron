@@ -3704,7 +3704,8 @@ const parsePredictions = async (response) => {
   predictionsReceived[file]++;
   const received = sumObjectValues(predictionsReceived);
   if (!selection && worker === 0) estimateTimeRemaining(received);
-  const fileProgress = predictionsReceived[file] / batchesToSend[file];
+  const batches = batchesToSend[file] || 1;
+  const fileProgress = predictionsReceived[file] / batches;
   if (!selection && STATE.increment() === 0) {
     getSummary({ interim: true });
     getTotal();
@@ -3932,7 +3933,7 @@ async function processNextFile({
         );
       else {
         boundaries.push({ start: start, end: end });
-        const batches = Math.ceil((end-start) / (BATCH_SIZE * WINDOW_SIZE));
+        const batches = Math.ceil((end - start - EPSILON) / (BATCH_SIZE * WINDOW_SIZE));
         batchesToSend[file] = batches;
       }
       for (let i = 0; i < boundaries.length; i++) {
@@ -4069,7 +4070,7 @@ function calculateTimeBoundaries(
   // Update global state
   STATE.clippedBatches += Math.ceil(clippedSeconds / (BATCH_SIZE * WINDOW_SIZE));
   STATE.clippedFilesDuration += clippedSeconds;
-  const batches = Math.ceil(keptSeconds - EPSILON / (BATCH_SIZE * WINDOW_SIZE));
+  const batches = Math.ceil((keptSeconds - EPSILON) / (BATCH_SIZE * WINDOW_SIZE));
   batchesToSend[file] = batches;
   return intervals.length ? intervals : [{ start: 0, end: 0 }];
 }
