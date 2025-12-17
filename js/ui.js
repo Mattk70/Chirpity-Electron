@@ -3843,20 +3843,16 @@ function setAutocomplete(species) {
 }
 
 /**
- * Renders a detection result row in the results table, updating headers, pagination, and UI as needed.
- *
- * For the first result, resets the table and sets up localized headers. Handles pagination and result limits for non-database results. Formats and displays detection details including timestamps, species, call counts, labels, comments, review status, and model information. Stores results for feedback and updates the UI accordingly.
+ * Render a single detection row into the results table and update related headers, pagination, and UI state.
  *
  * @param {Object} options - Rendering options.
- * @param {number} [options.index=1] - The sequential index of the detection result.
- * @param {Object} [options.result={}] - Detection result data, including timestamp, position, species, score, label, and related fields.
- * @param {*} [options.file=undefined] - The audio file reference for the detection.
- * @param {boolean} [options.isFromDB=false] - Whether the result is from the database.
- * @param {boolean} [options.selection=false] - Whether rendering is for a selection-specific view.
+ * @param {number} [options.index=1] - Sequential index of the detection result within the current result set.
+ * @param {Object} [options.result={}] - Detection data (timestamp, position, species, score, label, review status, model info, etc.).
+ * @param {*} [options.file=undefined] - Associated audio file reference for the detection.
+ * @param {boolean} [options.isFromDB=false] - True when the result originates from the database (affects pagination and rendering).
+ * @param {boolean} [options.selection=false] - True when rendering into a selection-specific view (hides some UI elements).
  *
- * @returns {Promise<void>} Resolves when the result has been rendered and the UI updated.
- *
- * @remark Results detected as daytime are skipped if nocturnal migration detection is enabled and not in selection mode.
+ * @returns {Promise<void>} Nothing.
  */
 
 async function renderResult({
@@ -4419,6 +4415,11 @@ function exportSpeciesList() {
   URL.revokeObjectURL(url);
 }
 
+/**
+ * Update the nocmig control's icon, tooltip, and checked state to reflect the given mode.
+ *
+ * @param {boolean|'day'} on - Mode to set: `true` enables nocmig (night mode), `false` disables it, `'day'` enables day mode styling.
+ */
 function setNocmig(on = config.detect.nocmig) {
   const i18 = i18n.get(i18n.Titles);
   const btn = DOM.nocmigButton;
@@ -8084,7 +8085,12 @@ function updateModelOptions(customOnly){
   customOnly || (select.value = config.selectedModel)
 }
 
-// Update checking for Intel Mac
+/**
+ * Checks GitHub for a newer release of the Intel Mac build and, if one exists, shows an in-app update alert.
+ *
+ * Performs the check at most once per day; when a newer release is detected it appends a warning alert to the
+ * "updateAlert" element, records an analytics event, updates config.lastUpdateCheck, and persists the config.
+ */
 
 function checkForIntelMacUpdates() {
   // Do this at most daily

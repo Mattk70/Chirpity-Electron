@@ -5,24 +5,17 @@
 const ID_SITE = 3;
 let VISITOR;
 /**
- * Logs an event to the Matomo analytics system.
+ * Send an analytics event to the Matomo server.
  *
- * Constructs and dispatches an asynchronous GET request to the Matomo tracking API using the provided event details.
- * The event name is sanitized by replacing any digits following "result" with an empty string, and the action parameter
- * is adjusted: a single space converts to "Spacebar" and a plus sign converts to "Plus". The request URL embeds the
- * current time (hours, minutes, seconds), site ID, visitor UUID, event category, action, and optional event name and value.
+ * Normalizes the provided event details, encodes optional name/value fields, and dispatches a tracking request to the Matomo endpoint.
+ * The `action` value is normalized so a single space becomes "Spacebar" and "+" becomes "Plus". If `name` is a string, digits following
+ * the substring "result" are removed (e.g., "result12" → "result").
  *
- * The function initiates an asynchronous fetch; if the network response is not OK, an error is thrown internally and
- * then logged to the console.
- *
- * @param {string} uuid - Unique identifier of the visitor.
- * @param {string} event - Event category for classification.
- * @param {string} action - Event action; " " becomes "Spacebar" and "+" becomes "Plus".
- * @param {string} [name] - Optional event name; any digits following "result" are removed.
- * @param {(string|number)} [value] - Optional event value providing additional context.
- *
- * @example
- * trackEvent('user-123', 'navigation', ' ', 'result45', 100);
+ * @param {string} uuid - Visitor UUID used to associate the event with a visitor.
+ * @param {string} event - Event category.
+ * @param {string} action - Event action (will be normalized as described above).
+ * @param {string} [name] - Optional event name; digits after "result" will be removed when present.
+ * @param {string|number} [value] - Optional event value providing additional context.
  */
 function trackEvent(uuid, event, action, name, value){
     // Squash result numbers
@@ -41,6 +34,27 @@ function trackEvent(uuid, event, action, name, value){
         .catch(error => console.log('Error posting tracking:', error))
 }
 
+/**
+ * Send an initial visit payload to the Matomo analytics endpoint, store the visitor ID, and start periodic heartbeats.
+ *
+ * Posts visit and device/application dimensions to the analytics server and schedules a heartbeat every 20 minutes.
+ *
+ * @param {Object} config - Visit and environment information.
+ * @param {string} config.UUID - Visitor UUID to associate with the visit.
+ * @param {string} config.selectedModel - Key of the selected model.
+ * @param {string} config.list - Model list identifier.
+ * @param {boolean} config.useWeek - Whether weekly usage is enabled.
+ * @param {string} config.locale - Current locale.
+ * @param {number} config.speciesThreshold - Species detection threshold.
+ * @param {Object} config.filters - Active filters configuration.
+ * @param {Object} config.audio - Audio-related settings.
+ * @param {Object} config.models - Map of models; used to derive backend-specific data.
+ * @param {Object} config.detect - Detection configuration/details.
+ * @param {string|number} config.CPU - CPU identifier or description.
+ * @param {string|number} config.RAM - RAM amount or description.
+ * @param {string|number} config.GPUs - GPU identifiers or description.
+ * @param {string} config.VERSION - Application version.
+ */
 function trackVisit(config){
     const {UUID, selectedModel, list, useWeek, locale, speciesThreshold, filters, audio, models, detect, CPU, RAM, GPUs, VERSION} = config;
     VISITOR = UUID;
