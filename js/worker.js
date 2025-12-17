@@ -1250,7 +1250,7 @@ async function addQueryQualifiers(stmt, range, caller) {
   }
   if (detect.nocmig) {
     const condition = detect.nocmig === 'day';
-    stmt += ` AND isDaylight = ${condition} `;
+    stmt += ` AND isDaylight = ${condition ? 1 : 0} `;
   }
   // if (detect.nocmig) stmt += " AND COALESCE(isDaylight, 0) != 1 ";
   if (locationID !== undefined) {
@@ -3711,6 +3711,7 @@ async function estimateTimeRemaining(batchesReceived) {
   const {totalBatches, clippedBatches} = STATE;
   const remainingBatches = totalBatches - clippedBatches;
   const progress = remainingBatches > 0 ? batchesReceived / remainingBatches : 0;
+  if (progress === 0 || remainingBatches === 0) return; // No batches to process
   const elapsedMinutes = (Date.now() - t0_analysis) / 60_000;
   const estimatedTime = elapsedMinutes / progress;
   const processedMinutes = ((STATE.allFilesDuration - STATE.clippedFilesDuration) / 60) * progress;
@@ -3956,7 +3957,6 @@ function calculateTimeBoundaries(
   }
   const endDay = new Date(fileEndMs);
   endDay.setHours(12, 0, 0, 0);
-  console.log('diff =', startDay - endDay)
   for (
     let day = new Date(startDay);
     day <= endDay;
@@ -4006,7 +4006,7 @@ function calculateTimeBoundaries(
   // Update global state
   STATE.clippedBatches += Math.ceil(clippedSeconds / (BATCH_SIZE * WINDOW_SIZE));
   STATE.clippedFilesDuration += clippedSeconds;
-  const batches = Math.ceil(keptSeconds / (BATCH_SIZE * WINDOW_SIZE));
+  const batches = Math.ceil(keptSeconds - EPSILON / (BATCH_SIZE * WINDOW_SIZE));
   batchesToSend[file] = batches;
   return intervals.length ? intervals : [{ start: 0, end: 0 }];
 }

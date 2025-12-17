@@ -80,18 +80,70 @@ const ACCOUNT = 'uuid';
 let DEBUG = false;
 
 async function getInstallInfo(date) {
+  // First, try the current key (ACCOUNT = 'uuid')
   try {
     const raw = await keytar.getPassword(SERVICE, ACCOUNT);
 
     if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed.installedAt === "string") {
-        return parsed;
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed.installedAt === "string") {
+          return parsed;
+        }
+        console.warn("getInstallInfo: keychain entry missing valid installedAt, will attempt migration or recreate", date);
+      } catch (e) {
+        console.warn("getInstallInfo: failed to parse current keychain entry, will attempt migration or recreate", e.message);
       }
-      console.warn("getInstallInfo: keychain entry missing valid installedAt, recreating with", date);
     }
   } catch (error) {
-    console.warn("getInstallInfo: keychain read/parse failed, recreating:", error.message);
+    console.warn("getInstallInfo: keychain read failed for current key, will attempt migration or recreate:", error.message);
+  }
+
+  // If no current entry, try legacy key 'install-info' and migrate it if present
+  try {
+    const legacyRaw = await keytar.getPassword(SERVICE, 'install-info');
+    if (legacyRaw) {
+      let migratedDateStr = null;
+      let legacyAppId = null;
+      try {
+        const legacyParsed = JSON.parse(legacyRaw);
+        // Accept either { installedAt: '...' } or { installedAt: '...', appId: '...' }
+        if (legacyParsed && typeof legacyParsed.installedAt === 'string') {
+          migratedDateStr = legacyParsed.installedAt;
+          if (legacyParsed.appId) legacyAppId = legacyParsed.appId;
+        }
+      } catch (e) {
+        // Not JSON — maybe it's a raw date string
+        const maybeDate = new Date(legacyRaw);
+        if (!Number.isNaN(maybeDate.getTime())) {
+          migratedDateStr = maybeDate.toISOString();
+        }
+      }
+
+      if (migratedDateStr) {
+        const installInfo = {
+          appId: legacyAppId || crypto.randomUUID(),
+          installedAt: migratedDateStr,
+        };
+        try {
+          await keytar.setPassword(SERVICE, ACCOUNT, JSON.stringify(installInfo));
+          try {
+            // Remove legacy key to avoid confusion; ignore failures
+            await keytar.deletePassword(SERVICE, 'install-info');
+          } catch (delErr) {
+            console.warn('getInstallInfo: failed to delete legacy install-info key:', delErr.message);
+          }
+          console.info('getInstallInfo: migrated legacy install-info to', ACCOUNT);
+        } catch (writeErr) {
+          console.warn('getInstallInfo: failed to write migrated installInfo to keychain:', writeErr.message);
+        }
+        return installInfo;
+      } else {
+        console.warn('getInstallInfo: legacy install-info found but no usable date; will recreate.');
+      }
+    }
+  } catch (legacyErr) {
+    console.warn('getInstallInfo: error reading legacy install-info key:', legacyErr.message);
   }
 
   let effectiveDate = date ? new Date(date) : new Date();
@@ -103,7 +155,7 @@ async function getInstallInfo(date) {
     appId: crypto.randomUUID(),
     installedAt: effectiveDate.toISOString(),
   };
-  console.log('attempt to set new service pawwword, using ', installInfo)
+  console.log('attempt to set new service password, using ', installInfo)
   
   try {
     await keytar.setPassword(SERVICE, ACCOUNT, JSON.stringify(installInfo));

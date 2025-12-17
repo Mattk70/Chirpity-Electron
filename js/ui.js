@@ -4419,7 +4419,7 @@ function exportSpeciesList() {
   URL.revokeObjectURL(url);
 }
 
-function setNocmig(on) {
+function setNocmig(on = config.detect.nocmig) {
   const i18 = i18n.get(i18n.Titles);
   const btn = DOM.nocmigButton;
   if (on === 'day') {
@@ -6242,7 +6242,7 @@ document.addEventListener("change", async function (e) {
               .localiseUI(DOM.locale.value)
               .then((result) => (STATE.i18n = result));
             config.locale = element.value;
-            setNocmig();
+            setNocmig(config.detect.nocmig);
             contextAwareIconDisplay();
             updateListIcon();
             filterIconDisplay();
@@ -8171,7 +8171,7 @@ function checkForIntelMacUpdates() {
 
 //   const headers = {
 //     Accept: "application/json",
-//     Authorization: "4ZaFgqJCdAWY3LnL88F1VHtB3Amg7EdusYGC",// "API_KEY", // Replace with the actual API key
+//     Authorization:"API_KEY", // Replace with the actual API key
 //     keepalive: true,
 //   };
 
