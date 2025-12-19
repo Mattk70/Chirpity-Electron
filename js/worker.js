@@ -2158,7 +2158,7 @@ const setMetadata = async ({ file, source_file = file }) => {
           if (error.code !== 'ENOENT') console.warn("Error extracting GUANO", error.message);
           return
         });
-        const metaKeys = Object.keys(wavMetadata);
+        const metaKeys = wavMetadata ? Object.keys(wavMetadata): [];
         if (metaKeys.length){
           if (metaKeys.includes("guano")) {
             const guano = wavMetadata.guano;
