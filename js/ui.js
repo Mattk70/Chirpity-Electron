@@ -1301,10 +1301,14 @@ async function fetchLocationAddress(lat, lon, pushLocations) {
             });
         }
         const response = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=14`
+          `https://subscriber.mattkirkland.co.uk/nominatim/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=14`,
+          {  headers: {'X-App-Version': config.VERSION, 'X-User-ID': config.UUID}} 
         );
 
         if (!response.ok) {
+          if (response.status === 429){
+            generateToast({message: "Too many map clicks, please wait", type: 'warning'})
+          }
           return reject(
             new Error(
               `Network error: code ${response.status} fetching location from OpenStreetMap.`
@@ -2123,10 +2127,15 @@ window.onload = async () => {
     document.getElementById("library-location").value =
       config.library.location;
     document.getElementById("library-format").value = config.library.format;
-    document.getElementById("library-trim").checked = config.library.trim;
-    document.getElementById("library-clips").checked = config.library.clips;
+    const libraryTrim = document.getElementById("library-trim");
+    libraryTrim.disabled = false;
+    libraryTrim.checked = config.library.trim;
+    const libraryClips = document.getElementById("library-clips");
+    libraryClips.checked = config.library.clips;
+    libraryClips.disabled = false;
     const autoArchive = document.getElementById("auto-library");
     autoArchive.checked = config.library.auto;
+    autoArchive.disabled = false;
   }
   if (config.database.location) {
     document.getElementById("database-location").value =
@@ -5642,6 +5651,12 @@ async function handleUIClicks(e) {
               .getElementById("compress-and-organise")
               .classList.remove("disabled");
           document.getElementById("library-location").value = archiveFolder;
+          const libraryTrim = document.getElementById("library-trim");
+          libraryTrim.disabled = false;
+          const libraryClips = document.getElementById("library-clips");
+          libraryClips.disabled = false;
+          const autoArchive = document.getElementById("auto-library");
+          autoArchive.disabled = false;
           updatePrefs("config.json", config);
           worker.postMessage({
             action: "update-state",
@@ -6675,7 +6690,7 @@ async function createContextMenu(e) {
         <span class="material-symbols-outlined">search</span> ${i18.analyse}
         </li>
         <div class="dropdown-divider ${hideInSummary}"></div>
-        <li class="dropdown-item" id="create-manual-record">
+        <li class="dropdown-item  ${hideInSelection}" id="create-manual-record">
         <span class="material-symbols-outlined">edit_document</span> ${createOrEdit} ${
     i18.record
   }

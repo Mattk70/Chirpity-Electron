@@ -1004,7 +1004,9 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true}) => {
             supportedFiles.some((ext) => file.toLowerCase().endsWith(ext)) &&
             !p.basename(file).startsWith(".")
         );
-        filePaths.push(...dirFiles);
+        for (const file of dirFiles) {
+          filePaths.push(file);
+        }
       } else if (
         !p.basename(path).startsWith(".") &&
         supportedFiles.some((ext) => path.toLowerCase().endsWith(ext))
@@ -2156,39 +2158,42 @@ const setMetadata = async ({ file, source_file = file }) => {
           if (error.code !== 'ENOENT') console.warn("Error extracting GUANO", error.message);
           return
         });
-        if (wavMetadata && Object.keys(wavMetadata).includes("guano")) {
-          const guano = wavMetadata.guano;
-          recorderModel = guano.Model;
-          const location = guano["Loc Position"];
-          if (location) {
-            const [lat, lon] = location.split(" ");
-            await onSetCustomLocation({
-              lat: roundedFloat(lat),
-              lon: roundedFloat(lon),
-              place: location,
-              files: [file],
-              overwritePlaceName: false,
-            });
-            fileMeta.lat = roundedFloat(lat);
-            fileMeta.lon = roundedFloat(lon);
+        const metaKeys = wavMetadata ? Object.keys(wavMetadata): [];
+        if (metaKeys.length){
+          if (metaKeys.includes("guano")) {
+            const guano = wavMetadata.guano;
+            recorderModel = guano.Model;
+            const location = guano["Loc Position"];
+            if (location) {
+              const [lat, lon] = location.split(" ");
+              await onSetCustomLocation({
+                lat: roundedFloat(lat),
+                lon: roundedFloat(lon),
+                place: location,
+                files: [file],
+                overwritePlaceName: false,
+              });
+              fileMeta.lat = roundedFloat(lat);
+              fileMeta.lon = roundedFloat(lon);
+            }
+            guanoTimestamp = Date.parse(guano.Timestamp);
+            if (guanoTimestamp) fileMeta.fileStart = guanoTimestamp;
+            if (guano.Length){
+              fileMeta.duration = parseFloat(guano.Length);
+            }
           }
-          guanoTimestamp = Date.parse(guano.Timestamp);
-          if (guanoTimestamp) fileMeta.fileStart = guanoTimestamp;
-          if (guano.Length){
-            fileMeta.duration = parseFloat(guano.Length);
+          else if (metaKeys.includes("bext")) {
+            const {Originator, OriginationDate, OriginationTime} = wavMetadata.bext;
+            // Remove trailing null chars
+            recorderModel = Originator.replace(/\0+$/, '');
+            if (OriginationDate && OriginationTime){
+              bextTimestamp = parseBextLocalDate(OriginationDate, OriginationTime)
+            }
           }
+          fileMeta.metadata = JSON.stringify(wavMetadata);
+          DEBUG &&
+            console.log(`GUANO search took: ${(Date.now() - t0) / 1000} seconds`);
         }
-        else if (wavMetadata && wavMetadata.bext) {
-          const {Originator, OriginationDate, OriginationTime} = wavMetadata.bext;
-          // Remove trailing null chars
-          recorderModel = Originator.replace(/\0+$/, '');
-          if (OriginationDate && OriginationTime){
-            bextTimestamp = parseBextLocalDate(OriginationDate, OriginationTime)
-          }
-        }
-        if (Object.keys(wavMetadata).length) fileMeta.metadata = JSON.stringify(wavMetadata);
-        DEBUG &&
-          console.log(`GUANO search took: ${(Date.now() - t0) / 1000} seconds`);
       }
     }
     let fileStart, fileEnd;
@@ -2221,9 +2226,9 @@ const setMetadata = async ({ file, source_file = file }) => {
         fileStart = new Date(stat.mtimeMs - fileMeta.duration * 1000);
       }
     }
-    
     fileMeta.fileStart = fileStart.getTime();
-    if (recorderModel !== STATE.recorderModel) {
+
+    if (recorderModel && recorderModel !== STATE.recorderModel) {
       STATE.recorderModel = recorderModel;
       console.info('Recorder model', recorderModel);
     } 
@@ -2241,8 +2246,7 @@ const setMetadata = async ({ file, source_file = file }) => {
       fileMeta.dateDuration[key2Copy] =
         fileMeta.duration - fileMeta.dateDuration[keyCopy];
     }
-    // If we haven't set METADATA.file.fileStart by now we need to create it from a Date
-    fileMeta.fileStart ??= fileStart.getTime();
+
     if (fileMeta.duration) {
       // Set complete flag
       fileMeta.isComplete = true;
