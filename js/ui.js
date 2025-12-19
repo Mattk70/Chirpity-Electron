@@ -1306,6 +1306,9 @@ async function fetchLocationAddress(lat, lon, pushLocations) {
         );
 
         if (!response.ok) {
+          if (response.status === 429){
+            generateToast({message: "Too many map clicks, please wait", type: 'warning'})
+          }
           return reject(
             new Error(
               `Network error: code ${response.status} fetching location from OpenStreetMap.`
