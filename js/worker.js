@@ -2129,8 +2129,8 @@ const setMetadata = async ({ file, source_file = file }) => {
     return metadataLocks[file];
   }
 
-    ``// Create a promise for the current run and store it
-    const run = (async () => {
+  // Create a promise for the current run and store it
+  const run = (async () => {
     let fileMeta = METADATA[file] || {};
     if (fileMeta.isComplete) return fileMeta;
     // CHeck the database first, so we honour any manual updates.
@@ -2253,7 +2253,7 @@ const setMetadata = async ({ file, source_file = file }) => {
     }
     METADATA[file] = fileMeta;
     return fileMeta;
-    })();
+  })();
 
   metadataLocks[file] = run;
 
