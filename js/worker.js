@@ -1004,7 +1004,9 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true}) => {
             supportedFiles.some((ext) => file.toLowerCase().endsWith(ext)) &&
             !p.basename(file).startsWith(".")
         );
-        filePaths.push(...dirFiles);
+        for (const file of dirFiles) {
+          filePaths.push(file);
+        }
       } else if (
         !p.basename(path).startsWith(".") &&
         supportedFiles.some((ext) => path.toLowerCase().endsWith(ext))
