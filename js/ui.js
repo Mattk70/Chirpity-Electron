@@ -6675,7 +6675,7 @@ async function createContextMenu(e) {
         <span class="material-symbols-outlined">search</span> ${i18.analyse}
         </li>
         <div class="dropdown-divider ${hideInSummary}"></div>
-        <li class="dropdown-item" id="create-manual-record">
+        <li class="dropdown-item  ${hideInSelection}" id="create-manual-record">
         <span class="material-symbols-outlined">edit_document</span> ${createOrEdit} ${
     i18.record
   }
