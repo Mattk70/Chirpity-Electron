@@ -1119,7 +1119,7 @@ function getFileSQLAndParams(range) {
   let SQL = "";
   if (range?.start) {
     // Prioritise range queries
-    SQL += " AND dateTime >= ? AND dateTime < ? ";
+    SQL += " AND position * 1000 + files.filestart >= ? AND position * 1000 + files.filestart < ? ";
     params.push(range.start, range.end);
   } else {
     const fileParams = prepParams(STATE.filesToAnalyse);
@@ -1288,7 +1288,7 @@ const prepSummaryStatement = async () => {
   const partition = detect.merge ? '' : ', r.modelID';
   let summaryStatement = `
     WITH ranked_records AS (
-        SELECT r.dateTime, r.confidence, f.name as file, f.archiveName, cname, sname, classIndex, COALESCE(callCount, 1) as callCount, isDaylight, tagID,
+        SELECT r.position * 1000 + f.filestart as dateTime, r.confidence, f.name as file, f.archiveName, cname, sname, classIndex, COALESCE(callCount, 1) as callCount, isDaylight, tagID,
         RANK() OVER (PARTITION BY fileID${partition}, dateTime ORDER BY r.confidence DESC) AS rank
         FROM records r
         JOIN files f ON f.id = r.fileID
@@ -1321,7 +1321,7 @@ const getTotal = async ({
   let SQL = ` WITH MaxConfidencePerDateTime AS (
         SELECT confidence,
         speciesID, classIndex, f.name as file, tagID,
-        RANK() OVER (PARTITION BY fileID${partition}, dateTime ORDER BY r.confidence DESC) AS rank
+        RANK() OVER (PARTITION BY fileID${partition}, r.position * 1000 + f.filestart ORDER BY r.confidence DESC) AS rank
         FROM records r
         JOIN species s ON r.speciesID = s.id
         JOIN files f ON r.fileID = f.id 
@@ -1357,7 +1357,7 @@ const prepResultsStatement = async (
   let resultStatement = `
     WITH ranked_records AS (
         SELECT 
-        r.dateTime, 
+        r.position * 1000 + f.filestart as dateTime, 
         f.duration, 
         f.filestart, 
         fileID,
@@ -1399,7 +1399,7 @@ const prepResultsStatement = async (
 
   resultStatement += ` )
     SELECT 
-    dateTime as timestamp, 
+    position * 1000 + filestart as timestamp, 
     score,
     duration, 
     filestart, 
@@ -2068,7 +2068,7 @@ async function sendDetections(file, start, end, goToRegion) {
                 position AS start, 
                 end, 
                 cname AS label, 
-                ROW_NUMBER() OVER (PARTITION BY fileID${partition}, dateTime ORDER BY confidence DESC) AS rank,
+                ROW_NUMBER() OVER (PARTITION BY fileID${partition}, r.position * 1000 + f.filestart ORDER BY confidence DESC) AS rank,
                 confidence,
                 name,
                 dateTime,
@@ -2076,7 +2076,7 @@ async function sendDetections(file, start, end, goToRegion) {
                 classIndex
             FROM records r
             JOIN species s ON speciesID = s.ID
-            JOIN files ON fileID = files.ID
+            JOIN files f ON fileID = f.id
             WHERE confidence >= ?
             AND name = ? 
             AND start BETWEEN ? AND ?
@@ -2883,20 +2883,20 @@ const saveResults2DataSet = ({ species, included }) => {
   let promise = Promise.resolve();
   let promises = [];
   let count = 0;
-  let db2ResultSQL = `SELECT dateTime AS timestamp, 
-    files.duration, 
-    files.filestart,
-    files.name AS file, 
+  let db2ResultSQL = `SELECT position * 1000 + f.filestart AS timestamp, 
+    f.duration, 
+    f.filestart,
+    f.name AS file, 
     position,
-    species.sname, 
-    species.cname, 
-    confidence AS score, 
+    s.sname, 
+    s.cname, 
+    r.confidence AS score, 
     tagID, 
     comment
-    FROM records
-    JOIN species
+    FROM records r
+    JOIN species s
     ON species.id = records.speciesID
-    JOIN files ON records.fileID = files.id
+    JOIN files f ON records.fileID = files.id
     WHERE confidence >= ${STATE.detect.confidence}`;
   db2ResultSQL += filtersApplied(included)
     ? ` AND speciesID IN (${prepParams(included)})`
@@ -3470,8 +3470,8 @@ const onInsertManualRecord = async ({
       const ids = result.map(r => r.originalSpeciesID);
       const placeholders = ids.map(() => '?').join(',');
       const res = await db.runAsync(
-        `DELETE FROM records WHERE datetime = ? AND speciesID in (${placeholders}) AND fileID = ?`,
-        dateTime,
+        `DELETE FROM records WHERE position = ? AND speciesID in (${placeholders}) AND fileID = ?`,
+        start,
         ...ids,
         fileID
       );
@@ -3490,23 +3490,17 @@ const onInsertManualRecord = async ({
   if (calledByBatch && cname === originalCname) {
     await db.runAsync(
       `UPDATE records SET tagID = ?, comment = ?, reviewed = 1 
-        WHERE dateTime = ? AND fileID = ? AND speciesID = ?`,
+        WHERE position = ? AND fileID = ? AND speciesID = ?`,
       tagID,
       comment,
-      dateTime,
+      start,
       fileID,
       speciesID
     );
   } else {
-    await db.runAsync(
-      `INSERT INTO records (dateTime, position, fileID, speciesID, modelID, confidence, tagID, comment, end, callCount, isDaylight, reviewed)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(dateTime, fileID, speciesID, modelID) DO UPDATE SET 
-          confidence = excluded.confidence, 
-          tagID = excluded.tagID,
-          comment = excluded.comment,
-          callCount = excluded.callCount,
-          reviewed = excluded.reviewed;`,
+    const result = await db.runAsync(
+      `INSERT OR REPLACE INTO records (datetime, position, fileID, speciesID, modelID, confidence, tagID, comment, end, callCount, isDaylight, reviewed)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       dateTime,
       start,
       fileID,
@@ -3612,7 +3606,7 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
         if (!speciesID) continue; // Skip unknown species
 
         insertPlaceholders.push("(?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        insertValues.push(timestamp, key, fileID, speciesID, modelID, confidence, key + predictionLength, isDaylight, 0);
+        insertValues.push(0, key, fileID, speciesID, modelID, confidence, key + predictionLength, isDaylight, 0);
       }
     }
 
@@ -4247,9 +4241,9 @@ const getResults = async ({
       } else if (species && STATE.mode !== "explore") {
         // get a number for the circle
         const { count } = await STATE.db.getAsync(
-          `SELECT COUNT(*) as count FROM records WHERE dateTime = ?
+          `SELECT COUNT(*) as count FROM records WHERE position = ?
                 AND confidence >= ? and fileID = ?`,
-          r.timestamp,
+          r.position,
           confidence,
           r.fileID
         );
@@ -4621,7 +4615,7 @@ const getDetectedSpecies = async () => {
   //   sql += ` AND speciesID IN (${included.join(",")})`;
   // }
   if (range?.start)
-    sql += ` AND datetime BETWEEN ${range.start} AND ${range.end}`;
+    sql += ` AND position * 1000 + files.filestart BETWEEN ${range.start} AND ${range.end}`;
   sql += filterLocation();
   sql += " GROUP BY cname ORDER BY cname";
   diskDB.all(sql, (err, rows) => {
@@ -4716,94 +4710,7 @@ const onUpdateFileStart = async (args) => {
     result = await db.runAsync("DELETE FROM duration WHERE fileID = ?", id);
     DEBUG && console.log(result.changes, " entries deleted from duration");
     await insertDurations(file, id);
-    try {
-      // Begin transaction
-      await db.runAsync("BEGIN TRANSACTION");
-
-      // Create a temporary table with the same structure as the records table
-      await db.runAsync(`
-                CREATE TABLE temp_records AS
-                SELECT * FROM records;
-            `);
-
-      // Update the temp_records table with the new filestart values
-      await db.runAsync(
-        "UPDATE temp_records SET dateTime = (position * 1000) + ? WHERE fileID = ?",
-        args.start,
-        id
-      );
-
-      // Check if temp_records exists and drop the original records table
-      const tempExists = await db.getAsync(
-        `SELECT name FROM sqlite_master WHERE type='table' AND name='temp_records';`
-      );
-
-      if (tempExists) {
-        // Drop the original records table
-        await db.runAsync("DROP TABLE records;");
-      }
-
-      // Rename the temp_records table to replace the original records table
-      await db.runAsync("ALTER TABLE temp_records RENAME TO records;");
-
-      // Recreate the UNIQUE constraint on the new records table
-      await db.runAsync(`
-                CREATE UNIQUE INDEX idx_unique_record ON records (dateTime, fileID, speciesID);
-            `);
-
-      // Update the daylight flag if necessary
-      let lat, lon;
-      if (locationID) {
-        const location = await STATE.db.getAsync(
-          "SELECT lat, lon FROM locations WHERE id = ?",
-          locationID
-        );
-        lat = location.lat;
-        lon = location.lon;
-      } else {
-        lat = STATE.lat;
-        lon = STATE.lon;
-      }
-
-      // Collect updates to be performed on each record
-      const updatePromises = [];
-
-      db.each(
-        `
-                SELECT rowid, dateTime, fileID, speciesID, confidence, isDaylight FROM records WHERE fileID = ${id}
-            `,
-        async (err, row) => {
-          if (err) {
-            throw err; // This will trigger rollback
-          }
-          const isDaylight = isDuringDaylight(row.dateTime, lat, lon) ? 1 : 0;
-          // Update the isDaylight column for this record
-          updatePromises.push(
-            db.runAsync(
-              "UPDATE records SET isDaylight = ? WHERE isDaylight != ? AND rowid = ?",
-              isDaylight,
-              isDaylight,
-              row.rowid
-            )
-          );
-        },
-        async (err, count) => {
-          if (err) {
-            throw err; // This will trigger rollback
-          }
-          // Wait for all updates to finish
-          await Promise.all(updatePromises);
-          // Commit transaction once all rows are processed
-          await db.runAsync("COMMIT");
-          DEBUG && console.log(`File ${file} updated successfully.`);
-          count && (await Promise.all([getResults(), getSummary(), getTotal()]));
-        }
-      );
-    } catch (error) {
-      // Rollback in case of error
-      console.error(`Transaction failed: ${error.message}`);
-      await db.runAsync("ROLLBACK");
-    }
+    await Promise.all([getResults(), getSummary(), getTotal()])
   }
 };
 
@@ -4889,7 +4796,7 @@ async function onDeleteSpecies({
   } else if (STATE.mode === "explore") {
     const { start, end } = STATE.explore.range;
     if (start) {
-      SQL += ` AND dateTime BETWEEN ? AND ?`;
+      SQL += ` AND position * 1000 + files.filestart BETWEEN ? AND ?`;
       params.push(start, end);
     }
     if (STATE.locationID) {
@@ -4911,10 +4818,10 @@ async function onDeleteSpecies({
 async function onDeleteConfidence({start, end, species, confidence, modelID}) {
   // Implement the logic for deleting by confidence here
   const db = STATE.db;
-  let SQL = "DELETE FROM records WHERE confidence <= ?";
+  let SQL = "DELETE FROM records JOIN files on records.fileID = files.id WHERE confidence <= ?";
   const params = [confidence];
   if (start && end) {
-    SQL += " AND dateTime BETWEEN ? AND ?";
+    SQL += " AND position * 1000 + files.filestart BETWEEN ? AND ?";
     params.push(start, end);
   }
   if (species) {
@@ -5340,7 +5247,7 @@ async function setIncludedIDs(lat, lon, week) {
         },
       });
     });
-    if (messages.length) throw new Error("Unrecognised labels in custom list");
+    if (messages.length) console.warn("Unrecognised labels in custom list");
     return STATE.included;
   })();
 
