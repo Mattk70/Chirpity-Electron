@@ -360,7 +360,6 @@ const createDB = async ({file, diskDB, dbMutex}) => {
 
     await db.runAsync(
       `CREATE TABLE records( 
-        dateTime INTEGER, 
         position INTEGER,
         fileID INTEGER, 
         speciesID INTEGER,
@@ -372,7 +371,7 @@ const createDB = async ({file, diskDB, dbMutex}) => {
         isDaylight INTEGER, 
         reviewed INTEGER, 
         tagID INTEGER,
-        UNIQUE (dateTime, fileID, speciesID, modelID), 
+        UNIQUE (position, fileID, speciesID, modelID), 
         CONSTRAINT fk_models FOREIGN KEY (modelID) REFERENCES models(id) ON DELETE CASCADE,
         CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,
         CONSTRAINT fk_species FOREIGN KEY (speciesID) REFERENCES species(id),

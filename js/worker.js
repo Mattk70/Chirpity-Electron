@@ -3606,14 +3606,14 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
         if (!speciesID) continue; // Skip unknown species
 
         insertPlaceholders.push("(?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        insertValues.push(0, key, fileID, speciesID, modelID, confidence, key + predictionLength, isDaylight, 0);
+        insertValues.push(key, fileID, speciesID, modelID, confidence, key + predictionLength, isDaylight, 0);
       }
     }
 
     if (insertValues.length) {
       await db.runAsync(
         `INSERT OR IGNORE INTO records 
-         (dateTime, position, fileID, speciesID, modelID, confidence, end, isDaylight, reviewed) 
+         (position, fileID, speciesID, modelID, confidence, end, isDaylight, reviewed) 
          VALUES ${insertPlaceholders.join(", ")}`,
         ...insertValues
       );
