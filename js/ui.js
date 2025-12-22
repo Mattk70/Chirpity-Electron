@@ -7257,6 +7257,7 @@ function generateToast({
  * Attempts to load cached comparison data; if unavailable, queries the Xeno-Canto API for relevant recordings, supporting both bird and bat models with appropriate call types and duration filters. Deduplicates and limits results per call type, updates the cache, and renders the comparison UI. Notifies the user if no suitable comparisons are found.
  */
 async function getXCComparisons() {
+  if (! activeRow) return
   let {sname, cname} = unpackNameAttr(activeRow);
   cname.includes("call)") ? "call" : "";
   let XCcache;
