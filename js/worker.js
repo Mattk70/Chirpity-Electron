@@ -733,7 +733,7 @@ ipcRenderer.on("close-database", async () => {
  *
  * @example
  * const files = ['track1.mp3', 'track2.wav'];
- * savedFileCheck(files).then(result => {
+ * savedFileCheckAsync(files).then(result => {
  *   if (result === true) {
  *     console.log('All files exist in the database.');
  *   } else if (result === false) {
@@ -743,20 +743,22 @@ ipcRenderer.on("close-database", async () => {
  *   }
  * });
  */
-async function savedFileCheck(fileList) {
+async function savedFileCheckAsync(fileList) {
   if (diskDB) {
     // Slice the list into a # of params SQLITE can handle
-    const batchSize = 10_000;
+    const batchSize = 5_000;
     let totalFilesChecked = 0;
+    const library = STATE.library.location + p.sep;
     fileList = fileList.map(f => (METADATA[f]?.name || f));
     for (let i = 0; i < fileList.length; i += batchSize) {
       const fileSlice = fileList.slice(i, i + batchSize);
-      let query; const library = STATE.library.location + p.sep;
+      let query; 
       const newList = fileSlice.map(file => file.replace(library, ''));
       // detect if any changes were made
       const libraryFiles = newList.filter((item, i) => item !== fileSlice[i]);
       const params = prepParams(newList);
       let countResult;
+      // Execute the query with the slice as parameters
       if (libraryFiles.length) {
         const archiveParams = prepParams(libraryFiles);
         query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${params}) or archiveName IN (${archiveParams})`;
@@ -764,12 +766,28 @@ async function savedFileCheck(fileList) {
       } else {
         query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${params})`;
         countResult = await diskDB.getAsync(query, ...fileSlice);
+        if (! countResult?.count || countResult.count < fileSlice.length){
+          // Short of updating the files table schema to have file basename and extension
+          // this seems the best way to manage searching for files
+          await diskDB.runAsync('CREATE TEMP TABLE tmp_prefixes (prefix TEXT PRIMARY KEY);')
+          await diskDB.runAsync("BEGIN");
+          const stmt = diskDB.prepare(
+            "INSERT OR IGNORE INTO tmp_prefixes (prefix) VALUES (?)"
+          );
+          for (const file of fileSlice) {
+            const prefix = file.replace(/\..*$/, "");
+            stmt.run(prefix);
+          }
+          stmt.finalize();
+          await diskDB.runAsync("COMMIT");
+          countResult = await diskDB.getAsync(`
+            SELECT COUNT(*) as count FROM files f
+            JOIN tmp_prefixes p
+            ON f.name LIKE p.prefix || '%'`);
+          await diskDB.runAsync('DROP TABLE tmp_prefixes')
+        }
       }
-
-      // Execute the query with the slice as parameters
-      
       const count = countResult?.count || 0;
-
       if (count < fileSlice.length) {
         UI.postMessage({
           event: "all-files-saved-check-result",
@@ -780,19 +798,12 @@ async function savedFileCheck(fileList) {
 
       totalFilesChecked += count;
     }
-
     const allSaved = totalFilesChecked === fileList.length;
     UI.postMessage({ event: "all-files-saved-check-result", result: allSaved });
-    if (allSaved) {
-      await onChangeMode("archive");
-      if (STATE.detect.autoLoad){
-        STATE.filesToAnalyse = fileList;
-        STATE.originalFiles = fileList
-        await Promise.all([getResults(), getSummary(), getTotal()]);
-      }
-    }
+    return allSaved;
   } else {
     generateAlert({ type: "error", message: "dbNotLoaded" });
+    return false
   }
 }
 
@@ -1028,8 +1039,17 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true}) => {
   const fileOrFolder = folderDropped ? "Open Folder(s)" : "Open Files(s)";
   trackEvent(STATE.UUID, "UI", "Drop", fileOrFolder, filePaths.length);
   UI.postMessage({ event: "files", filePaths, preserveResults, checkSaved });
+  const allSaved = await savedFileCheckAsync(filePaths);
+  if (allSaved) {
+    await onChangeMode("archive");
+    if (STATE.detect.autoLoad){
+      STATE.filesToAnalyse = filePaths;
+      STATE.originalFiles = filePaths;
+      await Promise.all([getResults(), getSummary(), getTotal()]);
+    }
+  }
   // Start gathering metadata for new files
-  await processFilesInBatches(filePaths, 10, checkSaved);
+  processFilesInBatches(filePaths, 10);
   return filePaths;
 };
 
@@ -1038,18 +1058,17 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true}) => {
  *
  * Processes filePaths in groups of up to batchSize, invoking setMetadata for each file and accumulating
  * per-file durations into STATE.allFilesDuration and estimated batch counts into STATE.totalBatches.
- * Files that fail metadata extraction are skipped; optionally runs savedFileCheck after processing.
+ * Files that fail metadata extraction are skipped.
  *
  * @param {string[]} filePaths - Array of file paths to process.
  * @param {number} [batchSize=20] - Maximum number of files to process concurrently per batch.
- * @param {boolean} [checkSaved=true] - If true, call savedFileCheck(filePaths) after processing completes.
  */
-async function processFilesInBatches(filePaths, batchSize = 20, checkSaved = true) {
+async function processFilesInBatches(filePaths, batchSize = 20) {
   STATE.totalBatches = 0;
   STATE.allFilesDuration = 0;
+  const t0 = Date.now();
   for (let i = 0; i < filePaths.length; i += batchSize) {
     const batch = filePaths.slice(i, i + batchSize);
-
     // Run the batch in parallel
     const results = await Promise.all(
       batch.map(file =>
@@ -1064,10 +1083,8 @@ async function processFilesInBatches(filePaths, batchSize = 20, checkSaved = tru
       ))
     );
     DEBUG && console.log(`Processed ${i + results.length} of ${filePaths.length}`);
-
   }
-  if (checkSaved) savedFileCheck(filePaths);
-  DEBUG && console.log('All files processed');
+  DEBUG && console.log(`All files processed in ${Date.now() - t0}ms`);
 }
 
 const getFilesInDirectory = async (dir) => {
@@ -1601,6 +1618,8 @@ async function onAnalyse({
     STATE.locationID = undefined;
     //create a copy of files in scope for state, as filesInScope is spliced
     STATE.setFiles([...filesInScope]);
+    // Check duration and expected batches of files
+    processFilesInBatches(filesInScope, 20, false);
   }
 
   let count = 0;
@@ -1624,31 +1643,10 @@ async function onAnalyse({
     // check if results for the files are cached
     // we only consider it cached if all files have been saved to the disk DB)
     // BECAUSE we want to change state.db to disk if they are
-    let allCached = true;
+    const allSaved = await savedFileCheckAsync(FILE_QUEUE);
     METADATA = await updateMetadata(FILE_QUEUE)
-    for (let i = 0; i < FILE_QUEUE.length; i++) {
-      let file = FILE_QUEUE[i];
-      if (STATE.library.location) {
-        const prefix = STATE.library.location + p.sep;
-        const newFile = file.replace(prefix, '');
-        if (file !== newFile) {
-          const match = Object.values(METADATA).find(
-            entry => entry.archiveName === newFile
-          );
-          if (match && !METADATA[file]){
-            METADATA[file] = match;
-          }
-        }
-      }
-
-      const meta = METADATA[file];
-      if (!meta?.isComplete || !meta?.isSaved){
-        allCached = false;
-        break;
-      }
-    }
     const retrieveFromDatabase =
-      (allCached && !reanalyse && !STATE.selection) || circleClicked;
+      (allSaved && !reanalyse && !STATE.selection) || circleClicked;
     if (retrieveFromDatabase) {
       filesBeingProcessed = [];
       if (circleClicked) {
@@ -3280,6 +3278,7 @@ function spawnPredictWorkers(model, batchSize, threads) {
     setLabelState({regenerate: true})
     return
   }
+  predictWorkers = [];
   for (let i = 0; i < threads; i++) {
     if (isPerch && i > 0) break; // Perch v2 only needs one worker, even if multiple threads requested
     const workerSrc = ['nocmig', 'chirpity', 'perch v2'].includes(model) ? model : "BirdNet2.4";
@@ -4492,8 +4491,7 @@ const getSavedFileInfo = async (file) => {
       // Get rid of archive (library) location prefix
       const archiveFile = file.replace(prefix, "");
       row = await diskDB.getAsync(
-        `
-          SELECT duration, filestart AS fileStart, metadata, locationID
+        ` SELECT duration, filestart AS fileStart, metadata, locationID
           FROM files LEFT JOIN locations ON files.locationID = locations.id 
           WHERE name = ? OR archiveName = ?`,
         file,
@@ -4502,7 +4500,7 @@ const getSavedFileInfo = async (file) => {
       if (!row) {
         const baseName = file.replace(/^(.*)\..*$/g, "$1%");
         row = await diskDB.getAsync(
-          "SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name LIKE  (?)",
+          "SELECT * FROM files LEFT JOIN locations ON files.locationID = locations.id WHERE name LIKE (?)",
           baseName
         );
       }
