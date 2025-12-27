@@ -62,7 +62,7 @@ const getMostCalls = (diskDB, location, species) => {
     // Add Location filter
     const locationFilter = filterLocation(location);
     diskDB.get(
-      `SELECT COUNT(*) as count,
+      `SELECT SUM(COALESCE(r.callCount, 1)) AS count,
       DATE(r.dateTime/1000, 'unixepoch', 'localtime') as date
       FROM records r
       JOIN species on species.id = r.speciesID
@@ -173,8 +173,8 @@ const getChartTotals = ({
         CAST(STRFTIME('%W', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS INTEGER) AS week,
         CAST(STRFTIME('%j', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS INTEGER) AS day,
         CAST(STRFTIME('%H', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS INTEGER) AS hour,
-        COUNT(*) as count
-      FROM records
+        SUM(COALESCE(r.callCount, 1)) AS count
+      FROM records r
       JOIN species ON species.id = speciesID
       JOIN files ON files.id = fileID
       ${whereSQL}
@@ -199,7 +199,7 @@ const getRate = (diskDB, location, species) => {
     const locationFilter = filterLocation(location);
 
     diskDB.all(
-      `select STRFTIME('%W', DATE(dateTime / 1000, 'unixepoch', 'localtime')) as week, COUNT(*) as calls
+      `select STRFTIME('%W', DATE(dateTime / 1000, 'unixepoch', 'localtime')) as week, SUM(COALESCE(r.callCount, 1)) AS count
           from records r
           JOIN species s ON s.id = r.speciesID
           JOIN files ON files.id = r.fileID

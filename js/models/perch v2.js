@@ -36,7 +36,6 @@ async function loadModel(mpath, backend, batchSize) {
   };
   const modelPath = path.join(mpath, 'perch_v2.onnx')
   session = await ort.InferenceSession.create(modelPath, sessionOptions);
-
 }
 onmessage = async (e) => {
   const modelRequest = e.data.message;
@@ -50,7 +49,7 @@ onmessage = async (e) => {
         if (e.data.backend) {
             if (backend !== e.data.backend) {
               if (session) {
-                try { session.release(); } catch { /* ignore */ }
+                try { session.release() } catch (e) { console.error(e) }
               }
               backend = e.data.backend;
               await loadModel(modelPath, backend, batchSize);
