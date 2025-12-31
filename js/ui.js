@@ -4434,12 +4434,12 @@ function setNocmig(on = config.detect.nocmig) {
   const btn = DOM.nocmigButton;
   if (on === 'day') {
     btn.textContent = "wb_sunny";
-    btn.title = i18.nocmigOn;
+    btn.title = i18.nocmigDay;
     btn.classList.add("text-warning");
     btn.classList.remove("text-info");
   } else if (on) {
     btn.textContent = "nights_stay";
-    btn.title = i18.nocmigOn;
+    btn.title = i18.nocmigNight;
     btn.classList.add("text-info");
     btn.classList.remove("text-warning");
   } else {
