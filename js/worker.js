@@ -2183,7 +2183,7 @@ const setMetadata = async ({ file, source_file = file }) => {
           else if (metaKeys.includes("bext")) {
             const {Originator, OriginationDate, OriginationTime} = wavMetadata.bext;
             // Remove trailing null chars
-            recorderModel = Originator.replace(/\0+$/, '');
+            recorderModel = Originator?.replace(/\0+$/, '');
             if (OriginationDate && OriginationTime){
               bextTimestamp = parseBextLocalDate(OriginationDate, OriginationTime)
             }
@@ -2206,7 +2206,7 @@ const setMetadata = async ({ file, source_file = file }) => {
       fileEnd = new Date(guanoTimestamp + fileMeta.duration * 1000);
     } else if (bextTimestamp) {
       // Then BEXT 3rd
-      if (recorderModel?.includes("ZOOM")){
+      if (recorderModel?.includes("ZOOM") || STATE.fileStartMtime){
         fileStart = new Date(bextTimestamp);
         fileEnd = new Date(bextTimestamp + fileMeta.duration * 1000);
       } else {
