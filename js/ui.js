@@ -4434,12 +4434,12 @@ function setNocmig(on = config.detect.nocmig) {
   const btn = DOM.nocmigButton;
   if (on === 'day') {
     btn.textContent = "wb_sunny";
-    btn.title = i18.nocmigOn;
+    btn.title = i18.nocmigDay;
     btn.classList.add("text-warning");
     btn.classList.remove("text-info");
   } else if (on) {
     btn.textContent = "nights_stay";
-    btn.title = i18.nocmigOn;
+    btn.title = i18.nocmigNight;
     btn.classList.add("text-info");
     btn.classList.remove("text-warning");
   } else {
@@ -5516,7 +5516,7 @@ async function handleUIClicks(e) {
       newOption.value = modelName;
       newOption.textContent = displayName;
       select.appendChild(newOption);
-      updatePrefs('config.json', config)
+      updatePrefs('config.json', config);
       updateModelOptions();
       handleModelChange(modelName);
       select.value = modelName;
@@ -7257,6 +7257,7 @@ function generateToast({
  * Attempts to load cached comparison data; if unavailable, queries the Xeno-Canto API for relevant recordings, supporting both bird and bat models with appropriate call types and duration filters. Deduplicates and limits results per call type, updates the cache, and renders the comparison UI. Notifies the user if no suitable comparisons are found.
  */
 async function getXCComparisons() {
+  if (! activeRow) return
   let {sname, cname} = unpackNameAttr(activeRow);
   cname.includes("call)") ? "call" : "";
   let XCcache;

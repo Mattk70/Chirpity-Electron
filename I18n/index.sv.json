@@ -111,7 +111,7 @@
         "basic": "Standard",
         "advanced": "Expert",
         "show-species": ["Visa de inkluderade arterna"],
-        "clear-call-cache": ["Rensa referenssamtalscache"],
+        "clear-call-cache": ["Rensa referensropcache"],
         "reset-defaults": ["Återställ till standardinställningar"],
         "model-to-use": "Modell:",
         "combine-detections": "Kombinera modelldetektioner",
