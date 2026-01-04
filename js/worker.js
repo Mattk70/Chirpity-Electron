@@ -2595,7 +2595,7 @@ const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sam
   end = Math.min(end, fileDuration);
 
   // Validate start time
-  if (isNaN(start)) throw new Error("fetchAudioBuffer: start is NaN");
+  if (isNaN(start)) throw new Error(`fetchAudioBuffer: start is NaN: ${start}`);
 
   return new Promise((resolve, reject) => {
     const additionalFilters = setAudioFilters();
