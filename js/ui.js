@@ -6796,11 +6796,14 @@ const getSplitChar = () => config.selectedModel.includes('perch') ? '~' : '_';
  * @returns {Promise<void>} Resolves when the record entry form is ready and displayed.
  */
 async function showRecordEntryForm(mode, batch) {
+  const { activeRegion, windowOffsetSecs} = STATE;
+  if (! activeRegion || ! windowOffsetSecs) return;
+
   const i18 = i18n.get(i18n.Headings);
   const cname = batch
     ? document.querySelector("#speciesFilter .text-warning .cname .cname")
         .textContent
-    : STATE.activeRegion?.label || "";
+    : activeRegion.label || "";
   let callCount = "",
     commentText = "",
     modelID, score;
@@ -6865,6 +6868,8 @@ async function showRecordEntryForm(mode, batch) {
 }
 
 recordEntryForm.addEventListener("submit", function (e) {
+  const { activeRegion, windowOffsetSecs} = STATE;
+  if (! activeRegion || ! windowOffsetSecs) return;
   e.preventDefault();
   const action = document.getElementById("DBmode").value;
   // cast boolstring to boolean
@@ -6875,15 +6880,13 @@ recordEntryForm.addEventListener("submit", function (e) {
   // Check we selected a species
   if (!LABELS.some((item) => item.includes(cname))) return;
   let start, end;
-  if (STATE.activeRegion) {
-    start = STATE.windowOffsetSecs + STATE.activeRegion.start;
-    end = STATE.windowOffsetSecs + STATE.activeRegion.end;
-    const region = spec.REGIONS.regions.find(
-      (region) => region.start === STATE.activeRegion.start
-    );
-    // You can still add a record if you cleared the regions
-    region?.setOptions({ content: cname });
-  }
+  start = windowOffsetSecs + activeRegion.start;
+  end = windowOffsetSecs + activeRegion.end;
+  const region = spec.REGIONS.regions.find(
+    (region) => region.start === STATE.activeRegion.start
+  );
+  // You can still add a record if you cleared the regions
+  region?.setOptions({ content: cname });
   const originalCname = document.getElementById("original-id").value || cname;
   // Update the region label
   const count = document.getElementById("call-count")?.valueAsNumber;
@@ -6926,6 +6929,8 @@ const insertManualRecord = ( {
   modelID,
   undo
 }  = {}) => {
+  // Prevent null start/datetime entries
+  if (!start) return
   worker.postMessage({
     action: "insert-manual-record",
     cname,
