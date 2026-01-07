@@ -6797,7 +6797,10 @@ const getSplitChar = () => config.selectedModel.includes('perch') ? '~' : '_';
  */
 async function showRecordEntryForm(mode, batch) {
   const { activeRegion, windowOffsetSecs} = STATE;
-  if (! activeRegion || ! windowOffsetSecs) return;
+  if (!activeRegion || windowOffsetSecs == null || Number.isNaN(windowOffsetSecs)) {
+    console.warn("showRecordEntryForm called without a valid activeRegion/windowOffsetSecs");
+    return;
+  }
 
   const i18 = i18n.get(i18n.Headings);
   const cname = batch
@@ -6869,8 +6872,11 @@ async function showRecordEntryForm(mode, batch) {
 
 recordEntryForm.addEventListener("submit", function (e) {
   const { activeRegion, windowOffsetSecs} = STATE;
-  if (! activeRegion || ! windowOffsetSecs) return;
   e.preventDefault();
+  if (!activeRegion || windowOffsetSecs == null || Number.isNaN(windowOffsetSecs)) {
+    console.warn("submit showRecordEntryForm called without a valid activeRegion/windowOffsetSecs");
+    return;
+  }
   const action = document.getElementById("DBmode").value;
   // cast boolstring to boolean
   const batch = document.getElementById("batch-mode").value === "true";
@@ -6929,8 +6935,8 @@ const insertManualRecord = ( {
   modelID,
   undo
 }  = {}) => {
-  // Prevent null start/datetime entries
-  if (!start) return
+  // Prevent null/NaN start/datetime entries
+  if (start == null || Number.isNaN(start)) return;
   worker.postMessage({
     action: "insert-manual-record",
     cname,
