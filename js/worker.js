@@ -776,7 +776,7 @@ async function savedFileCheckAsync(fileList) {
               "INSERT OR IGNORE INTO tmp_prefixes (prefix) VALUES (?)"
             );
             for (const file of fileSlice) {
-              const prefix = file.replace(/\..*$/, "");
+              const prefix = file.replace(/\.[^.]*$/, "");
               stmt.run(prefix);
             }
             stmt.finalize();
