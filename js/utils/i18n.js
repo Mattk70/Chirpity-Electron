@@ -1698,40 +1698,6 @@ const Titles = {
         "clear-custom-list": "清除自定义列表",
         "clear-database-location": "清除自定义数据库位置",
         primaryLogoLink: "访问 Chirpity 网站"
-    },
-    it: { // random! But will leave in. Italian
-        filename: "Fai clic destro per aggiornare l'ora di inizio o la posizione del file",
-        controlsWrapper: "Trascina per ridimensionare la finestra dello spettrogramma.",
-        playToggle: "Riproduci / Pausa (Barra spaziatrice)",
-        zoomIn: "Ingrandisci lo spettrogramma (Scorciatoia: tasto +)",
-        zoomOut: "Riduci lo spettrogramma (Scorciatoia: tasto -)",
-        nocmigOn: "Modalità Nocmig attivata",
-        nocmigOff: "Modalità Nocmig disattivata",
-        audioFiltersOn: "Filtri audio applicati",
-        audioFiltersOff: "Nessun filtro audio",
-        contextModeOn: "Modalità contestuale abilitata",
-        contextModeOff: "Modalità contestuale disabilitata",
-        "frequency-range": "Regola l'intervallo di frequenza dello spettrogramma",
-        "threshold-value": "Soglia di confidenza della previsione",
-        "clear-custom-list": "Cancella lista personalizzata",
-        primaryLogoLink: "Visita il sito web di Chirpity"
-    },
-    pl: { // Also random! Polish
-        filename: "Kliknij prawym przyciskiem myszy, aby zaktualizować czas rozpoczęcia lub lokalizację pliku",
-      controlsWrapper: "Przeciągnij, aby zmienić rozmiar okna spektrogramu.",
-      playToggle: "Odtwórz / Pauza (Spacja)",
-      zoomIn: "Powiększ spektrogram (Skrót klawiaturowy: klawisz +)",
-      zoomOut: "Pomniejsz spektrogram (Skrót klawiaturowy: klawisz -)",
-      nocmigOn: "Tryb Nocmig włączony",
-      nocmigOff: "Tryb Nocmig wyłączony",
-      audioFiltersOn: "Zastosowano filtry audio",
-      audioFiltersOff: "Brak filtrów audio",
-      contextModeOn: "Włączono tryb kontekstowy",
-      contextModeOff: "Wyłączono tryb kontekstowy",
-      "frequency-range": "Dostosuj zakres częstotliwości spektrogramu",
-      "threshold-value": "Próg pewności predykcji",
-      "clear-custom-list": "Wyczyść niestandardową listę",
-      primaryLogoLink: "Odwiedź stronę internetową Chirpity"
     }
   };
   
