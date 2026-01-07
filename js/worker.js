@@ -769,22 +769,25 @@ async function savedFileCheckAsync(fileList) {
         if (! countResult?.count || countResult.count < fileSlice.length){
           // Short of updating the files table schema to have file basename and extension
           // this seems the best way to manage searching for files
-          await diskDB.runAsync('CREATE TEMP TABLE tmp_prefixes (prefix TEXT PRIMARY KEY);')
-          await diskDB.runAsync("BEGIN");
-          const stmt = diskDB.prepare(
-            "INSERT OR IGNORE INTO tmp_prefixes (prefix) VALUES (?)"
-          );
-          for (const file of fileSlice) {
-            const prefix = file.replace(/\..*$/, "");
-            stmt.run(prefix);
+          try {
+            await diskDB.runAsync('CREATE TEMP TABLE tmp_prefixes (prefix TEXT PRIMARY KEY);')
+            await diskDB.runAsync("BEGIN");
+            const stmt = diskDB.prepare(
+              "INSERT OR IGNORE INTO tmp_prefixes (prefix) VALUES (?)"
+            );
+            for (const file of fileSlice) {
+              const prefix = file.replace(/\..*$/, "");
+              stmt.run(prefix);
+            }
+            stmt.finalize();
+            await diskDB.runAsync("COMMIT");
+            countResult = await diskDB.getAsync(`
+              SELECT COUNT(*) as count FROM files f
+              JOIN tmp_prefixes p
+              ON f.name LIKE p.prefix || '%'`);
+          } finally {
+            await diskDB.runAsync('DROP TABLE IF EXISTS tmp_prefixes')
           }
-          stmt.finalize();
-          await diskDB.runAsync("COMMIT");
-          countResult = await diskDB.getAsync(`
-            SELECT COUNT(*) as count FROM files f
-            JOIN tmp_prefixes p
-            ON f.name LIKE p.prefix || '%'`);
-          await diskDB.runAsync('DROP TABLE tmp_prefixes')
         }
       }
       const count = countResult?.count || 0;
