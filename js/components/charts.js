@@ -208,7 +208,7 @@ const getRate = (diskDB, location, species) => {
       species,
       (err, rows) => {
         for (let i = 0; i < rows.length; i++) {
-          calls[parseInt(rows[i].week) - 1] = rows[i].calls;
+          calls[parseInt(rows[i].week) - 1] = rows[i].count;
         }
         let locationSQL = '';
         if (locationFilter) {
