@@ -1619,7 +1619,7 @@ async function onAnalyse({
     //create a copy of files in scope for state, as filesInScope is spliced
     STATE.setFiles([...filesInScope]);
     // Check duration and expected batches of files
-    processFilesInBatches(filesInScope, 20, false);
+    processFilesInBatches(filesInScope, 20);
   }
 
   let count = 0;
