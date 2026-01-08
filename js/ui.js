@@ -2130,9 +2130,11 @@ window.onload = async () => {
     const libraryTrim = document.getElementById("library-trim");
     libraryTrim.disabled = false;
     libraryTrim.checked = config.library.trim;
-    const libraryClips = document.getElementById("library-clips");
-    libraryClips.checked = config.library.clips;
-    libraryClips.disabled = false;
+    if (isMember){
+      const libraryClips = document.getElementById("library-clips");
+      libraryClips.checked = config.library.clips;
+      libraryClips.disabled = false;
+    }
     const autoArchive = document.getElementById("auto-library");
     autoArchive.checked = config.library.auto;
     autoArchive.disabled = false;
