@@ -784,6 +784,7 @@ async function savedFileCheckAsync(fileList) {
     return allSaved;
   } else {
     generateAlert({ type: "error", message: "dbNotLoaded" });
+    return false;
   }
 }
 
