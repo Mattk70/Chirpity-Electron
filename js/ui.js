@@ -5519,6 +5519,9 @@ async function handleUIClicks(e) {
       newOption.textContent = displayName;
       select.appendChild(newOption);
       updatePrefs('config.json', config);
+      // Set list to everything
+      config.list = 'everything';
+      updateList();
       updateModelOptions();
       handleModelChange(modelName);
       select.value = modelName;
