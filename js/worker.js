@@ -1030,7 +1030,7 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true}) => {
     }
   }
   // Start gathering metadata for new files
-  await processFilesInBatches(filePaths, 10);
+  processFilesInBatches(filePaths, 10);
   return filePaths;
 };
 
