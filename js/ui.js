@@ -2130,10 +2130,12 @@ window.onload = async () => {
     const libraryTrim = document.getElementById("library-trim");
     libraryTrim.disabled = false;
     libraryTrim.checked = config.library.trim;
+    const libraryClips = document.getElementById("library-clips");
     if (isMember){
-      const libraryClips = document.getElementById("library-clips");
       libraryClips.checked = config.library.clips;
       libraryClips.disabled = false;
+    } else {
+      config.library.clips = false;
     }
     const autoArchive = document.getElementById("auto-library");
     autoArchive.checked = config.library.auto;
@@ -5518,9 +5520,9 @@ async function handleUIClicks(e) {
       newOption.value = modelName;
       newOption.textContent = displayName;
       select.appendChild(newOption);
-      updatePrefs('config.json', config);
       // Set list to everything
       config.list = 'everything';
+      updatePrefs('config.json', config);
       updateList();
       updateModelOptions();
       handleModelChange(modelName);
@@ -5658,8 +5660,10 @@ async function handleUIClicks(e) {
           document.getElementById("library-location").value = archiveFolder;
           const libraryTrim = document.getElementById("library-trim");
           libraryTrim.disabled = false;
-          const libraryClips = document.getElementById("library-clips");
-          libraryClips.disabled = false;
+          if (STATE.isMember){
+            const libraryClips = document.getElementById("library-clips");
+            libraryClips.disabled = false;
+          }
           const autoArchive = document.getElementById("auto-library");
           autoArchive.disabled = false;
           updatePrefs("config.json", config);
