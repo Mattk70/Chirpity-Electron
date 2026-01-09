@@ -746,10 +746,10 @@ ipcRenderer.on("close-database", async () => {
 async function savedFileCheckAsync(fileList) {
   if (diskDB) {
     // Slice the list into a # of params SQLITE can handle
-    const batchSize = 5_000;
+    const batchSize = 10_000;
     let totalFilesChecked = 0;
-    const library = STATE.library.location + p.sep;
     fileList = fileList.map(f => (METADATA[f]?.name || f));
+    const library = STATE.library.location + p.sep;
     for (let i = 0; i < fileList.length; i += batchSize) {
       const fileSlice = fileList.slice(i, i + batchSize);
       let query; 
@@ -758,7 +758,6 @@ async function savedFileCheckAsync(fileList) {
       const libraryFiles = newList.filter((item, i) => item !== fileSlice[i]);
       const params = prepParams(newList);
       let countResult;
-      // Execute the query with the slice as parameters
       if (libraryFiles.length) {
         const archiveParams = prepParams(libraryFiles);
         query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${params}) or archiveName IN (${archiveParams})`;
@@ -766,29 +765,6 @@ async function savedFileCheckAsync(fileList) {
       } else {
         query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${params})`;
         countResult = await diskDB.getAsync(query, ...fileSlice);
-        if (! countResult?.count || countResult.count < fileSlice.length){
-          // Short of updating the files table schema to have file basename and extension
-          // this seems the best way to manage searching for files
-          try {
-            await diskDB.runAsync('CREATE TEMP TABLE tmp_prefixes (prefix TEXT PRIMARY KEY);')
-            await diskDB.runAsync("BEGIN");
-            const stmt = diskDB.prepare(
-              "INSERT OR IGNORE INTO tmp_prefixes (prefix) VALUES (?)"
-            );
-            for (const file of fileSlice) {
-              const prefix = file.replace(/\.[^.]*$/, "");
-              stmt.run(prefix);
-            }
-            stmt.finalize();
-            await diskDB.runAsync("COMMIT");
-            countResult = await diskDB.getAsync(`
-              SELECT COUNT(*) as count FROM files f
-              JOIN tmp_prefixes p
-              ON f.name LIKE p.prefix || '%'`);
-          } finally {
-            await diskDB.runAsync('DROP TABLE IF EXISTS tmp_prefixes')
-          }
-        }
       }
       const count = countResult?.count || 0;
       if (count < fileSlice.length) {
@@ -798,15 +774,17 @@ async function savedFileCheckAsync(fileList) {
         });
         return false;
       }
-
       totalFilesChecked += count;
     }
     const allSaved = totalFilesChecked === fileList.length;
-    UI.postMessage({ event: "all-files-saved-check-result", result: allSaved });
+    UI.postMessage({
+      event: "all-files-saved-check-result",
+      result: allSaved,
+    });
     return allSaved;
   } else {
     generateAlert({ type: "error", message: "dbNotLoaded" });
-    return false
+    return false;
   }
 }
 
@@ -1081,10 +1059,12 @@ async function processFilesInBatches(filePaths, batchSize = 20) {
           STATE.totalBatches += Math.ceil(duration / (BATCH_SIZE * WINDOW_SIZE));
           return fileMetadata;
         }).catch ((_e) => {
+          console.warn(`Failed to get metadata for file: ${file}`);
           return null; // or handle the error as needed
         }
       ))
     );
+
     DEBUG && console.log(`Processed ${i + results.length} of ${filePaths.length}`);
   }
   DEBUG && console.log(`All files processed in ${Date.now() - t0}ms`);
@@ -1622,7 +1602,7 @@ async function onAnalyse({
     //create a copy of files in scope for state, as filesInScope is spliced
     STATE.setFiles([...filesInScope]);
     // Check duration and expected batches of files
-    processFilesInBatches(filesInScope, 20);
+    processFilesInBatches(filesInScope, 10);
   }
 
   let count = 0;

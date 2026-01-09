@@ -7123,6 +7123,7 @@ const prepTour = async () => {
 const tracking = document.getElementById("update-progress");
 const updateProgressBar = document.getElementById("update-progress-bar");
 const displayProgress = (progressObj, text) => {
+  if (isNaN(progressObj.percent)) return;
   tracking.querySelector('span').textContent = text;
   tracking.classList.remove("d-none");
   // Update your UI with the progress information
