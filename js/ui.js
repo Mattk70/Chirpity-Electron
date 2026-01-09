@@ -2131,8 +2131,12 @@ window.onload = async () => {
     libraryTrim.disabled = false;
     libraryTrim.checked = config.library.trim;
     const libraryClips = document.getElementById("library-clips");
-    libraryClips.checked = config.library.clips;
-    libraryClips.disabled = false;
+    if (isMember){
+      libraryClips.checked = config.library.clips;
+      libraryClips.disabled = false;
+    } else {
+      config.library.clips = false;
+    }
     const autoArchive = document.getElementById("auto-library");
     autoArchive.checked = config.library.auto;
     autoArchive.disabled = false;
@@ -4434,12 +4438,12 @@ function setNocmig(on = config.detect.nocmig) {
   const btn = DOM.nocmigButton;
   if (on === 'day') {
     btn.textContent = "wb_sunny";
-    btn.title = i18.nocmigOn;
+    btn.title = i18.nocmigDay;
     btn.classList.add("text-warning");
     btn.classList.remove("text-info");
   } else if (on) {
     btn.textContent = "nights_stay";
-    btn.title = i18.nocmigOn;
+    btn.title = i18.nocmigNight;
     btn.classList.add("text-info");
     btn.classList.remove("text-warning");
   } else {
@@ -5516,7 +5520,10 @@ async function handleUIClicks(e) {
       newOption.value = modelName;
       newOption.textContent = displayName;
       select.appendChild(newOption);
-      updatePrefs('config.json', config)
+      // Set list to everything
+      config.list = 'everything';
+      updatePrefs('config.json', config);
+      updateList();
       updateModelOptions();
       handleModelChange(modelName);
       select.value = modelName;
@@ -5653,8 +5660,10 @@ async function handleUIClicks(e) {
           document.getElementById("library-location").value = archiveFolder;
           const libraryTrim = document.getElementById("library-trim");
           libraryTrim.disabled = false;
-          const libraryClips = document.getElementById("library-clips");
-          libraryClips.disabled = false;
+          if (STATE.isMember){
+            const libraryClips = document.getElementById("library-clips");
+            libraryClips.disabled = false;
+          }
           const autoArchive = document.getElementById("auto-library");
           autoArchive.disabled = false;
           updatePrefs("config.json", config);
@@ -6796,11 +6805,16 @@ const getSplitChar = () => config.selectedModel.includes('perch') ? '~' : '_';
  * @returns {Promise<void>} Resolves when the record entry form is ready and displayed.
  */
 async function showRecordEntryForm(mode, batch) {
+  const { activeRegion, windowOffsetSecs} = STATE;
+  if (!activeRegion || windowOffsetSecs == null || Number.isNaN(windowOffsetSecs)) {
+    console.warn("showRecordEntryForm called without a valid activeRegion/windowOffsetSecs");
+    return;
+  }
+
   const i18 = i18n.get(i18n.Headings);
   const cname = batch
-    ? document.querySelector("#speciesFilter .text-warning .cname .cname")
-        .textContent
-    : STATE.activeRegion?.label || "";
+    ? document.querySelector("#speciesFilter .text-warning .cname .cname")?.textContent ?? ""
+    : activeRegion.label || "";
   let callCount = "",
     commentText = "",
     modelID, score;
@@ -6865,7 +6879,12 @@ async function showRecordEntryForm(mode, batch) {
 }
 
 recordEntryForm.addEventListener("submit", function (e) {
+  const { activeRegion, windowOffsetSecs} = STATE;
   e.preventDefault();
+  if (!activeRegion || windowOffsetSecs == null || Number.isNaN(windowOffsetSecs)) {
+    console.warn("submit showRecordEntryForm called without a valid activeRegion/windowOffsetSecs");
+    return;
+  }
   const action = document.getElementById("DBmode").value;
   // cast boolstring to boolean
   const batch = document.getElementById("batch-mode").value === "true";
@@ -6875,15 +6894,13 @@ recordEntryForm.addEventListener("submit", function (e) {
   // Check we selected a species
   if (!LABELS.some((item) => item.includes(cname))) return;
   let start, end;
-  if (STATE.activeRegion) {
-    start = STATE.windowOffsetSecs + STATE.activeRegion.start;
-    end = STATE.windowOffsetSecs + STATE.activeRegion.end;
-    const region = spec.REGIONS.regions.find(
-      (region) => region.start === STATE.activeRegion.start
-    );
-    // You can still add a record if you cleared the regions
-    region?.setOptions({ content: cname });
-  }
+  start = windowOffsetSecs + activeRegion.start;
+  end = windowOffsetSecs + activeRegion.end;
+  const region = spec.REGIONS.regions.find(
+    (region) => region.start === STATE.activeRegion.start
+  );
+  // You can still add a record if you cleared the regions
+  region?.setOptions({ content: cname });
   const originalCname = document.getElementById("original-id").value || cname;
   // Update the region label
   const count = document.getElementById("call-count")?.valueAsNumber;
@@ -6926,6 +6943,8 @@ const insertManualRecord = ( {
   modelID,
   undo
 }  = {}) => {
+  // Prevent null/NaN start/datetime entries
+  if (start == null || Number.isNaN(start)) return;
   worker.postMessage({
     action: "insert-manual-record",
     cname,
@@ -7257,6 +7276,7 @@ function generateToast({
  * Attempts to load cached comparison data; if unavailable, queries the Xeno-Canto API for relevant recordings, supporting both bird and bat models with appropriate call types and duration filters. Deduplicates and limits results per call type, updates the cache, and renders the comparison UI. Notifies the user if no suitable comparisons are found.
  */
 async function getXCComparisons() {
+  if (! activeRow) return
   let {sname, cname} = unpackNameAttr(activeRow);
   cname.includes("call)") ? "call" : "";
   let XCcache;
