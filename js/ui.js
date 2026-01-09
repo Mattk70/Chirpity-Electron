@@ -6813,8 +6813,7 @@ async function showRecordEntryForm(mode, batch) {
 
   const i18 = i18n.get(i18n.Headings);
   const cname = batch
-    ? document.querySelector("#speciesFilter .text-warning .cname .cname")
-        .textContent
+    ? document.querySelector("#speciesFilter .text-warning .cname .cname")?.textContent ?? ""
     : activeRegion.label || "";
   let callCount = "",
     commentText = "",
