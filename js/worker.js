@@ -5321,7 +5321,10 @@ async function setIncludedIDs(lat, lon, week) {
         },
       });
     });
-    if (messages.length) console.warn("Unrecognised labels in custom list:", messages[0]);
+    if (messages.length) {
+      const {sname, model} = messages[0];
+      console.warn(`Unrecognised labels in ${model} custom list:`, sname);
+    }
     return STATE.included;
   })();
 
