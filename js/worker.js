@@ -1652,13 +1652,7 @@ async function onAnalyse({
     }
   }
   DEBUG &&
-    console.log(
-      "FILE_QUEUE has",
-      FILE_QUEUE.length,
-      "files",
-      count,
-      "files ignored"
-    );
+    console.log("FILE_QUEUE has", FILE_QUEUE.length, "files", count, "files ignored");
   STATE.selection || await onChangeMode("analyse");
 
   filesBeingProcessed = [...FILE_QUEUE];

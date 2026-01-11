@@ -1934,7 +1934,7 @@ window.onload = async () => {
   
   const { library, database, detect, filters, audio, 
     limit, locale, speciesThreshold, list, useWeek, 
-    local, debug, fileStartMtime, specDetections, UUID } = config;
+    local, debug, fileStartMtime, specDetections, selectedModel, specLabels, UUID } = config;
   
   let modelPath = config.models[config.selectedModel].modelPath;
   if (modelPath){
@@ -1948,10 +1948,8 @@ window.onload = async () => {
       modelPath = undefined;
     }
   }
-  const selectedModel = config.selectedModel;
 
   updateListOptions(selectedModel);
-  if (detect.combine) document.getElementById('model-icon').classList.remove('d-none')
   debug && document.getElementById('dataset').classList.remove('d-none')
   isMember && updateModelOptions();
 
@@ -1983,7 +1981,7 @@ window.onload = async () => {
   if (isTestEnv) {
     config.models[selectedModel].backend = "tensorflow";
   }
-  const backend = config.models[config.selectedModel].backend;
+  const backend = config.models[selectedModel].backend;
 
   worker.postMessage({
     action: "_init_",
@@ -2007,11 +2005,11 @@ window.onload = async () => {
 
   // Map slider value to batch size
   DOM.batchSizeSlider.value = 
-    config[config.models[config.selectedModel].backend].batchSize;
+    config[config.models[selectedModel].backend].batchSize;
   DOM.batchSizeValue.textContent =
-    config[config.models[config.selectedModel].backend].batchSize;
-  DOM.modelToUse.value = config.selectedModel;
-  const backendEL = document.getElementById(config.models[config.selectedModel].backend);
+    config[config.models[selectedModel].backend].batchSize;
+  DOM.modelToUse.value = selectedModel;
+  const backendEL = document.getElementById(config.models[selectedModel].backend);
   backendEL.checked = true;
   // Show time of day in results?
   setTimelinePreferences();
@@ -2038,14 +2036,14 @@ window.onload = async () => {
   DOM.colourmap.value = config.colormap;
 
   // Spectrogram labels
-  DOM.specLabels.checked = config.specLabels;
+  DOM.specLabels.checked = specLabels;
   // Show all detections
-  DOM.specDetections.checked = config.specDetections;
+  DOM.specDetections.checked = specDetections;
   // Spectrogram frequencies
-  DOM.fromInput.value = config.audio.frequencyMin;
-  DOM.fromSlider.value = config.audio.frequencyMin;
-  DOM.toInput.value = config.audio.frequencyMax;
-  DOM.toSlider.value = config.audio.frequencyMax;
+  DOM.fromInput.value = audio.frequencyMin;
+  DOM.fromSlider.value = audio.frequencyMin;
+  DOM.toInput.value = audio.frequencyMax;
+  DOM.toSlider.value = audio.frequencyMax;
   fillSlider(DOM.fromInput, DOM.toInput, "#C6C6C6", "#0d6efd", DOM.toSlider);
   checkFilteredFrequency();
   // Window function & colormap
@@ -2067,36 +2065,44 @@ window.onload = async () => {
   document.getElementById("alpha-value").textContent = alpha;
   
   // Audio preferences:
-  DOM.gain.value = config.audio.gain;
-  DOM.gainAdjustment.textContent = config.audio.gain + "dB";
+  DOM.gain.value = audio.gain;
+  DOM.gainAdjustment.textContent = audio.gain + "dB";
   DOM.normalise.checked = config.filters.normalise;
-  DOM.audioFormat.value = config.audio.format;
-  DOM.audioBitrate.value = config.audio.bitrate;
-  DOM.audioQuality.value = config.audio.quality;
+  DOM.audioFormat.value = audio.format;
+  DOM.audioBitrate.value = audio.bitrate;
+  DOM.audioQuality.value = audio.quality;
   showRelevantAudioQuality();
-  DOM.audioFade.checked = config.audio.fade;
-  DOM.audioPadding.checked = config.audio.padding;
+  DOM.audioFade.checked = audio.fade;
+  DOM.audioPadding.checked = audio.padding;
   DOM.audioFade.disabled = !DOM.audioPadding.checked;
-  DOM.audioDownmix.checked = config.audio.downmix;
-  setNocmig(config.detect.nocmig);
-  document.getElementById("merge-detections").checked = config.detect.merge;
-  document.getElementById("combine-detections").checked = config.detect.combine;
-  document.getElementById("auto-load").checked = config.detect.autoLoad;
-  document.getElementById("iucn").checked = config.detect.iucn;
-  document.getElementById("iucn-scope").selected = config.detect.iucnScope;
-  handleModelChange(config.selectedModel, false)
+  DOM.audioDownmix.checked = audio.downmix;
+  setNocmig(detect.nocmig);
+  // Detection options
+  const mergeSwitch = document.getElementById("merge-detections");
+  mergeSwitch.checked = detect.merge;
+  if (mergeSwitch.checked) {
+    config.detect.combine = true;
+    document.getElementById("combine-detections").checked = true;
+  } else {
+    document.getElementById("combine-detections").checked = config.detect.combine;  
+  }
+  if (config.detect.combine) document.getElementById('model-icon').classList.remove('d-none')
+  document.getElementById("auto-load").checked = detect.autoLoad;
+  document.getElementById("iucn").checked = detect.iucn;
+  document.getElementById("iucn-scope").selected = detect.iucnScope;
+  handleModelChange(selectedModel, false)
   // List appearance in settings
   DOM.speciesThreshold.value = config.speciesThreshold;
   document.getElementById("species-week").checked = config.useWeek;
-  DOM.customListFile.value = config.models[config.selectedModel].customListFile;
+  DOM.customListFile.value = config.models[selectedModel].customListFile;
   if (!DOM.customListFile.value) delete LIST_MAP.custom;
   // And update the icon
   updateListIcon();
   setListUIState(list)
   contextAwareIconDisplay();
   DOM.debugMode.checked = config.debug;
-  showThreshold(config.detect.confidence);
-  showTopRankin(config.detect.topRankin)
+  showThreshold(detect.confidence);
+  showTopRankin(detect.topRankin)
 
   // Filters
   document.getElementById("HP-threshold").textContent = formatHz(config.filters.highPassFrequency);
@@ -6114,6 +6120,16 @@ document.addEventListener("change", async function (e) {
         }
         case "merge-detections": {
           config.detect.merge = element.checked;
+          // If merge is enabled, ensure combine is also on
+          const combineSwitch = document.getElementById('combine-detections');
+          if (element.checked) {
+            config.detect.combine = true;
+            document.getElementById('model-icon').classList.toggle('d-none', !element.checked)
+            combineSwitch.checked = true;
+            combineSwitch.disabled = true;
+          } else {
+            combineSwitch.disabled = false;
+          }
           worker.postMessage({
             action: "update-state",
             detect: config.detect,
@@ -6123,7 +6139,11 @@ document.addEventListener("change", async function (e) {
         }
         case "combine-detections": {
           config.detect.combine = element.checked;
-          document.getElementById('model-icon').classList.toggle('d-none', !element.checked)
+          document.getElementById('model-icon').classList.toggle('d-none', !element.checked);
+          if (!element.checked){
+            document.getElementById('merge-detections').checked = false;
+            config.detect.merge = false;
+          }
           worker.postMessage({
             action: "update-state",
             detect: config.detect,
