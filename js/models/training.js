@@ -178,7 +178,7 @@ async function trainModel({
   installConsoleTracking(() => Model.UUID, "Training");
   const {files:allFiles, classWeights} = getFilesWithLabelsAndWeights(dataset);
   if (!allFiles.length){
-    throw new Error(`No files found in any label folders in ${dataset}` )
+    throw new Error(`The selected training folder: ${dataset} does not have folders representing class / species labels containing audio files.` )
   }
   const baseModel = Model.model;
 
@@ -269,20 +269,23 @@ async function trainModel({
   if (useNoise) noise_ds = tf.data.generator(() => readBinaryGzipDataset(noiseBin, labels)).repeat();
 
   if (!cacheRecords || !fs.existsSync(trainBin)) {
-        // Check same number of classes in train and val data
-    // Step 1: Create sets of labels
-    const labels1 = new Set(trainFiles.map(item => item.label));
-    const labels2 = new Set(valFiles.map(item => item.label));
+    if (valFiles){
+      // Check same number of classes in train and val data
+      // Step 1: Create sets of labels
+      const labels1 = new Set(trainFiles.map(item => item.label));
+      const labels2 = new Set(valFiles.map(item => item.label));
 
-    // Step 2: Find missing labels from
-    let error;
-    const missing1 = [...labels1].filter(label => !labels2.has(label));
-    if (missing1.length) error = 'Validation set is missing examples of: <b>' + missing1.toString() +'</b>';
-    const missing2 = [...labels2].filter(label => !labels1.has(label));
-    if (missing2.length) error = 'Training set is missing examples of: <b>' + missing2.toString() +'</b>';
-    if (error){
-      postMessage({ message: "training-results", notice: error, type: 'error', autohide:false });
-      return
+      // Step 2: Find missing labels from
+      let error;
+      const missing1 = [...labels1].filter(label => !labels2.has(label));
+      if (missing1.length) error = 'Validation set is missing examples of: <b>' + missing1.toString() +'</b>. ';
+      const missing2 = [...labels2].filter(label => !labels1.has(label));
+      if (missing2.length) error = 'Training set is missing examples of: <b>' + missing2.toString() +'</b>. ';
+      if (error){
+        error += 'To have both training and validation data, at least two examples are needed per class.'
+        postMessage({ message: "training-results", notice: error, type: 'error', autohide:false });
+        return
+      }
     }
     await writeBinaryGzipDataset(embeddingModel, trainFiles, trainBin, labelToIndex, postMessage, "Preparing training data");
   }
