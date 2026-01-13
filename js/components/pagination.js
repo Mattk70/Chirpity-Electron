@@ -19,7 +19,9 @@ export class Pagination {
 
     let clicked = e.target.textContent;
     const activeElement = this.container.querySelector(".active");
+    activeElement?.classList.remove("active");
     let currentPage = activeElement ? parseInt(activeElement.textContent) : 1;
+    
 
     if (clicked === "Previous") {
       clicked = currentPage - 1;
@@ -28,7 +30,16 @@ export class Pagination {
     } else {
       clicked = parseInt(clicked);
     }
+    // Update active page
+    const pages = Array.from(this.container.querySelectorAll(".page-item"));
+    const newActive = pages.find(
+      (item) => parseInt(item.textContent) === clicked
+    );
+    const index = pages.indexOf(newActive);
 
+    pages[0].classList.toggle("disabled", index === 1);
+    pages.at(-1).classList.toggle("disabled", index === pages.length - 2);
+    newActive?.classList.add("active");
     const limit = config.limit;
     const offset = (clicked - 1) * limit;
     const species = this.handlers.isSpeciesViewFiltered(true);

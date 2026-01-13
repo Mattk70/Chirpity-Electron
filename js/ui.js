@@ -1133,7 +1133,6 @@ async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults 
   if (!filePaths.length) return;
   loadingFiles({hide:false})
   // Store the sanitised file list and Load First audio file
-  // utils.hideAll();
   resetResults();
   resetDiagnostics();
   utils.disableMenuItem([
@@ -1161,7 +1160,6 @@ async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults 
     if (modelReady) utils.enableMenuItem(["analyseAll", "reanalyseAll"]);
     STATE.openFiles = await sortFilesByTime(STATE.openFiles);
   }
-  utils.hideAll();
   utils.showElement(["spectrogramWrapper"], false);
   loadAudioFileSync({ filePath: STATE.openFiles[0], preserveResults });
   // Clear unsaved records warning
@@ -1578,6 +1576,7 @@ async function showExplore() {
  * @async
  */
 async function showAnalyse() {
+  utils.hideAll();
   utils.disableMenuItem(["active-analysis"]);
   //Restore STATE
   STATE = { ...STATE, ...STATE.currentAnalysis };
@@ -1588,7 +1587,6 @@ async function showAnalyse() {
     spec.spectrogram.destroy();
     spec.spectrogram = null;
   }
-  utils.hideAll();
   if (STATE.currentFile) {
     utils.showElement(["spectrogramWrapper"], false);
     spec.reInitSpec(config.specMaxHeight);
@@ -2407,7 +2405,7 @@ const setUpWorkerMessaging = () => {
           break;
         }
         case "total-records": {
-          updatePagination(args.total, args.offset);
+          // updatePagination(args.total, args.offset);
           break;
         }
         case "unsaved-records": {
@@ -3527,14 +3525,18 @@ async function onWorkerLoadedAudio({
  * If the total exceeds the configured limit, pagination controls are rendered using the given offset.
  * Otherwise, all pagination elements are hidden.
  *
- * @param {number} total - The total number of items.
- * @param {number} [offset=STATE.offset] - The starting offset for pagination.
  */
-function updatePagination(total, offset = STATE.offset) {
-  total > config.limit ? pagination.add(total, offset) : pagination.hide();
+function updatePagination(species) {
+  const limit = config.limit;
+  const total = species 
+    ? STATE.summary.find(item => item.cname === species)?.count || 0
+    : STATE.summary.reduce((acc, item) => acc + item.count, 0);
+  const offset = (pagination.getCurrentPage() - 1) * limit;
+  total > limit ? pagination.add(total, offset) : pagination.hide();
 }
 
 const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
+  STATE.summary = summary;
   const i18 = i18n.get(i18n.Headings);
   const showIUCN = config.detect.iucn;
 
@@ -3618,6 +3620,10 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
 
   showSummarySortIcon();
   setAutocomplete(selectedRow ? filterSpecies : "");
+
+  
+  updatePagination(filterSpecies);
+
   // scroll to the selected species
   if (selectedRow) {
     const table = document.getElementById("resultSummary");
@@ -3846,6 +3852,7 @@ function speciesFilter(e) {
     species = getSpecies(e.target);
   }
   setAutocomplete(species);
+  updatePagination(species);
   filterResults({ updateSummary: false });
   resetResults({
     clearSummary: false,
@@ -5225,7 +5232,7 @@ async function handleUIClicks(e) {
     }
     case "import-csv": {
       STATE.fileLoaded = false;
-      showAnalyse();
+      if (STATE.mode !== "analyse") showAnalyse();
       importData('csv');
       break;
     }
@@ -6600,6 +6607,7 @@ async function readLabels(labelFile, updating) {
         list: config.list,
         customLabels: labels,
         refreshResults: STATE.analysisDone,
+        member: STATE.isMember,
       });
       trackEvent(config.UUID, "UI", "Create", "Custom list", labels.length);
     } else {
