@@ -94,6 +94,10 @@
     "FAQ": ["FAQs"],
     "species": ["What species are detected?"],
     "eBird": ["What is an eBird Record?"],
+    "guides": ["Guides (on Github)"],
+    "false-positives": ["Handling False Positives"],
+    "using-custom-lists": ["Using Custom Lists"],
+    "training-custom-models": ["Training Custom Models"],
     "update-progress-text": ["Downloading update:"],
 
 
