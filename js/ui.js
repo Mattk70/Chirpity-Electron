@@ -4427,7 +4427,7 @@ function exportSpeciesList() {
   const included = STATE.includedList;
   // Create a blob containing the content of included array
   const content = included
-    .map((item) => `${item.sname}${getSplitChar()}${item.cname}`)
+    .map((item) => `${item.sname},${item.cname}`)
     .join("\n");
   const blob = new Blob([content], { type: "text/plain" });
   const url = URL.createObjectURL(blob);
