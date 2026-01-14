@@ -192,7 +192,6 @@ const GLOBAL_ACTIONS = {
       activeRow.classList.remove("table-active");
       activeRow = activeRow.previousSibling || activeRow;
       if (!activeRow.classList.contains("text-bg-dark")) activeRow.click();
-      // activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   },
   PageDown: () => {
@@ -232,7 +231,6 @@ const GLOBAL_ACTIONS = {
       activeRow.classList.remove("table-active");
       activeRow = activeRow.nextSibling || activeRow;
       if (!activeRow.classList.contains("text-bg-dark")) activeRow.click();
-      // activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   },
   ArrowLeft: () => {
@@ -1370,6 +1368,8 @@ async function importData(format){
     defaultPath,
   });
   if (files.canceled) return;
+  // remove the d-none class so wavesurfer can render
+  utils.showElement(["spectrogramWrapper"], false);
   const file = files.filePaths[0]
   const lastSaveFolder = p.dirname(file);
   localStorage.setItem("lastSaveFolder", lastSaveFolder);
@@ -3687,7 +3687,6 @@ function onResultsComplete({ active = undefined, select = undefined } = {}) {
 
   if (activeRow) {
     utils.waitFor(() => STATE.fileLoaded).then(() => activeRow.click());
-    activeRow.scrollIntoView({ behavior: "instant", block: "center" });
   }
   renderFilenamePanel();
   activateResultSort();
