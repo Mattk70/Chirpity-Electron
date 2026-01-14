@@ -640,7 +640,7 @@ async function handleMessage(e) {
         STATE.customLabels = args.customLabels;
         STATE.customLabelsMap = Object.fromEntries(
           args.customLabels.map(line => {
-            let [sname, _cname, start, end, confidence] = line.split(",").map(v => v.trim());           
+            let [_sname, cname, start, end, confidence] = line.split(",").map(v => v.trim());           
             if (!args.member) {
               start = undefined;
               end = undefined;
@@ -662,12 +662,15 @@ async function handleMessage(e) {
                 confidence = undefined;
               }
             }
+            if (cname && !['nocmig', 'chirpity'].includes(STATE.model)){
+              cname = cname.replace(/\s*\(.*?\)\s*$/g, ''); // remove any bracketed text for non-migrant models
+            }
             return [
-              sname,
+              cname,
               {
                 start,
                 end,
-                confidence: confidence !== undefined ? Number(confidence)*1000 : null
+                confidence: confidence ? Number(confidence)*1000 : null
               }
             ];
           })
@@ -4549,8 +4552,8 @@ function allowedByList(result){
   // Handle enhanced lists
   if (STATE.list !== 'custom') return true;
 
-  const {timestamp, sname, score} = result;
-  const conditions = STATE.customLabelsMap[sname];
+  const {timestamp, cname, score} = result;
+  const conditions = STATE.customLabelsMap[cname];
   if (!conditions) return false; // Species not in the custom list
 
   const {start, end, confidence} = conditions;
