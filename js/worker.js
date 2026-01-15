@@ -476,7 +476,7 @@ async function handleMessage(e) {
         const {files, meta} = result;
         METADATA = meta;
         STATE.filesToAnalyse = await getFiles({files, preserveResults:true, checkSaved: false});
-        await Promise.all([getResults(), getSummary(), getTotal()])
+        await Promise.all([getSummary(), getResults()]);
       }
       UI.postMessage({ event: "clear-loading"})
       break;
@@ -500,10 +500,9 @@ async function handleMessage(e) {
     }
     case "filter": {
       if (STATE.db) {
-        await getResults(args);
         args.updateSummary && (await getSummary(args));
+        await getResults(args);
         args.included = await getIncludedIDs(args.file);
-        await getTotal(args);
       }
       break;
     }
@@ -562,8 +561,8 @@ async function handleMessage(e) {
     case "insert-manual-record": {
       await onInsertManualRecord(args);
       await Promise.all([
-        getResults({ position: args.position, species: args.speciesFiltered }),
         getSummary({ species: args.speciesFiltered }),
+        getResults({ position: args.position, species: args.speciesFiltered }),
       ]);
       STATE.db === memoryDB && UI.postMessage({ event: "unsaved-records" });
       break;
@@ -637,17 +636,56 @@ async function handleMessage(e) {
     }
     case "update-list": {
       STATE.list = args.list;
-      STATE.customLabels =
-        args.list === "custom" ? args.customLabels : STATE.customLabels;
-      const { lat, lon, week } = STATE;
+      if (args.list === "custom") {
+        STATE.customLabels = args.customLabels;
+        STATE.customLabelsMap = Object.fromEntries(
+          args.customLabels.map(line => {
+            let [_sname, cname, start, end, confidence] = line.split(",").map(v => v.trim());           
+            if (!args.member) {
+              start = undefined;
+              end = undefined;
+              confidence = undefined;
+            } else {
+              // Sanity check the values (start and end, if defined, should be xx-xx )
+              [start, end].forEach((val) => {
+                if (val && !/^\d{1,2}-\d{1,2}$/.test(val)) {
+                  const message = `Custom list start/end value malformed, it should be 'DD-MM': ${line}`;
+                  generateAlert({message, type:'warning' });
+                  console.warn(message);
+                  val = undefined;
+                }
+              });
+              if (confidence && (isNaN(confidence) || confidence < 0 || confidence > 1)) {
+                const message = `Custom list confidence value must be a number between 0 and 1: ${line}`;
+                generateAlert({message, type:'warning' });
+                console.warn(message);
+                confidence = undefined;
+              }
+            }
+            if (cname && !['nocmig', 'chirpity'].includes(STATE.model)){
+              cname = cname.replace(/\s*\(.*?\)\s*$/g, ''); // remove any bracketed text for non-migrant models
+            }
+            return [
+              cname,
+              {
+                start,
+                end,
+                confidence: confidence ? Number(confidence)*1000 : null
+              }
+            ];
+          })
+        );
+      }
       // Clear the LIST_CACHE & STATE.included keys to force list regeneration
       LIST_CACHE = {};
       STATE.included = {}
+      STATE.globalOffset = 0;
+      STATE.filteredOffset = {};
       await INITIALISED;
       await setLabelState({regenerate:true});
       LIST_WORKER && (await getIncludedIDs());
       
-      args.refreshResults && (await Promise.all([getResults(), getSummary(), getTotal()]));
+      args.refreshResults && (await Promise.all([getSummary(), getResults()]));
       break;
     }
     case "update-locale": {
@@ -688,9 +726,8 @@ async function handleMessage(e) {
       if (args.labelFilters) {
         const species = args.species;
         await Promise.all([
-          getResults({ species, offset: 0 }),
           getSummary({ species }),
-          getTotal({ species, offset: 0 }),
+          getResults({ species, offset: 0 }),
         ]);
       }
       DEBUG = STATE.debug;
@@ -1020,13 +1057,13 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true}) => {
   const fileOrFolder = folderDropped ? "Open Folder(s)" : "Open Files(s)";
   trackEvent(STATE.UUID, "UI", "Drop", fileOrFolder, filePaths.length);
   UI.postMessage({ event: "files", filePaths, preserveResults, checkSaved });
-  const allSaved = await savedFileCheckAsync(filePaths);
+  const allSaved = checkSaved ? await savedFileCheckAsync(filePaths) : false;
   if (allSaved) {
     await onChangeMode("archive");
     if (STATE.detect.autoLoad){
       STATE.filesToAnalyse = filePaths;
       STATE.originalFiles = filePaths;
-      await Promise.all([getResults(), getSummary(), getTotal()]);
+      await Promise.all([getSummary(), getResults()]);
     }
   }
   // Start gathering metadata for new files
@@ -1188,11 +1225,10 @@ async function getMatchingIds(cnames) {
     nameSet.add(full);
     if (suffix && suffix !== "-") nameSet.add(base);
   }
-
+  if (nameSet.size === 0) return [];
   const names = [...nameSet];
-  if (names.length === 0) return [];
 
-  // Chunk if too many parameters (SQLite has a 999 parameter limit)
+  // Chunk if too many parameters
   const chunkSize = 999;
   const results = [];
 
@@ -1251,8 +1287,9 @@ async function getSpeciesSQLAsync(){
  * @returns {[string, any[]]} A two-element array: the augmented SQL string and an ordered array of parameters for prepared statements.
  */
 async function addQueryQualifiers(stmt, range, caller) {
-  const {mode, explore, labelFilters, detect, locationID, selection} = STATE;
-  let params = [detect.confidence];
+  const {list, mode, explore, labelFilters, detect, locationID, selection} = STATE;
+  
+  const params = list === "custom" ? [0] : [detect.confidence];
   range ??= mode === "explore" ? explore.range : undefined;
   if (mode === 'archive' || range?.start){
     const [SQLtext, fileParams] = getFileSQLAndParams(range);
@@ -1269,10 +1306,8 @@ async function addQueryQualifiers(stmt, range, caller) {
     stmt += await getSpeciesSQLAsync()
   }
   if (detect.nocmig) {
-    const condition = detect.nocmig === 'day';
-    stmt += ` AND isDaylight = ${condition ? 1 : 0} `;
+    stmt += ` AND isDaylight = ${detect.nocmig === 'day' ? 1 : 0} `;
   }
-  // if (detect.nocmig) stmt += " AND COALESCE(isDaylight, 0) != 1 ";
   if (locationID !== undefined) {
     stmt += locationID === 0 ? " AND locationID IS NULL " : " AND locationID = ? ";
     locationID !== 0 && params.push(locationID);
@@ -1281,10 +1316,9 @@ async function addQueryQualifiers(stmt, range, caller) {
 }
 
 const prepSummaryStatement = async () => {
-  const { detect, summarySortOrder} = STATE;
+  const { detect } = STATE;
   const topRankin = detect.topRankin;
-  // const range = mode === "explore" ? explore.range : undefined;
-  // let params = [detect.confidence];
+
   const partition = detect.merge ? '' : ', r.modelID';
   let summaryStatement = `
     WITH ranked_records AS (
@@ -1299,51 +1333,13 @@ const prepSummaryStatement = async () => {
   summaryStatement = stmt;
   summaryStatement += `
     )
-    SELECT cname, sname, COUNT(cname) as count, SUM(callcount) as calls, MAX(ranked_records.confidence) as max
+    SELECT cname, sname, confidence AS score, dateTime AS timestamp, callcount
     FROM ranked_records
-    WHERE ranked_records.rank <= ${topRankin}
-    GROUP BY cname ORDER BY ${summarySortOrder}`;
+    WHERE ranked_records.rank <= ${topRankin}`;
 
   return {sql: summaryStatement, params};
 };
 
-const getTotal = async ({
-  species = undefined,
-  offset = undefined,
-} = {}) => {
-  
-  const {db, mode, explore, filteredOffset, globalOffset, detect} = STATE;
-  const topRankin = detect.topRankin;
-  const range = mode === "explore" ? explore.range : undefined;
-  const partition = detect.merge ? '' : ', r.modelID';
-  offset ??= (species !== undefined ? filteredOffset[species] : globalOffset);
-
-  let SQL = ` WITH MaxConfidencePerDateTime AS (
-        SELECT confidence,
-        speciesID, classIndex, f.name as file, tagID,
-        RANK() OVER (PARTITION BY fileID${partition}, dateTime ORDER BY r.confidence DESC) AS rank
-        FROM records r
-        JOIN species s ON r.speciesID = s.id
-        JOIN files f ON r.fileID = f.id 
-        WHERE confidence >= ? `;
-
-  let [stmt, params] = await addQueryQualifiers(SQL, range, 'results');
-  SQL = stmt;
-  SQL += " ) ";
-  SQL += `SELECT COUNT(confidence) AS total FROM MaxConfidencePerDateTime WHERE rank <= ${topRankin}`;
-
-  if (species) {
-    params.push(species);
-    SQL += " AND speciesID IN (SELECT id from species WHERE cname = ?) ";
-  }
-  const { total } = await db.getAsync(SQL, ...params);
-  UI.postMessage({
-    event: "total-records",
-    total: total,
-    offset: offset,
-    species: species,
-  });
-};
 
 const prepResultsStatement = async (
   species,
@@ -1352,7 +1348,7 @@ const prepResultsStatement = async (
   topRankin,
   format
 ) => {
-  const {mode, explore, limit, resultsMetaSortOrder, resultsSortOrder, detect, selection} = STATE;
+  const {mode, list, limit, explore, resultsMetaSortOrder, resultsSortOrder, detect, selection} = STATE;
   const partition = detect.merge ? '' : ', r.modelID'; 
   let resultStatement = `
     WITH ranked_records AS (
@@ -1429,14 +1425,17 @@ const prepResultsStatement = async (
     resultStatement += ` AND  cname = ? `;
     params.push(species);
   }
-  const limitClause = noLimit ? "" : "LIMIT ?  OFFSET ?";
+  // Because custom list doesn't limit the results, it can get v slow when the archive is large.
+  // But, we can use the limit clause if the user is not using a custom list
+  noLimit = list === 'custom' || noLimit;
+  const limitClause = noLimit  ? " " : " LIMIT ?  OFFSET ? ";
   noLimit || params.push(limit, offset);
   const metaSort = resultsMetaSortOrder
     ? `${resultsMetaSortOrder}, `
     : "";
   resultStatement += format ==='audio'
-    ? ` ORDER BY RANDOM()  ${limitClause}`
-    : ` ORDER BY ${metaSort} ${resultsSortOrder} ${limitClause} `;
+    ? ` ORDER BY RANDOM() ${limitClause}`
+    : ` ORDER BY ${metaSort}  ${resultsSortOrder} ${limitClause}`;
   
   return {sql: resultStatement, params};
 };
@@ -1644,9 +1643,7 @@ async function onAnalyse({
           })
         );
         // Weirdness with promise all - list worker called 2x and no results returned
-        //await Promise.all([getResults(), getSummary()] );
-        await getResults();
-        await getSummary();
+        await Promise.all([getSummary(), getResults()] );
       }
       return;
     }
@@ -2032,21 +2029,23 @@ function addDays(date, days) {
  * @param {boolean} goToRegion - If true, instructs the UI to navigate to the detected region.
  */
 async function sendDetections(file, start, end, goToRegion) {
-  const {db, detect} = STATE;
+  const {list, db, detect} = STATE;
   const partition = detect.merge ? "" : ', r.modelID';
-  const params = [STATE.detect.confidence, file, start, end];
+  const customList = list === "custom";
+  const confidence = customList ? 0 : detect.confidence;
+  const params = [confidence, file, start, end];
   const includedSQL = await getSpeciesSQLAsync();
-  const results = await db.allAsync(
-    `
+
+  let SQL =     `
         WITH RankedRecords AS (
             SELECT 
                 position AS start, 
                 end, 
-                cname AS label, 
+                cname, 
                 ROW_NUMBER() OVER (PARTITION BY fileID${partition}, dateTime ORDER BY confidence DESC) AS rank,
-                confidence,
+                confidence as score,
                 name,
-                dateTime,
+                dateTime as timestamp,
                 speciesID,
                 classIndex
             FROM records r
@@ -2057,15 +2056,19 @@ async function sendDetections(file, start, end, goToRegion) {
             AND start BETWEEN ? AND ?
             ${includedSQL}
         )
-        SELECT start, end, label
+        SELECT start, end, cname, score, timestamp
         FROM RankedRecords
-        WHERE rank = 1  
-        `,
-    ...params
-  );
+        WHERE rank <= ${detect.topRankin}
+        `;
+  
+  let result = await db.allAsync(SQL,...params);
+  if (customList){
+    result = result.map( (r) => allowedByList(r) ? r : null).filter(r => r !== null);
+  }
+
   UI.postMessage({
     event: "window-detections",
-    detections: results,
+    detections: result,
     goToRegion,
   });
 }
@@ -3508,7 +3511,7 @@ const insertDurations = async (file, id) => {
   );
 };
 
-const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, file, modelID) => {
+const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, file, modelID, customList) => {
   const db = STATE.db;
   const { fileStart, metadata, duration } = METADATA[file];
   const predictionLength = STATE.model.includes("bats") ? 0.3 : WINDOW_SIZE;
@@ -3570,7 +3573,6 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
     // **Use batch inserts instead of string concatenation**
     const insertValues = [];
     const insertPlaceholders = [];
-
     for (let i = 0; i < keysArray.length; i++) {
       const key = parseFloat(keysArray[i]);
       const timestamp = fileStart + key * 1000;
@@ -3580,12 +3582,14 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
 
       for (let j = 0; j < confidenceArray.length; j++) {
         const confidence = Math.round(confidenceArray[j] * 1000);
-        if (confidence < minConfidence) break;
-
         const modelSpeciesID = speciesIDArray[j];
         const speciesID = STATE.speciesMap.get(modelID).get(modelSpeciesID);
 
         if (!speciesID) continue; // Skip unknown species
+        if (customList){
+          const cname = STATE.allLabels[modelSpeciesID].split(getSplitChar())[1];
+          if (! allowedByList({cname, timestamp, score: confidence})) continue;
+        } else if (confidence < minConfidence) break;
 
         insertPlaceholders.push("(?, ?, ?, ?, ?, ?, ?, ?, ?)");
         insertValues.push(timestamp, key, fileID, speciesID, modelID, confidence, key + predictionLength, isDaylight, 0);
@@ -3623,9 +3627,9 @@ const parsePredictions = async (response) => {
   DEBUG && console.log("worker being used:", worker);
   const [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
   const {modelID, selection, detect} = STATE;
-
+  const customList = STATE.list === 'custom';
   if (!selection)
-    await generateInsertQuery(keysArray, speciesIDBatch, confidenceBatch, file, modelID).catch((error) =>
+    await generateInsertQuery(keysArray, speciesIDBatch, confidenceBatch, file, modelID, customList).catch((error) =>
       console.warn("Error generating insert query", error)
     );
   if (index < 500) {
@@ -3633,6 +3637,7 @@ const parsePredictions = async (response) => {
       console.warn("Error getting included IDs", error)
     );
     const loopConfidence =  selection ? 50 : detect.confidence;
+    
     for (let i = 0; i < keysArray.length; i++) {
       let updateUI = false;
       let key = parseFloat(keysArray[i]);
@@ -3641,19 +3646,17 @@ const parsePredictions = async (response) => {
       const speciesIDArray = speciesIDBatch[i];
       for (let j = 0; j < confidenceArray.length; j++) {
         let confidence = Math.round(confidenceArray[j] * 1000);
-        if (confidence < loopConfidence) break;
         const species = speciesIDArray[j]
         const speciesID = species + 1; //STATE.speciesMap.get(modelID).get(species);
         updateUI = selection || !included.length || included.includes(speciesID);
         if (updateUI) {
           let end;
           if (selection) {
-            const duration =
-              (selection.end - selection.start) / 1000;
+            const duration = (selection.end - selection.start) / 1000;
             end = key + duration;
           } else { end = key + predictionLength }
 
-          const [sname, cname] = STATE.allLabels[species].split(getSplitChar()) 
+          const [sname, cname] = STATE.allLabels[species].split(getSplitChar());
           const lat = METADATA[file].lat || STATE.lat;
           const lon = METADATA[file].lon || STATE.lon;
           const isDaylight = isDuringDaylight(timestamp, lat, lon);
@@ -3668,6 +3671,10 @@ const parsePredictions = async (response) => {
             score: confidence,
             model: STATE.model,
           };
+          if (customList && !selection){
+            if (!allowedByList(result)) continue;
+          } else if (confidence < loopConfidence) break;
+
           sendResult(++index, result, false);
           if (index > 499) {
             setGetSummaryQueryInterval(NUM_WORKERS);
@@ -3690,7 +3697,6 @@ const parsePredictions = async (response) => {
   const fileProgress = predictionsReceived[file] / batches;
   if (!selection && STATE.increment() === 0) {
     getSummary({ interim: true });
-    getTotal();
   }
   if (fileProgress === 1) {
     if (index === 0) {
@@ -4109,8 +4115,39 @@ const getSummary = async ({
 } = {}) => {
   const {sql, params} = await prepSummaryStatement();
   const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
+  const rows = await STATE.db.allAsync(sql, ...params);
+  const allowedRows =
+    STATE.list === 'custom'
+      ? rows.filter(allowedByList)
+      : rows;
+  let summary = {};
 
-  const summary = await STATE.db.allAsync(sql, ...params);
+  for (const row of allowedRows) {
+    const key = row.cname;
+
+    if (!summary[key]) {
+      summary[key] = {
+        cname: row.cname,
+        sname: row.sname,
+        count: 0,
+        calls: 0,
+        max: 0
+      };
+    }
+
+    summary[key].count += 1;
+    summary[key].calls += row.callCount || 1;
+    summary[key].max = Math.max(summary[key].max, row.score);
+  }
+  const [field, direction] = STATE.summarySortOrder.split(" ");
+  const sortFunctions = {
+    count: (a, b) => direction === "ASC" ? a.count - b.count : b.count - a.count, 
+    calls: (a, b) => direction === "ASC" ? a.calls - b.calls : b.calls - a.calls,
+    max: (a, b) => direction === "ASC" ? a.max - b.max : b.max - a.max,
+    cname: (a, b) => direction === "ASC" ? a.cname.localeCompare(b.cname) : b.cname.localeCompare(a.cname),
+    sname: (a, b) => direction === "ASC" ? a.sname.localeCompare(b.sname) : b.sname.localeCompare(a.sname),
+  };
+  summary = Object.values(summary).sort(sortFunctions[field]);
   if (format){ // Export called
     await exportData(summary, path, format, headers);
   } else {
@@ -4155,8 +4192,6 @@ const getResults = async ({
     offset = (position.page - 1) * limit;
     // We want to consistently move to the next record. If results are sorted by time, this will be row + 1.
     active = position.row; //+ 1;
-    // update the pagination
-    await getTotal({ species, offset });
   }
   offset =
     offset ??
@@ -4174,7 +4209,13 @@ const getResults = async ({
     format
   );
 
-  const result = await STATE.db.allAsync(sql, ...params);
+  let result = await STATE.db.allAsync(sql, ...params);
+  // Apply custom list filtering
+  const t0 = Date.now();
+  if (STATE.list === 'custom'){
+    result = result.map( (r) => allowedByList(r) ? r : null).filter(r => r !== null).slice(offset, offset + limit);
+  }
+  console.log(`Filtering by custom list took ${Date.now() - t0} ms`);
   if (["text", "eBird", "Raven"].includes(format)) {
     await exportData(result, path, format);
   } else if (format === "Audacity") {
@@ -4442,14 +4483,66 @@ async function exportData(result, filename, format, headers) {
     });
 }
 
+function dayOfYear(date) {
+  const monthLengths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  const year = date.getFullYear();
+  // Leap year adjustment
+  if (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)) {
+    monthLengths[1] = 29;
+  }
+  let day = date.getDate();
+  for (let m = 0; m < date.getMonth(); m++) {
+    day += monthLengths[m];
+  }
+  return day;
+}
+
+
+function dayMonthToDayOfYear(dayMonth, year) {
+  const [day, month] = dayMonth.split("-").map(Number);
+  return dayOfYear(new Date(year, month - 1, day));
+}
+
+function epochInDayMonthRange(epochMs, startDM, endDM) {
+  const date = new Date(epochMs);
+  const year = date.getFullYear();
+
+  const targetDay = dayOfYear(date);
+  const startDay = dayMonthToDayOfYear(startDM, year);
+  const endDay = dayMonthToDayOfYear(endDM, year);
+
+  // Normal range (e.g. Mar → Oct)
+  if (startDay <= endDay) {
+    return targetDay >= startDay && targetDay <= endDay;
+  }
+
+  // Wraps year boundary (e.g. Oct → Mar)
+  return targetDay >= startDay || targetDay <= endDay;
+}
+
+function allowedByList(result){
+  // Handle enhanced lists
+  const {timestamp, cname, score} = result;
+  const conditions = STATE.customLabelsMap[cname];
+  if (!conditions) return false; // Species not in the custom list
+
+  const {start, end, confidence} = conditions;
+  if (start && end) {
+    if (!epochInDayMonthRange(timestamp, start, end)) return false;
+  }
+  // Confidence check (species-specific overrides global)
+  const minConfidence = confidence != null ? confidence : STATE.detect.confidence;
+  return score >= minConfidence;
+}
+
 const sendResult = (index, result, fromDBQuery) => {
   const model = result.model.includes('bats')  
   ? 'bats'
-  : ['birdnet', 'nocmig', 'chirpity', 'perch v2'].includes(result.model)
+  : ['birdnet', 'nocmig', 'chirpity', 'perch v2', 'user'].includes(result.model)
     ? result.model
     : 'custom';
   result.model = model.replace(' v2','');
-  // if (!fromDBQuery) {result.model = model, result.modelID = STATE.modelID};
+
   UI.postMessage({
     event: "new-result",
     file: result.file,
@@ -4771,7 +4864,7 @@ const onUpdateFileStart = async (args) => {
           // Commit transaction once all rows are processed
           await db.runAsync("COMMIT");
           DEBUG && console.log(`File ${file} updated successfully.`);
-          count && (await Promise.all([getResults(), getSummary(), getTotal()]));
+          count && (await Promise.all([getSummary(), getResults()]));
         }
       );
     } catch (error) {
@@ -4960,7 +5053,7 @@ const onFileDelete = async (fileName) => {
       variables: { file: fileName },
       updateFilenamePanel: true,
     });
-    await Promise.all([getResults(), getSummary(), getTotal()]);
+    await Promise.all([getSummary(), getResults()]);
   } else {
     generateAlert({
       message: "failedFilePurge",
@@ -5060,7 +5153,7 @@ async function onUpdateLocale(locale, labels, refreshResults) {
       db.locale = locale;
       await _updateSpeciesLocale(db, labels);
     }
-    if (refreshResults) await Promise.all([getResults(), getSummary()]);
+    if (refreshResults) await Promise.all([getSummary(), getResults()]);
   } catch (error) {
     throw error;
   } finally {
@@ -5392,6 +5485,17 @@ async function convertAndOrganiseFiles(threadLimit = 4) {
     const place = row.place?.replace(/[\/\\?%*:|"<>]/g, "_").trim();
 
     const inputFilePath = row.name;
+
+    // Does the file we want to convert exist?
+    if (!fs.existsSync(inputFilePath)) {
+      generateAlert({
+        type: "warning",
+        variables: { file: inputFilePath },
+        message: `fileToConvertNotFound`,
+      });
+      continue;
+    }
+
     const outputDir = p.join(place, year, month);
     const outputFileName =
       p.basename(inputFilePath, p.extname(inputFilePath)) + ext;
@@ -5402,7 +5506,6 @@ async function convertAndOrganiseFiles(threadLimit = 4) {
 
     const archiveName = row.archiveName;
     if (archiveName === dbArchiveName && fs.existsSync(fullFilePath)) {
-      // TODO: just check for the file, if archvive name is null, add archive name to the db (if it is complete)
       DEBUG &&
         console.log(
           `File ${inputFilePath} already converted. Skipping conversion.`
@@ -5410,6 +5513,8 @@ async function convertAndOrganiseFiles(threadLimit = 4) {
       continue;
     }
 
+
+    // Ensure the output directory exists
     if (!fs.existsSync(fullPath)) {
       try {
         fs.mkdirSync(fullPath, { recursive: true });
@@ -5423,15 +5528,6 @@ async function convertAndOrganiseFiles(threadLimit = 4) {
       }
     }
 
-    // Does the file we want to convert exist?
-    if (!fs.existsSync(inputFilePath)) {
-      generateAlert({
-        type: "warning",
-        variables: { file: inputFilePath },
-        message: `fileToConvertNotFound`,
-      });
-      continue;
-    }
     // Add the file conversion to the pool
     fileProgressMap[inputFilePath] = 0;
     conversions.push(
@@ -5481,14 +5577,14 @@ async function convertAndOrganiseFiles(threadLimit = 4) {
           failedTotal: failedConversions,
         },
       });
-      //    if (failedConversions > 0) {
-      //         type = 'warning';
-      //         summaryMessage += `<br>Failed conversion reasons:<br><ul>`;
-      //         failureReasons.forEach(reason => {
-      //             summaryMessage += `<li>${reason}</li>`;
-      //         });
-      //         summaryMessage += `</ul>`;
-      //     }
+      if (failedConversions > 0) {
+          type = 'warning';
+          summaryMessage += `<br>Failed conversion reasons:<br><ul>`;
+          failureReasons.forEach(reason => {
+              summaryMessage += `<li>${reason}</li>`;
+          });
+          summaryMessage += `</ul>`;
+      }
     } else {
       generateAlert({ message: "libraryUpToDate" });
     }
@@ -5529,7 +5625,7 @@ async function convertFile(
       command
         .audioBitrate("128k")
         .audioChannels(1) // Set to mono
-        .audioFrequency(30_000); // Set sample rate for BirdNET
+        .audioFrequency(32_000); // Set sample rate for BirdNET/Perch
     }
 
     let scaleFactor = 1;

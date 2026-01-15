@@ -192,7 +192,6 @@ const GLOBAL_ACTIONS = {
       activeRow.classList.remove("table-active");
       activeRow = activeRow.previousSibling || activeRow;
       if (!activeRow.classList.contains("text-bg-dark")) activeRow.click();
-      // activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   },
   PageDown: () => {
@@ -232,7 +231,6 @@ const GLOBAL_ACTIONS = {
       activeRow.classList.remove("table-active");
       activeRow = activeRow.nextSibling || activeRow;
       if (!activeRow.classList.contains("text-bg-dark")) activeRow.click();
-      // activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   },
   ArrowLeft: () => {
@@ -1133,7 +1131,7 @@ async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults 
   if (!filePaths.length) return;
   loadingFiles({hide:false})
   // Store the sanitised file list and Load First audio file
-  // utils.hideAll();
+  pagination.reset();
   resetResults();
   resetDiagnostics();
   utils.disableMenuItem([
@@ -1161,7 +1159,6 @@ async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults 
     if (modelReady) utils.enableMenuItem(["analyseAll", "reanalyseAll"]);
     STATE.openFiles = await sortFilesByTime(STATE.openFiles);
   }
-  utils.hideAll();
   utils.showElement(["spectrogramWrapper"], false);
   loadAudioFileSync({ filePath: STATE.openFiles[0], preserveResults });
   // Clear unsaved records warning
@@ -1372,6 +1369,8 @@ async function importData(format){
     defaultPath,
   });
   if (files.canceled) return;
+  // remove the d-none class so wavesurfer can render
+  utils.showElement(["spectrogramWrapper"], false);
   const file = files.filePaths[0]
   const lastSaveFolder = p.dirname(file);
   localStorage.setItem("lastSaveFolder", lastSaveFolder);
@@ -1578,6 +1577,7 @@ async function showExplore() {
  * @async
  */
 async function showAnalyse() {
+  utils.hideAll();
   utils.disableMenuItem(["active-analysis"]);
   //Restore STATE
   STATE = { ...STATE, ...STATE.currentAnalysis };
@@ -1588,7 +1588,6 @@ async function showAnalyse() {
     spec.spectrogram.destroy();
     spec.spectrogram = null;
   }
-  utils.hideAll();
   if (STATE.currentFile) {
     utils.showElement(["spectrogramWrapper"], false);
     spec.reInitSpec(config.specMaxHeight);
@@ -2333,10 +2332,12 @@ const setUpWorkerMessaging = () => {
               STATE.diskHasRecords &&
                 !PREDICTING &&
                 utils.enableMenuItem(["explore", "charts"]);
+              utils.hideElement(["exploreWrapper"]);
               break;
             }
             case "archive": {
               utils.enableMenuItem(["save2db", "explore", "charts"]);
+              utils.hideElement(["exploreWrapper"]);
               break;
             }
           }
@@ -2406,10 +2407,6 @@ const setUpWorkerMessaging = () => {
           args.init && setKeyAssignmentUI(config.keyAssignment);
           break;
         }
-        case "total-records": {
-          updatePagination(args.total, args.offset);
-          break;
-        }
         case "unsaved-records": {
           window.electron.unsavedRecords(true);
           document.getElementById("unsaved-icon").classList.remove("d-none");
@@ -2462,7 +2459,7 @@ function showWindowDetections({ detections, goToRegion }) {
       if (!config.specDetections && !active) continue;
       const colour = active ? STATE.regionActiveColour : null;
       const setPosition = active && goToRegion;
-      spec.createRegion(start, end, detection.label, setPosition, colour);
+      spec.createRegion(start, end, detection.cname, setPosition, colour);
     }
   }
 }
@@ -3527,14 +3524,23 @@ async function onWorkerLoadedAudio({
  * If the total exceeds the configured limit, pagination controls are rendered using the given offset.
  * Otherwise, all pagination elements are hidden.
  *
- * @param {number} total - The total number of items.
- * @param {number} [offset=STATE.offset] - The starting offset for pagination.
  */
-function updatePagination(total, offset = STATE.offset) {
-  total > config.limit ? pagination.add(total, offset) : pagination.hide();
+function updatePagination(species) {
+  const limit = config.limit;
+  const total = species 
+    ? STATE.summary.find(item => item.cname === species)?.count || 0
+    : STATE.summary.reduce((acc, item) => acc + item.count, 0);
+  if (total > limit){
+      pagination.add(total);
+      STATE.paginationPending = true;
+   } else {
+    pagination.hide(); 
+    STATE.paginationPending = false;
+  }
 }
 
 const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
+  STATE.summary = summary;
   const i18 = i18n.get(i18n.Headings);
   const showIUCN = config.detect.iucn;
 
@@ -3618,6 +3624,10 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
 
   showSummarySortIcon();
   setAutocomplete(selectedRow ? filterSpecies : "");
+
+  
+  updatePagination(filterSpecies);
+
   // scroll to the selected species
   if (selectedRow) {
     const table = document.getElementById("resultSummary");
@@ -3681,10 +3691,10 @@ function onResultsComplete({ active = undefined, select = undefined } = {}) {
 
   if (activeRow) {
     utils.waitFor(() => STATE.fileLoaded).then(() => activeRow.click());
-    activeRow.scrollIntoView({ behavior: "instant", block: "center" });
   }
   renderFilenamePanel();
   activateResultSort();
+  STATE.paginationPending && pagination.show();
 }
 
 
@@ -3800,7 +3810,7 @@ function onSummaryComplete({ filterSpecies = undefined, summary = [] }) {
 const pagination = new Pagination(
   document.querySelector(".pagination"),
   () => STATE, // Returns the current state
-  () => config, // Returns the current config
+  500, //the current limit
   () => worker,
   {
     isSpeciesViewFiltered,
@@ -3846,6 +3856,7 @@ function speciesFilter(e) {
     species = getSpecies(e.target);
   }
   setAutocomplete(species);
+  updatePagination(species);
   filterResults({ updateSummary: false });
   resetResults({
     clearSummary: false,
@@ -3917,7 +3928,7 @@ async function renderResult({
     )
       postBufferUpdate({ file, begin: STATE.windowOffsetSecs });
   } else if (!isFromDB && index % (config.limit + 1) === 0) {
-    pagination.add(index, 0);
+    pagination.add(index);
   }
   if (!isFromDB && index > config.limit) {
     return;
@@ -4421,7 +4432,7 @@ function exportSpeciesList() {
   const included = STATE.includedList;
   // Create a blob containing the content of included array
   const content = included
-    .map((item) => `${item.sname}${getSplitChar()}${item.cname}`)
+    .map((item) => `${item.sname},${item.cname}`)
     .join("\n");
   const blob = new Blob([content], { type: "text/plain" });
   const url = URL.createObjectURL(blob);
@@ -4939,6 +4950,7 @@ const handleThresholdChange = (e) => {
     action: "update-state",
     detect: { confidence: config.detect.confidence },
   });
+  pagination.reset();
   if (STATE.mode === "explore") {
     // Update the seen species list
     worker.postMessage({ action: "get-detected-species-list" });
@@ -5225,7 +5237,7 @@ async function handleUIClicks(e) {
     }
     case "import-csv": {
       STATE.fileLoaded = false;
-      showAnalyse();
+      if (STATE.mode !== "analyse") showAnalyse();
       importData('csv');
       break;
     }
@@ -5998,7 +6010,8 @@ function changeSettingsMode(target) {
  */
 async function updateList() {
   updateListIcon();
-  setListUIState(config.list)
+  setListUIState(config.list);
+  pagination.reset();
   if (config.list === "custom") {
     await readLabels(config.models[config.selectedModel].customListFile, "list");
   } else {
@@ -6600,6 +6613,7 @@ async function readLabels(labelFile, updating) {
         list: config.list,
         customLabels: labels,
         refreshResults: STATE.analysisDone,
+        member: STATE.isMember,
       });
       trackEvent(config.UUID, "UI", "Create", "Custom list", labels.length);
     } else {

@@ -1,25 +1,32 @@
 export class Pagination {
-  constructor(container, getState, getConfig, getWorker, handlers) {
+  constructor(container, getState, limit, getWorker, handlers) {
     this.container = container;
     this.getState = getState; // Function to get the current state
-    this.getConfig = getConfig; // Function to get the current config
+    this.limit = limit; // Function to get the current config
     this.getWorker = getWorker;
     this.handlers = handlers; // { isSpeciesViewFiltered, filterResults, resetResults }
+    this.globalPage = 1;
+    this.speciesPage = {}; // { speciesName: currentPage }
+    this.total = 0;
   }
 
   init() {
     this.container.addEventListener("click", (e) => this.handleClick(e));
   }
+  reset() {
+    this.globalPage = 1;
+    this.speciesPage = {};
+  }
 
   handleClick(e) {
     const state = this.getState(); // Get the latest state
-    const config = this.getConfig(); // Get the latest config
-
     if (!state.analysisDone || e.target.tagName !== "A") return;
-
+    const species = this.handlers.isSpeciesViewFiltered(true);
     let clicked = e.target.textContent;
     const activeElement = this.container.querySelector(".active");
-    let currentPage = activeElement ? parseInt(activeElement.textContent) : 1;
+    activeElement?.classList.remove("active");
+    let currentPage = species ? (this.speciesPage[species] || 1) : this.globalPage;
+    
 
     if (clicked === "Previous") {
       clicked = currentPage - 1;
@@ -28,15 +35,22 @@ export class Pagination {
     } else {
       clicked = parseInt(clicked);
     }
+    if (species) {
+      this.speciesPage[species] = clicked;
+    } else {
+      this.globalPage = clicked;
+    }
 
-    const limit = config.limit;
+    // Update active page
+    this.add(this.total);
+
+    const limit = this.limit;
     const offset = (clicked - 1) * limit;
-    const species = this.handlers.isSpeciesViewFiltered(true);
+
 
     const message = species
       ? { action: "update-state", filteredOffset: { [species]: offset } }
       : { action: "update-state", globalOffset: offset };
-
     const worker = this.getWorker();
     worker.postMessage(message);
     this.handlers.filterResults({ offset, limit, updateSummary: false });
@@ -47,11 +61,13 @@ export class Pagination {
     });
   }
 
-  add(total, offset) {
-    const config = this.getConfig(); // Get the latest config
-    const limit = config.limit;
+  add(total) {
+    this.total = total;
+    const limit = this.limit;
     const pages = Math.ceil(total / limit);
-    const currentPage = offset / limit + 1;
+    const species = this.handlers.isSpeciesViewFiltered(true);
+    const currentPage = species ? (this.speciesPage[species] || 1) : this.globalPage;
+    
     let list = "";
 
     // Previous button
@@ -83,11 +99,11 @@ export class Pagination {
         : `<li class="page-item"><a class="page-link" href="#">Next</a></li>`;
 
     // Update the container's content (assuming container is a single element)
-    this.container.classList.remove("d-none");
     this.container.innerHTML = list;
   }
 
   // New method to hide the pagination (supports multiple)
+  show = () => this.container.classList.remove("d-none");
   hide() {
     if (this.container instanceof NodeList || Array.isArray(this.container)) {
       this.container.forEach((item) => item.classList.add("d-none"));
@@ -95,8 +111,8 @@ export class Pagination {
       this.container.classList.add("d-none");
     }
   }
-  getCurrentPage(){
-    let currentPage = this.container.querySelector('.active');
-    return currentPage ? parseInt(currentPage.textContent) : 1;
+  getCurrentPage = () => {
+    const species = this.handlers.isSpeciesViewFiltered(true);
+    return species ? (this.speciesPage[species] || 1) : this.globalPage;
   }
 }

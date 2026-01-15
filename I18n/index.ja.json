@@ -88,6 +88,10 @@
 "FAQ": ["よくある質問"],
 "species": ["検出される種は何ですか？"],
 "eBird": ["eBird記録とは何ですか？"],
+"guides": ["ガイド（GitHub）"],
+"false-positives": ["誤検出の対処"],
+"using-custom-lists": ["カスタムリストの使用"],
+"training-custom-models": ["カスタムモデルのトレーニング"],
 "update-progress-text": ["アップデートをダウンロード中："],
 
 "record-add": ["追加"],
