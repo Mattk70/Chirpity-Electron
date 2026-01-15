@@ -973,18 +973,34 @@ export class ChirpityWS {
    */
   handleGesture(e) {
     const STATE = this.getState();
-    const config = this.getConfig();
-    const currentTime = Date.now();
-    if (currentTime - STATE.lastGestureTime < 1200) {
-      return; // Ignore successive events within 1.2 second
-    }
-    STATE.lastGestureTime = currentTime;
-    const moveDirection = e.deltaX || e.deltaY; // If deltaX is 0, use deltaY
-    const key = moveDirection > 0 ? "PageDown" : "PageUp";
-    config.debug && console.log(`scrolling x: ${e.deltaX} y: ${e.deltaY}`);
-    // waitForFinalEvent(() => {
-    this.actions[key](e);
-    this.handlers.trackEvent(config.UUID, "Swipe", key, "");
-    // }, 200, 'swipe');
+
+    // Keep the latest gesture only
+    STATE.pendingGesture = e;
+
+    // Already scheduled for this frame
+    if (STATE.gestureRAF) return;
+
+    STATE.gestureRAF = requestAnimationFrame(() => {
+      STATE.gestureRAF = null;
+
+      const config = this.getConfig();
+      const { deltaX = 0, deltaY = 0 } = STATE.pendingGesture;
+
+      // Prefer dominant axis
+      const move = Math.abs(deltaX) >= Math.abs(deltaY)
+        ? deltaX
+        : deltaY;
+
+      if (!move) return;
+
+      const key = move > 0 ? "PageDown" : "PageUp";
+
+      config.debug &&
+        console.log(`scrolling x: ${deltaX} y: ${deltaY}`);
+
+      this.actions[key](STATE.pendingGesture);
+      this.handlers.trackEvent(config.UUID, "Swipe", key, "");
+    });
   }
 }
+
