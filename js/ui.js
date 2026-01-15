@@ -32,7 +32,7 @@ import * as utils from "./utils/utils.js";
 import { UIState as State } from "./utils/UIState.js";
 import { ChirpityWS } from './components/spectrogram.js';
 
-let LOCATIONS,
+let LOCATIONS, pagination,
   locationID = undefined,
   loadingTimeout,
   LIST_MAP;
@@ -2176,6 +2176,20 @@ window.onload = async () => {
 
   // check for new version on Intel mac platform. dmg auto-update not yet working
   // window.electron.isIntelMac() && !isTestEnv && checkForIntelMacUpdates();
+
+  // Set up pagination
+  pagination = new Pagination(
+    document.querySelector(".pagination"),
+    () => STATE, // Returns the current state
+    limit, //the current limit
+    () => worker,
+    {
+      isSpeciesViewFiltered,
+      filterResults,
+      resetResults,
+    }
+  );
+  pagination.init();
 };
 
 let MISSING_FILE;
@@ -3806,19 +3820,7 @@ function onSummaryComplete({ filterSpecies = undefined, summary = [] }) {
   if (STATE.currentFile) utils.enableMenuItem(["analyse"]);
 }
 
-// Set up pagination
-const pagination = new Pagination(
-  document.querySelector(".pagination"),
-  () => STATE, // Returns the current state
-  500, //the current limit
-  () => worker,
-  {
-    isSpeciesViewFiltered,
-    filterResults,
-    resetResults,
-  }
-);
-pagination.init();
+
 
 /**
  * Toggles the species filter based on user interaction with the summary table.

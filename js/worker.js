@@ -652,7 +652,7 @@ async function handleMessage(e) {
                   const message = `Custom list start/end value malformed, it should be 'DD-MM': ${line}`;
                   generateAlert({message, type:'warning' });
                   console.warn(message);
-                  val = undefined;
+                  start = undefined; end = undefined;
                 }
               });
               if (confidence && (isNaN(confidence) || confidence < 0 || confidence > 1)) {

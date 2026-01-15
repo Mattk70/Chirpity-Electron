@@ -185,7 +185,7 @@ const Toasts = { // UI.js
         noDetectionsDetailed: 'Keine ${nocmig} ${species} Detektionen in ${archive} mit der ${list}-Liste gefunden.',
         noDetectionsDetailed2: 'Keine Detektionen in ${file} gefunden. Es wurde nach Einträgen mit der ${list}-Liste und einer Mindestkonfidenz von ${confidence}% gesucht.',
         dbNotLoaded: "Die Datenbank ist noch nicht vollständig geladen. Die Überprüfung auf das Vorhandensein der Datei im Archiv wurde übersprungen.",
-        noSnameFound: "Kann '${sname}' (in Zeile ${line} der benutzerdefinierten Liste) nicht in der <strong>${model}</strong>-Liste finden. <strong>Tipps:</strong> <ol><<li>Ist Ihre Liste formatiert als: <code>'Wissenschaftlicher Name,Allgemeiner Name'</code></li>li>Ist Ihre Liste für das <strong>${model}</strong>-Modell? Wenn nicht, ändern Sie das Modell in den Einstellungen</li><li>Überprüfen Sie auf Tippfehler im Artbegriff</li></ol>",
+        noSnameFound: "Kann '${sname}' (in Zeile ${line} der benutzerdefinierten Liste) nicht in der <strong>${model}</strong>-Liste finden. <strong>Tipps:</strong> <ol><li>Ist Ihre Liste formatiert als: <code>'Wissenschaftlicher Name,Allgemeiner Name'</code></li><li>Ist Ihre Liste für das <strong>${model}</strong>-Modell? Wenn nicht, ändern Sie das Modell in den Einstellungen</li><li>Überprüfen Sie auf Tippfehler im Artbegriff</li></ol>",
         noSpecies: "Keine Arten mit dem Namen ${cname} gefunden",
         noArchive: "Kann auf Archivstandort ${location} nicht zugreifen. <br> Vorgang abgebrochen",
         noWriteArchive: "Kann nicht in Archivstandort ${location} schreiben. <br> Vorgang abgebrochen",

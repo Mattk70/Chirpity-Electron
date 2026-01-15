@@ -2,7 +2,7 @@ export class Pagination {
   constructor(container, getState, limit, getWorker, handlers) {
     this.container = container;
     this.getState = getState; // Function to get the current state
-    this.limit = limit; // Function to get the current config
+    this.limit = limit; 
     this.getWorker = getWorker;
     this.handlers = handlers; // { isSpeciesViewFiltered, filterResults, resetResults }
     this.globalPage = 1;
@@ -103,7 +103,13 @@ export class Pagination {
   }
 
   // New method to hide the pagination (supports multiple)
-  show = () => this.container.classList.remove("d-none");
+  show() {
+    if (this.container instanceof NodeList || Array.isArray(this.container)) {
+      this.container.forEach((item) => item.classList.remove("d-none"));
+    } else {
+      this.container.classList.remove("d-none");
+    }
+  }
   hide() {
     if (this.container instanceof NodeList || Array.isArray(this.container)) {
       this.container.forEach((item) => item.classList.add("d-none"));
