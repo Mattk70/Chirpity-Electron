@@ -476,7 +476,7 @@ async function handleMessage(e) {
         const {files, meta} = result;
         METADATA = meta;
         STATE.filesToAnalyse = await getFiles({files, preserveResults:true, checkSaved: false});
-        await Promise.all([getResults(), getSummary()]);
+        await Promise.all([getSummary(), getResults()]);
       }
       UI.postMessage({ event: "clear-loading"})
       break;
@@ -500,8 +500,8 @@ async function handleMessage(e) {
     }
     case "filter": {
       if (STATE.db) {
-        await getResults(args);
         args.updateSummary && (await getSummary(args));
+        await getResults(args);
         args.included = await getIncludedIDs(args.file);
       }
       break;
@@ -561,8 +561,8 @@ async function handleMessage(e) {
     case "insert-manual-record": {
       await onInsertManualRecord(args);
       await Promise.all([
-        getResults({ position: args.position, species: args.speciesFiltered }),
         getSummary({ species: args.speciesFiltered }),
+        getResults({ position: args.position, species: args.speciesFiltered }),
       ]);
       STATE.db === memoryDB && UI.postMessage({ event: "unsaved-records" });
       break;
@@ -685,7 +685,7 @@ async function handleMessage(e) {
       await setLabelState({regenerate:true});
       LIST_WORKER && (await getIncludedIDs());
       
-      args.refreshResults && (await Promise.all([getResults(), getSummary()]));
+      args.refreshResults && (await Promise.all([getSummary(), getResults()]));
       break;
     }
     case "update-locale": {
@@ -726,8 +726,8 @@ async function handleMessage(e) {
       if (args.labelFilters) {
         const species = args.species;
         await Promise.all([
-          getResults({ species, offset: 0 }),
           getSummary({ species }),
+          getResults({ species, offset: 0 }),
         ]);
       }
       DEBUG = STATE.debug;
@@ -1063,7 +1063,7 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true}) => {
     if (STATE.detect.autoLoad){
       STATE.filesToAnalyse = filePaths;
       STATE.originalFiles = filePaths;
-      await Promise.all([getResults(), getSummary()]);
+      await Promise.all([getSummary(), getResults()]);
     }
   }
   // Start gathering metadata for new files
@@ -1287,8 +1287,9 @@ async function getSpeciesSQLAsync(){
  * @returns {[string, any[]]} A two-element array: the augmented SQL string and an ordered array of parameters for prepared statements.
  */
 async function addQueryQualifiers(stmt, range, caller) {
-  const {mode, explore, labelFilters, detect, locationID, selection} = STATE;
-  let params = [detect.confidence];
+  const {list, mode, explore, labelFilters, detect, locationID, selection} = STATE;
+  
+  const params = list === "custom" ? [0] : [detect.confidence];
   range ??= mode === "explore" ? explore.range : undefined;
   if (mode === 'archive' || range?.start){
     const [SQLtext, fileParams] = getFileSQLAndParams(range);
@@ -1305,10 +1306,8 @@ async function addQueryQualifiers(stmt, range, caller) {
     stmt += await getSpeciesSQLAsync()
   }
   if (detect.nocmig) {
-    const condition = detect.nocmig === 'day';
-    stmt += ` AND isDaylight = ${condition ? 1 : 0} `;
+    stmt += ` AND isDaylight = ${detect.nocmig === 'day' ? 1 : 0} `;
   }
-  // if (detect.nocmig) stmt += " AND COALESCE(isDaylight, 0) != 1 ";
   if (locationID !== undefined) {
     stmt += locationID === 0 ? " AND locationID IS NULL " : " AND locationID = ? ";
     locationID !== 0 && params.push(locationID);
@@ -1341,43 +1340,6 @@ const prepSummaryStatement = async () => {
   return {sql: summaryStatement, params};
 };
 
-const buildTotalRowsSQL = async ({ range }) => {
-  const { detect } = STATE;
-  const topRankin = detect.topRankin;
-  const partition = detect.merge ? '' : ', r.modelID';
-
-  let sql = `
-    WITH ranked_records AS (
-      SELECT
-        r.confidence      AS score,
-        r.dateTime        AS timestamp,
-        s.cname,
-        s.sname,
-        r.speciesID,
-        s.classIndex,
-        f.name            AS file,
-        r.tagID,
-        RANK() OVER (
-          PARTITION BY r.fileID${partition}, r.dateTime
-          ORDER BY r.confidence DESC
-        ) AS rank
-      FROM records r
-      JOIN species s ON s.id = r.speciesID
-      JOIN files f   ON f.id = r.fileID
-      WHERE r.confidence >= ?`;
-  
-  let params = [STATE.detect.confidence];
-  [sql, params] = await addQueryQualifiers(sql, range, 'results');
-  sql +=  `)
-    SELECT *
-    FROM ranked_records
-    WHERE rank <= ${topRankin}
-  `;
-  return { sql, params };
-};
-
-
-
 
 const prepResultsStatement = async (
   species,
@@ -1386,7 +1348,7 @@ const prepResultsStatement = async (
   topRankin,
   format
 ) => {
-  const {mode, explore, resultsMetaSortOrder, resultsSortOrder, detect, selection} = STATE;
+  const {mode, list, limit, explore, resultsMetaSortOrder, resultsSortOrder, detect, selection} = STATE;
   const partition = detect.merge ? '' : ', r.modelID'; 
   let resultStatement = `
     WITH ranked_records AS (
@@ -1463,14 +1425,17 @@ const prepResultsStatement = async (
     resultStatement += ` AND  cname = ? `;
     params.push(species);
   }
-  const limitClause = '';//noLimit ? "" : "LIMIT ?  OFFSET ?";
-  // noLimit || params.push(limit, offset);
+  // Because custom list doesn't limit the results, it can get v slow when the archive is large.
+  // But, we can use the limit clause if the user is not using a custom list
+  noLimit = list === 'custom' || noLimit;
+  const limitClause = noLimit  ? " " : " LIMIT ?  OFFSET ? ";
+  noLimit || params.push(limit, offset);
   const metaSort = resultsMetaSortOrder
     ? `${resultsMetaSortOrder}, `
     : "";
   resultStatement += format ==='audio'
-    ? ` ORDER BY RANDOM()  ${limitClause}`
-    : ` ORDER BY ${metaSort} ${resultsSortOrder} ${limitClause} `;
+    ? ` ORDER BY RANDOM() ${limitClause}`
+    : ` ORDER BY ${metaSort}  ${resultsSortOrder} ${limitClause}`;
   
   return {sql: resultStatement, params};
 };
@@ -1678,9 +1643,7 @@ async function onAnalyse({
           })
         );
         // Weirdness with promise all - list worker called 2x and no results returned
-        //await Promise.all([getResults(), getSummary()] );
-        await getResults();
-        await getSummary();
+        await Promise.all([getSummary(), getResults()] );
       }
       return;
     }
@@ -2066,21 +2029,23 @@ function addDays(date, days) {
  * @param {boolean} goToRegion - If true, instructs the UI to navigate to the detected region.
  */
 async function sendDetections(file, start, end, goToRegion) {
-  const {db, detect} = STATE;
+  const {list, db, detect} = STATE;
   const partition = detect.merge ? "" : ', r.modelID';
-  const params = [STATE.detect.confidence, file, start, end];
+  const customList = list === "custom";
+  const confidence = customList ? 0 : detect.confidence;
+  const params = [confidence, file, start, end];
   const includedSQL = await getSpeciesSQLAsync();
-  const results = await db.allAsync(
-    `
+
+  let SQL =     `
         WITH RankedRecords AS (
             SELECT 
                 position AS start, 
                 end, 
-                cname AS label, 
+                cname, 
                 ROW_NUMBER() OVER (PARTITION BY fileID${partition}, dateTime ORDER BY confidence DESC) AS rank,
-                confidence,
+                confidence as score,
                 name,
-                dateTime,
+                dateTime as timestamp,
                 speciesID,
                 classIndex
             FROM records r
@@ -2091,15 +2056,19 @@ async function sendDetections(file, start, end, goToRegion) {
             AND start BETWEEN ? AND ?
             ${includedSQL}
         )
-        SELECT start, end, label
+        SELECT start, end, cname, score, timestamp
         FROM RankedRecords
-        WHERE rank = 1  
-        `,
-    ...params
-  );
+        WHERE rank <= ${detect.topRankin}
+        `;
+  
+  let result = await db.allAsync(SQL,...params);
+  if (customList){
+    result = result.map( (r) => allowedByList(r) ? r : null).filter(r => r !== null);
+  }
+
   UI.postMessage({
     event: "window-detections",
-    detections: results,
+    detections: result,
     goToRegion,
   });
 }
@@ -3618,8 +3587,8 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
 
         if (!speciesID) continue; // Skip unknown species
         if (customList){
-          const sname = STATE.allLabels[modelSpeciesID].split(getSplitChar())[0];
-          if (! allowedByList({sname, timestamp, score: confidence})) continue;
+          const cname = STATE.allLabels[modelSpeciesID].split(getSplitChar())[1];
+          if (! allowedByList({cname, timestamp, score: confidence})) continue;
         } else if (confidence < minConfidence) break;
 
         insertPlaceholders.push("(?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -4146,9 +4115,11 @@ const getSummary = async ({
 } = {}) => {
   const {sql, params} = await prepSummaryStatement();
   const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
-
-  const rankedRows = await STATE.db.allAsync(sql, ...params);
-  const allowedRows = rankedRows.filter(allowedByList);
+  const rows = await STATE.db.allAsync(sql, ...params);
+  const allowedRows =
+    STATE.list === 'custom'
+      ? rows.filter(allowedByList)
+      : rows;
   let summary = {};
 
   for (const row of allowedRows) {
@@ -4241,8 +4212,9 @@ const getResults = async ({
   let result = await STATE.db.allAsync(sql, ...params);
   // Apply custom list filtering
   const t0 = Date.now();
-  result = result.map( (r) => allowedByList(r) ? r : null).filter(r => r !== null);
-  result = result.slice(offset, offset + limit);
+  if (STATE.list === 'custom'){
+    result = result.map( (r) => allowedByList(r) ? r : null).filter(r => r !== null).slice(offset, offset + limit);
+  }
   console.log(`Filtering by custom list took ${Date.now() - t0} ms`);
   if (["text", "eBird", "Raven"].includes(format)) {
     await exportData(result, path, format);
@@ -4550,8 +4522,6 @@ function epochInDayMonthRange(epochMs, startDM, endDM) {
 
 function allowedByList(result){
   // Handle enhanced lists
-  if (STATE.list !== 'custom') return true;
-
   const {timestamp, cname, score} = result;
   const conditions = STATE.customLabelsMap[cname];
   if (!conditions) return false; // Species not in the custom list
@@ -4561,8 +4531,7 @@ function allowedByList(result){
     if (!epochInDayMonthRange(timestamp, start, end)) return false;
   }
   // Confidence check (species-specific overrides global)
-  const minConfidence =
-    confidence != null ? confidence : STATE.detect.confidence;
+  const minConfidence = confidence != null ? confidence : STATE.detect.confidence;
   return score >= minConfidence;
 }
 
@@ -4895,7 +4864,7 @@ const onUpdateFileStart = async (args) => {
           // Commit transaction once all rows are processed
           await db.runAsync("COMMIT");
           DEBUG && console.log(`File ${file} updated successfully.`);
-          count && (await Promise.all([getResults(), getSummary()]));
+          count && (await Promise.all([getSummary(), getResults()]));
         }
       );
     } catch (error) {
@@ -5084,7 +5053,7 @@ const onFileDelete = async (fileName) => {
       variables: { file: fileName },
       updateFilenamePanel: true,
     });
-    await Promise.all([getResults(), getSummary()]);
+    await Promise.all([getSummary(), getResults()]);
   } else {
     generateAlert({
       message: "failedFilePurge",
@@ -5184,7 +5153,7 @@ async function onUpdateLocale(locale, labels, refreshResults) {
       db.locale = locale;
       await _updateSpeciesLocale(db, labels);
     }
-    if (refreshResults) await Promise.all([getResults(), getSummary()]);
+    if (refreshResults) await Promise.all([getSummary(), getResults()]);
   } catch (error) {
     throw error;
   } finally {
@@ -5516,6 +5485,17 @@ async function convertAndOrganiseFiles(threadLimit = 4) {
     const place = row.place?.replace(/[\/\\?%*:|"<>]/g, "_").trim();
 
     const inputFilePath = row.name;
+
+    // Does the file we want to convert exist?
+    if (!fs.existsSync(inputFilePath)) {
+      generateAlert({
+        type: "warning",
+        variables: { file: inputFilePath },
+        message: `fileToConvertNotFound`,
+      });
+      continue;
+    }
+
     const outputDir = p.join(place, year, month);
     const outputFileName =
       p.basename(inputFilePath, p.extname(inputFilePath)) + ext;
@@ -5526,7 +5506,6 @@ async function convertAndOrganiseFiles(threadLimit = 4) {
 
     const archiveName = row.archiveName;
     if (archiveName === dbArchiveName && fs.existsSync(fullFilePath)) {
-      // TODO: just check for the file, if archvive name is null, add archive name to the db (if it is complete)
       DEBUG &&
         console.log(
           `File ${inputFilePath} already converted. Skipping conversion.`
@@ -5534,6 +5513,8 @@ async function convertAndOrganiseFiles(threadLimit = 4) {
       continue;
     }
 
+
+    // Ensure the output directory exists
     if (!fs.existsSync(fullPath)) {
       try {
         fs.mkdirSync(fullPath, { recursive: true });
@@ -5547,15 +5528,6 @@ async function convertAndOrganiseFiles(threadLimit = 4) {
       }
     }
 
-    // Does the file we want to convert exist?
-    if (!fs.existsSync(inputFilePath)) {
-      generateAlert({
-        type: "warning",
-        variables: { file: inputFilePath },
-        message: `fileToConvertNotFound`,
-      });
-      continue;
-    }
     // Add the file conversion to the pool
     fileProgressMap[inputFilePath] = 0;
     conversions.push(
@@ -5605,14 +5577,14 @@ async function convertAndOrganiseFiles(threadLimit = 4) {
           failedTotal: failedConversions,
         },
       });
-      //    if (failedConversions > 0) {
-      //         type = 'warning';
-      //         summaryMessage += `<br>Failed conversion reasons:<br><ul>`;
-      //         failureReasons.forEach(reason => {
-      //             summaryMessage += `<li>${reason}</li>`;
-      //         });
-      //         summaryMessage += `</ul>`;
-      //     }
+      if (failedConversions > 0) {
+          type = 'warning';
+          summaryMessage += `<br>Failed conversion reasons:<br><ul>`;
+          failureReasons.forEach(reason => {
+              summaryMessage += `<li>${reason}</li>`;
+          });
+          summaryMessage += `</ul>`;
+      }
     } else {
       generateAlert({ message: "libraryUpToDate" });
     }
@@ -5653,7 +5625,7 @@ async function convertFile(
       command
         .audioBitrate("128k")
         .audioChannels(1) // Set to mono
-        .audioFrequency(30_000); // Set sample rate for BirdNET
+        .audioFrequency(32_000); // Set sample rate for BirdNET/Perch
     }
 
     let scaleFactor = 1;

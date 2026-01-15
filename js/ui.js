@@ -1131,6 +1131,7 @@ async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults 
   if (!filePaths.length) return;
   loadingFiles({hide:false})
   // Store the sanitised file list and Load First audio file
+  pagination.reset();
   resetResults();
   resetDiagnostics();
   utils.disableMenuItem([
@@ -2331,10 +2332,12 @@ const setUpWorkerMessaging = () => {
               STATE.diskHasRecords &&
                 !PREDICTING &&
                 utils.enableMenuItem(["explore", "charts"]);
+              utils.hideElement(["exploreWrapper"]);
               break;
             }
             case "archive": {
               utils.enableMenuItem(["save2db", "explore", "charts"]);
+              utils.hideElement(["exploreWrapper"]);
               break;
             }
           }
@@ -2404,10 +2407,6 @@ const setUpWorkerMessaging = () => {
           args.init && setKeyAssignmentUI(config.keyAssignment);
           break;
         }
-        case "total-records": {
-          // updatePagination(args.total, args.offset);
-          break;
-        }
         case "unsaved-records": {
           window.electron.unsavedRecords(true);
           document.getElementById("unsaved-icon").classList.remove("d-none");
@@ -2460,7 +2459,7 @@ function showWindowDetections({ detections, goToRegion }) {
       if (!config.specDetections && !active) continue;
       const colour = active ? STATE.regionActiveColour : null;
       const setPosition = active && goToRegion;
-      spec.createRegion(start, end, detection.label, setPosition, colour);
+      spec.createRegion(start, end, detection.cname, setPosition, colour);
     }
   }
 }
@@ -3531,8 +3530,13 @@ function updatePagination(species) {
   const total = species 
     ? STATE.summary.find(item => item.cname === species)?.count || 0
     : STATE.summary.reduce((acc, item) => acc + item.count, 0);
-  const offset = (pagination.getCurrentPage() - 1) * limit;
-  total > limit ? pagination.add(total, offset) : pagination.hide();
+  if (total > limit){
+      pagination.add(total);
+      STATE.paginationPending = true;
+   } else {
+    pagination.hide(); 
+    STATE.paginationPending = false;
+  }
 }
 
 const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
@@ -3690,6 +3694,7 @@ function onResultsComplete({ active = undefined, select = undefined } = {}) {
   }
   renderFilenamePanel();
   activateResultSort();
+  STATE.paginationPending && pagination.show();
 }
 
 
@@ -3805,7 +3810,7 @@ function onSummaryComplete({ filterSpecies = undefined, summary = [] }) {
 const pagination = new Pagination(
   document.querySelector(".pagination"),
   () => STATE, // Returns the current state
-  () => config, // Returns the current config
+  500, //the current limit
   () => worker,
   {
     isSpeciesViewFiltered,
@@ -3923,7 +3928,7 @@ async function renderResult({
     )
       postBufferUpdate({ file, begin: STATE.windowOffsetSecs });
   } else if (!isFromDB && index % (config.limit + 1) === 0) {
-    pagination.add(index, 0);
+    pagination.add(index);
   }
   if (!isFromDB && index > config.limit) {
     return;
@@ -4945,6 +4950,7 @@ const handleThresholdChange = (e) => {
     action: "update-state",
     detect: { confidence: config.detect.confidence },
   });
+  pagination.reset();
   if (STATE.mode === "explore") {
     // Update the seen species list
     worker.postMessage({ action: "get-detected-species-list" });
@@ -6004,7 +6010,8 @@ function changeSettingsMode(target) {
  */
 async function updateList() {
   updateListIcon();
-  setListUIState(config.list)
+  setListUIState(config.list);
+  pagination.reset();
   if (config.list === "custom") {
     await readLabels(config.models[config.selectedModel].customListFile, "list");
   } else {
