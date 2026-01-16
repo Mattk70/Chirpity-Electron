@@ -5575,8 +5575,7 @@ async function convertAndOrganiseFiles(threadLimit = 4) {
       }
     });
     const attempted = successfulConversions + failedConversions;
-    // Create a summary message
-    let summaryMessage;
+
     let type = "info";
 
     if (attempted) {
@@ -5586,14 +5585,18 @@ async function convertAndOrganiseFiles(threadLimit = 4) {
           successTotal: successfulConversions,
           failedTotal: failedConversions,
         },
+        autohide: false
       });
       if (failedConversions > 0) {
-          type = 'warning';
-          summaryMessage += `<br>Failed conversion reasons:<br><ul>`;
-          failureReasons.forEach(reason => {
-              summaryMessage += `<li>${reason}</li>`;
-          });
-          summaryMessage += `</ul>`;
+          // Create a summary message
+        let summaryMessage = `There were ${failedConversions} failures. `;
+        type = 'warning';
+        summaryMessage += `<br>Failed conversion reasons:<br><ul>`;
+        failureReasons.forEach(reason => {
+            summaryMessage += `<li>${reason}</li>`;
+        });
+        summaryMessage += `</ul>`;
+        generateAlert({message: summaryMessage, type:'warning'})
       }
     } else {
       generateAlert({ message: "libraryUpToDate" });
