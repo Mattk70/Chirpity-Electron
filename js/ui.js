@@ -1119,13 +1119,14 @@ async function sortFilesByTime(fileNames) {
     .map((file) => file.name); // Return sorted file names
 }
 /**
- * Opens one or more audio files, resets analysis state, and updates the UI for new input.
+ * Open one or more audio files and prepare the application state and UI for analysis.
  *
- * Loads the provided audio files, resets analysis results and diagnostics, updates menu items, and initializes the spectrogram. If multiple files are selected, sorts them by creation time and enables batch analysis options. Begins loading the first file in the list.
+ * Loads the specified files (sorting by creation time when multiple are provided), resets pagination, diagnostics, and result state, adjusts relevant menu items and spectrogram visibility, sets the UI mode to analysis, and begins loading the first file.
  *
- * @param {Object} args - Arguments for file opening.
+ * @param {Object} args
  * @param {string[]} args.filePaths - Paths of audio files to open.
- * @param {boolean} [args.preserveResults] - If true, preserves previous analysis results.
+ * @param {boolean} [args.checkSaved=true] - If false, mark analysis as complete for the opened files.
+ * @param {boolean} [args.preserveResults] - If true, preserve previous analysis results when loading the file.
  */
 async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults } = {}) {
   if (!filePaths.length) return;
@@ -1565,14 +1566,11 @@ async function showExplore() {
 }
 
 /**
- * Initiates the audio analysis workflow.
+ * Prepare the application and worker for performing analysis on the current file.
  *
- * This asynchronous function restores the previously saved analysis state and configures the UI and worker
- * process for a new analysis cycle. It disables the active analysis menu item, updates the worker mode,
- * and destroys any existing spectrogram instance to avoid conflicts. If an audio file is loaded, it
- * reveals the spectrogram UI, reinitializes the spectrogram, and updates the worker with the current state.
- * Depending on whether analysis was already completed, it either filters the results or reloads the audio file for analysis.
- * Finally, it resets the displayed results.
+ * Restores the saved analysis state, switches the UI and worker into analysis mode, ensures the spectrogram
+ * is initialized for analysis, updates the worker with the open-files and sort state, and either filters
+ * existing results or loads the current file for analysis. Finally, clears and resets the visible results.
  *
  * @async
  */
@@ -2456,14 +2454,13 @@ const setUpWorkerMessaging = () => {
 };
 
 /**
- * Creates and displays audio regions for detections within the current spectrogram window.
+ * Display regions for detections that fall within the current spectrogram window.
  *
- * Adjusts detection times relative to the current window offset and creates regions for those visible in the window. Only active detections or those allowed by configuration are processed. Optionally repositions the view to an active region.
+ * For each detection whose start time lies inside the current window, a region is created using times adjusted by the window offset. Only the active detection or detections allowed by configuration are shown. If `goToRegion` is true and a detection is active, the view is repositioned to that region.
  *
  * @param {Object} options - Options for region creation.
- * @param {Array<Object>} options.detections - Detections to display, each with `start`, `end`, and `label` properties.
- * @param {boolean} options.goToRegion - Whether to reposition the view to the active region.
- */
+ * @param {Array<Object>} options.detections - Array of detection objects. Each object should include `start` and `end` (seconds) and may include `label` or `cname` used for region labeling.
+ * @param {boolean} options.goToRegion - If true, reposition the view to the active region when one is present.
 function showWindowDetections({ detections, goToRegion }) {
   for (const detection of detections) {
     const start = detection.start - STATE.windowOffsetSecs;
@@ -3533,11 +3530,11 @@ async function onWorkerLoadedAudio({
 
 
 /**
- * Updates the pagination controls based on the total number of items.
+ * Configure UI pagination based on the total number of items for the current view.
  *
- * If the total exceeds the configured limit, pagination controls are rendered using the given offset.
- * Otherwise, all pagination elements are hidden.
+ * When the computed total exceeds the configured per-page limit, pagination controls are enabled and configured for the total count; otherwise pagination controls are hidden. This function also updates STATE.paginationPending to reflect whether pagination needs to be rendered.
  *
+ * @param {string} [species] - Optional canonical species name; when provided, only that species' count is considered. If omitted, the total count across all summary items is used.
  */
 function updatePagination(species) {
   const limit = config.limit;
@@ -3654,13 +3651,13 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
 };
 
 /**
- * Finalizes result processing by updating the results table UI and activating the appropriate result row.
+ * Finalizes result rendering and ensures an appropriate result row is activated in the UI.
  *
- * Replaces the results table with the latest data, resets analysis state, and determines which row to activate based on the provided options or current table state. Ensures the selected row is activated and scrolled into view, updates sorting indicators, and refreshes related UI panels.
+ * Replaces the results table with the prepared content, clears analysis state, updates sorting and label indicators, and activates (and scrolls to) a result row determined by the provided options or current table state. Also refreshes the filename panel and pagination display as needed.
  *
- * @param {Object} [options={}] - Options for determining which result row to activate.
- * @param {number} [options.active] - Index of the row to activate, if specified.
- * @param {*} [options.select] - Value used to identify the row to activate via a helper function.
+ * @param {Object} [options={}] - Options controlling which result row to activate.
+ * @param {number} [options.active] - Zero-based row index to activate; if not present the function will use `select` or the current/first row.
+ * @param {*} [options.select] - Value used to locate a row via the selection helper; used when `active` is not provided.
  */
 function onResultsComplete({ active = undefined, select = undefined } = {}) {
   PREDICTING = false; powerSave(false);
@@ -3786,11 +3783,11 @@ function onAnalysisComplete({ quiet }) {
 }
 
 /**
- * Updates the UI after summary data is loaded, refreshing the summary table, enabling or disabling menu items, and applying species filters if provided.
+ * Refreshes the UI summary view after summary data is available, applying an optional species filter, updating the summary table rows and hover styling, and enabling or disabling related menu actions.
  *
  * @param {Object} options - Parameters for updating the summary view.
- * @param {*} [options.filterSpecies] - Optional filter to restrict summary to specific species.
- * @param {Array} [options.summary=[]] - Summary records to display in the UI.
+ * @param {*} [options.filterSpecies] - Optional species identifier or filter to restrict which species are shown in the summary.
+ * @param {Array} [options.summary=[]] - Array of summary records to render in the summary table.
  */
 function onSummaryComplete({ filterSpecies = undefined, summary = [] }) {
   updateSummary({ summary: summary, filterSpecies: filterSpecies });
@@ -3823,20 +3820,15 @@ function onSummaryComplete({ filterSpecies = undefined, summary = [] }) {
 
 
 /**
- * Toggles the species filter based on user interaction with the summary table.
+ * Toggle the species filter from a click on the summary table.
  *
- * Validates the event against non-interactive elements and current analysis state before proceeding.
- * If the selected row is already highlighted (indicating an active filter), the highlight is removed;
- * otherwise, all highlighted rows are cleared, the current row is marked, and the corresponding species
- * is extracted from the clicked element. In explore mode, the species value is set in the bird list display.
- * Subsequently, the function refreshes the results filtering and resets the UI components without clearing
- * the summary, pagination, or result listings.
+ * When a summary row is clicked, either clear an existing species filter (if the
+ * row was active) or activate a new species filter by highlighting the row,
+ * setting the autocomplete value, updating pagination, refreshing filtered
+ * results, and resetting UI components without clearing the summary, pagination,
+ * or current result listings.
  *
- * @param {Event} e - The DOM event triggered by the user's click on a table row.
- *
- * @example
- * // Apply species filtering when a table row is clicked.
- * speciesFilter(event);
+ * @param {Event} e - Click event originating from the summary table row.
  */
 function speciesFilter(e) {
   if (
@@ -3875,15 +3867,17 @@ function setAutocomplete(species) {
 }
 
 /**
- * Render a single detection row into the results table and update related headers, pagination, and UI state.
+ * Render a single detection row into the results table and update table headers, pagination, and related UI state.
+ *
+ * Renders or resets the results header when index is 1, appends a table row for the provided detection data,
+ * updates pagination when results exceed page limits, and triggers a buffer update for visible detections when appropriate.
  *
  * @param {Object} options - Rendering options.
- * @param {number} [options.index=1] - Sequential index of the detection result within the current result set.
- * @param {Object} [options.result={}] - Detection data (timestamp, position, species, score, label, review status, model info, etc.).
- * @param {*} [options.file=undefined] - Associated audio file reference for the detection.
- * @param {boolean} [options.isFromDB=false] - True when the result originates from the database (affects pagination and rendering).
- * @param {boolean} [options.selection=false] - True when rendering into a selection-specific view (hides some UI elements).
- *
+ * @param {number} [options.index=1] - Sequential index of the detection within the current result set.
+ * @param {Object} [options.result={}] - Detection record containing fields like `timestamp`, `position`, `sname`, `cname`, `score`, `label`, `reviewed`, `model`, `modelID`, `count`, `callCount`, `comment`, `isDaylight`, `active`, and `end`.
+ * @param {*} [options.file] - Reference to the associated audio file (used for buffer updates/navigation).
+ * @param {boolean} [options.isFromDB=false] - When true, treat the result as originating from the database (affects pagination and rendering choices).
+ * @param {boolean} [options.selection=false] - When true, render for a selection-specific view (hides certain UI elements and does not store prediction state).
  * @returns {Promise<void>} Nothing.
  */
 
@@ -4429,7 +4423,11 @@ const populateSpeciesModal = async ({included, excluded, place}) => {
   STATE.includedList = included;
 };
 
-// exporting a list
+/**
+ * Save the current included species list as a plain-text CSV file and start a download named "species_list.txt".
+ *
+ * Each line contains the species scientific name and common name separated by a comma.
+ */
 function exportSpeciesList() {
   const included = STATE.includedList;
   // Create a blob containing the content of included array
@@ -5187,11 +5185,11 @@ const showRelevantAudioQuality = () => {
 };
 document.addEventListener("click", debounceClick(handleUIClicks));
 /**
- * Handles all UI click events by dispatching actions based on the clicked element's ID.
+ * Dispatches application actions based on the clicked element's ID.
  *
- * Routes user clicks to the appropriate application logic, including file operations, analysis commands, model management, settings adjustments, help dialogs, sorting, context menu actions, and UI updates. Updates application state, communicates with the worker thread, manages configuration, and triggers relevant UI changes as needed.
+ * Routes click events to the appropriate UI handlers (file and export operations, analysis and training commands, model management, settings and help dialogs, sorting and filtering, context-menu actions, and other UI updates). Events are ignored until the application has finished loading.
  *
- * @param {MouseEvent} e - The click event object.
+ * @param {MouseEvent} e - Click event whose target (or nearest ancestor with an id) determines which action to invoke.
  */
 async function handleUIClicks(e) {
   if (!APPLICATION_LOADED) return;
@@ -6593,15 +6591,14 @@ function setListUIState(list) {
 }
 
 /**
- * Loads and processes a label file, updating species labels or custom lists for the application.
+ * Load labels from a file and apply them to the application's locale labels or custom species list.
  *
- * If the label file cannot be fetched, displays an error toast and updates the UI to prompt for correction.
- * On success, updates the worker with the new labels or custom list, and ensures an "Unknown Sp._Unknown Sp." entry is present.
+ * Ensures an "Unknown Sp.<splitChar>Unknown Sp." entry is present. On success, sends an update to the worker to replace
+ * either the locale labels or the custom list and triggers a results refresh when appropriate. On failure, surfaces a
+ * user-facing error and highlights the list selector in the UI to prompt correction.
  *
  * @param {string} labelFile - Path or URL to the label file to load.
- * @param {string} [updating] - If set to "list", updates the custom species list; otherwise, updates locale labels.
- *
- * @throws {Error} If the label file cannot be fetched or read.
+ * @param {string} [updating] - If set to `"list"`, update the custom species list; otherwise update locale labels.
  */
 async function readLabels(labelFile, updating) {
   try {

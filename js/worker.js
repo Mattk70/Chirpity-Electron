@@ -351,12 +351,12 @@ async function setLabelState({ regenerate }) {
 
 
 /**
- * Handles and dispatches worker messages to perform actions such as analysis, file operations, prediction management, database updates, and UI communication.
+ * Dispatches incoming worker messages by action and performs the requested application operation.
  *
- * Processes incoming event messages containing an `action` field and delegates tasks accordingly, including model initialization, audio analysis, prediction worker management, database record manipulation, file loading and saving, exporting, importing, and updating application state. Waits for initialization to complete before handling most actions. Supports a wide range of commands for audio processing, data management, and UI updates.
+ * Waits for initialisation when required, then delegates actions such as model initialization, analysis/prediction control, worker management, audio file operations, database updates, import/export, tagging and list/locale updates, and UI notifications. Expects the event's data to include an `action` string and action-specific parameters.
  *
- * @param {Object} e - The message event containing an `action` and associated parameters.
- * @returns {Promise<void>} Resolves when the requested action is completed.
+ * @param {Object} e - Message event whose `data` property contains an `action` field and associated parameters.
+ * @returns {Promise<void>} Resolves when the requested action has been processed.
  */
 async function handleMessage(e) {
   const args = e.data;
@@ -1212,9 +1212,9 @@ function parseCnames(cnames) {
 
 
 /**
- * Map a list of CNAMES (possibly containing suffixes) to species IDs for the current model.
- * @param {string[]} cnames - Array of CNAMES; elements may include suffixes such as " (call)" or " (fc)".
- * @returns {number[]} Array of matching species IDs for STATE.modelID, empty if no matches.
+ * Map CNAMES (including variants with suffixes like " (call)" or " (fc)") to species IDs for the current model.
+ * @param {string[]} cnames - CNAMES to resolve; elements may include suffixes (e.g., "Species (call)").
+ * @returns {number[]} Matching species IDs for STATE.modelID; an empty array if no matches.
  */
 async function getMatchingIds(cnames) {
   const parsed = parseCnames(cnames);
@@ -1548,16 +1548,16 @@ async function updateMetadata(fileNames) {
 }
 
 /**
- * Start analysis of the provided audio files: prepare selection and global state, decide whether to reuse cached results or perform fresh analysis, and dispatch files to worker processors.
+ * Prepare and start analysis for the specified audio files, deciding whether to reuse cached results or run fresh processing.
  *
- * If all files are cached in the disk database (or when `circleClicked` is true), this function will retrieve results/summary instead of reprocessing. Otherwise it clears/sets analysis state, updates metadata, populates the processing queue, and starts worker-driven processing.
+ * If all files are present in the disk database (or `circleClicked` is true) this will retrieve summary and results from the archive; otherwise it initializes analysis state, updates metadata, populates the processing queue, and dispatches files to worker processors.
  *
  * @param {Object} params - Analysis parameters.
- * @param {string[]} [params.filesInScope=[]] - Array of file paths to include in the analysis.
+ * @param {string[]} [params.filesInScope=[]] - File paths to include in the analysis.
  * @param {number} [params.start] - Optional start time (seconds) to limit analysis range for the first file.
  * @param {number} [params.end] - Optional end time (seconds) to limit analysis range for the first file.
- * @param {boolean} [params.reanalyse=false] - When true, forces reanalysis even if results appear cached.
- * @param {boolean} [params.circleClicked=false] - When true, trigger retrieval mode (fetch top results/summary) instead of running a full analysis.
+ * @param {boolean} [params.reanalyse=false] - Force reanalysis even if cached results exist.
+ * @param {boolean} [params.circleClicked=false] - If true, retrieve top results/summary from the archive instead of running a full analysis.
  */
 async function onAnalyse({
   filesInScope = [],
@@ -4365,16 +4365,14 @@ function exportAudacity(result, directory) {
 
 
 /**
- * Exports detection or summary records to a CSV file in the specified format.
+ * Export detection or summary records to a CSV file in the specified format.
  *
- * Supports "text", "eBird", "Raven", and "summary" formats, applying format-specific transformations and batching for large datasets. In "Raven" format, assigns selection numbers and cumulative offsets; in "eBird" format, aggregates species counts by group. For "summary", applies custom headers and unit conversions as needed. Writes the resulting data to a CSV file with the appropriate delimiter and notifies the UI on completion or error.
+ * Supports formats: "text", "eBird", "Raven", and "summary". "Raven" output uses a tab delimiter and assigns selection numbers and cumulative file offsets. "eBird" output aggregates species counts by Start Time, Common name, and Species. "summary" output applies the provided header mapping and converts the `max` field by dividing it by 1000.
  *
- * @async
- * @param {Array<Object>} result - The records to export.
- * @param {string} filename - The destination file path.
- * @param {string} format - The export format: "text", "eBird", "Raven", or "summary".
- * @param {Object} [headers] - Optional column header mapping for "summary" format.
- */
+ * @param {Array<Object>} result - Array of detection or summary records to export.
+ * @param {string} filename - Destination filesystem path for the exported CSV.
+ * @param {string} format - Export format: "text", "eBird", "Raven", or "summary".
+ * @param {Object} [headers] - Optional mapping of source keys to column headers (used for "summary" format).
 async function exportData(result, filename, format, headers) {
   const formatFunctions = {
     text: "formatCSVValues",
@@ -4481,6 +4479,11 @@ async function exportData(result, filename, format, headers) {
     });
 }
 
+/**
+ * Compute the day-of-year for a given Date.
+ * @param {Date} date - The date to evaluate.
+ * @returns {number} The day number within the year (1 through 365, or 366 in a leap year).
+ */
 function dayOfYear(date) {
   const monthLengths = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
   const year = date.getFullYear();
@@ -4496,11 +4499,25 @@ function dayOfYear(date) {
 }
 
 
+/**
+ * Convert a day-month string into the corresponding day-of-year for a given year.
+ *
+ * @param {string} dayMonth - Day and month in the form "D-M" or "DD-MM" (e.g., "5-1" or "05-01").
+ * @param {number} year - Four-digit year used to account for leap years.
+ * @returns {number} The 1-based day of year corresponding to the provided date.
+ */
 function dayMonthToDayOfYear(dayMonth, year) {
   const [day, month] = dayMonth.split("-").map(Number);
   return dayOfYear(new Date(year, month - 1, day));
 }
 
+/**
+ * Determine whether a timestamp falls within an inclusive day/month range, correctly handling ranges that wrap across the end of the year.
+ * @param {number} epochMs - Timestamp in milliseconds since the Unix epoch.
+ * @param {*} startDM - Start day/month specifier accepted by dayMonthToDayOfYear (e.g., a "MM-DD" string or equivalent format used by that helper).
+ * @param {*} endDM - End day/month specifier accepted by dayMonthToDayOfYear.
+ * @returns {boolean} `true` if the timestamp's day-of-year is between startDM and endDM inclusive, `false` otherwise.
+ */
 function epochInDayMonthRange(epochMs, startDM, endDM) {
   const date = new Date(epochMs);
   const year = date.getFullYear();
@@ -4518,6 +4535,13 @@ function epochInDayMonthRange(epochMs, startDM, endDM) {
   return targetDay >= startDay || targetDay <= endDay;
 }
 
+/**
+ * Determine whether a detection is permitted by the active custom label list.
+ *
+ * Checks that the detection's species (cname) exists in STATE.customLabelsMap, that the detection timestamp falls within the species' optional start/end day-month range, and that the detection score meets the species-specific confidence threshold (falls back to STATE.detect.confidence when no species-specific threshold is set).
+ * @param {{timestamp:number, cname:string, score:number}} result - Detection object with epoch milliseconds `timestamp`, canonical species name `cname`, and detection confidence `score`.
+ * @returns {boolean} `true` if the detection passes the custom-list filters, `false` otherwise.
+ */
 function allowedByList(result){
   // Handle enhanced lists
   const {timestamp, cname, score} = result;
@@ -5329,16 +5353,16 @@ function deepMergeLists(model, list) {
 let LIST_CACHE = {};
 
 /**
- * Retrieves and caches the included species IDs for a given location and week, updating the global state.
+ * Load and cache species IDs included for a given location and week and merge them into global STATE.
  *
- * Requests a species inclusion list from the list worker based on model, labels, location, and week, merges the result into the global included species state, and caches the promise to avoid redundant requests. Generates alerts for any unrecognized labels and throws an error if such labels are found.
+ * Requests an inclusion list from the list worker using the current model, labels, list settings and the provided
+ * latitude/longitude/week (falling back to STATE values), merges the resulting IDs into STATE.included, caches the
+ * in-flight promise to avoid duplicate requests, and emits warnings for any unrecognized labels reported by the worker.
  *
- * @param {number|string} lat - Latitude for location-based filtering.
- * @param {number|string} lon - Longitude for location-based filtering.
- * @param {number|string} week - Week number for seasonal filtering.
- * @returns {Promise<Object>} The updated included species object in the global state.
- *
- * @throws {Error} If unrecognized labels are found in the custom list.
+ * @param {number|string} lat - Latitude to use for location-specific lists (falls back to STATE.lat if falsy).
+ * @param {number|string} lon - Longitude to use for location-specific lists (falls back to STATE.lon if falsy).
+ * @param {number|string} week - Week number for seasonal filtering (falls back to STATE.week if falsy).
+ * @returns {Promise<Object>} The updated STATE.included object after merging the retrieved included species IDs.
  */
 async function setIncludedIDs(lat, lon, week) {
   const key = `${lat}-${lon}-${week}-${STATE.model}-${STATE.list}`;
@@ -5422,22 +5446,10 @@ async function setIncludedIDs(lat, lon, week) {
 const pLimit = require("p-limit");
 
 /**
- * Organizes and converts audio files.
+ * Convert and organize audio files into the configured archive using year/month/place folders.
  *
- * This asynchronous function verifies that the archive directory exists and is writable before proceeding.
- * It retrieves file records from the database—optionally filtering to include only those with associated detection
- * records when library clips mode is active—and computes target output directories based on each file's recording date
- * and sanitized location. For files that exist and have not already been converted, the function schedules conversion
- * tasks with a configurable concurrency limit (defaulting to 4), while generating alerts for any encountered issues.
- * Upon completion of all tasks, it updates the UI with final progress and a summary alert detailing the counts of
- * successful and failed conversions.
- *
- * 1. Pull files from db that do not have archiveName
- * 2.
- *
- * @param {number} [threadLimit=4] - Maximum number of concurrent file conversion tasks.
- * @returns {Promise<boolean|undefined>} Resolves to false if the archive directory is missing or unwritable; otherwise,
- * the promise resolves when all conversion tasks have been processed.
+ * @param {number} [threadLimit=4] - Maximum number of concurrent conversion tasks.
+ * @returns {boolean|undefined} `false` if the archive directory is missing or not writable; otherwise `undefined` after scheduling and completing conversion tasks.
  */
 async function convertAndOrganiseFiles(threadLimit = 4) {
   // SANITY checks: archive location exists and is writeable?
@@ -5590,20 +5602,16 @@ async function convertAndOrganiseFiles(threadLimit = 4) {
 }
 
 /**
- * Converts an audio file to the archive format using FFmpeg, with optional trimming and progress tracking.
- *
- * Applies preset encoding parameters for "ogg" format and trims the audio based on calculated boundaries if enabled. Updates the file's modification time and corresponding database record upon successful conversion. Progress is reported via the provided map and UI messages.
+ * Convert an audio file into the archive format, optionally trim it to computed boundaries, update the file's mtime and database record, and report conversion progress.
  *
  * @param {string} inputFilePath - Path to the source audio file.
  * @param {string} fullFilePath - Destination path for the converted file.
- * @param {object} row - File metadata, including `id`, `duration`, and `filestart`; `duration` may be updated if trimming is applied.
- * @param {string} dbArchiveName - Archive name to record in the database.
- * @param {Object.<string, number>} fileProgressMap - Map tracking conversion progress, keyed by file paths.
- * @returns {Promise<void>} Resolves when conversion and database updates are complete.
- *
- * @throws {Error} If FFmpeg encounters an error during conversion.
- *
- * @remark Issues alerts for multi-day or all-daylight recordings when trimming boundaries are atypical.
+ * @param {object} row - File metadata object containing at least `id`, `duration`, and `filestart`. If trimming is applied, `row.duration` will be updated to the trimmed duration.
+ * @param {object} db - SQLite database handle used to update the file record.
+ * @param {string} dbArchiveName - Archive name to store in the database for the converted file.
+ * @param {Object.<string, number>} fileProgressMap - Map tracking per-file conversion progress (percent values), keyed by input file path; used to compute aggregate progress reported to the UI.
+ * @returns {Promise<void>} Resolves when the conversion, file timestamp update, and database update complete.
+ * @throws {Error} If FFmpeg reports an error during conversion (promise will reject).
  */
 async function convertFile(
   inputFilePath,
