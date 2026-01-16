@@ -142,31 +142,30 @@ function cosineDecay(initialLearningRate, globalStep, decaySteps) {
 }
 
 /**
- * Trains a transfer learning audio classification model with configurable augmentation, loss, and caching options.
+ * Train a transfer-learning audio classification model by freezing a base model and fitting a new classifier head with configurable augmentation, loss, and caching options.
  *
- * Freezes the base model, adds a new classifier head, and trains using the provided dataset with support for mixup, noise blending, rolling augmentation, class weighting, focal loss, and label smoothing. Handles dataset preparation, caching, validation split, progress reporting, early stopping, and model saving with updated configuration and license files. Returns a summary message with training metrics and settings.
+ * Prepares datasets (optionally caching as gzipped binaries), supports stratified validation splitting, mixup, background-noise blending, rolling augmentation, class weighting, focal loss, label smoothing, cosine learning-rate decay, early stopping, and periodic model checkpointing. Writes labels and a LICENSE to the save location and returns a summary message describing training metrics and settings.
  *
  * @param {Object} options - Training configuration options.
- * @param {Object} options.Model - The model wrapper object containing the base model and utility methods.
+ * @param {Object} options.Model - Wrapper providing the base model, utility methods (e.g., getSpectrogram, loadModel), and model metadata.
  * @param {number} options.lr - Initial learning rate.
- * @param {number} [options.batchSize=32] - Batch size for training.
- * @param {number} options.dropout - Dropout rate for hidden layers.
- * @param {number} options.epochs - Number of training epochs.
- * @param {number} options.hidden - Number of units in the optional hidden dense layer.
- * @param {string} options.dataset - Path to the dataset directory.
- * @param {string} options.cache - Path to the cache folder for binary datasets.
- * @param {string} options.modelLocation - Directory to save the trained model.
- * @param {string} options.modelType - Model saving mode ('append' to merge outputs).
- * @param {boolean} options.useCache - Whether to use cached binary datasets if available.
- * @param {number} options.validation - Validation split ratio (0–1).
- * @param {boolean} options.mixup - Whether to apply mixup augmentation.
- * @param {boolean} options.decay - Whether to use cosine learning rate decay.
- * @param {boolean} options.useWeights - Whether to use class weights in the loss function.
- * @param {boolean} options.useFocal - Whether to use focal loss.
- * @param {boolean} options.useNoise - Whether to blend background noise into training samples.
- * @param {number} options.labelSmoothing - Amount of label smoothing to apply in the loss.
- * @returns {Promise<Object>} A message object summarizing training results, metrics, and settings.
- */
+ * @param {number} [options.batchSize=32] - Number of samples per training batch.
+ * @param {number} options.dropout - Dropout rate applied to the classifier head when a hidden layer is present.
+ * @param {number} options.epochs - Maximum number of training epochs.
+ * @param {number} options.hidden - Number of units in the optional hidden dense layer of the classifier head.
+ * @param {string} options.dataset - Path to the root dataset folder containing class-labeled subfolders of audio files.
+ * @param {string} options.cache - Folder path used for storing or reading gzipped binary dataset caches.
+ * @param {string} options.modelLocation - Directory where the trained model, labels.txt, and auxiliary files will be saved.
+ * @param {string} options.modelType - Model saving mode; use 'append' to merge base outputs with classifier outputs when saving.
+ * @param {boolean} options.useCache - If true, use existing cached binary datasets when present.
+ * @param {number} options.validation - Fraction (0–1) of data to reserve for validation; when omitted, no validation split is created.
+ * @param {boolean} options.mixup - If true, apply mixup augmentation by pairing and interpolating training samples.
+ * @param {boolean} options.decay - If true, apply cosine learning-rate decay across epochs.
+ * @param {boolean} options.useWeights - If true, apply per-class weighting to the loss based on class frequencies.
+ * @param {boolean} options.useFocal - If true, use focal loss instead of softmax cross-entropy.
+ * @param {boolean} options.useNoise - If true, blend background-noise samples into training batches (requires background-labeled files).
+ * @param {number} options.labelSmoothing - Amount of label smoothing to apply in the loss (0 disables smoothing).
+ * @returns {Object} A message object summarizing training results, final metrics, notifications, and the training history.
 async function trainModel({
       Model, 
       lr:initialLearningRate,
