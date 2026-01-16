@@ -4211,11 +4211,9 @@ const getResults = async ({
 
   let result = await STATE.db.allAsync(sql, ...params);
   // Apply custom list filtering
-  const t0 = Date.now();
   if (STATE.list === 'custom'){
     result = result.map( (r) => allowedByList(r) ? r : null).filter(r => r !== null).slice(offset, offset + limit);
   }
-  console.log(`Filtering by custom list took ${Date.now() - t0} ms`);
   if (["text", "eBird", "Raven"].includes(format)) {
     await exportData(result, path, format);
   } else if (format === "Audacity") {
