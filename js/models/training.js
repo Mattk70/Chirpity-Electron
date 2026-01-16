@@ -166,6 +166,7 @@ function cosineDecay(initialLearningRate, globalStep, decaySteps) {
  * @param {boolean} options.useNoise - If true, blend background-noise samples into training batches (requires background-labeled files).
  * @param {number} options.labelSmoothing - Amount of label smoothing to apply in the loss (0 disables smoothing).
  * @returns {Object} A message object summarizing training results, final metrics, notifications, and the training history.
+ */
 async function trainModel({
       Model, 
       lr:initialLearningRate,
