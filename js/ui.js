@@ -2461,6 +2461,7 @@ const setUpWorkerMessaging = () => {
  * @param {Object} options - Options for region creation.
  * @param {Array<Object>} options.detections - Array of detection objects. Each object should include `start` and `end` (seconds) and may include `label` or `cname` used for region labeling.
  * @param {boolean} options.goToRegion - If true, reposition the view to the active region when one is present.
+ */
 function showWindowDetections({ detections, goToRegion }) {
   for (const detection of detections) {
     const start = detection.start - STATE.windowOffsetSecs;
