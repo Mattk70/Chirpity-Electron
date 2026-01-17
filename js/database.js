@@ -291,6 +291,9 @@ const createDB = async ({file, diskDB, dbMutex}) => {
     DEBUG && console.log("Created disk database", diskDB.filename);
   } else {
     memoryDB = new sqlite3.Database(":memory:");
+
+    await memoryDB.runAsync(`CREATE TABLE IF NOT EXISTS 
+      confidence_overrides (speciesID INTEGER PRIMARY KEY, minConfidence REAL)`);
     DEBUG && console.log("Created new in-memory database");
   }
   const db = archiveMode ? diskDB : memoryDB;

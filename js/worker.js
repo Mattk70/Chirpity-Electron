@@ -637,43 +637,67 @@ async function handleMessage(e) {
     case "update-list": {
       STATE.list = args.list;
       if (args.list === "custom") {
+        const usingMemoryDB = STATE.db === memoryDB;
+        if (usingMemoryDB) await memoryDB.runAsync('DELETE FROM confidence_overrides');
         STATE.customLabels = args.customLabels;
         STATE.customLabelsMap = Object.fromEntries(
-          args.customLabels.map(line => {
-            let [_sname, cname, start, end, confidence] = line.split(",").map(v => v.trim());           
-            if (!args.member) {
-              start = undefined;
-              end = undefined;
-              confidence = undefined;
-            } else {
-              // Sanity check the values (start and end, if defined, should be xx-xx )
-              [start, end].forEach((val) => {
-                if (val && !/^\d{1,2}-\d{1,2}$/.test(val)) {
-                  const message = `Custom list start/end value malformed, it should be 'DD-MM': ${line}`;
-                  generateAlert({message, type:'warning' });
-                  console.warn(message);
-                  start = undefined; end = undefined;
-                }
-              });
-              if (confidence && (isNaN(confidence) || confidence < 0 || confidence > 1)) {
-                const message = `Custom list confidence value must be a number between 0 and 1: ${line}`;
-                generateAlert({message, type:'warning' });
-                console.warn(message);
+          await Promise.all(
+            args.customLabels.map(async (line) => {
+              let [_sname, cname, start, end, confidence] =
+                line.split(",").map(v => v.trim());
+
+              if (!args.member) {
+                start = undefined;
+                end = undefined;
                 confidence = undefined;
+              } else {
+                // Sanity check start/end
+                [start, end].forEach((val) => {
+                  if (val && !/^\d{1,2}-\d{1,2}$/.test(val)) {
+                    const message =
+                      `Custom list start/end value malformed, it should be 'DD-MM': ${line}`;
+                    generateAlert({ message, type: 'warning' });
+                    console.warn(message);
+                    start = undefined;
+                    end = undefined;
+                  }
+                });
+
+                if (confidence && (isNaN(confidence) || confidence < 0 || confidence > 1)) {
+                  const message =
+                    `Custom list confidence value must be a number between 0 and 1: ${line}`;
+                  generateAlert({ message, type: 'warning' });
+                  console.warn(message);
+                  confidence = undefined;
+                } else if (confidence && usingMemoryDB){
+                  const result = await memoryDB.runAsync(
+                    `
+                    INSERT INTO confidence_overrides (speciesID, minConfidence)
+                    SELECT id, ?
+                    FROM species
+                    WHERE cname = ?
+                    `,
+                    Number(confidence),
+                    cname
+                  );
+                  console.log(result)
+                }
               }
-            }
-            if (cname && !['nocmig', 'chirpity'].includes(STATE.model)){
-              cname = cname.replace(/\s*\(.*?\)\s*$/g, ''); // remove any bracketed text for non-migrant models
-            }
-            return [
-              cname,
-              {
-                start,
-                end,
-                confidence: confidence ? Number(confidence)*1000 : null
+
+              if (cname && !['nocmig', 'chirpity'].includes(STATE.model)) {
+                cname = cname.replace(/\s*\(.*?\)\s*$/g, '');
               }
-            ];
-          })
+
+              return [
+                cname,
+                {
+                  start,
+                  end,
+                  confidence: confidence != null ? Number(confidence) * 1000 : null
+                }
+              ];
+            })
+          )
         );
       }
       // Clear the LIST_CACHE & STATE.included keys to force list regeneration
@@ -4632,7 +4656,7 @@ const onSave2DiskDB = async ({ file }) => {
       SELECT id, lat, lon, place FROM locations;
     `);
     await memoryDB.runAsync(
-      `INSERT OR IGNORE INTO disk.files SELECT * FROM files`
+      `INSERT OR REPLACE INTO disk.files SELECT * FROM files`
     );
     await memoryDB.runAsync(
       `INSERT OR IGNORE INTO disk.tags SELECT * FROM tags`
@@ -4640,7 +4664,7 @@ const onSave2DiskDB = async ({ file }) => {
 
     // Update the duration table
     response = await memoryDB.runAsync(
-      "INSERT OR IGNORE INTO disk.duration SELECT * FROM duration"
+      "INSERT OR REPLACE INTO disk.duration SELECT * FROM duration"
     );
     DEBUG &&
       console.log(response.changes + " date durations added to disk database");
@@ -4655,7 +4679,9 @@ const onSave2DiskDB = async ({ file }) => {
                 r.comment, r.end, r.callCount, r.isDaylight, r.reviewed, r.tagID
             FROM records r
             JOIN species s ON r.speciesID = s.id  
-            WHERE confidence >= ${STATE.detect.confidence} ${filterClause}`);
+            LEFT JOIN confidence_overrides co ON co.speciesID = r.speciesID
+            WHERE r.confidence >= COALESCE(co.minConfidence, ${STATE.detect.confidence}) 
+            ${filterClause}`);
     DEBUG && console.log(response?.changes + " records added to disk database");
     await memoryDB.runAsync("END");
   } catch (error) {

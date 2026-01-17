@@ -5256,7 +5256,7 @@ async function handleUIClicks(e) {
 
     // Records menu
     case "save2db": {
-      worker.postMessage({ action: "save2db", file: STATE.currentFile });
+      if (!element.classList.contains('disabled')) worker.postMessage({ action: "save2db", file: STATE.currentFile });
       break;
     }
     case "charts": {
