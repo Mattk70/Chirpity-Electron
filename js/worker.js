@@ -676,7 +676,7 @@ async function handleMessage(e) {
                     FROM species
                     WHERE cname = ?
                     `,
-                    Number(confidence),
+                    Number(confidence)*1000,
                     cname
                   );
                 }
