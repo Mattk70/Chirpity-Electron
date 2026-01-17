@@ -274,6 +274,8 @@ async function loadDB(modelPath) {
     STATE.modelID = modelID;
   } else {
     diskDB = new sqlite3.Database(file);
+    await diskDB.runAsync(`CREATE TABLE IF NOT EXISTS 
+      confidence_overrides (speciesID INTEGER PRIMARY KEY, minConfidence REAL)`);
     DEBUG && console.log("Opened and cleaned disk db " + file);
   }
   const labelsFile = 'labels.txt';
@@ -306,9 +308,7 @@ async function loadDB(modelPath) {
     STATE.speciesMap.get(modelID).set(classIndex, id);
   });
 
-  const row = await diskDB.getAsync(
-    "SELECT 1 FROM records LIMIT 1"
-  );
+  const row = await diskDB.getAsync("SELECT 1 FROM records LIMIT 1");
   if (row) {
     UI.postMessage({ event: "diskDB-has-records" });
   }
@@ -636,9 +636,8 @@ async function handleMessage(e) {
     }
     case "update-list": {
       STATE.list = args.list;
+      await diskDB.runAsync('DELETE FROM confidence_overrides');
       if (args.list === "custom") {
-        const usingMemoryDB = STATE.db === memoryDB;
-        if (usingMemoryDB) await memoryDB.runAsync('DELETE FROM confidence_overrides');
         STATE.customLabels = args.customLabels;
         STATE.customLabelsMap = Object.fromEntries(
           await Promise.all(
@@ -669,10 +668,10 @@ async function handleMessage(e) {
                   generateAlert({ message, type: 'warning' });
                   console.warn(message);
                   confidence = undefined;
-                } else if (confidence && usingMemoryDB){
-                  const result = await memoryDB.runAsync(
+                } else if (confidence){
+                  const result = await diskDB.runAsync(
                     `
-                    INSERT INTO confidence_overrides (speciesID, minConfidence)
+                    INSERT OR IGNORE INTO confidence_overrides (speciesID, minConfidence)
                     SELECT id, ?
                     FROM species
                     WHERE cname = ?
@@ -680,7 +679,6 @@ async function handleMessage(e) {
                     Number(confidence),
                     cname
                   );
-                  console.log(result)
                 }
               }
 
@@ -4679,7 +4677,7 @@ const onSave2DiskDB = async ({ file }) => {
                 r.comment, r.end, r.callCount, r.isDaylight, r.reviewed, r.tagID
             FROM records r
             JOIN species s ON r.speciesID = s.id  
-            LEFT JOIN confidence_overrides co ON co.speciesID = r.speciesID
+            LEFT JOIN disk.confidence_overrides co ON co.speciesID = r.speciesID
             WHERE r.confidence >= COALESCE(co.minConfidence, ${STATE.detect.confidence}) 
             ${filterClause}`);
     DEBUG && console.log(response?.changes + " records added to disk database");

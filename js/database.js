@@ -291,9 +291,6 @@ const createDB = async ({file, diskDB, dbMutex}) => {
     DEBUG && console.log("Created disk database", diskDB.filename);
   } else {
     memoryDB = new sqlite3.Database(":memory:");
-
-    await memoryDB.runAsync(`CREATE TABLE IF NOT EXISTS 
-      confidence_overrides (speciesID INTEGER PRIMARY KEY, minConfidence REAL)`);
     DEBUG && console.log("Created new in-memory database");
   }
   const db = archiveMode ? diskDB : memoryDB;
@@ -328,16 +325,10 @@ const createDB = async ({file, diskDB, dbMutex}) => {
         FOREIGN KEY (modelID) REFERENCES models(id) ON DELETE CASCADE
       )`
     );
-    // await db.runAsync(
-    //   `CREATE TABLE species_translations (
-    //       id INTEGER PRIMARY KEY,
-    //       sname TEXT NOT NULL,
-    //       language TEXT NOT NULL,
-    //       cname TEXT NOT NULL,
-    //       UNIQUE (cname, sname), -- Ensure one cname / sname combo. Start with en
-    //       FOREIGN KEY (sname) REFERENCES species(sname) ON DELETE CASCADE
-    //   );`
-    // );
+    await db.runAsync(`
+      CREATE TABLE  confidence_overrides(
+      speciesID INTEGER PRIMARY KEY, 
+      minConfidence REAL)`);
     await db.runAsync(
       `CREATE TABLE locations(
         id INTEGER PRIMARY KEY, 
@@ -435,7 +426,6 @@ const createDB = async ({file, diskDB, dbMutex}) => {
     console.error("Error during DB transaction:", error);
     await db.runAsync("ROLLBACK"); // Rollback the transaction in case of error
   } finally {
-    //insertTranslations(diskDB)
     dbMutex.unlock();
   }
   return db;
