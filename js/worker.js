@@ -681,11 +681,6 @@ async function handleMessage(e) {
                   );
                 }
               }
-
-              if (cname && !['nocmig', 'chirpity'].includes(STATE.model)) {
-                cname = cname.replace(/\s*\(.*?\)\s*$/g, '');
-              }
-
               return [
                 cname,
                 {
@@ -4567,7 +4562,14 @@ function epochInDayMonthRange(epochMs, startDM, endDM) {
 function allowedByList(result){
   // Handle enhanced lists
   const {timestamp, cname, score} = result;
-  const conditions = STATE.customLabelsMap[cname];
+  // Try exact match first
+  let conditions = STATE.customLabelsMap[cname];
+  // Fallback: if no exact match and model uses suffixes, try base name
+  if (!conditions && ['nocmig', 'chirpity'].includes(STATE.model)) {
+    const baseName = cname.replace(/\s*\(.*?\)\s*$/g, '');
+    conditions = STATE.customLabelsMap[baseName];
+  }
+
   if (!conditions) return false; // Species not in the custom list
 
   const {start, end, confidence} = conditions;
