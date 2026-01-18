@@ -4390,6 +4390,7 @@ function exportAudacity(result, directory) {
  * @param {string} filename - Destination filesystem path for the exported CSV.
  * @param {string} format - Export format: "text", "eBird", "Raven", or "summary".
  * @param {Object} [headers] - Optional mapping of source keys to column headers (used for "summary" format).
+ */
 async function exportData(result, filename, format, headers) {
   const formatFunctions = {
     text: "formatCSVValues",
