@@ -4425,7 +4425,7 @@ const populateSpeciesModal = async ({included, excluded, place}) => {
 };
 
 /**
- * Save the current included species list as a plain-text CSV file and start a download named "species_list.txt".
+ * Save the current included species list as a plain-text CSV file and start a download named "species_list.csv".
  *
  * Each line contains the species scientific name and common name separated by a comma.
  */
