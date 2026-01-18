@@ -4435,11 +4435,11 @@ function exportSpeciesList() {
   const content = included
     .map((item) => `${item.sname},${item.cname}`)
     .join("\n");
-  const blob = new Blob([content], { type: "text/plain" });
+  const blob = new Blob([content], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "species_list.txt";
+  a.download = "species_list.csv";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
