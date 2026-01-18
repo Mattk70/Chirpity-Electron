@@ -328,7 +328,7 @@ const createDB = async ({file, diskDB, dbMutex}) => {
     await db.runAsync(`
       CREATE TABLE  confidence_overrides(
       speciesID INTEGER PRIMARY KEY, 
-      minConfidence REAL)`);
+      minConfidence INTEGER)`);
     await db.runAsync(
       `CREATE TABLE locations(
         id INTEGER PRIMARY KEY, 
