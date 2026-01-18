@@ -275,7 +275,7 @@ async function loadDB(modelPath) {
   } else {
     diskDB = new sqlite3.Database(file);
     await diskDB.runAsync(`CREATE TABLE IF NOT EXISTS 
-      confidence_overrides (speciesID INTEGER PRIMARY KEY, minConfidence REAL)`);
+      confidence_overrides (speciesID INTEGER PRIMARY KEY, minConfidence INTEGER)`);
     DEBUG && console.log("Opened and cleaned disk db " + file);
   }
   const labelsFile = 'labels.txt';
@@ -686,7 +686,7 @@ async function handleMessage(e) {
                 {
                   start,
                   end,
-                  confidence: confidence != null ? Number(confidence) * 1000 : null
+                  confidence: confidence && Number(confidence) * 1000 || null
                 }
               ];
             })
