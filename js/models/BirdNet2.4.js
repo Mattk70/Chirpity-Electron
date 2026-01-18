@@ -89,13 +89,14 @@ onmessage = async (e) => {
           trainModel({ ...args, Model: myModel}).then((message) => {
             postMessage({...message})
           }).catch((err) => {
+            console.error("Error during model training:", err);
+            if (err.message?.includes(">=2")) err = "At least two class folders containing audio examples are needed. Only one was found."
             postMessage({
               message: "training-results", 
               notice: `Error during model training: ${err}`,
               type: 'error',
               complete: true
             });
-            console.error("Error during model training:", err);
           })
         break;
       }

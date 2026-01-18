@@ -83,9 +83,9 @@ export class WorkerState {
     (this.incrementor = 2),
     (this.UUID = 0),
     (this.track = true),
-    (this.powerSaveBlocker = false),
     (this.library = {
       location: undefined,
+      backfill: true,
       format: "ogg",
       auto: false,
       trim: false,

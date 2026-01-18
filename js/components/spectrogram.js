@@ -974,17 +974,17 @@ export class ChirpityWS {
   handleGesture(e) {
     const STATE = this.getState();
     const config = this.getConfig();
-    const currentTime = Date.now();
-    if (currentTime - STATE.lastGestureTime < 1200) {
-      return; // Ignore successive events within 1.2 second
+    const now = Date.now();
+    if (now - STATE.lastGestureTime < 500) {
+      return; // Ignore successive events within 0.5 second
     }
-    STATE.lastGestureTime = currentTime;
+    STATE.lastGestureTime = now;
     const moveDirection = e.deltaX || e.deltaY; // If deltaX is 0, use deltaY
     const key = moveDirection > 0 ? "PageDown" : "PageUp";
     config.debug && console.log(`scrolling x: ${e.deltaX} y: ${e.deltaY}`);
-    // waitForFinalEvent(() => {
     this.actions[key](e);
     this.handlers.trackEvent(config.UUID, "Swipe", key, "");
-    // }, 200, 'swipe');
   }
 }
+
+

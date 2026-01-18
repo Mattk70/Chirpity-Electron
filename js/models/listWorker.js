@@ -233,7 +233,8 @@ class Model {
     this.model_loaded = false;
     this.appPath = appPath;
     this.labels = undefined; // labels in the model we're filtering
-    this.modelLabels = {};
+    this.customLabels = undefined; // custom labels for custom list
+    this.splitChar = ",";
   }
 
   async loadModel() {
@@ -342,12 +343,10 @@ class Model {
       if (this.customLabels) {
         // hack: why it gets called first without customLabels I don't know! But it will be called a second time with one.
         const labelsScientificNames = this.labels.map(this.getFirstElement);
-        const customScienticNames = this.customLabels.map(this.getFirstElement);
-        let line = 0;
+        const customScienticNames = this.customLabels.map(label => label.split(',')[0]);
         // Go through each custom label
         for (let i = 0; i < customScienticNames.length; i++) {
           const sname = customScienticNames[i];
-          line++;
           // Find all indices in this model's labels that match the current custom label
           const indexes = findAllIndexes(labelsScientificNames, sname);
           if (indexes.length) {
@@ -375,8 +374,8 @@ class Model {
               includedIDs.push(...selectedIndexes);
             }
           } else {
-            sname === "Unknown Sp." ||
-              messages.push({ sname: sname, model: this.model, line: line });
+            sname === "Unknown Sp." || sname === `Unknown Sp.${this.splitChar}Unknown Sp.` ||
+              messages.push({ sname, model: this.model, line: (i + 1) });
           }
         }
       }
