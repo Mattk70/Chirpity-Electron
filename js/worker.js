@@ -5443,6 +5443,7 @@ async function setIncludedIDs(lat, lon, week) {
 
     if (STATE.included === undefined) STATE.included = {};
     STATE.included = merge(STATE.included, includedObject);
+    messages.splice(5) // Prevent spanning with 1000's messages, limit to 5
     messages.forEach((message) => {
       message.model = message.model.replace("chirpity", "Nocmig");
       generateAlert({
@@ -5458,7 +5459,7 @@ async function setIncludedIDs(lat, lon, week) {
     });
     if (messages.length) {
       const {sname, model} = messages[0];
-      console.warn(`Unrecognised labels in ${model} custom list:`, sname);
+      console.warn(`Unrecognised labels in ${model} custom list, e.g:`, sname);
     }
     return STATE.included;
   })();
