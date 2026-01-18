@@ -4425,7 +4425,7 @@ const populateSpeciesModal = async ({included, excluded, place}) => {
 };
 
 /**
- * Save the current included species list as a plain-text CSV file and start a download named "species_list.txt".
+ * Save the current included species list as a plain-text CSV file and start a download named "species_list.csv".
  *
  * Each line contains the species scientific name and common name separated by a comma.
  */
@@ -4435,11 +4435,11 @@ function exportSpeciesList() {
   const content = included
     .map((item) => `${item.sname},${item.cname}`)
     .join("\n");
-  const blob = new Blob([content], { type: "text/plain" });
+  const blob = new Blob([content], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "species_list.txt";
+  a.download = "species_list.csv";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
