@@ -32,7 +32,7 @@ import * as utils from "./utils/utils.js";
 import { UIState as State } from "./utils/UIState.js";
 import { ChirpityWS } from './components/spectrogram.js';
 
-let LOCATIONS,
+let LOCATIONS, pagination,
   locationID = undefined,
   loadingTimeout,
   LIST_MAP;
@@ -192,7 +192,6 @@ const GLOBAL_ACTIONS = {
       activeRow.classList.remove("table-active");
       activeRow = activeRow.previousSibling || activeRow;
       if (!activeRow.classList.contains("text-bg-dark")) activeRow.click();
-      // activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   },
   PageDown: () => {
@@ -232,7 +231,6 @@ const GLOBAL_ACTIONS = {
       activeRow.classList.remove("table-active");
       activeRow = activeRow.nextSibling || activeRow;
       if (!activeRow.classList.contains("text-bg-dark")) activeRow.click();
-      // activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   },
   ArrowLeft: () => {
@@ -1121,19 +1119,20 @@ async function sortFilesByTime(fileNames) {
     .map((file) => file.name); // Return sorted file names
 }
 /**
- * Opens one or more audio files, resets analysis state, and updates the UI for new input.
+ * Open one or more audio files and prepare the application state and UI for analysis.
  *
- * Loads the provided audio files, resets analysis results and diagnostics, updates menu items, and initializes the spectrogram. If multiple files are selected, sorts them by creation time and enables batch analysis options. Begins loading the first file in the list.
+ * Loads the specified files (sorting by creation time when multiple are provided), resets pagination, diagnostics, and result state, adjusts relevant menu items and spectrogram visibility, sets the UI mode to analysis, and begins loading the first file.
  *
- * @param {Object} args - Arguments for file opening.
+ * @param {Object} args
  * @param {string[]} args.filePaths - Paths of audio files to open.
- * @param {boolean} [args.preserveResults] - If true, preserves previous analysis results.
+ * @param {boolean} [args.checkSaved=true] - If false, mark analysis as complete for the opened files.
+ * @param {boolean} [args.preserveResults] - If true, preserve previous analysis results when loading the file.
  */
 async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults } = {}) {
   if (!filePaths.length) return;
   loadingFiles({hide:false})
   // Store the sanitised file list and Load First audio file
-  // utils.hideAll();
+  pagination.reset();
   resetResults();
   resetDiagnostics();
   utils.disableMenuItem([
@@ -1161,7 +1160,6 @@ async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults 
     if (modelReady) utils.enableMenuItem(["analyseAll", "reanalyseAll"]);
     STATE.openFiles = await sortFilesByTime(STATE.openFiles);
   }
-  utils.hideAll();
   utils.showElement(["spectrogramWrapper"], false);
   loadAudioFileSync({ filePath: STATE.openFiles[0], preserveResults });
   // Clear unsaved records warning
@@ -1372,6 +1370,8 @@ async function importData(format){
     defaultPath,
   });
   if (files.canceled) return;
+  // remove the d-none class so wavesurfer can render
+  utils.showElement(["spectrogramWrapper"], false);
   const file = files.filePaths[0]
   const lastSaveFolder = p.dirname(file);
   localStorage.setItem("lastSaveFolder", lastSaveFolder);
@@ -1566,18 +1566,16 @@ async function showExplore() {
 }
 
 /**
- * Initiates the audio analysis workflow.
+ * Prepare the application and worker for performing analysis on the current file.
  *
- * This asynchronous function restores the previously saved analysis state and configures the UI and worker
- * process for a new analysis cycle. It disables the active analysis menu item, updates the worker mode,
- * and destroys any existing spectrogram instance to avoid conflicts. If an audio file is loaded, it
- * reveals the spectrogram UI, reinitializes the spectrogram, and updates the worker with the current state.
- * Depending on whether analysis was already completed, it either filters the results or reloads the audio file for analysis.
- * Finally, it resets the displayed results.
+ * Restores the saved analysis state, switches the UI and worker into analysis mode, ensures the spectrogram
+ * is initialized for analysis, updates the worker with the open-files and sort state, and either filters
+ * existing results or loads the current file for analysis. Finally, clears and resets the visible results.
  *
  * @async
  */
 async function showAnalyse() {
+  utils.hideAll();
   utils.disableMenuItem(["active-analysis"]);
   //Restore STATE
   STATE = { ...STATE, ...STATE.currentAnalysis };
@@ -1588,7 +1586,6 @@ async function showAnalyse() {
     spec.spectrogram.destroy();
     spec.spectrogram = null;
   }
-  utils.hideAll();
   if (STATE.currentFile) {
     utils.showElement(["spectrogramWrapper"], false);
     spec.reInitSpec(config.specMaxHeight);
@@ -1934,7 +1931,7 @@ window.onload = async () => {
   
   const { library, database, detect, filters, audio, 
     limit, locale, speciesThreshold, list, useWeek, 
-    local, debug, fileStartMtime, specDetections, UUID } = config;
+    local, debug, fileStartMtime, specDetections, selectedModel, specLabels, UUID } = config;
   
   let modelPath = config.models[config.selectedModel].modelPath;
   if (modelPath){
@@ -1948,10 +1945,8 @@ window.onload = async () => {
       modelPath = undefined;
     }
   }
-  const selectedModel = config.selectedModel;
 
   updateListOptions(selectedModel);
-  if (detect.combine) document.getElementById('model-icon').classList.remove('d-none')
   debug && document.getElementById('dataset').classList.remove('d-none')
   isMember && updateModelOptions();
 
@@ -1983,7 +1978,7 @@ window.onload = async () => {
   if (isTestEnv) {
     config.models[selectedModel].backend = "tensorflow";
   }
-  const backend = config.models[config.selectedModel].backend;
+  const backend = config.models[selectedModel].backend;
 
   worker.postMessage({
     action: "_init_",
@@ -2007,11 +2002,11 @@ window.onload = async () => {
 
   // Map slider value to batch size
   DOM.batchSizeSlider.value = 
-    config[config.models[config.selectedModel].backend].batchSize;
+    config[config.models[selectedModel].backend].batchSize;
   DOM.batchSizeValue.textContent =
-    config[config.models[config.selectedModel].backend].batchSize;
-  DOM.modelToUse.value = config.selectedModel;
-  const backendEL = document.getElementById(config.models[config.selectedModel].backend);
+    config[config.models[selectedModel].backend].batchSize;
+  DOM.modelToUse.value = selectedModel;
+  const backendEL = document.getElementById(config.models[selectedModel].backend);
   backendEL.checked = true;
   // Show time of day in results?
   setTimelinePreferences();
@@ -2038,14 +2033,14 @@ window.onload = async () => {
   DOM.colourmap.value = config.colormap;
 
   // Spectrogram labels
-  DOM.specLabels.checked = config.specLabels;
+  DOM.specLabels.checked = specLabels;
   // Show all detections
-  DOM.specDetections.checked = config.specDetections;
+  DOM.specDetections.checked = specDetections;
   // Spectrogram frequencies
-  DOM.fromInput.value = config.audio.frequencyMin;
-  DOM.fromSlider.value = config.audio.frequencyMin;
-  DOM.toInput.value = config.audio.frequencyMax;
-  DOM.toSlider.value = config.audio.frequencyMax;
+  DOM.fromInput.value = audio.frequencyMin;
+  DOM.fromSlider.value = audio.frequencyMin;
+  DOM.toInput.value = audio.frequencyMax;
+  DOM.toSlider.value = audio.frequencyMax;
   fillSlider(DOM.fromInput, DOM.toInput, "#C6C6C6", "#0d6efd", DOM.toSlider);
   checkFilteredFrequency();
   // Window function & colormap
@@ -2067,36 +2062,44 @@ window.onload = async () => {
   document.getElementById("alpha-value").textContent = alpha;
   
   // Audio preferences:
-  DOM.gain.value = config.audio.gain;
-  DOM.gainAdjustment.textContent = config.audio.gain + "dB";
+  DOM.gain.value = audio.gain;
+  DOM.gainAdjustment.textContent = audio.gain + "dB";
   DOM.normalise.checked = config.filters.normalise;
-  DOM.audioFormat.value = config.audio.format;
-  DOM.audioBitrate.value = config.audio.bitrate;
-  DOM.audioQuality.value = config.audio.quality;
+  DOM.audioFormat.value = audio.format;
+  DOM.audioBitrate.value = audio.bitrate;
+  DOM.audioQuality.value = audio.quality;
   showRelevantAudioQuality();
-  DOM.audioFade.checked = config.audio.fade;
-  DOM.audioPadding.checked = config.audio.padding;
+  DOM.audioFade.checked = audio.fade;
+  DOM.audioPadding.checked = audio.padding;
   DOM.audioFade.disabled = !DOM.audioPadding.checked;
-  DOM.audioDownmix.checked = config.audio.downmix;
-  setNocmig(config.detect.nocmig);
-  document.getElementById("merge-detections").checked = config.detect.merge;
-  document.getElementById("combine-detections").checked = config.detect.combine;
-  document.getElementById("auto-load").checked = config.detect.autoLoad;
-  document.getElementById("iucn").checked = config.detect.iucn;
-  document.getElementById("iucn-scope").selected = config.detect.iucnScope;
-  handleModelChange(config.selectedModel, false)
+  DOM.audioDownmix.checked = audio.downmix;
+  setNocmig(detect.nocmig);
+  // Detection options
+  const mergeSwitch = document.getElementById("merge-detections");
+  mergeSwitch.checked = detect.merge;
+  if (mergeSwitch.checked) {
+    config.detect.combine = true;
+    document.getElementById("combine-detections").checked = true;
+  } else {
+    document.getElementById("combine-detections").checked = config.detect.combine;  
+  }
+  if (config.detect.combine) document.getElementById('model-icon').classList.remove('d-none')
+  document.getElementById("auto-load").checked = detect.autoLoad;
+  document.getElementById("iucn").checked = detect.iucn;
+  document.getElementById("iucn-scope").selected = detect.iucnScope;
+  handleModelChange(selectedModel, false)
   // List appearance in settings
   DOM.speciesThreshold.value = config.speciesThreshold;
   document.getElementById("species-week").checked = config.useWeek;
-  DOM.customListFile.value = config.models[config.selectedModel].customListFile;
+  DOM.customListFile.value = config.models[selectedModel].customListFile;
   if (!DOM.customListFile.value) delete LIST_MAP.custom;
   // And update the icon
   updateListIcon();
   setListUIState(list)
   contextAwareIconDisplay();
   DOM.debugMode.checked = config.debug;
-  showThreshold(config.detect.confidence);
-  showTopRankin(config.detect.topRankin)
+  showThreshold(detect.confidence);
+  showTopRankin(detect.topRankin)
 
   // Filters
   document.getElementById("HP-threshold").textContent = formatHz(config.filters.highPassFrequency);
@@ -2131,8 +2134,12 @@ window.onload = async () => {
     libraryTrim.disabled = false;
     libraryTrim.checked = config.library.trim;
     const libraryClips = document.getElementById("library-clips");
-    libraryClips.checked = config.library.clips;
-    libraryClips.disabled = false;
+    if (isMember){
+      libraryClips.checked = config.library.clips;
+      libraryClips.disabled = false;
+    } else {
+      config.library.clips = false;
+    }
     const autoArchive = document.getElementById("auto-library");
     autoArchive.checked = config.library.auto;
     autoArchive.disabled = false;
@@ -2167,6 +2174,20 @@ window.onload = async () => {
 
   // check for new version on Intel mac platform. dmg auto-update not yet working
   // window.electron.isIntelMac() && !isTestEnv && checkForIntelMacUpdates();
+
+  // Set up pagination
+  pagination = new Pagination(
+    document.querySelector(".pagination"),
+    () => STATE, // Returns the current state
+    limit, //the current limit
+    () => worker,
+    {
+      isSpeciesViewFiltered,
+      filterResults,
+      resetResults,
+    }
+  );
+  pagination.init();
 };
 
 let MISSING_FILE;
@@ -2323,10 +2344,12 @@ const setUpWorkerMessaging = () => {
               STATE.diskHasRecords &&
                 !PREDICTING &&
                 utils.enableMenuItem(["explore", "charts"]);
+              utils.hideElement(["exploreWrapper"]);
               break;
             }
             case "archive": {
               utils.enableMenuItem(["save2db", "explore", "charts"]);
+              utils.hideElement(["exploreWrapper"]);
               break;
             }
           }
@@ -2396,10 +2419,6 @@ const setUpWorkerMessaging = () => {
           args.init && setKeyAssignmentUI(config.keyAssignment);
           break;
         }
-        case "total-records": {
-          updatePagination(args.total, args.offset);
-          break;
-        }
         case "unsaved-records": {
           window.electron.unsavedRecords(true);
           document.getElementById("unsaved-icon").classList.remove("d-none");
@@ -2435,13 +2454,13 @@ const setUpWorkerMessaging = () => {
 };
 
 /**
- * Creates and displays audio regions for detections within the current spectrogram window.
+ * Display regions for detections that fall within the current spectrogram window.
  *
- * Adjusts detection times relative to the current window offset and creates regions for those visible in the window. Only active detections or those allowed by configuration are processed. Optionally repositions the view to an active region.
+ * For each detection whose start time lies inside the current window, a region is created using times adjusted by the window offset. Only the active detection or detections allowed by configuration are shown. If `goToRegion` is true and a detection is active, the view is repositioned to that region.
  *
  * @param {Object} options - Options for region creation.
- * @param {Array<Object>} options.detections - Detections to display, each with `start`, `end`, and `label` properties.
- * @param {boolean} options.goToRegion - Whether to reposition the view to the active region.
+ * @param {Array<Object>} options.detections - Array of detection objects. Each object should include `start` and `end` (seconds) and may include `label` or `cname` used for region labeling.
+ * @param {boolean} options.goToRegion - If true, reposition the view to the active region when one is present.
  */
 function showWindowDetections({ detections, goToRegion }) {
   for (const detection of detections) {
@@ -2452,7 +2471,7 @@ function showWindowDetections({ detections, goToRegion }) {
       if (!config.specDetections && !active) continue;
       const colour = active ? STATE.regionActiveColour : null;
       const setPosition = active && goToRegion;
-      spec.createRegion(start, end, detection.label, setPosition, colour);
+      spec.createRegion(start, end, detection.cname, setPosition, colour);
     }
   }
 }
@@ -3512,19 +3531,28 @@ async function onWorkerLoadedAudio({
 
 
 /**
- * Updates the pagination controls based on the total number of items.
+ * Configure UI pagination based on the total number of items for the current view.
  *
- * If the total exceeds the configured limit, pagination controls are rendered using the given offset.
- * Otherwise, all pagination elements are hidden.
+ * When the computed total exceeds the configured per-page limit, pagination controls are enabled and configured for the total count; otherwise pagination controls are hidden. This function also updates STATE.paginationPending to reflect whether pagination needs to be rendered.
  *
- * @param {number} total - The total number of items.
- * @param {number} [offset=STATE.offset] - The starting offset for pagination.
+ * @param {string} [species] - Optional canonical species name; when provided, only that species' count is considered. If omitted, the total count across all summary items is used.
  */
-function updatePagination(total, offset = STATE.offset) {
-  total > config.limit ? pagination.add(total, offset) : pagination.hide();
+function updatePagination(species) {
+  const limit = config.limit;
+  const total = species 
+    ? STATE.summary.find(item => item.cname === species)?.count || 0
+    : STATE.summary.reduce((acc, item) => acc + item.count, 0);
+  if (total > limit){
+      pagination.add(total);
+      STATE.paginationPending = true;
+   } else {
+    pagination.hide(); 
+    STATE.paginationPending = false;
+  }
 }
 
 const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
+  STATE.summary = summary;
   const i18 = i18n.get(i18n.Headings);
   const showIUCN = config.detect.iucn;
 
@@ -3608,6 +3636,10 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
 
   showSummarySortIcon();
   setAutocomplete(selectedRow ? filterSpecies : "");
+
+  
+  updatePagination(filterSpecies);
+
   // scroll to the selected species
   if (selectedRow) {
     const table = document.getElementById("resultSummary");
@@ -3620,13 +3652,13 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
 };
 
 /**
- * Finalizes result processing by updating the results table UI and activating the appropriate result row.
+ * Finalizes result rendering and ensures an appropriate result row is activated in the UI.
  *
- * Replaces the results table with the latest data, resets analysis state, and determines which row to activate based on the provided options or current table state. Ensures the selected row is activated and scrolled into view, updates sorting indicators, and refreshes related UI panels.
+ * Replaces the results table with the prepared content, clears analysis state, updates sorting and label indicators, and activates (and scrolls to) a result row determined by the provided options or current table state. Also refreshes the filename panel and pagination display as needed.
  *
- * @param {Object} [options={}] - Options for determining which result row to activate.
- * @param {number} [options.active] - Index of the row to activate, if specified.
- * @param {*} [options.select] - Value used to identify the row to activate via a helper function.
+ * @param {Object} [options={}] - Options controlling which result row to activate.
+ * @param {number} [options.active] - Zero-based row index to activate; if not present the function will use `select` or the current/first row.
+ * @param {*} [options.select] - Value used to locate a row via the selection helper; used when `active` is not provided.
  */
 function onResultsComplete({ active = undefined, select = undefined } = {}) {
   PREDICTING = false; powerSave(false);
@@ -3671,10 +3703,10 @@ function onResultsComplete({ active = undefined, select = undefined } = {}) {
 
   if (activeRow) {
     utils.waitFor(() => STATE.fileLoaded).then(() => activeRow.click());
-    activeRow.scrollIntoView({ behavior: "instant", block: "center" });
   }
   renderFilenamePanel();
   activateResultSort();
+  STATE.paginationPending && pagination.show();
 }
 
 
@@ -3752,11 +3784,11 @@ function onAnalysisComplete({ quiet }) {
 }
 
 /**
- * Updates the UI after summary data is loaded, refreshing the summary table, enabling or disabling menu items, and applying species filters if provided.
+ * Refreshes the UI summary view after summary data is available, applying an optional species filter, updating the summary table rows and hover styling, and enabling or disabling related menu actions.
  *
  * @param {Object} options - Parameters for updating the summary view.
- * @param {*} [options.filterSpecies] - Optional filter to restrict summary to specific species.
- * @param {Array} [options.summary=[]] - Summary records to display in the UI.
+ * @param {*} [options.filterSpecies] - Optional species identifier or filter to restrict which species are shown in the summary.
+ * @param {Array} [options.summary=[]] - Array of summary records to render in the summary table.
  */
 function onSummaryComplete({ filterSpecies = undefined, summary = [] }) {
   updateSummary({ summary: summary, filterSpecies: filterSpecies });
@@ -3786,35 +3818,18 @@ function onSummaryComplete({ filterSpecies = undefined, summary = [] }) {
   if (STATE.currentFile) utils.enableMenuItem(["analyse"]);
 }
 
-// Set up pagination
-const pagination = new Pagination(
-  document.querySelector(".pagination"),
-  () => STATE, // Returns the current state
-  () => config, // Returns the current config
-  () => worker,
-  {
-    isSpeciesViewFiltered,
-    filterResults,
-    resetResults,
-  }
-);
-pagination.init();
+
 
 /**
- * Toggles the species filter based on user interaction with the summary table.
+ * Toggle the species filter from a click on the summary table.
  *
- * Validates the event against non-interactive elements and current analysis state before proceeding.
- * If the selected row is already highlighted (indicating an active filter), the highlight is removed;
- * otherwise, all highlighted rows are cleared, the current row is marked, and the corresponding species
- * is extracted from the clicked element. In explore mode, the species value is set in the bird list display.
- * Subsequently, the function refreshes the results filtering and resets the UI components without clearing
- * the summary, pagination, or result listings.
+ * When a summary row is clicked, either clear an existing species filter (if the
+ * row was active) or activate a new species filter by highlighting the row,
+ * setting the autocomplete value, updating pagination, refreshing filtered
+ * results, and resetting UI components without clearing the summary, pagination,
+ * or current result listings.
  *
- * @param {Event} e - The DOM event triggered by the user's click on a table row.
- *
- * @example
- * // Apply species filtering when a table row is clicked.
- * speciesFilter(event);
+ * @param {Event} e - Click event originating from the summary table row.
  */
 function speciesFilter(e) {
   if (
@@ -3836,6 +3851,7 @@ function speciesFilter(e) {
     species = getSpecies(e.target);
   }
   setAutocomplete(species);
+  updatePagination(species);
   filterResults({ updateSummary: false });
   resetResults({
     clearSummary: false,
@@ -3852,15 +3868,17 @@ function setAutocomplete(species) {
 }
 
 /**
- * Render a single detection row into the results table and update related headers, pagination, and UI state.
+ * Render a single detection row into the results table and update table headers, pagination, and related UI state.
+ *
+ * Renders or resets the results header when index is 1, appends a table row for the provided detection data,
+ * updates pagination when results exceed page limits, and triggers a buffer update for visible detections when appropriate.
  *
  * @param {Object} options - Rendering options.
- * @param {number} [options.index=1] - Sequential index of the detection result within the current result set.
- * @param {Object} [options.result={}] - Detection data (timestamp, position, species, score, label, review status, model info, etc.).
- * @param {*} [options.file=undefined] - Associated audio file reference for the detection.
- * @param {boolean} [options.isFromDB=false] - True when the result originates from the database (affects pagination and rendering).
- * @param {boolean} [options.selection=false] - True when rendering into a selection-specific view (hides some UI elements).
- *
+ * @param {number} [options.index=1] - Sequential index of the detection within the current result set.
+ * @param {Object} [options.result={}] - Detection record containing fields like `timestamp`, `position`, `sname`, `cname`, `score`, `label`, `reviewed`, `model`, `modelID`, `count`, `callCount`, `comment`, `isDaylight`, `active`, and `end`.
+ * @param {*} [options.file] - Reference to the associated audio file (used for buffer updates/navigation).
+ * @param {boolean} [options.isFromDB=false] - When true, treat the result as originating from the database (affects pagination and rendering choices).
+ * @param {boolean} [options.selection=false] - When true, render for a selection-specific view (hides certain UI elements and does not store prediction state).
  * @returns {Promise<void>} Nothing.
  */
 
@@ -3907,7 +3925,7 @@ async function renderResult({
     )
       postBufferUpdate({ file, begin: STATE.windowOffsetSecs });
   } else if (!isFromDB && index % (config.limit + 1) === 0) {
-    pagination.add(index, 0);
+    pagination.add(index);
   }
   if (!isFromDB && index > config.limit) {
     return;
@@ -4406,18 +4424,22 @@ const populateSpeciesModal = async ({included, excluded, place}) => {
   STATE.includedList = included;
 };
 
-// exporting a list
+/**
+ * Save the current included species list as a plain-text CSV file and start a download named "species_list.csv".
+ *
+ * Each line contains the species scientific name and common name separated by a comma.
+ */
 function exportSpeciesList() {
   const included = STATE.includedList;
   // Create a blob containing the content of included array
   const content = included
-    .map((item) => `${item.sname}${getSplitChar()}${item.cname}`)
+    .map((item) => `${item.sname},${item.cname}`)
     .join("\n");
-  const blob = new Blob([content], { type: "text/plain" });
+  const blob = new Blob([content], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "species_list.txt";
+  a.download = "species_list.csv";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -4434,12 +4456,12 @@ function setNocmig(on = config.detect.nocmig) {
   const btn = DOM.nocmigButton;
   if (on === 'day') {
     btn.textContent = "wb_sunny";
-    btn.title = i18.nocmigOn;
+    btn.title = i18.nocmigDay;
     btn.classList.add("text-warning");
     btn.classList.remove("text-info");
   } else if (on) {
     btn.textContent = "nights_stay";
-    btn.title = i18.nocmigOn;
+    btn.title = i18.nocmigNight;
     btn.classList.add("text-info");
     btn.classList.remove("text-warning");
   } else {
@@ -4929,6 +4951,7 @@ const handleThresholdChange = (e) => {
     action: "update-state",
     detect: { confidence: config.detect.confidence },
   });
+  pagination.reset();
   if (STATE.mode === "explore") {
     // Update the seen species list
     worker.postMessage({ action: "get-detected-species-list" });
@@ -5163,11 +5186,11 @@ const showRelevantAudioQuality = () => {
 };
 document.addEventListener("click", debounceClick(handleUIClicks));
 /**
- * Handles all UI click events by dispatching actions based on the clicked element's ID.
+ * Dispatches application actions based on the clicked element's ID.
  *
- * Routes user clicks to the appropriate application logic, including file operations, analysis commands, model management, settings adjustments, help dialogs, sorting, context menu actions, and UI updates. Updates application state, communicates with the worker thread, manages configuration, and triggers relevant UI changes as needed.
+ * Routes click events to the appropriate UI handlers (file and export operations, analysis and training commands, model management, settings and help dialogs, sorting and filtering, context-menu actions, and other UI updates). Events are ignored until the application has finished loading.
  *
- * @param {MouseEvent} e - The click event object.
+ * @param {MouseEvent} e - Click event whose target (or nearest ancestor with an id) determines which action to invoke.
  */
 async function handleUIClicks(e) {
   if (!APPLICATION_LOADED) return;
@@ -5215,7 +5238,7 @@ async function handleUIClicks(e) {
     }
     case "import-csv": {
       STATE.fileLoaded = false;
-      showAnalyse();
+      if (STATE.mode !== "analyse") showAnalyse();
       importData('csv');
       break;
     }
@@ -5233,7 +5256,7 @@ async function handleUIClicks(e) {
 
     // Records menu
     case "save2db": {
-      worker.postMessage({ action: "save2db", file: STATE.currentFile });
+      if (!element.classList.contains('disabled')) worker.postMessage({ action: "save2db", file: STATE.currentFile });
       break;
     }
     case "charts": {
@@ -5516,7 +5539,10 @@ async function handleUIClicks(e) {
       newOption.value = modelName;
       newOption.textContent = displayName;
       select.appendChild(newOption);
-      updatePrefs('config.json', config)
+      // Set list to everything
+      config.list = 'everything';
+      updatePrefs('config.json', config);
+      updateList();
       updateModelOptions();
       handleModelChange(modelName);
       select.value = modelName;
@@ -5653,8 +5679,10 @@ async function handleUIClicks(e) {
           document.getElementById("library-location").value = archiveFolder;
           const libraryTrim = document.getElementById("library-trim");
           libraryTrim.disabled = false;
-          const libraryClips = document.getElementById("library-clips");
-          libraryClips.disabled = false;
+          if (STATE.isMember){
+            const libraryClips = document.getElementById("library-clips");
+            libraryClips.disabled = false;
+          }
           const autoArchive = document.getElementById("auto-library");
           autoArchive.disabled = false;
           updatePrefs("config.json", config);
@@ -5983,7 +6011,8 @@ function changeSettingsMode(target) {
  */
 async function updateList() {
   updateListIcon();
-  setListUIState(config.list)
+  setListUIState(config.list);
+  pagination.reset();
   if (config.list === "custom") {
     await readLabels(config.models[config.selectedModel].customListFile, "list");
   } else {
@@ -6105,6 +6134,16 @@ document.addEventListener("change", async function (e) {
         }
         case "merge-detections": {
           config.detect.merge = element.checked;
+          // If merge is enabled, ensure combine is also on
+          const combineSwitch = document.getElementById('combine-detections');
+          if (element.checked) {
+            config.detect.combine = true;
+            document.getElementById('model-icon').classList.toggle('d-none', !element.checked)
+            combineSwitch.checked = true;
+            combineSwitch.disabled = true;
+          } else {
+            combineSwitch.disabled = false;
+          }
           worker.postMessage({
             action: "update-state",
             detect: config.detect,
@@ -6114,7 +6153,11 @@ document.addEventListener("change", async function (e) {
         }
         case "combine-detections": {
           config.detect.combine = element.checked;
-          document.getElementById('model-icon').classList.toggle('d-none', !element.checked)
+          document.getElementById('model-icon').classList.toggle('d-none', !element.checked);
+          if (!element.checked){
+            document.getElementById('merge-detections').checked = false;
+            config.detect.merge = false;
+          }
           worker.postMessage({
             action: "update-state",
             detect: config.detect,
@@ -6549,15 +6592,14 @@ function setListUIState(list) {
 }
 
 /**
- * Loads and processes a label file, updating species labels or custom lists for the application.
+ * Load labels from a file and apply them to the application's locale labels or custom species list.
  *
- * If the label file cannot be fetched, displays an error toast and updates the UI to prompt for correction.
- * On success, updates the worker with the new labels or custom list, and ensures an "Unknown Sp._Unknown Sp." entry is present.
+ * Ensures an "Unknown Sp.<splitChar>Unknown Sp." entry is present. On success, sends an update to the worker to replace
+ * either the locale labels or the custom list and triggers a results refresh when appropriate. On failure, surfaces a
+ * user-facing error and highlights the list selector in the UI to prompt correction.
  *
  * @param {string} labelFile - Path or URL to the label file to load.
- * @param {string} [updating] - If set to "list", updates the custom species list; otherwise, updates locale labels.
- *
- * @throws {Error} If the label file cannot be fetched or read.
+ * @param {string} [updating] - If set to `"list"`, update the custom species list; otherwise update locale labels.
  */
 async function readLabels(labelFile, updating) {
   try {
@@ -6571,6 +6613,7 @@ async function readLabels(labelFile, updating) {
         list: config.list,
         customLabels: labels,
         refreshResults: STATE.analysisDone,
+        member: STATE.isMember,
       });
       trackEvent(config.UUID, "UI", "Create", "Custom list", labels.length);
     } else {
@@ -6796,11 +6839,16 @@ const getSplitChar = () => config.selectedModel.includes('perch') ? '~' : '_';
  * @returns {Promise<void>} Resolves when the record entry form is ready and displayed.
  */
 async function showRecordEntryForm(mode, batch) {
+  const { activeRegion, windowOffsetSecs} = STATE;
+  if (!activeRegion || windowOffsetSecs == null || Number.isNaN(windowOffsetSecs)) {
+    console.warn("showRecordEntryForm called without a valid activeRegion/windowOffsetSecs");
+    return;
+  }
+
   const i18 = i18n.get(i18n.Headings);
   const cname = batch
-    ? document.querySelector("#speciesFilter .text-warning .cname .cname")
-        .textContent
-    : STATE.activeRegion?.label || "";
+    ? document.querySelector("#speciesFilter .text-warning .cname .cname")?.textContent ?? ""
+    : activeRegion.label || "";
   let callCount = "",
     commentText = "",
     modelID, score;
@@ -6865,7 +6913,12 @@ async function showRecordEntryForm(mode, batch) {
 }
 
 recordEntryForm.addEventListener("submit", function (e) {
+  const { activeRegion, windowOffsetSecs} = STATE;
   e.preventDefault();
+  if (!activeRegion || windowOffsetSecs == null || Number.isNaN(windowOffsetSecs)) {
+    console.warn("submit showRecordEntryForm called without a valid activeRegion/windowOffsetSecs");
+    return;
+  }
   const action = document.getElementById("DBmode").value;
   // cast boolstring to boolean
   const batch = document.getElementById("batch-mode").value === "true";
@@ -6875,15 +6928,13 @@ recordEntryForm.addEventListener("submit", function (e) {
   // Check we selected a species
   if (!LABELS.some((item) => item.includes(cname))) return;
   let start, end;
-  if (STATE.activeRegion) {
-    start = STATE.windowOffsetSecs + STATE.activeRegion.start;
-    end = STATE.windowOffsetSecs + STATE.activeRegion.end;
-    const region = spec.REGIONS.regions.find(
-      (region) => region.start === STATE.activeRegion.start
-    );
-    // You can still add a record if you cleared the regions
-    region?.setOptions({ content: cname });
-  }
+  start = windowOffsetSecs + activeRegion.start;
+  end = windowOffsetSecs + activeRegion.end;
+  const region = spec.REGIONS.regions.find(
+    (region) => region.start === STATE.activeRegion.start
+  );
+  // You can still add a record if you cleared the regions
+  region?.setOptions({ content: cname });
   const originalCname = document.getElementById("original-id").value || cname;
   // Update the region label
   const count = document.getElementById("call-count")?.valueAsNumber;
@@ -6926,6 +6977,8 @@ const insertManualRecord = ( {
   modelID,
   undo
 }  = {}) => {
+  // Prevent null/NaN start/datetime entries
+  if (start == null || Number.isNaN(start)) return;
   worker.postMessage({
     action: "insert-manual-record",
     cname,
@@ -7104,6 +7157,7 @@ const prepTour = async () => {
 const tracking = document.getElementById("update-progress");
 const updateProgressBar = document.getElementById("update-progress-bar");
 const displayProgress = (progressObj, text) => {
+  if (isNaN(progressObj.percent)) return;
   tracking.querySelector('span').textContent = text;
   tracking.classList.remove("d-none");
   // Update your UI with the progress information
