@@ -5530,6 +5530,7 @@ async function convertAndOrganiseFiles(threadLimit = 4) {
         type: "warning",
         variables: { file: inputFilePath },
         message: `fileToConvertNotFound`,
+        file: inputFilePath,
       });
       continue;
     }
