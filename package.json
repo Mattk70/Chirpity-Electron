@@ -246,7 +246,7 @@
     "fast-png": "^6.1.0",
     "fluent-ffmpeg": "^2.1.2",
     "keytar": "^7.9.0",
-    "lodash.merge": "^4.17.23",
+    "lodash.merge": "^4.6.2",
     "onnxruntime-node": "^1.23.2",
     "p-limit": "3.1.0",
     "sqlite3": "^5.1.7",
