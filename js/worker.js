@@ -22,7 +22,8 @@ import {
   closeDatabase,
   Mutex,
   mergeDbIfNeeded,
-  addNewModel
+  addNewModel,
+  upgrade_to_v4
 } from "./database.js";
 import { customURLEncode, installConsoleTracking, trackEvent as _trackEvent } from "./utils/tracking.js";
 import { onChartRequest }  from "./components/charts.js";
@@ -271,7 +272,6 @@ async function loadDB(modelPath) {
       throw error;
     }
     DEBUG && console.log("DB created at : ", file);
-    STATE.modelID = modelID;
   } else {
     diskDB = new sqlite3.Database(file);
     await diskDB.runAsync(`CREATE TABLE IF NOT EXISTS 
@@ -280,7 +280,18 @@ async function loadDB(modelPath) {
   }
   const labelsFile = 'labels.txt';
   const labelsLocation = modelPath ? p.join(modelPath, labelsFile) : null;
-  ([modelID, needsTranslation] = await mergeDbIfNeeded({diskDB, model, appPath, dbMutex, labelsLocation }) )
+  [modelID, needsTranslation] = await mergeDbIfNeeded({diskDB, model, appPath, dbMutex, labelsLocation });
+  try {
+    const user_version_row = await diskDB.getAsync(`SELECT version FROM schema_version`);
+    const user_version = user_version_row?.version ?? 0;
+    if (user_version === 3) {
+      await upgrade_to_v4(diskDB, dbMutex);
+    }
+  } catch (error) {
+    // no schema_version table, catch it next time
+    console.info("No schema_version table found in database.", error);
+  }
+
   checkNewModel(modelID) && (STATE.modelID = modelID);
   STATE.update({ db: diskDB });
   diskDB.locale = STATE.locale;
@@ -1173,7 +1184,7 @@ function getFileSQLAndParams(range) {
   let SQL = "";
   if (range?.start) {
     // Prioritise range queries
-    SQL += " AND position * 1000 + files.filestart >= ? AND position * 1000 + files.filestart < ? ";
+    SQL += " AND dateTime >= ? AND dateTime < ? ";
     params.push(range.start, range.end);
   } else {
     const fileParams = prepParams(STATE.filesToAnalyse);
@@ -1340,7 +1351,7 @@ const prepSummaryStatement = async () => {
   let summaryStatement = `
     WITH ranked_records AS (
         SELECT r.position * 1000 + f.filestart as dateTime, r.confidence, f.name as file, f.archiveName, cname, sname, classIndex, COALESCE(callCount, 1) as callCount, isDaylight, tagID,
-        RANK() OVER (PARTITION BY fileID${partition}, dateTime ORDER BY r.confidence DESC) AS rank
+        RANK() OVER (PARTITION BY fileID${partition}, r.position ORDER BY r.confidence DESC) AS rank
         FROM records r
         JOIN files f ON f.id = r.fileID
         JOIN species s ON s.id = r.speciesID
@@ -1392,7 +1403,7 @@ const prepResultsStatement = async (
         r.callCount,
         r.isDaylight,
         r.reviewed,
-        RANK() OVER (PARTITION BY fileID${partition}, dateTime ORDER BY r.confidence DESC) AS rank
+        RANK() OVER (PARTITION BY fileID${partition}, r.position ORDER BY r.confidence DESC) AS rank
         FROM records r
         JOIN species s ON r.speciesID = s.id 
         JOIN files f ON r.fileID = f.id 
@@ -2062,7 +2073,7 @@ async function sendDetections(file, start, end, goToRegion) {
                 ROW_NUMBER() OVER (PARTITION BY fileID${partition}, r.position * 1000 + f.filestart ORDER BY confidence DESC) AS rank,
                 confidence as score,
                 name,
-                dateTime as timestamp,
+                position * 1000 + f.filestart as timestamp,
                 speciesID,
                 classIndex
             FROM records r
@@ -3404,8 +3415,6 @@ const onInsertManualRecord = async ({
 }) => {
   if (batch)
     return batchInsertRecords(cname, label, file, originalCname, confidence);
-  // (start = parseFloat(start)), (end = parseFloat(end));
-  const startMilliseconds = Math.round(start * 1000);
   let fileID, fileStart;
   const db = STATE.db;
   const speciesFound = await db.allAsync(
@@ -3452,9 +3461,8 @@ const onInsertManualRecord = async ({
     fileID = res.id;
     fileStart = res.filestart;
   }
-
-  const dateTime = fileStart + startMilliseconds;
-  const isDaylight = isDuringDaylight(dateTime, STATE.lat, STATE.lon);
+  const datetime = fileStart + (start * 1000);
+  const isDaylight = isDuringDaylight(datetime, STATE.lat, STATE.lon);
 
   // Delete an existing record if species was changed
   if (cname !== originalCname) {
@@ -3495,9 +3503,8 @@ const onInsertManualRecord = async ({
     );
   } else {
     const result = await db.runAsync(
-      `INSERT OR REPLACE INTO records (datetime, position, fileID, speciesID, modelID, confidence, tagID, comment, end, callCount, isDaylight, reviewed)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      dateTime,
+      `INSERT OR REPLACE INTO records (position, fileID, speciesID, modelID, confidence, tagID, comment, end, callCount, isDaylight, reviewed)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       start,
       fileID,
       speciesID,
@@ -3602,7 +3609,7 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
           if (! allowedByList({cname, timestamp, score: confidence})) continue;
         } else if (confidence < minConfidence) break;
 
-        insertPlaceholders.push("(?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        insertPlaceholders.push("(?, ?, ?, ?, ?, ?, ?, ?)");
         insertValues.push(key, fileID, speciesID, modelID, confidence, key + predictionLength, isDaylight, 0);
       }
     }
@@ -4003,16 +4010,35 @@ function sumObjectValues(obj) {
 
 function calculateTimeBoundaries(
   file,
-  fileStart,
-  fileEnd,
+  fileStartMs,
+  fileEndMs,
   latitude,
   longitude,
   period
 ) {
-  const intervals = [];
-  const fileStartMs = fileStart;
-  const fileEndMs = fileEnd;
+  const intervals = getIntervals(fileStartMs, fileEndMs, latitude, longitude, period);
+  // Handle files entirely outside the requested period
+  if (
+    !intervals.length &&
+    isDuringDaylight(fileStartMs, latitude, longitude) ===
+      (period === 'day')
+  ) intervals.push({ start: 0, end: 0 });
 
+  const fileDurationSeconds = (fileEndMs - fileStartMs) / 1000;
+  // Sum kept (active) time
+  const keptSeconds = intervals.reduce((sum, i) => sum + (i.end - i.start), 0);
+  // Amount clipped from the file
+  const clippedSeconds = Math.max(0, fileDurationSeconds - keptSeconds);
+  // Update global state
+  STATE.clippedBatches += Math.ceil(clippedSeconds / (BATCH_SIZE * WINDOW_SIZE));
+  STATE.clippedFilesDuration += clippedSeconds;
+  const batches = Math.ceil((keptSeconds - EPSILON) / (BATCH_SIZE * WINDOW_SIZE));
+  batchesToSend[file] = batches;
+  return intervals.length ? intervals : [{ start: 0, end: 0 }];
+}
+
+function getIntervals(fileStartMs, fileEndMs, latitude, longitude, period) {
+  const intervals = [];
   const startDay = new Date(fileStartMs);
   startDay.setHours(12, 0, 0, 0);
   if (period !== 'day') {
@@ -4026,9 +4052,7 @@ function calculateTimeBoundaries(
     day.setDate(day.getDate() + 1)
   ) {
     const today = SunCalc.getTimes(day, latitude, longitude);
-
     let periodStart, periodEnd;
-
     if (period === 'day') {
       // day
       periodStart = today.dawn.getTime();
@@ -4051,30 +4075,8 @@ function calculateTimeBoundaries(
       });
     }
   }
-
-  // Handle files entirely outside the requested period
-  if (
-    !intervals.length &&
-    isDuringDaylight(fileStartMs, latitude, longitude) ===
-      (period === 'day')
-  ) {
-    intervals.push({ start: 0, end: 0 });
-  }
-
-  const fileDurationSeconds = (fileEndMs - fileStartMs) / 1000;
-  // Sum kept (active) time
-  const keptSeconds = intervals.reduce((sum, i) => sum + (i.end - i.start), 0);
-  // Amount clipped from the file
-  const clippedSeconds = Math.max(0, fileDurationSeconds - keptSeconds);
-  // Update global state
-  STATE.clippedBatches += Math.ceil(clippedSeconds / (BATCH_SIZE * WINDOW_SIZE));
-  STATE.clippedFilesDuration += clippedSeconds;
-  const batches = Math.ceil((keptSeconds - EPSILON) / (BATCH_SIZE * WINDOW_SIZE));
-  batchesToSend[file] = batches;
-  return intervals.length ? intervals : [{ start: 0, end: 0 }];
+  return intervals;
 }
-
-
 
 /**
  * Compute active time intervals for an audio file based on its metadata and detection mode.
@@ -4180,7 +4182,8 @@ const getSummary = async ({
  * @param species: filter for SQL query
  * @param limit: the pagination limit per page
  * @param offset: is the SQL query offset to use
- * @param topRankin: return results >= to this rank for each datetime
+ * @param topRankin: return results >= to this rank for each position
+ * @param path: if set, will export audio or text of the returned results to this folder
  * @param directory: if set, will export audio of the returned results to this folder
  * @param format: whether to export audio or text
  *
@@ -4199,7 +4202,6 @@ const getResults = async ({
 } = {}) => {
   let confidence = STATE.detect.confidence;
   if (position) {
-    //const position = await getPosition({species: species, dateTime: select.dateTime, included: included});
     offset = (position.page - 1) * limit;
     // We want to consistently move to the next record. If results are sorted by time, this will be row + 1.
     active = position.row; //+ 1;
@@ -4666,11 +4668,11 @@ const onSave2DiskDB = async ({ file }) => {
     // now update records
     response = await memoryDB.runAsync(`
             INSERT OR IGNORE INTO disk.records (
-              dateTime, position, fileID, speciesID, modelID, confidence, 
+              position, fileID, speciesID, modelID, confidence, 
               comment, end, callCount, isDaylight, reviewed, tagID
             )
             SELECT 
-                r.dateTime, r.position, r.fileID, r.speciesID, r.modelID, r.confidence, 
+                r.position, r.fileID, r.speciesID, r.modelID, r.confidence, 
                 r.comment, r.end, r.callCount, r.isDaylight, r.reviewed, r.tagID
             FROM records r
             JOIN species s ON r.speciesID = s.id  
@@ -4821,12 +4823,45 @@ const onUpdateFileStart = async (args) => {
     );
     DEBUG && console.log(changes ? `Changed ${file}` : `No changes made`);
     // update file metadata
+    delete METADATA[file];
     await setMetadata({ file });
     // Update dateDuration
     let result;
     result = await db.runAsync("DELETE FROM duration WHERE fileID = ?", id);
     DEBUG && console.log(result.changes, " entries deleted from duration");
     await insertDurations(file, id);
+    // Update file records isDaylight info
+    const fileStart = METADATA[file].fileStart;
+    const fileEnd = fileStart + METADATA[file].duration * 1000;
+    if (locationID) {
+      row = await db.getAsync(
+        "SELECT lat, lon FROM locations WHERE id = ?",
+        locationID
+      );
+    } else row = null;
+    const { lat, lon } = row || { lat: STATE.lat, lon: STATE.lon };
+    const intervals = getIntervals(fileStart, fileEnd, parseFloat(lat), parseFloat(lon), 'day');
+    if (!intervals.length) { intervals.push({start:0, end:0}); } // no daylight
+    // Build SQL fragments
+    const conditions = intervals
+      .map(() => `(position BETWEEN ? AND ?)`)
+      .join(' OR ');
+
+    // Flatten params
+    const params = intervals.flatMap(i => [i.start, i.end]);
+
+    const sql = `
+      UPDATE records
+      SET isDaylight =
+        CASE
+          WHEN ${conditions} THEN 1
+          ELSE 0
+        END
+      WHERE fileID = ?
+    `;
+    result = await db.runAsync(sql, ...params, id);
+    DEBUG && console.log(result.changes, " records updated with new isDaylight");
+
   }
   await Promise.all([getResults(), getSummary()])
 };
@@ -4853,11 +4888,10 @@ async function onDelete({
     "SELECT id from files WHERE name = ?",
     file
   );
-  // const datetime = Math.round(filestart + (parseFloat(start) * 1000));
   end = parseFloat(end); start = parseFloat(start);
   const params = [id, start, end];
   let sql = "DELETE FROM records WHERE fileID = ? AND position = ? AND end = ?";
-  if (! STATE.detect.merge){
+  if (! (STATE.detect.merge || STATE.detect.combine)){
     params.push(modelID)
     sql += " AND modelID = ?";
   }
