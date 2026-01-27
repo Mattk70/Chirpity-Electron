@@ -70,17 +70,25 @@ onmessage = async (e) => {
             maskArray[bgIndex] = 0;
             myModel.bgMask = tf.tensor1d(maskArray)
           }
-          await myModel.loadModel("layers");
-          await myModel.warmUp(batch);
-          BACKEND = tf.getBackend();
-          postMessage({
-            message: "model-ready",
-            sampleRate: myModel.config.sampleRate,
-            chunkLength: myModel.chunkLength,
-            backend: BACKEND,
-            labels,
-            worker,
-          });
+          try {
+            await myModel.loadModel("layers");
+            await myModel.warmUp(batch);
+            BACKEND = tf.getBackend();
+            postMessage({
+              message: "model-ready",
+              sampleRate: myModel.config.sampleRate,
+              chunkLength: myModel.chunkLength,
+              backend: BACKEND,
+              labels,
+              worker,
+            });
+          } catch (error) {
+            console.error("Error loading model:", error);
+            postMessage({
+              message: "model-error",
+              error,
+            });
+          }
         });
         break;
       }

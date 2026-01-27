@@ -22,7 +22,8 @@ import {
   closeDatabase,
   Mutex,
   mergeDbIfNeeded,
-  addNewModel
+  addNewModel,
+  upgrade_to_v4
 } from "./database.js";
 import { customURLEncode, installConsoleTracking, trackEvent as _trackEvent } from "./utils/tracking.js";
 import { onChartRequest }  from "./components/charts.js";
@@ -51,7 +52,13 @@ let predictWorkers = [],
   aborted = false;
 let UI;
 let FILE_QUEUE = [];
-let INITIALISED = null;
+let initialiseResolve;
+let initialiseReject;
+
+let INITIALISED = new Promise((resolve, reject) => {
+  initialiseResolve = resolve;
+  initialiseReject = reject;
+});
 const EPSILON = 0.025;
 let t0_analysis = 0;
 const generateAlert = ({
@@ -271,7 +278,6 @@ async function loadDB(modelPath) {
       throw error;
     }
     DEBUG && console.log("DB created at : ", file);
-    STATE.modelID = modelID;
   } else {
     diskDB = new sqlite3.Database(file);
     await diskDB.runAsync(`CREATE TABLE IF NOT EXISTS 
@@ -280,7 +286,18 @@ async function loadDB(modelPath) {
   }
   const labelsFile = 'labels.txt';
   const labelsLocation = modelPath ? p.join(modelPath, labelsFile) : null;
-  ([modelID, needsTranslation] = await mergeDbIfNeeded({diskDB, model, appPath, dbMutex, labelsLocation }) )
+  [modelID, needsTranslation] = await mergeDbIfNeeded({diskDB, model, appPath, dbMutex, labelsLocation });
+  try {
+    const user_version_row = await diskDB.getAsync(`SELECT version FROM schema_version`);
+    const user_version = user_version_row?.version ?? 0;
+    if (user_version === 3) {
+      await upgrade_to_v4(diskDB, dbMutex);
+    }
+  } catch (error) {
+    // no schema_version table, catch it next time
+    console.info("No schema_version table found in database.", error);
+  }
+
   checkNewModel(modelID) && (STATE.modelID = modelID);
   STATE.update({ db: diskDB });
   diskDB.locale = STATE.locale;
@@ -362,7 +379,7 @@ async function handleMessage(e) {
   const args = e.data;
   const action = args.action;
   DEBUG && console.log("message received", action);
-  if (action !== "_init_" ) {
+  if (! ["_init_", "update-state","create message port"].includes(action)) {
     // Wait until _init_ or onLaunch completes before processing other messages
     await INITIALISED;
   }
@@ -371,18 +388,24 @@ async function handleMessage(e) {
       let { model, batchSize, threads, backend, list, modelPath } = args;
       const t0 = Date.now();
       STATE.detect.backend = backend;
-      INITIALISED = (async () => {
-        LIST_WORKER = await spawnListWorker(); // this can change the backend if tfjs-node isn't available
-        DEBUG && console.log("List worker took", Date.now() - t0, "ms to load");
-        await onLaunch({
-          model,
-          batchSize,
-          threads,
-          backend,
-          list,
-          modelPath
-        });
-      })();
+      try {
+        await (async () => {
+          LIST_WORKER = await spawnListWorker(); // this can change the backend if tfjs-node isn't available
+          DEBUG && console.log("List worker took", Date.now() - t0, "ms to load");
+          await onLaunch({
+            model,
+            batchSize,
+            threads,
+            backend,
+            list,
+            modelPath
+          });
+        })();  
+        initialiseResolve();        // resolve INITIALISED
+      } catch (err) {
+        console.error("Initialisation failed:", err);
+        initialiseReject(err);      // propagate failure
+      }
       break;
     }
     case "abort": {
@@ -618,7 +641,7 @@ async function handleMessage(e) {
       break;
     }
     case "set-custom-file-location": {
-      onSetCustomLocation(args);
+      onSetLocation(args);
       break;
     }
     case "train-model":{
@@ -714,8 +737,12 @@ async function handleMessage(e) {
       break;
     }
     case "update-state": {
-      appPath = args.path || appPath;
-      tempPath = args.temp || tempPath;
+      const {path, temp, lat, lon, place} = args;
+      appPath = path || appPath;
+      tempPath = temp || tempPath;
+      if (lat !== undefined && lon !== undefined && place) {
+        onSetLocation({ lat, lon, place });
+      }
       // If we change the speciesThreshold, we need to invalidate any location caches
       if (args.speciesThreshold) {
         for (const key in STATE.included) {
@@ -1339,8 +1366,8 @@ const prepSummaryStatement = async () => {
   const partition = detect.merge ? '' : ', r.modelID';
   let summaryStatement = `
     WITH ranked_records AS (
-        SELECT r.dateTime, r.confidence, f.name as file, f.archiveName, cname, sname, classIndex, COALESCE(callCount, 1) as callCount, isDaylight, tagID,
-        RANK() OVER (PARTITION BY fileID${partition}, dateTime ORDER BY r.confidence DESC) AS rank
+        SELECT r.position * 1000 + f.filestart as dateTime, r.confidence, f.name as file, f.archiveName, cname, sname, classIndex, COALESCE(callCount, 1) as callCount, isDaylight, tagID,
+        RANK() OVER (PARTITION BY fileID${partition}, r.position ORDER BY r.confidence DESC) AS rank
         FROM records r
         JOIN files f ON f.id = r.fileID
         JOIN species s ON s.id = r.speciesID
@@ -1370,7 +1397,7 @@ const prepResultsStatement = async (
   let resultStatement = `
     WITH ranked_records AS (
         SELECT 
-        r.dateTime, 
+        r.position * 1000 + f.filestart as dateTime, 
         f.duration, 
         f.filestart, 
         fileID,
@@ -1392,7 +1419,7 @@ const prepResultsStatement = async (
         r.callCount,
         r.isDaylight,
         r.reviewed,
-        RANK() OVER (PARTITION BY fileID${partition}, dateTime ORDER BY r.confidence DESC) AS rank
+        RANK() OVER (PARTITION BY fileID${partition}, r.position ORDER BY r.confidence DESC) AS rank
         FROM records r
         JOIN species s ON r.speciesID = s.id 
         JOIN files f ON r.fileID = f.id 
@@ -1412,7 +1439,7 @@ const prepResultsStatement = async (
 
   resultStatement += ` )
     SELECT 
-    dateTime as timestamp, 
+    position * 1000 + filestart as timestamp, 
     score,
     duration, 
     filestart, 
@@ -2059,15 +2086,15 @@ async function sendDetections(file, start, end, goToRegion) {
                 position AS start, 
                 end, 
                 cname, 
-                ROW_NUMBER() OVER (PARTITION BY fileID${partition}, dateTime ORDER BY confidence DESC) AS rank,
+                ROW_NUMBER() OVER (PARTITION BY fileID${partition}, r.position * 1000 + f.filestart ORDER BY confidence DESC) AS rank,
                 confidence as score,
                 name,
-                dateTime as timestamp,
+                position * 1000 + f.filestart as timestamp,
                 speciesID,
                 classIndex
             FROM records r
             JOIN species s ON speciesID = s.ID
-            JOIN files ON fileID = files.ID
+            JOIN files f ON fileID = f.id
             WHERE confidence >= ?
             AND name = ? 
             AND start BETWEEN ? AND ?
@@ -2142,8 +2169,9 @@ const setMetadata = async ({ file, source_file = file }) => {
         });
       fileMeta.isSaved = true; // Queried by UI to establish saved state of file.
     } 
+    const nearby = await getNearbyLocations(51.9026, -0.3995, 0.1);
     let guanoTimestamp, bextTimestamp, recorderModel;
-    // savedMeta may just have a locationID if it was set by onSetCUstomLocation
+    // savedMeta may just have a locationID if it was set by onSetLocation
     if (!savedMeta?.duration) {
       fileMeta.duration = await getDuration(file);
       if (file.toLowerCase().endsWith("wav")) {
@@ -2161,9 +2189,9 @@ const setMetadata = async ({ file, source_file = file }) => {
             const location = guano["Loc Position"];
             if (location) {
               const [lat, lon] = location.split(" ");
-              await onSetCustomLocation({
-                lat: roundedFloat(lat),
-                lon: roundedFloat(lon),
+              await onSetLocation({
+                lat,
+                lon,
                 place: location,
                 files: [file],
                 overwritePlaceName: false,
@@ -2878,20 +2906,20 @@ const saveResults2DataSet = ({ species, included }) => {
   let promise = Promise.resolve();
   let promises = [];
   let count = 0;
-  let db2ResultSQL = `SELECT dateTime AS timestamp, 
-    files.duration, 
-    files.filestart,
-    files.name AS file, 
+  let db2ResultSQL = `SELECT position * 1000 + f.filestart AS timestamp, 
+    f.duration, 
+    f.filestart,
+    f.name AS file, 
     position,
-    species.sname, 
-    species.cname, 
-    confidence AS score, 
+    s.sname, 
+    s.cname, 
+    r.confidence AS score, 
     tagID, 
     comment
-    FROM records
-    JOIN species
+    FROM records r
+    JOIN species s
     ON species.id = records.speciesID
-    JOIN files ON records.fileID = files.id
+    JOIN files f ON records.fileID = files.id
     WHERE confidence >= ${STATE.detect.confidence}`;
   db2ResultSQL += filtersApplied(included)
     ? ` AND speciesID IN (${prepParams(included)})`
@@ -3404,8 +3432,6 @@ const onInsertManualRecord = async ({
 }) => {
   if (batch)
     return batchInsertRecords(cname, label, file, originalCname, confidence);
-  // (start = parseFloat(start)), (end = parseFloat(end));
-  const startMilliseconds = Math.round(start * 1000);
   let fileID, fileStart;
   const db = STATE.db;
   const speciesFound = await db.allAsync(
@@ -3452,9 +3478,8 @@ const onInsertManualRecord = async ({
     fileID = res.id;
     fileStart = res.filestart;
   }
-
-  const dateTime = fileStart + startMilliseconds;
-  const isDaylight = isDuringDaylight(dateTime, STATE.lat, STATE.lon);
+  const datetime = fileStart + (start * 1000);
+  const isDaylight = isDuringDaylight(datetime, STATE.lat, STATE.lon);
 
   // Delete an existing record if species was changed
   if (cname !== originalCname) {
@@ -3466,8 +3491,8 @@ const onInsertManualRecord = async ({
       const ids = result.map(r => r.originalSpeciesID);
       const placeholders = ids.map(() => '?').join(',');
       const res = await db.runAsync(
-        `DELETE FROM records WHERE datetime = ? AND speciesID in (${placeholders}) AND fileID = ?`,
-        dateTime,
+        `DELETE FROM records WHERE position = ? AND speciesID in (${placeholders}) AND fileID = ?`,
+        start,
         ...ids,
         fileID
       );
@@ -3486,24 +3511,17 @@ const onInsertManualRecord = async ({
   if (calledByBatch && cname === originalCname) {
     await db.runAsync(
       `UPDATE records SET tagID = ?, comment = ?, reviewed = 1 
-        WHERE dateTime = ? AND fileID = ? AND speciesID = ?`,
+        WHERE position = ? AND fileID = ? AND speciesID = ?`,
       tagID,
       comment,
-      dateTime,
+      start,
       fileID,
       speciesID
     );
   } else {
-    await db.runAsync(
-      `INSERT INTO records (dateTime, position, fileID, speciesID, modelID, confidence, tagID, comment, end, callCount, isDaylight, reviewed)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(dateTime, fileID, speciesID, modelID) DO UPDATE SET 
-          confidence = excluded.confidence, 
-          tagID = excluded.tagID,
-          comment = excluded.comment,
-          callCount = excluded.callCount,
-          reviewed = excluded.reviewed;`,
-      dateTime,
+    const result = await db.runAsync(
+      `INSERT OR REPLACE INTO records (position, fileID, speciesID, modelID, confidence, tagID, comment, end, callCount, isDaylight, reviewed)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       start,
       fileID,
       speciesID,
@@ -3559,7 +3577,6 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
             roundedFloat(lon),
             place
           );
-
           locationID = result?.id;
         }
       }
@@ -3608,15 +3625,15 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
           if (! allowedByList({cname, timestamp, score: confidence})) continue;
         } else if (confidence < minConfidence) break;
 
-        insertPlaceholders.push("(?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        insertValues.push(timestamp, key, fileID, speciesID, modelID, confidence, key + predictionLength, isDaylight, 0);
+        insertPlaceholders.push("(?, ?, ?, ?, ?, ?, ?, ?)");
+        insertValues.push(key, fileID, speciesID, modelID, confidence, key + predictionLength, isDaylight, 0);
       }
     }
 
     if (insertValues.length) {
       await db.runAsync(
         `INSERT OR IGNORE INTO records 
-         (dateTime, position, fileID, speciesID, modelID, confidence, end, isDaylight, reviewed) 
+         (position, fileID, speciesID, modelID, confidence, end, isDaylight, reviewed) 
          VALUES ${insertPlaceholders.join(", ")}`,
         ...insertValues
       );
@@ -3815,6 +3832,21 @@ async function parseMessage(e) {
       }
       break;
     }
+    case "model-error": {
+      if (!SEEN_MODEL_READY) {
+        SEEN_MODEL_READY = true;
+        const error = response.error || "Unknown error";
+        if (error.message === "Failed to fetch") {
+          error.message = "Model files missing or inaccessible";
+        }
+        generateAlert({ type: "error", message: error.message });
+        UI.postMessage({
+          event: "model-ready",
+          message: "Model failed to load",
+        });
+      }
+      break;
+    }
     case "prediction": {
       if (!aborted) {
         predictWorkers[response.worker].isAvailable = true;
@@ -4009,16 +4041,35 @@ function sumObjectValues(obj) {
 
 function calculateTimeBoundaries(
   file,
-  fileStart,
-  fileEnd,
+  fileStartMs,
+  fileEndMs,
   latitude,
   longitude,
   period
 ) {
-  const intervals = [];
-  const fileStartMs = fileStart;
-  const fileEndMs = fileEnd;
+  const intervals = getIntervals(fileStartMs, fileEndMs, latitude, longitude, period);
+  // Handle files entirely outside the requested period
+  if (
+    !intervals.length &&
+    isDuringDaylight(fileStartMs, latitude, longitude) ===
+      (period === 'day')
+  ) intervals.push({ start: 0, end: 0 });
 
+  const fileDurationSeconds = (fileEndMs - fileStartMs) / 1000;
+  // Sum kept (active) time
+  const keptSeconds = intervals.reduce((sum, i) => sum + (i.end - i.start), 0);
+  // Amount clipped from the file
+  const clippedSeconds = Math.max(0, fileDurationSeconds - keptSeconds);
+  // Update global state
+  STATE.clippedBatches += Math.ceil(clippedSeconds / (BATCH_SIZE * WINDOW_SIZE));
+  STATE.clippedFilesDuration += clippedSeconds;
+  const batches = Math.ceil((keptSeconds - EPSILON) / (BATCH_SIZE * WINDOW_SIZE));
+  batchesToSend[file] = batches;
+  return intervals.length ? intervals : [{ start: 0, end: 0 }];
+}
+
+function getIntervals(fileStartMs, fileEndMs, latitude, longitude, period) {
+  const intervals = [];
   const startDay = new Date(fileStartMs);
   startDay.setHours(12, 0, 0, 0);
   if (period !== 'day') {
@@ -4032,9 +4083,7 @@ function calculateTimeBoundaries(
     day.setDate(day.getDate() + 1)
   ) {
     const today = SunCalc.getTimes(day, latitude, longitude);
-
     let periodStart, periodEnd;
-
     if (period === 'day') {
       // day
       periodStart = today.dawn.getTime();
@@ -4057,30 +4106,8 @@ function calculateTimeBoundaries(
       });
     }
   }
-
-  // Handle files entirely outside the requested period
-  if (
-    !intervals.length &&
-    isDuringDaylight(fileStartMs, latitude, longitude) ===
-      (period === 'day')
-  ) {
-    intervals.push({ start: 0, end: 0 });
-  }
-
-  const fileDurationSeconds = (fileEndMs - fileStartMs) / 1000;
-  // Sum kept (active) time
-  const keptSeconds = intervals.reduce((sum, i) => sum + (i.end - i.start), 0);
-  // Amount clipped from the file
-  const clippedSeconds = Math.max(0, fileDurationSeconds - keptSeconds);
-  // Update global state
-  STATE.clippedBatches += Math.ceil(clippedSeconds / (BATCH_SIZE * WINDOW_SIZE));
-  STATE.clippedFilesDuration += clippedSeconds;
-  const batches = Math.ceil((keptSeconds - EPSILON) / (BATCH_SIZE * WINDOW_SIZE));
-  batchesToSend[file] = batches;
-  return intervals.length ? intervals : [{ start: 0, end: 0 }];
+  return intervals;
 }
-
-
 
 /**
  * Compute active time intervals for an audio file based on its metadata and detection mode.
@@ -4186,7 +4213,8 @@ const getSummary = async ({
  * @param species: filter for SQL query
  * @param limit: the pagination limit per page
  * @param offset: is the SQL query offset to use
- * @param topRankin: return results >= to this rank for each datetime
+ * @param topRankin: return results >= to this rank for each position
+ * @param path: if set, will export audio or text of the returned results to this folder
  * @param directory: if set, will export audio of the returned results to this folder
  * @param format: whether to export audio or text
  *
@@ -4205,7 +4233,6 @@ const getResults = async ({
 } = {}) => {
   let confidence = STATE.detect.confidence;
   if (position) {
-    //const position = await getPosition({species: species, dateTime: select.dateTime, included: included});
     offset = (position.page - 1) * limit;
     // We want to consistently move to the next record. If results are sorted by time, this will be row + 1.
     active = position.row; //+ 1;
@@ -4279,9 +4306,9 @@ const getResults = async ({
       } else if (species && STATE.mode !== "explore") {
         // get a number for the circle
         const { count } = await STATE.db.getAsync(
-          `SELECT COUNT(*) as count FROM records WHERE dateTime = ?
+          `SELECT COUNT(*) as count FROM records WHERE position = ?
                 AND confidence >= ? and fileID = ?`,
-          r.timestamp,
+          r.position,
           confidence,
           r.fileID
         );
@@ -4672,11 +4699,11 @@ const onSave2DiskDB = async ({ file }) => {
     // now update records
     response = await memoryDB.runAsync(`
             INSERT OR IGNORE INTO disk.records (
-              dateTime, position, fileID, speciesID, modelID, confidence, 
+              position, fileID, speciesID, modelID, confidence, 
               comment, end, callCount, isDaylight, reviewed, tagID
             )
             SELECT 
-                r.dateTime, r.position, r.fileID, r.speciesID, r.modelID, r.confidence, 
+                r.position, r.fileID, r.speciesID, r.modelID, r.confidence, 
                 r.comment, r.end, r.callCount, r.isDaylight, r.reviewed, r.tagID
             FROM records r
             JOIN species s ON r.speciesID = s.id  
@@ -4738,7 +4765,7 @@ const getDetectedSpecies = async () => {
   //   sql += ` AND speciesID IN (${included.join(",")})`;
   // }
   if (range?.start)
-    sql += ` AND datetime BETWEEN ${range.start} AND ${range.end}`;
+    sql += ` AND position * 1000 + files.filestart BETWEEN ${range.start} AND ${range.end}`;
   sql += filterLocation();
   sql += " GROUP BY cname ORDER BY cname";
   diskDB.all(sql, (err, rows) => {
@@ -4827,101 +4854,47 @@ const onUpdateFileStart = async (args) => {
     );
     DEBUG && console.log(changes ? `Changed ${file}` : `No changes made`);
     // update file metadata
+    delete METADATA[file];
     await setMetadata({ file });
     // Update dateDuration
     let result;
     result = await db.runAsync("DELETE FROM duration WHERE fileID = ?", id);
     DEBUG && console.log(result.changes, " entries deleted from duration");
     await insertDurations(file, id);
-    try {
-      // Begin transaction
-      await db.runAsync("BEGIN TRANSACTION");
-
-      // Create a temporary table with the same structure as the records table
-      await db.runAsync(`
-                CREATE TABLE temp_records AS
-                SELECT * FROM records;
-            `);
-
-      // Update the temp_records table with the new filestart values
-      await db.runAsync(
-        "UPDATE temp_records SET dateTime = (position * 1000) + ? WHERE fileID = ?",
-        args.start,
-        id
+    // Update file records isDaylight info
+    const fileStart = METADATA[file].fileStart;
+    const fileEnd = fileStart + METADATA[file].duration * 1000;
+    if (locationID) {
+      row = await db.getAsync(
+        "SELECT lat, lon FROM locations WHERE id = ?",
+        locationID
       );
+    } else row = null;
+    const { lat, lon } = row || { lat: STATE.lat, lon: STATE.lon };
+    const intervals = getIntervals(fileStart, fileEnd, parseFloat(lat), parseFloat(lon), 'day');
+    if (!intervals.length) { intervals.push({start:0, end:0}); } // no daylight
+    // Build SQL fragments
+    const conditions = intervals
+      .map(() => `(position BETWEEN ? AND ?)`)
+      .join(' OR ');
 
-      // Check if temp_records exists and drop the original records table
-      const tempExists = await db.getAsync(
-        `SELECT name FROM sqlite_master WHERE type='table' AND name='temp_records';`
-      );
+    // Flatten params
+    const params = intervals.flatMap(i => [i.start, i.end]);
 
-      if (tempExists) {
-        // Drop the original records table
-        await db.runAsync("DROP TABLE records;");
-      }
+    const sql = `
+      UPDATE records
+      SET isDaylight =
+        CASE
+          WHEN ${conditions} THEN 1
+          ELSE 0
+        END
+      WHERE fileID = ?
+    `;
+    result = await db.runAsync(sql, ...params, id);
+    DEBUG && console.log(result.changes, " records updated with new isDaylight");
 
-      // Rename the temp_records table to replace the original records table
-      await db.runAsync("ALTER TABLE temp_records RENAME TO records;");
-
-      // Recreate the UNIQUE constraint on the new records table
-      await db.runAsync(`
-                CREATE UNIQUE INDEX idx_unique_record ON records (dateTime, fileID, speciesID);
-            `);
-
-      // Update the daylight flag if necessary
-      let lat, lon;
-      if (locationID) {
-        const location = await STATE.db.getAsync(
-          "SELECT lat, lon FROM locations WHERE id = ?",
-          locationID
-        );
-        lat = location.lat;
-        lon = location.lon;
-      } else {
-        lat = STATE.lat;
-        lon = STATE.lon;
-      }
-
-      // Collect updates to be performed on each record
-      const updatePromises = [];
-
-      db.each(
-        `
-                SELECT rowid, dateTime, fileID, speciesID, confidence, isDaylight FROM records WHERE fileID = ${id}
-            `,
-        async (err, row) => {
-          if (err) {
-            throw err; // This will trigger rollback
-          }
-          const isDaylight = isDuringDaylight(row.dateTime, lat, lon) ? 1 : 0;
-          // Update the isDaylight column for this record
-          updatePromises.push(
-            db.runAsync(
-              "UPDATE records SET isDaylight = ? WHERE isDaylight != ? AND rowid = ?",
-              isDaylight,
-              isDaylight,
-              row.rowid
-            )
-          );
-        },
-        async (err, count) => {
-          if (err) {
-            throw err; // This will trigger rollback
-          }
-          // Wait for all updates to finish
-          await Promise.all(updatePromises);
-          // Commit transaction once all rows are processed
-          await db.runAsync("COMMIT");
-          DEBUG && console.log(`File ${file} updated successfully.`);
-          count && (await Promise.all([getSummary(), getResults()]));
-        }
-      );
-    } catch (error) {
-      // Rollback in case of error
-      console.error(`Transaction failed: ${error.message}`);
-      await db.runAsync("ROLLBACK");
-    }
   }
+  await Promise.all([getResults(), getSummary()])
 };
 
 /**
@@ -4946,11 +4919,10 @@ async function onDelete({
     "SELECT id from files WHERE name = ?",
     file
   );
-  // const datetime = Math.round(filestart + (parseFloat(start) * 1000));
   end = parseFloat(end); start = parseFloat(start);
   const params = [id, start, end];
   let sql = "DELETE FROM records WHERE fileID = ? AND position = ? AND end = ?";
-  if (! STATE.detect.merge){
+  if (! (STATE.detect.merge || STATE.detect.combine)){
     params.push(modelID)
     sql += " AND modelID = ?";
   }
@@ -5006,7 +4978,7 @@ async function onDeleteSpecies({
   } else if (STATE.mode === "explore") {
     const { start, end } = STATE.explore.range;
     if (start) {
-      SQL += ` AND dateTime BETWEEN ? AND ?`;
+      SQL += ` AND position * 1000 + files.filestart BETWEEN ? AND ?`;
       params.push(start, end);
     }
     if (STATE.locationID) {
@@ -5028,10 +5000,10 @@ async function onDeleteSpecies({
 async function onDeleteConfidence({start, end, species, confidence, modelID}) {
   // Implement the logic for deleting by confidence here
   const db = STATE.db;
-  let SQL = "DELETE FROM records WHERE confidence <= ?";
+  let SQL = "DELETE FROM records JOIN files on records.fileID = files.id WHERE confidence <= ?";
   const params = [confidence];
   if (start && end) {
-    SQL += " AND dateTime BETWEEN ? AND ?";
+    SQL += " AND position * 1000 + files.filestart BETWEEN ? AND ?";
     params.push(start, end);
   }
   if (species) {
@@ -5226,7 +5198,7 @@ async function onUpdateLocale(locale, labels, refreshResults) {
  * @param {Object} [params.db] - Database instance to use.
  * @param {boolean} [params.overwritePlaceName=true] - Whether to overwrite the place name if the location already exists.
  */
-async function onSetCustomLocation({
+async function onSetLocation({
   lat,
   lon,
   place,
@@ -5234,10 +5206,22 @@ async function onSetCustomLocation({
   db = STATE.db,
   overwritePlaceName = true,
 }) {
-  if (lat === STATE.lat && lon === STATE.lon && place && place.trim() === STATE.place.trim()) {
-    // Don't add default location
+  lat = roundedFloat(lat);
+  lon = roundedFloat(lon);
+  if (!files) {
+    await INITIALISED;
+    // Default location update
+    await diskDB.runAsync(`INSERT OR REPLACE INTO locations (id, lat, lon, place) VALUES (0, ?, ?, ?)`, lat, lon, place.trim())
+    await memoryDB.runAsync(`INSERT OR REPLACE INTO locations (id, lat, lon, place) VALUES (0, ?, ?, ?)`, lat, lon, place.trim());
     return;
   }
+  if (!overwritePlaceName) {
+    const nearby = await getNearbyLocations(lat, lon, 0.1);
+    if (nearby.length) {
+      console.info(`Nearby locations exist: ${nearby.flatMap(x => x.distance).join(", ")}`);
+    }
+  }
+
   if (!place) {
     // Delete the location
     const row = await db.getAsync(
@@ -5282,9 +5266,8 @@ async function onSetCustomLocation({
 
 async function getLocations({ file, db = STATE.db, id }) {
   let locations = await db.allAsync("SELECT * FROM locations ORDER BY place");
-  locations ??= [];
   // Default location
-  locations.unshift({ id: 0, lat: STATE.lat, lon: STATE.lon, place: STATE.place.trim() });
+  locations ??= [{ id: 0, lat: STATE.lat, lon: STATE.lon, place: STATE.place.trim() }];
   UI.postMessage({
     id,
     event: "location-list",
@@ -5294,13 +5277,41 @@ async function getLocations({ file, db = STATE.db, id }) {
 }
 
 /**
- * Returns a promise resolving to the array of species IDs included in the current filter context, based on the active list type and file metadata.
+ * getNearbyLocations
+ * Fetches locations from the database that are within a specified radius of given latitude and longitude using the Haversine formula.
+ * @param {number} lat
+ * @param {number} lon
+ * @param {number} radius in km
+ * @returns {Promise<Array.<{id: number, lat: number, lon: number, place: string, distance: number}>>}
+*/
+
+async function getNearbyLocations(lat, lon, radius = 0.1) {
+  const miles = STATE.distanceUnit === 'miles';
+  const R = miles ? 3959 : 6371; // Radius of the Earth in miles or km
+  const locations = await STATE.db.allAsync(`
+    SELECT id, lat, lon, place,
+      (${R} * acos(
+        cos(radians(?)) * cos(radians(lat)) * cos(radians(lon) - radians(?)) +
+        sin(radians(?)) * sin(radians(lat))
+      )) AS distance
+    FROM locations
+    WHERE (${R} * acos(
+      cos(radians(?)) * cos(radians(lat)) * cos(radians(lon) - radians(?)) +
+      sin(radians(?)) * sin(radians(lat))
+    )) <= ?
+    ORDER BY distance ASC;`, lat, lon, lat, lat, lon, lat, radius);
+  return locations;
+}
+
+/**
+ * Retrieves the list of included species IDs based on the current STATE settings and optional file context.
  *
- * For "location" or "nocturnal" lists in local mode, determines latitude, longitude, and week from the file's metadata or global state, and ensures the inclusion cache is populated for those parameters. For other list types, retrieves included species IDs from the cache, populating it if necessary.
+ * Depending on the STATE.list type and whether a specific file is provided, this function determines the appropriate latitude, longitude, and week number to use for location-specific or seasonal inclusion lists. It checks if the relevant inclusion data is already cached in STATE.included; if not, it invokes setIncludedIDs to fetch and cache the data from the list worker. Finally, it returns the array of included species IDs for the specified model and list type.
  *
- * @param {*} [file] - Optional file identifier used to extract metadata for location-based filtering.
- * @returns {Promise<number[]>} Promise resolving to the included species IDs for the current filter context.
+ * @param {string} [file] - Optional file identifier to provide context for location-specific or seasonal lists.
+ * @returns {Promise<number[]>} An array of species IDs that are included based on the current STATE settings.
  */
+
 async function getIncludedIDs(file) {
   if (STATE.list === "everything") return [];
   let latitude, longitude, week;
