@@ -1937,7 +1937,7 @@ async function loadAudioFile({
     if (file) {
       fetchAudioBuffer({ file, start, end })
         .then(([audio, start]) => {
-          if (!audio) {
+          if (!audio || audio.length === 0) {
             return reject('no file duration') 
           }
           UI.postMessage(
