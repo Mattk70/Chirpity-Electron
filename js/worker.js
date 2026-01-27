@@ -2660,7 +2660,7 @@ function setAudioFilters() {
 
   // === Filter chain logic ===
   const batModel = STATE.model === 'bats';
-  if (!batModel && (highPass || lowPass < 15_000)) {
+  if (!batModel && (highPass || (lowPass < 15_000 && lowPass > 0))) {
     const options = {};
     if (highPass) options.hp = highPass;
     if (lowPass < 15_000) options.lp = lowPass;
