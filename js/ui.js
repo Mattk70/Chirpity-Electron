@@ -1000,7 +1000,12 @@ const cancelDefaultLocation = () => {
 const setDefaultLocation = () => {
   config.latitude = parseFloat(DOM.defaultLat.value).toFixed(4);
   config.longitude = parseFloat(parseFloat(DOM.defaultLon.value)).toFixed(4);
-  config.location = DOM.place.textContent.replace("fmd_good", "");
+  const location = DOM.place.textContent.replace("fmd_good", "");
+  if (location.startsWith("Getting location") || location.trim().startsWith("No location found")) {
+    return
+  }
+  config.location = location;
+
   updateMap(parseFloat(DOM.defaultLat.value), parseFloat(DOM.defaultLon.value));
   updatePrefs("config.json", config);
   worker.postMessage({
@@ -1009,17 +1014,14 @@ const setDefaultLocation = () => {
     lon: config.longitude,
     place: config.location,
   });
-  // Initially, so changes to the default location are immediately reflected in subsequent analyses
-  // We will switch to location filtering when the default location is changed.
-  config.list = "location";
-  DOM.speciesThresholdEl.classList.remove("d-none");
-  updateList();
-
-  resetResults();
-  worker.postMessage({
-    action: "update-list",
-    list: "location",
-  });
+  if (config.list === "location") {
+    DOM.speciesThresholdEl.classList.remove("d-none");
+    resetResults();
+    worker.postMessage({
+      action: "update-list",
+      list: "location",
+    });
+  }
   const button = document.getElementById("apply-location");
   button.classList.replace("btn-danger","btn-primary");
   button.innerHTML = 'Set <span class="material-symbols-outlined">done</span>';
@@ -1931,11 +1933,27 @@ window.onload = async () => {
   
   const { library, database, detect, filters, audio, 
     limit, locale, speciesThreshold, list, useWeek, 
-    local, debug, fileStartMtime, specDetections, selectedModel, specLabels, UUID } = config;
+    local, debug, fileStartMtime, specDetections, specLabels, UUID } = config;
   
   let modelPath = config.models[config.selectedModel].modelPath;
   if (modelPath){
+    const requiredFiles = [], missingFiles = [];
     if (!fs.existsSync(modelPath)) {
+      corrupt = true;
+      missingFiles.push(modelPath);
+    } else if (config.selectedModel === 'perch v2'){
+      requiredFiles.push('perch_v2.onnx', 'labels.txt');
+    } else {
+      requiredFiles.push('model.json', 'weights.bin', 'labels.txt');
+    }
+    // Check for required files
+    for (const file of requiredFiles) {
+      if (!fs.existsSync(p.join(modelPath, file))) {
+        missingFiles.push(p.join(modelPath, file));
+      }
+    }
+    if (missingFiles.length > 0){
+      modelPath = missingFiles.join(', ');
       generateToast({ type: "error", message: "modelPathNotFound", variables: {modelPath} });
       worker.postMessage({action: "update-state",
         modelPath: undefined,
@@ -1945,7 +1963,7 @@ window.onload = async () => {
       modelPath = undefined;
     }
   }
-
+  const selectedModel = config.selectedModel;
   updateListOptions(selectedModel);
   debug && document.getElementById('dataset').classList.remove('d-none')
   isMember && updateModelOptions();
@@ -2333,7 +2351,11 @@ const setUpWorkerMessaging = () => {
           break;
         }
         case "model-ready": {
-          onModelReady();
+          if (args.message === "Model failed to load") {
+              DOM.loadingScreen.classList.add("d-none");
+          } else {
+            onModelReady();
+          }
           break;
         }
         case "mode-changed": {
