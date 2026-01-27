@@ -294,8 +294,8 @@ async function upgrade_to_v4(diskDB, dbMutex) {
     await diskDB.runAsync("BEGIN");
     await diskDB.runAsync(
       `CREATE TABLE records_new
-        (position FLOAT, fileID INT, speciesID INT, modelID INT, 
-        confidence INT, comment TEXT, end FLOAT, callcount INT, isDaylight BOOL, 
+        (position REAL, fileID INT, speciesID INT, modelID INT, 
+        confidence INT, comment TEXT, end REAL, callcount INT, isDaylight BOOL, 
         reviewed BOOL, tagID INT,
         UNIQUE (position, fileID, speciesID), 
         CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE, 

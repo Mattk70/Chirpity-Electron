@@ -52,7 +52,13 @@ let predictWorkers = [],
   aborted = false;
 let UI;
 let FILE_QUEUE = [];
-let INITIALISED = null;
+let initialiseResolve;
+let initialiseReject;
+
+let INITIALISED = new Promise((resolve, reject) => {
+  initialiseResolve = resolve;
+  initialiseReject = reject;
+});
 const EPSILON = 0.025;
 let t0_analysis = 0;
 const generateAlert = ({
@@ -373,7 +379,7 @@ async function handleMessage(e) {
   const args = e.data;
   const action = args.action;
   DEBUG && console.log("message received", action);
-  if (action !== "_init_" ) {
+  if (! ["_init_", "update-state","create message port"].includes(action)) {
     // Wait until _init_ or onLaunch completes before processing other messages
     await INITIALISED;
   }
@@ -382,18 +388,24 @@ async function handleMessage(e) {
       let { model, batchSize, threads, backend, list, modelPath } = args;
       const t0 = Date.now();
       STATE.detect.backend = backend;
-      INITIALISED = (async () => {
-        LIST_WORKER = await spawnListWorker(); // this can change the backend if tfjs-node isn't available
-        DEBUG && console.log("List worker took", Date.now() - t0, "ms to load");
-        await onLaunch({
-          model,
-          batchSize,
-          threads,
-          backend,
-          list,
-          modelPath
-        });
-      })();
+      try {
+        await (async () => {
+          LIST_WORKER = await spawnListWorker(); // this can change the backend if tfjs-node isn't available
+          DEBUG && console.log("List worker took", Date.now() - t0, "ms to load");
+          await onLaunch({
+            model,
+            batchSize,
+            threads,
+            backend,
+            list,
+            modelPath
+          });
+        })();  
+        initialiseResolve();        // resolve INITIALISED
+      } catch (err) {
+        console.error("Initialisation failed:", err);
+        initialiseReject(err);      // propagate failure
+      }
       break;
     }
     case "abort": {
@@ -629,7 +641,7 @@ async function handleMessage(e) {
       break;
     }
     case "set-custom-file-location": {
-      onSetCustomLocation(args);
+      onSetLocation(args);
       break;
     }
     case "train-model":{
@@ -725,8 +737,12 @@ async function handleMessage(e) {
       break;
     }
     case "update-state": {
-      appPath = args.path || appPath;
-      tempPath = args.temp || tempPath;
+      const {path, temp, lat, lon, place} = args;
+      appPath = path || appPath;
+      tempPath = temp || tempPath;
+      if (lat !== undefined && lon !== undefined && place) {
+        onSetLocation({ lat, lon, place });
+      }
       // If we change the speciesThreshold, we need to invalidate any location caches
       if (args.speciesThreshold) {
         for (const key in STATE.included) {
@@ -2153,8 +2169,9 @@ const setMetadata = async ({ file, source_file = file }) => {
         });
       fileMeta.isSaved = true; // Queried by UI to establish saved state of file.
     } 
+    const nearby = await getNearbyLocations(51.9026, -0.3995, 0.1);
     let guanoTimestamp, bextTimestamp, recorderModel;
-    // savedMeta may just have a locationID if it was set by onSetCUstomLocation
+    // savedMeta may just have a locationID if it was set by onSetLocation
     if (!savedMeta?.duration) {
       fileMeta.duration = await getDuration(file);
       if (file.toLowerCase().endsWith("wav")) {
@@ -2172,9 +2189,9 @@ const setMetadata = async ({ file, source_file = file }) => {
             const location = guano["Loc Position"];
             if (location) {
               const [lat, lon] = location.split(" ");
-              await onSetCustomLocation({
-                lat: roundedFloat(lat),
-                lon: roundedFloat(lon),
+              await onSetLocation({
+                lat,
+                lon,
                 place: location,
                 files: [file],
                 overwritePlaceName: false,
@@ -3560,7 +3577,6 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
             roundedFloat(lon),
             place
           );
-
           locationID = result?.id;
         }
       }
@@ -3812,6 +3828,21 @@ async function parseMessage(e) {
         UI.postMessage({
           event: "model-ready",
           message: "Give It To Me Baby. Uh-Huh Uh-Huh",
+        });
+      }
+      break;
+    }
+    case "model-error": {
+      if (!SEEN_MODEL_READY) {
+        SEEN_MODEL_READY = true;
+        const error = response.error || "Unknown error";
+        if (error.message === "Failed to fetch") {
+          error.message = "Model files missing or inaccessible";
+        }
+        generateAlert({ type: "error", message: error.message });
+        UI.postMessage({
+          event: "model-ready",
+          message: "Model failed to load",
         });
       }
       break;
@@ -5167,7 +5198,7 @@ async function onUpdateLocale(locale, labels, refreshResults) {
  * @param {Object} [params.db] - Database instance to use.
  * @param {boolean} [params.overwritePlaceName=true] - Whether to overwrite the place name if the location already exists.
  */
-async function onSetCustomLocation({
+async function onSetLocation({
   lat,
   lon,
   place,
@@ -5175,10 +5206,22 @@ async function onSetCustomLocation({
   db = STATE.db,
   overwritePlaceName = true,
 }) {
-  if (lat === STATE.lat && lon === STATE.lon && place && place.trim() === STATE.place.trim()) {
-    // Don't add default location
+  lat = roundedFloat(lat);
+  lon = roundedFloat(lon);
+  if (!files) {
+    await INITIALISED;
+    // Default location update
+    await diskDB.runAsync(`INSERT OR REPLACE INTO locations (id, lat, lon, place) VALUES (0, ?, ?, ?)`, lat, lon, place.trim())
+    await memoryDB.runAsync(`INSERT OR REPLACE INTO locations (id, lat, lon, place) VALUES (0, ?, ?, ?)`, lat, lon, place.trim());
     return;
   }
+  if (!overwritePlaceName) {
+    const nearby = await getNearbyLocations(lat, lon, 0.1);
+    if (nearby.length) {
+      console.info(`Nearby locations exist: ${nearby.flatMap(x => x.distance).join(", ")}`);
+    }
+  }
+
   if (!place) {
     // Delete the location
     const row = await db.getAsync(
@@ -5223,9 +5266,8 @@ async function onSetCustomLocation({
 
 async function getLocations({ file, db = STATE.db, id }) {
   let locations = await db.allAsync("SELECT * FROM locations ORDER BY place");
-  locations ??= [];
   // Default location
-  locations.unshift({ id: 0, lat: STATE.lat, lon: STATE.lon, place: STATE.place.trim() });
+  locations ??= [{ id: 0, lat: STATE.lat, lon: STATE.lon, place: STATE.place.trim() }];
   UI.postMessage({
     id,
     event: "location-list",
@@ -5235,13 +5277,41 @@ async function getLocations({ file, db = STATE.db, id }) {
 }
 
 /**
- * Returns a promise resolving to the array of species IDs included in the current filter context, based on the active list type and file metadata.
+ * getNearbyLocations
+ * Fetches locations from the database that are within a specified radius of given latitude and longitude using the Haversine formula.
+ * @param {number} lat
+ * @param {number} lon
+ * @param {number} radius in km
+ * @returns {Promise<Array.<{id: number, lat: number, lon: number, place: string, distance: number}>>}
+*/
+
+async function getNearbyLocations(lat, lon, radius = 0.1) {
+  const miles = STATE.distanceUnit === 'miles';
+  const R = miles ? 3959 : 6371; // Radius of the Earth in miles or km
+  const locations = await STATE.db.allAsync(`
+    SELECT id, lat, lon, place,
+      (${R} * acos(
+        cos(radians(?)) * cos(radians(lat)) * cos(radians(lon) - radians(?)) +
+        sin(radians(?)) * sin(radians(lat))
+      )) AS distance
+    FROM locations
+    WHERE (${R} * acos(
+      cos(radians(?)) * cos(radians(lat)) * cos(radians(lon) - radians(?)) +
+      sin(radians(?)) * sin(radians(lat))
+    )) <= ?
+    ORDER BY distance ASC;`, lat, lon, lat, lat, lon, lat, radius);
+  return locations;
+}
+
+/**
+ * Retrieves the list of included species IDs based on the current STATE settings and optional file context.
  *
- * For "location" or "nocturnal" lists in local mode, determines latitude, longitude, and week from the file's metadata or global state, and ensures the inclusion cache is populated for those parameters. For other list types, retrieves included species IDs from the cache, populating it if necessary.
+ * Depending on the STATE.list type and whether a specific file is provided, this function determines the appropriate latitude, longitude, and week number to use for location-specific or seasonal inclusion lists. It checks if the relevant inclusion data is already cached in STATE.included; if not, it invokes setIncludedIDs to fetch and cache the data from the list worker. Finally, it returns the array of included species IDs for the specified model and list type.
  *
- * @param {*} [file] - Optional file identifier used to extract metadata for location-based filtering.
- * @returns {Promise<number[]>} Promise resolving to the included species IDs for the current filter context.
+ * @param {string} [file] - Optional file identifier to provide context for location-specific or seasonal lists.
+ * @returns {Promise<number[]>} An array of species IDs that are included based on the current STATE settings.
  */
+
 async function getIncludedIDs(file) {
   if (STATE.list === "everything") return [];
   let latitude, longitude, week;
