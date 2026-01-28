@@ -636,10 +636,11 @@ app.whenReady().then(async () => {
                 options.filters = [{ name: 'Audio Files', extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg', 'mp4', 'opus', 'mov'] } ]
             }
         } else {
-          const ext = type === 'Text' ? 'txt' : 'csv';
+          const ext = type === 'Text' ? ['txt', 'csv'] : ['csv'];
+          console.log('selecting ', type, ext )
           options = {
               filters: [
-                  { name: `${type} Files`, extensions: [ext] }
+                  { name: `${type} Files`, extensions: ext }
               ],
               properties: ['openFile']
           }

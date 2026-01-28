@@ -193,7 +193,7 @@ const setupFfmpegCommand = async ({
   const command = ffmpeg("file:" + file)
     .format(format)
     .audioChannels(channels);
-  // todo: consider whether to exponse bat model training
+  // todo: consider whether to expose bat model training
   const training = false
   if (STATE.model.includes('bats')) { 
     // No sample rate is supplied when exporting audio.
@@ -2672,7 +2672,7 @@ const stream = command.pipe();
  * 
  * @returns {Array<Object>} An array of filter configuration objects for use with ffmpeg or similar audio processing tools.
  */
-function setAudioFilters() {
+function setAudioFilters({sample_rate, channels} = {}) {
   const {
     active,
     lowShelfAttenuation: attenuation,
@@ -2687,9 +2687,10 @@ function setAudioFilters() {
   const filters = [];
 
   // === Filter chain logic ===
-  const batModel = STATE.model === 'bats';
+  const batModel = STATE.model.includes('bats');
   if (!batModel && (highPass || (lowPass < 15_000 && lowPass > 0))) {
     const options = {};
+    if (sample_rate) options.r = sample_rate;
     if (highPass) options.hp = highPass;
     if (lowPass < 15_000) options.lp = lowPass;
     // Use sinc + afir
@@ -3119,6 +3120,7 @@ const bufferToAudio = async ({
   format = STATE.audio.format,
   folder = undefined,
   filename = undefined,
+  audio_details = undefined
 }) => {
   if (!fs.existsSync(file)) {
     const found = await getWorkingFile(file);
@@ -3153,18 +3155,17 @@ const bufferToAudio = async ({
 
     end = Math.min(METADATA[file].duration, end + 1);
   }
-
   return new Promise(function (resolve, reject) {
-    const filters = setAudioFilters();
+    const filters = setAudioFilters(audio_details);
     if (fade && padding) {
       filters.push(
         { filter: "afade", options: `t=in:ss=${start}:d=1` },
         { filter: "afade", options: `t=out:st=${end - start - 1}:d=1` }
       );
     }
-
+    let metadata;
     if (Object.entries(meta).length) {
-      meta = Object.entries(meta).flatMap(([k, v]) => {
+      metadata = Object.entries(meta).flatMap(([k, v]) => {
         if (typeof v === "string") {
           // Escape special characters, including quotes and apostrophes
           v = v.replaceAll(" ", "_");
@@ -3172,7 +3173,7 @@ const bufferToAudio = async ({
         return ["-metadata", `${k}=${v}`];
       });
     }
-    let errorHandled = false
+    let errorHandled = false;
     setupFfmpegCommand({
       file,
       start,
@@ -3183,15 +3184,33 @@ const bufferToAudio = async ({
       audioCodec,
       format: soundFormat,
       channels: downmix ? 1 : -1,
-      metadata: meta,
-      additionalFilters: filters,
+      metadata,
+      additionalFilters: filters
     }).then(command => {
     const destination = p.join(folder || tempPath, filename);
-    command.save(destination);
 
     command.on("start", function (commandLine) {
       DEBUG && console.log("FFmpeg command: " + commandLine);
     });
+    if (!audio_details && STATE.filters.active && STATE.filters.highPassFrequency || (STATE.filters.lowPassFrequency < 15000 && STATE.filters.lowPassFrequency > 0)) {
+      command.on("codecData", async function (data) {
+        const sample_rate = parseInt(data.audio_details[1]);
+        const channels = data.audio_details[2].toLowerCase().includes('stereo') ? 2 : 1;
+        errorHandled = true;
+        command.kill('SIGKILL');
+        await bufferToAudio({
+          file,
+          start,
+          end,
+          meta,
+          format,
+          folder,
+          filename,
+          audio_details: { sample_rate, channels }
+        })
+        resolve(destination);
+      });
+    }
     if (format === "mp3" && ! STATE.audio.downmix) {
       command.on("codecData", function (data) {
         const channels = data.audio_details[2].toLowerCase();
@@ -3215,7 +3234,7 @@ const bufferToAudio = async ({
           return reject(console.warn("Export polyWAV to mp3 attempted."))
         }
       });
-    }
+    } 
     command.on("error", (err) => {
       if (errorHandled) return; // Prevent multiple error handling
       generateAlert({ type: "error", message: "ffmpeg", variables: { error: err.message } });
@@ -3230,9 +3249,8 @@ const bufferToAudio = async ({
       // }
       resolve(destination);
     });
+    command.save(destination);
     })
-
-
   });
 };
 
