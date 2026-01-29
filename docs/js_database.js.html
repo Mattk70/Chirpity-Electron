@@ -1,4 +1,32 @@
-/**
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: js/database.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: js/database.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
  * @file Utility functions for database interaction.
  */
 
@@ -106,7 +134,7 @@ class Mutex {
  *
  * @param {Object|null|undefined} db - The SQLite database instance on which to perform the checkpoint.
  *   If no database instance is provided (null or undefined), the checkpoint operation is skipped.
- * @returns {Promise<void>} A Promise that resolves when the checkpoint completes successfully or
+ * @returns {Promise&lt;void>} A Promise that resolves when the checkpoint completes successfully or
  *   immediately if no database is provided, and rejects with an error if the checkpoint operation fails.
  *
  * @example
@@ -139,7 +167,7 @@ function checkpoint(db) {
  * the error is logged and the promise is rejected with the encountered error.
  *
  * @param {object|null|undefined} db - The SQLite database instance to close. If falsy, no action is taken.
- * @return {Promise<void>} A promise that resolves when the database is successfully closed or if no
+ * @return {Promise&lt;void>} A promise that resolves when the database is successfully closed or if no
  * database is provided, and rejects if an error occurs during the close operation.
  *
  * @example
@@ -252,10 +280,10 @@ const createDB = async ({file, diskDB, dbMutex}) => {
     const {openSync} = require('node:fs');
     openSync(file, "w");
     diskDB = new sqlite3.Database(file);
-    DEBUG && console.log("Created disk database", diskDB.filename);
+    DEBUG &amp;&amp; console.log("Created disk database", diskDB.filename);
   } else {
     memoryDB = new sqlite3.Database(":memory:");
-    DEBUG && console.log("Created new in-memory database");
+    DEBUG &amp;&amp; console.log("Created new in-memory database");
   }
   const db = archiveMode ? diskDB : memoryDB;
 
@@ -359,28 +387,28 @@ const createDB = async ({file, diskDB, dbMutex}) => {
       let response = await db.runAsync(
         "INSERT INTO files SELECT * FROM disk.files"
       );
-      DEBUG &&
+      DEBUG &amp;&amp;
         console.log(response.changes + " files added to memory database");
       response = await db.runAsync(
         "INSERT INTO locations SELECT * FROM disk.locations"
       );
-      DEBUG &&
+      DEBUG &amp;&amp;
         console.log(response.changes + " locations added to memory database");
       response = await db.runAsync(
         "INSERT INTO species SELECT * FROM disk.species"
       );
-      DEBUG &&
+      DEBUG &amp;&amp;
         console.log(response.changes + " species added to memory database");
 
       response = await db.runAsync(
         "INSERT OR IGNORE INTO tags SELECT * FROM disk.tags"
       );
-      DEBUG && console.log(response.changes + " tags added to memory database");
+      DEBUG &amp;&amp; console.log(response.changes + " tags added to memory database");
 
       response = await db.runAsync(
         "INSERT OR IGNORE INTO models SELECT * FROM disk.models"
       );
-      DEBUG && console.log(response.changes + " models added to memory database");
+      DEBUG &amp;&amp; console.log(response.changes + " models added to memory database");
     }
     await db.runAsync("END");
   } catch (error) {
@@ -432,14 +460,14 @@ const addNewModel = async ({model, db = diskDB, dbMutex, labelsLocation}) => {
     const MAX_PARAMS = 25000;
     const PARAMS_PER_ROW = 4;
     const MAX_ROWS_PER_BATCH = Math.floor(MAX_PARAMS / PARAMS_PER_ROW);
-    for (let i = 0; i < labels.length; i += MAX_ROWS_PER_BATCH) {
+    for (let i = 0; i &lt; labels.length; i += MAX_ROWS_PER_BATCH) {
       const batch = labels.slice(i, i + MAX_ROWS_PER_BATCH);
 
       let insertQuery = `INSERT INTO species (sname, cname, modelID, classIndex) VALUES `;
       const params = [];
       batch.forEach((entry, index) => {
         const parts = entry.split(splitChar);
-        if (parts.length < 2 || parts.length > expectedParts) {
+        if (parts.length &lt; 2 || parts.length > expectedParts) {
           const err = `Invalid label: '${entry}' on line ${i + index + 1}. Expected 'scientific name${splitChar}common name[${splitChar}taxon]' format.`;
           throw new Error(err);
         }
@@ -475,7 +503,7 @@ const mergeDbIfNeeded = async ({diskDB, model, appPath, dbMutex, labelsLocation}
   const {existsSync} = require('node:fs');
   const dbNotFound = !existsSync(legacyDbPath);
   const isCustomDB = !diskDB.filename.includes(appPath);
-  DEBUG && console.log('isCustomDB:', isCustomDB);
+  DEBUG &amp;&amp; console.log('isCustomDB:', isCustomDB);
   if (dbNotFound) {
     console.log(`Model database not found: ${legacyDbPath}`);
     const modelID = await addNewModel({model, db:diskDB, dbMutex, labelsLocation})
@@ -504,7 +532,7 @@ const mergeDbIfNeeded = async ({diskDB, model, appPath, dbMutex, labelsLocation}
       user_version = row.version;
     }
 
-    if (user_version < 2) {
+    if (user_version &lt; 2) {
       await upgrade_to_v2(legacyDB, dbMutex);
     }
 
@@ -621,3 +649,26 @@ export {
   addNewModel,
   upgrade_to_v4
 };
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#LIST_CACHE">LIST_CACHE</a></li><li><a href="global.html#WSPlayPause">WSPlayPause</a></li><li><a href="global.html#_updateSpeciesLocale">_updateSpeciesLocale</a></li><li><a href="global.html#activateResultSort">activateResultSort</a></li><li><a href="global.html#addDays">addDays</a></li><li><a href="global.html#addQueryQualifiers">addQueryQualifiers</a></li><li><a href="global.html#addToHistory">addToHistory</a></li><li><a href="global.html#allowedByList">allowedByList</a></li><li><a href="global.html#analyseReset">analyseReset</a></li><li><a href="global.html#batchExportAudio">batchExportAudio</a></li><li><a href="global.html#batchInsertRecords">batchInsertRecords</a></li><li><a href="global.html#calculateTimeBoundaries">calculateTimeBoundaries</a></li><li><a href="global.html#changeInputElement">changeInputElement</a></li><li><a href="global.html#changeSettingsMode">changeSettingsMode</a></li><li><a href="global.html#chartInstance">chartInstance</a></li><li><a href="global.html#checkFilteredFrequency">checkFilteredFrequency</a></li><li><a href="global.html#checkForIntelMacUpdates">checkForIntelMacUpdates</a></li><li><a href="global.html#checkNewModel">checkNewModel</a></li><li><a href="global.html#checkpoint">checkpoint</a></li><li><a href="global.html#clearActive">clearActive</a></li><li><a href="global.html#closeDatabase">closeDatabase</a></li><li><a href="global.html#convertAndOrganiseFiles">convertAndOrganiseFiles</a></li><li><a href="global.html#convertFile">convertFile</a></li><li><a href="global.html#createContextMenu">createContextMenu</a></li><li><a href="global.html#customAnalysisAllMenu">customAnalysisAllMenu</a></li><li><a href="global.html#customiseAnalysisMenu">customiseAnalysisMenu</a></li><li><a href="global.html#dayMonthToDayOfYear">dayMonthToDayOfYear</a></li><li><a href="global.html#dayOfYear">dayOfYear</a></li><li><a href="global.html#deepMergeLists">deepMergeLists</a></li><li><a href="global.html#doPrediction">doPrediction</a></li><li><a href="global.html#epochInDayMonthRange">epochInDayMonthRange</a></li><li><a href="global.html#estimateTimeRemaining">estimateTimeRemaining</a></li><li><a href="global.html#exportAudacity">exportAudacity</a></li><li><a href="global.html#exportData">exportData</a></li><li><a href="global.html#exportSpeciesList">exportSpeciesList</a></li><li><a href="global.html#fetchAudioBuffer">fetchAudioBuffer</a></li><li><a href="global.html#filterResults">filterResults</a></li><li><a href="global.html#filterValidFiles">filterValidFiles</a></li><li><a href="global.html#formatAsBootstrapTable">formatAsBootstrapTable</a></li><li><a href="global.html#generateBirdIDList">generateBirdIDList</a></li><li><a href="global.html#generateToast">generateToast</a></li><li><a href="global.html#getDetectedSpecies">getDetectedSpecies</a></li><li><a href="global.html#getExcluded">getExcluded</a></li><li><a href="global.html#getFileSQLAndParams">getFileSQLAndParams</a></li><li><a href="global.html#getFiles">getFiles</a></li><li><a href="global.html#getFilteredBirds">getFilteredBirds</a></li><li><a href="global.html#getIncludedIDs">getIncludedIDs</a></li><li><a href="global.html#getInstallInfo">getInstallInfo</a></li><li><a href="global.html#getMatchingIds">getMatchingIds</a></li><li><a href="global.html#getNearbyLocations">getNearbyLocations</a></li><li><a href="global.html#getResults">getResults</a></li><li><a href="global.html#getRowFromStart">getRowFromStart</a></li><li><a href="global.html#getSpecies">getSpecies</a></li><li><a href="global.html#getSpeciesSQLAsync">getSpeciesSQLAsync</a></li><li><a href="global.html#getValidSpecies">getValidSpecies</a></li><li><a href="global.html#getWorkingFile">getWorkingFile</a></li><li><a href="global.html#getXCComparisons">getXCComparisons</a></li><li><a href="global.html#handleKeyDown">handleKeyDown</a></li><li><a href="global.html#handleKeyDownDeBounce">handleKeyDownDeBounce</a></li><li><a href="global.html#handleMessage">handleMessage</a></li><li><a href="global.html#handleUIClicks">handleUIClicks</a></li><li><a href="global.html#importData">importData</a></li><li><a href="global.html#loadAudioFile">loadAudioFile</a></li><li><a href="global.html#loadAudioFileSync">loadAudioFileSync</a></li><li><a href="global.html#loadDB">loadDB</a></li><li><a href="global.html#localiseModal">localiseModal</a></li><li><a href="global.html#locateFile">locateFile</a></li><li><a href="global.html#membershipCheck">membershipCheck</a></li><li><a href="global.html#metadataLocks">metadataLocks</a></li><li><a href="global.html#notifyMissingFile">notifyMissingFile</a></li><li><a href="global.html#onAbort">onAbort</a></li><li><a href="global.html#onAnalyse">onAnalyse</a></li><li><a href="global.html#onAnalysisComplete">onAnalysisComplete</a></li><li><a href="global.html#onChangeMode">onChangeMode</a></li><li><a href="global.html#onDelete">onDelete</a></li><li><a href="global.html#onDeleteSpecies">onDeleteSpecies</a></li><li><a href="global.html#onLaunch">onLaunch</a></li><li><a href="global.html#onModelReady">onModelReady</a></li><li><a href="global.html#onOpenFiles">onOpenFiles</a></li><li><a href="global.html#onResultsComplete">onResultsComplete</a></li><li><a href="global.html#onSave2DiskDB">onSave2DiskDB</a></li><li><a href="global.html#onSaveAudio">onSaveAudio</a></li><li><a href="global.html#onSetLocation">onSetLocation</a></li><li><a href="global.html#onSummaryComplete">onSummaryComplete</a></li><li><a href="global.html#onUpdateLocale">onUpdateLocale</a></li><li><a href="global.html#onWorkerLoadedAudio">onWorkerLoadedAudio</a></li><li><a href="global.html#parseBextLocalDate">parseBextLocalDate</a></li><li><a href="global.html#parseCnames">parseCnames</a></li><li><a href="global.html#parseMessage">parseMessage</a></li><li><a href="global.html#playRegion">playRegion</a></li><li><a href="global.html#positionMenu">positionMenu</a></li><li><a href="global.html#postAnalyseMessage">postAnalyseMessage</a></li><li><a href="global.html#processAudio">processAudio</a></li><li><a href="global.html#processFilesInBatches">processFilesInBatches</a></li><li><a href="global.html#processNextFile">processNextFile</a></li><li><a href="global.html#readLabels">readLabels</a></li><li><a href="global.html#recordUpdate">recordUpdate</a></li><li><a href="global.html#refreshResultsView">refreshResultsView</a></li><li><a href="global.html#refreshSummary">refreshSummary</a></li><li><a href="global.html#renderFilenamePanel">renderFilenamePanel</a></li><li><a href="global.html#renderResult">renderResult</a></li><li><a href="global.html#resetDiagnostics">resetDiagnostics</a></li><li><a href="global.html#resetResults">resetResults</a></li><li><a href="global.html#resultClick">resultClick</a></li><li><a href="global.html#savedFileCheckAsync">savedFileCheckAsync</a></li><li><a href="global.html#sendDetections">sendDetections</a></li><li><a href="global.html#setActiveRegion">setActiveRegion</a></li><li><a href="global.html#setActiveRow">setActiveRow</a></li><li><a href="global.html#setAudioFilters">setAudioFilters</a></li><li><a href="global.html#setClickedIndex">setClickedIndex</a></li><li><a href="global.html#setIncludedIDs">setIncludedIDs</a></li><li><a href="global.html#setKeyAssignment">setKeyAssignment</a></li><li><a href="global.html#setKeyAssignmentUI">setKeyAssignmentUI</a></li><li><a href="global.html#setLabelState">setLabelState</a></li><li><a href="global.html#setListUIState">setListUIState</a></li><li><a href="global.html#setNocmig">setNocmig</a></li><li><a href="global.html#setStartEnd">setStartEnd</a></li><li><a href="global.html#showAnalyse">showAnalyse</a></li><li><a href="global.html#showCharts">showCharts</a></li><li><a href="global.html#showDatePicker">showDatePicker</a></li><li><a href="global.html#showExplore">showExplore</a></li><li><a href="global.html#showRecordEntryForm">showRecordEntryForm</a></li><li><a href="global.html#showSummarySortIcon">showSummarySortIcon</a></li><li><a href="global.html#showThreshold">showThreshold</a></li><li><a href="global.html#showTopRankin">showTopRankin</a></li><li><a href="global.html#showWindowDetections">showWindowDetections</a></li><li><a href="global.html#spawnListWorker">spawnListWorker</a></li><li><a href="global.html#spawnPredictWorkers">spawnPredictWorkers</a></li><li><a href="global.html#speciesFilter">speciesFilter</a></li><li><a href="global.html#t0_warmup">t0_warmup</a></li><li><a href="global.html#training">training</a></li><li><a href="global.html#unpackNameAttr">unpackNameAttr</a></li><li><a href="global.html#updateFilesBeingProcessed">updateFilesBeingProcessed</a></li><li><a href="global.html#updateList">updateList</a></li><li><a href="global.html#updateMetadata">updateMetadata</a></li><li><a href="global.html#updatePagination">updatePagination</a></li><li><a href="global.html#updateSuggestions">updateSuggestions</a></li><li><a href="global.html#upgrade_to_v2">upgrade_to_v2</a></li><li><a href="global.html#upgrade_to_v4">upgrade_to_v4</a></li><li><a href="global.html#waitForWavesurferReady">waitForWavesurferReady</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Thu Jan 29 2026 18:44:25 GMT+0000 (Greenwich Mean Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: main.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: main.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>const fs = require("node:fs");
+const path = require("node:path");
+const isMac = process.platform === "darwin"; // macOS check
+const arch = process.arch;
+const {
+  app,
+  Menu,
+  dialog,
+  ipcMain,
+  MessageChannelMain,
+  BrowserWindow,
+  powerSaveBlocker,
+} = require("electron");
+app.commandLine.appendSwitch("disable-renderer-backgrounding");
+app.commandLine.appendSwitch("force-high-performance-gpu");
+app.commandLine.appendSwitch("xdg-portal-required-version", "4");
+// WebGPU flags needed for Linux
+app.commandLine.appendSwitch("enable-unsafe-webgpu");
+app.commandLine.appendSwitch("enable-features", "Vulkan");
+process.env["TF_ENABLE_ONEDNN_OPTS"] = "1";
+
+// Set the AppUserModelID (to prevent the two pinned icons bug)
+app.setAppUserModelId('com.electron.chirpity');
+const version = app.getVersion();
+function copyFilesOnly(srcDir, destDir) {
+  for (const item of fs.readdirSync(srcDir)) {
+    if (['config.json', 
+      'archive.sqlite', 
+      'archive.sqlite.shm', 
+      'archive.sqlite.wal', 
+      'XCcache.json', 
+      'settings.json'].includes(item)){
+      const srcPath = path.join(srcDir, item);
+      const destPath = path.join(destDir, item);
+      // Copy files
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
+// // When dmg is installed over a pkg installation, the app crashes, so...
+const userData = app.getPath("userData");
+const CONFIG_FILE = path.join(userData, 'config.json');
+    
+function checkForMigration() {
+  if (isMac &amp;&amp; ! fs.existsSync(path.join(userData, 'pkg2dmg')) &amp;&amp; fs.existsSync(CONFIG_FILE)){
+    console.log(`existing config found`)
+    try {
+      const data = fs.readFileSync(CONFIG_FILE);
+      const semver = require('semver');
+      const {VERSION} = JSON.parse(data);
+      if (semver.gt(VERSION, '5.6.1')) {
+        console.log(`No migrating needed for version ${VERSION}`)
+        fs.writeFileSync(path.join(userData, 'pkg2dmg'), "");
+        return; // no migration needed
+      }
+      console.log(`migrating settings from version ${VERSION}`)
+
+      const movedSettings = userData+' old'
+      fs.renameSync(userData, movedSettings);
+      fs.mkdirSync(userData)
+      copyFilesOnly(movedSettings, userData)
+      fs.writeFileSync(path.join(userData, 'pkg2dmg'), "");
+      console.log('Migration done')
+    } catch (err) {
+      console.error(err);
+    }
+  }
+}
+checkForMigration();
+
+const { autoUpdater } = require("electron-updater");
+const log = require("electron-log");
+const crypto = require("node:crypto");
+
+const settings = require("electron-settings");
+const keytar = require('keytar');
+const SERVICE = 'Chirpity';
+const ACCOUNT = 'uuid';
+let DEBUG = false;
+
+/**
+ * Ensure and return persistent install information, creating and storing it in the system keychain if missing or invalid.
+ * Attempts to read an existing record from the keychain; if none exists or it lacks a valid `installedAt`, a new record is generated and persisted. If a provided `date` is invalid, the current time is used. Keychain read/write failures are logged and the new record is returned (but may not be persisted).
+ * @param {string|Date|number} [date] - Optional install timestamp (ISO string, Date object, or epoch milliseconds) to use when creating a new record.
+ * @returns {{appId: string, installedAt: string}} An object containing `appId` (a UUID) and `installedAt` (an ISO 8601 timestamp).
+ */
+
+async function getInstallInfo(date) {
+  // First, try the current key (ACCOUNT = 'uuid')
+  try {
+    const raw = await keytar.getPassword(SERVICE, ACCOUNT);
+
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed &amp;&amp; typeof parsed.installedAt === "string") {
+          return parsed;
+        }
+        console.warn("getInstallInfo: keychain entry missing valid installedAt, will attempt migration or recreate", date);
+      } catch (e) {
+        console.warn("getInstallInfo: failed to parse current keychain entry, will attempt migration or recreate", e.message);
+      }
+    }
+  } catch (error) {
+    console.warn("getInstallInfo: keychain read failed for current key, will attempt migration or recreate:", error.message);
+  }
+
+  // If no current entry, try legacy key 'install-info' and migrate it if present
+  try {
+    const legacyRaw = await keytar.getPassword(SERVICE, 'install-info');
+    if (legacyRaw) {
+      let migratedDateStr = null;
+      let legacyAppId = null;
+      try {
+        const legacyParsed = JSON.parse(legacyRaw);
+        // Accept either { installedAt: '...' } or { installedAt: '...', appId: '...' }
+        if (legacyParsed &amp;&amp; typeof legacyParsed.installedAt === 'string') {
+          migratedDateStr = legacyParsed.installedAt;
+          if (legacyParsed.appId) legacyAppId = legacyParsed.appId;
+        }
+      } catch (e) {
+        // Not JSON — maybe it's a raw date string
+        const maybeDate = new Date(legacyRaw);
+        if (!Number.isNaN(maybeDate.getTime())) {
+          migratedDateStr = maybeDate.toISOString();
+        }
+      }
+
+      if (migratedDateStr) {
+        const installInfo = {
+          appId: legacyAppId || crypto.randomUUID(),
+          installedAt: migratedDateStr,
+        };
+        try {
+          await keytar.setPassword(SERVICE, ACCOUNT, JSON.stringify(installInfo));
+          try {
+            // Remove legacy key to avoid confusion; ignore failures
+            await keytar.deletePassword(SERVICE, 'install-info');
+          } catch (delErr) {
+            console.warn('getInstallInfo: failed to delete legacy install-info key:', delErr.message);
+          }
+          console.info('getInstallInfo: migrated legacy install-info to', ACCOUNT);
+        } catch (writeErr) {
+          console.warn('getInstallInfo: failed to write migrated installInfo to keychain:', writeErr.message);
+        }
+        return installInfo;
+      } else {
+        console.warn('getInstallInfo: legacy install-info found but no usable date; will recreate.');
+      }
+    }
+  } catch (legacyErr) {
+    console.warn('getInstallInfo: error reading legacy install-info key:', legacyErr.message);
+  }
+
+  let effectiveDate = date ? new Date(date) : new Date();
+  if (Number.isNaN(effectiveDate.getTime())) {
+    console.warn("getInstallInfo: invalid date provided, falling back to now. Date:", effectiveDate);
+    effectiveDate = new Date();
+  }
+  const installInfo = {
+    appId: crypto.randomUUID(),
+    installedAt: effectiveDate.toISOString(),
+  };
+  console.log('attempt to set new service password, using ', installInfo)
+  
+  try {
+    await keytar.setPassword(SERVICE, ACCOUNT, JSON.stringify(installInfo));
+  } catch (error) {
+    console.warn("getInstallInfo: keychain write failed (using in‑memory date only):", error.message);
+  }
+  return installInfo;
+}
+
+
+//require('update-electron-app')();
+let files = [];
+let unsavedRecords = false;
+
+// List of supported file for opening:
+const SUPPORTED_FILES = [
+  ".wav",
+  ".flac",
+  ".opus",
+  ".m4a",
+  ".mp3",
+  ".mpga",
+  ".ogg",
+  ".aac",
+  ".mpeg",
+  ".mp4",
+  ".mov",
+];
+
+
+//-------------------------------------------------------------------
+// Logging
+
+// This logging setup is not required for auto-updates to work,
+// but it sure makes debugging easier :)
+//-------------------------------------------------------------------
+
+console.log = log.log;
+console.warn = log.warn;
+console.error = log.error;
+autoUpdater.logger = log;
+autoUpdater.logger.transports.file.level = "info";
+autoUpdater.allowPrerelease = false; 
+const channel = `latest-${arch}`;
+log.info('channel:', channel)
+autoUpdater.channel = channel;
+log.info('App starting...');
+
+
+// Set membership URL here
+process.env.MEMBERSHIP_API_ENDPOINT = 'https://subscriber.mattkirkland.co.uk/check-uuid_v2';
+
+// Define the menu template
+const template = [
+  ...(isMac
+    ? [
+        {
+          label: "Chirpity",
+          submenu: [
+            { role: "about" },
+            { type: "separator" },
+            { role: "services" },
+            { type: "separator" },
+            { role: "hide" },
+            { role: "hideOthers" },
+            { role: "unhide" },
+            { type: "separator" },
+            { role: "quit" },
+          ],
+        },
+      ]
+    : []),
+  {
+    label: "Edit",
+    submenu: [
+      { role: "undo" },
+      { role: "redo" },
+      { type: "separator" },
+      { role: "cut" },
+      { role: "copy" },
+      { role: "paste" },
+      { role: "selectAll" },
+    ],
+  },
+];
+
+const menu = Menu.buildFromTemplate(template);
+
+Menu.setApplicationMenu(menu);
+// Updates
+// Function to fetch release notes from GitHub API
+async function fetchReleaseNotes(version) {
+  try {
+    const response = await fetch(
+      "https://api.github.com/repos/Mattk70/Chirpity-Electron/releases/latest"
+    );
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data &amp;&amp; data.body) {
+        return data.body;
+      }
+    } else {
+      console.error("Error fetching release notes:", response.statusText);
+    }
+  } catch (error) {
+    console.error("Error fetching release notes:", error);
+  }
+  return "Release notes not available.";
+}
+
+
+autoUpdater.on("checking-for-update", function () {
+  logUpdateStatus("Checking for update...");
+  if (process.env.PORTABLE_EXECUTABLE_DIR) {
+    logUpdateStatus("This is a portable exe");
+  }
+});
+
+autoUpdater.on("update-available", async function (info) {
+  if (!process.env.PORTABLE_EXECUTABLE_DIR) {
+    autoUpdater.downloadUpdate();
+  } else {
+    // Fetch release notes from GitHub API
+    const releaseNotes = await fetchReleaseNotes(info.version);
+    dialog.showMessageBox({
+      type: "info",
+      title: "Update Available",
+      message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}`,
+      buttons: ["OK"],
+      defaultId: 1,
+      noLink: true,
+    });
+  }
+});
+
+autoUpdater.on("update-not-available", function (_info) {
+  logUpdateStatus("Update not available.");
+});
+
+autoUpdater.on("error", function (err) {
+  logUpdateStatus("Error in auto-updater:" + err);
+});
+
+autoUpdater.on("download-progress", function (progressObj) {
+  try{
+    mainWindow.webContents.send("download-progress", progressObj);
+  } catch {
+    logUpdateStatus('mainwindow progress update failed')
+  }
+});
+
+autoUpdater.on("update-downloaded", async function (info) {
+  // Fetch release notes from GitHub API
+  const releaseNotes = await fetchReleaseNotes(info.version);
+  log.info(JSON.stringify(info));
+  // Display dialog to the user with release notes
+    dialog
+      .showMessageBox({
+        type: "info",
+        title: "Update Available",
+        message: `A new version (${info.version}) is available.\n\nRelease Notes:\n${releaseNotes}\n\nDo you want to install it now?`,
+        buttons: ["Quit and Install", "Install after Exit"],
+        defaultId: 1,
+        noLink: true,
+      })
+      .then((result) => {
+        if (result.response === 0) {
+          // User clicked 'Yes', start the installation
+          autoUpdater.quitAndInstall(true, true);
+        }
+      })
+});
+
+function logUpdateStatus(message) {
+  console.log(message);
+}
+
+process.stdin.resume(); //so the program will not close instantly
+
+function getFileFromArgs(args) {
+    return args.find(arg => SUPPORTED_FILES.some(ext => arg.toLowerCase().endsWith(ext)));
+}
+async function exitHandler(options, exitCode) {
+  if (options.cleanup) {
+    // clean up settings.json litter
+    const conf = userData;
+    fs.readdir(conf, (err, files) => {
+      if (err) {
+        console.error("Error reading folder:", err);
+        return;
+      }
+      files.forEach((file) => {
+        if (file.startsWith("settings.json.")) {
+          fs.unlink(path.join(conf, file), (err) => {
+            if (err) {
+              console.error("Error deleting file:", err);
+            } else {
+              DEBUG &amp;&amp; console.log("Deleted file:", file);
+            }
+          });
+        }
+      });
+    });
+
+    // Disable debug mode here?
+  } else {
+    DEBUG &amp;&amp; console.log("no clean");
+  }
+  if (exitCode || exitCode === 0) {
+    DEBUG &amp;&amp; console.log(`App closed with code: ${exitCode}`);
+  }
+}
+
+//do something when app is closing
+process.on("exit", exitHandler.bind(undefined, { cleanup: true }));
+process.on("SIGINT", () => {
+  exitHandler({ cleanup: true });
+  app.quit(); // Triggers before-quit handler
+});
+process.on("SIGUSR1", () => app.quit());
+process.on("SIGUSR2", () => app.quit());
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught exception:", err);
+  app.quit();
+});
+
+ipcMain.handle('getPath', () => userData);
+ipcMain.handle('getAppPath', () => app.getAppPath());
+ipcMain.handle('trialPeriod', () => 14*24*3600*1000); // 14 days
+ipcMain.handle('getLocale', () => app.getLocale());
+ipcMain.handle('getTemp', () => app.getPath('temp'));
+ipcMain.handle('isMac', () => isMac);
+ipcMain.handle('getAudio', () => path.join(__dirname.replace('app.asar', ''), 'Help', 'example.mp3'));
+ipcMain.handle('exitApplication', () => app.quit()); 
+ipcMain.handle('getInstallInfo', (_e, date) => getInstallInfo(date));
+
+let mainWindow;
+let workerWindow;
+
+async function windowStateKeeper(windowName) {
+  let window, windowState;
+  async function setBounds() {
+    // Restore from settings
+    if (await settings.has(`windowState.${windowName}`)) {
+      windowState = await settings.get(`windowState.${windowName}`);
+    } else {
+      // Default
+      windowState = {
+        x: undefined,
+        y: undefined,
+        width: 1280,
+        height: 768,
+      };
+    }
+  }
+  async function saveState() {
+    if (!windowState.isMaximized) {
+      windowState = window.getBounds();
+    }
+    windowState.isMaximized = window.isMaximized();
+    windowState.isFullScreen = window.isFullScreen();
+    try {
+      await settings.set(`windowState.${windowName}`, windowState);
+    } catch {} // do nothing
+  }
+  function track(win) {
+    window = win;
+    ["resize", "move", "maximize", "unmaximize"].forEach((event) => {
+      win.on(event, saveState);
+    });
+  }
+  await setBounds();
+  return { ...windowState, track };
+}
+
+
+async function createWindow() {
+  // Create the browser window.
+  // Get window state
+  const mainWindowStateKeeper = await windowStateKeeper("main");
+
+  mainWindow = new BrowserWindow({
+    show: false,
+    title: "Chirpity Nocmig",
+    x: mainWindowStateKeeper.x,
+    y: mainWindowStateKeeper.y,
+    width: mainWindowStateKeeper.width,
+    height: mainWindowStateKeeper.height,
+
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      nodeIntegration: true,
+      contextIsolation: true,
+      backgroundThrottling: false,
+    },
+  });
+
+  mainWindow.setFullScreen(mainWindowStateKeeper.isFullScreen);
+  mainWindowStateKeeper.isMaximized &amp;&amp;  mainWindow.maximize();
+
+  // Track window state
+  mainWindowStateKeeper.track(mainWindow);
+
+  // Set icon
+  mainWindow.setIcon(__dirname + "/img/icon/icon.png");
+
+  // Hide nav bar except in ci mode
+
+  mainWindow.setMenuBarVisibility(!!process.env.CI);
+
+  // and load the index.html of the app.
+  mainWindow.loadFile("index.html");
+
+  mainWindow.once("ready-to-show", () => {
+    mainWindow.show();
+    DEBUG &amp;&amp; mainWindow.webContents.openDevTools({ mode: "detach" });
+  });
+  DEBUG &amp;&amp; console.log("main window created");
+  // Emitted when the window is closed.
+  mainWindow.on("closed", () => {
+    app.quit();
+  });
+
+
+  if (!isMac) {
+    mainWindow.on("close", (e) => {
+      if (unsavedRecords &amp;&amp; !process.env.CI) {
+        const choice = dialog.showMessageBoxSync(mainWindow, {
+          type: "warning",
+          buttons: ["Yes", "No"],
+          title: "Unsaved Records",
+          message: "There are unsaved records, are you sure you want to exit?",
+        });
+
+        if (choice === 1) {
+          e.preventDefault(); // Prevent the app from closing
+        }
+      }
+    })
+  }
+}
+
+async function createWorker() {
+  // hidden worker
+  // Get window state
+  const mainWindowStateKeeper = await windowStateKeeper("worker");
+  workerWindow = new BrowserWindow({
+    show: false,
+    x: mainWindowStateKeeper.x,
+    y: mainWindowStateKeeper.y,
+    width: mainWindowStateKeeper.width,
+    height: mainWindowStateKeeper.height,
+    webPreferences: {
+      nodeIntegration: true,
+      nodeIntegrationInWorker: true,
+      contextIsolation: false,
+      backgroundThrottling: false,
+    },
+  });
+  // Track window state
+  mainWindowStateKeeper.track(workerWindow);
+  workerWindow.setIcon(__dirname + "/img/icon/icon.png");
+  await workerWindow.loadFile("worker.html");
+
+  workerWindow.on("closed", () => {
+    workerWindow = undefined;
+  });
+
+  workerWindow.once("ready-to-show", () => {
+    if (DEBUG) {
+      workerWindow.show();
+      workerWindow.webContents.openDevTools();
+    }
+  });
+  DEBUG &amp;&amp; console.log("worker created");
+}
+
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit()
+} else {
+  app.on('second-instance', (e, commandLine) => {
+    // This event is emitted when a second instance is launched
+    // Focus the primary instance's window
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+      const filePath = getFileFromArgs(commandLine)
+      if (filePath) {
+          mainWindow.webContents.send('open-file', filePath);
+      }
+    }
+  });
+}
+
+// This method will be called when Electron has finished loading
+app.whenReady().then(async () => {
+  // Update the userData path for portable app
+  if (process.env.PORTABLE_EXECUTABLE_DIR) {
+    app.setPath(
+      "userData",
+      path.join(process.env.PORTABLE_EXECUTABLE_DIR, "chirpity-data")
+    );
+    ipcMain.handle("getVersion", () => version + " (Portable)");
+  } else {
+    ipcMain.handle("getVersion", () => version);
+  }
+
+
+    
+    // Debug mode
+    try {
+        // Specify the file path
+        const filePath = path.join(userData, 'config.json');
+        // Read the contents of the file synchronously
+        const fileContent = fs.readFileSync(filePath, 'utf8');
+        const config = JSON.parse(fileContent);
+        DEBUG =   process.env.CI === 'e2e' ? false : config.debug;
+    } catch (error) {
+      console.warn('CONFIG: Error reading file:', error.message);
+    }
+    
+    DEBUG &amp;&amp; console.log('CI mode' , process.env.CI)
+
+    await createWorker();
+    await createWindow();
+
+    if (isMac) {
+        //const appIcon = new Tray('./img/icon/icon.png')
+        app.dock.setIcon(__dirname + '/img/icon/icon.png');
+        app.dock.bounce();
+    } else {
+        // Quit when all windows are closed.
+        app.on('window-all-closed', () => {
+            app.quit()
+        })
+        const filePath = getFileFromArgs(process.argv);
+        if (filePath) {
+            mainWindow.webContents.once('did-finish-load', () => {
+                mainWindow.webContents.send('open-file', filePath);
+            });
+        }
+    }
+    
+    app.on("activate", async () => {
+        const windowsOpen = BrowserWindow.getAllWindows().length
+        if (!windowsOpen) {
+            await createWorker();
+            await createWindow();
+        } else if (windowsOpen === 1) {
+            await createWindow();
+        }
+    });
+
+    
+    app.on('open-file', (event, path) => {
+        files.push(path);
+        DEBUG &amp;&amp; console.log('file passed to open:', path)
+    });
+    
+    ipcMain.handle('openFiles', async (_event, _method, config) => {
+        const {type, fileOrFolder, multi, buttonLabel, title} = config;
+        let options;
+        if (type === 'audio') {
+            options = {
+                properties: [fileOrFolder, multi].filter(Boolean),
+                buttonLabel: buttonLabel,
+                title: title
+            }
+            if (fileOrFolder === 'openFile' ){
+                options.filters = [{ name: 'Audio Files', extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg', 'mp4', 'opus', 'mov'] } ]
+            }
+        } else {
+          const ext = type === 'Text' ? ['txt', 'csv'] : ['csv'];
+          console.log('selecting ', type, ext )
+          options = {
+              filters: [
+                  { name: `${type} Files`, extensions: ext }
+              ],
+              properties: ['openFile']
+          }
+        }
+        // Show file dialog 
+        return await dialog.showOpenDialog(mainWindow, options);
+    })
+        
+    /**
+   * Retrieves the first file path from the given arguments that matches a supported file extension.
+   *
+   * This function iterates over an array of arguments and returns the first element that ends with any
+   * of the file extensions defined in the global `SUPPORTED_FILES` array. The check is performed in a
+   * case-insensitive manner.
+   *
+   * @param {string[]} args - An array of command line arguments potentially containing file paths.
+   * @returns {string|undefined} The first matching file path with a supported extension, or `undefined` if none is found.
+   */
+    
+    ipcMain.handle('selectDirectory', async (_e, path) => {
+        // Show file dialog to select a directory
+        return await dialog.showOpenDialog(mainWindow, {
+            // From docs:
+            // Note: On Windows and Linux an open dialog can not be both a file selector and a directory selector,
+            // so if you set properties to ['openFile', 'openDirectory'] on these platforms,
+            // a directory selector will be shown.
+            defaultPath: path,
+            properties: ['openDirectory']
+        });
+    })
+
+
+    
+    mainWindow.webContents.setWindowOpenHandler(({ url, frameName }) => {
+        require('electron').shell.openExternal(url);
+        return {
+            action: 'deny',
+        }
+    });
+    
+    workerWindow.webContents.once('render-process-gone', (e, details) => {
+        DEBUG &amp;&amp; console.log(details);
+        const dialogOpts = {
+            type: 'warning',
+            title: 'Crash report',
+            detail: 'Oh no! Chirpity has crashed. It is most likely that it has run out of memory.\nTry lowering the batch size and / or number of threads in settings'
+        };
+        
+        dialog.showMessageBox(dialogOpts).then((returnValue) => {
+            if (returnValue.response === 0) {
+                //app.relaunch();
+                app.quit();
+            }
+        })
+    });
+    //Update handling
+    if (process.env.CI) {
+        console.log("Auto-updater disabled in CI environment");
+    } else {
+        autoUpdater.autoDownload = false;
+        autoUpdater.checkForUpdates().catch(error => console.warn('Error checking for updates', error))
+    }
+});
+
+
+let DB_CLOSED = false;
+let DB_CLOSE_REQUESTED = false;
+app.on('before-quit', async (event) => {
+  if (!DB_CLOSE_REQUESTED &amp;&amp; unsavedRecords &amp;&amp; !process.env.CI) {
+    const choice = dialog.showMessageBoxSync(mainWindow, {
+      type: "warning",
+      buttons: ["Yes", "No"],
+      title: "Unsaved Records",
+      message: "There are unsaved records, are you sure you want to exit?",
+    });
+
+    if (choice === 1) {
+      event.preventDefault(); // Prevent the app from closing
+      return
+    }
+  }
+  if (DB_CLOSED) return;
+  // Always block quit while DB is still open
+  event.preventDefault();
+  if (DB_CLOSE_REQUESTED) return;
+  DB_CLOSE_REQUESTED = true;
+  try{
+    workerWindow.webContents.postMessage("close-database", null);
+  } catch {
+    console.log('workerWindow closed before DB close call')
+  }
+  // Add timeout to force quit after 5 seconds
+  setTimeout(() => {
+    if (!DB_CLOSED) {
+      console.warn('Database closure timed out after 5 seconds, forcing quit...');
+      DB_CLOSED = true;
+      app.quit();
+    }
+  }, 5000);
+});
+  
+ipcMain.on('database-closed', () =>{
+  DB_CLOSED = true;
+  app.quit()
+ })
+ipcMain.handle("request-worker-channel", async (_event) => {
+  // Create a new channel ...
+  const { port1, port2 } = new MessageChannelMain();
+  // ... send one end to the worker ...
+  workerWindow.webContents.postMessage("new-client", undefined, [port1]);
+  // ... and the other end to the UI window.
+  mainWindow.webContents.postMessage("provide-worker-channel", undefined, [
+    port2,
+  ]);
+  // Now the main window and the worker can communicate with each other
+  // without going through the main process!
+});
+
+ipcMain.on("unsaved-records", (_event, data) => {
+  unsavedRecords = data.newValue; // Update the variable with the new value
+});
+
+ipcMain.handle("exportData", async (event, arg) => {
+  const {defaultPath} = arg;
+  return await dialog
+    .showSaveDialog(mainWindow, {
+      filters: [{ name: "Text Files", extensions: ["txt", "csv"] }],
+      defaultPath
+    })
+    .then((file) => file.filePath)
+})
+
+
+ipcMain.handle("saveFile", async (event, arg) => {
+  // Show file dialog to select audio file
+    const { file, filename, extension } = arg;
+    dialog
+      .showSaveDialog(mainWindow, {
+        title: "Save File",
+        filters: [{ name: "Audio files", extensions: [extension] }],
+        defaultPath: filename,
+      })
+      .then((saveObj) => {
+        // Check if the user cancelled the operation
+        const { canceled, filePath } = saveObj;
+        if (canceled) {
+          DEBUG &amp;&amp; console.log("User cancelled the save operation.");
+          fs.rmSync(file);
+          return;
+        }
+        try {
+          // Copy file to the destination
+          fs.copyFileSync(file, filePath);
+
+          // Remove the original file
+          fs.unlinkSync(file);
+          DEBUG &amp;&amp; console.log(`File moved from ${file} to ${filePath}`);
+        } catch (error) {
+          console.error(`Error moving file: ${error}`);
+        }
+      });
+});
+
+let powerSaveID = null;
+ipcMain.on("powerSaveControl", (e, on) => {
+  if (on) {
+    powerSaveID = powerSaveBlocker.start("prevent-app-suspension");
+    //DEBUG &amp;&amp; console.log(powerSaveBlocker.isStarted(powerSaveID), powerSaveID)
+  } else {
+    if (powerSaveID !== null) powerSaveBlocker.stop(powerSaveID);
+    //DEBUG &amp;&amp; console.log(powerSaveBlocker.isStarted(powerSaveID), powerSaveID)
+  }
+});</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#LIST_CACHE">LIST_CACHE</a></li><li><a href="global.html#WSPlayPause">WSPlayPause</a></li><li><a href="global.html#_updateSpeciesLocale">_updateSpeciesLocale</a></li><li><a href="global.html#activateResultSort">activateResultSort</a></li><li><a href="global.html#addDays">addDays</a></li><li><a href="global.html#addQueryQualifiers">addQueryQualifiers</a></li><li><a href="global.html#addToHistory">addToHistory</a></li><li><a href="global.html#allowedByList">allowedByList</a></li><li><a href="global.html#analyseReset">analyseReset</a></li><li><a href="global.html#batchExportAudio">batchExportAudio</a></li><li><a href="global.html#batchInsertRecords">batchInsertRecords</a></li><li><a href="global.html#calculateTimeBoundaries">calculateTimeBoundaries</a></li><li><a href="global.html#changeInputElement">changeInputElement</a></li><li><a href="global.html#changeSettingsMode">changeSettingsMode</a></li><li><a href="global.html#chartInstance">chartInstance</a></li><li><a href="global.html#checkFilteredFrequency">checkFilteredFrequency</a></li><li><a href="global.html#checkForIntelMacUpdates">checkForIntelMacUpdates</a></li><li><a href="global.html#checkNewModel">checkNewModel</a></li><li><a href="global.html#checkpoint">checkpoint</a></li><li><a href="global.html#clearActive">clearActive</a></li><li><a href="global.html#closeDatabase">closeDatabase</a></li><li><a href="global.html#convertAndOrganiseFiles">convertAndOrganiseFiles</a></li><li><a href="global.html#convertFile">convertFile</a></li><li><a href="global.html#createContextMenu">createContextMenu</a></li><li><a href="global.html#customAnalysisAllMenu">customAnalysisAllMenu</a></li><li><a href="global.html#customiseAnalysisMenu">customiseAnalysisMenu</a></li><li><a href="global.html#dayMonthToDayOfYear">dayMonthToDayOfYear</a></li><li><a href="global.html#dayOfYear">dayOfYear</a></li><li><a href="global.html#deepMergeLists">deepMergeLists</a></li><li><a href="global.html#doPrediction">doPrediction</a></li><li><a href="global.html#epochInDayMonthRange">epochInDayMonthRange</a></li><li><a href="global.html#estimateTimeRemaining">estimateTimeRemaining</a></li><li><a href="global.html#exportAudacity">exportAudacity</a></li><li><a href="global.html#exportData">exportData</a></li><li><a href="global.html#exportSpeciesList">exportSpeciesList</a></li><li><a href="global.html#fetchAudioBuffer">fetchAudioBuffer</a></li><li><a href="global.html#filterResults">filterResults</a></li><li><a href="global.html#filterValidFiles">filterValidFiles</a></li><li><a href="global.html#formatAsBootstrapTable">formatAsBootstrapTable</a></li><li><a href="global.html#generateBirdIDList">generateBirdIDList</a></li><li><a href="global.html#generateToast">generateToast</a></li><li><a href="global.html#getDetectedSpecies">getDetectedSpecies</a></li><li><a href="global.html#getExcluded">getExcluded</a></li><li><a href="global.html#getFileSQLAndParams">getFileSQLAndParams</a></li><li><a href="global.html#getFiles">getFiles</a></li><li><a href="global.html#getFilteredBirds">getFilteredBirds</a></li><li><a href="global.html#getIncludedIDs">getIncludedIDs</a></li><li><a href="global.html#getInstallInfo">getInstallInfo</a></li><li><a href="global.html#getMatchingIds">getMatchingIds</a></li><li><a href="global.html#getNearbyLocations">getNearbyLocations</a></li><li><a href="global.html#getResults">getResults</a></li><li><a href="global.html#getRowFromStart">getRowFromStart</a></li><li><a href="global.html#getSpecies">getSpecies</a></li><li><a href="global.html#getSpeciesSQLAsync">getSpeciesSQLAsync</a></li><li><a href="global.html#getValidSpecies">getValidSpecies</a></li><li><a href="global.html#getWorkingFile">getWorkingFile</a></li><li><a href="global.html#getXCComparisons">getXCComparisons</a></li><li><a href="global.html#handleKeyDown">handleKeyDown</a></li><li><a href="global.html#handleKeyDownDeBounce">handleKeyDownDeBounce</a></li><li><a href="global.html#handleMessage">handleMessage</a></li><li><a href="global.html#handleUIClicks">handleUIClicks</a></li><li><a href="global.html#importData">importData</a></li><li><a href="global.html#loadAudioFile">loadAudioFile</a></li><li><a href="global.html#loadAudioFileSync">loadAudioFileSync</a></li><li><a href="global.html#loadDB">loadDB</a></li><li><a href="global.html#localiseModal">localiseModal</a></li><li><a href="global.html#locateFile">locateFile</a></li><li><a href="global.html#membershipCheck">membershipCheck</a></li><li><a href="global.html#metadataLocks">metadataLocks</a></li><li><a href="global.html#notifyMissingFile">notifyMissingFile</a></li><li><a href="global.html#onAbort">onAbort</a></li><li><a href="global.html#onAnalyse">onAnalyse</a></li><li><a href="global.html#onAnalysisComplete">onAnalysisComplete</a></li><li><a href="global.html#onChangeMode">onChangeMode</a></li><li><a href="global.html#onDelete">onDelete</a></li><li><a href="global.html#onDeleteSpecies">onDeleteSpecies</a></li><li><a href="global.html#onLaunch">onLaunch</a></li><li><a href="global.html#onModelReady">onModelReady</a></li><li><a href="global.html#onOpenFiles">onOpenFiles</a></li><li><a href="global.html#onResultsComplete">onResultsComplete</a></li><li><a href="global.html#onSave2DiskDB">onSave2DiskDB</a></li><li><a href="global.html#onSaveAudio">onSaveAudio</a></li><li><a href="global.html#onSetLocation">onSetLocation</a></li><li><a href="global.html#onSummaryComplete">onSummaryComplete</a></li><li><a href="global.html#onUpdateLocale">onUpdateLocale</a></li><li><a href="global.html#onWorkerLoadedAudio">onWorkerLoadedAudio</a></li><li><a href="global.html#parseBextLocalDate">parseBextLocalDate</a></li><li><a href="global.html#parseCnames">parseCnames</a></li><li><a href="global.html#parseMessage">parseMessage</a></li><li><a href="global.html#playRegion">playRegion</a></li><li><a href="global.html#positionMenu">positionMenu</a></li><li><a href="global.html#postAnalyseMessage">postAnalyseMessage</a></li><li><a href="global.html#processAudio">processAudio</a></li><li><a href="global.html#processFilesInBatches">processFilesInBatches</a></li><li><a href="global.html#processNextFile">processNextFile</a></li><li><a href="global.html#readLabels">readLabels</a></li><li><a href="global.html#recordUpdate">recordUpdate</a></li><li><a href="global.html#refreshResultsView">refreshResultsView</a></li><li><a href="global.html#refreshSummary">refreshSummary</a></li><li><a href="global.html#renderFilenamePanel">renderFilenamePanel</a></li><li><a href="global.html#renderResult">renderResult</a></li><li><a href="global.html#resetDiagnostics">resetDiagnostics</a></li><li><a href="global.html#resetResults">resetResults</a></li><li><a href="global.html#resultClick">resultClick</a></li><li><a href="global.html#savedFileCheckAsync">savedFileCheckAsync</a></li><li><a href="global.html#sendDetections">sendDetections</a></li><li><a href="global.html#setActiveRegion">setActiveRegion</a></li><li><a href="global.html#setActiveRow">setActiveRow</a></li><li><a href="global.html#setAudioFilters">setAudioFilters</a></li><li><a href="global.html#setClickedIndex">setClickedIndex</a></li><li><a href="global.html#setIncludedIDs">setIncludedIDs</a></li><li><a href="global.html#setKeyAssignment">setKeyAssignment</a></li><li><a href="global.html#setKeyAssignmentUI">setKeyAssignmentUI</a></li><li><a href="global.html#setLabelState">setLabelState</a></li><li><a href="global.html#setListUIState">setListUIState</a></li><li><a href="global.html#setNocmig">setNocmig</a></li><li><a href="global.html#setStartEnd">setStartEnd</a></li><li><a href="global.html#showAnalyse">showAnalyse</a></li><li><a href="global.html#showCharts">showCharts</a></li><li><a href="global.html#showDatePicker">showDatePicker</a></li><li><a href="global.html#showExplore">showExplore</a></li><li><a href="global.html#showRecordEntryForm">showRecordEntryForm</a></li><li><a href="global.html#showSummarySortIcon">showSummarySortIcon</a></li><li><a href="global.html#showThreshold">showThreshold</a></li><li><a href="global.html#showTopRankin">showTopRankin</a></li><li><a href="global.html#showWindowDetections">showWindowDetections</a></li><li><a href="global.html#spawnListWorker">spawnListWorker</a></li><li><a href="global.html#spawnPredictWorkers">spawnPredictWorkers</a></li><li><a href="global.html#speciesFilter">speciesFilter</a></li><li><a href="global.html#t0_warmup">t0_warmup</a></li><li><a href="global.html#training">training</a></li><li><a href="global.html#unpackNameAttr">unpackNameAttr</a></li><li><a href="global.html#updateFilesBeingProcessed">updateFilesBeingProcessed</a></li><li><a href="global.html#updateList">updateList</a></li><li><a href="global.html#updateMetadata">updateMetadata</a></li><li><a href="global.html#updatePagination">updatePagination</a></li><li><a href="global.html#updateSuggestions">updateSuggestions</a></li><li><a href="global.html#upgrade_to_v2">upgrade_to_v2</a></li><li><a href="global.html#upgrade_to_v4">upgrade_to_v4</a></li><li><a href="global.html#waitForWavesurferReady">waitForWavesurferReady</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Thu Jan 29 2026 18:44:25 GMT+0000 (Greenwich Mean Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

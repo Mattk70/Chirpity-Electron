@@ -229,7 +229,7 @@ async function countLines(filePath) {
         position, fileID, speciesID, 
         modelID, confidence, comment, end, callCount, tagID
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      position, fileID, speciesID, modelID, confidence, comment, end, callCount || undefined, tagID
+      position, fileID, speciesID, modelID, confidence, comment, end, callCount ?? undefined, tagID
     );
   
     return METADATA;

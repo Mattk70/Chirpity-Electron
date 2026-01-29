@@ -111,7 +111,7 @@ const getChartTotals = ({
     whereParts.push("species.cname = ?");
   }
 
-  if (range.start) {
+  if (range.start !== undefined) {
     whereParts.push(`r.position * 1000 + f.filestart BETWEEN ${range.start} AND ${range.end}`);
   }
 
