@@ -3,7 +3,7 @@ const DEBUG = false;
 const ZERO = new Date(1970, 0, 1)
 const filterLocation = (location) => {
   if (location !== undefined) {
-    return location === 0 ? " AND files.locationID IS NULL " : ` AND files.locationID = ${location}`;
+    return location === 0 ? " AND f.locationID IS NULL " : ` AND f.locationID = ${location}`;
   }
   return "";
 };
@@ -36,14 +36,14 @@ const getSeasonRecords = async (diskDB, location, species, season) => {
   const seasonMonth = { spring: "< '07'", autumn: " > '06'" };
   return new Promise(function (resolve, reject) {
     const stmt = diskDB.prepare(`
-          SELECT MAX(SUBSTR(DATE(r.dateTime/1000, 'unixepoch', 'localtime'), 6)) AS maxDate,
-          MIN(SUBSTR(DATE(r.dateTime/1000, 'unixepoch', 'localtime'), 6)) AS minDate
+          SELECT MAX(SUBSTR(DATE(r.position + f.filestart/1000, 'unixepoch', 'localtime'), 6)) AS maxDate,
+          MIN(SUBSTR(DATE(r.position + f.filestart/1000, 'unixepoch', 'localtime'), 6)) AS minDate
           FROM records r
           JOIN species ON species.id = r.speciesID
-          JOIN files ON files.id = r.fileID
+          JOIN files f ON f.id = r.fileID
           WHERE species.cname = (?) ${locationFilter}
           AND STRFTIME('%m',
-          DATETIME(r.dateTime / 1000, 'unixepoch', 'localtime'))
+          DATETIME(r.position + f.filestart / 1000, 'unixepoch', 'localtime'))
           ${seasonMonth[season]}`);
     stmt.get(species, (err, row) => {
       if (err) {
@@ -63,14 +63,14 @@ const getMostCalls = (diskDB, location, species) => {
     const locationFilter = filterLocation(location);
     diskDB.get(
       `SELECT SUM(COALESCE(r.callCount, 1)) AS count,
-      DATE(r.dateTime/1000, 'unixepoch', 'localtime') as date
+      DATE(r.position + f.filestart/1000, 'unixepoch', 'localtime') as date
       FROM records r
       JOIN species on species.id = r.speciesID
-      JOIN files ON files.id = r.fileID
+      JOIN files f ON f.id = r.fileID
       WHERE species.cname = ? ${locationFilter}
-      GROUP BY STRFTIME('%Y', DATETIME(r.dateTime/1000, 'unixepoch', 'localtime')),
-      STRFTIME('%W', DATETIME(r.dateTime/1000, 'unixepoch', 'localtime')),
-      STRFTIME('%d', DATETIME(r.dateTime/1000, 'unixepoch', 'localtime'))
+      GROUP BY STRFTIME('%Y', DATETIME(r.position + f.filestart/1000, 'unixepoch', 'localtime')),
+      STRFTIME('%W', DATETIME(r.position + f.filestart/1000, 'unixepoch', 'localtime')),
+      STRFTIME('%d', DATETIME(r.position + f.filestart/1000, 'unixepoch', 'localtime'))
       ORDER BY count DESC LIMIT 1`,
       species,
       (err, row) => {
@@ -111,8 +111,8 @@ const getChartTotals = ({
     whereParts.push("species.cname = ?");
   }
 
-  if (range.start) {
-    whereParts.push(`dateTime BETWEEN ${range.start} AND ${range.end}`);
+  if (range.start !== undefined) {
+    whereParts.push(`r.position * 1000 + f.filestart BETWEEN ${range.start} AND ${range.end}`);
   }
 
 
@@ -169,14 +169,14 @@ const getChartTotals = ({
     diskDB.all(
       `
       SELECT
-        CAST(STRFTIME('%Y', DATETIME(dateTime / 1000, 'unixepoch', 'localtime')) AS INTEGER) AS year,
-        CAST(STRFTIME('%W', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS INTEGER) AS week,
-        CAST(STRFTIME('%j', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS INTEGER) AS day,
-        CAST(STRFTIME('%H', DATETIME(dateTime/1000, 'unixepoch', 'localtime')) AS INTEGER) AS hour,
+        CAST(STRFTIME('%Y', DATETIME(r.position + f.filestart / 1000, 'unixepoch', 'localtime')) AS INTEGER) AS year,
+        CAST(STRFTIME('%W', DATETIME(r.position + f.filestart/1000, 'unixepoch', 'localtime')) AS INTEGER) AS week,
+        CAST(STRFTIME('%j', DATETIME(r.position + f.filestart/1000, 'unixepoch', 'localtime')) AS INTEGER) AS day,
+        CAST(STRFTIME('%H', DATETIME(r.position + f.filestart/1000, 'unixepoch', 'localtime')) AS INTEGER) AS hour,
         SUM(COALESCE(r.callCount, 1)) AS count
       FROM records r
       JOIN species ON species.id = speciesID
-      JOIN files ON files.id = fileID
+      JOIN files f ON f.id = fileID
       ${whereSQL}
       GROUP BY ${groupBy}
       ORDER BY ${orderBy}
@@ -199,10 +199,10 @@ const getRate = (diskDB, location, species) => {
     const locationFilter = filterLocation(location);
 
     diskDB.all(
-      `select STRFTIME('%W', DATE(dateTime / 1000, 'unixepoch', 'localtime')) as week, SUM(COALESCE(r.callCount, 1)) AS count
+      `select STRFTIME('%W', DATE(r.position + f.filestart / 1000, 'unixepoch', 'localtime')) as week, SUM(COALESCE(r.callCount, 1)) AS count
           from records r
           JOIN species s ON s.id = r.speciesID
-          JOIN files ON files.id = r.fileID
+          JOIN files f ON f.id = r.fileID
           WHERE s.cname = ? ${locationFilter}
           group by week;`,
       species,
@@ -212,7 +212,7 @@ const getRate = (diskDB, location, species) => {
         }
         let locationSQL = '';
         if (locationFilter) {
-          locationSQL = ` JOIN files ON files.id = duration.fileID  WHERE ${locationFilter.replace(" AND ", "")} `;
+          locationSQL = ` JOIN files f ON f.id = duration.fileID  WHERE ${locationFilter.replace(" AND ", "")} `;
         }
         diskDB.all(
           `select STRFTIME('%W', DATE(duration.day / 1000, 'unixepoch', 'localtime')) as week, cast(sum(duration.duration) as real)/3600  as total from duration ${locationSQL} group by week;`,

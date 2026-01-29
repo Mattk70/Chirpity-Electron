@@ -142,7 +142,69 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line5113">line 5113</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line5412">line 5412</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="chartInstance"><span class="type-signature"></span>chartInstance<span class="type-signature"></span></h4>
+
+
+
+
+<div class="description">
+    Processes chart data to update the UI and render a new Chart.js chart.This function updates UI elements based on the provided chart data. If a species name is given,it displays the species title and toggles visibility of the associated records table; otherwise,the records table is hidden. It then updates individual record elements with formatted dates or"N/A"/"No Records" messages. Any existing Chart.js instances are destroyed before constructing a newchart on the canvas element with the id "chart-week". The chart configuration includes bar datasetsfor each year (with an adjustment for hourly data) and, if provided, a line dataset displaying totalhours recorded. A custom plugin is used to set the background color of the canvas.
+</div>
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line2603">line 2603</a>
     </li></ul></dd>
     
 
@@ -204,7 +266,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line2096">line 2096</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line2146">line 2146</a>
     </li></ul></dd>
     
 
@@ -276,7 +338,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line461">line 461</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line485">line 485</a>
     </li></ul></dd>
     
 
@@ -338,7 +400,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3219">line 3219</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line3317">line 3317</a>
     </li></ul></dd>
     
 
@@ -418,7 +480,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line323">line 323</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line320">line 320</a>
     </li></ul></dd>
     
 
@@ -578,7 +640,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line4865">line 4865</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line5119">line 5119</a>
     </li></ul></dd>
     
 
@@ -717,7 +779,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line4548">line 4548</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line4687">line 4687</a>
     </li></ul></dd>
     
 
@@ -901,7 +963,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line2025">line 2025</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line2053">line 2053</a>
     </li></ul></dd>
     
 
@@ -984,6 +1046,225 @@ Analysis Rate: x real time performance
     <h5>Example</h5>
     
     <pre class="prettyprint"><code>// Add 3 days to the current dateconst newDate = addDays(new Date(), 3);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="addQueryQualifiers"><span class="type-signature">(async) </span>addQueryQualifiers<span class="signature">(stmt, range<span class="signature-attributes">opt</span>, caller<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Append SQL qualifiers to a WHERE clause based on current application STATE (file range, species/tags, selection, location, and daylight filters).
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>stmt</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Initial SQL text to augment (typically a WHERE or subquery fragment).</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>range</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Optional time range to constrain results; when omitted in explore mode the explore.range is used.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>caller</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Caller context that can alter behavior (e.g., when 'results' and a selection exists a file filter is applied).</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line1333">line 1333</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+    
+
+
 
 
 
@@ -1137,7 +1418,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line7948">line 7948</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line8115">line 8115</a>
     </li></ul></dd>
     
 
@@ -1181,6 +1462,165 @@ Analysis Rate: x real time performance
 |
 
 <span class="param-type">undefined</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="allowedByList"><span class="type-signature"></span>allowedByList<span class="signature">(result)</span><span class="type-signature"> &rarr; {boolean}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Determine whether a detection is permitted by the active custom label list.Checks that the detection's species (cname) exists in STATE.customLabelsMap, that the detection timestamp falls within the species' optional start/end day-month range, and that the detection score meets the species-specific confidence threshold (falls back to STATE.detect.confidence when no species-specific threshold is set).
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>result</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Detection object with epoch milliseconds `timestamp`, canonical species name `cname`, and detection confidence `score`.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line4611">line 4611</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    `true` if the detection passes the custom-list filters, `false` otherwise.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">boolean</span>
 
 
     </dd>
@@ -1250,7 +1690,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1167">line 1167</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line1195">line 1195</a>
     </li></ul></dd>
     
 
@@ -1338,7 +1778,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1326">line 1326</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line1358">line 1358</a>
     </li></ul></dd>
     
 
@@ -1544,7 +1984,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line3308">line 3308</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line3388">line 3388</a>
     </li></ul></dd>
     
 
@@ -1614,6 +2054,283 @@ Analysis Rate: x real time performance
     <dd>
         
 <span class="param-type">Promise.&lt;void></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="calculateTimeBoundaries"><span class="type-signature"></span>calculateTimeBoundaries<span class="signature">(file, fileStart, fileEnd, latitude, longitude, period)</span><span class="type-signature"> &rarr; {Array.&lt;{start: number, end: number}>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Compute active time intervals within a file for a given daylight period ("day" or "night") and update batching/clipping state.Calculates one or more intervals (in seconds, relative to the file start) where the requested period is active inside the file's time range. Clips day/night boundaries to the file start/end, records how much time was excluded, updates STATE.clippedBatches and STATE.clippedFilesDuration, and sets batchesToSend[file] to the number of processing batches for the kept intervals.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>file</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Identifier or path of the file used as key in batchesToSend.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>fileStart</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">File start timestamp in milliseconds (local time).</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>fileEnd</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">File end timestamp in milliseconds (local time).</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>latitude</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Latitude used for sunrise/sunset calculations.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>longitude</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Longitude used for sunrise/sunset calculations.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>period</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">'day'</span>
+|
+
+<span class="param-type">'night'</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Period to compute intervals for; "day" returns dawn→dusk intervals, "night" returns dusk→next dawn intervals.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line4063">line 4063</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    Array of intervals in seconds relative to the file start; returns [{start:0, end:0}] when no active period is found.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Array.&lt;{start: number, end: number}></span>
 
 
     </dd>
@@ -1860,7 +2577,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line7728">line 7728</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line7895">line 7895</a>
     </li></ul></dd>
     
 
@@ -2019,7 +2736,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line5841">line 5841</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line6004">line 6004</a>
     </li></ul></dd>
     
 
@@ -2107,7 +2824,95 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line6817">line 6817</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line7034">line 7034</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="checkForIntelMacUpdates"><span class="type-signature"></span>checkForIntelMacUpdates<span class="signature">()</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Checks GitHub for a newer release of the Intel Mac build and, if one exists, shows an in-app update alert.Performs the check at most once per day; when a newer release is detected it appends a warning alert to the"updateAlert" element, records an analytics event, updates config.lastUpdateCheck, and persists the config.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line8190">line 8190</a>
     </li></ul></dd>
     
 
@@ -2247,7 +3052,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line900">line 900</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line978">line 978</a>
     </li></ul></dd>
     
 
@@ -2390,7 +3195,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="database.js.html">database.js</a>, <a href="database.js.html#line117">line 117</a>
+        <a href="js_database.js.html">js/database.js</a>, <a href="js_database.js.html#line117">line 117</a>
     </li></ul></dd>
     
 
@@ -2505,7 +3310,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line585">line 585</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line609">line 609</a>
     </li></ul></dd>
     
 
@@ -2666,7 +3471,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="database.js.html">database.js</a>, <a href="database.js.html#line150">line 150</a>
+        <a href="js_database.js.html">js/database.js</a>, <a href="js_database.js.html#line150">line 150</a>
     </li></ul></dd>
     
 
@@ -2729,7 +3534,7 @@ Analysis Rate: x real time performance
     
 
     
-    <h4 class="name" id="convertAndOrganiseFiles"><span class="type-signature">(async) </span>convertAndOrganiseFiles<span class="signature">(threadLimit<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise.&lt;(boolean|undefined)>}</span></h4>
+    <h4 class="name" id="convertAndOrganiseFiles"><span class="type-signature">(async) </span>convertAndOrganiseFiles<span class="signature">(threadLimit<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {boolean|undefined}</span></h4>
     
 
     
@@ -2737,7 +3542,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Organizes and converts audio files.This asynchronous function verifies that the archive directory exists and is writable before proceeding.It retrieves file records from the database—optionally filtering to include only those with associated detectionrecords when library clips mode is active—and computes target output directories based on each file's recording dateand sanitized location. For files that exist and have not already been converted, the function schedules conversiontasks with a configurable concurrency limit (defaulting to 4), while generating alerts for any encountered issues.Upon completion of all tasks, it updates the UI with final progress and a summary alert detailing the counts ofsuccessful and failed conversions.1. Pull files from db that do not have archiveName2.
+    Convert and organize audio files into the configured archive using year/month/place folders.
 </div>
 
 
@@ -2809,7 +3614,7 @@ Analysis Rate: x real time performance
                 </td>
             
 
-            <td class="description last">Maximum number of concurrent file conversion tasks.</td>
+            <td class="description last">Maximum number of concurrent conversion tasks.</td>
         </tr>
 
     
@@ -2850,7 +3655,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line5223">line 5223</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line5514">line 5514</a>
     </li></ul></dd>
     
 
@@ -2879,7 +3684,7 @@ Analysis Rate: x real time performance
 
         
 <div class="param-desc">
-    Resolves to false if the archive directory is missing or unwritable; otherwise,the promise resolves when all conversion tasks have been processed.
+    `false` if the archive directory is missing or not writable; otherwise `undefined` after scheduling and completing conversion tasks.
 </div>
 
 
@@ -2890,7 +3695,10 @@ Analysis Rate: x real time performance
     </dt>
     <dd>
         
-<span class="param-type">Promise.&lt;(boolean|undefined)></span>
+<span class="param-type">boolean</span>
+|
+
+<span class="param-type">undefined</span>
 
 
     </dd>
@@ -2908,7 +3716,7 @@ Analysis Rate: x real time performance
     
 
     
-    <h4 class="name" id="convertFile"><span class="type-signature">(async) </span>convertFile<span class="signature">(inputFilePath, fullFilePath, row, dbArchiveName, fileProgressMap)</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
+    <h4 class="name" id="convertFile"><span class="type-signature">(async) </span>convertFile<span class="signature">(inputFilePath, fullFilePath, row, db, dbArchiveName, fileProgressMap)</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
     
 
     
@@ -2916,7 +3724,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Converts an audio file to the archive format using FFmpeg, with optional trimming and progress tracking.Applies preset encoding parameters for "ogg" format and trims the audio based on calculated boundaries if enabled. Updates the file's modification time and corresponding database record upon successful conversion. Progress is reported via the provided map and UI messages.
+    Convert an audio file into the archive format, optionally trim it to computed boundaries, update the file's mtime and database record, and report conversion progress.
 </div>
 
 
@@ -3014,7 +3822,30 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">File metadata, including `id`, `duration`, and `filestart`; `duration` may be updated if trimming is applied.</td>
+            <td class="description last">File metadata object containing at least `id`, `duration`, and `filestart`. If trimming is applied, `row.duration` will be updated to the trimmed duration.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>db</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">SQLite database handle used to update the file record.</td>
         </tr>
 
     
@@ -3037,7 +3868,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">Archive name to record in the database.</td>
+            <td class="description last">Archive name to store in the database for the converted file.</td>
         </tr>
 
     
@@ -3060,7 +3891,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">Map tracking conversion progress, keyed by file paths.</td>
+            <td class="description last">Map tracking per-file conversion progress (percent values), keyed by input file path; used to compute aggregate progress reported to the UI.</td>
         </tr>
 
     
@@ -3101,7 +3932,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line5386">line 5386</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line5680">line 5680</a>
     </li></ul></dd>
     
 
@@ -3131,7 +3962,7 @@ Analysis Rate: x real time performance
 <dl>
     <dt>
         <div class="param-desc">
-        If FFmpeg encounters an error during conversion.
+        If FFmpeg reports an error during conversion (promise will reject).
         </div>
     </dt>
     <dd></dd>
@@ -3159,7 +3990,7 @@ Analysis Rate: x real time performance
 
         
 <div class="param-desc">
-    Resolves when conversion and database updates are complete.
+    Resolves when the conversion, file timestamp update, and database update complete.
 </div>
 
 
@@ -3289,7 +4120,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line6500">line 6500</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line6705">line 6705</a>
     </li></ul></dd>
     
 
@@ -3448,7 +4279,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line835">line 835</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line859">line 859</a>
     </li></ul></dd>
     
 
@@ -3585,7 +4416,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line857">line 857</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line881">line 881</a>
     </li></ul></dd>
     
 
@@ -3610,6 +4441,347 @@ Analysis Rate: x real time performance
 
 
 
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="dayMonthToDayOfYear"><span class="type-signature"></span>dayMonthToDayOfYear<span class="signature">(dayMonth, year)</span><span class="type-signature"> &rarr; {number}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Convert a day-month string into the corresponding day-of-year for a given year.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>dayMonth</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Day and month in the form "D-M" or "DD-MM" (e.g., "5-1" or "05-01").</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>year</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Four-digit year used to account for leap years.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line4575">line 4575</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    The 1-based day of year corresponding to the provided date.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">number</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="dayOfYear"><span class="type-signature"></span>dayOfYear<span class="signature">(date)</span><span class="type-signature"> &rarr; {number}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Compute the day-of-year for a given Date.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>date</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Date</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">The date to evaluate.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line4553">line 4553</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    The day number within the year (1 through 365, or 366 in a leap year).
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">number</span>
+
+
+    </dd>
+</dl>
+
+    
 
 
 
@@ -3748,7 +4920,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line5089">line 5089</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line5388">line 5388</a>
     </li></ul></dd>
     
 
@@ -3814,7 +4986,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Initiates AI prediction on a specified audio file segment and updates the UI with the audio duration.
+    Start prediction for a segment of an audio file and notify the UI of the segment duration.
 </div>
 
 
@@ -3866,7 +5038,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">Parameters for prediction.
+            <td class="description last">Prediction parameters.
                 <h6>Properties</h6>
                 
 
@@ -3924,7 +5096,7 @@ Analysis Rate: x real time performance
                 </td>
             
 
-            <td class="description last">The path to the audio file.</td>
+            <td class="description last">Path to the audio file.</td>
         </tr>
 
     
@@ -3963,7 +5135,7 @@ Analysis Rate: x real time performance
                 </td>
             
 
-            <td class="description last">The start time (in seconds) of the segment to analyze.</td>
+            <td class="description last">Segment start time in seconds.</td>
         </tr>
 
     
@@ -4005,7 +5177,7 @@ Analysis Rate: x real time performance
                 </td>
             
 
-            <td class="description last">The end time (in seconds) of the segment to analyze.</td>
+            <td class="description last">Segment end time in seconds, or `null` to indicate the file's end.</td>
         </tr>
 
     
@@ -4053,7 +5225,349 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line2714">line 2714</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line2773">line 2773</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="epochInDayMonthRange"><span class="type-signature"></span>epochInDayMonthRange<span class="signature">(epochMs, startDM, endDM)</span><span class="type-signature"> &rarr; {boolean}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Determine whether a timestamp falls within an inclusive day/month range, correctly handling ranges that wrap across the end of the year.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>epochMs</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Timestamp in milliseconds since the Unix epoch.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>startDM</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">*</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Start day/month specifier accepted by dayMonthToDayOfYear (e.g., a "MM-DD" string or equivalent format used by that helper).</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>endDM</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">*</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">End day/month specifier accepted by dayMonthToDayOfYear.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line4587">line 4587</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    `true` if the timestamp's day-of-year is between startDM and endDM inclusive, `false` otherwise.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">boolean</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="estimateTimeRemaining"><span class="type-signature">(async) </span>estimateTimeRemaining<span class="signature">(batchesReceived)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Estimate remaining analysis time from processed batches and post localized progress to the UI footer.Computes progress, estimated minutes remaining, and processing speed based on the global analysis starttimestamp and STATE counters, then sends a `footer-progress` message to the UI with percent and localized text.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>batchesReceived</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Number of analysis batches processed so far for the current run.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line3788">line 3788</a>
     </li></ul></dd>
     
 
@@ -4213,7 +5727,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line4203">line 4203</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line4393">line 4393</a>
     </li></ul></dd>
     
 
@@ -4482,7 +5996,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1366">line 1366</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line1400">line 1400</a>
     </li></ul></dd>
     
 
@@ -4526,7 +6040,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Exports detection or summary records to a CSV file in the specified format.Supports "text", "eBird", "Raven", and "summary" formats, applying format-specific transformations and batching for large datasets. In "Raven" format, assigns selection numbers and cumulative offsets; in "eBird" format, aggregates species counts by group. For "summary", applies custom headers and unit conversions as needed. Writes the resulting data to a CSV file with the appropriate delimiter and notifies the UI on completion or error.
+    Export detection or summary records to a CSV file in the specified format.Supports formats: "text", "eBird", "Raven", and "summary". "Raven" output uses a tab delimiter and assigns selection numbers and cumulative file offsets. "eBird" output aggregates species counts by Start Time, Common name, and Species. "summary" output applies the provided header mapping and converts the `max` field by dividing it by 1000.
 </div>
 
 
@@ -4588,7 +6102,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">The records to export.</td>
+            <td class="description last">Array of detection or summary records to export.</td>
         </tr>
 
     
@@ -4619,7 +6133,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">The destination file path.</td>
+            <td class="description last">Destination filesystem path for the exported CSV.</td>
         </tr>
 
     
@@ -4650,7 +6164,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">The export format: "text", "eBird", "Raven", or "summary".</td>
+            <td class="description last">Export format: "text", "eBird", "Raven", or "summary".</td>
         </tr>
 
     
@@ -4683,7 +6197,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">Optional column header mapping for "summary" format.</td>
+            <td class="description last">Optional mapping of source keys to column headers (used for "summary" format).</td>
         </tr>
 
     
@@ -4724,7 +6238,95 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line4253">line 4253</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line4442">line 4442</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="exportSpeciesList"><span class="type-signature"></span>exportSpeciesList<span class="signature">()</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Save the current included species list as a plain-text CSV file and start a download named "species_list.csv".Each line contains the species scientific name and common name separated by a comma.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line4455">line 4455</a>
     </li></ul></dd>
     
 
@@ -4984,7 +6586,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line2543">line 2543</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line2597">line 2597</a>
     </li></ul></dd>
     
 
@@ -5384,7 +6986,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line4400">line 4400</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line4537">line 4537</a>
     </li></ul></dd>
     
 
@@ -5516,7 +7118,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1081">line 1081</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line1109">line 1109</a>
     </li></ul></dd>
     
 
@@ -5653,7 +7255,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line732">line 732</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line756">line 756</a>
     </li></ul></dd>
     
 
@@ -5812,7 +7414,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line2424">line 2424</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line2511">line 2511</a>
     </li></ul></dd>
     
 
@@ -6176,7 +7778,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line7052">line 7052</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line7220">line 7220</a>
     </li></ul></dd>
     
 
@@ -6264,7 +7866,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line4496">line 4496</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line4774">line 4774</a>
     </li></ul></dd>
     
 
@@ -6456,7 +8058,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1117">line 1117</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line1224">line 1224</a>
     </li></ul></dd>
     
 
@@ -6705,7 +8307,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1091">line 1091</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line1198">line 1198</a>
     </li></ul></dd>
     
 
@@ -6848,7 +8450,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line986">line 986</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line1064">line 1064</a>
     </li></ul></dd>
     
 
@@ -7008,7 +8610,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line7790">line 7790</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line7957">line 7957</a>
     </li></ul></dd>
     
 
@@ -7074,7 +8676,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Returns a promise resolving to the array of species IDs included in the current filter context, based on the active list type and file metadata.For "location" or "nocturnal" lists in local mode, determines latitude, longitude, and week from the file's metadata or global state, and ensures the inclusion cache is populated for those parameters. For other list types, retrieves included species IDs from the cache, populating it if necessary.
+    Retrieves the list of included species IDs based on the current STATE settings and optional file context.Depending on the STATE.list type and whether a specific file is provided, this function determines the appropriate latitude, longitude, and week number to use for location-specific or seasonal inclusion lists. It checks if the relevant inclusion data is already cached in STATE.included; if not, it invokes setIncludedIDs to fetch and cache the data from the list worker. Finally, it returns the array of included species IDs for the specified model and list type.
 </div>
 
 
@@ -7118,7 +8720,7 @@ Analysis Rate: x real time performance
             <td class="type">
             
                 
-<span class="param-type">*</span>
+<span class="param-type">string</span>
 
 
             
@@ -7138,7 +8740,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">Optional file identifier used to extract metadata for location-based filtering.</td>
+            <td class="description last">Optional file identifier to provide context for location-specific or seasonal lists.</td>
         </tr>
 
     
@@ -7179,7 +8781,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line5037">line 5037</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line5336">line 5336</a>
     </li></ul></dd>
     
 
@@ -7208,7 +8810,7 @@ Analysis Rate: x real time performance
 
         
 <div class="param-desc">
-    Promise resolving to the included species IDs for the current filter context.
+    An array of species IDs that are included based on the current STATE settings.
 </div>
 
 
@@ -7237,6 +8839,183 @@ Analysis Rate: x real time performance
     
 
     
+    <h4 class="name" id="getInstallInfo"><span class="type-signature">(async) </span>getInstallInfo<span class="signature">(date<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Object}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Ensure and return persistent install information, creating and storing it in the system keychain if missing or invalid.Attempts to read an existing record from the keychain; if none exists or it lacks a valid `installedAt`, a new record is generated and persisted. If a provided `date` is invalid, the current time is used. Keychain read/write failures are logged and the new record is returned (but may not be persisted).
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>date</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+|
+
+<span class="param-type">Date</span>
+|
+
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">Optional install timestamp (ISO string, Date object, or epoch milliseconds) to use when creating a new record.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="main.js.html">main.js</a>, <a href="main.js.html#line88">line 88</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    An object containing `appId` (a UUID) and `installedAt` (an ISO 8601 timestamp).
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Object</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
     <h4 class="name" id="getMatchingIds"><span class="type-signature">(async) </span>getMatchingIds<span class="signature">(cnames)</span><span class="type-signature"> &rarr; {Array.&lt;number>}</span></h4>
     
 
@@ -7245,7 +9024,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Map a list of CNAMES (possibly containing suffixes) to species IDs for the current model.
+    Map CNAMES (including variants with suffixes like " (call)" or " (fc)") to species IDs for the current model.
 </div>
 
 
@@ -7297,7 +9076,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">Array of CNAMES; elements may include suffixes such as " (call)" or " (fc)".</td>
+            <td class="description last">CNAMES to resolve; elements may include suffixes (e.g., "Species (call)").</td>
         </tr>
 
     
@@ -7338,7 +9117,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1156">line 1156</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line1263">line 1263</a>
     </li></ul></dd>
     
 
@@ -7367,7 +9146,7 @@ Analysis Rate: x real time performance
 
         
 <div class="param-desc">
-    Array of matching species IDs for STATE.modelID, empty if no matches.
+    Matching species IDs for STATE.modelID; an empty array if no matches.
 </div>
 
 
@@ -7396,7 +9175,224 @@ Analysis Rate: x real time performance
     
 
     
-    <h4 class="name" id="getResults"><span class="type-signature">(async) </span>getResults<span class="signature">(files:, species:, limit:, offset:, topRankin:, directory:, format:)</span><span class="type-signature"> &rarr; {Promise.&lt;integer>}</span></h4>
+    <h4 class="name" id="getNearbyLocations"><span class="type-signature">(async) </span>getNearbyLocations<span class="signature">(lat, lon, radius)</span><span class="type-signature"> &rarr; {Promise.&lt;Array.&lt;{id: number, lat: number, lon: number, place: string, distance: number}>>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    getNearbyLocationsFetches locations from the database that are within a specified radius of given latitude and longitude using the Haversine formula.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>lat</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>lon</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>radius</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+                <td class="default">
+                
+                    0.1
+                
+                </td>
+            
+
+            <td class="description last">in km</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line5309">line 5309</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;Array.&lt;{id: number, lat: number, lon: number, place: string, distance: number}>></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="getResults"><span class="type-signature">(async) </span>getResults<span class="signature">(files:, species:, limit:, offset:, topRankin:, path:, directory:, format:)</span><span class="type-signature"> &rarr; {Promise.&lt;integer>}</span></h4>
     
 
     
@@ -7519,7 +9515,25 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">return results >= to this rank for each datetime</td>
+            <td class="description last">return results >= to this rank for each position</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>path:</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">if set, will export audio or text of the returned results to this folder</td>
         </tr>
 
     
@@ -7596,7 +9610,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line4074">line 4074</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line4245">line 4245</a>
     </li></ul></dd>
     
 
@@ -7778,7 +9792,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3632">line 3632</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line3743">line 3743</a>
     </li></ul></dd>
     
 
@@ -7940,7 +9954,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line2467">line 2467</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line2554">line 2554</a>
     </li></ul></dd>
     
 
@@ -8050,7 +10064,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1198">line 1198</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line1304">line 1304</a>
     </li></ul></dd>
     
 
@@ -8160,7 +10174,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line4526">line 4526</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line4804">line 4804</a>
     </li></ul></dd>
     
 
@@ -8302,7 +10316,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1798">line 1798</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line1826">line 1826</a>
     </li></ul></dd>
     
 
@@ -8408,7 +10422,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line7168">line 7168</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line7336">line 7336</a>
     </li></ul></dd>
     
 
@@ -8545,7 +10559,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line2791">line 2791</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line2888">line 2888</a>
     </li></ul></dd>
     
 
@@ -8700,7 +10714,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line2747">line 2747</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line2844">line 2844</a>
     </li></ul></dd>
     
 
@@ -8744,7 +10758,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Handles and dispatches worker messages to perform actions such as analysis, file operations, prediction management, database updates, and UI communication.Processes incoming event messages containing an `action` field and delegates tasks accordingly, including model initialization, audio analysis, prediction worker management, database record manipulation, file loading and saving, exporting, importing, and updating application state. Waits for initialization to complete before handling most actions. Supports a wide range of commands for audio processing, data management, and UI updates.
+    Dispatches incoming worker messages by action and performs the requested application operation.Waits for initialisation when required, then delegates actions such as model initialization, analysis/prediction control, worker management, audio file operations, database updates, import/export, tagging and list/locale updates, and UI notifications. Expects the event's data to include an `action` string and action-specific parameters.
 </div>
 
 
@@ -8796,7 +10810,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">The message event containing an `action` and associated parameters.</td>
+            <td class="description last">Message event whose `data` property contains an `action` field and associated parameters.</td>
         </tr>
 
     
@@ -8837,7 +10851,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line361">line 361</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line378">line 378</a>
     </li></ul></dd>
     
 
@@ -8866,7 +10880,7 @@ Analysis Rate: x real time performance
 
         
 <div class="param-desc">
-    Resolves when the requested action is completed.
+    Resolves when the requested action has been processed.
 </div>
 
 
@@ -8903,7 +10917,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Handles all UI click events by dispatching actions based on the clicked element's ID.Routes user clicks to the appropriate application logic, including file operations, analysis commands, model management, settings adjustments, help dialogs, sorting, context menu actions, and UI updates. Updates application state, communicates with the worker thread, manages configuration, and triggers relevant UI changes as needed.
+    Dispatches application actions based on the clicked element's ID.Routes click events to the appropriate UI handlers (file and export operations, analysis and training commands, model management, settings and help dialogs, sorting and filtering, context-menu actions, and other UI updates). Events are ignored until the application has finished loading.
 </div>
 
 
@@ -8955,7 +10969,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">The click event object.</td>
+            <td class="description last">Click event whose target (or nearest ancestor with an id) determines which action to invoke.</td>
         </tr>
 
     
@@ -8996,7 +11010,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line5078">line 5078</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line5218">line 5218</a>
     </li></ul></dd>
     
 
@@ -9133,144 +11147,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1338">line 1338</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-            
-
-    
-
-    
-    <h4 class="name" id="insertTranslations"><span class="type-signature">(async) </span>insertTranslations<span class="signature">(db)</span><span class="type-signature"></span></h4>
-    
-
-    
-
-
-
-<div class="description">
-    Inserts species name translations from label files into the database.Reads translation files from the `labels/V2.4` directory, parses each file for language-specific species names, and inserts them into the `species_translations` table. Skips files with unexpected formats and malformed lines.
-</div>
-
-
-
-
-
-
-
-
-
-    <h5>Parameters:</h5>
-    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>db</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">object</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">The SQLite database instance supporting `runAsync`.</td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="database.js.html">database.js</a>, <a href="database.js.html#line669">line 669</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line1370">line 1370</a>
     </li></ul></dd>
     
 
@@ -9671,7 +11548,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1926">line 1926</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line1954">line 1954</a>
     </li></ul></dd>
     
 
@@ -9902,7 +11779,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line527">line 527</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line551">line 551</a>
     </li></ul></dd>
     
 
@@ -10051,7 +11928,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line255">line 255</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line262">line 262</a>
     </li></ul></dd>
     
 
@@ -10233,7 +12110,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line4139">line 4139</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line4255">line 4255</a>
     </li></ul></dd>
     
 
@@ -10392,7 +12269,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1835">line 1835</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line1863">line 1863</a>
     </li></ul></dd>
     
 
@@ -10502,7 +12379,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line7532">line 7532</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line7701">line 7701</a>
     </li></ul></dd>
     
 
@@ -10661,7 +12538,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1900">line 1900</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line1928">line 1928</a>
     </li></ul></dd>
     
 
@@ -10739,7 +12616,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Abort all in-progress audio processing and prediction work, clear related queues and transient state, and restart prediction workers for the specified model.This cancels active prediction jobs, clears in-memory queues and tracking structures, terminates existing worker processes, and spawns a fresh set of prediction workers for the provided model.
+    Stop ongoing audio processing and prediction, clear in-memory queues and transient tracking state, and (unless the model is "perch v2") restart prediction workers using the specified model.This sets the abort flag, clears file and prediction queues, cancels backlog intervals, terminates existing prediction workers, and spawns a fresh set of workers for the provided model identifier.
 </div>
 
 
@@ -10853,7 +12730,7 @@ Analysis Rate: x real time performance
                 </td>
             
 
-            <td class="description last">Model identifier to use when restarting prediction workers; defaults to the current STATE.model.</td>
+            <td class="description last">Model identifier to use when restarting prediction workers; if equal to `"perch v2"`, workers are not restarted.</td>
         </tr>
 
     
@@ -10901,7 +12778,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1685">line 1685</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line1713">line 1713</a>
     </li></ul></dd>
     
 
@@ -10945,7 +12822,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Initiates analysis of a set of audio files, handling selection state, caching, and dispatching processing tasks to workers.If all files are already analyzed and cached, retrieves results from the database or summary as needed. Otherwise, prepares files for analysis, updates relevant state, and distributes processing tasks to available workers.
+    Prepare and start analysis for the specified audio files, deciding whether to reuse cached results or run fresh processing.If all files are present in the disk database (or `circleClicked` is true) this will retrieve summary and results from the archive; otherwise it initializes analysis state, updates metadata, populates the processing queue, and dispatches files to worker processors.
 </div>
 
 
@@ -11059,7 +12936,7 @@ Analysis Rate: x real time performance
                 </td>
             
 
-            <td class="description last">List of audio files to analyze.</td>
+            <td class="description last">File paths to include in the analysis.</td>
         </tr>
 
     
@@ -11096,7 +12973,7 @@ Analysis Rate: x real time performance
                 </td>
             
 
-            <td class="description last">Optional start time for analysis (in seconds).</td>
+            <td class="description last">Optional start time (seconds) to limit analysis range for the first file.</td>
         </tr>
 
     
@@ -11133,7 +13010,7 @@ Analysis Rate: x real time performance
                 </td>
             
 
-            <td class="description last">Optional end time for analysis (in seconds).</td>
+            <td class="description last">Optional end time (seconds) to limit analysis range for the first file.</td>
         </tr>
 
     
@@ -11172,7 +13049,7 @@ Analysis Rate: x real time performance
                 </td>
             
 
-            <td class="description last">If true, forces reanalysis even if results are cached.</td>
+            <td class="description last">Force reanalysis even if cached results exist.</td>
         </tr>
 
     
@@ -11211,7 +13088,7 @@ Analysis Rate: x real time performance
                 </td>
             
 
-            <td class="description last">If true, triggers a special retrieval mode for results.</td>
+            <td class="description last">If true, retrieve top results/summary from the archive instead of running a full analysis.</td>
         </tr>
 
     
@@ -11259,7 +13136,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1553">line 1553</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line1606">line 1606</a>
     </li></ul></dd>
     
 
@@ -11445,7 +13322,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3652">line 3652</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line3763">line 3763</a>
     </li></ul></dd>
     
 
@@ -11582,424 +13459,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line806">line 806</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-            
-
-    
-
-    
-    <h4 class="name" id="onChartData"><span class="type-signature"></span>onChartData<span class="signature">(args)</span><span class="type-signature"></span></h4>
-    
-
-    
-
-
-
-<div class="description">
-    Processes chart data to update the UI and render a new Chart.js chart.This function updates UI elements based on the provided chart data. If a species name is given,it displays the species title and toggles visibility of the associated records table; otherwise,the records table is hidden. It then updates individual record elements with formatted dates or"N/A"/"No Records" messages. Any existing Chart.js instances are destroyed before constructing a newchart on the canvas element with the id "chart-week". The chart configuration includes bar datasetsfor each year (with an adjustment for hourly data) and, if provided, a line dataset displaying totalhours recorded. A custom plugin is used to set the background color of the canvas.
-</div>
-
-
-
-
-
-
-
-
-
-    <h5>Parameters:</h5>
-    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>args</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">Object</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">An object containing chart configuration and data.
-                <h6>Properties</h6>
-                
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-        <th>Attributes</th>
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>species</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">string</span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-                    &lt;optional><br>
-                
-
-                
-
-                
-                </td>
-            
-
-            
-
-            <td class="description last">The species name to display; its presence toggles the records table.</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>records</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">Object</span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-
-                
-
-                
-                </td>
-            
-
-            
-
-            <td class="description last">A mapping of DOM element IDs to record values (arrays or timestamps) used to update record displays.</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>aggregation</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">string</span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-
-                
-
-                
-                </td>
-            
-
-            
-
-            <td class="description last">The aggregation level (e.g., "Hour") which determines chart label generation.</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>pointStart</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">number</span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-
-                
-
-                
-                </td>
-            
-
-            
-
-            <td class="description last">The starting timestamp for the data points; may be adjusted for hourly charts.</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>results</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">Object</span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-
-                
-
-                
-                </td>
-            
-
-            
-
-            <td class="description last">An object where each key is a year and each value is an array of data points for that year.</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>total</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">Array.&lt;number></span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-                    &lt;optional><br>
-                
-
-                
-
-                
-                </td>
-            
-
-            
-
-            <td class="description last">Optional dataset representing total hours recorded, rendered as a line chart if provided.</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>dataPoints</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">number</span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-
-                
-
-                
-                </td>
-            
-
-            
-
-            <td class="description last">The number of data points to generate date labels for the x-axis.</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>rate</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">number</span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-
-                
-
-                
-                </td>
-            
-
-            
-
-            <td class="description last">A data rate value included in the arguments (currently unused in chart rendering).</td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-            </td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line2525">line 2525</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line884">line 884</a>
     </li></ul></dd>
     
 
@@ -12136,7 +13596,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line4704">line 4704</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line4928">line 4928</a>
     </li></ul></dd>
     
 
@@ -12365,7 +13825,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line4758">line 4758</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line4981">line 4981</a>
     </li></ul></dd>
     
 
@@ -12725,7 +14185,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line835">line 835</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line913">line 913</a>
     </li></ul></dd>
     
 
@@ -12813,7 +14273,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3344">line 3344</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line3442">line 3442</a>
     </li></ul></dd>
     
 
@@ -12857,7 +14317,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Opens one or more audio files, resets analysis state, and updates the UI for new input.Loads the provided audio files, resets analysis results and diagnostics, updates menu items, and initializes the spectrogram. If multiple files are selected, sorts them by creation time and enables batch analysis options. Begins loading the first file in the list.
+    Open one or more audio files and prepare the application state and UI for analysis.Loads the specified files (sorting by creation time when multiple are provided), resets pagination, diagnostics, and result state, adjusts relevant menu items and spectrogram visibility, sets the UI mode to analysis, and begins loading the first file.
 </div>
 
 
@@ -12909,7 +14369,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">Arguments for file opening.
+            <td class="description last">
                 <h6>Properties</h6>
                 
 
@@ -12926,6 +14386,8 @@ Analysis Rate: x real time performance
         <th>Attributes</th>
         
 
+        
+        <th>Default</th>
         
 
         <th class="last">Description</th>
@@ -12960,8 +14422,51 @@ Analysis Rate: x real time performance
             
 
             
+                <td class="default">
+                
+                </td>
+            
 
             <td class="description last">Paths of audio files to open.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>checkSaved</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    true
+                
+                </td>
+            
+
+            <td class="description last">If false, mark analysis as complete for the opened files.</td>
         </tr>
 
     
@@ -12993,8 +14498,12 @@ Analysis Rate: x real time performance
             
 
             
+                <td class="default">
+                
+                </td>
+            
 
-            <td class="description last">If true, preserves previous analysis results.</td>
+            <td class="description last">If true, preserve previous analysis results when loading the file.</td>
         </tr>
 
     
@@ -13042,7 +14551,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1106">line 1106</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line1135">line 1135</a>
     </li></ul></dd>
     
 
@@ -13086,7 +14595,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Finalizes result processing by updating the results table UI and activating the appropriate result row.Replaces the results table with the latest data, resets analysis state, and determines which row to activate based on the provided options or current table state. Ensures the selected row is activated and scrolled into view, updates sorting indicators, and refreshes related UI panels.
+    Finalizes result rendering and ensures an appropriate result row is activated in the UI.Replaces the results table with the prepared content, clears analysis state, updates sorting and label indicators, and activates (and scrolls to) a result row determined by the provided options or current table state. Also refreshes the filename panel and pagination display as needed.
 </div>
 
 
@@ -13158,7 +14667,7 @@ Analysis Rate: x real time performance
                 </td>
             
 
-            <td class="description last">Options for determining which result row to activate.
+            <td class="description last">Options controlling which result row to activate.
                 <h6>Properties</h6>
                 
 
@@ -13212,7 +14721,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">Index of the row to activate, if specified.</td>
+            <td class="description last">Zero-based row index to activate; if not present the function will use `select` or the current/first row.</td>
         </tr>
 
     
@@ -13245,7 +14754,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">Value used to identify the row to activate via a helper function.</td>
+            <td class="description last">Value used to locate a row via the selection helper; used when `active` is not provided.</td>
         </tr>
 
     
@@ -13293,7 +14802,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3575">line 3575</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line3686">line 3686</a>
     </li></ul></dd>
     
 
@@ -13381,7 +14890,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line4413">line 4413</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line4686">line 4686</a>
     </li></ul></dd>
     
 
@@ -13631,7 +15140,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line2484">line 2484</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line2571">line 2571</a>
     </li></ul></dd>
     
 
@@ -13667,7 +15176,7 @@ Analysis Rate: x real time performance
     
 
     
-    <h4 class="name" id="onSetCustomLocation"><span class="type-signature">(async) </span>onSetCustomLocation<span class="signature">(params)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="onSetLocation"><span class="type-signature">(async) </span>onSetLocation<span class="signature">(params)</span><span class="type-signature"></span></h4>
     
 
     
@@ -14016,7 +15525,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line4968">line 4968</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line5222">line 5222</a>
     </li></ul></dd>
     
 
@@ -14060,7 +15569,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Updates the UI after summary data is loaded, refreshing the summary table, enabling or disabling menu items, and applying species filters if provided.
+    Refreshes the UI summary view after summary data is available, applying an optional species filter, updating the summary table rows and hover styling, and enabling or disabling related menu actions.
 </div>
 
 
@@ -14172,7 +15681,7 @@ Analysis Rate: x real time performance
                 </td>
             
 
-            <td class="description last">Optional filter to restrict summary to specific species.</td>
+            <td class="description last">Optional species identifier or filter to restrict which species are shown in the summary.</td>
         </tr>
 
     
@@ -14211,7 +15720,7 @@ Analysis Rate: x real time performance
                 </td>
             
 
-            <td class="description last">Summary records to display in the UI.</td>
+            <td class="description last">Array of summary records to render in the summary table.</td>
         </tr>
 
     
@@ -14259,7 +15768,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3705">line 3705</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line3816">line 3816</a>
     </li></ul></dd>
     
 
@@ -14442,7 +15951,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line4935">line 4935</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line5189">line 5189</a>
     </li></ul></dd>
     
 
@@ -14952,7 +16461,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3396">line 3396</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line3494">line 3494</a>
     </li></ul></dd>
     
 
@@ -14989,6 +16498,191 @@ Analysis Rate: x real time performance
     <dd>
         
 <span class="param-type">Promise.&lt;void></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="parseBextLocalDate"><span class="type-signature"></span>parseBextLocalDate<span class="signature">(originationDate, originationTime)</span><span class="type-signature"> &rarr; {number|undefined}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Parse BExt origination date and time strings into a local timestamp.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>originationDate</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Date string in "YYYY-MM-DD" format from BExt metadata.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>originationTime</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Time string in "HH:MM:SS" format from BExt metadata.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line2129">line 2129</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    The local epoch timestamp (milliseconds) corresponding to the parsed date/time, or `undefined` if parsing fails.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">number</span>
+|
+
+<span class="param-type">undefined</span>
 
 
     </dd>
@@ -15107,7 +16801,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1139">line 1139</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line1246">line 1246</a>
     </li></ul></dd>
     
 
@@ -15138,6 +16832,143 @@ Analysis Rate: x real time performance
 
 
     
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="parseMessage"><span class="type-signature">(async) </span>parseMessage<span class="signature">(e)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Dispatches and handles messages received from worker threads, updating worker state,forwarding results to parsers, emitting UI events, and generating alerts as appropriate.Accepts messages with a `data.message` field such as `"model-ready"`, `"prediction"`,`"spectrogram"`, `"training-progress"`, and `"training-results"` and performs thecorresponding application updates (marking workers ready/available, parsing predictionsand advancing file processing, producing spectrogram files, posting footer progress,and creating alerts).
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>e</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">MessageEvent</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Worker message event whose `data` object contains the message type and payload.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line3837">line 3837</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -15201,7 +17032,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line5046">line 5046</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line5186">line 5186</a>
     </li></ul></dd>
     
 
@@ -15379,7 +17210,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line6612">line 6612</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line6819">line 6819</a>
     </li></ul></dd>
     
 
@@ -15516,7 +17347,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1215">line 1215</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line1243">line 1243</a>
     </li></ul></dd>
     
 
@@ -15560,7 +17391,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Streams audio data from a file, splits it into chunks, and queues each chunk for AI model prediction.Extracts audio from the specified file and time range, applies optional audio filters, and manages chunked buffering to optimize parallel processing. Handles encoder padding for compressed formats, manages backpressure by pausing/resuming ffmpeg as needed, and limits the backlog of audio chunks to control memory usage. Updates metadata and expected chunk counts based on actual processed duration. Resolves when all audio chunks have been processed and queued.
+    Stream audio from a file, split it into model-sized chunks, and queue those chunks for prediction.Processes the specified time range of the file into byte-aligned buffers, applies configured audio filters, handles encoder padding for compressed formats, and manages backpressure to limit in-memory backlog while feeding prepared batches to the prediction queue.
 </div>
 
 
@@ -15635,7 +17466,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">Start time in seconds for audio extraction.</td>
+            <td class="description last">Start time in seconds for extraction (may be adjusted slightly to compensate encoder padding).</td>
         </tr>
 
     
@@ -15658,7 +17489,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">End time in seconds for audio extraction.</td>
+            <td class="description last">End time in seconds for extraction.</td>
         </tr>
 
     
@@ -15681,7 +17512,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">Initial sample index for chunking.</td>
+            <td class="description last">Index (in samples) of the first sample for the first chunk produced from this stream.</td>
         </tr>
 
     
@@ -15704,7 +17535,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">Buffer size in bytes for each audio chunk.</td>
+            <td class="description last">Number of bytes per chunk buffer used to accumulate PCM before sending to the model.</td>
         </tr>
 
     
@@ -15727,7 +17558,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">Number of audio samples per batch sent to the model.</td>
+            <td class="description last">Number of audio samples contained in each batch sent to the model.</td>
         </tr>
 
     
@@ -15768,7 +17599,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line2327">line 2327</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line2390">line 2390</a>
     </li></ul></dd>
     
 
@@ -15797,7 +17628,7 @@ Analysis Rate: x real time performance
 
         
 <div class="param-desc">
-    Resolves when all audio chunks have been processed and queued for prediction.
+    Resolves when all audio chunks for the requested range have been prepared and queued for prediction.
 </div>
 
 
@@ -15826,6 +17657,198 @@ Analysis Rate: x real time performance
     
 
     
+    <h4 class="name" id="processFilesInBatches"><span class="type-signature">(async) </span>processFilesInBatches<span class="signature">(filePaths, batchSize<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Process a list of files in concurrent batches to gather metadata and update aggregate state.Processes filePaths in groups of up to batchSize, invoking setMetadata for each file and accumulatingper-file durations into STATE.allFilesDuration and estimated batch counts into STATE.totalBatches.Files that fail metadata extraction are skipped.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>filePaths</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Array.&lt;string></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last">Array of file paths to process.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>batchSize</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    20
+                
+                </td>
+            
+
+            <td class="description last">Maximum number of files to process concurrently per batch.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line1128">line 1128</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
     <h4 class="name" id="processNextFile"><span class="type-signature">(async) </span>processNextFile<span class="signature">(options<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h4>
     
 
@@ -15834,7 +17857,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Processes the next audio file in the prediction queue, handling file retrieval, analysis boundaries, and error conditions.Attempts to retrieve the next file for analysis, determines the appropriate analysis boundaries, and invokes prediction. If a file is missing or cannot be processed, generates a warning and continues to the next file. Recursively processes all files in the queue until none remain.
+    Dequeues the next file from the prediction queue, determines analysis time boundaries, and schedules prediction for each boundary segment.If a file cannot be located or processed, posts a warning and continues with the next file. Updates UI progress state and internal counters as segments are dispatched.
 </div>
 
 
@@ -15898,7 +17921,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">Optional arguments.
+            <td class="description last">Options to override default boundary selection and worker assignment.
                 <h6>Properties</h6>
                 
 
@@ -15952,7 +17975,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">Start time for analysis, if specified.</td>
+            <td class="description last">Explicit start time (seconds) for analysis on the dequeued file; when provided, a single boundary segment from `start` to `end` is used.</td>
         </tr>
 
     
@@ -15985,7 +18008,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">End time for analysis, if specified.</td>
+            <td class="description last">Explicit end time (seconds) for analysis on the dequeued file; used together with `start`.</td>
         </tr>
 
     
@@ -16018,7 +18041,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">Prediction worker to use, if specified.</td>
+            <td class="description last">Prediction worker to handle the scheduled prediction, if a specific worker is required.</td>
         </tr>
 
     
@@ -16066,7 +18089,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line3845">line 3845</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line3962">line 3962</a>
     </li></ul></dd>
     
 
@@ -16110,7 +18133,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Loads and processes a label file, updating species labels or custom lists for the application.If the label file cannot be fetched, displays an error toast and updates the UI to prompt for correction.On success, updates the worker with the new labels or custom list, and ensures an "Unknown Sp._Unknown Sp." entry is present.
+    Load labels from a file and apply them to the application's locale labels or custom species list.Ensures an "Unknown Sp.<splitChar>Unknown Sp." entry is present. On success, sends an update to the worker to replaceeither the locale labels or the custom list and triggers a results refresh when appropriate. On failure, surfaces auser-facing error and highlights the list selector in the UI to prompt correction.
 </div>
 
 
@@ -16205,7 +18228,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">If set to "list", updates the custom species list; otherwise, updates locale labels.</td>
+            <td class="description last">If set to `"list"`, update the custom species list; otherwise update locale labels.</td>
         </tr>
 
     
@@ -16246,7 +18269,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line6423">line 6423</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line6627">line 6627</a>
     </li></ul></dd>
     
 
@@ -16269,35 +18292,6 @@ Analysis Rate: x real time performance
 
 
 
-<h5>Throws:</h5>
-
-        
-
-<dl>
-    <dt>
-        <div class="param-desc">
-        If the label file cannot be fetched or read.
-        </div>
-    </dt>
-    <dd></dd>
-    <dt>
-        <dl>
-            <dt>
-                Type
-            </dt>
-            <dd>
-                
-<span class="param-type">Error</span>
-
-
-            </dd>
-        </dl>
-    </dt>
-    <dd></dd>
-</dl>
-
-
-    
 
 
 
@@ -16412,7 +18406,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3079">line 3079</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line3177">line 3177</a>
     </li></ul></dd>
     
 
@@ -16500,7 +18494,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1177">line 1177</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line1205">line 1205</a>
     </li></ul></dd>
     
 
@@ -16588,7 +18582,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line5892">line 5892</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line6056">line 6056</a>
     </li></ul></dd>
     
 
@@ -16676,7 +18670,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line781">line 781</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line805">line 805</a>
     </li></ul></dd>
     
 
@@ -16720,7 +18714,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Renders a detection result row in the results table, updating headers, pagination, and UI as needed.For the first result, resets the table and sets up localized headers. Handles pagination and result limits for non-database results. Formats and displays detection details including timestamps, species, call counts, labels, comments, review status, and model information. Stores results for feedback and updates the UI accordingly.
+    Render a single detection row into the results table and update table headers, pagination, and related UI state.Renders or resets the results header when index is 1, appends a table row for the provided detection data,updates pagination when results exceed page limits, and triggers a buffer update for visible detections when appropriate.
 </div>
 
 
@@ -16834,7 +18828,7 @@ Analysis Rate: x real time performance
                 </td>
             
 
-            <td class="description last">The sequential index of the detection result.</td>
+            <td class="description last">Sequential index of the detection within the current result set.</td>
         </tr>
 
     
@@ -16873,7 +18867,7 @@ Analysis Rate: x real time performance
                 </td>
             
 
-            <td class="description last">Detection result data, including timestamp, position, species, score, label, and related fields.</td>
+            <td class="description last">Detection record containing fields like `timestamp`, `position`, `sname`, `cname`, `score`, `label`, `reviewed`, `model`, `modelID`, `count`, `callCount`, `comment`, `isDaylight`, `active`, and `end`.</td>
         </tr>
 
     
@@ -16910,7 +18904,7 @@ Analysis Rate: x real time performance
                 </td>
             
 
-            <td class="description last">The audio file reference for the detection.</td>
+            <td class="description last">Reference to the associated audio file (used for buffer updates/navigation).</td>
         </tr>
 
     
@@ -16949,7 +18943,7 @@ Analysis Rate: x real time performance
                 </td>
             
 
-            <td class="description last">Whether the result is from the database.</td>
+            <td class="description last">When true, treat the result as originating from the database (affects pagination and rendering choices).</td>
         </tr>
 
     
@@ -16988,7 +18982,7 @@ Analysis Rate: x real time performance
                 </td>
             
 
-            <td class="description last">Whether rendering is for a selection-specific view.</td>
+            <td class="description last">When true, render for a selection-specific view (hides certain UI elements and does not store prediction state).</td>
         </tr>
 
     
@@ -17036,7 +19030,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3815">line 3815</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line3908">line 3908</a>
     </li></ul></dd>
     
 
@@ -17065,7 +19059,7 @@ Analysis Rate: x real time performance
 
         
 <div class="param-desc">
-    Resolves when the result has been rendered and the UI updated.
+    Nothing.
 </div>
 
 
@@ -17146,7 +19140,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1152">line 1152</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line1180">line 1180</a>
     </li></ul></dd>
     
 
@@ -17442,7 +19436,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line505">line 505</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line529">line 529</a>
     </li></ul></dd>
     
 
@@ -17579,7 +19573,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1606">line 1606</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line1635">line 1635</a>
     </li></ul></dd>
     
 
@@ -17633,7 +19627,7 @@ Analysis Rate: x real time performance
     
 
     
-    <h4 class="name" id="savedFileCheck"><span class="type-signature">(async) </span>savedFileCheck<span class="signature">(fileList)</span><span class="type-signature"> &rarr; {Promise.&lt;(boolean|undefined)>}</span></h4>
+    <h4 class="name" id="savedFileCheckAsync"><span class="type-signature">(async) </span>savedFileCheckAsync<span class="signature">(fileList)</span><span class="type-signature"> &rarr; {Promise.&lt;(boolean|undefined)>}</span></h4>
     
 
     
@@ -17734,7 +19728,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line741">line 741</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line827">line 827</a>
     </li></ul></dd>
     
 
@@ -17787,7 +19781,7 @@ Analysis Rate: x real time performance
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>const files = ['track1.mp3', 'track2.wav'];savedFileCheck(files).then(result => {  if (result === true) {    console.log('All files exist in the database.');  } else if (result === false) {    console.log('Some files are missing in the database.');  } else {    console.log('Database not loaded.');  }});</code></pre>
+    <pre class="prettyprint"><code>const files = ['track1.mp3', 'track2.wav'];savedFileCheckAsync(files).then(result => {  if (result === true) {    console.log('All files exist in the database.');  } else if (result === false) {    console.log('Some files are missing in the database.');  } else {    console.log('Database not loaded.');  }});</code></pre>
 
 
 
@@ -17967,7 +19961,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line2047">line 2047</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line2075">line 2075</a>
     </li></ul></dd>
     
 
@@ -18147,7 +20141,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line2829">line 2829</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line2927">line 2927</a>
     </li></ul></dd>
     
 
@@ -18284,7 +20278,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1639">line 1639</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line1668">line 1668</a>
     </li></ul></dd>
     
 
@@ -18372,7 +20366,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line2621">line 2621</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line2675">line 2675</a>
     </li></ul></dd>
     
 
@@ -18531,7 +20525,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3985">line 3985</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line4077">line 4077</a>
     </li></ul></dd>
     
 
@@ -18575,7 +20569,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Retrieves and caches the included species IDs for a given location and week, updating the global state.Requests a species inclusion list from the list worker based on model, labels, location, and week, merges the result into the global included species state, and caches the promise to avoid redundant requests. Generates alerts for any unrecognized labels and throws an error if such labels are found.
+    Load and cache species IDs included for a given location and week and merge them into global STATE.Requests an inclusion list from the list worker using the current model, labels, list settings and the providedlatitude/longitude/week (falling back to STATE values), merges the resulting IDs into STATE.included, caches thein-flight promise to avoid duplicate requests, and emits warnings for any unrecognized labels reported by the worker.
 </div>
 
 
@@ -18630,7 +20624,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">Latitude for location-based filtering.</td>
+            <td class="description last">Latitude to use for location-specific lists (falls back to STATE.lat if falsy).</td>
         </tr>
 
     
@@ -18656,7 +20650,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">Longitude for location-based filtering.</td>
+            <td class="description last">Longitude to use for location-specific lists (falls back to STATE.lon if falsy).</td>
         </tr>
 
     
@@ -18682,7 +20676,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">Week number for seasonal filtering.</td>
+            <td class="description last">Week number for seasonal filtering (falls back to STATE.week if falsy).</td>
         </tr>
 
     
@@ -18723,7 +20717,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line5127">line 5127</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line5426">line 5426</a>
     </li></ul></dd>
     
 
@@ -18746,42 +20740,13 @@ Analysis Rate: x real time performance
 
 
 
-<h5>Throws:</h5>
-
-        
-
-<dl>
-    <dt>
-        <div class="param-desc">
-        If unrecognized labels are found in the custom list.
-        </div>
-    </dt>
-    <dd></dd>
-    <dt>
-        <dl>
-            <dt>
-                Type
-            </dt>
-            <dd>
-                
-<span class="param-type">Error</span>
-
-
-            </dd>
-        </dl>
-    </dt>
-    <dd></dd>
-</dl>
-
-
-    
 
 
 <h5>Returns:</h5>
 
         
 <div class="param-desc">
-    The updated included species object in the global state.
+    The updated STATE.included object after merging the retrieved included species IDs.
 </div>
 
 
@@ -18934,7 +20899,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line7654">line 7654</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line7821">line 7821</a>
     </li></ul></dd>
     
 
@@ -19089,7 +21054,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line7705">line 7705</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line7872">line 7872</a>
     </li></ul></dd>
     
 
@@ -19280,7 +21245,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line327">line 327</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line344">line 344</a>
     </li></ul></dd>
     
 
@@ -19417,7 +21382,147 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line6392">line 6392</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line6597">line 6597</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="setNocmig"><span class="type-signature"></span>setNocmig<span class="signature">(on)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Update the nocmig control's icon, tooltip, and checked state to reflect the given mode.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>on</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+|
+
+<span class="param-type">'day'</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">Mode to set: `true` enables nocmig (night mode), `false` disables it, `'day'` enables day mode styling.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line4477">line 4477</a>
     </li></ul></dd>
     
 
@@ -19461,7 +21566,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Determines the active time boundaries for a given audio file based on its metadata and detection mode.If nocturnal migration detection is enabled, calculates nighttime intervals using the file's start time, duration, and associated location coordinates. Otherwise, returns the full duration of the file as a single interval.
+    Compute active time intervals for an audio file based on its metadata and detection mode.When nocturnal-migration mode is enabled, returns intervals clipped to the computed day/night boundaries for the file (using file start/end and location). When nocturnal-migration is disabled, returns a single interval covering the entire file duration and updates batchesToSend[file] with the number of processing batches (at least 1).
 </div>
 
 
@@ -19513,7 +21618,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">The file name or identifier for which to compute boundaries.</td>
+            <td class="description last">Key or filename used to look up the file's metadata in METADATA.</td>
         </tr>
 
     
@@ -19554,7 +21659,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line4007">line 4007</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line4141">line 4141</a>
     </li></ul></dd>
     
 
@@ -19583,7 +21688,7 @@ Analysis Rate: x real time performance
 
         
 <div class="param-desc">
-    An array of time interval objects representing active boundaries in seconds.
+    An array of intervals with `start` and `end` expressed in seconds relative to the file.
 </div>
 
 
@@ -19620,7 +21725,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Initiates the audio analysis workflow.This asynchronous function restores the previously saved analysis state and configures the UI and workerprocess for a new analysis cycle. It disables the active analysis menu item, updates the worker mode,and destroys any existing spectrogram instance to avoid conflicts. If an audio file is loaded, itreveals the spectrogram UI, reinitializes the spectrogram, and updates the worker with the current state.Depending on whether analysis was already completed, it either filters the results or reloads the audio file for analysis.Finally, it resets the displayed results.
+    Prepare the application and worker for performing analysis on the current file.Restores the saved analysis state, switches the UI and worker into analysis mode, ensures the spectrogramis initialized for analysis, updates the worker with the open-files and sort state, and either filtersexisting results or loads the current file for analysis. Finally, clears and resets the visible results.
 </div>
 
 
@@ -19664,7 +21769,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1552">line 1552</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line1581">line 1581</a>
     </li></ul></dd>
     
 
@@ -19752,7 +21857,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1459">line 1459</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line1495">line 1495</a>
     </li></ul></dd>
     
 
@@ -19840,7 +21945,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line646">line 646</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line670">line 670</a>
     </li></ul></dd>
     
 
@@ -19946,7 +22051,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line1501">line 1501</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line1533">line 1533</a>
     </li></ul></dd>
     
 
@@ -20106,7 +22211,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line6657">line 6657</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line6864">line 6864</a>
     </li></ul></dd>
     
 
@@ -20216,7 +22321,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line4611">line 4611</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line4750">line 4750</a>
     </li></ul></dd>
     
 
@@ -20361,7 +22466,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line4810">line 4810</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line4949">line 4949</a>
     </li></ul></dd>
     
 
@@ -20449,7 +22554,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line4823">line 4823</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line4962">line 4962</a>
     </li></ul></dd>
     
 
@@ -20493,7 +22598,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Creates and displays audio regions for detections within the current spectrogram window.Adjusts detection times relative to the current window offset and creates regions for those visible in the window. Only active detections or those allowed by configuration are processed. Optionally repositions the view to an active region.
+    Display regions for detections that fall within the current spectrogram window.For each detection whose start time lies inside the current window, a region is created using times adjusted by the window offset. Only the active detection or detections allowed by configuration are shown. If `goToRegion` is true and a detection is active, the view is repositioned to that region.
 </div>
 
 
@@ -20587,7 +22692,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">Detections to display, each with `start`, `end`, and `label` properties.</td>
+            <td class="description last">Array of detection objects. Each object should include `start` and `end` (seconds) and may include `label` or `cname` used for region labeling.</td>
         </tr>
 
     
@@ -20610,7 +22715,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">Whether to reposition the view to the active region.</td>
+            <td class="description last">If true, reposition the view to the active region when one is present.</td>
         </tr>
 
     
@@ -20658,7 +22763,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line2401">line 2401</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line2488">line 2488</a>
     </li></ul></dd>
     
 
@@ -20746,7 +22851,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line934">line 934</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line1012">line 1012</a>
     </li></ul></dd>
     
 
@@ -20980,7 +23085,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line3243">line 3243</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line3319">line 3319</a>
     </li></ul></dd>
     
 
@@ -21024,7 +23129,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Toggles the species filter based on user interaction with the summary table.Validates the event against non-interactive elements and current analysis state before proceeding.If the selected row is already highlighted (indicating an active filter), the highlight is removed;otherwise, all highlighted rows are cleared, the current row is marked, and the corresponding speciesis extracted from the clicked element. In explore mode, the species value is set in the bird list display.Subsequently, the function refreshes the results filtering and resets the UI components without clearingthe summary, pagination, or result listings.
+    Toggle the species filter from a click on the summary table.When a summary row is clicked, either clear an existing species filter (if therow was active) or activate a new species filter by highlighting the row,setting the autocomplete value, updating pagination, refreshing filteredresults, and resetting UI components without clearing the summary, pagination,or current result listings.
 </div>
 
 
@@ -21076,7 +23181,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last">The DOM event triggered by the user's click on a table row.</td>
+            <td class="description last">Click event originating from the summary table row.</td>
         </tr>
 
     
@@ -21117,7 +23222,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3763">line 3763</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line3857">line 3857</a>
     </li></ul></dd>
     
 
@@ -21144,11 +23249,6 @@ Analysis Rate: x real time performance
 
 
 
-
-
-    <h5>Example</h5>
-    
-    <pre class="prettyprint"><code>// Apply species filtering when a table row is clicked.speciesFilter(event);</code></pre>
 
 
 
@@ -21259,7 +23359,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line2445">line 2445</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line2532">line 2532</a>
     </li></ul></dd>
     
 
@@ -21325,7 +23425,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Called when a files processing is finished
+    Mark a file as finished processing and notify the UI when all files are complete.Removes the given file from the internal filesBeingProcessed list; if the list becomesempty, triggers a summary update when no selection is active and posts an"analysis-complete" message to the UI.
 </div>
 
 
@@ -21367,7 +23467,10 @@ Analysis Rate: x real time performance
             <td class="type">
             
                 
-<span class="param-type">*</span>
+<span class="param-type">string</span>
+|
+
+<span class="param-type">object</span>
 
 
             
@@ -21377,7 +23480,7 @@ Analysis Rate: x real time performance
 
             
 
-            <td class="description last"></td>
+            <td class="description last">File identifier (file path or file record) to remove from the processing list.</td>
         </tr>
 
     
@@ -21418,7 +23521,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line3817">line 3817</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line3936">line 3936</a>
     </li></ul></dd>
     
 
@@ -21506,7 +23609,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line5872">line 5872</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line6035">line 6035</a>
     </li></ul></dd>
     
 
@@ -21643,7 +23746,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="worker.js.html">worker.js</a>, <a href="worker.js.html#line1451">line 1451</a>
+        <a href="js_worker.js.html">js/worker.js</a>, <a href="js_worker.js.html#line1504">line 1504</a>
     </li></ul></dd>
     
 
@@ -21701,7 +23804,7 @@ Analysis Rate: x real time performance
     
 
     
-    <h4 class="name" id="updatePagination"><span class="type-signature"></span>updatePagination<span class="signature">(total, offset<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="updatePagination"><span class="type-signature"></span>updatePagination<span class="signature">(species<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h4>
     
 
     
@@ -21709,7 +23812,7 @@ Analysis Rate: x real time performance
 
 
 <div class="description">
-    Updates the pagination controls based on the total number of items.If the total exceeds the configured limit, pagination controls are rendered using the given offset.Otherwise, all pagination elements are hidden.
+    Configure UI pagination based on the total number of items for the current view.When the computed total exceeds the configured per-page limit, pagination controls are enabled and configured for the total count; otherwise pagination controls are hidden. This function also updates STATE.paginationPending to reflect whether pagination needs to be rendered.
 </div>
 
 
@@ -21737,8 +23840,6 @@ Analysis Rate: x real time performance
         
 
         
-        <th>Default</th>
-        
 
         <th class="last">Description</th>
     </tr>
@@ -21749,48 +23850,13 @@ Analysis Rate: x real time performance
 
         <tr>
             
-                <td class="name"><code>total</code></td>
+                <td class="name"><code>species</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type">number</span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-
-                
-
-                
-                </td>
-            
-
-            
-                <td class="default">
-                
-                </td>
-            
-
-            <td class="description last">The total number of items.</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>offset</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">number</span>
+<span class="param-type">string</span>
 
 
             
@@ -21809,14 +23875,8 @@ Analysis Rate: x real time performance
             
 
             
-                <td class="default">
-                
-                    STATE.offset
-                
-                </td>
-            
 
-            <td class="description last">The starting offset for pagination.</td>
+            <td class="description last">Optional canonical species name; when provided, only that species' count is considered. If omitted, the total count across all summary items is used.</td>
         </tr>
 
     
@@ -21857,7 +23917,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line3467">line 3467</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line3563">line 3563</a>
     </li></ul></dd>
     
 
@@ -22040,7 +24100,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line7824">line 7824</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line7991">line 7991</a>
     </li></ul></dd>
     
 
@@ -22128,7 +24188,95 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="database.js.html">database.js</a>, <a href="database.js.html#line256">line 256</a>
+        <a href="js_database.js.html">js/database.js</a>, <a href="js_database.js.html#line176">line 176</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="upgrade_to_v4"><span class="type-signature">(async) </span>upgrade_to_v4<span class="signature">()</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Migrates the database schema to version 4 by dropping datetime from the `records` table.
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="js_database.js.html">js/database.js</a>, <a href="js_database.js.html#line209">line 209</a>
     </li></ul></dd>
     
 
@@ -22216,7 +24364,7 @@ Analysis Rate: x real time performance
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="ui.js.html">ui.js</a>, <a href="ui.js.html#line304">line 304</a>
+        <a href="js_ui.js.html">js/ui.js</a>, <a href="js_ui.js.html#line301">line 301</a>
     </li></ul></dd>
     
 
@@ -22284,13 +24432,13 @@ Analysis Rate: x real time performance
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#LIST_CACHE">LIST_CACHE</a></li><li><a href="global.html#WSPlayPause">WSPlayPause</a></li><li><a href="global.html#_updateSpeciesLocale">_updateSpeciesLocale</a></li><li><a href="global.html#activateResultSort">activateResultSort</a></li><li><a href="global.html#addDays">addDays</a></li><li><a href="global.html#addToHistory">addToHistory</a></li><li><a href="global.html#analyseReset">analyseReset</a></li><li><a href="global.html#batchExportAudio">batchExportAudio</a></li><li><a href="global.html#batchInsertRecords">batchInsertRecords</a></li><li><a href="global.html#changeInputElement">changeInputElement</a></li><li><a href="global.html#changeSettingsMode">changeSettingsMode</a></li><li><a href="global.html#checkFilteredFrequency">checkFilteredFrequency</a></li><li><a href="global.html#checkNewModel">checkNewModel</a></li><li><a href="global.html#checkpoint">checkpoint</a></li><li><a href="global.html#clearActive">clearActive</a></li><li><a href="global.html#closeDatabase">closeDatabase</a></li><li><a href="global.html#convertAndOrganiseFiles">convertAndOrganiseFiles</a></li><li><a href="global.html#convertFile">convertFile</a></li><li><a href="global.html#createContextMenu">createContextMenu</a></li><li><a href="global.html#customAnalysisAllMenu">customAnalysisAllMenu</a></li><li><a href="global.html#customiseAnalysisMenu">customiseAnalysisMenu</a></li><li><a href="global.html#deepMergeLists">deepMergeLists</a></li><li><a href="global.html#doPrediction">doPrediction</a></li><li><a href="global.html#exportAudacity">exportAudacity</a></li><li><a href="global.html#exportData">exportData</a></li><li><a href="global.html#fetchAudioBuffer">fetchAudioBuffer</a></li><li><a href="global.html#filterResults">filterResults</a></li><li><a href="global.html#filterValidFiles">filterValidFiles</a></li><li><a href="global.html#formatAsBootstrapTable">formatAsBootstrapTable</a></li><li><a href="global.html#generateBirdIDList">generateBirdIDList</a></li><li><a href="global.html#generateToast">generateToast</a></li><li><a href="global.html#getDetectedSpecies">getDetectedSpecies</a></li><li><a href="global.html#getExcluded">getExcluded</a></li><li><a href="global.html#getFileSQLAndParams">getFileSQLAndParams</a></li><li><a href="global.html#getFiles">getFiles</a></li><li><a href="global.html#getFilteredBirds">getFilteredBirds</a></li><li><a href="global.html#getIncludedIDs">getIncludedIDs</a></li><li><a href="global.html#getMatchingIds">getMatchingIds</a></li><li><a href="global.html#getResults">getResults</a></li><li><a href="global.html#getRowFromStart">getRowFromStart</a></li><li><a href="global.html#getSpecies">getSpecies</a></li><li><a href="global.html#getSpeciesSQLAsync">getSpeciesSQLAsync</a></li><li><a href="global.html#getValidSpecies">getValidSpecies</a></li><li><a href="global.html#getWorkingFile">getWorkingFile</a></li><li><a href="global.html#getXCComparisons">getXCComparisons</a></li><li><a href="global.html#handleKeyDown">handleKeyDown</a></li><li><a href="global.html#handleKeyDownDeBounce">handleKeyDownDeBounce</a></li><li><a href="global.html#handleMessage">handleMessage</a></li><li><a href="global.html#handleUIClicks">handleUIClicks</a></li><li><a href="global.html#importData">importData</a></li><li><a href="global.html#insertTranslations">insertTranslations</a></li><li><a href="global.html#loadAudioFile">loadAudioFile</a></li><li><a href="global.html#loadAudioFileSync">loadAudioFileSync</a></li><li><a href="global.html#loadDB">loadDB</a></li><li><a href="global.html#localiseModal">localiseModal</a></li><li><a href="global.html#locateFile">locateFile</a></li><li><a href="global.html#membershipCheck">membershipCheck</a></li><li><a href="global.html#metadataLocks">metadataLocks</a></li><li><a href="global.html#notifyMissingFile">notifyMissingFile</a></li><li><a href="global.html#onAbort">onAbort</a></li><li><a href="global.html#onAnalyse">onAnalyse</a></li><li><a href="global.html#onAnalysisComplete">onAnalysisComplete</a></li><li><a href="global.html#onChangeMode">onChangeMode</a></li><li><a href="global.html#onChartData">onChartData</a></li><li><a href="global.html#onDelete">onDelete</a></li><li><a href="global.html#onDeleteSpecies">onDeleteSpecies</a></li><li><a href="global.html#onLaunch">onLaunch</a></li><li><a href="global.html#onModelReady">onModelReady</a></li><li><a href="global.html#onOpenFiles">onOpenFiles</a></li><li><a href="global.html#onResultsComplete">onResultsComplete</a></li><li><a href="global.html#onSave2DiskDB">onSave2DiskDB</a></li><li><a href="global.html#onSaveAudio">onSaveAudio</a></li><li><a href="global.html#onSetCustomLocation">onSetCustomLocation</a></li><li><a href="global.html#onSummaryComplete">onSummaryComplete</a></li><li><a href="global.html#onUpdateLocale">onUpdateLocale</a></li><li><a href="global.html#onWorkerLoadedAudio">onWorkerLoadedAudio</a></li><li><a href="global.html#parseCnames">parseCnames</a></li><li><a href="global.html#playRegion">playRegion</a></li><li><a href="global.html#positionMenu">positionMenu</a></li><li><a href="global.html#postAnalyseMessage">postAnalyseMessage</a></li><li><a href="global.html#processAudio">processAudio</a></li><li><a href="global.html#processNextFile">processNextFile</a></li><li><a href="global.html#readLabels">readLabels</a></li><li><a href="global.html#recordUpdate">recordUpdate</a></li><li><a href="global.html#refreshResultsView">refreshResultsView</a></li><li><a href="global.html#refreshSummary">refreshSummary</a></li><li><a href="global.html#renderFilenamePanel">renderFilenamePanel</a></li><li><a href="global.html#renderResult">renderResult</a></li><li><a href="global.html#resetDiagnostics">resetDiagnostics</a></li><li><a href="global.html#resetResults">resetResults</a></li><li><a href="global.html#resultClick">resultClick</a></li><li><a href="global.html#savedFileCheck">savedFileCheck</a></li><li><a href="global.html#sendDetections">sendDetections</a></li><li><a href="global.html#setActiveRegion">setActiveRegion</a></li><li><a href="global.html#setActiveRow">setActiveRow</a></li><li><a href="global.html#setAudioFilters">setAudioFilters</a></li><li><a href="global.html#setClickedIndex">setClickedIndex</a></li><li><a href="global.html#setIncludedIDs">setIncludedIDs</a></li><li><a href="global.html#setKeyAssignment">setKeyAssignment</a></li><li><a href="global.html#setKeyAssignmentUI">setKeyAssignmentUI</a></li><li><a href="global.html#setLabelState">setLabelState</a></li><li><a href="global.html#setListUIState">setListUIState</a></li><li><a href="global.html#setStartEnd">setStartEnd</a></li><li><a href="global.html#showAnalyse">showAnalyse</a></li><li><a href="global.html#showCharts">showCharts</a></li><li><a href="global.html#showDatePicker">showDatePicker</a></li><li><a href="global.html#showExplore">showExplore</a></li><li><a href="global.html#showRecordEntryForm">showRecordEntryForm</a></li><li><a href="global.html#showSummarySortIcon">showSummarySortIcon</a></li><li><a href="global.html#showThreshold">showThreshold</a></li><li><a href="global.html#showTopRankin">showTopRankin</a></li><li><a href="global.html#showWindowDetections">showWindowDetections</a></li><li><a href="global.html#spawnListWorker">spawnListWorker</a></li><li><a href="global.html#spawnPredictWorkers">spawnPredictWorkers</a></li><li><a href="global.html#speciesFilter">speciesFilter</a></li><li><a href="global.html#t0_warmup">t0_warmup</a></li><li><a href="global.html#training">training</a></li><li><a href="global.html#unpackNameAttr">unpackNameAttr</a></li><li><a href="global.html#updateFilesBeingProcessed">updateFilesBeingProcessed</a></li><li><a href="global.html#updateList">updateList</a></li><li><a href="global.html#updateMetadata">updateMetadata</a></li><li><a href="global.html#updatePagination">updatePagination</a></li><li><a href="global.html#updateSuggestions">updateSuggestions</a></li><li><a href="global.html#upgrade_to_v2">upgrade_to_v2</a></li><li><a href="global.html#waitForWavesurferReady">waitForWavesurferReady</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#LIST_CACHE">LIST_CACHE</a></li><li><a href="global.html#WSPlayPause">WSPlayPause</a></li><li><a href="global.html#_updateSpeciesLocale">_updateSpeciesLocale</a></li><li><a href="global.html#activateResultSort">activateResultSort</a></li><li><a href="global.html#addDays">addDays</a></li><li><a href="global.html#addQueryQualifiers">addQueryQualifiers</a></li><li><a href="global.html#addToHistory">addToHistory</a></li><li><a href="global.html#allowedByList">allowedByList</a></li><li><a href="global.html#analyseReset">analyseReset</a></li><li><a href="global.html#batchExportAudio">batchExportAudio</a></li><li><a href="global.html#batchInsertRecords">batchInsertRecords</a></li><li><a href="global.html#calculateTimeBoundaries">calculateTimeBoundaries</a></li><li><a href="global.html#changeInputElement">changeInputElement</a></li><li><a href="global.html#changeSettingsMode">changeSettingsMode</a></li><li><a href="global.html#chartInstance">chartInstance</a></li><li><a href="global.html#checkFilteredFrequency">checkFilteredFrequency</a></li><li><a href="global.html#checkForIntelMacUpdates">checkForIntelMacUpdates</a></li><li><a href="global.html#checkNewModel">checkNewModel</a></li><li><a href="global.html#checkpoint">checkpoint</a></li><li><a href="global.html#clearActive">clearActive</a></li><li><a href="global.html#closeDatabase">closeDatabase</a></li><li><a href="global.html#convertAndOrganiseFiles">convertAndOrganiseFiles</a></li><li><a href="global.html#convertFile">convertFile</a></li><li><a href="global.html#createContextMenu">createContextMenu</a></li><li><a href="global.html#customAnalysisAllMenu">customAnalysisAllMenu</a></li><li><a href="global.html#customiseAnalysisMenu">customiseAnalysisMenu</a></li><li><a href="global.html#dayMonthToDayOfYear">dayMonthToDayOfYear</a></li><li><a href="global.html#dayOfYear">dayOfYear</a></li><li><a href="global.html#deepMergeLists">deepMergeLists</a></li><li><a href="global.html#doPrediction">doPrediction</a></li><li><a href="global.html#epochInDayMonthRange">epochInDayMonthRange</a></li><li><a href="global.html#estimateTimeRemaining">estimateTimeRemaining</a></li><li><a href="global.html#exportAudacity">exportAudacity</a></li><li><a href="global.html#exportData">exportData</a></li><li><a href="global.html#exportSpeciesList">exportSpeciesList</a></li><li><a href="global.html#fetchAudioBuffer">fetchAudioBuffer</a></li><li><a href="global.html#filterResults">filterResults</a></li><li><a href="global.html#filterValidFiles">filterValidFiles</a></li><li><a href="global.html#formatAsBootstrapTable">formatAsBootstrapTable</a></li><li><a href="global.html#generateBirdIDList">generateBirdIDList</a></li><li><a href="global.html#generateToast">generateToast</a></li><li><a href="global.html#getDetectedSpecies">getDetectedSpecies</a></li><li><a href="global.html#getExcluded">getExcluded</a></li><li><a href="global.html#getFileSQLAndParams">getFileSQLAndParams</a></li><li><a href="global.html#getFiles">getFiles</a></li><li><a href="global.html#getFilteredBirds">getFilteredBirds</a></li><li><a href="global.html#getIncludedIDs">getIncludedIDs</a></li><li><a href="global.html#getInstallInfo">getInstallInfo</a></li><li><a href="global.html#getMatchingIds">getMatchingIds</a></li><li><a href="global.html#getNearbyLocations">getNearbyLocations</a></li><li><a href="global.html#getResults">getResults</a></li><li><a href="global.html#getRowFromStart">getRowFromStart</a></li><li><a href="global.html#getSpecies">getSpecies</a></li><li><a href="global.html#getSpeciesSQLAsync">getSpeciesSQLAsync</a></li><li><a href="global.html#getValidSpecies">getValidSpecies</a></li><li><a href="global.html#getWorkingFile">getWorkingFile</a></li><li><a href="global.html#getXCComparisons">getXCComparisons</a></li><li><a href="global.html#handleKeyDown">handleKeyDown</a></li><li><a href="global.html#handleKeyDownDeBounce">handleKeyDownDeBounce</a></li><li><a href="global.html#handleMessage">handleMessage</a></li><li><a href="global.html#handleUIClicks">handleUIClicks</a></li><li><a href="global.html#importData">importData</a></li><li><a href="global.html#loadAudioFile">loadAudioFile</a></li><li><a href="global.html#loadAudioFileSync">loadAudioFileSync</a></li><li><a href="global.html#loadDB">loadDB</a></li><li><a href="global.html#localiseModal">localiseModal</a></li><li><a href="global.html#locateFile">locateFile</a></li><li><a href="global.html#membershipCheck">membershipCheck</a></li><li><a href="global.html#metadataLocks">metadataLocks</a></li><li><a href="global.html#notifyMissingFile">notifyMissingFile</a></li><li><a href="global.html#onAbort">onAbort</a></li><li><a href="global.html#onAnalyse">onAnalyse</a></li><li><a href="global.html#onAnalysisComplete">onAnalysisComplete</a></li><li><a href="global.html#onChangeMode">onChangeMode</a></li><li><a href="global.html#onDelete">onDelete</a></li><li><a href="global.html#onDeleteSpecies">onDeleteSpecies</a></li><li><a href="global.html#onLaunch">onLaunch</a></li><li><a href="global.html#onModelReady">onModelReady</a></li><li><a href="global.html#onOpenFiles">onOpenFiles</a></li><li><a href="global.html#onResultsComplete">onResultsComplete</a></li><li><a href="global.html#onSave2DiskDB">onSave2DiskDB</a></li><li><a href="global.html#onSaveAudio">onSaveAudio</a></li><li><a href="global.html#onSetLocation">onSetLocation</a></li><li><a href="global.html#onSummaryComplete">onSummaryComplete</a></li><li><a href="global.html#onUpdateLocale">onUpdateLocale</a></li><li><a href="global.html#onWorkerLoadedAudio">onWorkerLoadedAudio</a></li><li><a href="global.html#parseBextLocalDate">parseBextLocalDate</a></li><li><a href="global.html#parseCnames">parseCnames</a></li><li><a href="global.html#parseMessage">parseMessage</a></li><li><a href="global.html#playRegion">playRegion</a></li><li><a href="global.html#positionMenu">positionMenu</a></li><li><a href="global.html#postAnalyseMessage">postAnalyseMessage</a></li><li><a href="global.html#processAudio">processAudio</a></li><li><a href="global.html#processFilesInBatches">processFilesInBatches</a></li><li><a href="global.html#processNextFile">processNextFile</a></li><li><a href="global.html#readLabels">readLabels</a></li><li><a href="global.html#recordUpdate">recordUpdate</a></li><li><a href="global.html#refreshResultsView">refreshResultsView</a></li><li><a href="global.html#refreshSummary">refreshSummary</a></li><li><a href="global.html#renderFilenamePanel">renderFilenamePanel</a></li><li><a href="global.html#renderResult">renderResult</a></li><li><a href="global.html#resetDiagnostics">resetDiagnostics</a></li><li><a href="global.html#resetResults">resetResults</a></li><li><a href="global.html#resultClick">resultClick</a></li><li><a href="global.html#savedFileCheckAsync">savedFileCheckAsync</a></li><li><a href="global.html#sendDetections">sendDetections</a></li><li><a href="global.html#setActiveRegion">setActiveRegion</a></li><li><a href="global.html#setActiveRow">setActiveRow</a></li><li><a href="global.html#setAudioFilters">setAudioFilters</a></li><li><a href="global.html#setClickedIndex">setClickedIndex</a></li><li><a href="global.html#setIncludedIDs">setIncludedIDs</a></li><li><a href="global.html#setKeyAssignment">setKeyAssignment</a></li><li><a href="global.html#setKeyAssignmentUI">setKeyAssignmentUI</a></li><li><a href="global.html#setLabelState">setLabelState</a></li><li><a href="global.html#setListUIState">setListUIState</a></li><li><a href="global.html#setNocmig">setNocmig</a></li><li><a href="global.html#setStartEnd">setStartEnd</a></li><li><a href="global.html#showAnalyse">showAnalyse</a></li><li><a href="global.html#showCharts">showCharts</a></li><li><a href="global.html#showDatePicker">showDatePicker</a></li><li><a href="global.html#showExplore">showExplore</a></li><li><a href="global.html#showRecordEntryForm">showRecordEntryForm</a></li><li><a href="global.html#showSummarySortIcon">showSummarySortIcon</a></li><li><a href="global.html#showThreshold">showThreshold</a></li><li><a href="global.html#showTopRankin">showTopRankin</a></li><li><a href="global.html#showWindowDetections">showWindowDetections</a></li><li><a href="global.html#spawnListWorker">spawnListWorker</a></li><li><a href="global.html#spawnPredictWorkers">spawnPredictWorkers</a></li><li><a href="global.html#speciesFilter">speciesFilter</a></li><li><a href="global.html#t0_warmup">t0_warmup</a></li><li><a href="global.html#training">training</a></li><li><a href="global.html#unpackNameAttr">unpackNameAttr</a></li><li><a href="global.html#updateFilesBeingProcessed">updateFilesBeingProcessed</a></li><li><a href="global.html#updateList">updateList</a></li><li><a href="global.html#updateMetadata">updateMetadata</a></li><li><a href="global.html#updatePagination">updatePagination</a></li><li><a href="global.html#updateSuggestions">updateSuggestions</a></li><li><a href="global.html#upgrade_to_v2">upgrade_to_v2</a></li><li><a href="global.html#upgrade_to_v4">upgrade_to_v4</a></li><li><a href="global.html#waitForWavesurferReady">waitForWavesurferReady</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Mon Nov 24 2025 17:05:02 GMT+0000 (Greenwich Mean Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Thu Jan 29 2026 18:44:25 GMT+0000 (Greenwich Mean Time)
 </footer>
 
 <script> prettyPrint(); </script>

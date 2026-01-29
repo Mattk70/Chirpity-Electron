@@ -226,10 +226,10 @@ async function countLines(filePath) {
     // Final insert
     await db.runAsync(
       `INSERT OR IGNORE INTO records (
-        dateTime, position, fileID, speciesID, 
+        position, fileID, speciesID, 
         modelID, confidence, comment, end, callCount, tagID
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      dateTime, position, fileID, speciesID, modelID, confidence, comment, end, callCount || undefined, tagID
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      position, fileID, speciesID, modelID, confidence, comment, end, callCount ?? undefined, tagID
     );
   
     return METADATA;
