@@ -3990,7 +3990,7 @@ async function processNextFile({
       }
       for (let i = 0; i < boundaries.length; i++) {
         const { start, end } = boundaries[i];
-        if (start === end) {
+        if (start === null) {
           // Nothing to do for this file
           updateFilesBeingProcessed(file);
           generateAlert({ message: "noNight", variables: { file } });
@@ -4063,12 +4063,6 @@ function calculateTimeBoundaries(
   period
 ) {
   const intervals = getIntervals(fileStartMs, fileEndMs, latitude, longitude, period);
-  // Handle files entirely outside the requested period
-  if (
-    !intervals.length &&
-    isDuringDaylight(fileStartMs, latitude, longitude) ===
-      (period === 'day')
-  ) intervals.push({ start: 0, end: 0 });
 
   const fileDurationSeconds = (fileEndMs - fileStartMs) / 1000;
   // Sum kept (active) time
@@ -4080,7 +4074,7 @@ function calculateTimeBoundaries(
   STATE.clippedFilesDuration += clippedSeconds;
   const batches = Math.ceil((keptSeconds - EPSILON) / (BATCH_SIZE * WINDOW_SIZE));
   batchesToSend[file] = batches;
-  return intervals.length ? intervals : [{ start: 0, end: 0 }];
+  return intervals;
 }
 
 function getIntervals(fileStartMs, fileEndMs, latitude, longitude, period) {
@@ -4121,7 +4115,7 @@ function getIntervals(fileStartMs, fileEndMs, latitude, longitude, period) {
       });
     }
   }
-  return intervals;
+  return intervals.length ? intervals : [{ start: null, end: null }];
 }
 
 /**
@@ -4887,7 +4881,6 @@ const onUpdateFileStart = async (args) => {
     } else row = null;
     const { lat, lon } = row || { lat: STATE.lat, lon: STATE.lon };
     const intervals = getIntervals(fileStart, fileEnd, parseFloat(lat), parseFloat(lon), 'day');
-    if (!intervals.length) { intervals.push({start:0, end:0}); } // no daylight
     // Build SQL fragments
     const conditions = intervals
       .map(() => `(position BETWEEN ? AND ?)`)
@@ -5028,7 +5021,7 @@ async function onDeleteConfidence({start, end, species, confidence, modelID}) {
                 WHERE r.confidence <= ?`;
   const params = [confidence];
   if (start && end) {
-    SQL += " AND position * 1000 + files.filestart BETWEEN ? AND ?";
+    SQL += " AND position * 1000 + f.filestart BETWEEN ? AND ?";
     params.push(start, end);
   }
   if (species) {
@@ -5714,7 +5707,7 @@ async function convertFile(
         });
       } else {
         const { start, end } = boundaries[0];
-        if (start === end) {
+        if (start === null) {
           generateAlert({
             type: "warning",
             message: "allDaylight",
