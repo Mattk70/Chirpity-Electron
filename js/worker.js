@@ -3186,7 +3186,7 @@ const bufferToAudio = async ({
       audioQuality: quality,
       audioCodec,
       format: soundFormat,
-      channels: downmix ? 1 : audio_details?.channels ?? -1,
+      channels: downmix ? 1 : -1,
       metadata,
       additionalFilters: filters
     }).then(command => {
