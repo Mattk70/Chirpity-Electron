@@ -164,87 +164,7 @@ function closeDatabase(db) {
   });
 }
 
-async function upgrade_to_v1(diskDB, dbMutex) {
-  let t0 = Date.now();
-  try {
-    await dbMutex.lock();
-    await diskDB.runAsync("PRAGMA foreign_keys=OFF");
-    await diskDB.runAsync("BEGIN");
-    //1.10.x update
-    await diskDB.runAsync(
-      "CREATE INDEX IF NOT EXISTS idx_species_sname ON species(sname)"
-    );
-    await diskDB.runAsync(
-      "CREATE INDEX IF NOT EXISTS idx_species_cname ON species(cname)"
-    );
-    const fileColumns = (await diskDB.allAsync("PRAGMA table_info(files)")).map(
-      (row) => row.name
-    );
-    if (!fileColumns.includes("archiveName")) {
-      await diskDB.runAsync("ALTER TABLE files ADD COLUMN archiveName TEXT");
-    }
-    if (!fileColumns.includes("metadata")) {
-      await diskDB.runAsync("ALTER TABLE files ADD COLUMN metadata TEXT");
-    }
 
-    await diskDB.runAsync(
-      "CREATE TABLE IF NOT EXISTS tags(id INTEGER PRIMARY KEY, name TEXT NOT NULL, UNIQUE(name))"
-    );
-    await diskDB.runAsync(
-      "INSERT OR IGNORE INTO tags VALUES(0, 'Nocmig'), (1, 'Local')"
-    );
-    await diskDB.runAsync("ALTER TABLE records ADD COLUMN tagID INTEGER");
-    await diskDB.runAsync(
-      "UPDATE records SET tagID = 0 WHERE label = 'Nocmig'"
-    );
-    await diskDB.runAsync("UPDATE records SET tagID = 1 WHERE label = 'Local'");
-    await diskDB.runAsync("ALTER TABLE records DROP COLUMN label");
-    // Change label names to labelIDs
-    await diskDB.runAsync("ALTER TABLE records ADD COLUMN reviewed INTEGER");
-
-    await diskDB.runAsync(`CREATE TABLE records_temp( dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, 
-      comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER, reviewed INTEGER, tagID INTEGER,
-      UNIQUE (dateTime, fileID, speciesID), 
-      CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,
-      CONSTRAINT fk_species FOREIGN KEY (speciesID) REFERENCES species(id),
-      CONSTRAINT fk_tags FOREIGN KEY (tagID) REFERENCES tags(id) ON DELETE SET NULL)`);
-    await diskDB.runAsync("INSERT INTO records_temp SELECT * from records");
-    await diskDB.runAsync("DROP TABLE records");
-    await diskDB.runAsync("ALTER TABLE records_temp RENAME TO records");
-    // Add old files table update
-    await diskDB.runAsync(`
-      CREATE TABLE files_new (
-          id INTEGER PRIMARY KEY, 
-          name TEXT NOT NULL, 
-          duration REAL,
-          filestart INTEGER, 
-          locationID INTEGER, 
-          archiveName TEXT, 
-          metadata TEXT, 
-          UNIQUE (name),
-          CONSTRAINT fk_locations FOREIGN KEY (locationID) REFERENCES locations(id) ON DELETE SET NULL
-      )`);
-    await diskDB.runAsync("INSERT INTO files_new SELECT * FROM files");
-    await diskDB.runAsync("DROP TABLE files");
-    await diskDB.runAsync("ALTER TABLE files_new RENAME TO files");
-    await diskDB.runAsync("UPDATE schema_version SET version = 1");
-    await diskDB.runAsync("END");
-    await diskDB.runAsync("PRAGMA foreign_keys=ON");
-    await diskDB.runAsync("PRAGMA integrity_check");
-    await diskDB.runAsync("PRAGMA foreign_key_check");
-    console.info(
-      "Migrated tags and added 'reviewed' column to ",
-      diskDB.filename
-    );
-  } catch (e) {
-    console.error("Error adding column and updating version", e.message, e);
-    await diskDB.runAsync("ROLLBACK");
-  } finally {
-    await checkpoint(diskDB);
-    dbMutex.unlock();
-    console.info(`DB migration took ${Date.now() - t0}ms`);
-  }
-}
 
 /**
  * Migrates the database schema to version 2 by adding a unique constraint on the `species` table.
@@ -583,9 +503,7 @@ const mergeDbIfNeeded = async ({diskDB, model, appPath, dbMutex, labelsLocation}
     } else {
       user_version = row.version;
     }
-    if (user_version < 1) {
-      await upgrade_to_v1(legacyDB, dbMutex);
-    }
+
     if (user_version < 2) {
       await upgrade_to_v2(legacyDB, dbMutex);
     }
