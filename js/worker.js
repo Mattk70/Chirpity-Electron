@@ -3166,16 +3166,6 @@ const bufferToAudio = async ({
         { filter: "afade", options: `t=out:st=${end - start - 1}:d=1` }
       );
     }
-    let metadata;
-    if (Object.entries(meta).length) {
-      metadata = Object.entries(meta).flatMap(([k, v]) => {
-        if (typeof v === "string") {
-          // Escape special characters, including quotes and apostrophes
-          v = v.replaceAll(" ", "_");
-        }
-        return ["-metadata", `${k}=${v}`];
-      });
-    }
     let errorHandled = false;
     setupFfmpegCommand({
       file,
@@ -3187,7 +3177,7 @@ const bufferToAudio = async ({
       audioCodec,
       format: soundFormat,
       channels: downmix ? 1 : -1,
-      metadata,
+      metadata: meta,
       additionalFilters: filters
     }).then(command => {
     const destination = p.join(folder || tempPath, filename);
@@ -3224,17 +3214,21 @@ const bufferToAudio = async ({
         const channelCount = channels === 'mono' || STATE.audio.downmix ? 1 : 2;
         errorHandled = true;
         command.kill('SIGKILL');
-        await bufferToAudio({
-          file,
-          start,
-          end,
-          meta,
-          format,
-          folder,
-          filename,
-          audio_details: { sample_rates, channels: channelCount }
-        })
-        resolve(destination);
+        try{
+          await bufferToAudio({
+            file,
+            start,
+            end,
+            meta,
+            format,
+            folder,
+            filename,
+            audio_details: { sample_rates, channels: channelCount }
+          })
+          resolve(destination);
+        } catch (e) {
+          reject(e)
+        }
       });
     }
 
