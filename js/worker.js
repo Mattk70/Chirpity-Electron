@@ -2672,7 +2672,7 @@ const stream = command.pipe();
  * 
  * @returns {Array<Object>} An array of filter configuration objects for use with ffmpeg or similar audio processing tools.
  */
-function setAudioFilters({sample_rate, channels} = {}) {
+function setAudioFilters(audio_details) {
   const {
     active,
     lowShelfAttenuation: attenuation,
@@ -2690,7 +2690,10 @@ function setAudioFilters({sample_rate, channels} = {}) {
   const batModel = STATE.model.includes('bats');
   if (!batModel && (highPass || (lowPass < 15_000 && lowPass > 0))) {
     const options = {};
-    if (sample_rate) options.r = sample_rate;
+    if (audio_details) {
+      const { sample_rates, channels } = audio_details;
+      options.r = sample_rates;
+    }
     if (highPass) options.hp = highPass;
     if (lowPass < 15_000) options.lp = lowPass;
     // Use sinc + afir
@@ -3178,12 +3181,12 @@ const bufferToAudio = async ({
       file,
       start,
       end,
-      sampleRate: undefined,
+      sampleRate: audio_details?.sample_rates,
       audioBitrate: bitrate,
       audioQuality: quality,
       audioCodec,
       format: soundFormat,
-      channels: downmix ? 1 : -1,
+      channels: downmix ? 1 : audio_details?.channels ?? -1,
       metadata,
       additionalFilters: filters
     }).then(command => {
@@ -3192,10 +3195,33 @@ const bufferToAudio = async ({
     command.on("start", function (commandLine) {
       DEBUG && console.log("FFmpeg command: " + commandLine);
     });
-    if (!audio_details && STATE.filters.active && STATE.filters.highPassFrequency || (STATE.filters.lowPassFrequency < 15000 && STATE.filters.lowPassFrequency > 0)) {
+    const need2ndPass = (!audio_details?.sample_rates && STATE.filters.active && (STATE.filters.highPassFrequency || (STATE.filters.lowPassFrequency < 15000 && STATE.filters.lowPassFrequency > 0)));
+    if (need2ndPass) {
       command.on("codecData", async function (data) {
-        const sample_rate = parseInt(data.audio_details[1]);
-        const channels = data.audio_details[2].toLowerCase().includes('stereo') ? 2 : 1;
+        const channels = data.audio_details[2].toLowerCase();
+        if (format === "mp3" && ! STATE.audio.downmix) {
+          if (!['mono', 'stereo', '1.0', '2.0', 'dual mono'].includes(channels) ){
+            const i18n = {
+              en: "Cannot export multichannel audio to MP3. Either enable downmixing, or choose a different export format.",
+              da: "Kan ikke eksportere multikanalslyd til MP3. Aktiver enten nedmiksning, eller vælg et andet eksportformat.",
+              de: "Mehrkanal-Audio kann nicht als MP3 exportiert werden. Aktivieren Sie entweder das Downmixing oder wählen Sie ein anderes Exportformat.",
+              es: "No se puede exportar audio multicanal a MP3. Active la mezcla descendente o elija un formato de exportación diferente.",
+              fr: "Impossible d’exporter un audio multicanal en MP3. Activez le mixage vers le bas ou choisissez un autre format d’exportation.",
+              ja: "マルチチャンネル音声をMP3に書き出すことはできません。ダウンミックスを有効にするか、別の書き出し形式を選択してください。",
+              nl: "Kan geen meerkanaalsaudio exporteren naar MP3. Schakel downmixen in of kies een ander exportformaat.",
+              pt: "Não é possível exportar áudio multicanal para MP3. Ative a mixagem para baixo ou escolha um formato de exportação diferente.",
+              ru: "Невозможно экспортировать многоканальное аудио в MP3. Включите даунмиксинг или выберите другой формат экспорта.",
+              sv: "Kan inte exportera flerkanalsljud till MP3. Aktivera antingen nedmixning eller välj ett annat exportformat.",
+              zh: "无法将多声道音频导出为 MP3。请启用混缩，或选择其他导出格式。"
+            };
+            const error = i18n[STATE.locale] || i18n["en"];
+            generateAlert({ type: "error", message: "ffmpeg", variables: {error}});
+            errorHandled = true;
+            return reject(console.warn("Export polyWAV to mp3 attempted."))
+          }
+        }
+        const sample_rates = parseInt(data.audio_details[1]);
+        const channelCount = channels === 'mono' || STATE.audio.downmix ? 1 : 2;
         errorHandled = true;
         command.kill('SIGKILL');
         await bufferToAudio({
@@ -3206,35 +3232,12 @@ const bufferToAudio = async ({
           format,
           folder,
           filename,
-          audio_details: { sample_rate, channels }
+          audio_details: { sample_rates, channels: channelCount }
         })
         resolve(destination);
       });
     }
-    if (format === "mp3" && ! STATE.audio.downmix) {
-      command.on("codecData", function (data) {
-        const channels = data.audio_details[2].toLowerCase();
-        if (!['mono', 'stereo', '1.0', '2.0', 'dual mono'].includes(channels) ){
-          const i18n = {
-            en: "Cannot export multichannel audio to MP3. Either enable downmixing, or choose a different export format.",
-            da: "Kan ikke eksportere multikanalslyd til MP3. Aktiver enten nedmiksning, eller vælg et andet eksportformat.",
-            de: "Mehrkanal-Audio kann nicht als MP3 exportiert werden. Aktivieren Sie entweder das Downmixing oder wählen Sie ein anderes Exportformat.",
-            es: "No se puede exportar audio multicanal a MP3. Active la mezcla descendente o elija un formato de exportación diferente.",
-            fr: "Impossible d’exporter un audio multicanal en MP3. Activez le mixage vers le bas ou choisissez un autre format d’exportation.",
-            ja: "マルチチャンネル音声をMP3に書き出すことはできません。ダウンミックスを有効にするか、別の書き出し形式を選択してください。",
-            nl: "Kan geen meerkanaalsaudio exporteren naar MP3. Schakel downmixen in of kies een ander exportformaat.",
-            pt: "Não é possível exportar áudio multicanal para MP3. Ative a mixagem para baixo ou escolha um formato de exportação diferente.",
-            ru: "Невозможно экспортировать многоканальное аудио в MP3. Включите даунмиксинг или выберите другой формат экспорта.",
-            sv: "Kan inte exportera flerkanalsljud till MP3. Aktivera antingen nedmixning eller välj ett annat exportformat.",
-            zh: "无法将多声道音频导出为 MP3。请启用混缩，或选择其他导出格式。"
-          };
-          const error = i18n[STATE.locale] || i18n["en"];
-          generateAlert({ type: "error", message: "ffmpeg", variables: {error}});
-          errorHandled = true;
-          return reject(console.warn("Export polyWAV to mp3 attempted."))
-        }
-      });
-    } 
+
     command.on("error", (err) => {
       if (errorHandled) return; // Prevent multiple error handling
       generateAlert({ type: "error", message: "ffmpeg", variables: { error: err.message } });
