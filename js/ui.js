@@ -957,6 +957,13 @@ const showLocation = async (fromSelect) => {
   updateMap(latEl.value, lonEl.value);
 };
 
+/**
+ * Helper function to sanitise tained input from API call
+ * 
+ * @param {*} el container for tainted input
+ * @param {*} tainted tainted content
+ */
+
 const renderLocation = (el, tainted) =>{
     // Clear existing content
   el.replaceChildren();
