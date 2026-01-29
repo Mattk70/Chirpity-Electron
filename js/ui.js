@@ -2369,6 +2369,7 @@ const setUpWorkerMessaging = () => {
         case "model-ready": {
           if (args.message === "Model failed to load") {
               DOM.loadingScreen.classList.add("d-none");
+              APPLICATION_LOADED = true;
           } else {
             onModelReady();
           }
