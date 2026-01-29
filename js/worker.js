@@ -2931,7 +2931,7 @@ const saveResults2DataSet = ({ species, included }) => {
 
   let params = filtersApplied(included) ? included : [];
   if (species) {
-    db2ResultSQL += ` AND species.cname = ?`;
+    db2ResultSQL += ` AND s.cname = ?`;
     params.push(species);
   }
   STATE.db.each(
