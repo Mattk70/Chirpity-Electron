@@ -957,6 +957,18 @@ const showLocation = async (fromSelect) => {
   updateMap(latEl.value, lonEl.value);
 };
 
+const renderLocation = (el, tainted) =>{
+    // Clear existing content
+  el.replaceChildren();
+  // Icon
+  const icon = document.createElement("span");
+  icon.className = "material-symbols-outlined";
+  icon.textContent = "fmd_good";
+  // Text (tainted input)
+  const text = document.createTextNode(" " + tainted);
+  el.append(icon, text);
+}
+
 const displayLocationAddress = async (where) => {
   const custom = where.includes("custom");
   let latEl, lonEl, placeEl, address;
@@ -973,9 +985,7 @@ const displayLocationAddress = async (where) => {
     placeEl = DOM.place;
     address = await fetchLocationAddress(latEl.value, lonEl.value, false);
     if (address === false) return;
-    const content =
-      '<span class="material-symbols-outlined">fmd_good</span> ' + address;
-    placeEl.innerHTML = content;
+    renderLocation(placeEl, address)
     const button = document.getElementById("apply-location");
     button.classList.replace("btn-primary", "btn-danger");
     button.textContent = "Apply";
@@ -988,9 +998,7 @@ const cancelDefaultLocation = () => {
   const placeEl = DOM.place;
   latEl.value = config.latitude;
   lonEl.value = config.longitude;
-  placeEl.innerHTML =
-    '<span class="material-symbols-outlined">fmd_good</span> ' +
-    config.location;
+  renderLocation(placeEl, config.location)
   updateMap(latEl.value, lonEl.value);
   const button = document.getElementById("apply-location");
   button.classList.replace("btn-danger","btn-primary");
