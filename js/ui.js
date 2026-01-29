@@ -1022,7 +1022,7 @@ const setDefaultLocation = () => {
   config.location = isPlaceholder
      ? `${config.latitude}, ${config.longitude}`
      : locationText;
-  DOM.place.textContent = config.location;
+  renderLocation(DOM.place, config.location)
   updateMap(parseFloat(DOM.defaultLat.value), parseFloat(DOM.defaultLon.value));
   updatePrefs("config.json", config);
   worker.postMessage({
