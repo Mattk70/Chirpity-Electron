@@ -1013,8 +1013,10 @@ const cancelDefaultLocation = () => {
 };
 
 const setDefaultLocation = () => {
-  config.latitude = parseFloat(DOM.defaultLat.value).toFixed(4);
-  config.longitude = parseFloat(parseFloat(DOM.defaultLon.value)).toFixed(4);
+  const lat = DOM.defaultLat.value ?? 0;
+  const lon = DOM.defaultLon.value ?? 0;
+  config.latitude = parseFloat(lat).toFixed(4);
+  config.longitude = parseFloat(parseFloat(lon)).toFixed(4);
   const locationText = DOM.place.textContent.replace("fmd_good", "").trim();
   const isPlaceholder =
     locationText.startsWith("Getting location") ||
@@ -1096,8 +1098,8 @@ async function setCustomLocation() {
     const files = batch ? STATE.openFiles : [STATE.currentFile];
     worker.postMessage({
       action: "set-custom-file-location",
-      lat: latEl.value,
-      lon: lonEl.value,
+      lat: latEl.value ?? 0,
+      lon: lonEl.value ?? 0,
       place: customPlaceEl.value,
       files: files,
     });
@@ -2224,8 +2226,6 @@ window.onload = async () => {
   pagination.init();
 };
 
-let MISSING_FILE;
-
 const setUpWorkerMessaging = () => {
   establishMessageChannel.then(() => {
     worker.addEventListener("message", async function (e) {
@@ -2306,14 +2306,14 @@ const setUpWorkerMessaging = () => {
           if (args.file) {
             // Clear the file loading overlay:
             loadingFiles({hide: true})
-            MISSING_FILE = args.file;
+            const file = args.file;
             const i18 = i18n.get(i18n.Locate);
             args.locate = `
                             <div class="d-flex justify-content-center mt-2">
-                                <button id="locate-missing-file" class="btn btn-primary border-dark text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
+                                <button id="locate-missing-file"  name="${file}" class="btn btn-primary border-dark text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
                                     ${i18.locate}
                                 </button>
-                                <button id="purge-from-toast" class="ms-3 btn btn-warning text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
+                                <button id="purge-from-toast" name="${file}" class="ms-3 btn btn-warning text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
                                 ${i18.remove}
                                 </button>
                             </div>
@@ -5357,13 +5357,15 @@ async function handleUIClicks(e) {
     }
 
     case "purge-from-toast": {
-      deleteFile(MISSING_FILE);
+      const file = element.name;
+      deleteFile(file);
       break;
     }
 
     // ----
     case "locate-missing-file": {
-      (async () => await locateFile(MISSING_FILE))();
+      const file = element.name;
+      (async () => await locateFile(file))();
       break;
     }
     case "clear-custom-list": {

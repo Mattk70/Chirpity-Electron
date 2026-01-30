@@ -1888,8 +1888,16 @@ const showMap = (where, locationID) => {
             const markersByID = {};
             const sharedIcon = new L.Icon.Default();
 
-            for (const { id, lat, lon } of LOCATIONS) {
+            for (const { id, lat, lon, radius } of LOCATIONS) {
                 const marker = L.marker([lat, lon], { icon: sharedIcon }).addTo(markerGroup);
+                const circle = L.circle([lat, lon], {
+                    color: 'MidnightBlue',
+                    width: 2,
+                    opacity: 0.5,
+                    fillColor: 'MidnightBlue',
+                    fillOpacity: 0.2,
+                    radius
+                }).addTo(map);
                 bounds.extend(marker.getLatLng());
                 markersByID[id] = marker;
 

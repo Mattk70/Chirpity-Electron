@@ -282,6 +282,15 @@ async function loadDB(modelPath) {
     diskDB = new sqlite3.Database(file);
     await diskDB.runAsync(`CREATE TABLE IF NOT EXISTS 
       confidence_overrides (speciesID INTEGER PRIMARY KEY, minConfidence INTEGER)`);
+    
+    const cols = await diskDB.allAsync(`PRAGMA table_info(locations)`);
+    const hasRadius = cols.some(col => col.name === 'radius');
+    if (!hasRadius) {
+      await diskDB.runAsync(`
+        ALTER TABLE locations
+        ADD COLUMN radius INTEGER 
+      `);
+    }
     DEBUG && console.log("Opened and cleaned disk db " + file);
   }
   const labelsFile = 'labels.txt';
@@ -2188,7 +2197,7 @@ const setMetadata = async ({ file, source_file = file }) => {
             recorderModel = guano.Model;
             const location = guano["Loc Position"];
             if (location) {
-              const [lat, lon] = location.split(" ");
+              let [lat, lon] = location.split(" ");
               await onSetLocation({
                 lat,
                 lon,
@@ -2196,8 +2205,6 @@ const setMetadata = async ({ file, source_file = file }) => {
                 files: [file],
                 overwritePlaceName: false,
               });
-              fileMeta.lat = roundedFloat(lat);
-              fileMeta.lon = roundedFloat(lon);
             }
             guanoTimestamp = Date.parse(guano.Timestamp);
             if (guanoTimestamp) fileMeta.fileStart = guanoTimestamp;
@@ -2274,7 +2281,7 @@ const setMetadata = async ({ file, source_file = file }) => {
       // Set complete flag
       fileMeta.isComplete = true;
     }
-    METADATA[file] = fileMeta;
+    METADATA[file] = {...METADATA[file],...fileMeta};
     return fileMeta;
   })();
 
@@ -5227,6 +5234,7 @@ async function onSetLocation({
 }) {
   lat = roundedFloat(lat);
   lon = roundedFloat(lon);
+  let id = null;
   if (!files) {
     await INITIALISED;
     // Default location update
@@ -5235,9 +5243,12 @@ async function onSetLocation({
     return;
   }
   if (!overwritePlaceName) {
-    const nearby = await getNearbyLocations(lat, lon, 0.1);
+    // Location set by metadata
+    const nearby = await getNearbyLocations(lat, lon);
     if (nearby.length) {
-      // Test & log without actually doing anything
+      // Snap the file to the highest priority existing location
+      const {lat:overrideLat, lon:overrideLon, id:overrideID} = nearby[0];
+      lat = overrideLat, lon = overrideLon; id = overrideID;
       console.info("Nearby locations exist", nearby.flatMap(x => x.distance).join(", "));
     }
   }
@@ -5251,8 +5262,10 @@ async function onSetLocation({
     );
     if (row) {
       await db.runAsync("DELETE FROM locations WHERE id = ?", row.id);
+      await getLocations({ file: files[0] });
+      return
     }
-  } else {
+  } else if (id === null) {
     const SQL = overwritePlaceName
     ? `INSERT INTO locations (lat, lon, place) VALUES (?, ?, ?)
        ON CONFLICT(lat, lon) DO UPDATE SET place = excluded.place
@@ -5261,33 +5274,35 @@ async function onSetLocation({
        RETURNING id;`;
   
     const result = await db.getAsync(SQL, lat, lon, place);
-    const id = result?.id ?? (
+    id = result?.id ?? (
       await db.getAsync("SELECT id FROM locations WHERE lat = ? AND lon = ?", lat, lon)
     )?.id;
-  
+  }
 // TODO: check if file in audio library and update its location on disk and in library
 // await checkLibrary(file, lat,lon, place)
-    // Upsert the file location id in the db
-    const placeholders = files.map(() => "(?, ?)").join(",");
-    const res = await db.runAsync(
-      `INSERT INTO files (name, locationID) VALUES ${placeholders}
-        ON CONFLICT(name) DO UPDATE SET locationID = excluded.locationID `,
-      ...files.flatMap(f => [f, id]));
+  // Upsert the file location id in the db
+  const placeholders = files.map(() => "(?, ?)").join(",");
+  const res = await db.runAsync(
+    `INSERT INTO files (name, locationID) VALUES ${placeholders}
+      ON CONFLICT(name) DO UPDATE SET locationID = excluded.locationID `,
+    ...files.flatMap(f => [f, id]));
 
-    for (const file of files) {
-      // we may not have set the METADATA for the file
-      METADATA[file] = { ...METADATA[file], locationID: id, lat, lon };
-      // tell the UI the file has a location id
-      UI.postMessage({ event: "file-location-id", file, id });
-    }
+  for (const file of files) {
+    // we may not have set the METADATA for the file
+    METADATA[file] = { ...METADATA[file], locationID: id, lat, lon };
+    // tell the UI the file has a location id
+    UI.postMessage({ event: "file-location-id", file, id });
   }
+  
   await getLocations({ file: files[0] });
 }
 
 async function getLocations({ file, db = STATE.db, id }) {
-  let locations = await db.allAsync("SELECT * FROM locations ORDER BY place");
+  let locations = await db.allAsync(
+    "SELECT id, lat, lon, place, COALESCE(radius,100) as radius FROM locations ORDER BY place"
+  );
   // Default location
-  locations ??= [{ id: 0, lat: STATE.lat, lon: STATE.lon, place: STATE.place.trim() }];
+  locations ??= [{ id: 0, lat: STATE.lat, lon: STATE.lon, place: STATE.place.trim(), radius:100 }];
   UI.postMessage({
     id,
     event: "location-list",
@@ -5299,27 +5314,28 @@ async function getLocations({ file, db = STATE.db, id }) {
 /**
  * getNearbyLocations
  * Fetches locations from the database that are within a specified radius of given latitude and longitude using the Haversine formula.
+ * Priority (first in the list is the point with the smallest radius)
  * @param {number} lat
  * @param {number} lon
- * @param {number} radius in km
- * @returns {Promise<Array.<{id: number, lat: number, lon: number, place: string, distance: number}>>}
+ * @returns {Promise<Array.<{id: number, lat: number, lon: number, place: string, radius: number, distance: number}>>}
 */
 
-async function getNearbyLocations(lat, lon, radius = 0.1) {
-  const miles = STATE.distanceUnit === 'miles';
-  const R = miles ? 3959 : 6371; // Radius of the Earth in miles or km
+async function getNearbyLocations(lat, lon) {
+  const R = 6_371_000; // Radius of the Earth in metres
   const locations = await STATE.db.allAsync(`
-    SELECT id, lat, lon, place,
-      (${R} * acos(
-        cos(radians(?)) * cos(radians(lat)) * cos(radians(lon) - radians(?)) +
-        sin(radians(?)) * sin(radians(lat))
-      )) AS distance
-    FROM locations
-    WHERE (${R} * acos(
-      cos(radians(?)) * cos(radians(lat)) * cos(radians(lon) - radians(?)) +
-      sin(radians(?)) * sin(radians(lat))
-    )) <= ?
-    ORDER BY distance ASC;`, lat, lon, lat, lat, lon, lat, radius);
+    SELECT *
+      FROM (
+        SELECT
+          id, lat, lon, place, COALESCE(radius, 100) AS radius,
+          (${R} * acos(
+            cos(radians(?)) * cos(radians(lat)) *
+            cos(radians(lon) - radians(?)) +
+            sin(radians(?)) * sin(radians(lat))
+          )) AS distance
+        FROM locations
+      )
+      WHERE distance <= radius
+      ORDER BY radius ASC, distance ASC`, lat, lon, lat);
   return locations;
 }
 

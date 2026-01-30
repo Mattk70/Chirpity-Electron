@@ -222,7 +222,8 @@ async function upgrade_to_v4(diskDB, dbMutex) {
         CONSTRAINT fk_tags FOREIGN KEY (tagID) REFERENCES tags(id) ON DELETE SET NULL)`
     );
     await diskDB.runAsync(
-      `INSERT INTO records_new (position, fileID, speciesID, modelID, confidence, 
+      // Insert or ignore to remove duplicate records causing UNIQUE constraint violations
+      `INSERT OR IGNORE INTO records_new (position, fileID, speciesID, modelID, confidence, 
         comment, end, callcount, isDaylight, reviewed, tagid)
         SELECT position, fileID, speciesID, modelID, confidence, 
         comment, end, callcount, isDaylight, reviewed, tagid FROM records;`
@@ -298,7 +299,8 @@ const createDB = async ({file, diskDB, dbMutex}) => {
         id INTEGER PRIMARY KEY, 
         lat REAL NOT NULL,
         lon REAL NOT NULL,
-        place TEXT NOT NULL, 
+        place TEXT NOT NULL,
+        radius INTEGER,
         UNIQUE (lat, lon)
       )`
     );
@@ -584,8 +586,8 @@ const mergeDbIfNeeded = async ({diskDB, model, appPath, dbMutex, labelsLocation}
 
       // Migrate records with updated foreign keys
       await diskDB.runAsync(`
-        INSERT INTO records (dateTime, position, fileID, speciesID, modelID, confidence, comment, end, callCount, isDaylight, reviewed, tagID)
-        SELECT r.dateTime, r.position, fm.newID, sm.newID, ?, r.confidence, r.comment, r.end, r.callCount, r.isDaylight, r.reviewed, tm.newID
+        INSERT INTO records (position, fileID, speciesID, modelID, confidence, comment, end, callCount, isDaylight, reviewed, tagID)
+        SELECT r.position, fm.newID, sm.newID, ?, r.confidence, r.comment, r.end, r.callCount, r.isDaylight, r.reviewed, tm.newID
         FROM modelDb.records r
         JOIN file_map fm ON r.fileID = fm.oldID
         JOIN species_map sm ON r.speciesID = sm.oldID
