@@ -893,15 +893,24 @@ function customiseAnalysisMenu(saved) {
   }
 }
 
-async function generateLocationList(id) {
+async function generateLocationList(elID) {
   const i18 = i18n.get(i18n.All);
-  const defaultText = id === "savedLocations" ? i18[0] : i18[1];
-  const el = document.getElementById(id);
+
+  const el = document.getElementById(elID);
+  el.replaceChildren(); // clear options
   LOCATIONS = await utils.requestFromWorker(worker, "get-locations", {
     file: STATE.currentFile
   });
-  el.innerHTML = `<option value="">${defaultText}</option>`; // clear options
-  LOCATIONS.forEach((loc) => {
+  if (elID !== "savedLocations"){
+    const defaultText =  i18[1];
+    el.innerHTML = `<option value="">${defaultText}</option>`; 
+  }
+  LOCATIONS.slice() // avoid mutating the original array, just in case
+  .sort((a, b) => { // put the default location at the top of the list
+    if (a.id === 0) return -1;
+    if (b.id === 0) return 1;
+    return 0;
+  }).forEach((loc) => {
     const option = document.createElement("option");
     option.value = loc.id;
     option.textContent = loc.place;
@@ -913,48 +922,60 @@ async function generateLocationList(id) {
 const FILE_LOCATION_MAP = {};
 const onFileLocationID = ({ file, id }) => (FILE_LOCATION_MAP[file] = id);
 const locationModalDiv = document.getElementById("locationModal");
-locationModalDiv.addEventListener("shown.bs.modal", () => {
+locationModalDiv.addEventListener("shown.bs.modal", async () => {
   const locationID = FILE_LOCATION_MAP[STATE.currentFile]
-  placeMap("customLocationMap", locationID);
+  await placeMap("customLocationMap", locationID);
 });
 //document
+const locationRadius = document.getElementById("location-radius");
+const onRadiusUpdated = (e) => {
+  const radius = e.target.valueAsNumber;
+  const latEl = document.getElementById("customLat");
+  const lonEl = document.getElementById("customLon");
+  updateMap(latEl.valueAsNumber, lonEl.valueAsNumber, radius);
+}
+
+locationRadius.addEventListener("change", onRadiusUpdated);
+
 
 // showLocation: Show the currently selected location in the form inputs
-const showLocation = async (fromSelect) => {
-  let newLocation;
+const showLocation = async (fromSelect, radiusValue) => {
   const latEl = document.getElementById("customLat");
   const lonEl = document.getElementById("customLon");
   const customPlaceEl = document.getElementById("customPlace");
   const locationSelect = document.getElementById("savedLocations");
+  
   // Check if current file has a location id
   const id = fromSelect
     ? parseInt(locationSelect.value)
     : FILE_LOCATION_MAP[STATE.currentFile];
 
-  if (id) {
-    newLocation = LOCATIONS.find((obj) => obj.id === id);
-    //locationSelect.value = id;
-    if (newLocation) {
-      (latEl.value = newLocation.lat),
-        (lonEl.value = newLocation.lon),
-        (customPlaceEl.value = newLocation.place),
-        (locationSelect.value = id);
-    } else {
-      (latEl.value = config.latitude),
-        (lonEl.value = config.longitude),
-        (customPlaceEl.value = config.location),
-        (locationSelect.value = "");
-    }
+  let locationIndex = LOCATIONS.findIndex((obj) => obj.id === id);
+  if (locationIndex !== -1) {
+    const {lat, lon, place, radius} = LOCATIONS[locationIndex];
+    radiusValue ??= radius;
+    latEl.value = lat;
+    lonEl.value = lon;
+    customPlaceEl.value = place;
+    locationSelect.value = id;
+    locationRadius.value = radiusValue;
+    showRadiusValue(radiusValue);
   } else {
+    locationIndex = LOCATIONS.findIndex((obj) => obj.id === 0);
+    const {id, lat, lon, place, radius} = LOCATIONS[locationIndex];
+    radiusValue ??= radius;
     //Default location
-    await generateLocationList("savedLocations");
-    (latEl.value = config.latitude),
-      (lonEl.value = config.longitude),
-      (customPlaceEl.value = config.location);
+    // await generateLocationList("savedLocations");
+    latEl.value = lat;
+    lonEl.value = lon;
+    customPlaceEl.value = place;
+    locationSelect.value = id;
+    locationRadius.value = radiusValue;
+    showRadiusValue(radiusValue);
   }
   // make sure the  map is initialised
-  if (!map) placeMap("customLocationMap", id);
-  updateMap(latEl.value, lonEl.value);
+  await placeMap("customLocationMap", id);
+  updateMap(latEl.valueAsNumber, lonEl.valueAsNumber, radiusValue);
 };
 
 /**
@@ -1003,20 +1024,21 @@ const cancelDefaultLocation = () => {
   const latEl = DOM.defaultLat;
   const lonEl = DOM.defaultLon;
   const placeEl = DOM.place;
-  latEl.value = config.latitude;
-  lonEl.value = config.longitude;
-  renderLocation(placeEl, config.location)
-  updateMap(latEl.value, lonEl.value);
+  const {lat, lon, place, radius} = LOCATIONS.find((obj) => obj.id === 0);
+  latEl.value = lat;
+  lonEl.value = lon;
+  renderLocation(placeEl, place)
+  updateMap(latEl.value, lonEl.value, radius);
   const button = document.getElementById("apply-location");
   button.classList.replace("btn-danger","btn-primary");
   button.innerHTML = 'Set <span class="material-symbols-outlined">done</span>';
 };
 
 const setDefaultLocation = () => {
-  const lat = DOM.defaultLat.value ?? 0;
-  const lon = DOM.defaultLon.value ?? 0;
-  config.latitude = parseFloat(lat).toFixed(4);
-  config.longitude = parseFloat(parseFloat(lon)).toFixed(4);
+  const latVal = DOM.defaultLat.value ?? 0;
+  const lonVal = DOM.defaultLon.value ?? 0;
+  config.latitude = parseFloat(latVal).toFixed(4);
+  config.longitude = parseFloat(lonVal).toFixed(4);
   const locationText = DOM.place.textContent.replace("fmd_good", "").trim();
   const isPlaceholder =
     locationText.startsWith("Getting location") ||
@@ -1024,14 +1046,17 @@ const setDefaultLocation = () => {
   config.location = isPlaceholder
      ? `${config.latitude}, ${config.longitude}`
      : locationText;
+  const defaultLoc = LOCATIONS.findIndex((obj) => obj.id === 0);
+  LOCATIONS[defaultLoc] = {...LOCATIONS[defaultLoc], lat: config.latitude, lon: config.longitude, place: config.location}
   renderLocation(DOM.place, config.location)
-  updateMap(parseFloat(DOM.defaultLat.value), parseFloat(DOM.defaultLon.value));
+  updateMap(config.latitude, config.longitude);
   updatePrefs("config.json", config);
   worker.postMessage({
     action: "update-state",
     lat: config.latitude,
     lon: config.longitude,
     place: config.location,
+    radius: config.radius // can only change radius in custom file location
   });
   if (config.list === "location") {
     DOM.speciesThresholdEl.classList.remove("d-none");
@@ -1053,6 +1078,7 @@ async function setCustomLocation() {
   const customPlaceEl = document.getElementById("customPlace");
   const locationAdd = document.getElementById("set-location");
   const batchWrapper = document.getElementById("location-batch-wrapper");
+  const locationRadius = document.getElementById("location-radius");
   STATE.openFiles.length > 1
     ? batchWrapper.classList.remove("d-none")
     : batchWrapper.classList.add("d-none");
@@ -1068,7 +1094,7 @@ async function setCustomLocation() {
       locationAdd.textContent = i18[0];
       locationAdd.classList.remove("btn-danger");
       locationAdd.classList.add("button-primary");
-    } else {
+    } else if (savedLocationSelect.value !== "0"){ //not 0, which is the default location
       locationAdd.textContent = i18[1];
       locationAdd.classList.add("btn-danger");
       locationAdd.classList.remove("button-primary");
@@ -1096,13 +1122,22 @@ async function setCustomLocation() {
     locationID = savedLocationSelect.value;
     const batch = document.getElementById("batchLocations").checked;
     const files = batch ? STATE.openFiles : [STATE.currentFile];
+    const lat = latEl.valueAsNumber ?? 0;
+    const lon = lonEl.valueAsNumber ?? 0;
+    const place = customPlaceEl.value;
+    const radius = locationRadius.valueAsNumber;
     worker.postMessage({
       action: "set-custom-file-location",
-      lat: latEl.value ?? 0,
-      lon: lonEl.value ?? 0,
-      place: customPlaceEl.value,
-      files: files,
+      lat,lon,place,radius,files
     });
+    const isDefaultLoc = LOCATIONS.find(l => l.lat === lat && l.lon === lon && l.id === 0)
+    if (isDefaultLoc){
+      config.latitude = lat;
+      config.longitude = lon;
+      config.location = place;
+      config.radius = radius;
+      updatePrefs('config.json', config)
+    }
     generateLocationList("explore-locations");
 
     locationModal.hide();
@@ -1112,8 +1147,7 @@ async function setCustomLocation() {
     locationForm.reset();
     locationAdd.removeEventListener("click", addLocation);
     locationModalDiv.removeEventListener("hide.bs.modal", onModalDismiss);
-    if (showLocation)
-      savedLocationSelect.removeEventListener("change", setCustomLocation);
+    savedLocationSelect.removeEventListener("change", setCustomLocation);
   };
   locationModalDiv.addEventListener("hide.bs.modal", onModalDismiss);
 }
@@ -1834,6 +1868,7 @@ const defaultConfig = {
   latitude: 52.87,
   longitude: 0.89,
   location: "Great Snoring, North Norfolk",
+  radius: 100,
   detect: {
     nocmig: false,
     autoLoad: false,
@@ -1983,7 +2018,7 @@ window.onload = async () => {
   }
   const selectedModel = config.selectedModel;
   updateListOptions(selectedModel);
-  debug && document.getElementById('dataset').classList.remove('d-none')
+  // debug && document.getElementById('dataset').classList.remove('d-none')
   isMember && updateModelOptions();
 
   worker.postMessage({
@@ -1996,6 +2031,7 @@ window.onload = async () => {
     lat: config.latitude,
     lon: config.longitude,
     place: config.location,
+    radius: config.radius,
     detect,
     filters,
     audio,
@@ -4971,6 +5007,16 @@ function showThreshold(e) {
 }
 
 /**
+ * Updates the threshold display and input values in both the filter and settings panels.
+ * @param {Event|number} e - The input event or numeric threshold value to display and set.
+ */
+function showRadiusValue(e) {
+  const radius = e instanceof Event ? e.target.valueAsNumber : e;
+  document.getElementById('radius-value').innerHTML = `<b>${radius}</b>`;
+  return radius
+}
+
+/**
  * Updates the UI to display the current topRankin threshold value.
  * 
  * Accepts either an event or a numeric value, updates the display element with the threshold, and sets the input value accordingly.
@@ -5106,6 +5152,10 @@ document.addEventListener('input', (e) =>{
     case "confidenceValue": {
       showThreshold(e)
       break;
+    }
+    case "location-radius": {
+      showRadiusValue(e);
+      break
     }
     case "top-rankin": {
       showTopRankin(e);
@@ -5744,6 +5794,16 @@ async function handleUIClicks(e) {
           const archiveFolder = files.filePaths[0];
           config.database.location = archiveFolder;
           document.getElementById("database-location").value = archiveFolder;
+          console.info('New database location selected:', archiveFolder);
+          // Assume no records in it until we hear otherwise from the worker
+          DOM.chartsLink.classList.add("disabled");
+          DOM.exploreLink.classList.add("disabled");
+          config.library.location &&
+            document
+              .getElementById("compress-and-organise")
+              .classList.add("disabled");
+          STATE.diskHasRecords = false;
+          
           updatePrefs("config.json", config);
           worker.postMessage({
             action: "update-state",
@@ -7706,8 +7766,8 @@ const IUCNMap = {
   EX: "text-bg-dark",
 };
 
-// Make config, LOCATIONS and displayLocationAddress and toasts available to the map script in index.html
-export { config, displayLocationAddress, LOCATIONS, generateToast };
+// Make functions available to the map script in index.html
+export { config, displayLocationAddress, LOCATIONS, generateToast, showRadiusValue, onRadiusUpdated };
 
 /**
  * Checks the user's membership status via a remote API and updates the UI to reflect feature access.
@@ -7942,6 +8002,8 @@ function changeInputElement(column, element, key, preSelected = null) {
     return input;
   }
 }
+
+
 
 document.addEventListener("labelsUpdated", (e) => {
   const tags = e.detail.tags;

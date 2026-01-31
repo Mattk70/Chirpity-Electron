@@ -286,10 +286,7 @@ async function loadDB(modelPath) {
     const cols = await diskDB.allAsync(`PRAGMA table_info(locations)`);
     const hasRadius = cols.some(col => col.name === 'radius');
     if (!hasRadius) {
-      await diskDB.runAsync(`
-        ALTER TABLE locations
-        ADD COLUMN radius INTEGER 
-      `);
+      await diskDB.runAsync(`ALTER TABLE locations ADD COLUMN radius INTEGER`);
     }
     DEBUG && console.log("Opened and cleaned disk db " + file);
   }
@@ -308,7 +305,7 @@ async function loadDB(modelPath) {
   }
 
   checkNewModel(modelID) && (STATE.modelID = modelID);
-  STATE.update({ db: diskDB });
+  // STATE.update({ db: diskDB });
   diskDB.locale = STATE.locale;
   await diskDB.runAsync("VACUUM");
   await diskDB.runAsync("CREATE INDEX IF NOT EXISTS idx_records_modelID ON records(modelID)");
@@ -668,7 +665,12 @@ async function handleMessage(e) {
     }
     case "update-list": {
       STATE.list = args.list;
-      await diskDB.runAsync('DELETE FROM confidence_overrides');
+      try {
+        await diskDB.runAsync('DELETE FROM confidence_overrides');
+      } catch (e) {
+        // no table do nothing
+        console.info('no confidence_overrides table?', e)
+      }
       if (args.list === "custom") {
         STATE.customLabels = args.customLabels;
         STATE.customLabelsMap = Object.fromEntries(
@@ -746,11 +748,11 @@ async function handleMessage(e) {
       break;
     }
     case "update-state": {
-      const {path, temp, lat, lon, place} = args;
+      const {path, temp, lat, lon, place, radius} = args;
       appPath = path || appPath;
       tempPath = temp || tempPath;
       if (lat !== undefined && lon !== undefined && place) {
-        onSetLocation({ lat, lon, place });
+        onSetLocation({ lat, lon, place, radius });
       }
       // If we change the speciesThreshold, we need to invalidate any location caches
       if (args.speciesThreshold) {
@@ -847,15 +849,14 @@ async function savedFileCheckAsync(fileList) {
       // detect if any changes were made
       const libraryFiles = newList.filter((item, i) => item !== fileSlice[i]);
       const params = prepParams(newList);
-      let countResult;
-      if (libraryFiles.length) {
-        const archiveParams = prepParams(libraryFiles);
-        query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${params}) or archiveName IN (${archiveParams})`;
-        countResult = await diskDB.getAsync(query, ...fileSlice, ...libraryFiles);
-      } else {
+      let countResult, parameters = fileSlice;
+      if (!libraryFiles.length) {
         query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${params})`;
-        countResult = await diskDB.getAsync(query, ...fileSlice);
+      } else {const archiveParams = prepParams(libraryFiles);
+        query += ` or archiveName IN (${archiveParams})`;
+        parameters.push(...libraryFiles)
       }
+      countResult = await diskDB.getAsync(query, ...parameters);
       const count = countResult?.count || 0;
       if (count < fileSlice.length) {
         UI.postMessage({
@@ -2179,7 +2180,7 @@ const setMetadata = async ({ file, source_file = file }) => {
       fileMeta.isSaved = true; // Queried by UI to establish saved state of file.
     } 
 
-    let guanoTimestamp, bextTimestamp, recorderModel;
+    let guanoTimestamp, bextTimestamp, recorderModel, lat, lon, place;
     // savedMeta may just have a locationID if it was set by onSetLocation
     if (!savedMeta?.duration) {
       fileMeta.duration = await getDuration(file);
@@ -2190,21 +2191,15 @@ const setMetadata = async ({ file, source_file = file }) => {
           if (error.code !== 'ENOENT') console.warn("Error extracting GUANO", error.message);
           return
         });
+
         const metaKeys = wavMetadata ? Object.keys(wavMetadata): [];
         if (metaKeys.length){
           if (metaKeys.includes("guano")) {
             const guano = wavMetadata.guano;
             recorderModel = guano.Model;
-            const location = guano["Loc Position"];
-            if (location) {
-              let [lat, lon] = location.split(" ");
-              await onSetLocation({
-                lat,
-                lon,
-                place: location,
-                files: [file],
-                overwritePlaceName: false,
-              });
+            place = guano["Loc Position"];
+            if (place) {
+              [lat, lon] = place.split(" ");
             }
             guanoTimestamp = Date.parse(guano.Timestamp);
             if (guanoTimestamp) fileMeta.fileStart = guanoTimestamp;
@@ -2282,7 +2277,8 @@ const setMetadata = async ({ file, source_file = file }) => {
       fileMeta.isComplete = true;
     }
     METADATA[file] = {...METADATA[file],...fileMeta};
-    return fileMeta;
+    if (place) await onSetLocation({ lat, lon, place, files: [file], overwritePlaceName: false });
+    return METADATA[file];
   })();
 
   metadataLocks[file] = run;
@@ -4700,7 +4696,7 @@ const onSave2DiskDB = async ({ file }) => {
       SELECT id, lat, lon, place FROM locations;
     `);
     await memoryDB.runAsync(
-      `INSERT OR REPLACE INTO disk.files SELECT * FROM files`
+      `INSERT OR REPLACE INTO disk.files SELECT * FROM files WHERE filestart IS NOT NULL`
     );
     await memoryDB.runAsync(
       `INSERT OR IGNORE INTO disk.tags SELECT * FROM tags`
@@ -5228,6 +5224,7 @@ async function onSetLocation({
   lat,
   lon,
   place,
+  radius = 100,
   files,
   db = STATE.db,
   overwritePlaceName = true,
@@ -5238,18 +5235,18 @@ async function onSetLocation({
   if (!files) {
     await INITIALISED;
     // Default location update
-    await diskDB.runAsync(`INSERT OR REPLACE INTO locations (id, lat, lon, place) VALUES (0, ?, ?, ?)`, lat, lon, place.trim())
-    await memoryDB.runAsync(`INSERT OR REPLACE INTO locations (id, lat, lon, place) VALUES (0, ?, ?, ?)`, lat, lon, place.trim());
+    await diskDB.runAsync(`INSERT OR REPLACE INTO locations (id, lat, lon, place, radius) VALUES (0, ?, ?, ?, ?)`, lat, lon, place.trim(), radius)
+    await memoryDB.runAsync(`INSERT OR REPLACE INTO locations (id, lat, lon, place, radius) VALUES (0, ?, ?, ?, ?)`, lat, lon, place.trim(), radius);
     return;
   }
+  let nearby = [];
   if (!overwritePlaceName) {
     // Location set by metadata
-    const nearby = await getNearbyLocations(lat, lon);
+    nearby = await getNearbyLocationsCached(lat, lon);
     if (nearby.length) {
       // Snap the file to the highest priority existing location
-      const {lat:overrideLat, lon:overrideLon, id:overrideID} = nearby[0];
-      lat = overrideLat, lon = overrideLon; id = overrideID;
-      console.info("Nearby locations exist", nearby.flatMap(x => x.distance).join(", "));
+      const {lat:overrideLat, lon:overrideLon, id:overrideID, place:overridePlace} = nearby[0];
+      lat = overrideLat, lon = overrideLon; id = overrideID; place = overridePlace;
     }
   }
 
@@ -5261,31 +5258,32 @@ async function onSetLocation({
       lon
     );
     if (row) {
-      await db.runAsync("DELETE FROM locations WHERE id = ?", row.id);
-      await getLocations({ file: files[0] });
-      return
+      if (row.id > 0){
+        await db.runAsync("DELETE FROM locations WHERE id = ?", row.id);
+        await getLocations({ file: files[0] });
+        return
+      } else id = 0
     }
   } else if (id === null) {
     const SQL = overwritePlaceName
-    ? `INSERT INTO locations (lat, lon, place) VALUES (?, ?, ?)
-       ON CONFLICT(lat, lon) DO UPDATE SET place = excluded.place
+    ? `INSERT INTO locations (lat, lon, place, radius) VALUES (?, ?, ?, ?)
+       ON CONFLICT(lat, lon) DO UPDATE SET place = excluded.place, radius = excluded.radius
        RETURNING id;`
-    : `INSERT OR IGNORE INTO locations (lat, lon, place) VALUES (?, ?, ?)
+    : `INSERT OR IGNORE INTO locations (lat, lon, place, radius) VALUES (?, ?, ?, ?)
        RETURNING id;`;
   
-    const result = await db.getAsync(SQL, lat, lon, place);
+    const result = await db.getAsync(SQL, lat, lon, place, radius);
     id = result?.id ?? (
       await db.getAsync("SELECT id FROM locations WHERE lat = ? AND lon = ?", lat, lon)
     )?.id;
+    const isExistinglocation = await diskDB.getAsync('SELECT * FROM locations WHERE id = ?', id)
+    if (isExistinglocation){
+      await db.runAsync("UPDATE locations SET place = ?, radius= ? WHERE id = ?", place, radius, id)
+    }
   }
 // TODO: check if file in audio library and update its location on disk and in library
 // await checkLibrary(file, lat,lon, place)
-  // Upsert the file location id in the db
-  const placeholders = files.map(() => "(?, ?)").join(",");
-  const res = await db.runAsync(
-    `INSERT INTO files (name, locationID) VALUES ${placeholders}
-      ON CONFLICT(name) DO UPDATE SET locationID = excluded.locationID `,
-    ...files.flatMap(f => [f, id]));
+
 
   for (const file of files) {
     // we may not have set the METADATA for the file
@@ -5293,6 +5291,14 @@ async function onSetLocation({
     // tell the UI the file has a location id
     UI.postMessage({ event: "file-location-id", file, id });
   }
+  // Upsert the file location id in the db
+  const placeholders = files.map(() => "(?, ?, ?, ?)").join(",");
+  const res = await db.runAsync(
+    `INSERT INTO files (name, filestart, duration, locationID) VALUES ${placeholders}
+      ON CONFLICT(name) DO UPDATE SET locationID = excluded.locationID `,
+    ...files.flatMap(f => [f, METADATA[f].filestart, METADATA[f].duration, id]));
+
+
   
   await getLocations({ file: files[0] });
 }
@@ -5302,7 +5308,7 @@ async function getLocations({ file, db = STATE.db, id }) {
     "SELECT id, lat, lon, place, COALESCE(radius,100) as radius FROM locations ORDER BY place"
   );
   // Default location
-  locations ??= [{ id: 0, lat: STATE.lat, lon: STATE.lon, place: STATE.place.trim(), radius:100 }];
+  locations ??= [{ id: 0, lat: STATE.lat, lon: STATE.lon, place: STATE.place.trim(), radius: STATE.radius }];
   UI.postMessage({
     id,
     event: "location-list",
@@ -5310,6 +5316,17 @@ async function getLocations({ file, db = STATE.db, id }) {
     currentLocation: METADATA[file]?.locationID,
   });
 }
+
+
+async function getNearbyLocationsCached(lat, lon) {
+  const key = `${lat} ${lon}`;
+  const cache = STATE.nearbyLocationCache;
+  if (!cache.has(key)) {
+    cache.set(key, getNearbyLocations(lat, lon));
+  }
+  return cache.get(key);
+}
+
 
 /**
  * getNearbyLocations
