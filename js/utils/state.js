@@ -80,6 +80,8 @@ export class WorkerState {
     (this.week = -1),
     (this.list = "everything"),
     (this.customList = undefined),
+    (this.customLabels = []),
+    (this.customLabelsMap = {}),
     (this.notFound = {}), // try to prevent spamming errors
     (this.local = true),
     (this.incrementor = 2),

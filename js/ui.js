@@ -911,9 +911,10 @@ async function generateLocationList(elID) {
     if (b.id === 0) return 1;
     return 0;
   }).forEach((loc) => {
+    const {id, place} = loc;
     const option = document.createElement("option");
-    option.value = loc.id;
-    option.textContent = loc.place;
+    option.value = id;
+    option.textContent = id === 0 ? place + '*': place;
     el.appendChild(option);
   });
   return el;
@@ -1044,7 +1045,7 @@ const setDefaultLocation = () => {
     locationText.startsWith("Getting location") ||
     locationText.startsWith("No location found");
   config.location = isPlaceholder
-     ? `${config.latitude}, ${config.longitude}`
+     ? `${config.latitude} ${config.longitude}`
      : locationText;
   const defaultLoc = LOCATIONS.findIndex((obj) => obj.id === 0);
   LOCATIONS[defaultLoc] = {...LOCATIONS[defaultLoc], lat: config.latitude, lon: config.longitude, place: config.location}
@@ -1071,24 +1072,27 @@ const setDefaultLocation = () => {
   button.innerHTML = 'Set <span class="material-symbols-outlined">done</span>';
 };
 
-async function setCustomLocation() {
+async function setCustomLocation(manage = false) {
   const savedLocationSelect = await generateLocationList("savedLocations");
   const latEl = document.getElementById("customLat");
   const lonEl = document.getElementById("customLon");
   const customPlaceEl = document.getElementById("customPlace");
   const locationAdd = document.getElementById("set-location");
+  const locationDelete = document.getElementById("delete-location");
+  if (manage) locationDelete.classList.remove('d-none');
   const batchWrapper = document.getElementById("location-batch-wrapper");
   const locationRadius = document.getElementById("location-radius");
-  STATE.openFiles.length > 1
+  STATE.openFiles.length > 1 && ! manage
     ? batchWrapper.classList.remove("d-none")
     : batchWrapper.classList.add("d-none");
   // Use the current file location for lat, lon, place or use defaults
-  showLocation(false);
+  showLocation(manage);
   savedLocationSelect.addEventListener("change", function () {
     showLocation(true);
   });
 
   const i18 = i18n.get(i18n.Location);
+  locationDelete.textContent = i18[1];
   const addOrDelete = () => {
     if (customPlaceEl.value) {
       locationAdd.textContent = i18[0];
@@ -1109,26 +1113,27 @@ async function setCustomLocation() {
     legends[i].textContent = i18[i + 2]; // process each node
   }
   locationModalDiv.querySelector('label[for="batchLocations"]').textContent =
-    i18[4];
-  document.getElementById("customLatLabel").textContent = i18[5];
-  document.getElementById("customLonLabel").textContent = i18[6];
+    i18[5];
+  document.getElementById("customLatLabel").textContent = i18[6];
+  document.getElementById("customLonLabel").textContent = i18[7];
   const locationModal = new bootstrap.Modal(locationModalDiv);
   locationModal.show();
 
   // Submit action
   const locationForm = document.getElementById("locationForm");
 
-  const addLocation = () => {
+  const addLocation = (e) => {
+    const remove = e.target.id === 'delete-location';
     locationID = savedLocationSelect.value;
     const batch = document.getElementById("batchLocations").checked;
     const files = batch ? STATE.openFiles : [STATE.currentFile];
     const lat = latEl.valueAsNumber ?? 0;
     const lon = lonEl.valueAsNumber ?? 0;
-    const place = customPlaceEl.value;
+    const place = remove ? null : customPlaceEl.value;
     const radius = locationRadius.valueAsNumber;
     worker.postMessage({
-      action: "set-custom-file-location",
-      lat,lon,place,radius,files
+      action: "set-location",
+      lat,lon,place,radius,files, manage
     });
     const isDefaultLoc = LOCATIONS.find(l => l.lat === lat && l.lon === lon && l.id === 0)
     if (isDefaultLoc){
@@ -1143,11 +1148,13 @@ async function setCustomLocation() {
     locationModal.hide();
   };
   locationAdd.addEventListener("click", addLocation);
+  locationDelete.addEventListener("click", addLocation);
   const onModalDismiss = () => {
     locationForm.reset();
+    locationDelete.classList.add('d-none');
+    customPlaceEl.removeEventListener("keyup", addOrDelete);
     locationAdd.removeEventListener("click", addLocation);
     locationModalDiv.removeEventListener("hide.bs.modal", onModalDismiss);
-    savedLocationSelect.removeEventListener("change", setCustomLocation);
   };
   locationModalDiv.addEventListener("hide.bs.modal", onModalDismiss);
 }
@@ -1185,6 +1192,7 @@ async function sortFilesByTime(fileNames) {
  */
 async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults } = {}) {
   if (!filePaths.length) return;
+  if (STATE.mode === 'chart') showAnalyse()
   loadingFiles({hide:false})
   // Store the sanitised file list and Load First audio file
   pagination.reset();
@@ -1206,7 +1214,9 @@ async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults 
   STATE.windowOffsetSecs = 0;
   STATE.windowLength = config.selectedModel.includes('bats') ? 5 : 20;
   // Reset the mode
+
   STATE.mode = 'analyse';
+
   // Reset analysis status - when importing, we want to set analysis done = true
   STATE.analysisDone = !checkSaved;
 
@@ -5372,6 +5382,10 @@ async function handleUIClicks(e) {
       showAnalyse();
       break;
     }
+    case "manage-locations": {
+      setCustomLocation(true)
+      break;
+    }
     case "compress-and-organise": {
       compressAndOrganise();
       break;
@@ -6037,7 +6051,7 @@ async function handleUIClicks(e) {
         break;      
     }
     case "setCustomLocation": {
-      setCustomLocation();
+      setCustomLocation(false);
       break;
     }
     case "setFileStart": {
@@ -7787,6 +7801,10 @@ async function membershipCheck() {
   const installPeriod = now - installDate;
   const trialDaysLeft = Math.max(Math.ceil((trialPeriod - installPeriod)/86_400_000), 0)
   const inTrial = installPeriod < trialPeriod;
+  if (trialDaysLeft){
+    document.getElementById('trialPill').classList.remove('d-none')
+
+  }
   const lockedElements = document.querySelectorAll(".locked, .unlocked");
   const unlockElements = () => {
     lockedElements.forEach((el) => {
@@ -8293,7 +8311,7 @@ function checkForIntelMacUpdates() {
             ].join("");
             alertPlaceholder.append(wrapper);
           };
-          const link = `<a href="https://chirpity.mattkirkland.co.uk?fromVersion=${VERSION}" target="_blank">`;
+          const link = `<a href="https://chirpity.net?fromVersion=${VERSION}" target="_blank">`;
           const message = utils.interpolate(i18n.get(i18n.UpdateMessage), {
             link: link,
           });

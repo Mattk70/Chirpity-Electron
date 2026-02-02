@@ -514,8 +514,8 @@
                     <h5 class="modal-title" id="locationModalLabel">Set Location</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form id="locationForm" class="fs-6">
-                    <div class="modal-body pb-0">
+                <div class="modal-body pb-0">
+                    <form id="locationForm" class="fs-6">
                         <fieldset class="border rounded m-2 p-1">
                             <legend class="h6">Pick A Saved Location</legend>
                             <div class="form-group rounded p-2 bg-light">
@@ -531,7 +531,7 @@
                         </fieldset>
                         <fieldset class="border rounded m-2 mb-0 p-1">
                             <legend class="h6">Add, Edit or Delete Location</legend>
-                            <div class="form-group rounded p-2 mb-2 bg-light">
+                            <div class="form-group rounded p-2 bg-light">
                                 <div class="row">
                                     <div class="input-group col">
                                         <label id="customLatLabel" class="input-group-text pe-2" for="customLat">Lat:</label>
@@ -543,22 +543,22 @@
                                         placeholder="0.00" step="0.1" max="180" min="-180"  aria-label="Longitude" aria-describedby="customLon"
                                         required>
                                     </div>
-                                <div class="row">
-                                    <h6 class="mt-2">Location radius</h6>
-                                    <div class="input-group">
-                                        <input id="location-radius" class="input-group w-75" type="range" value="100" min="10" max="2500" step="10"/>
-                                        <div class="input-group-append">
-                                            <span class="input-group-text" id="radius-value">100</span>
-                                        </div>
-                                    </div>
                                 </div>
-                                    
-                                <div id="customLocationMap" class="mt-2 border border-secondary rounded" style="height: 200px"></div>
+                                <div class="row">
+                                    <div class="col-10">
+                                        <legend class="h6 mt-2 mb-0">Location radius</legend>
+                                        <input id="location-radius" class="input-group" style="width:100%" type="range" value="100" min="10" max="2500" step="10"/>    
+                                    </div>
+                                    <div class="col-2 input-group-append d-flex align-items-end">
+                                        <span class="input-group-text" id="radius-value">100</span>
+                                    </div>
+                                    </div>
+                                    <div id="customLocationMap" class="mt-2 border border-secondary rounded" style="height: 200px"></div>
                                 </div>
                                 <div class="row">
                                     <div class="input-group p-1">
                                         <textarea class="m-2 w-100" id="customPlace" spellcheck="false"
-                                        maxlength="100" rows="1" required></textarea>
+                                        maxlength="100" required></textarea>
                                     </div>
                                 </div>
                                 <div class="row d-none" id="location-batch-wrapper">
@@ -571,12 +571,13 @@
                                 </div>
                             </div>
                         </fieldset>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-primary" id="set-location">Set Location</button>
-                    </div>
-                </form>
+                    </form>
+                
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-danger me-auto d-none" id="delete-location">Delete Location</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="set-location">Set Location</button>
+                </div>
             </div>
         </div>
     </div>
@@ -1669,6 +1670,9 @@
                                 <span class="shortcut float-end">Ctrl+S</span>
                             </li>
                             <li class="dropdown-divider"></li>
+                            <li class="dropdown-item" id="manage-locations">
+                                <span class="material-symbols-outlined">edit_location_alt</span> Manage locations
+                            </li>
                             <li class="dropdown-item disabled" id="charts">
                                 <span class="material-symbols-outlined">assessment</span> View charts
                             </li>
@@ -1811,7 +1815,7 @@
         </div>
         <div id="buy-me-coffee" class="d-none"><a href="https://www.buymeacoffee.com/matthew_kirkland" target="_blank"><img src="img/bmc.png" alt="Become a Chirpity supporter on Buy-me-a-coffee" title="Support Chirpity's ongoing development and unlock exclusive features"></a></div>
         <!-- navbar-collapse.// -->
-        <a href="https://chirpity.mattkirkland.co.uk" title="Visit the Chirpity website" target="_blank"  id="primaryLogoLink"><img id="primaryLogo" src="img/logo/chirpity_logo2.png" alt="Chirpity bird calls: Identifying birds by sound"></a>
+        <a href="https://chirpity.net" title="Visit the Chirpity website" target="_blank"  id="primaryLogoLink"><img id="primaryLogo" src="img/logo/chirpity_logo2.png" alt="Chirpity bird calls: Identifying birds by sound"></a>
     </div>
         <!-- container-fluid.// -->
     </nav>

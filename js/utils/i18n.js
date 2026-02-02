@@ -1050,94 +1050,106 @@ const Help = {
 
 const Location = {
     en: [
-        'Set Location', 
+        'Update Location', 
         'Delete Location', 
         'Pick A Saved Location', 
         'Add, Edit or Delete Location', 
+        'Location radius',
         'Update ALL open files to this location',
         "Lat:", "Lon:"
     ],
     da: [
-        'Angiv placering', 
+        'Opdater placering', 
         'Slet placering', 
         'Vælg en gemt placering', 
         'Tilføj, rediger eller slet placering', 
+        'Placeringsradius',
         'Opdater ALLE åbne filer til denne placering',
         "Bredde:", "Længde:"
     ],
     de: [
-        'Standort festlegen', 
+        'Standort aktualisieren', 
         'Standort löschen', 
         'Gespeicherten Standort auswählen', 
         'Standort hinzufügen, bearbeiten oder löschen', 
+        'Standortradius',
         'Alle geöffneten Dateien auf diesen Standort aktualisieren',
         "Breitengrad:", "Längengrad:"
     ],
     es: [
-        'Establecer ubicación', 
+        'Actualizar ubicación', 
         'Eliminar ubicación', 
         'Seleccionar una ubicación guardada', 
         'Añadir, editar o eliminar una ubicación', 
+        'Radio de ubicación',
         'Actualizar TODOS los archivos abiertos a esta ubicación',
         "Latitud:", "Longitud:"
     ],
     fr: [
-        'Définir l’emplacement', 
+        'Mettre à jour l’emplacement', 
         'Supprimer l’emplacement', 
         'Choisir un emplacement enregistré', 
         'Ajouter, modifier ou supprimer un emplacement', 
+        'Rayon de l’emplacement',
         'Mettre à jour TOUS les fichiers ouverts à cet emplacement',
         "Lat:", "Long:"
     ],
     ja: [
-        '位置を設定', 
+        '位置を更新', 
         '位置を削除', 
         '保存された位置を選択', 
         '位置を追加、編集、または削除', 
+        '位置の半径',
         'すべての開いているファイルをこの位置に更新',
         "緯度:", "経度:"
     ],
     nl: [
-        'Locatie instellen', 
+        'Locatie bijwerken', 
         'Locatie verwijderen', 
         'Kies een opgeslagen locatie', 
         'Locatie toevoegen, bewerken of verwijderen', 
+        'Locatiestraal',
         'Werk ALLE geopende bestanden bij naar deze locatie',
         "Breedte:", "Lengte:"
     ],
     pt: [
-        'Definir localização', 
+        'Atualizar localização', 
         'Excluir localização', 
         'Escolher uma localização salva', 
         'Adicionar, editar ou excluir localização', 
+        'Raio da localização',
         'Atualizar TODOS os arquivos abertos para esta localização',
         "Lat:", "Lon:"
     ],
     ru: [
-        'Установить местоположение', 
+        'Обновить местоположение', 
         'Удалить местоположение', 
         'Выбрать сохранённое местоположение', 
         'Добавить, изменить или удалить местоположение', 
+        'Радиус местоположения',
         'Обновить ВСЕ открытые файлы до этого местоположения',
         "Широта:", "Долгота:"
     ],
     sv: [
-        'Ange plats', 
+        'Uppdatera plats', 
         'Radera plats', 
         'Välj en sparad plats', 
         'Lägg till, redigera eller radera plats', 
+        'Platsradie',
         'Uppdatera ALLA öppna filer till denna plats',
         "Latitud:", "Longitud:"
     ],
     zh: [
-        '设置位置', 
+        '更新位置', 
         '删除位置', 
         '选择一个保存的位置', 
         '添加、编辑或删除位置', 
+        '位置半径',
         '更新所有打开的文件到此位置',
         "纬度:", "经度:"
     ]
 };
+
 
 const Context = {
     en: {

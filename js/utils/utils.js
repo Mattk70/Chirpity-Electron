@@ -254,7 +254,7 @@ function requestFromWorker(worker, action, payload = {}) {
    timeoutId = setTimeout(() => {
       worker.removeEventListener("message", handleMessage);
       reject(new Error(`Worker request timed out for action: ${action}`));
-    }, 60000); // 60 second timeout
+    }, 15_000); // 15 second timeout
 
     worker.addEventListener("message", handleMessage);
     worker.postMessage({ id: messageId, action, ...payload });
