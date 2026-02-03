@@ -1012,10 +1012,7 @@ const cancelDefaultLocation = () => {
   button.innerHTML = 'Set <span class="material-symbols-outlined">done</span>';
 };
 
-const setDefaultLocation = () => {
-  const latVal = DOM.defaultLat.valueAsNumber;
-  const lonVal = DOM.defaultLon.valueAsNumber;
-  const checkCoords = (latVal, lonVal) => {
+const checkCoords = (latVal, lonVal) => {
     if (!Number.isFinite(latVal) || !Number.isFinite(lonVal) 
       || latVal < -90 || latVal > 90 || lonVal < -180 || lonVal > 180) {
       generateToast({ type: "warning", message: "placeOutOfBounds" });
@@ -1023,6 +1020,10 @@ const setDefaultLocation = () => {
     }
     return true;
   }
+
+const setDefaultLocation = () => {
+  const latVal = DOM.defaultLat.valueAsNumber;
+  const lonVal = DOM.defaultLon.valueAsNumber;
   if (!checkCoords(latVal, lonVal)) return;
   config.latitude = parseFloat(latVal).toFixed(4);
   config.longitude = parseFloat(lonVal).toFixed(4);

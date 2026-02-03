@@ -5252,10 +5252,10 @@ async function onSetLocation({
     return;
   }
   if (!manualUpdate) {
-    const nearby = await getNearbyLocations(lat, lon, 0.1);
+    const nearby = await getNearbyLocationsCached(lat, lon);
     if (nearby.length && nearby[0].distance > 0) {
       // Test & log without actually doing anything
-      console.info("Nearby locations exist", nearby.flatMap(x => x.distance).join(", "));
+      console.info("Nearby locations exist", nearby.flatMap(x => Math.round(x.distance)).join(", "));
     }
   }
 
@@ -5276,21 +5276,26 @@ async function onSetLocation({
     if (row) {
       id = row.id;
     } else {
-    const row = manualUpdate
-      ? await db.getAsync('SELECT id FROM locations WHERE lat = ? AND lon = ? AND place = ?', lat, lon, place)
-      : await db.getAsync('SELECT id FROM locations WHERE lat = ? AND lon = ?', lat, lon);
-    if (row) {
-      id = row.id;
-    } else {
-      const SQL = manualUpdate
-        ? `INSERT INTO locations (lat, lon, place) VALUES (?, ?, ?)
-           ON CONFLICT(lat, lon) DO UPDATE SET place = excluded.place
-           RETURNING id;`
-        : `INSERT INTO locations (lat, lon, place) VALUES (?, ?, ?) RETURNING id;`;
-      const result = await db.getAsync(SQL, lat, lon, place);
-      id = result?.id;
-      invalidateLocations();
-    }
+      await dbMutex.lock();
+      try {
+        const row = manualUpdate
+          ? await db.getAsync('SELECT id FROM locations WHERE lat = ? AND lon = ? AND place = ?', lat, lon, place)
+          : await db.getAsync('SELECT id FROM locations WHERE lat = ? AND lon = ?', lat, lon);
+        if (row) {
+          id = row.id;
+        } else {
+            const SQL = manualUpdate
+              ? `INSERT INTO locations (lat, lon, place) VALUES (?, ?, ?)
+                ON CONFLICT(lat, lon) DO UPDATE SET place = excluded.place
+                RETURNING id;`
+              : `INSERT INTO locations (lat, lon, place) VALUES (?, ?, ?) RETURNING id;`;
+            const result = await db.getAsync(SQL, lat, lon, place);
+            id = result?.id;
+          invalidateLocations();
+        }
+      } finally {
+        dbMutex.unlock();
+      }
   }
   
 // TODO: check if file in audio library and update its location on disk and in library
@@ -5316,6 +5321,7 @@ let locationsCache = null;
 let locationsPromise = null;
 function invalidateLocations() {
   locationsCache = null;
+  STATE.nearbyLocationCache.clear();
 }
 function getLocations({ file, db = STATE.db, id }) {
   // 1️⃣ Return cached value immediately
@@ -5363,6 +5369,17 @@ function getLocations({ file, db = STATE.db, id }) {
   });
 }
 
+
+async function getNearbyLocationsCached(lat, lon) {
+  const key = `${lat} ${lon}`;
+  const cache = STATE.nearbyLocationCache;
+  if (!cache.has(key)) {
+    cache.set(key, getNearbyLocations(lat, lon));
+    console.warn("Cache miss for nearby locations", key);
+  }
+  return cache.get(key);
+}
+
 /**
  * getNearbyLocations
  * Fetches locations from the database that are within a specified radius of given latitude and longitude using the Haversine formula.
@@ -5372,9 +5389,8 @@ function getLocations({ file, db = STATE.db, id }) {
  * @returns {Promise<Array.<{id: number, lat: number, lon: number, place: string, distance: number}>>}
 */
 
-async function getNearbyLocations(lat, lon, radius = 0.1) {
-  const miles = STATE.distanceUnit === 'miles';
-  const R = miles ? 3959 : 6371; // Radius of the Earth in miles or km
+async function getNearbyLocations(lat, lon, radius = 100) {
+  const R = 6_371_000; // Radius of the Earth in metres
   const locations = await STATE.db.allAsync(`
     SELECT *
       FROM (

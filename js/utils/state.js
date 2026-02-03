@@ -71,6 +71,7 @@ export class WorkerState {
     (this.lat = undefined),
     (this.lon = undefined),
     (this.place = undefined),
+    (this.nearbyLocationCache = new Map()),
     (this.locationID = undefined),
     (this.locale = "en"),
     (this.speciesThreshold = undefined),
