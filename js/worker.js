@@ -28,6 +28,7 @@ import {
 import { customURLEncode, installConsoleTracking, trackEvent as _trackEvent } from "./utils/tracking.js";
 import { onChartRequest }  from "./components/charts.js";
 import { getAudioMetadata } from "./models/training.js";
+import { mem } from "systeminformation";
 let isWin32 = false;
 
 const dbMutex = new Mutex();
@@ -299,7 +300,7 @@ async function loadDB(modelPath) {
   }
 
   checkNewModel(modelID) && (STATE.modelID = modelID);
-  // STATE.update({ db: diskDB });
+
   diskDB.locale = STATE.locale;
   await diskDB.runAsync("VACUUM");
   await diskDB.runAsync("CREATE INDEX IF NOT EXISTS idx_records_modelID ON records(modelID)");
@@ -771,6 +772,8 @@ async function handleMessage(e) {
         diskDB = await loadDB(STATE.modelPath)
         // Create a fresh memoryDB to attach to it
         memoryDB = await createDB({file: null, diskDB, dbMutex})
+        STATE.update({ db: memoryDB });
+        invalidateLocations()
       }
       if (args.labelFilters) {
         const species = args.species;
@@ -5375,7 +5378,7 @@ async function getNearbyLocationsCached(lat, lon) {
   const cache = STATE.nearbyLocationCache;
   if (!cache.has(key)) {
     cache.set(key, getNearbyLocations(lat, lon));
-    console.warn("Cache miss for nearby locations", key);
+    console.log("Cache miss for nearby locations", key);
   }
   return cache.get(key);
 }
