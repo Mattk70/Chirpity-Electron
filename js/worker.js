@@ -5387,7 +5387,7 @@ async function getNearbyLocationsCached(lat, lon) {
  * Fetches locations from the database that are within a specified radius of given latitude and longitude using the Haversine formula.
  * @param {number} lat
  * @param {number} lon
- * @param {number} radius in km
+ * @param {number} radius in metres
  * @returns {Promise<Array.<{id: number, lat: number, lon: number, place: string, distance: number}>>}
 */
 
