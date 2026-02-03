@@ -299,7 +299,7 @@ async function loadDB(modelPath) {
   }
 
   checkNewModel(modelID) && (STATE.modelID = modelID);
-  STATE.update({ db: diskDB });
+  // STATE.update({ db: diskDB });
   diskDB.locale = STATE.locale;
   await diskDB.runAsync("VACUUM");
   await diskDB.runAsync("CREATE INDEX IF NOT EXISTS idx_records_modelID ON records(modelID)");
@@ -659,7 +659,12 @@ async function handleMessage(e) {
     }
     case "update-list": {
       STATE.list = args.list;
-      await diskDB.runAsync('DELETE FROM confidence_overrides');
+      try {
+        await diskDB.runAsync('DELETE FROM confidence_overrides');
+      } catch (e) {
+        // no table do nothing
+        console.info('no confidence_overrides table?', e)
+      }
       if (args.list === "custom") {
         STATE.customLabels = args.customLabels;
         STATE.customLabelsMap = Object.fromEntries(
@@ -833,20 +838,18 @@ async function savedFileCheckAsync(fileList) {
     const library = STATE.library.location + p.sep;
     for (let i = 0; i < fileList.length; i += batchSize) {
       const fileSlice = fileList.slice(i, i + batchSize);
-      let query; 
       const newList = fileSlice.map(file => file.replace(library, ''));
       // detect if any changes were made
       const libraryFiles = newList.filter((item, i) => item !== fileSlice[i]);
-      const params = prepParams(newList);
-      let countResult;
+      const placeholders = prepParams(newList);
+      let countResult, parameters = fileSlice.slice(); // make a copy
+      let query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${placeholders})`;
       if (libraryFiles.length) {
-        const archiveParams = prepParams(libraryFiles);
-        query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${params}) or archiveName IN (${archiveParams})`;
-        countResult = await diskDB.getAsync(query, ...fileSlice, ...libraryFiles);
-      } else {
-        query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${params})`;
-        countResult = await diskDB.getAsync(query, ...fileSlice);
+        const archivePlaceholders = prepParams(libraryFiles);
+        query += ` OR archiveName IN (${archivePlaceholders})`;
+        parameters.push(...libraryFiles)
       }
+      countResult = await diskDB.getAsync(query, ...parameters);
       const count = countResult?.count || 0;
       if (count < fileSlice.length) {
         UI.postMessage({
@@ -931,7 +934,7 @@ async function onLaunch({
     if (fs.existsSync(p.join(modelPath, '_internal'))){
       message += 'The version of Perch you have is not compatible with this version of Chirpity. '
     } 
-    message += `You can download a working version from the <a href="https://chirpity.mattkirkland.co.uk#classifiers" target='_blank'>website</a>.
+    message += `You can download a working version from the <a href="https://chirpity.net#classifiers" target='_blank'>website</a>.
     For now, the BirdNET model will be loaded instead.`
     model = 'birdnet'; perch = false; modelPath = null;
     generateAlert({message, type:'error'})
@@ -1109,9 +1112,11 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true}) => {
       STATE.originalFiles = filePaths;
       await Promise.all([getSummary(), getResults()]);
     }
-  }
+  } else {
   // Start gathering metadata for new files
-  processFilesInBatches(filePaths, 10);
+    processFilesInBatches(filePaths, 10);
+  }
+  
   return filePaths;
 };
 
@@ -1145,7 +1150,11 @@ async function processFilesInBatches(filePaths, batchSize = 20) {
         }
       ))
     );
-
+    UI.postMessage({
+      event: "footer-progress",
+      progress: { percent: ((i + results.length) / filePaths.length) *100 },
+      text: "Reading metadata",
+    });
     DEBUG && console.log(`Processed ${i + results.length} of ${filePaths.length}`);
   }
   DEBUG && console.log(`All files processed in ${Date.now() - t0}ms`);
@@ -1644,8 +1653,6 @@ async function onAnalyse({
     STATE.locationID = undefined;
     //create a copy of files in scope for state, as filesInScope is spliced
     STATE.setFiles([...filesInScope]);
-    // Check duration and expected batches of files
-    processFilesInBatches(filesInScope, 10);
   }
 
   let count = 0;
@@ -2170,7 +2177,7 @@ const setMetadata = async ({ file, source_file = file }) => {
       fileMeta.isSaved = true; // Queried by UI to establish saved state of file.
     } 
 
-    let guanoTimestamp, bextTimestamp, recorderModel;
+    let guanoTimestamp, bextTimestamp, recorderModel, lat, lon, place;
     // savedMeta may just have a locationID if it was set by onSetLocation
     if (!savedMeta?.duration) {
       fileMeta.duration = await getDuration(file);
@@ -2186,13 +2193,13 @@ const setMetadata = async ({ file, source_file = file }) => {
           if (metaKeys.includes("guano")) {
             const guano = wavMetadata.guano;
             recorderModel = guano.Model;
-            const location = guano["Loc Position"];
-            if (location) {
-              const [lat, lon] = location.split(" ");
+            place = guano["Site Name"] || guano["Loc Position"];
+            if (place) {
+              [lat, lon] = place.split(" ");
               await onSetLocation({
                 lat,
                 lon,
-                place: location,
+                place,
                 files: [file],
                 overwritePlaceName: false,
               });
@@ -2274,8 +2281,9 @@ const setMetadata = async ({ file, source_file = file }) => {
       // Set complete flag
       fileMeta.isComplete = true;
     }
-    METADATA[file] = fileMeta;
-    return fileMeta;
+    METADATA[file] = {...METADATA[file],...fileMeta};
+    if (place) await onSetLocation({ lat, lon, place, files: [file], manualUpdate: false });
+    return METADATA[file];
   })();
 
   metadataLocks[file] = run;
@@ -3473,18 +3481,20 @@ const onInsertManualRecord = async ({
   if (!res?.filestart) {
     // Manual records can be added off the bat, so there may be no record of the file in either db
     let duration, metadata;
-    ({fileStart, duration, metadata} = METADATA[file]);
+    ({fileStart, duration, metadata, locationID} = METADATA[file]);
     res = await db.runAsync(
-      `INSERT INTO files ( id, name, duration, filestart,  metadata ) VALUES (?,?,?,?,?)
+      `INSERT INTO files ( id, name, duration, filestart, locationID, metadata ) VALUES (?,?,?,?,?,?)
         ON CONFLICT(name) DO UPDATE SET
         duration = EXCLUDED.duration,
         filestart = EXCLUDED.filestart,
+        locationID = COALESCE(EXCLUDED.locationID, files.locationID),        
         metadata = EXCLUDED.metadata
         `,
       fileID,
       file,
       duration,
       fileStart,
+      locationID,
       metadata
     );
     fileID = res.lastID;
@@ -3561,9 +3571,9 @@ const insertDurations = async (file, id) => {
   );
 };
 
-const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, file, modelID, customList) => {
+const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, file, modelID, isCustomList) => {
   const db = STATE.db;
-  const { fileStart, metadata, duration } = METADATA[file];
+  let { fileStart, metadata, duration, locationID } = METADATA[file];
   const predictionLength = STATE.model.includes("bats") ? 0.3 : WINDOW_SIZE;
   let fileID;
   await dbMutex.lock();
@@ -3572,7 +3582,7 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
     // Fetch or Insert File ID
     const res = await db.getAsync("SELECT id, filestart, locationID FROM files WHERE name = ?", file);
     fileID = res?.id; 
-    let locationID = res?.locationID;
+    locationID = res?.locationID || locationID;
     const start = res?.filestart;
 
     if (!start) {
@@ -3603,6 +3613,7 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
          ON CONFLICT(name) DO UPDATE SET 
          duration = EXCLUDED.duration,
          filestart = EXCLUDED.filestart,
+         locationID = COALESCE(EXCLUDED.locationID, files.locationID),
          metadata = EXCLUDED.metadata 
          RETURNING id`,
         file, duration, fileStart, locationID, metadata
@@ -3635,7 +3646,7 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
         const speciesID = STATE.speciesMap.get(modelID).get(modelSpeciesID);
 
         if (!speciesID) continue; // Skip unknown species
-        if (customList){
+        if (isCustomList){
           const cname = STATE.allLabels[modelSpeciesID].split(getSplitChar())[1];
           if (! allowedByList({cname, timestamp, score: confidence})) continue;
         } else if (confidence < minConfidence) break;
@@ -3657,7 +3668,7 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
     await db.runAsync("END");
   } catch (error) {
     await db.runAsync("ROLLBACK");
-    console.error("Transaction error:", error);
+    console.error("Transaction error during insert:", error);
   } finally {
     dbMutex.unlock();
   }
@@ -3676,9 +3687,9 @@ const parsePredictions = async (response) => {
   DEBUG && console.log("worker being used:", worker);
   const [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
   const {modelID, selection, detect} = STATE;
-  const customList = STATE.list === 'custom';
+  const isCustomList = STATE.list === 'custom';
   if (!selection)
-    await generateInsertQuery(keysArray, speciesIDBatch, confidenceBatch, file, modelID, customList).catch((error) =>
+    await generateInsertQuery(keysArray, speciesIDBatch, confidenceBatch, file, modelID, isCustomList).catch((error) =>
       console.warn("Error generating insert query", error)
     );
   if (index < 500) {
@@ -3720,7 +3731,7 @@ const parsePredictions = async (response) => {
             score: confidence,
             model: STATE.model,
           };
-          if (customList && !selection){
+          if (isCustomList && !selection){
             if (!allowedByList(result)) continue;
           } else if (confidence < loopConfidence) break;
 
@@ -4693,7 +4704,15 @@ const onSave2DiskDB = async ({ file }) => {
       SELECT id, lat, lon, place FROM locations;
     `);
     await memoryDB.runAsync(
-      `INSERT OR REPLACE INTO disk.files SELECT * FROM files`
+    `INSERT INTO disk.files (name, duration, filestart, locationID, archiveName, metadata)
+      SELECT name, duration, filestart, locationID, archiveName, metadata FROM files
+      WHERE filestart IS NOT NULL
+      ON CONFLICT(name) DO UPDATE SET
+        duration     = excluded.duration,
+        filestart    = excluded.filestart,
+        locationID   = excluded.locationID,
+        archiveName  = excluded.archiveName,
+        metadata     = excluded.metadata;`
     );
     await memoryDB.runAsync(
       `INSERT OR IGNORE INTO disk.tags SELECT * FROM tags`
@@ -4724,7 +4743,7 @@ const onSave2DiskDB = async ({ file }) => {
   } catch (error) {
     await memoryDB.runAsync("ROLLBACK");
     errorOccurred = true;
-    console.error("Transaction error:", error);
+    console.error("Transaction error during save to disk:", error);
   } finally {
     dbMutex.unlock();
     if (!errorOccurred) {
@@ -5236,7 +5255,7 @@ async function onSetLocation({
   }
   if (!overwritePlaceName) {
     const nearby = await getNearbyLocations(lat, lon, 0.1);
-    if (nearby.length) {
+    if (nearby.length && nearby[0].distance > 0) {
       // Test & log without actually doing anything
       console.info("Nearby locations exist", nearby.flatMap(x => x.distance).join(", "));
     }
@@ -5309,17 +5328,21 @@ async function getNearbyLocations(lat, lon, radius = 0.1) {
   const miles = STATE.distanceUnit === 'miles';
   const R = miles ? 3959 : 6371; // Radius of the Earth in miles or km
   const locations = await STATE.db.allAsync(`
-    SELECT id, lat, lon, place,
-      (${R} * acos(
-        cos(radians(?)) * cos(radians(lat)) * cos(radians(lon) - radians(?)) +
-        sin(radians(?)) * sin(radians(lat))
-      )) AS distance
-    FROM locations
-    WHERE (${R} * acos(
-      cos(radians(?)) * cos(radians(lat)) * cos(radians(lon) - radians(?)) +
-      sin(radians(?)) * sin(radians(lat))
-    )) <= ?
-    ORDER BY distance ASC;`, lat, lon, lat, lat, lon, lat, radius);
+    SELECT *
+      FROM (
+        SELECT
+          id, lat, lon, place,
+          (${R} * acos(
+            min(1, max(-1,
+              cos(radians(?)) * cos(radians(lat)) *
+              cos(radians(lon) - radians(?)) +
+              sin(radians(?)) * sin(radians(lat))
+            ))
+          )) AS distance
+        FROM locations
+      )
+      WHERE distance <= ? 
+      ORDER BY distance ASC`, lat, lon, lat, radius);
   return locations;
 }
 
