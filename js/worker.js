@@ -5291,6 +5291,7 @@ async function onSetLocation({
       id = result?.id;
       invalidateLocations();
     }
+  }
   
 // TODO: check if file in audio library and update its location on disk and in library
 // await checkLibrary(file, lat,lon, place)
