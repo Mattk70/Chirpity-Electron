@@ -670,8 +670,9 @@ async function handleMessage(e) {
         STATE.customLabelsMap = Object.fromEntries(
           await Promise.all(
             args.customLabels.map(async (line) => {
+              const splitOn = STATE.model === 'perch v2' ? /[,~]/ : /[,_]/;
               let [_sname, cname, start, end, confidence] =
-                line.split(",").map(v => v.trim());
+                line.split(splitOn).map(v => v.trim());
 
               if (!args.member) {
                 start = undefined;
@@ -772,7 +773,7 @@ async function handleMessage(e) {
         // Create a fresh memoryDB to attach to it
         memoryDB = await createDB({file: null, diskDB, dbMutex})
         STATE.update({ db: memoryDB });
-        invalidateLocations()
+        invalidateLocations(-1); // invalidate all location caches
       }
       if (args.labelFilters) {
         const species = args.species;
@@ -5270,7 +5271,7 @@ async function onSetLocation({
     );
     if (row) {
       await db.runAsync("DELETE FROM locations WHERE id = ?", row.id);
-      invalidateLocations();
+      invalidateLocations(row.id);
     }
   } else {
     let id;
@@ -5293,7 +5294,7 @@ async function onSetLocation({
               : `INSERT INTO locations (lat, lon, place) VALUES (?, ?, ?) RETURNING id;`;
             const result = await db.getAsync(SQL, lat, lon, place);
             id = result?.id;
-          invalidateLocations();
+          invalidateLocations(id);
         }
       } finally {
         dbMutex.unlock();
@@ -5321,9 +5322,15 @@ async function onSetLocation({
 
 let locationsCache = null;
 let locationsPromise = null;
-function invalidateLocations() {
+function invalidateLocations(id) {
   locationsCache = null;
   STATE.nearbyLocationCache.clear();
+  for (const meta of Object.values(METADATA)) {
+    if (!meta) continue;
+    if (id === -1 || meta.locationID === id) {
+      meta.locationID = undefined;
+    }
+  }
 }
 function getLocations({ file, db = STATE.db, id }) {
   // 1️⃣ Return cached value immediately
