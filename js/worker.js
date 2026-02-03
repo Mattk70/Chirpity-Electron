@@ -5327,12 +5327,14 @@ function getLocations({ file, db = STATE.db, id }) {
         "SELECT * FROM locations ORDER BY place"
       );
 
-      locations ??= [{
-        id: 0,
-        lat: STATE.lat,
-        lon: STATE.lon,
-        place: STATE.place.trim(),
-      }];
+      if (!locations?.length) {
+        locations = [{
+          id: 0,
+          lat: STATE.lat,
+          lon: STATE.lon,
+          place: STATE.place.trim(),
+        }];
+      }
 
       locationsCache = locations;
       return locations;
