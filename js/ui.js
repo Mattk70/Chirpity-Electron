@@ -1021,6 +1021,7 @@ const setDefaultLocation = () => {
       generateToast({ type: "warning", message: "placeOutOfBounds" });
       return false;
     }
+    return true;
   }
   if (!checkCoords(latVal, lonVal)) return;
   config.latitude = parseFloat(latVal).toFixed(4);

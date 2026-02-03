@@ -2278,7 +2278,7 @@ const setMetadata = async ({ file, source_file = file }) => {
       fileMeta.isComplete = true;
     }
     METADATA[file] = {...METADATA[file],...fileMeta};
-    if (place  && Number.isFinite(lat) && Number.isFinite(lon)) {
+    if (place  && Number.isFinite(parseFloat(lat)) && Number.isFinite(parseFloat(lon))) {
       await onSetLocation({ lat, lon, place, files: [file], manualUpdate: false });
     }
     return METADATA[file];
