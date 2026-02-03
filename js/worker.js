@@ -841,7 +841,7 @@ async function savedFileCheckAsync(fileList) {
       const newList = fileSlice.map(file => file.replace(library, ''));
       // detect if any changes were made
       const libraryFiles = newList.filter((item, i) => item !== fileSlice[i]);
-      const placeholders = prepParams(newList);
+      const placeholders = prepParams(fileSlice);
       let countResult, parameters = fileSlice.slice(); // make a copy
       let query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${placeholders})`;
       if (libraryFiles.length) {
@@ -2193,18 +2193,14 @@ const setMetadata = async ({ file, source_file = file }) => {
           if (metaKeys.includes("guano")) {
             const guano = wavMetadata.guano;
             recorderModel = guano.Model;
-            place = guano["Site Name"] || guano["Loc Position"];
-            if (place) {
-              [lat, lon] = place.split(" ");
-              await onSetLocation({
-                lat,
-                lon,
-                place,
-                files: [file],
-                overwritePlaceName: false,
-              });
-              fileMeta.lat = roundedFloat(lat);
-              fileMeta.lon = roundedFloat(lon);
+            const locPosition = guano["Loc Position"];
+            place = guano["Site Name"] || locPosition;
+            if (locPosition) {
+              [lat, lon] = locPosition.split(" ");
+              if (Number.isFinite(parseFloat(lat)) && Number.isFinite(parseFloat(lon))) {
+                fileMeta.lat = roundedFloat(lat);
+                fileMeta.lon = roundedFloat(lon);
+              }
             }
             guanoTimestamp = Date.parse(guano.Timestamp);
             if (guanoTimestamp) fileMeta.fileStart = guanoTimestamp;
@@ -2282,7 +2278,9 @@ const setMetadata = async ({ file, source_file = file }) => {
       fileMeta.isComplete = true;
     }
     METADATA[file] = {...METADATA[file],...fileMeta};
-    if (place) await onSetLocation({ lat, lon, place, files: [file], manualUpdate: false });
+    if (place  && Number.isFinite(lat) && Number.isFinite(lon)) {
+      await onSetLocation({ lat, lon, place, files: [file], manualUpdate: false });
+    }
     return METADATA[file];
   })();
 
@@ -3480,7 +3478,7 @@ const onInsertManualRecord = async ({
 
   if (!res?.filestart) {
     // Manual records can be added off the bat, so there may be no record of the file in either db
-    let duration, metadata;
+    let duration, metadata, locationID;
     ({fileStart, duration, metadata, locationID} = METADATA[file]);
     res = await db.runAsync(
       `INSERT INTO files ( id, name, duration, filestart, locationID, metadata ) VALUES (?,?,?,?,?,?)
@@ -3582,7 +3580,7 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
     // Fetch or Insert File ID
     const res = await db.getAsync("SELECT id, filestart, locationID FROM files WHERE name = ?", file);
     fileID = res?.id; 
-    locationID = res?.locationID || locationID;
+    locationID = res?.locationID ?? locationID;
     const start = res?.filestart;
 
     if (!start) {
@@ -4710,7 +4708,7 @@ const onSave2DiskDB = async ({ file }) => {
       ON CONFLICT(name) DO UPDATE SET
         duration     = excluded.duration,
         filestart    = excluded.filestart,
-        locationID   = excluded.locationID,
+        locationID   = COALESCE(excluded.locationID, disk.files.locationID),
         archiveName  = excluded.archiveName,
         metadata     = excluded.metadata;`
     );
@@ -5234,7 +5232,7 @@ async function onUpdateLocale(locale, labels, refreshResults) {
  * @param {string} [params.place] - Name of the location. If omitted, the location is deleted.
  * @param {string[]} params.files - List of file names to update.
  * @param {Object} [params.db] - Database instance to use.
- * @param {boolean} [params.overwritePlaceName=true] - Whether to overwrite the place name if the location already exists.
+ * @param {boolean} [params.manualUpdate=true] - Whether to overwrite the place name if the location already exists.
  */
 async function onSetLocation({
   lat,
@@ -5242,7 +5240,7 @@ async function onSetLocation({
   place,
   files,
   db = STATE.db,
-  overwritePlaceName = true,
+  manualUpdate = true,
 }) {
   lat = roundedFloat(lat);
   lon = roundedFloat(lon);
@@ -5253,7 +5251,7 @@ async function onSetLocation({
     await memoryDB.runAsync(`INSERT OR REPLACE INTO locations (id, lat, lon, place) VALUES (0, ?, ?, ?)`, lat, lon, place.trim());
     return;
   }
-  if (!overwritePlaceName) {
+  if (!manualUpdate) {
     const nearby = await getNearbyLocations(lat, lon, 0.1);
     if (nearby.length && nearby[0].distance > 0) {
       // Test & log without actually doing anything
@@ -5270,19 +5268,21 @@ async function onSetLocation({
     );
     if (row) {
       await db.runAsync("DELETE FROM locations WHERE id = ?", row.id);
+      invalidateLocations();
     }
   } else {
-    const SQL = overwritePlaceName
-    ? `INSERT INTO locations (lat, lon, place) VALUES (?, ?, ?)
-       ON CONFLICT(lat, lon) DO UPDATE SET place = excluded.place
-       RETURNING id;`
-    : `INSERT OR IGNORE INTO locations (lat, lon, place) VALUES (?, ?, ?)
-       RETURNING id;`;
-  
-    const result = await db.getAsync(SQL, lat, lon, place);
-    const id = result?.id ?? (
-      await db.getAsync("SELECT id FROM locations WHERE lat = ? AND lon = ?", lat, lon)
-    )?.id;
+    let id;
+    const row  = await db.getAsync('SELECT id FROM locations WHERE lat = ? AND lon = ? AND place = ?', lat, lon, place);
+    if (row) {
+      id = row.id;
+    } else {
+      const SQL = `INSERT INTO locations (lat, lon, place) VALUES (?, ?, ?)
+         ON CONFLICT(lat, lon) DO UPDATE SET place = excluded.place
+         RETURNING id;`;
+      const result = await db.getAsync(SQL, lat, lon, place);
+      id = result?.id;
+      invalidateLocations();
+    }
   
 // TODO: check if file in audio library and update its location on disk and in library
 // await checkLibrary(file, lat,lon, place)
@@ -5303,15 +5303,52 @@ async function onSetLocation({
   await getLocations({ file: files[0] });
 }
 
-async function getLocations({ file, db = STATE.db, id }) {
-  let locations = await db.allAsync("SELECT * FROM locations ORDER BY place");
-  // Default location
-  locations ??= [{ id: 0, lat: STATE.lat, lon: STATE.lon, place: STATE.place.trim() }];
-  UI.postMessage({
-    id,
-    event: "location-list",
-    data: locations,
-    currentLocation: METADATA[file]?.locationID,
+let locationsCache = null;
+let locationsPromise = null;
+function invalidateLocations() {
+  locationsCache = null;
+}
+function getLocations({ file, db = STATE.db, id }) {
+  // 1️⃣ Return cached value immediately
+  if (locationsCache) {
+    UI.postMessage({
+      id,
+      event: "location-list",
+      data: locationsCache,
+      currentLocation: METADATA[file]?.locationID,
+    });
+    return Promise.resolve(locationsCache);
+  }
+
+  // 2️⃣ Reuse in-flight fetch
+  if (!locationsPromise) {
+    locationsPromise = (async () => {
+      let locations = await db.allAsync(
+        "SELECT * FROM locations ORDER BY place"
+      );
+
+      locations ??= [{
+        id: 0,
+        lat: STATE.lat,
+        lon: STATE.lon,
+        place: STATE.place.trim(),
+      }];
+
+      locationsCache = locations;
+      return locations;
+    })().finally(() => {
+      locationsPromise = null;
+    });
+  }
+
+  return locationsPromise.then(locations => {
+    UI.postMessage({
+      id,
+      event: "location-list",
+      data: locations,
+      currentLocation: METADATA[file]?.locationID,
+    });
+    return locations;
   });
 }
 

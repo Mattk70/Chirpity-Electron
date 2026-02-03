@@ -1013,8 +1013,16 @@ const cancelDefaultLocation = () => {
 };
 
 const setDefaultLocation = () => {
-  const latVal = DOM.defaultLat.value || 0;
-  const lonVal = DOM.defaultLon.value || 0;
+  const latVal = DOM.defaultLat.valueAsNumber;
+  const lonVal = DOM.defaultLon.valueAsNumber;
+  const checkCoords = (latVal, lonVal) => {
+    if (!Number.isFinite(latVal) || !Number.isFinite(lonVal) 
+      || latVal < -90 || latVal > 90 || lonVal < -180 || lonVal > 180) {
+      generateToast({ type: "warning", message: "placeOutOfBounds" });
+      return false;
+    }
+  }
+  if (!checkCoords(latVal, lonVal)) return;
   config.latitude = parseFloat(latVal).toFixed(4);
   config.longitude = parseFloat(lonVal).toFixed(4);
   const locationText = DOM.place.textContent.replace("fmd_good", "").trim();
@@ -1096,8 +1104,9 @@ async function setCustomLocation() {
     locationID = savedLocationSelect.value;
     const batch = document.getElementById("batchLocations").checked;
     const files = batch ? STATE.openFiles : [STATE.currentFile];
-    const lat = latEl.valueAsNumber || 0;
-    const lon = lonEl.valueAsNumber || 0;
+    const lat = latEl.valueAsNumber;
+    const lon = lonEl.valueAsNumber;
+    if (!checkCoords(lat, lon)) return;
     worker.postMessage({
       action: "set-custom-file-location",
       lat,
