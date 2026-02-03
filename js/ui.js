@@ -572,6 +572,7 @@ const postBufferUpdate = ({
   resetSpec = false,
   goToRegion = false,
 }) => {
+  if (!file) return;
   STATE.fileLoaded = false;
   worker.postMessage({
     action: "update-buffer",
@@ -1012,9 +1013,21 @@ const cancelDefaultLocation = () => {
   button.innerHTML = 'Set <span class="material-symbols-outlined">done</span>';
 };
 
+const checkCoords = (latVal, lonVal) => {
+    if (!Number.isFinite(latVal) || !Number.isFinite(lonVal) 
+      || latVal < -90 || latVal > 90 || lonVal < -180 || lonVal > 180) {
+      generateToast({ type: "warning", message: "placeOutOfBounds" });
+      return false;
+    }
+    return true;
+  }
+
 const setDefaultLocation = () => {
-  config.latitude = parseFloat(DOM.defaultLat.value).toFixed(4);
-  config.longitude = parseFloat(parseFloat(DOM.defaultLon.value)).toFixed(4);
+  const latVal = DOM.defaultLat.valueAsNumber;
+  const lonVal = DOM.defaultLon.valueAsNumber;
+  if (!checkCoords(latVal, lonVal)) return;
+  config.latitude = parseFloat(latVal).toFixed(4);
+  config.longitude = parseFloat(lonVal).toFixed(4);
   const locationText = DOM.place.textContent.replace("fmd_good", "").trim();
   const isPlaceholder =
     locationText.startsWith("Getting location") ||
@@ -1023,7 +1036,7 @@ const setDefaultLocation = () => {
      ? `${config.latitude}, ${config.longitude}`
      : locationText;
   renderLocation(DOM.place, config.location)
-  updateMap(parseFloat(DOM.defaultLat.value), parseFloat(DOM.defaultLon.value));
+  updateMap(config.latitude, config.longitude);
   updatePrefs("config.json", config);
   worker.postMessage({
     action: "update-state",
@@ -1094,10 +1107,13 @@ async function setCustomLocation() {
     locationID = savedLocationSelect.value;
     const batch = document.getElementById("batchLocations").checked;
     const files = batch ? STATE.openFiles : [STATE.currentFile];
+    const lat = latEl.valueAsNumber;
+    const lon = lonEl.valueAsNumber;
+    if (!checkCoords(lat, lon)) return;
     worker.postMessage({
       action: "set-custom-file-location",
-      lat: latEl.value,
-      lon: lonEl.value,
+      lat,
+      lon,
       place: customPlaceEl.value,
       files: files,
     });
@@ -1149,7 +1165,8 @@ async function sortFilesByTime(fileNames) {
  */
 async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults } = {}) {
   if (!filePaths.length) return;
-  loadingFiles({hide:false})
+  if (STATE.mode === 'chart') showAnalyse()
+
   // Store the sanitised file list and Load First audio file
   pagination.reset();
   resetResults();
@@ -1180,6 +1197,7 @@ async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults 
     STATE.openFiles = await sortFilesByTime(STATE.openFiles);
   }
   utils.showElement(["spectrogramWrapper"], false);
+  spec.reInitSpec(config.specMaxHeight);
   loadAudioFileSync({ filePath: STATE.openFiles[0], preserveResults });
   // Clear unsaved records warning
   window.electron.unsavedRecords(false);
@@ -1594,7 +1612,6 @@ async function showExplore() {
  * @async
  */
 async function showAnalyse() {
-  utils.hideAll();
   utils.disableMenuItem(["active-analysis"]);
   //Restore STATE
   STATE = { ...STATE, ...STATE.currentAnalysis };
@@ -1605,6 +1622,7 @@ async function showAnalyse() {
     spec.spectrogram.destroy();
     spec.spectrogram = null;
   }
+  utils.hideAll();
   if (STATE.currentFile) {
     utils.showElement(["spectrogramWrapper"], false);
     spec.reInitSpec(config.specMaxHeight);
@@ -1981,7 +1999,7 @@ window.onload = async () => {
   }
   const selectedModel = config.selectedModel;
   updateListOptions(selectedModel);
-  debug && document.getElementById('dataset').classList.remove('d-none')
+  // debug && document.getElementById('dataset').classList.remove('d-none')
   isMember && updateModelOptions();
 
   worker.postMessage({
@@ -2224,7 +2242,6 @@ window.onload = async () => {
   pagination.init();
 };
 
-let MISSING_FILE;
 
 const setUpWorkerMessaging = () => {
   establishMessageChannel.then(() => {
@@ -2306,14 +2323,14 @@ const setUpWorkerMessaging = () => {
           if (args.file) {
             // Clear the file loading overlay:
             loadingFiles({hide: true})
-            MISSING_FILE = args.file;
+            const file = args.file;
             const i18 = i18n.get(i18n.Locate);
             args.locate = `
                             <div class="d-flex justify-content-center mt-2">
-                                <button id="locate-missing-file" class="btn btn-primary border-dark text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
+                                <button id="locate-missing-file" name="${file}" class="btn btn-primary border-dark text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
                                     ${i18.locate}
                                 </button>
-                                <button id="purge-from-toast" class="ms-3 btn btn-warning text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
+                                <button id="purge-from-toast" name="${file}" class="ms-3 btn btn-warning text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
                                 ${i18.remove}
                                 </button>
                             </div>
@@ -5357,13 +5374,15 @@ async function handleUIClicks(e) {
     }
 
     case "purge-from-toast": {
-      deleteFile(MISSING_FILE);
+      const file = element.name;
+      deleteFile(file);
       break;
     }
 
     // ----
     case "locate-missing-file": {
-      (async () => await locateFile(MISSING_FILE))();
+      const file = element.name;
+      (async () => await locateFile(file))();
       break;
     }
     case "clear-custom-list": {
@@ -5390,7 +5409,7 @@ async function handleUIClicks(e) {
       config.list = 'everything';
       updateList();
       updatePrefs("config.json", config);
-      showAnalyse();
+      if (STATE.mode !== "analyse") showAnalyse();
       break;
     }
     // Custom models
@@ -5742,6 +5761,15 @@ async function handleUIClicks(e) {
           const archiveFolder = files.filePaths[0];
           config.database.location = archiveFolder;
           document.getElementById("database-location").value = archiveFolder;
+          console.info('New database location selected:', archiveFolder);
+          // Assume no records in it until we hear otherwise from the worker
+          DOM.chartsLink.classList.add("disabled");
+          DOM.exploreLink.classList.add("disabled");
+          config.library.location &&
+            document
+              .getElementById("compress-and-organise")
+              .classList.add("disabled");
+          STATE.diskHasRecords = false;          
           updatePrefs("config.json", config);
           worker.postMessage({
             action: "update-state",
@@ -5750,7 +5778,7 @@ async function handleUIClicks(e) {
           config.list = 'everything';
           updateList()
           updatePrefs("config.json", config);
-          showAnalyse();
+          if (STATE.mode !== "analyse") showAnalyse();
         }
       })();
       break;
@@ -8229,7 +8257,7 @@ function checkForIntelMacUpdates() {
             ].join("");
             alertPlaceholder.append(wrapper);
           };
-          const link = `<a href="https://chirpity.mattkirkland.co.uk?fromVersion=${VERSION}" target="_blank">`;
+          const link = `<a href="https://chirpity.net?fromVersion=${VERSION}" target="_blank">`;
           const message = utils.interpolate(i18n.get(i18n.UpdateMessage), {
             link: link,
           });

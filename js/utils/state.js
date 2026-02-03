@@ -71,6 +71,7 @@ export class WorkerState {
     (this.lat = undefined),
     (this.lon = undefined),
     (this.place = undefined),
+    (this.nearbyLocationCache = new Map()),
     (this.locationID = undefined),
     (this.locale = "en"),
     (this.speciesThreshold = undefined),
@@ -78,6 +79,8 @@ export class WorkerState {
     (this.week = -1),
     (this.list = "everything"),
     (this.customList = undefined),
+    (this.customLabels = []),
+    (this.customLabelsMap = {}),
     (this.notFound = {}), // try to prevent spamming errors
     (this.local = true),
     (this.incrementor = 2),
