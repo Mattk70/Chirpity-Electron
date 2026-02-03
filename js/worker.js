@@ -772,7 +772,8 @@ async function handleMessage(e) {
         diskDB = await loadDB(STATE.modelPath)
         // Create a fresh memoryDB to attach to it
         memoryDB = await createDB({file: null, diskDB, dbMutex})
-        STATE.update({ db: memoryDB });
+        const db = STATE.mode === "analyse" ? memoryDB : diskDB;
+        STATE.update({ db });
         invalidateLocations(-1); // invalidate all location caches
       }
       if (args.labelFilters) {
