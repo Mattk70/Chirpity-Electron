@@ -28,7 +28,6 @@ import {
 import { customURLEncode, installConsoleTracking, trackEvent as _trackEvent } from "./utils/tracking.js";
 import { onChartRequest }  from "./components/charts.js";
 import { getAudioMetadata } from "./models/training.js";
-import { mem } from "systeminformation";
 let isWin32 = false;
 
 const dbMutex = new Mutex();
