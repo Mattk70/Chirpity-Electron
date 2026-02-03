@@ -5276,9 +5276,17 @@ async function onSetLocation({
     if (row) {
       id = row.id;
     } else {
-      const SQL = `INSERT INTO locations (lat, lon, place) VALUES (?, ?, ?)
-         ON CONFLICT(lat, lon) DO UPDATE SET place = excluded.place
-         RETURNING id;`;
+    const row = manualUpdate
+      ? await db.getAsync('SELECT id FROM locations WHERE lat = ? AND lon = ? AND place = ?', lat, lon, place)
+      : await db.getAsync('SELECT id FROM locations WHERE lat = ? AND lon = ?', lat, lon);
+    if (row) {
+      id = row.id;
+    } else {
+      const SQL = manualUpdate
+        ? `INSERT INTO locations (lat, lon, place) VALUES (?, ?, ?)
+           ON CONFLICT(lat, lon) DO UPDATE SET place = excluded.place
+           RETURNING id;`
+        : `INSERT INTO locations (lat, lon, place) VALUES (?, ?, ?) RETURNING id;`;
       const result = await db.getAsync(SQL, lat, lon, place);
       id = result?.id;
       invalidateLocations();
