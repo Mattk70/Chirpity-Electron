@@ -2145,7 +2145,7 @@ function parseBextLocalDate(originationDate, originationTime) {
 }
 
 /**
- * Called by getWorkingFile, setCustomLocation
+ * Called by getWorkingFile, setLocation
  * Assigns file metadata to a metadata cache object. file is the key, and is the source file
  * @param file: the file name passed to the worker
  * @param source_file: the file that exists ( will be different after compression)

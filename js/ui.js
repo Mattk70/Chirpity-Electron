@@ -572,6 +572,7 @@ const postBufferUpdate = ({
   resetSpec = false,
   goToRegion = false,
 }) => {
+  if (!file) return;
   STATE.fileLoaded = false;
   worker.postMessage({
     action: "update-buffer",
@@ -1165,7 +1166,7 @@ async function sortFilesByTime(fileNames) {
 async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults } = {}) {
   if (!filePaths.length) return;
   if (STATE.mode === 'chart') showAnalyse()
-  loadingFiles({hide:false})
+
   // Store the sanitised file list and Load First audio file
   pagination.reset();
   resetResults();
@@ -1196,6 +1197,7 @@ async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults 
     STATE.openFiles = await sortFilesByTime(STATE.openFiles);
   }
   utils.showElement(["spectrogramWrapper"], false);
+  spec.reInitSpec(config.specMaxHeight);
   loadAudioFileSync({ filePath: STATE.openFiles[0], preserveResults });
   // Clear unsaved records warning
   window.electron.unsavedRecords(false);
@@ -1610,7 +1612,6 @@ async function showExplore() {
  * @async
  */
 async function showAnalyse() {
-  utils.hideAll();
   utils.disableMenuItem(["active-analysis"]);
   //Restore STATE
   STATE = { ...STATE, ...STATE.currentAnalysis };
@@ -1621,6 +1622,7 @@ async function showAnalyse() {
     spec.spectrogram.destroy();
     spec.spectrogram = null;
   }
+  utils.hideAll();
   if (STATE.currentFile) {
     utils.showElement(["spectrogramWrapper"], false);
     spec.reInitSpec(config.specMaxHeight);
