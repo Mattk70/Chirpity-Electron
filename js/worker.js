@@ -1314,11 +1314,13 @@ async function getMatchingIds(cnames) {
  * @returns {Promise<string>} An SQL fragment restricting species by id (for example " AND s.id IN (1,2) "),
  * or an empty string when no filtering is required.
  */
-async function getSpeciesSQLAsync(){
+async function getSpeciesSQLAsync(file){
   let not = "", SQL = "";
-  const {list, allLabels} = STATE;
+  const {list, allLabels, filesToAnalyse} = STATE;
+  // If we don't have a file, use the first analysed file if available
+  file ??= filesToAnalyse[0];
   if (list !== 'everything') {
-    let included = await getIncludedIDs();
+    let included = await getIncludedIDs(file);
     if (["birds", 'Animalia'].includes(list)) {
       included = getExcluded(included);
       if (!included.length) return SQL; // nothing filtered out
@@ -2089,7 +2091,7 @@ async function sendDetections(file, start, end, goToRegion) {
   const customList = list === "custom";
   const confidence = customList ? 0 : detect.confidence;
   const params = [confidence, file, start, end];
-  const includedSQL = await getSpeciesSQLAsync();
+  const includedSQL = await getSpeciesSQLAsync(file);
 
   let SQL =     `
         WITH RankedRecords AS (
