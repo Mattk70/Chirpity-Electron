@@ -82,6 +82,8 @@ export class WorkerState {
     (this.customList = undefined),
     (this.customLabels = []),
     (this.customLabelsMap = {}),
+    (this.customLabels = []),
+    (this.customLabelsMap = {}),
     (this.notFound = {}), // try to prevent spamming errors
     (this.local = true),
     (this.incrementor = 2),

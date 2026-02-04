@@ -572,6 +572,7 @@ const postBufferUpdate = ({
   resetSpec = false,
   goToRegion = false,
 }) => {
+  if (!file) return;
   STATE.fileLoaded = false;
   worker.postMessage({
     action: "update-buffer",
@@ -1035,9 +1036,19 @@ const cancelDefaultLocation = () => {
   button.innerHTML = 'Set <span class="material-symbols-outlined">done</span>';
 };
 
+const checkCoords = (latVal, lonVal) => {
+    if (!Number.isFinite(latVal) || !Number.isFinite(lonVal) 
+      || latVal < -90 || latVal > 90 || lonVal < -180 || lonVal > 180) {
+      generateToast({ type: "warning", message: "placeOutOfBounds" });
+      return false;
+    }
+    return true;
+  }
+
 const setDefaultLocation = () => {
-  const latVal = DOM.defaultLat.value ?? 0;
-  const lonVal = DOM.defaultLon.value ?? 0;
+  const latVal = DOM.defaultLat.valueAsNumber;
+  const lonVal = DOM.defaultLon.valueAsNumber;
+  if (!checkCoords(latVal, lonVal)) return;
   config.latitude = parseFloat(latVal).toFixed(4);
   config.longitude = parseFloat(lonVal).toFixed(4);
   const locationText = DOM.place.textContent.replace("fmd_good", "").trim();
@@ -1127,10 +1138,11 @@ async function setCustomLocation(manage = false) {
     locationID = savedLocationSelect.value;
     const batch = document.getElementById("batchLocations").checked;
     const files = batch ? STATE.openFiles : [STATE.currentFile];
-    const lat = latEl.valueAsNumber ?? 0;
-    const lon = lonEl.valueAsNumber ?? 0;
     const place = remove ? null : customPlaceEl.value;
     const radius = locationRadius.valueAsNumber;
+    const lat = latEl.valueAsNumber;
+    const lon = lonEl.valueAsNumber;
+    if (!checkCoords(lat, lon)) return;
     worker.postMessage({
       action: "set-location",
       lat,lon,place,radius,files, manage
@@ -1193,7 +1205,7 @@ async function sortFilesByTime(fileNames) {
 async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults } = {}) {
   if (!filePaths.length) return;
   if (STATE.mode === 'chart') showAnalyse()
-  loadingFiles({hide:false})
+
   // Store the sanitised file list and Load First audio file
   pagination.reset();
   resetResults();
@@ -1226,6 +1238,7 @@ async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults 
     STATE.openFiles = await sortFilesByTime(STATE.openFiles);
   }
   utils.showElement(["spectrogramWrapper"], false);
+  spec.reInitSpec(config.specMaxHeight);
   loadAudioFileSync({ filePath: STATE.openFiles[0], preserveResults });
   // Clear unsaved records warning
   window.electron.unsavedRecords(false);
@@ -1640,7 +1653,6 @@ async function showExplore() {
  * @async
  */
 async function showAnalyse() {
-  utils.hideAll();
   utils.disableMenuItem(["active-analysis"]);
   //Restore STATE
   STATE = { ...STATE, ...STATE.currentAnalysis };
@@ -1651,6 +1663,7 @@ async function showAnalyse() {
     spec.spectrogram.destroy();
     spec.spectrogram = null;
   }
+  utils.hideAll();
   if (STATE.currentFile) {
     utils.showElement(["spectrogramWrapper"], false);
     spec.reInitSpec(config.specMaxHeight);
@@ -2271,6 +2284,7 @@ window.onload = async () => {
   );
   pagination.init();
 };
+
 
 const setUpWorkerMessaging = () => {
   establishMessageChannel.then(() => {
@@ -5456,7 +5470,7 @@ async function handleUIClicks(e) {
       config.list = 'everything';
       updateList();
       updatePrefs("config.json", config);
-      showAnalyse();
+      if (STATE.mode !== "analyse") showAnalyse();
       break;
     }
     // Custom models
@@ -5816,8 +5830,7 @@ async function handleUIClicks(e) {
             document
               .getElementById("compress-and-organise")
               .classList.add("disabled");
-          STATE.diskHasRecords = false;
-          
+          STATE.diskHasRecords = false;          
           updatePrefs("config.json", config);
           worker.postMessage({
             action: "update-state",
@@ -5826,7 +5839,7 @@ async function handleUIClicks(e) {
           config.list = 'everything';
           updateList()
           updatePrefs("config.json", config);
-          showAnalyse();
+          if (STATE.mode !== "analyse") showAnalyse();
         }
       })();
       break;
