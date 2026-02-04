@@ -5163,7 +5163,7 @@ async function _updateSpeciesLocale(db, labels) {
 
     // 2. Query all matching species rows
     const snames = [...labelMap.keys()];
-    const placeholders = getSparseReshapeNegativeOutputDimErrorMessage
+    const placeholders = snames.map(() => "?").join(",");
     const speciesRows = await db.allAsync(
       `SELECT sname, cname, modelID FROM species WHERE sname IN (${placeholders})`,
       ...snames
@@ -5433,16 +5433,6 @@ async function getNearbyLocationsCached(lat, lon) {
   if (!cache.has(key)) {
     cache.set(key, getNearbyLocations(lat, lon));
     console.log("Cache miss for nearby locations", key);
-  }
-  return cache.get(key);
-}
-
-
-async function getNearbyLocationsCached(lat, lon) {
-  const key = `${lat} ${lon}`;
-  const cache = STATE.nearbyLocationCache;
-  if (!cache.has(key)) {
-    cache.set(key, getNearbyLocations(lat, lon));
   }
   return cache.get(key);
 }
