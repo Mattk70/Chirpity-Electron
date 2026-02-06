@@ -73,7 +73,7 @@ export class WorkerState {
     (this.place = undefined),
     (this.radius = 100),
     (this.nearbyLocationCache = new Map()),
-    (this.locationID = undefined),
+    (this.location = undefined),
     (this.locale = "en"),
     (this.speciesThreshold = undefined),
     (this.useWeek = false),

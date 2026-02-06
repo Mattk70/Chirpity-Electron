@@ -63,6 +63,7 @@
     "save2db": ["In Archiv speichern","Ctrl+S"
     ],
     "charts": ["Diagramme anzeigen"],
+    "manage-locations": ["Standorte verwalten"],
     "explore": ["Archiv durchsuchen"],
     "chart-datefilter": ["Ein Datumsfilter anwenden"],
     "explore-datefilter": ["Ein Datumsfilter anwenden"],

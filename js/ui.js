@@ -669,6 +669,10 @@ const buildFileMenu = (e) => {
  * @returns {void}
  */
 function showDatePicker() {
+  // Check for a form already existing to prevent multiple forms being opened if the user clicks repeatedly before the first form is removed
+  const existingForm = document.getElementById("fileStart");
+  if (existingForm) return;
+
   // Create a form element
   const i18 = i18n.get(i18n.Form);
   const form = document.createElement("form");
@@ -730,6 +734,7 @@ function showDatePicker() {
       action: "update-file-start",
       file: STATE.currentFile,
       start: timestamp,
+      refreshResults: STATE.analysisDone, // Only refresh results if analysis has already been done
     });
     trackEvent(config.UUID, "Settings Change", "fileStart", newStart);
     resetResults();
@@ -899,12 +904,14 @@ async function generateLocationList(elID) {
 
   const el = document.getElementById(elID);
   el.replaceChildren(); // clear options
-  LOCATIONS = await utils.requestFromWorker(worker, "get-locations", {
+  LOCATIONS ??= await utils.requestFromWorker(worker, "get-locations", {
     file: STATE.currentFile
   });
   if (elID !== "savedLocations"){
     const defaultText =  i18[1];
     el.innerHTML = `<option value="">${defaultText}</option>`; 
+  } else {
+    el.innerHTML = `<option value="">Add New Location</option>`; 
   }
   LOCATIONS.slice() // avoid mutating the original array, just in case
   .sort((a, b) => { // put the default location at the top of the list
@@ -923,9 +930,16 @@ async function generateLocationList(elID) {
 
 const FILE_LOCATION_MAP = {};
 const onFileLocationID = ({ file, id }) => (FILE_LOCATION_MAP[file] = id);
+const onLocationDeleted = ({ id }) => {
+  Object.keys(FILE_LOCATION_MAP).forEach(file => {
+    if (FILE_LOCATION_MAP[file] === id) {
+      delete FILE_LOCATION_MAP[file];
+    }
+  });
+}
 const locationModalDiv = document.getElementById("locationModal");
 locationModalDiv.addEventListener("shown.bs.modal", async () => {
-  const locationID = FILE_LOCATION_MAP[STATE.currentFile]
+  const locationID = FILE_LOCATION_MAP[STATE.currentFile] ?? 0
   await placeMap("customLocationMap", locationID);
 });
 //document
@@ -941,43 +955,37 @@ locationRadius.addEventListener("change", onRadiusUpdated);
 
 
 // showLocation: Show the currently selected location in the form inputs
-const showLocation = async (fromSelect, radiusValue) => {
+const showLocation = async (fromSelect) => {
   const latEl = document.getElementById("customLat");
   const lonEl = document.getElementById("customLon");
   const customPlaceEl = document.getElementById("customPlace");
   const locationSelect = document.getElementById("savedLocations");
-  
+  const locationDelete = document.getElementById("delete-location");
+  const locationAdd = document.getElementById("set-location");
   // Check if current file has a location id
   const id = fromSelect
-    ? parseInt(locationSelect.value)
+    ? locationSelect.value
     : FILE_LOCATION_MAP[STATE.currentFile];
 
-  let locationIndex = LOCATIONS.findIndex((obj) => obj.id === id);
-  if (locationIndex !== -1) {
-    const {lat, lon, place, radius} = LOCATIONS[locationIndex];
-    radiusValue ??= radius;
-    latEl.value = lat;
-    lonEl.value = lon;
-    customPlaceEl.value = place;
-    locationSelect.value = id;
-    locationRadius.value = radiusValue;
-    showRadiusValue(radiusValue);
-  } else {
-    locationIndex = LOCATIONS.findIndex((obj) => obj.id === 0);
-    const {id, lat, lon, place, radius} = LOCATIONS[locationIndex];
-    radiusValue ??= radius;
-    //Default location
-    // await generateLocationList("savedLocations");
-    latEl.value = lat;
-    lonEl.value = lon;
-    customPlaceEl.value = place;
-    locationSelect.value = id;
-    locationRadius.value = radiusValue;
-    showRadiusValue(radiusValue);
-  }
+  const location = !id && id !== 0
+     ? {id: "", lat: "", lon: "", place: "", radius: 100} // default location if no selection
+     : LOCATIONS.find(obj => obj.id === parseInt(id)) ?? LOCATIONS.find(obj => obj.id === 0);
+
+  const { id: locId, lat, lon, place, radius} = location;
+  const radiusValue = radius ?? 100;
+  latEl.value = lat;
+  lonEl.value = lon;
+  customPlaceEl.value = place;
+  locationSelect.value = id || "";
+  locationRadius.value = radiusValue;
+  showRadiusValue(radiusValue);
+  locationAdd.classList.toggle("disabled", !customPlaceEl.value.trim());
+  locationDelete.classList.toggle('disabled', locationSelect.selectedIndex < 2); // disable delete for default and placeholder options
   // make sure the  map is initialised
-  await placeMap("customLocationMap", id);
-  updateMap(latEl.valueAsNumber, lonEl.valueAsNumber, radiusValue);
+  await placeMap("customLocationMap", locId);
+  const latVal = lat === "" ? config.latitude : parseFloat(lat);
+  const lonVal = lon === "" ? config.longitude : parseFloat(lon);
+  updateMap(latVal, lonVal, radiusValue);
 };
 
 /**
@@ -1006,14 +1014,16 @@ const displayLocationAddress = async (where) => {
     latEl = document.getElementById("customLat");
     lonEl = document.getElementById("customLon");
     placeEl = document.getElementById("customPlace");
-    address = await fetchLocationAddress(latEl.value, lonEl.value, false);
+    address = await fetchLocationAddress(latEl.valueAsNumber, lonEl.valueAsNumber, false);
     if (address === false) return;
     placeEl.value = address || "Location not available";
+    const locationAdd = document.getElementById("set-location")
+    locationAdd.classList.remove('disabled')
   } else {
     latEl = DOM.defaultLat;
     lonEl = DOM.defaultLon;
     placeEl = DOM.place;
-    address = await fetchLocationAddress(latEl.value, lonEl.value, false);
+    address = await fetchLocationAddress(latEl.valueAsNumber, lonEl.valueAsNumber, false);
     if (address === false) return;
     renderLocation(placeEl, address)
     const button = document.getElementById("apply-location");
@@ -1037,8 +1047,8 @@ const cancelDefaultLocation = () => {
 };
 
 const checkCoords = (latVal, lonVal) => {
-    if (!Number.isFinite(latVal) || !Number.isFinite(lonVal) 
-      || latVal < -90 || latVal > 90 || lonVal < -180 || lonVal > 180) {
+    if (!Number.isFinite(latVal) || !Number.isFinite(lonVal)) return false;
+    if (latVal < -90 || latVal > 90 || lonVal < -180 || lonVal > 180) {
       generateToast({ type: "warning", message: "placeOutOfBounds" });
       return false;
     }
@@ -1098,35 +1108,22 @@ async function setCustomLocation(manage = false) {
     : batchWrapper.classList.add("d-none");
   // Use the current file location for lat, lon, place or use defaults
   showLocation(manage);
-  savedLocationSelect.addEventListener("change", function () {
-    showLocation(true);
-  });
-
+  const onSavedLocationChange = () => showLocation(true);
+  savedLocationSelect.addEventListener("change", onSavedLocationChange);
+  // Translate modal content
   const i18 = i18n.get(i18n.Location);
-  locationDelete.textContent = i18[1];
-  const addOrDelete = () => {
-    if (customPlaceEl.value) {
-      locationAdd.textContent = i18[0];
-      locationAdd.classList.remove("btn-danger");
-      locationAdd.classList.add("button-primary");
-    } else if (savedLocationSelect.value !== "0"){ //not 0, which is the default location
-      locationAdd.textContent = i18[1];
-      locationAdd.classList.add("btn-danger");
-      locationAdd.classList.remove("button-primary");
-    }
-  };
-  // Highlight delete
-  customPlaceEl.addEventListener("keyup", addOrDelete);
-  addOrDelete();
-  locationModalDiv.querySelector("h5").textContent = i18[0];
+  savedLocationSelect.querySelector("option").textContent = i18['add'];
+  locationDelete.textContent = i18['delete'];
+  locationModalDiv.querySelector("h5").textContent = i18['update'];
   const legends = locationModalDiv.querySelectorAll("legend");
+  const items = ['pick','edit', 'radius'];
   for (let i = 0; i < legends.length; i++) {
-    legends[i].textContent = i18[i + 2]; // process each node
+    legends[i].textContent = i18[items[i]]; // process each node
   }
   locationModalDiv.querySelector('label[for="batchLocations"]').textContent =
-    i18[5];
-  document.getElementById("customLatLabel").textContent = i18[6];
-  document.getElementById("customLonLabel").textContent = i18[7];
+    i18['all'];
+  document.getElementById("customLatLabel").textContent = i18['lat'];
+  document.getElementById("customLonLabel").textContent = i18['lon'];
   const locationModal = new bootstrap.Modal(locationModalDiv);
   locationModal.show();
 
@@ -1135,37 +1132,44 @@ async function setCustomLocation(manage = false) {
 
   const addLocation = (e) => {
     const remove = e.target.id === 'delete-location';
-    locationID = savedLocationSelect.value;
+    const locationID = parseInt(savedLocationSelect.value);
     const batch = document.getElementById("batchLocations").checked;
-    const files = batch ? STATE.openFiles : [STATE.currentFile];
-    const place = remove ? null : customPlaceEl.value;
+    const files = batch ? STATE.openFiles : STATE.currentFile ? [STATE.currentFile] : null;
+    const place = customPlaceEl.value;
     const radius = locationRadius.valueAsNumber;
     const lat = latEl.valueAsNumber;
     const lon = lonEl.valueAsNumber;
     if (!checkCoords(lat, lon)) return;
     worker.postMessage({
       action: "set-location",
-      lat,lon,place,radius,files, manage
+      lat,lon,place,radius,files, id: locationID, remove
     });
-    const isDefaultLoc = LOCATIONS.find(l => l.lat === lat && l.lon === lon && l.id === 0)
-    if (isDefaultLoc){
+    if (locationID === 0){
+      // Default location updated - update config and UI
       config.latitude = lat;
       config.longitude = lon;
       config.location = place;
       config.radius = radius;
       updatePrefs('config.json', config)
+      DOM.defaultLat.value = lat;
+      DOM.defaultLon.value = lon;
+      renderLocation(DOM.place, place);
     }
     generateLocationList("explore-locations");
 
     locationModal.hide();
   };
+  const toggleSetButton = () => locationAdd.classList.toggle("disabled", !customPlaceEl.value.trim());
+  toggleSetButton();
   locationAdd.addEventListener("click", addLocation);
   locationDelete.addEventListener("click", addLocation);
+  customPlaceEl.addEventListener("input", toggleSetButton);
   const onModalDismiss = () => {
     locationForm.reset();
     locationDelete.classList.add('d-none');
-    customPlaceEl.removeEventListener("keyup", addOrDelete);
     locationAdd.removeEventListener("click", addLocation);
+    customPlaceEl.removeEventListener("input", toggleSetButton);
+    savedLocationSelect.removeEventListener("change", onSavedLocationChange);
     locationModalDiv.removeEventListener("hide.bs.modal", onModalDismiss);
   };
   locationModalDiv.addEventListener("hide.bs.modal", onModalDismiss);
@@ -1350,22 +1354,27 @@ function postAnalyseMessage(args) {
 let openStreetMapTimer,
   currentRequest = null;
 async function fetchLocationAddress(lat, lon, pushLocations) {
-  const isInvalidLatitude = isNaN(lat) || lat === null || lat < -90 || lat > 90;
-  const isInvalidLongitude =
-    isNaN(lon) || lon === null || lon < -180 || lon > 180;
-
-  if (isInvalidLatitude || isInvalidLongitude) {
-    generateToast({ type: "warning", message: "placeOutOfBounds" });
-    return false;
-  }
-
+  if (!checkCoords(lat, lon)) return;
   currentRequest && clearTimeout(openStreetMapTimer); // Cancel pending request
 
   return new Promise((resolve, reject) => {
     currentRequest = { lat, lon }; // Store the current request details
-    const storedLocation = LOCATIONS?.find(
-      (obj) => obj.lat === lat && obj.lon === lon
-    );
+    const storedLocation = LOCATIONS?.find(obj => {
+      // Convert place string to numbers if it exists
+      const [placeLatStr, placeLonStr] = (obj.place || "").split(" ");
+      const placeLat = parseFloat(placeLatStr);
+      const placeLon = parseFloat(placeLonStr);
+      // Check if lat/lon match
+      if (obj.lat === lat && obj.lon === lon) {
+        // If place exactly matches "lat lon" string, treat as falsey
+        if (placeLat === lat && placeLon === lon) return false;
+        // Otherwise, lat/lon match but place is something else → truthy
+        return true;
+      }
+      // Lat/lon do not match → skip
+      return false;
+    });
+
     if (storedLocation) {
       return resolve(storedLocation.place);
     }
@@ -1520,8 +1529,10 @@ async function exportData(
 const handleLocationFilterChange = (e) => {
   const value = e.target.value;
   const parsed = value === "" ? undefined : parseInt(value, 10);
-  const location = Number.isFinite(parsed) ? parsed : undefined;
-  worker.postMessage({ action: "update-state", locationID: location });
+  const locationID = Number.isFinite(parsed) ? parsed : undefined;
+  const location = LOCATIONS.find(loc => loc.id === locationID);
+
+  worker.postMessage({ action: "update-state", location });
   // Update the seen species list
   worker.postMessage({ action: "get-detected-species-list" });
   worker.postMessage({
@@ -2335,6 +2346,10 @@ const setUpWorkerMessaging = () => {
           onFileLocationID(args);
           break;
         }
+        case "delete-location-id": {
+          onLocationDeleted(args);
+          break;
+        }
         case "files": {
           onOpenFiles(args);
           break;
@@ -2422,8 +2437,10 @@ const setUpWorkerMessaging = () => {
           break;
         }
         case "location-list": {
-          LOCATIONS = args.locations;
-          locationID = args.currentLocation;
+          LOCATIONS = args.data;
+          locationID = args.currentLocation || locationID;
+          generateLocationList("explore-locations");
+          generateLocationList("chart-locations");
           break;
         }
         case "model-ready": {
@@ -6147,7 +6164,7 @@ async function updateList() {
     worker.postMessage({
       action: "update-list",
       list: config.list,
-      refreshResults: STATE.analysisDone,
+      refreshResults: STATE.analysisDone && STATE.mode !== 'chart',
     });
   }
 }
@@ -6733,14 +6750,14 @@ async function readLabels(labelFile, updating) {
   try {
     const filecontents = await fs.promises.readFile(labelFile, "utf8");
     const labels = filecontents.trim().split(/\r?\n/);
-    const unknown = `Unknown Sp.${getSplitChar()}Unknown Sp.`;
+    const unknown = `Unknown Sp.${getSplitChar(labels)}Unknown Sp.`;
     if (!labels.includes(unknown)) labels.push(unknown);
     if (updating === "list") {
       worker.postMessage({
         action: "update-list",
         list: config.list,
         customLabels: labels,
-        refreshResults: STATE.analysisDone,
+        refreshResults: STATE.analysisDone && STATE.mode !== 'chart',
         member: STATE.isMember,
       });
       trackEvent(config.UUID, "UI", "Create", "Custom list", labels.length);
@@ -6956,7 +6973,7 @@ const recordEntryModal = new bootstrap.Modal(recordEntryModalDiv, {
 
 const recordEntryForm = document.getElementById("record-entry-form");
 
-const getSplitChar = () => config.selectedModel.includes('perch') ? '~' : '_';
+const getSplitChar = (labels) => labels[0].includes('~') ? '~' : '_';
 /**
  * Displays and populates the record entry modal for adding or updating audio record details.
  *
@@ -6999,9 +7016,9 @@ async function showRecordEntryForm(mode, batch) {
   const speciesDisplay = document.createElement("div");
   speciesDisplay.className = "border rounded w-100";
   if (cname) {
-    const species = LABELS.find(sp => sp.split(getSplitChar())[1] === cname);
+    const species = LABELS.find(sp => sp.split(getSplitChar(LABELS))[1] === cname);
     if (species) {
-      const [sciName, commonName] = species.split(getSplitChar());
+      const [sciName, commonName] = species.split(getSplitChar(LABELS));
       const styled = `${commonName}<br/><i>${sciName}</i>`;
       selectedBird.innerHTML = styled;
     } else {
@@ -7794,7 +7811,7 @@ const IUCNMap = {
 };
 
 // Make functions available to the map script in index.html
-export { config, displayLocationAddress, LOCATIONS, generateToast, showRadiusValue, onRadiusUpdated };
+export { config, displayLocationAddress, LOCATIONS, generateToast, showRadiusValue, onRadiusUpdated, checkCoords};
 
 /**
  * Checks the user's membership status via a remote API and updates the UI to reflect feature access.
@@ -8073,7 +8090,7 @@ function getFilteredBirds(search, list) {
   const sortedList = list.filter(bird => typeof bird === "string" && bird.toLowerCase().includes(search))
     .map((item) => {
       // Flip sname and cname from "sname_/~cname"
-      const [cname, sname] = item.split(getSplitChar()).reverse();
+      const [cname, sname] = item.split(getSplitChar(list)).reverse();
       return { cname, sname, styled: `${cname} <br/><i>${sname}</i>` };
     })
     .sort((a, b) =>

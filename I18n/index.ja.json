@@ -61,6 +61,7 @@
     "exit": ["終了"],
     "save2db": ["アーカイブに保存","Ctrl+S"],
 "charts": ["チャートを見る"],
+    "manage-locations": ["位置を管理"],
 "explore": ["アーカイブを探索"],
 "chart-datefilter": ["日付フィルターを適用"],
 "explore-datefilter": ["日付フィルターを適用"],

@@ -120,6 +120,187 @@ const NOT_BIRDS = [
   "Water Drops_Water Drops",
 ];
 
+ const p = {
+"Tachymarptis melba":"Apus melba",
+"Pogonotriccus lanyoni":"Phylloscartes lanyoni",
+"Chiroxiphia bokermanni":"Antilophia bokermanni",
+"Dessonornis archeri":"Cossypha archeri",
+"Tyranniscus cinereiceps":"Phyllomyias cinereiceps",
+"Ketupa sumatrana":"Bubo sumatranus",
+"Plocealauda assamica":"Mirafra assamica",
+"Tachyspiza virgata":"Accipiter virgatus",
+"Botaurus flavicollis":"Ixobrychus flavicollis",
+"Melloria quoyi":"Cracticus quoyi",
+"Astur melanoleucus":"Accipiter melanoleucus",
+"Microtarsus melanoleucos":"Brachypodius melanoleucos",
+"Strix nigrolineata":"Ciccaba nigrolineata",
+"Botaurus dubius":"Ixobrychus dubius",
+"Rufirallus fasciatus":"Anurolimnas fasciatus",
+"Strix huhula":"Ciccaba huhula",
+"Tyranniscus nigrocapillus":"Phyllomyias nigrocapillus",
+"Driophlox atrimaxillaris":"Habia atrimaxillaris",
+"Chalcites osculans":"Chrysococcyx osculans",
+"Chlorophoneus nigrifrons":"Telophorus nigrifrons",
+"Thinornis melanops":"Elseyornis melanops",
+"Microtarsus melanocephalos":"Brachypodius melanocephalos",
+"Cyanocorax colliei":"Calocitta colliei",
+"Pyrgilauda blanfordi":"Montifringilla blanfordi",
+"Eumyias hoevelli":"Cyornis hoevelli",
+"Heliodoxa rubricauda":"Clytolaema rubricauda",
+"Tachyspiza fasciata":"Accipiter fasciatus",
+"Cyanocorax morio":"Psilorhinus morio",
+"Paradoxornis unicolor":"Cholornis unicolor",
+"Radinopsyche sellowi":"Herpsilochmus sellowi",
+"Corypha apiata":"Mirafra apiata",
+"Dessonornis caffer":"Cossypha caffra",
+"Chalcopsitta cardinalis":"Pseudeos cardinalis",
+"Dendropicos fuscescens":"Chloropicus fuscescens",
+"Dyaphorophyia castanea":"Platysteira castanea",
+"Daptrius chimango":"Milvago chimango",
+"Tachyspiza soloensis":"Accipiter soloensis",
+"Turdus mupinensis":"Otocichla mupinensis",
+"Botaurus cinnamomeus":"Ixobrychus cinnamomeus",
+"Anarhynchus collaris":"Charadrius collaris",
+"Tachyspiza cirrocephala":"Accipiter cirrocephalus",
+"Astur cooperii":"Accipiter cooperii",
+"Driophlox cristata":"Habia cristata",
+"Lophospiza trivirgata":"Accipiter trivirgatus",
+"Periporphyrus celaeno":"Rhodothraupis celaeno",
+"Silvicultrix frontalis":"Ochthoeca frontalis",
+"Coloeus dauuricus":"Corvus dauuricus",
+"Laterallus spilopterus":"Porzana spiloptera",
+"Anarhynchus bicinctus":"Charadrius bicinctus",
+"Hesperoburhinus bistriatus":"Burhinus bistriatus",
+"Pogonornis bidentatus":"Lybius bidentatus",
+"Ketupa coromanda":"Bubo coromandus",
+"Corypha fasciolata":"Mirafra fasciolata",
+"Eudromias morinellus":"Charadrius morinellus",
+"Astur gentilis":"Accipiter gentilis",
+"Coloeus monedula":"Corvus monedula",
+"Iole finschii":"Alophoixus finschii",
+"Stizorhina finschi":"Neocossyphus finschi",
+"Sigelus silens":"Melaenornis silens",
+"Amirafra rufocinnamomea":"Mirafra rufocinnamomea",
+"Prionodura newtoniana":"Amblyornis newtoniana",
+"Silvicultrix pulchella":"Ochthoeca pulchella",
+"Icthyophaga ichthyaetus":"Haliaeetus ichthyaetus",
+"Paradoxornis aemodius":"Conostoma aemodium",
+"Anarhynchus leschenaultii":"Charadrius leschenaultii",
+"Cryptolybia olivacea":"Stactolaema olivacea",
+"Campethera maculosa":"Campethera cailliautii",
+"Ceblepyris caesius":"Coracina caesia",
+"Tachyspiza novaehollandiae":"Accipiter novaehollandiae",
+"Turdus litsitsirupa":"Psophocichla litsitsirupa",
+"Rhinoplax vigil":"Buceros vigil",
+"Chiroxiphia galeata":"Antilophia galeata",
+"Plocealauda erythrocephala":"Mirafra erythrocephala",
+"Tachyspiza gularis":"Accipiter gularis",
+"Anarhynchus javanicus":"Charadrius javanicus",
+"Silvicultrix jelskii":"Ochthoeca jelskii",
+"Plocealauda affinis":"Mirafra affinis",
+"Heterotetrax vigorsii":"Eupodotis vigorsii",
+"Anarhynchus alexandrinus":"Charadrius alexandrinus",
+"Spilopelia senegalensis":"Streptopelia senegalensis",
+"Botaurus exilis":"Ixobrychus exilis",
+"Aplopelia larvata":"Columba larvata",
+"Icthyophaga humilis":"Haliaeetus humilis",
+"Philohydor lictor":"Pitangus lictor",
+"Botaurus minutus":"Ixobrychus minutus",
+"Psitteuteles pusillus":"Parvipsitta pusilla",
+"Thinornis dubius":"Charadrius dubius",
+"Tachyspiza minulla":"Accipiter minullus",
+"Thinornis placidus":"Charadrius placidus",
+"Ceblepyris cinereus":"Coracina cinerea",
+"Diphyllodes magnificus":"Cicinnurus magnificus",
+"Anarhynchus peronii":"Charadrius peronii",
+"Pogonotriccus ophthalmicus":"Phylloscartes ophthalmicus",
+"Strix virgata":"Ciccaba virgata",
+"Origma robusta":"Crateroscelis robusta",
+"Anarhynchus montanus":"Charadrius montanus",
+"Nesotriccus murinus":"Phaeomyias murina",
+"Psephotellus varius":"Psephotus varius",
+"Trichoglossus concinnus":"Glossopsitta concinna",
+"Rufirallus schomburgkii":"Micropygia schomburgkii",
+"Chlorophoneus olivaceus":"Telophorus olivaceus",
+"Dendropicos griseocephalus":"Chloropicus griseocephalus",
+"Gecinulus rafflesii":"Dinopium rafflesii",
+"Dessonornis anomalus":"Cossypha anomala",
+"Chrysocolaptes validus":"Reinwardtipicus validus",
+"Anarhynchus veredus":"Charadrius veredus",
+"Eopsaltria capito":"Tregellasia capito",
+"Heteroscenes pallidus":"Cacomantis pallidus",
+"Aethomyias papuensis":"Sericornis papuensis",
+"Hesperoburhinus superciliaris":"Burhinus superciliaris",
+"Cacatua leadbeateri":"Lophochroa leadbeateri",
+"Microtarsus eutilotus":"Brachypodius eutilotus",
+"Gallirex porphyreolophus":"Tauraco porphyreolophus",
+"Psitteuteles porphyrocephalus":"Parvipsitta porphyrocephala",
+"Rufirallus leucopyrrhus":"Laterallus leucopyrrhus",
+"Buphagus erythroryncha":"Buphagus erythrorynchus",
+"Lophotis ruficrista":"Eupodotis ruficrista",
+"Driophlox fuscicauda":"Habia fuscicauda",
+"Tauraco rossae":"Musophaga rossae",
+"Acrochordopus burmeisteri":"Phyllomyias burmeisteri",
+"Stizorhina fraseri":"Neocossyphus fraseri",
+"Phyllaemulor bracteatus":"Nyctibius bracteatus",
+"Strix albitarsis":"Ciccaba albitarsis",
+"Zonibyx modestus":"Charadrius modestus",
+"Rufirallus xenopterus":"Laterallus xenopterus",
+"Corypha africana":"Mirafra africana",
+"Neophilydor erythrocercum":"Philydor erythrocercum",
+"Rufirallus viridis":"Anurolimnas viridis",
+"Origma murina":"Crateroscelis murina",
+"Botaurus eurhythmus":"Ixobrychus eurhythmus",
+"Tachyspiza badia":"Accipiter badius",
+"Sakesphoroides cristatus":"Sakesphorus cristatus",
+"Mirafra javanica":"Mirafra cantillans",
+"Haplospiza rustica":"Spodiornis rusticus",
+"Neophilydor fuscipenne":"Philydor fuscipenne",
+"Anarhynchus nivosus":"Charadrius nivosus",
+"Driophlox gutturalis":"Habia gutturalis",
+"Pogonotriccus eximius":"Phylloscartes eximius",
+"Thripophaga gutturata":"Cranioleuca gutturata",
+"Ketupa nipalensis":"Bubo nipalensis",
+"Tachyspiza trinotata":"Accipiter trinotatus",
+"Antiurus maculicaudus":"Hydropsalis maculicaudus",
+"Spilopelia chinensis":"Streptopelia chinensis",
+"Alcurus striatus":"Pycnonotus striatus",
+"Botaurus involucris":"Ixobrychus involucris",
+"Chlorophoneus sulfureopectus":"Telophorus sulfureopectus",
+"Tyranniscus uropygialis":"Phyllomyias uropygialis",
+"Pachyglossa agilis":"Dicaeum agile",
+"Thinornis tricollaris":"Charadrius tricollaris",
+"Microspizias superciliosus":"Accipiter superciliosus",
+"Quechuavis decussata":"Systellura decussata",
+"Anarhynchus falklandicus":"Charadrius falklandicus",
+"Tachyspiza hiogaster":"Accipiter hiogaster",
+"Pogonotriccus poecilotis":"Phylloscartes poecilotis",
+"Ketupa lactea":"Bubo lacteus",
+"Suthora webbiana":"Sinosuthora webbiana",
+"Ramosomyia violiceps":"Leucolia violiceps",
+"Crinifer leucogaster":"Corythaixoides leucogaster",
+"Icthyophaga leucogaster":"Haliaeetus leucogaster",
+"Ceblepyris pectoralis":"Coracina pectoralis",
+"Menelikornis leucotis":"Tauraco leucotis",
+"Caliechthrus leucolophus":"Cacomantis leucolophus",
+"Onychostruthus taczanowskii":"Montifringilla taczanowskii",
+"Leucoptilon concretum":"Cyornis concretus",
+"Cyanocorax formosus":"Calocitta formosa",
+"Dessonornis humeralis":"Cossypha humeralis",
+"Melanodryas sigillata":"Peneothello sigillata",
+"Diphyllodes respublica":"Cicinnurus respublica",
+"Anarhynchus wilsonia":"Charadrius wilsonia",
+"Botaurus sinensis":"Ixobrychus sinensis",
+"Silvicultrix diadema":"Ochthoeca diadema",
+"Corvinella corvina":"Lanius corvinus",
+"Laterallus flaviventer":"Hapalocrex flaviventer",
+"Acritillas indica":"Iole indica",
+"Daptrius chimachima":"Milvago chimachima",
+"Neosericornis citreogularis":"Sericornis citreogularis",
+"Pachyglossa chrysorrhea":"Dicaeum chrysorrheum",
+"Microtarsus urostictus":"Brachypodius urostictus",
+"Anthus lutescens":"Anthus chii"
+}
 const birdnetlabelFile = path.resolve(__dirname, '../../labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_en.txt');
 
 
@@ -186,7 +367,7 @@ onmessage = async (e) => {
         listModel.model = model;
         const perch = model === "perch v2";
         listModel.perch = perch;
-        listModel.splitChar = perch ? "~" : "_";
+        listModel.splitChar = perch ? /[~,]/ : /[_,]/;
         if (perch) {
           PERCH_LABELS ??= loadLabels(path.join(modelPath, 'labels.txt'));
           const parts = PERCH_LABELS && PERCH_LABELS[0]?.split("~");
@@ -234,7 +415,7 @@ class Model {
     this.appPath = appPath;
     this.labels = undefined; // labels in the model we're filtering
     this.customLabels = undefined; // custom labels for custom list
-    this.splitChar = ",";
+    this.splitChar = null;
   }
 
   async loadModel() {
@@ -343,12 +524,16 @@ class Model {
       if (this.customLabels) {
         // hack: why it gets called first without customLabels I don't know! But it will be called a second time with one.
         const labelsScientificNames = this.labels.map(this.getFirstElement);
-        const customScienticNames = this.customLabels.map(label => label.split(',')[0]);
+        const customScienticNames = this.customLabels.map(label => label.split(this.splitChar)[0]);
         // Go through each custom label
+        let duration = 0;
         for (let i = 0; i < customScienticNames.length; i++) {
           const sname = customScienticNames[i];
           // Find all indices in this model's labels that match the current custom label
-          const indexes = findAllIndexes(labelsScientificNames, sname);
+          const t0 = performance.now();
+          const indexes = this.findAllIndexes(labelsScientificNames, sname);
+          const t1 = performance.now();
+          duration += t1 - t0;
           if (indexes.length) {
             let selectedIndexes = [];
             if (indexes.length > 1) { // Multiple matches
@@ -374,10 +559,11 @@ class Model {
               includedIDs.push(...selectedIndexes);
             }
           } else {
-            sname === "Unknown Sp." || sname === `Unknown Sp.${this.splitChar}Unknown Sp.` ||
+            sname.includes("Unknown Sp.") ||
               messages.push({ sname, model: this.model, line: (i + 1) });
           }
         }
+        console.log(`Finding matches took`, duration, "ms");
       }
     } else {
       // looking for birds (chirpity) or (birds or migrants) in the case of birdnet
@@ -408,22 +594,28 @@ class Model {
     }
     return [includedIDs.sort((a, b) => a - b), messages];
   }
-}
-/**
- * Returns all indices at which a specified value occurs in an array.
- *
- * @param {Array} array - The array to search.
- * @param {*} value - The value to find within the array.
- * @returns {number[]} An array of indices where the value is found.
- */
-function findAllIndexes(array, value) {
-  return array.reduce((acc, currentValue, currentIndex) => {
-    if (currentValue === value) {
-      acc.push(currentIndex);
+
+    /**
+   * Returns all indices at which a specified value occurs in an array.
+   *
+   * @param {Array} array - The array to search.
+   * @param {*} value - The value to find within the array.
+   * @returns {number[]} An array of indices where the value is found.
+   */
+  findAllIndexes(array, value) {
+    const result = [];
+    const alt = p[value];
+
+    for (let i = 0; i < array.length; i++) {
+      const v = array[i];
+      if (v === value || v === alt) {
+        result.push(i);
+      }
     }
-    return acc;
-  }, []);
+    return result;
+  }
 }
+
 
 /**
  * Initializes TensorFlow.js with the specified backend and loads the bird identification model.

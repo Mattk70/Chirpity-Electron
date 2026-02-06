@@ -29,7 +29,7 @@ const Toasts = { // UI.js
         noIUCNRecord: "There is no record of <b>${sname}</b> on the IUCN Red List.",
         membershipExpiry: "Your membership is due to expire in ${expiresIn} days, you can visit <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>the membership page</a> to renew",
         modelPathNotFound: "The model path specified (${modelPath}) could not be found. Reverting to BirdNET model.",
-
+        badLocationUpdate: "There is an existing location at this latitude and longitude.",
         corruptFile: "Corrupt file(s) encountered",
         noLoad: 'The ${model} model is not loaded. Restart Chirpity to continue. If you see this message repeatedly, it is likely your computer does not support AVX2 and Chirpity will not run on your system.',
         noDLL: 'There has been an error loading the model. This may be due to missing AVX support. Chirpity AI models require the AVX2 instructions set to run. If you have AVX2 enabled and still see this notice, please refer to <a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">this issue</a> on Github.',
@@ -100,7 +100,7 @@ const Toasts = { // UI.js
         noIUCNRecord: "Der er ingen registrering af <b>${sname}</b> på IUCN's rødliste.",
         membershipExpiry: "Dit medlemskab udløber om ${expiresIn} dage, du kan besøge <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>medlemskabsiden</a> for at forny",
         modelPathNotFound: "Den angivne modelsti (${modelPath}) blev ikke fundet. Skifter tilbage til BirdNET-modellen.",
-        
+        badLocationUpdate: "Der findes allerede en placering på denne bredde- og længdegrad.",
 
         corruptFile: "Der blev fundet beskadigede fil(er)",
         noLoad: 'Modellen ${model} er ikke indlæst. Genstart Chirpity for at fortsætte. Hvis du ser denne besked gentagne gange, er det sandsynligt, at din computer ikke understøtter AVX2, og Chirpity vil ikke køre på dit system.',
@@ -172,6 +172,7 @@ const Toasts = { // UI.js
         noIUCNRecord: "Es gibt keinen Eintrag für <b>${sname}</b> auf der Roten Liste der IUCN.",
         membershipExpiry: "Ihre Mitgliedschaft läuft in ${expiresIn} Tagen ab, Sie können die <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>Mitgliedsseite</a> besuchen, um sie zu verlängern",
         modelPathNotFound: "Der angegebene Modellpfad (${modelPath}) wurde nicht gefunden. Es wird auf das BirdNET-Modell zurückgegriffen.",
+        badLocationUpdate: "An diesem Breitengrad und Längengrad existiert bereits ein Standort.",
 
         corruptFile: "Beschädigte Datei(en) gefunden",
         noLoad: 'Das Modell ${model} wurde nicht geladen. Starten Sie Chirpity neu, um fortzufahren. Wenn diese Nachricht wiederholt angezeigt wird, unterstützt Ihr Computer möglicherweise kein AVX2, und Chirpity wird auf Ihrem System nicht ausgeführt.',
@@ -243,6 +244,7 @@ const Toasts = { // UI.js
         noIUCNRecord: "No hay registro de <b>${sname}</b> en la Lista Roja de la UICN.",
         membershipExpiry: "Su membresía vencerá en ${expiresIn} días, puede visitar <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>la página de membresía</a> para renovarla",
         modelPathNotFound: "La ruta del modelo especificada (${modelPath}) no se pudo encontrar. Volviendo al modelo BirdNET.",
+        badLocationUpdate: "Ya existe una ubicación en esta latitud y longitud.",
 
         corruptFile: "Se encontraron archivos corruptos",
         noLoad: 'El modelo ${model} no está cargado. Reinicie Chirpity para continuar. Si ve este mensaje repetidamente es probable que su ordenador no sea compatible con AVX2 y que Chirpity no pueda ejecutarse en su sistema.',
@@ -315,7 +317,8 @@ const Toasts = { // UI.js
         noIUCNRecord: "Il n'y a aucun enregistrement de <b>${sname}</b> sur la Liste Rouge de l'UICN.",
         membershipExpiry: "Votre abonnement expire dans ${expiresIn} jours, vous pouvez visiter <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>la page d'abonnement</a> pour le renouveler",
         modelPathNotFound: "Le chemin du modèle spécifié (${modelPath}) est introuvable. Retour au modèle BirdNET.",
-        
+        badLocationUpdate: "Il existe déjà un emplacement à cette latitude et longitude.",
+
         corruptFile: "Fichier(s) corrompu(s) détecté(s)",
         noLoad: 'Le modèle ${model} n\'est pas chargé. Redémarrez Chirpity pour continuer. Si vous voyez ce message à plusieurs reprises, il est probable que votre ordinateur ne prenne pas en charge AVX2 et Chirpity ne fonctionnera pas sur votre système.',
         noDLL: 'Une erreur est survenue lors du chargement du modèle. Cela peut être dû à un manque de prise en charge d\'AVX. Les modèles AI de Chirpity nécessitent le jeu d\'instructions AVX2 pour fonctionner. Si vous avez AVX2 activé et que vous voyez toujours cet avertissement, veuillez vous référer à <a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">ce problème</a> sur Github.',
@@ -387,6 +390,7 @@ const Toasts = { // UI.js
         noIUCNRecord: "IUCNレッドリストに<b>${sname}</b>の記録がありません。",
         membershipExpiry: "会員期限が${expiresIn}日後に迫っています。<a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>会員ページ</a>にアクセスして更新してください",
         modelPathNotFound: "指定されたモデルパス (${modelPath}) が見つかりません。BirdNETモデルに戻します。",
+        badLocationUpdate: "この緯度と経度には既に位置が存在します。",
 
         corruptFile: "破損したファイルが見つかりました",
         noLoad: '${model}モデルがロードされていません。Chirpityを再起動して続行してください。このメッセージが繰り返し表示される場合、お使いのコンピュータがAVX2をサポートしていない可能性があります。',
@@ -457,6 +461,7 @@ const Toasts = { // UI.js
         noIUCNRecord: "Er is geen record van <b>${sname}</b> op de IUCN Rode Lijst.",
         membershipExpiry: "Je lidmaatschap verloopt over ${expiresIn} dagen, je kunt de <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>lidmaatschaps pagina</a> bezoeken om het te verlengen",
         modelPathNotFound: "Het opgegeven modelpad (${modelPath}) is niet gevonden. Terugschakelen naar het BirdNET-model.",
+        badLocationUpdate: "Er is al een locatie op deze breedte- en lengtegraad.",
 
         corruptFile: "Beschadigde bestand(en) aangetroffen",
         noLoad: 'Het ${model} model is niet geladen. Herstart Chirpity om door te gaan. Als je dit bericht herhaaldelijk ziet, ondersteunt je computer waarschijnlijk geen AVX2 en zal Chirpity niet op je systeem werken.',
@@ -530,6 +535,7 @@ const Toasts = { // UI.js
         noIUCNRecord: "Não há registro de <b>${sname}</b> na Lista Vermelha da IUCN.",
         membershipExpiry: "Sua adesão vai expirar em ${expiresIn} dias, você pode visitar <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>a página de adesão</a> para renová-la",
         modelPathNotFound: "O caminho do modelo especificado (${modelPath}) não foi encontrado. Revertendo para o modelo BirdNET.",
+        badLocationUpdate: "Já existe uma localização nesta latitude e longitude.",
 
         corruptFile: "Ficheiro(s) corrompido(s) encontrado(s)",
         noLoad: 'O modelo ${model} não está carregado. Reinicie o Chirpity para continuar. Se você ver esta mensagem repetidamente, é provável que seu computador não suporte AVX2 e o Chirpity não funcionará no seu sistema.',
@@ -603,6 +609,7 @@ const Toasts = { // UI.js
         noIUCNRecord: "Нет записи о <b>${sname}</b> в Красном списке IUCH.",
         membershipExpiry: "Ваша подписка истекает через ${expiresIn} дней, вы можете посетить <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>страницу подписки</a>, чтобы продлить её",
         modelPathNotFound: "Указанный путь к модели (${modelPath}) не найден. Возврат к модели BirdNET.",
+        badLocationUpdate: "На этой широте и долготе уже существует местоположение.",
 
         corruptFile: "Обнаружены повреждённые файлы",
         noLoad: 'Модель ${model} не загружена. Для продолжения работы перезапустите Chirpity. Если вы постоянно видите это сообщение, скорее всего, ваш компьютер не поддерживает AVX2 и Chirpity не будет работать в вашей системе.',
@@ -676,6 +683,7 @@ const Toasts = { // UI.js
         noIUCNRecord: "Det finns ingen post om <b>${sname}</b> i IUCN Röda listan.",
         membershipExpiry: "Ditt medlemskap löper ut om ${expiresIn} dagar, du kan besöka <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>medlemssidan</a> för att förnya",
         modelPathNotFound: "Den angivna modellsökvägen (${modelPath}) kunde inte hittas. Återgår till BirdNET-modellen.",
+        badLocationUpdate: "Det finns redan en plats på denna latitud och longitud.",
 
         corruptFile: "Skadade fil(er) påträffades",
         noLoad: 'Modellen ${model} är inte laddad. Starta om Chirpity för att fortsätta. Om du ser detta meddelande upprepade gånger, är det troligt att din dator inte stöder AVX2 och Chirpity kommer inte att fungera på ditt system.',
@@ -749,6 +757,7 @@ const Toasts = { // UI.js
         noIUCNRecord: "在 IUCN 红色名录中没有关于 <b>${sname}</b> 的记录。",
         membershipExpiry: "您的会员资格将在${expiresIn}天后到期，您可以访问<a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>会员页面</a>进行续订",
         modelPathNotFound: "指定的模型路径 (${modelPath}) 未找到。正在恢复为 BirdNET 模型。",
+        badLocationUpdate: "此纬度和经度上已存在一个位置。",
 
         corruptFile: "发现损坏的文件",
         noLoad: '模型 ${model} 未加载。请重新启动 Chirpity 以继续。如果您重复看到此消息，可能是您的计算机不支持 AVX2，Chirpity 将无法在您的系统上运行。',
@@ -1049,106 +1058,131 @@ const Help = {
   
 
 const Location = {
-    en: [
-        'Update Location', 
-        'Delete Location', 
-        'Pick A Saved Location', 
-        'Add, Edit or Delete Location', 
-        'Location radius',
-        'Update ALL open files to this location',
-        "Lat:", "Lon:"
-    ],
-    da: [
-        'Opdater placering', 
-        'Slet placering', 
-        'Vælg en gemt placering', 
-        'Tilføj, rediger eller slet placering', 
-        'Placeringsradius',
-        'Opdater ALLE åbne filer til denne placering',
-        "Bredde:", "Længde:"
-    ],
-    de: [
-        'Standort aktualisieren', 
-        'Standort löschen', 
-        'Gespeicherten Standort auswählen', 
-        'Standort hinzufügen, bearbeiten oder löschen', 
-        'Standortradius',
-        'Alle geöffneten Dateien auf diesen Standort aktualisieren',
-        "Breitengrad:", "Längengrad:"
-    ],
-    es: [
-        'Actualizar ubicación', 
-        'Eliminar ubicación', 
-        'Seleccionar una ubicación guardada', 
-        'Añadir, editar o eliminar una ubicación', 
-        'Radio de ubicación',
-        'Actualizar TODOS los archivos abiertos a esta ubicación',
-        "Latitud:", "Longitud:"
-    ],
-    fr: [
-        'Mettre à jour l’emplacement', 
-        'Supprimer l’emplacement', 
-        'Choisir un emplacement enregistré', 
-        'Ajouter, modifier ou supprimer un emplacement', 
-        'Rayon de l’emplacement',
-        'Mettre à jour TOUS les fichiers ouverts à cet emplacement',
-        "Lat:", "Long:"
-    ],
-    ja: [
-        '位置を更新', 
-        '位置を削除', 
-        '保存された位置を選択', 
-        '位置を追加、編集、または削除', 
-        '位置の半径',
-        'すべての開いているファイルをこの位置に更新',
-        "緯度:", "経度:"
-    ],
-    nl: [
-        'Locatie bijwerken', 
-        'Locatie verwijderen', 
-        'Kies een opgeslagen locatie', 
-        'Locatie toevoegen, bewerken of verwijderen', 
-        'Locatiestraal',
-        'Werk ALLE geopende bestanden bij naar deze locatie',
-        "Breedte:", "Lengte:"
-    ],
-    pt: [
-        'Atualizar localização', 
-        'Excluir localização', 
-        'Escolher uma localização salva', 
-        'Adicionar, editar ou excluir localização', 
-        'Raio da localização',
-        'Atualizar TODOS os arquivos abertos para esta localização',
-        "Lat:", "Lon:"
-    ],
-    ru: [
-        'Обновить местоположение', 
-        'Удалить местоположение', 
-        'Выбрать сохранённое местоположение', 
-        'Добавить, изменить или удалить местоположение', 
-        'Радиус местоположения',
-        'Обновить ВСЕ открытые файлы до этого местоположения',
-        "Широта:", "Долгота:"
-    ],
-    sv: [
-        'Uppdatera plats', 
-        'Radera plats', 
-        'Välj en sparad plats', 
-        'Lägg till, redigera eller radera plats', 
-        'Platsradie',
-        'Uppdatera ALLA öppna filer till denna plats',
-        "Latitud:", "Longitud:"
-    ],
-    zh: [
-        '更新位置', 
-        '删除位置', 
-        '选择一个保存的位置', 
-        '添加、编辑或删除位置', 
-        '位置半径',
-        '更新所有打开的文件到此位置',
-        "纬度:", "经度:"
-    ]
+    en: {
+        update: 'Update Location',
+        delete: 'Delete Location',
+        pick: 'Pick A Location',
+        add: 'Add a New Location',
+        edit: 'Edit Location',
+        radius: 'Location radius',
+        all: 'Update ALL open files to this location',
+        lat: 'Lat:',
+        lon: 'Lon:'
+    },
+    da: {
+        update: 'Opdater placering',
+        delete: 'Slet placering',
+        pick: 'Vælg en placering',
+        add: 'Tilføj en ny placering',
+        edit: 'Rediger placering',
+        radius: 'Placeringsradius',
+        all: 'Opdater ALLE åbne filer til denne placering',
+        lat: 'Bredde:',
+        lon: 'Længde:'
+    },
+    de: {
+        update: 'Standort aktualisieren',
+        delete: 'Standort löschen',
+        pick: 'Standort auswählen',
+        add: 'Neuen Standort hinzufügen',
+        edit: 'Standort bearbeiten',
+        radius: 'Standortradius',
+        all: 'Alle geöffneten Dateien auf diesen Standort aktualisieren',
+        lat: 'Breitengrad:',
+        lon: 'Längengrad:'
+    },
+    es: {
+        update: 'Actualizar ubicación',
+        delete: 'Eliminar ubicación',
+        pick: 'Seleccionar una ubicación',
+        add: 'Añadir una nueva ubicación',
+        edit: 'Editar ubicación',
+        radius: 'Radio de ubicación',
+        all: 'Actualizar TODOS los archivos abiertos a esta ubicación',
+        lat: 'Latitud:',
+        lon: 'Longitud:'
+    },
+    fr: {
+        update: 'Mettre à jour l’emplacement',
+        delete: 'Supprimer l’emplacement',
+        pick: 'Choisir un emplacement',
+        add: 'Ajouter un nouvel emplacement',
+        edit: 'Modifier l’emplacement',
+        radius: 'Rayon de l’emplacement',
+        all: 'Mettre à jour TOUS les fichiers ouverts à cet emplacement',
+        lat: 'Lat:',
+        lon: 'Long:'
+    },
+    ja: {
+        update: '位置を更新',
+        delete: '位置を削除',
+        pick: '位置を選択',
+        add: '新しい位置を追加',
+        edit: '位置を編集',
+        radius: '位置の半径',
+        all: 'すべての開いているファイルをこの位置に更新',
+        lat: '緯度:',
+        lon: '経度:'
+    },
+    nl: {
+        update: 'Locatie bijwerken',
+        delete: 'Locatie verwijderen',
+        pick: 'Kies een locatie',
+        add: 'Nieuwe locatie toevoegen',
+        edit: 'Locatie bewerken',
+        radius: 'Locatiestraal',
+        all: 'Werk ALLE geopende bestanden bij naar deze locatie',
+        lat: 'Breedte:',
+        lon: 'Lengte:'
+    },
+    pt: {
+        update: 'Atualizar localização',
+        delete: 'Excluir localização',
+        pick: 'Escolher uma localização',
+        add: 'Adicionar uma nova localização',
+        edit: 'Editar localização',
+        radius: 'Raio da localização',
+        all: 'Atualizar TODOS os arquivos abertos para esta localização',
+        lat: 'Lat:',
+        lon: 'Lon:'
+    },
+    ru: {
+        update: 'Обновить местоположение',
+        delete: 'Удалить местоположение',
+        pick: 'Выбрать местоположение',
+        add: 'Добавить новое местоположение',
+        edit: 'Редактировать местоположение',
+        radius: 'Радиус местоположения',
+        all: 'Обновить ВСЕ открытые файлы до этого местоположения',
+        lat: 'Широта:',
+        lon: 'Долгота:'
+    },
+    sv: {
+        update: 'Uppdatera plats',
+        delete: 'Radera plats',
+        pick: 'Välj en plats',
+        add: 'Lägg till en ny plats',
+        edit: 'Redigera plats',
+        radius: 'Platsradie',
+        all: 'Uppdatera ALLA öppna filer till denna plats',
+        lat: 'Latitud:',
+        lon: 'Longitud:'
+    },
+    zh: {
+        update: '更新位置',
+        delete: '删除位置',
+        pick: '选择一个位置',
+        add: '添加新位置',
+        edit: '编辑位置',
+        radius: '位置半径',
+        all: '更新所有打开的文件到此位置',
+        lat: '纬度:',
+        lon: '经度:'
+    }
 };
+
+
+
 
 
 const Context = {

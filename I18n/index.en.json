@@ -65,6 +65,7 @@
     "save2db": ["Save to Archive","Ctrl+S"
     ],
     "charts": ["View charts"],
+    "manage-locations": ["Manage locations"],
     "explore": ["Explore Archive"],
     "chart-datefilter": ["Apply a date filter"],
     "explore-datefilter": ["Apply a date filter"],

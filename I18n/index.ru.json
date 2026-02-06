@@ -63,6 +63,7 @@
     "save2db": ["Сохранить в архив","Ctrl+S"
     ],
     "charts": ["Просмотреть графики"],
+    "manage-locations": ["Управление местоположениями"],
     "explore": ["Изучить архив"],
     "chart-datefilter": ["Применить фильтр по дате"],
     "explore-datefilter": ["Применить фильтр по дате"],
@@ -109,7 +110,7 @@
     "apply-location": ["Установить"],
     "cancel-location": ["Отмена"],
     "library-location-select": ["Расположение библиотеки:"],
-    "database-location-select": ["Расположение базы данных:"],
+    "database-location-select": ["Путь БД:"],
     "close-tour": ["Закрыть"],
     "settings": {
         "basic": "Стандартный",
