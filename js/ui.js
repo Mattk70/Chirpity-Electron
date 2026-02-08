@@ -982,7 +982,7 @@ const showLocation = async (fromSelect) => {
   locationAdd.classList.toggle("disabled", !customPlaceEl.value.trim());
   locationDelete.classList.toggle('disabled', locationSelect.selectedIndex < 2); // disable delete for default and placeholder options
   // make sure the  map is initialised
-  await placeMap("customLocationMap", locId);
+  if (!window.map) await placeMap("customLocationMap", locId);
   const latVal = lat === "" ? config.latitude : parseFloat(lat);
   const lonVal = lon === "" ? config.longitude : parseFloat(lon);
   updateMap(latVal, lonVal, radiusValue);

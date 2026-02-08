@@ -2032,6 +2032,7 @@
     async function placeMap(divID, locationID){
         if (map) map?.remove();
         map = L.map(divID);
+        window.map = map;
         let latTxt, lonTxt;
         if (divID === 'settingsMap'){
             latTxt = 'latitude';
@@ -2056,7 +2057,7 @@
 
     window.placeMap = placeMap;
     window.updateMap = updateMap;
-    window.map = map;
+    
 </script>
 </body>
 
