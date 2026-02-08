@@ -7831,10 +7831,7 @@ async function membershipCheck() {
   const installPeriod = now - installDate;
   const trialDaysLeft = Math.max(Math.ceil((trialPeriod - installPeriod)/86_400_000), 0)
   const inTrial = installPeriod < trialPeriod;
-  if (trialDaysLeft){
-    document.getElementById('trialPill').classList.remove('d-none')
 
-  }
   const lockedElements = document.querySelectorAll(".locked, .unlocked");
   const unlockElements = () => {
     lockedElements.forEach((el) => {
