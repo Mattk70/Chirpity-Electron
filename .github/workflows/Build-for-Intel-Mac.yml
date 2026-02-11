@@ -116,6 +116,8 @@ jobs:
       - name: Install dependencies
         run: |
           npm install
+          # lock onnxruntime-node to 1.23.2 to avoid build issues with 1.24.1 on Intel Mac
+          npm install onnxruntime-node@1.23.2 --no-save
           echo "Install's status is ${{ job.status }}."
           
       - name: Set platform-specific ffmpeg path

@@ -1708,12 +1708,12 @@ async function onAnalyse({
             value: METADATA[file].duration,
           })
         );
-        // Weirdness with promise all - list worker called 2x and no results returned
         await Promise.all([getSummary(), getResults()] );
       }
       return;
     }
   }
+  await processFilesInBatches(FILE_QUEUE);
   DEBUG &&
     console.log("FILE_QUEUE has", FILE_QUEUE.length, "files", count, "files ignored");
   STATE.selection || await onChangeMode("analyse");
