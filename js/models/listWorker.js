@@ -415,7 +415,7 @@ class Model {
     this.appPath = appPath;
     this.labels = undefined; // labels in the model we're filtering
     this.customLabels = undefined; // custom labels for custom list
-    this.splitChar = null;
+    this.splitChar = '_';
   }
 
   async loadModel() {

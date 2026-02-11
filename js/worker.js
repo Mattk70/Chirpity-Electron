@@ -4787,8 +4787,17 @@ const onSave2DiskDB = async ({ file }) => {
   }
 };
 
-const filterLocation = () =>
-  STATE.location ? ` AND files.locationID = ${STATE.location.id}` : "";
+const filterLocation = () => {
+  let SQL = '';
+  if (STATE.location) {
+    if (STATE.location.id === 0) {
+      SQL = " AND (files.locationID IS NULL OR files.locationID = 0) ";
+    } else {
+      SQL = ` AND files.locationID = ${STATE.location.id} `;
+    }
+  }
+  return SQL;
+}
 
 /**
  * getDetectedSpecies generates a list of species to use in dropdowns for chart and explore mode filters
@@ -4828,8 +4837,8 @@ const getDetectedSpecies = async () => {
  */
 const getValidSpecies = async (file) => {
   const included = await getIncludedIDs(file); // classindex values
-  const locationID = METADATA[file]?.locationID || STATE.location?.id;
-  const {place} = locationID
+  const locationID = METADATA[file]?.locationID ?? STATE.location?.id;
+  const {place} = locationID != undefined
     ? await STATE.db.getAsync(
         "SELECT place FROM locations WHERE id = ?",
         locationID
@@ -5274,7 +5283,7 @@ async function onSetLocation({
   let locationsChanged = false, fileLocationChanged = false;
   if (remove) return deleteLocation({ id });
 
-  if (!files && (id !== undefined && place)) {
+  if (id !== undefined && place && (!files || !files.length)) {
     // Location update
     await INITIALISED;
     for (const db of [diskDB, memoryDB]) {

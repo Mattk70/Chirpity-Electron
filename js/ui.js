@@ -5059,7 +5059,7 @@ function showThreshold(e) {
  */
 function showRadiusValue(e) {
   const radius = e instanceof Event ? e.target.valueAsNumber : e;
-  document.getElementById('radius-value').innerHTML = `<b>${radius}</b>`;
+  document.getElementById('radius-value').innerHTML = `<b>${radius}m</b>`;
   return radius
 }
 

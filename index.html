@@ -554,8 +554,8 @@
                                         </div>
                                         <input id="location-radius" class="input-group locked disabled" style="width:100%" type="range" value="30" min="10" max="2500" step="10"/>
                                     </div>
-                                    <div class="col-2 input-group-append d-flex align-items-end">
-                                        <span class="input-group-text" id="radius-value">30</span>
+                                    <div class="col-2 input-group-append d-flex align-items-end ps-0">
+                                        <span class="input-group-text" id="radius-value">30m</span>
                                     </div>
                                 </div>
                             </div>
@@ -1925,13 +1925,13 @@
                 const markersByID = {};
                 const sharedIcon = new L.Icon.Default();
 
-                    for (const { id, lat, lon, radius } of LOCATIONS) {
+                    for (const { id, lat, lon, radius = 30} of LOCATIONS) {
                         const marker = L.marker([lat, lon], { icon: sharedIcon }).addTo(markerGroup);
                         const circle = L.circle([lat, lon], {
                             color: 'MidnightBlue',
                             weight: 1,
                             opacity: 0.5,
-                            fillColor: 'MidnightBlue',
+                            fillColor: 'MidnightBlue',  
                             fillOpacity: 0.2,
                             radius
                         }).addTo(markerGroup);
