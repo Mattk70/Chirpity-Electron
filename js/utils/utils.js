@@ -264,7 +264,7 @@ function requestFromWorker(worker, action, payload = {}) {
 /**
  * Returns a Promise that resolves when the provided check function returns a truthy value or after a maximum number of retries.
  *
- * The check function is evaluated every 100 milliseconds, up to 250 times.
+ * The check function is evaluated every 10 milliseconds, up to 250 times.
  *
  * @param {Function} checkFn - A function that is repeatedly called until it returns a truthy value.
  * @returns {Promise<void>} Resolves when {@link checkFn} returns a truthy value or after the maximum retries.

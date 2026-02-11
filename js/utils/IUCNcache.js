@@ -13,6 +13,7 @@ const s = {"Abeillia abeillei":{"scopes":[{"scope":"Global","status":"LC","url":
     "Antigone rubicunda": "Grus rubicunda",
     "Antigone vipio": "Grus vipio",
     "Anurolimnas fasciatus": "Porzana fasciata",
+    "Apus melba": "Tachymarptis melba",
     "Artamus leucorynchus": "Artamus leucoryn",
     "Asio grammicus": "Pseudoscops grammicus",
     "Atlapetes tibialis": "Pselliophorus tibialis",

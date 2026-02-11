@@ -26,7 +26,7 @@ import {
   upgrade_to_v4
 } from "./database.js";
 import { customURLEncode, installConsoleTracking, trackEvent as _trackEvent } from "./utils/tracking.js";
-import { onChartRequest }  from "./components/charts.js";
+import { onChartRequest, getIncludedLocations }  from "./components/charts.js";
 import { getAudioMetadata } from "./models/training.js";
 let isWin32 = false;
 
@@ -1374,8 +1374,8 @@ async function addQueryQualifiers(stmt, range, caller) {
     stmt += ` AND isDaylight = ${detect.nocmig === 'day' ? 1 : 0} `;
   }
   if (location !== undefined) {
-    const {lat, lon, radius} = location;
-    const locations = await getIncludedLocations(lat,lon)
+    const {lat, lon} = location;
+    const locations = await getIncludedLocations(diskDB, lat,lon)
     const ids = locations.map(l => l.id);
     stmt +=  " AND locationID IN (" + ids.join(',') + ") ";
     if (ids.includes(0)) stmt +=  " OR locationID IS NULL ";
@@ -4726,7 +4726,7 @@ const onSave2DiskDB = async ({ file }) => {
       ON CONFLICT(name) DO UPDATE SET
         duration     = excluded.duration,
         filestart    = excluded.filestart,
-        locationID   = COALESCE(excluded.locationID, disk.files.locationID),
+        locationID   = excluded.locationID,
         archiveName  = excluded.archiveName,
         metadata     = excluded.metadata;`
     );
@@ -5257,7 +5257,7 @@ async function onSetLocation({
   lat,
   lon,
   place,
-  radius = 100,
+  radius = 30,
   files,
   id,
   db = STATE.db,
@@ -5333,7 +5333,7 @@ async function onSetLocation({
     if (row?.id) {
       id = row.id;
       locationsChanged = true;
-      if (radius !== 100) console.info("Non-default radius was set", radius);
+      if (radius !== 30) console.info("Non-default radius was set", radius);
     }
     if (manualUpdate && inMemory){
       await diskDB.getAsync(SQL, lat, lon, place, radius);
@@ -5442,42 +5442,19 @@ function getLocations({ file, db = STATE.db, id }) {
 }
 
 
+
+
 async function getNearbyLocationsCached(lat, lon) {
   const key = `${lat} ${lon}`;
   const cache = STATE.nearbyLocationCache;
   if (!cache.has(key)) {
-    cache.set(key, getNearbyLocations(lat, lon));
+    cache.set(key, _getNearbyLocations(lat, lon));
   }
   return cache.get(key);
 }
 
-async function getIncludedLocations(lat, lon) {
-  return await STATE.db.allAsync(`
-    WITH centre AS (
-      SELECT
-        lat,
-        lon,
-        COALESCE(radius, 100) AS centre_radius
-      FROM locations
-      WHERE lat = ? AND lon = ?
-    )
-    SELECT
-      l.*,
-      (6371000 * acos(
-        min(1, max(-1,
-          cos(radians(c.lat)) * cos(radians(l.lat)) *
-          cos(radians(l.lon) - radians(c.lon)) +
-          sin(radians(c.lat)) * sin(radians(l.lat))
-        ))
-      )) AS distance
-    FROM locations l
-    CROSS JOIN centre c
-    WHERE distance <= c.centre_radius
-    ORDER BY distance ASC;
-    `, lat, lon);
-  }
 /**
- * getNearbyLocations
+ * _getNearbyLocations
  * Fetches locations from the database that are within a specified radius of given latitude and longitude using the Haversine formula.
  * Priority (first in the list is the point with the smallest radius. If radii are equal, then the nearest point will be used)
  * @param {number} lat
@@ -5485,13 +5462,13 @@ async function getIncludedLocations(lat, lon) {
  * @returns {Promise<Array.<{id: number, lat: number, lon: number, place: string, radius: number, distance: number}>>}
 */
 
-async function getNearbyLocations(lat, lon) {
+async function _getNearbyLocations(lat, lon) {
   const R = 6_371_000; // Radius of the Earth in metres
   return await STATE.db.allAsync(`
     SELECT *
       FROM (
         SELECT
-          id, lat, lon, place, COALESCE(radius, 100) AS radius,
+          id, lat, lon, place, COALESCE(radius, 30) AS radius,
           (${R} * acos(
             min(1, max(-1,
               cos(radians(?)) * cos(radians(lat)) *

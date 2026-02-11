@@ -546,11 +546,16 @@
                                 </div>
                                 <div class="row">
                                     <div class="col-10">
-                                        <legend class="h6 mt-2 mb-0">Location radius</legend>
-                                        <input id="location-radius" class="input-group" style="width:100%" type="range" value="100" min="10" max="2500" step="10"/>    
+                                        <div class="d-flex align-items-center mt-2 mb-0">
+                                            <legend class="h6 mt-2 mb-0">Location radius</legend>
+                                            <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature.">
+                                                <span class="pointer locked material-symbols-outlined">lock</span>
+                                            </a>
+                                        </div>
+                                        <input id="location-radius" class="input-group locked disabled" style="width:100%" type="range" value="30" min="10" max="2500" step="10"/>
                                     </div>
                                     <div class="col-2 input-group-append d-flex align-items-end">
-                                        <span class="input-group-text" id="radius-value">100</span>
+                                        <span class="input-group-text" id="radius-value">30</span>
                                     </div>
                                     </div>
                                     <div id="customLocationMap" class="mt-2 border border-secondary rounded" style="height: 200px"></div>
@@ -1888,7 +1893,7 @@
         const radius = document.getElementById('location-radius');
         const radiusValue = document.getElementById('radius-value');
 
-        radius.value = 100, radiusValue.innerHTML = "<b>100</b>";
+        radius.value = 30, radiusValue.innerHTML = "<b>30</b>";
 
         updateMap(lat, lng);
         
@@ -1983,8 +1988,9 @@
             });
     })
 
-    function updateMap(lat, lng, radius = 100) {
+    function updateMap(lat, lng, radius = 30) {
         try {
+            if (! checkCoords(lat, lng)) return;
             // Remove all previous markers & circles
             markerGroup && markerGroup.remove();
             markerGroup = L.featureGroup();

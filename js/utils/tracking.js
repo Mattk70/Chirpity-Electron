@@ -25,13 +25,9 @@ function trackEvent(uuid, event, action, name, value){
     const t = new Date()
     name = name ? `&e_n=${name}` : '';
     value = value ? `&e_v=${value}` : '';
-    fetch(`https://analytics.mattkirkland.co.uk/matomo.php?h=${t.getHours()}&m=${t.getMinutes()}&s=${t.getSeconds()}
+    navigator.sendBeacon(`https://analytics.mattkirkland.co.uk/matomo.php?h=${t.getHours()}&m=${t.getMinutes()}&s=${t.getSeconds()}
         &action_name=Settings%20Change&idsite=${ID_SITE}&rand=${Date.now()}&rec=1&uid=${uuid}&apiv=1
-        &e_c=${event}&e_a=${action}${name}${value}`, {method: "POST" })
-        .then(response => {
-            if (! response.ok) throw new Error('Network response was not ok', response);
-        })
-        .catch(error => console.log('Error posting tracking:', error))
+        &e_c=${event}&e_a=${action}${name}${value}`)
 }
 
 /**
@@ -59,7 +55,7 @@ function trackVisit(config){
     const {UUID, selectedModel, list, useWeek, locale, speciesThreshold, filters, audio, models, detect, CPU, RAM, GPUs, VERSION} = config;
     VISITOR = UUID;
     const {width, height} = window.screen;
-    fetch(`https://analytics.mattkirkland.co.uk/matomo.php?idsite=${ID_SITE}&rand=${Date.now()}&rec=1&uid=${UUID}&apiv=1
+    navigator.sendBeacon(`https://analytics.mattkirkland.co.uk/matomo.php?idsite=${ID_SITE}&rand=${Date.now()}&rec=1&uid=${UUID}&apiv=1
             &res=${width}x${height}
             &dimension1=${selectedModel}
             &dimension2=${list}
@@ -73,11 +69,7 @@ function trackVisit(config){
             &dimension11=${VERSION}
             &dimension12=${CPU}
             &dimension13=${RAM}
-            &dimension14=${GPUs}`, { method: "POST"})
-        .then(response => {
-            if (! response.ok) throw new Error('Network response was not ok', response);
-        })
-        .catch(error => console.log('Error posting tracking:', error))
+            &dimension14=${GPUs}`)
     setInterval(sendHeartbeat, 20 * 60 * 1000); // Send ping every 20 mins
 }
 
@@ -91,13 +83,7 @@ function sendHeartbeat() {
         visitorId: VISITOR 
     });
 
-    fetch(`${url}?${params.toString()}`, {
-        method: 'GET'
-    }).then(() => {
-        console.log('Heartbeat sent');
-    }).catch(error => {
-        console.log('Error sending heartbeat:', error);
-    });
+    navigator.sendBeacon(`${url}?${params.toString()}`)
 }
 
 function customURLEncode(str) {

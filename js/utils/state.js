@@ -71,7 +71,7 @@ export class WorkerState {
     (this.lat = undefined),
     (this.lon = undefined),
     (this.place = undefined),
-    (this.radius = 100),
+    (this.radius = 30),
     (this.nearbyLocationCache = new Map()),
     (this.location = undefined),
     (this.locale = "en"),

@@ -968,11 +968,11 @@ const showLocation = async (fromSelect) => {
     : FILE_LOCATION_MAP[STATE.currentFile];
 
   const location = !id && id !== 0
-     ? {id: "", lat: "", lon: "", place: "", radius: 100} // default location if no selection
+     ? {id: "", lat: "", lon: "", place: "", radius: 30} // default location if no selection
      : LOCATIONS.find(obj => obj.id === parseInt(id)) ?? LOCATIONS.find(obj => obj.id === 0);
 
   const { id: locId, lat, lon, place, radius} = location;
-  const radiusValue = radius ?? 100;
+  const radiusValue = radius ?? 30;
   latEl.value = lat;
   lonEl.value = lon;
   customPlaceEl.value = place;
@@ -1902,7 +1902,7 @@ const defaultConfig = {
   latitude: 52.87,
   longitude: 0.89,
   location: "Great Snoring, North Norfolk",
-  radius: 100,
+  radius: 30,
   detect: {
     nocmig: false,
     autoLoad: false,
