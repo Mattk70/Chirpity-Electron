@@ -563,7 +563,6 @@ class Model {
               messages.push({ sname, model: this.model, line: (i + 1) });
           }
         }
-        console.log(`Finding matches took`, duration, "ms");
       }
     } else {
       // looking for birds (chirpity) or (birds or migrants) in the case of birdnet

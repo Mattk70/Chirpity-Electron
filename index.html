@@ -529,7 +529,7 @@
                                 </div>
                             </div>
                         </fieldset>
-                        <fieldset class="border rounded m-2 mb-0 p-1">
+                        <fieldset class="border rounded m-2 mb-0 p-1" id="edit-section">
                             <legend class="h6">Add, Edit or Delete Location</legend>
                             <div class="form-group rounded p-2 bg-light">
                                 <div class="row">
@@ -557,13 +557,17 @@
                                     <div class="col-2 input-group-append d-flex align-items-end">
                                         <span class="input-group-text" id="radius-value">30</span>
                                     </div>
-                                    </div>
-                                    <div id="customLocationMap" class="mt-2 border border-secondary rounded" style="height: 200px"></div>
                                 </div>
+                            </div>
+                        </fieldset>
+
+                            <div class="form-group rounded p-2 bg-light mt-2">
+                                <div id="customLocationMap" class="mt-2 border border-secondary rounded" style="height: 200px"></div>
+                            </div>
+                        <fieldset class="border rounded m-2 mt-0 p-1">
                                 <div class="row">
                                     <div class="input-group p-1">
-                                        <textarea class="m-2 w-100" id="customPlace" spellcheck="false"
-                                        maxlength="100" required></textarea>
+                                        <textarea class="m-2 w-100" id="customPlace" spellcheck="false" maxlength="100" required></textarea>
                                     </div>
                                 </div>
                                 <div class="row d-none" id="location-batch-wrapper">
@@ -574,10 +578,10 @@
                                         </label> 
                                     </div>
                                 </div>
-                            </div>
+                            
                         </fieldset>
                     </form>
-                
+                </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-danger me-auto d-none" id="delete-location">Delete Location</button>
                     <button type="button" class="btn btn-primary" id="set-location">Set Location</button>
@@ -1851,7 +1855,7 @@
 </audio>
 <script src="./js/ui.js" type="module"></script>
 <script type="module" defer>
-    import { config, displayLocationAddress, LOCATIONS, generateToast, showRadiusValue, onRadiusUpdated, checkCoords } from './js/ui.js';
+    import { config, displayLocationAddress, LOCATIONS, generateToast, checkCoords } from './js/ui.js';
     let map, marker, clickTimer = 0;
     let currentTileLayer = null;
     const createTileLayer = () =>
@@ -1925,7 +1929,7 @@
                         const marker = L.marker([lat, lon], { icon: sharedIcon }).addTo(markerGroup);
                         const circle = L.circle([lat, lon], {
                             color: 'MidnightBlue',
-                            width: 1,
+                            weight: 1,
                             opacity: 0.5,
                             fillColor: 'MidnightBlue',
                             fillOpacity: 0.2,
@@ -1947,11 +1951,11 @@
                         map.fitBounds(bounds.pad(0.2));
                     }
 
-                    createTileLayer().addTo(map);
+                    currentTileLayer = createTileLayer().addTo(map);
                     markerGroup.on('click', onMapClick);
             } else {
                 map.setView([config.latitude, config.longitude], 12);
-                createTileLayer().addTo(map);
+                currentTileLayer = createTileLayer().addTo(map);
 
                 const fallbackMarker = L.marker([config.latitude, config.longitude]).addTo(map);
                 fallbackMarker.on('click', onMapClick);

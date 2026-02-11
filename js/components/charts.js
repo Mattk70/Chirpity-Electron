@@ -7,8 +7,9 @@ const filterLocation = async (location) => {
     const {lat, lon} = STATE.location;
     const locations = await getIncludedLocations(DB, lat,lon)
     const ids = locations.map(l => l.id);
-    let stmt =  " AND locationID IN (" + ids.join(',') + ") ";
-    if (ids.includes(0)) stmt +=  " OR locationID IS NULL ";
+    let stmt =  " AND (locationID IN (" + ids.join(',') + ")";
+    if (ids.includes(0)) stmt +=  " OR locationID IS NULL";
+    stmt += ") ";
     return stmt;
   }
   return "";
@@ -312,7 +313,7 @@ async function onChartRequest(args) {
   }
 
   const result = await getChartTotals(args)
-    .catch((error) => console.log(error));
+    .catch((error) => { console.warn('Error in getChartTotals:', error); return [[], 0, args.aggregation, 0]; });
   const [ rows, dataPoints, aggregation, startIndex ] = result;
   const years = [...new Set(rows.map(o => o.year))];
   const hasMultipleYears = years.length > 1;

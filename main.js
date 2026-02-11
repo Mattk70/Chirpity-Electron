@@ -746,7 +746,7 @@ ipcMain.handle("request-worker-channel", async (_event) => {
   // without going through the main process!
 });
 
-ipcMain.on("unsaved-records", (_event, data) => {5
+ipcMain.on("unsaved-records", (_event, data) => {
   unsavedRecords = data.newValue; // Update the variable with the new value
 });
 

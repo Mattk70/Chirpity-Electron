@@ -1377,8 +1377,9 @@ async function addQueryQualifiers(stmt, range, caller) {
     const {lat, lon} = location;
     const locations = await getIncludedLocations(diskDB, lat,lon)
     const ids = locations.map(l => l.id);
-    stmt +=  " AND locationID IN (" + ids.join(',') + ") ";
-    if (ids.includes(0)) stmt +=  " OR locationID IS NULL ";
+    stmt +=  " AND (locationID IN (" + ids.join(',') + ") ";
+    if (ids.includes(0)) stmt +=  " OR locationID IS NULL";
+    stmt += ") ";
   }
   return [stmt, params];
 }
@@ -4802,7 +4803,7 @@ const getDetectedSpecies = async () => {
     FROM records
     JOIN species ON species.id = records.speciesID 
     JOIN files on records.fileID = files.id
-    Join locations l on files.locationID = l.id`;
+    LEFT JOIN locations l on files.locationID = l.id`;
 
   if (STATE.mode === "explore") sql += ` WHERE confidence >= ${confidence}`;
   // if (!["location", "everything"].includes(STATE.list)) {
@@ -5271,9 +5272,9 @@ async function onSetLocation({
   if (["Fetching...", "No location found for this map point"].includes(place)) place = `${lat} ${lon}`;
   const inMemory = db === memoryDB;
   let locationsChanged = false, fileLocationChanged = false;
-  if (remove) return deleteLocation({ lat, lon, id });
+  if (remove) return deleteLocation({ id });
 
-  if (!files || (id !== undefined && place)) {
+  if (!files && (id !== undefined && place)) {
     // Location update
     await INITIALISED;
     for (const db of [diskDB, memoryDB]) {
@@ -5295,7 +5296,7 @@ async function onSetLocation({
     }
     if (dbErrors) return;
     if (id === 0) Object.assign(STATE, { lat, lon, place, radius });
-    invalidateLocations(0);
+    invalidateLocations(id);
     getLocations({ file: null });
     return;
   }
@@ -5380,11 +5381,11 @@ function invalidateLocations(id) {
   }
 }
 
-async function deleteLocation({ lat, lon, id }) {
+async function deleteLocation({ id }) {
     // Delete the location
     if (id > 0){
       for (const db of [diskDB, memoryDB]) {
-          await db.runAsync("DELETE FROM locations WHERE lat = ? AND lon = ?", lat, lon);
+          await db.runAsync("DELETE FROM locations WHERE id = ?", id);
         }
       invalidateLocations(id);
       UI.postMessage({ event: "delete-location-id", id });

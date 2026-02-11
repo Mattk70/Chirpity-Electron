@@ -899,7 +899,7 @@ function customiseAnalysisMenu(saved) {
   }
 }
 
-async function generateLocationList(elID) {
+async function generateLocationList(elID, skipDefault = false) {
   const i18 = i18n.get(i18n.All);
 
   const el = document.getElementById(elID);
@@ -907,11 +907,12 @@ async function generateLocationList(elID) {
   LOCATIONS ??= await utils.requestFromWorker(worker, "get-locations", {
     file: STATE.currentFile
   });
-  if (elID !== "savedLocations"){
+  if (skipDefault) {}
+  else if (elID === "savedLocations"){
+    el.innerHTML = `<option value="">${i18n.get(i18n.Location)['add']}</option>`; 
+  } else {
     const defaultText =  i18[1];
     el.innerHTML = `<option value="">${defaultText}</option>`; 
-  } else {
-    el.innerHTML = `<option value="">Add New Location</option>`; 
   }
   LOCATIONS.slice() // avoid mutating the original array, just in case
   .sort((a, b) => { // put the default location at the top of the list
@@ -968,7 +969,7 @@ const showLocation = async (fromSelect) => {
     : FILE_LOCATION_MAP[STATE.currentFile];
 
   const location = !id && id !== 0
-     ? {id: "", lat: "", lon: "", place: "", radius: 30} // default location if no selection
+     ? LOCATIONS.find(obj => obj.id === 0) // default location if no selection
      : LOCATIONS.find(obj => obj.id === parseInt(id)) ?? LOCATIONS.find(obj => obj.id === 0);
 
   const { id: locId, lat, lon, place, radius} = location;
@@ -976,7 +977,7 @@ const showLocation = async (fromSelect) => {
   latEl.value = lat;
   lonEl.value = lon;
   customPlaceEl.value = place;
-  locationSelect.value = id || "";
+  locationSelect.value = id ?? "0";
   locationRadius.value = radiusValue;
   showRadiusValue(radiusValue);
   locationAdd.classList.toggle("disabled", !customPlaceEl.value.trim());
@@ -1094,25 +1095,27 @@ const setDefaultLocation = () => {
 };
 
 async function setCustomLocation(manage = false) {
-  const savedLocationSelect = await generateLocationList("savedLocations");
+  const savedLocationSelect = await generateLocationList("savedLocations", !manage);
   const latEl = document.getElementById("customLat");
   const lonEl = document.getElementById("customLon");
   const customPlaceEl = document.getElementById("customPlace");
   const locationAdd = document.getElementById("set-location");
   const locationDelete = document.getElementById("delete-location");
-  if (manage) locationDelete.classList.remove('d-none');
+  const editSection = document.getElementById("edit-section");
+  editSection.classList.toggle("d-none", !manage);
+  locationDelete.classList.toggle('d-none', !manage);
+  customPlaceEl.toggleAttribute('readonly', !manage);
   const batchWrapper = document.getElementById("location-batch-wrapper");
+  batchWrapper.classList.toggle("d-none", !(STATE.openFiles.length > 1 && !manage));
   const locationRadius = document.getElementById("location-radius");
-  STATE.openFiles.length > 1 && ! manage
-    ? batchWrapper.classList.remove("d-none")
-    : batchWrapper.classList.add("d-none");
+
   // Use the current file location for lat, lon, place or use defaults
   showLocation(manage);
   const onSavedLocationChange = () => showLocation(true);
   savedLocationSelect.addEventListener("change", onSavedLocationChange);
   // Translate modal content
   const i18 = i18n.get(i18n.Location);
-  savedLocationSelect.querySelector("option").textContent = i18['add'];
+  // savedLocationSelect.querySelector("option").textContent = i18['add'];
   locationDelete.textContent = i18['delete'];
   locationModalDiv.querySelector("h5").textContent = i18['update'];
   const legends = locationModalDiv.querySelectorAll("legend");
@@ -1132,9 +1135,10 @@ async function setCustomLocation(manage = false) {
 
   const addLocation = (e) => {
     const remove = e.target.id === 'delete-location';
-    const locationID = parseInt(savedLocationSelect.value);
+    const parsed = parseInt(savedLocationSelect.value, 10);
+    const locationID = Number.isFinite(parsed) ? parsed : undefined;
     const batch = document.getElementById("batchLocations").checked;
-    const files = batch ? STATE.openFiles : STATE.currentFile ? [STATE.currentFile] : null;
+    const files = batch ? STATE.openFiles : !manage && STATE.currentFile ? [STATE.currentFile] : null;
     const place = customPlaceEl.value;
     const radius = locationRadius.valueAsNumber;
     const lat = latEl.valueAsNumber;
@@ -1159,7 +1163,7 @@ async function setCustomLocation(manage = false) {
 
     locationModal.hide();
   };
-  const toggleSetButton = () => locationAdd.classList.toggle("disabled", !customPlaceEl.value.trim());
+  const toggleSetButton = () => locationAdd.classList.toggle("disabled", isNaN(savedLocationSelect.valueAsNumber));
   toggleSetButton();
   locationAdd.addEventListener("click", addLocation);
   locationDelete.addEventListener("click", addLocation);
@@ -1168,6 +1172,7 @@ async function setCustomLocation(manage = false) {
     locationForm.reset();
     locationDelete.classList.add('d-none');
     locationAdd.removeEventListener("click", addLocation);
+    locationDelete.removeEventListener("click", addLocation);
     customPlaceEl.removeEventListener("input", toggleSetButton);
     savedLocationSelect.removeEventListener("change", onSavedLocationChange);
     locationModalDiv.removeEventListener("hide.bs.modal", onModalDismiss);
@@ -5048,8 +5053,9 @@ function showThreshold(e) {
 }
 
 /**
- * Updates the threshold display and input values in both the filter and settings panels.
+ * Updates the radius display in the location modal.
  * @param {Event|number} e - The input event or numeric threshold value to display and set.
+ * `@returns` {number} The resolved radius value.
  */
 function showRadiusValue(e) {
   const radius = e instanceof Event ? e.target.valueAsNumber : e;
@@ -6973,7 +6979,7 @@ const recordEntryModal = new bootstrap.Modal(recordEntryModalDiv, {
 
 const recordEntryForm = document.getElementById("record-entry-form");
 
-const getSplitChar = (labels) => labels[0].includes('~') ? '~' : '_';
+const getSplitChar = (labels = []) => labels[0].includes('~') ? '~' : '_';
 /**
  * Displays and populates the record entry modal for adding or updating audio record details.
  *
@@ -7524,7 +7530,7 @@ async function getXCComparisons() {
         })
         .catch((error) => {
           loadingFiles({hide:true})
-          console.warn("Error getting XC data for type", type, error);
+          console.warn(`Error getting XC data for type:${type}`, error);
           return [];
         });
     });
@@ -7811,7 +7817,7 @@ const IUCNMap = {
 };
 
 // Make functions available to the map script in index.html
-export { config, displayLocationAddress, LOCATIONS, generateToast, showRadiusValue, onRadiusUpdated, checkCoords};
+export { config, displayLocationAddress, LOCATIONS, generateToast, checkCoords};
 
 /**
  * Checks the user's membership status via a remote API and updates the UI to reflect feature access.
