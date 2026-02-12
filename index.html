@@ -555,7 +555,7 @@
                                         <input id="location-radius" class="input-group locked disabled" style="width:100%" type="range" value="30" min="10" max="2500" step="10"/>
                                     </div>
                                     <div class="col-2 input-group-append d-flex align-items-end ps-0">
-                                        <span class="input-group-text" id="radius-value">30m</span>
+                                        <span class="input-group-text" id="radius-value"></span>
                                     </div>
                                 </div>
                             </div>
@@ -1897,7 +1897,7 @@
         const radius = document.getElementById('location-radius');
         const radiusValue = document.getElementById('radius-value');
 
-        radius.value = 30, radiusValue.innerHTML = "<b>30</b>";
+        radius.value = 30, radiusValue.innerHTML = "<b>30m</b>";
 
         updateMap(lat, lng);
         
