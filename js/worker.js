@@ -4740,6 +4740,7 @@ const onSave2DiskDB = async ({ file }) => {
       SELECT id, lat, lon, place FROM locations;
     `);
     await memoryDB.runAsync(
+    // Don't coalesce locationID here, because we want to preserve NULLs for files without location
     `INSERT INTO disk.files (name, duration, filestart, locationID, archiveName, metadata)
       SELECT name, duration, filestart, locationID, archiveName, metadata FROM files
       WHERE filestart IS NOT NULL
@@ -5333,15 +5334,19 @@ async function onSetLocation({
     // Location set by metadata
     nearby = await getNearbyLocationsCached(lat, lon);
     if (nearby.length) {
-      // Snap the file location to the highest priority existing location
-      const {lat:overrideLat, lon:overrideLon, id:overrideID, place:overridePlace} = nearby[0];
-      lat = overrideLat, lon = overrideLon; id = overrideID; place = overridePlace;
-      console.info("Nearby location", nearby.flatMap(x => Math.round(x.distance)).join(", "));
+      const closest = nearby[0];
+      if (closest.distance > 0){
+        // Snap the file location to the highest priority existing location
+        const {lat:overrideLat, lon:overrideLon, id:overrideID, place:overridePlace, radius:overrideRadius} = closest;
+        lat = overrideLat, lon = overrideLon; id = overrideID; place = overridePlace; radius = overrideRadius;
+        console.info("Snapping to nearby location:", `${closest.distance} meters away`);
+      }
+      
     } 
   }
 
  if (id === null || id === undefined) {
-    let row = await db.getAsync('SELECT id FROM locations WHERE lat = ? AND lon = ? AND place = ? AND radius = ?',
+    let row = await db.getAsync('SELECT id FROM locations WHERE lat = ? AND lon = ? AND place = ? AND COALESCE(radius, 30) = ?',
       lat, lon, place, radius);
     let SQL;
     if (!row){

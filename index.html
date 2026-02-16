@@ -1877,18 +1877,21 @@
             latEl.value = lat.toFixed(4); 
             lonEl.value = lng.toFixed(4);
             const placeEl = document.getElementById('place');
-            placeEl.textContent = 'Getting location...'
+            placeEl.value = 'Getting location...'
+            displayLocationAddress(target);
         } else {
             const savedLocationSelect = document.getElementById('savedLocations');
-            if (! afterDrag) savedLocationSelect.value = '';
+            // if (! afterDrag) savedLocationSelect.value = '';
             const latEl = document.getElementById('customLat')
             const lonEl = document.getElementById('customLon')
             latEl.value = lat.toFixed(4); 
             lonEl.value = lng.toFixed(4);
-            const customPlaceEl = document.getElementById('customPlace');
-            customPlaceEl.value = 'Fetching...'
+            if (! savedLocationSelect.value) {
+                const customPlaceEl = document.getElementById('customPlace');
+                customPlaceEl.value = 'Getting location...';
+                displayLocationAddress(target);
+            }
         }
-        displayLocationAddress(target);
     }
 
     async function onMapClick(e) {
