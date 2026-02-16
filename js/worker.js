@@ -1180,9 +1180,10 @@ async function processFilesInBatches(filePaths, batchSize = 20) {
         }
       ))
     );
+    const progress = results.filter(Boolean).length // only count successful metadata retrievals towards progress
     UI.postMessage({
       event: "footer-progress",
-      progress: { percent: ((i + results.length) / filePaths.length) *100 },
+      progress: { percent: ((i + progress) / filePaths.length) * 100 },
       text: "Reading metadata",
     });
     DEBUG && console.log(`Processed ${i + results.length} of ${filePaths.length}`);
