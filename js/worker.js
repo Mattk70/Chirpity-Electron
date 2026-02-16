@@ -535,6 +535,11 @@ async function handleMessage(e) {
       }
       break;
     }
+    case "find-time": {
+      const time = args.time;
+      await findTime(time);
+      break;
+    }
     case "get-detected-species-list": {
       getDetectedSpecies();
       break;
@@ -887,6 +892,19 @@ function setGetSummaryQueryInterval(threads) {
     STATE.detect.backend !== "tensorflow" ? threads * 10 : threads;
 }
 
+
+async function findTime(time) {
+  const result = await STATE.db.allAsync(`
+    SELECT
+      name as file,
+      (? - filestart) / 1000.0 AS offset
+    FROM files
+    WHERE filestart <= ?
+      AND filestart + (duration * 1000) > ?;
+  `, time, time, time);
+  UI.postMessage({ event: "found-time", result });
+}
+
 /**
  * Switches the application to a new operational mode, initializing the in-memory database if needed and notifying the UI.
  *
@@ -1156,6 +1174,7 @@ async function processFilesInBatches(filePaths, batchSize = 20) {
           return fileMetadata;
         }).catch ((_e) => {
           console.warn(`Failed to get metadata for file: ${file}`);
+          filePaths.splice(filePaths.indexOf(file), 1); // Remove the file from the list
           return null; // or handle the error as needed
         }
       ))
@@ -1166,6 +1185,14 @@ async function processFilesInBatches(filePaths, batchSize = 20) {
       text: "Reading metadata",
     });
     DEBUG && console.log(`Processed ${i + results.length} of ${filePaths.length}`);
+  }
+  if (STATE.corruptFiles.length) {
+    generateAlert({
+      type: "warning",
+      message: "corruptFile",
+      variables: { files: '<br>' + STATE.corruptFiles.join("<br>") },
+      autohide: false,
+    });
   }
   DEBUG && console.log(`All files processed in ${Date.now() - t0}ms`);
 }
@@ -1777,12 +1804,6 @@ const measureDurationWithFfmpeg = (src, type) => {
       .audioFrequency(sampleRate)
       .on("error", (err) => {
         STATE.corruptFiles.push(src);
-        if (STATE.corruptFiles.length === 1){
-          generateAlert({
-            type: "error",
-            message: "corruptFile"
-          });
-        }
         stream.destroy();
         reject(err);
       })
@@ -2200,11 +2221,7 @@ const setMetadata = async ({ file, source_file = file }) => {
       if (file.toLowerCase().endsWith("wav")) {
         const { extractWaveMetadata } = require("./js/utils/metadata.js");
         const t0 = Date.now();
-        const wavMetadata = await extractWaveMetadata(file).catch(error => {
-          if (error.code !== 'ENOENT') console.warn("Error extracting GUANO", error.message);
-          return
-        });
-
+        const wavMetadata = await extractWaveMetadata(file);
         const metaKeys = wavMetadata ? Object.keys(wavMetadata): [];
         if (metaKeys.length){
           if (metaKeys.includes("guano")) {
