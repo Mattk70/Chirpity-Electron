@@ -5475,11 +5475,11 @@ async function getNearbyLocationsCached(lat, lon) {
   const key = `${lat} ${lon}`;
   const cache = STATE.nearbyLocationCache;
   if (!cache.has(key)) {
-    cache.set(key, _getNearbyLocations(lat, lon))
-      .catch(err => {
-        cache.delete(key);
-        throw err;
-      });
+    const promise = _getNearbyLocations(lat, lon).catch(err => {
+      cache.delete(key);
+      throw err;
+    });
+    cache.set(key, promise);
   }
   return cache.get(key);
 }
