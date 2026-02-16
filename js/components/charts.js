@@ -1,13 +1,19 @@
 const DEBUG = false;
+let DB, STATE;
 
 const ZERO = new Date(1970, 0, 1)
-const filterLocation = (location) => {
+const filterLocation = async (location) => {
   if (location !== undefined) {
-    return location === 0 ? " AND f.locationID IS NULL " : ` AND f.locationID = ${location}`;
+    const {lat, lon} = STATE.location;
+    const locations = await getIncludedLocations(DB, lat,lon)
+    const ids = locations.map(l => l.id);
+    let stmt =  " AND (locationID IN (" + ids.join(',') + ")";
+    if (ids.includes(0)) stmt +=  " OR locationID IS NULL";
+    stmt += ") ";
+    return stmt;
   }
   return "";
 };
-
 
 function getWeekAndDayOfYearAndLeapLocal(ts) {
     const date = new Date(ts);
@@ -31,7 +37,7 @@ function getWeekAndDayOfYearAndLeapLocal(ts) {
 
 const getSeasonRecords = async (diskDB, location, species, season) => {
   // Add Location filter
-  const locationFilter = filterLocation(location);
+  const locationFilter = await filterLocation(location);
   // Because we're using stmt.prepare, we need to unescape quotes
   const seasonMonth = { spring: "< '07'", autumn: " > '06'" };
   return new Promise(function (resolve, reject) {
@@ -60,31 +66,32 @@ const getSeasonRecords = async (diskDB, location, species, season) => {
 const getMostCalls = (diskDB, location, species) => {
   return new Promise(function (resolve, reject) {
     // Add Location filter
-    const locationFilter = filterLocation(location);
-    diskDB.get(
-      `SELECT SUM(COALESCE(r.callCount, 1)) AS count,
-      DATE(r.position + f.filestart/1000, 'unixepoch', 'localtime') as date
-      FROM records r
-      JOIN species on species.id = r.speciesID
-      JOIN files f ON f.id = r.fileID
-      WHERE species.cname = ? ${locationFilter}
-      GROUP BY STRFTIME('%Y', DATETIME(r.position + f.filestart/1000, 'unixepoch', 'localtime')),
-      STRFTIME('%W', DATETIME(r.position + f.filestart/1000, 'unixepoch', 'localtime')),
-      STRFTIME('%d', DATETIME(r.position + f.filestart/1000, 'unixepoch', 'localtime'))
-      ORDER BY count DESC LIMIT 1`,
-      species,
-      (err, row) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(row);
-        }
-      }
-    );
+    filterLocation(location).then((locationFilter) => {
+      diskDB.get(
+        `SELECT SUM(COALESCE(r.callCount, 1)) AS count,
+        DATE(r.position + f.filestart/1000, 'unixepoch', 'localtime') as date
+        FROM records r
+        JOIN species on species.id = r.speciesID
+        JOIN files f ON f.id = r.fileID
+        WHERE species.cname = ? ${locationFilter}
+        GROUP BY STRFTIME('%Y', DATETIME(r.position + f.filestart/1000, 'unixepoch', 'localtime')),
+        STRFTIME('%W', DATETIME(r.position + f.filestart/1000, 'unixepoch', 'localtime')),
+        STRFTIME('%d', DATETIME(r.position + f.filestart/1000, 'unixepoch', 'localtime'))
+        ORDER BY count DESC LIMIT 1`,
+        species,
+        (err, row) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(row);
+          }
+        })
+    })
+    .catch((err) => reject(err));
   });
 };
 
-const getChartTotals = ({
+const getChartTotals = async ({
   diskDB,
   location,
   species,
@@ -92,7 +99,7 @@ const getChartTotals = ({
   aggregation,
   byYear
 }) => {
-  const locationFilter = filterLocation(location);
+  const locationFilter = await filterLocation(location);
   const useRange = range.start !== undefined;
 
   const intervalHours = useRange
@@ -196,47 +203,49 @@ const getRate = (diskDB, location, species) => {
     const calls = Array.from({ length: 53 }).fill(0);
     const total = Array.from({ length: 53 }).fill(0);
     // Add Location filter
-    const locationFilter = filterLocation(location);
+    filterLocation(location).then((locationFilter) => {
 
-    diskDB.all(
-      `select STRFTIME('%W', DATE(r.position + f.filestart / 1000, 'unixepoch', 'localtime')) as week, SUM(COALESCE(r.callCount, 1)) AS count
-          from records r
-          JOIN species s ON s.id = r.speciesID
-          JOIN files f ON f.id = r.fileID
-          WHERE s.cname = ? ${locationFilter}
-          group by week;`,
-      species,
-      (err, rows) => {
-        for (let i = 0; i < rows.length; i++) {
-          calls[parseInt(rows[i].week) - 1] = rows[i].count;
-        }
-        let locationSQL = '';
-        if (locationFilter) {
-          locationSQL = ` JOIN files f ON f.id = duration.fileID  WHERE ${locationFilter.replace(" AND ", "")} `;
-        }
-        diskDB.all(
-          `select STRFTIME('%W', DATE(duration.day / 1000, 'unixepoch', 'localtime')) as week, cast(sum(duration.duration) as real)/3600  as total from duration ${locationSQL} group by week;`,
-          (err, rows) => {
-            for (let i = 0; i < rows.length; i++) {
-              // Round the total to 2 dp
-              total[parseInt(rows[i].week) - 1] =
-                Math.round(rows[i].total * 100) / 100;
-            }
-            let rate = [];
-            for (let i = 0; i < calls.length; i++) {
-              total[i] > 0
-                ? (rate[i] = Math.round((calls[i] / total[i]) * 100) / 100)
-                : (rate[i] = 0);
-            }
-            if (err) {
-              reject(err);
-            } else {
-              resolve([total, rate]);
-            }
+      diskDB.all(
+        `select STRFTIME('%W', DATE(r.position + f.filestart / 1000, 'unixepoch', 'localtime')) as week, SUM(COALESCE(r.callCount, 1)) AS count
+            from records r
+            JOIN species s ON s.id = r.speciesID
+            JOIN files f ON f.id = r.fileID
+            WHERE s.cname = ? ${locationFilter}
+            group by week;`,
+        species,
+        (err, rows) => {
+          for (let i = 0; i < rows.length; i++) {
+            calls[parseInt(rows[i].week) - 1] = rows[i].count;
           }
-        );
-      }
-    );
+          let locationSQL = '';
+          if (locationFilter) {
+            locationSQL = ` JOIN files f ON f.id = duration.fileID  WHERE ${locationFilter.replace(" AND ", "")} `;
+          }
+          diskDB.all(
+            `select STRFTIME('%W', DATE(duration.day / 1000, 'unixepoch', 'localtime')) as week, cast(sum(duration.duration) as real)/3600  as total from duration ${locationSQL} group by week;`,
+            (err, rows) => {
+              for (let i = 0; i < rows.length; i++) {
+                // Round the total to 2 dp
+                total[parseInt(rows[i].week) - 1] =
+                  Math.round(rows[i].total * 100) / 100;
+              }
+              let rate = [];
+              for (let i = 0; i < calls.length; i++) {
+                total[i] > 0
+                  ? (rate[i] = Math.round((calls[i] / total[i]) * 100) / 100)
+                  : (rate[i] = 0);
+              }
+              if (err) {
+                reject(err);
+              } else {
+                resolve([total, rate]);
+              }
+            }
+          );
+        }
+      )
+    })
+    .catch((err) => reject(err));
   });
 };
 /**
@@ -266,6 +275,7 @@ const getRate = (diskDB, location, species) => {
  */
 async function onChartRequest(args) {
   const { diskDB, species, UI, byYear, location } = args;
+  DB = diskDB; STATE = args.state;
   DEBUG &&
     console.log(`Getting chart for ${species} starting ${args.range.start}`);
   const range = args.range,
@@ -302,8 +312,9 @@ async function onChartRequest(args) {
       });
   }
 
-  const [rows, dataPoints, aggregation, startIndex] = await getChartTotals(args)
-    .catch((error) => console.log(error));
+  const result = await getChartTotals(args)
+    .catch((error) => { console.warn('Error in getChartTotals:', error); return [[], 0, args.aggregation, 0]; });
+  const [ rows, dataPoints, aggregation, startIndex ] = result;
   const years = [...new Set(rows.map(o => o.year))];
   const hasMultipleYears = years.length > 1;
   for (let i = 0; i < rows.length; i++) {
@@ -402,4 +413,30 @@ function plotTrainingHistory(history) {
   }, { once: true });
 }
 
-export { onChartRequest, plotTrainingHistory };
+async function getIncludedLocations(db, lat, lon) {
+  return await db.allAsync(`
+    WITH centre AS (
+      SELECT
+        lat,
+        lon,
+        COALESCE(radius, 30) AS centre_radius
+      FROM locations
+      WHERE lat = ? AND lon = ?
+    )
+    SELECT
+      l.*,
+      (6371000 * acos(
+        min(1, max(-1,
+          cos(radians(c.lat)) * cos(radians(l.lat)) *
+          cos(radians(l.lon) - radians(c.lon)) +
+          sin(radians(c.lat)) * sin(radians(l.lat))
+        ))
+      )) AS distance
+    FROM locations l
+    CROSS JOIN centre c
+    WHERE distance <= c.centre_radius
+    ORDER BY distance ASC;
+    `, lat, lon);
+  }
+
+export { onChartRequest, plotTrainingHistory, getIncludedLocations };

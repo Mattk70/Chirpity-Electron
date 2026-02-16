@@ -63,6 +63,7 @@
   "save2db": ["Salvar no Arquivo","Ctrl+S"
   ],
   "charts": ["Ver Gráficos"],
+  "manage-locations": ["Gerir localizações"],
   "explore": ["Explorar Arquivo"],  
   "chart-datefilter": ["Aplicar um filtro de data"],
   "explore-datefilter": ["Aplicar um filtro de data"],
@@ -109,7 +110,7 @@
   "apply-location": ["Definir"],
   "cancel-location": ["Cancelar"],
   "library-location-select": ["Localização da biblioteca:"],
-  "database-location-select": ["Localização do banco de dados:"],
+  "database-location-select": ["Localização BD:"],
   "close-tour": ["Fechar"],
   "settings": {
     "basic": "Padrão",

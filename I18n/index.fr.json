@@ -63,6 +63,7 @@
     "save2db": ["Enregistrer dans l'archive","Ctrl+S"
     ],
     "charts": ["Voir les graphiques"],
+    "manage-locations": ["Gérer les emplacements"],
     "explore": ["Explorer l'archive"],
     "chart-datefilter": ["Appliquer un filtre de date"],
     "explore-datefilter": ["Appliquer un filtre de date"],
@@ -109,7 +110,7 @@
     "apply-location": ["Définir"],
     "cancel-location": ["Annuler"],
     "library-location-select": ["Lieu de la Bibliothèque:"],
-    "database-location-select": ["Emplacement de la base de données:"],
+    "database-location-select": ["Chemin BD:"],
     "close-tour": ["Fermer"],
     "settings": {
       "basic": "Standard",

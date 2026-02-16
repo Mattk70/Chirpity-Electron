@@ -63,6 +63,7 @@
   "save2db": ["保存到档案","Ctrl+S"
   ],
   "charts": ["查看图表"],
+  "manage-locations": ["管理位置"],
   "explore": ["浏览档案"],
   "chart-datefilter": ["应用日期过滤器"],
   "explore-datefilter": ["应用日期过滤器"],

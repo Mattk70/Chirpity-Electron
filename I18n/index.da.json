@@ -60,8 +60,8 @@
       "saveLabels": ["Gem Audacity etiketter"],
       "import-csv": ["Importér resultater fra CSV"],
       "exit": ["Afslut"],
-      "save2db": ["Gem til arkiv","Ctrl+S"
-      ],
+      "save2db": ["Gem til arkiv","Ctrl+S"],
+      "manage-locations": ["Administrer placeringer"],
       "charts": ["Vis diagrammer"],
       "explore": ["Udforsk arkiv"],
       "chart-datefilter": ["Anvend en datofiltrering"],

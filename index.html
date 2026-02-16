@@ -494,7 +494,7 @@
                         
                     <div class="modal-body">
                         <div class="mb-3">
-                            <input type="time" step="1" class="form-control" id="timeInput" name="timeInput">
+                            <input type="datetime-local" step="1" class="form-control" id="timeInput" name="timeInput">
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -514,15 +514,14 @@
                     <h5 class="modal-title" id="locationModalLabel">Set Location</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form id="locationForm" class="fs-6">
-                    <div class="modal-body">
+                <div class="modal-body pb-0">
+                    <form id="locationForm" class="fs-6">
                         <fieldset class="border rounded m-2 p-1">
                             <legend class="h6">Pick A Saved Location</legend>
-                            <div class="form-group rounded p-2 mb-2 bg-light">
+                            <div class="form-group rounded p-2 bg-light">
                                 <div class="row">
                                     <div class="input-group col">
                                         <div class="form-group w-100">
-                                            <label for="savedLocations"></label>
                                             <select class="form-select" id="savedLocations">
                                             </select>
                                         </div>
@@ -530,26 +529,45 @@
                                 </div>
                             </div>
                         </fieldset>
-                        <fieldset class="border rounded m-2 p-1">
+                        <fieldset class="border rounded m-2 mb-0 p-1" id="edit-section">
                             <legend class="h6">Add, Edit or Delete Location</legend>
-                            <div class="form-group rounded p-2 mb-2 bg-light">
+                            <div class="form-group rounded p-2 bg-light">
                                 <div class="row">
                                     <div class="input-group col">
                                         <label id="customLatLabel" class="input-group-text pe-2" for="customLat">Lat:</label>
                                         <input id="customLat" type="number" class="form-control ps-2"
-                                        placeholder="0.00" step="0.1" max="90" min="-90" aria-label="Latitude" aria-describedby="customLat"
+                                        placeholder="0.00" step="0.001" max="90" min="-90" aria-label="Latitude" aria-describedby="customLat"
                                         required>
                                         <label id="customLonLabel" class="input-group-text pe-2" for="customLon">Lon:</label>
                                         <input id="customLon" type="number" class="form-control ps-2"
-                                        placeholder="0.00" step="0.1" max="180" min="-180"  aria-label="Longitude" aria-describedby="customLon"
+                                        placeholder="0.00" step="0.0001" max="180" min="-180"  aria-label="Longitude" aria-describedby="customLon"
                                         required>
                                     </div>
-                                    <div id="customLocationMap" class="mt-2 border border-secondary rounded" style="height: 200px"></div>
                                 </div>
                                 <div class="row">
-                                    <div class="input-group col">
-                                        <textarea class="mt-2 w-100" id="customPlace" spellcheck="false"
-                                        maxlength="100" required>...</textarea>
+                                    <div class="col-10">
+                                        <div class="d-flex align-items-center mt-2 mb-0">
+                                            <legend class="h6 mt-2 mb-0">Location radius</legend>
+                                            <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="Become a <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>member</a> to unlock this feature.">
+                                                <span class="pointer locked material-symbols-outlined">lock</span>
+                                            </a>
+                                        </div>
+                                        <input id="location-radius" class="input-group locked disabled" style="width:100%" type="range" value="30" min="10" max="2500" step="10"/>
+                                    </div>
+                                    <div class="col-2 input-group-append d-flex align-items-end ps-0">
+                                        <span class="input-group-text" id="radius-value"><b>30m</b></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </fieldset>
+
+                            <div class="form-group rounded p-2 bg-light mt-2">
+                                <div id="customLocationMap" class="mt-2 border border-secondary rounded" style="height: 200px"></div>
+                            </div>
+                        <fieldset class="border rounded m-2 mt-0 p-1">
+                                <div class="row">
+                                    <div class="input-group p-1">
+                                        <textarea class="m-2 w-100" id="customPlace" spellcheck="false" maxlength="100" required></textarea>
                                     </div>
                                 </div>
                                 <div class="row d-none" id="location-batch-wrapper">
@@ -560,14 +578,14 @@
                                         </label> 
                                     </div>
                                 </div>
-                            </div>
+                            
                         </fieldset>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-primary" id="set-location">Set Location</button>
-                    </div>
-                </form>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-danger me-auto d-none" id="delete-location">Delete Location</button>
+                    <button type="button" class="btn btn-primary" id="set-location">Set Location</button>
+                </div>
             </div>
         </div>
     </div>
@@ -1002,9 +1020,9 @@
                     <div class="form-group rounded p-2 mb-2">
                         <div class="input-group">
                             <label class="input-group-text pe-2" for="latitude">Lat:</label>
-                            <input id="latitude" type="number" class="form-control ps-2 " placeholder="0.00" step="0.1" max="90" min="-90" aria-label="Latitude" aria-describedby="latitude">
+                            <input id="latitude" type="number" class="form-control ps-2 " placeholder="0.00" step="0.0001" max="90" min="-90" aria-label="Latitude" aria-describedby="latitude">
                             <label class="input-group-text pe-2" for="longitude">Lon:</label>
-                            <input id="longitude" type="number" class="form-control ps-2" placeholder="0.00" step="0.1"  max="180" min="-180" aria-label="Longitude" aria-describedby="longitude">
+                            <input id="longitude" type="number" class="form-control ps-2" placeholder="0.00" step="0.0001"  max="180" min="-180" aria-label="Longitude" aria-describedby="longitude">
                         </div>
                         <div class="mt-1 float-end">
                             <button class="btn btn-primary" id="apply-location" onclick="return false">Set</button>
@@ -1660,6 +1678,9 @@
                                 <span class="shortcut float-end">Ctrl+S</span>
                             </li>
                             <li class="dropdown-divider"></li>
+                            <li class="dropdown-item" id="manage-locations">
+                                <span class="material-symbols-outlined">edit_location_alt</span> Manage locations
+                            </li>
                             <li class="dropdown-item disabled" id="charts">
                                 <span class="material-symbols-outlined">assessment</span> View charts
                             </li>
@@ -1677,9 +1698,9 @@
                                 <span class="material-symbols-outlined">unarchive</span> Remove Current File From
                                 Archive
                             </li>
-                            <li class="dropdown-item d-none" id="dataset">
+                            <!-- <li class="dropdown-item d-none" id="dataset">
                                 <span class="material-symbols-outlined">dataset</span> Create Dataset
-                            </li>
+                            </li> -->
                         </ul>
                     </li>
                     <li class="nav-item dropdown">
@@ -1834,12 +1855,23 @@
 </audio>
 <script src="./js/ui.js" type="module"></script>
 <script type="module" defer>
-    import { config, displayLocationAddress, LOCATIONS, generateToast } from './js/ui.js';
+    import { config, displayLocationAddress, LOCATIONS, generateToast, checkCoords } from './js/ui.js';
     let map, marker, clickTimer = 0;
     let currentTileLayer = null;
-    async function onMapClick(e) {
-        const {lat, lng} = e.latlng;
+    const DEFAULT_RADIUS = 30;
+    const createTileLayer = () =>
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 16,
+            minZoom: 1,
+            attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        });
+
+    let markerGroup = null;
+
+
+    function updateForm(lat, lng) {
         const target = map.getContainer().id;
+
         if (target === 'settingsMap'){
             const latEl = document.getElementById('latitude')
             const lonEl = document.getElementById('longitude')
@@ -1847,106 +1879,173 @@
             lonEl.value = lng.toFixed(4);
             const placeEl = document.getElementById('place');
             placeEl.textContent = 'Getting location...'
+            displayLocationAddress(target);
         } else {
+            const savedLocationSelect = document.getElementById('savedLocations');
             const latEl = document.getElementById('customLat')
             const lonEl = document.getElementById('customLon')
             latEl.value = lat.toFixed(4); 
             lonEl.value = lng.toFixed(4);
-            const customPlaceEl = document.getElementById('customPlace');
-            customPlaceEl.value = 'Fetching...'
+            if (! savedLocationSelect.value) {
+                const customPlaceEl = document.getElementById('customPlace');
+                customPlaceEl.value = 'Getting location...';
+                displayLocationAddress(target);
+            }
         }
-        updateMap(lat, lng);
-        displayLocationAddress(target);
+    }
+
+    async function onMapClick(e) {
+        const {lat, lng} = e.latlng;
+        updateForm(lat, lng)
+        const radius = document.getElementById('location-radius');
+        const radiusDisplay = document.getElementById('radius-value');
+        const savedLocationSelect = document.getElementById('savedLocations');
+        const currentLocation = LOCATIONS.find(loc => loc.id === parseInt(savedLocationSelect.value));
+        radius.value = currentLocation ? currentLocation.radius ?? DEFAULT_RADIUS : DEFAULT_RADIUS;
+        radiusDisplay.innerHTML = `<b>${radius.valueAsNumber}m</b>`;
+
+        updateMap(lat, lng, radius.valueAsNumber);
+        
         // Stop propagation of the click event to the map
         L.DomEvent.stopPropagation(e);
     }
-const showMap = (where, locationID) => {
-    const createTileLayer = () =>
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 15,
-            minZoom: 2,
-            attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        });
+    const showMap = (where, locationID) => {
+        const addClassToMarkerIcon = (marker, className) => {
+            marker.on('add', () => {
+                const el = marker.getElement();
+                if (el) el.classList.add(className);
+            });
+        };
+        currentTileLayer && map.removeLayer(currentTileLayer);
+        
+        try {
+            if (where === 'customLocationMap' && LOCATIONS.length) {
+                markerGroup = L.featureGroup();
+                const bounds = L.latLngBounds();
 
-    const addClassToMarkerIcon = (marker, className) => {
-        marker.on('add', () => {
-            const el = marker.getElement();
-            if (el) el.classList.add(className);
-        });
-    };
-    currentTileLayer && map.removeLayer(currentTileLayer);
-    
-    try {
-        if (where === 'customLocationMap' && LOCATIONS.length) {
-            const markerGroup = L.featureGroup();
-            const bounds = L.latLngBounds();
+                const defaultIcon = new L.Icon.Default({ className: 'leaflet-icon-default' });
+                const defaultMarker = L.marker([config.latitude, config.longitude], { icon: defaultIcon }).addTo(markerGroup);
+                bounds.extend(defaultMarker.getLatLng());
 
-            const defaultIcon = new L.Icon.Default({ className: 'leaflet-icon-default' });
-            const defaultMarker = L.marker([config.latitude, config.longitude], { icon: defaultIcon }).addTo(markerGroup);
-            bounds.extend(defaultMarker.getLatLng());
+                const markersByID = {};
+                const sharedIcon = new L.Icon.Default();
 
-            const markersByID = {};
-            const sharedIcon = new L.Icon.Default();
+                    for (const { id, lat, lon, radius = DEFAULT_RADIUS} of LOCATIONS) {
+                        const marker = L.marker([lat, lon], { icon: sharedIcon }).addTo(markerGroup);
+                        const circle = L.circle([lat, lon], {
+                            color: 'MidnightBlue',
+                            weight: 1,
+                            opacity: 0.5,
+                            fillColor: 'MidnightBlue',  
+                            fillOpacity: 0.2,
+                            radius
+                        }).addTo(markerGroup);
+                        bounds.extend(marker.getLatLng());
+                        markersByID[id] = marker;
 
-            for (const { id, lat, lon } of LOCATIONS) {
-                const marker = L.marker([lat, lon], { icon: sharedIcon }).addTo(markerGroup);
-                bounds.extend(marker.getLatLng());
-                markersByID[id] = marker;
+                        if (id === locationID) {
+                            addClassToMarkerIcon(marker, 'leaflet-icon-current');
+                        }
+                    }
+                    markerGroup.addTo(map);
 
-                if (id === locationID) {
-                    addClassToMarkerIcon(marker, 'leaflet-icon-current');
-                }
-            }
+                    if (bounds.isValid() && bounds.getNorthEast().equals(bounds.getSouthWest())) {
+                        // Single point → use setView
+                        map.setView(bounds.getCenter(), 12);
+                    } else {
+                        map.fitBounds(bounds.pad(0.2));
+                    }
 
-            markerGroup.addTo(map);
-            map.fitBounds(bounds);
-            createTileLayer().addTo(map);
-            markerGroup.on('click', onMapClick);
-        } else {
-            map.setView([config.latitude, config.longitude], 2);
-            createTileLayer().addTo(map);
-
-            const fallbackMarker = L.marker([config.latitude, config.longitude]).addTo(map);
-            fallbackMarker.on('click', onMapClick);
-
-            const iconEl = fallbackMarker.getElement();
-            if (iconEl) iconEl.classList.add('leaflet-marker-icon-default');
+                    currentTileLayer = createTileLayer().addTo(map);
+                    markerGroup.on('click', onMapClick);
+            } else {
+                map.setView([config.latitude, config.longitude], 12);
+                currentTileLayer = createTileLayer().addTo(map);
+                markerGroup = L.featureGroup();
+                const fallbackMarker = L.marker([config.latitude, config.longitude]).addTo(markerGroup);
+                addClassToMarkerIcon(fallbackMarker, 'leaflet-marker-icon-default');
+                markerGroup.addTo(map);
+                fallbackMarker.on('click', onMapClick);
+                            }
+        } catch (error) {
+            generateToast({ message: 'leafletError', variables: { error: error.message } });
         }
-    } catch (error) {
-        generateToast({ message: 'leafletError', variables: { error: error.message } });
-    }
-};
+    };
 
     const latLonElements = ['latitude', 'longitude', 'customLat', 'customLon'];
-    latLonElements.forEach(el => {
-        const where = el.indexOf('custom') > -1 ? 'customLocationMap' : 'settingsMap';
-        el = document.getElementById(el);
-        el.addEventListener('change', () => {
-            showMap(where);
-            displayLocationAddress(where, true);
-        });
+        latLonElements.forEach(el => {
+            const where = el.indexOf('custom') > -1 ? 'customLocationMap' : 'settingsMap';
+            el = document.getElementById(el);
+            el.addEventListener('change', () => {
+                if (where === 'customLocationMap') {
+                    const radius = document.getElementById('location-radius').valueAsNumber || DEFAULT_RADIUS;
+                    const lat = document.getElementById('customLat').valueAsNumber;
+                    const lon = document.getElementById('customLon').valueAsNumber;
+                    if (checkCoords(lat, lon)) {
+                        updateMap(lat, lon, radius);
+                    }
+                } else {
+                     const lat = document.getElementById('latitude').valueAsNumber;
+                    const lon = document.getElementById('longitude').valueAsNumber;
+                    if (checkCoords(lat, lon)) {
+                        updateMap(lat, lon);
+                    }
+                }
+                displayLocationAddress(where, true);
+            });
     })
 
-    function updateMap(lat,lng){
+    function updateMap(lat, lng, radius = DEFAULT_RADIUS) {
         try {
-            // remove the previous active marker highlight
-            const activeMarker = document.querySelector('.leaflet-icon-current');
-            if (activeMarker) activeMarker.classList.remove('leaflet-icon-current');
+            if (! checkCoords(lat, lng)) return;
+            // Remove all previous markers & circles
+            markerGroup && markerGroup.remove();
+            markerGroup = L.featureGroup();
+            const zoom = Math.max(map.getZoom(), 14);
+            const icon = new L.Icon.Default({
+                className: 'leaflet-icon-current'
+            });
+            const draggable = true;
+            const autoPan = true;
 
-            const currentIcon = new L.Icon.Default({className: 'leaflet-icon-current'});
-            // Update the marker's position
-            if (!marker) marker = L.marker([lat, lng], {icon: currentIcon}).addTo(map);
-            marker.setLatLng([lat, lng]);
-            // Center the map view on the new marker position
-            map.setView([lat, lng]);
+            // Marker
+            const marker = L.marker([lat, lng], { icon, draggable, autoPan }).addTo(markerGroup);
+
+            // Circle
+            const circle = L.circle([lat, lng], {
+                color: 'MidnightBlue',
+                weight: 1,
+                opacity: 0.5,
+                fillColor: 'MidnightBlue',
+                fillOpacity: 0.2,
+                radius
+            }).addTo(markerGroup);
+            markerGroup.addTo(map)
+
+            marker.on('drag', (e) => {
+                const { lat, lng } = e.target.getLatLng();
+                circle.setLatLng([lat, lng]);
+            });
+            marker.on('dragend', (e) => {
+                const { lat, lng } = e.target.getLatLng();
+                updateForm(lat, lng)
+            });
+            map.fitBounds(markerGroup.getBounds().pad(0.2), { maxZoom: zoom, animate: true });
+
         } catch (error) {
-            generateToast({message: 'leafletError' , variables: {error: error.message}})
+            generateToast({
+                message: 'leafletError',
+                variables: { error: error.message }
+            });
+            console.log(error)
         }
     }
 
+
     async function placeMap(divID, locationID){
-        map?.remove(); marker = undefined;
+        if (map) map?.remove();
         map = L.map(divID);
+        window.map = map;
         let latTxt, lonTxt;
         if (divID === 'settingsMap'){
             latTxt = 'latitude';
@@ -1971,7 +2070,7 @@ const showMap = (where, locationID) => {
 
     window.placeMap = placeMap;
     window.updateMap = updateMap;
-    window.map = map;
+    
 </script>
 </body>
 

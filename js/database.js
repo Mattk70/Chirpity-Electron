@@ -222,6 +222,7 @@ async function upgrade_to_v4(diskDB, dbMutex) {
         CONSTRAINT fk_tags FOREIGN KEY (tagID) REFERENCES tags(id) ON DELETE SET NULL)`
     );
     await diskDB.runAsync(
+      // Insert or ignore to remove duplicate records causing UNIQUE constraint violations
       `INSERT OR IGNORE INTO records_new (position, fileID, speciesID, modelID, confidence, 
         comment, end, callcount, isDaylight, reviewed, tagid)
         SELECT position, fileID, speciesID, modelID, confidence, 
@@ -299,6 +300,7 @@ const createDB = async ({file, diskDB, dbMutex}) => {
         lat REAL NOT NULL,
         lon REAL NOT NULL,
         place TEXT NOT NULL,
+        radius INTEGER,
         UNIQUE (lat, lon)
       )`
     );

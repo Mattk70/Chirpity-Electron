@@ -29,8 +29,8 @@ const Toasts = { // UI.js
         noIUCNRecord: "There is no record of <b>${sname}</b> on the IUCN Red List.",
         membershipExpiry: "Your membership is due to expire in ${expiresIn} days, you can visit <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>the membership page</a> to renew",
         modelPathNotFound: "The model path specified (${modelPath}) could not be found. Reverting to BirdNET model.",
-
-        corruptFile: "Corrupt file(s) encountered",
+        badLocationUpdate: "There is an existing location at this latitude and longitude.",
+        corruptFile: "<b>Corrupt file(s) encountered:</b> ${files}",
         noLoad: 'The ${model} model is not loaded. Restart Chirpity to continue. If you see this message repeatedly, it is likely your computer does not support AVX2 and Chirpity will not run on your system.',
         noDLL: 'There has been an error loading the model. This may be due to missing AVX support. Chirpity AI models require the AVX2 instructions set to run. If you have AVX2 enabled and still see this notice, please refer to <a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">this issue</a> on Github.',
         noFile: "Cannot open: ${error}",
@@ -100,9 +100,9 @@ const Toasts = { // UI.js
         noIUCNRecord: "Der er ingen registrering af <b>${sname}</b> på IUCN's rødliste.",
         membershipExpiry: "Dit medlemskab udløber om ${expiresIn} dage, du kan besøge <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>medlemskabsiden</a> for at forny",
         modelPathNotFound: "Den angivne modelsti (${modelPath}) blev ikke fundet. Skifter tilbage til BirdNET-modellen.",
-        
+        badLocationUpdate: "Der findes allerede en placering på denne bredde- og længdegrad.",
 
-        corruptFile: "Der blev fundet beskadigede fil(er)",
+        corruptFile: "<b><b>Der blev fundet beskadigede fil(er):</b></b> ${files}",
         noLoad: 'Modellen ${model} er ikke indlæst. Genstart Chirpity for at fortsætte. Hvis du ser denne besked gentagne gange, er det sandsynligt, at din computer ikke understøtter AVX2, og Chirpity vil ikke køre på dit system.',
         noDLL: 'Der opstod en fejl ved indlæsning af modellen. Dette kan skyldes manglende AVX-understøttelse. Chirpity AI-modeller kræver AVX2-instruktionssættet for at køre. Hvis AVX2 er aktiveret, og du stadig ser denne meddelelse, skal du henvises til <a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">denne sag</a> på Github.',
         noFile: "Kan ikke åbne: ${error}",
@@ -172,8 +172,9 @@ const Toasts = { // UI.js
         noIUCNRecord: "Es gibt keinen Eintrag für <b>${sname}</b> auf der Roten Liste der IUCN.",
         membershipExpiry: "Ihre Mitgliedschaft läuft in ${expiresIn} Tagen ab, Sie können die <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>Mitgliedsseite</a> besuchen, um sie zu verlängern",
         modelPathNotFound: "Der angegebene Modellpfad (${modelPath}) wurde nicht gefunden. Es wird auf das BirdNET-Modell zurückgegriffen.",
+        badLocationUpdate: "An diesem Breitengrad und Längengrad existiert bereits ein Standort.",
 
-        corruptFile: "Beschädigte Datei(en) gefunden",
+        corruptFile: "<b>Beschädigte Datei(en) gefunden:</b> ${files}",
         noLoad: 'Das Modell ${model} wurde nicht geladen. Starten Sie Chirpity neu, um fortzufahren. Wenn diese Nachricht wiederholt angezeigt wird, unterstützt Ihr Computer möglicherweise kein AVX2, und Chirpity wird auf Ihrem System nicht ausgeführt.',
         noDLL: 'Beim Laden des Modells ist ein Fehler aufgetreten. Dies könnte an fehlender AVX-Unterstützung liegen. Chirpity AI-Modelle benötigen das AVX2-Instruktionsset zum Ausführen. Wenn AVX2 aktiviert ist und Sie diese Nachricht trotzdem sehen, beziehen Sie sich bitte auf <a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">dieses Problem</a> auf Github.',
         noFile: "Kann nicht öffnen: ${error}",
@@ -243,8 +244,9 @@ const Toasts = { // UI.js
         noIUCNRecord: "No hay registro de <b>${sname}</b> en la Lista Roja de la UICN.",
         membershipExpiry: "Su membresía vencerá en ${expiresIn} días, puede visitar <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>la página de membresía</a> para renovarla",
         modelPathNotFound: "La ruta del modelo especificada (${modelPath}) no se pudo encontrar. Volviendo al modelo BirdNET.",
+        badLocationUpdate: "Ya existe una ubicación en esta latitud y longitud.",
 
-        corruptFile: "Se encontraron archivos corruptos",
+        corruptFile: "<b>Se encontraron archivos corruptos:</b> ${files}",
         noLoad: 'El modelo ${model} no está cargado. Reinicie Chirpity para continuar. Si ve este mensaje repetidamente es probable que su ordenador no sea compatible con AVX2 y que Chirpity no pueda ejecutarse en su sistema.',
         noDLL: 'Ha ocurrido un error al cargar el modelo. Esto puede deberse a la falta de soporte para AVX. Los modelos de inteligencia artificial de Chirpity requieren el conjunto de instrucciones AVX2 para funcionar. Si tiene AVX2 habilitado y sigue viendo este mensaje, consulte <a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">este problema</a> en Github.',
         noFile: "No se puede abrir: ${error}",
@@ -315,8 +317,9 @@ const Toasts = { // UI.js
         noIUCNRecord: "Il n'y a aucun enregistrement de <b>${sname}</b> sur la Liste Rouge de l'UICN.",
         membershipExpiry: "Votre abonnement expire dans ${expiresIn} jours, vous pouvez visiter <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>la page d'abonnement</a> pour le renouveler",
         modelPathNotFound: "Le chemin du modèle spécifié (${modelPath}) est introuvable. Retour au modèle BirdNET.",
-        
-        corruptFile: "Fichier(s) corrompu(s) détecté(s)",
+        badLocationUpdate: "Il existe déjà un emplacement à cette latitude et longitude.",
+
+        corruptFile: "<b>Fichier(s) corrompu(s) détecté(s):</b> ${files}",
         noLoad: 'Le modèle ${model} n\'est pas chargé. Redémarrez Chirpity pour continuer. Si vous voyez ce message à plusieurs reprises, il est probable que votre ordinateur ne prenne pas en charge AVX2 et Chirpity ne fonctionnera pas sur votre système.',
         noDLL: 'Une erreur est survenue lors du chargement du modèle. Cela peut être dû à un manque de prise en charge d\'AVX. Les modèles AI de Chirpity nécessitent le jeu d\'instructions AVX2 pour fonctionner. Si vous avez AVX2 activé et que vous voyez toujours cet avertissement, veuillez vous référer à <a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">ce problème</a> sur Github.',
         noFile: "Impossible d'ouvrir : ${error}",
@@ -387,8 +390,9 @@ const Toasts = { // UI.js
         noIUCNRecord: "IUCNレッドリストに<b>${sname}</b>の記録がありません。",
         membershipExpiry: "会員期限が${expiresIn}日後に迫っています。<a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>会員ページ</a>にアクセスして更新してください",
         modelPathNotFound: "指定されたモデルパス (${modelPath}) が見つかりません。BirdNETモデルに戻します。",
+        badLocationUpdate: "この緯度と経度には既に位置が存在します。",
 
-        corruptFile: "破損したファイルが見つかりました",
+        corruptFile: "<b>破損したファイルが見つかりました:</b> ${files}",
         noLoad: '${model}モデルがロードされていません。Chirpityを再起動して続行してください。このメッセージが繰り返し表示される場合、お使いのコンピュータがAVX2をサポートしていない可能性があります。',
         noDLL: 'モデルのロード中にエラーが発生しました。これはAVXサポートが欠如しているためかもしれません。Chirpity AIモデルはAVX2命令セットを必要とします。AVX2が有効であるにもかかわらずこの通知が表示される場合は、<a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">この問題</a>を参照してください。',
         noFile: "開くことができません: ${error}",
@@ -457,8 +461,9 @@ const Toasts = { // UI.js
         noIUCNRecord: "Er is geen record van <b>${sname}</b> op de IUCN Rode Lijst.",
         membershipExpiry: "Je lidmaatschap verloopt over ${expiresIn} dagen, je kunt de <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>lidmaatschaps pagina</a> bezoeken om het te verlengen",
         modelPathNotFound: "Het opgegeven modelpad (${modelPath}) is niet gevonden. Terugschakelen naar het BirdNET-model.",
+        badLocationUpdate: "Er is al een locatie op deze breedte- en lengtegraad.",
 
-        corruptFile: "Beschadigde bestand(en) aangetroffen",
+        corruptFile: "<b>Beschadigde bestand(en) aangetroffen:</b> ${files}",
         noLoad: 'Het ${model} model is niet geladen. Herstart Chirpity om door te gaan. Als je dit bericht herhaaldelijk ziet, ondersteunt je computer waarschijnlijk geen AVX2 en zal Chirpity niet op je systeem werken.',
         noDLL: 'Er is een fout opgetreden bij het laden van het model. Dit kan te maken hebben met ontbrekende AVX-ondersteuning. Chirpity AI-modellen vereisen de AVX2-instructieset om te draaien. Als je AVX2 hebt ingeschakeld en nog steeds deze melding ziet, raadpleeg dan <a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">dit probleem</a> op Github.',
         noFile: "Kan niet openen: ${error}",
@@ -530,8 +535,9 @@ const Toasts = { // UI.js
         noIUCNRecord: "Não há registro de <b>${sname}</b> na Lista Vermelha da IUCN.",
         membershipExpiry: "Sua adesão vai expirar em ${expiresIn} dias, você pode visitar <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>a página de adesão</a> para renová-la",
         modelPathNotFound: "O caminho do modelo especificado (${modelPath}) não foi encontrado. Revertendo para o modelo BirdNET.",
+        badLocationUpdate: "Já existe uma localização nesta latitude e longitude.",
 
-        corruptFile: "Ficheiro(s) corrompido(s) encontrado(s)",
+        corruptFile: "<b>Ficheiro(s) corrompido(s) encontrado(s):</b> ${files}",
         noLoad: 'O modelo ${model} não está carregado. Reinicie o Chirpity para continuar. Se você ver esta mensagem repetidamente, é provável que seu computador não suporte AVX2 e o Chirpity não funcionará no seu sistema.',
         noDLL: 'Ocorreu um erro ao carregar o modelo. Isso pode ser devido à falta de suporte AVX. Os modelos de IA do Chirpity exigem o conjunto de instruções AVX2 para funcionar. Se você tiver o AVX2 ativado e ainda ver este aviso, consulte <a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">este problema</a> no Github.',
         noFile: "Não é possível abrir: ${error}",
@@ -603,8 +609,9 @@ const Toasts = { // UI.js
         noIUCNRecord: "Нет записи о <b>${sname}</b> в Красном списке IUCH.",
         membershipExpiry: "Ваша подписка истекает через ${expiresIn} дней, вы можете посетить <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>страницу подписки</a>, чтобы продлить её",
         modelPathNotFound: "Указанный путь к модели (${modelPath}) не найден. Возврат к модели BirdNET.",
+        badLocationUpdate: "На этой широте и долготе уже существует местоположение.",
 
-        corruptFile: "Обнаружены повреждённые файлы",
+        corruptFile: "<b>Обнаружены повреждённые файлы:</b> ${files}",
         noLoad: 'Модель ${model} не загружена. Для продолжения работы перезапустите Chirpity. Если вы постоянно видите это сообщение, скорее всего, ваш компьютер не поддерживает AVX2 и Chirpity не будет работать в вашей системе.',
         noDLL: 'Произошла ошибка при загрузке модели. Это может быть связано с отсутствием поддержки AVX. Для запуска моделей AI Chirpity требуется набор инструкций AVX2. Если у вас включен AVX2 и вы по-прежнему видите это уведомление, пожалуйста, обратитесь к <a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">этому вопросу</a> на Github.',
         noFile: "Не удается открыть: ${error}",
@@ -676,8 +683,9 @@ const Toasts = { // UI.js
         noIUCNRecord: "Det finns ingen post om <b>${sname}</b> i IUCN Röda listan.",
         membershipExpiry: "Ditt medlemskap löper ut om ${expiresIn} dagar, du kan besöka <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>medlemssidan</a> för att förnya",
         modelPathNotFound: "Den angivna modellsökvägen (${modelPath}) kunde inte hittas. Återgår till BirdNET-modellen.",
+        badLocationUpdate: "Det finns redan en plats på denna latitud och longitud.",
 
-        corruptFile: "Skadade fil(er) påträffades",
+        corruptFile: "<b>Skadade fil(er) påträffades:</b> ${files}",
         noLoad: 'Modellen ${model} är inte laddad. Starta om Chirpity för att fortsätta. Om du ser detta meddelande upprepade gånger, är det troligt att din dator inte stöder AVX2 och Chirpity kommer inte att fungera på ditt system.',
         noDLL: 'Det har uppstått ett fel vid inläsning av modellen. Detta kan bero på att AVX-stöd saknas. Chirpity AI-modeller kräver AVX2-instruktionsuppsättningen för att fungera. Om du har AVX2 aktiverat och fortfarande ser detta meddelande, vänligen hänvisa till <a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">detta problem</a> på Github.',
         noFile: "Kan inte öppna: ${error}",
@@ -749,8 +757,9 @@ const Toasts = { // UI.js
         noIUCNRecord: "在 IUCN 红色名录中没有关于 <b>${sname}</b> 的记录。",
         membershipExpiry: "您的会员资格将在${expiresIn}天后到期，您可以访问<a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>会员页面</a>进行续订",
         modelPathNotFound: "指定的模型路径 (${modelPath}) 未找到。正在恢复为 BirdNET 模型。",
+        badLocationUpdate: "此纬度和经度上已存在一个位置。",
 
-        corruptFile: "发现损坏的文件",
+        corruptFile: "<b>发现损坏的文件:</b> ${files}",
         noLoad: '模型 ${model} 未加载。请重新启动 Chirpity 以继续。如果您重复看到此消息，可能是您的计算机不支持 AVX2，Chirpity 将无法在您的系统上运行。',
         noDLL: '加载模型时发生错误。这可能是由于缺少 AVX 支持。Chirpity AI 模型需要 AVX2 指令集才能运行。如果您已启用 AVX2 但仍然看到此通知，请参考 <a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">此问题</a> 以获取更多信息。',
         noFile: "无法打开：${error}",
@@ -1049,95 +1058,132 @@ const Help = {
   
 
 const Location = {
-    en: [
-        'Set Location', 
-        'Delete Location', 
-        'Pick A Saved Location', 
-        'Add, Edit or Delete Location', 
-        'Update ALL open files to this location',
-        "Lat:", "Lon:"
-    ],
-    da: [
-        'Angiv placering', 
-        'Slet placering', 
-        'Vælg en gemt placering', 
-        'Tilføj, rediger eller slet placering', 
-        'Opdater ALLE åbne filer til denne placering',
-        "Bredde:", "Længde:"
-    ],
-    de: [
-        'Standort festlegen', 
-        'Standort löschen', 
-        'Gespeicherten Standort auswählen', 
-        'Standort hinzufügen, bearbeiten oder löschen', 
-        'Alle geöffneten Dateien auf diesen Standort aktualisieren',
-        "Breitengrad:", "Längengrad:"
-    ],
-    es: [
-        'Establecer ubicación', 
-        'Eliminar ubicación', 
-        'Seleccionar una ubicación guardada', 
-        'Añadir, editar o eliminar una ubicación', 
-        'Actualizar TODOS los archivos abiertos a esta ubicación',
-        "Latitud:", "Longitud:"
-    ],
-    fr: [
-        'Définir l’emplacement', 
-        'Supprimer l’emplacement', 
-        'Choisir un emplacement enregistré', 
-        'Ajouter, modifier ou supprimer un emplacement', 
-        'Mettre à jour TOUS les fichiers ouverts à cet emplacement',
-        "Lat:", "Long:"
-    ],
-    ja: [
-        '位置を設定', 
-        '位置を削除', 
-        '保存された位置を選択', 
-        '位置を追加、編集、または削除', 
-        'すべての開いているファイルをこの位置に更新',
-        "緯度:", "経度:"
-    ],
-    nl: [
-        'Locatie instellen', 
-        'Locatie verwijderen', 
-        'Kies een opgeslagen locatie', 
-        'Locatie toevoegen, bewerken of verwijderen', 
-        'Werk ALLE geopende bestanden bij naar deze locatie',
-        "Breedte:", "Lengte:"
-    ],
-    pt: [
-        'Definir localização', 
-        'Excluir localização', 
-        'Escolher uma localização salva', 
-        'Adicionar, editar ou excluir localização', 
-        'Atualizar TODOS os arquivos abertos para esta localização',
-        "Lat:", "Lon:"
-    ],
-    ru: [
-        'Установить местоположение', 
-        'Удалить местоположение', 
-        'Выбрать сохранённое местоположение', 
-        'Добавить, изменить или удалить местоположение', 
-        'Обновить ВСЕ открытые файлы до этого местоположения',
-        "Широта:", "Долгота:"
-    ],
-    sv: [
-        'Ange plats', 
-        'Radera plats', 
-        'Välj en sparad plats', 
-        'Lägg till, redigera eller radera plats', 
-        'Uppdatera ALLA öppna filer till denna plats',
-        "Latitud:", "Longitud:"
-    ],
-    zh: [
-        '设置位置', 
-        '删除位置', 
-        '选择一个保存的位置', 
-        '添加、编辑或删除位置', 
-        '更新所有打开的文件到此位置',
-        "纬度:", "经度:"
-    ]
+    en: {
+        update: 'Update Location',
+        delete: 'Delete Location',
+        pick: 'Pick A Location',
+        add: 'Add a New Location',
+        edit: 'Edit Location',
+        radius: 'Location radius',
+        all: 'Update ALL open files to this location',
+        lat: 'Lat:',
+        lon: 'Lon:'
+    },
+    da: {
+        update: 'Opdater placering',
+        delete: 'Slet placering',
+        pick: 'Vælg en placering',
+        add: 'Tilføj en ny placering',
+        edit: 'Rediger placering',
+        radius: 'Placeringsradius',
+        all: 'Opdater ALLE åbne filer til denne placering',
+        lat: 'Bredde:',
+        lon: 'Længde:'
+    },
+    de: {
+        update: 'Standort aktualisieren',
+        delete: 'Standort löschen',
+        pick: 'Standort auswählen',
+        add: 'Neuen Standort hinzufügen',
+        edit: 'Standort bearbeiten',
+        radius: 'Standortradius',
+        all: 'Alle geöffneten Dateien auf diesen Standort aktualisieren',
+        lat: 'Breitengrad:',
+        lon: 'Längengrad:'
+    },
+    es: {
+        update: 'Actualizar ubicación',
+        delete: 'Eliminar ubicación',
+        pick: 'Seleccionar una ubicación',
+        add: 'Añadir una nueva ubicación',
+        edit: 'Editar ubicación',
+        radius: 'Radio de ubicación',
+        all: 'Actualizar TODOS los archivos abiertos a esta ubicación',
+        lat: 'Latitud:',
+        lon: 'Longitud:'
+    },
+    fr: {
+        update: 'Mettre à jour l’emplacement',
+        delete: 'Supprimer l’emplacement',
+        pick: 'Choisir un emplacement',
+        add: 'Ajouter un nouvel emplacement',
+        edit: 'Modifier l’emplacement',
+        radius: 'Rayon de l’emplacement',
+        all: 'Mettre à jour TOUS les fichiers ouverts à cet emplacement',
+        lat: 'Lat:',
+        lon: 'Long:'
+    },
+    ja: {
+        update: '位置を更新',
+        delete: '位置を削除',
+        pick: '位置を選択',
+        add: '新しい位置を追加',
+        edit: '位置を編集',
+        radius: '位置の半径',
+        all: 'すべての開いているファイルをこの位置に更新',
+        lat: '緯度:',
+        lon: '経度:'
+    },
+    nl: {
+        update: 'Locatie bijwerken',
+        delete: 'Locatie verwijderen',
+        pick: 'Kies een locatie',
+        add: 'Nieuwe locatie toevoegen',
+        edit: 'Locatie bewerken',
+        radius: 'Locatiestraal',
+        all: 'Werk ALLE geopende bestanden bij naar deze locatie',
+        lat: 'Breedte:',
+        lon: 'Lengte:'
+    },
+    pt: {
+        update: 'Atualizar localização',
+        delete: 'Excluir localização',
+        pick: 'Escolher uma localização',
+        add: 'Adicionar uma nova localização',
+        edit: 'Editar localização',
+        radius: 'Raio da localização',
+        all: 'Atualizar TODOS os arquivos abertos para esta localização',
+        lat: 'Lat:',
+        lon: 'Lon:'
+    },
+    ru: {
+        update: 'Обновить местоположение',
+        delete: 'Удалить местоположение',
+        pick: 'Выбрать местоположение',
+        add: 'Добавить новое местоположение',
+        edit: 'Редактировать местоположение',
+        radius: 'Радиус местоположения',
+        all: 'Обновить ВСЕ открытые файлы до этого местоположения',
+        lat: 'Широта:',
+        lon: 'Долгота:'
+    },
+    sv: {
+        update: 'Uppdatera plats',
+        delete: 'Radera plats',
+        pick: 'Välj en plats',
+        add: 'Lägg till en ny plats',
+        edit: 'Redigera plats',
+        radius: 'Platsradie',
+        all: 'Uppdatera ALLA öppna filer till denna plats',
+        lat: 'Latitud:',
+        lon: 'Longitud:'
+    },
+    zh: {
+        update: '更新位置',
+        delete: '删除位置',
+        pick: '选择一个位置',
+        add: '添加新位置',
+        edit: '编辑位置',
+        radius: '位置半径',
+        all: '更新所有打开的文件到此位置',
+        lat: '纬度:',
+        lon: '经度:'
+    }
 };
+
+
+
+
 
 const Context = {
     en: {

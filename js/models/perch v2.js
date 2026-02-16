@@ -29,7 +29,7 @@ async function loadModel(mpath, backend, batchSize) {
     executionProviders: providers,
     enableGraphCapture: true, 
     ...threadOptions,
-    freeDimensionOverrides,
+    // freeDimensionOverrides,
     preferredOutputLocation,
     // enableProfiling: true,
     // profileFilePrefix: 'perch_v2-profile'

@@ -63,6 +63,7 @@
     "save2db": ["Spara till arkiv","Ctrl+S"
     ],
     "charts": ["Visa diagram"],
+    "manage-locations": ["Hantera platser"],
     "explore": ["Utforska arkiv"],
     "chart-datefilter": ["Tillämpa ett datumfilter"],
     "explore-datefilter": ["Tillämpa ett datumfilter"],

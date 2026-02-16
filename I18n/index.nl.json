@@ -63,6 +63,7 @@
     "save2db": ["Opslaan naar Archief","Ctrl+S"
     ],
     "charts": ["Bekijk grafieken"],
+    "manage-locations": ["Locaties beheren"],
     "explore": ["Verken Archief"],
     "chart-datefilter": ["Een datumfilter toepassen"],
     "explore-datefilter": ["Een datumfilter toepassen"],
