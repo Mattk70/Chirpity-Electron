@@ -5356,14 +5356,14 @@ async function onSetLocation({
           RETURNING id;`;
 
       row = await db.getAsync(SQL, lat, lon, place, radius);
+      if (manualUpdate && inMemory){
+        await diskDB.getAsync(SQL, lat, lon, place, radius);
+      }
     }
     if (row?.id) {
       id = row.id;
       locationsChanged = true;
       if (radius !== 30) console.info("Non-default radius was set", radius);
-    }
-    if (manualUpdate && inMemory){
-      await diskDB.getAsync(SQL, lat, lon, place, radius);
     }
   }
 // TODO: check if file in audio library and update its location on disk and in library
@@ -5475,7 +5475,11 @@ async function getNearbyLocationsCached(lat, lon) {
   const key = `${lat} ${lon}`;
   const cache = STATE.nearbyLocationCache;
   if (!cache.has(key)) {
-    cache.set(key, _getNearbyLocations(lat, lon));
+    cache.set(key, _getNearbyLocations(lat, lon))
+      .catch(err => {
+        cache.delete(key);
+        throw err;
+      });
   }
   return cache.get(key);
 }

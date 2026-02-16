@@ -1958,10 +1958,10 @@
                 currentTileLayer = createTileLayer().addTo(map);
                 markerGroup = L.featureGroup();
                 const fallbackMarker = L.marker([config.latitude, config.longitude]).addTo(markerGroup);
+                addClassToMarkerIcon(fallbackMarker, 'leaflet-marker-icon-default');
                 markerGroup.addTo(map);
                 fallbackMarker.on('click', onMapClick);
-                addClassToMarkerIcon(fallbackMarker, 'leaflet-marker-icon-default');
-            }
+                            }
         } catch (error) {
             generateToast({ message: 'leafletError', variables: { error: error.message } });
         }
@@ -1973,13 +1973,12 @@
             el = document.getElementById(el);
             el.addEventListener('change', () => {
                 if (where === 'customLocationMap') {
-                    const radius = document.getElementById('radius-value').textContent;
+                    const radius = document.getElementById('location-radius').valueAsNumber || 30;
                     const lat = document.getElementById('customLat').valueAsNumber;
                     const lon = document.getElementById('customLon').valueAsNumber;
                     if (checkCoords(lat, lon)) {
-                        updateMap(lat, lon, parseInt(radius));
+                        updateMap(lat, lon, radius);
                     }
-
                 } else {
                      const lat = document.getElementById('latitude').valueAsNumber;
                     const lon = document.getElementById('longitude').valueAsNumber;

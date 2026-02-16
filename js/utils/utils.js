@@ -73,8 +73,8 @@ function extractFileNameAndFolder(path) {
 /**
  * Converts a Date object or timestamp into a string formatted for HTML datetime-local input fields.
  *
- * @param {Date|number|string} date - The date value to convert, as a Date object, timestamp, or date string.
- * @returns {string} A string in the format "YYYY-MM-DDTHH:mm" suitable for use in datetime-local inputs.
+ * @param {Date|number} date - The date value to convert, as a Date object or timestamp.
+ * @returns {string} A string in the format "YYYY-MM-DDTHH:mm:ss" suitable for use in datetime-local inputs.
  */
 function getDatetimeLocalFromEpoch(epoch) {
   const date = new Date(epoch);
