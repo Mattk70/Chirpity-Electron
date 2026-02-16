@@ -1858,6 +1858,7 @@
     import { config, displayLocationAddress, LOCATIONS, generateToast, checkCoords } from './js/ui.js';
     let map, marker, clickTimer = 0;
     let currentTileLayer = null;
+    const DEFAULT_RADIUS = 30;
     const createTileLayer = () =>
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 16,
@@ -1868,7 +1869,7 @@
     let markerGroup = null;
 
 
-    function updateForm(lat, lng, afterDrag = false) {
+    function updateForm(lat, lng) {
         const target = map.getContainer().id;
 
         if (target === 'settingsMap'){
@@ -1877,11 +1878,10 @@
             latEl.value = lat.toFixed(4); 
             lonEl.value = lng.toFixed(4);
             const placeEl = document.getElementById('place');
-            placeEl.value = 'Getting location...'
+            placeEl.textContent = 'Getting location...'
             displayLocationAddress(target);
         } else {
             const savedLocationSelect = document.getElementById('savedLocations');
-            // if (! afterDrag) savedLocationSelect.value = '';
             const latEl = document.getElementById('customLat')
             const lonEl = document.getElementById('customLon')
             latEl.value = lat.toFixed(4); 
@@ -1901,7 +1901,7 @@
         const radiusDisplay = document.getElementById('radius-value');
         const savedLocationSelect = document.getElementById('savedLocations');
         const currentLocation = LOCATIONS.find(loc => loc.id === parseInt(savedLocationSelect.value));
-        radius.value = currentLocation ? currentLocation.radius : 30;
+        radius.value = currentLocation ? currentLocation.radius ?? DEFAULT_RADIUS : DEFAULT_RADIUS;
         radiusDisplay.innerHTML = `<b>${radius.valueAsNumber}m</b>`;
 
         updateMap(lat, lng, radius.valueAsNumber);
@@ -1930,7 +1930,7 @@
                 const markersByID = {};
                 const sharedIcon = new L.Icon.Default();
 
-                    for (const { id, lat, lon, radius = 30} of LOCATIONS) {
+                    for (const { id, lat, lon, radius = DEFAULT_RADIUS} of LOCATIONS) {
                         const marker = L.marker([lat, lon], { icon: sharedIcon }).addTo(markerGroup);
                         const circle = L.circle([lat, lon], {
                             color: 'MidnightBlue',
@@ -1978,7 +1978,7 @@
             el = document.getElementById(el);
             el.addEventListener('change', () => {
                 if (where === 'customLocationMap') {
-                    const radius = document.getElementById('location-radius').valueAsNumber || 30;
+                    const radius = document.getElementById('location-radius').valueAsNumber || DEFAULT_RADIUS;
                     const lat = document.getElementById('customLat').valueAsNumber;
                     const lon = document.getElementById('customLon').valueAsNumber;
                     if (checkCoords(lat, lon)) {
@@ -1995,13 +1995,13 @@
             });
     })
 
-    function updateMap(lat, lng, radius = 30) {
+    function updateMap(lat, lng, radius = DEFAULT_RADIUS) {
         try {
             if (! checkCoords(lat, lng)) return;
             // Remove all previous markers & circles
             markerGroup && markerGroup.remove();
             markerGroup = L.featureGroup();
-            const zoom = map.getZoom();
+            const zoom = Math.max(map.getZoom(), 14);
             const icon = new L.Icon.Default({
                 className: 'leaflet-icon-current'
             });
@@ -2028,9 +2028,9 @@
             });
             marker.on('dragend', (e) => {
                 const { lat, lng } = e.target.getLatLng();
-                updateForm(lat, lng, true)
+                updateForm(lat, lng)
             });
-            map.fitBounds(markerGroup.getBounds().pad(0.2), { maxZoom: 14, animate: true });
+            map.fitBounds(markerGroup.getBounds().pad(0.2), { maxZoom: zoom, animate: true });
 
         } catch (error) {
             generateToast({
