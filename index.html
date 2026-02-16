@@ -1898,11 +1898,13 @@
         const {lat, lng} = e.latlng;
         updateForm(lat, lng)
         const radius = document.getElementById('location-radius');
-        const radiusValue = document.getElementById('radius-value');
+        const radiusDisplay = document.getElementById('radius-value');
+        const savedLocationSelect = document.getElementById('savedLocations');
+        const currentLocation = LOCATIONS.find(loc => loc.id === parseInt(savedLocationSelect.value));
+        radius.value = currentLocation ? currentLocation.radius : 30;
+        radiusDisplay.innerHTML = `<b>${radius.valueAsNumber}m</b>`;
 
-        radius.value ??= 30, radiusValue.innerHTML = `<b>${radius.value}mm</b>`;
-
-        updateMap(lat, lng);
+        updateMap(lat, lng, radius.valueAsNumber);
         
         // Stop propagation of the click event to the map
         L.DomEvent.stopPropagation(e);
