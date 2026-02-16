@@ -1138,7 +1138,7 @@ async function setCustomLocation(manage = false) {
     const parsed = parseInt(savedLocationSelect.value, 10);
     const locationID = Number.isFinite(parsed) ? parsed : undefined;
     const batch = document.getElementById("batchLocations").checked;
-    const files = batch ? STATE.openFiles : !manage && STATE.currentFile ? [STATE.currentFile] : null;
+    const files = batch ? STATE.openFiles : !manage && STATE.currentFile ? [STATE.currentFile] : [];
     const place = customPlaceEl.value;
     const radius = locationRadius.valueAsNumber;
     const lat = latEl.valueAsNumber;
@@ -1163,7 +1163,9 @@ async function setCustomLocation(manage = false) {
 
     locationModal.hide();
   };
-  const toggleSetButton = () => locationAdd.classList.toggle("disabled", isNaN(savedLocationSelect.valueAsNumber));
+  const toggleSetButton = () => {
+    locationAdd.classList.toggle("disabled", isNaN(savedLocationSelect.value) || !customPlaceEl.value.trim());
+  };
   toggleSetButton();
   locationAdd.addEventListener("click", addLocation);
   locationDelete.addEventListener("click", addLocation);

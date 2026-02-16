@@ -716,12 +716,14 @@ async function handleMessage(e) {
                   );
                 }
               }
+              const {base, suffix} = parseCnames([cname])[0];
               return [
-                cname,
+                base,
                 {
                   start,
                   end,
-                  confidence: confidence && Number(confidence) * 1000 || null
+                  confidence: confidence && Number(confidence) * 1000 || null,
+                  callType: suffix || ''
                 }
               ];
             })
@@ -1338,7 +1340,7 @@ async function getSpeciesSQLAsync(file){
     included = cnames.length ? await getMatchingIds(cnames) : [-1];
     DEBUG &&
       console.log("included", included.length, "# labels", allLabels.length);
-    SQL = ` AND s.id ${not} IN (${included}) `;
+    SQL = ` AND (s.id ${not} IN (${included}) OR r.modelID = 0) `; // always include records with modelID 0 (manual records)
   }
   return SQL
 }
@@ -3665,7 +3667,10 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
         if (!speciesID) continue; // Skip unknown species
         if (isCustomList){
           const cname = STATE.allLabels[modelSpeciesID].split(getSplitChar())[1];
-          if (! allowedByList({cname, timestamp, score: confidence})) continue;
+          // To ensure results don't fail the confidence threshold when they would otherwise be allowed by the list, 
+          // we assign a score of 1001  so that it will be included regardless of confidence value
+          // And therefore be available if the confidence or list is changed later
+          if (! allowedByList({cname, timestamp, score: confidence, confidenceCheck: true})) continue;
         } else if (confidence < minConfidence) break;
         insertPlaceholders.push("(?, ?, ?, ?, ?, ?, ?, ?)");
         insertValues.push(key, fileID, speciesID, modelID, confidence, key + predictionLength, isDaylight, 0);
@@ -4624,25 +4629,36 @@ function epochInDayMonthRange(epochMs, startDM, endDM) {
  * @returns {boolean} `true` if the detection passes the custom-list filters, `false` otherwise.
  */
 function allowedByList(result){
-  // Handle enhanced lists
-  const {timestamp, cname, score} = result;
-  // Try exact match first
+  // Handle enhanced lists. 
+  // Calltype always undefined here:
+  let { timestamp, cname, score, callType, confidenceCheck } = result;
+  if (score === 2000) return true; // Manual records always allowed
+  if (/\(|-$/.test(cname)){
+    // Strip suffixes
+    const parsed = parseCnames([cname]);
+    cname = parsed[0].base;
+    callType = parsed[0].callType;
+  }
 
   let conditions = STATE.customLabelsMap[cname];
-  // Fallback: if no exact match and model uses suffixes, try base name
-  if (!conditions && ['nocmig', 'chirpity'].includes(STATE.model)) {
-    const baseName = cname.replace(/\s*\(.*?\)\s*$/g, '');
-    conditions = STATE.customLabelsMap[baseName];
-  }
+  let confidence = null;
+  if (!confidenceCheck) {
+    if (!conditions) return false; // Species not in the custom list
 
-  if (!conditions) return false; // Species not in the custom list
-
-  const {start, end, confidence} = conditions;
-  if (start && end) {
-    if (!epochInDayMonthRange(timestamp, start, end)) return false;
+    const {start, end, confidence: conditionsConfidence, callType: conditionsCallType} = conditions;
+    confidence = conditionsConfidence;
+    if (start && end) {
+      if (!epochInDayMonthRange(timestamp, start, end)) return false;
+    }
+    // Call type check
+    if (callType && conditionsCallType !== callType) {
+      return false;
+    }
   }
   // Confidence check (species-specific overrides global)
-  const minConfidence = confidence != null ? confidence : STATE.detect.confidence;
+  const minConfidence = confidence != null ? confidence : confidenceCheck 
+    ? Math.min(STATE.detect.confidence, 150) 
+    : STATE.detect.confidence;
   return score >= minConfidence;
 }
 

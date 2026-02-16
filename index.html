@@ -1897,7 +1897,7 @@
         const radius = document.getElementById('location-radius');
         const radiusValue = document.getElementById('radius-value');
 
-        radius.value = 30, radiusValue.innerHTML = "<b>30</b>";
+        radius.value ??= 30, radiusValue.innerHTML = `<b>${radius.value}m</b>`;
 
         updateMap(lat, lng);
         
@@ -1974,13 +1974,12 @@
             el = document.getElementById(el);
             el.addEventListener('change', () => {
                 if (where === 'customLocationMap') {
-                    const radius = document.getElementById('radius-value').textContent;
+                    const radius = document.getElementById('radius-value').textContent.replace('m','');
                     const lat = document.getElementById('customLat').valueAsNumber;
                     const lon = document.getElementById('customLon').valueAsNumber;
                     if (checkCoords(lat, lon)) {
-                        updateMap(lat, lon, parseInt(radius));
+                        updateMap(lat, lon, parseInt(radius) || 30);
                     }
-
                 } else {
                      const lat = document.getElementById('latitude').valueAsNumber;
                     const lon = document.getElementById('longitude').valueAsNumber;
