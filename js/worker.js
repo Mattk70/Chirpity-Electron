@@ -1174,7 +1174,8 @@ async function processFilesInBatches(filePaths, batchSize = 20) {
           return fileMetadata;
         }).catch ((_e) => {
           console.warn(`Failed to get metadata for file: ${file}`);
-          filePaths.splice(filePaths.indexOf(file), 1); // Remove the file from the list
+          const idx = filePaths.indexOf(file);
+          if (idx !== -1) filePaths.splice(idx, 1); // Remove the file from the list
           return null; // or handle the error as needed
         }
       ))
