@@ -555,7 +555,7 @@
                                         <input id="location-radius" class="input-group locked disabled" style="width:100%" type="range" value="30" min="10" max="2500" step="10"/>
                                     </div>
                                     <div class="col-2 input-group-append d-flex align-items-end ps-0">
-                                        <span class="input-group-text" id="radius-value"></span>
+                                        <span class="input-group-text" id="radius-value"><b>30m</b></span>
                                     </div>
                                 </div>
                             </div>
@@ -1861,7 +1861,7 @@
     const createTileLayer = () =>
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 16,
-            minZoom: 2,
+            minZoom: 1,
             attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         });
 
@@ -1956,12 +1956,11 @@
             } else {
                 map.setView([config.latitude, config.longitude], 12);
                 currentTileLayer = createTileLayer().addTo(map);
-
-                const fallbackMarker = L.marker([config.latitude, config.longitude]).addTo(map);
+                markerGroup = L.featureGroup();
+                const fallbackMarker = L.marker([config.latitude, config.longitude]).addTo(markerGroup);
+                markerGroup.addTo(map);
                 fallbackMarker.on('click', onMapClick);
-
-                const iconEl = fallbackMarker.getElement();
-                if (iconEl) iconEl.classList.add('leaflet-marker-icon-default');
+                addClassToMarkerIcon(fallbackMarker, 'leaflet-marker-icon-default');
             }
         } catch (error) {
             generateToast({ message: 'leafletError', variables: { error: error.message } });

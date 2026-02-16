@@ -968,7 +968,7 @@ const showLocation = async (fromSelect) => {
     ? locationSelect.value
     : FILE_LOCATION_MAP[STATE.currentFile];
 
-  const location = !id && id !== 0
+  const location = !id || id === 0
      ? LOCATIONS.find(obj => obj.id === 0) // default location if no selection
      : LOCATIONS.find(obj => obj.id === parseInt(id)) ?? LOCATIONS.find(obj => obj.id === 0);
 
