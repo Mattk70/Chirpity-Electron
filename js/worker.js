@@ -5355,7 +5355,7 @@ async function onSetLocation({
         // Snap the file location to the highest priority existing location
         const {lat:overrideLat, lon:overrideLon, id:overrideID, place:overridePlace, radius:overrideRadius} = closest;
         lat = overrideLat, lon = overrideLon; id = overrideID; place = overridePlace; radius = overrideRadius;
-        console.info("Snapping to nearby location:", `${closest.distance} meters away`);
+        console.info("Snapping to nearby location:", `${Math.round(closest.distance)} meters away`);
       }
       
     } 

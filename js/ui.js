@@ -1161,7 +1161,7 @@ async function setCustomLocation(manage = false) {
       renderLocation(DOM.place, place);
     }
     generateLocationList("explore-locations");
-
+    e.target.blur();
     locationModal.hide();
   };
   const toggleSetButton = () => {
