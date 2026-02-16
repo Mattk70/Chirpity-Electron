@@ -526,14 +526,10 @@ class Model {
         const labelsScientificNames = this.labels.map(this.getFirstElement);
         const customScienticNames = this.customLabels.map(label => label.split(this.splitChar)[0]);
         // Go through each custom label
-        let duration = 0;
         for (let i = 0; i < customScienticNames.length; i++) {
           const sname = customScienticNames[i];
           // Find all indices in this model's labels that match the current custom label
-          const t0 = performance.now();
           const indexes = this.findAllIndexes(labelsScientificNames, sname);
-          const t1 = performance.now();
-          duration += t1 - t0;
           if (indexes.length) {
             let selectedIndexes = [];
             if (indexes.length > 1) { // Multiple matches

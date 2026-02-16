@@ -73,28 +73,19 @@ function extractFileNameAndFolder(path) {
 /**
  * Converts a Date object or timestamp into a string formatted for HTML datetime-local input fields.
  *
- * @param {Date|number|string} date - The date value to convert, as a Date object, timestamp, or date string.
- * @returns {string} A string in the format "YYYY-MM-DDTHH:mm" suitable for use in datetime-local inputs.
+ * @param {Date|number} date - The date value to convert, as a Date object or timestamp.
+ * @returns {string} A string in the format "YYYY-MM-DDTHH:mm:ss" suitable for use in datetime-local inputs.
  */
-function getDatetimeLocalFromEpoch(date) {
-  // Assuming you have a Date object, for example:
-  const myDate = new Date(date);
-  let datePart = myDate.toLocaleDateString("en-GB", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  datePart = datePart.split("/").reverse().join("-");
-  const timePart = myDate
-    .toLocaleTimeString([], {
-      hour12: false,
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-    .replace(/\s.M$/, "");
-  // Combine date and time parts in the format expected by datetime-local input
-  const isoDate = datePart + "T" + timePart;
-  return isoDate;
+function getDatetimeLocalFromEpoch(epoch) {
+  const date = new Date(epoch);
+
+  // Adjust for local timezone offset
+  const tzOffset = date.getTimezoneOffset() * 60000;
+  const localISOTime = new Date(epoch - tzOffset)
+    .toISOString()
+    .slice(0, 19);
+
+  return localISOTime;
 }
 
 

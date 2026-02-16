@@ -694,6 +694,7 @@ function showDatePicker() {
   // Create the datetime-local input
   const datetimeInput = document.createElement("input");
   datetimeInput.setAttribute("type", "datetime-local");
+  datetimeInput.setAttribute("step", "1");
   datetimeInput.setAttribute("id", "fileStart");
   datetimeInput.setAttribute(
     "value",
@@ -968,7 +969,7 @@ const showLocation = async (fromSelect) => {
     ? locationSelect.value
     : FILE_LOCATION_MAP[STATE.currentFile];
 
-  const location = !id && id !== 0
+  const location = !id || id === 0
      ? LOCATIONS.find(obj => obj.id === 0) // default location if no selection
      : LOCATIONS.find(obj => obj.id === parseInt(id)) ?? LOCATIONS.find(obj => obj.id === 0);
 
@@ -1195,7 +1196,7 @@ async function sortFilesByTime(fileNames) {
   const fileData = await Promise.all(
     fileNames.map(async (fileName) => {
       const stats = await fs.promises.stat(fileName);
-      return { name: fileName, time: stats.mtimeMs };
+      return { name: fileName, time: stats.mtimeMs, start: stats.birthtimeMs };
     })
   );
 
@@ -2361,6 +2362,21 @@ const setUpWorkerMessaging = () => {
           onOpenFiles(args);
           break;
         }
+        case "found-time": {
+          const result = args.result;
+          if (result.length){
+            const {file, offset} = result[0];
+            STATE.windowLength = 20;
+            postBufferUpdate({
+              file,
+              begin: Math.max(offset - STATE.windowLength / 2, 0),
+              position: 0.5,
+            });
+          } else {
+            generateToast({type: "info", message: "Time not found in any file"});
+          }
+          break;
+        }
         case "generate-alert": {
           if (args.message.includes("archive.sqlite")) {
             config.database.location = undefined;
@@ -3347,62 +3363,25 @@ const goto = new bootstrap.Modal(document.getElementById("gotoModal"));
 const showGoToPosition = () => {
   if (STATE.currentFile) {
     const gotoLabel = document.getElementById("gotoModalLabel");
-    const timeHeading = config.timeOfDay
-      ? i18n.get(i18n.Context).gotoTimeOfDay
-      : i18n.get(i18n.Context).gotoPosition;
+    const timeHeading = i18n.get(i18n.Context).gotoTimeOfDay;
     gotoLabel.textContent = timeHeading;
+    const timeInput = document.getElementById("timeInput");
+    timeInput.value = 
+    utils.getDatetimeLocalFromEpoch(STATE.fileStart 
+      + (spec.wavesurfer.getCurrentTime() + STATE.windowOffsetSecs) * 1000);
+    timeInput.focus();
     goto.show();
   }
 };
 
-const gotoModal = document.getElementById("gotoModal");
-//gotoModal.addEventListener('hidden.bs.modal', enableKeyDownEvent)
-
-gotoModal.addEventListener("shown.bs.modal", () => {
-  const timeInput = document.getElementById("timeInput");
-  timeInput.value = "";
-  timeInput.focus();
-});
 
 const gotoTime = (e) => {
   if (STATE.currentFile) {
     e.preventDefault();
     const time = document.getElementById("timeInput").value;
-    // Nothing entered?
-    if (!time) {
-      // generateToast({type: 'warning',  message:'badTime'});
-      return;
-    }
-    let [hours, minutes, seconds] = time.split(":").map(Number);
-    hours ??= 0;
-    minutes ??= 0;
-    seconds ??= 0;
-    let initialTime, start;
-    if (config.timeOfDay) {
-      initialTime = new Date(STATE.fileStart);
-      // Create a Date object for the input time on the same day as the file start
-      const inputDate = new Date(
-        initialTime.getFullYear(),
-        initialTime.getMonth(),
-        initialTime.getDate(),
-        hours,
-        minutes,
-        seconds
-      );
-      // Calculate the offset in milliseconds
-      const offsetMillis = inputDate - STATE.fileStart;
-      start = offsetMillis / 1000;
-      //if we move to a new day... add 24 hours
-      start += start < 0 ? 86400 : 0;
-    } else {
-      start = hours * 3600 + minutes * 60 + seconds;
-    }
-    STATE.windowLength = 20;
-
-    start = Math.min(start, STATE.currentFileDuration);
-    STATE.windowOffsetSecs = Math.max(start - STATE.windowLength / 2, 0);
-    const position = start === 0 ? 0 : 0.5;
-    postBufferUpdate({ begin: STATE.windowOffsetSecs, position: position });
+    const dateTime = Date.parse(time);
+    if (isNaN(dateTime)) return;
+    worker.postMessage({ action: "find-time", time: dateTime});
     // Close the modal
     goto.hide();
   }
@@ -4895,7 +4874,7 @@ document.addEventListener("drop", (event) => {
     );
   if (fileList.length){
     const audioFiles = fileList.map(file => window.electron.showFilePath(file));
-    worker.postMessage({ action: "get-valid-files-list", files: audioFiles });
+    filterValidFiles({ filePaths:audioFiles });
   } else {
     const noSupport = {
         en: 'File type not supported',

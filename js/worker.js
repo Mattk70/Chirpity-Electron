@@ -535,6 +535,11 @@ async function handleMessage(e) {
       }
       break;
     }
+    case "find-time": {
+      const time = args.time;
+      await findTime(time);
+      break;
+    }
     case "get-detected-species-list": {
       getDetectedSpecies();
       break;
@@ -889,6 +894,19 @@ function setGetSummaryQueryInterval(threads) {
     STATE.detect.backend !== "tensorflow" ? threads * 10 : threads;
 }
 
+
+async function findTime(time) {
+  const result = await STATE.db.allAsync(`
+    SELECT
+      name as file,
+      (? - filestart) / 1000.0 AS offset
+    FROM files
+    WHERE filestart <= ?
+      AND filestart + (duration * 1000) > ?;
+  `, time, time, time);
+  UI.postMessage({ event: "found-time", result });
+}
+
 /**
  * Switches the application to a new operational mode, initializing the in-memory database if needed and notifying the UI.
  *
@@ -1158,16 +1176,27 @@ async function processFilesInBatches(filePaths, batchSize = 20) {
           return fileMetadata;
         }).catch ((_e) => {
           console.warn(`Failed to get metadata for file: ${file}`);
+          const idx = filePaths.indexOf(file);
+          if (idx !== -1) filePaths.splice(idx, 1); // Remove the file from the list
           return null; // or handle the error as needed
         }
       ))
     );
+    const progress = results.filter(Boolean).length // only count successful metadata retrievals towards progress
     UI.postMessage({
       event: "footer-progress",
-      progress: { percent: ((i + results.length) / filePaths.length) *100 },
+      progress: { percent: ((i + progress) / filePaths.length) * 100 },
       text: "Reading metadata",
     });
     DEBUG && console.log(`Processed ${i + results.length} of ${filePaths.length}`);
+  }
+  if (STATE.corruptFiles.length) {
+    generateAlert({
+      type: "warning",
+      message: "corruptFile",
+      variables: { files: '<br>' + STATE.corruptFiles.join("<br>") },
+      autohide: false,
+    });
   }
   DEBUG && console.log(`All files processed in ${Date.now() - t0}ms`);
 }
@@ -1779,12 +1808,6 @@ const measureDurationWithFfmpeg = (src, type) => {
       .audioFrequency(sampleRate)
       .on("error", (err) => {
         STATE.corruptFiles.push(src);
-        if (STATE.corruptFiles.length === 1){
-          generateAlert({
-            type: "error",
-            message: "corruptFile"
-          });
-        }
         stream.destroy();
         reject(err);
       })
@@ -2202,11 +2225,7 @@ const setMetadata = async ({ file, source_file = file }) => {
       if (file.toLowerCase().endsWith("wav")) {
         const { extractWaveMetadata } = require("./js/utils/metadata.js");
         const t0 = Date.now();
-        const wavMetadata = await extractWaveMetadata(file).catch(error => {
-          if (error.code !== 'ENOENT') console.warn("Error extracting GUANO", error.message);
-          return
-        });
-
+        const wavMetadata = await extractWaveMetadata(file);
         const metaKeys = wavMetadata ? Object.keys(wavMetadata): [];
         if (metaKeys.length){
           if (metaKeys.includes("guano")) {
@@ -4737,6 +4756,7 @@ const onSave2DiskDB = async ({ file }) => {
       SELECT id, lat, lon, place FROM locations;
     `);
     await memoryDB.runAsync(
+    // Don't coalesce locationID here, because we want to preserve NULLs for files without location
     `INSERT INTO disk.files (name, duration, filestart, locationID, archiveName, metadata)
       SELECT name, duration, filestart, locationID, archiveName, metadata FROM files
       WHERE filestart IS NOT NULL
@@ -5330,15 +5350,19 @@ async function onSetLocation({
     // Location set by metadata
     nearby = await getNearbyLocationsCached(lat, lon);
     if (nearby.length) {
-      // Snap the file location to the highest priority existing location
-      const {lat:overrideLat, lon:overrideLon, id:overrideID, place:overridePlace} = nearby[0];
-      lat = overrideLat, lon = overrideLon; id = overrideID; place = overridePlace;
-      console.info("Nearby location", nearby.flatMap(x => Math.round(x.distance)).join(", "));
+      const closest = nearby[0];
+      if (closest.distance > 0){
+        // Snap the file location to the highest priority existing location
+        const {lat:overrideLat, lon:overrideLon, id:overrideID, place:overridePlace, radius:overrideRadius} = closest;
+        lat = overrideLat, lon = overrideLon; id = overrideID; place = overridePlace; radius = overrideRadius;
+        console.info("Snapping to nearby location:", `${closest.distance} meters away`);
+      }
+      
     } 
   }
 
  if (id === null || id === undefined) {
-    let row = await db.getAsync('SELECT id FROM locations WHERE lat = ? AND lon = ? AND place = ? AND radius = ?',
+    let row = await db.getAsync('SELECT id FROM locations WHERE lat = ? AND lon = ? AND place = ? AND COALESCE(radius, 30) = ?',
       lat, lon, place, radius);
     let SQL;
     if (!row){
@@ -5355,14 +5379,14 @@ async function onSetLocation({
           RETURNING id;`;
 
       row = await db.getAsync(SQL, lat, lon, place, radius);
+      if (manualUpdate && inMemory){
+        await diskDB.getAsync(SQL, lat, lon, place, radius);
+      }
     }
     if (row?.id) {
       id = row.id;
       locationsChanged = true;
       if (radius !== 30) console.info("Non-default radius was set", radius);
-    }
-    if (manualUpdate && inMemory){
-      await diskDB.getAsync(SQL, lat, lon, place, radius);
     }
   }
 // TODO: check if file in audio library and update its location on disk and in library
@@ -5474,7 +5498,11 @@ async function getNearbyLocationsCached(lat, lon) {
   const key = `${lat} ${lon}`;
   const cache = STATE.nearbyLocationCache;
   if (!cache.has(key)) {
-    cache.set(key, _getNearbyLocations(lat, lon));
+    const promise = _getNearbyLocations(lat, lon).catch(err => {
+      cache.delete(key);
+      throw err;
+    });
+    cache.set(key, promise);
   }
   return cache.get(key);
 }
