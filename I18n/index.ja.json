@@ -92,6 +92,7 @@
 "guides": ["ガイド（GitHub）"],
 "false-positives": ["誤検出の対処"],
 "using-custom-lists": ["カスタムリストの使用"],
+"understanding-locations": ["場所の理解"],
 "training-custom-models": ["カスタムモデルのトレーニング"],
 "update-progress-text": ["アップデートをダウンロード中："],
 

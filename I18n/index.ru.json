@@ -96,6 +96,7 @@
     "guides": ["Руководства (на GitHub)"],
     "false-positives": ["Обработка ложных срабатываний"],
     "using-custom-lists": ["Использование пользовательских списков"],
+    "understanding-locations": ["Понимание местоположений"],
     "training-custom-models": ["Обучение пользовательских моделей"],
     "update-progress-text": ["Загрузка обновления:"],
     "record-add": ["Добавить"],

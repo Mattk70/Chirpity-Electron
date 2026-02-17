@@ -95,6 +95,7 @@
       "guides": ["Vejledninger (på GitHub)"],
       "false-positives": ["Håndtering af falske positiver"],
       "using-custom-lists": ["Brug af brugerdefinerede lister"],
+      "understanding-locations": ["Forståelse af placeringer"],
       "training-custom-models": ["Træning af brugerdefinerede modeller"],
       "update-progress-text": ["Downloader opdatering:"],
       "record-add": ["Tilføj"],

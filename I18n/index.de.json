@@ -96,6 +96,7 @@
     "guides": ["Anleitungen (auf GitHub)"],
     "false-positives": ["Umgang mit Fehlalarmen"],
     "using-custom-lists": ["Verwendung benutzerdefinierter Listen"],
+    "understanding-locations": ["Verständnis von Standorten"],
     "training-custom-models": ["Training benutzerdefinierter Modelle"],
     "update-progress-text": ["Update wird heruntergeladen:"],
     "record-add": ["Hinzufügen"],
