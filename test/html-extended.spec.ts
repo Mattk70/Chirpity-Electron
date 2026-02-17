@@ -387,7 +387,7 @@ test.describe('HTML File - Form Validation', () => {
       const typeMatch = input.match(/type="([^"]+)"/);
       if (typeMatch) {
         const inputType = typeMatch[1];
-        const validTypes = ['text', 'checkbox', 'radio', 'hidden', 'number', 'email', 'password', 'search', 'range'];
+        const validTypes = ['text', 'color','checkbox', 'radio', 'hidden', 'number', 'email', 'password', 'search', 'range', 'datetime-local'];
         expect(
           validTypes.includes(inputType),
           `Input type "${inputType}" should be valid HTML5 type`

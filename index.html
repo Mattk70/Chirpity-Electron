@@ -657,7 +657,7 @@
                 </div>                            
                 <div class="col-9">
                     <div class="chart-outer position-relative" id="chart-outer">
-                        <span class="material-symbols-outlined text-muted" style="z-index: 2;position: absolute; top: 40px; left: 30px" title="View Fullscreen" onclick="goFullscreen()">fullscreen</span>
+                        <span class="material-symbols-outlined text-muted" style="z-index: 2;position: absolute; top: 40px; left: 30px" title="View Fullscreen" id="fullscreen-button">fullscreen</span>
                         <canvas class="border border-dark rounded-3 w-100" id="chart-week"></canvas>
                     </div>
                 </div>
@@ -723,7 +723,7 @@
                     </div>
                     <div class="form_control_container d-flex">
                         <div class="form_control_container__time"></div>
-                        <button class="btn btn-secondary disabled align-self-end pt-0 pb-0" id="reset-spec-frequency" onclick="return false">Reset</button>
+                        <button class="btn btn-secondary disabled align-self-end pt-0 pb-0" id="reset-spec-frequency">Reset</button>
                     </div>
                 </div>
             </fieldset>
@@ -851,7 +851,7 @@
                     
                     <div class="form-group rounded p-2">
                         <div class="form-check form-switch ps-0">
-                            <button class="btn btn-primary" id="show-species" onclick="return false">Show the species included</button>
+                            <button class="btn btn-primary" id="show-species">Show the species included</button>
                         </div>
                     </div>
                     <div class="form-group rounded p-2 pe-0 mb-2">
@@ -893,7 +893,7 @@
                         <hr>
                         <div class="form-group rounded text-center">
                             <div class="form-check form-switch ps-2">
-                                <button class="btn btn-primary" id="clear-call-cache" onclick="return false">Clear Reference Call Cache</button>
+                                <button class="btn btn-primary" id="clear-call-cache">Clear Reference Call Cache</button>
                                 <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Clear Call Cache" id="Clear Call Cache-circle-help"  data-bs-content="The data used for the reference call comparisons are cached. Clearing the cache will refresh the calls for each species the next time a comparison is requested">?</a>
                             </div>
                         </div>
@@ -1027,8 +1027,8 @@
                             <input id="longitude" type="number" class="form-control ps-2" placeholder="0.00" step="0.0001"  max="180" min="-180" aria-label="Longitude" aria-describedby="longitude">
                         </div>
                         <div class="mt-1 float-end">
-                            <button class="btn btn-primary" id="apply-location" onclick="return false">Set</button>
-                            <button class="btn btn-secondary" id="cancel-location" onclick="return false">Cancel</button>
+                            <button class="btn btn-primary" id="apply-location">Set</button>
+                            <button class="btn btn-secondary" id="cancel-location">Cancel</button>
                         </div>
                         <div class="clearfix"></div>
                         <div id="settingsMap" class="mt-2 border border-secondary rounded"></div>
@@ -1480,7 +1480,7 @@
                     </div>
                     <div class="col-auto form-group rounded p-2 mb-2">
                         <div class="text-nowrap">
-                            <button class="btn btn-warning" id="reset-defaults" onclick="return false">Reset to default settings</button>
+                            <button class="btn btn-warning" id="reset-defaults">Reset to default settings</button>
                             <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Default Settings" id="Default Settings-circle-help"  data-bs-content="Reset the configuration settings to their default values. N.B. Relaunch Chirpity to see changes, also, language settings will need to be re-set manually">?</a>
                         </div>
                     </div>
@@ -1793,7 +1793,7 @@
                     </ul>
                 </li>
             <div class="nav-item">
-                <li class="nav-link text-nowrap"  onclick="placeMap('settingsMap')" id="navbarSettings"
+                <li class="nav-link text-nowrap" id="navbarSettings"
                 data-bs-toggle="offcanvas" data-bs-target="#settings" aria-controls="settings">Settings</li>
             </div>
             </ul>
@@ -1833,6 +1833,10 @@
 <script src="./js/ui.js" type="module"></script>
 <script type="module" defer>
     import { config, displayLocationAddress, LOCATIONS, generateToast, checkCoords } from './js/ui.js';
+    const settingsMenu = document.getElementById('navbarSettings');
+    settingsMenu.addEventListener('click', () => {
+        placeMap('settingsMap')
+    });
     let map, marker, clickTimer = 0;
     let currentTileLayer = null;
     const DEFAULT_RADIUS = 30;
