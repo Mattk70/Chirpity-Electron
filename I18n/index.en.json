@@ -98,6 +98,7 @@
     "guides": ["Guides (on Github)"],
     "false-positives": ["Handling False Positives"],
     "using-custom-lists": ["Using Custom Lists"],
+    "understanding-locations": ["Understanding Locations"],
     "training-custom-models": ["Training Custom Models"],
     "update-progress-text": ["Downloading update:"],
 

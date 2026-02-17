@@ -96,6 +96,7 @@
     "guides": ["Handleidingen (op GitHub)"],
     "false-positives": ["Omgaan met fout-positieven"],
     "using-custom-lists": ["Gebruik van aangepaste lijsten"],
+    "understanding-locations": ["Begrijpen van locaties"],
     "training-custom-models": ["Trainen van aangepaste modellen"],
     "update-progress-text": ["Downloaden van update:"],
     "record-add": ["Toevoegen"],

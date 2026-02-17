@@ -96,6 +96,7 @@
   "guides": ["Guias (no GitHub)"],
   "false-positives": ["Gestão de falsos positivos"],
   "using-custom-lists": ["Utilização de listas personalizadas"],
+  "understanding-locations": ["Compreendendo localizações"],
   "training-custom-models": ["Treino de modelos personalizados"],
   "update-progress-text": ["Baixando atualização:"],
   "record-add": ["Adicionar"],

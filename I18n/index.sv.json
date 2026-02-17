@@ -96,6 +96,7 @@
     "guides": ["Guider (på GitHub)"],
     "false-positives": ["Hantering av falska positiva"],
     "using-custom-lists": ["Användning av anpassade listor"],
+    "understanding-locations": ["Förståelse av platser"],
     "training-custom-models": ["Träning av anpassade modeller"],
     "update-progress-text": ["Laddar ner uppdatering:"],
     "record-add": ["Lägg till"],
