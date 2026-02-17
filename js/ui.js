@@ -5392,6 +5392,10 @@ async function handleUIClicks(e) {
       element.disabled = false;
       break;
     }
+    case "fullscreen-button":{
+      goFullscreen();
+      break;
+    }
     case "explore": {
       showExplore();
       break;
@@ -5718,6 +5722,7 @@ async function handleUIClicks(e) {
     }
     case "show-species":
     case "species": {
+      e.preventDefault();
       worker.postMessage({
         action: "get-valid-species",
         file: STATE.currentFile,
@@ -5927,6 +5932,7 @@ async function handleUIClicks(e) {
       break;
     }
     case "reset-defaults": {
+      e.preventDefault();
       const i18 = {
         en: "Are you sure you want to revert to the default settings? You will need to relaunch Chirpity to see the changes.",
         da: "Er du sikker på, at du vil gendanne standardindstillingerne? Du skal genstarte Chirpity for at se ændringerne.",
@@ -6030,10 +6036,12 @@ async function handleUIClicks(e) {
       break;
     }
     case "apply-location": {
+      e.preventDefault();
       setDefaultLocation();
       break;
     }
     case "cancel-location": {
+      e.preventDefault();
       cancelDefaultLocation();
       break;
     }
@@ -6054,6 +6062,7 @@ async function handleUIClicks(e) {
       break;
     }
     case "clear-call-cache": {
+      e.preventDefault();
       const data = fs.rm(p.join(appPath, "XCcache.json"), (err) => {
         if (err)
           generateToast({ type: "error", message: "noCallCache" }) &&

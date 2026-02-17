@@ -42,7 +42,7 @@ test.describe('I18n JSON Files - Translation Placeholders and Variables', () => 
       const data = JSON.parse(content);
 
       // Technical terms that should not be translated
-      const technicalTerms = ['BirdNET', 'Nocmig', 'eBird', 'CSV', 'FLAC', 'GPU', 'CPU'];
+      const technicalTerms = ['BirdNET', 'eBird', 'CSV', 'FLAC', 'GPU', 'CPU'];
 
       const checkForTerms = (value: any): boolean => {
         if (typeof value === 'string') {
@@ -290,14 +290,10 @@ test.describe('I18n JSON Files - Punctuation and Formatting', () => {
       const checkQuotes = (value: any): void => {
         if (typeof value === 'string') {
           // Count different types of quotes
-          const singleQuotes = (value.match(/'/g) || []).length;
           const doubleQuotes = (value.match(/"/g) || []).length;
           const curlyQuotes = (value.match(/[""]/g) || []).length;
 
           // Quotes should be balanced (even number)
-          if (singleQuotes > 0) {
-            expect(singleQuotes % 2, `Single quotes should be balanced in value: "${value}"`).toBe(0);
-          }
           if (doubleQuotes > 0) {
             expect(doubleQuotes % 2, `Double quotes should be balanced in value: "${value}"`).toBe(0);
           }

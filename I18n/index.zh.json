@@ -165,7 +165,7 @@
     "mid-color": "中频颜色",
     "quiet-color": "安静颜色",
     "mid-color-threshold-slider": "中位位置：",
-    "quiet-color-threshold-slider":  "静音阈值: ",
+    "quiet-color-threshold-slider": "静音阈值:",
     "window-function": "窗口函数：",
     "timelineSetting": "时间轴：",
     "send-filtered-audio-to-model": "发送过滤后的音频进行分析",
