@@ -257,8 +257,17 @@ function resolveDatabaseFile(path) {
   if (fs.existsSync(newFile)) return newFile;
   const oldFile = p.join(path, 'archive.sqlite');
   if (fs.existsSync(oldFile)) {
-    fs.renameSync(oldFile, newFile);
-    return newFile;
+    try {
+      fs.renameSync(oldFile, newFile);
+      return newFile;
+    } catch (error) {
+      console.error("Failed to move  database file:", error);
+      generateAlert({
+        type: "error",
+        message: `Failed to move database file: ${error.message}`
+      });
+      throw error // rethrow to prevent continuing with an old file
+    }
   }
   return newFile; // does not exist yet
 }
@@ -4786,7 +4795,7 @@ const onSave2DiskDB = async ({ file }) => {
 
     // Update the duration table
     response = await memoryDB.runAsync(
-      "INSERT OR IGNORE INTO disk.duration SELECT * FROM duration"
+      "INSERT OR REPLACE INTO disk.duration SELECT * FROM duration"
     );
     DEBUG &&
       console.log(response.changes + " date durations added to disk database");
