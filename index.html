@@ -1844,7 +1844,8 @@
         });
 
     let markerGroup = null;
-
+    let manage = false;
+    const savedLocationSelect = document.getElementById('savedLocations');
 
     function updateForm(lat, lng) {
         const target = map.getContainer().id;
@@ -1858,7 +1859,6 @@
             placeEl.textContent = 'Getting location...'
             displayLocationAddress(target);
         } else {
-            const savedLocationSelect = document.getElementById('savedLocations');
             const latEl = document.getElementById('customLat')
             const lonEl = document.getElementById('customLon')
             latEl.value = lat.toFixed(4); 
@@ -1876,7 +1876,6 @@
         updateForm(lat, lng)
         const radius = document.getElementById('location-radius');
         const radiusDisplay = document.getElementById('radius-value');
-        const savedLocationSelect = document.getElementById('savedLocations');
         const currentLocation = LOCATIONS.find(loc => loc.id === parseInt(savedLocationSelect.value));
         radius.value = currentLocation ? currentLocation.radius ?? DEFAULT_RADIUS : DEFAULT_RADIUS;
         radiusDisplay.innerHTML = `<b>${radius.valueAsNumber}m</b>`;
@@ -1897,44 +1896,46 @@
         
         try {
             if (where === 'customLocationMap' && LOCATIONS.length) {
+                const editSection = document.getElementById('edit-section');
+                manage = !editSection.classList.contains('d-none');
                 markerGroup = L.featureGroup();
                 const bounds = L.latLngBounds();
 
-                const defaultIcon = new L.Icon.Default({ className: 'leaflet-icon-default' });
-                const defaultMarker = L.marker([config.latitude, config.longitude], { icon: defaultIcon }).addTo(markerGroup);
-                bounds.extend(defaultMarker.getLatLng());
-
                 const markersByID = {};
                 const sharedIcon = new L.Icon.Default();
+                const selectedID = parseInt(savedLocationSelect.value);
+                const locations = isNaN(selectedID) ? LOCATIONS : LOCATIONS.filter(loc => loc.id === selectedID);  
 
-                    for (const { id, lat, lon, radius = DEFAULT_RADIUS} of LOCATIONS) {
-                        const marker = L.marker([lat, lon], { icon: sharedIcon }).addTo(markerGroup);
-                        const circle = L.circle([lat, lon], {
-                            color: 'MidnightBlue',
-                            weight: 1,
-                            opacity: 0.5,
-                            fillColor: 'MidnightBlue',  
-                            fillOpacity: 0.2,
-                            radius
-                        }).addTo(markerGroup);
-                        bounds.extend(marker.getLatLng());
-                        markersByID[id] = marker;
-
-                        if (id === locationID) {
-                            addClassToMarkerIcon(marker, 'leaflet-icon-current');
-                        }
+                for (const { id, lat, lon, radius = DEFAULT_RADIUS} of locations) {
+                    const marker = L.marker([lat, lon], { icon: sharedIcon }).addTo(markerGroup);
+                    const circle = L.circle([lat, lon], {
+                        color: 'MidnightBlue',
+                        weight: 1,
+                        opacity: 0.5,
+                        fillColor: 'MidnightBlue',  
+                        fillOpacity: 0.2,
+                        radius
+                    }).addTo(markerGroup);
+                    bounds.extend(marker.getLatLng());
+                    markersByID[id] = marker;
+                    if (id === 0) {
+                        addClassToMarkerIcon(marker, 'leaflet-icon-default');
                     }
-                    markerGroup.addTo(map);
-
-                    if (bounds.isValid() && bounds.getNorthEast().equals(bounds.getSouthWest())) {
-                        // Single point → use setView
-                        map.setView(bounds.getCenter(), 12);
-                    } else {
-                        map.fitBounds(bounds.pad(0.2));
+                    else if (id === locationID) {
+                        addClassToMarkerIcon(marker, 'leaflet-icon-current');
                     }
+                }
+                markerGroup.addTo(map);
+
+                if (bounds.isValid() && bounds.getNorthEast().equals(bounds.getSouthWest())) {
+                    // Single point → use setView
+                    map.setView(bounds.getCenter(), 12);
+                } else {
+                    map.fitBounds(bounds.pad(0.2));
+                }
 
                     currentTileLayer = createTileLayer().addTo(map);
-                    markerGroup.on('click', onMapClick);
+                    // if (manage) markerGroup.on('click', onMapClick);
             } else {
                 map.setView([config.latitude, config.longitude], 12);
                 currentTileLayer = createTileLayer().addTo(map);
@@ -2034,15 +2035,18 @@
         const latEl = document.getElementById(latTxt);
         const lonEl = document.getElementById(lonTxt);
         showMap(divID, locationID);
-        map.on('click', (e) => {
-            clearTimeout(clickTimer);
-            //Wait for dblclick
-            clickTimer = setTimeout(() => {onMapClick(e)}, 250);
-        })
-        // don't call onMapClick on dblclick
-        map.on('dblclick', (e) => {
-            clearTimeout(clickTimer);
-        })
+        if (manage || divID === 'settingsMap') {
+            map.on('click', (e) => {
+                clearTimeout(clickTimer);
+                //Wait for dblclick
+                clickTimer = setTimeout(() => {onMapClick(e)}, 250);
+            })
+
+            // don't call onMapClick on dblclick
+            map.on('dblclick', (e) => {
+                clearTimeout(clickTimer);
+            })
+        }
     }
 
     window.placeMap = placeMap;

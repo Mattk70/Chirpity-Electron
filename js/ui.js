@@ -941,7 +941,7 @@ const onLocationDeleted = ({ id }) => {
 }
 const locationModalDiv = document.getElementById("locationModal");
 locationModalDiv.addEventListener("shown.bs.modal", async () => {
-  const locationID = FILE_LOCATION_MAP[STATE.currentFile] ?? 0
+  const locationID = FILE_LOCATION_MAP[STATE.currentFile] ?? undefined
   await placeMap("customLocationMap", locationID);
 });
 //document
@@ -1136,7 +1136,7 @@ async function setCustomLocation(manage = false) {
 
   const addLocation = (e) => {
     const remove = e.target.id === 'delete-location';
-    const parsed = parseInt(savedLocationSelect.value, 10);
+    const parsed = parseInt(savedLocationSelect.value);
     const locationID = Number.isFinite(parsed) ? parsed : undefined;
     const batch = document.getElementById("batchLocations").checked;
     const files = batch ? STATE.openFiles : !manage && STATE.currentFile ? [STATE.currentFile] : [];

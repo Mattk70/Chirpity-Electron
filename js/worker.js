@@ -252,6 +252,16 @@ const getSelectionRange = (file, start, end) => {
   };
 };
 
+function resolveDatabaseFile(path) {
+  const newFile = p.join(path, 'archive_v2.sqlite');
+  if (fs.existsSync(newFile)) return newFile;
+  const oldFile = p.join(path, 'archive.sqlite');
+  if (fs.existsSync(oldFile)) {
+    fs.renameSync(oldFile, newFile);
+    return newFile;
+  }
+  return newFile; // does not exist yet
+}
 
 /**
  * Load and initialize the application's SQLite archive database and prepare species mappings for the current model.
@@ -264,20 +274,23 @@ async function loadDB(modelPath) {
   DEBUG && console.log("Loading db " + path);
   const model = STATE.model;
   let modelID, needsTranslation;
-  const file = p.join(path, `archive.sqlite`);
-  if (!fs.existsSync(file)) {
-    DEBUG && console.log("No db file: ", file);
-    try {
-        diskDB = await createDB({file, dbMutex});
-    } catch (error) {
-      console.error("Error creating database:", error);
-      generateAlert({
-        type: "error",
-        message: `Database creation failed: ${error.message}`
-      });
-      throw error;
-    }
-    DEBUG && console.log("DB created at : ", file);
+  // Prevent downgrade corruption
+  const file = resolveDatabaseFile(path);
+  const dbExists = fs.existsSync(file);
+
+  if (!dbExists) {
+      DEBUG && console.log("No db file: ", file);
+      try {
+          diskDB = await createDB({file, dbMutex});
+      } catch (error) {
+        console.error("Error creating database:", error);
+        generateAlert({
+          type: "error",
+          message: `Database creation failed: ${error.message}`
+        });
+        throw error;
+      }
+      DEBUG && console.log("DB created at : ", file);
   } else {
     diskDB = new sqlite3.Database(file);
     await diskDB.runAsync(`CREATE TABLE IF NOT EXISTS 
@@ -4752,8 +4765,8 @@ const onSave2DiskDB = async ({ file }) => {
   try {
     await memoryDB.runAsync("BEGIN");
     await memoryDB.runAsync(`
-      INSERT OR REPLACE INTO disk.locations (id, lat, lon, place)
-      SELECT id, lat, lon, place FROM locations;
+      INSERT OR IGNORE INTO disk.locations (id, lat, lon, place, radius)
+      SELECT id, lat, lon, place, radius FROM locations;
     `);
     await memoryDB.runAsync(
     // Don't coalesce locationID here, because we want to preserve NULLs for files without location
@@ -4773,7 +4786,7 @@ const onSave2DiskDB = async ({ file }) => {
 
     // Update the duration table
     response = await memoryDB.runAsync(
-      "INSERT OR REPLACE INTO disk.duration SELECT * FROM duration"
+      "INSERT OR IGNORE INTO disk.duration SELECT * FROM duration"
     );
     DEBUG &&
       console.log(response.changes + " date durations added to disk database");
