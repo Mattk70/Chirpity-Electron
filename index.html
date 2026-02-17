@@ -1901,7 +1901,6 @@
                 markerGroup = L.featureGroup();
                 const bounds = L.latLngBounds();
 
-                const markersByID = {};
                 const sharedIcon = new L.Icon.Default();
                 const selectedID = parseInt(savedLocationSelect.value);
                 const locations = isNaN(selectedID) ? LOCATIONS : LOCATIONS.filter(loc => loc.id === selectedID);  
@@ -1917,7 +1916,6 @@
                         radius
                     }).addTo(markerGroup);
                     bounds.extend(marker.getLatLng());
-                    markersByID[id] = marker;
                     if (id === 0) {
                         addClassToMarkerIcon(marker, 'leaflet-icon-default');
                     }
