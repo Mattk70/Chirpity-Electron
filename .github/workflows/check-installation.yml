@@ -183,7 +183,10 @@ jobs:
             echo "skip_build=true" >> $GITHUB_ENV
           fi
 
-
+      # Run unit tests
+      - name: Run unit tests
+        run: npm run unittest
+        
       # Conditional build command for each OS
       - name: Build Electron application
         env:

@@ -178,6 +178,9 @@ jobs:
       
         shell: bash
 
+      - name: Run unit tests
+        run: npm run unittest
+        
       - name: Build Electron application
         shell: bash
         env:
