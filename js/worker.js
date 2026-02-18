@@ -699,11 +699,24 @@ async function handleMessage(e) {
         console.info('no confidence_overrides table?', e)
       }
       if (args.list === "custom") {
+        const splitOn = STATE.model === 'perch v2' ? /[,~]/ : /[,_]/;
+        for (let i = 0; i < args.customLabels.length; i++) {
+          const value = args.customLabels[i];
+          const line = i + 1;
+          // If no delimiter match, it can't have 2 parts
+          if (!splitOn.test(value)) {
+            generateAlert({
+              message: 'badListFormat',
+              variables: { line, value },
+              type: 'warning'
+            });
+            return;
+          }
+        }
         STATE.customLabels = args.customLabels;
         STATE.customLabelsMap = Object.fromEntries(
           await Promise.all(
             args.customLabels.map(async (line) => {
-              const splitOn = STATE.model === 'perch v2' ? /[,~]/ : /[,_]/;
               let [_sname, cname, start, end, confidence] =
                 line.split(splitOn).map(v => v.trim());
 
@@ -743,7 +756,7 @@ async function handleMessage(e) {
                   );
                 }
               }
-              const {base, suffix} = parseCnames([cname])[0];
+              const {base, suffix} = cname ? parseCnames([cname])[0] : {base: null, suffix: null};
               return [
                 base,
                 {
@@ -5772,13 +5785,19 @@ async function convertAndOrganiseFiles(threadLimit = 4) {
   const conversions = []; // Array to hold the conversion promises
 
   // Query the files & records table to get the necessary data
+  const params = [];
   let query =
     "SELECT DISTINCT f.id, f.name, f.archiveName, f.duration, f.filestart, l.place FROM files f LEFT JOIN locations l ON f.locationID = l.id";
   // If just saving files with records
   if (STATE.library.clips) query += " INNER JOIN records r ON r.fileID = f.id";
   if (!STATE.library.backfill) query += " WHERE f.archiveName is NULL";
+  if (STATE.mode === "archive") {
+    // Only add current results
+    query += " AND f.name IN (" + prepParams(STATE.filesToAnalyse) + ")";
+    params.push(...STATE.filesToAnalyse);
+  }
   t0 = Date.now();
-  const rows = await db.allAsync(query);
+  const rows = await db.allAsync(query, ...params);
   DEBUG && console.log(`db query took ${Date.now() - t0}ms`);
   const ext = "." + STATE.library.format;
   for (const row of rows) {
