@@ -228,85 +228,93 @@ function _parseMetadataText(text) {
 
 // }
 
+
 function readUInt64LE(buf, offset) {
   const low = buf.readUInt32LE(offset);
   const high = buf.readUInt32LE(offset + 4);
   return high * 0x100000000 + low;
 }
 
+/**
++ * Get WAV duration without decoding the full file (supports RF64/ds64).
++ * `@param` {string} filePath
++ * `@returns` {number} duration in seconds
++ */
+
 function getWavDuration(filePath) {
   const fd = fs.openSync(filePath, 'r');
+  try {
+    // Read enough to cover RIFF/RF64 + ds64 + fmt + data headers
+    const header = Buffer.alloc(8192);
+    fs.readSync(fd, header, 0, header.length, 0);
+    let offset = 0;
 
-  // Read enough to cover RIFF/RF64 + ds64 + fmt + data headers
-  const header = Buffer.alloc(8192);
-  fs.readSync(fd, header, 0, header.length, 0);
-  fs.closeSync(fd);
+    // --- RIFF or RF64 ---
+    const riffId = header.toString('ascii', offset, offset + 4);
+    offset += 8; // Skip RIFF/RF64 and file size
 
-  let offset = 0;
+    const waveId = header.toString('ascii', offset, offset + 4);
+    offset += 4;
 
-  // --- RIFF or RF64 ---
-  const riffId = header.toString('ascii', offset, offset + 4);
-  offset += 8; // Skip RIFF/RF64 and file size
-
-  const waveId = header.toString('ascii', offset, offset + 4);
-  offset += 4;
-
-  if (waveId !== 'WAVE') {
-    throw new Error(filePath + ' is not a valid WAV file');
-  }
-
-  const isRF64 = riffId === 'RF64';
-  let fmt = null;
-  let dataSize = null;
-  let sampleCount = null;
-
-  // --- Parse chunks ---
-  while (offset < header.length) {
-    const chunkId = header.toString('ascii', offset, offset + 4);
-    const chunkSize = header.readUInt32LE(offset + 4);
-    const chunkStart = offset + 8;
-
-    if (chunkId.trim() === '') break; // end of meaningful data
-
-    // --- fmt chunk ---
-    else if (chunkId === 'fmt ') {
-      fmt = {
-        audioFormat: header.readUInt16LE(chunkStart),
-        numChannels: header.readUInt16LE(chunkStart + 2),
-        sampleRate: header.readUInt32LE(chunkStart + 4),
-        byteRate: header.readUInt32LE(chunkStart + 8),
-        blockAlign: header.readUInt16LE(chunkStart + 12),
-        bitsPerSample: header.readUInt16LE(chunkStart + 14)
-      };
+    if (waveId !== 'WAVE') {
+      throw new Error(filePath + ' is not a valid WAV file');
     }
 
-    // --- data chunk ---
-    else if (chunkId === 'data') {
-      if (!isRF64) {
-        dataSize = chunkSize; // normal WAV
+    const isRF64 = riffId === 'RF64';
+    let fmt = null;
+    let dataSize = null;
+    let sampleCount = null;
+
+    // --- Parse chunks ---
+    while (offset < header.length) {
+      const chunkId = header.toString('ascii', offset, offset + 4);
+      const chunkSize = header.readUInt32LE(offset + 4);
+      const chunkStart = offset + 8;
+
+      if (chunkId.trim() === '') break; // end of meaningful data
+
+      // --- fmt chunk ---
+      else if (chunkId === 'fmt ') {
+        fmt = {
+          audioFormat: header.readUInt16LE(chunkStart),
+          numChannels: header.readUInt16LE(chunkStart + 2),
+          sampleRate: header.readUInt32LE(chunkStart + 4),
+          byteRate: header.readUInt32LE(chunkStart + 8),
+          blockAlign: header.readUInt16LE(chunkStart + 12),
+          bitsPerSample: header.readUInt16LE(chunkStart + 14)
+        };
       }
-      break; // we have everything we need
-    }
 
-    // --- RF64 ds64 chunk ---
-    if (chunkId === 'ds64') {
-      dataSize = readUInt64LE(header, chunkStart + 8);
-      sampleCount = readUInt64LE(header, chunkStart + 16);
+      // --- data chunk ---
+      else if (chunkId === 'data') {
+        if (!isRF64) {
+          dataSize = chunkSize; // normal WAV
+        }
+        break; // we have everything we need
+      }
+
+      // --- RF64 ds64 chunk ---
+      if (chunkId === 'ds64') {
+        dataSize = readUInt64LE(header, chunkStart + 8);
+        sampleCount = readUInt64LE(header, chunkStart + 16);
+      }
+      offset = chunkStart + chunkSize  + (chunkSize % 2);
     }
-    offset = chunkStart + chunkSize  + (chunkSize % 2);
+    
+    if (!fmt) {
+      throw new Error('Missing fmt chunk');
+    }
+    // --- Compute duration ---
+    if (sampleCount && sampleCount > 0) {
+      return sampleCount / fmt.sampleRate;
+    }
+    if (!dataSize) {
+      throw new Error('Could not determine data size');
+    }
+    return dataSize / (fmt.blockAlign * fmt.sampleRate);
+  } finally {
+    fs.closeSync(fd);
   }
-  
-  if (!fmt) {
-    throw new Error('Missing fmt chunk');
-  }
-  // --- Compute duration ---
-  if (sampleCount && sampleCount > 0) {
-    return sampleCount / fmt.sampleRate;
-  }
-  if (!dataSize) {
-    throw new Error('Could not determine data size');
-  }
-  return dataSize / (fmt.blockAlign * fmt.sampleRate);
 }
 
 
