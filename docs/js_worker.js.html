@@ -36,6 +36,7 @@ const fs = require("node:fs");
 const p = require("node:path");
 const SunCalc = require("suncalc");
 const ffmpeg = require("fluent-ffmpeg");
+const { extractWaveMetadata, getWavDuration } = require("./js/utils/metadata.js");
 const ffmpegPath = require("@ffmpeg-installer/ffmpeg").path.replace(
   "app.asar",
   "app.asar.unpacked"
@@ -54,7 +55,7 @@ import {
   upgrade_to_v4
 } from "./database.js";
 import { customURLEncode, installConsoleTracking, trackEvent as _trackEvent } from "./utils/tracking.js";
-import { onChartRequest }  from "./components/charts.js";
+import { onChartRequest, getIncludedLocations }  from "./components/charts.js";
 import { getAudioMetadata } from "./models/training.js";
 let isWin32 = false;
 
@@ -280,6 +281,25 @@ const getSelectionRange = (file, start, end) => {
   };
 };
 
+function resolveDatabaseFile(path) {
+  const newFile = p.join(path, 'archive_v2.sqlite');
+  if (fs.existsSync(newFile)) return newFile;
+  const oldFile = p.join(path, 'archive.sqlite');
+  if (fs.existsSync(oldFile)) {
+    try {
+      fs.renameSync(oldFile, newFile);
+      return newFile;
+    } catch (error) {
+      console.error("Failed to move  database file:", error);
+      generateAlert({
+        type: "error",
+        message: `Failed to move database file: ${error.message}`
+      });
+      throw error // rethrow to prevent continuing with an old file
+    }
+  }
+  return newFile; // does not exist yet
+}
 
 /**
  * Load and initialize the application's SQLite archive database and prepare species mappings for the current model.
@@ -292,24 +312,33 @@ async function loadDB(modelPath) {
   DEBUG &amp;&amp; console.log("Loading db " + path);
   const model = STATE.model;
   let modelID, needsTranslation;
-  const file = p.join(path, `archive.sqlite`);
-  if (!fs.existsSync(file)) {
-    DEBUG &amp;&amp; console.log("No db file: ", file);
-    try {
-        diskDB = await createDB({file, dbMutex});
-    } catch (error) {
-      console.error("Error creating database:", error);
-      generateAlert({
-        type: "error",
-        message: `Database creation failed: ${error.message}`
-      });
-      throw error;
-    }
-    DEBUG &amp;&amp; console.log("DB created at : ", file);
+  // Prevent downgrade corruption
+  const file = resolveDatabaseFile(path);
+  const dbExists = fs.existsSync(file);
+
+  if (!dbExists) {
+      DEBUG &amp;&amp; console.log("No db file: ", file);
+      try {
+          diskDB = await createDB({file, dbMutex});
+      } catch (error) {
+        console.error("Error creating database:", error);
+        generateAlert({
+          type: "error",
+          message: `Database creation failed: ${error.message}`
+        });
+        throw error;
+      }
+      DEBUG &amp;&amp; console.log("DB created at : ", file);
   } else {
     diskDB = new sqlite3.Database(file);
     await diskDB.runAsync(`CREATE TABLE IF NOT EXISTS 
       confidence_overrides (speciesID INTEGER PRIMARY KEY, minConfidence INTEGER)`);
+    
+    const cols = await diskDB.allAsync(`PRAGMA table_info(locations)`);
+    const hasRadius = cols.some(col => col.name === 'radius');
+    if (!hasRadius) {
+      await diskDB.runAsync(`ALTER TABLE locations ADD COLUMN radius INTEGER`);
+    }
     DEBUG &amp;&amp; console.log("Opened and cleaned disk db " + file);
   }
   const labelsFile = 'labels.txt';
@@ -327,7 +356,7 @@ async function loadDB(modelPath) {
   }
 
   checkNewModel(modelID) &amp;&amp; (STATE.modelID = modelID);
-  STATE.update({ db: diskDB });
+
   diskDB.locale = STATE.locale;
   await diskDB.runAsync("VACUUM");
   await diskDB.runAsync("CREATE INDEX IF NOT EXISTS idx_records_modelID ON records(modelID)");
@@ -557,6 +586,11 @@ async function handleMessage(e) {
       }
       break;
     }
+    case "find-time": {
+      const time = args.time;
+      await findTime(time);
+      break;
+    }
     case "get-detected-species-list": {
       getDetectedSpecies();
       break;
@@ -668,7 +702,7 @@ async function handleMessage(e) {
       STATE.library.auto &amp;&amp; convertAndOrganiseFiles();
       break;
     }
-    case "set-custom-file-location": {
+    case "set-location": {
       onSetLocation(args);
       break;
     }
@@ -686,15 +720,33 @@ async function handleMessage(e) {
       break;
     }
     case "update-list": {
-      STATE.list = args.list;
-      await diskDB.runAsync('DELETE FROM confidence_overrides');
+      try {
+        await diskDB.runAsync('DELETE FROM confidence_overrides');
+      } catch (e) {
+        // no table do nothing
+        console.info('no confidence_overrides table?', e)
+      }
       if (args.list === "custom") {
+        const splitOn = STATE.model === 'perch v2' ? /[,~]/ : /[,_]/;
+        for (let i = 0; i &lt; args.customLabels.length; i++) {
+          const value = args.customLabels[i];
+          const line = i + 1;
+          // If no delimiter match, it can't have 2 parts
+          if (!splitOn.test(value)) {
+            generateAlert({
+              message: 'badListFormat',
+              variables: { line, value },
+              type: 'warning'
+            });
+            return;
+          }
+        }
         STATE.customLabels = args.customLabels;
         STATE.customLabelsMap = Object.fromEntries(
           await Promise.all(
             args.customLabels.map(async (line) => {
               let [_sname, cname, start, end, confidence] =
-                line.split(",").map(v => v.trim());
+                line.split(splitOn).map(v => v.trim());
 
               if (!args.member) {
                 start = undefined;
@@ -732,18 +784,21 @@ async function handleMessage(e) {
                   );
                 }
               }
+              const {base, suffix} = cname ? parseCnames([cname])[0] : {base: null, suffix: null};
               return [
-                cname,
+                base,
                 {
                   start,
                   end,
-                  confidence: confidence &amp;&amp; Number(confidence) * 1000 || null
+                  confidence: confidence &amp;&amp; Number(confidence) * 1000 || null,
+                  callType: suffix || ''
                 }
               ];
             })
           )
         );
       }
+      STATE.list = args.list;
       // Clear the LIST_CACHE &amp; STATE.included keys to force list regeneration
       LIST_CACHE = {};
       STATE.included = {}
@@ -765,11 +820,11 @@ async function handleMessage(e) {
       break;
     }
     case "update-state": {
-      const {path, temp, lat, lon, place} = args;
+      const {path, temp, lat, lon, place, radius} = args;
       appPath = path || appPath;
       tempPath = temp || tempPath;
       if (lat !== undefined &amp;&amp; lon !== undefined &amp;&amp; place) {
-        onSetLocation({ lat, lon, place });
+        onSetLocation({ id: 0, lat, lon, place, radius });
       }
       // If we change the speciesThreshold, we need to invalidate any location caches
       if (args.speciesThreshold) {
@@ -794,6 +849,9 @@ async function handleMessage(e) {
         diskDB = await loadDB(STATE.modelPath)
         // Create a fresh memoryDB to attach to it
         memoryDB = await createDB({file: null, diskDB, dbMutex})
+        const db = STATE.mode === "analyse" ? memoryDB : diskDB;
+        STATE.update({ db });
+        invalidateLocations(-1); // invalidate all location caches
       }
       if (args.labelFilters) {
         const species = args.species;
@@ -861,20 +919,18 @@ async function savedFileCheckAsync(fileList) {
     const library = STATE.library.location + p.sep;
     for (let i = 0; i &lt; fileList.length; i += batchSize) {
       const fileSlice = fileList.slice(i, i + batchSize);
-      let query; 
       const newList = fileSlice.map(file => file.replace(library, ''));
       // detect if any changes were made
       const libraryFiles = newList.filter((item, i) => item !== fileSlice[i]);
-      const params = prepParams(newList);
-      let countResult;
+      const placeholders = prepParams(fileSlice);
+      let countResult, parameters = fileSlice.slice(); // make a copy
+      let query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${placeholders})`;
       if (libraryFiles.length) {
-        const archiveParams = prepParams(libraryFiles);
-        query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${params}) or archiveName IN (${archiveParams})`;
-        countResult = await diskDB.getAsync(query, ...fileSlice, ...libraryFiles);
-      } else {
-        query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${params})`;
-        countResult = await diskDB.getAsync(query, ...fileSlice);
+        const archivePlaceholders = prepParams(libraryFiles);
+        query += ` OR archiveName IN (${archivePlaceholders})`;
+        parameters.push(...libraryFiles)
       }
+      countResult = await diskDB.getAsync(query, ...parameters);
       const count = countResult?.count || 0;
       if (count &lt; fileSlice.length) {
         UI.postMessage({
@@ -900,6 +956,19 @@ async function savedFileCheckAsync(fileList) {
 function setGetSummaryQueryInterval(threads) {
   STATE.incrementor =
     STATE.detect.backend !== "tensorflow" ? threads * 10 : threads;
+}
+
+
+async function findTime(time) {
+  const result = await STATE.db.allAsync(`
+    SELECT
+      name as file,
+      (? - filestart) / 1000.0 AS offset
+    FROM files
+    WHERE filestart &lt;= ?
+      AND filestart + (duration * 1000) > ?;
+  `, time, time, time);
+  UI.postMessage({ event: "found-time", result });
 }
 
 /**
@@ -959,7 +1028,7 @@ async function onLaunch({
     if (fs.existsSync(p.join(modelPath, '_internal'))){
       message += 'The version of Perch you have is not compatible with this version of Chirpity. '
     } 
-    message += `You can download a working version from the &lt;a href="https://chirpity.mattkirkland.co.uk#classifiers" target='_blank'>website&lt;/a>.
+    message += `You can download a working version from the &lt;a href="https://chirpity.net#classifiers" target='_blank'>website&lt;/a>.
     For now, the BirdNET model will be loaded instead.`
     model = 'birdnet'; perch = false; modelPath = null;
     generateAlert({message, type:'error'})
@@ -1137,9 +1206,11 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true}) => {
       STATE.originalFiles = filePaths;
       await Promise.all([getSummary(), getResults()]);
     }
-  }
+  } else {
   // Start gathering metadata for new files
-  processFilesInBatches(filePaths, 10);
+    processFilesInBatches(filePaths, 10);
+  }
+  
   return filePaths;
 };
 
@@ -1157,6 +1228,20 @@ async function processFilesInBatches(filePaths, batchSize = 20) {
   STATE.totalBatches = 0;
   STATE.allFilesDuration = 0;
   const t0 = Date.now();
+  const reading = {
+    en: "Reading metadata",
+    da: "Indlæser metadata",
+    de: "Metadaten werden gelesen",
+    es: "Leyendo metadatos",
+    fr: "Lecture des métadonnées",
+    ja: "メタデータを読み込み中",
+    nl: "Metadata lezen",
+    pt: "Lendo metadados",
+    ru: "Чтение метаданных",
+    sv: "Läser metadata",
+    zh: "正在读取元数据",
+  };
+  const text = reading[STATE.locale] || reading['en'];
   for (let i = 0; i &lt; filePaths.length; i += batchSize) {
     const batch = filePaths.slice(i, i + batchSize);
     // Run the batch in parallel
@@ -1169,12 +1254,24 @@ async function processFilesInBatches(filePaths, batchSize = 20) {
           return fileMetadata;
         }).catch ((_e) => {
           console.warn(`Failed to get metadata for file: ${file}`);
+          const idx = filePaths.indexOf(file);
+          if (idx !== -1) filePaths.splice(idx, 1); // Remove the file from the list
           return null; // or handle the error as needed
         }
       ))
     );
+    const progress = results.filter(Boolean).length // only count successful metadata retrievals towards progress
 
+    sendProgress(text, ((i + progress) / filePaths.length) * 100);
     DEBUG &amp;&amp; console.log(`Processed ${i + results.length} of ${filePaths.length}`);
+  }
+  if (STATE.corruptFiles.length) {
+    generateAlert({
+      type: "warning",
+      message: "corruptFile",
+      variables: { files: '&lt;br>' + STATE.corruptFiles.join("&lt;br>") },
+      autohide: false,
+    });
   }
   DEBUG &amp;&amp; console.log(`All files processed in ${Date.now() - t0}ms`);
 }
@@ -1269,7 +1366,7 @@ function getExcluded(included, fullRange = STATE.allLabels.length) {
 /**
  * Convert an array of CNAMES into objects containing the original name, the base name with any trailing parenthesized suffix removed, and a flag indicating presence of that suffix.
  * @param {string[]} cnames - Array of names which may include a trailing parenthesized suffix (e.g., "Species (call)").
- * @returns {{full: string, base: string, hasSuffix: boolean}[]} Array of objects each with `full` (original cname), `base` (trimmed name without a trailing parenthesized suffix), and `hasSuffix` (`true` if a parenthesized suffix was present).
+ * @returns {{full: string, base: string, suffix: string}[]} Array of objects each with `full` (original cname), `base` (trimmed name without a trailing parenthesized suffix), and `hasSuffix` (`true` if a parenthesized suffix was present).
  */
 function parseCnames(cnames) {
   return cnames.map(cname => {
@@ -1329,11 +1426,13 @@ async function getMatchingIds(cnames) {
  * @returns {Promise&lt;string>} An SQL fragment restricting species by id (for example " AND s.id IN (1,2) "),
  * or an empty string when no filtering is required.
  */
-async function getSpeciesSQLAsync(){
+async function getSpeciesSQLAsync(file){
   let not = "", SQL = "";
-  const {list, allLabels} = STATE;
+  const {list, allLabels, filesToAnalyse} = STATE;
+  // If we don't have a file, use the first analysed file if available
+  file ??= filesToAnalyse[0];
   if (list !== 'everything') {
-    let included = await getIncludedIDs();
+    let included = await getIncludedIDs(file);
     if (["birds", 'Animalia'].includes(list)) {
       included = getExcluded(included);
       if (!included.length) return SQL; // nothing filtered out
@@ -1345,7 +1444,7 @@ async function getSpeciesSQLAsync(){
     included = cnames.length ? await getMatchingIds(cnames) : [-1];
     DEBUG &amp;&amp;
       console.log("included", included.length, "# labels", allLabels.length);
-    SQL = ` AND s.id ${not} IN (${included}) `;
+    SQL = ` AND (s.id ${not} IN (${included}) OR r.modelID = 0) `; // always include records with modelID 0 (manual records)
   }
   return SQL
 }
@@ -1359,7 +1458,7 @@ async function getSpeciesSQLAsync(){
  * @returns {[string, any[]]} A two-element array: the augmented SQL string and an ordered array of parameters for prepared statements.
  */
 async function addQueryQualifiers(stmt, range, caller) {
-  const {list, mode, explore, labelFilters, detect, locationID, selection} = STATE;
+  const {list, mode, explore, labelFilters, detect, location, selection} = STATE;
   
   const params = list === "custom" ? [0] : [detect.confidence];
   range ??= mode === "explore" ? explore.range : undefined;
@@ -1380,9 +1479,13 @@ async function addQueryQualifiers(stmt, range, caller) {
   if (detect.nocmig) {
     stmt += ` AND isDaylight = ${detect.nocmig === 'day' ? 1 : 0} `;
   }
-  if (locationID !== undefined) {
-    stmt += locationID === 0 ? " AND locationID IS NULL " : " AND locationID = ? ";
-    locationID !== 0 &amp;&amp; params.push(locationID);
+  if (location !== undefined) {
+    const {lat, lon} = location;
+    const locations = await getIncludedLocations(diskDB, lat,lon)
+    const ids = locations.map(l => l.id);
+    stmt +=  " AND (locationID IN (" + ids.join(',') + ") ";
+    if (ids.includes(0)) stmt +=  " OR locationID IS NULL";
+    stmt += ") ";
   }
   return [stmt, params];
 }
@@ -1669,11 +1772,9 @@ async function onAnalyse({
       await memoryDB.runAsync("DELETE FROM records; VACUUM");
     }
     // Clear any location filters set in explore/charts
-    STATE.locationID = undefined;
+    STATE.location = undefined;
     //create a copy of files in scope for state, as filesInScope is spliced
     STATE.setFiles([...filesInScope]);
-    // Check duration and expected batches of files
-    processFilesInBatches(filesInScope, 10);
   }
 
   let count = 0;
@@ -1714,12 +1815,12 @@ async function onAnalyse({
             value: METADATA[file].duration,
           })
         );
-        // Weirdness with promise all - list worker called 2x and no results returned
         await Promise.all([getSummary(), getResults()] );
       }
       return;
     }
   }
+  await processFilesInBatches(FILE_QUEUE);
   DEBUG &amp;&amp;
     console.log("FILE_QUEUE has", FILE_QUEUE.length, "files", count, "files ignored");
   STATE.selection || await onChangeMode("analyse");
@@ -1764,7 +1865,7 @@ function onAbort({ model = STATE.model }) {
   }
 }
 
-const measureDurationWithFfmpeg = (src, type) => {
+const measureDurationWithFfmpeg = (src) => {
   return new Promise((resolve, reject) => {
     const { PassThrough } = require("node:stream");
     const stream = new PassThrough();
@@ -1782,12 +1883,6 @@ const measureDurationWithFfmpeg = (src, type) => {
       .audioFrequency(sampleRate)
       .on("error", (err) => {
         STATE.corruptFiles.push(src);
-        if (STATE.corruptFiles.length === 1){
-          generateAlert({
-            type: "error",
-            message: "corruptFile"
-          });
-        }
         stream.destroy();
         reject(err);
       })
@@ -1814,6 +1909,8 @@ const measureDurationWithFfmpeg = (src, type) => {
 };
 
 const getDuration = async (src) => {
+  // Speedy WAVE parsing
+  if (src.toLowerCase().endsWith(".wav")) return await getWavDuration(src);
   let audio;
   return new Promise(function (resolve, reject) {
     audio = new Audio();
@@ -1823,7 +1920,7 @@ const getDuration = async (src) => {
       const duration = audio.duration;
       if (duration === Infinity || !duration || isNaN(duration)) {
         // Fallback: decode entire file with ffmpeg
-        measureDurationWithFfmpeg(src, duration)
+        measureDurationWithFfmpeg(src)
           .then((realDuration) => resolve(realDuration))
           .catch((err) => {
             err.message = `${err.message} (file: ${src})`;
@@ -1834,8 +1931,8 @@ const getDuration = async (src) => {
       }
       audio.remove();
     });
-    audio.addEventListener("error", (error) => {
-      measureDurationWithFfmpeg(src, 'error')
+    audio.addEventListener("error", (_error) => {
+      measureDurationWithFfmpeg(src)
           .then((realDuration) => resolve(realDuration))
           .catch((err) => {
             err.message = `${err.message} (file: ${src})`;
@@ -2106,7 +2203,7 @@ async function sendDetections(file, start, end, goToRegion) {
   const customList = list === "custom";
   const confidence = customList ? 0 : detect.confidence;
   const params = [confidence, file, start, end];
-  const includedSQL = await getSpeciesSQLAsync();
+  const includedSQL = await getSpeciesSQLAsync(file);
 
   let SQL =     `
         WITH RankedRecords AS (
@@ -2164,7 +2261,7 @@ function parseBextLocalDate(originationDate, originationTime) {
 }
 
 /**
- * Called by getWorkingFile, setCustomLocation
+ * Called by getWorkingFile, setLocation
  * Assigns file metadata to a metadata cache object. file is the key, and is the source file
  * @param file: the file name passed to the worker
  * @param source_file: the file that exists ( will be different after compression)
@@ -2197,35 +2294,27 @@ const setMetadata = async ({ file, source_file = file }) => {
         });
       fileMeta.isSaved = true; // Queried by UI to establish saved state of file.
     } 
-    const nearby = await getNearbyLocations(51.9026, -0.3995, 0.1);
-    let guanoTimestamp, bextTimestamp, recorderModel;
+
+    let guanoTimestamp, bextTimestamp, recorderModel, lat, lon, place;
     // savedMeta may just have a locationID if it was set by onSetLocation
     if (!savedMeta?.duration) {
       fileMeta.duration = await getDuration(file);
       if (file.toLowerCase().endsWith("wav")) {
-        const { extractWaveMetadata } = require("./js/utils/metadata.js");
         const t0 = Date.now();
-        const wavMetadata = await extractWaveMetadata(file).catch(error => {
-          if (error.code !== 'ENOENT') console.warn("Error extracting GUANO", error.message);
-          return
-        });
+        const wavMetadata = await extractWaveMetadata(file);
         const metaKeys = wavMetadata ? Object.keys(wavMetadata): [];
         if (metaKeys.length){
           if (metaKeys.includes("guano")) {
             const guano = wavMetadata.guano;
             recorderModel = guano.Model;
-            const location = guano["Loc Position"];
-            if (location) {
-              const [lat, lon] = location.split(" ");
-              await onSetLocation({
-                lat,
-                lon,
-                place: location,
-                files: [file],
-                overwritePlaceName: false,
-              });
-              fileMeta.lat = roundedFloat(lat);
-              fileMeta.lon = roundedFloat(lon);
+            const locPosition = guano["Loc Position"];
+            place = guano["Site Name"] || locPosition;
+            if (locPosition) {
+              [lat, lon] = locPosition.split(" ");
+              if (Number.isFinite(parseFloat(lat)) &amp;&amp; Number.isFinite(parseFloat(lon))) {
+                fileMeta.lat = roundedFloat(lat);
+                fileMeta.lon = roundedFloat(lon);
+              }
             }
             guanoTimestamp = Date.parse(guano.Timestamp);
             if (guanoTimestamp) fileMeta.fileStart = guanoTimestamp;
@@ -2258,8 +2347,10 @@ const setMetadata = async ({ file, source_file = file }) => {
       fileStart = new Date(guanoTimestamp);
       fileEnd = new Date(guanoTimestamp + fileMeta.duration * 1000);
     } else if (bextTimestamp) {
+      const fileStarters = ["zoom", "sounddev"]
+      const matches = fileStarters.some(starter => recorderModel?.toLowerCase().includes(starter));
       // Then BEXT 3rd
-      if (recorderModel?.includes("ZOOM") || STATE.fileStartMtime){
+      if (matches || STATE.fileStartMtime){
         fileStart = new Date(bextTimestamp);
         fileEnd = new Date(bextTimestamp + fileMeta.duration * 1000);
       } else {
@@ -2268,7 +2359,7 @@ const setMetadata = async ({ file, source_file = file }) => {
       }
     } else {
       // Least preferred
-      const stat = fs.statSync(source_file);
+      const stat = await fs.promises.stat(source_file);
       if (STATE.fileStartMtime) {
         fileStart = new Date(stat.mtimeMs);
         fileEnd = new Date(stat.mtimeMs + fileMeta.duration * 1000);
@@ -2302,8 +2393,11 @@ const setMetadata = async ({ file, source_file = file }) => {
       // Set complete flag
       fileMeta.isComplete = true;
     }
-    METADATA[file] = fileMeta;
-    return fileMeta;
+    METADATA[file] = {...METADATA[file],...fileMeta};
+    if (place  &amp;&amp; Number.isFinite(parseFloat(lat)) &amp;&amp; Number.isFinite(parseFloat(lon))) {
+      await onSetLocation({ lat, lon, place, files: [file], manualUpdate: false });
+    }
+    return METADATA[file];
   })();
 
   metadataLocks[file] = run;
@@ -2429,7 +2523,7 @@ async function processAudio(
     // Many compressed files start with a small section of silence due to encoder padding, which affects predictions
     // To compensate, we move the start back a small amount, and slice the data to remove the silence
     let remainingTrim;
-    if (!(file.endsWith(".wav") || file.endsWith(".flac"))) {
+    if (!(file.toLowerCase().endsWith(".wav") || file.toLowerCase().endsWith(".flac"))) {
       const adjustment = 0.05;
       if (start >= adjustment) {
         remainingTrim = sampleRate * 2 * adjustment;
@@ -2950,8 +3044,8 @@ const saveResults2DataSet = ({ species, included }) => {
     comment
     FROM records r
     JOIN species s
-    ON species.id = records.speciesID
-    JOIN files f ON records.fileID = files.id
+    ON s.id = r.speciesID
+    JOIN files f ON r.fileID = f.id
     WHERE confidence >= ${STATE.detect.confidence}`;
   db2ResultSQL += filtersApplied(included)
     ? ` AND speciesID IN (${prepParams(included)})`
@@ -2959,7 +3053,7 @@ const saveResults2DataSet = ({ species, included }) => {
 
   let params = filtersApplied(included) ? included : [];
   if (species) {
-    db2ResultSQL += ` AND species.cname = ?`;
+    db2ResultSQL += ` AND s.cname = ?`;
     params.push(species);
   }
   STATE.db.each(
@@ -3194,16 +3288,6 @@ const bufferToAudio = async ({
         { filter: "afade", options: `t=out:st=${end - start - 1}:d=1` }
       );
     }
-    let metadata;
-    if (Object.entries(meta).length) {
-      metadata = Object.entries(meta).flatMap(([k, v]) => {
-        if (typeof v === "string") {
-          // Escape special characters, including quotes and apostrophes
-          v = v.replaceAll(" ", "_");
-        }
-        return ["-metadata", `${k}=${v}`];
-      });
-    }
     let errorHandled = false;
     setupFfmpegCommand({
       file,
@@ -3215,7 +3299,7 @@ const bufferToAudio = async ({
       audioCodec,
       format: soundFormat,
       channels: downmix ? 1 : -1,
-      metadata,
+      metadata: meta,
       additionalFilters: filters
     }).then(command => {
     const destination = p.join(folder || tempPath, filename);
@@ -3252,17 +3336,21 @@ const bufferToAudio = async ({
         const channelCount = channels === 'mono' || STATE.audio.downmix ? 1 : 2;
         errorHandled = true;
         command.kill('SIGKILL');
-        await bufferToAudio({
-          file,
-          start,
-          end,
-          meta,
-          format,
-          folder,
-          filename,
-          audio_details: { sample_rates, channels: channelCount }
-        })
-        resolve(destination);
+        try{
+          await bufferToAudio({
+            file,
+            start,
+            end,
+            meta,
+            format,
+            folder,
+            filename,
+            audio_details: { sample_rates, channels: channelCount }
+          })
+          resolve(destination);
+        } catch (e) {
+          reject(e)
+        }
       });
     }
 
@@ -3342,9 +3430,9 @@ const processQueue = async () => {
  *
  * @param {string} model - The AI model to load for prediction; "birdnet" uses the "BirdNet2.4" worker script.
  * @param {number} batchSize - Number of items each worker processes per batch.
- * @param {number} threads - Number of worker threads to spawn.
+ * @param {number} toSpawn - Number of worker threads to spawn.
  */
-function spawnPredictWorkers(model, batchSize, threads) {
+function spawnPredictWorkers(model, batchSize, toSpawn) {
   const isPerch = model === 'perch v2';
   STATE.perchWorker = predictWorkers.filter(w => w.name === 'perch v2');
   if (isPerch &amp;&amp; STATE.perchWorker?.length) {
@@ -3352,8 +3440,7 @@ function spawnPredictWorkers(model, batchSize, threads) {
     setLabelState({regenerate: true})
     return
   }
-  predictWorkers = [];
-  for (let i = 0; i &lt; threads; i++) {
+  for (let i = 0; i &lt; toSpawn; i++) {
     if (isPerch &amp;&amp; i > 0) break; // Perch v2 only needs one worker, even if multiple threads requested
     const workerSrc = ['nocmig', 'chirpity', 'perch v2'].includes(model) ? model : "BirdNet2.4";
     const worker = new Worker(`./js/models/${workerSrc}.js`, { type: "module" });
@@ -3368,7 +3455,7 @@ function spawnPredictWorkers(model, batchSize, threads) {
       model,
       modelPath: STATE.modelPath,
       batchSize,
-      threads,
+      threads: toSpawn,
       backend: STATE.detect.backend,
       worker: i,
     });
@@ -3506,19 +3593,21 @@ const onInsertManualRecord = async ({
 
   if (!res?.filestart) {
     // Manual records can be added off the bat, so there may be no record of the file in either db
-    let duration, metadata;
-    ({fileStart, duration, metadata} = METADATA[file]);
+    let duration, metadata, locationID;
+    ({fileStart, duration, metadata, locationID} = METADATA[file]);
     res = await db.runAsync(
-      `INSERT INTO files ( id, name, duration, filestart,  metadata ) VALUES (?,?,?,?,?)
+      `INSERT INTO files ( id, name, duration, filestart, locationID, metadata ) VALUES (?,?,?,?,?,?)
         ON CONFLICT(name) DO UPDATE SET
         duration = EXCLUDED.duration,
         filestart = EXCLUDED.filestart,
+        locationID = COALESCE(EXCLUDED.locationID, files.locationID),        
         metadata = EXCLUDED.metadata
         `,
       fileID,
       file,
       duration,
       fileStart,
+      locationID,
       metadata
     );
     fileID = res.lastID;
@@ -3595,9 +3684,9 @@ const insertDurations = async (file, id) => {
   );
 };
 
-const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, file, modelID, customList) => {
+const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, file, modelID, isCustomList) => {
   const db = STATE.db;
-  const { fileStart, metadata, duration } = METADATA[file];
+  let { fileStart, metadata, duration, locationID } = METADATA[file];
   const predictionLength = STATE.model.includes("bats") ? 0.3 : WINDOW_SIZE;
   let fileID;
   await dbMutex.lock();
@@ -3606,7 +3695,7 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
     // Fetch or Insert File ID
     const res = await db.getAsync("SELECT id, filestart, locationID FROM files WHERE name = ?", file);
     fileID = res?.id; 
-    let locationID = res?.locationID;
+    locationID = res?.locationID ?? locationID;
     const start = res?.filestart;
 
     if (!start) {
@@ -3637,6 +3726,7 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
          ON CONFLICT(name) DO UPDATE SET 
          duration = EXCLUDED.duration,
          filestart = EXCLUDED.filestart,
+         locationID = COALESCE(EXCLUDED.locationID, files.locationID),
          metadata = EXCLUDED.metadata 
          RETURNING id`,
         file, duration, fileStart, locationID, metadata
@@ -3669,11 +3759,13 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
         const speciesID = STATE.speciesMap.get(modelID).get(modelSpeciesID);
 
         if (!speciesID) continue; // Skip unknown species
-        if (customList){
+        if (isCustomList){
           const cname = STATE.allLabels[modelSpeciesID].split(getSplitChar())[1];
-          if (! allowedByList({cname, timestamp, score: confidence})) continue;
+          // To ensure results don't fail the confidence threshold when they would otherwise be allowed by the list, 
+          // we assign a score of 1001  so that it will be included regardless of confidence value
+          // And therefore be available if the confidence or list is changed later
+          if (! allowedByList({cname, timestamp, score: confidence, confidenceCheck: true})) continue;
         } else if (confidence &lt; minConfidence) break;
-
         insertPlaceholders.push("(?, ?, ?, ?, ?, ?, ?, ?)");
         insertValues.push(key, fileID, speciesID, modelID, confidence, key + predictionLength, isDaylight, 0);
       }
@@ -3691,7 +3783,7 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
     await db.runAsync("END");
   } catch (error) {
     await db.runAsync("ROLLBACK");
-    console.error("Transaction error:", error);
+    console.error("Transaction error during insert:", error);
   } finally {
     dbMutex.unlock();
   }
@@ -3710,9 +3802,9 @@ const parsePredictions = async (response) => {
   DEBUG &amp;&amp; console.log("worker being used:", worker);
   const [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
   const {modelID, selection, detect} = STATE;
-  const customList = STATE.list === 'custom';
+  const isCustomList = STATE.list === 'custom';
   if (!selection)
-    await generateInsertQuery(keysArray, speciesIDBatch, confidenceBatch, file, modelID, customList).catch((error) =>
+    await generateInsertQuery(keysArray, speciesIDBatch, confidenceBatch, file, modelID, isCustomList).catch((error) =>
       console.warn("Error generating insert query", error)
     );
   if (index &lt; 500) {
@@ -3754,7 +3846,7 @@ const parsePredictions = async (response) => {
             score: confidence,
             model: STATE.model,
           };
-          if (customList &amp;&amp; !selection){
+          if (isCustomList &amp;&amp; !selection){
             if (!allowedByList(result)) continue;
           } else if (confidence &lt; loopConfidence) break;
 
@@ -3809,7 +3901,7 @@ const parsePredictions = async (response) => {
  * Estimate remaining analysis time from processed batches and post localized progress to the UI footer.
  *
  * Computes progress, estimated minutes remaining, and processing speed based on the global analysis start
- * timestamp and STATE counters, then sends a `footer-progress` message to the UI with percent and localized text.
+ * timestamp and STATE counters, then sends a progress message to the UI with percent and localized text.
  *
  * @param {number} batchesReceived - Number of analysis batches processed so far for the current run.
  */
@@ -3843,11 +3935,8 @@ async function estimateTimeRemaining(batchesReceived) {
       ? `${i18n[locale].less} (${speed}x)`
       : `${remaining.toFixed(0)} ${i18n[locale].min} (${speed}x)`;
 
-  UI.postMessage({
-    event: 'footer-progress',
-    progress: { percent: progress * 100 },
-    text
-  });
+  sendProgress(text, progress*100);
+
 }
 
 /**
@@ -3931,11 +4020,8 @@ async function parseMessage(e) {
       break;
     }
     case "training-progress": {
-      UI.postMessage({
-        event: "footer-progress", //use this handler to send footer progress updates
-        progress: response.progress,
-        text: response.text,
-      });
+      const { progress, text } = response;
+      sendProgress(text, progress);
       break;
     }
     case "training-results": {
@@ -4024,7 +4110,7 @@ async function processNextFile({
       }
       for (let i = 0; i &lt; boundaries.length; i++) {
         const { start, end } = boundaries[i];
-        if (start === end) {
+        if (start === null) {
           // Nothing to do for this file
           updateFilesBeingProcessed(file);
           generateAlert({ message: "noNight", variables: { file } });
@@ -4034,23 +4120,20 @@ async function processNextFile({
           );
         } else {
           if (!STATE.selection &amp;&amp; !sumObjectValues(predictionsReceived)) {
-            const awaiting = {
-              en: "Awaiting detections",
-              da: "Afventer detektioner",
-              de: "Warten auf Erkennungen",
-              es: "Esperando detecciones",
-              fr: "En attente des détections",
-              nl: "Wachten op detecties",
-              pt: "Aguardando detecções",
-              ru: "Ожидание обнаружений",
-              sv: "Väntar på detektioner",
-              zh: "等待检测",
-            };
-            UI.postMessage({
-              event: "footer-progress",
-              text: awaiting[STATE.locale] || awaiting["en"],
-              progress: {percent: 0},
-            });
+          const awaiting = {
+            en: "Awaiting detections",
+            da: "Afventer detektioner",
+            de: "Warten auf Erkennungen",
+            es: "Esperando detecciones",
+            fr: "En attente des détections",
+            ja: "検出を待機中",
+            nl: "Wachten op detecties",
+            pt: "Aguardando detecções",
+            ru: "Ожидание обнаружений",
+            sv: "Väntar på detektioner",
+            zh: "等待检测",
+          };
+            sendProgress(awaiting[STATE.locale] || awaiting["en"], 0);
           }
           await doPrediction({start, end, file, worker})
             .catch((error) => console.warn("Error in doPrediction", error.message));
@@ -4097,12 +4180,6 @@ function calculateTimeBoundaries(
   period
 ) {
   const intervals = getIntervals(fileStartMs, fileEndMs, latitude, longitude, period);
-  // Handle files entirely outside the requested period
-  if (
-    !intervals.length &amp;&amp;
-    isDuringDaylight(fileStartMs, latitude, longitude) ===
-      (period === 'day')
-  ) intervals.push({ start: 0, end: 0 });
 
   const fileDurationSeconds = (fileEndMs - fileStartMs) / 1000;
   // Sum kept (active) time
@@ -4114,7 +4191,7 @@ function calculateTimeBoundaries(
   STATE.clippedFilesDuration += clippedSeconds;
   const batches = Math.ceil((keptSeconds - EPSILON) / (BATCH_SIZE * WINDOW_SIZE));
   batchesToSend[file] = batches;
-  return intervals.length ? intervals : [{ start: 0, end: 0 }];
+  return intervals;
 }
 
 function getIntervals(fileStartMs, fileEndMs, latitude, longitude, period) {
@@ -4155,7 +4232,7 @@ function getIntervals(fileStartMs, fileEndMs, latitude, longitude, period) {
       });
     }
   }
-  return intervals;
+  return intervals.length ? intervals : [{ start: null, end: null }];
 }
 
 /**
@@ -4313,6 +4390,20 @@ const getResults = async ({
     exportAudacity(result, path);
   } else {
     let count = 0;
+    const savingFiles = {
+      en: "Saving files:",
+      da: "Gemmer filer:",
+      de: "Dateien werden gespeichert:",
+      es: "Guardando archivos:",
+      fr: "Enregistrement des fichiers :",
+      ja: "ファイルを保存中：",
+      nl: "Bestanden opslaan:",
+      pt: "A guardar ficheiros:",
+      ru: "Сохранение файлов:",
+      sv: "Sparar filer:",
+      zh: "正在保存文件：",
+    };
+    const savingText = savingFiles[STATE.locale] || savingFiles["en"];
     for (let i = 0; i &lt; result.length; i++) {
       count++;
       const r = result[i];
@@ -4340,11 +4431,7 @@ const getResults = async ({
             path
           );
           // Progress updates
-          UI.postMessage({
-            event: "footer-progress", //use this handler to send footer progress updates
-            progress: {percent: (count / result.length)*100},
-            text: 'Saving files:',
-          });
+          sendProgress(`${savingText} ${filename}`, (count / result.length)*100);
 
           i === result.length - 1 &amp;&amp;
             generateAlert({
@@ -4637,24 +4724,34 @@ function epochInDayMonthRange(epochMs, startDM, endDM) {
  * @returns {boolean} `true` if the detection passes the custom-list filters, `false` otherwise.
  */
 function allowedByList(result){
-  // Handle enhanced lists
-  const {timestamp, cname, score} = result;
-  // Try exact match first
-  let conditions = STATE.customLabelsMap[cname];
-  // Fallback: if no exact match and model uses suffixes, try base name
-  if (!conditions &amp;&amp; ['nocmig', 'chirpity'].includes(STATE.model)) {
-    const baseName = cname.replace(/\s*\(.*?\)\s*$/g, '');
-    conditions = STATE.customLabelsMap[baseName];
+  // Handle enhanced lists. 
+  // Calltype always undefined here:
+  let { timestamp, cname, score, callType, confidenceCheck } = result;
+  if (score === 2000) return true; // Manual records always allowed
+  if (/\(|-$/.test(cname)){
+    // Strip suffixes
+    const parsed = parseCnames([cname]);
+    cname = parsed[0].base;
+    callType = parsed[0].suffix;
   }
 
-  if (!conditions) return false; // Species not in the custom list
-
-  const {start, end, confidence} = conditions;
-  if (start &amp;&amp; end) {
-    if (!epochInDayMonthRange(timestamp, start, end)) return false;
+  let conditions = STATE.customLabelsMap[cname];
+  if (!confidenceCheck) {
+    if (!conditions) return false; // Species not in the custom list
+    const {start, end, callType: conditionsCallType} = conditions;
+    if (start &amp;&amp; end) {
+      if (!epochInDayMonthRange(timestamp, start, end)) return false;
+    }
+    // Call type check
+    if (callType &amp;&amp; conditionsCallType &amp;&amp; conditionsCallType !== callType) {
+      return false;
+    }
   }
   // Confidence check (species-specific overrides global)
-  const minConfidence = confidence != null ? confidence : STATE.detect.confidence;
+  const confidence = conditions?.confidence;
+  const minConfidence = confidence ?? (confidenceCheck 
+    ? Math.min(STATE.detect.confidence, 150) 
+    : STATE.detect.confidence);
   return score >= minConfidence;
 }
 
@@ -4707,6 +4804,15 @@ const getSavedFileInfo = async (file) => {
   }
 };
 
+function recordRowToAllowedInput(row) {
+  return {
+    timestamp: row.filestart + (row.position * 1000),
+    cname: row.cname,
+    score: row.confidence,
+    callType: row.callType || null
+  };
+}
+
 /**
  *  Transfers data in memoryDB to diskDB
  * @returns {Promise&lt;unknown>}
@@ -4726,14 +4832,24 @@ const onSave2DiskDB = async ({ file }) => {
   let response,
     errorOccurred = false;
   await dbMutex.lock();
+  let inserted = 0;
   try {
     await memoryDB.runAsync("BEGIN");
     await memoryDB.runAsync(`
-      INSERT OR REPLACE INTO disk.locations (id, lat, lon, place)
-      SELECT id, lat, lon, place FROM locations;
+      INSERT OR IGNORE INTO disk.locations (id, lat, lon, place, radius)
+      SELECT id, lat, lon, place, radius FROM locations;
     `);
     await memoryDB.runAsync(
-      `INSERT OR REPLACE INTO disk.files SELECT * FROM files`
+    // Don't coalesce locationID here, because we want to preserve NULLs for files without location
+    `INSERT INTO disk.files (name, duration, filestart, locationID, archiveName, metadata)
+      SELECT name, duration, filestart, locationID, archiveName, metadata FROM files
+      WHERE filestart IS NOT NULL
+      ON CONFLICT(name) DO UPDATE SET
+        duration     = excluded.duration,
+        filestart    = excluded.filestart,
+        locationID   = excluded.locationID,
+        archiveName  = excluded.archiveName,
+        metadata     = excluded.metadata;`
     );
     await memoryDB.runAsync(
       `INSERT OR IGNORE INTO disk.tags SELECT * FROM tags`
@@ -4746,41 +4862,68 @@ const onSave2DiskDB = async ({ file }) => {
     DEBUG &amp;&amp;
       console.log(response.changes + " date durations added to disk database");
     // now update records
-    response = await memoryDB.runAsync(`
-            INSERT OR IGNORE INTO disk.records (
-              position, fileID, speciesID, modelID, confidence, 
-              comment, end, callCount, isDaylight, reviewed, tagID
-            )
-            SELECT 
-                r.position, r.fileID, r.speciesID, r.modelID, r.confidence, 
-                r.comment, r.end, r.callCount, r.isDaylight, r.reviewed, r.tagID
-            FROM records r
-            JOIN species s ON r.speciesID = s.id  
-            LEFT JOIN disk.confidence_overrides co ON co.speciesID = r.speciesID
-            WHERE r.confidence >= COALESCE(co.minConfidence, ${STATE.detect.confidence}) 
-            ${filterClause}`);
-    DEBUG &amp;&amp; console.log(response?.changes + " records added to disk database");
-    await memoryDB.runAsync("END");
-  } catch (error) {
-    await memoryDB.runAsync("ROLLBACK");
-    errorOccurred = true;
-    console.error("Transaction error:", error);
-  } finally {
-    dbMutex.unlock();
-    if (!errorOccurred) {
-      if (response?.changes) {
-        UI.postMessage({ event: "diskDB-has-records" });
-        if (!DATASET) {
-          // Now we have saved the records, set state to DiskDB
-          await onChangeMode("archive");
-          await getLocations({ file: file });
-        }
-        // Set the saved flag on files' METADATA
-        Object.values(METADATA).forEach((file) => (file.isSaved = true));
+    const candidates =  await memoryDB.allAsync(`
+      SELECT 
+          r.position, r.fileID, r.speciesID, r.modelID, r.confidence, 
+          r.comment, r.end, r.callCount, r.isDaylight, r.reviewed, r.tagID,
+          f.filestart, f.name AS fileName, s.cname
+      FROM records r
+      JOIN species s ON r.speciesID = s.id
+      JOIN files f ON r.fileID = f.id
+      ${filterClause}`);
+    
+    let allowed = [];
+    if (STATE.list === 'custom') {
+      for (const row of candidates) {
+        const allowedInput = recordRowToAllowedInput(row);
+        if(allowedByList(allowedInput)) allowed.push(row);
       }
+    } else {
+      allowed = candidates.filter(row => row.confidence >= STATE.detect.confidence  );
     }
-    DEBUG &amp;&amp; console.log("transaction ended successfully");
-    const total = response?.changes || 0;
+
+    // Build bulk INSERT using filestart as stable identifier to resolve disk DB fileIDs
+    if (allowed.length > 0) {
+      const batchSize = 2500;
+      for (let i = 0; i &lt; allowed.length; i += batchSize) {
+        const batch = allowed.slice(i, i + batchSize);
+        const rowPlaceholders = batch.map(() =>
+          '(?,?,?,?,?,?,?,?,?,?,?)'
+        ).join(',');
+        const insertValues = batch.flatMap(row => [
+          row.position, row.speciesID, row.modelID, row.confidence,
+          row.comment ?? null, row.end, row.callCount ?? null,
+          row.isDaylight, row.reviewed, row.tagID ?? null, row.fileName
+        ]);
+        await memoryDB.runAsync(`
+          WITH v(position, speciesID, modelID, confidence,
+                comment, end, callCount, isDaylight, reviewed, tagID, fileName)
+          AS (VALUES ${rowPlaceholders})
+          INSERT OR IGNORE INTO disk.records (
+            position, speciesID, modelID, confidence,
+            comment, end, callCount, isDaylight, reviewed, tagID, fileID
+          )
+          SELECT v.position, v.speciesID, v.modelID, v.confidence,
+                v.comment, v.end, v.callCount, v.isDaylight, v.reviewed, v.tagID,
+                d.id
+          FROM v JOIN disk.files d ON v.fileName = d.name
+        `, ...insertValues);
+      }
+      inserted = allowed.length;
+    }
+    DEBUG &amp;&amp; console.log(inserted + " records added to disk database");
+    await memoryDB.runAsync("END");
+    if (allowed.length) {
+      UI.postMessage({ event: "diskDB-has-records" });
+      if (!DATASET) {
+        // Now we have saved the records, set state to DiskDB
+        await onChangeMode("archive");
+        await getLocations({ file: file });
+      }
+      // Set the saved flag on files' METADATA
+      Object.values(METADATA).forEach((file) => (file.isSaved = true));
+    }
+    const total = allowed.length;
     const seconds = (Date.now() - t0) / 1000;
     generateAlert({
       message: "goodDBUpdate",
@@ -4788,11 +4931,26 @@ const onSave2DiskDB = async ({ file }) => {
       updateFilenamePanel: true,
       database: true,
     });
+    DEBUG &amp;&amp; console.log("transaction ended successfully");
+  } catch (error) {
+    await memoryDB.runAsync("ROLLBACK");
+    console.error("Transaction error during save to disk:", error);
+  } finally {
+    dbMutex.unlock();
   }
 };
 
-const filterLocation = () =>
-  STATE.locationID ? ` AND files.locationID = ${STATE.locationID}` : "";
+const filterLocation = () => {
+  let SQL = '';
+  if (STATE.location) {
+    if (STATE.location.id === 0) {
+      SQL = " AND (files.locationID IS NULL OR files.locationID = 0) ";
+    } else {
+      SQL = ` AND files.locationID = ${STATE.location.id} `;
+    }
+  }
+  return SQL;
+}
 
 /**
  * getDetectedSpecies generates a list of species to use in dropdowns for chart and explore mode filters
@@ -4806,7 +4964,8 @@ const getDetectedSpecies = async () => {
   let sql = `SELECT sname || '${splitChar}' || cname as label, locationID
     FROM records
     JOIN species ON species.id = records.speciesID 
-    JOIN files on records.fileID = files.id`;
+    JOIN files on records.fileID = files.id
+    LEFT JOIN locations l on files.locationID = l.id`;
 
   if (STATE.mode === "explore") sql += ` WHERE confidence >= ${confidence}`;
   // if (!["location", "everything"].includes(STATE.list)) {
@@ -4831,8 +4990,8 @@ const getDetectedSpecies = async () => {
  */
 const getValidSpecies = async (file) => {
   const included = await getIncludedIDs(file); // classindex values
-  const locationID = METADATA[file]?.locationID || STATE.locationID;
-  const {place} = locationID
+  const locationID = METADATA[file]?.locationID ?? STATE.location?.id;
+  const {place} = locationID != undefined
     ? await STATE.db.getAsync(
         "SELECT place FROM locations WHERE id = ?",
         locationID
@@ -4840,11 +4999,34 @@ const getValidSpecies = async (file) => {
     : { place: STATE.place };
   const includedSpecies = [];
   const excludedSpecies = [];
+  let customCnames = [], customCnamesWithCallType = [];
+  const customList = STATE.list === 'custom';
+  const labelMap = STATE.customLabelsMap;
+  if (customList){
+    customCnames = Object.keys(labelMap)
+    customCnamesWithCallType = 
+          Object.keys(labelMap).map(k => `${k}${labelMap[k].callType}`)
+  }
+  const splitChar = getSplitChar();
   for (const [index, speciesName] of STATE.allLabels.entries()) {
     const i = index + 1;
-    const [cname, sname] = speciesName.split(getSplitChar()).reverse();
+    const [cname, sname] = speciesName.split(splitChar).reverse();
     if (cname.includes("ackground") || cname.includes("Unknown")) continue; // skip background and unknown species
-    (!included.length || included.includes(i)) 
+    if (customList &amp;&amp; ! customCnames.includes(cname)) {
+      // Check for nocmig models
+      if (['nocmig', 'chirpity'].includes(STATE.model)){
+        // Wildcard entry (no call-type) should match all variants — check base name too
+        const { base: cnameBase } = parseCnames([cname])[0];
+        if (!customCnames.includes(cnameBase) &amp;&amp; !customCnamesWithCallType.includes(cname)) {
+          excludedSpecies.push({cname, sname});
+          continue
+        }
+      } else {
+        excludedSpecies.push({cname, sname});
+        continue
+      }
+    }
+    (!included.length || included.includes(i) ) 
       ? includedSpecies.push({cname, sname})
       : excludedSpecies.push({cname, sname});
   }
@@ -4921,7 +5103,6 @@ const onUpdateFileStart = async (args) => {
     } else row = null;
     const { lat, lon } = row || { lat: STATE.lat, lon: STATE.lon };
     const intervals = getIntervals(fileStart, fileEnd, parseFloat(lat), parseFloat(lon), 'day');
-    if (!intervals.length) { intervals.push({start:0, end:0}); } // no daylight
     // Build SQL fragments
     const conditions = intervals
       .map(() => `(position BETWEEN ? AND ?)`)
@@ -4943,7 +5124,7 @@ const onUpdateFileStart = async (args) => {
     DEBUG &amp;&amp; console.log(result.changes, " records updated with new isDaylight");
 
   }
-  await Promise.all([getResults(), getSummary()])
+  if (args.refreshResults) await Promise.all([getResults(), getSummary()])
 };
 
 /**
@@ -5027,12 +5208,17 @@ async function onDeleteSpecies({
   } else if (STATE.mode === "explore") {
     const { start, end } = STATE.explore.range;
     if (start) {
-      SQL += ` AND position * 1000 + files.filestart BETWEEN ? AND ?`;
+      SQL += ` AND rowid IN (
+        SELECT r.rowid
+        FROM records r
+        JOIN files f ON f.id = r.fileID
+        WHERE (r.position * 1000 + f.filestart) BETWEEN ? AND ?
+      )`;
       params.push(start, end);
     }
-    if (STATE.locationID) {
+    if (STATE.location) {
       SQL += ` AND fileID IN (SELECT id FROM files WHERE locationID = ?)`;
-      params.push(STATE.locationID);
+      params.push(STATE.location.id);
     }
   }
   let { changes } = await db.runAsync(SQL, ...params);
@@ -5049,10 +5235,15 @@ async function onDeleteSpecies({
 async function onDeleteConfidence({start, end, species, confidence, modelID}) {
   // Implement the logic for deleting by confidence here
   const db = STATE.db;
-  let SQL = "DELETE FROM records JOIN files on records.fileID = files.id WHERE confidence &lt;= ?";
+  let SQL = `DELETE FROM records
+              WHERE rowid IN (
+                SELECT r.rowid
+                FROM records r
+                JOIN files f ON f.id = r.fileID
+                WHERE r.confidence &lt;= ?`;
   const params = [confidence];
   if (start &amp;&amp; end) {
-    SQL += " AND position * 1000 + files.filestart BETWEEN ? AND ?";
+    SQL += " AND position * 1000 + f.filestart BETWEEN ? AND ?";
     params.push(start, end);
   }
   if (species) {
@@ -5063,10 +5254,11 @@ async function onDeleteConfidence({start, end, species, confidence, modelID}) {
     SQL += " AND modelID = ?";
     params.push(modelID);
   }
-  if (STATE.locationID){
+  if (STATE.location){
     SQL += ` AND fileID IN (SELECT id FROM files WHERE locationID = ?)`;
-    params.push(STATE.locationID);
+    params.push(STATE.location.id);
   }
+  SQL += ')';
   let { changes } = await db.runAsync(SQL, ...params);
   if (changes) {
     if (db === diskDB) {
@@ -5245,111 +5437,243 @@ async function onUpdateLocale(locale, labels, refreshResults) {
  * @param {string} [params.place] - Name of the location. If omitted, the location is deleted.
  * @param {string[]} params.files - List of file names to update.
  * @param {Object} [params.db] - Database instance to use.
- * @param {boolean} [params.overwritePlaceName=true] - Whether to overwrite the place name if the location already exists.
+ * @param {boolean} [params.manualUpdate=true] - Whether to overwrite the place name if the location already exists.
  */
 async function onSetLocation({
   lat,
   lon,
   place,
+  radius = 30,
   files,
+  id,
   db = STATE.db,
-  overwritePlaceName = true,
+  remove,
+  manualUpdate = true,
 }) {
   lat = roundedFloat(lat);
   lon = roundedFloat(lon);
-  if (!files) {
+  let dbErrors = false;
+  place = place?.trim();
+  if (["Fetching...", "No location found for this map point"].includes(place)) place = `${lat} ${lon}`;
+  const inMemory = db === memoryDB;
+  let locationsChanged = false, fileLocationChanged = false;
+  if (remove) return deleteLocation({ id });
+
+  if (id !== undefined &amp;&amp; place &amp;&amp; (!files || !files.length)) {
+    // Location update
     await INITIALISED;
-    // Default location update
-    await diskDB.runAsync(`INSERT OR REPLACE INTO locations (id, lat, lon, place) VALUES (0, ?, ?, ?)`, lat, lon, place.trim())
-    await memoryDB.runAsync(`INSERT OR REPLACE INTO locations (id, lat, lon, place) VALUES (0, ?, ?, ?)`, lat, lon, place.trim());
+    for (const db of [diskDB, memoryDB]) {
+      try {
+        await db.runAsync(`
+          INSERT INTO locations (id, lat, lon, place, radius)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+              lat    = excluded.lat,
+              lon    = excluded.lon,
+              place  = excluded.place,
+              radius = excluded.radius
+          `, id, lat, lon, place, radius);
+      } catch (err) {
+        generateAlert({ type: "warning", message: "badLocationUpdate" });
+        dbErrors = true;
+        break; // exit the loop immediately
+      }
+    }
+    if (dbErrors) return;
+    if (id === 0) Object.assign(STATE, { lat, lon, place, radius });
+    invalidateLocations(id);
+    getLocations({ file: null });
     return;
   }
-  if (!overwritePlaceName) {
-    const nearby = await getNearbyLocations(lat, lon, 0.1);
+  let nearby = [];
+  if (!manualUpdate) {
+    // Location set by metadata
+    nearby = await getNearbyLocationsCached(lat, lon);
     if (nearby.length) {
-      console.info(`Nearby locations exist: ${nearby.flatMap(x => x.distance).join(", ")}`);
-    }
+      const closest = nearby[0];
+      if (closest.distance > 0){
+        // Snap the file location to the highest priority existing location
+        const {lat:overrideLat, lon:overrideLon, id:overrideID, place:overridePlace, radius:overrideRadius} = closest;
+        lat = overrideLat, lon = overrideLon; id = overrideID; place = overridePlace; radius = overrideRadius;
+        console.info("Snapping to nearby location:", `${Math.round(closest.distance)} meters away`);
+      }
+      
+    } 
   }
 
-  if (!place) {
-    // Delete the location
-    const row = await db.getAsync(
-      "SELECT id FROM locations WHERE lat = ? AND lon = ?",
-      lat,
-      lon
-    );
-    if (row) {
-      await db.runAsync("DELETE FROM locations WHERE id = ?", row.id);
+ if (id === null || id === undefined) {
+    let row = await db.getAsync('SELECT id FROM locations WHERE lat = ? AND lon = ? AND place = ? AND COALESCE(radius, 30) = ?',
+      lat, lon, place, radius);
+    let SQL;
+    if (!row){
+      SQL = manualUpdate
+        ? `INSERT INTO locations (lat, lon, place, radius)
+          VALUES (?, ?, ?, ?)
+          ON CONFLICT(lat, lon)
+          DO UPDATE SET
+            place = excluded.place,
+            radius = excluded.radius
+          RETURNING id;`
+        : `INSERT OR IGNORE INTO locations (lat, lon, place, radius)
+          VALUES (?, ?, ?, ?)
+          RETURNING id;`;
+
+      row = await db.getAsync(SQL, lat, lon, place, radius);
+      if (manualUpdate &amp;&amp; inMemory){
+        await diskDB.getAsync(SQL, lat, lon, place, radius);
+      }
     }
-  } else {
-    const SQL = overwritePlaceName
-    ? `INSERT INTO locations (lat, lon, place) VALUES (?, ?, ?)
-       ON CONFLICT(lat, lon) DO UPDATE SET place = excluded.place
-       RETURNING id;`
-    : `INSERT OR IGNORE INTO locations (lat, lon, place) VALUES (?, ?, ?)
-       RETURNING id;`;
-  
-    const result = await db.getAsync(SQL, lat, lon, place);
-    const id = result?.id ?? (
-      await db.getAsync("SELECT id FROM locations WHERE lat = ? AND lon = ?", lat, lon)
-    )?.id;
-  
+    if (row?.id) {
+      id = row.id;
+      locationsChanged = true;
+      if (radius !== 30) console.info("Non-default radius was set", radius);
+    }
+  }
 // TODO: check if file in audio library and update its location on disk and in library
 // await checkLibrary(file, lat,lon, place)
-    // Upsert the file location id in the db
-    const placeholders = files.map(() => "(?, ?)").join(",");
-    const res = await db.runAsync(
-      `INSERT INTO files (name, locationID) VALUES ${placeholders}
-        ON CONFLICT(name) DO UPDATE SET locationID = excluded.locationID `,
-      ...files.flatMap(f => [f, id]));
 
-    for (const file of files) {
-      // we may not have set the METADATA for the file
+
+  for (const file of files) { 
+    if (METADATA[file]?.locationID !== id) {
+      fileLocationChanged = true;
       METADATA[file] = { ...METADATA[file], locationID: id, lat, lon };
-      // tell the UI the file has a location id
       UI.postMessage({ event: "file-location-id", file, id });
     }
   }
-  await getLocations({ file: files[0] });
+  // Update the files' locationid in the db
+
+  if (fileLocationChanged) {
+    const CHUNK = 5000;
+    for (let i = 0; i &lt; files.length; i += CHUNK) {
+      const slice = files.slice(i, i + CHUNK);
+      const placeholders = slice.map(() => "?").join(",");
+      await db.runAsync(`UPDATE files SET locationID = ? WHERE name IN (${placeholders})`,
+        id, ...slice)
+    }
+  }
+  if (locationsChanged)  {
+    invalidateLocations(id);
+    getLocations({ file: null });
+  }
 }
 
-async function getLocations({ file, db = STATE.db, id }) {
-  let locations = await db.allAsync("SELECT * FROM locations ORDER BY place");
-  // Default location
-  locations ??= [{ id: 0, lat: STATE.lat, lon: STATE.lon, place: STATE.place.trim() }];
-  UI.postMessage({
-    id,
-    event: "location-list",
-    data: locations,
-    currentLocation: METADATA[file]?.locationID,
+let locationsCache = null;
+let locationsPromise = null;
+function invalidateLocations(id) {
+  locationsCache = null;
+  STATE.nearbyLocationCache.clear();
+  for (const meta of Object.values(METADATA)) {
+    if (!meta) continue;
+    if (id === -1 || meta.locationID === id) {
+      meta.locationID = undefined;
+    }
+  }
+}
+
+async function deleteLocation({ id }) {
+    // Delete the location
+    if (id > 0){
+      for (const db of [diskDB, memoryDB]) {
+          await db.runAsync("DELETE FROM locations WHERE id = ?", id);
+        }
+      invalidateLocations(id);
+      UI.postMessage({ event: "delete-location-id", id });
+      getLocations({ file: null });
+      return
+    }
+    
+}
+
+
+function getLocations({ file, db = STATE.db, id }) {
+  // 1️⃣ Return cached value immediately
+  if (locationsCache) {
+    UI.postMessage({
+      id,
+      event: "location-list",
+      data: locationsCache,
+      currentLocation: METADATA[file]?.locationID,
+    });
+    return Promise.resolve(locationsCache);
+  }
+
+  // 2️⃣ Reuse in-flight fetch
+  if (!locationsPromise) {
+    locationsPromise = (async () => {
+      let locations = await db.allAsync(
+        "SELECT * FROM locations ORDER BY place"
+      );
+
+      if (!locations?.length) {
+        locations = [{
+          id: 0,
+          lat: STATE.lat,
+          lon: STATE.lon,
+          place: STATE.place.trim(),
+        }];
+      }
+
+      locationsCache = locations;
+      return locations;
+    })().finally(() => {
+      locationsPromise = null;
+    });
+  }
+
+  return locationsPromise.then(locations => {
+    UI.postMessage({
+      id,
+      event: "location-list",
+      data: locations,
+      currentLocation: METADATA[file]?.locationID,
+    });
+    return locations;
   });
 }
 
+
+
+
+async function getNearbyLocationsCached(lat, lon) {
+  const key = `${lat} ${lon}`;
+  const cache = STATE.nearbyLocationCache;
+  if (!cache.has(key)) {
+    const promise = _getNearbyLocations(lat, lon).catch(err => {
+      cache.delete(key);
+      throw err;
+    });
+    cache.set(key, promise);
+  }
+  return cache.get(key);
+}
+
 /**
- * getNearbyLocations
+ * _getNearbyLocations
  * Fetches locations from the database that are within a specified radius of given latitude and longitude using the Haversine formula.
+ * Priority (first in the list is the point with the smallest radius. If radii are equal, then the nearest point will be used)
  * @param {number} lat
  * @param {number} lon
- * @param {number} radius in km
- * @returns {Promise&lt;Array.&lt;{id: number, lat: number, lon: number, place: string, distance: number}>>}
+ * @returns {Promise&lt;Array.&lt;{id: number, lat: number, lon: number, place: string, radius: number, distance: number}>>}
 */
 
-async function getNearbyLocations(lat, lon, radius = 0.1) {
-  const miles = STATE.distanceUnit === 'miles';
-  const R = miles ? 3959 : 6371; // Radius of the Earth in miles or km
-  const locations = await STATE.db.allAsync(`
-    SELECT id, lat, lon, place,
-      (${R} * acos(
-        cos(radians(?)) * cos(radians(lat)) * cos(radians(lon) - radians(?)) +
-        sin(radians(?)) * sin(radians(lat))
-      )) AS distance
-    FROM locations
-    WHERE (${R} * acos(
-      cos(radians(?)) * cos(radians(lat)) * cos(radians(lon) - radians(?)) +
-      sin(radians(?)) * sin(radians(lat))
-    )) &lt;= ?
-    ORDER BY distance ASC;`, lat, lon, lat, lat, lon, lat, radius);
-  return locations;
+async function _getNearbyLocations(lat, lon) {
+  const R = 6_371_000; // Radius of the Earth in metres
+  return await STATE.db.allAsync(`
+    SELECT *
+      FROM (
+        SELECT
+          id, lat, lon, place, COALESCE(radius, 30) AS radius,
+          (${R} * acos(
+            min(1, max(-1,
+              cos(radians(?)) * cos(radians(lat)) *
+              cos(radians(lon) - radians(?)) +
+              sin(radians(?)) * sin(radians(lat))
+            ))
+          )) AS distance
+        FROM locations
+      )
+      WHERE distance &lt;= radius 
+      ORDER BY radius ASC, distance ASC`, lat, lon, lat);
 }
 
 /**
@@ -5540,22 +5864,23 @@ const pLimit = require("p-limit");
  * @returns {boolean|undefined} `false` if the archive directory is missing or not writable; otherwise `undefined` after scheduling and completing conversion tasks.
  */
 async function convertAndOrganiseFiles(threadLimit = 4) {
+  const {location, clips, backfill} = STATE.library;
   // SANITY checks: archive location exists and is writeable?
-  if (!fs.existsSync(STATE.library.location)) {
+  if (!fs.existsSync(location)) {
     generateAlert({
       type: "error",
       message: "noArchive",
-      variables: { location: STATE.library.location },
+      variables: { location },
     });
     return false;
   }
   try {
-    fs.accessSync(STATE.library.location, fs.constants.W_OK);
+    fs.accessSync(location, fs.constants.W_OK);
   } catch {
     generateAlert({
       type: "error",
       message: "noWriteArchive",
-      variables: { location: STATE.library.location },
+      variables: { location },
     });
     return false;
   }
@@ -5566,13 +5891,20 @@ async function convertAndOrganiseFiles(threadLimit = 4) {
   const conversions = []; // Array to hold the conversion promises
 
   // Query the files &amp; records table to get the necessary data
+  const params = [];
   let query =
     "SELECT DISTINCT f.id, f.name, f.archiveName, f.duration, f.filestart, l.place FROM files f LEFT JOIN locations l ON f.locationID = l.id";
   // If just saving files with records
-  if (STATE.library.clips) query += " INNER JOIN records r ON r.fileID = f.id";
-  if (!STATE.library.backfill) query += " WHERE f.archiveName is NULL";
+  if (clips) query += " INNER JOIN records r ON r.fileID = f.id";
+  if (!backfill) query += " WHERE f.archiveName is NULL";
+  if (STATE.mode === "archive") {
+    // Only add current results
+    const keyword = backfill ? " WHERE" : " AND";
+    query += `${keyword} f.name IN (${prepParams(STATE.filesToAnalyse)})`;
+    params.push(...STATE.filesToAnalyse);
+  }
   t0 = Date.now();
-  const rows = await db.allAsync(query);
+  const rows = await db.allAsync(query, ...params);
   DEBUG &amp;&amp; console.log(`db query took ${Date.now() - t0}ms`);
   const ext = "." + STATE.library.format;
   for (const row of rows) {
@@ -5645,11 +5977,8 @@ async function convertAndOrganiseFiles(threadLimit = 4) {
 
   Promise.allSettled(conversions).then((results) => {
     // Oftentimes, the final percent.progress reported is &lt; 100. So when finished, send 100 so the progress panel can be hidden
-    UI.postMessage({
-      event: "footer-progress",
-      progress: { percent: 100 },
-      text: "",
-    });
+    sendProgress('',100);
+
     // Summarise the results
     let successfulConversions = 0;
     let failedConversions = 0;
@@ -5715,7 +6044,20 @@ async function convertFile(
 ) {
   await setMetadata({ file: inputFilePath });
   const boundaries = await setStartEnd(inputFilePath);
-
+  const conversionProgress = {
+    en: "Conversion progress",
+    da: "Konverteringsstatus",
+    de: "Konvertierungsfortschritt",
+    es: "Progreso de conversión",
+    fr: "Progression de la conversion",
+    ja: "変換の進行状況",
+    nl: "Conversievoortgang",
+    pt: "Progresso da conversão",
+    ru: "Ход преобразования",
+    sv: "Konverteringsförlopp",
+    zh: "转换进度",
+  };
+  const conversionText = conversionProgress[STATE.locale] || conversionProgress['en'];
   return new Promise((resolve, reject) => {
     let command = ffmpeg("file:" + inputFilePath);
 
@@ -5736,7 +6078,7 @@ async function convertFile(
         });
       } else {
         const { start, end } = boundaries[0];
-        if (start === end) {
+        if (start === null) {
           generateAlert({
             type: "warning",
             message: "allDaylight",
@@ -5795,15 +6137,24 @@ async function convertFile(
             0
           );
           const average = sum / values.length;
-          UI.postMessage({
-            event: `footer-progress`,
-            progress: { percent: average },
-            text: `Archive file conversion progress: ${average.toFixed(1)}%`,
-          });
+          const text = `${conversionText}: ${average.toFixed(1)}%`
+          sendProgress(text, average);
         }
       })
       .run();
   });
+}
+/**
+ * Send a progress update to the UI with the given text and percentage.
+ * @param {*} text 
+ * @param {*} progress 
+ */
+function sendProgress(text, progress){
+      UI.postMessage({
+      event: "footer-progress",
+      progress: { percent: progress },
+      text,
+    });
 }
 
 async function onDeleteModel(model){
@@ -5852,13 +6203,13 @@ async function onDeleteModel(model){
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#LIST_CACHE">LIST_CACHE</a></li><li><a href="global.html#WSPlayPause">WSPlayPause</a></li><li><a href="global.html#_updateSpeciesLocale">_updateSpeciesLocale</a></li><li><a href="global.html#activateResultSort">activateResultSort</a></li><li><a href="global.html#addDays">addDays</a></li><li><a href="global.html#addQueryQualifiers">addQueryQualifiers</a></li><li><a href="global.html#addToHistory">addToHistory</a></li><li><a href="global.html#allowedByList">allowedByList</a></li><li><a href="global.html#analyseReset">analyseReset</a></li><li><a href="global.html#batchExportAudio">batchExportAudio</a></li><li><a href="global.html#batchInsertRecords">batchInsertRecords</a></li><li><a href="global.html#calculateTimeBoundaries">calculateTimeBoundaries</a></li><li><a href="global.html#changeInputElement">changeInputElement</a></li><li><a href="global.html#changeSettingsMode">changeSettingsMode</a></li><li><a href="global.html#chartInstance">chartInstance</a></li><li><a href="global.html#checkFilteredFrequency">checkFilteredFrequency</a></li><li><a href="global.html#checkForIntelMacUpdates">checkForIntelMacUpdates</a></li><li><a href="global.html#checkNewModel">checkNewModel</a></li><li><a href="global.html#checkpoint">checkpoint</a></li><li><a href="global.html#clearActive">clearActive</a></li><li><a href="global.html#closeDatabase">closeDatabase</a></li><li><a href="global.html#convertAndOrganiseFiles">convertAndOrganiseFiles</a></li><li><a href="global.html#convertFile">convertFile</a></li><li><a href="global.html#createContextMenu">createContextMenu</a></li><li><a href="global.html#customAnalysisAllMenu">customAnalysisAllMenu</a></li><li><a href="global.html#customiseAnalysisMenu">customiseAnalysisMenu</a></li><li><a href="global.html#dayMonthToDayOfYear">dayMonthToDayOfYear</a></li><li><a href="global.html#dayOfYear">dayOfYear</a></li><li><a href="global.html#deepMergeLists">deepMergeLists</a></li><li><a href="global.html#doPrediction">doPrediction</a></li><li><a href="global.html#epochInDayMonthRange">epochInDayMonthRange</a></li><li><a href="global.html#estimateTimeRemaining">estimateTimeRemaining</a></li><li><a href="global.html#exportAudacity">exportAudacity</a></li><li><a href="global.html#exportData">exportData</a></li><li><a href="global.html#exportSpeciesList">exportSpeciesList</a></li><li><a href="global.html#fetchAudioBuffer">fetchAudioBuffer</a></li><li><a href="global.html#filterResults">filterResults</a></li><li><a href="global.html#filterValidFiles">filterValidFiles</a></li><li><a href="global.html#formatAsBootstrapTable">formatAsBootstrapTable</a></li><li><a href="global.html#generateBirdIDList">generateBirdIDList</a></li><li><a href="global.html#generateToast">generateToast</a></li><li><a href="global.html#getDetectedSpecies">getDetectedSpecies</a></li><li><a href="global.html#getExcluded">getExcluded</a></li><li><a href="global.html#getFileSQLAndParams">getFileSQLAndParams</a></li><li><a href="global.html#getFiles">getFiles</a></li><li><a href="global.html#getFilteredBirds">getFilteredBirds</a></li><li><a href="global.html#getIncludedIDs">getIncludedIDs</a></li><li><a href="global.html#getInstallInfo">getInstallInfo</a></li><li><a href="global.html#getMatchingIds">getMatchingIds</a></li><li><a href="global.html#getNearbyLocations">getNearbyLocations</a></li><li><a href="global.html#getResults">getResults</a></li><li><a href="global.html#getRowFromStart">getRowFromStart</a></li><li><a href="global.html#getSpecies">getSpecies</a></li><li><a href="global.html#getSpeciesSQLAsync">getSpeciesSQLAsync</a></li><li><a href="global.html#getValidSpecies">getValidSpecies</a></li><li><a href="global.html#getWorkingFile">getWorkingFile</a></li><li><a href="global.html#getXCComparisons">getXCComparisons</a></li><li><a href="global.html#handleKeyDown">handleKeyDown</a></li><li><a href="global.html#handleKeyDownDeBounce">handleKeyDownDeBounce</a></li><li><a href="global.html#handleMessage">handleMessage</a></li><li><a href="global.html#handleUIClicks">handleUIClicks</a></li><li><a href="global.html#importData">importData</a></li><li><a href="global.html#loadAudioFile">loadAudioFile</a></li><li><a href="global.html#loadAudioFileSync">loadAudioFileSync</a></li><li><a href="global.html#loadDB">loadDB</a></li><li><a href="global.html#localiseModal">localiseModal</a></li><li><a href="global.html#locateFile">locateFile</a></li><li><a href="global.html#membershipCheck">membershipCheck</a></li><li><a href="global.html#metadataLocks">metadataLocks</a></li><li><a href="global.html#notifyMissingFile">notifyMissingFile</a></li><li><a href="global.html#onAbort">onAbort</a></li><li><a href="global.html#onAnalyse">onAnalyse</a></li><li><a href="global.html#onAnalysisComplete">onAnalysisComplete</a></li><li><a href="global.html#onChangeMode">onChangeMode</a></li><li><a href="global.html#onDelete">onDelete</a></li><li><a href="global.html#onDeleteSpecies">onDeleteSpecies</a></li><li><a href="global.html#onLaunch">onLaunch</a></li><li><a href="global.html#onModelReady">onModelReady</a></li><li><a href="global.html#onOpenFiles">onOpenFiles</a></li><li><a href="global.html#onResultsComplete">onResultsComplete</a></li><li><a href="global.html#onSave2DiskDB">onSave2DiskDB</a></li><li><a href="global.html#onSaveAudio">onSaveAudio</a></li><li><a href="global.html#onSetLocation">onSetLocation</a></li><li><a href="global.html#onSummaryComplete">onSummaryComplete</a></li><li><a href="global.html#onUpdateLocale">onUpdateLocale</a></li><li><a href="global.html#onWorkerLoadedAudio">onWorkerLoadedAudio</a></li><li><a href="global.html#parseBextLocalDate">parseBextLocalDate</a></li><li><a href="global.html#parseCnames">parseCnames</a></li><li><a href="global.html#parseMessage">parseMessage</a></li><li><a href="global.html#playRegion">playRegion</a></li><li><a href="global.html#positionMenu">positionMenu</a></li><li><a href="global.html#postAnalyseMessage">postAnalyseMessage</a></li><li><a href="global.html#processAudio">processAudio</a></li><li><a href="global.html#processFilesInBatches">processFilesInBatches</a></li><li><a href="global.html#processNextFile">processNextFile</a></li><li><a href="global.html#readLabels">readLabels</a></li><li><a href="global.html#recordUpdate">recordUpdate</a></li><li><a href="global.html#refreshResultsView">refreshResultsView</a></li><li><a href="global.html#refreshSummary">refreshSummary</a></li><li><a href="global.html#renderFilenamePanel">renderFilenamePanel</a></li><li><a href="global.html#renderResult">renderResult</a></li><li><a href="global.html#resetDiagnostics">resetDiagnostics</a></li><li><a href="global.html#resetResults">resetResults</a></li><li><a href="global.html#resultClick">resultClick</a></li><li><a href="global.html#savedFileCheckAsync">savedFileCheckAsync</a></li><li><a href="global.html#sendDetections">sendDetections</a></li><li><a href="global.html#setActiveRegion">setActiveRegion</a></li><li><a href="global.html#setActiveRow">setActiveRow</a></li><li><a href="global.html#setAudioFilters">setAudioFilters</a></li><li><a href="global.html#setClickedIndex">setClickedIndex</a></li><li><a href="global.html#setIncludedIDs">setIncludedIDs</a></li><li><a href="global.html#setKeyAssignment">setKeyAssignment</a></li><li><a href="global.html#setKeyAssignmentUI">setKeyAssignmentUI</a></li><li><a href="global.html#setLabelState">setLabelState</a></li><li><a href="global.html#setListUIState">setListUIState</a></li><li><a href="global.html#setNocmig">setNocmig</a></li><li><a href="global.html#setStartEnd">setStartEnd</a></li><li><a href="global.html#showAnalyse">showAnalyse</a></li><li><a href="global.html#showCharts">showCharts</a></li><li><a href="global.html#showDatePicker">showDatePicker</a></li><li><a href="global.html#showExplore">showExplore</a></li><li><a href="global.html#showRecordEntryForm">showRecordEntryForm</a></li><li><a href="global.html#showSummarySortIcon">showSummarySortIcon</a></li><li><a href="global.html#showThreshold">showThreshold</a></li><li><a href="global.html#showTopRankin">showTopRankin</a></li><li><a href="global.html#showWindowDetections">showWindowDetections</a></li><li><a href="global.html#spawnListWorker">spawnListWorker</a></li><li><a href="global.html#spawnPredictWorkers">spawnPredictWorkers</a></li><li><a href="global.html#speciesFilter">speciesFilter</a></li><li><a href="global.html#t0_warmup">t0_warmup</a></li><li><a href="global.html#training">training</a></li><li><a href="global.html#unpackNameAttr">unpackNameAttr</a></li><li><a href="global.html#updateFilesBeingProcessed">updateFilesBeingProcessed</a></li><li><a href="global.html#updateList">updateList</a></li><li><a href="global.html#updateMetadata">updateMetadata</a></li><li><a href="global.html#updatePagination">updatePagination</a></li><li><a href="global.html#updateSuggestions">updateSuggestions</a></li><li><a href="global.html#upgrade_to_v2">upgrade_to_v2</a></li><li><a href="global.html#upgrade_to_v4">upgrade_to_v4</a></li><li><a href="global.html#waitForWavesurferReady">waitForWavesurferReady</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#LIST_CACHE">LIST_CACHE</a></li><li><a href="global.html#WSPlayPause">WSPlayPause</a></li><li><a href="global.html#_getNearbyLocations">_getNearbyLocations</a></li><li><a href="global.html#_updateSpeciesLocale">_updateSpeciesLocale</a></li><li><a href="global.html#activateResultSort">activateResultSort</a></li><li><a href="global.html#addDays">addDays</a></li><li><a href="global.html#addQueryQualifiers">addQueryQualifiers</a></li><li><a href="global.html#addToHistory">addToHistory</a></li><li><a href="global.html#allowedByList">allowedByList</a></li><li><a href="global.html#analyseReset">analyseReset</a></li><li><a href="global.html#batchExportAudio">batchExportAudio</a></li><li><a href="global.html#batchInsertRecords">batchInsertRecords</a></li><li><a href="global.html#calculateTimeBoundaries">calculateTimeBoundaries</a></li><li><a href="global.html#changeInputElement">changeInputElement</a></li><li><a href="global.html#changeSettingsMode">changeSettingsMode</a></li><li><a href="global.html#chartInstance">chartInstance</a></li><li><a href="global.html#checkFilteredFrequency">checkFilteredFrequency</a></li><li><a href="global.html#checkForIntelMacUpdates">checkForIntelMacUpdates</a></li><li><a href="global.html#checkNewModel">checkNewModel</a></li><li><a href="global.html#checkpoint">checkpoint</a></li><li><a href="global.html#clearActive">clearActive</a></li><li><a href="global.html#closeDatabase">closeDatabase</a></li><li><a href="global.html#convertAndOrganiseFiles">convertAndOrganiseFiles</a></li><li><a href="global.html#convertFile">convertFile</a></li><li><a href="global.html#createContextMenu">createContextMenu</a></li><li><a href="global.html#customAnalysisAllMenu">customAnalysisAllMenu</a></li><li><a href="global.html#customiseAnalysisMenu">customiseAnalysisMenu</a></li><li><a href="global.html#dayMonthToDayOfYear">dayMonthToDayOfYear</a></li><li><a href="global.html#dayOfYear">dayOfYear</a></li><li><a href="global.html#deepMergeLists">deepMergeLists</a></li><li><a href="global.html#doPrediction">doPrediction</a></li><li><a href="global.html#epochInDayMonthRange">epochInDayMonthRange</a></li><li><a href="global.html#estimateTimeRemaining">estimateTimeRemaining</a></li><li><a href="global.html#exportAudacity">exportAudacity</a></li><li><a href="global.html#exportData">exportData</a></li><li><a href="global.html#exportSpeciesList">exportSpeciesList</a></li><li><a href="global.html#fetchAudioBuffer">fetchAudioBuffer</a></li><li><a href="global.html#filterResults">filterResults</a></li><li><a href="global.html#filterValidFiles">filterValidFiles</a></li><li><a href="global.html#formatAsBootstrapTable">formatAsBootstrapTable</a></li><li><a href="global.html#generateBirdIDList">generateBirdIDList</a></li><li><a href="global.html#generateToast">generateToast</a></li><li><a href="global.html#getDetectedSpecies">getDetectedSpecies</a></li><li><a href="global.html#getExcluded">getExcluded</a></li><li><a href="global.html#getFileSQLAndParams">getFileSQLAndParams</a></li><li><a href="global.html#getFiles">getFiles</a></li><li><a href="global.html#getFilteredBirds">getFilteredBirds</a></li><li><a href="global.html#getIncludedIDs">getIncludedIDs</a></li><li><a href="global.html#getInstallInfo">getInstallInfo</a></li><li><a href="global.html#getMatchingIds">getMatchingIds</a></li><li><a href="global.html#getResults">getResults</a></li><li><a href="global.html#getRowFromStart">getRowFromStart</a></li><li><a href="global.html#getSpecies">getSpecies</a></li><li><a href="global.html#getSpeciesSQLAsync">getSpeciesSQLAsync</a></li><li><a href="global.html#getValidSpecies">getValidSpecies</a></li><li><a href="global.html#getWorkingFile">getWorkingFile</a></li><li><a href="global.html#getXCComparisons">getXCComparisons</a></li><li><a href="global.html#handleKeyDown">handleKeyDown</a></li><li><a href="global.html#handleKeyDownDeBounce">handleKeyDownDeBounce</a></li><li><a href="global.html#handleMessage">handleMessage</a></li><li><a href="global.html#handleUIClicks">handleUIClicks</a></li><li><a href="global.html#importData">importData</a></li><li><a href="global.html#loadAudioFile">loadAudioFile</a></li><li><a href="global.html#loadAudioFileSync">loadAudioFileSync</a></li><li><a href="global.html#loadDB">loadDB</a></li><li><a href="global.html#localiseModal">localiseModal</a></li><li><a href="global.html#locateFile">locateFile</a></li><li><a href="global.html#membershipCheck">membershipCheck</a></li><li><a href="global.html#metadataLocks">metadataLocks</a></li><li><a href="global.html#notifyMissingFile">notifyMissingFile</a></li><li><a href="global.html#onAbort">onAbort</a></li><li><a href="global.html#onAnalyse">onAnalyse</a></li><li><a href="global.html#onAnalysisComplete">onAnalysisComplete</a></li><li><a href="global.html#onChangeMode">onChangeMode</a></li><li><a href="global.html#onDelete">onDelete</a></li><li><a href="global.html#onDeleteSpecies">onDeleteSpecies</a></li><li><a href="global.html#onLaunch">onLaunch</a></li><li><a href="global.html#onModelReady">onModelReady</a></li><li><a href="global.html#onOpenFiles">onOpenFiles</a></li><li><a href="global.html#onResultsComplete">onResultsComplete</a></li><li><a href="global.html#onSave2DiskDB">onSave2DiskDB</a></li><li><a href="global.html#onSaveAudio">onSaveAudio</a></li><li><a href="global.html#onSetLocation">onSetLocation</a></li><li><a href="global.html#onSummaryComplete">onSummaryComplete</a></li><li><a href="global.html#onUpdateLocale">onUpdateLocale</a></li><li><a href="global.html#onWorkerLoadedAudio">onWorkerLoadedAudio</a></li><li><a href="global.html#parseBextLocalDate">parseBextLocalDate</a></li><li><a href="global.html#parseCnames">parseCnames</a></li><li><a href="global.html#parseMessage">parseMessage</a></li><li><a href="global.html#playRegion">playRegion</a></li><li><a href="global.html#positionMenu">positionMenu</a></li><li><a href="global.html#postAnalyseMessage">postAnalyseMessage</a></li><li><a href="global.html#processAudio">processAudio</a></li><li><a href="global.html#processFilesInBatches">processFilesInBatches</a></li><li><a href="global.html#processNextFile">processNextFile</a></li><li><a href="global.html#readLabels">readLabels</a></li><li><a href="global.html#recordUpdate">recordUpdate</a></li><li><a href="global.html#refreshResultsView">refreshResultsView</a></li><li><a href="global.html#refreshSummary">refreshSummary</a></li><li><a href="global.html#renderFilenamePanel">renderFilenamePanel</a></li><li><a href="global.html#renderLocation">renderLocation</a></li><li><a href="global.html#renderResult">renderResult</a></li><li><a href="global.html#resetDiagnostics">resetDiagnostics</a></li><li><a href="global.html#resetResults">resetResults</a></li><li><a href="global.html#resultClick">resultClick</a></li><li><a href="global.html#savedFileCheckAsync">savedFileCheckAsync</a></li><li><a href="global.html#sendDetections">sendDetections</a></li><li><a href="global.html#sendProgress">sendProgress</a></li><li><a href="global.html#setActiveRegion">setActiveRegion</a></li><li><a href="global.html#setActiveRow">setActiveRow</a></li><li><a href="global.html#setAudioFilters">setAudioFilters</a></li><li><a href="global.html#setClickedIndex">setClickedIndex</a></li><li><a href="global.html#setIncludedIDs">setIncludedIDs</a></li><li><a href="global.html#setKeyAssignment">setKeyAssignment</a></li><li><a href="global.html#setKeyAssignmentUI">setKeyAssignmentUI</a></li><li><a href="global.html#setLabelState">setLabelState</a></li><li><a href="global.html#setListUIState">setListUIState</a></li><li><a href="global.html#setNocmig">setNocmig</a></li><li><a href="global.html#setStartEnd">setStartEnd</a></li><li><a href="global.html#showAnalyse">showAnalyse</a></li><li><a href="global.html#showCharts">showCharts</a></li><li><a href="global.html#showDatePicker">showDatePicker</a></li><li><a href="global.html#showExplore">showExplore</a></li><li><a href="global.html#showRadiusValue">showRadiusValue</a></li><li><a href="global.html#showRecordEntryForm">showRecordEntryForm</a></li><li><a href="global.html#showSummarySortIcon">showSummarySortIcon</a></li><li><a href="global.html#showThreshold">showThreshold</a></li><li><a href="global.html#showTopRankin">showTopRankin</a></li><li><a href="global.html#showWindowDetections">showWindowDetections</a></li><li><a href="global.html#spawnListWorker">spawnListWorker</a></li><li><a href="global.html#spawnPredictWorkers">spawnPredictWorkers</a></li><li><a href="global.html#speciesFilter">speciesFilter</a></li><li><a href="global.html#t0_warmup">t0_warmup</a></li><li><a href="global.html#training">training</a></li><li><a href="global.html#unpackNameAttr">unpackNameAttr</a></li><li><a href="global.html#updateFilesBeingProcessed">updateFilesBeingProcessed</a></li><li><a href="global.html#updateList">updateList</a></li><li><a href="global.html#updateMetadata">updateMetadata</a></li><li><a href="global.html#updatePagination">updatePagination</a></li><li><a href="global.html#updateSuggestions">updateSuggestions</a></li><li><a href="global.html#upgrade_to_v2">upgrade_to_v2</a></li><li><a href="global.html#upgrade_to_v4">upgrade_to_v4</a></li><li><a href="global.html#waitForWavesurferReady">waitForWavesurferReady</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Thu Jan 29 2026 18:44:25 GMT+0000 (Greenwich Mean Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Thu Feb 19 2026 18:31:48 GMT+0000 (Greenwich Mean Time)
 </footer>
 
 <script> prettyPrint(); </script>

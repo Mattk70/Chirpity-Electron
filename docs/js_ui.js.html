@@ -600,6 +600,7 @@ const postBufferUpdate = ({
   resetSpec = false,
   goToRegion = false,
 }) => {
+  if (!file) return;
   STATE.fileLoaded = false;
   worker.postMessage({
     action: "update-buffer",
@@ -696,6 +697,10 @@ const buildFileMenu = (e) => {
  * @returns {void}
  */
 function showDatePicker() {
+  // Check for a form already existing to prevent multiple forms being opened if the user clicks repeatedly before the first form is removed
+  const existingForm = document.getElementById("fileStart");
+  if (existingForm) return;
+
   // Create a form element
   const i18 = i18n.get(i18n.Form);
   const form = document.createElement("form");
@@ -717,6 +722,7 @@ function showDatePicker() {
   // Create the datetime-local input
   const datetimeInput = document.createElement("input");
   datetimeInput.setAttribute("type", "datetime-local");
+  datetimeInput.setAttribute("step", "1");
   datetimeInput.setAttribute("id", "fileStart");
   datetimeInput.setAttribute(
     "value",
@@ -757,6 +763,7 @@ function showDatePicker() {
       action: "update-file-start",
       file: STATE.currentFile,
       start: timestamp,
+      refreshResults: STATE.analysisDone, // Only refresh results if analysis has already been done
     });
     trackEvent(config.UUID, "Settings Change", "fileStart", newStart);
     resetResults();
@@ -921,18 +928,31 @@ function customiseAnalysisMenu(saved) {
   }
 }
 
-async function generateLocationList(id) {
+async function generateLocationList(elID, skipDefault = false) {
   const i18 = i18n.get(i18n.All);
-  const defaultText = id === "savedLocations" ? i18[0] : i18[1];
-  const el = document.getElementById(id);
-  LOCATIONS = await utils.requestFromWorker(worker, "get-locations", {
+
+  const el = document.getElementById(elID);
+  el.replaceChildren(); // clear options
+  LOCATIONS ??= await utils.requestFromWorker(worker, "get-locations", {
     file: STATE.currentFile
   });
-  el.innerHTML = `&lt;option value="">${defaultText}&lt;/option>`; // clear options
-  LOCATIONS.forEach((loc) => {
+  if (skipDefault) {}
+  else if (elID === "savedLocations"){
+    el.innerHTML = `&lt;option value="">${i18n.get(i18n.Location)['add']}&lt;/option>`; 
+  } else {
+    const defaultText =  i18[1];
+    el.innerHTML = `&lt;option value="">${defaultText}&lt;/option>`; 
+  }
+  LOCATIONS.slice() // avoid mutating the original array, just in case
+  .sort((a, b) => { // put the default location at the top of the list
+    if (a.id === 0) return -1;
+    if (b.id === 0) return 1;
+    return 0;
+  }).forEach((loc) => {
+    const {id, place} = loc;
     const option = document.createElement("option");
-    option.value = loc.id;
-    option.textContent = loc.place;
+    option.value = id;
+    option.textContent = id === 0 ? place + '*': place;
     el.appendChild(option);
   });
   return el;
@@ -940,50 +960,82 @@ async function generateLocationList(id) {
 
 const FILE_LOCATION_MAP = {};
 const onFileLocationID = ({ file, id }) => (FILE_LOCATION_MAP[file] = id);
+const onLocationDeleted = ({ id }) => {
+  Object.keys(FILE_LOCATION_MAP).forEach(file => {
+    if (FILE_LOCATION_MAP[file] === id) {
+      delete FILE_LOCATION_MAP[file];
+    }
+  });
+}
 const locationModalDiv = document.getElementById("locationModal");
-locationModalDiv.addEventListener("shown.bs.modal", () => {
-  const locationID = FILE_LOCATION_MAP[STATE.currentFile]
-  placeMap("customLocationMap", locationID);
+locationModalDiv.addEventListener("shown.bs.modal", async () => {
+  const locationID = FILE_LOCATION_MAP[STATE.currentFile] ?? undefined
+  await placeMap("customLocationMap", locationID);
 });
 //document
+const locationRadius = document.getElementById("location-radius");
+const onRadiusUpdated = (e) => {
+  const radius = e.target.valueAsNumber;
+  const latEl = document.getElementById("customLat");
+  const lonEl = document.getElementById("customLon");
+  updateMap(latEl.valueAsNumber, lonEl.valueAsNumber, radius);
+}
+
+locationRadius.addEventListener("change", onRadiusUpdated);
+
 
 // showLocation: Show the currently selected location in the form inputs
 const showLocation = async (fromSelect) => {
-  let newLocation;
   const latEl = document.getElementById("customLat");
   const lonEl = document.getElementById("customLon");
   const customPlaceEl = document.getElementById("customPlace");
   const locationSelect = document.getElementById("savedLocations");
+  const locationDelete = document.getElementById("delete-location");
+  const locationAdd = document.getElementById("set-location");
   // Check if current file has a location id
   const id = fromSelect
-    ? parseInt(locationSelect.value)
+    ? locationSelect.value
     : FILE_LOCATION_MAP[STATE.currentFile];
 
-  if (id) {
-    newLocation = LOCATIONS.find((obj) => obj.id === id);
-    //locationSelect.value = id;
-    if (newLocation) {
-      (latEl.value = newLocation.lat),
-        (lonEl.value = newLocation.lon),
-        (customPlaceEl.value = newLocation.place),
-        (locationSelect.value = id);
-    } else {
-      (latEl.value = config.latitude),
-        (lonEl.value = config.longitude),
-        (customPlaceEl.value = config.location),
-        (locationSelect.value = "");
-    }
-  } else {
-    //Default location
-    await generateLocationList("savedLocations");
-    (latEl.value = config.latitude),
-      (lonEl.value = config.longitude),
-      (customPlaceEl.value = config.location);
-  }
+  const location = !id || id === 0
+     ? LOCATIONS.find(obj => obj.id === 0) // default location if no selection
+     : LOCATIONS.find(obj => obj.id === parseInt(id)) ?? LOCATIONS.find(obj => obj.id === 0);
+
+  const { id: locId, lat, lon, place, radius} = location;
+  const radiusValue = radius ?? 30;
+  latEl.value = lat;
+  lonEl.value = lon;
+  customPlaceEl.value = place;
+  locationSelect.value = id ?? "0";
+  locationRadius.value = radiusValue;
+  showRadiusValue(radiusValue);
+  locationAdd.classList.toggle("disabled", !customPlaceEl.value.trim());
+  locationDelete.classList.toggle('disabled', locationSelect.selectedIndex &lt; 2); // disable delete for default and placeholder options
   // make sure the  map is initialised
-  if (!map) placeMap("customLocationMap", id);
-  updateMap(latEl.value, lonEl.value);
+  if (!window.map) await placeMap("customLocationMap", locId);
+  const latVal = lat === "" ? config.latitude : parseFloat(lat);
+  const lonVal = lon === "" ? config.longitude : parseFloat(lon);
+  updateMap(latVal, lonVal, radiusValue);
 };
+
+/**
+ * Helper function to sanitise tained input from API call
+ * 
+ * @param {*} el container for tainted input
+ * @param {*} tainted tainted content
+ */
+
+const renderLocation = (el, tainted) =>{
+    // Clear existing content
+  el.replaceChildren();
+  // Icon
+  const icon = document.createElement("span");
+  icon.className = "material-symbols-outlined";
+  icon.textContent = "fmd_good";
+  // Text (tainted input)
+  const text = document.createTextNode(" " + tainted);
+  el.append(icon, text);
+}
 
 const displayLocationAddress = async (where) => {
   const custom = where.includes("custom");
@@ -992,18 +1044,18 @@ const displayLocationAddress = async (where) => {
     latEl = document.getElementById("customLat");
     lonEl = document.getElementById("customLon");
     placeEl = document.getElementById("customPlace");
-    address = await fetchLocationAddress(latEl.value, lonEl.value, false);
+    address = await fetchLocationAddress(latEl.valueAsNumber, lonEl.valueAsNumber, false);
     if (address === false) return;
     placeEl.value = address || "Location not available";
+    const locationAdd = document.getElementById("set-location")
+    locationAdd.classList.remove('disabled')
   } else {
     latEl = DOM.defaultLat;
     lonEl = DOM.defaultLon;
     placeEl = DOM.place;
-    address = await fetchLocationAddress(latEl.value, lonEl.value, false);
+    address = await fetchLocationAddress(latEl.valueAsNumber, lonEl.valueAsNumber, false);
     if (address === false) return;
-    const content =
-      '&lt;span class="material-symbols-outlined">fmd_good&lt;/span> ' + address;
-    placeEl.innerHTML = content;
+    renderLocation(placeEl, address)
     const button = document.getElementById("apply-location");
     button.classList.replace("btn-primary", "btn-danger");
     button.textContent = "Apply";
@@ -1014,35 +1066,49 @@ const cancelDefaultLocation = () => {
   const latEl = DOM.defaultLat;
   const lonEl = DOM.defaultLon;
   const placeEl = DOM.place;
-  latEl.value = config.latitude;
-  lonEl.value = config.longitude;
-  placeEl.innerHTML =
-    '&lt;span class="material-symbols-outlined">fmd_good&lt;/span> ' +
-    config.location;
-  updateMap(latEl.value, lonEl.value);
+  const {lat, lon, place, radius} = LOCATIONS.find((obj) => obj.id === 0);
+  latEl.value = lat;
+  lonEl.value = lon;
+  renderLocation(placeEl, place)
+  updateMap(latEl.value, lonEl.value, radius);
   const button = document.getElementById("apply-location");
   button.classList.replace("btn-danger","btn-primary");
   button.innerHTML = 'Set &lt;span class="material-symbols-outlined">done&lt;/span>';
 };
 
+const checkCoords = (latVal, lonVal) => {
+    if (!Number.isFinite(latVal) || !Number.isFinite(lonVal)) return false;
+    if (latVal &lt; -90 || latVal > 90 || lonVal &lt; -180 || lonVal > 180) {
+      generateToast({ type: "warning", message: "placeOutOfBounds" });
+      return false;
+    }
+    return true;
+  }
+
 const setDefaultLocation = () => {
-  config.latitude = parseFloat(DOM.defaultLat.value).toFixed(4);
-  config.longitude = parseFloat(parseFloat(DOM.defaultLon.value)).toFixed(4);
+  const latVal = DOM.defaultLat.valueAsNumber;
+  const lonVal = DOM.defaultLon.valueAsNumber;
+  if (!checkCoords(latVal, lonVal)) return;
+  config.latitude = parseFloat(latVal).toFixed(4);
+  config.longitude = parseFloat(lonVal).toFixed(4);
   const locationText = DOM.place.textContent.replace("fmd_good", "").trim();
   const isPlaceholder =
     locationText.startsWith("Getting location") ||
     locationText.startsWith("No location found");
   config.location = isPlaceholder
-     ? `${config.latitude}, ${config.longitude}`
+     ? `${config.latitude} ${config.longitude}`
      : locationText;
-  DOM.place.textContent = config.location;
-  updateMap(parseFloat(DOM.defaultLat.value), parseFloat(DOM.defaultLon.value));
+  const defaultLoc = LOCATIONS.findIndex((obj) => obj.id === 0);
+  LOCATIONS[defaultLoc] = {...LOCATIONS[defaultLoc], lat: config.latitude, lon: config.longitude, place: config.location}
+  renderLocation(DOM.place, config.location)
+  updateMap(config.latitude, config.longitude);
   updatePrefs("config.json", config);
   worker.postMessage({
     action: "update-state",
     lat: config.latitude,
     lon: config.longitude,
     place: config.location,
+    radius: config.radius // can only change radius in custom file location
   });
   if (config.list === "location") {
     DOM.speciesThresholdEl.classList.remove("d-none");
@@ -1057,74 +1123,90 @@ const setDefaultLocation = () => {
   button.innerHTML = 'Set &lt;span class="material-symbols-outlined">done&lt;/span>';
 };
 
-async function setCustomLocation() {
-  const savedLocationSelect = await generateLocationList("savedLocations");
+async function setCustomLocation(manage = false) {
+  const savedLocationSelect = await generateLocationList("savedLocations", !manage);
   const latEl = document.getElementById("customLat");
   const lonEl = document.getElementById("customLon");
   const customPlaceEl = document.getElementById("customPlace");
   const locationAdd = document.getElementById("set-location");
+  const locationDelete = document.getElementById("delete-location");
+  const editSection = document.getElementById("edit-section");
+  editSection.classList.toggle("d-none", !manage);
+  locationDelete.classList.toggle('d-none', !manage);
+  customPlaceEl.toggleAttribute('readonly', !manage);
   const batchWrapper = document.getElementById("location-batch-wrapper");
-  STATE.openFiles.length > 1
-    ? batchWrapper.classList.remove("d-none")
-    : batchWrapper.classList.add("d-none");
-  // Use the current file location for lat, lon, place or use defaults
-  showLocation(false);
-  savedLocationSelect.addEventListener("change", function () {
-    showLocation(true);
-  });
+  batchWrapper.classList.toggle("d-none", !(STATE.openFiles.length > 1 &amp;&amp; !manage));
+  const locationRadius = document.getElementById("location-radius");
 
+  // Use the current file location for lat, lon, place or use defaults
+  showLocation(manage);
+  const onSavedLocationChange = () => showLocation(true);
+  savedLocationSelect.addEventListener("change", onSavedLocationChange);
+  // Translate modal content
   const i18 = i18n.get(i18n.Location);
-  const addOrDelete = () => {
-    if (customPlaceEl.value) {
-      locationAdd.textContent = i18[0];
-      locationAdd.classList.remove("btn-danger");
-      locationAdd.classList.add("button-primary");
-    } else {
-      locationAdd.textContent = i18[1];
-      locationAdd.classList.add("btn-danger");
-      locationAdd.classList.remove("button-primary");
-    }
-  };
-  // Highlight delete
-  customPlaceEl.addEventListener("keyup", addOrDelete);
-  addOrDelete();
-  locationModalDiv.querySelector("h5").textContent = i18[0];
+  // savedLocationSelect.querySelector("option").textContent = i18['add'];
+  locationDelete.textContent = i18['delete'];
+  locationModalDiv.querySelector("h5").textContent = i18['update'];
   const legends = locationModalDiv.querySelectorAll("legend");
+  const items = ['pick','edit', 'radius'];
   for (let i = 0; i &lt; legends.length; i++) {
-    legends[i].textContent = i18[i + 2]; // process each node
+    legends[i].textContent = i18[items[i]]; // process each node
   }
   locationModalDiv.querySelector('label[for="batchLocations"]').textContent =
-    i18[4];
-  document.getElementById("customLatLabel").textContent = i18[5];
-  document.getElementById("customLonLabel").textContent = i18[6];
+    i18['all'];
+  document.getElementById("customLatLabel").textContent = i18['lat'];
+  document.getElementById("customLonLabel").textContent = i18['lon'];
   const locationModal = new bootstrap.Modal(locationModalDiv);
   locationModal.show();
 
   // Submit action
   const locationForm = document.getElementById("locationForm");
 
-  const addLocation = () => {
-    locationID = savedLocationSelect.value;
+  const addLocation = (e) => {
+    const remove = e.target.id === 'delete-location';
+    const parsed = parseInt(savedLocationSelect.value);
+    const locationID = Number.isFinite(parsed) ? parsed : undefined;
     const batch = document.getElementById("batchLocations").checked;
-    const files = batch ? STATE.openFiles : [STATE.currentFile];
+    const files = batch ? STATE.openFiles : !manage &amp;&amp; STATE.currentFile ? [STATE.currentFile] : [];
+    const place = customPlaceEl.value;
+    const radius = locationRadius.valueAsNumber;
+    const lat = latEl.valueAsNumber;
+    const lon = lonEl.valueAsNumber;
+    if (!checkCoords(lat, lon)) return;
     worker.postMessage({
-      action: "set-custom-file-location",
-      lat: latEl.value,
-      lon: lonEl.value,
-      place: customPlaceEl.value,
-      files: files,
+      action: "set-location",
+      lat,lon,place,radius,files, id: locationID, remove
     });
+    if (locationID === 0){
+      // Default location updated - update config and UI
+      config.latitude = lat;
+      config.longitude = lon;
+      config.location = place;
+      config.radius = radius;
+      updatePrefs('config.json', config)
+      DOM.defaultLat.value = lat;
+      DOM.defaultLon.value = lon;
+      renderLocation(DOM.place, place);
+    }
     generateLocationList("explore-locations");
-
+    e.target.blur();
     locationModal.hide();
   };
+  const toggleSetButton = () => {
+    locationAdd.classList.toggle("disabled", isNaN(savedLocationSelect.value) || !customPlaceEl.value.trim());
+  };
+  toggleSetButton();
   locationAdd.addEventListener("click", addLocation);
+  locationDelete.addEventListener("click", addLocation);
+  customPlaceEl.addEventListener("input", toggleSetButton);
   const onModalDismiss = () => {
     locationForm.reset();
+    locationDelete.classList.add('d-none');
     locationAdd.removeEventListener("click", addLocation);
+    locationDelete.removeEventListener("click", addLocation);
+    customPlaceEl.removeEventListener("input", toggleSetButton);
+    savedLocationSelect.removeEventListener("change", onSavedLocationChange);
     locationModalDiv.removeEventListener("hide.bs.modal", onModalDismiss);
-    if (showLocation)
-      savedLocationSelect.removeEventListener("change", setCustomLocation);
   };
   locationModalDiv.addEventListener("hide.bs.modal", onModalDismiss);
 }
@@ -1142,7 +1224,7 @@ async function sortFilesByTime(fileNames) {
   const fileData = await Promise.all(
     fileNames.map(async (fileName) => {
       const stats = await fs.promises.stat(fileName);
-      return { name: fileName, time: stats.mtimeMs };
+      return { name: fileName, time: stats.mtimeMs, start: stats.birthtimeMs };
     })
   );
 
@@ -1162,7 +1244,8 @@ async function sortFilesByTime(fileNames) {
  */
 async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults } = {}) {
   if (!filePaths.length) return;
-  loadingFiles({hide:false})
+  if (STATE.mode === 'chart') showAnalyse()
+
   // Store the sanitised file list and Load First audio file
   pagination.reset();
   resetResults();
@@ -1183,7 +1266,9 @@ async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults 
   STATE.windowOffsetSecs = 0;
   STATE.windowLength = config.selectedModel.includes('bats') ? 5 : 20;
   // Reset the mode
+
   STATE.mode = 'analyse';
+
   // Reset analysis status - when importing, we want to set analysis done = true
   STATE.analysisDone = !checkSaved;
 
@@ -1193,6 +1278,7 @@ async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults 
     STATE.openFiles = await sortFilesByTime(STATE.openFiles);
   }
   utils.showElement(["spectrogramWrapper"], false);
+  spec.reInitSpec(config.specMaxHeight);
   loadAudioFileSync({ filePath: STATE.openFiles[0], preserveResults });
   // Clear unsaved records warning
   window.electron.unsavedRecords(false);
@@ -1304,22 +1390,27 @@ function postAnalyseMessage(args) {
 let openStreetMapTimer,
   currentRequest = null;
 async function fetchLocationAddress(lat, lon, pushLocations) {
-  const isInvalidLatitude = isNaN(lat) || lat === null || lat &lt; -90 || lat > 90;
-  const isInvalidLongitude =
-    isNaN(lon) || lon === null || lon &lt; -180 || lon > 180;
-
-  if (isInvalidLatitude || isInvalidLongitude) {
-    generateToast({ type: "warning", message: "placeOutOfBounds" });
-    return false;
-  }
-
+  if (!checkCoords(lat, lon)) return;
   currentRequest &amp;&amp; clearTimeout(openStreetMapTimer); // Cancel pending request
 
   return new Promise((resolve, reject) => {
     currentRequest = { lat, lon }; // Store the current request details
-    const storedLocation = LOCATIONS?.find(
-      (obj) => obj.lat === lat &amp;&amp; obj.lon === lon
-    );
+    const storedLocation = LOCATIONS?.find(obj => {
+      // Convert place string to numbers if it exists
+      const [placeLatStr, placeLonStr] = (obj.place || "").split(" ");
+      const placeLat = parseFloat(placeLatStr);
+      const placeLon = parseFloat(placeLonStr);
+      // Check if lat/lon match
+      if (obj.lat === lat &amp;&amp; obj.lon === lon) {
+        // If place exactly matches "lat lon" string, treat as falsey
+        if (placeLat === lat &amp;&amp; placeLon === lon) return false;
+        // Otherwise, lat/lon match but place is something else → truthy
+        return true;
+      }
+      // Lat/lon do not match → skip
+      return false;
+    });
+
     if (storedLocation) {
       return resolve(storedLocation.place);
     }
@@ -1474,8 +1565,10 @@ async function exportData(
 const handleLocationFilterChange = (e) => {
   const value = e.target.value;
   const parsed = value === "" ? undefined : parseInt(value, 10);
-  const location = Number.isFinite(parsed) ? parsed : undefined;
-  worker.postMessage({ action: "update-state", locationID: location });
+  const locationID = Number.isFinite(parsed) ? parsed : undefined;
+  const location = LOCATIONS.find(loc => loc.id === locationID);
+
+  worker.postMessage({ action: "update-state", location });
   // Update the seen species list
   worker.postMessage({ action: "get-detected-species-list" });
   worker.postMessage({
@@ -1607,7 +1700,6 @@ async function showExplore() {
  * @async
  */
 async function showAnalyse() {
-  utils.hideAll();
   utils.disableMenuItem(["active-analysis"]);
   //Restore STATE
   STATE = { ...STATE, ...STATE.currentAnalysis };
@@ -1618,6 +1710,7 @@ async function showAnalyse() {
     spec.spectrogram.destroy();
     spec.spectrogram = null;
   }
+  utils.hideAll();
   if (STATE.currentFile) {
     utils.showElement(["spectrogramWrapper"], false);
     spec.reInitSpec(config.specMaxHeight);
@@ -1845,6 +1938,7 @@ const defaultConfig = {
   latitude: 52.87,
   longitude: 0.89,
   location: "Great Snoring, North Norfolk",
+  radius: 30,
   detect: {
     nocmig: false,
     autoLoad: false,
@@ -1994,7 +2088,7 @@ window.onload = async () => {
   }
   const selectedModel = config.selectedModel;
   updateListOptions(selectedModel);
-  debug &amp;&amp; document.getElementById('dataset').classList.remove('d-none')
+  // debug &amp;&amp; document.getElementById('dataset').classList.remove('d-none')
   isMember &amp;&amp; updateModelOptions();
 
   worker.postMessage({
@@ -2007,6 +2101,7 @@ window.onload = async () => {
     lat: config.latitude,
     lon: config.longitude,
     place: config.location,
+    radius: config.radius,
     detect,
     filters,
     audio,
@@ -2237,7 +2332,6 @@ window.onload = async () => {
   pagination.init();
 };
 
-let MISSING_FILE;
 
 const setUpWorkerMessaging = () => {
   establishMessageChannel.then(() => {
@@ -2288,8 +2382,27 @@ const setUpWorkerMessaging = () => {
           onFileLocationID(args);
           break;
         }
+        case "delete-location-id": {
+          onLocationDeleted(args);
+          break;
+        }
         case "files": {
           onOpenFiles(args);
+          break;
+        }
+        case "found-time": {
+          const result = args.result;
+          if (result.length){
+            const {file, offset} = result[0];
+            STATE.windowLength = 20;
+            postBufferUpdate({
+              file,
+              begin: Math.max(offset - STATE.windowLength / 2, 0),
+              position: 0.5,
+            });
+          } else {
+            generateToast({type: "info", message: "Time not found in any file"});
+          }
           break;
         }
         case "generate-alert": {
@@ -2319,14 +2432,14 @@ const setUpWorkerMessaging = () => {
           if (args.file) {
             // Clear the file loading overlay:
             loadingFiles({hide: true})
-            MISSING_FILE = args.file;
+            const file = args.file;
             const i18 = i18n.get(i18n.Locate);
             args.locate = `
                             &lt;div class="d-flex justify-content-center mt-2">
-                                &lt;button id="locate-missing-file" class="btn btn-primary border-dark text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
+                                &lt;button id="locate-missing-file"  name="${file}" class="btn btn-primary border-dark text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
                                     ${i18.locate}
                                 &lt;/button>
-                                &lt;button id="purge-from-toast" class="ms-3 btn btn-warning text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
+                                &lt;button id="purge-from-toast" name="${file}" class="ms-3 btn btn-warning text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
                                 ${i18.remove}
                                 &lt;/button>
                             &lt;/div>
@@ -2346,6 +2459,13 @@ const setUpWorkerMessaging = () => {
         case "labels": {
           // Remove duplicate labels
           LABELS = [...new Set(args.labels)];
+          let range;
+          if (STATE.mode === "explore") { range = STATE.explore.range }
+          else if (STATE.mode === "chart") { range = STATE.chart.range }
+          worker.postMessage({
+            action: "get-detected-species-list",
+            range
+          });
           // Code below to retrieve Red list data
           // if (!done &amp;&amp; LABELS.length){
           //   STATE.IUCNcache = {};
@@ -2375,13 +2495,16 @@ const setUpWorkerMessaging = () => {
           break;
         }
         case "location-list": {
-          LOCATIONS = args.locations;
-          locationID = args.currentLocation;
+          LOCATIONS = args.data;
+          locationID = args.currentLocation || locationID;
+          generateLocationList("explore-locations");
+          generateLocationList("chart-locations");
           break;
         }
         case "model-ready": {
           if (args.message === "Model failed to load") {
               DOM.loadingScreen.classList.add("d-none");
+              APPLICATION_LOADED = true;
           } else {
             onModelReady();
           }
@@ -3275,62 +3398,25 @@ const goto = new bootstrap.Modal(document.getElementById("gotoModal"));
 const showGoToPosition = () => {
   if (STATE.currentFile) {
     const gotoLabel = document.getElementById("gotoModalLabel");
-    const timeHeading = config.timeOfDay
-      ? i18n.get(i18n.Context).gotoTimeOfDay
-      : i18n.get(i18n.Context).gotoPosition;
+    const timeHeading = i18n.get(i18n.Context).gotoTimeOfDay;
     gotoLabel.textContent = timeHeading;
+    const timeInput = document.getElementById("timeInput");
+    timeInput.value = 
+    utils.getDatetimeLocalFromEpoch(STATE.fileStart 
+      + (spec.wavesurfer.getCurrentTime() + STATE.windowOffsetSecs) * 1000);
+    timeInput.focus();
     goto.show();
   }
 };
 
-const gotoModal = document.getElementById("gotoModal");
-//gotoModal.addEventListener('hidden.bs.modal', enableKeyDownEvent)
-
-gotoModal.addEventListener("shown.bs.modal", () => {
-  const timeInput = document.getElementById("timeInput");
-  timeInput.value = "";
-  timeInput.focus();
-});
 
 const gotoTime = (e) => {
   if (STATE.currentFile) {
     e.preventDefault();
     const time = document.getElementById("timeInput").value;
-    // Nothing entered?
-    if (!time) {
-      // generateToast({type: 'warning',  message:'badTime'});
-      return;
-    }
-    let [hours, minutes, seconds] = time.split(":").map(Number);
-    hours ??= 0;
-    minutes ??= 0;
-    seconds ??= 0;
-    let initialTime, start;
-    if (config.timeOfDay) {
-      initialTime = new Date(STATE.fileStart);
-      // Create a Date object for the input time on the same day as the file start
-      const inputDate = new Date(
-        initialTime.getFullYear(),
-        initialTime.getMonth(),
-        initialTime.getDate(),
-        hours,
-        minutes,
-        seconds
-      );
-      // Calculate the offset in milliseconds
-      const offsetMillis = inputDate - STATE.fileStart;
-      start = offsetMillis / 1000;
-      //if we move to a new day... add 24 hours
-      start += start &lt; 0 ? 86400 : 0;
-    } else {
-      start = hours * 3600 + minutes * 60 + seconds;
-    }
-    STATE.windowLength = 20;
-
-    start = Math.min(start, STATE.currentFileDuration);
-    STATE.windowOffsetSecs = Math.max(start - STATE.windowLength / 2, 0);
-    const position = start === 0 ? 0 : 0.5;
-    postBufferUpdate({ begin: STATE.windowOffsetSecs, position: position });
+    const dateTime = Date.parse(time);
+    if (isNaN(dateTime)) return;
+    worker.postMessage({ action: "find-time", time: dateTime});
     // Close the modal
     goto.hide();
   }
@@ -4823,7 +4909,7 @@ document.addEventListener("drop", (event) => {
     );
   if (fileList.length){
     const audioFiles = fileList.map(file => window.electron.showFilePath(file));
-    worker.postMessage({ action: "get-valid-files-list", files: audioFiles });
+    filterValidFiles({ filePaths:audioFiles });
   } else {
     const noSupport = {
         en: 'File type not supported',
@@ -4983,6 +5069,17 @@ function showThreshold(e) {
 }
 
 /**
+ * Updates the radius display in the location modal.
+ * @param {Event|number} e - The input event or numeric threshold value to display and set.
+ * `@returns` {number} The resolved radius value.
+ */
+function showRadiusValue(e) {
+  const radius = e instanceof Event ? e.target.valueAsNumber : e;
+  document.getElementById('radius-value').innerHTML = `&lt;b>${radius}m&lt;/b>`;
+  return radius
+}
+
+/**
  * Updates the UI to display the current topRankin threshold value.
  * 
  * Accepts either an event or a numeric value, updates the display element with the threshold, and sets the input value accordingly.
@@ -5118,6 +5215,10 @@ document.addEventListener('input', (e) =>{
     case "confidenceValue": {
       showThreshold(e)
       break;
+    }
+    case "location-radius": {
+      showRadiusValue(e);
+      break
     }
     case "top-rankin": {
       showTopRankin(e);
@@ -5326,12 +5427,20 @@ async function handleUIClicks(e) {
       element.disabled = false;
       break;
     }
+    case "fullscreen-button":{
+      goFullscreen();
+      break;
+    }
     case "explore": {
       showExplore();
       break;
     }
     case "active-analysis": {
       showAnalyse();
+      break;
+    }
+    case "manage-locations": {
+      setCustomLocation(true)
       break;
     }
     case "compress-and-organise": {
@@ -5369,13 +5478,15 @@ async function handleUIClicks(e) {
     }
 
     case "purge-from-toast": {
-      deleteFile(MISSING_FILE);
+      const file = element.name;
+      deleteFile(file);
       break;
     }
 
     // ----
     case "locate-missing-file": {
-      (async () => await locateFile(MISSING_FILE))();
+      const file = element.name;
+      (async () => await locateFile(file))();
       break;
     }
     case "clear-custom-list": {
@@ -5402,7 +5513,7 @@ async function handleUIClicks(e) {
       config.list = 'everything';
       updateList();
       updatePrefs("config.json", config);
-      showAnalyse();
+      if (STATE.mode !== "analyse") showAnalyse();
       break;
     }
     // Custom models
@@ -5646,6 +5757,7 @@ async function handleUIClicks(e) {
     }
     case "show-species":
     case "species": {
+      e.preventDefault();
       worker.postMessage({
         action: "get-valid-species",
         file: STATE.currentFile,
@@ -5754,6 +5866,15 @@ async function handleUIClicks(e) {
           const archiveFolder = files.filePaths[0];
           config.database.location = archiveFolder;
           document.getElementById("database-location").value = archiveFolder;
+          console.info('New database location selected:', archiveFolder);
+          // Assume no records in it until we hear otherwise from the worker
+          DOM.chartsLink.classList.add("disabled");
+          DOM.exploreLink.classList.add("disabled");
+          config.library.location &amp;&amp;
+            document
+              .getElementById("compress-and-organise")
+              .classList.add("disabled");
+          STATE.diskHasRecords = false;          
           updatePrefs("config.json", config);
           worker.postMessage({
             action: "update-state",
@@ -5762,7 +5883,7 @@ async function handleUIClicks(e) {
           config.list = 'everything';
           updateList()
           updatePrefs("config.json", config);
-          showAnalyse();
+          if (STATE.mode !== "analyse") showAnalyse();
         }
       })();
       break;
@@ -5846,6 +5967,7 @@ async function handleUIClicks(e) {
       break;
     }
     case "reset-defaults": {
+      e.preventDefault();
       const i18 = {
         en: "Are you sure you want to revert to the default settings? You will need to relaunch Chirpity to see the changes.",
         da: "Er du sikker på, at du vil gendanne standardindstillingerne? Du skal genstarte Chirpity for at se ændringerne.",
@@ -5949,10 +6071,12 @@ async function handleUIClicks(e) {
       break;
     }
     case "apply-location": {
+      e.preventDefault();
       setDefaultLocation();
       break;
     }
     case "cancel-location": {
+      e.preventDefault();
       cancelDefaultLocation();
       break;
     }
@@ -5973,6 +6097,7 @@ async function handleUIClicks(e) {
       break;
     }
     case "clear-call-cache": {
+      e.preventDefault();
       const data = fs.rm(p.join(appPath, "XCcache.json"), (err) => {
         if (err)
           generateToast({ type: "error", message: "noCallCache" }) &amp;&amp;
@@ -5987,7 +6112,7 @@ async function handleUIClicks(e) {
         break;      
     }
     case "setCustomLocation": {
-      setCustomLocation();
+      setCustomLocation(false);
       break;
     }
     case "setFileStart": {
@@ -6070,7 +6195,7 @@ async function updateList() {
     worker.postMessage({
       action: "update-list",
       list: config.list,
-      refreshResults: STATE.analysisDone,
+      refreshResults: STATE.analysisDone &amp;&amp; STATE.mode !== 'chart',
     });
   }
 }
@@ -6656,14 +6781,15 @@ async function readLabels(labelFile, updating) {
   try {
     const filecontents = await fs.promises.readFile(labelFile, "utf8");
     const labels = filecontents.trim().split(/\r?\n/);
-    const unknown = `Unknown Sp.${getSplitChar()}Unknown Sp.`;
-    if (!labels.includes(unknown)) labels.push(unknown);
+    const unknown = `Unknown Sp.,Unknown Sp.`;
+    const unknownPattern = /^Unknown Sp\.[,_~]Unknown Sp\.$/;
+    if (!labels.some(l => unknownPattern.test(l))) labels.push(unknown);
     if (updating === "list") {
       worker.postMessage({
         action: "update-list",
         list: config.list,
         customLabels: labels,
-        refreshResults: STATE.analysisDone,
+        refreshResults: STATE.analysisDone &amp;&amp; STATE.mode !== 'chart',
         member: STATE.isMember,
       });
       trackEvent(config.UUID, "UI", "Create", "Custom list", labels.length);
@@ -6879,7 +7005,7 @@ const recordEntryModal = new bootstrap.Modal(recordEntryModalDiv, {
 
 const recordEntryForm = document.getElementById("record-entry-form");
 
-const getSplitChar = () => config.selectedModel.includes('perch') ? '~' : '_';
+const getSplitChar = (labels = []) => config.selectedModel === "perch v2" ? /[,~]/ : /[,_]/;
 /**
  * Displays and populates the record entry modal for adding or updating audio record details.
  *
@@ -6922,9 +7048,9 @@ async function showRecordEntryForm(mode, batch) {
   const speciesDisplay = document.createElement("div");
   speciesDisplay.className = "border rounded w-100";
   if (cname) {
-    const species = LABELS.find(sp => sp.split(getSplitChar())[1] === cname);
+    const species = LABELS.find(sp => sp.split(getSplitChar(LABELS))[1] === cname);
     if (species) {
-      const [sciName, commonName] = species.split(getSplitChar());
+      const [sciName, commonName] = species.split(getSplitChar(LABELS));
       const styled = `${commonName}&lt;br/>&lt;i>${sciName}&lt;/i>`;
       selectedBird.innerHTML = styled;
     } else {
@@ -7430,7 +7556,7 @@ async function getXCComparisons() {
         })
         .catch((error) => {
           loadingFiles({hide:true})
-          console.warn("Error getting XC data for type", type, error);
+          console.warn(`Error getting XC data for type:${type}`, error);
           return [];
         });
     });
@@ -7716,8 +7842,8 @@ const IUCNMap = {
   EX: "text-bg-dark",
 };
 
-// Make config, LOCATIONS and displayLocationAddress and toasts available to the map script in index.html
-export { config, displayLocationAddress, LOCATIONS, generateToast };
+// Make functions available to the map script in index.html
+export { config, displayLocationAddress, LOCATIONS, generateToast, checkCoords};
 
 /**
  * Checks the user's membership status via a remote API and updates the UI to reflect feature access.
@@ -7737,6 +7863,7 @@ async function membershipCheck() {
   const installPeriod = now - installDate;
   const trialDaysLeft = Math.max(Math.ceil((trialPeriod - installPeriod)/86_400_000), 0)
   const inTrial = installPeriod &lt; trialPeriod;
+
   const lockedElements = document.querySelectorAll(".locked, .unlocked");
   const unlockElements = () => {
     lockedElements.forEach((el) => {
@@ -7953,6 +8080,8 @@ function changeInputElement(column, element, key, preSelected = null) {
   }
 }
 
+
+
 document.addEventListener("labelsUpdated", (e) => {
   const tags = e.detail.tags;
   const tagObjects = tags.map((name, index) => ({ id: index, name }));
@@ -7990,7 +8119,7 @@ function getFilteredBirds(search, list) {
   const sortedList = list.filter(bird => typeof bird === "string" &amp;&amp; bird.toLowerCase().includes(search))
     .map((item) => {
       // Flip sname and cname from "sname_/~cname"
-      const [cname, sname] = item.split(getSplitChar()).reverse();
+      const [cname, sname] = item.split(getSplitChar(list)).reverse();
       return { cname, sname, styled: `${cname} &lt;br/>&lt;i>${sname}&lt;/i>` };
     })
     .sort((a, b) =>
@@ -8241,7 +8370,7 @@ function checkForIntelMacUpdates() {
             ].join("");
             alertPlaceholder.append(wrapper);
           };
-          const link = `&lt;a href="https://chirpity.mattkirkland.co.uk?fromVersion=${VERSION}" target="_blank">`;
+          const link = `&lt;a href="https://chirpity.net?fromVersion=${VERSION}" target="_blank">`;
           const message = utils.interpolate(i18n.get(i18n.UpdateMessage), {
             link: link,
           });
@@ -8381,13 +8510,13 @@ function checkForIntelMacUpdates() {
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#LIST_CACHE">LIST_CACHE</a></li><li><a href="global.html#WSPlayPause">WSPlayPause</a></li><li><a href="global.html#_updateSpeciesLocale">_updateSpeciesLocale</a></li><li><a href="global.html#activateResultSort">activateResultSort</a></li><li><a href="global.html#addDays">addDays</a></li><li><a href="global.html#addQueryQualifiers">addQueryQualifiers</a></li><li><a href="global.html#addToHistory">addToHistory</a></li><li><a href="global.html#allowedByList">allowedByList</a></li><li><a href="global.html#analyseReset">analyseReset</a></li><li><a href="global.html#batchExportAudio">batchExportAudio</a></li><li><a href="global.html#batchInsertRecords">batchInsertRecords</a></li><li><a href="global.html#calculateTimeBoundaries">calculateTimeBoundaries</a></li><li><a href="global.html#changeInputElement">changeInputElement</a></li><li><a href="global.html#changeSettingsMode">changeSettingsMode</a></li><li><a href="global.html#chartInstance">chartInstance</a></li><li><a href="global.html#checkFilteredFrequency">checkFilteredFrequency</a></li><li><a href="global.html#checkForIntelMacUpdates">checkForIntelMacUpdates</a></li><li><a href="global.html#checkNewModel">checkNewModel</a></li><li><a href="global.html#checkpoint">checkpoint</a></li><li><a href="global.html#clearActive">clearActive</a></li><li><a href="global.html#closeDatabase">closeDatabase</a></li><li><a href="global.html#convertAndOrganiseFiles">convertAndOrganiseFiles</a></li><li><a href="global.html#convertFile">convertFile</a></li><li><a href="global.html#createContextMenu">createContextMenu</a></li><li><a href="global.html#customAnalysisAllMenu">customAnalysisAllMenu</a></li><li><a href="global.html#customiseAnalysisMenu">customiseAnalysisMenu</a></li><li><a href="global.html#dayMonthToDayOfYear">dayMonthToDayOfYear</a></li><li><a href="global.html#dayOfYear">dayOfYear</a></li><li><a href="global.html#deepMergeLists">deepMergeLists</a></li><li><a href="global.html#doPrediction">doPrediction</a></li><li><a href="global.html#epochInDayMonthRange">epochInDayMonthRange</a></li><li><a href="global.html#estimateTimeRemaining">estimateTimeRemaining</a></li><li><a href="global.html#exportAudacity">exportAudacity</a></li><li><a href="global.html#exportData">exportData</a></li><li><a href="global.html#exportSpeciesList">exportSpeciesList</a></li><li><a href="global.html#fetchAudioBuffer">fetchAudioBuffer</a></li><li><a href="global.html#filterResults">filterResults</a></li><li><a href="global.html#filterValidFiles">filterValidFiles</a></li><li><a href="global.html#formatAsBootstrapTable">formatAsBootstrapTable</a></li><li><a href="global.html#generateBirdIDList">generateBirdIDList</a></li><li><a href="global.html#generateToast">generateToast</a></li><li><a href="global.html#getDetectedSpecies">getDetectedSpecies</a></li><li><a href="global.html#getExcluded">getExcluded</a></li><li><a href="global.html#getFileSQLAndParams">getFileSQLAndParams</a></li><li><a href="global.html#getFiles">getFiles</a></li><li><a href="global.html#getFilteredBirds">getFilteredBirds</a></li><li><a href="global.html#getIncludedIDs">getIncludedIDs</a></li><li><a href="global.html#getInstallInfo">getInstallInfo</a></li><li><a href="global.html#getMatchingIds">getMatchingIds</a></li><li><a href="global.html#getNearbyLocations">getNearbyLocations</a></li><li><a href="global.html#getResults">getResults</a></li><li><a href="global.html#getRowFromStart">getRowFromStart</a></li><li><a href="global.html#getSpecies">getSpecies</a></li><li><a href="global.html#getSpeciesSQLAsync">getSpeciesSQLAsync</a></li><li><a href="global.html#getValidSpecies">getValidSpecies</a></li><li><a href="global.html#getWorkingFile">getWorkingFile</a></li><li><a href="global.html#getXCComparisons">getXCComparisons</a></li><li><a href="global.html#handleKeyDown">handleKeyDown</a></li><li><a href="global.html#handleKeyDownDeBounce">handleKeyDownDeBounce</a></li><li><a href="global.html#handleMessage">handleMessage</a></li><li><a href="global.html#handleUIClicks">handleUIClicks</a></li><li><a href="global.html#importData">importData</a></li><li><a href="global.html#loadAudioFile">loadAudioFile</a></li><li><a href="global.html#loadAudioFileSync">loadAudioFileSync</a></li><li><a href="global.html#loadDB">loadDB</a></li><li><a href="global.html#localiseModal">localiseModal</a></li><li><a href="global.html#locateFile">locateFile</a></li><li><a href="global.html#membershipCheck">membershipCheck</a></li><li><a href="global.html#metadataLocks">metadataLocks</a></li><li><a href="global.html#notifyMissingFile">notifyMissingFile</a></li><li><a href="global.html#onAbort">onAbort</a></li><li><a href="global.html#onAnalyse">onAnalyse</a></li><li><a href="global.html#onAnalysisComplete">onAnalysisComplete</a></li><li><a href="global.html#onChangeMode">onChangeMode</a></li><li><a href="global.html#onDelete">onDelete</a></li><li><a href="global.html#onDeleteSpecies">onDeleteSpecies</a></li><li><a href="global.html#onLaunch">onLaunch</a></li><li><a href="global.html#onModelReady">onModelReady</a></li><li><a href="global.html#onOpenFiles">onOpenFiles</a></li><li><a href="global.html#onResultsComplete">onResultsComplete</a></li><li><a href="global.html#onSave2DiskDB">onSave2DiskDB</a></li><li><a href="global.html#onSaveAudio">onSaveAudio</a></li><li><a href="global.html#onSetLocation">onSetLocation</a></li><li><a href="global.html#onSummaryComplete">onSummaryComplete</a></li><li><a href="global.html#onUpdateLocale">onUpdateLocale</a></li><li><a href="global.html#onWorkerLoadedAudio">onWorkerLoadedAudio</a></li><li><a href="global.html#parseBextLocalDate">parseBextLocalDate</a></li><li><a href="global.html#parseCnames">parseCnames</a></li><li><a href="global.html#parseMessage">parseMessage</a></li><li><a href="global.html#playRegion">playRegion</a></li><li><a href="global.html#positionMenu">positionMenu</a></li><li><a href="global.html#postAnalyseMessage">postAnalyseMessage</a></li><li><a href="global.html#processAudio">processAudio</a></li><li><a href="global.html#processFilesInBatches">processFilesInBatches</a></li><li><a href="global.html#processNextFile">processNextFile</a></li><li><a href="global.html#readLabels">readLabels</a></li><li><a href="global.html#recordUpdate">recordUpdate</a></li><li><a href="global.html#refreshResultsView">refreshResultsView</a></li><li><a href="global.html#refreshSummary">refreshSummary</a></li><li><a href="global.html#renderFilenamePanel">renderFilenamePanel</a></li><li><a href="global.html#renderResult">renderResult</a></li><li><a href="global.html#resetDiagnostics">resetDiagnostics</a></li><li><a href="global.html#resetResults">resetResults</a></li><li><a href="global.html#resultClick">resultClick</a></li><li><a href="global.html#savedFileCheckAsync">savedFileCheckAsync</a></li><li><a href="global.html#sendDetections">sendDetections</a></li><li><a href="global.html#setActiveRegion">setActiveRegion</a></li><li><a href="global.html#setActiveRow">setActiveRow</a></li><li><a href="global.html#setAudioFilters">setAudioFilters</a></li><li><a href="global.html#setClickedIndex">setClickedIndex</a></li><li><a href="global.html#setIncludedIDs">setIncludedIDs</a></li><li><a href="global.html#setKeyAssignment">setKeyAssignment</a></li><li><a href="global.html#setKeyAssignmentUI">setKeyAssignmentUI</a></li><li><a href="global.html#setLabelState">setLabelState</a></li><li><a href="global.html#setListUIState">setListUIState</a></li><li><a href="global.html#setNocmig">setNocmig</a></li><li><a href="global.html#setStartEnd">setStartEnd</a></li><li><a href="global.html#showAnalyse">showAnalyse</a></li><li><a href="global.html#showCharts">showCharts</a></li><li><a href="global.html#showDatePicker">showDatePicker</a></li><li><a href="global.html#showExplore">showExplore</a></li><li><a href="global.html#showRecordEntryForm">showRecordEntryForm</a></li><li><a href="global.html#showSummarySortIcon">showSummarySortIcon</a></li><li><a href="global.html#showThreshold">showThreshold</a></li><li><a href="global.html#showTopRankin">showTopRankin</a></li><li><a href="global.html#showWindowDetections">showWindowDetections</a></li><li><a href="global.html#spawnListWorker">spawnListWorker</a></li><li><a href="global.html#spawnPredictWorkers">spawnPredictWorkers</a></li><li><a href="global.html#speciesFilter">speciesFilter</a></li><li><a href="global.html#t0_warmup">t0_warmup</a></li><li><a href="global.html#training">training</a></li><li><a href="global.html#unpackNameAttr">unpackNameAttr</a></li><li><a href="global.html#updateFilesBeingProcessed">updateFilesBeingProcessed</a></li><li><a href="global.html#updateList">updateList</a></li><li><a href="global.html#updateMetadata">updateMetadata</a></li><li><a href="global.html#updatePagination">updatePagination</a></li><li><a href="global.html#updateSuggestions">updateSuggestions</a></li><li><a href="global.html#upgrade_to_v2">upgrade_to_v2</a></li><li><a href="global.html#upgrade_to_v4">upgrade_to_v4</a></li><li><a href="global.html#waitForWavesurferReady">waitForWavesurferReady</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#LIST_CACHE">LIST_CACHE</a></li><li><a href="global.html#WSPlayPause">WSPlayPause</a></li><li><a href="global.html#_getNearbyLocations">_getNearbyLocations</a></li><li><a href="global.html#_updateSpeciesLocale">_updateSpeciesLocale</a></li><li><a href="global.html#activateResultSort">activateResultSort</a></li><li><a href="global.html#addDays">addDays</a></li><li><a href="global.html#addQueryQualifiers">addQueryQualifiers</a></li><li><a href="global.html#addToHistory">addToHistory</a></li><li><a href="global.html#allowedByList">allowedByList</a></li><li><a href="global.html#analyseReset">analyseReset</a></li><li><a href="global.html#batchExportAudio">batchExportAudio</a></li><li><a href="global.html#batchInsertRecords">batchInsertRecords</a></li><li><a href="global.html#calculateTimeBoundaries">calculateTimeBoundaries</a></li><li><a href="global.html#changeInputElement">changeInputElement</a></li><li><a href="global.html#changeSettingsMode">changeSettingsMode</a></li><li><a href="global.html#chartInstance">chartInstance</a></li><li><a href="global.html#checkFilteredFrequency">checkFilteredFrequency</a></li><li><a href="global.html#checkForIntelMacUpdates">checkForIntelMacUpdates</a></li><li><a href="global.html#checkNewModel">checkNewModel</a></li><li><a href="global.html#checkpoint">checkpoint</a></li><li><a href="global.html#clearActive">clearActive</a></li><li><a href="global.html#closeDatabase">closeDatabase</a></li><li><a href="global.html#convertAndOrganiseFiles">convertAndOrganiseFiles</a></li><li><a href="global.html#convertFile">convertFile</a></li><li><a href="global.html#createContextMenu">createContextMenu</a></li><li><a href="global.html#customAnalysisAllMenu">customAnalysisAllMenu</a></li><li><a href="global.html#customiseAnalysisMenu">customiseAnalysisMenu</a></li><li><a href="global.html#dayMonthToDayOfYear">dayMonthToDayOfYear</a></li><li><a href="global.html#dayOfYear">dayOfYear</a></li><li><a href="global.html#deepMergeLists">deepMergeLists</a></li><li><a href="global.html#doPrediction">doPrediction</a></li><li><a href="global.html#epochInDayMonthRange">epochInDayMonthRange</a></li><li><a href="global.html#estimateTimeRemaining">estimateTimeRemaining</a></li><li><a href="global.html#exportAudacity">exportAudacity</a></li><li><a href="global.html#exportData">exportData</a></li><li><a href="global.html#exportSpeciesList">exportSpeciesList</a></li><li><a href="global.html#fetchAudioBuffer">fetchAudioBuffer</a></li><li><a href="global.html#filterResults">filterResults</a></li><li><a href="global.html#filterValidFiles">filterValidFiles</a></li><li><a href="global.html#formatAsBootstrapTable">formatAsBootstrapTable</a></li><li><a href="global.html#generateBirdIDList">generateBirdIDList</a></li><li><a href="global.html#generateToast">generateToast</a></li><li><a href="global.html#getDetectedSpecies">getDetectedSpecies</a></li><li><a href="global.html#getExcluded">getExcluded</a></li><li><a href="global.html#getFileSQLAndParams">getFileSQLAndParams</a></li><li><a href="global.html#getFiles">getFiles</a></li><li><a href="global.html#getFilteredBirds">getFilteredBirds</a></li><li><a href="global.html#getIncludedIDs">getIncludedIDs</a></li><li><a href="global.html#getInstallInfo">getInstallInfo</a></li><li><a href="global.html#getMatchingIds">getMatchingIds</a></li><li><a href="global.html#getResults">getResults</a></li><li><a href="global.html#getRowFromStart">getRowFromStart</a></li><li><a href="global.html#getSpecies">getSpecies</a></li><li><a href="global.html#getSpeciesSQLAsync">getSpeciesSQLAsync</a></li><li><a href="global.html#getValidSpecies">getValidSpecies</a></li><li><a href="global.html#getWorkingFile">getWorkingFile</a></li><li><a href="global.html#getXCComparisons">getXCComparisons</a></li><li><a href="global.html#handleKeyDown">handleKeyDown</a></li><li><a href="global.html#handleKeyDownDeBounce">handleKeyDownDeBounce</a></li><li><a href="global.html#handleMessage">handleMessage</a></li><li><a href="global.html#handleUIClicks">handleUIClicks</a></li><li><a href="global.html#importData">importData</a></li><li><a href="global.html#loadAudioFile">loadAudioFile</a></li><li><a href="global.html#loadAudioFileSync">loadAudioFileSync</a></li><li><a href="global.html#loadDB">loadDB</a></li><li><a href="global.html#localiseModal">localiseModal</a></li><li><a href="global.html#locateFile">locateFile</a></li><li><a href="global.html#membershipCheck">membershipCheck</a></li><li><a href="global.html#metadataLocks">metadataLocks</a></li><li><a href="global.html#notifyMissingFile">notifyMissingFile</a></li><li><a href="global.html#onAbort">onAbort</a></li><li><a href="global.html#onAnalyse">onAnalyse</a></li><li><a href="global.html#onAnalysisComplete">onAnalysisComplete</a></li><li><a href="global.html#onChangeMode">onChangeMode</a></li><li><a href="global.html#onDelete">onDelete</a></li><li><a href="global.html#onDeleteSpecies">onDeleteSpecies</a></li><li><a href="global.html#onLaunch">onLaunch</a></li><li><a href="global.html#onModelReady">onModelReady</a></li><li><a href="global.html#onOpenFiles">onOpenFiles</a></li><li><a href="global.html#onResultsComplete">onResultsComplete</a></li><li><a href="global.html#onSave2DiskDB">onSave2DiskDB</a></li><li><a href="global.html#onSaveAudio">onSaveAudio</a></li><li><a href="global.html#onSetLocation">onSetLocation</a></li><li><a href="global.html#onSummaryComplete">onSummaryComplete</a></li><li><a href="global.html#onUpdateLocale">onUpdateLocale</a></li><li><a href="global.html#onWorkerLoadedAudio">onWorkerLoadedAudio</a></li><li><a href="global.html#parseBextLocalDate">parseBextLocalDate</a></li><li><a href="global.html#parseCnames">parseCnames</a></li><li><a href="global.html#parseMessage">parseMessage</a></li><li><a href="global.html#playRegion">playRegion</a></li><li><a href="global.html#positionMenu">positionMenu</a></li><li><a href="global.html#postAnalyseMessage">postAnalyseMessage</a></li><li><a href="global.html#processAudio">processAudio</a></li><li><a href="global.html#processFilesInBatches">processFilesInBatches</a></li><li><a href="global.html#processNextFile">processNextFile</a></li><li><a href="global.html#readLabels">readLabels</a></li><li><a href="global.html#recordUpdate">recordUpdate</a></li><li><a href="global.html#refreshResultsView">refreshResultsView</a></li><li><a href="global.html#refreshSummary">refreshSummary</a></li><li><a href="global.html#renderFilenamePanel">renderFilenamePanel</a></li><li><a href="global.html#renderLocation">renderLocation</a></li><li><a href="global.html#renderResult">renderResult</a></li><li><a href="global.html#resetDiagnostics">resetDiagnostics</a></li><li><a href="global.html#resetResults">resetResults</a></li><li><a href="global.html#resultClick">resultClick</a></li><li><a href="global.html#savedFileCheckAsync">savedFileCheckAsync</a></li><li><a href="global.html#sendDetections">sendDetections</a></li><li><a href="global.html#sendProgress">sendProgress</a></li><li><a href="global.html#setActiveRegion">setActiveRegion</a></li><li><a href="global.html#setActiveRow">setActiveRow</a></li><li><a href="global.html#setAudioFilters">setAudioFilters</a></li><li><a href="global.html#setClickedIndex">setClickedIndex</a></li><li><a href="global.html#setIncludedIDs">setIncludedIDs</a></li><li><a href="global.html#setKeyAssignment">setKeyAssignment</a></li><li><a href="global.html#setKeyAssignmentUI">setKeyAssignmentUI</a></li><li><a href="global.html#setLabelState">setLabelState</a></li><li><a href="global.html#setListUIState">setListUIState</a></li><li><a href="global.html#setNocmig">setNocmig</a></li><li><a href="global.html#setStartEnd">setStartEnd</a></li><li><a href="global.html#showAnalyse">showAnalyse</a></li><li><a href="global.html#showCharts">showCharts</a></li><li><a href="global.html#showDatePicker">showDatePicker</a></li><li><a href="global.html#showExplore">showExplore</a></li><li><a href="global.html#showRadiusValue">showRadiusValue</a></li><li><a href="global.html#showRecordEntryForm">showRecordEntryForm</a></li><li><a href="global.html#showSummarySortIcon">showSummarySortIcon</a></li><li><a href="global.html#showThreshold">showThreshold</a></li><li><a href="global.html#showTopRankin">showTopRankin</a></li><li><a href="global.html#showWindowDetections">showWindowDetections</a></li><li><a href="global.html#spawnListWorker">spawnListWorker</a></li><li><a href="global.html#spawnPredictWorkers">spawnPredictWorkers</a></li><li><a href="global.html#speciesFilter">speciesFilter</a></li><li><a href="global.html#t0_warmup">t0_warmup</a></li><li><a href="global.html#training">training</a></li><li><a href="global.html#unpackNameAttr">unpackNameAttr</a></li><li><a href="global.html#updateFilesBeingProcessed">updateFilesBeingProcessed</a></li><li><a href="global.html#updateList">updateList</a></li><li><a href="global.html#updateMetadata">updateMetadata</a></li><li><a href="global.html#updatePagination">updatePagination</a></li><li><a href="global.html#updateSuggestions">updateSuggestions</a></li><li><a href="global.html#upgrade_to_v2">upgrade_to_v2</a></li><li><a href="global.html#upgrade_to_v4">upgrade_to_v4</a></li><li><a href="global.html#waitForWavesurferReady">waitForWavesurferReady</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Thu Jan 29 2026 18:44:25 GMT+0000 (Greenwich Mean Time)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a> on Thu Feb 19 2026 18:31:48 GMT+0000 (Greenwich Mean Time)
 </footer>
 
 <script> prettyPrint(); </script>
