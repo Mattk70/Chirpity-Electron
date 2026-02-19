@@ -4721,9 +4721,9 @@ function allowedByList(result){
   }
   // Confidence check (species-specific overrides global)
   const confidence = conditions?.confidence;
-  const minConfidence = confidence ?? confidenceCheck 
+  const minConfidence = confidence ?? (confidenceCheck 
     ? Math.min(STATE.detect.confidence, 150) 
-    : STATE.detect.confidence;
+    : STATE.detect.confidence);
   return score >= minConfidence;
 }
 
@@ -4838,7 +4838,7 @@ const onSave2DiskDB = async ({ file }) => {
       SELECT 
           r.position, r.fileID, r.speciesID, r.modelID, r.confidence, 
           r.comment, r.end, r.callCount, r.isDaylight, r.reviewed, r.tagID,
-          f.filestart, s.cname
+          f.filestart, f.name AS fileName, s.cname
       FROM records r
       JOIN species s ON r.speciesID = s.id
       JOIN files f ON r.fileID = f.id
@@ -4856,45 +4856,31 @@ const onSave2DiskDB = async ({ file }) => {
 
     // Build bulk INSERT using filestart as stable identifier to resolve disk DB fileIDs
     if (allowed.length > 0) {
-      // Build VALUES clause from allowed records
-      const valuesClauses = allowed.map((row, idx) => {
-        const {position, speciesID, modelID, confidence, comment, end, callCount, isDaylight, reviewed, tagID, filestart} = row;
-        // Escape and quote values safely for SQL VALUES clause
-        const fields = [
-          position,
-          speciesID,
-          modelID,
-          confidence,
-          comment ? `'${comment.replace(/'/g, "''")}'` : 'NULL',
-          end,
-          callCount ?? 'NULL',
-          isDaylight,
-          reviewed,
-          tagID ?? 'NULL',
-          filestart
-        ];
-        return `(${fields.join(',')})`;
-      }).join(',');
-
-      // Bulk insert resolves fileID by joining on filestart
-      await memoryDB.runAsync(`
-        WITH v (
-          position, speciesID, modelID, confidence,
-          comment, end, callCount, isDaylight, reviewed, tagID, filestart
-        ) AS (
-          VALUES ${valuesClauses}
-        )
-        INSERT OR IGNORE INTO disk.records (
-          position, speciesID, modelID, confidence,
-          comment, end, callCount, isDaylight, reviewed, tagID, fileID
-        )
-        SELECT
-          v.position, v.speciesID, v.modelID, v.confidence,
-          v.comment, v.end, v.callCount, v.isDaylight, v.reviewed, v.tagID,
-          d.id
-        FROM v
-        JOIN disk.files d ON v.filestart = d.filestart
-      `);
+      const batchSize = 2500;
+      for (let i = 0; i < allowed.length; i += batchSize) {
+        const batch = allowed.slice(i, i + batchSize);
+        const rowPlaceholders = batch.map(() =>
+          '(?,?,?,?,?,?,?,?,?,?,?)'
+        ).join(',');
+        const insertValues = batch.flatMap(row => [
+          row.position, row.speciesID, row.modelID, row.confidence,
+          row.comment ?? null, row.end, row.callCount ?? null,
+          row.isDaylight, row.reviewed, row.tagID ?? null, row.fileName
+        ]);
+        await memoryDB.runAsync(`
+          WITH v(position, speciesID, modelID, confidence,
+                comment, end, callCount, isDaylight, reviewed, tagID, fileName)
+          AS (VALUES ${rowPlaceholders})
+          INSERT OR IGNORE INTO disk.records (
+            position, speciesID, modelID, confidence,
+            comment, end, callCount, isDaylight, reviewed, tagID, fileID
+          )
+          SELECT v.position, v.speciesID, v.modelID, v.confidence,
+                v.comment, v.end, v.callCount, v.isDaylight, v.reviewed, v.tagID,
+                d.id
+          FROM v JOIN disk.files d ON v.fileName = d.name
+        `, ...insertValues);
+      }
       inserted = allowed.length;
     }
     DEBUG && console.log(inserted + " records added to disk database");
@@ -5882,7 +5868,7 @@ async function convertAndOrganiseFiles(threadLimit = 4) {
     "SELECT DISTINCT f.id, f.name, f.archiveName, f.duration, f.filestart, l.place FROM files f LEFT JOIN locations l ON f.locationID = l.id";
   // If just saving files with records
   if (clips) query += " INNER JOIN records r ON r.fileID = f.id";
-  if (backfill) query += " WHERE f.archiveName is NULL";
+  if (!backfill) query += " WHERE f.archiveName is NULL";
   if (STATE.mode === "archive") {
     // Only add current results
     const keyword = backfill ? " WHERE" : " AND";
