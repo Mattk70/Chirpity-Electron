@@ -8,6 +8,7 @@ const fs = require("node:fs");
 const p = require("node:path");
 const SunCalc = require("suncalc");
 const ffmpeg = require("fluent-ffmpeg");
+const { extractWaveMetadata, getWavDuration } = require("./js/utils/metadata.js");
 const ffmpegPath = require("@ffmpeg-installer/ffmpeg").path.replace(
   "app.asar",
   "app.asar.unpacked"
@@ -691,7 +692,6 @@ async function handleMessage(e) {
       break;
     }
     case "update-list": {
-      STATE.list = args.list;
       try {
         await diskDB.runAsync('DELETE FROM confidence_overrides');
       } catch (e) {
@@ -699,11 +699,24 @@ async function handleMessage(e) {
         console.info('no confidence_overrides table?', e)
       }
       if (args.list === "custom") {
+        const splitOn = STATE.model === 'perch v2' ? /[,~]/ : /[,_]/;
+        for (let i = 0; i < args.customLabels.length; i++) {
+          const value = args.customLabels[i];
+          const line = i + 1;
+          // If no delimiter match, it can't have 2 parts
+          if (!splitOn.test(value)) {
+            generateAlert({
+              message: 'badListFormat',
+              variables: { line, value },
+              type: 'warning'
+            });
+            return;
+          }
+        }
         STATE.customLabels = args.customLabels;
         STATE.customLabelsMap = Object.fromEntries(
           await Promise.all(
             args.customLabels.map(async (line) => {
-              const splitOn = STATE.model === 'perch v2' ? /[,~]/ : /[,_]/;
               let [_sname, cname, start, end, confidence] =
                 line.split(splitOn).map(v => v.trim());
 
@@ -743,7 +756,7 @@ async function handleMessage(e) {
                   );
                 }
               }
-              const {base, suffix} = parseCnames([cname])[0];
+              const {base, suffix} = cname ? parseCnames([cname])[0] : {base: null, suffix: null};
               return [
                 base,
                 {
@@ -757,6 +770,7 @@ async function handleMessage(e) {
           )
         );
       }
+      STATE.list = args.list;
       // Clear the LIST_CACHE & STATE.included keys to force list regeneration
       LIST_CACHE = {};
       STATE.included = {}
@@ -1186,6 +1200,20 @@ async function processFilesInBatches(filePaths, batchSize = 20) {
   STATE.totalBatches = 0;
   STATE.allFilesDuration = 0;
   const t0 = Date.now();
+  const reading = {
+    en: "Reading metadata",
+    da: "Indlæser metadata",
+    de: "Metadaten werden gelesen",
+    es: "Leyendo metadatos",
+    fr: "Lecture des métadonnées",
+    ja: "メタデータを読み込み中",
+    nl: "Metadata lezen",
+    pt: "Lendo metadados",
+    ru: "Чтение метаданных",
+    sv: "Läser metadata",
+    zh: "正在读取元数据",
+  };
+  const text = reading[STATE.locale] || reading['en'];
   for (let i = 0; i < filePaths.length; i += batchSize) {
     const batch = filePaths.slice(i, i + batchSize);
     // Run the batch in parallel
@@ -1205,11 +1233,8 @@ async function processFilesInBatches(filePaths, batchSize = 20) {
       ))
     );
     const progress = results.filter(Boolean).length // only count successful metadata retrievals towards progress
-    UI.postMessage({
-      event: "footer-progress",
-      progress: { percent: ((i + progress) / filePaths.length) * 100 },
-      text: "Reading metadata",
-    });
+
+    sendProgress(text, ((i + progress) / filePaths.length) * 100);
     DEBUG && console.log(`Processed ${i + results.length} of ${filePaths.length}`);
   }
   if (STATE.corruptFiles.length) {
@@ -1313,7 +1338,7 @@ function getExcluded(included, fullRange = STATE.allLabels.length) {
 /**
  * Convert an array of CNAMES into objects containing the original name, the base name with any trailing parenthesized suffix removed, and a flag indicating presence of that suffix.
  * @param {string[]} cnames - Array of names which may include a trailing parenthesized suffix (e.g., "Species (call)").
- * @returns {{full: string, base: string, hasSuffix: boolean}[]} Array of objects each with `full` (original cname), `base` (trimmed name without a trailing parenthesized suffix), and `hasSuffix` (`true` if a parenthesized suffix was present).
+ * @returns {{full: string, base: string, suffix: string}[]} Array of objects each with `full` (original cname), `base` (trimmed name without a trailing parenthesized suffix), and `hasSuffix` (`true` if a parenthesized suffix was present).
  */
 function parseCnames(cnames) {
   return cnames.map(cname => {
@@ -1812,7 +1837,7 @@ function onAbort({ model = STATE.model }) {
   }
 }
 
-const measureDurationWithFfmpeg = (src, type) => {
+const measureDurationWithFfmpeg = (src) => {
   return new Promise((resolve, reject) => {
     const { PassThrough } = require("node:stream");
     const stream = new PassThrough();
@@ -1856,6 +1881,8 @@ const measureDurationWithFfmpeg = (src, type) => {
 };
 
 const getDuration = async (src) => {
+  // Speedy WAVE parsing
+  if (src.toLowerCase().endsWith(".wav")) return await getWavDuration(src);
   let audio;
   return new Promise(function (resolve, reject) {
     audio = new Audio();
@@ -1865,7 +1892,7 @@ const getDuration = async (src) => {
       const duration = audio.duration;
       if (duration === Infinity || !duration || isNaN(duration)) {
         // Fallback: decode entire file with ffmpeg
-        measureDurationWithFfmpeg(src, duration)
+        measureDurationWithFfmpeg(src)
           .then((realDuration) => resolve(realDuration))
           .catch((err) => {
             err.message = `${err.message} (file: ${src})`;
@@ -1876,8 +1903,8 @@ const getDuration = async (src) => {
       }
       audio.remove();
     });
-    audio.addEventListener("error", (error) => {
-      measureDurationWithFfmpeg(src, 'error')
+    audio.addEventListener("error", (_error) => {
+      measureDurationWithFfmpeg(src)
           .then((realDuration) => resolve(realDuration))
           .catch((err) => {
             err.message = `${err.message} (file: ${src})`;
@@ -2245,7 +2272,6 @@ const setMetadata = async ({ file, source_file = file }) => {
     if (!savedMeta?.duration) {
       fileMeta.duration = await getDuration(file);
       if (file.toLowerCase().endsWith("wav")) {
-        const { extractWaveMetadata } = require("./js/utils/metadata.js");
         const t0 = Date.now();
         const wavMetadata = await extractWaveMetadata(file);
         const metaKeys = wavMetadata ? Object.keys(wavMetadata): [];
@@ -2305,7 +2331,7 @@ const setMetadata = async ({ file, source_file = file }) => {
       }
     } else {
       // Least preferred
-      const stat = fs.statSync(source_file);
+      const stat = await fs.promises.stat(source_file);
       if (STATE.fileStartMtime) {
         fileStart = new Date(stat.mtimeMs);
         fileEnd = new Date(stat.mtimeMs + fileMeta.duration * 1000);
@@ -2469,7 +2495,7 @@ async function processAudio(
     // Many compressed files start with a small section of silence due to encoder padding, which affects predictions
     // To compensate, we move the start back a small amount, and slice the data to remove the silence
     let remainingTrim;
-    if (!(file.endsWith(".wav") || file.endsWith(".flac"))) {
+    if (!(file.toLowerCase().endsWith(".wav") || file.toLowerCase().endsWith(".flac"))) {
       const adjustment = 0.05;
       if (start >= adjustment) {
         remainingTrim = sampleRate * 2 * adjustment;
@@ -3376,9 +3402,9 @@ const processQueue = async () => {
  *
  * @param {string} model - The AI model to load for prediction; "birdnet" uses the "BirdNet2.4" worker script.
  * @param {number} batchSize - Number of items each worker processes per batch.
- * @param {number} threads - Number of worker threads to spawn.
+ * @param {number} toSpawn - Number of worker threads to spawn.
  */
-function spawnPredictWorkers(model, batchSize, threads) {
+function spawnPredictWorkers(model, batchSize, toSpawn) {
   const isPerch = model === 'perch v2';
   STATE.perchWorker = predictWorkers.filter(w => w.name === 'perch v2');
   if (isPerch && STATE.perchWorker?.length) {
@@ -3386,8 +3412,7 @@ function spawnPredictWorkers(model, batchSize, threads) {
     setLabelState({regenerate: true})
     return
   }
-  predictWorkers = [];
-  for (let i = 0; i < threads; i++) {
+  for (let i = 0; i < toSpawn; i++) {
     if (isPerch && i > 0) break; // Perch v2 only needs one worker, even if multiple threads requested
     const workerSrc = ['nocmig', 'chirpity', 'perch v2'].includes(model) ? model : "BirdNet2.4";
     const worker = new Worker(`./js/models/${workerSrc}.js`, { type: "module" });
@@ -3402,7 +3427,7 @@ function spawnPredictWorkers(model, batchSize, threads) {
       model,
       modelPath: STATE.modelPath,
       batchSize,
-      threads,
+      threads: toSpawn,
       backend: STATE.detect.backend,
       worker: i,
     });
@@ -3848,7 +3873,7 @@ const parsePredictions = async (response) => {
  * Estimate remaining analysis time from processed batches and post localized progress to the UI footer.
  *
  * Computes progress, estimated minutes remaining, and processing speed based on the global analysis start
- * timestamp and STATE counters, then sends a `footer-progress` message to the UI with percent and localized text.
+ * timestamp and STATE counters, then sends a progress message to the UI with percent and localized text.
  *
  * @param {number} batchesReceived - Number of analysis batches processed so far for the current run.
  */
@@ -3882,11 +3907,8 @@ async function estimateTimeRemaining(batchesReceived) {
       ? `${i18n[locale].less} (${speed}x)`
       : `${remaining.toFixed(0)} ${i18n[locale].min} (${speed}x)`;
 
-  UI.postMessage({
-    event: 'footer-progress',
-    progress: { percent: progress * 100 },
-    text
-  });
+  sendProgress(text, progress*100);
+
 }
 
 /**
@@ -3970,11 +3992,8 @@ async function parseMessage(e) {
       break;
     }
     case "training-progress": {
-      UI.postMessage({
-        event: "footer-progress", //use this handler to send footer progress updates
-        progress: response.progress,
-        text: response.text,
-      });
+      const { progress, text } = response;
+      sendProgress(text, progress);
       break;
     }
     case "training-results": {
@@ -4073,23 +4092,20 @@ async function processNextFile({
           );
         } else {
           if (!STATE.selection && !sumObjectValues(predictionsReceived)) {
-            const awaiting = {
-              en: "Awaiting detections",
-              da: "Afventer detektioner",
-              de: "Warten auf Erkennungen",
-              es: "Esperando detecciones",
-              fr: "En attente des détections",
-              nl: "Wachten op detecties",
-              pt: "Aguardando detecções",
-              ru: "Ожидание обнаружений",
-              sv: "Väntar på detektioner",
-              zh: "等待检测",
-            };
-            UI.postMessage({
-              event: "footer-progress",
-              text: awaiting[STATE.locale] || awaiting["en"],
-              progress: {percent: 0},
-            });
+          const awaiting = {
+            en: "Awaiting detections",
+            da: "Afventer detektioner",
+            de: "Warten auf Erkennungen",
+            es: "Esperando detecciones",
+            fr: "En attente des détections",
+            ja: "検出を待機中",
+            nl: "Wachten op detecties",
+            pt: "Aguardando detecções",
+            ru: "Ожидание обнаружений",
+            sv: "Väntar på detektioner",
+            zh: "等待检测",
+          };
+            sendProgress(awaiting[STATE.locale] || awaiting["en"], 0);
           }
           await doPrediction({start, end, file, worker})
             .catch((error) => console.warn("Error in doPrediction", error.message));
@@ -4346,6 +4362,20 @@ const getResults = async ({
     exportAudacity(result, path);
   } else {
     let count = 0;
+    const savingFiles = {
+      en: "Saving files:",
+      da: "Gemmer filer:",
+      de: "Dateien werden gespeichert:",
+      es: "Guardando archivos:",
+      fr: "Enregistrement des fichiers :",
+      ja: "ファイルを保存中：",
+      nl: "Bestanden opslaan:",
+      pt: "A guardar ficheiros:",
+      ru: "Сохранение файлов:",
+      sv: "Sparar filer:",
+      zh: "正在保存文件：",
+    };
+    const savingText = savingFiles[STATE.locale] || savingFiles["en"];
     for (let i = 0; i < result.length; i++) {
       count++;
       const r = result[i];
@@ -4373,11 +4403,7 @@ const getResults = async ({
             path
           );
           // Progress updates
-          UI.postMessage({
-            event: "footer-progress", //use this handler to send footer progress updates
-            progress: {percent: (count / result.length)*100},
-            text: 'Saving files:',
-          });
+          sendProgress(`${savingText} ${filename}`, (count / result.length)*100);
 
           i === result.length - 1 &&
             generateAlert({
@@ -4678,28 +4704,26 @@ function allowedByList(result){
     // Strip suffixes
     const parsed = parseCnames([cname]);
     cname = parsed[0].base;
-    callType = parsed[0].callType;
+    callType = parsed[0].suffix;
   }
 
   let conditions = STATE.customLabelsMap[cname];
-  let confidence = null;
   if (!confidenceCheck) {
     if (!conditions) return false; // Species not in the custom list
-
-    const {start, end, confidence: conditionsConfidence, callType: conditionsCallType} = conditions;
-    confidence = conditionsConfidence;
+    const {start, end, callType: conditionsCallType} = conditions;
     if (start && end) {
       if (!epochInDayMonthRange(timestamp, start, end)) return false;
     }
     // Call type check
-    if (callType && conditionsCallType !== callType) {
+    if (callType && conditionsCallType && conditionsCallType !== callType) {
       return false;
     }
   }
   // Confidence check (species-specific overrides global)
-  const minConfidence = confidence != null ? confidence : confidenceCheck 
+  const confidence = conditions?.confidence;
+  const minConfidence = confidence ?? (confidenceCheck 
     ? Math.min(STATE.detect.confidence, 150) 
-    : STATE.detect.confidence;
+    : STATE.detect.confidence);
   return score >= minConfidence;
 }
 
@@ -4752,6 +4776,15 @@ const getSavedFileInfo = async (file) => {
   }
 };
 
+function recordRowToAllowedInput(row) {
+  return {
+    timestamp: row.filestart + (row.position * 1000),
+    cname: row.cname,
+    score: row.confidence,
+    callType: row.callType || null
+  };
+}
+
 /**
  *  Transfers data in memoryDB to diskDB
  * @returns {Promise<unknown>}
@@ -4771,6 +4804,7 @@ const onSave2DiskDB = async ({ file }) => {
   let response,
     errorOccurred = false;
   await dbMutex.lock();
+  let inserted = 0;
   try {
     await memoryDB.runAsync("BEGIN");
     await memoryDB.runAsync(`
@@ -4800,41 +4834,68 @@ const onSave2DiskDB = async ({ file }) => {
     DEBUG &&
       console.log(response.changes + " date durations added to disk database");
     // now update records
-    response = await memoryDB.runAsync(`
-            INSERT OR IGNORE INTO disk.records (
-              position, fileID, speciesID, modelID, confidence, 
-              comment, end, callCount, isDaylight, reviewed, tagID
-            )
-            SELECT 
-                r.position, r.fileID, r.speciesID, r.modelID, r.confidence, 
-                r.comment, r.end, r.callCount, r.isDaylight, r.reviewed, r.tagID
-            FROM records r
-            JOIN species s ON r.speciesID = s.id  
-            LEFT JOIN disk.confidence_overrides co ON co.speciesID = r.speciesID
-            WHERE r.confidence >= COALESCE(co.minConfidence, ${STATE.detect.confidence}) 
-            ${filterClause}`);
-    DEBUG && console.log(response?.changes + " records added to disk database");
-    await memoryDB.runAsync("END");
-  } catch (error) {
-    await memoryDB.runAsync("ROLLBACK");
-    errorOccurred = true;
-    console.error("Transaction error during save to disk:", error);
-  } finally {
-    dbMutex.unlock();
-    if (!errorOccurred) {
-      if (response?.changes) {
-        UI.postMessage({ event: "diskDB-has-records" });
-        if (!DATASET) {
-          // Now we have saved the records, set state to DiskDB
-          await onChangeMode("archive");
-          await getLocations({ file: file });
-        }
-        // Set the saved flag on files' METADATA
-        Object.values(METADATA).forEach((file) => (file.isSaved = true));
+    const candidates =  await memoryDB.allAsync(`
+      SELECT 
+          r.position, r.fileID, r.speciesID, r.modelID, r.confidence, 
+          r.comment, r.end, r.callCount, r.isDaylight, r.reviewed, r.tagID,
+          f.filestart, f.name AS fileName, s.cname
+      FROM records r
+      JOIN species s ON r.speciesID = s.id
+      JOIN files f ON r.fileID = f.id
+      ${filterClause}`);
+    
+    let allowed = [];
+    if (STATE.list === 'custom') {
+      for (const row of candidates) {
+        const allowedInput = recordRowToAllowedInput(row);
+        if(allowedByList(allowedInput)) allowed.push(row);
       }
+    } else {
+      allowed = candidates.filter(row => row.confidence >= STATE.detect.confidence  );
     }
-    DEBUG && console.log("transaction ended successfully");
-    const total = response?.changes || 0;
+
+    // Build bulk INSERT using filestart as stable identifier to resolve disk DB fileIDs
+    if (allowed.length > 0) {
+      const batchSize = 2500;
+      for (let i = 0; i < allowed.length; i += batchSize) {
+        const batch = allowed.slice(i, i + batchSize);
+        const rowPlaceholders = batch.map(() =>
+          '(?,?,?,?,?,?,?,?,?,?,?)'
+        ).join(',');
+        const insertValues = batch.flatMap(row => [
+          row.position, row.speciesID, row.modelID, row.confidence,
+          row.comment ?? null, row.end, row.callCount ?? null,
+          row.isDaylight, row.reviewed, row.tagID ?? null, row.fileName
+        ]);
+        await memoryDB.runAsync(`
+          WITH v(position, speciesID, modelID, confidence,
+                comment, end, callCount, isDaylight, reviewed, tagID, fileName)
+          AS (VALUES ${rowPlaceholders})
+          INSERT OR IGNORE INTO disk.records (
+            position, speciesID, modelID, confidence,
+            comment, end, callCount, isDaylight, reviewed, tagID, fileID
+          )
+          SELECT v.position, v.speciesID, v.modelID, v.confidence,
+                v.comment, v.end, v.callCount, v.isDaylight, v.reviewed, v.tagID,
+                d.id
+          FROM v JOIN disk.files d ON v.fileName = d.name
+        `, ...insertValues);
+      }
+      inserted = allowed.length;
+    }
+    DEBUG && console.log(inserted + " records added to disk database");
+    await memoryDB.runAsync("END");
+    if (allowed.length) {
+      UI.postMessage({ event: "diskDB-has-records" });
+      if (!DATASET) {
+        // Now we have saved the records, set state to DiskDB
+        await onChangeMode("archive");
+        await getLocations({ file: file });
+      }
+      // Set the saved flag on files' METADATA
+      Object.values(METADATA).forEach((file) => (file.isSaved = true));
+    }
+    const total = allowed.length;
     const seconds = (Date.now() - t0) / 1000;
     generateAlert({
       message: "goodDBUpdate",
@@ -4842,6 +4903,12 @@ const onSave2DiskDB = async ({ file }) => {
       updateFilenamePanel: true,
       database: true,
     });
+    DEBUG && console.log("transaction ended successfully");
+  } catch (error) {
+    await memoryDB.runAsync("ROLLBACK");
+    console.error("Transaction error during save to disk:", error);
+  } finally {
+    dbMutex.unlock();
   }
 };
 
@@ -4904,11 +4971,34 @@ const getValidSpecies = async (file) => {
     : { place: STATE.place };
   const includedSpecies = [];
   const excludedSpecies = [];
+  let customCnames = [], customCnamesWithCallType = [];
+  const customList = STATE.list === 'custom';
+  const labelMap = STATE.customLabelsMap;
+  if (customList){
+    customCnames = Object.keys(labelMap)
+    customCnamesWithCallType = 
+          Object.keys(labelMap).map(k => `${k}${labelMap[k].callType}`)
+  }
+  const splitChar = getSplitChar();
   for (const [index, speciesName] of STATE.allLabels.entries()) {
     const i = index + 1;
-    const [cname, sname] = speciesName.split(getSplitChar()).reverse();
+    const [cname, sname] = speciesName.split(splitChar).reverse();
     if (cname.includes("ackground") || cname.includes("Unknown")) continue; // skip background and unknown species
-    (!included.length || included.includes(i)) 
+    if (customList && ! customCnames.includes(cname)) {
+      // Check for nocmig models
+      if (['nocmig', 'chirpity'].includes(STATE.model)){
+        // Wildcard entry (no call-type) should match all variants — check base name too
+        const { base: cnameBase } = parseCnames([cname])[0];
+        if (!customCnames.includes(cnameBase) && !customCnamesWithCallType.includes(cname)) {
+          excludedSpecies.push({cname, sname});
+          continue
+        }
+      } else {
+        excludedSpecies.push({cname, sname});
+        continue
+      }
+    }
+    (!included.length || included.includes(i) ) 
       ? includedSpecies.push({cname, sname})
       : excludedSpecies.push({cname, sname});
   }
@@ -5746,22 +5836,23 @@ const pLimit = require("p-limit");
  * @returns {boolean|undefined} `false` if the archive directory is missing or not writable; otherwise `undefined` after scheduling and completing conversion tasks.
  */
 async function convertAndOrganiseFiles(threadLimit = 4) {
+  const {location, clips, backfill} = STATE.library;
   // SANITY checks: archive location exists and is writeable?
-  if (!fs.existsSync(STATE.library.location)) {
+  if (!fs.existsSync(location)) {
     generateAlert({
       type: "error",
       message: "noArchive",
-      variables: { location: STATE.library.location },
+      variables: { location },
     });
     return false;
   }
   try {
-    fs.accessSync(STATE.library.location, fs.constants.W_OK);
+    fs.accessSync(location, fs.constants.W_OK);
   } catch {
     generateAlert({
       type: "error",
       message: "noWriteArchive",
-      variables: { location: STATE.library.location },
+      variables: { location },
     });
     return false;
   }
@@ -5772,13 +5863,20 @@ async function convertAndOrganiseFiles(threadLimit = 4) {
   const conversions = []; // Array to hold the conversion promises
 
   // Query the files & records table to get the necessary data
+  const params = [];
   let query =
     "SELECT DISTINCT f.id, f.name, f.archiveName, f.duration, f.filestart, l.place FROM files f LEFT JOIN locations l ON f.locationID = l.id";
   // If just saving files with records
-  if (STATE.library.clips) query += " INNER JOIN records r ON r.fileID = f.id";
-  if (!STATE.library.backfill) query += " WHERE f.archiveName is NULL";
+  if (clips) query += " INNER JOIN records r ON r.fileID = f.id";
+  if (!backfill) query += " WHERE f.archiveName is NULL";
+  if (STATE.mode === "archive") {
+    // Only add current results
+    const keyword = backfill ? " WHERE" : " AND";
+    query += `${keyword} f.name IN (${prepParams(STATE.filesToAnalyse)})`;
+    params.push(...STATE.filesToAnalyse);
+  }
   t0 = Date.now();
-  const rows = await db.allAsync(query);
+  const rows = await db.allAsync(query, ...params);
   DEBUG && console.log(`db query took ${Date.now() - t0}ms`);
   const ext = "." + STATE.library.format;
   for (const row of rows) {
@@ -5851,11 +5949,8 @@ async function convertAndOrganiseFiles(threadLimit = 4) {
 
   Promise.allSettled(conversions).then((results) => {
     // Oftentimes, the final percent.progress reported is < 100. So when finished, send 100 so the progress panel can be hidden
-    UI.postMessage({
-      event: "footer-progress",
-      progress: { percent: 100 },
-      text: "",
-    });
+    sendProgress('',100);
+
     // Summarise the results
     let successfulConversions = 0;
     let failedConversions = 0;
@@ -5921,7 +6016,20 @@ async function convertFile(
 ) {
   await setMetadata({ file: inputFilePath });
   const boundaries = await setStartEnd(inputFilePath);
-
+  const conversionProgress = {
+    en: "Conversion progress",
+    da: "Konverteringsstatus",
+    de: "Konvertierungsfortschritt",
+    es: "Progreso de conversión",
+    fr: "Progression de la conversion",
+    ja: "変換の進行状況",
+    nl: "Conversievoortgang",
+    pt: "Progresso da conversão",
+    ru: "Ход преобразования",
+    sv: "Konverteringsförlopp",
+    zh: "转换进度",
+  };
+  const conversionText = conversionProgress[STATE.locale] || conversionProgress['en'];
   return new Promise((resolve, reject) => {
     let command = ffmpeg("file:" + inputFilePath);
 
@@ -6001,15 +6109,24 @@ async function convertFile(
             0
           );
           const average = sum / values.length;
-          UI.postMessage({
-            event: `footer-progress`,
-            progress: { percent: average },
-            text: `Archive file conversion progress: ${average.toFixed(1)}%`,
-          });
+          const text = `${conversionText}: ${average.toFixed(1)}%`
+          sendProgress(text, average);
         }
       })
       .run();
   });
+}
+/**
+ * Send a progress update to the UI with the given text and percentage.
+ * @param {*} text 
+ * @param {*} progress 
+ */
+function sendProgress(text, progress){
+      UI.postMessage({
+      event: "footer-progress",
+      progress: { percent: progress },
+      text,
+    });
 }
 
 async function onDeleteModel(model){

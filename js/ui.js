@@ -2431,6 +2431,13 @@ const setUpWorkerMessaging = () => {
         case "labels": {
           // Remove duplicate labels
           LABELS = [...new Set(args.labels)];
+          let range;
+          if (STATE.mode === "explore") { range = STATE.explore.range }
+          else if (STATE.mode === "chart") { range = STATE.chart.range }
+          worker.postMessage({
+            action: "get-detected-species-list",
+            range
+          });
           // Code below to retrieve Red list data
           // if (!done && LABELS.length){
           //   STATE.IUCNcache = {};
@@ -6746,8 +6753,9 @@ async function readLabels(labelFile, updating) {
   try {
     const filecontents = await fs.promises.readFile(labelFile, "utf8");
     const labels = filecontents.trim().split(/\r?\n/);
-    const unknown = `Unknown Sp.${getSplitChar(labels)}Unknown Sp.`;
-    if (!labels.includes(unknown)) labels.push(unknown);
+    const unknown = `Unknown Sp.,Unknown Sp.`;
+    const unknownPattern = /^Unknown Sp\.[,_~]Unknown Sp\.$/;
+    if (!labels.some(l => unknownPattern.test(l))) labels.push(unknown);
     if (updating === "list") {
       worker.postMessage({
         action: "update-list",
@@ -6969,7 +6977,7 @@ const recordEntryModal = new bootstrap.Modal(recordEntryModalDiv, {
 
 const recordEntryForm = document.getElementById("record-entry-form");
 
-const getSplitChar = (labels = []) => labels[0].includes('~') ? '~' : '_';
+const getSplitChar = (labels = []) => config.selectedModel === "perch v2" ? /[,~]/ : /[,_]/;
 /**
  * Displays and populates the record entry modal for adding or updating audio record details.
  *

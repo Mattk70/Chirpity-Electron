@@ -121,6 +121,7 @@ const NOT_BIRDS = [
 ];
 
  const p = {
+"Ardea ibis":"Bubulcus ibis",
 "Tachymarptis melba":"Apus melba",
 "Pogonotriccus lanyoni":"Phylloscartes lanyoni",
 "Chiroxiphia bokermanni":"Antilophia bokermanni",
