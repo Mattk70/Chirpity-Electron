@@ -2433,7 +2433,7 @@ const setUpWorkerMessaging = () => {
           LABELS = [...new Set(args.labels)];
           let range;
           if (STATE.mode === "explore") { range = STATE.explore.range }
-          else if (STATE.mode === "charts") { range = STATE.chart.range }
+          else if (STATE.mode === "chart") { range = STATE.chart.range }
           worker.postMessage({
             action: "get-detected-species-list",
             range
@@ -6754,7 +6754,8 @@ async function readLabels(labelFile, updating) {
     const filecontents = await fs.promises.readFile(labelFile, "utf8");
     const labels = filecontents.trim().split(/\r?\n/);
     const unknown = `Unknown Sp.,Unknown Sp.`;
-    if (!labels.includes(unknown)) labels.push(unknown);
+    const unknownPattern = /^Unknown Sp\.[,_~]Unknown Sp\.$/;
+    if (!labels.some(l => unknownPattern.test(l))) labels.push(unknown);
     if (updating === "list") {
       worker.postMessage({
         action: "update-list",

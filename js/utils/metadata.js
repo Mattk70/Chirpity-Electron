@@ -293,7 +293,7 @@ function getWavDuration(filePath) {
       dataSize = readUInt64LE(header, chunkStart + 8);
       sampleCount = readUInt64LE(header, chunkStart + 16);
     }
-    offset = chunkStart + chunkSize;
+    offset = chunkStart + chunkSize  + (chunkSize % 2);
   }
   
   if (!fmt) {

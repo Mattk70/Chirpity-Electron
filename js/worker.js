@@ -692,7 +692,6 @@ async function handleMessage(e) {
       break;
     }
     case "update-list": {
-      STATE.list = args.list;
       try {
         await diskDB.runAsync('DELETE FROM confidence_overrides');
       } catch (e) {
@@ -771,6 +770,7 @@ async function handleMessage(e) {
           )
         );
       }
+      STATE.list = args.list;
       // Clear the LIST_CACHE & STATE.included keys to force list regeneration
       LIST_CACHE = {};
       STATE.included = {}
@@ -1882,7 +1882,7 @@ const measureDurationWithFfmpeg = (src) => {
 
 const getDuration = async (src) => {
   // Speedy WAVE parsing
-  if (src.endsWith(".wav")) return await getWavDuration(src);
+  if (src.toLowerCase().endsWith(".wav")) return await getWavDuration(src);
   let audio;
   return new Promise(function (resolve, reject) {
     audio = new Audio();
@@ -2495,7 +2495,7 @@ async function processAudio(
     // Many compressed files start with a small section of silence due to encoder padding, which affects predictions
     // To compensate, we move the start back a small amount, and slice the data to remove the silence
     let remainingTrim;
-    if (!(file.endsWith(".wav") || file.endsWith(".flac"))) {
+    if (!(file.toLowerCase().endsWith(".wav") || file.toLowerCase().endsWith(".flac"))) {
       const adjustment = 0.05;
       if (start >= adjustment) {
         remainingTrim = sampleRate * 2 * adjustment;
@@ -4708,10 +4708,9 @@ function allowedByList(result){
   }
 
   let conditions = STATE.customLabelsMap[cname];
-  if (!conditions) return false; // Species not in the custom list
-  const {start, end, confidence: conditionsConfidence, callType: conditionsCallType} = conditions;
-  let confidence = conditionsConfidence;
   if (!confidenceCheck) {
+    if (!conditions) return false; // Species not in the custom list
+    const {start, end, callType: conditionsCallType} = conditions;
     if (start && end) {
       if (!epochInDayMonthRange(timestamp, start, end)) return false;
     }
@@ -4721,7 +4720,8 @@ function allowedByList(result){
     }
   }
   // Confidence check (species-specific overrides global)
-  const minConfidence = confidence ? confidence : confidenceCheck 
+  const confidence = conditions?.confidence;
+  const minConfidence = confidence ?? confidenceCheck 
     ? Math.min(STATE.detect.confidence, 150) 
     : STATE.detect.confidence;
   return score >= minConfidence;
@@ -4848,44 +4848,54 @@ const onSave2DiskDB = async ({ file }) => {
     if (STATE.list === 'custom') {
       for (const row of candidates) {
         const allowedInput = recordRowToAllowedInput(row);
-
-        if (STATE.list !== 'custom' || allowedByList(allowedInput)) {
-          allowed.push(row);
-        }
+        if(allowedByList(allowedInput)) allowed.push(row);
       }
     } else {
       allowed = candidates.filter(row => row.confidence >= STATE.detect.confidence  );
     }
-    
-    const savingRecords = {
-      en: "Saving records",
-      da: "Gemmer poster",
-      de: "Speichert Einträge",
-      es: "Guardando registros",
-      fr: "Enregistrement des enregistrements",
-      ja: "記録を保存中",
-      nl: "Records opslaan",
-      pt: "A guardar registos",
-      ru: "Сохранение записей",
-      sv: "Sparar poster",
-      zh: "正在保存记录",
-    };
-    const savingText = savingRecords[STATE.locale] || savingRecords["en"];
 
-    for (const row of allowed) {
-      const {position, fileID, speciesID, modelID, confidence, comment, end, callCount, isDaylight, reviewed, tagID} = row;
+    // Build bulk INSERT using filestart as stable identifier to resolve disk DB fileIDs
+    if (allowed.length > 0) {
+      // Build VALUES clause from allowed records
+      const valuesClauses = allowed.map((row, idx) => {
+        const {position, speciesID, modelID, confidence, comment, end, callCount, isDaylight, reviewed, tagID, filestart} = row;
+        // Escape and quote values safely for SQL VALUES clause
+        const fields = [
+          position,
+          speciesID,
+          modelID,
+          confidence,
+          comment ? `'${comment.replace(/'/g, "''")}'` : 'NULL',
+          end,
+          callCount ?? 'NULL',
+          isDaylight,
+          reviewed,
+          tagID ?? 'NULL',
+          filestart
+        ];
+        return `(${fields.join(',')})`;
+      }).join(',');
+
+      // Bulk insert resolves fileID by joining on filestart
       await memoryDB.runAsync(`
-        INSERT OR IGNORE INTO disk.records (
-          position, fileID, speciesID, modelID, confidence,
-          comment, end, callCount, isDaylight, reviewed, tagID
+        WITH v (
+          position, speciesID, modelID, confidence,
+          comment, end, callCount, isDaylight, reviewed, tagID, filestart
+        ) AS (
+          VALUES ${valuesClauses}
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, 
-      position,fileID, speciesID, modelID, confidence, comment, end, 
-      callCount, isDaylight, reviewed, tagID
-      );
-      inserted ++;
-      sendProgress(savingText, (inserted / allowed.length)*100);
+        INSERT OR IGNORE INTO disk.records (
+          position, speciesID, modelID, confidence,
+          comment, end, callCount, isDaylight, reviewed, tagID, fileID
+        )
+        SELECT
+          v.position, v.speciesID, v.modelID, v.confidence,
+          v.comment, v.end, v.callCount, v.isDaylight, v.reviewed, v.tagID,
+          d.id
+        FROM v
+        JOIN disk.files d ON v.filestart = d.filestart
+      `);
+      inserted = allowed.length;
     }
     DEBUG && console.log(inserted + " records added to disk database");
     await memoryDB.runAsync("END");
@@ -4991,8 +5001,9 @@ const getValidSpecies = async (file) => {
     if (customList && ! customCnames.includes(cname)) {
       // Check for nocmig models
       if (['nocmig', 'chirpity'].includes(STATE.model)){
-        
-        if (!customCnamesWithCallType.includes(cname)) {
+        // Wildcard entry (no call-type) should match all variants — check base name too
+        const { base: cnameBase } = parseCnames([cname])[0];
+        if (!customCnames.includes(cnameBase) && !customCnamesWithCallType.includes(cname)) {
           excludedSpecies.push({cname, sname});
           continue
         }
@@ -5839,22 +5850,23 @@ const pLimit = require("p-limit");
  * @returns {boolean|undefined} `false` if the archive directory is missing or not writable; otherwise `undefined` after scheduling and completing conversion tasks.
  */
 async function convertAndOrganiseFiles(threadLimit = 4) {
+  const {location, clips, backfill} = STATE.library;
   // SANITY checks: archive location exists and is writeable?
-  if (!fs.existsSync(STATE.library.location)) {
+  if (!fs.existsSync(location)) {
     generateAlert({
       type: "error",
       message: "noArchive",
-      variables: { location: STATE.library.location },
+      variables: { location },
     });
     return false;
   }
   try {
-    fs.accessSync(STATE.library.location, fs.constants.W_OK);
+    fs.accessSync(location, fs.constants.W_OK);
   } catch {
     generateAlert({
       type: "error",
       message: "noWriteArchive",
-      variables: { location: STATE.library.location },
+      variables: { location },
     });
     return false;
   }
@@ -5869,11 +5881,12 @@ async function convertAndOrganiseFiles(threadLimit = 4) {
   let query =
     "SELECT DISTINCT f.id, f.name, f.archiveName, f.duration, f.filestart, l.place FROM files f LEFT JOIN locations l ON f.locationID = l.id";
   // If just saving files with records
-  if (STATE.library.clips) query += " INNER JOIN records r ON r.fileID = f.id";
-  if (!STATE.library.backfill) query += " WHERE f.archiveName is NULL";
+  if (clips) query += " INNER JOIN records r ON r.fileID = f.id";
+  if (backfill) query += " WHERE f.archiveName is NULL";
   if (STATE.mode === "archive") {
     // Only add current results
-    query += " AND f.name IN (" + prepParams(STATE.filesToAnalyse) + ")";
+    const keyword = backfill ? " WHERE" : " AND";
+    query += `${keyword} f.name IN (${prepParams(STATE.filesToAnalyse)})`;
     params.push(...STATE.filesToAnalyse);
   }
   t0 = Date.now();
