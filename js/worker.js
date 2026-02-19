@@ -4715,7 +4715,7 @@ function allowedByList(result){
       if (!epochInDayMonthRange(timestamp, start, end)) return false;
     }
     // Call type check
-    if (callType && conditionsCallType !== callType) {
+    if (callType && conditionsCallType && conditionsCallType !== callType) {
       return false;
     }
   }

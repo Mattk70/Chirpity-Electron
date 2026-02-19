@@ -236,10 +236,10 @@ function readUInt64LE(buf, offset) {
 }
 
 /**
-+ * Get WAV duration without decoding the full file (supports RF64/ds64).
-+ * `@param` {string} filePath
-+ * `@returns` {number} duration in seconds
-+ */
+ * Get WAV duration without decoding the full file (supports RF64/ds64).
+ * @param {string} filePath - path to the file
+ * @returns {number} duration in seconds
+ */
 
 function getWavDuration(filePath) {
   const fd = fs.openSync(filePath, 'r');
