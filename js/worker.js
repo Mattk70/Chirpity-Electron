@@ -1336,9 +1336,17 @@ function getExcluded(included, fullRange = STATE.allLabels.length) {
 
 
 /**
- * Convert an array of CNAMES into objects containing the original name, the base name with any trailing parenthesized suffix removed, and a flag indicating presence of that suffix.
- * @param {string[]} cnames - Array of names which may include a trailing parenthesized suffix (e.g., "Species (call)").
- * @returns {{full: string, base: string, suffix: string}[]} Array of objects each with `full` (original cname), `base` (trimmed name without a trailing parenthesized suffix), and `hasSuffix` (`true` if a parenthesized suffix was present).
+ * Converts an array of CNAMES into objects containing:
+ * - the original name,
+ * - the base name with any trailing parenthesised suffix removed,
+ * - the extracted suffix (or an empty string if none).
+ *
+ * @param {string[]} cnames - Names which may include a trailing parenthesised suffix (e.g. "Species (call)").
+ * @returns {{ full: string, base: string, suffix: string }[]} 
+ * Array of objects with:
+ * - `full`: original cname
+ * - `base`: name without trailing parenthesised suffix
+ * - `suffix`: extracted suffix including parentheses, or '' if none
  */
 function parseCnames(cnames) {
   return cnames.map(cname => {
