@@ -36,7 +36,7 @@ const fs = require("node:fs");
 const p = require("node:path");
 const SunCalc = require("suncalc");
 const ffmpeg = require("fluent-ffmpeg");
-const { extractWaveMetadata, getWavDuration } = require("./js/utils/metadata.js");
+const { extractWaveMetadata, getWaveDuration } = require("./js/utils/metadata.js");
 const ffmpegPath = require("@ffmpeg-installer/ffmpeg").path.replace(
   "app.asar",
   "app.asar.unpacked"
@@ -1910,7 +1910,7 @@ const measureDurationWithFfmpeg = (src) => {
 
 const getDuration = async (src) => {
   // Speedy WAVE parsing
-  if (src.toLowerCase().endsWith(".wav")) return await getWavDuration(src);
+  if (src.toLowerCase().endsWith(".wav")) return await getWaveDuration(src);
   let audio;
   return new Promise(function (resolve, reject) {
     audio = new Audio();

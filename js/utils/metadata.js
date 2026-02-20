@@ -241,7 +241,7 @@ function readUInt64LE(buf, offset) {
  * @returns {number} duration in seconds
  */
 
-function getWavDuration(filePath) {
+function getWaveDuration(filePath) {
   const fd = fs.openSync(filePath, 'r');
   try {
     // Read enough to cover RIFF/RF64 + ds64 + fmt + data headers
@@ -318,4 +318,4 @@ function getWavDuration(filePath) {
 }
 
 
-module.exports = { extractWaveMetadata, getWavDuration };
+module.exports = { extractWaveMetadata, getWaveDuration };
