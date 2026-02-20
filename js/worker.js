@@ -2828,7 +2828,13 @@ function setAudioFilters(audio_details) {
 }
 
 
-// Helper function to check if a given time is within daylight hours
+/**
+ * Helper function to check if a given time is within civil daylight hours
+ * @param {number} datetime - JS epoch
+ * @param {number} lat - float (-90 - 90)
+ * @param {number} lon - float (-180 -180)
+ * @returns 
+ */
 function isDuringDaylight(datetime, lat, lon) {
   const date = new Date(datetime);
   const { dawn, dusk } = SunCalc.getTimes(date, lat, lon);
