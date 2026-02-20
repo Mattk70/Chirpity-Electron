@@ -559,7 +559,7 @@ function normaliseAudio(audioArray, mode = "centre") {
 /**
  * Converts a list of labeled audio files into a gzip-compressed binary dataset for efficient training.
  *
- * Each record consists of a 3-second (144,000-sample) Float32 audio array and a 2-byte label index. Audio shorter than 1.5 seconds is skipped; shorter samples are left-padded to 3 seconds. Progress is reported via the provided callback, and the process supports aborting.
+ * Each record consists of a 3-second (144,000-sample) Float32 audio array and a 2-byte label index. Audio shorter than 1.5 seconds is skipped; shorter samples are center-padded to 3 seconds. Progress is reported via the provided callback, and the process supports aborting.
  *
  * @param {Array} fileList - List of objects with `filePath` and `label` properties.
  * @param {string} outputPath - Destination path for the compressed binary dataset.
@@ -602,6 +602,10 @@ async function writeBinaryGzipDataset(embeddingModel, fileList, outputPath, labe
       }
 
       audioArray = normaliseAudio(audioArray, 'centre')
+      if (!audioArray) {
+       completed++;
+       return;
+      }
       // Get embeddings from BirdNET
       const input = tf.tensor2d(audioArray, [1, audioArray.length]);
       const embeddingTensor = await embeddingModel.predict(input);
