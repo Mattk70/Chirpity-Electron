@@ -372,9 +372,8 @@ const getSplitChar = () => STATE.model === "perch v2" ? /[,~]/ : /[,_]/;
 async function setLabelState({ regenerate }) {
   if (regenerate || !STATE.allLabelsMap) {
     DEBUG && console.log("Getting labels from disk db");
-    const splitChar = getSplitChar();
     const res = await diskDB.allAsync(
-      `SELECT classIndex + 1 as id, sname || '${splitChar}' || cname AS labels, modelID 
+      `SELECT classIndex + 1 as id, sname || ',' || cname AS labels, modelID 
       FROM species WHERE modelID = ? ORDER BY id`, STATE.modelID
     );
 
@@ -2765,15 +2764,11 @@ const stream = command.pipe();
 /**
  * Build the chain of audio filter configurations based on current STATE.filters and STATE.audio settings.
  *
- * When filters are not active an empty array is returned. If provided, `audio_details.sample_rates`
- * is used to populate sample-rate-related filter options.
- *
- * @param {Object} [audio_details] - Optional probe-derived audio metadata.
- * @param {number[]} [audio_details.sample_rates] - Available sample rates to apply to resampling-related filters.
- * @param {number} [audio_details.channels] - Channel count (informational; may be used by filters).
+ * When filters are not active an empty array is returned. 
+
  * @returns {Array<Object>} An array of filter configuration objects suitable for ffmpeg-style filter chains; empty if no filters are active.
  */
-function setAudioFilters(audio_details) {
+function setAudioFilters() {
   const {
     active,
     lowShelfAttenuation: attenuation,
@@ -2791,10 +2786,6 @@ function setAudioFilters(audio_details) {
   const batModel = STATE.model.includes('bats');
   if (!batModel && (highPass || (lowPass < 15_000 && lowPass > 0))) {
     const options = {};
-    if (audio_details) {
-      const { sample_rates, channels } = audio_details;
-      options.r = sample_rates;
-    }
     if (highPass) options.hp = highPass;
     if (lowPass < 15_000) options.lp = lowPass;
     // Use sinc + afir
@@ -2892,19 +2883,7 @@ async function doPrediction({
   });
 }
 
-/**
- * Retrieve FFmpeg probe metadata for a media input.
- * @param {string|Buffer|import('stream').Readable} file - Path, buffer, or readable stream accepted by ffprobe.
- * @returns {Object} The probe result object containing `streams`, `format`, and other metadata produced by ffprobe.
- */
-async function getProbeData(file) {
-  return new Promise((resolve, reject) => {
-    ffmpeg.ffprobe(file, (err, data) => {
-      if (err) reject(err);
-      else resolve(data);
-    });
-  });
-}
+
 
 const bufferToAudio = async ({
   file = "",
@@ -2948,40 +2927,55 @@ const bufferToAudio = async ({
 
     end = Math.min(METADATA[file].duration, end + 1);
   }
-  const metadata = await getProbeData(file)
-  const streams = metadata?.streams;
-  const audioStream = streams?.find(s => s.codec_type === 'audio');
-  const {sample_rate, channels} = audioStream || {sample_rate: undefined, channels: undefined};
+
   return new Promise(function (resolve, reject) {
-    const filters = setAudioFilters(audio_details);
+    const filters = setAudioFilters();
     if (fade && padding) {
       filters.push(
         { filter: "afade", options: `t=in:ss=${start}:d=1` },
         { filter: "afade", options: `t=out:st=${end - start - 1}:d=1` }
       );
     }
-    let errorHandled = false;
+    
     setupFfmpegCommand({
       file,
       start,
       end,
-      sampleRate: sample_rate,
+      sampleRate: undefined,
       audioBitrate: bitrate,
       audioQuality: quality,
       audioCodec,
       format: soundFormat,
-      channels: downmix ? 1 : channels,
+      channels: downmix ? 1 : -1,
       metadata: meta,
       additionalFilters: filters
     }).then(command => {
     const destination = p.join(folder || tempPath, filename);
 
-    command.on("start", function (commandLine) {
-      DEBUG && console.log("FFmpeg command: " + commandLine);
-    });
-
+    command.on("codecData", async function (data) {
+      const channels = data.audio_details[2].toLowerCase();
+      if (format === "mp3" && ! STATE.audio.downmix) {
+        if (!['mono', 'stereo', '1.0', '2.0', 'dual mono'].includes(channels) ){
+          const i18n = {
+            en: "Cannot export multichannel audio to MP3. Either enable downmixing, or choose a different export format.",
+            da: "Kan ikke eksportere multikanalslyd til MP3. Aktiver enten nedmiksning, eller vælg et andet eksportformat.",
+            de: "Mehrkanal-Audio kann nicht als MP3 exportiert werden. Aktivieren Sie entweder das Downmixing oder wählen Sie ein anderes Exportformat.",
+            es: "No se puede exportar audio multicanal a MP3. Active la mezcla descendente o elija un formato de exportación diferente.",
+            fr: "Impossible d’exporter un audio multicanal en MP3. Activez le mixage vers le bas ou choisissez un autre format d’exportation.",
+            ja: "マルチチャンネル音声をMP3に書き出すことはできません。ダウンミックスを有効にするか、別の書き出し形式を選択してください。",
+            nl: "Kan geen meerkanaalsaudio exporteren naar MP3. Schakel downmixen in of kies een ander exportformaat.",
+            pt: "Não é possível exportar áudio multicanal para MP3. Ative a mixagem para baixo ou escolha um formato de exportação diferente.",
+            ru: "Невозможно экспортировать многоканальное аудио в MP3. Включите даунмиксинг или выберите другой формат экспорта.",
+            sv: "Kan inte exportera flerkanalsljud till MP3. Aktivera antingen nedmixning eller välj ett annat exportformat.",
+            zh: "无法将多声道音频导出为 MP3。请启用混缩，或选择其他导出格式。"
+          };
+          const error = i18n[STATE.locale] || i18n["en"];
+          generateAlert({ type: "error", message: error});
+          return reject(console.warn("Export polyWAV to mp3 attempted."))
+        }
+      }
+    })
     command.on("error", (err) => {
-      if (errorHandled) return; // Prevent multiple error handling
       generateAlert({ type: "error", message: "ffmpeg", variables: { error: err.message } });
       reject(console.error("An ffmpeg error occurred: ", err.message));
     });
@@ -4974,8 +4968,9 @@ async function _updateSpeciesLocale(db, labels) {
 
     // 1. Build a map: sname => translated cname (label version)
     const labelMap = new Map();
+    const splitChar = getSplitChar();
     for (const label of labels) {
-      const [sname, translatedCname] = label.split(getSplitChar());
+      const [sname, translatedCname] = label.split(splitChar);
       labelMap.set(sname, translatedCname); // only one cname per sname in labels
     }
 
