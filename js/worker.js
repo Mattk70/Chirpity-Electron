@@ -1430,6 +1430,8 @@ async function getSpeciesSQLAsync(file){
  * @param {Object} [range] - Optional time range to constrain results; when omitted in explore mode the explore.range is used.
  * @param {string} [caller] - Caller context that can change behavior (e.g., when `'results'` and a selection exists a file filter is applied).
  * @returns {Array<string | any[]>} An array with two elements: the augmented SQL string and an ordered array of parameters for the prepared statement.
+*/
+
 async function addQueryQualifiers(stmt, range, caller) {
   const {list, mode, explore, labelFilters, detect, location, selection} = STATE;
   
@@ -1587,6 +1589,8 @@ const prepResultsStatement = async (
   
   return {sql: resultStatement, params};
 };
+
+
 
 // Helper to chunk an array
 function chunkArray(array, size) {
