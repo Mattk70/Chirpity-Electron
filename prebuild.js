@@ -21,7 +21,7 @@ function searchPatterns(directory, patterns) {
     const stats = fs.statSync(filePath);
     if (stats.isDirectory() || file.endsWith(".js")) {
       if (stats.isDirectory()) {
-        if (!filePath.includes("node_modules") || !filePath.includes("unittest") ) {
+        if (!(filePath.includes("node_modules") || filePath.includes("unittest")) ) {
           searchPatterns(filePath, patterns);
         }
       } else if (stats.isFile()) {
