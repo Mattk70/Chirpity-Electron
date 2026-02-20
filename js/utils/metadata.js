@@ -236,12 +236,12 @@ function readUInt64LE(buf, offset) {
 }
 
 /**
- * Get WAV duration without decoding the full file (supports RF64/ds64).
- * @param {string} filePath - path to the file
- * @returns {number} duration in seconds
+ * Compute the duration of a WAV file without decoding audio data; supports RF64/ds64 large-file variants.
+ * @param {string} filePath - Path to the WAV file.
+ * @returns {number} Duration in seconds.
  */
 
-function getWavDuration(filePath) {
+function getWaveDuration(filePath) {
   const fd = fs.openSync(filePath, 'r');
   try {
     // Read enough to cover RIFF/RF64 + ds64 + fmt + data headers
@@ -318,4 +318,4 @@ function getWavDuration(filePath) {
 }
 
 
-module.exports = { extractWaveMetadata, getWavDuration };
+module.exports = { extractWaveMetadata, getWaveDuration };
