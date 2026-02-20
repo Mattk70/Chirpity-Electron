@@ -189,8 +189,8 @@ const setupFfmpegCommand = async ({
 }) => {
 
   const command = ffmpeg("file:" + file)
-    .format(format)
-    .audioChannels(channels);
+    .format(format);
+  if (channels) command.audioChannels(channels);
   // todo: consider whether to expose bat model training
   const training = false
   if (STATE.model.includes('bats')) { 
@@ -2946,16 +2946,19 @@ const bufferToAudio = async ({
       audioQuality: quality,
       audioCodec,
       format: soundFormat,
-      channels: downmix ? 1 : -1,
+      channels: downmix ? 1 : 0,
       metadata: meta,
       additionalFilters: filters
     }).then(command => {
     const destination = p.join(folder || tempPath, filename);
 
     command.on("codecData", async function (data) {
-      const channels = data.audio_details[2].toLowerCase();
-      if (format === "mp3" && ! STATE.audio.downmix) {
-        if (!['mono', 'stereo', '1.0', '2.0', 'dual mono'].includes(channels) ){
+      const channelStr = data.audio_details?.[2]?.toLowerCase() ?? '';
+      // Allow: mono (1ch), stereo/2ch (2ch), dual-mono
+      const isSafe = /^(mono|stereo|1[\s.]?0|2[\s.]?0|dual[\s-]?mono|1\s+channels?|2\s+channels?)$/
+        .test(channelStr);
+      if (format === "mp3" && !STATE.audio.downmix) {
+        if (channelStr && !isSafe) {
           const i18n = {
             en: "Cannot export multichannel audio to MP3. Either enable downmixing, or choose a different export format.",
             da: "Kan ikke eksportere multikanalslyd til MP3. Aktiver enten nedmiksning, eller vælg et andet eksportformat.",
@@ -5422,7 +5425,7 @@ async function setIncludedIDs(lat, lon, week) {
     });
     // // Add the *label* id of "Unknown Sp." to all lists
     STATE.list !== "everything" 
-      && result.push(STATE.allLabels.indexOf('Unknown Sp._Unknown Sp.') + 1);
+      && result.push(STATE.allLabels.indexOf('Unknown Sp.,Unknown Sp.') + 1);
 
     let includedObject = {};
     if (

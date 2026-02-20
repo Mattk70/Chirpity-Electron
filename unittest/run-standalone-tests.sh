@@ -18,7 +18,7 @@ total_failed=0
 
 # Run I18n tests
 echo -e "${CYAN}Running I18n JSON Tests...${NC}"
-if node test/i18n-standalone.test.js; then
+if node unittest/i18n-standalone.test.js; then
     echo -e "${GREEN}I18n tests PASSED${NC}"
     total_passed=$((total_passed + 1))
 else
@@ -32,11 +32,21 @@ echo ""
 
 # Run HTML tests
 echo -e "${CYAN}Running HTML Tests...${NC}"
-if node test/html-standalone.test.js; then
+if node unittest/html-standalone.test.js; then
     echo -e "${GREEN}HTML tests PASSED${NC}"
     total_passed=$((total_passed + 1))
 else
     echo -e "${RED}HTML tests FAILED${NC}"
+    total_failed=$((total_failed + 1))
+fi
+
+# Run Worker tests
+echo -e "${CYAN}Running Worker Tests...${NC}"
+if node unittest/worker.test.js; then
+    echo -e "${GREEN}Worker tests PASSED${NC}"
+    total_passed=$((total_passed + 1))
+else
+    echo -e "${RED}Worker tests FAILED${NC}"
     total_failed=$((total_failed + 1))
 fi
 
