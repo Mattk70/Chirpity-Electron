@@ -271,10 +271,12 @@ function resolveDatabaseFile(path) {
 }
 
 /**
- * Load and initialize the application's SQLite archive database and prepare species mappings for the current model.
+ * Initialize or create the archive SQLite database, ensure schema and indices are current, and populate model-to-species ID mappings.
  *
- * @param {string} [modelPath] - Path to the active model folder; if provided, its `labels.txt` is used to align database labels.
- * @returns {sqlite3.Database} The initialized archive database instance.
+ * Performs schema migrations and maintenance, aligns labels when a modelPath is provided, and notifies the UI about translation needs or existing records.
+ *
+ * @param {string} [modelPath] - Path to the active model folder; when provided, its `labels.txt` is used to align database labels.
+ * @returns {sqlite3.Database} The opened or newly created archive database instance.
  */
 async function loadDB(modelPath) {
   const path = STATE.database.location || appPath;
@@ -1333,17 +1335,13 @@ function getExcluded(included, fullRange = STATE.allLabels.length) {
 
 
 /**
- * Converts an array of CNAMES into objects containing:
- * - the original name,
- * - the base name with any trailing parenthesised suffix removed,
- * - the extracted suffix (or an empty string if none).
+ * Parse an array of CNAMES into objects with full, base, and suffix components.
  *
- * @param {string[]} cnames - Names which may include a trailing parenthesised suffix (e.g. "Species (call)").
- * @returns {Array<{ full: string, base: string, suffix: string }>} 
- * Array of objects with:
- * - `full`: original cname
- * - `base`: name without trailing parenthesised suffix
- * - `suffix`: extracted suffix including parentheses, or '' if none
+ * @param {string[]} cnames - Names that may include a trailing parenthesized suffix or a trailing hyphen (e.g. "Species (call)" or "Species -").
+ * @returns {Array<{ full: string, base: string, suffix: string|undefined }>} Array of objects where:
+ *  - `full` is the original cname,
+ *  - `base` is the cname with any trailing parenthesized suffix removed and trimmed,
+ *  - `suffix` is the matched trailing part (including surrounding parentheses or the hyphen) or `undefined` if none.
  */
 function parseCnames(cnames) {
   return cnames.map(cname => {
@@ -1427,13 +1425,12 @@ async function getSpeciesSQLAsync(file){
 }
 
 /**
- * Append SQL qualifiers to a WHERE clause based on current application STATE (file range, species/tags, selection, location, and daylight filters).
+ * Augment a SQL WHERE fragment with filters derived from current application STATE (file/time range, labels, species, selection, location, and daylight).
  *
- * @param {string} stmt - Initial SQL text to augment (typically a WHERE or subquery fragment).
+ * @param {string} stmt - Base SQL fragment to augment (typically a WHERE clause or subquery fragment).
  * @param {Object} [range] - Optional time range to constrain results; when omitted in explore mode the explore.range is used.
- * @param {string} [caller] - Caller context that can alter behavior (e.g., when 'results' and a selection exists a file filter is applied).
- * @returns {Array<string | any[]>} A two-element array: the augmented SQL string and an ordered array of parameters for prepared statements.
- */
+ * @param {string} [caller] - Caller context that can change behavior (e.g., when `'results'` and a selection exists a file filter is applied).
+ * @returns {Array<string | any[]>} An array with two elements: the augmented SQL string and an ordered array of parameters for the prepared statement.
 async function addQueryQualifiers(stmt, range, caller) {
   const {list, mode, explore, labelFilters, detect, location, selection} = STATE;
   
@@ -2766,11 +2763,15 @@ const stream = command.pipe();
 };
 
 /**
- * Constructs an array of audio filter configurations based on the current filter settings in application state.
- * 
- * The returned filter chain may include high-pass, low-pass, low-shelf, gain, and normalization filters, depending on which options are enabled.
- * 
- * @returns {Array<Object>} An array of filter configuration objects for use with ffmpeg or similar audio processing tools.
+ * Build the chain of audio filter configurations based on current STATE.filters and STATE.audio settings.
+ *
+ * When filters are not active an empty array is returned. If provided, `audio_details.sample_rates`
+ * is used to populate sample-rate-related filter options.
+ *
+ * @param {Object} [audio_details] - Optional probe-derived audio metadata.
+ * @param {number[]} [audio_details.sample_rates] - Available sample rates to apply to resampling-related filters.
+ * @param {number} [audio_details.channels] - Channel count (informational; may be used by filters).
+ * @returns {Array<Object>} An array of filter configuration objects suitable for ffmpeg-style filter chains; empty if no filters are active.
  */
 function setAudioFilters(audio_details) {
   const {
@@ -2835,11 +2836,11 @@ function setAudioFilters(audio_details) {
 
 
 /**
- * Helper function to check if a given time is within civil daylight hours
- * @param {number} datetime - JS epoch
- * @param {number} lat - float (-90 - 90)
- * @param {number} lon - float (-180 -180)
- * @returns {boolean}
+ * Determine whether a timestamp falls within civil daylight (between dawn and dusk) for a geographic location.
+ * @param {number} datetime - Epoch milliseconds (Date.now()-style value) to test.
+ * @param {number} lat - Latitude in degrees (−90 to 90).
+ * @param {number} lon - Longitude in degrees (−180 to 180).
+ * @returns {boolean} `true` if `datetime` is between local dawn and dusk at the given location, `false` otherwise.
  */
 function isDuringDaylight(datetime, lat, lon) {
   const date = new Date(datetime);
@@ -2869,12 +2870,12 @@ async function feedChunksToModel(channelData, chunkStart, file, end) {
   predictWorkers[worker].postMessage(objData, [channelData.buffer]);
 }
 /**
- * Start prediction for a segment of an audio file and notify the UI of the segment duration.
+ * Start prediction for a segment of an audio file and post the segment duration to the UI.
  *
  * @param {Object} params - Prediction parameters.
  * @param {string} params.file - Path to the audio file.
  * @param {number} [params.start=0] - Segment start time in seconds.
- * @param {number|null} [params.end=null] - Segment end time in seconds, or `null` to indicate the file's end.
+ * @param {number|null} [params.end=null] - Segment end time in seconds; `null` indicates the file's end.
  */
 async function doPrediction({
   file = "",
@@ -2891,6 +2892,11 @@ async function doPrediction({
   });
 }
 
+/**
+ * Retrieve FFmpeg probe metadata for a media input.
+ * @param {string|Buffer|import('stream').Readable} file - Path, buffer, or readable stream accepted by ffprobe.
+ * @returns {Object} The probe result object containing `streams`, `format`, and other metadata produced by ffprobe.
+ */
 async function getProbeData(file) {
   return new Promise((resolve, reject) => {
     ffmpeg.ffprobe(file, (err, data) => {
