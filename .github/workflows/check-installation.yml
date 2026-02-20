@@ -121,12 +121,12 @@ jobs:
           echo "PLATFORM=$PLATFORM" >> $GITHUB_ENV
           echo "BINARY=$BINARY" >> $GITHUB_ENV
           
-      - name: Overwrite FFmpeg binary
-        if: runner.os == 'macOS'
-        run: |
-          echo "copying  ./build/$PLATFORM/$BINARY to ./node_modules/@ffmpeg-installer/$PLATFORM/$BINARY"
-          cp ./build/$PLATFORM/$BINARY ./node_modules/@ffmpeg-installer/$PLATFORM/$BINARY
-        shell: bash
+      # - name: Overwrite FFmpeg binary
+      #   if: runner.os == 'macOS'
+      #   run: |
+      #     echo "copying  ./build/$PLATFORM/$BINARY to ./node_modules/@ffmpeg-installer/$PLATFORM/$BINARY"
+      #     cp ./build/$PLATFORM/$BINARY ./node_modules/@ffmpeg-installer/$PLATFORM/$BINARY
+      #   shell: bash
 
       - name: Modify fluent-ffmpeg processor.js
         run: |
