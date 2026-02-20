@@ -2913,8 +2913,7 @@ const bufferToAudio = async ({
   meta = {},
   format = STATE.audio.format,
   folder = undefined,
-  filename = undefined,
-  audio_details = undefined
+  filename = undefined
 }) => {
   if (!fs.existsSync(file)) {
     const found = await getWorkingFile(file);
