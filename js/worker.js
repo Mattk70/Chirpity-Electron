@@ -2951,7 +2951,8 @@ const bufferToAudio = async ({
   }
   const metadata = await getProbeData(file)
   const streams = metadata?.streams;
-  const {sample_rate, channels} = streams ? streams[0] : {sample_rate: undefined, channels:-1};
+  const audioStream = streams?.find(s => s.codec_type === 'audio');
+  const {sample_rate, channels} = audioStream || {sample_rate: undefined, channels: undefined};
   return new Promise(function (resolve, reject) {
     const filters = setAudioFilters(audio_details);
     if (fade && padding) {
