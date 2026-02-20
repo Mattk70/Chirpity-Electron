@@ -6977,7 +6977,7 @@ const recordEntryModal = new bootstrap.Modal(recordEntryModalDiv, {
 
 const recordEntryForm = document.getElementById("record-entry-form");
 
-const getSplitChar = (labels = []) => config.selectedModel === "perch v2" ? /[,~]/ : /[,_]/;
+const getSplitChar = () => config.selectedModel === "perch v2" ? /[,~]/ : /[,_]/;
 /**
  * Displays and populates the record entry modal for adding or updating audio record details.
  *

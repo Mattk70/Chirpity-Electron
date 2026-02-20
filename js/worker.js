@@ -33,10 +33,6 @@ let isWin32 = false;
 
 const dbMutex = new Mutex();
 const DATASET = false;
-const DATABASE = "archive_test";
-const adding_chirpity_additions = true;
-const DATASET_SAVE_LOCATION =
-  "C:/Users/simpo/Downloads";
 let ntsuspend;
 if (process.platform === "win32") {
   ntsuspend = require("ntsuspend");
@@ -191,6 +187,7 @@ const setupFfmpegCommand = async ({
   audioBitrate = null,
   outputOptions = [],
 }) => {
+
   const command = ffmpeg("file:" + file)
     .format(format)
     .audioChannels(channels);
@@ -361,7 +358,7 @@ async function loadDB(modelPath) {
   return diskDB;
 }
 
-const getSplitChar = () => STATE.model.includes('perch') ? '~' : '_';
+const getSplitChar = () => STATE.model === "perch v2" ? /[,~]/ : /[,_]/;
 /**
  * Updates the application's species label list based on current inclusion filters.
  *
@@ -1290,7 +1287,7 @@ const prepParams = (list) => "?".repeat(list.length).split("").join(",");
  * @param {Object} [range] - Optional date range for filtering.
  * @param {(number|string)} range.start - Inclusive start of the date range.
  * @param {(number|string)} range.end - Exclusive end of the date range.
- * @returns {[string, any[]]} An array containing the SQL condition string and its associated parameter values.
+ * @returns {Array<string | any[]>} An array containing the SQL condition string and its associated parameter values.
  */
 function getFileSQLAndParams(range) {
   const params = [];
@@ -1342,7 +1339,7 @@ function getExcluded(included, fullRange = STATE.allLabels.length) {
  * - the extracted suffix (or an empty string if none).
  *
  * @param {string[]} cnames - Names which may include a trailing parenthesised suffix (e.g. "Species (call)").
- * @returns {{ full: string, base: string, suffix: string }[]} 
+ * @returns {Array<{ full: string, base: string, suffix: string }>} 
  * Array of objects with:
  * - `full`: original cname
  * - `base`: name without trailing parenthesised suffix
@@ -1435,7 +1432,7 @@ async function getSpeciesSQLAsync(file){
  * @param {string} stmt - Initial SQL text to augment (typically a WHERE or subquery fragment).
  * @param {Object} [range] - Optional time range to constrain results; when omitted in explore mode the explore.range is used.
  * @param {string} [caller] - Caller context that can alter behavior (e.g., when 'results' and a selection exists a file filter is applied).
- * @returns {[string, any[]]} A two-element array: the augmented SQL string and an ordered array of parameters for prepared statements.
+ * @returns {Array<string | any[]>} A two-element array: the augmented SQL string and an ordered array of parameters for prepared statements.
  */
 async function addQueryQualifiers(stmt, range, caller) {
   const {list, mode, explore, labelFilters, detect, location, selection} = STATE;
@@ -1891,6 +1888,7 @@ const measureDurationWithFfmpeg = (src) => {
 const getDuration = async (src) => {
   // Speedy WAVE parsing
   if (src.toLowerCase().endsWith(".wav")) return await getWaveDuration(src);
+  
   let audio;
   return new Promise(function (resolve, reject) {
     audio = new Audio();
@@ -2841,7 +2839,7 @@ function setAudioFilters(audio_details) {
  * @param {number} datetime - JS epoch
  * @param {number} lat - float (-90 - 90)
  * @param {number} lon - float (-180 -180)
- * @returns 
+ * @returns {boolean}
  */
 function isDuringDaylight(datetime, lat, lon) {
   const date = new Date(datetime);
@@ -2893,334 +2891,13 @@ async function doPrediction({
   });
 }
 
-const speciesMatch = (path, sname) => {
-  const pathElements = path.split(p.sep);
-  const species = pathElements[pathElements.length - 2];
-  sname = sname.replace(/ /g, "_");
-  return species.includes(sname);
-};
-
-function findFile(pathParts, filename, species) {
-  const baseDir = pathParts.slice(0, 5).concat(["XC_ALL_mp3"]).join(p.sep);
-
-  // List of suffixes to check, in order
-  const suffixes = ["", " (call)", " (fc)", " (nfc)", " (song)"];
-
-  // Extract existing suffix from species, if present
-  const suffixPattern = / \((call|fc|nfc|song)\)$/;
-  let speciesBase = species;
-  let existingSuffix = "";
-
-  const match = species.match(suffixPattern);
-  if (match) {
-    existingSuffix = match[0]; // e.g., " (call)"
-    speciesBase = species.replace(suffixPattern, ""); // Remove suffix
-  }
-
-  // First, check the species with its existing suffix
-  if (existingSuffix) {
-    const folder = p.join(baseDir, species);
-    const filePath = p.join(folder, filename + ".mp3");
-    if (fs.existsSync(filePath)) {
-      DEBUG && console.log(`File found: ${filePath}`);
-      return [filePath, species];
-    }
-  }
-
-  // Check species with other suffixes, removing the existing one
-  for (const suffix of suffixes) {
-    if (suffix === existingSuffix) continue; // Skip the suffix already checked
-    const found_calltype = speciesBase + suffix;
-    const folder = p.join(baseDir, found_calltype);
-    const filePath = p.join(folder, filename + ".mp3");
-    if (fs.existsSync(filePath)) {
-      DEBUG && console.log(`File found: ${filePath}`);
-
-      return [filePath, found_calltype];
-    }
-  }
-
-  DEBUG && console.log("File not found in any directory");
-  return [null, null];
-}
-const convertSpecsFromExistingSpecs = async (path) => {
-  path ??=
-    "/media/matt/36A5CC3B5FA24585/DATASETS/MISSING/NEW_DATASET_WITHOUT_ALSO_MERGED";
-  const file_list = await getFiles({files:[path], image:true});
-  for (let i = 0; i < file_list.length; i++) {
-    if (i % 100 === 0) {
-      console.log(`${i} records processed`);
-    }
-    const parts = p.parse(file_list[i]);
-    let path_parts = parts.dir.split(p.sep);
-    let species = path_parts[path_parts.length - 1];
-    const species_parts = species.split("~");
-    species = species_parts[1] + "~" + species_parts[0];
-    const [filename, time] = parts.name.split("_");
-    const [start, end] = time.split("-");
-    // const path_to_save = path.replace('New_Dataset', 'New_Dataset_Converted') + p.sep + species;
-    let path_to_save =
-      "/Users/matthew/Downloads/converted" +
-      p.sep +
-      species;
-    let file_to_save = p.join(path_to_save, parts.base);
-    if (fs.existsSync(file_to_save)) {
-      DEBUG && console.log("skipping file as it is already saved");
-    } else {
-      const [file_to_analyse, confirmed_species_folder] = findFile(
-        path_parts,
-        filename,
-        species
-      );
-      path_to_save = path_to_save.replace(species, confirmed_species_folder);
-      file_to_save = p.join(path_to_save, parts.base);
-      if (fs.existsSync(file_to_save)) {
-        console.log("skipping file as it is already saved");
-        continue;
-      }
-      if (!file_to_analyse) continue;
-      //parts.dir.replace('MISSING/NEW_DATASET_WITHOUT_ALSO_MERGED', 'XC_ALL_mp3') + p.sep + filename + '.mp3';
-      const [AudioBuffer, begin] = await fetchAudioBuffer({
-        start: parseFloat(start),
-        end: parseFloat(end),
-        file: file_to_analyse,
-      });
-      if (AudioBuffer) {
-        // condition to prevent barfing when audio snippet is v short i.e. fetchAudioBUffer false when < 0.1s
-        if (++workerInstance === NUM_WORKERS) {
-          workerInstance = 0;
-        }
-        const buffer = getMonoChannelData(AudioBuffer);
-        predictWorkers[workerInstance].postMessage(
-          {
-            message: "get-spectrogram",
-            filepath: path_to_save,
-            file: parts.base,
-            buffer: buffer,
-            height: 256,
-            width: 384,
-            worker: workerInstance,
-          },
-          [buffer.buffer]
-        );
-      }
-    }
-  }
-};
-
-const saveResults2DataSet = ({ species, included }) => {
-  const exportType = 'audio';
-  const rootDirectory = DATASET_SAVE_LOCATION;
-  sampleRate = 48_000; //STATE.model === "birdnet" ? 48_000 : 24_000;
-  const height = 256,
-    width = 384;
-  let t0 = Date.now();
-  let promise = Promise.resolve();
-  let promises = [];
-  let count = 0;
-  let db2ResultSQL = `SELECT position * 1000 + f.filestart AS timestamp, 
-    f.duration, 
-    f.filestart,
-    f.name AS file, 
-    position,
-    s.sname, 
-    s.cname, 
-    r.confidence AS score, 
-    tagID, 
-    comment
-    FROM records r
-    JOIN species s
-    ON s.id = r.speciesID
-    JOIN files f ON r.fileID = f.id
-    WHERE confidence >= ${STATE.detect.confidence}`;
-  db2ResultSQL += filtersApplied(included)
-    ? ` AND speciesID IN (${prepParams(included)})`
-    : "";
-
-  let params = filtersApplied(included) ? included : [];
-  if (species) {
-    db2ResultSQL += ` AND s.cname = ?`;
-    params.push(species);
-  }
-  STATE.db.each(
-    db2ResultSQL,
-    ...params,
-    async (err, result) => {
-      // Check for level of ambient noise activation
-      let ambient,
-        threshold,
-        value = STATE.detect.confidence;
-      // adding_chirpity_additions is a flag for curated files, if true we assume every detection is correct
-      if (!adding_chirpity_additions) {
-        // ambient = (result.sname2 === 'Ambient Noise' ? result.score2 : result.sname3 === 'Ambient Noise' ? result.score3 : false)
-        // console.log('Ambient', ambient)
-        // // If we have a high level of ambient noise activation, insist on a high threshold for species detection
-        // if (ambient && ambient > 0.2) {
-        //     value = 0.7
-        // }
-        // Check whether top predicted species matches folder (i.e. the searched for species)
-        // species not matching the top prediction sets threshold to 2000, effectively limiting treatment to manual records
-        threshold = speciesMatch(result.file, result.sname) ? value : 2000;
-      } else {
-        //threshold = result.sname === "Ambient_Noise" ? 0 : 2000;
-        threshold = result.sname === "Ambient_Noise" ? 0 : 0;
-      }
-      promise = promise.then(async function () {
-        let score = result.score;
-        if (score >= threshold) {
-          //const folders = p.dirname(result.file).split(p.sep);
-          species = result.cname.replaceAll(" ", "_");
-          const sname = result.sname.replaceAll(" ", "_");
-          // score 2000 when manual id. if manual ID when doing  additions put it in the species folder
-          const folder =
-            adding_chirpity_additions && score !== 2000
-              ? "No_call"
-              : `${sname}~${species}`;
-          // get start and end from timestamp
-          const start = result.position;
-          let end = start + WINDOW_SIZE;
-
-          // filename format: <source file>_<confidence>_<start>.png
-          const file = `${p
-            .basename(result.file)
-            .replace(p.extname(result.file), "")}_${start}-${end}.png`;
-          const filepath = p.join(rootDirectory, folder);
-          const file_to_save = p.join(filepath, file);
-          if (fs.existsSync(file_to_save)) {
-            DEBUG && console.log("skipping file as it is already saved");
-          } else {
-            end = Math.min(end, result.duration);
-            if (exportType === "audio")
-              await saveAudio(
-                result.file,
-                start,
-                end,
-                file.replace(".png", ".wav"),
-                { Artist: "Chirpity" },
-                filepath
-              );
-            else {
-              const [AudioBuffer, _] = await fetchAudioBuffer({
-                start,
-                end,
-                file: result.file,
-                format: "s16le",
-                sampleRate
-              });
-              if (AudioBuffer) {
-                // condition to prevent barfing when audio snippet is v short i.e. fetchAudioBUffer false when < 0.1s
-                if (++workerInstance === NUM_WORKERS) {
-                  workerInstance = 0;
-                }
-                const buffer = getMonoChannelData(AudioBuffer);
-                // STATE.totalSpecs++
-                predictWorkers[workerInstance].postMessage(
-                  {
-                    message: "get-spectrogram",
-                    filepath: filepath,
-                    file: file,
-                    buffer: buffer,
-                    height: height,
-                    width: width,
-                    worker: workerInstance,
-                  },
-                  [buffer.buffer]
-                );
-              }
-            }
-            count++;
-          }
-        }
-        return new Promise(function (resolve) {
-          setTimeout(resolve, 0.1);
-        });
-      });
-      promises.push(promise);
-    },
-    (err) => {
-      if (err) return console.log(err);
-
-      Promise.all(promises).then(() =>
-        console.log(
-          `Dataset created. ${count} files saved in ${
-            (Date.now() - t0) / 1000
-          } seconds`
-        )
-      );
-    }
-  );
-};
-
-const onSpectrogram = async (filepath, file, width, height, data, channels) => {
-  const { writeFile, mkdir } = require("node:fs/promises");
-  const png = require("fast-png");
-  const p = require("path");
-  channels ??= 1; // Default to greyscale if not specified
-  await mkdir(filepath, { recursive: true });
-const colormap = ''; // Default colormap, can be set to 'hot', 'jet', etc.
-  if (colormap){
-    const colors = require("colormap");
-    // Generate a colour map (e.g., "hot", "jet", "viridis", etc.)
-    const map = colors({
-      colormap: colormap,
-      nshades: 256,
-      format: "rgba",
-      alpha: 1,
+async function getProbeData(file) {
+  return new Promise((resolve, reject) => {
+    ffmpeg.ffprobe(file, (err, data) => {
+      if (err) reject(err);
+      else resolve(data);
     });
-
-    // Assume `data` is Uint8Array or similar with grayscale values from 0–255
-    const rgbData = new Uint8ClampedArray(width * height * 4); // 4 channels (RGBA)
-
-    for (let i = 0; i < data.length; i++) {
-      const grayscale = data[i] ; // 0–255
-      const [r, g, b, a] = map[Math.round(grayscale)];
-      const offset = i * 4;
-      rgbData[offset] = r;
-      rgbData[offset + 1] = g;
-      rgbData[offset + 2] = b;
-      rgbData[offset + 3] = a * 255; // convert alpha from 0–1 to 0–255
-    }
-    data = rgbData; // Use the RGBA data for the image
-    channels = 4; // RGBA
-  }
-
-  const image = png.encode({
-    width,
-    height,
-    data,
-    channels
   });
-
-  const file_to_save = p.join(filepath, file);
-  await writeFile(file_to_save, image);
-  DEBUG && console.log("saved:", file_to_save);
-};
-
-
-async function uploadOpus({ file, start, end, defaultName, metadata, mode }) {
-  const blob = await bufferToAudio({
-    file: file,
-    start: start,
-    end: end,
-    format: "opus",
-    meta: metadata,
-  });
-  // Populate a form with the file (blob) and filename
-  const formData = new FormData();
-  //const timestamp = Date.now()
-  formData.append("thefile", blob, defaultName);
-  // Was the prediction a correct one?
-  formData.append("Chirpity_assessment", mode);
-  // post form data
-  const xhr = new XMLHttpRequest();
-  xhr.responseType = "text";
-  // log response
-  xhr.onload = () => {
-    DEBUG && console.log(xhr.response);
-  };
-  // create and send the reqeust
-  xhr.open("POST", "https://birds.mattkirkland.co.uk/upload");
-  xhr.send(formData);
 }
 
 const bufferToAudio = async ({
@@ -3266,6 +2943,9 @@ const bufferToAudio = async ({
 
     end = Math.min(METADATA[file].duration, end + 1);
   }
+  const metadata = await getProbeData(file)
+  const streams = metadata?.streams;
+  const {sample_rate, channels} = streams ? streams[0] : {sample_rate: undefined, channels:-1};
   return new Promise(function (resolve, reject) {
     const filters = setAudioFilters(audio_details);
     if (fade && padding) {
@@ -3279,12 +2959,12 @@ const bufferToAudio = async ({
       file,
       start,
       end,
-      sampleRate: audio_details?.sample_rates,
+      sampleRate: sample_rate,
       audioBitrate: bitrate,
       audioQuality: quality,
       audioCodec,
       format: soundFormat,
-      channels: downmix ? 1 : -1,
+      channels: downmix ? 1 : channels,
       metadata: meta,
       additionalFilters: filters
     }).then(command => {
@@ -3293,52 +2973,6 @@ const bufferToAudio = async ({
     command.on("start", function (commandLine) {
       DEBUG && console.log("FFmpeg command: " + commandLine);
     });
-    const need2ndPass = (!audio_details?.sample_rates && STATE.filters.active && (STATE.filters.highPassFrequency || (STATE.filters.lowPassFrequency < 15000 && STATE.filters.lowPassFrequency > 0)));
-    if (need2ndPass) {
-      command.on("codecData", async function (data) {
-        const channels = data.audio_details[2].toLowerCase();
-        if (format === "mp3" && ! STATE.audio.downmix) {
-          if (!['mono', 'stereo', '1.0', '2.0', 'dual mono'].includes(channels) ){
-            const i18n = {
-              en: "Cannot export multichannel audio to MP3. Either enable downmixing, or choose a different export format.",
-              da: "Kan ikke eksportere multikanalslyd til MP3. Aktiver enten nedmiksning, eller vælg et andet eksportformat.",
-              de: "Mehrkanal-Audio kann nicht als MP3 exportiert werden. Aktivieren Sie entweder das Downmixing oder wählen Sie ein anderes Exportformat.",
-              es: "No se puede exportar audio multicanal a MP3. Active la mezcla descendente o elija un formato de exportación diferente.",
-              fr: "Impossible d’exporter un audio multicanal en MP3. Activez le mixage vers le bas ou choisissez un autre format d’exportation.",
-              ja: "マルチチャンネル音声をMP3に書き出すことはできません。ダウンミックスを有効にするか、別の書き出し形式を選択してください。",
-              nl: "Kan geen meerkanaalsaudio exporteren naar MP3. Schakel downmixen in of kies een ander exportformaat.",
-              pt: "Não é possível exportar áudio multicanal para MP3. Ative a mixagem para baixo ou escolha um formato de exportação diferente.",
-              ru: "Невозможно экспортировать многоканальное аудио в MP3. Включите даунмиксинг или выберите другой формат экспорта.",
-              sv: "Kan inte exportera flerkanalsljud till MP3. Aktivera antingen nedmixning eller välj ett annat exportformat.",
-              zh: "无法将多声道音频导出为 MP3。请启用混缩，或选择其他导出格式。"
-            };
-            const error = i18n[STATE.locale] || i18n["en"];
-            generateAlert({ type: "error", message: "ffmpeg", variables: {error}});
-            errorHandled = true;
-            return reject(console.warn("Export polyWAV to mp3 attempted."))
-          }
-        }
-        const sample_rates = parseInt(data.audio_details[1]);
-        const channelCount = channels === 'mono' || STATE.audio.downmix ? 1 : 2;
-        errorHandled = true;
-        command.kill('SIGKILL');
-        try{
-          await bufferToAudio({
-            file,
-            start,
-            end,
-            meta,
-            format,
-            folder,
-            filename,
-            audio_details: { sample_rates, channels: channelCount }
-          })
-          resolve(destination);
-        } catch (e) {
-          reject(e)
-        }
-      });
-    }
 
     command.on("error", (err) => {
       if (errorHandled) return; // Prevent multiple error handling
