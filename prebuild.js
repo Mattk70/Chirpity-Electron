@@ -4,7 +4,15 @@ const path = require("path");
 // Define the directory where your source files are located
 let SOURCE_DIR = process.cwd(); 
 
-// Function to recursively search for patterns in files
+/**
+ * Recursively scans a directory tree and checks JavaScript files for any of the provided regular-expression patterns.
+ *
+ * Only files with a ".js" extension are inspected; directories named "node_modules" are skipped during recursion.
+ *
+ * @param {string} directory - Path to the directory to scan.
+ * @param {RegExp[]} patterns - Array of regular expressions to test against each JavaScript file's contents.
+ * @throws {Error} If any pattern matches a file's contents; the error message includes the matching pattern and the file path.
+ */
 function searchPatterns(directory, patterns) {
   const files = fs.readdirSync(directory);
 
