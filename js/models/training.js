@@ -508,11 +508,58 @@ function getFilesWithLabelsAndWeights(rootDir) {
   };
 }
 
+function normaliseAudio(audioArray, mode = "centre") {
+  const expectedSamples = 48000 * 3;
 
+  if (audioArray.length !== expectedSamples) {
+    // Skip clips shorter than 1.5s
+    if (audioArray.length < 72000) return;
+    const padded = new Float32Array(expectedSamples);
+    let start;
+    if (audioArray.length > expectedSamples) {
+      // 🔹 Cropping case
+      switch (mode) {
+        case "start":
+          start = 0;
+          break;
+        case "centre":
+        case "center":
+          start = Math.floor((audioArray.length - expectedSamples) / 2);
+          break;
+        case "end":
+        default:
+          start = audioArray.length - expectedSamples;
+          break;
+      }
+      padded.set(audioArray.slice(start, start + expectedSamples));
+    } else {
+      // 🔹 Padding case (clip between 1.5s and 3s)
+      switch (mode) {
+        case "start":
+          // pad at end
+          padded.set(audioArray, 0);
+          break;
+        case "centre":
+        case "center":
+          // pad evenly both sides
+          const offset = Math.floor((expectedSamples - audioArray.length) / 2);
+          padded.set(audioArray, offset);
+          break;
+        case "end":
+        default:
+          // pad at start (your original behaviour)
+          padded.set(audioArray, expectedSamples - audioArray.length);
+          break;
+      }
+    }
+    audioArray = padded;
+  }
+  return audioArray;
+}
 /**
  * Converts a list of labeled audio files into a gzip-compressed binary dataset for efficient training.
  *
- * Each record consists of a 3-second (144,000-sample) Float32 audio array and a 2-byte label index. Audio shorter than 1.5 seconds is skipped; shorter samples are left-padded to 3 seconds. Progress is reported via the provided callback, and the process supports aborting.
+ * Each record consists of a 3-second (144,000-sample) Float32 audio array and a 2-byte label index. Audio shorter than 1.5 seconds is skipped; shorter samples are center-padded to 3 seconds. Progress is reported via the provided callback, and the process supports aborting.
  *
  * @param {Array} fileList - List of objects with `filePath` and `label` properties.
  * @param {string} outputPath - Destination path for the compressed binary dataset.
@@ -554,13 +601,10 @@ async function writeBinaryGzipDataset(embeddingModel, fileList, outputPath, labe
         return;
       }
 
-      const expectedSamples = 48000 * 3;
-      if (audioArray.length !== expectedSamples) {
-        if (audioArray.length < 72000) return // don't includes samples less than 1.5 seconds        )
-        const padded = new Float32Array(expectedSamples);
-        const start = Math.max(audioArray.length - expectedSamples, 0);
-        padded.set(audioArray.slice(start), expectedSamples - (audioArray.length - start));
-        audioArray = padded;
+      audioArray = normaliseAudio(audioArray, 'centre')
+      if (!audioArray) {
+       completed++;
+       return;
       }
       // Get embeddings from BirdNET
       const input = tf.tensor2d(audioArray, [1, audioArray.length]);
