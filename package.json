@@ -19,7 +19,8 @@
     "testBuild": "electron-builder --win",
     "postinstall": "electron-builder install-app-deps",
     "test": "playwright test",
-    "unittest": "playwright test test/i18n.spec.ts test/html.spec.ts test/i18n-extended.spec.ts test/html-extended.spec.ts",
+    "unittest": "sh unittest/run-standalone-tests.sh",
+
     "asbuild:debug": "asc assembly/index.ts --target debug",
     "asbuild:release": "asc assembly/index.ts --target release",
     "asbuild": "npm run asbuild:debug && npm run asbuild:release"

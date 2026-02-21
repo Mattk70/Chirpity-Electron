@@ -28,7 +28,7 @@ import {
 } from "./database.js";
 import { customURLEncode, installConsoleTracking, trackEvent as _trackEvent } from "./utils/tracking.js";
 import { onChartRequest, getIncludedLocations }  from "./components/charts.js";
-import { getAudioMetadata } from "./models/training.js";
+
 let isWin32 = false;
 
 const dbMutex = new Mutex();
@@ -189,14 +189,15 @@ const setupFfmpegCommand = async ({
 }) => {
 
   const command = ffmpeg("file:" + file)
-    .format(format)
-    .audioChannels(channels);
+    .format(format);
+  if (channels) command.audioChannels(channels);
   // todo: consider whether to expose bat model training
   const training = false
   if (STATE.model.includes('bats')) { 
     // No sample rate is supplied when exporting audio.
     // If the sampleRate is 256k, Wavesurfer will handle the tempo/pitch conversion
     if ((training || sampleRate) && sampleRate !== 256000) {
+      const { getAudioMetadata } = require("./models/training.js");
       const {bitrate} = await getAudioMetadata(file);
       const MIN_EXPECTED_BITRATE = 96000; // Lower bitrates aren't capturing ultrasonic frequencies
       if (bitrate < MIN_EXPECTED_BITRATE) console.warn(file, 'has bitrate', bitrate)
@@ -372,9 +373,8 @@ const getSplitChar = () => STATE.model === "perch v2" ? /[,~]/ : /[,_]/;
 async function setLabelState({ regenerate }) {
   if (regenerate || !STATE.allLabelsMap) {
     DEBUG && console.log("Getting labels from disk db");
-    const splitChar = getSplitChar();
     const res = await diskDB.allAsync(
-      `SELECT classIndex + 1 as id, sname || '${splitChar}' || cname AS labels, modelID 
+      `SELECT classIndex + 1 as id, sname || ',' || cname AS labels, modelID 
       FROM species WHERE modelID = ? ORDER BY id`, STATE.modelID
     );
 
@@ -396,12 +396,10 @@ async function setLabelState({ regenerate }) {
 
 
 /**
- * Dispatches incoming worker messages by action and performs the requested application operation.
+ * Dispatches worker messages by action and performs the corresponding application operation, sending back UI events as needed.
  *
- * Waits for initialisation when required, then delegates actions such as model initialization, analysis/prediction control, worker management, audio file operations, database updates, import/export, tagging and list/locale updates, and UI notifications. Expects the event's data to include an `action` string and action-specific parameters.
- *
- * @param {Object} e - Message event whose `data` property contains an `action` field and associated parameters.
- * @returns {Promise<void>} Resolves when the requested action has been processed.
+ * Expects the event's `data` to include an `action` string and any action-specific parameters; handles initialization, analysis/control commands, worker and model management, audio/file operations, DB updates, import/export, tagging, list/locale changes, and related UI notifications.
+ * @param {Object} e - Message event whose `data` property contains an `action` field and associated parameters. 
  */
 async function handleMessage(e) {
   const args = e.data;
@@ -553,7 +551,6 @@ async function handleMessage(e) {
       if (STATE.db) {
         args.updateSummary && (await getSummary(args));
         await getResults(args);
-        args.included = await getIncludedIDs(args.file);
       }
       break;
     }
@@ -929,9 +926,26 @@ function setGetSummaryQueryInterval(threads) {
     STATE.detect.backend !== "tensorflow" ? threads * 10 : threads;
 }
 
+function findFileAtTime(timeMs) {
+  const match = Object.entries(METADATA)
+    .find(([_, data]) => {
+      const start = data.fileStart;
+      const end = start + (data.duration * 1000);
+      return timeMs > start && timeMs < end;
+    });
+
+  if (!match) return [];
+
+  const [file, data] = match;
+
+  return [{
+    file,
+    offset: (timeMs - data.fileStart) / 1000
+  }];
+}
 
 async function findTime(time) {
-  const result = await STATE.db.allAsync(`
+  let result = await STATE.db.allAsync(`
     SELECT
       name as file,
       (? - filestart) / 1000.0 AS offset
@@ -939,6 +953,9 @@ async function findTime(time) {
     WHERE filestart <= ?
       AND filestart + (duration * 1000) > ?;
   `, time, time, time);
+  if (! result.length){
+    result = findFileAtTime(time)
+  }
   UI.postMessage({ event: "found-time", result });
 }
 
@@ -1425,12 +1442,16 @@ async function getSpeciesSQLAsync(file){
 }
 
 /**
- * Augment a SQL WHERE fragment with filters derived from current application STATE (file/time range, labels, species, selection, location, and daylight).
+ * Apply application-state filters (date/file range, labels, species/list selection, daylight, and location) to a SQL WHERE fragment.
  *
- * @param {string} stmt - Base SQL fragment to augment (typically a WHERE clause or subquery fragment).
- * @param {Object} [range] - Optional time range to constrain results; when omitted in explore mode the explore.range is used.
- * @param {string} [caller] - Caller context that can change behavior (e.g., when `'results'` and a selection exists a file filter is applied).
- * @returns {Array<string | any[]>} An array with two elements: the augmented SQL string and an ordered array of parameters for the prepared statement.
+ * If no explicit range is provided and the app is in "explore" mode, the explore.range is used. When caller is `'results'` and a selection exists, a file filter is applied instead of the species filter.
+ *
+ * @param {string} stmt - Base SQL fragment to augment.
+ * @param {Object} [range] - Optional time range to constrain results (overrides explore.range when provided).
+ * @param {string} [caller] - Caller context that can alter behavior (e.g., `'results'` applies selection-based file filtering).
+ * @returns {Array} A two-element array: [augmented SQL string, ordered parameters array] for use with a prepared statement.
+ */
+
 async function addQueryQualifiers(stmt, range, caller) {
   const {list, mode, explore, labelFilters, detect, location, selection} = STATE;
   
@@ -1589,7 +1610,14 @@ const prepResultsStatement = async (
   return {sql: resultStatement, params};
 };
 
-// Helper to chunk an array
+
+
+/**
+ * Split an array into consecutive chunks of the given size.
+ * @param {Array} array - The array to split.
+ * @param {number} size - Maximum size of each chunk; the final chunk may be smaller.
+ * @returns {Array<Array>} An array of chunk arrays in the same order as the input.
+ */
 function chunkArray(array, size) {
   const result = [];
   for (let i = 0; i < array.length; i += size) {
@@ -2765,15 +2793,11 @@ const stream = command.pipe();
 /**
  * Build the chain of audio filter configurations based on current STATE.filters and STATE.audio settings.
  *
- * When filters are not active an empty array is returned. If provided, `audio_details.sample_rates`
- * is used to populate sample-rate-related filter options.
- *
- * @param {Object} [audio_details] - Optional probe-derived audio metadata.
- * @param {number[]} [audio_details.sample_rates] - Available sample rates to apply to resampling-related filters.
- * @param {number} [audio_details.channels] - Channel count (informational; may be used by filters).
+ * When filters are not active an empty array is returned. 
+
  * @returns {Array<Object>} An array of filter configuration objects suitable for ffmpeg-style filter chains; empty if no filters are active.
  */
-function setAudioFilters(audio_details) {
+function setAudioFilters() {
   const {
     active,
     lowShelfAttenuation: attenuation,
@@ -2791,10 +2815,6 @@ function setAudioFilters(audio_details) {
   const batModel = STATE.model.includes('bats');
   if (!batModel && (highPass || (lowPass < 15_000 && lowPass > 0))) {
     const options = {};
-    if (audio_details) {
-      const { sample_rates, channels } = audio_details;
-      options.r = sample_rates;
-    }
     if (highPass) options.hp = highPass;
     if (lowPass < 15_000) options.lp = lowPass;
     // Use sinc + afir
@@ -2892,19 +2912,7 @@ async function doPrediction({
   });
 }
 
-/**
- * Retrieve FFmpeg probe metadata for a media input.
- * @param {string|Buffer|import('stream').Readable} file - Path, buffer, or readable stream accepted by ffprobe.
- * @returns {Object} The probe result object containing `streams`, `format`, and other metadata produced by ffprobe.
- */
-async function getProbeData(file) {
-  return new Promise((resolve, reject) => {
-    ffmpeg.ffprobe(file, (err, data) => {
-      if (err) reject(err);
-      else resolve(data);
-    });
-  });
-}
+
 
 const bufferToAudio = async ({
   file = "",
@@ -2913,8 +2921,7 @@ const bufferToAudio = async ({
   meta = {},
   format = STATE.audio.format,
   folder = undefined,
-  filename = undefined,
-  audio_details = undefined
+  filename = undefined
 }) => {
   if (!fs.existsSync(file)) {
     const found = await getWorkingFile(file);
@@ -2949,40 +2956,58 @@ const bufferToAudio = async ({
 
     end = Math.min(METADATA[file].duration, end + 1);
   }
-  const metadata = await getProbeData(file)
-  const streams = metadata?.streams;
-  const audioStream = streams?.find(s => s.codec_type === 'audio');
-  const {sample_rate, channels} = audioStream || {sample_rate: undefined, channels: undefined};
+
   return new Promise(function (resolve, reject) {
-    const filters = setAudioFilters(audio_details);
+    const filters = setAudioFilters();
     if (fade && padding) {
       filters.push(
         { filter: "afade", options: `t=in:ss=${start}:d=1` },
         { filter: "afade", options: `t=out:st=${end - start - 1}:d=1` }
       );
     }
-    let errorHandled = false;
+    
     setupFfmpegCommand({
       file,
       start,
       end,
-      sampleRate: sample_rate,
+      sampleRate: undefined,
       audioBitrate: bitrate,
       audioQuality: quality,
       audioCodec,
       format: soundFormat,
-      channels: downmix ? 1 : channels,
+      channels: downmix ? 1 : 0,
       metadata: meta,
       additionalFilters: filters
     }).then(command => {
     const destination = p.join(folder || tempPath, filename);
 
-    command.on("start", function (commandLine) {
-      DEBUG && console.log("FFmpeg command: " + commandLine);
-    });
-
+    command.on("codecData", async function (data) {
+      const channelStr = data.audio_details?.[2]?.toLowerCase() ?? '';
+      // Allow: mono (1ch), stereo/2ch (2ch), dual-mono
+      const isSafe = /^(mono|stereo|1[\s.]?0|2[\s.]?0|dual[\s-]?mono|1\s+channels?|2\s+channels?)$/
+        .test(channelStr);
+      if (format === "mp3" && !STATE.audio.downmix) {
+        if (channelStr && !isSafe) {
+          const i18n = {
+            en: "Cannot export multichannel audio to MP3. Either enable downmixing, or choose a different export format.",
+            da: "Kan ikke eksportere multikanalslyd til MP3. Aktiver enten nedmiksning, eller vælg et andet eksportformat.",
+            de: "Mehrkanal-Audio kann nicht als MP3 exportiert werden. Aktivieren Sie entweder das Downmixing oder wählen Sie ein anderes Exportformat.",
+            es: "No se puede exportar audio multicanal a MP3. Active la mezcla descendente o elija un formato de exportación diferente.",
+            fr: "Impossible d’exporter un audio multicanal en MP3. Activez le mixage vers le bas ou choisissez un autre format d’exportation.",
+            ja: "マルチチャンネル音声をMP3に書き出すことはできません。ダウンミックスを有効にするか、別の書き出し形式を選択してください。",
+            nl: "Kan geen meerkanaalsaudio exporteren naar MP3. Schakel downmixen in of kies een ander exportformaat.",
+            pt: "Não é possível exportar áudio multicanal para MP3. Ative a mixagem para baixo ou escolha um formato de exportação diferente.",
+            ru: "Невозможно экспортировать многоканальное аудио в MP3. Включите даунмиксинг или выберите другой формат экспорта.",
+            sv: "Kan inte exportera flerkanalsljud till MP3. Aktivera antingen nedmixning eller välj ett annat exportformat.",
+            zh: "无法将多声道音频导出为 MP3。请启用混缩，或选择其他导出格式。"
+          };
+          const error = i18n[STATE.locale] || i18n["en"];
+          generateAlert({ type: "error", message: error});
+          return reject(console.warn("Export polyWAV to mp3 attempted."))
+        }
+      }
+    })
     command.on("error", (err) => {
-      if (errorHandled) return; // Prevent multiple error handling
       generateAlert({ type: "error", message: "ffmpeg", variables: { error: err.message } });
       reject(console.error("An ffmpeg error occurred: ", err.message));
     });
@@ -3085,6 +3110,7 @@ function spawnPredictWorkers(model, batchSize, toSpawn) {
       threads: toSpawn,
       backend: STATE.detect.backend,
       worker: i,
+      locale: STATE.locale.slice(0,2)
     });
 
     // Web worker message event handler
@@ -4975,8 +5001,9 @@ async function _updateSpeciesLocale(db, labels) {
 
     // 1. Build a map: sname => translated cname (label version)
     const labelMap = new Map();
+    const splitChar = getSplitChar();
     for (const label of labels) {
-      const [sname, translatedCname] = label.split(getSplitChar());
+      const [sname, translatedCname] = label.split(splitChar);
       labelMap.set(sname, translatedCname); // only one cname per sname in labels
     }
 
@@ -5304,14 +5331,13 @@ async function _getNearbyLocations(lat, lon) {
 }
 
 /**
- * Retrieves the list of included species IDs based on the current STATE settings and optional file context.
+ * Determine which species IDs are included by the current list settings, optionally using a file's location/week context.
  *
- * Depending on the STATE.list type and whether a specific file is provided, this function determines the appropriate latitude, longitude, and week number to use for location-specific or seasonal inclusion lists. It checks if the relevant inclusion data is already cached in STATE.included; if not, it invokes setIncludedIDs to fetch and cache the data from the list worker. Finally, it returns the array of included species IDs for the specified model and list type.
+ * When a file is provided, its metadata (lat/lon and week) is used to resolve location- or week-specific inclusion; otherwise global STATE values are used. The function will fetch and cache inclusion data from the list worker when a cache miss occurs.
  *
- * @param {string} [file] - Optional file identifier to provide context for location-specific or seasonal lists.
- * @returns {Promise<number[]>} An array of species IDs that are included based on the current STATE settings.
- */
-
+ * @param {string} [file] - Optional file key whose metadata should be used to derive location and week context.
+ * @returns {Promise<number[]>} An array of species IDs included according to the current STATE list and any file-specific context.
+*/
 async function getIncludedIDs(file) {
   if (STATE.list === "everything") return [];
   let latitude, longitude, week;
@@ -5321,10 +5347,10 @@ async function getIncludedIDs(file) {
     (list === "nocturnal" && local)
   ) {
     if (file) {
-      file = METADATA[file];
-      week = useWeek ? new Date(file.fileStart).getWeekNumber() : "-1";
-      latitude = file.lat || lat;
-      longitude = file.lon || lon;
+      const meta = METADATA[file] ?? await setMetadata({file});
+      week = useWeek ? new Date(meta.fileStart).getWeekNumber() : "-1";
+      latitude = meta.lat || lat;
+      longitude = meta.lon || lon;
       STATE.week = week;
     } else {
       // summary context: use the week, lat & lon from the first file??
@@ -5391,16 +5417,16 @@ function deepMergeLists(model, list) {
 let LIST_CACHE = {};
 
 /**
- * Load and cache species IDs included for a given location and week and merge them into global STATE.
+ * Load and cache the species ID inclusion list for a given location and week and merge it into STATE.included.
  *
  * Requests an inclusion list from the list worker using the current model, labels, list settings and the provided
- * latitude/longitude/week (falling back to STATE values), merges the resulting IDs into STATE.included, caches the
- * in-flight promise to avoid duplicate requests, and emits warnings for any unrecognized labels reported by the worker.
+ * latitude/longitude/week (falling back to STATE values), caches the in-flight request to avoid duplicate calls,
+ * merges the returned IDs into STATE.included, and emits warnings for any unrecognized labels reported by the worker.
  *
  * @param {number|string} lat - Latitude to use for location-specific lists (falls back to STATE.lat if falsy).
  * @param {number|string} lon - Longitude to use for location-specific lists (falls back to STATE.lon if falsy).
  * @param {number|string} week - Week number for seasonal filtering (falls back to STATE.week if falsy).
- * @returns {Promise<Object>} The updated STATE.included object after merging the retrieved included species IDs.
+ * @returns {Object} The updated STATE.included object after merging the retrieved included species IDs.
  */
 async function setIncludedIDs(lat, lon, week) {
   const key = `${lat}-${lon}-${week}-${STATE.model}-${STATE.list}`;
@@ -5428,7 +5454,7 @@ async function setIncludedIDs(lat, lon, week) {
     });
     // // Add the *label* id of "Unknown Sp." to all lists
     STATE.list !== "everything" 
-      && result.push(STATE.allLabels.indexOf('Unknown Sp._Unknown Sp.') + 1);
+      && result.push(STATE.allLabels.indexOf('Unknown Sp.,Unknown Sp.') + 1);
 
     let includedObject = {};
     if (

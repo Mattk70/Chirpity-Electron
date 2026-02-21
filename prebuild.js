@@ -2,12 +2,12 @@ const fs = require("fs");
 const path = require("path");
 
 // Define the directory where your source files are located
-let SOURCE_DIR = process.cwd(); 
+const SOURCE_DIR = process.cwd(); 
 
 /**
  * Recursively scans a directory tree and checks JavaScript files for any of the provided regular-expression patterns.
  *
- * Only files with a ".js" extension are inspected; directories named "node_modules" are skipped during recursion.
+ * Only files with a ".js" extension are inspected; directories named "node_modules" or "unittest" are skipped during recursion.
  *
  * @param {string} directory - Path to the directory to scan.
  * @param {RegExp[]} patterns - Array of regular expressions to test against each JavaScript file's contents.
@@ -21,11 +21,10 @@ function searchPatterns(directory, patterns) {
     const stats = fs.statSync(filePath);
     if (stats.isDirectory() || file.endsWith(".js")) {
       if (stats.isDirectory()) {
-        if (!filePath.includes("node_modules")) {
+        if (!(filePath.includes("node_modules") || filePath.includes("unittest")) ) {
           searchPatterns(filePath, patterns);
         }
       } else if (stats.isFile()) {
-        console.log(filePath);
         const content = fs.readFileSync(filePath, "utf8");
         patterns.forEach((pattern) => {
           if (content.match(pattern)) {
@@ -50,7 +49,7 @@ const patterns = [
 try {
   searchPatterns(SOURCE_DIR, patterns);
   searchPatterns(SOURCE_DIR + "/node_modules/fluent-ffmpeg/lib", [
-    /ffmpegProc.kill\(\);?\s+\},\s*\d{1,3}\s*\);?/,
+    /ffmpegProc\.kill\(\);?\s+\},\s*\d{1,3}\s*\);?/,
   ]);
   console.log("No patterns found. Proceeding with the build...");
 } catch (error) {

@@ -332,7 +332,8 @@ class ChirpityModel extends BaseModel {
     });
 
     buffers.dispose();
-    const batchKeys = this.getKeys(numSamples, start);
+    const maxKeys = Math.ceil(audioBuffer.length / this.chunkLength);
+    const batchKeys = this.getKeys(maxKeys, start);
     const result = await this.predictBatch(
       specBatch,
       batchKeys,
