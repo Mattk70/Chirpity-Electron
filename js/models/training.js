@@ -67,11 +67,12 @@ async function trainModel({
   const {files:allFiles, classWeights} = getFilesWithLabelsAndWeights(dataset);
   i18n = messages[locale] || messages['en'];
   if (!allFiles.length){
-    throw new Error("Training error", `${i18n.noAudio} ${dataset}`)
+    console.warn("Training error", "No audio files found in dataset location")
+    throw new Error(`${i18n.noAudio} ${dataset}`)
   }
   // Check locations:
   if (!fs.existsSync(saveLocation)){
-    throw new Error("Training error",i18n.badSaveLocation)
+    throw new Error(i18n.badSaveLocation)
   }
 
   const baseModel = Model.model;
@@ -523,7 +524,7 @@ async function writeBinaryGzipDataset(embeddingModel, fileList, outputPath, labe
       const embeddingsBuffer = Buffer.from(embeddings.buffer);
       const labelIndex = labelToIndex[label];
       if (typeof labelIndex !== 'number' || labelIndex < 0 || labelIndex > 65535) {
-        console.error("Training error", `${i18n.badLabel} "${label}" → ${labelIndex}`);
+        console.warn("Training error", `${i18n.badLabel} "${label}" → ${labelIndex}`);
       }
 
       // Write labels
