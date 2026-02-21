@@ -5317,7 +5317,7 @@ async function _getNearbyLocations(lat, lon) {
  *
  * @param {string} [file] - Optional file key whose metadata should be used to derive location and week context.
  * @returns {Promise<number[]>} An array of species IDs included according to the current STATE list and any file-specific context.
-
+*/
 async function getIncludedIDs(file) {
   if (STATE.list === "everything") return [];
   let latitude, longitude, week;

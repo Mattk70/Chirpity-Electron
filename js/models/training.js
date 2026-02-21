@@ -1,6 +1,6 @@
 import {installConsoleTracking } from "../utils/tracking.js";
 
-let tf, i18n, DEBUG = false;
+let tf, i18n, DEBUG = true;
 const fs = require('node:fs')
 const path = require('node:path')
 const zlib = require('node:zlib')
@@ -67,11 +67,11 @@ async function trainModel({
   const {files:allFiles, classWeights} = getFilesWithLabelsAndWeights(dataset);
   i18n = messages[locale] || messages['en'];
   if (!allFiles.length){
-    throw new Error(`${i18n.noAudio} ${dataset}`)
+    throw new Error("Training error", `${i18n.noAudio} ${dataset}`)
   }
   // Check locations:
   if (!fs.existsSync(saveLocation)){
-    throw new Error(i18n.badSaveLocation)
+    throw new Error("Training error",i18n.badSaveLocation)
   }
 
   const baseModel = Model.model;
@@ -179,6 +179,7 @@ async function trainModel({
       if (error){
         error += i18n.notEnoughFiles[2]
         postMessage({ message: "training-results", notice: error, type: 'error', autohide:false });
+        console.error("Training error", error)
         return
       }
     }
@@ -251,7 +252,7 @@ async function trainModel({
         text: ''
       });
       const t1 = Date.now();
-      console.info(`Training completed in ${((t1 - t0) / 1000).toFixed(2)} seconds`);
+      console.info("Training completed", `${((t1 - t0) / 1000).toFixed(2)} seconds`);
       return logs
     }
   })
@@ -349,7 +350,7 @@ Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License
   Model.one.dispose(), Model.two.dispose(), Model.scalarFive.dispose();
   DEBUG && console.log(`Tensors in memory after: ${tf.memory().numTensors}`);
   await Model.loadModel("layers");
-  console.info('Custom model saved.', `Val Loss: ${bestLoss.toFixed(4)}, Val Accuracy: ${bestAccuracy.toFixed(4)}`)
+  console.info('Custom model saved', `Val Loss: ${bestLoss.toFixed(4)}, Val Accuracy: ${bestAccuracy.toFixed(4)}`)
   return message
 }
 
@@ -393,7 +394,7 @@ function getFilesWithLabelsAndWeights(rootDir) {
   const total = files.length;
   const classWeights = {};
   for (const [label, count] of Object.entries(labelCounts)) {
-    console.log(`Label "${label}" has ${count} samples`);
+    DEBUG && console.log(`Label "${label}" has ${count} samples`);
     // Normalize by total samples and number of classes
     classWeights[label] = total / (Object.keys(labelCounts).length * count);
   }
@@ -517,10 +518,12 @@ async function writeBinaryGzipDataset(embeddingModel, fileList, outputPath, labe
       const input = tf.tensor2d(audioArray, [1, audioArray.length]);
       const embeddingTensor = await embeddingModel.predict(input);
       const embeddings = await embeddingTensor.data();
+      input.dispose();
+      embeddingTensor.dispose();
       const embeddingsBuffer = Buffer.from(embeddings.buffer);
       const labelIndex = labelToIndex[label];
       if (typeof labelIndex !== 'number' || labelIndex < 0 || labelIndex > 65535) {
-        console.error(`${i18n.badLabel} "${label}" → ${labelIndex}`);
+        console.error("Training error", `${i18n.badLabel} "${label}" → ${labelIndex}`);
       }
 
       // Write labels
@@ -547,7 +550,7 @@ async function writeBinaryGzipDataset(embeddingModel, fileList, outputPath, labe
   await Promise.all(tasks);
   gzip.end();
   abortController.off('abort', onAbort);
-  console.info(`Dataset preparation took: ${((Date.now() - t0)/ 1000).toFixed(0)} seconds. ${completed} files processed.`)
+  console.info("Dataset preparation", `${((Date.now() - t0)/ 1000).toFixed(0)} seconds. ${completed} files processed.`)
 }
 
 
@@ -599,7 +602,7 @@ async function* readBinaryGzipDataset(gzippedPath, labels, roll = false) {
 
       const embedding = new Float32Array(audioBuf.buffer, audioBuf.byteOffset, 1024);
       if (labelIndex >= labels.length) {
-        console.error(`Invalid label index: ${labelIndex}. Max allowed: ${labels.length - 1}`);
+        console.error(`Invalid label index`, `${labelIndex}. Max allowed: ${labels.length - 1}`);
       }
       try{
         yield {
@@ -607,7 +610,7 @@ async function* readBinaryGzipDataset(gzippedPath, labels, roll = false) {
           ys: tf.oneHot(labelIndex, labels.length)
         };
       } catch (e) {
-        console.error(e)
+        console.error("Training error", e)
         throw new Error(i18n.oneClass)
       }
       offset += RECORD_SIZE;
@@ -857,8 +860,8 @@ async function* blendedGenerator(train_ds, noise_ds) {
 
 const messages = {
   en:{
-    badSaveLocation: "The selected model save location does not exist.",
     oneClass: "At least two class folders containing audio examples are needed. Only one was found.",
+    badSaveLocation: "The selected model save location does not exist.",
     noAudio: `No labels folders containing audio files in:`,
     notEnoughFiles: ['Validation set is missing examples of:', "Training set is missing examples of:", 'To have both training and validation data, at least two examples are needed per class.'],
     prepTrain: "Preparing Training Data",
