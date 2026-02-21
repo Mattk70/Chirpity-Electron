@@ -552,7 +552,6 @@ async function handleMessage(e) {
       if (STATE.db) {
         args.updateSummary && (await getSummary(args));
         await getResults(args);
-        args.included = await getIncludedIDs(args.file);
       }
       break;
     }
@@ -5322,10 +5321,10 @@ async function getIncludedIDs(file) {
     (list === "nocturnal" && local)
   ) {
     if (file) {
-      file = METADATA[file];
+      const meta = METADATA[file] ?? await setMetadata({file});
       week = useWeek ? new Date(file.fileStart).getWeekNumber() : "-1";
-      latitude = file.lat || lat;
-      longitude = file.lon || lon;
+      latitude = meta.lat || lat;
+      longitude = meta.lon || lon;
       STATE.week = week;
     } else {
       // summary context: use the week, lat & lon from the first file??
