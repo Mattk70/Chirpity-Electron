@@ -1,6 +1,6 @@
 import {installConsoleTracking } from "../utils/tracking.js";
 
-let tf, i18n, DEBUG = true;
+let tf, i18n, DEBUG = false;
 const fs = require('node:fs')
 const path = require('node:path')
 const zlib = require('node:zlib')

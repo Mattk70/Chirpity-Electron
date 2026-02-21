@@ -926,9 +926,26 @@ function setGetSummaryQueryInterval(threads) {
     STATE.detect.backend !== "tensorflow" ? threads * 10 : threads;
 }
 
+function findFileAtTime(timeMs) {
+  const match = Object.entries(METADATA)
+    .find(([_, data]) => {
+      const start = data.fileStart;
+      const end = start + (data.duration * 1000);
+      return timeMs > start && timeMs < end;
+    });
+
+  if (!match) return [];
+
+  const [file, data] = match;
+
+  return [{
+    file,
+    offset: (timeMs - data.fileStart) / 1000
+  }];
+}
 
 async function findTime(time) {
-  const result = await STATE.db.allAsync(`
+  let result = await STATE.db.allAsync(`
     SELECT
       name as file,
       (? - filestart) / 1000.0 AS offset
@@ -936,6 +953,9 @@ async function findTime(time) {
     WHERE filestart <= ?
       AND filestart + (duration * 1000) > ?;
   `, time, time, time);
+  if (! result.length){
+    result = findFileAtTime(time)
+  }
   UI.postMessage({ event: "found-time", result });
 }
 
