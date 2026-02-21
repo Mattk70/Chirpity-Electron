@@ -1,4 +1,4 @@
-let tf, BACKEND, myModel, DEBUG = false;
+let tf, BACKEND, myModel, LOCALE, DEBUG = false;
 try {
   tf = require("@tensorflow/tfjs-node");
 } catch {
@@ -8,7 +8,7 @@ try {
 const fs = require("node:fs");
 const path = require("node:path");
 import { BaseModel } from "./BaseModel.js";
-import {trainModel} from './training.js';
+
 const {stft} = require("./custom-ops.js");
 import abortController from '../utils/abortController.js';
 
@@ -41,6 +41,7 @@ onmessage = async (e) => {
         const batch = e.data.batchSize;
         const backend = BACKEND || e.data.backend;
         BACKEND = backend;
+        LOCALE  = e.data.locale; // for error messages
         DEBUG && console.log(`Using backend: ${backend}`);
         backend === "webgpu" && require("@tensorflow/tfjs-backend-webgpu");
         let labels;
@@ -93,8 +94,9 @@ onmessage = async (e) => {
         break;
       }
       case "train-model":{
+        const {trainModel} = require('./training.js');
         const args = e.data;
-          trainModel({ ...args, Model: myModel}).then((message) => {
+          trainModel({ ...args, locale: LOCALE, Model: myModel}).then((message) => {
             postMessage({...message})
           }).catch((err) => {
             console.error("Error during model training:", err);
@@ -177,7 +179,8 @@ class BirdNETModel extends BaseModel {
   ) {
     DEBUG && console.log("predictChunk begin", tf.memory().numTensors);
     const [audioBatch, numSamples] = this.createAudioTensorBatch(audioBuffer);
-    const batchKeys = this.getKeys(numSamples, start);
+    const maxKeys = Math.ceil(audioBuffer.length / this.chunkLength)
+    const batchKeys = this.getKeys(maxKeys, start);
     const result = await this.predictBatch(
       audioBatch,
       batchKeys,
