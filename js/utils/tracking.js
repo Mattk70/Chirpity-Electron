@@ -26,9 +26,10 @@ function trackEvent(uuid, event, action, name, value){
     name = name ? `&e_n=${name}` : '';
     value = value ? `&e_v=${value}` : '';
     const payload = 
-        `https://analytics.mattkirkland.co.uk/matomo.php?h=${t.getHours()}&m=${t.getMinutes()}&s=${t.getSeconds()}
-        &action_name=Settings%20Change&idsite=${ID_SITE}&rand=${Date.now()}&rec=1&uid=${uuid}&apiv=1
-        &e_c=${event}&e_a=${action}${name}${value}`;
+        'https://analytics.mattkirkland.co.uk/matomo.php?'
+        + `h=${t.getHours()}&m=${t.getMinutes()}&s=${t.getSeconds()}&`
+        + `action_name=Settings%20Change&idsite=${ID_SITE}&rand=${Date.now()}&`
+        + `rec=1&uid=${uuid}&apiv=1&e_c=${event}&e_a=${action}${name}${value}`;
     try{
         navigator.sendBeacon(payload)
     } catch {

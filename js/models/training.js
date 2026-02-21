@@ -348,7 +348,7 @@ Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License
   Model.one.dispose(), Model.two.dispose(), Model.scalarFive.dispose();
   DEBUG && console.log(`Tensors in memory after: ${tf.memory().numTensors}`);
   await Model.loadModel("layers");
-  console.info('Custom model saved.', `Loss: ${bestLoss.toFixed(4)}, Accuracy: ${bestAccuracy.toFixed(4)}`)
+  console.info('Custom model saved.', `Val Loss: ${bestLoss.toFixed(4)}, Val Accuracy: ${bestAccuracy.toFixed(4)}`)
   return message
 }
 
@@ -435,11 +435,12 @@ function normaliseAudio(audioArray, mode = "centre") {
           padded.set(audioArray, 0);
           break;
         case "centre":
-        case "center":
+        case "center": {
           // pad evenly both sides
           const offset = Math.floor((expectedSamples - audioArray.length) / 2);
           padded.set(audioArray, offset);
           break;
+        }
         case "end":
         default:
           // pad at start (your original behaviour)
@@ -589,10 +590,15 @@ async function* readBinaryGzipDataset(gzippedPath, labels, roll = false) {
       if (labelIndex >= labels.length) {
         console.error(`Invalid label index: ${labelIndex}. Max allowed: ${labels.length - 1}`);
       }
-      yield {
-        xs: tf.tensor1d(embedding),
-        ys: tf.oneHot(labelIndex, labels.length)
-      };
+      try{
+        yield {
+          xs: tf.tensor1d(embedding),
+          ys: tf.oneHot(labelIndex, labels.length)
+        };
+      } catch (e) {
+        console.error(e)
+        throw new Error(i18n.oneClass)
+      }
       offset += RECORD_SIZE;
     }
 
@@ -678,7 +684,7 @@ async function decodeAudio(filePath) {
       .audioChannels(1)
       .audioFrequency(48000)
       .seekInput(seekTime)
-      .duration(5.0)
+      .duration(3.0)
       .on('error', reject)
       .on('end', () => {
         const wavBuffer = Buffer.concat(chunks);
@@ -841,6 +847,7 @@ async function* blendedGenerator(train_ds, noise_ds) {
 const messages = {
   en:{
     badSaveLocation: "The selected model save location does not exist.",
+    oneClass: "At least two class folders containing audio examples are needed. Only one was found.",
     noAudio: `No labels folders containing audio files in:`,
     notEnoughFiles: ['Validation set is missing examples of:', "Training set is missing examples of:", 'To have both training and validation data, at least two examples are needed per class.'],
     prepTrain: "Preparing Training Data",
@@ -851,6 +858,7 @@ const messages = {
     halted: ["Training halted at", "due to no further improvement"]
   },
   da:{
+    oneClass: "Der kræves mindst to klassemapper med lydeksempler. Kun én blev fundet.",
     badSaveLocation: "Den valgte gemmeplacering for modellen findes ikke.",
     noAudio: `Ingen label-mapper med lydfiler i:`,
     notEnoughFiles: ['Valideringssættet mangler eksempler på:', "Træningssættet mangler eksempler på:", 'For at have både trænings- og valideringsdata kræves mindst to eksempler pr. klasse.'],
@@ -862,6 +870,7 @@ const messages = {
     halted: ["Træning stoppet ved", "på grund af ingen yderligere forbedring"]
   },
   de:{
+    oneClass: "Es werden mindestens zwei Klassenordner mit Audiobeispielen benötigt. Es wurde nur einer gefunden.",
     badSaveLocation: "Der ausgewählte Speicherort für das Modell existiert nicht.",
     noAudio: `Keine Label-Ordner mit Audiodateien in:`,
     notEnoughFiles: ['Im Validierungssatz fehlen Beispiele für:', "Im Trainingssatz fehlen Beispiele für:", 'Für Trainings- und Validierungsdaten werden mindestens zwei Beispiele pro Klasse benötigt.'],
@@ -873,6 +882,7 @@ const messages = {
     halted: ["Training gestoppt bei", "aufgrund keiner weiteren Verbesserung"]
   },
   es:{
+    oneClass: "Se necesitan al menos dos carpetas de clases con ejemplos de audio. Solo se encontró una.",
     badSaveLocation: "La ubicación seleccionada para guardar el modelo no existe.",
     noAudio: `No hay carpetas de etiquetas con archivos de audio en:`,
     notEnoughFiles: ['Al conjunto de validación le faltan ejemplos de:', "Al conjunto de entrenamiento le faltan ejemplos de:", 'Para tener datos de entrenamiento y validación se necesitan al menos dos ejemplos por clase.'],
@@ -884,6 +894,7 @@ const messages = {
     halted: ["Entrenamiento detenido en", "debido a que no hubo más mejoras"]
   },
   fr:{
+    oneClass: "Au moins deux dossiers de classes contenant des exemples audio sont nécessaires. Un seul a été trouvé.",
     badSaveLocation: "L’emplacement sélectionné pour enregistrer le modèle n’existe pas.",
     noAudio: `Aucun dossier d’étiquettes contenant des fichiers audio dans :`,
     notEnoughFiles: ['Le jeu de validation manque d’exemples pour :', "Le jeu d’entraînement manque d’exemples pour :", 'Pour disposer de données d’entraînement et de validation, au moins deux exemples par classe sont nécessaires.'],
@@ -895,6 +906,7 @@ const messages = {
     halted: ["Entraînement arrêté à", "en raison de l’absence d’amélioration supplémentaire"]
   },
   ja:{
+    oneClass: "音声例を含むクラスフォルダーが少なくとも2つ必要です。1つしか見つかりませんでした。",
     badSaveLocation: "選択されたモデル保存先が存在しません。",
     noAudio: `音声ファイルを含むラベルフォルダーがありません:`,
     notEnoughFiles: ['検証セットに次の例が不足しています:', "トレーニングセットに次の例が不足しています:", 'トレーニングと検証の両方のデータには、クラスごとに少なくとも2つの例が必要です。'],
@@ -906,6 +918,7 @@ const messages = {
     halted: ["トレーニングは次の時点で停止しました", "これ以上の改善がなかったため"]
   },
   nl:{
+    oneClass: "Er zijn minimaal twee klassemappen met audiovoorbeelden nodig. Er is er slechts één gevonden.",
     badSaveLocation: "De geselecteerde opslaglocatie voor het model bestaat niet.",
     noAudio: `Geen labelmappen met audiobestanden in:`,
     notEnoughFiles: ['Validatieset mist voorbeelden van:', "Trainingsset mist voorbeelden van:", 'Voor zowel trainings- als validatiegegevens zijn minimaal twee voorbeelden per klasse nodig.'],
@@ -917,6 +930,7 @@ const messages = {
     halted: ["Training gestopt bij", "vanwege geen verdere verbetering"]
   },
   pt:{
+    oneClass: "São necessárias pelo menos duas pastas de classes com exemplos de áudio. Apenas uma foi encontrada.",
     badSaveLocation: "O local selecionado para guardar o modelo não existe.",
     noAudio: `Não há pastas de rótulos com ficheiros de áudio em:`,
     notEnoughFiles: ['O conjunto de validação não tem exemplos de:', "O conjunto de treino não tem exemplos de:", 'Para ter dados de treino e validação, são necessários pelo menos dois exemplos por classe.'],
@@ -928,6 +942,7 @@ const messages = {
     halted: ["Treino interrompido em", "devido à ausência de melhorias adicionais"]
   },
   ru:{
+    oneClass: "Требуется как минимум две папки классов с аудиопримерами. Найдена только одна.",
     badSaveLocation: "Выбранное место сохранения модели не существует.",
     noAudio: `Нет папок с метками, содержащих аудиофайлы в:`,
     notEnoughFiles: ['В наборе проверки отсутствуют примеры для:', "В обучающем наборе отсутствуют примеры для:", 'Для наличия обучающих и проверочных данных требуется не менее двух примеров на класс.'],
@@ -939,6 +954,7 @@ const messages = {
     halted: ["Обучение остановлено на", "из-за отсутствия дальнейших улучшений"]
   },
   sv:{
+    oneClass: "Minst två klassmappar med ljudexempel krävs. Endast en hittades.",
     badSaveLocation: "Den valda platsen för att spara modellen finns inte.",
     noAudio: `Inga etikettmappar med ljudfiler i:`,
     notEnoughFiles: ['Valideringsuppsättningen saknar exempel på:', "Träningsuppsättningen saknar exempel på:", 'För att ha både tränings- och valideringsdata krävs minst två exempel per klass.'],
@@ -950,6 +966,7 @@ const messages = {
     halted: ["Träning stoppad vid", "på grund av ingen ytterligare förbättring"]
   },
   zh:{
+    oneClass: "至少需要两个包含音频示例的类别文件夹。只找到一个。",
     badSaveLocation: "所选的模型保存位置不存在。",
     noAudio: `在以下位置未找到包含音频文件的标签文件夹：`,
     notEnoughFiles: ['验证集缺少以下类别的示例：', "训练集缺少以下类别的示例：", '要同时拥有训练和验证数据，每个类别至少需要两个示例。'],

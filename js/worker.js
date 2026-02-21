@@ -5324,7 +5324,7 @@ async function getIncludedIDs(file) {
   ) {
     if (file) {
       const meta = METADATA[file] ?? await setMetadata({file});
-      week = useWeek ? new Date(file.fileStart).getWeekNumber() : "-1";
+      week = useWeek ? new Date(meta.fileStart).getWeekNumber() : "-1";
       latitude = meta.lat || lat;
       longitude = meta.lon || lon;
       STATE.week = week;
