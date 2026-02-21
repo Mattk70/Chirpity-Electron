@@ -524,7 +524,7 @@ async function writeBinaryGzipDataset(embeddingModel, fileList, outputPath, labe
       const embeddingsBuffer = Buffer.from(embeddings.buffer);
       const labelIndex = labelToIndex[label];
       if (typeof labelIndex !== 'number' || labelIndex < 0 || labelIndex > 65535) {
-        console.warn("Training error", `${i18n.badLabel} "${label}" → ${labelIndex}`);
+        console.error("Training error", `${i18n.badLabel} "${label}" → ${labelIndex}`);
         completed++
         return
       }
