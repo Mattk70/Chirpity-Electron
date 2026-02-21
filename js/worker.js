@@ -396,12 +396,10 @@ async function setLabelState({ regenerate }) {
 
 
 /**
- * Dispatches incoming worker messages by action and performs the requested application operation.
+ * Dispatches worker messages by action and performs the corresponding application operation, sending back UI events as needed.
  *
- * Waits for initialisation when required, then delegates actions such as model initialization, analysis/prediction control, worker management, audio file operations, database updates, import/export, tagging and list/locale updates, and UI notifications. Expects the event's data to include an `action` string and action-specific parameters.
- *
- * @param {Object} e - Message event whose `data` property contains an `action` field and associated parameters.
- * @returns {Promise<void>} Resolves when the requested action has been processed.
+ * Expects the event's `data` to include an `action` string and any action-specific parameters; handles initialization, analysis/control commands, worker and model management, audio/file operations, DB updates, import/export, tagging, list/locale changes, and related UI notifications.
+ * @param {Object} e - Message event whose `data` property contains an `action` field and associated parameters. 
  */
 async function handleMessage(e) {
   const args = e.data;
@@ -1424,13 +1422,15 @@ async function getSpeciesSQLAsync(file){
 }
 
 /**
- * Augment a SQL WHERE fragment with filters derived from current application STATE (file/time range, labels, species, selection, location, and daylight).
+ * Apply application-state filters (date/file range, labels, species/list selection, daylight, and location) to a SQL WHERE fragment.
  *
- * @param {string} stmt - Base SQL fragment to augment (typically a WHERE clause or subquery fragment).
- * @param {Object} [range] - Optional time range to constrain results; when omitted in explore mode the explore.range is used.
- * @param {string} [caller] - Caller context that can change behavior (e.g., when `'results'` and a selection exists a file filter is applied).
- * @returns {Array<string | any[]>} An array with two elements: the augmented SQL string and an ordered array of parameters for the prepared statement.
-*/
+ * If no explicit range is provided and the app is in "explore" mode, the explore.range is used. When caller is `'results'` and a selection exists, a file filter is applied instead of the species filter.
+ *
+ * @param {string} stmt - Base SQL fragment to augment.
+ * @param {Object} [range] - Optional time range to constrain results (overrides explore.range when provided).
+ * @param {string} [caller] - Caller context that can alter behavior (e.g., `'results'` applies selection-based file filtering).
+ * @returns {Array} A two-element array: [augmented SQL string, ordered parameters array] for use with a prepared statement.
+ */
 
 async function addQueryQualifiers(stmt, range, caller) {
   const {list, mode, explore, labelFilters, detect, location, selection} = STATE;
@@ -1592,7 +1592,12 @@ const prepResultsStatement = async (
 
 
 
-// Helper to chunk an array
+/**
+ * Split an array into consecutive chunks of the given size.
+ * @param {Array} array - The array to split.
+ * @param {number} size - Maximum size of each chunk; the final chunk may be smaller.
+ * @returns {Array<Array>} An array of chunk arrays in the same order as the input.
+ */
 function chunkArray(array, size) {
   const result = [];
   for (let i = 0; i < array.length; i += size) {
@@ -5306,13 +5311,12 @@ async function _getNearbyLocations(lat, lon) {
 }
 
 /**
- * Retrieves the list of included species IDs based on the current STATE settings and optional file context.
+ * Determine which species IDs are included by the current list settings, optionally using a file's location/week context.
  *
- * Depending on the STATE.list type and whether a specific file is provided, this function determines the appropriate latitude, longitude, and week number to use for location-specific or seasonal inclusion lists. It checks if the relevant inclusion data is already cached in STATE.included; if not, it invokes setIncludedIDs to fetch and cache the data from the list worker. Finally, it returns the array of included species IDs for the specified model and list type.
+ * When a file is provided, its metadata (lat/lon and week) is used to resolve location- or week-specific inclusion; otherwise global STATE values are used. The function will fetch and cache inclusion data from the list worker when a cache miss occurs.
  *
- * @param {string} [file] - Optional file identifier to provide context for location-specific or seasonal lists.
- * @returns {Promise<number[]>} An array of species IDs that are included based on the current STATE settings.
- */
+ * @param {string} [file] - Optional file key whose metadata should be used to derive location and week context.
+ * @returns {Promise<number[]>} An array of species IDs included according to the current STATE list and any file-specific context.
 
 async function getIncludedIDs(file) {
   if (STATE.list === "everything") return [];
@@ -5393,16 +5397,16 @@ function deepMergeLists(model, list) {
 let LIST_CACHE = {};
 
 /**
- * Load and cache species IDs included for a given location and week and merge them into global STATE.
+ * Load and cache the species ID inclusion list for a given location and week and merge it into STATE.included.
  *
  * Requests an inclusion list from the list worker using the current model, labels, list settings and the provided
- * latitude/longitude/week (falling back to STATE values), merges the resulting IDs into STATE.included, caches the
- * in-flight promise to avoid duplicate requests, and emits warnings for any unrecognized labels reported by the worker.
+ * latitude/longitude/week (falling back to STATE values), caches the in-flight request to avoid duplicate calls,
+ * merges the returned IDs into STATE.included, and emits warnings for any unrecognized labels reported by the worker.
  *
  * @param {number|string} lat - Latitude to use for location-specific lists (falls back to STATE.lat if falsy).
  * @param {number|string} lon - Longitude to use for location-specific lists (falls back to STATE.lon if falsy).
  * @param {number|string} week - Week number for seasonal filtering (falls back to STATE.week if falsy).
- * @returns {Promise<Object>} The updated STATE.included object after merging the retrieved included species IDs.
+ * @returns {Object} The updated STATE.included object after merging the retrieved included species IDs.
  */
 async function setIncludedIDs(lat, lon, week) {
   const key = `${lat}-${lon}-${week}-${STATE.model}-${STATE.list}`;

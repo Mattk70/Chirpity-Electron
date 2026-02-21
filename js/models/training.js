@@ -28,30 +28,31 @@ function cosineDecay(initialLearningRate, globalStep, decaySteps) {
 }
 
 /**
- * Train a transfer-learning audio classification model by freezing a base model and fitting a new classifier head with configurable augmentation, loss, and caching options.
+ * Train a transfer-learning audio classifier by freezing a base model and fitting a new classifier head with optional augmentations, weighting, loss choices, caching, and checkpointing.
  *
- * Prepares datasets (optionally caching as gzipped binaries), supports stratified validation splitting, mixup, background-noise blending, rolling augmentation, class weighting, focal loss, label smoothing, cosine learning-rate decay, early stopping, and periodic model checkpointing. Writes labels and a LICENSE to the save location and returns a summary message describing training metrics and settings.
+ * Trains a classifier head on embeddings produced by the provided base model, supporting stratified validation splitting, gzipped binary dataset caching, mixup, background-noise blending, rolling augmentation, per-class weighting, focal loss, label smoothing, cosine LR decay, early stopping, and periodic checkpoint saves. Writes labels.txt, training metrics, and a LICENSE to the save location and returns a summary message containing final metrics and the training history.
  *
  * @param {Object} options - Training configuration options.
- * @param {Object} options.Model - Wrapper providing the base model, utility methods (e.g., getSpectrogram, loadModel), and model metadata.
+ * @param {Object} options.Model - Wrapper that exposes the loaded base model, utilities (e.g., getSpectrogram, loadModel), and model metadata.
+ * @param {string} [options.locale] - Locale key for user-facing messages; falls back to English.
  * @param {number} options.lr - Initial learning rate.
- * @param {number} [options.batchSize=32] - Number of samples per training batch.
- * @param {number} options.dropout - Dropout rate applied to the classifier head when a hidden layer is present.
+ * @param {number} [options.batchSize=32] - Training batch size.
+ * @param {number} [options.dropout] - Dropout rate applied around the optional hidden layer.
  * @param {number} options.epochs - Maximum number of training epochs.
- * @param {number} options.hidden - Number of units in the optional hidden dense layer of the classifier head.
- * @param {string} options.dataset - Path to the root dataset folder containing class-labeled subfolders of audio files.
- * @param {string} options.cache - Folder path used for storing or reading gzipped binary dataset caches.
+ * @param {number} [options.hidden] - Number of units in the optional hidden dense layer of the classifier head.
+ * @param {string} options.dataset - Root path containing class-labelled subfolders of audio files.
+ * @param {string} [options.cache] - Folder path used for reading/writing gzipped binary dataset caches; defaults to the dataset folder.
  * @param {string} options.modelLocation - Directory where the trained model, labels.txt, and auxiliary files will be saved.
- * @param {string} options.modelType - Model saving mode; use 'append' to merge base outputs with classifier outputs when saving.
- * @param {boolean} options.useCache - If true, use existing cached binary datasets when present.
- * @param {number} options.validation - Fraction (0–1) of data to reserve for validation; when omitted, no validation split is created.
- * @param {boolean} options.mixup - If true, apply mixup augmentation by pairing and interpolating training samples.
- * @param {boolean} options.decay - If true, apply cosine learning-rate decay across epochs.
- * @param {boolean} options.useWeights - If true, apply per-class weighting to the loss based on class frequencies.
- * @param {boolean} options.useFocal - If true, use focal loss instead of softmax cross-entropy.
- * @param {boolean} options.useNoise - If true, blend background-noise samples into training batches (requires background-labeled files).
- * @param {number} options.labelSmoothing - Amount of label smoothing to apply in the loss (0 disables smoothing).
- * @returns {Object} A message object summarizing training results, final metrics, notifications, and the training history.
+ * @param {string} [options.modelType] - If 'append', merges base-model outputs with classifier outputs when saving; otherwise saves classifier outputs.
+ * @param {boolean} [options.useCache] - When true, reuse existing cached binary datasets if present.
+ * @param {number} [options.validation] - Fraction (0–1) of data reserved for validation; omit or falsy to disable validation.
+ * @param {boolean} [options.mixup] - When true, apply mixup augmentation to training samples.
+ * @param {boolean} [options.decay] - When true, apply cosine learning-rate decay across epochs.
+ * @param {boolean} [options.useWeights] - When true, apply per-class weighting to the loss based on class frequencies.
+ * @param {boolean} [options.useFocal] - When true, use focal loss instead of softmax cross-entropy.
+ * @param {boolean} [options.useNoise] - When true, blend background-noise samples into training batches (requires background-labelled files).
+ * @param {number} [options.labelSmoothing] - Amount of label smoothing to apply (0 disables smoothing).
+ * @returns {Object} A message object summarizing training results, notifications, final metrics, and the training history.
  */
 async function trainModel({
       Model, 
@@ -403,6 +404,15 @@ function getFilesWithLabelsAndWeights(rootDir) {
   };
 }
 
+/**
+ * Normalize an audio sample array to exactly 3 seconds (48 kHz) by cropping or padding according to the requested alignment.
+ *
+ * If the input is shorter than 1.5 seconds, the function returns `undefined`.
+ *
+ * @param {Float32Array} audioArray - Mono PCM samples to normalize.
+ * @param {string} [mode="centre"] - Alignment mode used when cropping or padding: `"start"` (keep start), `"centre"` or `"center"` (centered), `"end"` (keep end).
+ * @returns {Float32Array|undefined} A Float32Array of length 48000*3 containing the normalized audio, or `undefined` if the input is shorter than 1.5 seconds.
+ */
 function normaliseAudio(audioArray, mode = "centre") {
   const expectedSamples = 48000 * 3;
 
@@ -453,15 +463,16 @@ function normaliseAudio(audioArray, mode = "centre") {
   return audioArray;
 }
 /**
- * Converts a list of labeled audio files into a gzip-compressed binary dataset for efficient training.
+ * Create a gzip-compressed binary dataset of model embeddings and label indices from labeled audio files for training.
  *
- * Each record consists of a 3-second (144,000-sample) Float32 audio array and a 2-byte label index. Audio shorter than 1.5 seconds is skipped; shorter samples are center-padded to 3 seconds. Progress is reported via the provided callback, and the process supports aborting.
+ * Each written record contains a fixed-length embedding (Float32 array produced by `embeddingModel`) followed by a 4-byte little-endian float label index. Audio shorter than 1.5 seconds is skipped; audio shorter than 3 seconds is center-padded to 3 seconds before embedding. Progress and errors are reported via `postMessage`, and the operation listens for abort signals from the global abort controller to stop and delete the output file.
  *
- * @param {Array} fileList - List of objects with `filePath` and `label` properties.
- * @param {string} outputPath - Destination path for the compressed binary dataset.
- * @param {Object} labelToIndex - Mapping from label names to numeric indices.
- * @param {Function} postMessage - Callback for progress and error reporting.
- * @param {string} [description] - Optional description for progress updates.
+ * @param {tf.LayersModel|tf.GraphModel} embeddingModel - Model used to convert 3s audio into an embedding vector.
+ * @param {Array<{filePath: string, label: string}>} fileList - Array of files with their label names.
+ * @param {string} outputPath - Filesystem path to write the gzip-compressed dataset.
+ * @param {Object<string,number>} labelToIndex - Mapping from label name to numeric index (written as a 4-byte float).
+ * @param {Function} postMessage - Callback used to emit progress and error messages.
+ * @param {string} [description] - Optional human-readable description used in progress messages.
  */
 async function writeBinaryGzipDataset(embeddingModel, fileList, outputPath, labelToIndex, postMessage, description = i18n.prepTrain) {
   const t0 = Date.now()
