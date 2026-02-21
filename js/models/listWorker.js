@@ -465,11 +465,9 @@ class Model {
           const foundIndices = this.labels.reduce(
             (indices, element, index) => {
               let latinName;
-              const parts = element.split("_");
+              const parts = element.split(this.splitChar);
               if (parts.length === 2) {
                 latinName = parts[0];
-              } else {
-                latinName = element.split("~")[0];
               }
               if (latinName === latin) indices.push(index);
               return indices;
