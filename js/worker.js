@@ -1923,7 +1923,12 @@ const getDuration = async (src) => {
   let audio;
   return new Promise(function (resolve, reject) {
     audio = new Audio();
-
+    const removeAudio = (audio) => {
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load(); // forces media pipeline teardown
+      audio.remove();
+    }
     audio.src = src.replaceAll("#", "%23").replaceAll("?", "%3F"); // allow hash and ? in the path (https://github.com/Mattk70/Chirpity-Electron/issues/98)
     audio.addEventListener("loadedmetadata", function () {
       const duration = audio.duration;
@@ -1938,7 +1943,7 @@ const getDuration = async (src) => {
       } else {
         resolve(duration);
       }
-      audio.remove();
+      removeAudio(audio)
     });
     audio.addEventListener("error", (_error) => {
       measureDurationWithFfmpeg(src)
@@ -1947,7 +1952,7 @@ const getDuration = async (src) => {
             err.message = `${err.message} (file: ${src})`;
             return reject(err)
           });
-      audio.remove();
+      removeAudio(audio)
     });
   });
 };
