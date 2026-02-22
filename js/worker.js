@@ -1912,7 +1912,14 @@ const measureDurationWithFfmpeg = (src) => {
 
 const getDuration = async (src) => {
   // Speedy WAVE parsing
-  if (src.toLowerCase().endsWith(".wav")) return await getWaveDuration(src);
+  if (src.toLowerCase().endsWith(".wav")) {
+    try {
+      return await getWaveDuration(src)
+    } catch (e) {
+      console.warn('Decode audio', 'Failed to extract WAV duration', e.message)
+      return 0
+    }
+  } 
   
   let audio;
   return new Promise(function (resolve, reject) {
