@@ -14,20 +14,21 @@ import abortController from '../utils/abortController.js';
 
 
 onmessage = async (e) => {
-  const modelRequest = e.data.message;
-  const worker = e.data.worker;
+  const data = e.data;
+  const modelRequest = data.message;
+  const worker = data.worker;
   let response;
   try {
     switch (modelRequest) {
       case "change-batch-size": {
-        myModel.warmUp(e.data.batchSize);
+        myModel.warmUp(data.batchSize);
         break;
       }
       case "load": {
-        const version = e.data.model;
+        const version = data.model;
         const isBirdNET = version === 'birdnet';
         DEBUG && console.log("load request to worker");
-        let appPath = e.data.modelPath;
+        let appPath = data.modelPath;
         if (isBirdNET){
           const {location} = JSON.parse(
             fs.readFileSync(
@@ -38,8 +39,8 @@ onmessage = async (e) => {
           appPath = "../../" + location + "/";
         }
         
-        const batch = e.data.batchSize;
-        const backend = BACKEND || e.data.backend;
+        const batch = data.batchSize;
+        const backend = BACKEND || data.backend;
         BACKEND = backend;
         DEBUG && console.log(`Using backend: ${backend}`);
         backend === "webgpu" && require("@tensorflow/tfjs-backend-webgpu");
@@ -61,7 +62,7 @@ onmessage = async (e) => {
             console.log(tf.env().getFlags());
           }
           myModel = new BirdNETModel(appPath, version);
-          myModel.UUID = e.data.UUID
+          myModel.UUID = data.UUID
           myModel.labels = labels;
           // Prepare a mask to squash 'background' predictions
           const bgIndex = labels.findIndex(item => item.toLowerCase().includes('background'));
@@ -93,8 +94,7 @@ onmessage = async (e) => {
         break;
       }
       case "train-model":{
-        const args = e.data;
-          trainModel({ ...args, Model: myModel}).then((message) => {
+          trainModel({ ...data, Model: myModel}).then((message) => {
             postMessage({...message})
           }).catch((err) => {
             console.error("Error during model training:", err);
@@ -109,7 +109,7 @@ onmessage = async (e) => {
         break;
       }
       case "get-spectrogram": {
-        await myModel.getSpectrogram(e.data)
+        await myModel.getSpectrogram(data)
         break;
     }
       case "predict": {

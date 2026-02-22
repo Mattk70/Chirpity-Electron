@@ -83,17 +83,18 @@ function loadModel(params) {
   });
 }
 onmessage = async (e) => {
-  const modelRequest = e.data.message;
-  const worker = e.data.worker;
+  const data = e.data;
+  const modelRequest = data.message;
+  const worker = data.worker;
   let response;
   try {
     switch (modelRequest) {
       case "change-batch-size": {
-        myModel.warmUp(e.data.batchSize);
+        myModel.warmUp(data.batchSize);
         break;
       }
       case "load": {
-        loadModel(e.data);
+        loadModel(data);
         break;
       }
       case "predict": {
@@ -113,7 +114,7 @@ onmessage = async (e) => {
           confidence,
           context,
           resetResults,
-        } = e.data;
+        } = data;
         myModel.useContext = context;
         myModel.selection = !resetResults;
         const [result, filename, startPosition] = await myModel.predictChunk(
@@ -137,12 +138,12 @@ onmessage = async (e) => {
         break;
       }
       case "get-spectrogram": {
-        const buffer = e.data.buffer;
+        const buffer = data.buffer;
         if (buffer.length < myModel.chunkLength) {
           return;
         }
-        const specFile = e.data.file;
-        const filepath = e.data.filepath;
+        const specFile = data.file;
+        const filepath = data.filepath;
         let image;
         image = tf.tidy(() => {
           const signal = tf.tensor1d(buffer, "float32");

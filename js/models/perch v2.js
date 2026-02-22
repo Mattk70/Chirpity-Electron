@@ -38,20 +38,21 @@ async function loadModel(mpath, backend, batchSize) {
   session = await ort.InferenceSession.create(modelPath, sessionOptions);
 }
 onmessage = async (e) => {
-  const modelRequest = e.data.message;
-  const worker = e.data.worker;
-  modelPath = e.data.modelPath ?? modelPath;
+  const data = e.data;
+  const modelRequest = data.message;
+  const worker = data.worker;
+  modelPath = data.modelPath ?? modelPath;
   let response;
   try {
     switch (modelRequest) {
       case 'terminate': {
-        batchSize = e.data.batchSize || batchSize;
-        if (e.data.backend) {
-            if (backend !== e.data.backend) {
+        batchSize = data.batchSize || batchSize;
+        if (data.backend) {
+            if (backend !== data.backend) {
               if (session) {
                 try { session.release() } catch (e) { console.error(e) }
               }
-              backend = e.data.backend;
+              backend = data.backend;
               await loadModel(modelPath, backend, batchSize);
             }
         }
@@ -63,8 +64,8 @@ onmessage = async (e) => {
       }
       case "load": {
         if (!session) {
-          backend = e.data.backend;
-          batchSize = e.data.batchSize;
+          backend = data.backend;
+          batchSize = data.batchSize;
           await loadModel(modelPath, backend, batchSize);
           DEBUG && console.log(`Using backend: ${backend}`);
 
@@ -96,7 +97,7 @@ onmessage = async (e) => {
             confidence,
             worker,
             resetResults,
-          } = e.data;
+          } = data;
           const selection = !resetResults;
           const [result, filename, startPosition] = await predictChunk(
             chunks,
