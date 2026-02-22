@@ -1932,6 +1932,7 @@ const getDuration = async (src) => {
     audio.src = src.replaceAll("#", "%23").replaceAll("?", "%3F"); // allow hash and ? in the path (https://github.com/Mattk70/Chirpity-Electron/issues/98)
     audio.addEventListener("loadedmetadata", function () {
       const duration = audio.duration;
+      removeAudio(audio)
       if (duration === Infinity || !duration || isNaN(duration)) {
         // Fallback: decode entire file with ffmpeg
         measureDurationWithFfmpeg(src)
@@ -1943,16 +1944,15 @@ const getDuration = async (src) => {
       } else {
         resolve(duration);
       }
-      removeAudio(audio)
     });
     audio.addEventListener("error", (_error) => {
+      removeAudio(audio)
       measureDurationWithFfmpeg(src)
           .then((realDuration) => resolve(realDuration))
           .catch((err) => {
             err.message = `${err.message} (file: ${src})`;
             return reject(err)
           });
-      removeAudio(audio)
     });
   });
 };
