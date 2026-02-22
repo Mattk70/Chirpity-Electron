@@ -295,12 +295,17 @@ async function trainModel({
   notice += `
 Metrics:<br>
   Loss = ${l[l.length -1].toFixed(4)}<br>
-  Accuracy = ${(Acc[Acc.length -1]* 100).toFixed(2)}%<br>`
-  val_loss && (notice += `
+  Accuracy = ${(Acc[Acc.length -1]* 100).toFixed(2)}%<br>`;
+
+  if (val_loss) {
+    notice += `
   Validation Loss = ${bestLoss.toFixed(4)}<br>
-  Validation Accuracy = ${(bestAccuracy*100).toFixed(2)}%<br>
+  Validation Accuracy = ${(bestAccuracy*100).toFixed(2)}%`
+  };
+
+  notice += `
   <br>${i18n.completed}:<br>
-  ${saveLocation}`);
+  ${saveLocation}`;
 
   const message = {message: "training-results", notice, type, autohide:false, complete: true, history: history.history}
 
