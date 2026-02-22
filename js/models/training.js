@@ -1,7 +1,6 @@
 import {installConsoleTracking } from "../utils/tracking.js";
 
-let tf, DEBUG = false;
-
+let tf, i18n, DEBUG = false;
 const fs = require('node:fs')
 const path = require('node:path')
 const zlib = require('node:zlib')
@@ -11,119 +10,6 @@ try {
   tf = require("@tensorflow/tfjs");
 }
 import abortController from '../utils/abortController.js';
-
-// Define custom layer for computing mel spectrograms
-class MelSpecLayerSimple extends tf.layers.Layer {
-  constructor(config) {
-    super(config);
-
-    // Initialize parameters
-    this.sampleRate = config.sampleRate;
-    this.specShape = config.specShape;
-    this.frameStep = config.frameStep;
-    this.frameLength = config.frameLength;
-    this.fmin = config.fmin;
-    this.fmax = config.fmax;
-    this.melFilterbank = tf.tensor2d(config.melFilterbank);
-    this.mels = config.melFilterbank;
-    this.two = tf.scalar(2);
-    this.one = tf.scalar(1);
-  }
-
-  build(inputShape) {
-    // Initialize trainable weights, for example:
-    this.magScale = this.addWeight(
-      "magnitude_scaling",
-      [],
-      "float32",
-      tf.initializers.constant({ value: 1.23 })
-    );
-
-    super.build(inputShape);
-  }
-
-  // Compute the output shape of the layer
-  computeOutputShape(inputShape) {
-    return [inputShape[0], this.specShape[0], this.specShape[1], 1];
-  }
-
-normalise_audio_batch = (tensor) => {
-  return tf.tidy(() => {
-    const sigMax = tf.max(tensor, -1, true);
-    const sigMin = tf.min(tensor, -1, true);
-    const range = sigMax.sub(sigMin);
-    return tensor
-      .sub(sigMin)
-      .divNoNan(range)
-      .mul(this.two)
-      .sub(this.one);
-  });
-};
-
-  // Define the layer's forward pass
-  call(inputs) {
-    return tf.tidy(() => {
-      // inputs is a tensor representing the input data
-      inputs = inputs[0];
-      let result;
-      if (BACKEND === 'tensorflow') {
-        result = tf.stack(
-          inputs.split(inputs.shape[0]).map((input) => {
-            input = input.squeeze();
-            
-            // Normalize values between -1 and 1
-            input = this.normalise_audio_batch(input);
-            // Perform STFT and cast result to float
-            return tf.signal.stft(
-              input,
-              this.frameLength,
-              this.frameStep,
-              this.frameLength,
-              tf.signal.hannWindow
-            ).cast("float32");
-          })
-        )
-      } else {
-        // Normalise batch
-        inputs = this.normalise_audio_batch(inputs);
-        //Custom optimized and batch-capable stft
-        result = stft(
-          inputs,
-          this.frameLength,
-          this.frameStep,
-          this.frameLength,
-          tf.signal.hannWindow
-        )
-      }
-      let interim = result
-        .matMul(this.melFilterbank)
-        .pow(this.two)
-        .pow(tf.div(this.one, tf.add(this.one, tf.exp(this.magScale.read()))))
-        .reverse(-1)
-        .transpose([0, 2, 1])
-        .expandDims(-1);
-      return interim
-    });
-  }
-
-  // Optionally, include the `className` method to provide a machine-readable name for the layer
-  static get className() {
-    return "MelSpecLayerSimple";
-  }
-
-  getConfig() {
-    const baseConfig = super.getConfig();
-    return Object.assign(baseConfig, {
-      sampleRate: this.sampleRate,
-      specShape: this.specShape,
-      frameStep: this.frameStep,
-      frameLength: this.frameLength,
-      fmin: this.fmin,
-      fmax: this.fmax,
-      melFilterbank: this.mels,
-    });
-  }
-}
 
 /**
  * Computes a cosine decay learning rate based on the current training step.
@@ -142,33 +28,35 @@ function cosineDecay(initialLearningRate, globalStep, decaySteps) {
 }
 
 /**
- * Train a transfer-learning audio classification model by freezing a base model and fitting a new classifier head with configurable augmentation, loss, and caching options.
+ * Train a transfer-learning audio classifier by freezing a base model and fitting a new classifier head with optional augmentations, weighting, loss choices, caching, and checkpointing.
  *
- * Prepares datasets (optionally caching as gzipped binaries), supports stratified validation splitting, mixup, background-noise blending, rolling augmentation, class weighting, focal loss, label smoothing, cosine learning-rate decay, early stopping, and periodic model checkpointing. Writes labels and a LICENSE to the save location and returns a summary message describing training metrics and settings.
+ * Trains a classifier head on embeddings produced by the provided base model, supporting stratified validation splitting, gzipped binary dataset caching, mixup, background-noise blending, rolling augmentation, per-class weighting, focal loss, label smoothing, cosine LR decay, early stopping, and periodic checkpoint saves. Writes labels.txt, training metrics, and a LICENSE to the save location and returns a summary message containing final metrics and the training history.
  *
  * @param {Object} options - Training configuration options.
- * @param {Object} options.Model - Wrapper providing the base model, utility methods (e.g., getSpectrogram, loadModel), and model metadata.
+ * @param {Object} options.Model - Wrapper that exposes the loaded base model, utilities (e.g., getSpectrogram, loadModel), and model metadata.
+ * @param {string} [options.locale] - Locale key for user-facing messages; falls back to English.
  * @param {number} options.lr - Initial learning rate.
- * @param {number} [options.batchSize=32] - Number of samples per training batch.
- * @param {number} options.dropout - Dropout rate applied to the classifier head when a hidden layer is present.
+ * @param {number} [options.batchSize=32] - Training batch size.
+ * @param {number} [options.dropout] - Dropout rate applied around the optional hidden layer.
  * @param {number} options.epochs - Maximum number of training epochs.
- * @param {number} options.hidden - Number of units in the optional hidden dense layer of the classifier head.
- * @param {string} options.dataset - Path to the root dataset folder containing class-labeled subfolders of audio files.
- * @param {string} options.cache - Folder path used for storing or reading gzipped binary dataset caches.
+ * @param {number} [options.hidden] - Number of units in the optional hidden dense layer of the classifier head.
+ * @param {string} options.dataset - Root path containing class-labelled subfolders of audio files.
+ * @param {string} [options.cache] - Folder path used for reading/writing gzipped binary dataset caches; defaults to the dataset folder.
  * @param {string} options.modelLocation - Directory where the trained model, labels.txt, and auxiliary files will be saved.
- * @param {string} options.modelType - Model saving mode; use 'append' to merge base outputs with classifier outputs when saving.
- * @param {boolean} options.useCache - If true, use existing cached binary datasets when present.
- * @param {number} options.validation - Fraction (0–1) of data to reserve for validation; when omitted, no validation split is created.
- * @param {boolean} options.mixup - If true, apply mixup augmentation by pairing and interpolating training samples.
- * @param {boolean} options.decay - If true, apply cosine learning-rate decay across epochs.
- * @param {boolean} options.useWeights - If true, apply per-class weighting to the loss based on class frequencies.
- * @param {boolean} options.useFocal - If true, use focal loss instead of softmax cross-entropy.
- * @param {boolean} options.useNoise - If true, blend background-noise samples into training batches (requires background-labeled files).
- * @param {number} options.labelSmoothing - Amount of label smoothing to apply in the loss (0 disables smoothing).
- * @returns {Object} A message object summarizing training results, final metrics, notifications, and the training history.
+ * @param {string} [options.modelType] - If 'append', merges base-model outputs with classifier outputs when saving; otherwise saves classifier outputs.
+ * @param {boolean} [options.useCache] - When true, reuse existing cached binary datasets if present.
+ * @param {number} [options.validation] - Fraction (0–1) of data reserved for validation; omit or falsy to disable validation.
+ * @param {boolean} [options.mixup] - When true, apply mixup augmentation to training samples.
+ * @param {boolean} [options.decay] - When true, apply cosine learning-rate decay across epochs.
+ * @param {boolean} [options.useWeights] - When true, apply per-class weighting to the loss based on class frequencies.
+ * @param {boolean} [options.useFocal] - When true, use focal loss instead of softmax cross-entropy.
+ * @param {boolean} [options.useNoise] - When true, blend background-noise samples into training batches (requires background-labelled files).
+ * @param {number} [options.labelSmoothing] - Amount of label smoothing to apply (0 disables smoothing).
+ * @returns {Object} A message object summarizing training results, notifications, final metrics, and the training history.
  */
 async function trainModel({
       Model, 
+      locale,
       lr:initialLearningRate,
       batchSize = 32,
       dropout, epochs, hidden,
@@ -177,21 +65,29 @@ async function trainModel({
       useWeights, useFocal, useNoise, labelSmoothing}) {
   installConsoleTracking(() => Model.UUID, "Training");
   const {files:allFiles, classWeights} = getFilesWithLabelsAndWeights(dataset);
+  i18n = messages[locale] || messages['en'];
   if (!allFiles.length){
-    throw new Error(`The selected training folder: ${dataset} does not have folders representing class / species labels containing audio files.` )
+    console.warn("Training error", "No audio files found in dataset location")
+    throw new Error(`${i18n.noAudio} ${dataset}`)
   }
-  const baseModel = Model.model;
+  // Check locations:
+  if (!fs.existsSync(saveLocation)){
+    throw new Error(i18n.badSaveLocation)
+  }
 
+  const baseModel = Model.model;
   const labels = Object.keys(classWeights); //[...new Set(allFiles.map(f => f.label))];
   const labelToIndex = Object.fromEntries(labels.map((l, i) => [l, i]));
   const t0 = Date.now();
   const cacheRecords = useCache;
   const metrics = [ tf.metrics.categoricalAccuracy ];
-  const optimizer = tf.train.adam(initialLearningRate);
+  // Adjust learning rate for batch size
+  const lr = initialLearningRate * (batchSize / 32)
+  const optimizer = tf.train.adam(lr);
   let bestAccuracy, bestLoss = Infinity;
   // Cache in the dataset folder if not selected
   cacheFolder = cacheFolder || dataset;
-
+  // await tf.setBackend('webgpu')
   // Get embeddings from BirdNET
   let embeddingModel = tf.model({
     inputs: baseModel.inputs,
@@ -278,22 +174,23 @@ async function trainModel({
       // Step 2: Find missing labels from
       let error;
       const missing1 = [...labels1].filter(label => !labels2.has(label));
-      if (missing1.length) error = 'Validation set is missing examples of: <b>' + missing1.toString() +'</b>. ';
+      if (missing1.length) error =  i18n.notEnoughFiles[0] + ' <b>' + missing1.toString() +'</b>. ';
       const missing2 = [...labels2].filter(label => !labels1.has(label));
-      if (missing2.length) error = 'Training set is missing examples of: <b>' + missing2.toString() +'</b>. ';
+      if (missing2.length) error = i18n.notEnoughFiles[1] + ' <b>' + missing2.toString() +'</b>. ';
       if (error){
-        error += 'To have both training and validation data, at least two examples are needed per class.'
+        error += i18n.notEnoughFiles[2]
         postMessage({ message: "training-results", notice: error, type: 'error', autohide:false });
+        console.error("Training error", error)
         return
       }
     }
-    await writeBinaryGzipDataset(embeddingModel, trainFiles, trainBin, labelToIndex, postMessage, "Preparing training data");
+    await writeBinaryGzipDataset(embeddingModel, trainFiles, trainBin, labelToIndex, postMessage, i18n.prepTrain);
   }
 
   if (validation && (!cacheRecords || !fs.existsSync(valBin))) {
-    await writeBinaryGzipDataset(embeddingModel, valFiles, valBin, labelToIndex, postMessage, "Preparing validation data");
+    await writeBinaryGzipDataset(embeddingModel, valFiles, valBin, labelToIndex, postMessage, i18n.prepVal);
   }
-  let mergedModel, modelSavePromise;
+  let mergedModel;
   const saveModelAsync = async () => {
       let mergedLabels = labels;
       const intermediate = transferModel.apply(baseModel.getLayer('GLOBAL_AVG_POOL').output);
@@ -324,19 +221,19 @@ async function trainModel({
       const progress = (batch / batchesInEpoch) * 100
       postMessage({
             message: "training-progress", 
-            progress: {percent: Math.min(progress, 99.5)},
+            progress: Math.min(progress, 99.5),
             text: `Epoch ${epoch + 1} / ${epochs}: `
       });
     },
-    onEpochEnd: (epoch, logs) => {
-      decay && (transferModel.optimizer.learningRate = Math.max(1e-6, cosineDecay(initialLearningRate, epoch+1, epochs)) );
+    onEpochEnd: async (epoch, logs) => {
+      decay && (transferModel.optimizer.learningRate = Math.max(1e-6, cosineDecay(lr, epoch+1, epochs)) );
       const {loss, val_loss, val_categoricalAccuracy, categoricalAccuracy} = logs;
       const monitoredLoss = val_loss || loss;
       // Save best weights
       if (monitoredLoss < bestLoss){
         bestLoss = monitoredLoss;
         bestAccuracy = val_categoricalAccuracy || categoricalAccuracy;
-        modelSavePromise = saveModelAsync()
+        await saveModelAsync()
       }
       let notice = `<table class="table table-striped">
             <tr><th colspan="2">Epoch ${epoch + 1}:</th></tr>
@@ -352,11 +249,11 @@ async function trainModel({
     onTrainEnd: (logs) => {
       postMessage({
         message: "training-progress", 
-        progress: {percent: 100},
+        progress: 100,
         text: ''
       });
       const t1 = Date.now();
-      console.info(`Training completed in ${((t1 - t0) / 1000).toFixed(2)} seconds`);
+      console.info("Training completed", `${((t1 - t0) / 1000).toFixed(2)} seconds`);
       return logs
     }
   })
@@ -388,11 +285,10 @@ async function trainModel({
     callbacks: [earlyStopping, events],
     verbosity: 0
   });
-  await modelSavePromise;
 
   let notice ='', type = '';
   if (history.epoch.length < epochs){
-      notice += `Training halted at Epoch ${history.epoch.length} due to no further improvement. <br>`;
+      notice += `${i18n.halted[0]} Epoch ${history.epoch.length} ${i18n.halted[1]}. <br>`;
       type = 'warning';
   }
   const {loss:l, val_loss, categoricalAccuracy:Acc, val_categoricalAccuracy} = history.history;
@@ -403,7 +299,7 @@ Metrics:<br>
   val_loss && (notice += `
   Validation Loss = ${bestLoss.toFixed(4)}<br>
   Validation Accuracy = ${(bestAccuracy*100).toFixed(2)}%<br>
-  <br>Training completed! Model saved in:<br>
+  <br>${i18n.completed}:<br>
   ${saveLocation}`);
 
   const message = {message: "training-results", notice, type, autohide:false, complete: true, history: history.history}
@@ -455,7 +351,7 @@ Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License
   Model.one.dispose(), Model.two.dispose(), Model.scalarFive.dispose();
   DEBUG && console.log(`Tensors in memory after: ${tf.memory().numTensors}`);
   await Model.loadModel("layers");
-  console.info('Custom model saved.', `Loss: ${bestLoss.toFixed(4)}, Accuracy: ${bestAccuracy.toFixed(4)}`)
+  console.info('Custom model saved', `Val Loss: ${bestLoss.toFixed(4)}, Val Accuracy: ${bestAccuracy.toFixed(4)}`)
   return message
 }
 
@@ -472,6 +368,7 @@ Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License
 function getFilesWithLabelsAndWeights(rootDir) {
   const files = [];
   const labelCounts = {};
+  const SUPPORTED_AUDIO = [".wav", ".flac", ".opus", ".m4a", ".mp3", ".mpga", ".ogg", ".aac", ".mpeg", ".mp4"];
   const folders = fs.readdirSync(rootDir);
 
   for (const folder of folders) {
@@ -481,7 +378,8 @@ function getFilesWithLabelsAndWeights(rootDir) {
     if (stats.isDirectory()) {
       const audioFiles = fs.readdirSync(folderPath);
       for (const file of audioFiles) {
-        if (file.startsWith('.') || file.endsWith('.bin')) continue;
+        const ext = path.extname(file).toLowerCase();
+        if (!SUPPORTED_AUDIO.includes(ext) || file.startsWith('.')) continue
         const label = folder;
         files.push({
           filePath: path.join(folderPath, file),
@@ -497,7 +395,7 @@ function getFilesWithLabelsAndWeights(rootDir) {
   const total = files.length;
   const classWeights = {};
   for (const [label, count] of Object.entries(labelCounts)) {
-    console.log(`Label "${label}" has ${count} samples`);
+    DEBUG && console.log(`Label "${label}" has ${count} samples`);
     // Normalize by total samples and number of classes
     classWeights[label] = total / (Object.keys(labelCounts).length * count);
   }
@@ -508,6 +406,15 @@ function getFilesWithLabelsAndWeights(rootDir) {
   };
 }
 
+/**
+ * Normalize an audio sample array to exactly 3 seconds (48 kHz) by cropping or padding according to the requested alignment.
+ *
+ * If the input is shorter than 1.5 seconds, the function returns `undefined`.
+ *
+ * @param {Float32Array} audioArray - Mono PCM samples to normalize.
+ * @param {string} [mode="centre"] - Alignment mode used when cropping or padding: `"start"` (keep start), `"centre"` or `"center"` (centered), `"end"` (keep end).
+ * @returns {Float32Array|undefined} A Float32Array of length 48000*3 containing the normalized audio, or `undefined` if the input is shorter than 1.5 seconds.
+ */
 function normaliseAudio(audioArray, mode = "centre") {
   const expectedSamples = 48000 * 3;
 
@@ -540,11 +447,12 @@ function normaliseAudio(audioArray, mode = "centre") {
           padded.set(audioArray, 0);
           break;
         case "centre":
-        case "center":
+        case "center": {
           // pad evenly both sides
           const offset = Math.floor((expectedSamples - audioArray.length) / 2);
           padded.set(audioArray, offset);
           break;
+        }
         case "end":
         default:
           // pad at start (your original behaviour)
@@ -557,17 +465,18 @@ function normaliseAudio(audioArray, mode = "centre") {
   return audioArray;
 }
 /**
- * Converts a list of labeled audio files into a gzip-compressed binary dataset for efficient training.
+ * Create a gzip-compressed binary dataset of model embeddings and label indices from labeled audio files for training.
  *
- * Each record consists of a 3-second (144,000-sample) Float32 audio array and a 2-byte label index. Audio shorter than 1.5 seconds is skipped; shorter samples are center-padded to 3 seconds. Progress is reported via the provided callback, and the process supports aborting.
+ * Each written record contains a fixed-length embedding (Float32 array produced by `embeddingModel`) followed by a 4-byte little-endian float label index. Audio shorter than 1.5 seconds is skipped; audio shorter than 3 seconds is center-padded to 3 seconds before embedding. Progress and errors are reported via `postMessage`, and the operation listens for abort signals from the global abort controller to stop and delete the output file.
  *
- * @param {Array} fileList - List of objects with `filePath` and `label` properties.
- * @param {string} outputPath - Destination path for the compressed binary dataset.
- * @param {Object} labelToIndex - Mapping from label names to numeric indices.
- * @param {Function} postMessage - Callback for progress and error reporting.
- * @param {string} [description] - Optional description for progress updates.
+ * @param {tf.LayersModel|tf.GraphModel} embeddingModel - Model used to convert 3s audio into an embedding vector.
+ * @param {Array<{filePath: string, label: string}>} fileList - Array of files with their label names.
+ * @param {string} outputPath - Filesystem path to write the gzip-compressed dataset.
+ * @param {Object<string,number>} labelToIndex - Mapping from label name to numeric index (written as a 4-byte float).
+ * @param {Function} postMessage - Callback used to emit progress and error messages.
+ * @param {string} [description] - Optional human-readable description used in progress messages.
  */
-async function writeBinaryGzipDataset(embeddingModel, fileList, outputPath, labelToIndex, postMessage, description = "Preparing data") {
+async function writeBinaryGzipDataset(embeddingModel, fileList, outputPath, labelToIndex, postMessage, description = i18n.prepTrain) {
   const t0 = Date.now()
   const pLimit = require('p-limit');
   const limit = pLimit(8); // Or whatever your CPU/I/O can handle
@@ -593,7 +502,7 @@ async function writeBinaryGzipDataset(embeddingModel, fileList, outputPath, labe
       } catch (err) {
         postMessage({
           message: "training-results", 
-          notice: `Error loading file:<br>${filePath}<br>${err}`,
+          notice: `${i18n.badFile}:<br>${filePath}<br>${err}`,
           type: 'error'
         });
         console.error("Training: decode audio", err)
@@ -610,10 +519,14 @@ async function writeBinaryGzipDataset(embeddingModel, fileList, outputPath, labe
       const input = tf.tensor2d(audioArray, [1, audioArray.length]);
       const embeddingTensor = await embeddingModel.predict(input);
       const embeddings = await embeddingTensor.data();
+      input.dispose();
+      embeddingTensor.dispose();
       const embeddingsBuffer = Buffer.from(embeddings.buffer);
       const labelIndex = labelToIndex[label];
       if (typeof labelIndex !== 'number' || labelIndex < 0 || labelIndex > 65535) {
-        console.error(`Invalid labelIndex for "${label}" → ${labelIndex}`);
+        console.error("Training error", `${i18n.badLabel} "${label}" → ${labelIndex}`);
+        completed++
+        return
       }
 
       // Write labels
@@ -629,7 +542,7 @@ async function writeBinaryGzipDataset(embeddingModel, fileList, outputPath, labe
       completed++;
       postMessage({
         message: "training-progress", 
-        progress: { percent: (completed / fileList.length) * 100 },
+        progress: (completed / fileList.length) * 100 ,
         text: `${description}: `
       });
     })
@@ -640,7 +553,7 @@ async function writeBinaryGzipDataset(embeddingModel, fileList, outputPath, labe
   await Promise.all(tasks);
   gzip.end();
   abortController.off('abort', onAbort);
-  console.info(`Dataset preparation took: ${((Date.now() - t0)/ 1000).toFixed(0)} seconds. ${completed} files processed.`)
+  console.info("Dataset preparation", `${((Date.now() - t0)/ 1000).toFixed(0)} seconds. ${completed} files processed.`)
 }
 
 
@@ -692,12 +605,17 @@ async function* readBinaryGzipDataset(gzippedPath, labels, roll = false) {
 
       const embedding = new Float32Array(audioBuf.buffer, audioBuf.byteOffset, 1024);
       if (labelIndex >= labels.length) {
-        console.error(`Invalid label index: ${labelIndex}. Max allowed: ${labels.length - 1}`);
+        console.error(`Invalid label index`, `${labelIndex}. Max allowed: ${labels.length - 1}`);
       }
-      yield {
-        xs: tf.tensor1d(embedding),
-        ys: tf.oneHot(labelIndex, labels.length)
-      };
+      try{
+        yield {
+          xs: tf.tensor1d(embedding),
+          ys: tf.oneHot(labelIndex, labels.length)
+        };
+      } catch (e) {
+        console.error("Training error", e)
+        throw new Error(i18n.oneClass)
+      }
       offset += RECORD_SIZE;
     }
 
@@ -942,5 +860,141 @@ async function* blendedGenerator(train_ds, noise_ds) {
     yield result;
   }
 }
+
+const messages = {
+  en:{
+    oneClass: "At least two class folders containing audio examples are needed. Only one was found.",
+    badSaveLocation: "The selected model save location does not exist.",
+    noAudio: `No labels folders containing audio files in:`,
+    notEnoughFiles: ['Validation set is missing examples of:', "Training set is missing examples of:", 'To have both training and validation data, at least two examples are needed per class.'],
+    prepTrain: "Preparing Training Data",
+    prepVal: "Preparing Validation Data",
+    badFile: "Error loading file",
+    badLabel: "Invalid labelIndex for",
+    completed: "Training completed! Model saved in",
+    halted: ["Training halted at", "due to no further improvement"]
+  },
+  da:{
+    oneClass: "Der kræves mindst to klassemapper med lydeksempler. Kun én blev fundet.",
+    badSaveLocation: "Den valgte gemmeplacering for modellen findes ikke.",
+    noAudio: `Ingen label-mapper med lydfiler i:`,
+    notEnoughFiles: ['Valideringssættet mangler eksempler på:', "Træningssættet mangler eksempler på:", 'For at have både trænings- og valideringsdata kræves mindst to eksempler pr. klasse.'],
+    prepTrain: "Forbereder træningsdata",
+    prepVal: "Forbereder valideringsdata",
+    badFile: "Fejl ved indlæsning af fil",
+    badLabel: "Ugyldigt labelIndex for",
+    completed: "Træning fuldført! Model gemt i",
+    halted: ["Træning stoppet ved", "på grund af ingen yderligere forbedring"]
+  },
+  de:{
+    oneClass: "Es werden mindestens zwei Klassenordner mit Audiobeispielen benötigt. Es wurde nur einer gefunden.",
+    badSaveLocation: "Der ausgewählte Speicherort für das Modell existiert nicht.",
+    noAudio: `Keine Label-Ordner mit Audiodateien in:`,
+    notEnoughFiles: ['Im Validierungssatz fehlen Beispiele für:', "Im Trainingssatz fehlen Beispiele für:", 'Für Trainings- und Validierungsdaten werden mindestens zwei Beispiele pro Klasse benötigt.'],
+    prepTrain: "Trainingsdaten werden vorbereitet",
+    prepVal: "Validierungsdaten werden vorbereitet",
+    badFile: "Fehler beim Laden der Datei",
+    badLabel: "Ungültiger labelIndex für",
+    completed: "Training abgeschlossen! Modell gespeichert in",
+    halted: ["Training gestoppt bei", "aufgrund keiner weiteren Verbesserung"]
+  },
+  es:{
+    oneClass: "Se necesitan al menos dos carpetas de clases con ejemplos de audio. Solo se encontró una.",
+    badSaveLocation: "La ubicación seleccionada para guardar el modelo no existe.",
+    noAudio: `No hay carpetas de etiquetas con archivos de audio en:`,
+    notEnoughFiles: ['Al conjunto de validación le faltan ejemplos de:', "Al conjunto de entrenamiento le faltan ejemplos de:", 'Para tener datos de entrenamiento y validación se necesitan al menos dos ejemplos por clase.'],
+    prepTrain: "Preparando datos de entrenamiento",
+    prepVal: "Preparando datos de validación",
+    badFile: "Error al cargar el archivo",
+    badLabel: "labelIndex no válido para",
+    completed: "¡Entrenamiento completado! Modelo guardado en",
+    halted: ["Entrenamiento detenido en", "debido a que no hubo más mejoras"]
+  },
+  fr:{
+    oneClass: "Au moins deux dossiers de classes contenant des exemples audio sont nécessaires. Un seul a été trouvé.",
+    badSaveLocation: "L’emplacement sélectionné pour enregistrer le modèle n’existe pas.",
+    noAudio: `Aucun dossier d’étiquettes contenant des fichiers audio dans :`,
+    notEnoughFiles: ['Le jeu de validation manque d’exemples pour :', "Le jeu d’entraînement manque d’exemples pour :", 'Pour disposer de données d’entraînement et de validation, au moins deux exemples par classe sont nécessaires.'],
+    prepTrain: "Préparation des données d’entraînement",
+    prepVal: "Préparation des données de validation",
+    badFile: "Erreur lors du chargement du fichier",
+    badLabel: "labelIndex invalide pour",
+    completed: "Entraînement terminé ! Modèle enregistré dans",
+    halted: ["Entraînement arrêté à", "en raison de l’absence d’amélioration supplémentaire"]
+  },
+  ja:{
+    oneClass: "音声例を含むクラスフォルダーが少なくとも2つ必要です。1つしか見つかりませんでした。",
+    badSaveLocation: "選択されたモデル保存先が存在しません。",
+    noAudio: `音声ファイルを含むラベルフォルダーがありません:`,
+    notEnoughFiles: ['検証セットに次の例が不足しています:', "トレーニングセットに次の例が不足しています:", 'トレーニングと検証の両方のデータには、クラスごとに少なくとも2つの例が必要です。'],
+    prepTrain: "トレーニングデータを準備中",
+    prepVal: "検証データを準備中",
+    badFile: "ファイルの読み込みエラー",
+    badLabel: "無効なlabelIndex:",
+    completed: "トレーニング完了！モデルの保存先:",
+    halted: ["トレーニングは次の時点で停止しました", "これ以上の改善がなかったため"]
+  },
+  nl:{
+    oneClass: "Er zijn minimaal twee klassemappen met audiovoorbeelden nodig. Er is er slechts één gevonden.",
+    badSaveLocation: "De geselecteerde opslaglocatie voor het model bestaat niet.",
+    noAudio: `Geen labelmappen met audiobestanden in:`,
+    notEnoughFiles: ['Validatieset mist voorbeelden van:', "Trainingsset mist voorbeelden van:", 'Voor zowel trainings- als validatiegegevens zijn minimaal twee voorbeelden per klasse nodig.'],
+    prepTrain: "Trainingsgegevens voorbereiden",
+    prepVal: "Validatiegegevens voorbereiden",
+    badFile: "Fout bij het laden van bestand",
+    badLabel: "Ongeldige labelIndex voor",
+    completed: "Training voltooid! Model opgeslagen in",
+    halted: ["Training gestopt bij", "vanwege geen verdere verbetering"]
+  },
+  pt:{
+    oneClass: "São necessárias pelo menos duas pastas de classes com exemplos de áudio. Apenas uma foi encontrada.",
+    badSaveLocation: "O local selecionado para guardar o modelo não existe.",
+    noAudio: `Não há pastas de rótulos com ficheiros de áudio em:`,
+    notEnoughFiles: ['O conjunto de validação não tem exemplos de:', "O conjunto de treino não tem exemplos de:", 'Para ter dados de treino e validação, são necessários pelo menos dois exemplos por classe.'],
+    prepTrain: "A preparar dados de treino",
+    prepVal: "A preparar dados de validação",
+    badFile: "Erro ao carregar ficheiro",
+    badLabel: "labelIndex inválido para",
+    completed: "Treino concluído! Modelo guardado em",
+    halted: ["Treino interrompido em", "devido à ausência de melhorias adicionais"]
+  },
+  ru:{
+    oneClass: "Требуется как минимум две папки классов с аудиопримерами. Найдена только одна.",
+    badSaveLocation: "Выбранное место сохранения модели не существует.",
+    noAudio: `Нет папок с метками, содержащих аудиофайлы в:`,
+    notEnoughFiles: ['В наборе проверки отсутствуют примеры для:', "В обучающем наборе отсутствуют примеры для:", 'Для наличия обучающих и проверочных данных требуется не менее двух примеров на класс.'],
+    prepTrain: "Подготовка обучающих данных",
+    prepVal: "Подготовка данных проверки",
+    badFile: "Ошибка загрузки файла",
+    badLabel: "Недопустимый labelIndex для",
+    completed: "Обучение завершено! Модель сохранена в",
+    halted: ["Обучение остановлено на", "из-за отсутствия дальнейших улучшений"]
+  },
+  sv:{
+    oneClass: "Minst två klassmappar med ljudexempel krävs. Endast en hittades.",
+    badSaveLocation: "Den valda platsen för att spara modellen finns inte.",
+    noAudio: `Inga etikettmappar med ljudfiler i:`,
+    notEnoughFiles: ['Valideringsuppsättningen saknar exempel på:', "Träningsuppsättningen saknar exempel på:", 'För att ha både tränings- och valideringsdata krävs minst två exempel per klass.'],
+    prepTrain: "Förbereder träningsdata",
+    prepVal: "Förbereder valideringsdata",
+    badFile: "Fel vid inläsning av fil",
+    badLabel: "Ogiltig labelIndex för",
+    completed: "Träning slutförd! Modell sparad i",
+    halted: ["Träning stoppad vid", "på grund av ingen ytterligare förbättring"]
+  },
+  zh:{
+    oneClass: "至少需要两个包含音频示例的类别文件夹。只找到一个。",
+    badSaveLocation: "所选的模型保存位置不存在。",
+    noAudio: `在以下位置未找到包含音频文件的标签文件夹：`,
+    notEnoughFiles: ['验证集缺少以下类别的示例：', "训练集缺少以下类别的示例：", '要同时拥有训练和验证数据，每个类别至少需要两个示例。'],
+    prepTrain: "正在准备训练数据",
+    prepVal: "正在准备验证数据",
+    badFile: "加载文件时出错",
+    badLabel: "无效的labelIndex：",
+    completed: "训练完成！模型已保存至",
+    halted: ["训练在以下位置停止：", "由于没有进一步改进"]
+  }
+}
+
 
 export {trainModel, getAudioMetadata};

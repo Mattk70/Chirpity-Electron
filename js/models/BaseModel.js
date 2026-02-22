@@ -133,6 +133,11 @@ class BaseModel {
     values.dispose();
     const scaleFactor = this.version.includes('bats') ? 10 : 1;
     keys = keys.map((key) => (key / (this.config.sampleRate * scaleFactor)).toFixed(3));
+    if (keys.length < topIndices.length){
+      // Trim return values to eliminate GPU padded silence from the results
+      const len = keys.length;
+      return [keys, topIndices.slice(0,len), topValues.slice(0,len)];  
+    }
     return [keys, topIndices, topValues];
   }
 

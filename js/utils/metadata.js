@@ -244,17 +244,14 @@ function readUInt64LE(buf, offset) {
 function getWaveDuration(filePath) {
   const fd = fs.openSync(filePath, 'r');
   try {
-    // Read enough to cover RIFF/RF64 + ds64 + fmt + data headers
-    const header = Buffer.alloc(8192);
-    fs.readSync(fd, header, 0, header.length, 0);
-    let offset = 0;
+    let position = 0;
+    const header = Buffer.alloc(12);
+    // --- Read RIFF/RF64 header ---
+    fs.readSync(fd, header, 0, 12, position);
+    position += 12;
 
-    // --- RIFF or RF64 ---
-    const riffId = header.toString('ascii', offset, offset + 4);
-    offset += 8; // Skip RIFF/RF64 and file size
-
-    const waveId = header.toString('ascii', offset, offset + 4);
-    offset += 4;
+    const riffId = header.toString('ascii', 0, 4);
+    const waveId = header.toString('ascii', 8, 12);
 
     if (waveId !== 'WAVE') {
       throw new Error(filePath + ' is not a valid WAV file');
@@ -265,42 +262,50 @@ function getWaveDuration(filePath) {
     let dataSize = null;
     let sampleCount = null;
 
-    // --- Parse chunks ---
-    while (offset < header.length) {
-      const chunkId = header.toString('ascii', offset, offset + 4);
-      const chunkSize = header.readUInt32LE(offset + 4);
-      const chunkStart = offset + 8;
-
-      if (chunkId.trim() === '') break; // end of meaningful data
-
+    const chunkHeader = Buffer.alloc(8);
+    // --- Walk chunks sequentially ---
+    while (true) {
+      const bytesRead = fs.readSync(fd, chunkHeader, 0, 8, position);
+      if (bytesRead < 8) break;
+      const chunkId = chunkHeader.toString('ascii', 0, 4);
+      const chunkSize = chunkHeader.readUInt32LE(4);
+      position += 8;
+      // A zero-sized chunk would stall the loop — treat as end-of-header.
+      if (chunkSize === 0 && chunkId !== 'data') break;
       // --- fmt chunk ---
-      else if (chunkId === 'fmt ') {
+      if (chunkId === 'fmt ') {
+        if (chunkSize < 16) throw new Error('fmt chunk too small: ' + chunkSize);
+        const fmtBuffer = Buffer.alloc(chunkSize);
+        fs.readSync(fd, fmtBuffer, 0, chunkSize, position);
+
         fmt = {
-          audioFormat: header.readUInt16LE(chunkStart),
-          numChannels: header.readUInt16LE(chunkStart + 2),
-          sampleRate: header.readUInt32LE(chunkStart + 4),
-          byteRate: header.readUInt32LE(chunkStart + 8),
-          blockAlign: header.readUInt16LE(chunkStart + 12),
-          bitsPerSample: header.readUInt16LE(chunkStart + 14)
+          audioFormat: fmtBuffer.readUInt16LE(0),
+          numChannels: fmtBuffer.readUInt16LE(2),
+          sampleRate: fmtBuffer.readUInt32LE(4),
+          byteRate: fmtBuffer.readUInt32LE(8),
+          blockAlign: fmtBuffer.readUInt16LE(12),
+          bitsPerSample: fmtBuffer.readUInt16LE(14)
         };
       }
 
       // --- data chunk ---
       else if (chunkId === 'data') {
         if (!isRF64) {
-          dataSize = chunkSize; // normal WAV
+          dataSize = chunkSize;
         }
-        break; // we have everything we need
+        break; // we have what we need
       }
 
       // --- RF64 ds64 chunk ---
-      if (chunkId === 'ds64') {
-        dataSize = readUInt64LE(header, chunkStart + 8);
-        sampleCount = readUInt64LE(header, chunkStart + 16);
+      else if (chunkId === 'ds64') {
+        const ds64Buffer = Buffer.alloc(chunkSize);
+        fs.readSync(fd, ds64Buffer, 0, chunkSize, position);
+        dataSize = readUInt64LE(ds64Buffer, 8);
+        sampleCount = readUInt64LE(ds64Buffer, 16);
       }
-      offset = chunkStart + chunkSize  + (chunkSize % 2);
+      // Move to next chunk (account for padding byte)
+      position += chunkSize + (chunkSize % 2);
     }
-    
     if (!fmt) {
       throw new Error('Missing fmt chunk');
     }

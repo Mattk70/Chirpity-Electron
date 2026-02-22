@@ -28,7 +28,7 @@ import {
 } from "./database.js";
 import { customURLEncode, installConsoleTracking, trackEvent as _trackEvent } from "./utils/tracking.js";
 import { onChartRequest, getIncludedLocations }  from "./components/charts.js";
-import { getAudioMetadata } from "./models/training.js";
+
 let isWin32 = false;
 
 const dbMutex = new Mutex();
@@ -197,6 +197,7 @@ const setupFfmpegCommand = async ({
     // No sample rate is supplied when exporting audio.
     // If the sampleRate is 256k, Wavesurfer will handle the tempo/pitch conversion
     if ((training || sampleRate) && sampleRate !== 256000) {
+      const { getAudioMetadata } = require("./models/training.js");
       const {bitrate} = await getAudioMetadata(file);
       const MIN_EXPECTED_BITRATE = 96000; // Lower bitrates aren't capturing ultrasonic frequencies
       if (bitrate < MIN_EXPECTED_BITRATE) console.warn(file, 'has bitrate', bitrate)
@@ -395,12 +396,10 @@ async function setLabelState({ regenerate }) {
 
 
 /**
- * Dispatches incoming worker messages by action and performs the requested application operation.
+ * Dispatches worker messages by action and performs the corresponding application operation, sending back UI events as needed.
  *
- * Waits for initialisation when required, then delegates actions such as model initialization, analysis/prediction control, worker management, audio file operations, database updates, import/export, tagging and list/locale updates, and UI notifications. Expects the event's data to include an `action` string and action-specific parameters.
- *
- * @param {Object} e - Message event whose `data` property contains an `action` field and associated parameters.
- * @returns {Promise<void>} Resolves when the requested action has been processed.
+ * Expects the event's `data` to include an `action` string and any action-specific parameters; handles initialization, analysis/control commands, worker and model management, audio/file operations, DB updates, import/export, tagging, list/locale changes, and related UI notifications.
+ * @param {Object} e - Message event whose `data` property contains an `action` field and associated parameters. 
  */
 async function handleMessage(e) {
   const args = e.data;
@@ -927,9 +926,26 @@ function setGetSummaryQueryInterval(threads) {
     STATE.detect.backend !== "tensorflow" ? threads * 10 : threads;
 }
 
+function findFileAtTime(timeMs) {
+  const match = Object.entries(METADATA)
+    .find(([_, data]) => {
+      const start = data.fileStart;
+      const end = start + (data.duration * 1000);
+      return timeMs > start && timeMs < end;
+    });
+
+  if (!match) return [];
+
+  const [file, data] = match;
+
+  return [{
+    file,
+    offset: (timeMs - data.fileStart) / 1000
+  }];
+}
 
 async function findTime(time) {
-  const result = await STATE.db.allAsync(`
+  let result = await STATE.db.allAsync(`
     SELECT
       name as file,
       (? - filestart) / 1000.0 AS offset
@@ -937,6 +953,9 @@ async function findTime(time) {
     WHERE filestart <= ?
       AND filestart + (duration * 1000) > ?;
   `, time, time, time);
+  if (! result.length){
+    result = findFileAtTime(time)
+  }
   UI.postMessage({ event: "found-time", result });
 }
 
@@ -1423,13 +1442,15 @@ async function getSpeciesSQLAsync(file){
 }
 
 /**
- * Augment a SQL WHERE fragment with filters derived from current application STATE (file/time range, labels, species, selection, location, and daylight).
+ * Apply application-state filters (date/file range, labels, species/list selection, daylight, and location) to a SQL WHERE fragment.
  *
- * @param {string} stmt - Base SQL fragment to augment (typically a WHERE clause or subquery fragment).
- * @param {Object} [range] - Optional time range to constrain results; when omitted in explore mode the explore.range is used.
- * @param {string} [caller] - Caller context that can change behavior (e.g., when `'results'` and a selection exists a file filter is applied).
- * @returns {Array<string | any[]>} An array with two elements: the augmented SQL string and an ordered array of parameters for the prepared statement.
-*/
+ * If no explicit range is provided and the app is in "explore" mode, the explore.range is used. When caller is `'results'` and a selection exists, a file filter is applied instead of the species filter.
+ *
+ * @param {string} stmt - Base SQL fragment to augment.
+ * @param {Object} [range] - Optional time range to constrain results (overrides explore.range when provided).
+ * @param {string} [caller] - Caller context that can alter behavior (e.g., `'results'` applies selection-based file filtering).
+ * @returns {Array} A two-element array: [augmented SQL string, ordered parameters array] for use with a prepared statement.
+ */
 
 async function addQueryQualifiers(stmt, range, caller) {
   const {list, mode, explore, labelFilters, detect, location, selection} = STATE;
@@ -1591,7 +1612,12 @@ const prepResultsStatement = async (
 
 
 
-// Helper to chunk an array
+/**
+ * Split an array into consecutive chunks of the given size.
+ * @param {Array} array - The array to split.
+ * @param {number} size - Maximum size of each chunk; the final chunk may be smaller.
+ * @returns {Array<Array>} An array of chunk arrays in the same order as the input.
+ */
 function chunkArray(array, size) {
   const result = [];
   for (let i = 0; i < array.length; i += size) {
@@ -1886,15 +1912,27 @@ const measureDurationWithFfmpeg = (src) => {
 
 const getDuration = async (src) => {
   // Speedy WAVE parsing
-  if (src.toLowerCase().endsWith(".wav")) return await getWaveDuration(src);
+  if (src.toLowerCase().endsWith(".wav")) {
+    try {
+      return await getWaveDuration(src)
+    } catch (e) {
+      console.warn('Decode audio', 'Failed to extract WAV duration', e.message)
+    }
+  } 
   
   let audio;
   return new Promise(function (resolve, reject) {
     audio = new Audio();
-
+    const removeAudio = (audio) => {
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load(); // forces media pipeline teardown
+      audio.remove();
+    }
     audio.src = src.replaceAll("#", "%23").replaceAll("?", "%3F"); // allow hash and ? in the path (https://github.com/Mattk70/Chirpity-Electron/issues/98)
     audio.addEventListener("loadedmetadata", function () {
       const duration = audio.duration;
+      removeAudio(audio)
       if (duration === Infinity || !duration || isNaN(duration)) {
         // Fallback: decode entire file with ffmpeg
         measureDurationWithFfmpeg(src)
@@ -1906,16 +1944,15 @@ const getDuration = async (src) => {
       } else {
         resolve(duration);
       }
-      audio.remove();
     });
     audio.addEventListener("error", (_error) => {
+      removeAudio(audio)
       measureDurationWithFfmpeg(src)
           .then((realDuration) => resolve(realDuration))
           .catch((err) => {
             err.message = `${err.message} (file: ${src})`;
             return reject(err)
           });
-      audio.remove();
     });
   });
 };
@@ -3084,6 +3121,7 @@ function spawnPredictWorkers(model, batchSize, toSpawn) {
       threads: toSpawn,
       backend: STATE.detect.backend,
       worker: i,
+      locale: STATE.locale.slice(0,2)
     });
 
     // Web worker message event handler
@@ -5304,14 +5342,13 @@ async function _getNearbyLocations(lat, lon) {
 }
 
 /**
- * Retrieves the list of included species IDs based on the current STATE settings and optional file context.
+ * Determine which species IDs are included by the current list settings, optionally using a file's location/week context.
  *
- * Depending on the STATE.list type and whether a specific file is provided, this function determines the appropriate latitude, longitude, and week number to use for location-specific or seasonal inclusion lists. It checks if the relevant inclusion data is already cached in STATE.included; if not, it invokes setIncludedIDs to fetch and cache the data from the list worker. Finally, it returns the array of included species IDs for the specified model and list type.
+ * When a file is provided, its metadata (lat/lon and week) is used to resolve location- or week-specific inclusion; otherwise global STATE values are used. The function will fetch and cache inclusion data from the list worker when a cache miss occurs.
  *
- * @param {string} [file] - Optional file identifier to provide context for location-specific or seasonal lists.
- * @returns {Promise<number[]>} An array of species IDs that are included based on the current STATE settings.
- */
-
+ * @param {string} [file] - Optional file key whose metadata should be used to derive location and week context.
+ * @returns {Promise<number[]>} An array of species IDs included according to the current STATE list and any file-specific context.
+*/
 async function getIncludedIDs(file) {
   if (STATE.list === "everything") return [];
   let latitude, longitude, week;
@@ -5322,7 +5359,7 @@ async function getIncludedIDs(file) {
   ) {
     if (file) {
       const meta = METADATA[file] ?? await setMetadata({file});
-      week = useWeek ? new Date(file.fileStart).getWeekNumber() : "-1";
+      week = useWeek ? new Date(meta.fileStart).getWeekNumber() : "-1";
       latitude = meta.lat || lat;
       longitude = meta.lon || lon;
       STATE.week = week;
@@ -5391,16 +5428,16 @@ function deepMergeLists(model, list) {
 let LIST_CACHE = {};
 
 /**
- * Load and cache species IDs included for a given location and week and merge them into global STATE.
+ * Load and cache the species ID inclusion list for a given location and week and merge it into STATE.included.
  *
  * Requests an inclusion list from the list worker using the current model, labels, list settings and the provided
- * latitude/longitude/week (falling back to STATE values), merges the resulting IDs into STATE.included, caches the
- * in-flight promise to avoid duplicate requests, and emits warnings for any unrecognized labels reported by the worker.
+ * latitude/longitude/week (falling back to STATE values), caches the in-flight request to avoid duplicate calls,
+ * merges the returned IDs into STATE.included, and emits warnings for any unrecognized labels reported by the worker.
  *
  * @param {number|string} lat - Latitude to use for location-specific lists (falls back to STATE.lat if falsy).
  * @param {number|string} lon - Longitude to use for location-specific lists (falls back to STATE.lon if falsy).
  * @param {number|string} week - Week number for seasonal filtering (falls back to STATE.week if falsy).
- * @returns {Promise<Object>} The updated STATE.included object after merging the retrieved included species IDs.
+ * @returns {Object} The updated STATE.included object after merging the retrieved included species IDs.
  */
 async function setIncludedIDs(lat, lon, week) {
   const key = `${lat}-${lon}-${week}-${STATE.model}-${STATE.list}`;

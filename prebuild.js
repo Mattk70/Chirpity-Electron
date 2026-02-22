@@ -7,7 +7,7 @@ const SOURCE_DIR = process.cwd();
 /**
  * Recursively scans a directory tree and checks JavaScript files for any of the provided regular-expression patterns.
  *
- * Only files with a ".js" extension are inspected; directories named "node_modules" are skipped during recursion.
+ * Only files with a ".js" extension are inspected; directories named "node_modules" or "unittest" are skipped during recursion.
  *
  * @param {string} directory - Path to the directory to scan.
  * @param {RegExp[]} patterns - Array of regular expressions to test against each JavaScript file's contents.
