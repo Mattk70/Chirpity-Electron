@@ -270,9 +270,11 @@ function getWaveDuration(filePath) {
       const chunkId = chunkHeader.toString('ascii', 0, 4);
       const chunkSize = chunkHeader.readUInt32LE(4);
       position += 8;
-
+      // A zero-sized chunk would stall the loop — treat as end-of-header.
+      if (chunkSize === 0 && chunkId !== 'data') break;
       // --- fmt chunk ---
       if (chunkId === 'fmt ') {
+        if (chunkSize < 16) throw new Error('fmt chunk too small: ' + chunkSize);
         const fmtBuffer = Buffer.alloc(chunkSize);
         fs.readSync(fd, fmtBuffer, 0, chunkSize, position);
 

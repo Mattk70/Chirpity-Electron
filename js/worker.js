@@ -1917,7 +1917,6 @@ const getDuration = async (src) => {
       return await getWaveDuration(src)
     } catch (e) {
       console.warn('Decode audio', 'Failed to extract WAV duration', e.message)
-      return 0
     }
   } 
   
