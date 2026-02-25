@@ -3917,7 +3917,7 @@ function onAnalysisComplete({ quiet }) {
 
 function removeNoEntry() {
   const summarySpecies = DOM.summary.querySelectorAll(".cname");
-  summarySpecies.forEach((row) => row.classList.replace("not-allowed","pointer"));
+  summarySpecies.forEach((row) => {row.classList.replace("not-allowed","pointer")} );
 }
 
 /**

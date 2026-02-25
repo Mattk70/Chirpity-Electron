@@ -7,10 +7,6 @@ let DIM, BIN_PATH, BYTES_PER_VECTOR;
 // const BIN_PATH = p.join(TEST_PATH,'embeddings.bin')
 let fd;
 
-function getCurrentVectorCount() {
-  const stats = fs.fstatSync(fd);
-  return Math.floor(stats.size / BYTES_PER_VECTOR);
-}
 
 async function createEmbeddingTable(db, path, dim){
   DIM = dim;
@@ -26,7 +22,11 @@ async function createEmbeddingTable(db, path, dim){
       );`)
   await db.runAsync('DELETE FROM embeddings');
   BIN_PATH = p.join(path, 'embeddings.bin')
-  if (fs.existsSync(BIN_PATH)) fs.rmSync(BIN_PATH)
+  if (fd !== undefined) {
+    fs.closeSync(fd);
+    fd = undefined;
+  }
+  fs.rmSync(BIN_PATH, { force: true });
   fd = fs.openSync(BIN_PATH, 'w')
 }
 async function storeEmbeddings({db, dbMutex, fileID, embeddings, keys}) {
@@ -35,7 +35,9 @@ async function storeEmbeddings({db, dbMutex, fileID, embeddings, keys}) {
   }
 
   await dbMutex.lock();
-  let currentIndex = getCurrentVectorCount();
+
+  const initialSize = fs.fstatSync(fd).size;
+  let currentIndex = Math.floor(initialSize / BYTES_PER_VECTOR);
   try {
     const placeholders = [];
     const values = [];
@@ -54,9 +56,7 @@ async function storeEmbeddings({db, dbMutex, fileID, embeddings, keys}) {
       VALUES ${placeholders.join(',')}
     `;
     const result = await db.runAsync(sql, ...values);
-    if (result.changes === embeddings.length){
-        await db.runAsync('END');
-    } else {
+    if (result.changes !== embeddings.length){
         await db.runAsync('ROLLBACK');
         return
     }
@@ -77,15 +77,19 @@ async function storeEmbeddings({db, dbMutex, fileID, embeddings, keys}) {
 
         // Append to binary file
         fs.writeSync(fd, buffer);
-
-    }
-
-    } finally {
-        dbMutex.unlock();
-    }
+      }
+    await db.runAsync('END');
+  } catch (error) {
+    fs.ftruncateSync(fd, initialSize);
+    await db.runAsync('ROLLBACK');
+    throw error;
+  } finally {
+      dbMutex.unlock();
+  }
 }
 
 function searchTopN(query, embeddings, N) {
+  if (!Number.isInteger(N) || N < 1) return [];
   const top = [];
   const totalVectors = embeddings.byteLength / BYTES_PER_VECTOR;
   for (let i = 0; i < totalVectors; i++) {

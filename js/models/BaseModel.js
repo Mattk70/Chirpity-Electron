@@ -30,7 +30,7 @@ class BaseModel {
     this.two  = tf.scalar(2);
     this.one = tf.scalar(1);
     this.backend = tf.getBackend();
-    this.embeddingsDIM = 1024;
+    this.embeddingsDIM = undefined;
   }
 
   async loadModel(type) {
@@ -131,6 +131,8 @@ async predictBatch(audio, keys) {
   });
 
   audio.dispose();
+  const embeddingDim = embeddingsValues.shape[1];
+  this.embeddingsDIM = embeddingDim;
   const [indicesData, valuesData, embeddingsData] = await Promise.all([
     topIndices.data(),
     topValues.data(),

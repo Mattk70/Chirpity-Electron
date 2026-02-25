@@ -561,7 +561,7 @@ async function handleMessage(e) {
       break;
     }
     case "find-similar": {
-      getEmbedding(args);
+      await getEmbedding(args);
       break;
     }
     case "get-detected-species-list": {
@@ -3495,6 +3495,8 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
   } catch (error) {
     await db.runAsync("ROLLBACK");
     console.error("Transaction error during insert:", error);
+    fileID = undefined;
+    throw error;
   } finally {
     dbMutex.unlock();
   }
@@ -3533,16 +3535,23 @@ const parsePredictions = async (response) => {
   const {modelID, selection, detect} = STATE;
   const isCustomList = STATE.list === 'custom';
   if (STATE.queryMetadata){
-    prepareQuery(embeddingsBatch[0])
-    // UI.postMessage({ event: "analysis-complete" });
-    return;
+    if (!embeddingsBatch?.length) {
+      predictionsReceived[file]++;
+      return worker;
+    }
+    await prepareQuery(embeddingsBatch[0]);
+    predictionsReceived[file]++;
+    if (predictionsReceived[file] >= (batchesToSend[file] || 1)) {
+      updateFilesBeingProcessed(file);
+    }
+    return worker;
   }
   if (!selection) {
     let fileID = await generateInsertQuery(keysArray, speciesIDBatch, confidenceBatch, file, modelID, isCustomList).catch((error) =>
       console.warn("Error generating insert query", error)
     );
     if (embeddingsBatch && fileID !== undefined){
-      storeEmbeddings({db: STATE.db, dbMutex, fileID, embeddings: embeddingsBatch, keys: keysArray})
+      await storeEmbeddings({db: STATE.db, dbMutex, fileID, embeddings: embeddingsBatch, keys: keysArray})
     }
   }
   if (index < 500) {
