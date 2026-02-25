@@ -26,7 +26,7 @@ async function createEmbeddingTable(db, path, dim){
       );`)
   await db.runAsync('DELETE FROM embeddings');
   BIN_PATH = p.join(path, 'embeddings.bin')
-  fs.rmSync(BIN_PATH)
+  if (fs.existsSync(BIN_PATH)) fs.rmSync(BIN_PATH)
   fd = fs.openSync(BIN_PATH, 'w')
 }
 async function storeEmbeddings({db, dbMutex, fileID, embeddings, keys}) {
