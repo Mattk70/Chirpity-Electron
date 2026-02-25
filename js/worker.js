@@ -26,6 +26,7 @@ import {
   addNewModel,
   upgrade_to_v4
 } from "./database.js";
+import {createEmbeddingTable, storeEmbeddings, queryEmbeddings} from './embeddings.js';
 import { customURLEncode, installConsoleTracking, trackEvent as _trackEvent } from "./utils/tracking.js";
 import { onChartRequest, getIncludedLocations }  from "./components/charts.js";
 
@@ -557,6 +558,10 @@ async function handleMessage(e) {
     case "find-time": {
       const time = args.time;
       await findTime(time);
+      break;
+    }
+    case "find-similar": {
+      getEmbedding(args);
       break;
     }
     case "get-detected-species-list": {
@@ -1724,6 +1729,43 @@ async function updateMetadata(fileNames) {
   return finalResult;
 }
 
+const resetEmbeddings = async () =>{
+  STATE.queryMetadata = undefined;
+  const dim = STATE.model === 'birdnet' ? 1024 : 1536;
+  await createEmbeddingTable(memoryDB, tempPath, dim);
+}
+async function getEmbedding({file,cname, sname, max, queryRegion }){
+const row = await STATE.db.getAsync(
+  `INSERT INTO species (sname, cname, modelID, classIndex)
+   VALUES (
+     ?, ?, ?,
+     COALESCE(
+       (SELECT MAX(classIndex) + 1 FROM species WHERE modelID = ?),
+       0
+     )
+   )
+   ON CONFLICT(modelID, sname, cname)
+   DO UPDATE SET
+     sname = excluded.sname
+   RETURNING id`,
+  sname,
+  cname,
+  0,   // modelID
+  0    // modelID again for subquery
+);
+  const id = row?.id;
+  STATE.queryMetadata = {cname, sname, max, id};
+  if (!STATE.speciesMap.has(0)) {
+      STATE.speciesMap.set(0, new Map());
+  }
+  STATE.speciesMap.get(0).set(1, id);
+  const {start, end} = queryRegion;
+  onAnalyse({filesInScope: [file], start, end, resetResults: false })
+  // Create a dummy species so records can be added for it
+  
+}
+
+
 /**
  * Prepare and start analysis for the specified audio files, deciding whether to reuse cached results or run fresh processing.
  *
@@ -1825,7 +1867,10 @@ async function onAnalyse({
   await processFilesInBatches(FILE_QUEUE);
   DEBUG &&
     console.log("FILE_QUEUE has", FILE_QUEUE.length, "files", count, "files ignored");
-  STATE.selection || await onChangeMode("analyse");
+  if (!STATE.selection) {
+    await onChangeMode("analyse");
+    await resetEmbeddings();
+  }
 
   filesBeingProcessed = [...FILE_QUEUE];
   for (let i = 0; i < NUM_WORKERS; i++) {
@@ -2892,7 +2937,6 @@ async function feedChunksToModel(channelData, chunkStart, file, end) {
     start: chunkStart,
     duration: end,
     resetResults: !STATE.selection,
-    snr: STATE.filters.SNR,
     context: STATE.detect.contextAware,
     confidence: STATE.detect.confidence,
     chunks: channelData,
@@ -3097,11 +3141,15 @@ const processQueue = async () => {
  */
 function spawnPredictWorkers(model, batchSize, toSpawn) {
   const isPerch = model === 'perch v2';
-  STATE.perchWorker = predictWorkers.filter(w => w.name === 'perch v2');
-  if (isPerch && STATE.perchWorker?.length) {
+  if (! STATE.perchWorker?.length){
+    STATE.perchWorker = predictWorkers.filter(w => w.name === 'perch v2');
+  }
+  if (isPerch && STATE.perchWorker.length) {
     predictWorkers = STATE.perchWorker;
     setLabelState({regenerate: true})
     return
+  } else if (STATE.perchWorker.length) {
+    predictWorkers = predictWorkers.filter(w => w.name !== 'perch v2');
   }
   for (let i = 0; i < toSpawn; i++) {
     if (isPerch && i > 0) break; // Perch v2 only needs one worker, even if multiple threads requested
@@ -3147,7 +3195,6 @@ const terminateWorkers = () => {
     worker.postMessage({message: 'terminate'})
     if (worker.name !== 'perch v2') worker.terminate()
   });
-  STATE.perchWorker = predictWorkers.filter(w => w.name === 'perch v2');
   predictWorkers = []
 };
 
@@ -3451,9 +3498,27 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
   } finally {
     dbMutex.unlock();
   }
-
+  return fileID
 };
 
+async function prepareQuery(query){
+  const {cname, max} = STATE.queryMetadata;
+  const matches = await queryEmbeddings(STATE.db, query, max);
+  for (let i = 0; i < matches.length; i++){
+    const [fileID, offset, score] = matches[i];
+    const row = await STATE.db.getAsync(
+      'SELECT name AS file, filestart + ? * 1000 as timestamp FROM files WHERE id = ?',
+      offset, fileID);
+    const {file, timestamp} = row;
+    
+    const keysArray = [[offset]], speciesIDBatch = [[1]], confidenceBatch = [[score]];
+    await generateInsertQuery(keysArray, speciesIDBatch, confidenceBatch, file, 0, false);
+  }
+
+  STATE.queryMetadata = undefined;
+  STATE.selection = false;
+  await Promise.all([getResults({species: cname}), getSummary({species: cname})])
+}
 
 const parsePredictions = async (response) => {
   const {file, worker, result:latestResult} = response;
@@ -3464,13 +3529,22 @@ const parsePredictions = async (response) => {
     return worker;
   }
   DEBUG && console.log("worker being used:", worker);
-  const [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
+  const [keysArray, speciesIDBatch, confidenceBatch, embeddingsBatch] = latestResult;
   const {modelID, selection, detect} = STATE;
   const isCustomList = STATE.list === 'custom';
-  if (!selection)
-    await generateInsertQuery(keysArray, speciesIDBatch, confidenceBatch, file, modelID, isCustomList).catch((error) =>
+  if (STATE.queryMetadata){
+    prepareQuery(embeddingsBatch[0])
+    // UI.postMessage({ event: "analysis-complete" });
+    return;
+  }
+  if (!selection) {
+    let fileID = await generateInsertQuery(keysArray, speciesIDBatch, confidenceBatch, file, modelID, isCustomList).catch((error) =>
       console.warn("Error generating insert query", error)
     );
+    if (embeddingsBatch && fileID !== undefined){
+      storeEmbeddings({db: STATE.db, dbMutex, fileID, embeddings: embeddingsBatch, keys: keysArray})
+    }
+  }
   if (index < 500) {
     const included = await getIncludedIDs(file).catch((error) =>
       console.warn("Error getting included IDs", error)
@@ -4493,8 +4567,7 @@ const onSave2DiskDB = async ({ file }) => {
     const condition = STATE.detect.nocmig === 'day';
     filterClause += ` AND isDaylight = ${condition} `;
   }
-  let response,
-    errorOccurred = false;
+  let response;
   await dbMutex.lock();
   let inserted = 0;
   try {
@@ -4502,6 +4575,11 @@ const onSave2DiskDB = async ({ file }) => {
     await memoryDB.runAsync(`
       INSERT OR IGNORE INTO disk.locations (id, lat, lon, place, radius)
       SELECT id, lat, lon, place, radius FROM locations;
+    `);
+    await memoryDB.runAsync(`
+      INSERT OR IGNORE INTO disk.species (id, sname, cname, modelID, classIndex)
+      SELECT id, sname, cname, modelID, classIndex FROM species
+      WHERE modelID = 0;
     `);
     await memoryDB.runAsync(
     // Don't coalesce locationID here, because we want to preserve NULLs for files without location

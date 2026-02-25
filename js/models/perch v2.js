@@ -7,7 +7,7 @@ let session;
 let labels;
 let backend;
 const chunkLength = 160000; // 5 seconds at 32kHz
-let batchSize = 1;
+let batchSize = 8;
 const sampleRate = 32000;
 const numClasses = 14795;
 const DEBUG = false;
@@ -18,9 +18,9 @@ async function loadModel(mpath, backend, batchSize) {
   const providers = gpu ? [ 'webgpu', 'cpu'] : ['cpu'];
   const freeDimensionOverrides = { 'batch': batchSize };
   const   preferredOutputLocation = {
-    'label': 'cpu',         // keep label on CPU. This is the only output we use.
-    'embedding': 'gpu-buffer',   // keep other outputs on GPU buffer to save copying effort
-    'spatial_embedding': 'gpu-buffer',   
+    'label': 'cpu',         // keep label & embedding on CPU. This is the only output we use.
+    'embedding': 'cpu',   
+    'spatial_embedding': 'gpu-buffer',   // keep other outputs on GPU buffer to save copying effort
     'spectrogram': 'gpu-buffer'
   }
   const threadOptions = gpu ? { intraOpNumThreads: 1, interOpNumThreads: 1 } : {};
@@ -29,10 +29,7 @@ async function loadModel(mpath, backend, batchSize) {
     executionProviders: providers,
     enableGraphCapture: true, 
     ...threadOptions,
-    // freeDimensionOverrides,
     preferredOutputLocation,
-    // enableProfiling: true,
-    // profileFilePrefix: 'perch_v2-profile'
   };
   const modelPath = path.join(mpath, 'perch_v2.onnx')
   session = await ort.InferenceSession.create(modelPath, sessionOptions);
@@ -161,41 +158,66 @@ async function predictChunk(
 // Configure once (reuse these across calls)
 const batchedIndices = Array.from({ length: batchSize });
 const batchedProbs   = Array.from({ length: batchSize });
+const batchedEmbeds    = Array.from({ length: batchSize });
 
 async function disposeGPUTensors(prediction) {
-  const {spectrogram, embedding, spatial_embedding} = prediction;
+  const {spectrogram, spatial_embedding} = prediction;
   spectrogram.dispose();
-  embedding.dispose();
   spatial_embedding.dispose();
 }
 
+let duration = 0, sDuration = 0;
 /**
  * Predict batch post-process: returns [keys, batchedIndices, batchedProbs]
  * - flat: Float32Array of length batchSize * numClasses (logits)
  * - batchSize, numClasses, sampleRate available in outer scope / params
  */
 async function predictBatch(audio, keys) {
-  return new Promise((resolve) => {
-    session.run({ inputs: audio }).then((prediction) => {
-      const flat = prediction.label.cpuData; // Float32Array
-      for (let b = 0; b < batchSize; b++) {
-        const offset = b * numClasses;
-        const logits = flat.subarray(offset, offset + numClasses);
-        const {probs, idx} = topK(logits);
-        batchedIndices[b] = idx;
-        batchedProbs[b] = probs;
-      }
-      resolve([keys, batchedIndices, batchedProbs]);
-      disposeGPUTensors(prediction)
-      })
+    const prediction = await session.run({ inputs: audio })
+    const flatID = prediction.label.cpuData; // Float32Array
+    const flatEmbeds = prediction.embedding.cpuData;
+    const dim = prediction.embedding.dims[1]
+    
+    for (let b = 0; b < batchSize; b++) {
+      const offset = b * numClasses;
+      const bOffset = b * dim;
+      const logits = flatID.subarray(offset, offset + numClasses);
+      const embedding = flatEmbeds.subarray(bOffset, bOffset + dim);
+      const t0 = Date.now();
+      const {probs, idx} = topK(logits);
+      duration += Date.now() - t0;
+      console.log(`Topk so far ${duration/1000} seconds`)
+      batchedIndices[b] = idx;
+      batchedProbs[b] = probs;
+      l2Normalize(embedding);
+      const f16 = new Float16Array(embedding.length);
+      f16.set(embedding);   // automatic float32 → float16 conversion
+      batchedEmbeds[b] = f16;
+    }
+    disposeGPUTensors(prediction)
     // convert keys to time strings once (not in the inner loop)
     for (let i = 0; i < keys.length; i++) {
-      keys[i] = (keys[i] / sampleRate).toFixed(3);
+      keys[i] = Math.round((keys[i] / sampleRate) * 1000) / 1000;
     }
-  });
+    return [keys, batchedIndices, batchedProbs, batchedEmbeds];
 }
 
-
+function l2Normalize(vec) {
+  let sum = 0.0;
+  // Compute squared norm
+  for (let i = 0; i < vec.length; i++) {
+    const v = vec[i];
+    sum += v * v;
+  }
+  const norm = Math.sqrt(sum);
+  if (norm > 0) {
+    const inv = 1.0 / norm;
+    for (let i = 0; i < vec.length; i++) {
+      vec[i] *= inv;
+    }
+  }
+  return vec;
+}
 function getKeys(numSamples, start) {
     return [...Array(numSamples).keys()].map((i) => start + chunkLength * i);
 }

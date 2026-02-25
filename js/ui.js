@@ -1319,6 +1319,12 @@ const getSelectionResults = (fromDB) => {
   });
 };
 
+
+const showQueryModal = () => {
+  const queryModel = new bootstrap.Modal(document.getElementById("query-modal"));
+  queryModel.show();
+}
+
 /**
  * Sends an analysis request to the worker thread to initiate audio analysis, managing UI state and preventing concurrent analyses.
  *
@@ -2591,7 +2597,7 @@ const setUpWorkerMessaging = () => {
           generateToast({
             type: "error",
             message: "badMessage",
-            variables: { "args.event": args.event },
+            variables: { event: args.message },
           });
         }
       }
@@ -3394,9 +3400,26 @@ const gotoTime = (e) => {
   }
 };
 
-const gotoForm = document.getElementById("gotoForm");
-gotoForm.addEventListener("submit", gotoTime);
-
+const findSimilar = (e) => {
+  e.preventDefault();
+  const form = document.getElementById('queryForm');
+  if (!form.reportValidity()) return;
+  const cname = document.getElementById("cnameInput")?.value;
+  const sname = document.getElementById("snameInput")?.value;
+  const max = document.getElementById("maxResults")?.valueAsNumber;
+  const {start, end} = STATE.activeRegion;
+  const queryRegion = {
+    start: start + STATE.windowOffsetSecs,
+    end: end + STATE.windowOffsetSecs
+  }
+  worker.postMessage({ 
+    action: "find-similar", 
+    cname, sname, max,
+    queryRegion, file: STATE.currentFile});
+  const modalEl = document.getElementById("query-modal");
+  const modal = bootstrap.Modal.getInstance(modalEl);
+  if (modal) modal.hide();
+}
 /**
  * Custom model modals
  */
@@ -3625,9 +3648,9 @@ async function onWorkerLoadedAudio({
   resetRegions();
   await spec.updateSpec({
     buffer: STATE.currentBuffer,
-    position: position,
-    play: play,
-    resetSpec: resetSpec,
+    position,
+    play,
+    resetSpec,
   });
   // Do this after the spec has loaded the file
   STATE.fileLoaded = true;
@@ -3660,7 +3683,7 @@ function updatePagination(species) {
   }
 }
 
-const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
+const updateSummary = ({ summary = [], filterSpecies = "" }) => {
   STATE.summary = summary;
   const i18 = i18n.get(i18n.Headings);
   const showIUCN = config.detect.iucn;
@@ -3892,6 +3915,11 @@ function onAnalysisComplete({ quiet }) {
   worker.postMessage({ action: "update-state", selection: false });
 }
 
+function removeNoEntry() {
+  const summarySpecies = DOM.summary.querySelectorAll(".cname");
+  summarySpecies.forEach((row) => row.classList.replace("not-allowed","pointer"));
+}
+
 /**
  * Refreshes the UI summary view after summary data is available, applying an optional species filter, updating the summary table rows and hover styling, and enabling or disabling related menu actions.
  *
@@ -3901,10 +3929,7 @@ function onAnalysisComplete({ quiet }) {
  */
 function onSummaryComplete({ filterSpecies = undefined, summary = [] }) {
   updateSummary({ summary: summary, filterSpecies: filterSpecies });
-  // Add pointer icon to species summaries
-  const summarySpecies = DOM.summaryTable.querySelectorAll(".cname");
-  summarySpecies.forEach((row) => row.classList.replace("not-allowed","pointer"));
-  
+
   // Add hover to the summary
   const summaryNode = document.getElementById("resultSummary");
   if (summaryNode) {
@@ -3925,6 +3950,8 @@ function onSummaryComplete({ filterSpecies = undefined, summary = [] }) {
     ]);
   }
   if (STATE.currentFile) utils.enableMenuItem(["analyse"]);
+  // Add pointer icon to species summaries
+  removeNoEntry();
 }
 
 
@@ -5489,14 +5516,8 @@ async function handleUIClicks(e) {
       break;
     }
     // Custom models
-    case "open-training": {
-      showTraining();
-      break;
-    }
-    case "import-model": {
-      showImport();
-      break;
-    }
+    case "open-training": { showTraining(); break }
+    case "import-model": { showImport(); break }
     case "remove-model": {
       // Just present custom models to choose from
       updateModelOptions('customOnly');
@@ -5736,10 +5757,7 @@ async function handleUIClicks(e) {
       });
       break;
     }
-    case "startTour": {
-      prepTour();
-      break;
-    }
+    case "startTour": { prepTour(); break }
     case "eBird": {
       (async () => await populateHelpModal("ebird", i18n.Help.eBird[locale]))();
       break;
@@ -5774,20 +5792,12 @@ async function handleUIClicks(e) {
 
     // Settings
     case "basic":
-    case "advanced": {
-      changeSettingsMode(target);
-      break;
-    }
+    case "advanced": { changeSettingsMode(target); break }
 
     // Context-menu
-    case "play-region": {
-      playRegion();
-      break;
-    }
-    case "context-analyse-selection": {
-      getSelectionResults();
-      break;
-    }
+    case "play-region": { playRegion(); break }
+    case "context-analyse-selection": { getSelectionResults(); break}
+    case "context-find-similar":{ showQueryModal(); break }
     case "context-create-clip": {
       element.closest("#inSummary") ? batchExportAudio() : exportAudio();
       break;
@@ -5798,6 +5808,9 @@ async function handleUIClicks(e) {
       ws.playPause();
       break;
     }
+    // Modal forms
+    case "go": { gotoTime(e); break }
+    case "query":{ findSimilar(e) ;break }
 
     case "library-location-select": {
       (async () => {
@@ -5860,10 +5873,7 @@ async function handleUIClicks(e) {
       })();
       break;
     }
-    case "export-list": {
-      exportSpeciesList();
-      break;
-    }
+    case "export-list": { exportSpeciesList(); break }
     case "sort-label":
     case "sort-comment":
     case "sort-reviewed":
@@ -6007,18 +6017,9 @@ async function handleUIClicks(e) {
       await setFontSizeScale();
       break;
     }
-    case "speciesFilter": {
-      speciesFilter(e);
-      break;
-    }
-    case "audioFiltersIcon": {
-      toggleFilters();
-      break;
-    }
-    case "context-mode": {
-      toggleContextAwareMode();
-      break;
-    }
+    case "speciesFilter": { speciesFilter(e); break }
+    case "audioFiltersIcon": { toggleFilters(); break }
+    case "context-mode": { toggleContextAwareMode(); break }
     case "frequency-range": {
       document
         .getElementById("frequency-range-panel")
@@ -6038,10 +6039,7 @@ async function handleUIClicks(e) {
       }
       break;
     }
-    case "nocmigMode": {
-      changeNocmigMode();
-      break;
-    }
+    case "nocmigMode": { changeNocmigMode(); break }
     case "apply-location": {
       e.preventDefault();
       setDefaultLocation();
@@ -6054,10 +6052,7 @@ async function handleUIClicks(e) {
     }
 
     case "zoomIn":
-    case "zoomOut": {
-      spec.zoom(e);
-      break;
-    }
+    case "zoomOut": { spec.zoom(e); break }
     case "cmpZoomIn":
     case "cmpZoomOut": {
       let minPxPerSec = ws.options.minPxPerSec;
@@ -6083,20 +6078,11 @@ async function handleUIClicks(e) {
       if (spec.wavesurfer) WSPlayPause();
         break;      
     }
-    case "setCustomLocation": {
-      setCustomLocation(false);
-      break;
-    }
-    case "setFileStart": {
-      showDatePicker();
-      break;
-    }
+    case "setCustomLocation": { setCustomLocation(false); break }
+    case "setFileStart": { showDatePicker(); break }
 
     // XC API calls (no await)
-    case "context-xc": {
-      getXCComparisons();
-      break;
-    }
+    case "context-xc": { getXCComparisons(); break }
 
   }
   DOM.contextMenu.classList.add("d-none");
@@ -6871,7 +6857,9 @@ async function createContextMenu(e) {
 
   const createOrEdit =
     STATE.activeRegion?.label || target.closest("#summary") ? i18.edit : i18.create;
-
+  const disabled = STATE.isMember 
+    && STATE.analysisDone 
+    && ['birdnet', 'perch v2'].includes(config.selectedModel) ? '' : 'disabled';
   DOM.contextMenu.innerHTML = `
     <div id="${inSummary ? "inSummary" : "inResults"}">
       <ul class="list-unstyled mb-1">
@@ -6880,6 +6868,9 @@ async function createContextMenu(e) {
   }</li>
         <li class="dropdown-item ${hideInSummary} ${hideInSelection}" id="context-analyse-selection">
         <span class="material-symbols-outlined">search</span> ${i18.analyse}
+        </li>
+        <li class="dropdown-item ${hideInSummary} ${hideInSelection} ${disabled}" id="context-find-similar">
+        <span class="material-symbols-outlined">search</span> ${i18.find}
         </li>
         <div class="dropdown-divider ${hideInSummary}"></div>
         <li class="dropdown-item  ${hideInSelection}" id="create-manual-record">
