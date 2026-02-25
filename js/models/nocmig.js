@@ -101,26 +101,22 @@ onmessage = async (e) => {
           start,
           fileStart,
           file,
-          snr,
           confidence,
           context,
           resetResults,
         } = e.data;
         myModel.useContext = context;
         myModel.selection = !resetResults;
-        const [result, filename, startPosition] = await myModel.predictChunk(
+        const result = await myModel.predictChunk(
           chunks,
           start,
-          fileStart,
-          file,
-          snr,
           confidence / 1000
         );
         response = {
           message: "prediction",
-          file: filename,
-          result: result,
-          fileStart: startPosition,
+          file,
+          result,
+          fileStart,
           worker: worker,
           selection: myModel.selection,
         };
@@ -227,49 +223,9 @@ class ChirpityModel extends BaseModel {
       return snr;
     });
   }
-  async predictBatch(TensorBatch, keys, threshold, confidence) {
-    let maskedTensorBatch;
-    if (threshold && BACKEND === "tensorflow" && !this.selection) {
-      threshold *= 4;
-      const keysTensor = tf.stack(keys); // + 1 tensor
-      const snr = this.getSNR(TensorBatch);
-      const condition = tf.greaterEqual(snr, threshold); // + 1 tensor
-      DEBUG && console.log("SNR is:", await snr.data());
-      snr.dispose();
-      // Avoid mask cannot be scalar error at end of predictions
-      let newCondition;
-      if (condition.rankType === "0") {
-        newCondition = tf.expandDims(condition); // + 1 tensor
-        condition.dispose(); // - 1 tensor
-      }
-      const c = newCondition || condition;
-      let maskedKeysTensor;
-      [maskedTensorBatch, maskedKeysTensor] = await Promise.all([
-        tf.booleanMaskAsync(TensorBatch, c),
-        tf.booleanMaskAsync(keysTensor, c),
-      ]); // + 2 tensor
-      c.dispose(); // - 1 tensor
-      keysTensor.dispose(); // - 1 tensor
+  async predictBatch(TensorBatch, keys, confidence) {
 
-      if (!maskedTensorBatch.size) {
-        maskedTensorBatch.dispose(); // - 1 tensor
-        maskedKeysTensor.dispose(); // - 1 tensor
-        TensorBatch.dispose(); // - 1 tensor
-        DEBUG &&
-          console.log(
-            "No surviving tensors in batch",
-            maskedTensorBatch.shape[0]
-          );
-        return [];
-      } else {
-        keys = Array.from(await maskedKeysTensor.data());
-        maskedKeysTensor.dispose(); // - 1 tensor
-        DEBUG &&
-          console.log("surviving tensors in batch", maskedTensorBatch.shape[0]);
-      }
-    }
-
-    const tb = maskedTensorBatch || TensorBatch;
+    const tb = TensorBatch;
     const rawPrediction = this.model.predict(tb, { batchSize: this.batchSize });
 
     // Zero prediction values for silence
@@ -292,12 +248,11 @@ class ChirpityModel extends BaseModel {
       newPrediction = tf.max(prediction, 0, true);
       prediction.dispose();
       keys = keys.splice(0, 1);
-    } else if (this.useContext && this.batchSize > 1 && threshold === 0) {
+    } else if (this.useContext && this.batchSize > 1) {
       newPrediction = this.addContext(prediction, tb, confidence);
       prediction.dispose();
     }
     TensorBatch.dispose();
-    if (maskedTensorBatch) maskedTensorBatch.dispose();
 
     const finalPrediction = newPrediction || prediction;
     // const finalPrediction = finalRawPrediction.mul(this.mask);
@@ -312,6 +267,11 @@ class ChirpityModel extends BaseModel {
     values.dispose();
     finalPrediction.dispose();
     newPrediction && newPrediction.dispose();
+    if (keys.length < topIndices.length){
+      // Trim return values to eliminate GPU padded silence from the results
+      const len = keys.length;
+      return [keys, topIndices.slice(0,len), topValues.slice(0,len)];  
+    }
     keys = keys.map((key) => (key / CONFIG.sampleRate).toFixed(3));
     return [keys, topIndices, topValues];
   }
@@ -319,12 +279,9 @@ class ChirpityModel extends BaseModel {
   async predictChunk(
     audioBuffer,
     start,
-    fileStart,
-    file,
-    threshold,
     confidence
   ) {
-    const [buffers, numSamples] = this.createAudioTensorBatch(audioBuffer);
+    const buffers = this.createAudioTensorBatch(audioBuffer);
     const specBatch = tf.tidy(() => {
       return this.backend === "tensorflow"
         ? this.fixUpSpecBatch(tf.stack(tf.unstack(buffers).map((x) => this.makeSpectrogram(x))))
@@ -337,11 +294,10 @@ class ChirpityModel extends BaseModel {
     const result = await this.predictBatch(
       specBatch,
       batchKeys,
-      threshold,
       confidence
     );
     specBatch.dispose();
     if (DEBUG) console.log("predictChunk end", tf.memory().numTensors);
-    return [result, file, fileStart];
+    return result;
   }
 }

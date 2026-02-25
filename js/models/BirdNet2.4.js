@@ -1,4 +1,4 @@
-let tf, BACKEND, myModel, LOCALE, DEBUG = false;
+let tf, BACKEND, Model, LOCALE, DEBUG = false;
 try {
   tf = require("@tensorflow/tfjs-node");
 } catch {
@@ -16,11 +16,10 @@ import abortController from '../utils/abortController.js';
 onmessage = async (e) => {
   const modelRequest = e.data.message;
   const worker = e.data.worker;
-  let response;
   try {
     switch (modelRequest) {
       case "change-batch-size": {
-        myModel.warmUp(e.data.batchSize);
+        Model.warmUp(e.data.batchSize);
         break;
       }
       case "load": {
@@ -61,24 +60,33 @@ onmessage = async (e) => {
             console.log(tf.env());
             console.log(tf.env().getFlags());
           }
-          myModel = new BirdNETModel(appPath, version);
-          myModel.UUID = e.data.UUID
-          myModel.labels = labels;
+          Model = new BirdNETModel(appPath, version);
+          Model.UUID = e.data.UUID
+          Model.labels = labels;
           // Prepare a mask to squash 'background' predictions
           const bgIndex = labels.findIndex(item => item.toLowerCase().includes('background'));
           if (bgIndex !== -1){
             const maskArray = new Array(labels.length).fill(1);
             maskArray[bgIndex] = 0;
-            myModel.bgMask = tf.tensor1d(maskArray)
+            Model.bgMask = tf.tensor1d(maskArray)
           }
           try {
-            await myModel.loadModel("layers");
-            await myModel.warmUp(batch);
+            await Model.loadModel("layers");
+            // Set up BirdNET embedding model
+            const baseModel = Model.model;
+            const predictions = baseModel.outputs[0];
+            const embeddings = baseModel.getLayer('GLOBAL_AVG_POOL').output;
+            const combinedModel = tf.model({
+              inputs: baseModel.inputs,
+              outputs: [predictions, embeddings],
+            });
+            Model.model = combinedModel;
+            await Model.warmUp(batch);
             BACKEND = tf.getBackend();
             postMessage({
               message: "model-ready",
-              sampleRate: myModel.config.sampleRate,
-              chunkLength: myModel.chunkLength,
+              sampleRate: Model.config.sampleRate,
+              chunkLength: Model.chunkLength,
               backend: BACKEND,
               labels,
               worker,
@@ -96,7 +104,7 @@ onmessage = async (e) => {
       case "train-model":{
         const {trainModel} = require('./training.js');
         const args = e.data;
-          trainModel({ ...args, locale: LOCALE, Model: myModel}).then((message) => {
+          trainModel({ ...args, locale: LOCALE, Model: Model}).then((message) => {
             postMessage({...message})
           }).catch((err) => {
             postMessage({
@@ -109,42 +117,34 @@ onmessage = async (e) => {
         break;
       }
       case "get-spectrogram": {
-        await myModel.getSpectrogram(e.data)
+        await Model.getSpectrogram(e.data)
         break;
-    }
+      }
+
       case "predict": {
-        if (myModel?.model_loaded) {
+        if (Model?.model_loaded) {
           const {
             chunks,
             start,
             fileStart,
             file,
-            snr,
-            confidence,
             worker,
             context,
             resetResults,
           } = e.data;
-          myModel.useContext = context;
-          myModel.selection = !resetResults;
-          const [result, filename, startPosition] = await myModel.predictChunk(
-            chunks,
-            start,
-            fileStart,
-            file,
-            snr,
-            confidence / 1000
-          );
-          response = {
+          Model.useContext = context;
+          Model.selection = !resetResults;
+          const result = await Model.predictChunk(chunks, start);
+          const response = {
             message: "prediction",
-            file: filename,
-            result: result,
-            fileStart: startPosition,
-            worker: worker,
-            selection: myModel.selection,
+            file,
+            result,
+            fileStart,
+            worker,
+            selection: Model.selection,
           };
           postMessage(response);
-          myModel.result = [];
+          Model.result = [];
         }
         break;
       }
@@ -167,44 +167,43 @@ class BirdNETModel extends BaseModel {
     this.chunkLength = this.config.sampleRate * this.config.specLength;
   }
 
-  async predictChunk(
-    audioBuffer,
-    start,
-    fileStart,
-    file,
-    threshold,
-    confidence
-  ) {
+  async predictChunk(audioBuffer, start, embeddings = false) {
     DEBUG && console.log("predictChunk begin", tf.memory().numTensors);
-    const [audioBatch, numSamples] = this.createAudioTensorBatch(audioBuffer);
+    const audioBatch = this.createAudioTensorBatch(audioBuffer);
     const maxKeys = Math.ceil(audioBuffer.length / this.chunkLength)
     const batchKeys = this.getKeys(maxKeys, start);
-    const result = await this.predictBatch(
-      audioBatch,
-      batchKeys,
-      threshold,
-      confidence
-    );
+    let result;
+    if (embeddings){
+      result = await this.getEmbeddings(
+        audioBatch,
+        batchKeys
+      );
+    } else {
+      result = await this.predictBatch(
+        audioBatch,
+        batchKeys
+      );
+    }
     DEBUG && console.log("predictChunk end", tf.memory().numTensors);
-    return [result, file, fileStart];
+    return result;
   }
   async getSpectrogram(data){
     const {buffer, file:specFile, filepath} = data;
-    if (buffer.length < myModel.chunkLength) {
+    if (buffer.length < Model.chunkLength) {
       return;
     }
     const image = tf.tidy(() => {
       // Get the spec layer by name
-      const concat = myModel.model.getLayer("concatenate");
+      const concat = Model.model.getLayer("concatenate");
       // Create a new model that outputs the MEL_SPEC1 layer
       const intermediateModel = tf.model({
-          inputs: myModel.model.inputs,
+          inputs: Model.model.inputs,
           outputs: concat.output,
         });
       const signal = (buffer.shape ? buffer : tf.tensor1d(buffer, "float32")).reshape([1, 144000]);
         // Get the output of the MEL_SPEC1 layer
       
-      let spec = myModel.normalise(intermediateModel.predict(signal));
+      let spec = Model.normalise(intermediateModel.predict(signal));
       // Add a zero channel to the spectrogram so the resulting png has 3 channels and is in colour 
       const [b, h, w, _] = spec.shape;
       const zeroChannel = tf.zeros([b, h, w, 1], spec.dtype);
