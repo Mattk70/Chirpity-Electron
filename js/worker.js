@@ -1497,7 +1497,7 @@ const prepSummaryStatement = async () => {
   const partition = detect.merge ? '' : ', r.modelID';
   let summaryStatement = `
     WITH ranked_records AS (
-        SELECT r.position * 1000 + f.filestart as dateTime, r.confidence, f.name as file, f.archiveName, cname, sname, classIndex, COALESCE(callCount, 1) as callCount, isDaylight, tagID,
+        SELECT r.position * 1000 + f.filestart as dateTime, r.confidence, f.name as file, f.archiveName, cname, sname, classIndex, COALESCE(callCount, 1) as callCount, isDaylight, tagID, r.modelID,
         RANK() OVER (PARTITION BY fileID${partition}, r.position ORDER BY r.confidence DESC) AS rank
         FROM records r
         JOIN files f ON f.id = r.fileID
@@ -1508,7 +1508,7 @@ const prepSummaryStatement = async () => {
   summaryStatement = stmt;
   summaryStatement += `
     )
-    SELECT cname, sname, confidence AS score, dateTime AS timestamp, callcount
+    SELECT cname, sname, confidence AS score, dateTime AS timestamp, callcount, modelID
     FROM ranked_records
     WHERE ranked_records.rank <= ${topRankin}`;
 
@@ -3506,7 +3506,7 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
 
 async function prepareQuery(query){
   const {cname, max} = STATE.queryMetadata;
-  const matches = await queryEmbeddings(STATE.db, query, max);
+  const matches = await queryEmbeddings(memoryDB, query, max);
   for (let i = 0; i < matches.length; i++){
     const [fileID, offset, score] = matches[i];
     const row = await STATE.db.getAsync(
@@ -4475,8 +4475,9 @@ function epochInDayMonthRange(epochMs, startDM, endDM) {
 function allowedByList(result){
   // Handle enhanced lists. 
   // Calltype always undefined here:
-  let { timestamp, cname, score, callType, confidenceCheck } = result;
+  let { timestamp, cname, score, modelID, callType, confidenceCheck } = result;
   if (score === 2000) return true; // Manual records always allowed
+  if (modelID === 0) return score >= STATE.detect.confidence;
   if (/\(|-$/.test(cname)){
     // Strip suffixes
     const parsed = parseCnames([cname]);
@@ -4558,6 +4559,7 @@ function recordRowToAllowedInput(row) {
     timestamp: row.filestart + (row.position * 1000),
     cname: row.cname,
     score: row.confidence,
+    modelID: row.modelID,
     callType: row.callType || null
   };
 }
