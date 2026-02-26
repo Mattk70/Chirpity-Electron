@@ -1760,9 +1760,7 @@ const row = await STATE.db.getAsync(
   }
   STATE.speciesMap.get(0).set(1, id);
   const {start, end} = queryRegion;
-  onAnalyse({filesInScope: [file], start, end, resetResults: false })
-  // Create a dummy species so records can be added for it
-  
+  await onAnalyse({filesInScope: [file], start, end, resetResults: false })  
 }
 
 
@@ -3141,9 +3139,12 @@ const processQueue = async () => {
  */
 function spawnPredictWorkers(model, batchSize, toSpawn) {
   const isPerch = model === 'perch v2';
+  // Perch worker cannot be terminated due to ONNX runtime global memory management,
+  // so we preserve it in STATE.perchWorker for reuse across model switches
   if (! STATE.perchWorker?.length){
     STATE.perchWorker = predictWorkers.filter(w => w.name === 'perch v2');
   }
+
   if (isPerch && STATE.perchWorker.length) {
     predictWorkers = STATE.perchWorker;
     setLabelState({regenerate: true})
@@ -3509,9 +3510,10 @@ async function prepareQuery(query){
   for (let i = 0; i < matches.length; i++){
     const [fileID, offset, score] = matches[i];
     const row = await STATE.db.getAsync(
-      'SELECT name AS file, filestart + ? * 1000 as timestamp FROM files WHERE id = ?',
+      'SELECT name AS file FROM files WHERE id = ?',
       offset, fileID);
-    const {file, timestamp} = row;
+    if (! row) continue
+    const {file} = row;
     
     const keysArray = [[offset]], speciesIDBatch = [[1]], confidenceBatch = [[score]];
     await generateInsertQuery(keysArray, speciesIDBatch, confidenceBatch, file, 0, false);

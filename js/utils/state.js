@@ -109,7 +109,8 @@ export class WorkerState {
     (this.clippedFilesDuration = 0),
     (this.clippedBatches = 0),
     (this.corruptFiles = []),
-    (this.originalFiles = undefined);
+    (this.originalFiles = undefined),
+    (this.perchWorker = []);
   }
 
   update(updates) {

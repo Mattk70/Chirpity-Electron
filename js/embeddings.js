@@ -134,7 +134,9 @@ async function queryEmbeddings(db, query, N){
         vectorMeta[vectorIndex] = {fileID, offset};
     }
     const result = searchTopN(query, embeddings, N)
-    const matches = result.map(r => [vectorMeta[r.index].fileID, vectorMeta[r.index].offset , r.score])
+    const matches = result
+      .filter(r => vectorMeta[r.index] != null)
+      .map(r => [vectorMeta[r.index].fileID, vectorMeta[r.index].offset , r.score])
     return matches;
 }
 
