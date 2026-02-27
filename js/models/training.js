@@ -91,7 +91,7 @@ async function trainModel({
   // Get embeddings from BirdNET
   let embeddingModel = tf.model({
     inputs: baseModel.inputs,
-    outputs: baseModel.getLayer('GLOBAL_AVG_POOL').output,
+    outputs: baseModel.outputs[1],
     name: baseModel.name + "_embeddings"
   });
 
@@ -190,18 +190,19 @@ async function trainModel({
   if (validation && (!cacheRecords || !fs.existsSync(valBin))) {
     await writeBinaryGzipDataset(embeddingModel, valFiles, valBin, labelToIndex, postMessage, i18n.prepVal);
   }
+  
   let mergedModel;
   const saveModelAsync = async () => {
       let mergedLabels = labels;
       const intermediate = transferModel.apply(baseModel.getLayer('GLOBAL_AVG_POOL').output);
       let output = intermediate;
       if (modelType === 'append'){
-        output = tf.layers.concatenate({ axis: -1 }).apply([baseModel.output, intermediate]);
+        output = tf.layers.concatenate({ axis: -1 }).apply([baseModel.outputs[0], intermediate]);
         mergedLabels = Model.labels.concat(labels);
       }
       mergedModel = tf.model({
           inputs: baseModel.inputs,
-          outputs: output,
+          outputs: [output, baseModel.outputs[1] ],
           name: 'transfer_model'
         });
       // Write labels to a file

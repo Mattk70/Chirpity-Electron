@@ -29,6 +29,7 @@ class BaseModel {
     this.scalarFive = tf.scalar(5);
     this.two  = tf.scalar(2);
     this.one = tf.scalar(1);
+    this.topN = 5;
     this.backend = tf.getBackend();
     this.embeddingsDIM = undefined;
   }
@@ -42,6 +43,17 @@ class BaseModel {
       this.model = await load(this.appPath + "/model.json", {
         weightPathPrefix: this.appPath + '/',
       });
+      if (type === 'layers'){
+        // Set up BirdNET embedding model
+        const baseModel = this.model;
+        const predictions = baseModel.outputs[0];
+        const embeddings = baseModel.getLayer('GLOBAL_AVG_POOL').output;
+        const combinedModel = tf.model({
+          inputs: baseModel.inputs,
+          outputs: [predictions, embeddings],
+        });
+        this.model = combinedModel;
+      }
       this.model_loaded = true;
       this.inputShape = [...this.model.inputs[0].shape];
     }
@@ -149,13 +161,13 @@ async predictBatch(audio, keys) {
   keys = keys.map(
     key => Math.round((key / (this.config.sampleRate * this.scaleFactor)) * 10000) / 10000
   );
-  const batchSize = keys.length;
-  const topN = valuesData.length / batchSize;
+  const adjustedBatchSize = keys.length;
+  const topN = this.topN;
   // Reshape manually without expensive array()
   const reshapedIndices = [];
   const reshapedValues = [];
   const reshapedEmbeddings = [];
-  for (let i = 0; i < batchSize; i++) {
+  for (let i = 0; i < adjustedBatchSize; i++) {
     reshapedIndices.push(
       indicesData.slice(i * topN, (i + 1) * topN)
     );

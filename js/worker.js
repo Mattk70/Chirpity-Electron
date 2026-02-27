@@ -1508,7 +1508,7 @@ const prepSummaryStatement = async () => {
   summaryStatement = stmt;
   summaryStatement += `
     )
-    SELECT cname, sname, confidence AS score, dateTime AS timestamp, callcount, modelID
+    SELECT cname, sname, confidence AS score, dateTime AS timestamp, callCount, modelID
     FROM ranked_records
     WHERE ranked_records.rank <= ${topRankin}`;
 
@@ -1731,7 +1731,7 @@ async function updateMetadata(fileNames) {
 
 const resetEmbeddings = async () =>{
   STATE.queryMetadata = undefined;
-  const dim = STATE.model === 'birdnet' ? 1024 : 1536;
+  const dim = STATE.model === 'perch v2' ? 1536 : 1024;
   await createEmbeddingTable(memoryDB, tempPath, dim);
 }
 async function getEmbedding({file,cname, sname, max, queryRegion }){
@@ -3511,7 +3511,7 @@ async function prepareQuery(query){
     const [fileID, offset, score] = matches[i];
     const row = await STATE.db.getAsync(
       'SELECT name AS file FROM files WHERE id = ?',
-      offset, fileID);
+      fileID);
     if (! row) continue
     const {file} = row;
     

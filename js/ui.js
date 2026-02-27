@@ -6840,7 +6840,7 @@ async function createContextMenu(e) {
   } else if (target.closest("#selectionResultTableBody")) {
     hideInSelection = "d-none";
   }
-
+  const hideFindSimilar = (['analyse', 'archive']).includes(STATE.mode) && ! ['chirpity', 'nocmig'].includes(config.selectedModel) ? '' : 'd-none';
   // If we haven't clicked the active row or we cleared the region, load the row we clicked
   if (resultContext || hideInSelection || hideInSummary) {
     // Lets check if the summary needs to be filtered
@@ -6858,8 +6858,7 @@ async function createContextMenu(e) {
   const createOrEdit =
     STATE.activeRegion?.label || target.closest("#summary") ? i18.edit : i18.create;
   const disabled = STATE.isMember 
-    && STATE.analysisDone 
-    && ['birdnet', 'perch v2'].includes(config.selectedModel) ? '' : 'disabled';
+    && STATE.analysisDone ? '' : 'disabled';
   DOM.contextMenu.innerHTML = `
     <div id="${inSummary ? "inSummary" : "inResults"}">
       <ul class="list-unstyled mb-1">
@@ -6869,7 +6868,7 @@ async function createContextMenu(e) {
         <li class="dropdown-item ${hideInSummary} ${hideInSelection}" id="context-analyse-selection">
         <span class="material-symbols-outlined">search</span> ${i18.analyse}
         </li>
-        <li class="dropdown-item ${hideInSummary} ${hideInSelection} ${disabled}" id="context-find-similar">
+        <li class="dropdown-item ${hideFindSimilar} ${hideInSummary} ${hideInSelection} ${disabled}" id="context-find-similar">
         <span class="material-symbols-outlined">search</span> ${i18.find}
         </li>
         <div class="dropdown-divider ${hideInSummary}"></div>

@@ -118,26 +118,29 @@ function searchTopN(query, embeddings, N) {
 
 
 async function queryEmbeddings(db, query, N){
-    const buffer = fs.readFileSync(BIN_PATH);
-    // Create a zero-copy Float16Array view
-    const embeddings = new Float16Array(
+  if (!BIN_PATH || !fs.existsSync(BIN_PATH)) {
+      return [];
+   }
+  const buffer = fs.readFileSync(BIN_PATH);
+  // Create a zero-copy Float16Array view
+  const embeddings = new Float16Array(
     buffer.buffer,
     buffer.byteOffset,
     buffer.byteLength / 2
-    );
+  );
 
-    const totalVectors = embeddings.length / DIM;
-    const vectorMeta = new Array(totalVectors);
-    const rows = await db.allAsync("SELECT vectorIndex, fileID, offset FROM embeddings");
-    for (const row of rows){
-        const {vectorIndex, fileID, offset} = row;
-        vectorMeta[vectorIndex] = {fileID, offset};
-    }
-    const result = searchTopN(query, embeddings, N)
-    const matches = result
-      .filter(r => vectorMeta[r.index] != null)
-      .map(r => [vectorMeta[r.index].fileID, vectorMeta[r.index].offset , r.score])
-    return matches;
+  const totalVectors = embeddings.length / DIM;
+  const vectorMeta = new Array(totalVectors);
+  const rows = await db.allAsync("SELECT vectorIndex, fileID, offset FROM embeddings");
+  for (const row of rows){
+      const {vectorIndex, fileID, offset} = row;
+      vectorMeta[vectorIndex] = {fileID, offset};
+  }
+  const result = searchTopN(query, embeddings, N)
+  const matches = result
+    .filter(r => vectorMeta[r.index] != null)
+    .map(r => [vectorMeta[r.index].fileID, vectorMeta[r.index].offset , r.score])
+  return matches;
 }
 
 export {storeEmbeddings, createEmbeddingTable, queryEmbeddings}

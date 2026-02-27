@@ -74,15 +74,7 @@ onmessage = async (e) => {
           }
           try {
             await Model.loadModel("layers");
-            // Set up BirdNET embedding model
-            const baseModel = Model.model;
-            const predictions = baseModel.outputs[0];
-            const embeddings = baseModel.getLayer('GLOBAL_AVG_POOL').output;
-            const combinedModel = tf.model({
-              inputs: baseModel.inputs,
-              outputs: [predictions, embeddings],
-            });
-            Model.model = combinedModel;
+
             await Model.warmUp(batch);
             BACKEND = tf.getBackend();
             postMessage({

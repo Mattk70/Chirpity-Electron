@@ -13,9 +13,16 @@ const numClasses = 14795;
 const DEBUG = false;
 let modelPath;
 
+let batchedIndices;
+let batchedProbs; 
+let batchedEmbeds;
+
 async function loadModel(mpath, backend, batchSize) {
+  batchedEmbeds  = Array.from({ length: batchSize });
+  batchedIndices  = Array.from({ length: batchSize });
+  batchedProbs  = Array.from({ length: batchSize });
   const gpu = backend === 'webgpu';
-  const providers = gpu ? [ 'webgpu', 'cpu'] : ['cpu'];
+  const providers = gpu ? ['webgpu', 'cpu'] : ['cpu'];
   const freeDimensionOverrides = { 'batch': batchSize };
   const   preferredOutputLocation = {
     'label': 'cpu',         // keep label & embedding on CPU. This is the only output we use.
@@ -23,12 +30,17 @@ async function loadModel(mpath, backend, batchSize) {
     'spatial_embedding': 'gpu-buffer',   // keep other outputs on GPU buffer to save copying effort
     'spectrogram': 'gpu-buffer'
   }
-  const threadOptions = gpu ? { intraOpNumThreads: 1, interOpNumThreads: 1 } : {};
-//  const executionProviderConfig = gpu ? { webgpu: {  preferredLayout: 'NCHW',  validationMode: 'wgpuOnly' } } : {};
+  const threadOptions = gpu ? { intraOpNumThreads:1, interOpNumThreads: 1 } : {};
+ const executionProviderConfig = gpu ? { webgpu: {  validationMode: 'disabled' } } : {};
   const sessionOptions = { 
     executionProviders: providers,
     enableGraphCapture: true, 
     ...threadOptions,
+    executionProviderConfig,
+    executionMode: 'sequential',
+    freeDimensionOverrides,
+    enableCpuMemArena: true,
+    freeDimensionOverrides,
     preferredOutputLocation,
   };
   const modelPath = path.join(mpath, 'perch_v2.onnx')
@@ -43,16 +55,14 @@ onmessage = async (e) => {
   try {
     switch (modelRequest) {
       case 'terminate': {
-        batchSize = data.batchSize || batchSize;
-        if (data.backend) {
-            if (backend !== data.backend) {
-              if (session) {
-                try { session.release() } catch (e) { console.error(e) }
-              }
-              backend = data.backend;
-              await loadModel(modelPath, backend, batchSize);
+          if ((data.backend && backend !== data.backend ) || (data.batchSize && batchSize !== data.batchSize)) {
+            if (session) {
+              try { session.release() } catch (e) { console.error(e) }
             }
-        }
+            batchSize = data.batchSize || batchSize;
+            backend = data.backend;
+            await loadModel(modelPath, backend, batchSize);
+          }
         break;
       }
       case "change-threads": {
@@ -155,10 +165,6 @@ async function predictChunk(
     return [result, file, fileStart];
 }
 
-// Configure once (reuse these across calls)
-const batchedIndices = Array.from({ length: batchSize });
-const batchedProbs   = Array.from({ length: batchSize });
-const batchedEmbeds    = Array.from({ length: batchSize });
 
 async function disposeGPUTensors(prediction) {
   const {spectrogram, spatial_embedding} = prediction;
@@ -166,7 +172,6 @@ async function disposeGPUTensors(prediction) {
   spatial_embedding.dispose();
 }
 
-let duration = 0, sDuration = 0;
 /**
  * Predict batch post-process: returns [keys, batchedIndices, batchedProbs]
  * - flat: Float32Array of length batchSize * numClasses (logits)
@@ -177,7 +182,6 @@ async function predictBatch(audio, keys) {
     const flatID = prediction.label.cpuData; // Float32Array
     const flatEmbeds = prediction.embedding.cpuData;
     const dim = prediction.embedding.dims[1]
-    
     for (let b = 0; b < batchSize; b++) {
       const offset = b * numClasses;
       const bOffset = b * dim;
@@ -185,8 +189,6 @@ async function predictBatch(audio, keys) {
       const embedding = flatEmbeds.subarray(bOffset, bOffset + dim);
       const t0 = Date.now();
       const {probs, idx} = topK(logits);
-      duration += Date.now() - t0;
-      console.log(`Topk so far ${duration/1000} seconds`)
       batchedIndices[b] = idx;
       batchedProbs[b] = probs;
       l2Normalize(embedding);
