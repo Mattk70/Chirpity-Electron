@@ -3431,6 +3431,7 @@ const findSimilar = (e) => {
   e.preventDefault();
   const form = document.getElementById('queryForm');
   if (!form.reportValidity()) return;
+  if (! STATE.activeRegion) return;
   const cname = document.getElementById("cnameInput")?.value;
   const sname = document.getElementById("snameInput")?.value;
   const max = document.getElementById("maxResults")?.valueAsNumber;

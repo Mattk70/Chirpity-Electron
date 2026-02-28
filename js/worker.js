@@ -1221,20 +1221,6 @@ async function processFilesInBatches(filePaths, batchSize = 20) {
   STATE.totalBatches = 0;
   STATE.allFilesDuration = 0;
   const t0 = Date.now();
-  const reading = {
-    en: "Reading metadata",
-    da: "Indlæser metadata",
-    de: "Metadaten werden gelesen",
-    es: "Leyendo metadatos",
-    fr: "Lecture des métadonnées",
-    ja: "メタデータを読み込み中",
-    nl: "Metadata lezen",
-    pt: "Lendo metadados",
-    ru: "Чтение метаданных",
-    sv: "Läser metadata",
-    zh: "正在读取元数据",
-  };
-  const text = reading[STATE.locale] || reading['en'];
   for (let i = 0; i < filePaths.length; i += batchSize) {
     const batch = filePaths.slice(i, i + batchSize);
     // Run the batch in parallel
@@ -1253,9 +1239,6 @@ async function processFilesInBatches(filePaths, batchSize = 20) {
         }
       ))
     );
-    const progress = results.filter(Boolean).length // only count successful metadata retrievals towards progress
-
-    sendProgress(text, ((i + progress) / filePaths.length) * 100);
     DEBUG && console.log(`Processed ${i + results.length} of ${filePaths.length}`);
   }
   if (STATE.corruptFiles.length) {
@@ -3509,22 +3492,26 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
 
 async function prepareQuery(query){
   const {cname, max, threshold} = STATE.queryMetadata;
-  const matches = await queryEmbeddings(memoryDB, query, max, threshold);
-  for (let i = 0; i < matches.length; i++){
-    const [fileID, offset, score] = matches[i];
-    const row = await STATE.db.getAsync(
-      'SELECT name AS file FROM files WHERE id = ?',
-      fileID);
-    if (! row) continue
-    const {file} = row;
-    
-    const keysArray = [[offset]], speciesIDBatch = [[1]], confidenceBatch = [[score]];
-    await generateInsertQuery(keysArray, speciesIDBatch, confidenceBatch, file, 0, false);
-  }
+  try {
+    const matches = await queryEmbeddings(memoryDB, query, max, threshold);
+    for (let i = 0; i < matches.length; i++){
+      const [fileID, offset, score] = matches[i];
+      const row = await STATE.db.getAsync(
+        'SELECT name AS file FROM files WHERE id = ?',
+        fileID);
+      if (! row) continue
+      const {file} = row;
+      
+      const keysArray = [[offset]], speciesIDBatch = [[1]], confidenceBatch = [[score]];
+      await generateInsertQuery(keysArray, speciesIDBatch, confidenceBatch, file, 0, false);
+    }
 
-  STATE.queryMetadata = undefined;
-  STATE.selection = false;
-  await Promise.all([getResults({species: cname}), getSummary({species: cname})])
+    
+    await Promise.all([getResults({species: cname}), getSummary({species: cname})])
+  } finally {
+    STATE.queryMetadata = undefined;
+    STATE.selection = false;
+  }
 }
 
 const parsePredictions = async (response) => {
@@ -5253,10 +5240,8 @@ async function onSetLocation({
         // Snap the file location to the highest priority existing location
         const {lat:overrideLat, lon:overrideLon, id:overrideID, place:overridePlace, radius:overrideRadius} = closest;
         lat = overrideLat, lon = overrideLon; id = overrideID; place = overridePlace; radius = overrideRadius;
-        console.info("Snapping to nearby location:", `${Math.round(closest.distance)} meters away`);
-      }
-      
-    } 
+      } 
+    }
   }
 
  if (id === null || id === undefined) {
