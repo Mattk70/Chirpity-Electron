@@ -1221,20 +1221,6 @@ async function processFilesInBatches(filePaths, batchSize = 20) {
   STATE.totalBatches = 0;
   STATE.allFilesDuration = 0;
   const t0 = Date.now();
-  const reading = {
-    en: "Reading metadata",
-    da: "Indlæser metadata",
-    de: "Metadaten werden gelesen",
-    es: "Leyendo metadatos",
-    fr: "Lecture des métadonnées",
-    ja: "メタデータを読み込み中",
-    nl: "Metadata lezen",
-    pt: "Lendo metadados",
-    ru: "Чтение метаданных",
-    sv: "Läser metadata",
-    zh: "正在读取元数据",
-  };
-  const text = reading[STATE.locale] || reading['en'];
   for (let i = 0; i < filePaths.length; i += batchSize) {
     const batch = filePaths.slice(i, i + batchSize);
     // Run the batch in parallel
@@ -1253,9 +1239,6 @@ async function processFilesInBatches(filePaths, batchSize = 20) {
         }
       ))
     );
-    const progress = results.filter(Boolean).length // only count successful metadata retrievals towards progress
-
-    sendProgress(text, ((i + progress) / filePaths.length) * 100);
     DEBUG && console.log(`Processed ${i + results.length} of ${filePaths.length}`);
   }
   if (STATE.corruptFiles.length) {
@@ -1734,27 +1717,27 @@ const resetEmbeddings = async () =>{
   const dim = STATE.model === 'perch v2' ? 1536 : 1024;
   await createEmbeddingTable(memoryDB, tempPath, dim);
 }
-async function getEmbedding({file,cname, sname, max, queryRegion }){
-const row = await STATE.db.getAsync(
-  `INSERT INTO species (sname, cname, modelID, classIndex)
-   VALUES (
-     ?, ?, ?,
-     COALESCE(
-       (SELECT MAX(classIndex) + 1 FROM species WHERE modelID = ?),
-       0
-     )
-   )
-   ON CONFLICT(modelID, sname, cname)
-   DO UPDATE SET
-     sname = excluded.sname
-   RETURNING id`,
-  sname,
-  cname,
-  0,   // modelID
-  0    // modelID again for subquery
-);
+async function getEmbedding({file,cname, sname, max, threshold, queryRegion }){
+  const row = await STATE.db.getAsync(
+    `INSERT INTO species (sname, cname, modelID, classIndex)
+    VALUES (
+      ?, ?, ?,
+      COALESCE(
+        (SELECT MAX(classIndex) + 1 FROM species WHERE modelID = ?),
+        0
+      )
+    )
+    ON CONFLICT(modelID, sname, cname)
+    DO UPDATE SET
+      sname = excluded.sname
+    RETURNING id`,
+    sname,
+    cname,
+    0,   // modelID
+    0    // modelID again for subquery
+  );
   const id = row?.id;
-  STATE.queryMetadata = {cname, sname, max, id};
+  STATE.queryMetadata = {cname, sname, threshold, max, id};
   if (!STATE.speciesMap.has(0)) {
       STATE.speciesMap.set(0, new Map());
   }
@@ -2273,6 +2256,7 @@ async function sendDetections(file, start, end, goToRegion) {
                 name,
                 position * 1000 + f.filestart as timestamp,
                 speciesID,
+                r.modelID,
                 classIndex
             FROM records r
             JOIN species s ON speciesID = s.ID
@@ -2282,7 +2266,7 @@ async function sendDetections(file, start, end, goToRegion) {
             AND start BETWEEN ? AND ?
             ${includedSQL}
         )
-        SELECT start, end, cname, score, timestamp
+        SELECT start, end, cname, score, timestamp, modelID
         FROM RankedRecords
         WHERE rank <= ${detect.topRankin}
         `;
@@ -2976,6 +2960,8 @@ const bufferToAudio = async ({
   folder = undefined,
   filename = undefined
 }) => {
+  const destination = p.join(folder || tempPath, filename);
+  if (fs.existsSync(destination)) return; // Don't overwrite existing files
   if (!fs.existsSync(file)) {
     const found = await getWorkingFile(file);
     if (!found) return;
@@ -3032,7 +3018,7 @@ const bufferToAudio = async ({
       metadata: meta,
       additionalFilters: filters
     }).then(command => {
-    const destination = p.join(folder || tempPath, filename);
+    
 
     command.on("codecData", async function (data) {
       const channelStr = data.audio_details?.[2]?.toLowerCase() ?? '';
@@ -3505,23 +3491,27 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
 };
 
 async function prepareQuery(query){
-  const {cname, max} = STATE.queryMetadata;
-  const matches = await queryEmbeddings(memoryDB, query, max);
-  for (let i = 0; i < matches.length; i++){
-    const [fileID, offset, score] = matches[i];
-    const row = await STATE.db.getAsync(
-      'SELECT name AS file FROM files WHERE id = ?',
-      fileID);
-    if (! row) continue
-    const {file} = row;
-    
-    const keysArray = [[offset]], speciesIDBatch = [[1]], confidenceBatch = [[score]];
-    await generateInsertQuery(keysArray, speciesIDBatch, confidenceBatch, file, 0, false);
-  }
+  const {cname, max, threshold} = STATE.queryMetadata;
+  try {
+    const matches = await queryEmbeddings(memoryDB, query, max, threshold);
+    for (let i = 0; i < matches.length; i++){
+      const [fileID, offset, score] = matches[i];
+      const row = await STATE.db.getAsync(
+        'SELECT name AS file FROM files WHERE id = ?',
+        fileID);
+      if (! row) continue
+      const {file} = row;
+      
+      const keysArray = [[offset]], speciesIDBatch = [[1]], confidenceBatch = [[score]];
+      await generateInsertQuery(keysArray, speciesIDBatch, confidenceBatch, file, 0, false);
+    }
 
-  STATE.queryMetadata = undefined;
-  STATE.selection = false;
-  await Promise.all([getResults({species: cname}), getSummary({species: cname})])
+    
+    await Promise.all([getResults({species: cname}), getSummary({species: cname})])
+  } finally {
+    STATE.queryMetadata = undefined;
+    STATE.selection = false;
+  }
 }
 
 const parsePredictions = async (response) => {
@@ -4511,9 +4501,8 @@ function allowedByList(result){
 const sendResult = (index, result, fromDBQuery) => {
   const model = result.model.includes('bats')  
   ? 'bats'
-  : ['birdnet', 'nocmig', 'chirpity', 'perch v2', 'user'].includes(result.model)
-    ? result.model
-    : 'custom';
+  : result.model;
+
   result.model = model.replace(' v2','');
 
   UI.postMessage({
@@ -5254,10 +5243,8 @@ async function onSetLocation({
         // Snap the file location to the highest priority existing location
         const {lat:overrideLat, lon:overrideLon, id:overrideID, place:overridePlace, radius:overrideRadius} = closest;
         lat = overrideLat, lon = overrideLon; id = overrideID; place = overridePlace; radius = overrideRadius;
-        console.info("Snapping to nearby location:", `${Math.round(closest.distance)} meters away`);
-      }
-      
-    } 
+      } 
+    }
   }
 
  if (id === null || id === undefined) {
