@@ -38,7 +38,6 @@ async function loadModel(mpath, backend, batchSize) {
     ...threadOptions,
     executionProviderConfig,
     executionMode: 'sequential',
-    freeDimensionOverrides,
     enableCpuMemArena: true,
     freeDimensionOverrides,
     preferredOutputLocation,

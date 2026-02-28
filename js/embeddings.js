@@ -30,18 +30,17 @@ async function createEmbeddingTable(db, path, dim){
   fd = fs.openSync(BIN_PATH, 'w')
 }
 async function storeEmbeddings({db, dbMutex, fileID, embeddings, keys}) {
-  if (embeddings.length !== keys.length) {
-    throw new Error('Embedding and key array mismatch');
+  const emLength = embeddings.length;
+  if ( ! emLength || emLength !== keys.length) {
+    throw new Error('No Embeddings or Embeddings and key array mismatch:', emLength);
   }
-
   await dbMutex.lock();
-
   const initialSize = fs.fstatSync(fd).size;
   let currentIndex = Math.floor(initialSize / BYTES_PER_VECTOR);
   try {
     const placeholders = [];
     const values = [];
-    for (let i = 0; i < embeddings.length; i++) {
+    for (let i = 0; i < emLength; i++) {
         placeholders.push('(?, ?, ?)');
         values.push(
             fileID,
@@ -56,12 +55,12 @@ async function storeEmbeddings({db, dbMutex, fileID, embeddings, keys}) {
       VALUES ${placeholders.join(',')}
     `;
     const result = await db.runAsync(sql, ...values);
-    if (result.changes !== embeddings.length){
+    if (result.changes !== emLength){
         await db.runAsync('ROLLBACK');
         return
     }
-    for (let i = 0; i < embeddings.length; i++) {
-        const vector = embeddings[i];  // Float32Array length = DIM
+    for (let i = 0; i < emLength; i++) {
+        const vector = embeddings[i];
         const offset = keys[i];
 
         if (vector.length !== DIM) {

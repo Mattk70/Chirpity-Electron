@@ -3539,6 +3539,9 @@ const parsePredictions = async (response) => {
   if (STATE.queryMetadata){
     if (!embeddingsBatch?.length) {
       predictionsReceived[file]++;
+      if (predictionsReceived[file] >= (batchesToSend[file] || 1)) {
+        updateFilesBeingProcessed(file);
+      }
       return worker;
     }
     await prepareQuery(embeddingsBatch[0]);
