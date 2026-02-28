@@ -100,7 +100,9 @@ const GLOBAL_ACTIONS = {
   c: (e) => {
     const selection = window.getSelection().toString();
     if (selection) {
-      navigator.clipboard.writeText(selection);
+      navigator.clipboard.writeText(selection).catch((err) => {
+        console.warn("Clipboard write failed:", err)
+      })
       return
     }
     (e.ctrlKey || e.metaKey) && STATE.fileLoaded && spec.centreSpec()},
@@ -2624,7 +2626,7 @@ const setUpWorkerMessaging = () => {
           generateToast({
             type: "error",
             message: "badMessage",
-            variables: { event: args.message },
+            variables: { event: args.event ?? args.message ?? "unknown" },
           });
         }
       }
@@ -4169,7 +4171,7 @@ async function renderResult({
             <td class="label ${hide}">${labelHTML}</td>
             <td class="comment text-end ${hide}">${commentHTML}</td>
             <td class="reviewed text-end ${hide}">${reviewHTML}</td>
-            <td class="text-end"><img class="model-logo" src="img/icon/${logo}_logo.png" title="${modelName}" alt="${model}"></td>
+            <td class="text-end"><img class="model-logo" src="img/icon/${logo}_logo.png" title="${modelName}" alt="${modelName}"></td>
             </tr>`;
   }
   updateResultTable(tr, isFromDB, selection);
