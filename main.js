@@ -1,3 +1,4 @@
+
 const fs = require("node:fs");
 const path = require("node:path");
 const isMac = process.platform === "darwin"; // macOS check
@@ -11,12 +12,17 @@ const {
   BrowserWindow,
   powerSaveBlocker,
 } = require("electron");
+console.log('platform', process.platform)
 app.commandLine.appendSwitch("disable-renderer-backgrounding");
 app.commandLine.appendSwitch("force-high-performance-gpu");
 app.commandLine.appendSwitch("xdg-portal-required-version", "4");
-// WebGPU flags needed for Linux
-app.commandLine.appendSwitch("enable-unsafe-webgpu");
-app.commandLine.appendSwitch("enable-features", "Vulkan");
+
+const isX11 = process.platform === 'linux' && !!process.env.DISPLAY && !process.env.WAYLAND_DISPLAY;
+if (isX11) {
+  // WebGPU flags needed for Linux
+  app.commandLine.appendSwitch("enable-unsafe-webgpu");
+  app.commandLine.appendSwitch("enable-features", "Vulkan");
+}
 process.env["TF_ENABLE_ONEDNN_OPTS"] = "1";
 
 // Set the AppUserModelID (to prevent the two pinned icons bug)
