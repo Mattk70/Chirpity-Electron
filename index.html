@@ -510,7 +510,7 @@
     <!-- Find similar Modal -->
     <div class="modal fade" id="query-modal" tabindex="-1" aria-labelledby="queryModalLabel" aria-modal="true">
         <form id="queryForm">
-            <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-dialog modal-dialog-centered ">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title" id="queryModalLabel">Find Similar Sounds</h5>
@@ -528,9 +528,14 @@
                                 <input type="text" pattern="^[^,_~]+$" title="Commas, underscores and tildes are not allowed" class="form-control" id="snameInput" name="snameInput" required>
                                 <label for="snameInput">Scientific name</label>
                             </div>
-                            <div class="mb-3 form-floating">
-                                <input type="number" class="form-control" id="maxResults" name="maxResults" min="1" max="5000" value="10">
-                                <label for="maxResults">Maximum results</label>
+                            <div class="mb-3 input-group">
+                                <label class="input-group-text w-50" for="maxResults" id="query-limit">Limit</label>
+                                <input type="number" class="form-control" id="maxResults" name="maxResults" min="1" max="5000" value="10" required>
+                            </div>
+                            <div class="mb-3 input-group">
+                                <label class="input-group-text w-50" for="similarity-threshold" id="query-threshold">Threshold</label>
+                                <input type="number" class="form-control" id="similarity-threshold" name="similarity-threshold" min="1" max="100" value="75">
+                                <span class="input-group-text">%</span>
                             </div>
                         </fieldset>
                     </div>

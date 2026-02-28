@@ -1734,27 +1734,27 @@ const resetEmbeddings = async () =>{
   const dim = STATE.model === 'perch v2' ? 1536 : 1024;
   await createEmbeddingTable(memoryDB, tempPath, dim);
 }
-async function getEmbedding({file,cname, sname, max, queryRegion }){
-const row = await STATE.db.getAsync(
-  `INSERT INTO species (sname, cname, modelID, classIndex)
-   VALUES (
-     ?, ?, ?,
-     COALESCE(
-       (SELECT MAX(classIndex) + 1 FROM species WHERE modelID = ?),
-       0
-     )
-   )
-   ON CONFLICT(modelID, sname, cname)
-   DO UPDATE SET
-     sname = excluded.sname
-   RETURNING id`,
-  sname,
-  cname,
-  0,   // modelID
-  0    // modelID again for subquery
-);
+async function getEmbedding({file,cname, sname, max, threshold, queryRegion }){
+  const row = await STATE.db.getAsync(
+    `INSERT INTO species (sname, cname, modelID, classIndex)
+    VALUES (
+      ?, ?, ?,
+      COALESCE(
+        (SELECT MAX(classIndex) + 1 FROM species WHERE modelID = ?),
+        0
+      )
+    )
+    ON CONFLICT(modelID, sname, cname)
+    DO UPDATE SET
+      sname = excluded.sname
+    RETURNING id`,
+    sname,
+    cname,
+    0,   // modelID
+    0    // modelID again for subquery
+  );
   const id = row?.id;
-  STATE.queryMetadata = {cname, sname, max, id};
+  STATE.queryMetadata = {cname, sname, threshold, max, id};
   if (!STATE.speciesMap.has(0)) {
       STATE.speciesMap.set(0, new Map());
   }
@@ -2273,6 +2273,7 @@ async function sendDetections(file, start, end, goToRegion) {
                 name,
                 position * 1000 + f.filestart as timestamp,
                 speciesID,
+                r.modelID,
                 classIndex
             FROM records r
             JOIN species s ON speciesID = s.ID
@@ -2282,7 +2283,7 @@ async function sendDetections(file, start, end, goToRegion) {
             AND start BETWEEN ? AND ?
             ${includedSQL}
         )
-        SELECT start, end, cname, score, timestamp
+        SELECT start, end, cname, score, timestamp, modelID
         FROM RankedRecords
         WHERE rank <= ${detect.topRankin}
         `;
@@ -2976,6 +2977,7 @@ const bufferToAudio = async ({
   folder = undefined,
   filename = undefined
 }) => {
+  if (fs.existsSync(filename)) return; // Don't overwrite existing files
   if (!fs.existsSync(file)) {
     const found = await getWorkingFile(file);
     if (!found) return;
@@ -3505,8 +3507,8 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
 };
 
 async function prepareQuery(query){
-  const {cname, max} = STATE.queryMetadata;
-  const matches = await queryEmbeddings(memoryDB, query, max);
+  const {cname, max, threshold} = STATE.queryMetadata;
+  const matches = await queryEmbeddings(memoryDB, query, max, threshold);
   for (let i = 0; i < matches.length; i++){
     const [fileID, offset, score] = matches[i];
     const row = await STATE.db.getAsync(
@@ -4508,9 +4510,8 @@ function allowedByList(result){
 const sendResult = (index, result, fromDBQuery) => {
   const model = result.model.includes('bats')  
   ? 'bats'
-  : ['birdnet', 'nocmig', 'chirpity', 'perch v2', 'user'].includes(result.model)
-    ? result.model
-    : 'custom';
+  : result.model;
+
   result.model = model.replace(' v2','');
 
   UI.postMessage({

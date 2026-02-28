@@ -88,8 +88,10 @@ async function storeEmbeddings({db, dbMutex, fileID, embeddings, keys}) {
   }
 }
 
-function searchTopN(query, embeddings, N) {
+function searchTopN(query, embeddings, N, minScore) {
   if (!Number.isInteger(N) || N < 1) return [];
+  if (!minScore || isNaN(minScore)) minScore = 0;
+  else minScore /= 100; // Percent to fraction
   const top = [];
   const totalVectors = embeddings.byteLength / BYTES_PER_VECTOR;
   for (let i = 0; i < totalVectors; i++) {
@@ -99,6 +101,8 @@ function searchTopN(query, embeddings, N) {
     for (let d = 0; d < DIM; d++) {
       dot += query[d] * embeddings[base + d];
     }
+    // Skip anything below threshold
+    if (dot < minScore) continue;
 
     if (top.length < N) {
       top.push({ index: i, score: dot });
@@ -117,7 +121,7 @@ function searchTopN(query, embeddings, N) {
 
 
 
-async function queryEmbeddings(db, query, N){
+async function queryEmbeddings(db, query, N, threshold){
   if (!BIN_PATH || !fs.existsSync(BIN_PATH)) {
       return [];
    }
@@ -136,7 +140,7 @@ async function queryEmbeddings(db, query, N){
       const {vectorIndex, fileID, offset} = row;
       vectorMeta[vectorIndex] = {fileID, offset};
   }
-  const result = searchTopN(query, embeddings, N)
+  const result = searchTopN(query, embeddings, N, threshold)
   const matches = result
     .filter(r => vectorMeta[r.index] != null)
     .map(r => [vectorMeta[r.index].fileID, vectorMeta[r.index].offset , r.score])

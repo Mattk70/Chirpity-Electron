@@ -268,8 +268,13 @@ ul {
   color: coral;
 }
 
-.unlocked {
+.trial {
   color: greenyellow;
+}
+
+.unlocked {
+  
+  display: none;
 }
 
 .table {
@@ -282,6 +287,15 @@ ul {
 :not(input):not(textarea)::before {
   user-select: none;
   /*cursor: default; */
+}
+
+#summary td.cname, #summary td.cname *  {
+  user-select: text;
+}
+
+td.cname ::selection {
+  background: #555;
+  color: inherit;
 }
 
 .chart-outer {

@@ -33,6 +33,18 @@ function syncConfig(config, defaultConfig) {
   });
 }
 
+/**
+ * 
+ * @param {*} str 
+ * @returns {string} An escaped string suitable for insertion in HTML attributes
+ */
+const escapeHTML = str => str
+  .replace(/&/g, "&amp;")
+  .replace(/</g, "&lt;")
+  .replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;")
+  .replace(/'/g, "&#39;");
+
 function hexToRgb(hex) {
   // Remove the '#' character if present
   hex = hex.replace(/^#/, "");
@@ -285,6 +297,7 @@ function shuffle(array) {
 }
 
 export {
+  escapeHTML,
   syncConfig,
   hexToRgb,
   interpolate,
