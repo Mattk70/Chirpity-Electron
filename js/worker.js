@@ -2977,7 +2977,8 @@ const bufferToAudio = async ({
   folder = undefined,
   filename = undefined
 }) => {
-  if (fs.existsSync(filename)) return; // Don't overwrite existing files
+  const destination = p.join(folder || tempPath, filename);
+  if (fs.existsSync(destination)) return; // Don't overwrite existing files
   if (!fs.existsSync(file)) {
     const found = await getWorkingFile(file);
     if (!found) return;
@@ -3034,7 +3035,7 @@ const bufferToAudio = async ({
       metadata: meta,
       additionalFilters: filters
     }).then(command => {
-    const destination = p.join(folder || tempPath, filename);
+    
 
     command.on("codecData", async function (data) {
       const channelStr = data.audio_details?.[2]?.toLowerCase() ?? '';

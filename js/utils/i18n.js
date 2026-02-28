@@ -1201,7 +1201,7 @@ const Context = {
         lastNight: 'Last Night', thisWeek: 'This Week', lastWeek: 'LastWeek', thisMonth: 'This Month', lastMonth: 'Last Month', thisYear: 'This Year', lastYear: 'Last Year',
         midnight: "Midnight", noon: 'Noon', one: 'day', other: 'days',
         apply: 'Apply', cancel: 'Cancel', filter: 'Apply a date Filter',
-        'nocturnal flight call': 'Nocturnal Flight Call', 'flight call': 'Flight Call', call: 'Call', song: 'Song', other: "Other",
+        'nocturnal flight call': 'Nocturnal Flight Call', 'flight call': 'Flight Call', call: 'Call', song: 'Song',
         ecolocation: 'Echolocation', 'feeding buzz': 'Feeding Buzz', 'distress call': 'Distress Call', 'social call': 'Social Call',
         play: 'Play',
         pause: 'Pause',

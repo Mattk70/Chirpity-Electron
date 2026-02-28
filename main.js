@@ -12,7 +12,6 @@ const {
   BrowserWindow,
   powerSaveBlocker,
 } = require("electron");
-console.log('platform', process.platform)
 app.commandLine.appendSwitch("disable-renderer-backgrounding");
 app.commandLine.appendSwitch("force-high-performance-gpu");
 app.commandLine.appendSwitch("xdg-portal-required-version", "4");
