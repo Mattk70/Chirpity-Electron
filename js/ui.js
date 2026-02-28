@@ -5751,7 +5751,7 @@ async function handleUIClicks(e) {
       config.selectedModel ===  model && (config.selectedModel = 'birdnet');
       updateModelOptions();
       const modelSelect = document.getElementById("model-to-use");
-+      [...modelSelect.options].find((opt) => opt.value === model)?.remove();
+      [...modelSelect.options].find((opt) => opt.value === model)?.remove();
       updatePrefs('config.json', config);
       break;
     }
