@@ -34,7 +34,6 @@ async function storeEmbeddings({db, dbMutex, fileID, embeddings, keys}) {
   if ( ! emLength || emLength !== keys.length) {
     throw new Error('No Embeddings or Embeddings and key array mismatch:', emLength);
   }
-  await dbMutex.lock();
   const initialSize = fs.fstatSync(fd).size;
   let currentIndex = Math.floor(initialSize / BYTES_PER_VECTOR);
   try {
@@ -48,6 +47,7 @@ async function storeEmbeddings({db, dbMutex, fileID, embeddings, keys}) {
             currentIndex + i
         );
     }
+    await dbMutex.lock();
     await db.runAsync('BEGIN');
     const sql = `
       INSERT OR IGNORE INTO embeddings
