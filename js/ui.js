@@ -5750,7 +5750,8 @@ async function handleUIClicks(e) {
       delete config.models[model];
       config.selectedModel ===  model && (config.selectedModel = 'birdnet');
       updateModelOptions();
-      document.querySelector(`#model-to-use option[value="${utils.escapeHTML(model)}"]`)?.remove();
+      const modelSelect = document.getElementById("model-to-use");
++      [...modelSelect.options].find((opt) => opt.value === model)?.remove();
       updatePrefs('config.json', config);
       break;
     }
