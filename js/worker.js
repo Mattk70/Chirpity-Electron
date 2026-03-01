@@ -2706,13 +2706,11 @@ const getPredictBuffers = async ({ file = "", start = 0, end = undefined }) => {
     samplesInBatch = samplesInWindow * BATCH_SIZE;
   }
   const highWaterMark = samplesInBatch * 2;
-  let chunkStart = start * sampleRate;
-
+  
   await processAudio(
     file,
     start,
     end,
-    chunkStart,
     highWaterMark,
     samplesInBatch
   );

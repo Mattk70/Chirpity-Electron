@@ -161,23 +161,12 @@ class BirdNETModel extends BaseModel {
     this.chunkLength = this.config.sampleRate * this.config.specLength;
   }
 
-  async predictChunk(audioBuffer, start, embeddings = false) {
+  async predictChunk(audioBuffer, start) {
     DEBUG && console.log("predictChunk begin", tf.memory().numTensors);
     const audioBatch = this.createAudioTensorBatch(audioBuffer);
     const maxKeys = Math.ceil(audioBuffer.length / this.chunkLength)
     const batchKeys = this.getKeys(maxKeys, start);
-    let result;
-    if (embeddings){
-      result = await this.getEmbeddings(
-        audioBatch,
-        batchKeys
-      );
-    } else {
-      result = await this.predictBatch(
-        audioBatch,
-        batchKeys
-      );
-    }
+    const result = await this.predictBatch(audioBatch, batchKeys );
     DEBUG && console.log("predictChunk end", tf.memory().numTensors);
     return result;
   }
