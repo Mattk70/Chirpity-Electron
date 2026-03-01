@@ -198,7 +198,7 @@ class PredictionWritable extends Writable {
   }
 }
 
-function createMultiWorkerQueue(workers, { timeoutMs = 30000 } = {}) {
+function createMultiWorkerQueue(workers, { timeoutMs = 60_000 } = {}) {
   let nextId = 1;
   let nextWorker = 0;
 
@@ -2735,7 +2735,6 @@ async function processAudio(
   file,
   start,
   endTime,
-  chunkStart,
   highWaterMark,
   samplesInBatch
 ) {
@@ -2749,9 +2748,7 @@ async function processAudio(
     }
   const additionalFilters = STATE.filters.sendToModel ? setAudioFilters() : [];
   const command = await setupFfmpegCommand({ file, start, end:endTime, sampleRate, additionalFilters, });
-
   const workerQueue = STATE.workerQueue;
-
   const sendToModel = createPredictSender(workerQueue);
   
   const predictionWritable = new PredictionWritable(sendToModel, {
@@ -2806,17 +2803,6 @@ function getMonoChannelData(audio) {
   return out;
 }
 
-function prepareWavForModel(audio, file, end, chunkStart, writable) {
-  predictionsRequested[file]++;
-  const channelData = getMonoChannelData(audio);
-
-  writable.write({
-    channelData,
-    chunkStart,
-    file,
-    end
-  });
-}
 
 /**
  * Called when file first loaded, when result clicked and when saving or sending file snippets
@@ -2865,7 +2851,7 @@ const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sam
       channels: 1,
       additionalFilters,
     }).then(command => {
-const stream = command.pipe();
+    const stream = command.pipe();
     let concatenatedBuffer = Buffer.alloc(0);
 
     command.on("error", (error) => {
@@ -2892,8 +2878,6 @@ const stream = command.pipe();
       }
     });
     })
-
-    
   });
 };
 
@@ -3176,12 +3160,12 @@ function spawnPredictWorkers(model, batchSize, toSpawn) {
   } else if (STATE.perchWorker.length) {
     predictWorkers = predictWorkers.filter(w => w.name !== 'perch v2');
   }
+  
   for (let i = 0; i < toSpawn; i++) {
     if (isPerch && i > 0) break; // Perch v2 only needs one worker, even if multiple threads requested
     const workerSrc = ['nocmig', 'chirpity', 'perch v2'].includes(model) ? model : "BirdNet2.4";
     const worker = new Worker(`./js/models/${workerSrc}.js`, { type: "module" });
 
-    worker.isReady = false;
     worker.name = model;
     predictWorkers.push(worker);
     DEBUG && console.log("loading a worker");
@@ -3756,7 +3740,6 @@ async function parseMessage(e) {
     case "model-error": {
       if (!SEEN_MODEL_READY) {
         SEEN_MODEL_READY = true;
-
         const error = response.error || new Error("Unknown error");
 
         if (error.message === "Failed to fetch") {
