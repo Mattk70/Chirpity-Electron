@@ -2749,14 +2749,13 @@ async function processAudio(
     }
   const additionalFilters = STATE.filters.sendToModel ? setAudioFilters() : [];
   const command = await setupFfmpegCommand({ file, start, end:endTime, sampleRate, additionalFilters, });
-  const ffmpegStream = command.pipe();
 
   const workerQueue = STATE.workerQueue;
 
   const sendToModel = createPredictSender(workerQueue);
   
   const predictionWritable = new PredictionWritable(sendToModel, {
-    concurrency: predictWorkers.length * 2
+    concurrency: 6
   });
 
   const chunker = new PCMChunker({
@@ -2770,7 +2769,7 @@ async function processAudio(
   });
 
   await pipeline(
-    ffmpegStream,   // ffmpeg stdout
+    command.pipe(),   // ffmpeg stdout
     chunker,          // PCM → channelData objects
     predictionWritable
   );
