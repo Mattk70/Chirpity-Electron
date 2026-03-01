@@ -205,8 +205,14 @@ function createMultiWorkerQueue(workers, { timeoutMs = 60_000 } = {}) {
   const pending = new Map();
 
   workers.forEach((worker, index) => {
+    const fallbackOnMessage = worker.onmessage;
+    const fallbackOnError = worker.onerror;
     worker.onmessage = (e) => {
-      const { id, result, error } = e.data;
+      const { id, result, error, message } = e.data || {};
+      if (message !== "prediction" || id == null) {
+        fallbackOnMessage?.(e);
+        return;
+      }
       const entry = pending.get(id);
       if (!entry) return;
 
@@ -221,6 +227,7 @@ function createMultiWorkerQueue(workers, { timeoutMs = 60_000 } = {}) {
     };
 
     worker.onerror = (err) => {
+      fallbackOnError?.(err);
       for (const { reject, timeout } of pending.values()) {
         clearTimeout(timeout);
         reject(err);
@@ -236,11 +243,15 @@ function createMultiWorkerQueue(workers, { timeoutMs = 60_000 } = {}) {
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
+        const entry = pending.get(id);
+        if (!entry) return;
         pending.delete(id);
-        reject(new Error("Worker timeout"));
+        // Mark this chunk as completed with empty output so file progress can advance.
+        parsePredictions({ file: payload.file, worker: workerIndex, result: [] }).catch(() => {});
+        entry.reject(new Error("Worker timeout"));
       }, timeoutMs);
 
-      pending.set(id, { resolve, reject, timeout });
+      pending.set(id, { resolve, reject, timeout, file: payload.file, workerIndex });
 
       workers[workerIndex].postMessage(
         { ...payload, worker: workerIndex, id },
@@ -2736,11 +2747,11 @@ async function processAudio(
   highWaterMark,
   samplesInBatch
 ) {
-  let remainingTrim;
+  let remainingTrimSeconds = 0;
   if (!(file.toLowerCase().endsWith(".wav") || file.toLowerCase().endsWith(".flac"))) { 
     const adjustment = 0.05; 
     if (start >= adjustment) {
-       remainingTrim = sampleRate * 2 * adjustment;
+       remainingTrimSeconds = adjustment;
        start -= adjustment; 
       } 
     }
@@ -2757,10 +2768,10 @@ async function processAudio(
     highWaterMarkBytes: highWaterMark,
     samplesInBatch,
     sampleRate,
-    startTime: start,
+    startTime: Math.round(start * sampleRate),
     file,
     endTime,
-    trimSeconds: remainingTrim
+    trimSeconds: remainingTrimSeconds
   });
 
   await pipeline(
@@ -3182,7 +3193,7 @@ function spawnPredictWorkers(model, batchSize, toSpawn) {
     // Web worker message event handler
     worker.onmessage = async (msg) => {
       await parseMessage(msg).catch((error) => {
-        console.warn("Parse message error", error, "message was", message);
+        console.warn("Parse message error", error, "message was", msg);
       });
     };
     worker.onerror = (e) => {
