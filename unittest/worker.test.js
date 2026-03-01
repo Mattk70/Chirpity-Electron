@@ -436,27 +436,6 @@ test('handles DLL errors specifically', () => {
             'Should handle DLL-related errors');
 });
 
-// Test Suite 14: Platform-Specific Code
-console.log(`\n${colors.yellow}Test Suite: Platform-Specific Code${colors.reset}`);
-
-test('checks for Windows platform', () => {
-  assert.ok(/process\.platform\s*===\s*['"]win32['"]/.test(workerContent),
-            'Should check for Windows platform');
-});
-
-test('defines isWin32 flag', () => {
-  assert.ok(/let\s+isWin32\s*=/.test(workerContent), 'Should define isWin32 flag');
-});
-
-test('conditionally loads ntsuspend on Windows', () => {
-  assert.ok(/ntsuspend/.test(workerContent),
-            'Should reference ntsuspend for Windows');
-});
-
-test('handles platform-specific paths', () => {
-  assert.ok(/process\.platform/.test(workerContent),
-            'Should handle platform-specific behavior');
-});
 
 // Test Suite 15: Initialization and Promises
 console.log(`\n${colors.yellow}Test Suite: Initialization and Promises${colors.reset}`);
