@@ -29,16 +29,242 @@ import {
 import {createEmbeddingTable, storeEmbeddings, queryEmbeddings} from './embeddings.js';
 import { customURLEncode, installConsoleTracking, trackEvent as _trackEvent } from "./utils/tracking.js";
 import { onChartRequest, getIncludedLocations }  from "./components/charts.js";
+const { Transform, Writable  } = require("stream");
+const { pipeline } = require("stream/promises");
 
-let isWin32 = false;
+class PCMChunker extends Transform {
+  constructor({
+    highWaterMarkBytes,
+    sampleRate,
+    startTime = 0,
+    file,
+    endTime,
+    trimSeconds = 0
+  }) {
+    super({ readableObjectMode: true });
+
+    this.file = file;
+    this.endTime = endTime;
+    this.sampleRate = sampleRate;
+
+    this.bytesPerSecond = 2 * sampleRate; // 16-bit mono
+    this.frameSize = highWaterMarkBytes;
+
+    this.buffer = Buffer.alloc(this.frameSize);
+    this.bufferIndex = 0;
+
+    // ✅ Single source of truth
+    this.totalSamples = startTime;
+
+    this.remainingTrim = trimSeconds > 0
+      ? Math.floor(this.bytesPerSecond * trimSeconds)
+      : 0;
+  }
+
+  _transform(chunk, _, callback) {
+    try {
+      if (this.remainingTrim > 0) {
+        if (chunk.length <= this.remainingTrim) {
+          this.remainingTrim -= chunk.length;
+          return callback();
+        } else {
+          chunk = chunk.subarray(this.remainingTrim);
+          this.remainingTrim = 0;
+        }
+      }
+
+      let offset = 0;
+
+      while (offset < chunk.length) {
+        const remainingSpace = this.frameSize - this.bufferIndex;
+        const toCopy = Math.min(
+          remainingSpace,
+          chunk.length - offset
+        );
+
+        chunk.copy(
+          this.buffer,
+          this.bufferIndex,
+          offset,
+          offset + toCopy
+        );
+
+        this.bufferIndex += toCopy;
+        offset += toCopy;
+
+        if (this.bufferIndex === this.frameSize) {
+          const channelData = getMonoChannelData(
+            this.buffer.subarray(0, this.frameSize)
+          );
+
+          const samplesInFrame = this.frameSize / 2;
+
+          const job = {
+            channelData,
+            chunkStart: this.totalSamples,
+            file: this.file,
+            endTime: this.endTime
+          };
+
+          this.totalSamples += samplesInFrame;
+          this.bufferIndex = 0;
+
+          this.push(job)
+        }
+      }
+
+      callback();
+    } catch (err) {
+      callback(err);
+    }
+  }
+
+  _flush(callback) {
+    try {
+      if (this.bufferIndex > 0) {
+        const channelData = getMonoChannelData(
+          this.buffer.subarray(0, this.bufferIndex)
+        );
+
+        const samplesInFrame = this.bufferIndex / 2;
+
+        this.push({
+          channelData,
+          chunkStart: this.totalSamples,
+          file: this.file,
+          endTime: this.endTime
+        });
+
+        this.totalSamples += samplesInFrame;
+      }
+
+      callback();
+    } catch (err) {
+      callback(err);
+    }
+  }
+}
+
+class PredictionWritable extends Writable {
+  constructor(sendToModel, { concurrency = 6 }) {
+    super({ objectMode: true });
+
+    this.sendToModel = sendToModel;
+    this.concurrency = concurrency;
+
+    this.inFlight = 0;
+    this.queue = [];
+    this.finalCallback = null;
+  }
+
+  _write(chunk, _, callback) {
+    if (this.inFlight >= this.concurrency) {
+      // Queue chunk until capacity frees
+      this.queue.push({ chunk, callback });
+      return;
+    }
+
+    this._dispatch(chunk);
+    callback(); // Allow stream to continue immediately
+  }
+
+  _dispatch(chunk) {
+    this.inFlight++;
+
+    const { channelData, chunkStart, file, endTime } = chunk;
+
+    this.sendToModel(channelData, chunkStart, file, endTime)
+      .catch((e) => {console.warn('Error in sendtomodel', e)})
+      .finally(() => {
+        this.inFlight--;
+
+        if (this.queue.length > 0) {
+          const { chunk, callback } = this.queue.shift();
+          this._dispatch(chunk);
+          callback();
+        } else if (this.inFlight === 0 && this.finalCallback) {
+          STATE.lastChunks = true;
+          this.finalCallback();
+        }
+      });
+  }
+
+  _final(callback) {
+    if (this.inFlight === 0) {
+      callback();
+    } else {
+      this.finalCallback = callback;
+    }
+  }
+}
+
+function createMultiWorkerQueue(workers, { timeoutMs = 60_000 } = {}) {
+  let nextId = 1;
+  let nextWorker = 0;
+
+  const pending = new Map();
+
+  workers.forEach((worker, index) => {
+    const fallbackOnMessage = worker.onmessage;
+    const fallbackOnError = worker.onerror;
+    worker.onmessage = (e) => {
+      const { id, result, error, message } = e.data || {};
+      if (message !== "prediction" || id == null) {
+        fallbackOnMessage?.(e);
+        return;
+      }
+      const entry = pending.get(id);
+      if (!entry) return;
+
+      clearTimeout(entry.timeout);
+      pending.delete(id);
+
+      if (error) entry.reject(new Error(error));
+      else {
+        parsePredictions(e.data)
+        entry.resolve(result);
+      }
+    };
+
+    worker.onerror = (err) => {
+      fallbackOnError?.(err);
+      for (const { reject, timeout } of pending.values()) {
+        clearTimeout(timeout);
+        reject(err);
+      }
+      pending.clear();
+    };
+  });
+
+  function send(payload, transfer = []) {
+    const id = nextId++;
+    const workerIndex = nextWorker;
+    nextWorker = (nextWorker + 1) % workers.length;
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        const entry = pending.get(id);
+        if (!entry) return;
+        pending.delete(id);
+        // Mark this chunk as completed with empty output so file progress can advance.
+        parsePredictions({ file: payload.file, worker: workerIndex, result: [] }).catch(() => {});
+        entry.reject(new Error("Worker timeout"));
+      }, timeoutMs);
+
+      pending.set(id, { resolve, reject, timeout, file: payload.file, workerIndex });
+
+      workers[workerIndex].postMessage(
+        { ...payload, worker: workerIndex, id },
+        transfer
+      );
+    });
+  }
+
+  return { send };
+}
 
 const dbMutex = new Mutex();
 const DATASET = false;
-let ntsuspend;
-if (process.platform === "win32") {
-  ntsuspend = require("ntsuspend");
-  isWin32 = true;
-}
 
 let DEBUG;
 let SEEN_MODEL_READY = false;
@@ -148,7 +374,7 @@ const SUPPORTED_FILES = [
   ".mov",
 ];
 
-let NUM_WORKERS, AUDIO_BACKLOG;
+let NUM_WORKERS;
 let workerInstance = 0;
 let appPath,
   tempPath,
@@ -1772,6 +1998,7 @@ async function onAnalyse({
   STATE.corruptFiles = [];
   STATE.clippedBatches = 0;
   STATE.clippedFilesDuration = 0;
+  STATE.lastChunks = false;
   predictionStart = new Date();
   // Set the appropriate selection range if this is a selection analysis
   STATE.update({
@@ -1786,7 +2013,6 @@ async function onAnalyse({
   index = 0;
   batchesToSend = {};
   FILE_QUEUE = filesInScope;
-  AUDIO_BACKLOG = 0;
   STATE.processingPaused = {};
   STATE.backlogInterval = {};
   t0_analysis = Date.now();
@@ -1854,6 +2080,9 @@ async function onAnalyse({
   }
 
   filesBeingProcessed = [...FILE_QUEUE];
+  STATE.workerQueue = createMultiWorkerQueue(predictWorkers, {
+    timeoutMs: 30000
+  });
   for (let i = 0; i < NUM_WORKERS; i++) {
     processNextFile({ start, end, worker: i });
   }
@@ -1874,7 +2103,6 @@ function onAbort({ model = STATE.model }) {
     backend: STATE.detect.backend}));
   aborted = true;
   FILE_QUEUE = [];
-  predictQueue = [];
   filesBeingProcessed = [];
   predictionsReceived = {};
   predictionsRequested = {};
@@ -2453,42 +2681,6 @@ const setMetadata = async ({ file, source_file = file }) => {
 };
 
 
-function pauseFfmpeg(ffmpegCommand, pid) {
-  if (!STATE.processingPaused[pid]) {
-    if (isWin32) {
-      const message = pid
-        ? ntsuspend.suspend(pid)
-          ? "Ffmpeg process paused"
-          : "Could not pause process"
-        : "Could not pause process (exited)";
-      DEBUG && console.log(message);
-    } else {
-      ffmpegCommand.kill("SIGSTOP");
-      DEBUG && console.log("paused ", pid);
-    }
-    STATE.processingPaused[pid] = true;
-  }
-}
-
-function resumeFfmpeg(ffmpegCommand, pid) {
-  if (STATE.processingPaused[pid]) {
-    if (isWin32) {
-      const message = pid
-        ? ntsuspend.resume(pid)
-          ? "Ffmpeg process resumed"
-          : `Could not resume process ${pid}`
-        : "Could not resume process (exited)";
-      DEBUG && console.log(message);
-    } else {
-      ffmpegCommand.kill("SIGCONT");
-      DEBUG && console.log("resumed ", pid);
-    }
-    STATE.processingPaused[pid] = false;
-  }
-}
-
-let predictQueue = [];
-
 const getPredictBuffers = async ({ file = "", start = 0, end = undefined }) => {
   if (!fs.existsSync(file)) {
     const found = await getWorkingFile(file);
@@ -2525,13 +2717,11 @@ const getPredictBuffers = async ({ file = "", start = 0, end = undefined }) => {
     samplesInBatch = samplesInWindow * BATCH_SIZE;
   }
   const highWaterMark = samplesInBatch * 2;
-  let chunkStart = start * sampleRate;
-
+  
   await processAudio(
     file,
     start,
     end,
-    chunkStart,
     highWaterMark,
     samplesInBatch
   );
@@ -2553,164 +2743,44 @@ const getPredictBuffers = async ({ file = "", start = 0, end = undefined }) => {
 async function processAudio(
   file,
   start,
-  end,
-  chunkStart,
+  endTime,
   highWaterMark,
   samplesInBatch
 ) {
-  // Find a balance between performance and memory usage
-  const MAX_CHUNKS = Math.max(12, Math.min(NUM_WORKERS * 2, 36));
-  return new Promise((resolve, reject) => {
-    // Many compressed files start with a small section of silence due to encoder padding, which affects predictions
-    // To compensate, we move the start back a small amount, and slice the data to remove the silence
-    let remainingTrim;
-    if (!(file.toLowerCase().endsWith(".wav") || file.toLowerCase().endsWith(".flac"))) {
-      const adjustment = 0.05;
-      if (start >= adjustment) {
-        remainingTrim = sampleRate * 2 * adjustment;
-        start -= adjustment;
-      }
+  let remainingTrimSeconds = 0;
+  if (!(file.toLowerCase().endsWith(".wav") || file.toLowerCase().endsWith(".flac"))) { 
+    const adjustment = 0.05; 
+    if (start >= adjustment) {
+       remainingTrimSeconds = adjustment;
+       start -= adjustment; 
+      } 
     }
-    let currentIndex = 0,
-      duration = 0,
-      bytesPerSecond = 2 * sampleRate;
-    const audioBuffer = Buffer.allocUnsafe(highWaterMark);
-    const additionalFilters = STATE.filters.sendToModel
-      ? setAudioFilters()
-      : [];
-    setupFfmpegCommand({
-      file,
-      start,
-      end,
-      sampleRate,
-      additionalFilters,
-    }).then(command => {
-    command.on("error", (error) => {
-      if ((error.message === "Output stream closed") & !aborted) {
-        console.warn(`processAudio: ${file} ${error}`);
-      } else {
-        if (error.message.includes("SIGKILL"))
-          DEBUG && console.log("FFMPEG process shut down at user request");
-        reject(error);
-      }
-    });
+  const additionalFilters = STATE.filters.sendToModel ? setAudioFilters() : [];
+  const command = await setupFfmpegCommand({ file, start, end:endTime, sampleRate, additionalFilters, });
+  const workerQueue = STATE.workerQueue;
+  const sendToModel = createPredictSender(workerQueue);
+  
+  const predictionWritable = new PredictionWritable(sendToModel, {
+    concurrency: 6
+  });
 
-    const STREAM = command.pipe();
+  const chunker = new PCMChunker({
+    highWaterMarkBytes: highWaterMark,
+    samplesInBatch,
+    sampleRate,
+    startTime: Math.round(start * sampleRate),
+    file,
+    endTime,
+    trimSeconds: remainingTrimSeconds
+  });
 
-    STREAM.on("data", (chunk) => {
-      const pid = command.ffmpegProc?.pid;
-      duration += chunk.length / bytesPerSecond;
-      if (!STATE.processingPaused[pid] && AUDIO_BACKLOG >= MAX_CHUNKS) {
-      pauseFfmpeg(command, pid);
+  await pipeline(
+    command.pipe(),   // ffmpeg stdout
+    chunker,          // PCM → channelData objects
+    predictionWritable
+  );
 
-      // avoid creating multiple intervals for the same pid
-      if (STATE.backlogInterval[pid]) {
-        clearInterval(STATE.backlogInterval[pid]);
-      }
-
-      STATE.backlogInterval[pid] = setInterval(() => {
-        DEBUG && console.log(`[${pid}] backlog check: AUDIO_BACKLOG=${AUDIO_BACKLOG}`);
-
-        if (AUDIO_BACKLOG <= 4) {
-          DEBUG && console.log(`[${pid}] resuming ffmpeg (normal), backlog=${AUDIO_BACKLOG}`);
-          resumeFfmpeg(command, pid);
-          clearInterval(STATE.backlogInterval[pid]);
-          STATE.backlogInterval[pid] = null;
-          return;
-        }
-
-      }, 200); // 200ms interval
-    }
-
-      if (aborted) {
-        STREAM.destroy();
-        return;
-      }
-      if (remainingTrim) {
-        if (chunk.length <= remainingTrim) {
-          // Reduce the remaining trim by the chunk length and skip this chunk
-          remainingTrim -= chunk.length;
-          return; // Ignore this chunk and move to the next
-        } else {
-          // Trim the current chunk by the remaining amount
-          chunk = chunk.subarray(remainingTrim, highWaterMark);
-          remainingTrim = 0; // Reset the remainder after trimming
-        }
-      }
-      // Copy incoming chunk into the audioBuffer
-      const remainingSpace = highWaterMark - currentIndex;
-      if (chunk.length <= remainingSpace) {
-        chunk.copy(audioBuffer, currentIndex);
-        currentIndex += chunk.length;
-      } else {
-        // Fill remaining space
-        chunk.copy(audioBuffer, currentIndex);
-        // Process full buffer
-        AUDIO_BACKLOG++;
-        prepareWavForModel(
-          audioBuffer.subarray(0, highWaterMark),
-          file,
-          end,
-          chunkStart
-        );
-        feedChunksToModel(...predictQueue.shift());
-        chunkStart += samplesInBatch;
-
-        // Handle the remainder
-        const remainder = chunk.subarray(highWaterMark - currentIndex);
-        remainder.copy(audioBuffer, 0);
-        currentIndex = remainder.length; // Reset index for the new chunk
-      }
-
-      // If we have filled the buffer completely
-      if (currentIndex === highWaterMark) {
-        AUDIO_BACKLOG++;
-        prepareWavForModel(audioBuffer, file, end, chunkStart);
-        feedChunksToModel(...predictQueue.shift());
-        chunkStart += samplesInBatch;
-        currentIndex = 0; // Reset index for the next fill
-      }
-    });
-    STREAM.on("end", () => {
-      const metaDuration = METADATA[file].duration;
-      if (start === 0 && end === metaDuration && isFinite(duration) && duration + EPSILON < metaDuration) {
-        // If we have a short file (header duration > processed duration)
-        // *and* were looking for the whole file, we'll fix # of expected chunks here
-        batchesToSend[file] = Math.ceil(
-          (duration - EPSILON) / (BATCH_SIZE * WINDOW_SIZE)
-        );
-
-        const diff = Math.abs(metaDuration - duration);
-        if (diff > 3) {
-          if (fs.existsSync(file)) console.warn("File duration mismatch", diff)
-          else console.warn("File duration mismatch", "File missing");
-        }
-
-        METADATA[file].duration = duration;
-      }
-      // Handle any remaining data in the buffer
-      if (currentIndex > 0) {
-        // Check if there's any data left in the buffer
-        AUDIO_BACKLOG++;
-        prepareWavForModel(
-          audioBuffer.subarray(0, currentIndex),
-          file,
-          end,
-          chunkStart
-        );
-        feedChunksToModel(...predictQueue.shift());
-      }
-      DEBUG && console.log("All chunks sent for ", file);
-      return resolve();
-    });
-
-    STREAM.on("error", (err) => {
-      DEBUG && console.log("stream error: ", err);
-      err.code === "ENOENT" && notifyMissingFile(file);
-    });      
-  })
-
-  }).catch((error) => console.error(error));
+  DEBUG && console.log("All chunks processed for", file);
 }
 
 function getMonoChannelData(audio) {
@@ -2742,12 +2812,6 @@ function getMonoChannelData(audio) {
   return out;
 }
 
-function prepareWavForModel(audio, file, end, chunkStart) {
-  predictionsRequested[file]++;
-  const channelData = getMonoChannelData(audio);
-  // Send the channel data to the model
-  predictQueue.push([channelData, chunkStart, file, end]);
-}
 
 /**
  * Called when file first loaded, when result clicked and when saving or sending file snippets
@@ -2796,7 +2860,7 @@ const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sam
       channels: 1,
       additionalFilters,
     }).then(command => {
-const stream = command.pipe();
+    const stream = command.pipe();
     let concatenatedBuffer = Buffer.alloc(0);
 
     command.on("error", (error) => {
@@ -2823,8 +2887,6 @@ const stream = command.pipe();
       }
     });
     })
-
-    
   });
 };
 
@@ -2906,25 +2968,22 @@ function isDuringDaylight(datetime, lat, lon) {
   return datetime >= dawn && datetime <= dusk;
 }
 
-async function feedChunksToModel(channelData, chunkStart, file, end) {
-  // pick a worker - this round robin method is faster than looking for available workers
-  if (++workerInstance >= predictWorkers.length) workerInstance = 0;
-  const worker = workerInstance;
-  predictWorkers[worker].isAvailable = false;
-  const objData = {
-    message: "predict",
-    worker: worker,
-    fileStart: METADATA[file].fileStart,
-    file: file,
-    start: chunkStart,
-    duration: end,
-    resetResults: !STATE.selection,
-    context: STATE.detect.contextAware,
-    confidence: STATE.detect.confidence,
-    chunks: channelData,
+function createPredictSender(workerQueue) {
+  return function sendToModel(channelData, chunkStart, file, endTime) {
+    const payload = {
+      message: "predict",
+      fileStart: METADATA[file].fileStart,
+      file,
+      start: chunkStart,
+      duration: endTime,
+      resetResults: !STATE.selection,
+      context: STATE.detect.contextAware,
+      confidence: STATE.detect.confidence,
+      chunks: channelData
+    };
+
+    return workerQueue.send(payload, [channelData.buffer]);
   };
-  
-  predictWorkers[worker].postMessage(objData, [channelData.buffer]);
 }
 /**
  * Start prediction for a segment of an audio file and post the segment duration to the UI.
@@ -2939,14 +2998,13 @@ async function doPrediction({
   start = 0,
   end = null,
 }) {
-  await getPredictBuffers({ file: file, start: start, end: end }).catch(
-    (error) => console.warn(error)
-  );
-
   UI.postMessage({
     event: "update-audio-duration",
     value: end - start,
   });
+  await getPredictBuffers({ file: file, start: start, end: end }).catch(
+    (error) => console.warn(error)
+  );
 }
 
 
@@ -3086,33 +3144,6 @@ async function saveAudio(file, start, end, filename, metadata, folder) {
   }
 }
 
-// Create a flag to indicate if parseMessage is currently being executed
-let isParsing = false;
-
-// Create a queue to hold messages while parseMessage is executing
-const messageQueue = [];
-
-// Function to process the message queue
-const processQueue = async () => {
-  if (!isParsing && messageQueue.length > 0) {
-    // Set isParsing to true to prevent concurrent executions
-    isParsing = true;
-
-    // Get the first message from the queue
-    const message = messageQueue.shift();
-
-    // Parse the message
-    await parseMessage(message).catch((error) => {
-      console.warn("Parse message error", error, "message was", message);
-    });
-
-    // Set isParsing to false to allow the next message to be processed
-    isParsing = false;
-
-    // Process the next message in the queue
-    processQueue();
-  }
-};
 
 /**
  * Spawns multiple Web Workers for parallel AI model prediction.
@@ -3138,12 +3169,12 @@ function spawnPredictWorkers(model, batchSize, toSpawn) {
   } else if (STATE.perchWorker.length) {
     predictWorkers = predictWorkers.filter(w => w.name !== 'perch v2');
   }
+  
   for (let i = 0; i < toSpawn; i++) {
     if (isPerch && i > 0) break; // Perch v2 only needs one worker, even if multiple threads requested
     const workerSrc = ['nocmig', 'chirpity', 'perch v2'].includes(model) ? model : "BirdNet2.4";
     const worker = new Worker(`./js/models/${workerSrc}.js`, { type: "module" });
-    worker.isAvailable = true;
-    worker.isReady = false;
+
     worker.name = model;
     predictWorkers.push(worker);
     DEBUG && console.log("loading a worker");
@@ -3160,11 +3191,10 @@ function spawnPredictWorkers(model, batchSize, toSpawn) {
     });
 
     // Web worker message event handler
-    worker.onmessage = (e) => {
-      // Push the message to the queue
-      messageQueue.push(e);
-      // Process the queue
-      processQueue();
+    worker.onmessage = async (msg) => {
+      await parseMessage(msg).catch((error) => {
+        console.warn("Parse message error", error, "message was", msg);
+      });
     };
     worker.onerror = (e) => {
       console.warn(
@@ -3517,7 +3547,6 @@ async function prepareQuery(query){
 const parsePredictions = async (response) => {
   const {file, worker, result:latestResult} = response;
   const predictionLength = STATE.model.includes("bats") ? 0.3 : WINDOW_SIZE;
-  AUDIO_BACKLOG--;
   if (!latestResult.length) {
     predictionsReceived[file]++;
     return worker;
@@ -3530,14 +3559,14 @@ const parsePredictions = async (response) => {
     if (!embeddingsBatch?.length) {
       predictionsReceived[file]++;
       if (predictionsReceived[file] >= (batchesToSend[file] || 1)) {
-        updateFilesBeingProcessed(file);
+        updateFilesBeingProcessed(file, worker);
       }
       return worker;
     }
     await prepareQuery(embeddingsBatch[0]);
     predictionsReceived[file]++;
     if (predictionsReceived[file] >= (batchesToSend[file] || 1)) {
-      updateFilesBeingProcessed(file);
+      updateFilesBeingProcessed(file, worker);
     }
     return worker;
   }
@@ -3626,7 +3655,7 @@ const parsePredictions = async (response) => {
         },
       });
     }
-    updateFilesBeingProcessed(response.file);
+    updateFilesBeingProcessed(response.file, worker);
     DEBUG &&
       console.log(
         `File ${file} processed after ${
@@ -3634,7 +3663,10 @@ const parsePredictions = async (response) => {
         } seconds: ${filesBeingProcessed.length} files to go`
       );
   }
-
+  if (!filesBeingProcessed.length && STATE.lastChunks) {
+    getSummary(); 
+    UI.postMessage({ event: "analysis-complete" })
+  }
   return worker;
 };
 
@@ -3695,16 +3727,17 @@ async function estimateTimeRemaining(batchesReceived) {
  */
 async function parseMessage(e) {
   const response = e.data;
-  switch (response["message"]) {
+
+  switch (response.message) {
+
     case "model-ready": {
-      const worker = response.worker || 0;
-      predictWorkers[worker].isReady = true;
-      predictWorkers[worker].isAvailable = true;
       if (!SEEN_MODEL_READY) {
         SEEN_MODEL_READY = true;
-        sampleRate = response["sampleRate"];
-        const backend = response["backend"];
+        sampleRate = response.sampleRate;
+        const backend = response.backend;
+
         DEBUG && console.log(backend);
+
         UI.postMessage({
           event: "model-ready",
           message: "Give It To Me Baby. Uh-Huh Uh-Huh",
@@ -3712,14 +3745,21 @@ async function parseMessage(e) {
       }
       break;
     }
+
     case "model-error": {
       if (!SEEN_MODEL_READY) {
         SEEN_MODEL_READY = true;
-        const error = response.error || "Unknown error";
+        const error = response.error || new Error("Unknown error");
+
         if (error.message === "Failed to fetch") {
           error.message = "Model files missing or inaccessible";
         }
-        generateAlert({ type: "error", message: error.message });
+
+        generateAlert({
+          type: "error",
+          message: error.message
+        });
+
         UI.postMessage({
           event: "model-ready",
           message: "Model failed to load",
@@ -3727,45 +3767,25 @@ async function parseMessage(e) {
       }
       break;
     }
-    case "prediction": {
-      if (!aborted) {
-        predictWorkers[response.worker].isAvailable = true;
-        let worker = await parsePredictions(response).catch((error) =>
-        DEBUG &&  console.log("Error parsing predictions", error)
-        );
-        DEBUG &&
-          console.log(
-            "predictions left for",
-            response.file,
-            batchesToSend[response.file] -
-              predictionsReceived[response.file]
-          );
-        const remaining =
-          predictionsReceived[response.file] - batchesToSend[response.file];
-        if (remaining === 0) {
-          if (filesBeingProcessed.length) {
-            processNextFile({ worker: worker });
-          }
-        }
-      }
-      break;
-    }
+
     case "spectrogram": {
       onSpectrogram(
-        response["filepath"],
-        response["file"],
-        response["width"],
-        response["height"],
-        response["image"],
-        response["channels"]
+        response.filepath,
+        response.file,
+        response.width,
+        response.height,
+        response.image,
+        response.channels
       );
       break;
     }
+
     case "training-progress": {
       const { progress, text } = response;
       sendProgress(text, progress);
       break;
     }
+
     case "training-results": {
       generateAlert({
         type: response.type,
@@ -3777,19 +3797,18 @@ async function parseMessage(e) {
       });
       break;
     }
+
   }
 }
 
 /**
  * Mark a file as finished processing and notify the UI when all files are complete.
  *
- * Removes the given file from the internal filesBeingProcessed list; if the list becomes
- * empty, triggers a summary update when no selection is active and posts an
- * "analysis-complete" message to the UI.
+ * Removes the given file from the internal filesBeingProcessed list;
  *
  * @param {string|object} file - File identifier (file path or file record) to remove from the processing list.
  */
-function updateFilesBeingProcessed(file) {
+function updateFilesBeingProcessed(file, worker) {
   // This method to determine batch complete
   const fileIndex = filesBeingProcessed.indexOf(file);
   if (fileIndex !== -1) {
@@ -3798,12 +3817,10 @@ function updateFilesBeingProcessed(file) {
         filesBeingProcessed.length
       );
   }
-  if (!filesBeingProcessed.length) {
-    if (!STATE.selection) getSummary();
-    // Need this here in case last file is not sent for analysis (e.g. nocmig mode)
-    UI.postMessage({ event: "analysis-complete" });
-  }
+
+  processNextFile({ worker: worker });
 }
+
 
 /**
  * Dequeues the next file from the prediction queue, determines analysis time boundaries, and schedules prediction for each boundary segment.
@@ -3854,7 +3871,7 @@ async function processNextFile({
         const { start, end } = boundaries[i];
         if (start === null) {
           // Nothing to do for this file
-          updateFilesBeingProcessed(file);
+          updateFilesBeingProcessed(file, worker);
           generateAlert({ message: "noNight", variables: { file } });
           DEBUG && console.log("Recursion: start = end");
           await processNextFile(arguments[0]).catch((error) =>
@@ -3883,7 +3900,7 @@ async function processNextFile({
       }
     } else {
       DEBUG && console.log("Recursion: file not found");
-      updateFilesBeingProcessed(file); // remove file from processing list
+      updateFilesBeingProcessed(file, worker); // remove file from processing list
       await processNextFile(arguments[0]).catch((error) =>
         console.warn("Error in recursive processNextFile call", error)
       );
