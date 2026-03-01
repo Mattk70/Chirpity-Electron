@@ -691,7 +691,7 @@ app.whenReady().then(async () => {
         const dialogOpts = {
             type: 'warning',
             title: 'Crash report',
-            detail: 'Oh no! Chirpity has crashed. It is most likely that it has run out of memory.\nTry lowering the batch size and / or number of threads in settings'
+            detail: 'Oh no! Chirpity has crashed. It is most likely that it has run out of memory.\nTry lowering the batch size and / or number of threads\nYou will find those options in the Expert tab of Settings'
         };
         
         dialog.showMessageBox(dialogOpts).then((returnValue) => {
