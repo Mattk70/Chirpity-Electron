@@ -26,6 +26,7 @@ import {
   addNewModel,
   upgrade_to_v4
 } from "./database.js";
+import {createEmbeddingTable, storeEmbeddings, queryEmbeddings} from './embeddings.js';
 import { customURLEncode, installConsoleTracking, trackEvent as _trackEvent } from "./utils/tracking.js";
 import { onChartRequest, getIncludedLocations }  from "./components/charts.js";
 
@@ -557,6 +558,10 @@ async function handleMessage(e) {
     case "find-time": {
       const time = args.time;
       await findTime(time);
+      break;
+    }
+    case "find-similar": {
+      await getEmbedding(args);
       break;
     }
     case "get-detected-species-list": {
@@ -1216,20 +1221,6 @@ async function processFilesInBatches(filePaths, batchSize = 20) {
   STATE.totalBatches = 0;
   STATE.allFilesDuration = 0;
   const t0 = Date.now();
-  const reading = {
-    en: "Reading metadata",
-    da: "Indlæser metadata",
-    de: "Metadaten werden gelesen",
-    es: "Leyendo metadatos",
-    fr: "Lecture des métadonnées",
-    ja: "メタデータを読み込み中",
-    nl: "Metadata lezen",
-    pt: "Lendo metadados",
-    ru: "Чтение метаданных",
-    sv: "Läser metadata",
-    zh: "正在读取元数据",
-  };
-  const text = reading[STATE.locale] || reading['en'];
   for (let i = 0; i < filePaths.length; i += batchSize) {
     const batch = filePaths.slice(i, i + batchSize);
     // Run the batch in parallel
@@ -1248,9 +1239,6 @@ async function processFilesInBatches(filePaths, batchSize = 20) {
         }
       ))
     );
-    const progress = results.filter(Boolean).length // only count successful metadata retrievals towards progress
-
-    sendProgress(text, ((i + progress) / filePaths.length) * 100);
     DEBUG && console.log(`Processed ${i + results.length} of ${filePaths.length}`);
   }
   if (STATE.corruptFiles.length) {
@@ -1492,7 +1480,7 @@ const prepSummaryStatement = async () => {
   const partition = detect.merge ? '' : ', r.modelID';
   let summaryStatement = `
     WITH ranked_records AS (
-        SELECT r.position * 1000 + f.filestart as dateTime, r.confidence, f.name as file, f.archiveName, cname, sname, classIndex, COALESCE(callCount, 1) as callCount, isDaylight, tagID,
+        SELECT r.position * 1000 + f.filestart as dateTime, r.confidence, f.name as file, f.archiveName, cname, sname, classIndex, COALESCE(callCount, 1) as callCount, isDaylight, tagID, r.modelID,
         RANK() OVER (PARTITION BY fileID${partition}, r.position ORDER BY r.confidence DESC) AS rank
         FROM records r
         JOIN files f ON f.id = r.fileID
@@ -1503,7 +1491,7 @@ const prepSummaryStatement = async () => {
   summaryStatement = stmt;
   summaryStatement += `
     )
-    SELECT cname, sname, confidence AS score, dateTime AS timestamp, callcount
+    SELECT cname, sname, confidence AS score, dateTime AS timestamp, callCount, modelID
     FROM ranked_records
     WHERE ranked_records.rank <= ${topRankin}`;
 
@@ -1724,6 +1712,41 @@ async function updateMetadata(fileNames) {
   return finalResult;
 }
 
+const resetEmbeddings = async () =>{
+  STATE.queryMetadata = undefined;
+  const dim = STATE.model === 'perch v2' ? 1536 : 1024;
+  await createEmbeddingTable(memoryDB, tempPath, dim);
+}
+async function getEmbedding({file,cname, sname, max, threshold, queryRegion }){
+  const row = await STATE.db.getAsync(
+    `INSERT INTO species (sname, cname, modelID, classIndex)
+    VALUES (
+      ?, ?, ?,
+      COALESCE(
+        (SELECT MAX(classIndex) + 1 FROM species WHERE modelID = ?),
+        0
+      )
+    )
+    ON CONFLICT(modelID, sname, cname)
+    DO UPDATE SET
+      sname = excluded.sname
+    RETURNING id`,
+    sname,
+    cname,
+    0,   // modelID
+    0    // modelID again for subquery
+  );
+  const id = row?.id;
+  STATE.queryMetadata = {cname, sname, threshold, max, id};
+  if (!STATE.speciesMap.has(0)) {
+      STATE.speciesMap.set(0, new Map());
+  }
+  STATE.speciesMap.get(0).set(1, id);
+  const {start, end} = queryRegion;
+  await onAnalyse({filesInScope: [file], start, end, resetResults: false })  
+}
+
+
 /**
  * Prepare and start analysis for the specified audio files, deciding whether to reuse cached results or run fresh processing.
  *
@@ -1825,7 +1848,10 @@ async function onAnalyse({
   await processFilesInBatches(FILE_QUEUE);
   DEBUG &&
     console.log("FILE_QUEUE has", FILE_QUEUE.length, "files", count, "files ignored");
-  STATE.selection || await onChangeMode("analyse");
+  if (!STATE.selection) {
+    await onChangeMode("analyse");
+    await resetEmbeddings();
+  }
 
   filesBeingProcessed = [...FILE_QUEUE];
   for (let i = 0; i < NUM_WORKERS; i++) {
@@ -1923,10 +1949,16 @@ const getDuration = async (src) => {
   let audio;
   return new Promise(function (resolve, reject) {
     audio = new Audio();
-
+    const removeAudio = (audio) => {
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load(); // forces media pipeline teardown
+      audio.remove();
+    }
     audio.src = src.replaceAll("#", "%23").replaceAll("?", "%3F"); // allow hash and ? in the path (https://github.com/Mattk70/Chirpity-Electron/issues/98)
     audio.addEventListener("loadedmetadata", function () {
       const duration = audio.duration;
+      removeAudio(audio)
       if (duration === Infinity || !duration || isNaN(duration)) {
         // Fallback: decode entire file with ffmpeg
         measureDurationWithFfmpeg(src)
@@ -1938,16 +1970,15 @@ const getDuration = async (src) => {
       } else {
         resolve(duration);
       }
-      audio.remove();
     });
     audio.addEventListener("error", (_error) => {
+      removeAudio(audio)
       measureDurationWithFfmpeg(src)
           .then((realDuration) => resolve(realDuration))
           .catch((err) => {
             err.message = `${err.message} (file: ${src})`;
             return reject(err)
           });
-      audio.remove();
     });
   });
 };
@@ -2225,6 +2256,7 @@ async function sendDetections(file, start, end, goToRegion) {
                 name,
                 position * 1000 + f.filestart as timestamp,
                 speciesID,
+                r.modelID,
                 classIndex
             FROM records r
             JOIN species s ON speciesID = s.ID
@@ -2234,7 +2266,7 @@ async function sendDetections(file, start, end, goToRegion) {
             AND start BETWEEN ? AND ?
             ${includedSQL}
         )
-        SELECT start, end, cname, score, timestamp
+        SELECT start, end, cname, score, timestamp, modelID
         FROM RankedRecords
         WHERE rank <= ${detect.topRankin}
         `;
@@ -2887,7 +2919,6 @@ async function feedChunksToModel(channelData, chunkStart, file, end) {
     start: chunkStart,
     duration: end,
     resetResults: !STATE.selection,
-    snr: STATE.filters.SNR,
     context: STATE.detect.contextAware,
     confidence: STATE.detect.confidence,
     chunks: channelData,
@@ -2929,6 +2960,8 @@ const bufferToAudio = async ({
   folder = undefined,
   filename = undefined
 }) => {
+  const destination = p.join(folder || tempPath, filename);
+  if (fs.existsSync(destination)) return; // Don't overwrite existing files
   if (!fs.existsSync(file)) {
     const found = await getWorkingFile(file);
     if (!found) return;
@@ -2985,7 +3018,7 @@ const bufferToAudio = async ({
       metadata: meta,
       additionalFilters: filters
     }).then(command => {
-    const destination = p.join(folder || tempPath, filename);
+    
 
     command.on("codecData", async function (data) {
       const channelStr = data.audio_details?.[2]?.toLowerCase() ?? '';
@@ -3092,11 +3125,18 @@ const processQueue = async () => {
  */
 function spawnPredictWorkers(model, batchSize, toSpawn) {
   const isPerch = model === 'perch v2';
-  STATE.perchWorker = predictWorkers.filter(w => w.name === 'perch v2');
-  if (isPerch && STATE.perchWorker?.length) {
+  // Perch worker cannot be terminated due to ONNX runtime global memory management,
+  // so we preserve it in STATE.perchWorker for reuse across model switches
+  if (! STATE.perchWorker?.length){
+    STATE.perchWorker = predictWorkers.filter(w => w.name === 'perch v2');
+  }
+
+  if (isPerch && STATE.perchWorker.length) {
     predictWorkers = STATE.perchWorker;
     setLabelState({regenerate: true})
     return
+  } else if (STATE.perchWorker.length) {
+    predictWorkers = predictWorkers.filter(w => w.name !== 'perch v2');
   }
   for (let i = 0; i < toSpawn; i++) {
     if (isPerch && i > 0) break; // Perch v2 only needs one worker, even if multiple threads requested
@@ -3142,7 +3182,6 @@ const terminateWorkers = () => {
     worker.postMessage({message: 'terminate'})
     if (worker.name !== 'perch v2') worker.terminate()
   });
-  STATE.perchWorker = predictWorkers.filter(w => w.name === 'perch v2');
   predictWorkers = []
 };
 
@@ -3443,12 +3482,37 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
   } catch (error) {
     await db.runAsync("ROLLBACK");
     console.error("Transaction error during insert:", error);
+    fileID = undefined;
+    throw error;
   } finally {
     dbMutex.unlock();
   }
-
+  return fileID
 };
 
+async function prepareQuery(query){
+  const {cname, max, threshold} = STATE.queryMetadata;
+  try {
+    const matches = await queryEmbeddings(memoryDB, query, max, threshold);
+    for (let i = 0; i < matches.length; i++){
+      const [fileID, offset, score] = matches[i];
+      const row = await STATE.db.getAsync(
+        'SELECT name AS file FROM files WHERE id = ?',
+        fileID);
+      if (! row) continue
+      const {file} = row;
+      
+      const keysArray = [[offset]], speciesIDBatch = [[1]], confidenceBatch = [[score]];
+      await generateInsertQuery(keysArray, speciesIDBatch, confidenceBatch, file, 0, false);
+    }
+
+    
+    await Promise.all([getResults({species: cname}), getSummary({species: cname})])
+  } finally {
+    STATE.queryMetadata = undefined;
+    STATE.selection = false;
+  }
+}
 
 const parsePredictions = async (response) => {
   const {file, worker, result:latestResult} = response;
@@ -3459,13 +3523,32 @@ const parsePredictions = async (response) => {
     return worker;
   }
   DEBUG && console.log("worker being used:", worker);
-  const [keysArray, speciesIDBatch, confidenceBatch] = latestResult;
+  const [keysArray, speciesIDBatch, confidenceBatch, embeddingsBatch] = latestResult;
   const {modelID, selection, detect} = STATE;
   const isCustomList = STATE.list === 'custom';
-  if (!selection)
-    await generateInsertQuery(keysArray, speciesIDBatch, confidenceBatch, file, modelID, isCustomList).catch((error) =>
+  if (STATE.queryMetadata){
+    if (!embeddingsBatch?.length) {
+      predictionsReceived[file]++;
+      if (predictionsReceived[file] >= (batchesToSend[file] || 1)) {
+        updateFilesBeingProcessed(file);
+      }
+      return worker;
+    }
+    await prepareQuery(embeddingsBatch[0]);
+    predictionsReceived[file]++;
+    if (predictionsReceived[file] >= (batchesToSend[file] || 1)) {
+      updateFilesBeingProcessed(file);
+    }
+    return worker;
+  }
+  if (!selection) {
+    let fileID = await generateInsertQuery(keysArray, speciesIDBatch, confidenceBatch, file, modelID, isCustomList).catch((error) =>
       console.warn("Error generating insert query", error)
     );
+    if (embeddingsBatch && fileID !== undefined){
+      await storeEmbeddings({db: STATE.db, dbMutex, fileID, embeddings: embeddingsBatch, keys: keysArray})
+    }
+  }
   if (index < 500) {
     const included = await getIncludedIDs(file).catch((error) =>
       console.warn("Error getting included IDs", error)
@@ -4385,8 +4468,9 @@ function epochInDayMonthRange(epochMs, startDM, endDM) {
 function allowedByList(result){
   // Handle enhanced lists. 
   // Calltype always undefined here:
-  let { timestamp, cname, score, callType, confidenceCheck } = result;
+  let { timestamp, cname, score, modelID, callType, confidenceCheck } = result;
   if (score === 2000) return true; // Manual records always allowed
+  if (modelID === 0) return score >= STATE.detect.confidence;
   if (/\(|-$/.test(cname)){
     // Strip suffixes
     const parsed = parseCnames([cname]);
@@ -4417,9 +4501,8 @@ function allowedByList(result){
 const sendResult = (index, result, fromDBQuery) => {
   const model = result.model.includes('bats')  
   ? 'bats'
-  : ['birdnet', 'nocmig', 'chirpity', 'perch v2', 'user'].includes(result.model)
-    ? result.model
-    : 'custom';
+  : result.model;
+
   result.model = model.replace(' v2','');
 
   UI.postMessage({
@@ -4468,6 +4551,7 @@ function recordRowToAllowedInput(row) {
     timestamp: row.filestart + (row.position * 1000),
     cname: row.cname,
     score: row.confidence,
+    modelID: row.modelID,
     callType: row.callType || null
   };
 }
@@ -4488,8 +4572,7 @@ const onSave2DiskDB = async ({ file }) => {
     const condition = STATE.detect.nocmig === 'day';
     filterClause += ` AND isDaylight = ${condition} `;
   }
-  let response,
-    errorOccurred = false;
+  let response;
   await dbMutex.lock();
   let inserted = 0;
   try {
@@ -4497,6 +4580,11 @@ const onSave2DiskDB = async ({ file }) => {
     await memoryDB.runAsync(`
       INSERT OR IGNORE INTO disk.locations (id, lat, lon, place, radius)
       SELECT id, lat, lon, place, radius FROM locations;
+    `);
+    await memoryDB.runAsync(`
+      INSERT OR IGNORE INTO disk.species (id, sname, cname, modelID, classIndex)
+      SELECT id, sname, cname, modelID, classIndex FROM species
+      WHERE modelID = 0;
     `);
     await memoryDB.runAsync(
     // Don't coalesce locationID here, because we want to preserve NULLs for files without location
@@ -5155,10 +5243,8 @@ async function onSetLocation({
         // Snap the file location to the highest priority existing location
         const {lat:overrideLat, lon:overrideLon, id:overrideID, place:overridePlace, radius:overrideRadius} = closest;
         lat = overrideLat, lon = overrideLon; id = overrideID; place = overridePlace; radius = overrideRadius;
-        console.info("Snapping to nearby location:", `${Math.round(closest.distance)} meters away`);
-      }
-      
-    } 
+      } 
+    }
   }
 
  if (id === null || id === undefined) {

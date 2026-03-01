@@ -1,6 +1,6 @@
 {
   "name": "Chirpity",
-  "version": "5.10.3",
+  "version": "5.11.0",
   "description": "Chirpity is a bioacoustics platform for the analysis of bird song and other wildlife sounds. It uses machine learning models to identify bird species from audio recordings.",
   "main": "main.js",
   "scripts": {
@@ -20,7 +20,6 @@
     "postinstall": "electron-builder install-app-deps",
     "test": "playwright test",
     "unittest": "sh unittest/run-standalone-tests.sh",
-
     "asbuild:debug": "asc assembly/index.ts --target debug",
     "asbuild:release": "asc assembly/index.ts --target release",
     "asbuild": "npm run asbuild:debug && npm run asbuild:release"
@@ -226,7 +225,7 @@
     "jest": "^29.7.0",
     "jimp": "^1.6.0",
     "jsdoc": "^4.0.4",
-    "node-abi": "^4.24.0",
+    "node-abi": "^4.26.0",
     "playwright": "^1.48.2"
   },
   "dependencies": {
@@ -249,7 +248,7 @@
     "fluent-ffmpeg": "^2.1.2",
     "keytar": "^7.9.0",
     "lodash.merge": "^4.6.2",
-    "onnxruntime-node": "^1.24.1",
+    "onnxruntime-node": "1.24.1",
     "p-limit": "3.1.0",
     "sqlite3": "^5.1.7",
     "suncalc": "^1.9.0",

@@ -24,11 +24,14 @@ class BaseModel {
     this.appPath = appPath;
     this.useContext = undefined;
     this.version = version;
+    this.scaleFactor = this.version.includes('bats') ? 10 : 1;
     this.selection = false;
     this.scalarFive = tf.scalar(5);
     this.two  = tf.scalar(2);
     this.one = tf.scalar(1);
+    this.topN = 5;
     this.backend = tf.getBackend();
+    this.embeddingsDIM = undefined;
   }
 
   async loadModel(type) {
@@ -40,6 +43,17 @@ class BaseModel {
       this.model = await load(this.appPath + "/model.json", {
         weightPathPrefix: this.appPath + '/',
       });
+      if (type === 'layers'){
+        // Set up BirdNET embedding model
+        const baseModel = this.model;
+        const predictions = baseModel.outputs[0];
+        const embeddings = baseModel.getLayer('GLOBAL_AVG_POOL').output;
+        const combinedModel = tf.model({
+          inputs: baseModel.inputs,
+          outputs: [predictions, embeddings],
+        });
+        this.model = combinedModel;
+      }
       this.model_loaded = true;
       this.inputShape = [...this.model.inputs[0].shape];
     }
@@ -73,7 +87,12 @@ class BaseModel {
 
   normalise = (spec) => spec.mul(255).divNoNan(spec.max([1, 2], true));
 
-  
+  l2Normalise(embeddings) {
+    return tf.tidy(() => {
+      const norms = embeddings.norm('euclidean', 1, true);
+      return embeddings.divNoNan(norms);
+    });
+  }
   normalise_audio_batch = (tensor) => {
   return tf.tidy(() => {
     const sigMax = tf.max(tensor, -1, true);
@@ -102,44 +121,68 @@ class BaseModel {
     });
   }
 
-  async predictBatch(audio, keys) {
-    const prediction = this.model.predict(audio, { batchSize: this.batchSize });
-    audio.dispose();
-    let newPrediction;
+async predictBatch(audio, keys) {
+  const { topIndices, topValues, embeddingsValues } = tf.tidy(() => {
+    const [prediction, embeddings] =
+      this.model.predict(audio, { batchSize: this.batchSize });
+    let output = prediction;
     if (this.selection) {
-      newPrediction = tf.max(prediction, 0, true);
-      prediction.dispose();
-      keys = keys.splice(0, 1);
+      output = tf.max(output, 0, true);
     }
+    if (this.bgMask) {
+      output = output.mul(this.bgMask);
+    }
+    const topN = Math.min(output.shape[1], 5);
+    const { indices, values } = tf.topk(output, topN, true);
+    const normEmbeddings = this.l2Normalise(embeddings);
+    return {
+      topIndices: indices,
+      topValues: values,
+      embeddingsValues: normEmbeddings
+    };
+  });
 
-    const unmaskedPrediction = newPrediction || prediction;
-    let maskedPrediction;
-    if (this.bgMask){
-      // Mask out the background class prediction
-      maskedPrediction = tf.tidy(() => unmaskedPrediction.mul(this.bgMask))
-      unmaskedPrediction.dispose()
-    }
-    const finalPrediction = maskedPrediction || unmaskedPrediction;
-    const classes = finalPrediction.shape[1];
-    const topN = Math.min(classes, 5);
-    const { indices, values } = tf.topk(finalPrediction, topN, true);
-    finalPrediction.dispose();
-    
-    const [topIndices, topValues] = await Promise.all([
-      indices.array(),
-      values.array(),
-    ]).catch((err) => console.log("Data transfer error:", err));
-    indices.dispose();
-    values.dispose();
-    const scaleFactor = this.version.includes('bats') ? 10 : 1;
-    keys = keys.map((key) => (key / (this.config.sampleRate * scaleFactor)).toFixed(3));
-    if (keys.length < topIndices.length){
-      // Trim return values to eliminate GPU padded silence from the results
-      const len = keys.length;
-      return [keys, topIndices.slice(0,len), topValues.slice(0,len)];  
-    }
-    return [keys, topIndices, topValues];
+  audio.dispose();
+  const embeddingDim = embeddingsValues.shape[1];
+  this.embeddingsDIM = embeddingDim;
+  const [indicesData, valuesData, embeddingsData] = await Promise.all([
+    topIndices.data(),
+    topValues.data(),
+    embeddingsValues.data()
+  ]);
+  topIndices.dispose();
+  topValues.dispose();
+  embeddingsValues.dispose();
+  // Fix keys trimming
+  if (this.selection) {
+    keys = keys.slice(0, 1);
   }
+
+  keys = keys.map(
+    key => Math.round((key / (this.config.sampleRate * this.scaleFactor)) * 10000) / 10000
+  );
+  const adjustedBatchSize = keys.length;
+  const topN = this.topN;
+  // Reshape manually without expensive array()
+  const reshapedIndices = [];
+  const reshapedValues = [];
+  const reshapedEmbeddings = [];
+  for (let i = 0; i < adjustedBatchSize; i++) {
+    reshapedIndices.push(
+      indicesData.slice(i * topN, (i + 1) * topN)
+    );
+    reshapedValues.push(
+      valuesData.slice(i * topN, (i + 1) * topN)
+    );
+    reshapedEmbeddings.push(
+      embeddingsData.slice(
+        i * this.embeddingsDIM,
+        (i + 1) * this.embeddingsDIM
+      )
+    );
+  }
+  return [keys, reshapedIndices, reshapedValues, reshapedEmbeddings];
+}
 
   makeSpectrogram = (input) => {
     return this.backend === "tensorflow" 
@@ -192,7 +235,7 @@ class BaseModel {
       audio = this.padAudio(audio);
       const numSamples = audio.length / this.chunkLength;
       audio = tf.tensor1d(audio);
-      return [tf.reshape(audio, [numSamples, this.chunkLength]), numSamples];
+      return tf.reshape(audio, [numSamples, this.chunkLength]);
     });
   };
 

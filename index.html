@@ -501,7 +501,47 @@
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary" id="go">Go</button>
+                        <button type="button" class="btn btn-primary" id="go">Go</button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+    <!-- Find similar Modal -->
+    <div class="modal fade" id="query-modal" tabindex="-1" aria-labelledby="queryModalLabel" aria-modal="true">
+        <form id="queryForm">
+            <div class="modal-dialog modal-dialog-centered ">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="queryModalLabel">Find Similar Sounds</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                        
+                    <div class="modal-body">
+                        <fieldset class="border rounded m-2 p-1">
+                            <legend class="h6">Enter a label for results</legend>
+                            <div class="mb-3 form-floating">
+                                <input type="text" pattern="^[^,_~]+$" title="Commas, underscores and tildes are not allowed" class="form-control" id="cnameInput" name="cnameInput" required>
+                                <label for="cnameInput">Common name</label>
+                            </div>
+                            <div class="mb-3 form-floating">
+                                <input type="text" pattern="^[^,_~]+$" title="Commas, underscores and tildes are not allowed" class="form-control" id="snameInput" name="snameInput" required>
+                                <label for="snameInput">Scientific name</label>
+                            </div>
+                            <div class="mb-3 input-group">
+                                <label class="input-group-text w-50" for="maxResults" id="query-limit">Limit</label>
+                                <input type="number" class="form-control" id="maxResults" name="maxResults" min="1" max="5000" value="10" required>
+                            </div>
+                            <div class="mb-3 input-group">
+                                <label class="input-group-text w-50" for="similarity-threshold" id="query-threshold">Threshold</label>
+                                <input type="number" class="form-control" id="similarity-threshold" name="similarity-threshold" min="1" max="100" value="75">
+                                <span class="input-group-text">%</span>
+                            </div>
+                        </fieldset>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="query">Find</button>
                     </div>
                 </div>
             </div>

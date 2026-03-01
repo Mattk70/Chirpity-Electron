@@ -97,7 +97,15 @@ const GLOBAL_ACTIONS = {
       STATE.currentFile &&
       document.getElementById("analyseAll").click();
   },
-  c: (e) => (e.ctrlKey || e.metaKey) && STATE.fileLoaded && spec.centreSpec(),
+  c: (e) => {
+    const selection = window.getSelection().toString();
+    if (selection) {
+      navigator.clipboard.writeText(selection).catch((err) => {
+        console.warn("Clipboard write failed:", err)
+      })
+      return
+    }
+    (e.ctrlKey || e.metaKey) && STATE.fileLoaded && spec.centreSpec()},
   // D: (e) => {
   //     if (( e.ctrlKey || e.metaKey)) worker.postMessage({ action: 'create-dataset' });
   // },
@@ -1318,6 +1326,33 @@ const getSelectionResults = (fromDB) => {
     fromDB,
   });
 };
+
+
+const showQueryModal = () => {
+  // i18n
+  const modalEl = document.getElementById("query-modal");
+  const {find, enterLabel, similarity, max } = i18n.get(i18n.Context);
+  const titleEl = document.getElementById('queryModalLabel'); 
+  titleEl.textContent = find;
+  const {cname, sname} = i18n.get(i18n.SpeciesList);
+  const cnameEl = document.getElementById('cnameInput');
+  modalEl.querySelector('label[for="cnameInput"]').textContent = cname;
+  modalEl.querySelector('label[for="snameInput"]').textContent = sname;
+  modalEl.querySelector('legend').textContent = enterLabel;
+  const limitEl = document.getElementById('query-limit');
+  limitEl.textContent = max;
+  const thresholdEl = document.getElementById('query-threshold');
+  document.getElementById('similarity-threshold').value = config.detect.confidence;
+  thresholdEl.textContent = similarity;
+  const submitEl = document.getElementById('query')
+  submitEl.textContent = find;
+
+  const queryModel = new bootstrap.Modal(modalEl);
+  modalEl.addEventListener('shown.bs.modal', e => {
+    cnameEl.focus();
+  }, {once: true});
+  queryModel.show();
+}
 
 /**
  * Sends an analysis request to the worker thread to initiate audio analysis, managing UI state and preventing concurrent analyses.
@@ -2591,7 +2626,7 @@ const setUpWorkerMessaging = () => {
           generateToast({
             type: "error",
             message: "badMessage",
-            variables: { "args.event": args.event },
+            variables: { event: args.event ?? args.message ?? "unknown" },
           });
         }
       }
@@ -3394,9 +3429,28 @@ const gotoTime = (e) => {
   }
 };
 
-const gotoForm = document.getElementById("gotoForm");
-gotoForm.addEventListener("submit", gotoTime);
-
+const findSimilar = (e) => {
+  e.preventDefault();
+  const form = document.getElementById('queryForm');
+  if (!form.reportValidity()) return;
+  if (! STATE.activeRegion) return;
+  const cname = document.getElementById("cnameInput")?.value;
+  const sname = document.getElementById("snameInput")?.value;
+  const max = document.getElementById("maxResults")?.valueAsNumber;
+  const threshold = document.getElementById("similarity-threshold")?.valueAsNumber;
+  const {start, end} = STATE.activeRegion;
+  const queryRegion = {
+    start: start + STATE.windowOffsetSecs,
+    end: end + STATE.windowOffsetSecs
+  }
+  worker.postMessage({ 
+    action: "find-similar", 
+    cname, sname, threshold, max,
+    queryRegion, file: STATE.currentFile});
+  const modalEl = document.getElementById("query-modal");
+  const modal = bootstrap.Modal.getInstance(modalEl);
+  if (modal) modal.hide();
+}
 /**
  * Custom model modals
  */
@@ -3625,9 +3679,9 @@ async function onWorkerLoadedAudio({
   resetRegions();
   await spec.updateSpec({
     buffer: STATE.currentBuffer,
-    position: position,
-    play: play,
-    resetSpec: resetSpec,
+    position,
+    play,
+    resetSpec,
   });
   // Do this after the spec has loaded the file
   STATE.fileLoaded = true;
@@ -3660,7 +3714,7 @@ function updatePagination(species) {
   }
 }
 
-const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
+const updateSummary = ({ summary = [], filterSpecies = "" }) => {
   STATE.summary = summary;
   const i18 = i18n.get(i18n.Headings);
   const showIUCN = config.detect.iucn;
@@ -3892,6 +3946,11 @@ function onAnalysisComplete({ quiet }) {
   worker.postMessage({ action: "update-state", selection: false });
 }
 
+function removeNoEntry() {
+  const summarySpecies = DOM.summary.querySelectorAll(".cname");
+  summarySpecies.forEach((row) => {row.classList.replace("not-allowed","pointer")} );
+}
+
 /**
  * Refreshes the UI summary view after summary data is available, applying an optional species filter, updating the summary table rows and hover styling, and enabling or disabling related menu actions.
  *
@@ -3901,10 +3960,7 @@ function onAnalysisComplete({ quiet }) {
  */
 function onSummaryComplete({ filterSpecies = undefined, summary = [] }) {
   updateSummary({ summary: summary, filterSpecies: filterSpecies });
-  // Add pointer icon to species summaries
-  const summarySpecies = DOM.summaryTable.querySelectorAll(".cname");
-  summarySpecies.forEach((row) => row.classList.replace("not-allowed","pointer"));
-  
+
   // Add hover to the summary
   const summaryNode = document.getElementById("resultSummary");
   if (summaryNode) {
@@ -3925,6 +3981,8 @@ function onSummaryComplete({ filterSpecies = undefined, summary = [] }) {
     ]);
   }
   if (STATE.currentFile) utils.enableMenuItem(["analyse"]);
+  // Add pointer icon to species summaries
+  removeNoEntry();
 }
 
 
@@ -3943,7 +4001,8 @@ function onSummaryComplete({ filterSpecies = undefined, summary = [] }) {
 function speciesFilter(e) {
   if (
     PREDICTING ||
-    ["TBODY", "TH", "DIV"].includes(e.target.tagName)
+    ["TBODY", "TH", "DIV"].includes(e.target.tagName) ||
+    window.getSelection().toString()
   )
     return; // on Drag or clicked header
   let species;
@@ -4058,8 +4117,9 @@ async function renderResult({
       modelID
     } = result;
 
+    const logo = ['birdnet', 'nocmig', 'chirpity', 'perch', 'user'].includes(result.model) ? model : 'custom';
+    const modelName = config.models[model]? utils.escapeHTML(config.models[model].displayName) : 'User';
     const dayNight = isDaylight ? "daytime" : "nighttime";
-
     const commentHTML = comment
       ? `<span title="${comment.replaceAll(
           '"',
@@ -4111,7 +4171,7 @@ async function renderResult({
             <td class="label ${hide}">${labelHTML}</td>
             <td class="comment text-end ${hide}">${commentHTML}</td>
             <td class="reviewed text-end ${hide}">${reviewHTML}</td>
-            <td class="text-end"><img class="model-logo" src="img/icon/${model}_logo.png" title="${model}" alt="${model}"></td>
+            <td class="text-end"><img class="model-logo" src="img/icon/${logo}_logo.png" title="${modelName}" alt="${modelName}"></td>
             </tr>`;
   }
   updateResultTable(tr, isFromDB, selection);
@@ -5489,14 +5549,8 @@ async function handleUIClicks(e) {
       break;
     }
     // Custom models
-    case "open-training": {
-      showTraining();
-      break;
-    }
-    case "import-model": {
-      showImport();
-      break;
-    }
+    case "open-training": { showTraining(); break }
+    case "import-model": { showImport(); break }
     case "remove-model": {
       // Just present custom models to choose from
       updateModelOptions('customOnly');
@@ -5696,7 +5750,8 @@ async function handleUIClicks(e) {
       delete config.models[model];
       config.selectedModel ===  model && (config.selectedModel = 'birdnet');
       updateModelOptions();
-      document.querySelector(`#model-to-use option[value="${model}"]`)?.remove();
+      const modelSelect = document.getElementById("model-to-use");
+      [...modelSelect.options].find((opt) => opt.value === model)?.remove();
       updatePrefs('config.json', config);
       break;
     }
@@ -5736,10 +5791,7 @@ async function handleUIClicks(e) {
       });
       break;
     }
-    case "startTour": {
-      prepTour();
-      break;
-    }
+    case "startTour": { prepTour(); break }
     case "eBird": {
       (async () => await populateHelpModal("ebird", i18n.Help.eBird[locale]))();
       break;
@@ -5774,20 +5826,12 @@ async function handleUIClicks(e) {
 
     // Settings
     case "basic":
-    case "advanced": {
-      changeSettingsMode(target);
-      break;
-    }
+    case "advanced": { changeSettingsMode(target); break }
 
     // Context-menu
-    case "play-region": {
-      playRegion();
-      break;
-    }
-    case "context-analyse-selection": {
-      getSelectionResults();
-      break;
-    }
+    case "play-region": { playRegion(); break }
+    case "context-analyse-selection": { getSelectionResults(); break}
+    case "context-find-similar":{ showQueryModal(); break }
     case "context-create-clip": {
       element.closest("#inSummary") ? batchExportAudio() : exportAudio();
       break;
@@ -5798,6 +5842,9 @@ async function handleUIClicks(e) {
       ws.playPause();
       break;
     }
+    // Modal forms
+    case "go": { gotoTime(e); break }
+    case "query":{ findSimilar(e) ;break }
 
     case "library-location-select": {
       (async () => {
@@ -5860,10 +5907,7 @@ async function handleUIClicks(e) {
       })();
       break;
     }
-    case "export-list": {
-      exportSpeciesList();
-      break;
-    }
+    case "export-list": { exportSpeciesList(); break }
     case "sort-label":
     case "sort-comment":
     case "sort-reviewed":
@@ -6007,18 +6051,9 @@ async function handleUIClicks(e) {
       await setFontSizeScale();
       break;
     }
-    case "speciesFilter": {
-      speciesFilter(e);
-      break;
-    }
-    case "audioFiltersIcon": {
-      toggleFilters();
-      break;
-    }
-    case "context-mode": {
-      toggleContextAwareMode();
-      break;
-    }
+    case "speciesFilter": { speciesFilter(e); break }
+    case "audioFiltersIcon": { toggleFilters(); break }
+    case "context-mode": { toggleContextAwareMode(); break }
     case "frequency-range": {
       document
         .getElementById("frequency-range-panel")
@@ -6038,10 +6073,7 @@ async function handleUIClicks(e) {
       }
       break;
     }
-    case "nocmigMode": {
-      changeNocmigMode();
-      break;
-    }
+    case "nocmigMode": { changeNocmigMode(); break }
     case "apply-location": {
       e.preventDefault();
       setDefaultLocation();
@@ -6054,10 +6086,7 @@ async function handleUIClicks(e) {
     }
 
     case "zoomIn":
-    case "zoomOut": {
-      spec.zoom(e);
-      break;
-    }
+    case "zoomOut": { spec.zoom(e); break }
     case "cmpZoomIn":
     case "cmpZoomOut": {
       let minPxPerSec = ws.options.minPxPerSec;
@@ -6083,20 +6112,11 @@ async function handleUIClicks(e) {
       if (spec.wavesurfer) WSPlayPause();
         break;      
     }
-    case "setCustomLocation": {
-      setCustomLocation(false);
-      break;
-    }
-    case "setFileStart": {
-      showDatePicker();
-      break;
-    }
+    case "setCustomLocation": { setCustomLocation(false); break }
+    case "setFileStart": { showDatePicker(); break }
 
     // XC API calls (no await)
-    case "context-xc": {
-      getXCComparisons();
-      break;
-    }
+    case "context-xc": { getXCComparisons(); break }
 
   }
   DOM.contextMenu.classList.add("d-none");
@@ -6854,7 +6874,7 @@ async function createContextMenu(e) {
   } else if (target.closest("#selectionResultTableBody")) {
     hideInSelection = "d-none";
   }
-
+  const hideFindSimilar = (['analyse', 'archive']).includes(STATE.mode) && ! ['chirpity', 'nocmig'].includes(config.selectedModel) ? '' : 'd-none';
   // If we haven't clicked the active row or we cleared the region, load the row we clicked
   if (resultContext || hideInSelection || hideInSummary) {
     // Lets check if the summary needs to be filtered
@@ -6871,7 +6891,8 @@ async function createContextMenu(e) {
 
   const createOrEdit =
     STATE.activeRegion?.label || target.closest("#summary") ? i18.edit : i18.create;
-
+  const disabled = STATE.isMember 
+    && STATE.analysisDone ? '' : 'disabled';
   DOM.contextMenu.innerHTML = `
     <div id="${inSummary ? "inSummary" : "inResults"}">
       <ul class="list-unstyled mb-1">
@@ -6880,6 +6901,9 @@ async function createContextMenu(e) {
   }</li>
         <li class="dropdown-item ${hideInSummary} ${hideInSelection}" id="context-analyse-selection">
         <span class="material-symbols-outlined">search</span> ${i18.analyse}
+        </li>
+        <li class="dropdown-item ${hideFindSimilar} ${hideInSummary} ${hideInSelection} ${disabled}" id="context-find-similar">
+        <span class="material-symbols-outlined">search</span> ${i18.find}
         </li>
         <div class="dropdown-divider ${hideInSummary}"></div>
         <li class="dropdown-item  ${hideInSelection}" id="create-manual-record">
@@ -7484,8 +7508,8 @@ async function getXCComparisons() {
     const defaultLength = bats ? "+len:0.5-10" : "+len:3-15";
     sname = XCtaxon[sname] || sname;
     const types = bats
-      ? ["distress call", "feeding buzz", "social call", "ecolocation", "song"]
-      : ["nocturnal flight call", "flight call", "call", "song"];
+      ? ['"distress call"', '"feeding buzz"', '"social call"', 'ecolocation', 'song']
+      : ['"nocturnal flight call"', '"flight call"', 'call', 'song'];
     const filteredLists = {}
     types.forEach((type) => {
       filteredLists[type] = []; // Initialize each type with an empty array
@@ -7493,10 +7517,10 @@ async function getXCComparisons() {
     
     // Create an array of promises—one for each call type
     const fetchRequests = types.map((type) => {
-      type = type.replaceAll(" ", "%20"); // Replace spaces with underscores for the API query
+      type = type.replaceAll(" ", "%20"); // Replace spaces with entities for the API query
       // Use a different length parameter for "song"
       const typeLength = type === "song" ? "+len:10-30" : defaultLength;
-      const query = `https://xeno-canto.org/api/3/recordings?key=d5e2d2775c7f2b2fb8325ffacc41b9e6aa94679e&query=sp:"${sname}"${quality}${typeLength}+type:"${type}"`;
+      const query = `https://xeno-canto.org/api/3/recordings?key=d5e2d2775c7f2b2fb8325ffacc41b9e6aa94679e&query=sp:"${sname}"${quality}${typeLength}+type:=${type}`;
       
       return fetch(query)
         .then((response) =>
@@ -7619,7 +7643,7 @@ function renderComparisons(lists, cname) {
   let count = 0;
   Object.keys(lists).forEach((callType) => {
     const active = count === 0 ? "active" : "";
-    const callTypePrefix = callType.replaceAll(" ", "-");
+    const callTypePrefix = callType.replaceAll(" ", "-").replaceAll('"', '');
     if (lists[callType]?.length) {
       // tab headings
       const tabHeading = document.createElement("li");
@@ -7627,7 +7651,7 @@ function renderComparisons(lists, cname) {
       tabHeading.setAttribute("role", "presentation");
       const button = `<button class="nav-link text-nowrap ${active}" id="${callTypePrefix}-tab" data-bs-toggle="tab" data-bs-target="#${callTypePrefix}-tab-pane" type="button" role="tab" aria-controls="${callTypePrefix}-tab-pane" aria-selected="${
         count === 0
-      }">${i18[callType]}</button>`;
+      }">${i18[callType.replaceAll('"', '')]}</button>`;
       tabHeading.innerHTML = button;
       callTypeHeader.appendChild(tabHeading);
 
@@ -7837,10 +7861,11 @@ async function membershipCheck() {
   const inTrial = installPeriod < trialPeriod;
 
   const lockedElements = document.querySelectorAll(".locked, .unlocked");
-  const unlockElements = () => {
+  const unlockElements = (inTrial) => {
+    const lockClass = inTrial ? 'trial' : 'unlocked';
     lockedElements.forEach((el) => {
       if (el instanceof HTMLSpanElement) {
-        el.classList.replace("locked", "unlocked");
+        el.classList.replace("locked", lockClass);
         el.textContent = "lock_open";
       } else {
         el.classList.remove("locked", "disabled");
@@ -7892,7 +7917,7 @@ async function membershipCheck() {
             variables: { expiresIn },
           });
         }
-        unlockElements();
+        unlockElements(inTrial);
         if (isMember) {
           document.getElementById("primaryLogo").src =
             `img/logo/chirpity_logo_subscriber_${level}.png`; // bronze / Silver (& Gold) available
@@ -7908,7 +7933,18 @@ async function membershipCheck() {
           config.selectedModel = 'birdnet'      
         }
       }
-
+      if (!isMember){
+        const footer = document.getElementById('footer');
+        const span = document.createElement('span');
+        span.type = 'button';
+        span.id = 'trial-notification';
+        span.className = 'float-end pe-3';
+        const trialText = trialDaysLeft > 0 
+          ? `<span class="badge text-bg-info border border-light gb-2">${trialDaysLeft}</span> ` + i18n.get(i18n.Trial) 
+          : `<i>${i18n.get(i18n.TrialExpired)}</i>`;
+        span.innerHTML = `<small>${trialText}</small>`;
+        footer.appendChild(span);
+      }
       console.info(
         `Version: ${VERSION}. Trial: ${inTrial} Subscriber: ${isMember}`, trialDaysLeft
       );
