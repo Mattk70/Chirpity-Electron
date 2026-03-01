@@ -123,6 +123,7 @@ onmessage = async (e) => {
         );
         response = {
           message: "prediction",
+          id: data.id,
           file,
           result,
           fileStart,

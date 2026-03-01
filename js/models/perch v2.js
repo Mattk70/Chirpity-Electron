@@ -114,6 +114,7 @@ onmessage = async (e) => {
           );
           response = {
             message: "prediction",
+            id: data.id,
             file: filename,
             result,
             fileStart: startPosition,
