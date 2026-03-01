@@ -35,29 +35,27 @@ const { pipeline } = require("stream/promises");
 class PCMChunker extends Transform {
   constructor({
     highWaterMarkBytes,
-    samplesInBatch,
     sampleRate,
     startTime = 0,
     file,
     endTime,
     trimSeconds = 0
   }) {
-    super({
-      readableObjectMode: true
-    });
+    super({ readableObjectMode: true });
 
     this.file = file;
     this.endTime = endTime;
-    this.samplesInBatch = samplesInBatch;
     this.sampleRate = sampleRate;
 
-    this.bytesPerSecond = 2 * sampleRate; // 16-bit mono assumed
+    this.bytesPerSecond = 2 * sampleRate; // 16-bit mono
     this.frameSize = highWaterMarkBytes;
 
-    this.buffer = Buffer.allocUnsafe(this.frameSize);
+    this.buffer = Buffer.alloc(this.frameSize);
     this.bufferIndex = 0;
 
-    this.chunkStart = startTime;
+    // ✅ Single source of truth
+    this.totalSamples = startTime;
+
     this.remainingTrim = trimSeconds > 0
       ? Math.floor(this.bytesPerSecond * trimSeconds)
       : 0;
@@ -65,7 +63,6 @@ class PCMChunker extends Transform {
 
   _transform(chunk, _, callback) {
     try {
-      // ---- Trim encoder padding if needed ----
       if (this.remainingTrim > 0) {
         if (chunk.length <= this.remainingTrim) {
           this.remainingTrim -= chunk.length;
@@ -95,28 +92,24 @@ class PCMChunker extends Transform {
         this.bufferIndex += toCopy;
         offset += toCopy;
 
-        // ---- Frame complete ----
         if (this.bufferIndex === this.frameSize) {
           const channelData = getMonoChannelData(
             this.buffer.subarray(0, this.frameSize)
           );
 
+          const samplesInFrame = this.frameSize / 2;
+
           const job = {
             channelData,
-            chunkStart: this.chunkStart,
+            chunkStart: this.totalSamples,
             file: this.file,
             endTime: this.endTime
           };
 
-          // Push downstream (backpressure-aware)
-          if (!this.push(job)) {
-            // If downstream is saturated,
-            // stop producing more until resumed
-            break;
-          }
-
-          this.chunkStart += this.samplesInBatch;
+          this.totalSamples += samplesInFrame;
           this.bufferIndex = 0;
+
+          this.push(job)
         }
       }
 
@@ -133,12 +126,16 @@ class PCMChunker extends Transform {
           this.buffer.subarray(0, this.bufferIndex)
         );
 
+        const samplesInFrame = this.bufferIndex / 2;
+
         this.push({
           channelData,
-          chunkStart: this.chunkStart,
+          chunkStart: this.totalSamples,
           file: this.file,
-          end: this.end
+          endTime: this.endTime
         });
+
+        this.totalSamples += samplesInFrame;
       }
 
       callback();
@@ -186,6 +183,7 @@ class PredictionWritable extends Writable {
           this._dispatch(chunk);
           callback();
         } else if (this.inFlight === 0 && this.finalCallback) {
+          STATE.lastChunks = true;
           this.finalCallback();
         }
       });
@@ -254,17 +252,8 @@ function createMultiWorkerQueue(workers, { timeoutMs = 30000 } = {}) {
   return { send };
 }
 
-
-
-let isWin32 = false;
-
 const dbMutex = new Mutex();
 const DATASET = false;
-let ntsuspend;
-if (process.platform === "win32") {
-  ntsuspend = require("ntsuspend");
-  isWin32 = true;
-}
 
 let DEBUG;
 let SEEN_MODEL_READY = false;
@@ -1998,6 +1987,7 @@ async function onAnalyse({
   STATE.corruptFiles = [];
   STATE.clippedBatches = 0;
   STATE.clippedFilesDuration = 0;
+  STATE.lastChunks = false;
   predictionStart = new Date();
   // Set the appropriate selection range if this is a selection analysis
   STATE.update({
@@ -2079,8 +2069,11 @@ async function onAnalyse({
   }
 
   filesBeingProcessed = [...FILE_QUEUE];
+  STATE.workerQueue = createMultiWorkerQueue(predictWorkers, {
+    timeoutMs: 30000
+  });
   for (let i = 0; i < NUM_WORKERS; i++) {
-    processNextFile({ start, end, worker: 0 });
+    processNextFile({ start, end, worker: i });
   }
 }
 
@@ -2757,12 +2750,11 @@ async function processAudio(
   const additionalFilters = STATE.filters.sendToModel ? setAudioFilters() : [];
   const command = await setupFfmpegCommand({ file, start, end:endTime, sampleRate, additionalFilters, });
   const ffmpegStream = command.pipe();
-  const workerQueue = createMultiWorkerQueue(predictWorkers, {
-    timeoutMs: 30000
-  });
+
+  const workerQueue = STATE.workerQueue;
 
   const sendToModel = createPredictSender(workerQueue);
-
+  
   const predictionWritable = new PredictionWritable(sendToModel, {
     concurrency: predictWorkers.length * 2
   });
@@ -2784,7 +2776,6 @@ async function processAudio(
   );
 
   DEBUG && console.log("All chunks processed for", file);
-
 }
 
 function getMonoChannelData(audio) {
@@ -3015,14 +3006,13 @@ async function doPrediction({
   start = 0,
   end = null,
 }) {
-  await getPredictBuffers({ file: file, start: start, end: end }).catch(
-    (error) => console.warn(error)
-  );
-
   UI.postMessage({
     event: "update-audio-duration",
     value: end - start,
   });
+  await getPredictBuffers({ file: file, start: start, end: end }).catch(
+    (error) => console.warn(error)
+  );
 }
 
 
@@ -3681,7 +3671,10 @@ const parsePredictions = async (response) => {
         } seconds: ${filesBeingProcessed.length} files to go`
       );
   }
-
+  if (!filesBeingProcessed.length && STATE.lastChunks) {
+    getSummary(); 
+    UI.postMessage({ event: "analysis-complete" })
+  }
   return worker;
 };
 
@@ -3820,9 +3813,7 @@ async function parseMessage(e) {
 /**
  * Mark a file as finished processing and notify the UI when all files are complete.
  *
- * Removes the given file from the internal filesBeingProcessed list; if the list becomes
- * empty, triggers a summary update when no selection is active and posts an
- * "analysis-complete" message to the UI.
+ * Removes the given file from the internal filesBeingProcessed list;
  *
  * @param {string|object} file - File identifier (file path or file record) to remove from the processing list.
  */
@@ -3835,14 +3826,10 @@ function updateFilesBeingProcessed(file, worker) {
         filesBeingProcessed.length
       );
   }
-  if (!filesBeingProcessed.length) {
-    if (!STATE.selection) getSummary();
-    // Need this here in case last file is not sent for analysis (e.g. nocmig mode)
-    UI.postMessage({ event: "analysis-complete" });
-  } else {
-    processNextFile({ worker: worker });
-  }
+
+  processNextFile({ worker: worker });
 }
+
 
 /**
  * Dequeues the next file from the prediction queue, determines analysis time boundaries, and schedules prediction for each boundary segment.

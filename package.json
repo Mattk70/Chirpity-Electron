@@ -255,8 +255,5 @@
     "systeminformation": "^5.27.14",
     "utimes": "^5.2.1",
     "wavesurfer.js": "7.9.5"
-  },
-  "optionalDependencies": {
-    "ntsuspend": "^1.0.2"
   }
 }
