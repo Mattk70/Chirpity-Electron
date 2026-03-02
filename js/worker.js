@@ -1299,11 +1299,18 @@ function getFileSQLAndParams(range) {
     params.push(range.start, range.end);
   } else {
     const files = QUEUE.getAllPaths();
+    if (!files.length) {
+      console.warn('getFileAndSQLParams', 'QUEUE.getAllPaths() returned 0 files')
+      SQL += " AND 1 = 0 ";
+      return [SQL, params];
+    }
     const fileParams = prepParams(files);
     SQL += ` AND ( file IN  (${fileParams}) `;
-    STATE.originalFiles ??= files.map((item) => (METADATA[item]?.name || item));
-    params.push(...STATE.originalFiles);
+    const originalFiles = files.map((item) => (METADATA[item]?.name || item));
+    STATE.originalFiles = originalFiles;
+    params.push(...originalFiles);
     SQL += ` OR archiveName IN  (${fileParams}) ) `;
+
     const archivePath = STATE.library.location + p.sep;
     const archive_names = files.map((item) => item.replace(archivePath, ""));
     params.push(...archive_names);
@@ -5402,7 +5409,11 @@ async function convertAndOrganiseFiles(threadLimit = 4) {
   if (STATE.mode === "archive") {
     // Only add current results
     const keyword = backfill ? " WHERE" : " AND";
-    const files = QUEUE.getAllPaths();
+    const files = QUEUE.getAllPaths('completed');
+    if (!files.length) {
+      generateAlert({ message: "libraryUpToDate" });
+      return;
+    }
     query += `${keyword} f.name IN (${prepParams(files)})`;
     params.push(...files);
   }
