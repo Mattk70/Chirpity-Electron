@@ -369,7 +369,8 @@ class FileQueueManager {
   /** Set a new status for all files in the queue */
   setAll(newStatus) {
     this._checkStatusValue(newStatus);
-    for (const status of this.byStatus) {
+    for (const status of this.statuses) {
+      if (status === newStatus) continue;
       const set = this.byStatus[status];
       for (const path of set) {
         this.byStatus[newStatus].add(path);

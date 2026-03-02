@@ -1451,7 +1451,7 @@ async function addQueryQualifiers(stmt, range, caller) {
   }
   if (selection && caller === 'results') {
     stmt += ` AND file = ? `;
-    params.push(QUEUE.getAllPaths[0]);
+    params.push(QUEUE.getAllPaths()[0]);
   } else {
     stmt += await getSpeciesSQLAsync()
   }
@@ -1827,12 +1827,12 @@ async function onAnalyse({
         await getResults({ topRankin: 5, offset: 0 });
       } else {
         await onChangeMode("archive");
-        files.forEach((file) =>
+        files.forEach((file) => {
           UI.postMessage({
             event: "update-audio-duration",
             value: METADATA[file].duration,
           })
-        );
+        });
         await Promise.all([getSummary(), getResults()] );
       }
       return;
@@ -4693,12 +4693,14 @@ async function onDeleteSpecies({
     WHERE speciesID IN (SELECT id FROM species WHERE cname = ?)`;
   if (STATE.mode === "analyse") {
     const filePaths = QUEUE.getAllPaths();
+    if (!filePaths.length) return;
     const rows = await db.allAsync(
       `SELECT id FROM files WHERE NAME IN (${prepParams(
         filePaths
       )})`,
       ...filePaths
     );
+    if (!rows.length) return;
     const ids = rows.map((row) => row.id).join(",");
     SQL += ` AND fileID in (${ids})`;
   } else if (STATE.mode === "explore") {

@@ -161,7 +161,7 @@ test('STATE uses WorkerState class', () => {
 });
 
 test('defines FILE_QUEUE', () => {
-  assert.ok(/let\s+FILE_QUEUE\s*=/.test(workerContent), 'Should define FILE_QUEUE array');
+  assert.ok(/const\s+QUEUE\s*=\s*new\s+FileQueueManager/.test(workerContent), 'Should define QUEUE class');
 });
 
 test('defines predictWorkers array', () => {
@@ -300,7 +300,7 @@ test('handles audio metadata extraction', () => {
 });
 
 test('processes audio files from queue', () => {
-  assert.ok(/FILE_QUEUE/.test(workerContent), 'Should process files from queue');
+  assert.ok(/QUEUE\.transition/.test(workerContent), 'Should process files from queue');
 });
 
 test('tracks sample rate', () => {
@@ -315,7 +315,7 @@ test('handles file analysis requests', () => {
 });
 
 test('manages file queue', () => {
-  assert.ok(/FILE_QUEUE/.test(workerContent), 'Should manage file queue');
+  assert.ok(/QUEUE\.addFiles/.test(workerContent), 'Should populate file queue');
 });
 
 test('tracks analysis progress', () => {
