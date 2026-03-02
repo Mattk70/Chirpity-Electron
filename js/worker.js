@@ -29,7 +29,7 @@ import {
 import {createEmbeddingTable, storeEmbeddings, queryEmbeddings} from './embeddings.js';
 import { customURLEncode, installConsoleTracking, trackEvent as _trackEvent } from "./utils/tracking.js";
 import { onChartRequest, getIncludedLocations }  from "./components/charts.js";
-import {PCMChunker, PredictionWritable, createMultiWorkerQueue} from './utils/streams.js';
+import {PCMChunker, PredictionWritable, createMultiWorkerQueue, FileQueueManager} from './utils/streams.js';
 const { pipeline } = require("stream/promises");
 
 const dbMutex = new Mutex();
@@ -44,7 +44,6 @@ let sampleRate; // Should really make this a property of the model
 let predictWorkers = [],
   aborted = false;
 let UI;
-let FILE_QUEUE = [];
 let initialiseResolve;
 let initialiseReject;
 
@@ -151,6 +150,7 @@ let appPath,
   batchesToSend = {};
 let LIST_WORKER;
 
+const QUEUE = new FileQueueManager();
 // Adapted from https://stackoverflow.com/questions/6117814/get-week-of-year-in-javascript-like-in-php
 Date.prototype.getWeekNumber = function () {
   var d = new Date(
@@ -164,8 +164,7 @@ Date.prototype.getWeekNumber = function () {
 
 
 let predictionsRequested = {},
-  predictionsReceived = {},
-  filesBeingProcessed = [];
+  predictionsReceived = {};
 let diskDB, memoryDB;
 
 let t0; // Application profiler
@@ -520,17 +519,16 @@ async function handleMessage(e) {
       if (result) {
         const {files, meta} = result;
         METADATA = meta;
-        STATE.filesToAnalyse = await getFiles({files, preserveResults:true, checkSaved: false});
+        QUEUE.addFiles(await getFiles({files, preserveResults:true, checkSaved: false}), 'complete')
         await Promise.all([getSummary(), getResults()]);
       }
       UI.postMessage({ event: "clear-loading"})
       break;
     }
     case "file-load-request": {
-      STATE.corruptFiles = [];
       const {preserveResults, file, model} = args;
       index = 0;
-      filesBeingProcessed.length && onAbort({model});
+      QUEUE.any('inProgress') && onAbort({model});
       DEBUG && console.log("Worker received audio " + file);
       await loadAudioFile(args).catch((_e) =>
         console.warn("Error opening file:", file)
@@ -625,7 +623,7 @@ async function handleMessage(e) {
         STATE.backend = args.backend;
         predictWorkers[0].postMessage({ message: "terminate", backend: args.backend });
       } else {
-        if (filesBeingProcessed.length) {
+        if (QUEUE.any('inProgress')) {
           onAbort(args);
         } else {
           predictWorkers.length && terminateWorkers();
@@ -1187,15 +1185,15 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true}) => {
   trackEvent(STATE.UUID, "UI", "Drop", fileOrFolder, filePaths.length);
   UI.postMessage({ event: "files", filePaths, preserveResults, checkSaved });
   const allSaved = checkSaved ? await savedFileCheckAsync(filePaths) : false;
+  QUEUE.addFiles(filePaths);
   if (allSaved) {
     await onChangeMode("archive");
     if (STATE.detect.autoLoad){
-      STATE.filesToAnalyse = filePaths;
       STATE.originalFiles = filePaths;
       await Promise.all([getSummary(), getResults()]);
     }
   } else {
-  // Start gathering metadata for new files
+    // Start gathering metadata for new files
     processFilesInBatches(filePaths, 10);
   }
   
@@ -1228,6 +1226,7 @@ async function processFilesInBatches(filePaths, batchSize = 20) {
           return fileMetadata;
         }).catch ((_e) => {
           console.warn(`Failed to get metadata for file: ${file}`);
+          QUEUE.transition(file, 'pending', 'invalid')
           const idx = filePaths.indexOf(file);
           if (idx !== -1) filePaths.splice(idx, 1); // Remove the file from the list
           return null; // or handle the error as needed
@@ -1236,11 +1235,11 @@ async function processFilesInBatches(filePaths, batchSize = 20) {
     );
     DEBUG && console.log(`Processed ${i + results.length} of ${filePaths.length}`);
   }
-  if (STATE.corruptFiles.length) {
+  if (QUEUE.any('invalid')) {
     generateAlert({
       type: "warning",
       message: "corruptFile",
-      variables: { files: '<br>' + STATE.corruptFiles.join("<br>") },
+      variables: { files: '<br>' + QUEUE.getAllPaths('invalid').join("<br>") },
       autohide: false,
     });
   }
@@ -1299,13 +1298,14 @@ function getFileSQLAndParams(range) {
     SQL += " AND dateTime >= ? AND dateTime < ? ";
     params.push(range.start, range.end);
   } else {
-    const fileParams = prepParams(STATE.filesToAnalyse);
+    const files = QUEUE.getAllPaths();
+    const fileParams = prepParams(files);
     SQL += ` AND ( file IN  (${fileParams}) `;
-    STATE.originalFiles ??= STATE.filesToAnalyse.map((item) => (METADATA[item]?.name || item));
+    STATE.originalFiles ??= files.map((item) => (METADATA[item]?.name || item));
     params.push(...STATE.originalFiles);
     SQL += ` OR archiveName IN  (${fileParams}) ) `;
     const archivePath = STATE.library.location + p.sep;
-    const archive_names = STATE.filesToAnalyse.map((item) => item.replace(archivePath, ""));
+    const archive_names = files.map((item) => item.replace(archivePath, ""));
     params.push(...archive_names);
   }
   return [SQL, params];
@@ -1403,9 +1403,10 @@ async function getMatchingIds(cnames) {
  */
 async function getSpeciesSQLAsync(file){
   let not = "", SQL = "";
-  const {list, allLabels, filesToAnalyse} = STATE;
+  const {list, allLabels} = STATE;
+  
   // If we don't have a file, use the first analysed file if available
-  file ??= filesToAnalyse[0];
+  file ??= QUEUE.getAllPaths()[0];
   if (list !== 'everything') {
     let included = await getIncludedIDs(file);
     if (["birds", 'Animalia'].includes(list)) {
@@ -1450,7 +1451,7 @@ async function addQueryQualifiers(stmt, range, caller) {
   }
   if (selection && caller === 'results') {
     stmt += ` AND file = ? `;
-    params.push(STATE.filesToAnalyse[0]);
+    params.push(QUEUE.getAllPaths[0]);
   } else {
     stmt += await getSpeciesSQLAsync()
   }
@@ -1764,16 +1765,16 @@ async function onAnalyse({
   // Now we've asked for a new analysis, clear the aborted flag
   aborted = false;
   STATE.incrementor = 1;
-  STATE.corruptFiles = [];
   STATE.clippedBatches = 0;
   STATE.clippedFilesDuration = 0;
-  STATE.lastChunks = false;
   predictionStart = new Date();
   // Set the appropriate selection range if this is a selection analysis
   STATE.update({
     selection: end ? getSelectionRange(filesInScope[0], start, end) : undefined,
   });
-
+  if (STATE.selection){
+    QUEUE.transition(filesInScope[0], 'complete', 'pending')
+  } else { QUEUE.moveAll(['inProgress', 'complete'], 'pending') }
   DEBUG &&
     console.log(
       `Worker received message: ${filesInScope}, ${STATE.detect.confidence}, start: ${start}, end: ${end}`
@@ -1781,8 +1782,6 @@ async function onAnalyse({
   //Reset GLOBAL variables
   index = 0;
   batchesToSend = {};
-  FILE_QUEUE = filesInScope;
-  STATE.processingPaused = {};
   STATE.backlogInterval = {};
   t0_analysis = Date.now();
   if (!STATE.selection) {
@@ -1793,22 +1792,21 @@ async function onAnalyse({
     }
     // Clear any location filters set in explore/charts
     STATE.location = undefined;
-    //create a copy of files in scope for state, as filesInScope is spliced
-    STATE.setFiles([...filesInScope]);
   }
 
   let count = 0;
+  const files = QUEUE.getAllPaths('pending')
   if (DATASET && !STATE.selection && !reanalyse) {
-    for (let i = FILE_QUEUE.length - 1; i >= 0; i--) {
-      let file = FILE_QUEUE[i];
+    for (let i =  files.length - 1; i >= 0; i--) {
+      let file = files[i];
       //STATE.db = diskDB;
       const result = await diskDB.getAsync(
         "SELECT name FROM files WHERE name = ?",
         file
       );
-      if (result && result.name !== FILE_QUEUE[0]) {
+      if (result && result.name !== files[0]) {
         DEBUG && console.log(`Skipping ${file}, already analysed`);
-        FILE_QUEUE.splice(i, 1);
+        files.splice(i, 1);
         count++;
         continue;
       }
@@ -1818,18 +1816,18 @@ async function onAnalyse({
     // check if results for the files are cached
     // we only consider it cached if all files have been saved to the disk DB)
     // BECAUSE we want to change state.db to disk if they are
-    const allSaved = await savedFileCheckAsync(FILE_QUEUE);
-    METADATA = await updateMetadata(FILE_QUEUE)
+    const allSaved = await savedFileCheckAsync(files);
+    METADATA = await updateMetadata(files)
     const retrieveFromDatabase =
       (allSaved && !reanalyse && !STATE.selection) || circleClicked;
     if (retrieveFromDatabase) {
-      filesBeingProcessed = [];
+      QUEUE.setAll('complete');
       if (circleClicked) {
         // handle circle here
         await getResults({ topRankin: 5, offset: 0 });
       } else {
         await onChangeMode("archive");
-        FILE_QUEUE.forEach((file) =>
+        files.forEach((file) =>
           UI.postMessage({
             event: "update-audio-duration",
             value: METADATA[file].duration,
@@ -1840,15 +1838,12 @@ async function onAnalyse({
       return;
     }
   }
-  await processFilesInBatches(FILE_QUEUE);
   DEBUG &&
-    console.log("FILE_QUEUE has", FILE_QUEUE.length, "files", count, "files ignored");
+    console.log("queue has", files.length, "files", count, "files ignored");
   if (!STATE.selection) {
     await onChangeMode("analyse");
     await resetEmbeddings();
   }
-
-  filesBeingProcessed = [...FILE_QUEUE];
   STATE.workerQueue = createMultiWorkerQueue(predictWorkers, parsePredictions, {
     timeoutMs: 60000
   });
@@ -1871,8 +1866,6 @@ function onAbort({ model = STATE.model }) {
     batchSize: BATCH_SIZE,
     backend: STATE.detect.backend}));
   aborted = true;
-  FILE_QUEUE = [];
-  filesBeingProcessed = [];
   predictionsReceived = {};
   predictionsRequested = {};
   index = 0;
@@ -1907,7 +1900,7 @@ const measureDurationWithFfmpeg = (src) => {
       .audioChannels(channels)
       .audioFrequency(sampleRate)
       .on("error", (err) => {
-        STATE.corruptFiles.push(src);
+        QUEUE.setStatus(src, 'invalid');
         stream.destroy();
         reject(err);
       })
@@ -2003,6 +1996,7 @@ async function getWorkingFile(file) {
       zh: "文件未找到",
     };
     const message = i18n[STATE.locale] || i18n["en"];
+    QUEUE.setStatus(file, 'missing');
     throw new Error(`${message}: ${file}`);
   }
   const meta = await setMetadata({ file: file, source_file: source_file });
@@ -2453,12 +2447,11 @@ const setMetadata = async ({ file, source_file = file }) => {
 const getPredictBuffers = async ({ file = "", start = 0, end = undefined }) => {
   if (!fs.existsSync(file)) {
     const found = await getWorkingFile(file);
-    if (!found) throw new Error("Unable to locate " + file);
-    const index = filesBeingProcessed.indexOf(file);
-    filesBeingProcessed[index] = found;
-    // Need to update state too
-    const stateIndex = STATE.filesToAnalyse.indexOf(file);
-    STATE.filesToAnalyse[stateIndex] = found;
+    if (!found) {
+      QUEUE.setStatus(file, 'missing');
+      return
+    }
+    QUEUE.renameFile(file, found);
     file = found;
   }
   // Ensure max and min are within range
@@ -2516,6 +2509,7 @@ async function processAudio(
   highWaterMark,
   samplesInBatch
 ) {
+  STATE.lastChunks = false;
   let remainingTrimSeconds = 0;
   if (!(file.toLowerCase().endsWith(".wav") || file.toLowerCase().endsWith(".flac"))) { 
     const adjustment = 0.05; 
@@ -2549,7 +2543,7 @@ async function processAudio(
     chunker,          // PCM → channelData objects
     predictionWritable
   );
-  if (!FILE_QUEUE.length) STATE.lastChunks = true;
+  if (QUEUE.allComplete()) STATE.lastChunks = true;
   DEBUG && console.log("All chunks processed for", file);
 }
 
@@ -3299,14 +3293,14 @@ const parsePredictions = async (response) => {
     if (!embeddingsBatch?.length) {
       predictionsReceived[file]++;
       if (predictionsReceived[file] >= (batchesToSend[file] || 1)) {
-        updateFilesBeingProcessed(file, worker);
+        updateQueue(file, worker);
       }
       return worker;
     }
     await prepareQuery(embeddingsBatch[0]);
     predictionsReceived[file]++;
     if (predictionsReceived[file] >= (batchesToSend[file] || 1)) {
-      updateFilesBeingProcessed(file, worker);
+      updateQueue(file, worker);
     }
     return worker;
   }
@@ -3385,28 +3379,29 @@ const parsePredictions = async (response) => {
     getSummary({ interim: true });
   }
   if (fileProgress === 1) {
-    if (index === 0) {
-      generateAlert({
-        message: "noDetectionsDetailed2",
-        variables: {
-          file,
-          list: STATE.list,
-          confidence: STATE.detect.confidence / 10,
-        },
-      });
-    }
-    updateFilesBeingProcessed(response.file, worker);
+    updateQueue(response.file, worker);
     DEBUG &&
       console.log(
         `File ${file} processed after ${
           (new Date() - predictionStart) / 1000
-        } seconds: ${filesBeingProcessed.length} files to go`
+        } seconds: ${QUEUE.getSize('pending') + QUEUE.getSize('inProgress')} files to go`
       );
+    if (QUEUE.allComplete()) {
+      if (index === 0) {
+        generateAlert({
+          message: "noDetectionsDetailed2",
+          variables: {
+            file,
+            list: STATE.list,
+            confidence: STATE.detect.confidence / 10,
+          },
+        });
+      }
+      STATE.selection || getSummary(); 
+      UI.postMessage({ event: "analysis-complete" })
+    }
   }
-  if (!FILE_QUEUE.length && (selection || STATE.lastChunks)) {
-    STATE.selection || getSummary(); 
-    UI.postMessage({ event: "analysis-complete" })
-  }
+
   return worker;
 };
 
@@ -3542,22 +3537,16 @@ async function parseMessage(e) {
 }
 
 /**
- * Mark a file as finished processing and notify the UI when all files are complete.
- *
- * Removes the given file from the internal filesBeingProcessed list;
+ * Mark a file as finished processing and begin processing the next
  *
  * @param {string|object} file - File identifier (file path or file record) to remove from the processing list.
  */
-function updateFilesBeingProcessed(file, worker) {
+function updateQueue(file, worker) {
   // This method to determine batch complete
-  const fileIndex = filesBeingProcessed.indexOf(file);
-  if (fileIndex !== -1) {
-    filesBeingProcessed.splice(fileIndex, 1);
-    if (DEBUG) console.log("filesbeingprocessed length is:",
-        filesBeingProcessed.length
-      );
-  }
-
+  QUEUE.markComplete(file)
+  if (DEBUG) console.log("queue length is:",
+      QUEUE.getSize('inProgress') + QUEUE.getSize('pending')
+    );
   processNextFile({ worker: worker });
 }
 
@@ -3577,16 +3566,18 @@ async function processNextFile({
   end = undefined,
   worker = undefined,
 } = {}) {
-  if (FILE_QUEUE.length) {
-    let file = FILE_QUEUE.shift();
+  const files = QUEUE.getAllPaths('pending');
+  if (files.length) {
+    let file = files.shift();
+    QUEUE.setStatus(file, 'inProgress')
     predictionsReceived[file] = 0;
     predictionsRequested[file] = 0;
     const found = await getWorkingFile(file).catch((error) => {
       if (error instanceof Event)
         error = `Event passed ${error.type}, attached to ${error.currentTarget}`;
       const message = error.message || error;
-      if (!STATE.notFound.file) {
-        STATE.notFound[file] = true;
+      if (QUEUE.getStatus(file) !== 'missing' ) {
+        QUEUE.transition(file, 'inProgress', 'missing')
         console.warn("Error in getWorkingFile", message);
         generateAlert({
           type: "warning",
@@ -3596,7 +3587,6 @@ async function processNextFile({
       }
     });
     if (found) {
-      delete STATE.notFound[file];
       let boundaries = [];
       if (start === undefined)
         boundaries = await setStartEnd(file).catch((error) =>
@@ -3611,7 +3601,7 @@ async function processNextFile({
         const { start, end } = boundaries[i];
         if (start === null) {
           // Nothing to do for this file
-          updateFilesBeingProcessed(file, worker);
+          updateQueue(file, worker);
           generateAlert({ message: "noNight", variables: { file } });
           DEBUG && console.log("Recursion: start = end");
           await processNextFile(arguments[0]).catch((error) =>
@@ -3640,7 +3630,7 @@ async function processNextFile({
       }
     } else {
       DEBUG && console.log("Recursion: file not found");
-      updateFilesBeingProcessed(file, worker); // remove file from processing list
+      updateQueue(file, worker); // remove file from processing list
       await processNextFile(arguments[0]).catch((error) =>
         console.warn("Error in recursive processNextFile call", error)
       );
@@ -4656,7 +4646,8 @@ async function onDelete({
   end = parseFloat(end); start = parseFloat(start);
   const params = [id, start, end];
   let sql = "DELETE FROM records WHERE fileID = ? AND position = ? AND end = ?";
-  if (! (STATE.detect.merge || STATE.detect.combine)){
+  const {combine, merge} = STATE.detect;
+  if (!(combine || merge)){
     params.push(modelID)
     sql += " AND modelID = ?";
   }
@@ -4701,11 +4692,12 @@ async function onDeleteSpecies({
   let SQL = `DELETE FROM records 
     WHERE speciesID IN (SELECT id FROM species WHERE cname = ?)`;
   if (STATE.mode === "analyse") {
+    const filePaths = QUEUE.getAllPaths();
     const rows = await db.allAsync(
       `SELECT id FROM files WHERE NAME IN (${prepParams(
-        STATE.filesToAnalyse
+        filePaths
       )})`,
-      ...STATE.filesToAnalyse
+      ...filePaths
     );
     const ids = rows.map((row) => row.id).join(",");
     SQL += ` AND fileID in (${ids})`;
@@ -5402,8 +5394,9 @@ async function convertAndOrganiseFiles(threadLimit = 4) {
   if (STATE.mode === "archive") {
     // Only add current results
     const keyword = backfill ? " WHERE" : " AND";
-    query += `${keyword} f.name IN (${prepParams(STATE.filesToAnalyse)})`;
-    params.push(...STATE.filesToAnalyse);
+    const files = QUEUE.getAllPaths();
+    query += `${keyword} f.name IN (${prepParams(files)})`;
+    params.push(...files);
   }
   t0 = Date.now();
   const rows = await db.allAsync(query, ...params);
