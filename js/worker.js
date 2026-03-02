@@ -1795,6 +1795,7 @@ async function onAnalyse({
   });
   const selection = STATE.selection; // we only get 'end' during selection analysis
   if (selection){
+    QUEUE.addFiles(filesInScope)
     // Set all files complete
     QUEUE.moveAll(['inProgress', 'pending'], 'complete')
     // Set the first (actually the only file in scope) to pending
