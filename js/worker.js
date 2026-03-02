@@ -5409,7 +5409,7 @@ async function convertAndOrganiseFiles(threadLimit = 4) {
   if (STATE.mode === "archive") {
     // Only add current results
     const keyword = backfill ? " WHERE" : " AND";
-    const files = QUEUE.getAllPaths('completed');
+    const files = QUEUE.getAllPaths('complete');
     if (!files.length) {
       generateAlert({ message: "libraryUpToDate" });
       return;
