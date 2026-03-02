@@ -1768,12 +1768,18 @@ async function onAnalyse({
   STATE.clippedBatches = 0;
   STATE.clippedFilesDuration = 0;
   predictionStart = new Date();
+
+  const selection = end; // we only get 'end' during selection analysis
+
   // Set the appropriate selection range if this is a selection analysis
   STATE.update({
-    selection: end ? getSelectionRange(filesInScope[0], start, end) : undefined,
+    selection: selection ? getSelectionRange(filesInScope[0], start, end) : undefined,
   });
-  if (STATE.selection){
-    QUEUE.transition(filesInScope[0], 'complete', 'pending')
+  if (selection){
+    // Set all files complete
+    QUEUE.moveAll(['inProgress', 'pending'], 'complete')
+    // Set the first (actually the only file in scope) to pending
+    QUEUE.setStatus(filesInScope[0], 'pending')
   } else { QUEUE.moveAll(['inProgress', 'complete'], 'pending') }
   DEBUG &&
     console.log(
@@ -1784,7 +1790,7 @@ async function onAnalyse({
   batchesToSend = {};
   STATE.backlogInterval = {};
   t0_analysis = Date.now();
-  if (!STATE.selection) {
+  if (!selection) {
     const {combine, merge} = STATE.detect;
     // Clear records from the memory db
     if (!(combine || merge)){
@@ -1796,7 +1802,7 @@ async function onAnalyse({
 
   let count = 0;
   const files = QUEUE.getAllPaths('pending')
-  if (DATASET && !STATE.selection && !reanalyse) {
+  if (DATASET && !selection && !reanalyse) {
     for (let i =  files.length - 1; i >= 0; i--) {
       let file = files[i];
       //STATE.db = diskDB;
@@ -1819,7 +1825,7 @@ async function onAnalyse({
     const allSaved = await savedFileCheckAsync(files);
     METADATA = await updateMetadata(files)
     const retrieveFromDatabase =
-      (allSaved && !reanalyse && !STATE.selection) || circleClicked;
+      (allSaved && !reanalyse && !selection) || circleClicked;
     if (retrieveFromDatabase) {
       QUEUE.setAll('complete');
       if (circleClicked) {
@@ -1840,7 +1846,7 @@ async function onAnalyse({
   }
   DEBUG &&
     console.log("queue has", files.length, "files", count, "files ignored");
-  if (!STATE.selection) {
+  if (!selection) {
     await onChangeMode("analyse");
     await resetEmbeddings();
   }
