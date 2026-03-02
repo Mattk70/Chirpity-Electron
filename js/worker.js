@@ -1413,7 +1413,10 @@ async function getSpeciesSQLAsync(file){
   const {list, allLabels} = STATE;
   
   // If we don't have a file, use the first analysed file if available
-  file ??= QUEUE.getAllPaths()[0];
+  file ??=
+    QUEUE.getAllPaths('pending')[0] ??
+    QUEUE.getAllPaths('inProgress')[0] ??
+    QUEUE.getAllPaths('complete')[0];
   if (list !== 'everything') {
     let included = await getIncludedIDs(file);
     if (["birds", 'Animalia'].includes(list)) {
@@ -1457,8 +1460,16 @@ async function addQueryQualifiers(stmt, range, caller) {
     params.push(...labelFilters);
   }
   if (selection && caller === 'results') {
-    stmt += ` AND file = ? `;
-    params.push(QUEUE.getAllPaths()[0]);
+    const selectedFile =
+      QUEUE.getAllPaths('pending')[0] ??
+      QUEUE.getAllPaths('inProgress')[0] ??
+      QUEUE.getAllPaths('complete')[0];
+    if (selectedFile) {
+      stmt += ` AND file = ? `;
+     params.push(selectedFile);
+    } else {
+      stmt += ` AND 1 = 0 `;
+    }
   } else {
     stmt += await getSpeciesSQLAsync()
   }
@@ -3617,9 +3628,6 @@ async function processNextFile({
           updateQueue(file, worker);
           generateAlert({ message: "noNight", variables: { file } });
           DEBUG && console.log("Recursion: start = end");
-          await processNextFile(arguments[0]).catch((error) =>
-            console.warn("Error in processNextFile call", error)
-          );
         } else {
           if (!STATE.selection && !sumObjectValues(predictionsReceived)) {
           const awaiting = {
@@ -3644,9 +3652,6 @@ async function processNextFile({
     } else {
       DEBUG && console.log("Recursion: file not found");
       updateQueue(file, worker); // remove file from processing list
-      await processNextFile(arguments[0]).catch((error) =>
-        console.warn("Error in recursive processNextFile call", error)
-      );
     }
   }
 }
