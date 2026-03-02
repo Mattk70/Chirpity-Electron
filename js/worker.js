@@ -1787,12 +1787,13 @@ async function onAnalyse({
   STATE.clippedFilesDuration = 0;
   predictionStart = new Date();
 
-  const selection = end; // we only get 'end' during selection analysis
+
 
   // Set the appropriate selection range if this is a selection analysis
   STATE.update({
-    selection: selection ? getSelectionRange(filesInScope[0], start, end) : undefined,
+    selection: end ? getSelectionRange(filesInScope[0], start, end) : undefined,
   });
+  const selection = STATE.selection; // we only get 'end' during selection analysis
   if (selection){
     // Set all files complete
     QUEUE.moveAll(['inProgress', 'pending'], 'complete')
@@ -1845,7 +1846,6 @@ async function onAnalyse({
     const retrieveFromDatabase =
       (allSaved && !reanalyse && !selection) || circleClicked;
     if (retrieveFromDatabase) {
-      QUEUE.setAll('complete');
       if (circleClicked) {
         // handle circle here
         await getResults({ topRankin: 5, offset: 0 });
