@@ -6798,6 +6798,7 @@ async function readLabels(labelFile, updating) {
           type: 'warning'
         });
         config.list = 'birds';
+        updatePrefs("config.json", config);
         updateList()
         return;
       }
@@ -6815,6 +6816,7 @@ async function readLabels(labelFile, updating) {
           type: 'warning'
         });
         config.list = 'birds';
+        updatePrefs("config.json", config);
         updateList()
         return;
       }

@@ -2034,7 +2034,6 @@ async function getWorkingFile(file) {
       zh: "文件未找到",
     };
     const message = i18n[STATE.locale] || i18n["en"];
-    QUEUE.setStatus(file, 'missing');
     throw new Error(`${message}: ${file}`);
   }
   const meta = await setMetadata({ file: file, source_file: source_file });
@@ -3622,9 +3621,13 @@ async function processNextFile({
   if (found) {
     let boundaries = [];
     if (start === undefined)
-      boundaries = await setStartEnd(file).catch((error) =>
-        console.warn("Error in setStartEnd", error)
-      );
+      try {
+        boundaries = await setStartEnd(file);
+      } catch (error) {
+        console.warn("Error in setStartEnd", error);
+        updateQueue(file, worker);
+        return;
+      }
     else {
       boundaries.push({ start: start, end: end });
       const batches = Math.ceil((end - start - EPSILON) / (BATCH_SIZE * WINDOW_SIZE));
@@ -3636,7 +3639,6 @@ async function processNextFile({
         // Nothing to do for this file
         generateAlert({ message: "noNight", variables: { file } });
         DEBUG && console.log("Recursion: start = end");
-
         updateQueue(file, worker);
         continue;
       } else {
