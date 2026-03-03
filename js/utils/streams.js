@@ -422,15 +422,6 @@ class FileQueueManager {
     return this.statuses.flatMap((s) => [...this.byStatus[s]]);
   }
 
-  /** Get batches of paths (optionally filtered by status) */
-  getBatches(batchSize = 1000, status) {
-    const paths = this.getAllPaths(status);
-    const batches = [];
-    for (let i = 0; i < paths.length; i += batchSize) {
-      batches.push(paths.slice(i, i + batchSize));
-    }
-    return batches;
-  }
 
   /** Get the size of the queue (optionally for 'status') */
   getSize(status) {

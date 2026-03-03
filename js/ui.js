@@ -1599,6 +1599,8 @@ function saveAnalyseState() {
       active: active,
       analysisDone: STATE.analysisDone,
       resultsSortOrder: STATE.resultsSortOrder,
+      resultsMetaSortOrder: STATE.resultsMetaSortOrder,
+      summarySortOrder: STATE.summarySortOrder
     };
   }
 }
@@ -1723,6 +1725,8 @@ async function showAnalyse() {
     worker.postMessage({
       action: "update-state",
       resultsSortOrder: STATE.resultsSortOrder,
+      resultsMetaSortOrder: STATE.resultsMetaSortOrder,
+      summarySortOrder: STATE.summarySortOrder,
     });
     if (STATE.analysisDone) {
       filterResults({
