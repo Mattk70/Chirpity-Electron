@@ -3688,6 +3688,7 @@ async function processNextFile({
   } else {
     DEBUG && console.log("Recursion: file not found");
     QUEUE.transition(file, 'inProgress', 'missing'); // Ensure missing files are marked as such in the queue
+    updateQueue(file, worker); // advances queue; markComplete no-ops on terminal states
   }
 }
 
