@@ -1,7 +1,10 @@
 const fs = require('node:fs');
 const csv = require('@fast-csv/parse');
 const readline = require('readline');
+const pLimit = require('p-limit');
+const limit = pLimit(8);
 
+const processingTasks = [];
 async function countLines(filePath) {
   const fileStream = fs.createReadStream(filePath);
   const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
@@ -33,14 +36,16 @@ async function countLines(filePath) {
         species: new Map(),
         tags: new Map(),
         locations: new Map(),
-        files: new Map()
+        files: new Map(),
+        fileExists: new Map()
       };
+    const processingTasks = [];
     const totalLines = await countLines(file);
     let rowCounter = 0, lastPercentReported = -1;
     let t0 = Date.now()
     const stream = fs.createReadStream(file);
     const fileSet = new Set();
-    let processing = Promise.resolve();
+    // let processing = Promise.resolve();
     return new Promise((resolve, reject) =>{
         csv.parseStream(stream, 
         {
@@ -52,13 +57,16 @@ async function countLines(filePath) {
             trim: true
         }
         )
-        .on('error', error => {
+        .on('error', async error => {
             console.error(error);
             return reject(error)
         })
         .on('data',  row =>  {
             // Chain processing to ensure sequential execution
-            processing = processing.then(async () => {
+            // processing = processing.then(async () => {
+                const task = limit(async () => {
+
+
             try {
                 METADATA = await prepInsertParams({db, row, METADATA, setMetadata, defaultLocation, caches})
                 rowCounter++;
@@ -71,11 +79,20 @@ async function countLines(filePath) {
             } catch (error) {
                 return reject(error)
             }
-            fs.existsSync(row.file) && fileSet.add(row.file);
+            let exists = caches.fileExists.get(file);
+            if (exists === undefined) {
+              exists = fs.existsSync(file);
+              caches.fileExists.set(file, exists);
+            }
+            if (exists) {
+              fileSet.add(row.file);
+            }
             });
+              processingTasks.push(task);
         })
         .on('end', async rowCount => {
-            await processing;
+            // await processing;
+            await Promise.all(processingTasks);
             console.log(`Parsed ${rowCount} rows in ${Date.now() - t0}ms`)
             resolve({files: Array.from(fileSet), meta:METADATA})
         });

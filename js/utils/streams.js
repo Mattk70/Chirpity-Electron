@@ -227,8 +227,9 @@ function createMultiWorkerQueue(
 
       if (error) entry.reject(new Error(error));
       else {
-        consumer(e.data);
-        entry.resolve(result);
+        Promise.resolve(consumer(e.data))
+          .then(() => entry.resolve(result))
+          .catch((consumeErr) => entry.reject(consumeErr));
       }
     };
 
