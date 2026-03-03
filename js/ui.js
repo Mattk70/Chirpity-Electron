@@ -6784,6 +6784,40 @@ async function readLabels(labelFile, updating) {
     const unknownPattern = /^Unknown Sp\.[,_~]Unknown Sp\.$/;
     if (!labels.some(l => unknownPattern.test(l))) labels.push(unknown);
     if (updating === "list") {
+      const MAX_LABELS = 15_000;
+      const lines = labels.length;
+      const validLinePattern = /^[^,_~]+[,_~][^,_~]+([,_~][^,_~]*){0,3}$/;
+      // 1️⃣ Guard maximum line count first
+      if (lines > MAX_LABELS) {
+        generateToast({
+          message: 'badListFormat',
+          variables: {
+            line: MAX_LABELS,
+            value: "Too many labels"
+          },
+          type: 'warning'
+        });
+        config.list = 'birds';
+        updateList()
+        return;
+      }
+
+      // 2️⃣ Then validate format
+      const invalidIndex = labels.findIndex(l => !validLinePattern.test(l));
+
+      if (invalidIndex !== -1) {
+        generateToast({
+          message: 'badListFormat',
+          variables: {
+            line: invalidIndex + 1,
+            value: labels[invalidIndex]
+          },
+          type: 'warning'
+        });
+        config.list = 'birds';
+        updateList()
+        return;
+      }
       worker.postMessage({
         action: "update-list",
         list: config.list,
