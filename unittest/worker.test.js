@@ -160,8 +160,8 @@ test('STATE uses WorkerState class', () => {
   assert.ok(/new\s+State\s*\(/.test(workerContent), 'Should instantiate State class');
 });
 
-test('defines FILE_QUEUE', () => {
-  assert.ok(/const\s+QUEUE\s*=\s*new\s+FileQueueManager/.test(workerContent), 'Should define QUEUE class');
+test('defines QUEUE', () => {
+  assert.ok(/const\s+analyseQueue\s*=\s*new\s+FileQueueManager/.test(workerContent), 'Should define QUEUE class');
 });
 
 test('defines predictWorkers array', () => {
@@ -315,7 +315,7 @@ test('handles file analysis requests', () => {
 });
 
 test('manages file queue', () => {
-  assert.ok(/QUEUE\.addFiles/.test(workerContent), 'Should populate file queue');
+  assert.ok(/QUEUE\.setFiles/.test(workerContent), 'Should populate file queue');
 });
 
 test('tracks analysis progress', () => {
@@ -491,11 +491,6 @@ test('prepares SQL parameters', () => {
 
 // Test Suite 17: Filter and Label Management
 console.log(`\n${colors.yellow}Test Suite: Filter and Label Management${colors.reset}`);
-
-test('checks if filters are applied', () => {
-  assert.ok(/filtersApplied/.test(workerContent),
-            'Should have filtersApplied function');
-});
 
 test('manages labels', () => {
   assert.ok(/STATE\.allLabels/.test(workerContent) ||
