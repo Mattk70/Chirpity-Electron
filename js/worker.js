@@ -148,9 +148,10 @@ let appPath,
   tempPath,
   BATCH_SIZE,
   batchesToSend = {};
-let LIST_WORKER;
+let LIST_WORKER, QUEUE;
 
-const QUEUE = new FileQueueManager();
+const analyseQueue = new FileQueueManager();
+QUEUE = analyseQueue;
 // Adapted from https://stackoverflow.com/questions/6117814/get-week-of-year-in-javascript-like-in-php
 Date.prototype.getWeekNumber = function () {
   var d = new Date(
@@ -519,7 +520,7 @@ async function handleMessage(e) {
       if (result) {
         const {files, meta} = result;
         METADATA = meta;
-        QUEUE.addFiles(await getFiles({files, preserveResults:true, checkSaved: false}), 'complete')
+        QUEUE.setFiles(await getFiles({files, preserveResults:true, checkSaved: false}), 'complete')
         await Promise.all([getSummary(), getResults()]);
       }
       UI.postMessage({ event: "clear-loading"})
@@ -976,9 +977,6 @@ async function onChangeMode(mode) {
   UI.postMessage({ event: "mode-changed", mode: mode });
 }
 
-const filtersApplied = (list) => {
-  return STATE.list !== 'everything';
-};
 
 /**
  * Initialize application state, databases, and prediction workers for the specified model.
@@ -1019,12 +1017,20 @@ async function onLaunch({
     model = 'birdnet'; perch = false; modelPath = null;
     generateAlert({message, type:'error'})
   }
-  WINDOW_SIZE = perch ? 5 : 3;
-  // threads = perch ? 1 : threads;
+  const newWindowSize = perch ? 5 : 3;
+  if (newWindowSize !== WINDOW_SIZE) {
+    // Update totalBatches so time estimates remain accurate
+    WINDOW_SIZE = newWindowSize;
+    if (STATE.totalBatches > 0) {
+      const files = QUEUE.getAllPaths();
+      await processFilesInBatches(files);
+    }
+  }
 
   sampleRate = sampleRates[model] || 48_000;
   STATE.detect.backend = backend;
   BATCH_SIZE = batchSize;
+
   STATE.update({ model, modelPath });
   const result = await diskDB?.getAsync('SELECT id FROM models WHERE NAME = ?', model)
   if (!result){
@@ -1185,7 +1191,7 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true}) => {
   trackEvent(STATE.UUID, "UI", "Drop", fileOrFolder, filePaths.length);
   UI.postMessage({ event: "files", filePaths, preserveResults, checkSaved });
   const allSaved = checkSaved ? await savedFileCheckAsync(filePaths) : false;
-  QUEUE.addFiles(filePaths);
+  QUEUE.setFiles(filePaths);
   if (allSaved) {
     await onChangeMode("archive");
     if (STATE.detect.autoLoad){
@@ -1226,9 +1232,7 @@ async function processFilesInBatches(filePaths, batchSize = 20) {
           return fileMetadata;
         }).catch ((_e) => {
           console.warn(`Failed to get metadata for file: ${file}`);
-          QUEUE.transition(file, 'pending', 'invalid')
-          const idx = filePaths.indexOf(file);
-          if (idx !== -1) filePaths.splice(idx, 1); // Remove the file from the list
+          QUEUE.setStatus(file, 'invalid')
           return null; // or handle the error as needed
         }
       ))
@@ -1789,18 +1793,24 @@ async function onAnalyse({
 
 
 
+
   // Set the appropriate selection range if this is a selection analysis
   STATE.update({
     selection: end ? getSelectionRange(filesInScope[0], start, end) : undefined,
   });
   const selection = STATE.selection; // we only get 'end' during selection analysis
-  if (selection){
-    QUEUE.addFiles(filesInScope)
-    // Set all files complete
-    QUEUE.moveAll(['inProgress', 'pending'], 'complete')
-    // Set the first (actually the only file in scope) to pending
-    QUEUE.setStatus(filesInScope[0], 'pending')
-  } else { QUEUE.moveAll(['inProgress', 'complete'], 'pending') }
+  QUEUE.setFiles(filesInScope);
+
+  // TODO: figure out if we can reuse a queue across analyses
+  // benefit: don't keep flagging corrupt / missing files
+  // if (filesInScope.length === 1) {
+  //   // Handle explore case
+  //   QUEUE.addFile(filesInScope[0]);
+  //   // Set all files complete
+  //   QUEUE.moveAll(['inProgress', 'pending'], 'complete')
+  //   // Set the first (actually the only file in scope) to pending
+  //   QUEUE.setStatus(filesInScope[0], 'pending')
+  // } else { QUEUE.moveAll(['inProgress', 'complete'], 'pending') }
   DEBUG &&
     console.log(
       `Worker received message: ${filesInScope}, ${STATE.detect.confidence}, start: ${start}, end: ${end}`
@@ -1891,6 +1901,7 @@ function onAbort({ model = STATE.model }) {
     batchSize: BATCH_SIZE,
     backend: STATE.detect.backend}));
   aborted = true;
+  // QUEUE.moveAll(['inProgress', 'complete'], 'pending');
   predictionsReceived = {};
   predictionsRequested = {};
   index = 0;
@@ -2476,7 +2487,22 @@ const getPredictBuffers = async ({ file = "", start = 0, end = undefined }) => {
       QUEUE.setStatus(file, 'missing');
       return
     }
-    QUEUE.renameFile(file, found);
+    if (found !== file) {
+      QUEUE.renameFile(file, found);
+
+      if (file in predictionsReceived) {
+        predictionsReceived[found] = predictionsReceived[file];
+        delete predictionsReceived[file];
+      }
+      if (file in predictionsRequested) {
+        predictionsRequested[found] = predictionsRequested[file];
+        delete predictionsRequested[file];
+      }
+      if (file in batchesToSend) {
+        batchesToSend[found] = batchesToSend[file];
+        delete batchesToSend[file];
+      }
+    }
     file = found;
   }
   // Ensure max and min are within range
@@ -2534,7 +2560,6 @@ async function processAudio(
   highWaterMark,
   samplesInBatch
 ) {
-  STATE.lastChunks = false;
   let remainingTrimSeconds = 0;
   if (!(file.toLowerCase().endsWith(".wav") || file.toLowerCase().endsWith(".flac"))) { 
     const adjustment = 0.05; 
@@ -2545,14 +2570,8 @@ async function processAudio(
     }
   const additionalFilters = STATE.filters.sendToModel ? setAudioFilters() : [];
   const command = await setupFfmpegCommand({ file, start, end:endTime, sampleRate, additionalFilters, });
-  const workerQueue = STATE.workerQueue;
-  const sendToModel = createPredictSender(workerQueue);
   
-  const predictionWritable = new PredictionWritable(sendToModel, {
-    concurrency: 6
-  });
-
-  const chunker = new PCMChunker({
+  const prepareAudio = new PCMChunker({
     highWaterMarkBytes: highWaterMark,
     samplesInBatch,
     sampleRate,
@@ -2563,12 +2582,15 @@ async function processAudio(
     alertFn: generateAlert
   });
 
+  const workerQueue = STATE.workerQueue;
+  const sendToModel = createPredictSender(workerQueue);
+  const bufferAndSend = new PredictionWritable(sendToModel, {concurrency: 6 });
+
   await pipeline(
-    command.pipe(),   // ffmpeg stdout
-    chunker,          // PCM → channelData objects
-    predictionWritable
+    command.pipe(), // ffmpeg stdout
+    prepareAudio,   // PCM → channelData objects
+    bufferAndSend   // Buffer channelData objects, send to model
   );
-  if (QUEUE.allComplete()) STATE.lastChunks = true;
   DEBUG && console.log("All chunks processed for", file);
 }
 
@@ -2763,7 +2785,7 @@ async function doPrediction({
     event: "update-audio-duration",
     value: end - start,
   });
-  await getPredictBuffers({ file: file, start: start, end: end }).catch(
+  await getPredictBuffers({ file, start, end }).catch(
     (error) => console.warn(error)
   );
 }
@@ -3413,14 +3435,18 @@ const parsePredictions = async (response) => {
       );
     if (QUEUE.allComplete()) {
       if (index === 0) {
-        generateAlert({
-          message: "noDetectionsDetailed2",
-          variables: {
-            file,
-            list: STATE.list,
-            confidence: STATE.detect.confidence / 10,
-          },
-        });
+        if (STATE.selection) {
+          generateAlert({ message: "noDetections" });
+        } else {
+          generateAlert({
+            message: "noDetectionsDetailed2",
+            variables: {
+              file,
+              list: STATE.list,
+              confidence: STATE.detect.confidence / 10,
+            },
+          });
+        }
       }
       STATE.selection || getSummary(); 
       UI.postMessage({ event: "analysis-complete" })
@@ -3567,10 +3593,10 @@ async function parseMessage(e) {
  * @param {string|object} file - File identifier (file path or file record) to remove from the processing list.
  */
 function updateQueue(file, worker) {
-  // This method to determine batch complete
+  // This method to determine file complete
   QUEUE.markComplete(file)
-  if (DEBUG) console.log("queue length is:",
-      QUEUE.getSize('inProgress') + QUEUE.getSize('pending')
+  if (DEBUG) console.log(
+    "queue length is: ", QUEUE.getSize('inProgress') + QUEUE.getSize('pending')
     );
   processNextFile({ worker: worker });
 }
@@ -3601,8 +3627,7 @@ async function processNextFile({
       if (error instanceof Event)
         error = `Event passed ${error.type}, attached to ${error.currentTarget}`;
       const message = error.message || error;
-      if (QUEUE.getStatus(file) !== 'missing' ) {
-        QUEUE.transition(file, 'inProgress', 'missing')
+      if (QUEUE.transition(file, 'inProgress', 'missing')) {
         console.warn("Error in getWorkingFile", message);
         generateAlert({
           type: "warning",
@@ -3626,7 +3651,6 @@ async function processNextFile({
         const { start, end } = boundaries[i];
         if (start === null) {
           // Nothing to do for this file
-          updateQueue(file, worker);
           generateAlert({ message: "noNight", variables: { file } });
           DEBUG && console.log("Recursion: start = end");
         } else {
@@ -3646,13 +3670,16 @@ async function processNextFile({
           };
             sendProgress(awaiting[STATE.locale] || awaiting["en"], 0);
           }
-          await doPrediction({start, end, file, worker})
-            .catch((error) => console.warn("Error in doPrediction", error.message));
+          UI.postMessage({
+            event: "update-audio-duration",
+            value: end - start,
+          });
+          await getPredictBuffers({ file, start, end }).catch((error) => console.warn(error));
         }
       }
     } else {
       DEBUG && console.log("Recursion: file not found");
-      updateQueue(file, worker); // remove file from processing list
+      QUEUE.transition(file, 'inProgress', 'missing'); // Ensure missing files are marked as such in the queue
     }
   }
 }

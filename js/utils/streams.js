@@ -285,14 +285,22 @@ class FileQueueManager {
   }
 
   /** Add new files with a given status or all start as pending */
-  addFiles(filePaths, status) {
-    this._reset();
+  setFiles(filePaths, status) {
     status ??= "pending";
     this._checkStatusValue(status);
+    this._reset();
     for (const path of filePaths) {
       this.byStatus[status].add(path);
     }
   }
+
+  /** Add new files with a given status or all start as pending */
+  addFile(file, status) {
+    status ??= "pending";
+    this._checkStatusValue(status);
+    this.byStatus[status].add(file);
+  }
+
   /** Get the current status of a file */
   getStatus(path) {
     for (const status in this.byStatus) {
@@ -306,6 +314,7 @@ class FileQueueManager {
   /** Transition only if current status matches expected */
   transition(path, fromStatus, toStatus) {
     this._checkStatusValue(toStatus);
+    this._checkStatusValue(fromStatus);
     if (this.byStatus[fromStatus]?.has(path)) {
       this.byStatus[fromStatus].delete(path);
       this.byStatus[toStatus].add(path);

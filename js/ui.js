@@ -1685,8 +1685,7 @@ async function showExplore() {
   utils.hideAll();
   utils.showElement(["exploreWrapper", "spectrogramWrapper"], false);
   spec.reInitSpec(config.specMaxHeight);
-  worker.postMessage({ action: "update-state", filesToAnalyse: [] });
-  // Analysis is done
+    // Analysis is done
   STATE.analysisDone = true;
   filterResults({
     species: undefined,
@@ -1723,7 +1722,6 @@ async function showAnalyse() {
     spec.reInitSpec(config.specMaxHeight);
     worker.postMessage({
       action: "update-state",
-      filesToAnalyse: STATE.openFiles,
       resultsSortOrder: STATE.resultsSortOrder,
     });
     if (STATE.analysisDone) {
@@ -1991,15 +1989,21 @@ const defaultConfig = {
 };
 let dirname, appPath, tempPath, systemLocale, isMac;
 window.onload = async () => {
-  window.electron.requestWorkerChannel();
-  await diagnosticsReady;
+
+  const [, , mac, paths] = await Promise.all([
+    window.electron.requestWorkerChannel(),
+    diagnosticsReady,
+    window.electron.isMac(),
+    getPaths(),
+    appVersionLoaded
+  ]);
+
+  isMac = mac;
+  [appPath, tempPath, systemLocale, dirname] = paths;
   defaultConfig.tensorflow.threads = DIAGNOSTICS["Physical Cores"] || 2;
-  isMac = await window.electron.isMac();
   if (isMac) replaceCtrlWithCommand();
   DOM.contentWrapper.classList.add("loaded");
 
-  // Load preferences and override defaults
-  [appPath, tempPath, systemLocale, dirname] = await getPaths();
   // Set default locale
   systemLocale = systemLocale.replace("en-GB", "en_uk");
   systemLocale =
@@ -2014,7 +2018,6 @@ window.onload = async () => {
 
   // Set footer year
   document.getElementById("year").textContent = new Date().getFullYear();
-  await appVersionLoaded;
   document.getElementById("version").textContent = VERSION;
   const configPath = p.join(appPath, "config.json");
   const configFile = await fs.promises.readFile(configPath, "utf8").catch(err =>{
