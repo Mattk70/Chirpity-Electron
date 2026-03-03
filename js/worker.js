@@ -2483,7 +2483,7 @@ const getPredictBuffers = async ({ file = "", start = 0, end = undefined }) => {
     const found = await getWorkingFile(file);
     if (!found) {
       QUEUE.setStatus(file, 'missing');
-      return
+      throw new Error(`File unavailable for prediction: ${file}`);
     }
     if (found !== file) {
       QUEUE.renameFile(file, found);
@@ -2766,29 +2766,6 @@ function createPredictSender(workerQueue) {
     return workerQueue.send(payload, [channelData.buffer]);
   };
 }
-/**
- * Start prediction for a segment of an audio file and post the segment duration to the UI.
- *
- * @param {Object} params - Prediction parameters.
- * @param {string} params.file - Path to the audio file.
- * @param {number} [params.start=0] - Segment start time in seconds.
- * @param {number|null} [params.end=null] - Segment end time in seconds; `null` indicates the file's end.
- */
-async function doPrediction({
-  file = "",
-  start = 0,
-  end = null,
-}) {
-  UI.postMessage({
-    event: "update-audio-duration",
-    value: end - start,
-  });
-  await getPredictBuffers({ file, start, end }).catch(
-    (error) => console.warn(error)
-  );
-}
-
-
 
 const bufferToAudio = async ({
   file = "",
@@ -3679,10 +3656,13 @@ async function processNextFile({
           event: "update-audio-duration",
           value: end - start,
         });
-        await getPredictBuffers({ file, start, end }).catch((error) => {
+        try {
+          await getPredictBuffers({ file, start, end });
+        } catch (error) {
           console.warn(error);
           updateQueue(file, worker);
-        })
+          return; // stop processing this file after queue advancement
+        }
       }
     }
   } else {
