@@ -1464,10 +1464,8 @@ async function addQueryQualifiers(stmt, range, caller) {
     params.push(...labelFilters);
   }
   if (selection && caller === 'results') {
-    const selectedFile =
-      QUEUE.getAllPaths('pending')[0] ??
-      QUEUE.getAllPaths('inProgress')[0] ??
-      QUEUE.getAllPaths('complete')[0];
+    // Only ever 1 file in Queue
+    const selectedFile = QUEUE.getAllPaths()[0]
     if (selectedFile) {
       stmt += ` AND file = ? `;
      params.push(selectedFile);
@@ -3449,10 +3447,8 @@ const parsePredictions = async (response) => {
         }
       }
       STATE.selection || getSummary(); 
-      UI.postMessage({ event: "analysis-complete" })
     }
   }
-
   return worker;
 };
 
@@ -3618,69 +3614,80 @@ async function processNextFile({
   worker = undefined,
 } = {}) {
   const files = QUEUE.getAllPaths('pending');
-  if (files.length) {
-    let file = files.shift();
-    QUEUE.setStatus(file, 'inProgress')
-    predictionsReceived[file] = 0;
-    predictionsRequested[file] = 0;
-    const found = await getWorkingFile(file).catch((error) => {
-      if (error instanceof Event)
-        error = `Event passed ${error.type}, attached to ${error.currentTarget}`;
-      const message = error.message || error;
-      if (QUEUE.transition(file, 'inProgress', 'missing')) {
-        console.warn("Error in getWorkingFile", message);
-        generateAlert({
-          type: "warning",
-          message: "noFile",
-          variables: { error: message },
-        });
-      }
-    });
-    if (found) {
-      let boundaries = [];
-      if (start === undefined)
-        boundaries = await setStartEnd(file).catch((error) =>
-          console.warn("Error in setStartEnd", error)
-        );
-      else {
-        boundaries.push({ start: start, end: end });
-        const batches = Math.ceil((end - start - EPSILON) / (BATCH_SIZE * WINDOW_SIZE));
-        batchesToSend[file] = batches;
-      }
-      for (let i = 0; i < boundaries.length; i++) {
-        const { start, end } = boundaries[i];
-        if (start === null) {
-          // Nothing to do for this file
-          generateAlert({ message: "noNight", variables: { file } });
-          DEBUG && console.log("Recursion: start = end");
-        } else {
-          if (!STATE.selection && !sumObjectValues(predictionsReceived)) {
-          const awaiting = {
-            en: "Awaiting detections",
-            da: "Afventer detektioner",
-            de: "Warten auf Erkennungen",
-            es: "Esperando detecciones",
-            fr: "En attente des détections",
-            ja: "検出を待機中",
-            nl: "Wachten op detecties",
-            pt: "Aguardando detecções",
-            ru: "Ожидание обнаружений",
-            sv: "Väntar på detektioner",
-            zh: "等待检测",
-          };
-            sendProgress(awaiting[STATE.locale] || awaiting["en"], 0);
-          }
-          UI.postMessage({
-            event: "update-audio-duration",
-            value: end - start,
-          });
-          await getPredictBuffers({ file, start, end }).catch((error) => console.warn(error));
-        }
-      }
-    } else {
-      DEBUG && console.log("Recursion: file not found");
-      QUEUE.transition(file, 'inProgress', 'missing'); // Ensure missing files are marked as such in the queue
+  if (files.length === 0) {
+    if (QUEUE.getSize('inProgress') === 0) {
+      DEBUG && console.log("All files processed.");
+      UI.postMessage({ event: "analysis-complete" });
     }
+    return;
+  }
+  let file = files.shift();
+  QUEUE.setStatus(file, 'inProgress')
+  predictionsReceived[file] = 0;
+  predictionsRequested[file] = 0;
+  const found = await getWorkingFile(file).catch((error) => {
+    if (error instanceof Event)
+      error = `Event passed ${error.type}, attached to ${error.currentTarget}`;
+    const message = error.message || error;
+    if (QUEUE.transition(file, 'inProgress', 'missing')) {
+      console.warn("Error in getWorkingFile", message);
+      generateAlert({
+        type: "warning",
+        message: "noFile",
+        variables: { error: message },
+      });
+    }
+  });
+  if (found) {
+    let boundaries = [];
+    if (start === undefined)
+      boundaries = await setStartEnd(file).catch((error) =>
+        console.warn("Error in setStartEnd", error)
+      );
+    else {
+      boundaries.push({ start: start, end: end });
+      const batches = Math.ceil((end - start - EPSILON) / (BATCH_SIZE * WINDOW_SIZE));
+      batchesToSend[file] = batches;
+    }
+    for (let i = 0; i < boundaries.length; i++) {
+      const { start, end } = boundaries[i];
+      if (start === null) {
+        // Nothing to do for this file
+        generateAlert({ message: "noNight", variables: { file } });
+        DEBUG && console.log("Recursion: start = end");
+
+        updateQueue(file, worker);
+        continue;
+      } else {
+        if (!STATE.selection && !sumObjectValues(predictionsReceived)) {
+        const awaiting = {
+          en: "Awaiting detections",
+          da: "Afventer detektioner",
+          de: "Warten auf Erkennungen",
+          es: "Esperando detecciones",
+          fr: "En attente des détections",
+          ja: "検出を待機中",
+          nl: "Wachten op detecties",
+          pt: "Aguardando detecções",
+          ru: "Ожидание обнаружений",
+          sv: "Väntar på detektioner",
+          zh: "等待检测",
+        };
+          sendProgress(awaiting[STATE.locale] || awaiting["en"], 0);
+        }
+        UI.postMessage({
+          event: "update-audio-duration",
+          value: end - start,
+        });
+        await getPredictBuffers({ file, start, end }).catch((error) => {
+          console.warn(error);
+          updateQueue(file, worker);
+        })
+      }
+    }
+  } else {
+    DEBUG && console.log("Recursion: file not found");
+    QUEUE.transition(file, 'inProgress', 'missing'); // Ensure missing files are marked as such in the queue
   }
 }
 
@@ -4500,7 +4507,7 @@ const filterLocation = () => {
 const getDetectedSpecies = async () => {
   const range = STATE.explore.range;
   const confidence = STATE.detect.confidence;
-  const splitChar = getSplitChar();
+  const splitChar = ',';
   let sql = `SELECT sname || '${splitChar}' || cname as label, locationID
     FROM records
     JOIN species ON species.id = records.speciesID 

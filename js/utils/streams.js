@@ -336,6 +336,7 @@ class FileQueueManager {
     const sources = Array.isArray(fromStatuses) ? fromStatuses : [fromStatuses];
 
     for (const fromStatus of sources) {
+        if (fromStatus === toStatus) continue;
       const fromSet = this.byStatus[fromStatus];
       if (!fromSet) throw new Error(`Invalid source status: ${fromStatus}`);
       for (const path of fromSet) {
