@@ -738,7 +738,7 @@ ipcMain.on('database-closed', () =>{
   DB_CLOSED = true;
   app.quit()
  })
-ipcMain.handle("request-worker-channel", async (_event) => {
+ipcMain.handle("request-worker-channel", (_event) => {
   // Create a new channel ...
   const { port1, port2 } = new MessageChannelMain();
   // ... send one end to the worker ...

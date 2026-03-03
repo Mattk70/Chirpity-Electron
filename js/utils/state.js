@@ -10,7 +10,6 @@ export class WorkerState {
     (this.resultsSortOrder = "dateTime"),
     this.resultsMetaSortOrder = '',
     (this.summarySortOrder = "cname ASC"),
-    (this.filesToAnalyse = []),
     (this.limit = 500),
     (this.saved = new Set()), // list of files requested that are in the disk database
     (this.globalOffset = 0), // Current start number for unfiltered results
@@ -108,9 +107,9 @@ export class WorkerState {
     (this.allFilesDuration = 0),
     (this.clippedFilesDuration = 0),
     (this.clippedBatches = 0),
-    (this.corruptFiles = []),
     (this.originalFiles = undefined),
-    (this.perchWorker = []);
+    (this.perchWorker = []),
+    (this.fileStatus = {selected: [], pending: [], incomplete: []})
   }
 
   update(updates) {
@@ -151,11 +150,6 @@ export class WorkerState {
     this.globalOffset = 0;
     this.filteredOffset = {};
     this.originalFiles = undefined;
-  }
-
-  setFiles(files) {
-    //console.log("Setting STATE, filesToAnalyse " + files);
-    this.update({ filesToAnalyse: files });
   }
 
   // Used to decrease calls to get summary when prepping a dataset

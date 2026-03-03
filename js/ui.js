@@ -1599,6 +1599,8 @@ function saveAnalyseState() {
       active: active,
       analysisDone: STATE.analysisDone,
       resultsSortOrder: STATE.resultsSortOrder,
+      resultsMetaSortOrder: STATE.resultsMetaSortOrder,
+      summarySortOrder: STATE.summarySortOrder
     };
   }
 }
@@ -1685,8 +1687,7 @@ async function showExplore() {
   utils.hideAll();
   utils.showElement(["exploreWrapper", "spectrogramWrapper"], false);
   spec.reInitSpec(config.specMaxHeight);
-  worker.postMessage({ action: "update-state", filesToAnalyse: [] });
-  // Analysis is done
+    // Analysis is done
   STATE.analysisDone = true;
   filterResults({
     species: undefined,
@@ -1723,8 +1724,9 @@ async function showAnalyse() {
     spec.reInitSpec(config.specMaxHeight);
     worker.postMessage({
       action: "update-state",
-      filesToAnalyse: STATE.openFiles,
       resultsSortOrder: STATE.resultsSortOrder,
+      resultsMetaSortOrder: STATE.resultsMetaSortOrder,
+      summarySortOrder: STATE.summarySortOrder,
     });
     if (STATE.analysisDone) {
       filterResults({
@@ -1991,15 +1993,21 @@ const defaultConfig = {
 };
 let dirname, appPath, tempPath, systemLocale, isMac;
 window.onload = async () => {
-  window.electron.requestWorkerChannel();
-  await diagnosticsReady;
+
+  const [, , mac, paths] = await Promise.all([
+    window.electron.requestWorkerChannel(),
+    diagnosticsReady,
+    window.electron.isMac(),
+    getPaths(),
+    appVersionLoaded
+  ]);
+
+  isMac = mac;
+  [appPath, tempPath, systemLocale, dirname] = paths;
   defaultConfig.tensorflow.threads = DIAGNOSTICS["Physical Cores"] || 2;
-  isMac = await window.electron.isMac();
   if (isMac) replaceCtrlWithCommand();
   DOM.contentWrapper.classList.add("loaded");
 
-  // Load preferences and override defaults
-  [appPath, tempPath, systemLocale, dirname] = await getPaths();
   // Set default locale
   systemLocale = systemLocale.replace("en-GB", "en_uk");
   systemLocale =
@@ -2014,7 +2022,6 @@ window.onload = async () => {
 
   // Set footer year
   document.getElementById("year").textContent = new Date().getFullYear();
-  await appVersionLoaded;
   document.getElementById("version").textContent = VERSION;
   const configPath = p.join(appPath, "config.json");
   const configFile = await fs.promises.readFile(configPath, "utf8").catch(err =>{
@@ -6777,6 +6784,42 @@ async function readLabels(labelFile, updating) {
     const unknownPattern = /^Unknown Sp\.[,_~]Unknown Sp\.$/;
     if (!labels.some(l => unknownPattern.test(l))) labels.push(unknown);
     if (updating === "list") {
+      const MAX_LABELS = 15_000;
+      const lines = labels.length;
+      const validLinePattern = /^[^,_~]+[,_~][^,_~]+([,_~][^,_~]*){0,3}$/;
+      // 1️⃣ Guard maximum line count first
+      if (lines > MAX_LABELS) {
+        generateToast({
+          message: 'badListFormat',
+          variables: {
+            line: MAX_LABELS,
+            value: "Too many labels"
+          },
+          type: 'warning'
+        });
+        config.list = 'birds';
+        updatePrefs("config.json", config);
+        updateList()
+        return;
+      }
+
+      // 2️⃣ Then validate format
+      const invalidIndex = labels.findIndex(l => !validLinePattern.test(l));
+
+      if (invalidIndex !== -1) {
+        generateToast({
+          message: 'badListFormat',
+          variables: {
+            line: invalidIndex + 1,
+            value: labels[invalidIndex]
+          },
+          type: 'warning'
+        });
+        config.list = 'birds';
+        updatePrefs("config.json", config);
+        updateList()
+        return;
+      }
       worker.postMessage({
         action: "update-list",
         list: config.list,
