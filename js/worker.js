@@ -520,7 +520,11 @@ async function handleMessage(e) {
       if (result) {
         const {files, meta} = result;
         METADATA = meta;
-        QUEUE.setFiles(await getFiles({files, preserveResults:true, checkSaved: false}), 'complete')
+        QUEUE.setFiles(await getFiles({
+          files, 
+          preserveResults:true, 
+          checkSaved: false, 
+          skipMetadataScan: true}), 'complete');
         await Promise.all([getSummary(), getResults()]);
       }
       UI.postMessage({ event: "clear-loading"})
@@ -1150,7 +1154,7 @@ async function spawnListWorker() {
  * Sends this list to the UI
  * @param {*} files must be a list of file paths
  */
-const getFiles = async ({files, image, preserveResults, checkSaved = true}) => {
+const getFiles = async ({files, image, preserveResults, checkSaved = true, skipMetadataScan = false}) => {
   const supportedFiles = image ? [".png"] : SUPPORTED_FILES;
   let folderDropped = false;
   let filePaths = [];
@@ -1198,7 +1202,7 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true}) => {
       STATE.originalFiles = filePaths;
       await Promise.all([getSummary(), getResults()]);
     }
-  } else {
+  } else if (!skipMetadataScan) {
     // Start gathering metadata for new files
     processFilesInBatches(filePaths, 10);
   }
