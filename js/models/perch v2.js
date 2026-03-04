@@ -103,6 +103,7 @@ onmessage = async (e) => {
             confidence,
             worker,
             resetResults,
+            id
           } = data;
           const selection = !resetResults;
           const [result, filename, startPosition] = await predictChunk(
@@ -114,7 +115,7 @@ onmessage = async (e) => {
           );
           response = {
             message: "prediction",
-            id: data.id,
+            id,
             file: filename,
             result,
             fileStart: startPosition,

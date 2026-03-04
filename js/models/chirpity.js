@@ -113,6 +113,7 @@ onmessage = async (e) => {
           confidence,
           context,
           resetResults,
+          id
         } = data;
         myModel.useContext = context;
         myModel.selection = !resetResults;
@@ -123,7 +124,7 @@ onmessage = async (e) => {
         );
         response = {
           message: "prediction",
-          id: data.id,
+          id,
           file,
           result,
           fileStart,

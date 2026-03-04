@@ -124,13 +124,14 @@ onmessage = async (e) => {
             worker,
             context,
             resetResults,
+            id
           } = data;
           Model.useContext = context;
           Model.selection = !resetResults;
           const result = await Model.predictChunk(chunks, start);
           const response = {
             message: "prediction",
-            id: data.id,
+            id,
             file,
             result,
             fileStart,

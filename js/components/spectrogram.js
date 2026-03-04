@@ -896,7 +896,7 @@ export class ChirpityWS {
     const STATE = this.getState();
     const relativePosition = e.clientX / e.currentTarget.clientWidth;
     const time = relativePosition * STATE.windowLength;
-    const region = this.REGIONS.regions.find(
+    const region = this.REGIONS?.regions.find(
       (r) => r.start < time && r.end > time
     );
     region && setActive && this.handlers.setActiveRegion(region, false);
