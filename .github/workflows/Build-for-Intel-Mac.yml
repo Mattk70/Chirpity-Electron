@@ -95,10 +95,10 @@ jobs:
           fi
 
 
-      # - name: Create and push a Git tag
-      #   run: |
-      #     git tag v$PACKAGE_VERSION
-      #     git push origin v$PACKAGE_VERSION
+      - name: Create and push a Git tag
+        run: |
+          git tag v$PACKAGE_VERSION
+          git push origin v$PACKAGE_VERSION
 
       - name: Setup node
         uses: actions/setup-node@v3
