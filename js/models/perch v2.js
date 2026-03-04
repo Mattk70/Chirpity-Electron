@@ -64,8 +64,6 @@ onmessage = async (e) => {
         if (session) {
           try { session.release() } catch (e) { console.error(e) }
         }
-        batchSize = data.batchSize || batchSize;
-        backend = data.backend;
         await loadModel(modelPath, backend, batchSize);
         break;
       }
