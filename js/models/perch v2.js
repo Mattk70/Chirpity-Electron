@@ -63,7 +63,9 @@ onmessage = async (e) => {
         backend = data.backend || backend;
         if (session) {
           try { await session.release() } catch (e) { console.error(e) }
+          session = null;
         }
+    
         await loadModel(modelPath, backend, batchSize);
         break;
       }
@@ -109,6 +111,7 @@ onmessage = async (e) => {
             id
           } = data;
           const selection = !resetResults;
+          if (cancelled) return;
           const myGeneration = currentGeneration;
           const [result, filename, startPosition] = await predictChunk(
             chunks,
