@@ -170,7 +170,9 @@ class PredictionWritable extends Writable {
 
     this.sendToModel(channelData, chunkStart, file, endTime)
       .catch((e) => {
-        console.warn("Error in sendtomodel", e);
+        if (! ["Prediction aborted", "Queue cancelled"].includes(e.message)) {
+          console.error("Error in sendtomodel", e);
+        }
       })
       .finally(() => {
         this.inFlight--;
@@ -184,7 +186,9 @@ class PredictionWritable extends Writable {
         }
       });
   }
-
+  _destroy(err, callback) {
+    callback(err);
+  }
   _final(callback) {
     if (this.inFlight === 0) {
       callback();
@@ -207,7 +211,7 @@ function createMultiWorkerQueue(
 ) {
   let nextId = 1;
   let nextWorker = 0;
-
+  let cancelled = false;
   const pending = new Map();
 
   workers.forEach((worker) => {
@@ -242,8 +246,18 @@ function createMultiWorkerQueue(
       pending.clear();
     };
   });
-
+  function cancelAll(reason = "Aborted") {
+    cancelled = true;
+    for (const { reject, timeout } of pending.values()) {
+      clearTimeout(timeout);
+      reject(new Error(reason));
+    }
+    pending.clear();
+  }
   function send(payload, transfer = []) {
+    if (cancelled) {
+        return Promise.reject(new Error("Queue cancelled"));
+    }
     const id = nextId++;
     const workerIndex = nextWorker;
     nextWorker = (nextWorker + 1) % workers.length;
@@ -275,7 +289,7 @@ function createMultiWorkerQueue(
     });
   }
 
-  return { send };
+  return { send, cancelAll };
 }
 
 class FileQueueManager {
@@ -337,7 +351,7 @@ class FileQueueManager {
     const sources = Array.isArray(fromStatuses) ? fromStatuses : [fromStatuses];
 
     for (const fromStatus of sources) {
-        if (fromStatus === toStatus) continue;
+      if (fromStatus === toStatus) continue;
       const fromSet = this.byStatus[fromStatus];
       if (!fromSet) throw new Error(`Invalid source status: ${fromStatus}`);
       for (const path of fromSet) {
@@ -422,7 +436,6 @@ class FileQueueManager {
     }
     return this.statuses.flatMap((s) => [...this.byStatus[s]]);
   }
-
 
   /** Get the size of the queue (optionally for 'status') */
   getSize(status) {

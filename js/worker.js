@@ -34,7 +34,6 @@ const { pipeline } = require("stream/promises");
 
 const dbMutex = new Mutex();
 const DATASET = false;
-
 let DEBUG;
 let SEEN_MODEL_READY = false;
 let METADATA = {};
@@ -237,6 +236,11 @@ const setupFfmpegCommand = async ({
       console.log("FFmpeg command: " + commandLine);
     });
   }
+  command.on("error", function (err) {
+    if (err.outputStreamError?.name !== 'AbortError') {
+      console.warn("An ffmpeg error occurred:",  err.message);
+    }
+  });
   return command;
 };
 
@@ -713,61 +717,7 @@ async function handleMessage(e) {
           }
         }
         STATE.customLabels = args.customLabels;
-        STATE.customLabelsMap = Object.fromEntries(
-          await Promise.all(
-            args.customLabels.map(async (line) => {
-              let [_sname, cname, start, end, confidence] =
-                line.split(splitOn).map(v => v.trim());
-
-              if (!args.member) {
-                start = undefined;
-                end = undefined;
-                confidence = undefined;
-              } else {
-                // Sanity check start/end
-                [start, end].forEach((val) => {
-                  if (val && !/^\d{1,2}-\d{1,2}$/.test(val)) {
-                    const message =
-                      `Custom list start/end value malformed, it should be 'DD-MM': ${line}`;
-                    generateAlert({ message, type: 'warning' });
-                    console.warn(message);
-                    start = undefined;
-                    end = undefined;
-                  }
-                });
-
-                if (confidence && (isNaN(confidence) || confidence < 0 || confidence > 1)) {
-                  const message =
-                    `Custom list confidence value must be a number between 0 and 1: ${line}`;
-                  generateAlert({ message, type: 'warning' });
-                  console.warn(message);
-                  confidence = undefined;
-                } else if (confidence){
-                  const result = await diskDB.runAsync(
-                    `
-                    INSERT OR IGNORE INTO confidence_overrides (speciesID, minConfidence)
-                    SELECT id, ?
-                    FROM species
-                    WHERE cname = ?
-                    `,
-                    Number(confidence)*1000,
-                    cname
-                  );
-                }
-              }
-              const {base, suffix} = cname ? parseCnames([cname])[0] : {base: null, suffix: null};
-              return [
-                base,
-                {
-                  start,
-                  end,
-                  confidence: confidence && Number(confidence) * 1000 || null,
-                  callType: suffix || ''
-                }
-              ];
-            })
-          )
-        );
+        await createCustomListMap(args.customLabels, splitOn, args.member);
       }
       STATE.list = args.list;
       // Clear the LIST_CACHE & STATE.included keys to force list regeneration
@@ -881,6 +831,83 @@ ipcRenderer.on("close-database", async () => {
  *   }
  * });
  */
+
+/**
+ * Creates a custom list mapping from species names to call types, along with optional date ranges and confidence thresholds.
+ *
+ * This function processes an array of custom label strings, each expected to contain species name, call type, optional start/end dates, and an optional confidence value, separated by a delimiter (comma or tilde depending on the model).
+ * It validates the format of the start/end date values (expecting 'DD-MM') and the confidence value (expecting a number between 0 and 1), generating warnings for any malformed entries.
+ * Valid entries are used to build a mapping of species base names to arrays of call type objects, which include the call type suffix, optional date range, and confidence threshold.
+ * If the `member` parameter is false, date and confidence values are ignored and not included in the mapping.
+ * @param {*} customLabels 
+ * @param {*} member 
+ */
+
+async function createCustomListMap(customLabels, splitOn, member) {
+  STATE.customLabelsMap = {};
+
+  for (const line of customLabels) {
+    let [_sname, cname, start, end, confidence] =
+      line.split(splitOn).map(v => v.trim());
+
+    if (!member) {
+      start = undefined;
+      end = undefined;
+      confidence = undefined;
+    } else {
+      // Validate start/end
+      if (
+        (start && !/^\d{1,2}-\d{1,2}$/.test(start)) ||
+        (end && !/^\d{1,2}-\d{1,2}$/.test(end))
+      ) {
+        const message =
+          `Custom list start/end value malformed, it should be 'DD-MM': ${line}`;
+        generateAlert({ message, type: 'warning' });
+        console.warn(message);
+        start = undefined;
+        end = undefined;
+      }
+
+      // Validate confidence
+      if (confidence && (isNaN(confidence) || confidence < 0 || confidence > 1)) {
+        const message =
+          `Custom list confidence value must be a number between 0 and 1: ${line}`;
+        generateAlert({ message, type: 'warning' });
+        console.warn(message);
+        confidence = undefined;
+      } else if (confidence) {
+        await diskDB.runAsync(
+          `
+          INSERT OR IGNORE INTO confidence_overrides (speciesID, minConfidence)
+          SELECT id, ?
+          FROM species
+          WHERE cname = ?
+          `,
+          Number(confidence) * 1000,
+          cname
+        );
+      }
+    }
+
+    const { base, suffix } = cname
+      ? parseCnames([cname])[0]
+      : { base: null, suffix: null };
+
+    if (!base) continue;
+
+    if (!STATE.customLabelsMap[base]) {
+      STATE.customLabelsMap[base] = [];
+    }
+
+    STATE.customLabelsMap[base].push({
+      callType: suffix || '',
+      start: start || null,
+      end: end || null,
+      confidence: confidence ? Number(confidence) * 1000 : null
+    });
+  }
+}
+
 async function savedFileCheckAsync(fileList) {
   if (diskDB) {
     // Slice the list into a # of params SQLITE can handle
@@ -1793,6 +1820,10 @@ async function onAnalyse({
   STATE.clippedFilesDuration = 0;
   predictionStart = new Date();
 
+  STATE.currentRun = {
+    abortController: new AbortController(),
+    cancelled: false,
+  };
 
 
 
@@ -1820,7 +1851,6 @@ async function onAnalyse({
   //Reset GLOBAL variables
   index = 0;
   batchesToSend = {};
-  STATE.backlogInterval = {};
   t0_analysis = Date.now();
   if (!selection) {
     const {combine, merge} = STATE.detect;
@@ -1898,19 +1928,28 @@ async function onAnalyse({
  * @param {string} [params.model=STATE.model] - Model identifier to use when restarting prediction workers; if equal to `"perch v2"`, workers are not restarted.
  */
 function onAbort({ model = STATE.model }) {
+  const run = STATE.currentRun;
+  if (!run) return;
+  run.cancelled = true;
+  // Stop all pipelines immediately
+  run.abortController.abort();
+  // Reject all pending worker promises
+  try {
+    STATE.workerQueue.cancelAll("Prediction aborted");
+  } catch (e) {
+      console.error("Error occurred while cancelling worker queue", e.name, 'message', e.message);
+    
+  }
+
+  // Tell workers to ignore results from any in-flight batches and stop processing
   predictWorkers.forEach(worker => worker.postMessage({
     message: 'terminate', 
     batchSize: BATCH_SIZE,
     backend: STATE.detect.backend}));
-  aborted = true;
-  // QUEUE.moveAll(['inProgress', 'complete'], 'pending');
+  
   predictionsReceived = {};
   predictionsRequested = {};
   index = 0;
-  DEBUG && console.log("abort received");
-  Object.keys(STATE.backlogInterval || {}).forEach((pid) => {
-    clearInterval(STATE.backlogInterval[pid]);
-  });
   //restart the workers
   if (model !== 'perch v2'){
     terminateWorkers();
@@ -2587,11 +2626,21 @@ async function processAudio(
   const sendToModel = createPredictSender(workerQueue);
   const bufferAndSend = new PredictionWritable(sendToModel, {concurrency: 6 });
 
-  await pipeline(
-    command.pipe(), // ffmpeg stdout
-    prepareAudio,   // PCM → channelData objects
-    bufferAndSend   // Buffer channelData objects, send to model
-  );
+  try {
+    await pipeline(
+      command.pipe(), // ffmpeg stdout
+      prepareAudio,   // PCM → channelData objects
+      bufferAndSend,   // Buffer channelData objects, send to model
+      { signal: STATE.currentRun.abortController.signal }
+    )
+  } catch (err) {
+    if (err.name === "AbortError") {
+      // Expected — ignore
+      console.info("Prediction aborted", `After ${(Date.now() - t0_analysis)/1000} seconds`);
+      return;
+    }
+    throw err; // real error
+  }
   DEBUG && console.log("All chunks processed for", file);
 }
 
@@ -4265,23 +4314,55 @@ function allowedByList(result){
     callType = parsed[0].suffix;
   }
 
-  let conditions = STATE.customLabelsMap[cname];
+  let conditionsList = STATE.customLabelsMap[cname];
+
   if (!confidenceCheck) {
-    if (!conditions) return false; // Species not in the custom list
-    const {start, end, callType: conditionsCallType} = conditions;
-    if (start && end) {
-      if (!epochInDayMonthRange(timestamp, start, end)) return false;
+    if (!conditionsList || conditionsList.length === 0) {
+      return false; // Species not in the custom list
     }
-    // Call type check
-    if (callType && conditionsCallType && conditionsCallType !== callType) {
-      return false;
+
+    // Find at least one matching condition
+    const matchingCondition = conditionsList.find(cond => {
+
+      // Date range check
+      if (cond.start && cond.end) {
+        if (!epochInDayMonthRange(timestamp, cond.start, cond.end)) {
+          return false;
+        }
+      }
+
+      // Call type check
+      if (callType && cond.callType && cond.callType !== callType) {
+        return false;
+      }
+
+      return true;
+    });
+
+    if (!matchingCondition) {
+      return false; // No matching condition found
     }
+
+    // Confidence override comes from the matched condition
+    const minConfidence =
+      matchingCondition.confidence ??
+      (confidenceCheck
+        ? Math.min(STATE.detect.confidence, 150)
+        : STATE.detect.confidence);
+
+    return score >= minConfidence;
   }
-  // Confidence check (species-specific overrides global)
-  const confidence = conditions?.confidence;
-  const minConfidence = confidence ?? (confidenceCheck 
-    ? Math.min(STATE.detect.confidence, 150) 
-    : STATE.detect.confidence);
+
+  // Confidence-only mode (no seasonal / calltype filtering)
+  const speciesOverride =
+    conditionsList?.find(c => c.confidence != null)?.confidence;
+
+  const minConfidence =
+    speciesOverride ??
+    (confidenceCheck
+      ? Math.min(STATE.detect.confidence, 150)
+      : STATE.detect.confidence);
+
   return score >= minConfidence;
 }
 
@@ -4537,9 +4618,15 @@ const getValidSpecies = async (file) => {
   const customList = STATE.list === 'custom';
   const labelMap = STATE.customLabelsMap;
   if (customList){
-    customCnames = Object.keys(labelMap)
-    customCnamesWithCallType = 
-          Object.keys(labelMap).map(k => `${k}${labelMap[k].callType}`)
+  customCnames = Object.keys(labelMap);
+  customCnamesWithCallType = Object.entries(labelMap)
+    .flatMap(([species, conditions]) =>
+      conditions.map(cond =>
+        cond.callType
+          ? `${species}${cond.callType}`
+          : species
+      )
+    );
   }
   const splitChar = getSplitChar();
   for (const [index, speciesName] of STATE.allLabels.entries()) {

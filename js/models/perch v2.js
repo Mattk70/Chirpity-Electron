@@ -3,7 +3,9 @@ let ort = require ("onnxruntime-node");
 const fs = require("node:fs");
 const path = require("node:path");
 
-let session;
+let session = null;
+let currentGeneration = 0;
+let cancelled = false;
 let labels;
 let backend;
 const chunkLength = 160000; // 5 seconds at 32kHz
@@ -44,6 +46,7 @@ async function loadModel(mpath, backend, batchSize) {
   };
   const modelPath = path.join(mpath, 'perch_v2.onnx')
   session = await ort.InferenceSession.create(modelPath, sessionOptions);
+  cancelled = false;
 }
 onmessage = async (e) => {
   const data = e.data;
@@ -54,14 +57,16 @@ onmessage = async (e) => {
   try {
     switch (modelRequest) {
       case 'terminate': {
-          if ((data.backend && backend !== data.backend ) || (data.batchSize && batchSize !== data.batchSize)) {
-            if (session) {
-              try { session.release() } catch (e) { console.error(e) }
-            }
-            batchSize = data.batchSize || batchSize;
-            backend = data.backend;
-            await loadModel(modelPath, backend, batchSize);
-          }
+        cancelled = true;
+        currentGeneration++;
+        batchSize = data.batchSize || batchSize;
+        backend = data.backend || backend;
+        if (session) {
+          try { await session.release() } catch (e) { console.error(e) }
+          session = null;
+        }
+    
+        await loadModel(modelPath, backend, batchSize);
         break;
       }
       case "change-threads": {
@@ -106,6 +111,8 @@ onmessage = async (e) => {
             id
           } = data;
           const selection = !resetResults;
+          if (cancelled) return;
+          const myGeneration = currentGeneration;
           const [result, filename, startPosition] = await predictChunk(
             chunks,
             start,
@@ -113,6 +120,9 @@ onmessage = async (e) => {
             file,
             confidence
           );
+          if (cancelled || myGeneration !== currentGeneration) {
+            return; // Ignore stale results
+          }
           response = {
             message: "prediction",
             id,

@@ -270,12 +270,12 @@ class ChirpityModel extends BaseModel {
     values.dispose();
     finalPrediction.dispose();
     newPrediction && newPrediction.dispose();
+    keys = keys.map((key) => (key / CONFIG.sampleRate).toFixed(3));
     if (keys.length < topIndices.length){
       // Trim return values to eliminate GPU padded silence from the results
       const len = keys.length;
       return [keys, topIndices.slice(0,len), topValues.slice(0,len)];  
     }
-    keys = keys.map((key) => (key / CONFIG.sampleRate).toFixed(3));
     return [keys, topIndices, topValues];
   }
 
