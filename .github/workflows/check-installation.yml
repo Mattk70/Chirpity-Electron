@@ -29,6 +29,9 @@ jobs:
       - run: echo "💡 The ${{ github.repository }} repository has been cloned to the runner."
       - run: echo "🖥️ The workflow is now ready to test your code on the runner."
 
+      - name: Check 7zip
+        run: where 7z
+        
       - name: Setup node
         uses: actions/setup-node@v3
         with:
@@ -256,6 +259,7 @@ jobs:
           curl -L -o Perch.v2.7z \
             https://github.com/Mattk70/Chirpity-Website/releases/download/v4.0.0/Perch.v2.7z
         shell: bash
+       
 
       - name: Extract Perch Model
         if: runner.os != 'Linux'
