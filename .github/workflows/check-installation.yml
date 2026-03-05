@@ -30,8 +30,9 @@ jobs:
       - run: echo "🖥️ The workflow is now ready to test your code on the runner."
 
       - name: Check 7zip
+        if: runner.os == 'Windows'
         run: where 7z
-        
+
       - name: Setup node
         uses: actions/setup-node@v3
         with:
