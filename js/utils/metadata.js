@@ -242,22 +242,20 @@ function readUInt64LE(buf, offset) {
  * @returns {number} Duration in seconds.
  */
 
-
-function readUInt64LE(buf, offset) {
-  const lo = buf.readUInt32LE(offset);
-  const hi = buf.readUInt32LE(offset + 4);
-  return hi * 2 ** 32 + lo;
-}
-
 function getWaveDuration(filePath) {
   const fd = fs.openSync(filePath, "r");
   try {
-    const header = Buffer.allocUnsafe(12);
-    fs.readSync(fd, header, 0, 12, 0);
+    const header = Buffer.alloc(12);
+    if (fs.readSync(fd, header, 0, 12, 0) !== 12) {
+      throw new Error(`Truncated WAV header: ${filePath}`);
+    }
 
     const riffId = header.toString("ascii", 0, 4);
     const waveId = header.toString("ascii", 8, 12);
-    if (waveId !== "WAVE") throw new Error(`Not a WAV file: ${filePath}`);
+    const validHeaders = new Set(["RIFF", "RF64", "BW64"]);
+    if (!validHeaders.has(riffId) || waveId !== "WAVE") {
+        throw new Error(`Not a WAV file: ${filePath}`);
+    }
 
     const isRF64 = riffId === "RF64" || riffId === "BW64";
 
@@ -275,15 +273,19 @@ function getWaveDuration(filePath) {
 
       if (chunkId === "fmt ") {
         const needed = Math.min(chunkSize, 16);
-        const fmt = Buffer.allocUnsafe(needed);
-        fs.readSync(fd, fmt, 0, needed, pos);
+        const fmt = Buffer.alloc(needed);
+        if (fs.readSync(fd, fmt, 0, needed, pos) !== needed) {
+          throw new Error(`Truncated fmt chunk: ${filePath}`);
+        }
         if (needed >= 16) {
           sampleRate = fmt.readUInt32LE(4);
           blockAlign = fmt.readUInt16LE(12);
         }
       } else if (chunkId === "ds64") {
-        const ds64 = Buffer.allocUnsafe(24);
-        fs.readSync(fd, ds64, 0, 24, pos);
+        const ds64 = Buffer.alloc(24);
+        if (fs.readSync(fd, ds64, 0, 24, pos) !== 24) {
+          throw new Error(`Truncated ds64 chunk: ${filePath}`);
+        }
         dataSize = readUInt64LE(ds64, 8);
         sampleCount = readUInt64LE(ds64, 16);
       } else if (chunkId === "data") {
@@ -297,7 +299,7 @@ function getWaveDuration(filePath) {
     // prefer sample count (more precise, avoids blockAlign=0 risk)
     if (sampleCount != null && sampleRate) return sampleCount / sampleRate;
 
-    if (!dataSize || !sampleRate || !blockAlign)
+    if (dataSize === null || sampleRate === null || blockAlign === null)
       throw new Error(`Could not determine duration: ${filePath}`);
     if (blockAlign === 0) throw new Error(`Invalid blockAlign=0: ${filePath}`);
 
