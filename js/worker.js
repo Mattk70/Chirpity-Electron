@@ -2009,6 +2009,9 @@ const getDuration = async (src) => {
     try {
       return await getWaveDuration(src)
     } catch (e) {
+      if (e.message.includes("Truncated WAV header")) {
+        return reject(err) // no point trying to decode with ffmpeg if the file is truncated
+      }
       console.warn('Decode audio failed', `${e.message}`)
     }
   } 
