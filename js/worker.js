@@ -4809,11 +4809,7 @@ async function onDelete({
  * @param {string} params.species - The common name of the species to delete records for.
  * @param {string} [params.speciesFiltered] - Used for UI highlighting; does not affect deletion logic.
  */
-async function onDeleteSpecies({
-  species,
-  // need speciesFiltered because species triggers getSummary to highlight it
-  speciesFiltered,
-}) {
+async function onDeleteSpecies({species}) {
   const db = STATE.db;
   const params = [species];
   let SQL = `DELETE FROM records 
@@ -5402,7 +5398,7 @@ async function setIncludedIDs(lat, lon, week) {
   const key = `${lat}-${lon}-${week}-${STATE.model}-${STATE.list}`;
   if (LIST_CACHE[key]) {
     // If a promise is in the cache, return it
-    return await LIST_CACHE[key];
+    return LIST_CACHE[key];
   }
   DEBUG && console.log("calling for a new list");
   // Store the promise in the cache immediately
