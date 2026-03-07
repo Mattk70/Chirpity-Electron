@@ -1189,6 +1189,17 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true, skipM
   for (const path of files) {
     try {
       const stats = fs.lstatSync(path);
+      if (stats.size === 0) { 
+        if (files.length === 1) {
+          generateAlert({
+            type: "warning",
+            message: "corruptFile",
+            variables: { files: path },
+            autohide: false,
+          });
+        }
+        continue; // skip empty files
+      }
       if (stats.isDirectory()) {
         folderDropped = true;
         // Retrieve files in the directory and filter immediately
@@ -1218,22 +1229,23 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true, skipM
       throw error;
     }
   }
-  const fileOrFolder = folderDropped ? "Open Folder(s)" : "Open Files(s)";
-  trackEvent(STATE.UUID, "UI", "Drop", fileOrFolder, filePaths.length);
-  UI.postMessage({ event: "files", filePaths, preserveResults, checkSaved });
-  const allSaved = checkSaved ? await savedFileCheckAsync(filePaths) : false;
-  QUEUE.setFiles(filePaths);
-  if (allSaved) {
-    await onChangeMode("archive");
-    if (STATE.detect.autoLoad){
-      STATE.originalFiles = filePaths;
-      await Promise.all([getSummary(), getResults()]);
+  if (filePaths.length) {
+    const fileOrFolder = folderDropped ? "Open Folder(s)" : "Open Files(s)";
+    trackEvent(STATE.UUID, "UI", "Drop", fileOrFolder, filePaths.length);
+    UI.postMessage({ event: "files", filePaths, preserveResults, checkSaved });
+    const allSaved = checkSaved ? await savedFileCheckAsync(filePaths) : false;
+    QUEUE.setFiles(filePaths);
+    if (allSaved) {
+      await onChangeMode("archive");
+      if (STATE.detect.autoLoad){
+        STATE.originalFiles = filePaths;
+        await Promise.all([getSummary(), getResults()]);
+      }
+    } else if (!skipMetadataScan) {
+      // Start gathering metadata for new files
+      processFilesInBatches(filePaths, 10);
     }
-  } else if (!skipMetadataScan) {
-    // Start gathering metadata for new files
-    processFilesInBatches(filePaths, 10);
   }
-  
   return filePaths;
 };
 
@@ -2010,7 +2022,7 @@ const getDuration = async (src) => {
       return await getWaveDuration(src)
     } catch (e) {
       if (e.message.includes("Truncated WAV header")) {
-        return reject(err) // no point trying to decode with ffmpeg if the file is truncated
+        throw e;// no point trying to decode with ffmpeg if the file is truncated
       }
       console.warn('Decode audio failed', `${e.message}`)
     }
@@ -2627,7 +2639,7 @@ async function processAudio(
 
   const workerQueue = STATE.workerQueue;
   const sendToModel = createPredictSender(workerQueue);
-  const bufferAndSend = new PredictionWritable(sendToModel, {concurrency: 6 });
+  const bufferAndSend = new PredictionWritable(sendToModel, {concurrency: 2});
 
   try {
     await pipeline(
