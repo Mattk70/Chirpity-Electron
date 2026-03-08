@@ -71,6 +71,7 @@ contextBridge.exposeInMainWorld("electron", {
   isIntelMac: () => isIntelMac,
   exitApplication: () => ipcRenderer.invoke("exitApplication"),
   powerSaveBlocker: (onOff) => ipcRenderer.send("powerSaveControl", onOff),
+  debugMode: (onOff) => ipcRenderer.send("debug-mode", onOff),
   onFileOpen: (callback) => ipcRenderer.on('open-file', (event, filePath) => callback(filePath)),
   MEMBERSHIP_API_ENDPOINT: () => process.env.MEMBERSHIP_API_ENDPOINT
 });

@@ -293,7 +293,7 @@ function getWaveDuration(filePath) {
         break;
       }
 
-      pos += chunkSize + (chunkSize & 1); // word-align
+      pos += chunkSize + (chunkSize & 1); // pad to even byte boundary
     }
 
     // prefer sample count (more precise, avoids blockAlign=0 risk)

@@ -1,5 +1,5 @@
 const { Transform, Writable } = require("stream");
-
+const DEBUG = false;
 class PCMChunker extends Transform {
   constructor({
     highWaterMarkBytes,
@@ -64,6 +64,7 @@ class PCMChunker extends Transform {
     }
     return out;
   }
+
   _transform(chunk, _, callback) {
     try {
       if (this.remainingTrim > 0) {
@@ -141,62 +142,97 @@ class PCMChunker extends Transform {
 }
 
 class PredictionWritable extends Writable {
-  constructor(sendToModel, { concurrency = 6 }) {
+  constructor(sendToModel, { concurrency = 2, maxConcurrency = 32, minConcurrency = 1 }) {
     super({ objectMode: true });
 
     this.sendToModel = sendToModel;
-    this.concurrency = concurrency;
+    this.concurrency = concurrency;       // starts conservative
+    this.maxConcurrency = maxConcurrency;
+    this.minConcurrency = minConcurrency;
 
     this.inFlight = 0;
     this.queue = [];
     this.finalCallback = null;
+
+    // Throughput tracking
+    this._completedSinceLastCheck = 0;
+    this._totalDuration = 0;
+    this._logInterval = setInterval(() => this._adjustConcurrency(), 2000);
+  }
+
+  _adjustConcurrency() {
+    const completed = this._completedSinceLastCheck;
+    if (completed === 0) return;
+
+    const avgDuration = this._totalDuration / completed;
+    const queuePressure = this.queue.length;
+
+    if (queuePressure === 0 && this.inFlight >= this.concurrency && this.concurrency < this.maxConcurrency) {
+      // Workers are keeping up and we're saturated — try adding a slot
+      this.concurrency++;
+      DEBUG && console.log(`[PredictionWritable] concurrency ↑ ${this.concurrency} (avg job: ${avgDuration.toFixed(0)}ms)`);
+    } else if (queuePressure > 0 && this.concurrency > this.minConcurrency) {
+      // Queue is building — back off
+      this.concurrency--;
+      DEBUG && console.log(`[PredictionWritable] concurrency ↓ ${this.concurrency} (queue: ${queuePressure})`);
+    }
+
+    this._completedSinceLastCheck = 0;
+    this._totalDuration = 0;
   }
 
   _write(chunk, _, callback) {
     if (this.inFlight >= this.concurrency) {
-      // Queue chunk until capacity frees
+      // Hold the callback to apply backpressure upstream until a slot is free
       this.queue.push({ chunk, callback });
       return;
     }
 
-    this._dispatch(chunk);
-    callback(); // Allow stream to continue immediately
+    this._dispatch(chunk, callback);
   }
 
-  _dispatch(chunk) {
+  _dispatch(chunk, callback) {
     this.inFlight++;
+    callback();
 
+    const t0 = Date.now();
     const { channelData, chunkStart, file, endTime } = chunk;
 
     this.sendToModel(channelData, chunkStart, file, endTime)
       .catch((e) => {
-        if (! ["Prediction aborted", "Queue cancelled"].includes(e.message)) {
+        if (!["Prediction aborted", "Queue cancelled"].includes(e.message)) {
           console.error("Error in sendtomodel", e);
         }
       })
       .finally(() => {
         this.inFlight--;
+        this._completedSinceLastCheck++;
+        this._totalDuration += Date.now() - t0;
 
         if (this.queue.length > 0) {
           const { chunk, callback } = this.queue.shift();
-          this._dispatch(chunk);
-          callback();
+          this._dispatch(chunk, callback);
         } else if (this.inFlight === 0 && this.finalCallback) {
           this.finalCallback();
         }
       });
   }
-  _destroy(err, callback) {
-    callback(err);
-  }
+
   _final(callback) {
+    clearInterval(this._logInterval);
     if (this.inFlight === 0) {
       callback();
     } else {
       this.finalCallback = callback;
     }
   }
+
+  _destroy(err, callback) {
+    clearInterval(this._logInterval);
+    callback(err);
+  }
 }
+
 
 /**
  * @param {*} workers An array of web workers

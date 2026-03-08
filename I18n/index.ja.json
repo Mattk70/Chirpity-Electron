@@ -10,7 +10,7 @@
     "Detections Per Segment-circle-help": ["任意の3秒間に表示される検出の最大数を設定します"],
     "Context Mode-circle-help": ["有効にすると、コンテキストモードは周囲のコンテキストを分析して予測を適応させます。分析前にのみ変更可能で、低い初期信頼度しきい値（例：20-30％）を推奨します。コンテキストモードはBirdNETモデルでは利用できません。"],
     "Crop Library-circle-help": ["有効にすると、昼間の期間を含むオーディオファイルがクロップされ、夜間の期間のみが保存されます。"],
-    "Debug Mode-circle-help": ["デバッグモードに入ります（この設定の変更はChirpityの再起動が必要です）。"],
+    "Debug Mode-circle-help": ["デバッグモードに入ります"],
     "Decorators-circle-help": ["'Pad'はエクスポートされたオーディオの前後に2秒を追加します。'Fade'はオーディオの開始と終了に1秒のフェード効果を追加します。"],
     "Default Location-circle-help": ["Chirpityは、録音の夜明けと夕暮れの時間を決定するために位置情報を使用します。"],
     "Default Settings-circle-help": ["設定をデフォルト値にリセットします。注：変更を確認するにはChirpityを再起動してください。また、言語設定は手動で再設定する必要があります。"],
