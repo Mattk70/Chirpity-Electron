@@ -10,7 +10,7 @@
     "Detections Per Segment-circle-help":  ["Angiver det maksimale antal registreringer, der vises i en periode på 3 sekunder"],
     "Context Mode-circle-help": ["Når aktiveret, tilpasser konteksttilstand forudsigelser ved at analysere den omgivende kontekst. Det kan kun ændres før en analyse, og et lavt konfidensniveau anbefales, f.eks. 20-30 %. Konteksttilstand er ikke tilgængelig i BirdNET-modellen."],
     "Crop Library-circle-help": ["Når aktiveret, beskæres lydfiler, der indeholder dagslysperioder, så kun lydfiler fra natperioder gemmes."],
-    "Debug Mode-circle-help": ["Aktivér fejlsøgningsmodus (ændringer i denne indstilling kræver en genstart af Chirpity for at træde i kraft)."],
+    "Debug Mode-circle-help": ["Aktivér fejlsøgningsmodus"],
     "Decorators-circle-help": ["'Pad' tilføjer 2 sekunder før og efter et udvalg i det eksporterede lyd. 'Fade' tilføjer en 1-sekunders fade-effekt i starten og slutningen af lydfilen."],
     "Default Location-circle-help": ["Chirpity bruger placeringsoplysninger til at bestemme skumrings- og daggryperioder for optagelser."],
     "Default Settings-circle-help": ["Nulstil konfigurationsindstillinger til standardværdierne. Bemærk: Genstart Chirpity for at se ændringerne. Sprogindstillinger skal nulstilles manuelt."],

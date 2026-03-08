@@ -806,3 +806,15 @@ ipcMain.on("powerSaveControl", (e, on) => {
     //DEBUG && console.log(powerSaveBlocker.isStarted(powerSaveID), powerSaveID)
   }
 });
+
+ipcMain.on("debug-mode", (e, on) => {
+  if (on) {
+    mainWindow.webContents.openDevTools({ mode: "detach" });
+    workerWindow.show();
+    workerWindow.webContents.openDevTools();
+  } else {
+    mainWindow.webContents.closeDevTools();
+    workerWindow.webContents.closeDevTools();
+    workerWindow.hide();
+  }
+});

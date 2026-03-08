@@ -6700,6 +6700,7 @@ document.addEventListener("change", async function (e) {
         }
         case "debug-mode": {
           config.debug = !config.debug;
+          window.electron.debugMode(config.debug);
           break;
         }
       }
