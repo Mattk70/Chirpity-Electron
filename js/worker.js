@@ -1228,23 +1228,27 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true, skipM
       throw error;
     }
   }
-  if (filePaths.length) {
-    const fileOrFolder = folderDropped ? "Open Folder(s)" : "Open Files(s)";
-    trackEvent(STATE.UUID, "UI", "Drop", fileOrFolder, filePaths.length);
-    UI.postMessage({ event: "files", filePaths, preserveResults, checkSaved });
-    const allSaved = checkSaved ? await savedFileCheckAsync(filePaths) : false;
-    QUEUE.setFiles(filePaths);
-    if (allSaved) {
-      await onChangeMode("archive");
-      if (STATE.detect.autoLoad){
-        STATE.originalFiles = filePaths;
-        await Promise.all([getSummary(), getResults()]);
-      }
-    } else if (!skipMetadataScan) {
-      // Start gathering metadata for new files
-      processFilesInBatches(filePaths, 10);
-    }
+  if (!filePaths.length) {
+    QUEUE.setFiles([]);
+    UI.postMessage({ event: "files", filePaths: [], preserveResults, checkSaved });
+    return filePaths;
   }
+  const fileOrFolder = folderDropped ? "Open Folder(s)" : "Open Files(s)";
+  trackEvent(STATE.UUID, "UI", "Drop", fileOrFolder, filePaths.length);
+  UI.postMessage({ event: "files", filePaths, preserveResults, checkSaved });
+  const allSaved = checkSaved ? await savedFileCheckAsync(filePaths) : false;
+  QUEUE.setFiles(filePaths);
+  if (allSaved) {
+    await onChangeMode("archive");
+    if (STATE.detect.autoLoad){
+      STATE.originalFiles = filePaths;
+      await Promise.all([getSummary(), getResults()]);
+    }
+  } else if (!skipMetadataScan) {
+    // Start gathering metadata for new files
+    processFilesInBatches(filePaths, 10);
+  }
+  
   return filePaths;
 };
 
@@ -1953,10 +1957,12 @@ function onAbort({ model = STATE.model }) {
     }
   }
   // Tell workers to ignore results from any in-flight batches and stop processing
-  predictWorkers.forEach(worker => worker.postMessage({
+  predictWorkers.forEach(worker => {
+    worker.postMessage({
     message: 'terminate', 
     batchSize: BATCH_SIZE,
-    backend: STATE.detect.backend}));
+    backend: STATE.detect.backend})
+  });
   
 
   //restart the workers

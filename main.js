@@ -808,13 +808,14 @@ ipcMain.on("powerSaveControl", (e, on) => {
 });
 
 ipcMain.on("debug-mode", (e, on) => {
+  DEBUG = !!on;
   if (on) {
-    mainWindow.webContents.openDevTools({ mode: "detach" });
-    workerWindow.show();
-    workerWindow.webContents.openDevTools();
+    mainWindow?.webContents.openDevTools({ mode: "detach" });
+    workerWindow?.show();
+    workerWindow?.webContents.openDevTools();
   } else {
-    mainWindow.webContents.closeDevTools();
-    workerWindow.webContents.closeDevTools();
-    workerWindow.hide();
+    mainWindow?.webContents.closeDevTools();
+    workerWindow?.webContents.closeDevTools();
+    workerWindow?.hide();
   }
 });

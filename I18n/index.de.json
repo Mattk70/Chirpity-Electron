@@ -10,7 +10,7 @@
     "Detections Per Segment-circle-help": ["Legt die maximale Anzahl von Erkennungen fest, die in einem Zeitraum von 3 Sekunden angezeigt werden"],
     "Context Mode-circle-help": ["Wenn aktiviert, passt der Kontextmodus die Vorhersagen durch Analyse des umgebenden Kontexts an. Er kann nur vor einer Analyse geändert werden, und eine anfängliche niedrige Konfidenzschwelle wird empfohlen, z. B. 20-30%. Der Kontextmodus ist im BirdNET-Modell nicht verfügbar."],
     "Crop Library-circle-help": ["Wenn aktiviert, werden Audiodateien, die Tageslichtperioden enthalten, beschnitten, sodass nur Audiodateien aus Nachtperioden gespeichert werden."],
-    "Debug Mode-circle-help": ["Debug-Modus aktivieren"],
+    "Debug Mode-circle-help": ["Fehlermodus aktivieren"],
     "Decorators-circle-help": ["'Pad' fügt 2 Sekunden vor und nach einer Auswahl im exportierten Audio hinzu. 'Fade' fügt einen 1-sekündigen Fade-Effekt am Anfang und Ende des Audios hinzu."],
     "Default Location-circle-help": ["Chirpity verwendet Standortinformationen, um die Dämmerungs- und Morgengrauenzeiten für Aufnahmen zu bestimmen."],
     "Default Settings-circle-help": ["Setzen Sie die Konfigurationseinstellungen auf die Standardwerte zurück. Hinweis: Starten Sie Chirpity neu, um die Änderungen zu sehen. Spracheinstellungen müssen manuell zurückgesetzt werden."],

@@ -228,6 +228,7 @@ class PredictionWritable extends Writable {
   }
 
   _destroy(err, callback) {
+    clearInterval(this._logInterval);
     callback(err);
   }
 }
