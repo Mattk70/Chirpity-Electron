@@ -77,7 +77,7 @@ class Mutex {
     return new Promise((resolve) => {
       if (this.locked) {
         this.queue.push(resolve);
-        console.log("mutex queue ", this.queue.length);
+        DEBUG && console.log("mutex queue ", this.queue.length);
       } else {
         this.locked = true;
         resolve();
@@ -88,7 +88,7 @@ class Mutex {
   unlock() {
     if (this.queue.length > 0) {
       const nextResolve = this.queue.shift();
-      console.log("mutex queue shifted", this.queue.length);
+      DEBUG && console.log("mutex queue shifted", this.queue.length);
       nextResolve();
     } else {
       this.locked = false;
