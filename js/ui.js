@@ -6701,6 +6701,8 @@ document.addEventListener("change", async function (e) {
         case "debug-mode": {
           config.debug = !config.debug;
           window.electron.debugMode(config.debug);
+          // Tell the worker
+          worker.postMessage({ action: "update-state", debug: config.debug });
           break;
         }
       }
