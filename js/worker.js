@@ -625,6 +625,12 @@ async function handleMessage(e) {
       break;
     }
     case "load-model": {
+      const run = STATE.currentRun;
+      if (run) {
+        run.cancelled = true;
+        run.abortController.abort();
+        STATE.workerQueue?.cancelAll("Prediction aborted");
+      }      
       terminateWorkers();
       INITIALISED = await onLaunch(args);
       await resetEstimates();
@@ -1222,6 +1228,7 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true, skipM
       throw error;
     }
   }
+  STATE.openFiles = filePaths;
   if (!filePaths.length) {
     QUEUE.setFiles([]);
     UI.postMessage({ event: "files", filePaths: [], preserveResults, checkSaved });
@@ -1242,7 +1249,7 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true, skipM
     // Start gathering metadata for new files
     processFilesInBatches(filePaths, 10);
   }
-  STATE.openFiles = filePaths;
+
   return filePaths;
 };
 
