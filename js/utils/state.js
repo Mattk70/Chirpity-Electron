@@ -81,8 +81,6 @@ export class WorkerState {
     (this.customList = undefined),
     (this.customLabels = []),
     (this.customLabelsMap = {}),
-    (this.customLabels = []),
-    (this.customLabelsMap = {}),
     (this.notFound = {}), // try to prevent spamming errors
     (this.local = true),
     (this.incrementor = 2),
@@ -109,7 +107,7 @@ export class WorkerState {
     (this.clippedBatches = 0),
     (this.originalFiles = undefined),
     (this.perchWorker = []),
-    (this.fileStatus = {selected: [], pending: [], incomplete: []})
+    (this.openFiles = [])
   }
 
   update(updates) {

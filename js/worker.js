@@ -625,13 +625,7 @@ async function handleMessage(e) {
       break;
     }
     case "load-model": {
-      if (STATE.model === 'perch v2') {
-        STATE.backend = args.backend;
-        BATCH_SIZE = args.batchSize;
-        predictWorkers[0].postMessage({ message: "terminate", batchSize: args.batchSize, backend: args.backend });
-      } else {
-        terminateWorkers();
-      }
+      terminateWorkers();
       INITIALISED = await onLaunch(args);
       await resetEstimates();
       break;
@@ -1248,7 +1242,7 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true, skipM
     // Start gathering metadata for new files
     processFilesInBatches(filePaths, 10);
   }
-  
+  STATE.openFiles = filePaths;
   return filePaths;
 };
 
@@ -1928,7 +1922,7 @@ async function onAnalyse({
     await resetEmbeddings();
   }
   STATE.workerQueue = createMultiWorkerQueue(predictWorkers, parsePredictions, {
-    timeoutMs: 60000
+    timeoutMs: 120_000, // 2 minutes
   });
   for (let i = 0; i < predictWorkers.length; i++) {
     processNextFile({ start, end, worker: i });
@@ -1953,7 +1947,7 @@ function onAbort({ model = STATE.model }) {
     try {
       STATE.workerQueue.cancelAll("Prediction aborted");
     } catch (e) {
-        console.error("Error occurred while cancelling worker queue", e.name, 'message', e.message);
+        console.error("Error occurred while cancelling worker queue", e);
     }
   }
   // Tell workers to ignore results from any in-flight batches and stop processing
@@ -4831,8 +4825,8 @@ async function onDeleteSpecies({species}) {
   const params = [species];
   let SQL = `DELETE FROM records 
     WHERE speciesID IN (SELECT id FROM species WHERE cname = ?)`;
-  if (STATE.mode === "analyse") {
-    const filePaths = QUEUE.getAllPaths();
+  if (STATE.mode === "archive") {
+    const filePaths = STATE.openFiles;
     if (!filePaths.length) return;
     const rows = await db.allAsync(
       `SELECT id FROM files WHERE NAME IN (${prepParams(
@@ -4843,7 +4837,8 @@ async function onDeleteSpecies({species}) {
     if (!rows.length) return;
     const ids = rows.map((row) => row.id).join(",");
     SQL += ` AND fileID in (${ids})`;
-  } else if (STATE.mode === "explore") {
+  }
+  else if (STATE.mode === "explore") {
     const { start, end } = STATE.explore.range;
     if (start) {
       SQL += ` AND rowid IN (
