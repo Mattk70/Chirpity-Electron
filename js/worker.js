@@ -37,11 +37,9 @@ const DATASET = false;
 let DEBUG;
 let SEEN_MODEL_READY = false;
 let METADATA = {};
-let index = 0,
-  predictionStart;
+let index = 0, predictionStart;
 let sampleRate; // Should really make this a property of the model
-let predictWorkers = [],
-  aborted = false;
+let predictWorkers = [];
 let UI;
 let initialiseResolve;
 let initialiseReject;
@@ -51,7 +49,6 @@ let INITIALISED = new Promise((resolve, reject) => {
   initialiseReject = reject;
 });
 const EPSILON = 0.025;
-let t0_analysis = 0;
 const generateAlert = ({
   message,
   type,
@@ -544,6 +541,7 @@ async function handleMessage(e) {
         await memoryDB.runAsync("DELETE FROM records; VACUUM");
         const mode = METADATA[file]?.isSaved ? "archive" : "analyse";
         await onChangeMode(mode);
+        STATE.openFiles = [file];
       }
       break;
     }
@@ -625,13 +623,13 @@ async function handleMessage(e) {
       break;
     }
     case "load-model": {
-      if (STATE.model === 'perch v2') {
-        STATE.backend = args.backend;
-        BATCH_SIZE = args.batchSize;
-        predictWorkers[0].postMessage({ message: "terminate", batchSize: args.batchSize, backend: args.backend });
-      } else {
-        terminateWorkers();
-      }
+      const run = STATE.currentRun;
+      if (run) {
+        run.cancelled = true;
+        run.abortController.abort();
+        STATE.workerQueue?.cancelAll("Prediction aborted");
+      }      
+      terminateWorkers();
       INITIALISED = await onLaunch(args);
       await resetEstimates();
       break;
@@ -1188,7 +1186,7 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true, skipM
   for (const path of files) {
     try {
       const stats = fs.lstatSync(path);
-      if (stats.size === 0) { 
+      if (!stats.isDirectory() && stats.size === 0) { 
         if (files.length === 1) {
           generateAlert({
             type: "warning",
@@ -1228,6 +1226,7 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true, skipM
       throw error;
     }
   }
+  STATE.openFiles = filePaths;
   if (!filePaths.length) {
     QUEUE.setFiles([]);
     UI.postMessage({ event: "files", filePaths: [], preserveResults, checkSaved });
@@ -1248,7 +1247,7 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true, skipM
     // Start gathering metadata for new files
     processFilesInBatches(filePaths, 10);
   }
-  
+
   return filePaths;
 };
 
@@ -1832,7 +1831,6 @@ async function onAnalyse({
   aborted = false;
   //Reset GLOBAL variables
   index = 0;
-  t0_analysis = Date.now();
   STATE.incrementor = 1;
   STATE.clippedBatches = 0;
   STATE.clippedFilesDuration = 0;
@@ -1845,7 +1843,7 @@ async function onAnalyse({
     cancelled: false,
   };
 
-
+  STATE.openFiles = filesInScope;
 
   // Set the appropriate selection range if this is a selection analysis
   STATE.update({
@@ -1928,7 +1926,7 @@ async function onAnalyse({
     await resetEmbeddings();
   }
   STATE.workerQueue = createMultiWorkerQueue(predictWorkers, parsePredictions, {
-    timeoutMs: 60000
+    timeoutMs: 120_000, // 2 minutes
   });
   for (let i = 0; i < predictWorkers.length; i++) {
     processNextFile({ start, end, worker: i });
@@ -1953,7 +1951,7 @@ function onAbort({ model = STATE.model }) {
     try {
       STATE.workerQueue.cancelAll("Prediction aborted");
     } catch (e) {
-        console.error("Error occurred while cancelling worker queue", e.name, 'message', e.message);
+        console.error("Error occurred while cancelling worker queue", e);
     }
   }
   // Tell workers to ignore results from any in-flight batches and stop processing
@@ -2654,7 +2652,7 @@ async function processAudio(
   } catch (err) {
     if (err.name === "AbortError") {
       // Expected — ignore
-      console.info("Prediction aborted", `After ${(Date.now() - t0_analysis)/1000} seconds`);
+      console.info("Prediction aborted", `After ${(Date.now() - predictionStart)/1000} seconds`);
       return;
     }
     throw err; // real error
@@ -3514,7 +3512,7 @@ async function estimateTimeRemaining(batchesReceived) {
   const remainingBatches = totalBatches - clippedBatches;
   const progress = remainingBatches > 0 ? batchesReceived / remainingBatches : 0;
   if (progress === 0 || remainingBatches === 0) return; // No batches to process
-  const elapsedMinutes = (Date.now() - t0_analysis) / 60_000;
+  const elapsedMinutes = (Date.now() - predictionStart) / 60_000;
   const estimatedTime = elapsedMinutes / progress;
   const processedMinutes = ((STATE.allFilesDuration - STATE.clippedFilesDuration) / 60) * progress;
   const remaining = estimatedTime - elapsedMinutes;
@@ -4831,8 +4829,8 @@ async function onDeleteSpecies({species}) {
   const params = [species];
   let SQL = `DELETE FROM records 
     WHERE speciesID IN (SELECT id FROM species WHERE cname = ?)`;
-  if (STATE.mode === "analyse") {
-    const filePaths = QUEUE.getAllPaths();
+  if (STATE.mode === "archive") {
+    const filePaths = STATE.openFiles;
     if (!filePaths.length) return;
     const rows = await db.allAsync(
       `SELECT id FROM files WHERE NAME IN (${prepParams(
@@ -4843,7 +4841,8 @@ async function onDeleteSpecies({species}) {
     if (!rows.length) return;
     const ids = rows.map((row) => row.id).join(",");
     SQL += ` AND fileID in (${ids})`;
-  } else if (STATE.mode === "explore") {
+  }
+  else if (STATE.mode === "explore") {
     const { start, end } = STATE.explore.range;
     if (start) {
       SQL += ` AND rowid IN (

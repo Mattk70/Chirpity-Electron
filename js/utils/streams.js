@@ -284,7 +284,9 @@ function createMultiWorkerQueue(
   });
   function cancelAll(reason = "Aborted") {
     cancelled = true;
-    for (const { reject, timeout } of pending.values()) {
+    for (const entry of pending.values()) {
+      if (!entry) continue;
+      const { reject, timeout } = entry;
       clearTimeout(timeout);
       reject(new Error(reason));
     }
