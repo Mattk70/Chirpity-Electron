@@ -2080,7 +2080,9 @@ window.onload = async () => {
       missingFiles.push(modelPath);
     } else if (config.selectedModel === 'perch v2'){
       requiredFiles.push('perch_v2.onnx', 'labels.txt');
-    } else {
+    } else if (config.selectedModel === 'nighthawk'){
+      requiredFiles.push('nighthawk.onnx', 'labels.txt');
+    }else {
       requiredFiles.push('model.json', 'weights.bin', 'labels.txt');
     }
     // Check for required files
@@ -5702,7 +5704,10 @@ async function handleUIClicks(e) {
 
       const modelName = displayName.toLowerCase();
       const modelLocation = document.getElementById('import-location').value;
-      const requiredFiles = modelName === 'perch v2' ? ['perch_v2.onnx', 'labels.txt'] : ['weights.bin', 'labels.txt', 'model.json'];
+      const requiredFiles = modelName === 'perch v2' 
+      ? ['perch_v2.onnx', 'labels.txt'] : modelName === 'nighthawk'
+      ? ['nighthawk.onnx', 'labels.txt']
+      : ['weights.bin', 'labels.txt', 'model.json'];
       if (config.models[modelName] !== undefined){
         generateToast({message: 'A model with that name already exists', type:'error'})
         break;

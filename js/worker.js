@@ -1031,8 +1031,10 @@ async function onLaunch({
     chirpity: 24_000,
     nocmig: 24_000,
     'perch v2': 32_000,
+    nighthawk: 22_050,
   };
-  let perch = model === 'perch v2';
+  const perch = model === 'perch v2';
+  const nighthawk = model === 'nighthawk';
   // Check correct perch model being used
   if (perch && ! fs.existsSync(p.join(modelPath, 'perch_v2.onnx'))) {
     let message = `<b>'perch_v2.onnx'</b> was not found in ${modelPath}. `;
@@ -1044,7 +1046,8 @@ async function onLaunch({
     model = 'birdnet'; perch = false; modelPath = null;
     generateAlert({message, type:'error'})
   }
-  const newWindowSize = perch ? 5 : 3;
+  const newWindowSize = perch ? 5 : nighthawk ? 1 : 3;
+
   if (newWindowSize !== WINDOW_SIZE) {
     // Update totalBatches so time estimates remain accurate
     WINDOW_SIZE = newWindowSize;
@@ -1182,7 +1185,7 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true, skipM
   for (const path of files) {
     try {
       const stats = fs.lstatSync(path);
-      if (stats.size === 0) { 
+      if (!stats.isDirectory() && stats.size === 0) { 
         if (files.length === 1) {
           generateAlert({
             type: "warning",
@@ -2994,9 +2997,22 @@ function spawnPredictWorkers(model, batchSize, toSpawn) {
   const startAt = predictWorkers.length;
   for (let i = startAt; i < startAt + toSpawn; i++) {
     if (isPerch && i > startAt) break; // Perch v2 only needs one worker, even if multiple threads requested
-    const workerSrc = ['nocmig', 'chirpity', 'perch v2'].includes(model) ? model : "BirdNet2.4";
+    const workerSrc = ['nocmig', 'chirpity', 'perch v2', 'nighthawk'].includes(model) ? model : "BirdNet2.4";
     const worker = new Worker(`./js/models/${workerSrc}.js`, { type: "module" });
-
+    // Web worker message event handler
+    worker.onmessage = async (msg) => {
+      await parseMessage(msg).catch((error) => {
+        console.warn("Parse message error", error, msg);
+      });
+    };
+    worker.onerror = (e) => {
+      console.warn(
+        `Worker ${i} is suffering, shutting it down.`,
+        e.message
+      );
+      predictWorkers.splice(i, 1);
+      worker.terminate();
+    };
     worker.name = model;
     predictWorkers.push(worker);
     DEBUG && console.log("loading a worker");
@@ -3012,20 +3028,6 @@ function spawnPredictWorkers(model, batchSize, toSpawn) {
       locale: STATE.locale.slice(0,2)
     });
 
-    // Web worker message event handler
-    worker.onmessage = async (msg) => {
-      await parseMessage(msg).catch((error) => {
-        console.warn("Parse message error", error, msg);
-      });
-    };
-    worker.onerror = (e) => {
-      console.warn(
-        `Worker ${i} is suffering, shutting it down.`,
-        e.message
-      );
-      predictWorkers.splice(i, 1);
-      worker.terminate();
-    };
   }
 }
 
