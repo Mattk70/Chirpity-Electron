@@ -37,11 +37,9 @@ const DATASET = false;
 let DEBUG;
 let SEEN_MODEL_READY = false;
 let METADATA = {};
-let index = 0,
-  predictionStart;
+let index = 0, predictionStart;
 let sampleRate; // Should really make this a property of the model
-let predictWorkers = [],
-  aborted = false;
+let predictWorkers = [];
 let UI;
 let initialiseResolve;
 let initialiseReject;
@@ -51,7 +49,6 @@ let INITIALISED = new Promise((resolve, reject) => {
   initialiseReject = reject;
 });
 const EPSILON = 0.025;
-let t0_analysis = 0;
 const generateAlert = ({
   message,
   type,
@@ -544,6 +541,7 @@ async function handleMessage(e) {
         await memoryDB.runAsync("DELETE FROM records; VACUUM");
         const mode = METADATA[file]?.isSaved ? "archive" : "analyse";
         await onChangeMode(mode);
+        STATE.openFiles = [file];
       }
       break;
     }
@@ -1833,7 +1831,6 @@ async function onAnalyse({
   aborted = false;
   //Reset GLOBAL variables
   index = 0;
-  t0_analysis = Date.now();
   STATE.incrementor = 1;
   STATE.clippedBatches = 0;
   STATE.clippedFilesDuration = 0;
@@ -1846,7 +1843,7 @@ async function onAnalyse({
     cancelled: false,
   };
 
-
+  STATE.openFiles = filesInScope;
 
   // Set the appropriate selection range if this is a selection analysis
   STATE.update({
@@ -2655,7 +2652,7 @@ async function processAudio(
   } catch (err) {
     if (err.name === "AbortError") {
       // Expected — ignore
-      console.info("Prediction aborted", `After ${(Date.now() - t0_analysis)/1000} seconds`);
+      console.info("Prediction aborted", `After ${(Date.now() - predictionStart)/1000} seconds`);
       return;
     }
     throw err; // real error
@@ -3515,7 +3512,7 @@ async function estimateTimeRemaining(batchesReceived) {
   const remainingBatches = totalBatches - clippedBatches;
   const progress = remainingBatches > 0 ? batchesReceived / remainingBatches : 0;
   if (progress === 0 || remainingBatches === 0) return; // No batches to process
-  const elapsedMinutes = (Date.now() - t0_analysis) / 60_000;
+  const elapsedMinutes = (Date.now() - predictionStart) / 60_000;
   const estimatedTime = elapsedMinutes / progress;
   const processedMinutes = ((STATE.allFilesDuration - STATE.clippedFilesDuration) / 60) * progress;
   const remaining = estimatedTime - elapsedMinutes;
