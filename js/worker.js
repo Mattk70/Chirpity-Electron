@@ -1182,7 +1182,7 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true, skipM
   for (const path of files) {
     try {
       const stats = fs.lstatSync(path);
-      if (stats.size === 0) { 
+      if (!stats.isDirectory() && stats.size === 0) { 
         if (files.length === 1) {
           generateAlert({
             type: "warning",
