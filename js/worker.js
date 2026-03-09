@@ -1827,8 +1827,6 @@ async function onAnalyse({
   reanalyse = false,
   circleClicked = false,
 }) {
-  // Now we've asked for a new analysis, clear the aborted flag
-  aborted = false;
   //Reset GLOBAL variables
   index = 0;
   STATE.incrementor = 1;
