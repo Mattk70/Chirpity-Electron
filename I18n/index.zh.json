@@ -10,7 +10,7 @@
   "Detections Per Segment-circle-help": ["设置在任意3秒内显示的最大检测数量"],
   "Context Mode-circle-help": ["启用后，情境模式通过分析周围的情境来调整预测。只能在分析之前更改，并建议设置较低的初始置信度，例如 20-30%。情境模式在 BirdNET 模型中不可用。"],
   "Crop Library-circle-help": ["启用后，包含白天时间段的音频文件将被裁剪，只保留夜间的音频。"],
-  "Debug Mode-circle-help": ["进入调试模式（更改此设置需要重新启动 Chirpity 才能生效）。"],
+  "Debug Mode-circle-help": ["进入调试模式"],
   "Decorators-circle-help": ["‘填充’在导出的音频的选择部分前后各添加 2 秒。‘淡化’在音频的开头和结尾添加 1 秒淡化效果。"],
   "Default Location-circle-help": ["Chirpity 使用位置信息来确定录音的日出和日落时间。"],
   "Default Settings-circle-help": ["将配置设置重置为默认值。注意：重新启动 Chirpity 以查看更改，同时需要手动重新设置语言设置。"],

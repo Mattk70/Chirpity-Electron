@@ -37,11 +37,9 @@ const DATASET = false;
 let DEBUG;
 let SEEN_MODEL_READY = false;
 let METADATA = {};
-let index = 0,
-  predictionStart;
+let index = 0, predictionStart;
 let sampleRate; // Should really make this a property of the model
-let predictWorkers = [],
-  aborted = false;
+let predictWorkers = [];
 let UI;
 let initialiseResolve;
 let initialiseReject;
@@ -51,7 +49,6 @@ let INITIALISED = new Promise((resolve, reject) => {
   initialiseReject = reject;
 });
 const EPSILON = 0.025;
-let t0_analysis = 0;
 const generateAlert = ({
   message,
   type,
@@ -133,7 +130,6 @@ const SUPPORTED_FILES = [
 ];
 
 let NUM_WORKERS;
-let workerInstance = 0;
 let appPath,
   tempPath,
   BATCH_SIZE,
@@ -154,8 +150,7 @@ Date.prototype.getWeekNumber = function () {
 };
 
 
-let predictionsRequested = {},
-  predictionsReceived = {};
+let predictionsReceived = {};
 let diskDB, memoryDB;
 
 let t0; // Application profiler
@@ -439,14 +434,13 @@ async function handleMessage(e) {
         UI.postMessage({ event: "analysis-complete", quiet: true });
         break;
       }
-      predictionsReceived = {};
-      predictionsRequested = {};
       await onAnalyse(args);
       break;
     } 
     case "change-batch-size": {
       BATCH_SIZE = args.batchSize;
       onAbort({});
+      await resetEstimates();
       break;
     }
     case "change-threads": {
@@ -538,6 +532,7 @@ async function handleMessage(e) {
         await memoryDB.runAsync("DELETE FROM records; VACUUM");
         const mode = METADATA[file]?.isSaved ? "archive" : "analyse";
         await onChangeMode(mode);
+        STATE.openFiles = [file];
       }
       break;
     }
@@ -619,17 +614,15 @@ async function handleMessage(e) {
       break;
     }
     case "load-model": {
-      if (STATE.model === 'perch v2') {
-        STATE.backend = args.backend;
-        predictWorkers[0].postMessage({ message: "terminate", backend: args.backend });
-      } else {
-        if (QUEUE.any('inProgress')) {
-          onAbort(args);
-        } else {
-          predictWorkers.length && terminateWorkers();
-        }
-      }
-      INITIALISED = onLaunch(args);
+      const run = STATE.currentRun;
+      if (run) {
+        run.cancelled = true;
+        run.abortController.abort();
+        STATE.workerQueue?.cancelAll("Prediction aborted");
+      }      
+      terminateWorkers();
+      INITIALISED = await onLaunch(args);
+      await resetEstimates();
       break;
     }
     case "expunge-model": {
@@ -947,6 +940,13 @@ function setGetSummaryQueryInterval(threads) {
     STATE.detect.backend !== "tensorflow" ? threads * 10 : threads;
 }
 
+async function resetEstimates() {
+  if (STATE.totalBatches > 0) {
+    // Update time estimates based on new batch size
+    const files = QUEUE.getAllPaths();
+    await processFilesInBatches(files);
+  }
+}
 function findFileAtTime(timeMs) {
   const match = Object.entries(METADATA)
     .find(([_, data]) => {
@@ -1043,10 +1043,7 @@ async function onLaunch({
   if (newWindowSize !== WINDOW_SIZE) {
     // Update totalBatches so time estimates remain accurate
     WINDOW_SIZE = newWindowSize;
-    if (STATE.totalBatches > 0) {
-      const files = QUEUE.getAllPaths();
-      await processFilesInBatches(files);
-    }
+    await resetEstimates();
   }
 
   sampleRate = sampleRates[model] || 48_000;
@@ -1180,6 +1177,17 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true, skipM
   for (const path of files) {
     try {
       const stats = fs.lstatSync(path);
+      if (!stats.isDirectory() && stats.size === 0) { 
+        if (files.length === 1) {
+          generateAlert({
+            type: "warning",
+            message: "corruptFile",
+            variables: { files: path },
+            autohide: false,
+          });
+        }
+        continue; // skip empty files
+      }
       if (stats.isDirectory()) {
         folderDropped = true;
         // Retrieve files in the directory and filter immediately
@@ -1209,6 +1217,12 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true, skipM
       throw error;
     }
   }
+  STATE.openFiles = filePaths;
+  if (!filePaths.length) {
+    QUEUE.setFiles([]);
+    UI.postMessage({ event: "files", filePaths: [], preserveResults, checkSaved });
+    return filePaths;
+  }
   const fileOrFolder = folderDropped ? "Open Folder(s)" : "Open Files(s)";
   trackEvent({uuid: STATE.UUID, event: "UI", action: "Drop", name: fileOrFolder, value: filePaths.length, version: STATE.VERSION});
   UI.postMessage({ event: "files", filePaths, preserveResults, checkSaved });
@@ -1224,7 +1238,7 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true, skipM
     // Start gathering metadata for new files
     processFilesInBatches(filePaths, 10);
   }
-  
+
   return filePaths;
 };
 
@@ -1804,11 +1818,13 @@ async function onAnalyse({
   reanalyse = false,
   circleClicked = false,
 }) {
-  // Now we've asked for a new analysis, clear the aborted flag
-  aborted = false;
+  //Reset GLOBAL variables
+  index = 0;
   STATE.incrementor = 1;
   STATE.clippedBatches = 0;
   STATE.clippedFilesDuration = 0;
+  predictionsReceived = {};
+  batchesToSend = {};
   predictionStart = new Date();
 
   STATE.currentRun = {
@@ -1816,7 +1832,7 @@ async function onAnalyse({
     cancelled: false,
   };
 
-
+  STATE.openFiles = filesInScope;
 
   // Set the appropriate selection range if this is a selection analysis
   STATE.update({
@@ -1839,10 +1855,6 @@ async function onAnalyse({
     console.log(
       `Worker received message: ${filesInScope}, ${STATE.detect.confidence}, start: ${start}, end: ${end}`
     );
-  //Reset GLOBAL variables
-  index = 0;
-  batchesToSend = {};
-  t0_analysis = Date.now();
   if (!selection) {
     const {combine, merge} = STATE.detect;
     // Clear records from the memory db
@@ -1903,9 +1915,9 @@ async function onAnalyse({
     await resetEmbeddings();
   }
   STATE.workerQueue = createMultiWorkerQueue(predictWorkers, parsePredictions, {
-    timeoutMs: 60000
+    timeoutMs: 120_000, // 2 minutes
   });
-  for (let i = 0; i < NUM_WORKERS; i++) {
+  for (let i = 0; i < predictWorkers.length; i++) {
     processNextFile({ start, end, worker: i });
   }
 }
@@ -1920,27 +1932,26 @@ async function onAnalyse({
  */
 function onAbort({ model = STATE.model }) {
   const run = STATE.currentRun;
-  if (!run) return;
-  run.cancelled = true;
-  // Stop all pipelines immediately
-  run.abortController.abort();
-  // Reject all pending worker promises
-  try {
-    STATE.workerQueue.cancelAll("Prediction aborted");
-  } catch (e) {
-      console.error("Error occurred while cancelling worker queue", e.name, 'message', e.message);
-    
+  if (run) {
+    run.cancelled = true;
+    // Stop all pipelines immediately
+    run.abortController.abort();
+    // Reject all pending worker promises
+    try {
+      STATE.workerQueue.cancelAll("Prediction aborted");
+    } catch (e) {
+        console.error("Error occurred while cancelling worker queue", e);
+    }
   }
-
   // Tell workers to ignore results from any in-flight batches and stop processing
-  predictWorkers.forEach(worker => worker.postMessage({
+  predictWorkers.forEach(worker => {
+    worker.postMessage({
     message: 'terminate', 
     batchSize: BATCH_SIZE,
-    backend: STATE.detect.backend}));
+    backend: STATE.detect.backend})
+  });
   
-  predictionsReceived = {};
-  predictionsRequested = {};
-  index = 0;
+
   //restart the workers
   if (model !== 'perch v2'){
     terminateWorkers();
@@ -2001,7 +2012,7 @@ const getDuration = async (src) => {
       return await getWaveDuration(src)
     } catch (e) {
       if (e.message.includes("Truncated WAV header")) {
-        return reject(err) // no point trying to decode with ffmpeg if the file is truncated
+        throw e;// no point trying to decode with ffmpeg if the file is truncated
       }
       console.warn('Decode audio failed', `${e.message}`)
     }
@@ -2528,10 +2539,6 @@ const getPredictBuffers = async ({ file = "", start = 0, end = undefined }) => {
         predictionsReceived[found] = predictionsReceived[file];
         delete predictionsReceived[file];
       }
-      if (file in predictionsRequested) {
-        predictionsRequested[found] = predictionsRequested[file];
-        delete predictionsRequested[file];
-      }
       if (file in batchesToSend) {
         batchesToSend[found] = batchesToSend[file];
         delete batchesToSend[file];
@@ -2618,7 +2625,11 @@ async function processAudio(
 
   const workerQueue = STATE.workerQueue;
   const sendToModel = createPredictSender(workerQueue);
-  const bufferAndSend = new PredictionWritable(sendToModel, {concurrency: 6 });
+  // As there is a queue per file, we don't want the concurrency across all queues
+  // to exceed the number of workers
+  const concurrency = Math.max(1, Math.round(predictWorkers.length / QUEUE.getSize()));
+  
+  const bufferAndSend = new PredictionWritable(sendToModel, {concurrency});
 
   try {
     await pipeline(
@@ -2630,7 +2641,7 @@ async function processAudio(
   } catch (err) {
     if (err.name === "AbortError") {
       // Expected — ignore
-      console.info("Prediction aborted", `After ${(Date.now() - t0_analysis)/1000} seconds`);
+      console.info("Prediction aborted", `After ${(Date.now() - predictionStart)/1000} seconds`);
       return;
     }
     throw err; // real error
@@ -2973,9 +2984,9 @@ function spawnPredictWorkers(model, batchSize, toSpawn) {
   } else if (STATE.perchWorker.length) {
     predictWorkers = predictWorkers.filter(w => w.name !== 'perch v2');
   }
-  
-  for (let i = 0; i < toSpawn; i++) {
-    if (isPerch && i > 0) break; // Perch v2 only needs one worker, even if multiple threads requested
+  const startAt = predictWorkers.length;
+  for (let i = startAt; i < startAt + toSpawn; i++) {
+    if (isPerch && i > startAt) break; // Perch v2 only needs one worker, even if multiple threads requested
     const workerSrc = ['nocmig', 'chirpity', 'perch v2'].includes(model) ? model : "BirdNet2.4";
     const worker = new Worker(`./js/models/${workerSrc}.js`, { type: "module" });
 
@@ -3491,7 +3502,7 @@ async function estimateTimeRemaining(batchesReceived) {
   const remainingBatches = totalBatches - clippedBatches;
   const progress = remainingBatches > 0 ? batchesReceived / remainingBatches : 0;
   if (progress === 0 || remainingBatches === 0) return; // No batches to process
-  const elapsedMinutes = (Date.now() - t0_analysis) / 60_000;
+  const elapsedMinutes = (Date.now() - predictionStart) / 60_000;
   const estimatedTime = elapsedMinutes / progress;
   const processedMinutes = ((STATE.allFilesDuration - STATE.clippedFilesDuration) / 60) * progress;
   const remaining = estimatedTime - elapsedMinutes;
@@ -3648,7 +3659,6 @@ async function processNextFile({
   let file = files.shift();
   QUEUE.setStatus(file, 'inProgress')
   predictionsReceived[file] = 0;
-  predictionsRequested[file] = 0;
   const found = await getWorkingFile(file).catch((error) => {
     if (error instanceof Event)
       error = `Event passed ${error.type}, attached to ${error.currentTarget}`;
@@ -4809,8 +4819,8 @@ async function onDeleteSpecies({species}) {
   const params = [species];
   let SQL = `DELETE FROM records 
     WHERE speciesID IN (SELECT id FROM species WHERE cname = ?)`;
-  if (STATE.mode === "analyse") {
-    const filePaths = QUEUE.getAllPaths();
+  if (STATE.mode === "archive") {
+    const filePaths = STATE.openFiles;
     if (!filePaths.length) return;
     const rows = await db.allAsync(
       `SELECT id FROM files WHERE NAME IN (${prepParams(
@@ -4821,7 +4831,8 @@ async function onDeleteSpecies({species}) {
     if (!rows.length) return;
     const ids = rows.map((row) => row.id).join(",");
     SQL += ` AND fileID in (${ids})`;
-  } else if (STATE.mode === "explore") {
+  }
+  else if (STATE.mode === "explore") {
     const { start, end } = STATE.explore.range;
     if (start) {
       SQL += ` AND rowid IN (

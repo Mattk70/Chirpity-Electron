@@ -341,7 +341,7 @@ function WSPlayPause(){
 //Open Files from OS "open with"
 let OS_FILE_QUEUE = [];
 window.electron.onFileOpen((filePath) => {
-  if (APPLICATION_LOADED) onOpenFiles({ filePaths: [filePath], checkSaved: true });
+  if (APPLICATION_LOADED) filterValidFiles({ filePaths: [filePath] });
   else OS_FILE_QUEUE.push(filePath);
 });
 
@@ -3615,7 +3615,7 @@ function onModelReady() {
     prepTour();
   }
   if (OS_FILE_QUEUE.length) {
-    onOpenFiles({ filePaths: OS_FILE_QUEUE, checkSaved: true });
+    filterValidFiles({ filePaths: OS_FILE_QUEUE });
     OS_FILE_QUEUE = []; // Clear the queue
   }
 }
@@ -6688,6 +6688,9 @@ document.addEventListener("change", async function (e) {
         }
         case "debug-mode": {
           config.debug = !config.debug;
+          window.electron.debugMode(config.debug);
+          // Tell the worker
+          worker.postMessage({ action: "update-state", debug: config.debug });
           break;
         }
       }

@@ -10,7 +10,7 @@
     "Detections Per Segment-circle-help": ["Définit le nombre maximal de détections qui seront affichées pendant toute période de 3 secondes"],
     "Context Mode-circle-help": ["Lorsqu'il est activé, le mode contextuel adapte les prédictions en analysant le contexte environnant. Il ne peut être modifié qu'avant une analyse, et un seuil de confiance initial faible est recommandé, par exemple 20-30%. Le mode contextuel n'est pas disponible dans le modèle BirdNET."],
     "Crop Library-circle-help": ["Lorsqu'il est activé, les fichiers audio contenant des périodes de lumière du jour sont recadrés, de sorte que seuls les fichiers audio des périodes nocturnes sont enregistrés."],
-    "Debug Mode-circle-help": ["Entrez en mode débogage (les modifications de ce paramètre nécessitent un redémarrage de Chirpity pour prendre effet)."],
+    "Debug Mode-circle-help": ["Entrez en mode débogage"],
     "Decorators-circle-help": ["'Pad' ajoute 2 secondes avant et après une sélection dans l'audio exporté. 'Fade' ajoute un effet de fondu de 1 seconde au début et à la fin de l'audio."],
     "Default Location-circle-help": ["Chirpity utilise les informations de localisation pour déterminer les heures de l'aube et du crépuscule pour les enregistrements."],
     "Default Settings-circle-help": ["Réinitialisez les paramètres de configuration à leurs valeurs par défaut. N.B. Redémarrez Chirpity pour voir les changements, de plus, les paramètres de langue devront être réinitialisés manuellement."],

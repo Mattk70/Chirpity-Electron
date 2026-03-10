@@ -319,7 +319,7 @@ test('manages file queue', () => {
 });
 
 test('tracks analysis progress', () => {
-  assert.ok(/t0_analysis/.test(workerContent), 'Should track analysis timing');
+  assert.ok(/predictionStart/.test(workerContent), 'Should track analysis timing');
 });
 
 test('handles prediction requests', () => {
