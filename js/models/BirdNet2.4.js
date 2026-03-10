@@ -63,7 +63,8 @@ onmessage = async (e) => {
             console.log(tf.env().getFlags());
           }
           Model = new BirdNETModel(appPath, version);
-          Model.UUID = data.UUID
+          Model.UUID = data.UUID;
+          Model.VERSION = data.version;
           Model.labels = labels;
           // Prepare a mask to squash 'background' predictions
           const bgIndex = labels.findIndex(item => item.toLowerCase().includes('background'));

@@ -63,7 +63,7 @@ async function trainModel({
       dataset, cache:cacheFolder, modelLocation:saveLocation, modelType, 
       useCache, validation, mixup, decay, 
       useWeights, useFocal, useNoise, labelSmoothing}) {
-  installConsoleTracking(() => Model.UUID, "Training");
+  installConsoleTracking(() => [Model.UUID, Model.VERSION], "Training");
   const {files:allFiles, classWeights} = getFilesWithLabelsAndWeights(dataset);
   i18n = messages[locale] || messages['en'];
   if (!allFiles.length){

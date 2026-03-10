@@ -79,15 +79,12 @@ const generateAlert = ({
 
 // Is this CI / playwright? Disable tracking
 const isTestEnv = process.env.TEST_ENV;
-isTestEnv || installConsoleTracking(() => STATE.UUID, "Worker");
+isTestEnv || installConsoleTracking(() => [STATE.UUID, STATE.VERSION], "Worker");
 const trackEvent = isTestEnv ? () => {} : _trackEvent;
 // Implement error handling in the worker
 self.onerror = function (message, file, lineno, colno, error) {
   trackEvent(
-    STATE.UUID,
-    "Unhandled Worker Error",
-    message,
-    customURLEncode(error?.stack)
+    {uuid: STATE.UUID, event: "Unhandled Worker Error", action: message, name: customURLEncode(error?.stack), version: STATE.VERSION}
   );
   if (message.includes("dynamic link library"))
     generateAlert({ type: "error", message: "noDLL" });
@@ -102,10 +99,7 @@ self.addEventListener("unhandledrejection", function (event) {
 
   // Track the unhandled promise rejection
   trackEvent(
-    STATE.UUID,
-    "Unhandled Worker PR",
-    errorMessage,
-    customURLEncode(stackTrace)
+    {uuid: STATE.UUID, event: "Unhandled Worker PR", action: errorMessage, name: customURLEncode(stackTrace), version: STATE.VERSION}
   );
 });
 
@@ -116,10 +110,7 @@ self.addEventListener("rejectionhandled", function (event) {
 
   // Track the unhandled promise rejection
   trackEvent(
-    STATE.UUID,
-    "Handled Worker PR",
-    errorMessage,
-    customURLEncode(stackTrace)
+    {uuid: STATE.UUID, event: "Handled Worker PR", action: errorMessage, name: customURLEncode(stackTrace), version: STATE.VERSION}
   );
 });
 
@@ -1219,7 +1210,7 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true, skipM
     }
   }
   const fileOrFolder = folderDropped ? "Open Folder(s)" : "Open Files(s)";
-  trackEvent(STATE.UUID, "UI", "Drop", fileOrFolder, filePaths.length);
+  trackEvent({uuid: STATE.UUID, event: "UI", action: "Drop", name: fileOrFolder, value: filePaths.length, version: STATE.VERSION});
   UI.postMessage({ event: "files", filePaths, preserveResults, checkSaved });
   const allSaved = checkSaved ? await savedFileCheckAsync(filePaths) : false;
   QUEUE.setFiles(filePaths);
@@ -2994,6 +2985,7 @@ function spawnPredictWorkers(model, batchSize, toSpawn) {
     worker.postMessage({
       message: "load",
       UUID: STATE.UUID,
+      version: STATE.VERSION,
       model,
       modelPath: STATE.modelPath,
       batchSize,
