@@ -1935,6 +1935,7 @@ function onAbort({ model = STATE.model }) {
     } catch (e) {
         console.error("Error occurred while cancelling worker queue", e);
     }
+    QUEUE.moveAll(['pending', 'inProgress'], 'complete');
   }
   // Tell workers to ignore results from any in-flight batches and stop processing
   predictWorkers.forEach(worker => {
