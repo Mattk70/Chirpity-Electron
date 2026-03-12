@@ -1839,23 +1839,10 @@ async function onAnalyse({
     selection: end ? getSelectionRange(filesInScope[0], start, end) : undefined,
   });
   const selection = STATE.selection; // we only get 'end' during selection analysis
-  QUEUE.setFiles(filesInScope);
-
-  // TODO: figure out if we can reuse a queue across analyses
-  // benefit: don't keep flagging corrupt / missing files
-  // if (filesInScope.length === 1) {
-  //   // Handle explore case
-  //   QUEUE.addFile(filesInScope[0]);
-  //   // Set all files complete
-  //   QUEUE.moveAll(['inProgress', 'pending'], 'complete')
-  //   // Set the first (actually the only file in scope) to pending
-  //   QUEUE.setStatus(filesInScope[0], 'pending')
-  // } else { QUEUE.moveAll(['inProgress', 'complete'], 'pending') }
-  DEBUG &&
-    console.log(
-      `Worker received message: ${filesInScope}, ${STATE.detect.confidence}, start: ${start}, end: ${end}`
-    );
-  if (!selection) {
+  if (selection) {
+    if (! QUEUE.setStatus(filesInScope[0], 'pending')) QUEUE.setFiles(filesInScope, 'pending')
+  } else {
+    QUEUE.setFiles(filesInScope, 'pending');
     const {combine, merge} = STATE.detect;
     // Clear records from the memory db
     if (!(combine || merge)){
@@ -1864,6 +1851,12 @@ async function onAnalyse({
     // Clear any location filters set in explore/charts
     STATE.location = undefined;
   }
+  // } else { QUEUE.moveAll(['inProgress', 'complete'], 'pending') }
+  DEBUG &&
+    console.log(
+      `Worker received message: ${filesInScope}, ${STATE.detect.confidence}, start: ${start}, end: ${end}`
+    );
+
 
   let count = 0;
   const files = QUEUE.getAllPaths('pending')
