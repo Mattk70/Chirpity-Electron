@@ -1849,23 +1849,13 @@ async function onAnalyse({
     selection: end ? getSelectionRange(filesInScope[0], start, end) : undefined,
   });
   const selection = STATE.selection; // we only get 'end' during selection analysis
-  QUEUE.setFiles(filesInScope);
 
-  // TODO: figure out if we can reuse a queue across analyses
-  // benefit: don't keep flagging corrupt / missing files
-  // if (filesInScope.length === 1) {
-  //   // Handle explore case
-  //   QUEUE.addFile(filesInScope[0]);
-  //   // Set all files complete
-  //   QUEUE.moveAll(['inProgress', 'pending'], 'complete')
-  //   // Set the first (actually the only file in scope) to pending
-  //   QUEUE.setStatus(filesInScope[0], 'pending')
-  // } else { QUEUE.moveAll(['inProgress', 'complete'], 'pending') }
-  DEBUG &&
-    console.log(
-      `Worker received message: ${filesInScope}, ${STATE.detect.confidence}, start: ${start}, end: ${end}`
-    );
-  if (!selection) {
+  // We can analyse many files, but if analysing a selection we don't want to reset the queue unless 
+  // the named file isn't in the queue (i.e. after switch to explore).
+  if (selection) {
+    if (! QUEUE.setStatus(filesInScope[0], 'pending')) QUEUE.setFiles(filesInScope, 'pending')
+  } else {
+    QUEUE.setFiles(filesInScope, 'pending');
     const {combine, merge} = STATE.detect;
     // Clear records from the memory db
     if (!(combine || merge)){
@@ -1874,6 +1864,11 @@ async function onAnalyse({
     // Clear any location filters set in explore/charts
     STATE.location = undefined;
   }
+
+  DEBUG &&
+    console.log(
+      `Worker received message: ${filesInScope}, ${STATE.detect.confidence}, start: ${start}, end: ${end}`
+    );
 
   let count = 0;
   const files = QUEUE.getAllPaths('pending')
@@ -1908,11 +1903,22 @@ async function onAnalyse({
       } else {
         await onChangeMode("archive");
         files.forEach((file) => {
+          if (!METADATA[file]) {
+            const entry = Object.values(METADATA)
+              .find(item => item.archiveName === file);
+            if (entry) {
+              METADATA[file] = entry;
+            } else {
+              console.warn(`Metadata for file ${file} not found in updateMetadata results`);
+              METADATA[file] = { duration: 0 }; // fallback to prevent errors
+            }
+          }
           UI.postMessage({
             event: "update-audio-duration",
             value: METADATA[file].duration,
           })
         });
+        QUEUE.setAll('complete');
         await Promise.all([getSummary(), getResults()] );
       }
       return;
@@ -1952,6 +1958,7 @@ function onAbort({ model = STATE.model }) {
     } catch (e) {
         console.error("Error occurred while cancelling worker queue", e);
     }
+    QUEUE.moveAll(['pending', 'inProgress'], 'complete');
   }
   // Tell workers to ignore results from any in-flight batches and stop processing
   predictWorkers.forEach(worker => {

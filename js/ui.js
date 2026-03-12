@@ -274,7 +274,7 @@ const GLOBAL_ACTIONS = {
   F1: () => document.getElementById("navbarSettings").click(),
   F4: () =>  STATE.fileLoaded && (spec.wavesurfer && (config.FFT = spec.increaseFFT())),
   F5: () =>  STATE.fileLoaded && (spec.wavesurfer && (config.FFT = spec.reduceFFT())),
-  " ": () => { STATE.fileLoaded && WSPlayPause()},
+  " ": (e) => { STATE.fileLoaded  && WSPlayPause()},
   Tab: (e) => {
     if ((e.metaKey || e.ctrlKey) && !PREDICTING && STATE.diskHasRecords) {
       // If you did this when predicting, your results would go straight to the archive
@@ -3009,11 +3009,15 @@ window.addEventListener("resize", function () {
  * @param {KeyboardEvent} e - The keydown event.
  */
 function handleKeyDownDeBounce(e) {
+  const el = e.target;
+  if (['range','checkbox','radio','button','submit'].includes(el.type)) {
+      e.stopPropagation();
+  }
   if (
     !(
-      e.target instanceof HTMLInputElement ||
-      e.target instanceof HTMLTextAreaElement ||
-      e.target instanceof CustomSelect
+      el instanceof HTMLInputElement ||
+      el instanceof HTMLTextAreaElement ||
+      el instanceof CustomSelect
     )
   ) {
     e.preventDefault();
@@ -5300,7 +5304,7 @@ const handlePassFilterchange = (el) => {
   });
   showFilterEffect();
   filterIconDisplay();
-  el.blur(); // Fix slider capturing the focus so you can't use spaceBar or hit 'p' directly
+  // el.blur(); // Fix slider capturing the focus so you can't use spaceBar or hit 'p' directly
 };
 
 
@@ -5314,7 +5318,7 @@ const handleLowShelfchange = () => {
   });
   showFilterEffect();
   filterIconDisplay();
-  DOM.LowShelfSlider.blur(); // Fix slider capturing thefocus so you can't use spaceBar or hit 'p' directly
+  // DOM.LowShelfSlider.blur(); // Fix slider capturing thefocus so you can't use spaceBar or hit 'p' directly
 };
 
 

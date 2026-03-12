@@ -46,6 +46,9 @@ async function loadModel(mpath, backend, batchSize) {
   };
   const modelPath = path.join(mpath, 'nighthawk.onnx')
   session = await ort.InferenceSession.create(modelPath, sessionOptions);
+  console.log(session.inputNames);
+console.log(session.inputMetadata);
+
   cancelled = false;
 }
 onmessage = async (e) => {
@@ -189,10 +192,12 @@ async function disposeGPUTensors(prediction) {
  * - batchSize, numClasses, sampleRate available in outer scope / params
  */
 async function predictBatch(audio, keys) {
-    const prediction = await session.run({ inputs: audio })
+    const data = audio.data;
+    const input = new ort.Tensor('float32', data, [audio.dims[1]]);
+    const prediction = await session.run({ "serving_default_args_0:0": input });
     const flatID = prediction.label.cpuData; // Float32Array
     const flatEmbeds = prediction.embedding.cpuData;
-    const dim = prediction.embedding.dims[1]
+    const dim = prediction.embedding.dims[1];
     for (let b = 0; b < batchSize; b++) {
       const offset = b * numClasses;
       const bOffset = b * dim;
