@@ -1842,7 +1842,7 @@ async function onAnalyse({
   if (selection) {
     if (! QUEUE.setStatus(filesInScope[0], 'pending')) QUEUE.setFiles(filesInScope, 'pending')
   } else {
-    QUEUE.setFiles(filesInScope, 'pending');
+    QUEUE.moveAll(['inProgress', 'complete'], 'pending');
     const {combine, merge} = STATE.detect;
     // Clear records from the memory db
     if (!(combine || merge)){
@@ -1851,7 +1851,7 @@ async function onAnalyse({
     // Clear any location filters set in explore/charts
     STATE.location = undefined;
   }
-  // } else { QUEUE.moveAll(['inProgress', 'complete'], 'pending') }
+
   DEBUG &&
     console.log(
       `Worker received message: ${filesInScope}, ${STATE.detect.confidence}, start: ${start}, end: ${end}`
@@ -1890,12 +1890,11 @@ async function onAnalyse({
         await getResults({ topRankin: 5, offset: 0 });
       } else {
         await onChangeMode("archive");
-        files.forEach((file) => {
-          UI.postMessage({
-            event: "update-audio-duration",
-            value: METADATA[file].duration,
-          })
-        });
+        UI.postMessage({
+          event: "update-audio-duration",
+          value: 0,
+        })
+        QUEUE.moveAll(['pending', 'inProgress'], 'complete');
         await Promise.all([getSummary(), getResults()] );
       }
       return;
