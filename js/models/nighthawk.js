@@ -1,247 +1,243 @@
-let ort = require ("onnxruntime-node");
-
+let tf, BACKEND, Model, LOCALE, DEBUG = false;
+try {
+  tf = require("@tensorflow/tfjs-node");
+} catch {
+  tf = require("@tensorflow/tfjs");
+  BACKEND = "webgpu";
+}
 const fs = require("node:fs");
 const path = require("node:path");
+import { BaseModel } from "./BaseModel.js";
+import abortController from '../utils/abortController.js';
 
-let session = null;
-let currentGeneration = 0;
-let cancelled = false;
-let labels;
-let backend;
-const chunkLength = 22050; // 1 second at 22050Hz
-let batchSize = 1;
-const sampleRate = 22050;
-const numClasses = 130;
-const DEBUG = false;
-let modelPath;
 
-let batchedIndices;
-let batchedProbs; 
-let batchedEmbeds;
-console.log('loading nighthawk model');
-async function loadModel(mpath, backend, batchSize) {
-  batchedEmbeds  = Array.from({ length: batchSize });
-  batchedIndices  = Array.from({ length: batchSize });
-  batchedProbs  = Array.from({ length: batchSize });
-  const gpu = backend === 'webgpu';
-  const providers = gpu ? ['webgpu', 'cpu'] : ['cpu'];
-  // const freeDimensionOverrides = { 'batch': batchSize };
-  const   preferredOutputLocation = {
-    'order': 'cpu',         // keep label & embedding on CPU. This is the only output we use.
-    'family': 'cpu',   
-    'group': 'cpu',   // keep other outputs on GPU buffer to save copying effort
-    'species': 'cpu'
-  }
-  const threadOptions = gpu ? { intraOpNumThreads:1, interOpNumThreads: 1 } : {};
- const executionProviderConfig = gpu ? { webgpu: {  validationMode: 'disabled' } } : {};
-  const sessionOptions = { 
-    executionProviders: providers,
-    enableGraphCapture: true, 
-    ...threadOptions,
-    executionProviderConfig,
-    executionMode: 'sequential',
-    enableCpuMemArena: true,
-    // freeDimensionOverrides,
-    // preferredOutputLocation,
-  };
-  const modelPath = path.join(mpath, 'nighthawk.onnx')
-  session = await ort.InferenceSession.create(modelPath, sessionOptions);
-  console.log(session.inputNames);
-console.log(session.inputMetadata);
-
-  cancelled = false;
-}
 onmessage = async (e) => {
   const data = e.data;
   const modelRequest = data.message;
   const worker = data.worker;
-  modelPath = data.modelPath ?? modelPath;
   let response;
   try {
     switch (modelRequest) {
-      case 'terminate': {
-        cancelled = true;
-        currentGeneration++;
-        batchSize = 1;
-        backend = data.backend || backend;
-        if (session) {
-          try { await session.release() } catch (e) { console.error(e) }
-          session = null;
-        }
-    
-        await loadModel(modelPath, backend, batchSize);
-        break;
-      }
-      case "change-threads": {
-        // Optimal threads are set - can ignore this message
+      case "change-batch-size": {
+        Model.warmUp(data.batchSize);
         break;
       }
       case "load": {
-        if (!session) {
-          backend = data.backend;
-          batchSize = 1;
-          await loadModel(modelPath, backend, batchSize);
-          DEBUG && console.log(`Using backend: ${backend}`);
+        const version = data.model;
+        DEBUG && console.log("load request to worker");
+        let appPath = data.modelPath;
+        const batch = data.batchSize;
+        const backend = BACKEND || data.backend;
+        BACKEND = backend;
+        LOCALE  = e.data.locale; // for error messages
+        DEBUG && console.log(`Using backend: ${backend}`);
+        backend === "webgpu" && require("@tensorflow/tfjs-backend-webgpu");
+        let labels;
+        const labelFile =  path.join(appPath, 'labels.txt');
+        const fileContents = fs.readFileSync(labelFile, 'utf-8');
+        labels = fileContents.trim().split(/\r?\n/);
+        DEBUG &&
+          console.log(
+            `Model received load instruction. Using batch size ${batch}`
+          );
 
-          const labelFile = path.join(modelPath,"labels.txt");
-          const fileContents = fs.readFileSync(labelFile, 'utf-8');
-          labels = fileContents.trim().split(/\r?\n/);
-          DEBUG && console.log(
-              `Model received load instruction. Using batch size ${batchSize}`
-            );
+        tf.setBackend(backend).then(async () => {
+          tf.enableProdMode();
+          if (DEBUG) {
+            console.log(tf.env());
+            console.log(tf.env().getFlags());
+          }
+          Model = new NightHawkModel(appPath, version);
+          Model.UUID = data.UUID
+          Model.labels = labels;
 
-        }
-        postMessage({
-        message: "model-ready",
-        sampleRate,
-        chunkLength,
-        backend,
-        labels,
-        worker,
+          try {
+            await Model.loadModel("graph");
+
+            await Model.warmUp();
+            BACKEND = tf.getBackend();
+            postMessage({
+              message: "model-ready",
+              sampleRate: Model.config.sampleRate,
+              chunkLength: Model.chunkLength,
+              backend: BACKEND,
+              labels,
+              worker,
+            });
+          } catch (error) {
+            console.error("Error loading model:", error);
+            postMessage({
+              message: "model-error",
+              error,
+            });
+          }
         });
-
         break;
       }
+      case "train-model":{
+        const {trainModel} = require('./training.js');
+          trainModel({ ...data, locale: LOCALE, Model: Model}).then((message) => {
+            postMessage({...message})
+          }).catch((err) => {
+            postMessage({
+              message: "training-results", 
+              notice: `Error during model training: ${err}`,
+              type: 'error',
+              complete: true
+            });
+          })
+        break;
+      }
+      case "get-spectrogram": {
+        await Model.getSpectrogram(data)
+        break;
+      }
+
       case "predict": {
+        if (Model?.model_loaded) {
           const {
             chunks,
             start,
             fileStart,
             file,
-            confidence,
             worker,
+            context,
             resetResults,
             id
           } = data;
-          const selection = !resetResults;
-          if (cancelled) return;
-          const myGeneration = currentGeneration;
-          const [result, filename, startPosition] = await predictChunk(
-            chunks,
-            start,
-            fileStart,
-            file,
-            confidence
-          );
-          if (cancelled || myGeneration !== currentGeneration) {
-            return; // Ignore stale results
-          }
-          response = {
+          Model.useContext = context;
+          Model.selection = !resetResults;
+          const result = await Model.predictChunk(chunks, start);
+          const response = {
             message: "prediction",
             id,
-            file: filename,
+            file,
             result,
-            fileStart: startPosition,
+            fileStart,
             worker,
-            selection,
+            selection: Model.selection,
           };
           postMessage(response);
+          Model.result = [];
         }
         break;
+      }
+      case "terminate": {
+        abortController.abort();
+        tf.backend().dispose();
+        self.close(); // Terminate the worker
+      }
     }
   } catch (error) {
     // If worker was respawned
-    console.log(error);
+    console.error(error);
   }
 };
 
-const padAudio = (audio) => {
-    const samples = batchSize * chunkLength;
-    const remainder = audio.length % samples;
-    if (remainder) {
-        // Create a new array with the desired length
-        const paddedAudio = new Float32Array(
-        audio.length + (samples - remainder)
-        );
-        // Copy the existing values into the new array
-        paddedAudio.set(audio);
-        return paddedAudio;
-    } else return audio;
-};
+class NightHawkModel extends BaseModel {
+  constructor(appPath, version) {
+    super(appPath, version);
+    this.config = { sampleRate: 22_050, specLength: 1, sigmoid: 1 };
+    this.batchSize = 1;
+    this.chunkLength = this.config.sampleRate * this.config.specLength;
+  }
 
-const createAudioTensorBatch = (audio) => {
-    audio = padAudio(audio);
-    const numSamples = audio.length / chunkLength;
-    return [new ort.Tensor('float32', audio, [numSamples, chunkLength]), numSamples];
-};
-async function predictChunk(
-    audioBuffer,
-    start,
-    fileStart,
-    file
-  ) {
-    const [audioBatch, numSamples] = createAudioTensorBatch(audioBuffer);
-    const batchKeys = getKeys(numSamples, start);
-    const result = await predictBatch(
-      audioBatch,
-      batchKeys
+    async warmUp() {
+
+    DEBUG && console.log("WarmUp begin", tf.memory().numTensors);
+    const input = tf.zeros(this.inputShape);
+
+    // Parallel compilation for faster warmup
+    // https://github.com/tensorflow/tfjs/pull/7755/files#diff-a70aa640d286e39c922aa79fc636e610cae6e3a50dd75b3960d0acbe543c3a49R316
+    if (tf.getBackend() === "webgpu") {
+      const compileRes = this.model.predict(input);
+      await tf.backend().checkCompileCompletionAsync();
+      tf.dispose(compileRes);
+    } else {
+      // Tensorflow backend
+      // const compileRes = this.model.predict(input);
+      // tf.dispose(compileRes);
+    }
+    input.dispose();
+    DEBUG && console.log("WarmUp end", tf.memory().numTensors);
+    return true;
+  }
+
+  createAudioTensor = (audio) => {
+    return tf.tidy(() => {
+      audio = this.padAudio(audio);
+      return tf.tensor1d(audio);
+    });
+  };
+
+  async predictChunk(audioBuffer, start) {
+    DEBUG && console.log("predictChunk begin", tf.memory().numTensors);
+    const audioBatch = this.createAudioTensor(audioBuffer);
+    const maxKeys = Math.ceil(audioBuffer.length / this.chunkLength)
+    const batchKeys = this.getKeys(maxKeys, start);
+    const result = await this.predictBatch(audioBatch, batchKeys );
+    DEBUG && console.log("predictChunk end", tf.memory().numTensors);
+    return result;
+  }
+
+  async predictBatch(audio, keys) {
+    const { topIndices, topValues } = tf.tidy(() => {
+      const [family, species, order, group] =
+        this.model.predict(audio);
+      let output = species;
+      if (this.selection) {
+        output = tf.max(species, 0, true);
+      }
+      if (this.bgMask) {
+        output = output.mul(this.bgMask);
+      }
+      const topN = Math.min(species.shape[1], 5);
+      const { indices, values } = tf.topk(output, topN, true);
+      return {
+        topIndices: indices,
+        topValues: tf.sigmoid(values),
+      };
+    });
+
+    audio.dispose();
+    // const embeddingDim = embeddingsValues.shape[1];
+    // this.embeddingsDIM = embeddingDim;
+    const [indicesData, valuesData] = await Promise.all([
+      topIndices.data(),
+      topValues.data(),
+    ]);
+    topIndices.dispose();
+    topValues.dispose();
+    // embeddingsValues.dispose();
+    // Fix keys trimming
+    if (this.selection) {
+      keys = keys.slice(0, 1);
+    }
+
+    keys = keys.map(
+      key => Math.round((key / (this.config.sampleRate)) * 10000) / 10000
     );
-    return [result, file, fileStart];
-}
-
-
-async function disposeGPUTensors(prediction) {
-  const {spectrogram, spatial_embedding} = prediction;
-  spectrogram.dispose();
-  spatial_embedding.dispose();
-}
-
-/**
- * Predict batch post-process: returns [keys, batchedIndices, batchedProbs]
- * - flat: Float32Array of length batchSize * numClasses (logits)
- * - batchSize, numClasses, sampleRate available in outer scope / params
- */
-async function predictBatch(audio, keys) {
-    const data = audio.data;
-    const input = new ort.Tensor('float32', data, [audio.dims[1]]);
-    const prediction = await session.run({ "serving_default_args_0:0": input });
-    const flatID = prediction.label.cpuData; // Float32Array
-    const flatEmbeds = prediction.embedding.cpuData;
-    const dim = prediction.embedding.dims[1];
-    for (let b = 0; b < batchSize; b++) {
-      const offset = b * numClasses;
-      const bOffset = b * dim;
-      const logits = flatID.subarray(offset, offset + numClasses);
-      const embedding = flatEmbeds.subarray(bOffset, bOffset + dim);
-      const t0 = Date.now();
-      const {probs, idx} = topK(logits);
-      batchedIndices[b] = idx;
-      batchedProbs[b] = probs;
-      l2Normalize(embedding);
-      const f16 = new Float16Array(embedding.length);
-      f16.set(embedding);   // automatic float32 → float16 conversion
-      batchedEmbeds[b] = f16;
+    const adjustedBatchSize = keys.length;
+    const topN = this.topN;
+    // Reshape manually without expensive array()
+    const reshapedIndices = [];
+    const reshapedValues = [];
+    // const reshapedEmbeddings = [];
+    for (let i = 0; i < adjustedBatchSize; i++) {
+      reshapedIndices.push(
+        indicesData.slice(i * topN, (i + 1) * topN)
+      );
+      reshapedValues.push(
+        valuesData.slice(i * topN, (i + 1) * topN)
+      );
+      // reshapedEmbeddings.push(
+      //   embeddingsData.slice(
+      //     i * this.embeddingsDIM,
+      //     (i + 1) * this.embeddingsDIM
+      //   )
+      // );
     }
-    disposeGPUTensors(prediction)
-    // convert keys to time strings once (not in the inner loop)
-    for (let i = 0; i < keys.length; i++) {
-      keys[i] = Math.round((keys[i] / sampleRate) * 1000) / 1000;
-    }
-    return [keys, batchedIndices, batchedProbs, batchedEmbeds];
-}
-
-function l2Normalize(vec) {
-  let sum = 0.0;
-  // Compute squared norm
-  for (let i = 0; i < vec.length; i++) {
-    const v = vec[i];
-    sum += v * v;
+    return [keys, reshapedIndices, reshapedValues];
   }
-  const norm = Math.sqrt(sum);
-  if (norm > 0) {
-    const inv = 1.0 / norm;
-    for (let i = 0; i < vec.length; i++) {
-      vec[i] *= inv;
-    }
-  }
-  return vec;
 }
-function getKeys(numSamples, start) {
-    return [...Array(numSamples).keys()].map((i) => start + chunkLength * i);
-}
-
-
-
-const loadTopK = require("../utils/topKWASM.js");
-const { topK } = await loadTopK();
 
