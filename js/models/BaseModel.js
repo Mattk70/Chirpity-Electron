@@ -216,28 +216,31 @@ async predictBatch(audio, keys) {
     });
   }
 
-  padAudio = (audio) => {
-    const samples = this.backend === 'webgpu' ? this.chunkLength * this.batchSize : this.chunkLength;
-    const remainder = audio.length % samples;
-    if (remainder) {
-      // Create a new array with the desired length
-      const paddedAudio = new Float32Array(
-        audio.length + (samples - remainder)
-      );
-      // Copy the existing values into the new array
-      paddedAudio.set(audio);
-      return paddedAudio;
-    } else return audio;
-  };
-
-  createAudioTensorBatch = (audio) => {
-    return tf.tidy(() => {
-      audio = this.padAudio(audio);
-      const numSamples = audio.length / this.chunkLength;
-      audio = tf.tensor1d(audio);
-      return tf.reshape(audio, [numSamples, this.chunkLength]);
-    });
-  };
+async predictChunk(audioBuffers, startSamples) {
+  DEBUG && console.log("predictChunk begin", tf.memory().numTensors);
+  const audioBatch = this.createAudioTensorBatch(audioBuffers);
+  const result = await this.predictBatch(audioBatch, startSamples);
+  DEBUG && console.log("predictChunk end", tf.memory().numTensors);
+  return result;
+}
+createAudioTensorBatch = (audioArray) => {
+  return tf.tidy(() => {
+    const batch = audioArray.length;
+    const targetBatch =
+      this.backend === "webgpu" ? this.batchSize : batch;
+    const data = new Float32Array(targetBatch * this.chunkLength);
+    for (let i = 0; i < batch; i++) {
+      const audio = audioArray[i];
+      if (audio.length >= this.chunkLength) {
+        data.set(audio.subarray(0, this.chunkLength), i * this.chunkLength);
+      } else {
+        data.set(audio, i * this.chunkLength);
+        // remaining samples already zero (silence)
+      }
+    }
+    return tf.tensor2d(data, [targetBatch, this.chunkLength]);
+  });
+};
 
   getKeys = (numSamples, start) =>
     [...Array(numSamples).keys()].map((i) => start + this.chunkLength * i);

@@ -48,7 +48,8 @@ export class WorkerState {
       combine: true, // Whether to split or merge results from different models
       iucn: false,
       iucnScope: "Global",
-      topRankin: 1
+      topRankin: 1,
+      overlap: 0,
     }),
     (this.chart = {
       range: { start: undefined, end: undefined },

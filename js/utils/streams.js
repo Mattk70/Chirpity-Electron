@@ -2,8 +2,9 @@ const { Transform, Writable } = require("stream");
 const DEBUG = false;
 class PCMChunker extends Transform {
   constructor({
-    highWaterMarkBytes,
     sampleRate,
+    windowSeconds,
+    overlap = 0,
     startTime = 0,
     file,
     endTime,
@@ -11,58 +12,99 @@ class PCMChunker extends Transform {
     alertFn,
   }) {
     super({ readableObjectMode: true });
+
     this.alertFn = alertFn;
     this.file = file;
     this.endTime = endTime;
     this.sampleRate = sampleRate;
 
-    this.bytesPerSecond = 2 * sampleRate; // 16-bit mono
-    this.frameSize = highWaterMarkBytes;
+    this.bytesPerSample = 2;
 
-    this.buffer = Buffer.alloc(this.frameSize);
-    this.bufferIndex = 0;
+    this.windowSamples = Math.floor(sampleRate * windowSeconds);
+    this.stepSamples = Math.ceil(this.windowSamples * (1 - overlap));
 
-    // ✅ Single source of truth
+    this.windowBytes = this.windowSamples * this.bytesPerSample;
+    this.stepBytes = this.stepSamples * this.bytesPerSample;
+
+    // ring buffer must hold at least one full window plus step
+    this.bufferBytes = this.windowBytes * 2;
+
+    this.buffer = Buffer.allocUnsafe(this.bufferBytes);
+
+    this.writePos = 0;
+    this.availableBytes = 0;
+
+    this.nextWindowStart = 0;
+
     this.totalSamples = startTime;
 
     this.remainingTrim =
-      trimSeconds > 0 ? Math.floor(this.bytesPerSecond * trimSeconds) : 0;
+      trimSeconds > 0 ? Math.floor(sampleRate * trimSeconds * 2) : 0;
   }
 
   _getMonoChannelData(audio) {
-    if (audio.length % 2 !== 0) {
-      this.alertFn({
-        message: `WAV audio sample length must be even, got ${audio.length}`,
-        type: "error",
-      });
-      throw new Error(`Audio length must be even, got ${audio.length}`);
-    }
     const int16 = new Int16Array(
       audio.buffer,
       audio.byteOffset,
-      audio.byteLength / 2,
+      audio.byteLength / 2
     );
+
     const out = new Float32Array(int16.length);
     const s = 1 / 32768;
-    const n = int16.length;
-    const end = n - (n % 8);
-    let i = 0;
-    // Unroll for speed
-    for (; i < end; i += 8) {
-      out[i] = int16[i] * s;
-      out[i + 1] = int16[i + 1] * s;
-      out[i + 2] = int16[i + 2] * s;
-      out[i + 3] = int16[i + 3] * s;
-      out[i + 4] = int16[i + 4] * s;
-      out[i + 5] = int16[i + 5] * s;
-      out[i + 6] = int16[i + 6] * s;
-      out[i + 7] = int16[i + 7] * s;
-    }
-    // Deal with remainder
-    for (; i < n; i++) {
+
+    for (let i = 0; i < int16.length; i++) {
       out[i] = int16[i] * s;
     }
+
     return out;
+  }
+
+  _readWindow(offset) {
+    if (offset + this.windowBytes <= this.bufferBytes) {
+      return this.buffer.subarray(offset, offset + this.windowBytes);
+    }
+
+    // wrap case
+    const part1 = this.buffer.subarray(offset);
+    const part2 = this.buffer.subarray(
+      0,
+      this.windowBytes - part1.length
+    );
+
+    const tmp = Buffer.allocUnsafe(this.windowBytes);
+    part1.copy(tmp, 0);
+    part2.copy(tmp, part1.length);
+    return tmp;
+  }
+
+  _emitAvailableWindows() {
+    while (
+      this.availableBytes - this.nextWindowStart >= this.windowBytes
+    ) {
+      const offset =
+        (this.writePos - this.availableBytes + this.nextWindowStart +
+          this.bufferBytes) %
+        this.bufferBytes;
+
+      const window = this._readWindow(offset);
+
+      const channelData = this._getMonoChannelData(window);
+
+      this.push({
+        channelData,
+        chunkStart: this.totalSamples,
+        file: this.file,
+        endTime: this.endTime,
+      });
+
+      this.totalSamples += this.stepSamples;
+      this.nextWindowStart += this.stepBytes;
+    }
+
+    if (this.nextWindowStart > 0) {
+      this.availableBytes -= this.nextWindowStart;
+      this.nextWindowStart = 0;
+    }
   }
 
   _transform(chunk, _, callback) {
@@ -80,33 +122,22 @@ class PCMChunker extends Transform {
       let offset = 0;
 
       while (offset < chunk.length) {
-        const remainingSpace = this.frameSize - this.bufferIndex;
-        const toCopy = Math.min(remainingSpace, chunk.length - offset);
+        const space = this.bufferBytes - this.writePos;
+        const toCopy = Math.min(space, chunk.length - offset);
 
-        chunk.copy(this.buffer, this.bufferIndex, offset, offset + toCopy);
+        chunk.copy(
+          this.buffer,
+          this.writePos,
+          offset,
+          offset + toCopy
+        );
 
-        this.bufferIndex += toCopy;
+        this.writePos = (this.writePos + toCopy) % this.bufferBytes;
+        this.availableBytes += toCopy;
+
         offset += toCopy;
 
-        if (this.bufferIndex === this.frameSize) {
-          const channelData = this._getMonoChannelData(
-            this.buffer.subarray(0, this.frameSize),
-          );
-
-          const samplesInFrame = this.frameSize / 2;
-
-          const job = {
-            channelData,
-            chunkStart: this.totalSamples,
-            file: this.file,
-            endTime: this.endTime,
-          };
-
-          this.totalSamples += samplesInFrame;
-          this.bufferIndex = 0;
-
-          this.push(job);
-        }
+        this._emitAvailableWindows();
       }
 
       callback();
@@ -117,21 +148,35 @@ class PCMChunker extends Transform {
 
   _flush(callback) {
     try {
-      if (this.bufferIndex > 0) {
-        const channelData = this._getMonoChannelData(
-          this.buffer.subarray(0, this.bufferIndex),
-        );
+      this._emitAvailableWindows();
 
-        const samplesInFrame = this.bufferIndex / 2;
+      const availableSamples = this.availableBytes / this.bytesPerSample;
 
-        this.push({
-          channelData,
-          chunkStart: this.totalSamples,
-          file: this.file,
-          endTime: this.endTime,
-        });
+      if (availableSamples > 0) {
+        let offset =
+          (this.writePos - this.availableBytes + this.bufferBytes) %
+          this.bufferBytes;
 
-        this.totalSamples += samplesInFrame;
+        let startSamples = this.totalSamples;
+
+        while (availableSamples - (startSamples - this.totalSamples) > 0) {
+          const tmp = Buffer.alloc(this.windowBytes);
+
+          const part = this._readWindow(offset);
+          part.copy(tmp);
+
+          const channelData = this._getMonoChannelData(tmp);
+
+          this.push({
+            channelData,
+            chunkStart: startSamples,
+            file: this.file,
+            endTime: this.endTime,
+          });
+
+          startSamples += this.stepSamples;
+          offset = (offset + this.stepBytes) % this.bufferBytes;
+        }
       }
 
       callback();
@@ -142,39 +187,42 @@ class PCMChunker extends Transform {
 }
 
 class PredictionWritable extends Writable {
-  constructor(sendToModel, { concurrency = 2, maxConcurrency = 32, minConcurrency = 1 }) {
+  constructor(
+    sendToModel,
+    { batchSize = 8, concurrency = 2, maxConcurrency = 32, minConcurrency = 1 }
+  ) {
     super({ objectMode: true });
 
     this.sendToModel = sendToModel;
-    this.concurrency = concurrency;       // starts conservative
+
+    this.batchSize = batchSize;
+    this.batch = [];
+
+    this.concurrency = concurrency;
     this.maxConcurrency = maxConcurrency;
     this.minConcurrency = minConcurrency;
 
-    this.inFlight = 0;
-    this.queue = [];
-    this.finalCallback = null;
+    this.inFlight = 0; 
+    this.pendingCallbacks = [];
 
-    // Throughput tracking
     this._completedSinceLastCheck = 0;
     this._totalDuration = 0;
+
     this._logInterval = setInterval(() => this._adjustConcurrency(), 2000);
   }
 
   _adjustConcurrency() {
     const completed = this._completedSinceLastCheck;
-    if (completed === 0) return;
+    if (!completed) return;
 
     const avgDuration = this._totalDuration / completed;
-    const queuePressure = this.queue.length;
 
-    if (queuePressure === 0 && this.inFlight >= this.concurrency && this.concurrency < this.maxConcurrency) {
-      // Workers are keeping up and we're saturated — try adding a slot
+    if (this.inFlight >= this.concurrency && this.concurrency < this.maxConcurrency) {
       this.concurrency++;
-      DEBUG && console.log(`[PredictionWritable] concurrency ↑ ${this.concurrency} (avg job: ${avgDuration.toFixed(0)}ms)`);
-    } else if (queuePressure > 0 && this.concurrency > this.minConcurrency) {
-      // Queue is building — back off
+      DEBUG && console.log(`[PredictionWritable] concurrency ↑ ${this.concurrency} (${avgDuration.toFixed(0)}ms)`);
+    } else if (this.inFlight < this.concurrency && this.concurrency > this.minConcurrency) {
       this.concurrency--;
-      DEBUG && console.log(`[PredictionWritable] concurrency ↓ ${this.concurrency} (queue: ${queuePressure})`);
+      DEBUG && console.log(`[PredictionWritable] concurrency ↓ ${this.concurrency}`);
     }
 
     this._completedSinceLastCheck = 0;
@@ -182,26 +230,39 @@ class PredictionWritable extends Writable {
   }
 
   _write(chunk, _, callback) {
-    if (this.inFlight >= this.concurrency) {
-      // Hold the callback to apply backpressure upstream until a slot is free
-      this.queue.push({ chunk, callback });
+    this.batch.push(chunk);
+
+    if (this.batch.length < this.batchSize) {
+      callback();
       return;
     }
 
-    this._dispatch(chunk, callback);
+    const batch = this.batch;
+    this.batch = [];
+
+    this._sendBatch(batch, callback);
   }
 
-  _dispatch(chunk, callback) {
+  _sendBatch(batch, callback) {
+    if (this.inFlight >= this.concurrency) {
+      this.pendingCallbacks.push(() => this._sendBatch(batch, callback));
+      return;
+    }
+
     this.inFlight++;
     callback();
 
     const t0 = Date.now();
-    const { channelData, chunkStart, file, endTime } = chunk;
 
-    this.sendToModel(channelData, chunkStart, file, endTime)
-      .catch((e) => {
+    const channelData = batch.map(j => j.channelData);
+    const chunkStarts = batch.map(j => j.chunkStart);
+    const file = batch[0].file;
+    const endTime = batch[0].endTime;
+
+    this.sendToModel(channelData, chunkStarts, file, endTime)
+      .catch(e => {
         if (!["Prediction aborted", "Queue cancelled"].includes(e.message)) {
-          console.error("Error in sendtomodel", e);
+          console.error("Error in sendToModel", e);
         }
       })
       .finally(() => {
@@ -209,10 +270,10 @@ class PredictionWritable extends Writable {
         this._completedSinceLastCheck++;
         this._totalDuration += Date.now() - t0;
 
-        if (this.queue.length > 0) {
-          const { chunk, callback } = this.queue.shift();
-          this._dispatch(chunk, callback);
-        } else if (this.inFlight === 0 && this.finalCallback) {
+        if (this.pendingCallbacks.length > 0) {
+          const next = this.pendingCallbacks.shift();
+          next();
+        } else if (this.finalCallback && this.inFlight === 0) {
           this.finalCallback();
         }
       });
@@ -220,6 +281,12 @@ class PredictionWritable extends Writable {
 
   _final(callback) {
     clearInterval(this._logInterval);
+
+    if (this.batch.length > 0) {
+      this._sendBatch(this.batch, () => {});
+      this.batch = [];
+    }
+
     if (this.inFlight === 0) {
       callback();
     } else {
@@ -232,7 +299,6 @@ class PredictionWritable extends Writable {
     callback(err);
   }
 }
-
 
 /**
  * @param {*} workers An array of web workers

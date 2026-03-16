@@ -1957,7 +1957,8 @@ const defaultConfig = {
     confidence: 45,
     iucn: true,
     iucnScope: "Global",
-    topRankin: 1
+    topRankin: 1,
+    overlap: 0,
   },
   filters: {
     active: false,
@@ -2258,6 +2259,7 @@ window.onload = async () => {
   DOM.debugMode.checked = config.debug;
   showThreshold(detect.confidence);
   showTopRankin(detect.topRankin)
+  showOverlap(detect.overlap);
 
   // Filters
   document.getElementById("HP-threshold").textContent = formatHz(config.filters.highPassFrequency);
@@ -5101,18 +5103,23 @@ const hideConfidenceSlider = () => {
   confidenceSliderDisplay.classList.add("d-none");
 };
 
-/**
- * Updates the threshold display and input values in both the filter and settings panels.
- * @param {Event|number} e - The input event or numeric threshold value to display and set.
- */
-function showThreshold(e) {
-  const threshold = e instanceof Event ? e.target.valueAsNumber : e;
-  filterPanelThresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
-  settingsPanelThresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
-  filterPanelRangeInput.value = threshold;
-  settingsPanelRangeInput.value = threshold;
-}
+  /**
+   * Updates the threshold display and input values in both the filter and settings panels.
+   * @param {Event|number} e - The input event or numeric threshold value to display and set.
+   */
+  function showThreshold(e) {
+    const threshold = e instanceof Event ? e.target.valueAsNumber : e;
+    filterPanelThresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
+    settingsPanelThresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
+    filterPanelRangeInput.value = threshold;
+    settingsPanelRangeInput.value = threshold;
+  }
 
+const showOverlap = (e) => {
+  const overlap = e instanceof Event ? e.target.valueAsNumber : e * 100;  
+  document.getElementById('overlap-value').innerHTML = `<b>${overlap}%</b>`;
+  document.getElementById('overlap').value = overlap;
+}
 /**
  * Updates the radius display in the location modal.
  * @param {Event|number} e - The input event or numeric threshold value to display and set.
@@ -5163,6 +5170,20 @@ const handleThresholdChange = (e) => {
     filterResults();
   }
 };
+
+
+
+const handleOverlapChange = (e) => {
+  const overlap = e.target.valueAsNumber;
+  config.detect.overlap = overlap / 100;
+  updatePrefs("config.json", config);
+  worker.postMessage({
+    action: "update-state",
+    detect: { overlap: config.detect.overlap },
+  });
+  worker.postMessage({ action: "update-total-batches", files: STATE.openFiles });
+}
+
 
 // Filter handling
 const filterIconDisplay = () => {
@@ -5260,6 +5281,10 @@ document.addEventListener('input', (e) =>{
     case "confidenceValue": {
       showThreshold(e)
       break;
+    }
+    case "overlap": {
+      showOverlap(e);
+      break; 
     }
     case "location-radius": {
       showRadiusValue(e);
@@ -6403,6 +6428,10 @@ document.addEventListener("change", async function (e) {
         case "confidenceValue":
         case "confidence": {
           handleThresholdChange(e);
+          break;
+        }
+        case "overlap": {
+          handleOverlapChange(e);
           break;
         }
         case "context": {

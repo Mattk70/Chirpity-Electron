@@ -282,7 +282,6 @@ class ChirpityModel extends BaseModel {
     values.dispose();
     finalPrediction.dispose();
     newPrediction && newPrediction.dispose();
-    keys = keys.map((key) => (key / CONFIG.sampleRate).toFixed(3));
     if (keys.length < topIndices.length){
       // Trim return values to eliminate GPU padded silence from the results
       const len = keys.length;
@@ -316,13 +315,16 @@ class ChirpityModel extends BaseModel {
     });
 
     bufferList.dispose();
-    const maxKeys = Math.ceil(audioBuffer.length / this.chunkLength)
-    const batchKeys = [...Array(maxKeys).keys()].map(
-      (i) => start + this.chunkLength * i
+    // const maxKeys = Math.ceil(audioBuffer.length / this.chunkLength)
+    // const batchKeys = [...Array(maxKeys).keys()].map(
+    //   (i) => start + this.chunkLength * i
+    // );
+    const keys = start.map(
+      key => Math.round((key / this.config.sampleRate) * 10000) / 10000
     );
     const result = await this.predictBatch(
       specBatch,
-      batchKeys,
+      keys,
       confidence
     );
     specBatch.dispose();

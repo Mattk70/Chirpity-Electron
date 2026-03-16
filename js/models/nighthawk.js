@@ -10,7 +10,12 @@ const path = require("node:path");
 import { BaseModel } from "./BaseModel.js";
 import abortController from '../utils/abortController.js';
 
+const families = ["Turdidae", "Parulidae", "Passerellidae", "Cardinalidae", "Ardeidae", "Charadriidae", "Regulidae", "Scolopacidae", "Icteridae", "Cuculidae", "Motacillidae",  "Calcariidae",  "Sittidae", "Laridae", "Corvidae", "Recurvirostridae", "Alaudidae", "Bombycillidae","Haematopodidae"];
+const species = ["amered", "amtspa", "bawwar", "btbwar", "camwar", "chispa", "chswar", "comyel", "daejun", "gycthr", "herthr", "norpar", "ovenbi1", "robgro", "savspa", "swathr", "veery", "whtspa", "woothr", "whcspa", "canwar", "graspa", "indbun", "wlswar", "boboli", "norwat", "palwar", "mouwar", "yerwar", "clcspa", "hoowar", "lecspa", "fiespa", "scatan", "yebcuc", "bkbcuc", "bcnher", "vesspa", "leabit", "uplsan", "amebit", "grnher", "macwar", "dickci", "amepip", "amerob", "greyel", "leasan", "semplo", "shbdow", "sposan", "solsan", "laplon", "rebnut", "babwar", "bkpwar", "btnwar", "magwar", "naswar", "tenwar", "balori", "bicthr", "bkbplo", "bkbwar", "bknsti", "blkski", "blugrb1", "brespa", "btywar", "buwwar", "caster1", "cerwar", "comter", "conwar", "easmea", "forter", "foxspa", "gockin", "gocspa", "gowwar", "grbher3", "greegr", "henspa", "harspa", "herwar", "horlar", "kenwar", "killde", "kirwar", "lazbun", "larspa", "lesyel", "linspa", "lobcur", "lobdow", "nstspa", "orcori", "orcwar", "paibun", "pinwar", "prawar", "prowar", "sander", "seaspa", "smilon", "snobun", "sonspa", "sprpip", "sumtan", "swawar", "towwar", "wesmea", "whimbr", "willet1", "wilsni1", "woewar1", "ycnher", "yelwar", "yetwar", "swaspa", "virwar", "triher", "grawar", "cedwax", "amgplo", "ameavo", "ameoys", "baisan", "blkoys", "dunlin"];
+const orders = ["Passeriformes", "Charadriiformes", "Pelecaniformes", "Cuculiformes"];
+const groups = ["CUPS", "SWLI", "SFHS", "HSSP", "SBUF", "DESP", "DEWA", "BUNT", "GROS", "THSH", "GCBI", "ZEEP", "DBUP", "BZWA", "CCBRS", "MWAR", "TANA"];
 
+const allEntries = [...families, ...species, ...orders, ...groups];
 onmessage = async (e) => {
   const data = e.data;
   const modelRequest = data.message;
@@ -20,12 +25,14 @@ onmessage = async (e) => {
     switch (modelRequest) {
       case "change-batch-size": {
         Model.warmUp(data.batchSize);
+        Model.batchSize = data.batchSize;
         break;
       }
       case "load": {
         const version = data.model;
         DEBUG && console.log("load request to worker");
         let appPath = data.modelPath;
+        const calibrations = loadCalibrations(path.join(appPath,"probability_calibrations.csv"));
         const batch = data.batchSize;
         const backend = BACKEND || data.backend;
         BACKEND = backend;
@@ -50,6 +57,8 @@ onmessage = async (e) => {
           Model = new NightHawkModel(appPath, version);
           Model.UUID = data.UUID
           Model.labels = labels;
+          Model.batchSize = batch;
+          Model.calibrators = calibrations;
 
           try {
             await Model.loadModel("graph");
@@ -72,24 +81,6 @@ onmessage = async (e) => {
             });
           }
         });
-        break;
-      }
-      case "train-model":{
-        const {trainModel} = require('./training.js');
-          trainModel({ ...data, locale: LOCALE, Model: Model}).then((message) => {
-            postMessage({...message})
-          }).catch((err) => {
-            postMessage({
-              message: "training-results", 
-              notice: `Error during model training: ${err}`,
-              type: 'error',
-              complete: true
-            });
-          })
-        break;
-      }
-      case "get-spectrogram": {
-        await Model.getSpectrogram(data)
         break;
       }
 
@@ -138,11 +129,10 @@ class NightHawkModel extends BaseModel {
   constructor(appPath, version) {
     super(appPath, version);
     this.config = { sampleRate: 22_050, specLength: 1, sigmoid: 1 };
-    this.batchSize = 1;
     this.chunkLength = this.config.sampleRate * this.config.specLength;
   }
 
-    async warmUp() {
+  async warmUp() {
 
     DEBUG && console.log("WarmUp begin", tf.memory().numTensors);
     const input = tf.zeros(this.inputShape);
@@ -163,81 +153,113 @@ class NightHawkModel extends BaseModel {
     return true;
   }
 
-  createAudioTensor = (audio) => {
-    return tf.tidy(() => {
-      audio = this.padAudio(audio);
-      return tf.tensor1d(audio);
-    });
-  };
+  applyCalibration(output) {
 
-  async predictChunk(audioBuffer, start) {
-    DEBUG && console.log("predictChunk begin", tf.memory().numTensors);
-    const audioBatch = this.createAudioTensor(audioBuffer);
-    const maxKeys = Math.ceil(audioBuffer.length / this.chunkLength)
-    const batchKeys = this.getKeys(maxKeys, start);
-    const result = await this.predictBatch(audioBatch, batchKeys );
-    DEBUG && console.log("predictChunk end", tf.memory().numTensors);
-    return result;
+    for (const [i, entry] of output.entries()) {
+      const column = allEntries[i];
+      if (this.calibrators[column]) {
+        output[i] = this.calibrators[column].predict(entry);
+      } else {
+        DEBUG && console.log(`Calibrator for ${column} not found; not calibrating this taxon`);
+      }
+    }
+    return output;
   }
 
   async predictBatch(audio, keys) {
-    const { topIndices, topValues } = tf.tidy(() => {
-      const [family, species, order, group] =
-        this.model.predict(audio);
-      let output = species;
-      if (this.selection) {
-        output = tf.max(species, 0, true);
-      }
-      if (this.bgMask) {
-        output = output.mul(this.bgMask);
-      }
-      const topN = Math.min(species.shape[1], 5);
-      const { indices, values } = tf.topk(output, topN, true);
-      return {
-        topIndices: indices,
-        topValues: tf.sigmoid(values),
-      };
+    const raw = await tf.tidy(() => {
+      // Map predict over each item in the batch [batch, input] -> per-item [input]
+      const audioSlices = tf.unstack(audio, 0); 
+      return  audioSlices.map((singleAudio) => {
+        return tf.sigmoid(tf.concat(this.model.predict(singleAudio), -1));
+      });
     });
-
     audio.dispose();
-    // const embeddingDim = embeddingsValues.shape[1];
-    // this.embeddingsDIM = embeddingDim;
-    const [indicesData, valuesData] = await Promise.all([
-      topIndices.data(),
-      topValues.data(),
-    ]);
-    topIndices.dispose();
-    topValues.dispose();
-    // embeddingsValues.dispose();
-    // Fix keys trimming
+    const batchedResults = await Promise.all(raw.map(r => r.data()));
+    const calibratedResults = batchedResults.map(result => this.applyCalibration(result));
+    raw.forEach(t => t.dispose());
+    
+    const probsBatch = calibratedResults.map(r => ({family: r.slice(0, 19), species: r.slice(19, 149), order: r.slice(149, 153), group: r.slice(153, 170)}));
+
+    
+    
     if (this.selection) {
       keys = keys.slice(0, 1);
     }
 
     keys = keys.map(
-      key => Math.round((key / (this.config.sampleRate)) * 10000) / 10000
+      key => Math.round((key / this.config.sampleRate) * 10000) / 10000
     );
+
     const adjustedBatchSize = keys.length;
     const topN = this.topN;
-    // Reshape manually without expensive array()
+
     const reshapedIndices = [];
     const reshapedValues = [];
-    // const reshapedEmbeddings = [];
     for (let i = 0; i < adjustedBatchSize; i++) {
-      reshapedIndices.push(
-        indicesData.slice(i * topN, (i + 1) * topN)
-      );
-      reshapedValues.push(
-        valuesData.slice(i * topN, (i + 1) * topN)
-      );
-      // reshapedEmbeddings.push(
-      //   embeddingsData.slice(
-      //     i * this.embeddingsDIM,
-      //     (i + 1) * this.embeddingsDIM
-      //   )
-      // );
+      const arr = probsBatch[i].species;
+
+      const topValues = [];
+      const topIndices = [];
+
+      for (let j = 0; j < arr.length; j++) {
+        const v = arr[j];
+        if (Number.isNaN(v)) continue;
+
+        let pos = topValues.findIndex(x => v > x);
+        if (pos === -1 && topValues.length < 5) pos = topValues.length;
+
+        if (pos !== -1) {
+          topValues.splice(pos, 0, v);
+          topIndices.splice(pos, 0, j);
+          if (topValues.length > 5) {
+            topValues.pop();
+            topIndices.pop();
+          }
+        }
+      }
+
+      reshapedValues.push(topValues);
+      reshapedIndices.push(topIndices);
     }
+
     return [keys, reshapedIndices, reshapedValues];
+  }
+}
+
+
+function loadCalibrations(csvFilePath) {
+  const contents = fs.readFileSync(csvFilePath, "utf8");
+
+  const lines = contents.trim().split("\n").slice(1);
+  const triples = lines.map(line => line.split(","));
+
+  const result = {};
+
+  for (const [taxon, a, b] of triples) {
+    result[taxon] = new SigmoidProbabilityCalibration(
+      parseFloat(a),
+      parseFloat(b)
+    );
+  }
+
+  return result;
+}
+
+class SigmoidProbabilityCalibration {
+  /**
+   * Sigmoid probability calibration.
+   *
+   * Equivalent to the scikit-learn sigmoid calibration:
+   * https://scikit-learn.org/stable/modules/calibration.html#sigmoid
+   */
+  constructor(a, b) {
+    this._a = a;
+    this._b = b;
+  }
+
+  predict(x) {
+    return 1 / (1 + Math.exp(this._a * x + this._b));
   }
 }
 

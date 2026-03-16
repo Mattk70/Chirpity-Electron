@@ -823,6 +823,16 @@
                         </div>
                     </div>
                     <div class="form-group rounded p-2 pe-0 mb-2">
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Overlap" id="Overlap-circle-help"  data-bs-content="Determines the amount successive detection windows will overlap">?</a>
+                        <label for="overlap">Overlap:</label>
+                        <div class="input-group">
+                            <input type="range" class="form-control-range w-75" id="overlap" min="0" max="90" step="10">
+                            <div class="input-group-append">
+                                <span class="input-group-text" id="overlap-value">50%</span>
+                            </div>
+                        </div>
+                    </div>                    
+                    <div class="form-group rounded p-2 pe-0 mb-2">
                         <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Detections Per Segment" id="Detections Per Segment-circle-help"  data-bs-content="Select the maximum number of detections that will be shown in any 3 second period">?</a>
                         <label for="top-rankin">Detections per segment:</label>
                         <div class="input-group">
