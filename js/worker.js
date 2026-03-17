@@ -3292,13 +3292,12 @@ const generateInsertQuery = async (detections, file, modelID) => {
     }
 
     if (insertValues.length) {
-      const result = await db.runAsync(
+      await db.runAsync(
         `INSERT OR IGNORE INTO records 
          (position, fileID, speciesID, modelID, confidence, end, isDaylight, reviewed) 
          VALUES ${insertPlaceholders.join(", ")}`,
         ...insertValues
       );
-      console.log(result.changes)
     }
 
     await db.runAsync("END");
@@ -3336,94 +3335,149 @@ async function prepareQuery(query){
   }
 }
 
-
-function extractDetections({
+function updateDetectionState({
+  file,
   keysArray,
   speciesIDBatch,
   confidenceBatch,
   threshold,
   predictionLength,
-  dropSingles = false
+  dropSingles,
+  isCustomList,
+  merge = true
 }) {
-  const activeSpecies = [];
-  const activeStart = [];
-  const activeEnd = [];
-  const activeMaxConf = [];
-  const activeCount = [];
 
-  const detections = [];
+  /*
+  ----------------------------------
+  FAST PATH: NO MERGING
+  ----------------------------------
+  */
 
+  const completed = [];
+
+  if (!merge) {
+    for (let i = 0; i < keysArray.length; i++) {
+      const t = keysArray[i];
+      const ids = speciesIDBatch[i];
+      const confs = confidenceBatch[i];
+      for (let j = 0; j < ids.length; j++) {
+        const species = ids[j];
+        const conf = confs[j] * 1000;
+        if (conf < threshold) if (isCustomList) continue; else break;
+        completed.push({
+          species,
+          start: t,
+          end: t + predictionLength,
+          confidence: conf
+        });
+        // mimic original behaviour: only top hit unless custom list
+        if (!isCustomList) break;
+      }
+    }
+    return completed;
+  }
+
+  /*
+  ----------------------------------
+  MERGE MODE (STATEFUL)
+  ----------------------------------
+  */
+
+  const detectionState = STATE.detectionState;
+
+  if (!detectionState[file]) {
+    detectionState[file] = {
+      species: [],
+      start: [],
+      end: [],
+      maxConf: [],
+      count: []
+    };
+  }
+
+  const state = detectionState[file];
+for (let i = 0; i < state.species.length; i++) {
+  for (let j = i + 1; j < state.species.length; j++) {
+    if (state.species[i] === state.species[j]) {
+      console.warn("Duplicate active species!", state.species[i]);
+    }
+  }
+}
   for (let i = 0; i < keysArray.length; i++) {
     const t = keysArray[i];
     const ids = speciesIDBatch[i];
     const confs = confidenceBatch[i];
-
-    const seen = new Array(activeSpecies.length).fill(false);
+    const seen = new Array(state.species.length).fill(false);
 
     for (let j = 0; j < ids.length; j++) {
       const species = ids[j];
-      const conf = Math.round(confs[j]*1000);
-
-      if (conf < threshold) continue;
-
+      const conf = confs[j] * 1000;
+      if (conf < threshold) if (isCustomList) continue; else break;
       let idx = -1;
-
-      for (let k = 0; k < activeSpecies.length; k++) {
-        if (activeSpecies[k] === species) {
+      for (let k = 0; k < state.species.length; k++) {
+        if (state.species[k] === species) {
           idx = k;
           break;
         }
       }
 
       if (idx !== -1) {
-        activeEnd[idx] = t + predictionLength;
-        if (conf > activeMaxConf[idx]) activeMaxConf[idx] = conf;
-        activeCount[idx]++;
+        state.end[idx] = t + predictionLength;
+        if (conf > state.maxConf[idx]) state.maxConf[idx] = conf;
+        state.count[idx]++;
         seen[idx] = true;
       } else {
-        activeSpecies.push(species);
-        activeStart.push(t);
-        activeEnd.push(t + predictionLength);
-        activeMaxConf.push(conf);
-        activeCount.push(1);
+        state.species.push(species);
+        state.start.push(t);
+        state.end.push(t + predictionLength);
+        state.maxConf.push(conf);
+        state.count.push(1);
+
         seen.push(true);
       }
     }
 
-    for (let k = activeSpecies.length - 1; k >= 0; k--) {
+    // close detections not seen in this frame
+    for (let k = state.species.length - 1; k >= 0; k--) {
       if (!seen[k]) {
-        if (!dropSingles || activeCount[k] > 1) {
-          detections.push({
-            species: activeSpecies[k],
-            start: activeStart[k],
-            end: activeEnd[k],
-            confidence: activeMaxConf[k]
+        if (!dropSingles || state.count[k] > 1) {
+          completed.push({
+            species: state.species[k],
+            start: state.start[k],
+            end: state.end[k],
+            confidence: state.maxConf[k]
           });
         }
-
-        activeSpecies.splice(k, 1);
-        activeStart.splice(k, 1);
-        activeEnd.splice(k, 1);
-        activeMaxConf.splice(k, 1);
-        activeCount.splice(k, 1);
+        state.species.splice(k, 1);
+        state.start.splice(k, 1);
+        state.end.splice(k, 1);
+        state.maxConf.splice(k, 1);
+        state.count.splice(k, 1);
       }
     }
   }
+  return completed;
+}
 
-  for (let k = 0; k < activeSpecies.length; k++) {
-    if (!dropSingles || activeCount[k] > 1) {
-      detections.push({
-        species: activeSpecies[k],
-        start: activeStart[k],
-        end: activeEnd[k],
-        confidence: activeMaxConf[k]
+function flushDetectionState(file, dropSingles) {
+  const state = STATE.detectionState[file];
+  if (!state) return [];
+
+  const completed = [];
+  for (let i = 0; i < state.species.length; i++) {
+    if (!dropSingles || state.count[i] > 1) {
+      completed.push({
+        species: state.species[i],
+        start: state.start[i],
+        end: state.end[i],
+        confidence: state.maxConf[i]
       });
     }
   }
+  delete STATE.detectionState[file];
 
-  return detections;
+  return completed;
 }
-
 
 const parsePredictions = async (response) => {
   const { file, worker, result: latestResult } = response;
@@ -3472,13 +3526,15 @@ const parsePredictions = async (response) => {
 
   const threshold = selection ? 50 : detect.confidence;
   const dropSingles = !selection && STATE.detect.overlap;
-  const detections = extractDetections({
+  const detections = updateDetectionState({
+    file,
     keysArray,
     speciesIDBatch,
     confidenceBatch,
     threshold,
     predictionLength,
-    dropSingles 
+    dropSingles, 
+    isCustomList
   });
 
   /*
@@ -3513,34 +3569,7 @@ const parsePredictions = async (response) => {
   */
 
   if (index < 500) {
-    const included = await getIncludedIDs(file).catch(console.warn);
-    for (const det of detections) {      
-      const speciesID = STATE.speciesMap.get(modelID).get(det.species);
-      if (included.length && !included.includes(speciesID)) {
-        continue;
-      }
-      const timestamp = metadata.fileStart + det.start * 1000;
-      const [sname, cname] =
-        STATE.allLabels[det.species].split(getSplitChar());
-      const result = {
-        timestamp,
-        position: det.start,
-        end: det.end,
-        file,
-        cname,
-        sname,
-        isDaylight: isDuringDaylight(timestamp, lat, lon),
-        score: det.confidence,
-        model: STATE.model
-      };
-      if (isCustomList && !selection) {
-        if (!allowedByList(result)) continue;
-      }
-      sendResult(++index, result, false);
-      if (index > 499) {
-        setGetSummaryQueryInterval(NUM_WORKERS);
-      }
-    }
+    await sendResultsToUI (detections, file, modelID, lat, lon, isCustomList)
   }
 
   /*
@@ -3561,6 +3590,16 @@ const parsePredictions = async (response) => {
   }
   if (fileProgress === 1) {
     updateQueue(file, worker);
+
+    const remaining = flushDetectionState(file, dropSingles);
+    detections.push(...remaining);
+    await generateInsertQuery( detections, 
+      file,
+      modelID,
+      isCustomList
+    ).catch(console.warn);
+    await sendResultsToUI (detections, file, modelID, lat, lon, isCustomList)
+
     if (QUEUE.allComplete()) {
       if (index === 0) {
         if (STATE.selection) {
@@ -3582,6 +3621,38 @@ const parsePredictions = async (response) => {
   return worker;
 };
 
+
+async function sendResultsToUI (detections, file, modelID, lat, lon, isCustomList){
+  const included = await getIncludedIDs(file).catch(console.warn);
+  const metadata = METADATA[file];
+    for (const det of detections) {      
+      const speciesID = STATE.speciesMap.get(modelID).get(det.species);
+      if (included.length && !included.includes(speciesID)) {
+        continue;
+      }
+      const timestamp = metadata.fileStart + det.start * 1000;
+      const [sname, cname] =
+        STATE.allLabels[det.species].split(getSplitChar());
+      const result = {
+        timestamp,
+        position: det.start,
+        end: det.end,
+        file,
+        cname,
+        sname,
+        isDaylight: isDuringDaylight(timestamp, lat, lon),
+        score: det.confidence,
+        model: STATE.model
+      };
+      if (isCustomList && !STATE.selection) {
+        if (!allowedByList(result)) continue;
+      }
+      sendResult(++index, result, false);
+      if (index > 499) {
+        setGetSummaryQueryInterval(NUM_WORKERS);
+      }
+    }
+}
 /**
  * Estimate remaining analysis time from processed batches and post localized progress to the UI footer.
  *

@@ -108,7 +108,8 @@ export class WorkerState {
     (this.clippedBatches = 0),
     (this.originalFiles = undefined),
     (this.perchWorker = []),
-    (this.openFiles = [])
+    (this.openFiles = []),
+    this.detectionState = Object.create(null);
   }
 
   update(updates) {

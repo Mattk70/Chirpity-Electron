@@ -6879,20 +6879,16 @@ async function readLabels(labelFile, updating) {
       });
     }
   } catch (error) {
-    if (error?.message?.startsWith("ENOENT")) {
-      generateToast({
-        type: "error",
-        message: "listNotFound",
-        variables: { file: labelFile },
-      });
-      DOM.customListSelector.classList.add("btn-outline-danger");
-      if (!document.getElementById("settings").classList.contains("show")) {
-        document.getElementById("navbarSettings").click();
-      }
-      document.getElementById("list-file-selector").focus();
-    } else {
-      console.error(`Error reading label file ${labelFile}:`, error);
+    generateToast({
+      type: "error",
+      message: "listNotFound",
+      variables: { file: labelFile },
+    });
+    DOM.customListSelector.classList.add("btn-outline-danger");
+    if (!document.getElementById("settings").classList.contains("show")) {
+      document.getElementById("navbarSettings").click();
     }
+    document.getElementById("list-file-selector").focus();
   }
 }
 
