@@ -3334,7 +3334,6 @@ async function prepareQuery(query){
     STATE.queryMetadata = undefined;
   }
 }
-
 function updateDetectionState({
   file,
   keysArray,
@@ -3347,30 +3346,36 @@ function updateDetectionState({
   merge = true
 }) {
 
+  const completed = [];
+
   /*
   ----------------------------------
   FAST PATH: NO MERGING
   ----------------------------------
   */
 
-  const completed = [];
-
   if (!merge) {
     for (let i = 0; i < keysArray.length; i++) {
       const t = keysArray[i];
       const ids = speciesIDBatch[i];
       const confs = confidenceBatch[i];
+
       for (let j = 0; j < ids.length; j++) {
         const species = ids[j];
         const conf = confs[j] * 1000;
-        if (conf < threshold) if (isCustomList) continue; else break;
+
+        if (conf < threshold) {
+          if (isCustomList) continue;
+          else break;
+        }
+
         completed.push({
           species,
           start: t,
           end: t + predictionLength,
           confidence: conf
         });
-        // mimic original behaviour: only top hit unless custom list
+
         if (!isCustomList) break;
       }
     }
@@ -3396,13 +3401,7 @@ function updateDetectionState({
   }
 
   const state = detectionState[file];
-for (let i = 0; i < state.species.length; i++) {
-  for (let j = i + 1; j < state.species.length; j++) {
-    if (state.species[i] === state.species[j]) {
-      console.warn("Duplicate active species!", state.species[i]);
-    }
-  }
-}
+
   for (let i = 0; i < keysArray.length; i++) {
     const t = keysArray[i];
     const ids = speciesIDBatch[i];
@@ -3412,7 +3411,8 @@ for (let i = 0; i < state.species.length; i++) {
     for (let j = 0; j < ids.length; j++) {
       const species = ids[j];
       const conf = confs[j] * 1000;
-      if (conf < threshold) if (isCustomList) continue; else break;
+
+      // find existing detection
       let idx = -1;
       for (let k = 0; k < state.species.length; k++) {
         if (state.species[k] === species) {
@@ -3421,12 +3421,33 @@ for (let i = 0; i < state.species.length; i++) {
         }
       }
 
-      if (idx !== -1) {
+      const isActive = idx !== -1;
+
+      /*
+      ----------------------------------
+      START vs CONTINUE LOGIC
+      ----------------------------------
+      */
+
+      // START requires threshold
+      if (!isActive && conf < threshold) {
+        if (isCustomList) continue;
+        else break;
+      }
+
+      if (isActive && conf > threshold/4) {
+        // CONTINUE: 5% requirement
         state.end[idx] = t + predictionLength;
-        if (conf > state.maxConf[idx]) state.maxConf[idx] = conf;
+
+        if (conf > state.maxConf[idx]) {
+          state.maxConf[idx] = conf;
+        }
+
         state.count[idx]++;
         seen[idx] = true;
+
       } else {
+        // START new detection
         state.species.push(species);
         state.start.push(t);
         state.end.push(t + predictionLength);
@@ -3435,11 +3456,20 @@ for (let i = 0; i < state.species.length; i++) {
 
         seen.push(true);
       }
+
+      // preserve original behaviour
+      if (!isCustomList) break;
     }
 
-    // close detections not seen in this frame
+    /*
+    ----------------------------------
+    CLOSE DETECTIONS
+    ----------------------------------
+    */
+
     for (let k = state.species.length - 1; k >= 0; k--) {
       if (!seen[k]) {
+
         if (!dropSingles || state.count[k] > 1) {
           completed.push({
             species: state.species[k],
@@ -3448,6 +3478,7 @@ for (let i = 0; i < state.species.length; i++) {
             confidence: state.maxConf[k]
           });
         }
+
         state.species.splice(k, 1);
         state.start.splice(k, 1);
         state.end.splice(k, 1);
@@ -3456,9 +3487,9 @@ for (let i = 0; i < state.species.length; i++) {
       }
     }
   }
+
   return completed;
 }
-
 function flushDetectionState(file, dropSingles) {
   const state = STATE.detectionState[file];
   if (!state) return [];

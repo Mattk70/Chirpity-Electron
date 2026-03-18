@@ -6882,7 +6882,7 @@ async function readLabels(labelFile, updating) {
     generateToast({
       type: "error",
       message: "listNotFound",
-      variables: { file: labelFile },
+      variables: { file: labelFile || 'undefined' },
     });
     DOM.customListSelector.classList.add("btn-outline-danger");
     if (!document.getElementById("settings").classList.contains("show")) {
