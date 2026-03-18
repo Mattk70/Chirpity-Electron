@@ -37,11 +37,9 @@ const DATASET = false;
 let DEBUG;
 let SEEN_MODEL_READY = false;
 let METADATA = {};
-let index = 0,
-  predictionStart;
+let index = 0, predictionStart;
 let sampleRate; // Should really make this a property of the model
-let predictWorkers = [],
-  aborted = false;
+let predictWorkers = [];
 let UI;
 let initialiseResolve;
 let initialiseReject;
@@ -51,7 +49,6 @@ let INITIALISED = new Promise((resolve, reject) => {
   initialiseReject = reject;
 });
 const EPSILON = 1e-6;
-let t0_analysis = 0;
 const generateAlert = ({
   message,
   type,
@@ -79,15 +76,12 @@ const generateAlert = ({
 
 // Is this CI / playwright? Disable tracking
 const isTestEnv = process.env.TEST_ENV;
-isTestEnv || installConsoleTracking(() => STATE.UUID, "Worker");
+isTestEnv || installConsoleTracking(() => [STATE.UUID, STATE.VERSION], "Worker");
 const trackEvent = isTestEnv ? () => {} : _trackEvent;
 // Implement error handling in the worker
 self.onerror = function (message, file, lineno, colno, error) {
   trackEvent(
-    STATE.UUID,
-    "Unhandled Worker Error",
-    message,
-    customURLEncode(error?.stack)
+    {uuid: STATE.UUID, event: "Unhandled Worker Error", action: message, name: customURLEncode(error?.stack), version: STATE.VERSION}
   );
   if (message.includes("dynamic link library"))
     generateAlert({ type: "error", message: "noDLL" });
@@ -102,10 +96,7 @@ self.addEventListener("unhandledrejection", function (event) {
 
   // Track the unhandled promise rejection
   trackEvent(
-    STATE.UUID,
-    "Unhandled Worker PR",
-    errorMessage,
-    customURLEncode(stackTrace)
+    {uuid: STATE.UUID, event: "Unhandled Worker PR", action: errorMessage, name: customURLEncode(stackTrace), version: STATE.VERSION}
   );
 });
 
@@ -116,10 +107,7 @@ self.addEventListener("rejectionhandled", function (event) {
 
   // Track the unhandled promise rejection
   trackEvent(
-    STATE.UUID,
-    "Handled Worker PR",
-    errorMessage,
-    customURLEncode(stackTrace)
+    {uuid: STATE.UUID, event: "Handled Worker PR", action: errorMessage, name: customURLEncode(stackTrace), version: STATE.VERSION}
   );
 });
 
@@ -532,6 +520,7 @@ async function handleMessage(e) {
         await memoryDB.runAsync("DELETE FROM records; VACUUM");
         const mode = METADATA[file]?.isSaved ? "archive" : "analyse";
         await onChangeMode(mode);
+        STATE.openFiles = [file];
       }
       break;
     }
@@ -613,6 +602,12 @@ async function handleMessage(e) {
       break;
     }
     case "load-model": {
+      const run = STATE.currentRun;
+      if (run) {
+        run.cancelled = true;
+        run.abortController.abort();
+        STATE.workerQueue?.cancelAll("Prediction aborted");
+      }      
       terminateWorkers();
       INITIALISED = await onLaunch(args);
       await resetEstimates();
@@ -1217,13 +1212,14 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true, skipM
       throw error;
     }
   }
+  STATE.openFiles = filePaths;
   if (!filePaths.length) {
     QUEUE.setFiles([]);
     UI.postMessage({ event: "files", filePaths: [], preserveResults, checkSaved });
     return filePaths;
   }
   const fileOrFolder = folderDropped ? "Open Folder(s)" : "Open Files(s)";
-  trackEvent(STATE.UUID, "UI", "Drop", fileOrFolder, filePaths.length);
+  trackEvent({uuid: STATE.UUID, event: "UI", action: "Drop", name: fileOrFolder, value: filePaths.length, version: STATE.VERSION});
   UI.postMessage({ event: "files", filePaths, preserveResults, checkSaved });
   const allSaved = checkSaved ? await savedFileCheckAsync(filePaths) : false;
   QUEUE.setFiles(filePaths);
@@ -1237,7 +1233,7 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true, skipM
     // Start gathering metadata for new files
     processFilesInBatches(filePaths, 10);
   }
-  STATE.openFiles = filePaths;
+
   return filePaths;
 };
 
@@ -1817,11 +1813,8 @@ async function onAnalyse({
   reanalyse = false,
   circleClicked = false,
 }) {
-  // Now we've asked for a new analysis, clear the aborted flag
-  aborted = false;
   //Reset GLOBAL variables
   index = 0;
-  t0_analysis = Date.now();
   STATE.incrementor = 1;
   STATE.clippedBatches = 0;
   STATE.clippedFilesDuration = 0;
@@ -1834,7 +1827,7 @@ async function onAnalyse({
     cancelled: false,
   };
 
-
+  STATE.openFiles = filesInScope;
 
   // Set the appropriate selection range if this is a selection analysis
   STATE.update({
@@ -1856,11 +1849,6 @@ async function onAnalyse({
     // Clear any location filters set in explore/charts
     STATE.location = undefined;
   }
-
-  DEBUG &&
-    console.log(
-      `Worker received message: ${filesInScope}, ${STATE.detect.confidence}, start: ${start}, end: ${end}`
-    );
 
   let count = 0;
   const files = QUEUE.getAllPaths('pending')
@@ -2628,7 +2616,7 @@ async function processAudio(
   } catch (err) {
     if (err.name === "AbortError") {
       // Expected — ignore
-      console.info("Prediction aborted", `After ${(Date.now() - t0_analysis)/1000} seconds`);
+      console.info("Prediction aborted", `After ${(Date.now() - predictionStart)/1000} seconds`);
       return;
     }
     throw err; // real error
@@ -2999,6 +2987,7 @@ function spawnPredictWorkers(model, batchSize, toSpawn) {
     worker.postMessage({
       message: "load",
       UUID: STATE.UUID,
+      version: STATE.VERSION,
       model,
       modelPath: STATE.modelPath,
       batchSize,
@@ -3698,7 +3687,7 @@ async function estimateTimeRemaining(batchesReceived) {
   const remainingBatches = totalBatches - clippedBatches;
   const progress = remainingBatches > 0 ? batchesReceived / remainingBatches : 0;
   if (progress === 0 || remainingBatches === 0) return; // No batches to process
-  const elapsedMinutes = (Date.now() - t0_analysis) / 60_000;
+  const elapsedMinutes = (Date.now() - predictionStart) / 60_000;
   const estimatedTime = elapsedMinutes / progress;
   const processedMinutes = ((STATE.allFilesDuration - STATE.clippedFilesDuration) / 60) * progress;
   const remaining = estimatedTime - elapsedMinutes;

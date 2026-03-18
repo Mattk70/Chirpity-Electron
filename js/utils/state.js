@@ -85,7 +85,8 @@ export class WorkerState {
     (this.notFound = {}), // try to prevent spamming errors
     (this.local = true),
     (this.incrementor = 2),
-    (this.UUID = 0),
+    (this.UUID = "not set"),
+    (this.VERSION = 0),
     (this.track = true),
     (this.library = {
       location: undefined,

@@ -37,6 +37,7 @@ let LOCATIONS, pagination,
   loadingTimeout,
   LIST_MAP;
 
+let VERSION;
 let APPLICATION_LOADED = false;
 let LABELS = [],
   HISTORY = [];
@@ -49,10 +50,11 @@ window.addEventListener("unhandledrejection", function (event) {
 
   // Track the unhandled promise rejection
   trackEvent(
-    config.UUID,
-    "Unhandled UI PR",
-    errorMessage,
-    customURLEncode(stackTrace)
+    {uuid:config.UUID,
+    event: "Unhandled UI PR",
+    action: errorMessage,
+    name: customURLEncode(stackTrace),
+    version: config.VERSION}
   );
 });
 
@@ -64,10 +66,11 @@ window.addEventListener("rejectionhandled", function (event) {
 
   // Track the unhandled promise rejection
   trackEvent(
-    config.UUID,
-    "Handled UI PR",
-    errorMessage,
-    customURLEncode(stackTrace)
+      {uuid:config.UUID,
+      event: "Handled UI PR",
+      action: errorMessage,
+      name: customURLEncode(stackTrace),
+      version: config.VERSION}
   );
 });
 
@@ -346,7 +349,7 @@ window.electron.onFileOpen((filePath) => {
 // Is this CI / playwright?
 const isTestEnv = window.env.TEST_ENV === "true";
 const trackVisit = isTestEnv ? () => {} : _trackVisit;
-isTestEnv || installConsoleTracking(() => config.UUID, "UI");
+isTestEnv || installConsoleTracking(() => [config.UUID, config.VERSION], "UI");
 const trackEvent = isTestEnv ? () => {} : _trackEvent;
 isTestEnv && console.log("Running in test environment");
 
@@ -387,7 +390,6 @@ async function getPaths() {
   return [appPath, tempPath, locale, dirname];
 }
 
-let VERSION;
 let DIAGNOSTICS = {};
 
 let appVersionLoaded = new Promise((resolve, reject) => {
@@ -441,7 +443,7 @@ DOM.controlsWrapper.addEventListener("mousedown", (e) => {
   // Remove event listener on mouseup
   const onMouseUp = () => {
     document.removeEventListener("mousemove", onMouseMove);
-    trackEvent(config.UUID, "Drag", "Spec Resize", newHeight);
+    trackEvent({uuid: config.UUID, event: "Drag", action: "Spec Resize", value: newHeight, version: config.VERSION});
   };
   // Attach event listeners for mousemove and mouseup
   document.addEventListener("mousemove", onMouseMove);
@@ -466,7 +468,7 @@ chartContainer.addEventListener("mousedown", (e) => {
   const onMouseUp = () => {
     document.body.style.cursor = "default";
     document.removeEventListener("mousemove", onMouseMove);
-    trackEvent(config.UUID, "Drag", "Chart Resize", newHeight);
+    trackEvent({uuid: config.UUID, event: "Drag", action: "Chart Resize", value: newHeight, version: config.VERSION});
   };
   // Attach event listeners for mousemove and mouseup
   document.addEventListener("mousemove", onMouseMove);
@@ -745,7 +747,7 @@ function showDatePicker() {
       start: timestamp,
       refreshResults: STATE.analysisDone, // Only refresh results if analysis has already been done
     });
-    trackEvent(config.UUID, "Settings Change", "fileStart", newStart);
+    trackEvent({uuid: config.UUID, event: "Settings Change", action: "fileStart", name: newStart, version: config.VERSION});
     resetResults();
     STATE.fileStart = timestamp;
     // Remove the form from the DOM
@@ -2055,10 +2057,7 @@ window.onload = async () => {
   // Attach an error event listener to the window object
   window.onerror = function (message, file, lineno, colno, error) {
     trackEvent(
-      config.UUID,
-      "Error",
-      error.message,
-      encodeURIComponent(error.stack)
+      {uuid: config.UUID, event: "Error", action: error.message, name: encodeURIComponent(error.stack), version: config.VERSION}
     );
     // Return false not to inhibit the default error handling
     return false;
@@ -2132,6 +2131,7 @@ window.onload = async () => {
     debug,
     fileStartMtime,
     specDetections,
+    VERSION
   });
   t0_warmup = Date.now();
   if (isTestEnv) {
@@ -3077,7 +3077,7 @@ function handleKeyDown(e) {
       : e.metaKey
       ? "Alt"
       : "no";
-    trackEvent(config.UUID, "KeyPress", action, modifier);
+    trackEvent({uuid: config.UUID, event: "KeyPress", action, name:modifier, version: config.VERSION});
     GLOBAL_ACTIONS[action](e);
   } else {
     GLOBAL_ACTIONS.handleNumberKeys(e);
@@ -3928,37 +3928,25 @@ function onAnalysisComplete({ quiet }) {
     ? STATE.selection.end - STATE.selection.start
     : DIAGNOSTICS["Audio Duration"];
   const rate = duration / parseFloat(analysisTime);
-
+  if (rate > 10_000) return // must be a database fetch - skip the diagnostics which are only relevant to audio analysis
+  const backend = config.models[config.selectedModel].backend;
+  const event = `${config.selectedModel}-${backend}`
   trackEvent(
-    config.UUID,
-    `${config.selectedModel}-${config.models[config.selectedModel].backend}`,
-    "Audio Duration",
-    config.models[config.selectedModel].backend,
-    Math.round(duration)
+      {uuid:config.UUID, event, action:"Audio Duration", name: backend, value:Math.round(duration), version: config.VERSION}
   );
-
   if (!STATE.selection) {
     trackEvent(
-      config.UUID,
-      `${config.selectedModel}-${config.models[config.selectedModel].backend}`,
-      "Analysis Rate",
-      config.models[config.selectedModel].backend,
-      parseInt(rate)
+      {uuid: config.UUID, event, action: "Analysis Rate", name: backend, value: parseInt(rate), version: config.VERSION}
     );
     trackEvent(
-      config.UUID,
-      `${config.selectedModel}-${config.models[config.selectedModel].backend}`,
-      "Analysis Duration",
-      config.models[config.selectedModel].backend,
-      parseInt(analysisTime)
+      {uuid: config.UUID, event, action: "Analysis Duration", name: backend, value: parseInt(analysisTime), version: config.VERSION}
     );
     DIAGNOSTICS["Analysis Duration"] = utils.formatDuration(analysisTime);
     DIAGNOSTICS["Analysis Rate"] =
       rate.toFixed(0) + "x faster than real time performance.";
     generateToast({ message: "complete" });
     displayProgress({percent: 100});
-  }
-  worker.postMessage({ action: "update-state", selection: false });
+  } else {worker.postMessage({ action: "update-state", selection: false });} 
 }
 
 function removeNoEntry() {
@@ -6177,7 +6165,7 @@ async function handleUIClicks(e) {
   config.debug && console.log("clicked", target);
   target &&
     target !== "result1" &&
-    trackEvent(config.UUID, "UI", "Click", target);
+    trackEvent({uuid:config.UUID, event: "UI", action: "Click", name: target, version: VERSION});
 };
 
 /**
@@ -6748,7 +6736,7 @@ document.addEventListener("change", async function (e) {
     updatePrefs("config.json", config);
     const value = element.type === "checkbox" ? element.checked : element.value;
     target === "fileStart" ||
-      trackEvent(config.UUID, "Settings Change", target, value);
+      trackEvent({uuid:config.UUID, event: "Settings Change", action: target, value: value, version: VERSION});
   }
 });
 
@@ -6868,7 +6856,7 @@ async function readLabels(labelFile, updating) {
         refreshResults: STATE.analysisDone && STATE.mode !== 'chart',
         member: STATE.isMember,
       });
-      trackEvent(config.UUID, "UI", "Create", "Custom list", labels.length);
+      trackEvent({uuid:config.UUID, event: "UI", action: "Create", name: "Custom list", value: labels.length, version: VERSION});
     } else {
       LABELS = labels;
       worker.postMessage({
@@ -8467,10 +8455,7 @@ function checkForIntelMacUpdates() {
             "warning"
           );
           trackEvent(
-            config.UUID,
-            "Update message",
-            `From ${VERSION}`,
-            `To: ${latestVersion}`
+            {uuid:config.UUID, event: "Update message", action: `From ${VERSION}`, name: `To: ${latestVersion}`, version: VERSION}
           );
         }
         config.lastUpdateCheck = latestCheck;
