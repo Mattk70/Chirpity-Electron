@@ -39,6 +39,11 @@ async function countLines(filePath) {
         files: new Map(),
         fileExists: new Map()
       };
+
+    // Set up the model cache initially
+    const models = await db.allAsync('SELECT id, name FROM MODELS');
+    models.forEach(m => caches.models.set(m.name, m.id))
+
     const processingTasks = [];
     const totalLines = await countLines(file);
     let rowCounter = 0, lastPercentReported = -1;
