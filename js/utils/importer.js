@@ -84,10 +84,10 @@ async function countLines(filePath) {
             } catch (error) {
                 return reject(error)
             }
-            let exists = caches.fileExists.get(file);
+            let exists = caches.fileExists.get(row.file);
             if (exists === undefined) {
-              exists = fs.existsSync(file);
-              caches.fileExists.set(file, exists);
+              exists = fs.existsSync(row.file);
+              caches.fileExists.set(row.file, exists);
             }
             if (exists) {
               fileSet.add(row.file);

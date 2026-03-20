@@ -3938,7 +3938,7 @@ function onAnalysisComplete({ quiet }) {
       rate.toFixed(0) + "x faster than real time performance.";
     generateToast({ message: "complete" });
     displayProgress({percent: 100});
-  } else {worker.postMessage({ action: "update-state", selection: false });} 
+  }
 }
 
 function removeNoEntry() {
@@ -5531,6 +5531,7 @@ async function handleUIClicks(e) {
       break;
     }
     case "clear-database-location": {
+      if (PREDICTING) break;
       config.database.location = undefined;
       document.getElementById("database-location").value = "";
       worker.postMessage({
@@ -7542,7 +7543,7 @@ async function getXCComparisons() {
     const defaultLength = bats ? '+len:"0.5-10"' : '+len:"3-15"';
     sname = XCtaxon[sname] || sname;
     const types = bats
-      ? ['distress call', 'feeding buzz', 'social call', 'ecolocation', 'song']
+      ? ['distress call', 'feeding buzz', 'social call', 'echolocation', 'song']
       : ['nocturnal flight call', 'flight call', 'call', 'song'];
     const filteredLists = {}
     types.forEach((type) => {

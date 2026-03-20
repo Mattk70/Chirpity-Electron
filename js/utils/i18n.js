@@ -1202,7 +1202,7 @@ const Context = {
         midnight: "Midnight", noon: 'Noon', one: 'day', other: 'days',
         apply: 'Apply', cancel: 'Cancel', filter: 'Apply a date Filter',
         'nocturnal flight call': 'Nocturnal Flight Call', 'flight call': 'Flight Call', call: 'Call', song: 'Song',
-        ecolocation: 'Echolocation', 'feeding buzz': 'Feeding Buzz', 'distress call': 'Distress Call', 'social call': 'Social Call',
+        echolocation: 'Echolocation', 'feeding buzz': 'Feeding Buzz', 'distress call': 'Distress Call', 'social call': 'Social Call',
         play: 'Play',
         pause: 'Pause',
         analyse: 'Analyse',
