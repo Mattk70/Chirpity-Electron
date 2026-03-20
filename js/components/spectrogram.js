@@ -983,8 +983,7 @@ export class ChirpityWS {
     const key = moveDirection > 0 ? "PageDown" : "PageUp";
     config.debug && console.log(`scrolling x: ${e.deltaX} y: ${e.deltaY}`);
     this.actions[key](e);
-    this.handlers.trackEvent(config.UUID, "Swipe", key, "");
+    this.handlers.trackEvent({uuid: config.UUID, event: "Swipe", action: key, version: config.VERSION});
   }
 }
-
 

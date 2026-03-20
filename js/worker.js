@@ -76,15 +76,12 @@ const generateAlert = ({
 
 // Is this CI / playwright? Disable tracking
 const isTestEnv = process.env.TEST_ENV;
-isTestEnv || installConsoleTracking(() => STATE.UUID, "Worker");
+isTestEnv || installConsoleTracking(() => [STATE.UUID, STATE.VERSION], "Worker");
 const trackEvent = isTestEnv ? () => {} : _trackEvent;
 // Implement error handling in the worker
 self.onerror = function (message, file, lineno, colno, error) {
   trackEvent(
-    STATE.UUID,
-    "Unhandled Worker Error",
-    message,
-    customURLEncode(error?.stack)
+    {uuid: STATE.UUID, event: "Unhandled Worker Error", action: message, name: customURLEncode(error?.stack), version: STATE.VERSION}
   );
   if (message.includes("dynamic link library"))
     generateAlert({ type: "error", message: "noDLL" });
@@ -99,10 +96,7 @@ self.addEventListener("unhandledrejection", function (event) {
 
   // Track the unhandled promise rejection
   trackEvent(
-    STATE.UUID,
-    "Unhandled Worker PR",
-    errorMessage,
-    customURLEncode(stackTrace)
+    {uuid: STATE.UUID, event: "Unhandled Worker PR", action: errorMessage, name: customURLEncode(stackTrace), version: STATE.VERSION}
   );
 });
 
@@ -113,10 +107,7 @@ self.addEventListener("rejectionhandled", function (event) {
 
   // Track the unhandled promise rejection
   trackEvent(
-    STATE.UUID,
-    "Handled Worker PR",
-    errorMessage,
-    customURLEncode(stackTrace)
+    {uuid: STATE.UUID, event: "Handled Worker PR", action: errorMessage, name: customURLEncode(stackTrace), version: STATE.VERSION}
   );
 });
 
@@ -1233,7 +1224,7 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true, skipM
     return filePaths;
   }
   const fileOrFolder = folderDropped ? "Open Folder(s)" : "Open Files(s)";
-  trackEvent(STATE.UUID, "UI", "Drop", fileOrFolder, filePaths.length);
+  trackEvent({uuid: STATE.UUID, event: "UI", action: "Drop", name: fileOrFolder, value: filePaths.length, version: STATE.VERSION});
   UI.postMessage({ event: "files", filePaths, preserveResults, checkSaved });
   const allSaved = checkSaved ? await savedFileCheckAsync(filePaths) : false;
   QUEUE.setFiles(filePaths);
@@ -1848,23 +1839,10 @@ async function onAnalyse({
     selection: end ? getSelectionRange(filesInScope[0], start, end) : undefined,
   });
   const selection = STATE.selection; // we only get 'end' during selection analysis
-  QUEUE.setFiles(filesInScope);
-
-  // TODO: figure out if we can reuse a queue across analyses
-  // benefit: don't keep flagging corrupt / missing files
-  // if (filesInScope.length === 1) {
-  //   // Handle explore case
-  //   QUEUE.addFile(filesInScope[0]);
-  //   // Set all files complete
-  //   QUEUE.moveAll(['inProgress', 'pending'], 'complete')
-  //   // Set the first (actually the only file in scope) to pending
-  //   QUEUE.setStatus(filesInScope[0], 'pending')
-  // } else { QUEUE.moveAll(['inProgress', 'complete'], 'pending') }
-  DEBUG &&
-    console.log(
-      `Worker received message: ${filesInScope}, ${STATE.detect.confidence}, start: ${start}, end: ${end}`
-    );
-  if (!selection) {
+  if (selection) {
+    if (! QUEUE.setStatus(filesInScope[0], 'pending')) QUEUE.setFiles(filesInScope, 'pending')
+  } else {
+    QUEUE.moveAll(['inProgress', 'complete'], 'pending');
     const {combine, merge} = STATE.detect;
     // Clear records from the memory db
     if (!(combine || merge)){
@@ -1873,6 +1851,12 @@ async function onAnalyse({
     // Clear any location filters set in explore/charts
     STATE.location = undefined;
   }
+
+  DEBUG &&
+    console.log(
+      `Worker received message: ${filesInScope}, ${STATE.detect.confidence}, start: ${start}, end: ${end}`
+    );
+
 
   let count = 0;
   const files = QUEUE.getAllPaths('pending')
@@ -1906,12 +1890,11 @@ async function onAnalyse({
         await getResults({ topRankin: 5, offset: 0 });
       } else {
         await onChangeMode("archive");
-        files.forEach((file) => {
-          UI.postMessage({
-            event: "update-audio-duration",
-            value: METADATA[file].duration,
-          })
-        });
+        UI.postMessage({
+          event: "update-audio-duration",
+          value: 0,
+        })
+        QUEUE.moveAll(['pending', 'inProgress'], 'complete');
         await Promise.all([getSummary(), getResults()] );
       }
       return;
@@ -1951,6 +1934,7 @@ function onAbort({ model = STATE.model }) {
     } catch (e) {
         console.error("Error occurred while cancelling worker queue", e);
     }
+    QUEUE.moveAll(['pending', 'inProgress'], 'complete');
   }
   // Tell workers to ignore results from any in-flight batches and stop processing
   predictWorkers.forEach(worker => {
@@ -3005,6 +2989,7 @@ function spawnPredictWorkers(model, batchSize, toSpawn) {
     worker.postMessage({
       message: "load",
       UUID: STATE.UUID,
+      version: STATE.VERSION,
       model,
       modelPath: STATE.modelPath,
       batchSize,

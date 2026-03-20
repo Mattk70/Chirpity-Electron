@@ -37,6 +37,7 @@ let LOCATIONS, pagination,
   loadingTimeout,
   LIST_MAP;
 
+let VERSION;
 let APPLICATION_LOADED = false;
 let LABELS = [],
   HISTORY = [];
@@ -49,10 +50,11 @@ window.addEventListener("unhandledrejection", function (event) {
 
   // Track the unhandled promise rejection
   trackEvent(
-    config.UUID,
-    "Unhandled UI PR",
-    errorMessage,
-    customURLEncode(stackTrace)
+    {uuid:config.UUID,
+    event: "Unhandled UI PR",
+    action: errorMessage,
+    name: customURLEncode(stackTrace),
+    version: config.VERSION}
   );
 });
 
@@ -64,10 +66,11 @@ window.addEventListener("rejectionhandled", function (event) {
 
   // Track the unhandled promise rejection
   trackEvent(
-    config.UUID,
-    "Handled UI PR",
-    errorMessage,
-    customURLEncode(stackTrace)
+      {uuid:config.UUID,
+      event: "Handled UI PR",
+      action: errorMessage,
+      name: customURLEncode(stackTrace),
+      version: config.VERSION}
   );
 });
 
@@ -346,7 +349,7 @@ window.electron.onFileOpen((filePath) => {
 // Is this CI / playwright?
 const isTestEnv = window.env.TEST_ENV === "true";
 const trackVisit = isTestEnv ? () => {} : _trackVisit;
-isTestEnv || installConsoleTracking(() => config.UUID, "UI");
+isTestEnv || installConsoleTracking(() => [config.UUID, config.VERSION], "UI");
 const trackEvent = isTestEnv ? () => {} : _trackEvent;
 isTestEnv && console.log("Running in test environment");
 
@@ -387,7 +390,6 @@ async function getPaths() {
   return [appPath, tempPath, locale, dirname];
 }
 
-let VERSION;
 let DIAGNOSTICS = {};
 
 let appVersionLoaded = new Promise((resolve, reject) => {
@@ -441,7 +443,7 @@ DOM.controlsWrapper.addEventListener("mousedown", (e) => {
   // Remove event listener on mouseup
   const onMouseUp = () => {
     document.removeEventListener("mousemove", onMouseMove);
-    trackEvent(config.UUID, "Drag", "Spec Resize", newHeight);
+    trackEvent({uuid: config.UUID, event: "Drag", action: "Spec Resize", value: newHeight, version: config.VERSION});
   };
   // Attach event listeners for mousemove and mouseup
   document.addEventListener("mousemove", onMouseMove);
@@ -466,7 +468,7 @@ chartContainer.addEventListener("mousedown", (e) => {
   const onMouseUp = () => {
     document.body.style.cursor = "default";
     document.removeEventListener("mousemove", onMouseMove);
-    trackEvent(config.UUID, "Drag", "Chart Resize", newHeight);
+    trackEvent({uuid: config.UUID, event: "Drag", action: "Chart Resize", value: newHeight, version: config.VERSION});
   };
   // Attach event listeners for mousemove and mouseup
   document.addEventListener("mousemove", onMouseMove);
@@ -745,7 +747,7 @@ function showDatePicker() {
       start: timestamp,
       refreshResults: STATE.analysisDone, // Only refresh results if analysis has already been done
     });
-    trackEvent(config.UUID, "Settings Change", "fileStart", newStart);
+    trackEvent({uuid: config.UUID, event: "Settings Change", action: "fileStart", name: newStart, version: config.VERSION});
     resetResults();
     STATE.fileStart = timestamp;
     // Remove the form from the DOM
@@ -2054,10 +2056,7 @@ window.onload = async () => {
   // Attach an error event listener to the window object
   window.onerror = function (message, file, lineno, colno, error) {
     trackEvent(
-      config.UUID,
-      "Error",
-      error.message,
-      encodeURIComponent(error.stack)
+      {uuid: config.UUID, event: "Error", action: error.message, name: encodeURIComponent(error.stack), version: config.VERSION}
     );
     // Return false not to inhibit the default error handling
     return false;
@@ -2129,6 +2128,7 @@ window.onload = async () => {
     debug,
     fileStartMtime,
     specDetections,
+    VERSION
   });
   t0_warmup = Date.now();
   if (isTestEnv) {
@@ -3069,7 +3069,7 @@ function handleKeyDown(e) {
       : e.metaKey
       ? "Alt"
       : "no";
-    trackEvent(config.UUID, "KeyPress", action, modifier);
+    trackEvent({uuid: config.UUID, event: "KeyPress", action, name:modifier, version: config.VERSION});
     GLOBAL_ACTIONS[action](e);
   } else {
     GLOBAL_ACTIONS.handleNumberKeys(e);
@@ -3920,29 +3920,18 @@ function onAnalysisComplete({ quiet }) {
     ? STATE.selection.end - STATE.selection.start
     : DIAGNOSTICS["Audio Duration"];
   const rate = duration / parseFloat(analysisTime);
-
+  if (rate > 10_000) return // must be a database fetch - skip the diagnostics which are only relevant to audio analysis
+  const backend = config.models[config.selectedModel].backend;
+  const event = `${config.selectedModel}-${backend}`
   trackEvent(
-    config.UUID,
-    `${config.selectedModel}-${config.models[config.selectedModel].backend}`,
-    "Audio Duration",
-    config.models[config.selectedModel].backend,
-    Math.round(duration)
+      {uuid:config.UUID, event, action:"Audio Duration", name: backend, value:Math.round(duration), version: config.VERSION}
   );
-
   if (!STATE.selection) {
     trackEvent(
-      config.UUID,
-      `${config.selectedModel}-${config.models[config.selectedModel].backend}`,
-      "Analysis Rate",
-      config.models[config.selectedModel].backend,
-      parseInt(rate)
+      {uuid: config.UUID, event, action: "Analysis Rate", name: backend, value: parseInt(rate), version: config.VERSION}
     );
     trackEvent(
-      config.UUID,
-      `${config.selectedModel}-${config.models[config.selectedModel].backend}`,
-      "Analysis Duration",
-      config.models[config.selectedModel].backend,
-      parseInt(analysisTime)
+      {uuid: config.UUID, event, action: "Analysis Duration", name: backend, value: parseInt(analysisTime), version: config.VERSION}
     );
     DIAGNOSTICS["Analysis Duration"] = utils.formatDuration(analysisTime);
     DIAGNOSTICS["Analysis Rate"] =
@@ -3950,7 +3939,6 @@ function onAnalysisComplete({ quiet }) {
     generateToast({ message: "complete" });
     displayProgress({percent: 100});
   }
-  worker.postMessage({ action: "update-state", selection: false });
 }
 
 function removeNoEntry() {
@@ -5543,6 +5531,7 @@ async function handleUIClicks(e) {
       break;
     }
     case "clear-database-location": {
+      if (PREDICTING) break;
       config.database.location = undefined;
       document.getElementById("database-location").value = "";
       worker.postMessage({
@@ -6143,7 +6132,7 @@ async function handleUIClicks(e) {
   config.debug && console.log("clicked", target);
   target &&
     target !== "result1" &&
-    trackEvent(config.UUID, "UI", "Click", target);
+    trackEvent({uuid:config.UUID, event: "UI", action: "Click", name: target, version: VERSION});
 };
 
 /**
@@ -6710,7 +6699,7 @@ document.addEventListener("change", async function (e) {
     updatePrefs("config.json", config);
     const value = element.type === "checkbox" ? element.checked : element.value;
     target === "fileStart" ||
-      trackEvent(config.UUID, "Settings Change", target, value);
+      trackEvent({uuid:config.UUID, event: "Settings Change", action: target, value: value, version: VERSION});
   }
 });
 
@@ -6830,7 +6819,7 @@ async function readLabels(labelFile, updating) {
         refreshResults: STATE.analysisDone && STATE.mode !== 'chart',
         member: STATE.isMember,
       });
-      trackEvent(config.UUID, "UI", "Create", "Custom list", labels.length);
+      trackEvent({uuid:config.UUID, event: "UI", action: "Create", name: "Custom list", value: labels.length, version: VERSION});
     } else {
       LABELS = labels;
       worker.postMessage({
@@ -6909,9 +6898,7 @@ async function createContextMenu(e) {
     return;
   } else if (target.classList.contains("circle") || target.closest("thead"))
     return;
-  let hideInSummary = "",
-    hideInSelection = "",
-    plural = "";
+  let hideInSummary = "", hideInSelection = "", disableWhenPredicting = "", plural = "";
   const inSummary = target.closest("#speciesFilter");
   const resultContext = !target.closest("#summaryTable");
   if (inSummary) {
@@ -6920,6 +6907,7 @@ async function createContextMenu(e) {
   } else if (target.closest("#selectionResultTableBody")) {
     hideInSelection = "d-none";
   }
+  if (PREDICTING) disableWhenPredicting = "disabled";
   const hideFindSimilar = (['analyse', 'archive']).includes(STATE.mode) && ! ['chirpity', 'nocmig'].includes(config.selectedModel) ? '' : 'd-none';
   // If we haven't clicked the active row or we cleared the region, load the row we clicked
   if (resultContext || hideInSelection || hideInSummary) {
@@ -6942,36 +6930,28 @@ async function createContextMenu(e) {
   DOM.contextMenu.innerHTML = `
     <div id="${inSummary ? "inSummary" : "inResults"}">
       <ul class="list-unstyled mb-1">
-        <li class="dropdown-item ${hideInSummary}" id="play-region"><span class='material-symbols-outlined'>play_circle</span> ${
-    i18.play
-  }</li>
-        <li class="dropdown-item ${hideInSummary} ${hideInSelection}" id="context-analyse-selection">
-        <span class="material-symbols-outlined">search</span> ${i18.analyse}
+        <li class="dropdown-item ${hideInSummary}" id="play-region"><span class='material-symbols-outlined'>play_circle</span> ${i18.play}</li>
+        <li class="dropdown-item ${hideInSummary} ${hideInSelection} ${disableWhenPredicting}" id="context-analyse-selection">
+          <span class="material-symbols-outlined">search</span> ${i18.analyse}
         </li>
-        <li class="dropdown-item ${hideFindSimilar} ${hideInSummary} ${hideInSelection} ${disabled}" id="context-find-similar">
-        <span class="material-symbols-outlined">search</span> ${i18.find}
+        <li class="dropdown-item ${disableWhenPredicting} ${hideFindSimilar} ${hideInSummary} ${hideInSelection} ${disabled}" id="context-find-similar">
+          <span class="material-symbols-outlined">search</span> ${i18.find}
         </li>
         <div class="dropdown-divider ${hideInSummary}"></div>
         <li class="dropdown-item  ${hideInSelection}" id="create-manual-record">
-        <span class="material-symbols-outlined">edit_document</span> ${createOrEdit} ${
-    i18.record
-  }
+          <span class="material-symbols-outlined">edit_document</span> ${createOrEdit} ${i18.record}
         </li>
         <li class="dropdown-item" id="context-create-clip">
-        <span class="material-symbols-outlined">music_note</span> ${i18.export}
+          <span class="material-symbols-outlined">music_note</span> ${i18.export}
         </li>
-        <span class="dropdown-item" id="context-xc" target="xc">
-        <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> ${
-          i18.compare
-        }
-        </span>
+          <span class="dropdown-item" id="context-xc" target="xc">
+            <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> ${i18.compare}
+          </span>
         <div class="dropdown-divider ${hideInSelection}"></div>
         <li class="dropdown-item ${hideInSelection}" id="context-delete">
-        <span class='delete material-symbols-outlined'>delete_forever</span> ${
-          i18.delete
-        }
+          <span class='delete material-symbols-outlined'>delete_forever</span> ${i18.delete}
         </li>
-        </ul>
+      </ul>
     </div>
     `;
   const modalTitle = document.getElementById("record-entry-modal-label");
@@ -7550,12 +7530,12 @@ async function getXCComparisons() {
     const content = "Loading Xeno-Canto data...";
     loadingFiles({hide:false, content})
     const bats = config.selectedModel.includes('bats');
-    const quality = "+q:%22>C%22";
-    const defaultLength = bats ? "+len:0.5-10" : "+len:3-15";
+    const quality = '+q:">C"';
+    const defaultLength = bats ? '+len:"0.5-10"' : '+len:"3-15"';
     sname = XCtaxon[sname] || sname;
     const types = bats
-      ? ['"distress call"', '"feeding buzz"', '"social call"', 'ecolocation', 'song']
-      : ['"nocturnal flight call"', '"flight call"', 'call', 'song'];
+      ? ['distress call', 'feeding buzz', 'social call', 'echolocation', 'song']
+      : ['nocturnal flight call', 'flight call', 'call', 'song'];
     const filteredLists = {}
     types.forEach((type) => {
       filteredLists[type] = []; // Initialize each type with an empty array
@@ -7565,8 +7545,8 @@ async function getXCComparisons() {
     const fetchRequests = types.map((type) => {
       type = type.replaceAll(" ", "%20"); // Replace spaces with entities for the API query
       // Use a different length parameter for "song"
-      const typeLength = type === "song" ? "+len:10-30" : defaultLength;
-      const query = `https://xeno-canto.org/api/3/recordings?key=d5e2d2775c7f2b2fb8325ffacc41b9e6aa94679e&query=sp:"${sname}"${quality}${typeLength}+type:=${type}`;
+      const typeLength = type === "song" ? '+len:"10-30"' : defaultLength;
+      const query = `https://xeno-canto.org/api/3/recordings?key=d5e2d2775c7f2b2fb8325ffacc41b9e6aa94679e&query=sp:"${sname}"${quality}${typeLength}+type:"${type}"`;
       
       return fetch(query)
         .then((response) =>
@@ -8433,10 +8413,7 @@ function checkForIntelMacUpdates() {
             "warning"
           );
           trackEvent(
-            config.UUID,
-            "Update message",
-            `From ${VERSION}`,
-            `To: ${latestVersion}`
+            {uuid:config.UUID, event: "Update message", action: `From ${VERSION}`, name: `To: ${latestVersion}`, version: VERSION}
           );
         }
         config.lastUpdateCheck = latestCheck;

@@ -16,8 +16,9 @@ let VISITOR;
  * @param {string} action - Event action (will be normalized as described above).
  * @param {string} [name] - Optional event name; digits after "result" will be removed when present.
  * @param {string|number} [value] - Optional event value providing additional context.
+ * @param {string} version - Application version to include as a custom dimension.
  */
-function trackEvent(uuid, event, action, name, value){
+function trackEvent({uuid, event, action, name, value, version}){
     // Squash result numbers
     name = typeof name == 'string' ? name.replace(/result\d+/, 'result') : name;
     if (action === ' ') action = 'Spacebar';
@@ -25,10 +26,12 @@ function trackEvent(uuid, event, action, name, value){
     const t = new Date()
     name = name ? `&e_n=${name}` : '';
     value = value ? `&e_v=${value}` : '';
+    uuid ??= '0';
     const payload = 
         'https://analytics.mattkirkland.co.uk/matomo.php?'
         + `h=${t.getHours()}&m=${t.getMinutes()}&s=${t.getSeconds()}&`
-        + `action_name=Settings%20Change&idsite=${ID_SITE}&rand=${Date.now()}&`
+        + `idsite=${ID_SITE}&rand=${Date.now()}&dimension15=${version}&`
+        + `_id=${uuid.substring(0,16)}&`
         + `rec=1&uid=${uuid}&apiv=1&e_c=${event}&e_a=${action}${name}${value}`;
     try{
         navigator.sendBeacon(payload)
@@ -62,7 +65,7 @@ function trackVisit(config){
     const {UUID, selectedModel, list, useWeek, locale, speciesThreshold, filters, audio, models, detect, CPU, RAM, GPUs, VERSION} = config;
     VISITOR = UUID;
     const {width, height} = window.screen;
-    navigator.sendBeacon(`https://analytics.mattkirkland.co.uk/matomo.php?idsite=${ID_SITE}&rand=${Date.now()}&rec=1&uid=${UUID}&apiv=1
+    navigator.sendBeacon(`https://analytics.mattkirkland.co.uk/matomo.php?idsite=${ID_SITE}&rand=${Date.now()}&rec=1&uid=${UUID}&_id=${UUID.substring(0,16)}&apiv=1
             &res=${width}x${height}
             &dimension1=${selectedModel}
             &dimension2=${list}
@@ -113,10 +116,7 @@ function installConsoleTracking(getUUID, scriptSrc) {
             original.apply(console, args);
             if (args.length >= 2 && typeof getUUID === 'function') {
                 trackEvent(
-                    getUUID(),
-                    label,
-                    args[0],
-                    customURLEncode(args[1])
+                    {uuid: getUUID()[0], event: label, action: args[0], name: customURLEncode(args[1]), version: getUUID()[1]}
                 );
             }
         };
