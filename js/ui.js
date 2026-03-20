@@ -7572,12 +7572,12 @@ async function getXCComparisons() {
     const content = "Loading Xeno-Canto data...";
     loadingFiles({hide:false, content})
     const bats = config.selectedModel.includes('bats');
-    const quality = "+q:%22>C%22";
-    const defaultLength = bats ? "+len:0.5-10" : "+len:3-15";
+    const quality = '+q:">C"';
+    const defaultLength = bats ? '+len:"0.5-10"' : '+len:"3-15"';
     sname = XCtaxon[sname] || sname;
     const types = bats
-      ? ['"distress call"', '"feeding buzz"', '"social call"', 'ecolocation', 'song']
-      : ['"nocturnal flight call"', '"flight call"', 'call', 'song'];
+      ? ['distress call', 'feeding buzz', 'social call', 'ecolocation', 'song']
+      : ['nocturnal flight call', 'flight call', 'call', 'song'];
     const filteredLists = {}
     types.forEach((type) => {
       filteredLists[type] = []; // Initialize each type with an empty array
@@ -7587,8 +7587,8 @@ async function getXCComparisons() {
     const fetchRequests = types.map((type) => {
       type = type.replaceAll(" ", "%20"); // Replace spaces with entities for the API query
       // Use a different length parameter for "song"
-      const typeLength = type === "song" ? "+len:10-30" : defaultLength;
-      const query = `https://xeno-canto.org/api/3/recordings?key=d5e2d2775c7f2b2fb8325ffacc41b9e6aa94679e&query=sp:"${sname}"${quality}${typeLength}+type:=${type}`;
+      const typeLength = type === "song" ? '+len:"10-30"' : defaultLength;
+      const query = `https://xeno-canto.org/api/3/recordings?key=d5e2d2775c7f2b2fb8325ffacc41b9e6aa94679e&query=sp:"${sname}"${quality}${typeLength}+type:"${type}"`;
       
       return fetch(query)
         .then((response) =>
