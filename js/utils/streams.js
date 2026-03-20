@@ -26,15 +26,16 @@ class PCMChunker extends Transform {
     this.windowBytes = this.windowSamples * this.bytesPerSample;
     this.stepBytes = this.stepSamples * this.bytesPerSample;
 
-    // ring buffer must hold at least one full window plus step
     this.bufferBytes = this.windowBytes * 2;
-
-    this.buffer = Buffer.allocUnsafe(this.bufferBytes);
+    this.buffer = Buffer.alloc(this.bufferBytes);
 
     this.writePos = 0;
+    this.readPos = 0;
+
     this.availableBytes = 0;
 
-    this.nextWindowStart = 0;
+    // NEW: how many bytes have been logically consumed (like nextWindowStart)
+    this.consumedBytes = 0;
 
     this.totalSamples = startTime;
 
@@ -64,14 +65,13 @@ class PCMChunker extends Transform {
       return this.buffer.subarray(offset, offset + this.windowBytes);
     }
 
-    // wrap case
     const part1 = this.buffer.subarray(offset);
     const part2 = this.buffer.subarray(
       0,
       this.windowBytes - part1.length
     );
 
-    const tmp = Buffer.allocUnsafe(this.windowBytes);
+    const tmp = Buffer.alloc(this.windowBytes);
     part1.copy(tmp, 0);
     part2.copy(tmp, part1.length);
     return tmp;
@@ -79,14 +79,9 @@ class PCMChunker extends Transform {
 
   _emitAvailableWindows() {
     while (
-      this.availableBytes - this.nextWindowStart >= this.windowBytes
+      this.availableBytes - this.consumedBytes >= this.windowBytes
     ) {
-      const offset =
-        (this.writePos - this.availableBytes + this.nextWindowStart +
-          this.bufferBytes) %
-        this.bufferBytes;
-
-      const window = this._readWindow(offset);
+      const window = this._readWindow(this.readPos);
 
       const channelData = this._getMonoChannelData(window);
 
@@ -97,13 +92,18 @@ class PCMChunker extends Transform {
         endTime: this.endTime,
       });
 
+      // advance logical read position
+      this.readPos =
+        (this.readPos + this.stepBytes) % this.bufferBytes;
+
+      this.consumedBytes += this.stepBytes;
       this.totalSamples += this.stepSamples;
-      this.nextWindowStart += this.stepBytes;
     }
 
-    if (this.nextWindowStart > 0) {
-      this.availableBytes -= this.nextWindowStart;
-      this.nextWindowStart = 0;
+    // now discard only what is no longer needed
+    if (this.consumedBytes > 0) {
+      this.availableBytes -= this.consumedBytes;
+      this.consumedBytes = 0;
     }
   }
 
@@ -150,33 +150,30 @@ class PCMChunker extends Transform {
     try {
       this._emitAvailableWindows();
 
-      const availableSamples = this.availableBytes / this.bytesPerSample;
+      let remaining = this.availableBytes;
 
-      if (availableSamples > 0) {
-        let offset =
-          (this.writePos - this.availableBytes + this.bufferBytes) %
-          this.bufferBytes;
+      let offset = this.readPos;
+      let startSamples = this.totalSamples;
 
-        let startSamples = this.totalSamples;
+      while (remaining > 0) {
+        const tmp = Buffer.alloc(this.windowBytes);
 
-        while (availableSamples - (startSamples - this.totalSamples) > 0) {
-          const tmp = Buffer.alloc(this.windowBytes);
+        const part = this._readWindow(offset);
+        part.copy(tmp);
 
-          const part = this._readWindow(offset);
-          part.copy(tmp);
+        const channelData = this._getMonoChannelData(tmp);
 
-          const channelData = this._getMonoChannelData(tmp);
+        this.push({
+          channelData,
+          chunkStart: startSamples,
+          file: this.file,
+          endTime: this.endTime,
+        });
 
-          this.push({
-            channelData,
-            chunkStart: startSamples,
-            file: this.file,
-            endTime: this.endTime,
-          });
+        offset = (offset + this.stepBytes) % this.bufferBytes;
+        startSamples += this.stepSamples;
 
-          startSamples += this.stepSamples;
-          offset = (offset + this.stepBytes) % this.bufferBytes;
-        }
+        remaining -= this.stepBytes;
       }
 
       callback();

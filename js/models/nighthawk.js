@@ -167,7 +167,7 @@ class NightHawkModel extends BaseModel {
   }
 
   async predictBatch(audio, keys) {
-    const raw = await tf.tidy(() => {
+    const raw = tf.tidy(() => {
       // Map predict over each item in the batch [batch, input] -> per-item [input]
       const audioSlices = tf.unstack(audio, 0); 
       return  audioSlices.map((singleAudio) => {

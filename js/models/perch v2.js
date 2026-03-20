@@ -15,14 +15,7 @@ const numClasses = 14795;
 const DEBUG = false;
 let modelPath;
 
-let batchedIndices;
-let batchedProbs; 
-let batchedEmbeds;
-
 async function loadModel(mpath, backend, batchSize) {
-  batchedEmbeds  = Array.from({ length: batchSize });
-  batchedIndices  = Array.from({ length: batchSize });
-  batchedProbs  = Array.from({ length: batchSize });
   const gpu = backend === 'webgpu';
   const providers = gpu ? ['webgpu', 'cpu'] : ['cpu'];
   const freeDimensionOverrides = { 'batch': batchSize };
@@ -113,12 +106,9 @@ onmessage = async (e) => {
           const selection = !resetResults;
           if (cancelled) return;
           const myGeneration = currentGeneration;
-          const [result, filename, startPosition] = await predictChunk(
+          const result = await predictChunk(
             chunks,
-            start,
-            fileStart,
-            file,
-            confidence
+            start
           );
           if (cancelled || myGeneration !== currentGeneration) {
             return; // Ignore stale results
@@ -126,9 +116,9 @@ onmessage = async (e) => {
           response = {
             message: "prediction",
             id,
-            file: filename,
+            file,
             result,
-            fileStart: startPosition,
+            fileStart,
             worker,
             selection,
           };
@@ -142,38 +132,26 @@ onmessage = async (e) => {
   }
 };
 
-const padAudio = (audio) => {
-    const samples = batchSize * chunkLength;
-    const remainder = audio.length % samples;
-    if (remainder) {
-        // Create a new array with the desired length
-        const paddedAudio = new Float32Array(
-        audio.length + (samples - remainder)
-        );
-        // Copy the existing values into the new array
-        paddedAudio.set(audio);
-        return paddedAudio;
-    } else return audio;
+
+const createAudioTensorBatch = (audioArray) => {
+    const batch = audioArray.length;
+    const data = new Float32Array(batch * chunkLength);
+    for (let i = 0; i < batch; i++) {
+      const audio = audioArray[i];
+      if (audio.length >= chunkLength) {
+        data.set(audio.subarray(0, chunkLength), i * chunkLength);
+      } else {
+        data.set(audio, i * chunkLength);
+        // remaining samples already zero (silence)
+      }
+    }
+    return new ort.Tensor('float32', data, [batch, chunkLength]);
 };
 
-const createAudioTensorBatch = (audio) => {
-    audio = padAudio(audio);
-    const numSamples = audio.length / chunkLength;
-    return [new ort.Tensor('float32', audio, [numSamples, chunkLength]), numSamples];
-};
-async function predictChunk(
-    audioBuffer,
-    start,
-    fileStart,
-    file
-  ) {
-    const [audioBatch, numSamples] = createAudioTensorBatch(audioBuffer);
-    const batchKeys = getKeys(numSamples, start);
-    const result = await predictBatch(
-      audioBatch,
-      batchKeys
-    );
-    return [result, file, fileStart];
+async function predictChunk(audioBuffer, startSamples) {
+    const audioBatch = createAudioTensorBatch(audioBuffer);
+    const result = await predictBatch( audioBatch, startSamples );
+    return result;
 }
 
 
@@ -189,11 +167,15 @@ async function disposeGPUTensors(prediction) {
  * - batchSize, numClasses, sampleRate available in outer scope / params
  */
 async function predictBatch(audio, keys) {
+    const length = keys.length;
+    const batchedEmbeds  = Array.from({ length });
+    const batchedIndices  = Array.from({ length });
+    const batchedProbs  = Array.from({ length });
     const prediction = await session.run({ inputs: audio })
     const flatID = prediction.label.cpuData; // Float32Array
     const flatEmbeds = prediction.embedding.cpuData;
     const dim = prediction.embedding.dims[1]
-    for (let b = 0; b < batchSize; b++) {
+    for (let b = 0; b < length; b++) {
       const offset = b * numClasses;
       const bOffset = b * dim;
       const logits = flatID.subarray(offset, offset + numClasses);
@@ -230,9 +212,6 @@ function l2Normalize(vec) {
     }
   }
   return vec;
-}
-function getKeys(numSamples, start) {
-    return [...Array(numSamples).keys()].map((i) => start + chunkLength * i);
 }
 
 const loadTopK = require("../utils/topKWASM.js");

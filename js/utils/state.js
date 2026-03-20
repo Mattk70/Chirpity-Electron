@@ -110,7 +110,9 @@ export class WorkerState {
     (this.originalFiles = undefined),
     (this.perchWorker = []),
     (this.openFiles = []),
-    this.detectionState = Object.create(null);
+    this.detectionState = Object.create(null),
+    this.detectionQueues = Object.create(null),
+    this.detectionRunning = Object.create(null);
   }
 
   update(updates) {

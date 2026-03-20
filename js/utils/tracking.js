@@ -21,7 +21,6 @@ let VISITOR;
 function trackEvent({uuid, event, action, name, value, version}){
     // Squash result numbers
     name = typeof name == 'string' ? name.replace(/result\d+/, 'result') : name;
-    console.log(`Tracking event: ${uuid}, action: ${action}, name: ${name}, value: ${value}, version: ${version}`);
     if (action === ' ') action = 'Spacebar';
     else if (action === '+') action = 'Plus';
     const t = new Date()

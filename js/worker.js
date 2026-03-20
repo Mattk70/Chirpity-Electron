@@ -345,7 +345,7 @@ const getSplitChar = () => STATE.model === "perch v2" ? /[,~]/ : /[,_]/;
  * @param {boolean} options.regenerate - If true, forces reloading of labels from the database.
  */
 async function setLabelState({ regenerate }) {
-  if (regenerate || !STATE.allLabelsMap) {
+  if (regenerate || !STATE.modelLabelsMap) {
     DEBUG && console.log("Getting labels from disk db");
     const res = await diskDB.allAsync(
       `SELECT classIndex + 1 as id, sname || ',' || cname AS labels, modelID 
@@ -353,17 +353,17 @@ async function setLabelState({ regenerate }) {
     );
 
     // Map from species ID to label
-    STATE.allLabelsMap = new Map(res.map(obj => [obj.id, obj.labels]));
+    STATE.modelLabelsMap = new Map(res.map(obj => [obj.id, obj.labels]));
 
     // Also keep a flat list of all labels (optional, if still useful for 'everything')
-    STATE.allLabels = res.map(obj => obj.labels);
+    STATE.modelLabels = res.map(obj => obj.labels);
   }
 
   const included = await getIncludedIDs(); // assumes array of species.id values
 
   STATE.filteredLabels = STATE.list === 'everything'
-    ? STATE.allLabels
-    : included.map(id => STATE.allLabelsMap.get(id)).filter(Boolean);
+    ? STATE.modelLabels
+    : included.map(id => STATE.modelLabelsMap.get(id)).filter(Boolean);
 
   UI.postMessage({ event: "labels", labels: STATE.filteredLabels });
 }
@@ -1356,10 +1356,10 @@ function getFileSQLAndParams(range) {
  * Compute indices between 1 and fullRange (inclusive) that are not present in the sorted `included` list.
  *
  * @param {number[]} included - Sorted array of indices to include.
- * @param {number} [fullRange=STATE.allLabels.length] - Maximum index to check (inclusive).
+ * @param {number} [fullRange=STATE.modelLabels.length] - Maximum index to check (inclusive).
  * @returns {number[]} Array of indices between 1 and `fullRange` (inclusive) that are not in `included`.
  */
-function getExcluded(included, fullRange = STATE.allLabels.length) {
+function getExcluded(included, fullRange = STATE.modelLabels.length) {
   const missing = [];
   let currentIndex = 0;
 
@@ -1445,7 +1445,7 @@ async function getMatchingIds(cnames) {
  */
 async function getSpeciesSQLAsync(file){
   let not = "", SQL = "";
-  const {list, allLabels} = STATE;
+  const {list, modelLabels} = STATE;
   
   // If we don't have a file, use the first analysed file if available
   file ??=
@@ -1464,7 +1464,7 @@ async function getSpeciesSQLAsync(file){
     const cnames = result.map(row => row.cname);
     included = cnames.length ? await getMatchingIds(cnames) : [-1];
     DEBUG &&
-      console.log("included", included.length, "# labels", allLabels.length);
+      console.log("included", included.length, "# labels", modelLabels.length);
     SQL = ` AND (s.id ${not} IN (${included}) OR r.modelID = 0) `; // always include records with modelID 0 (manual records)
   }
   return SQL
@@ -1818,6 +1818,7 @@ async function onAnalyse({
   STATE.incrementor = 1;
   STATE.clippedBatches = 0;
   STATE.clippedFilesDuration = 0;
+  STATE.detectionState = Object.create(null)
   predictionsReceived = {};
   batchesToSend = {};
   predictionStart = new Date();
@@ -3334,15 +3335,13 @@ function updateDetectionState({
   isCustomList,
   merge = true
 }) {
-
   const completed = [];
 
   /*
   ----------------------------------
-  FAST PATH: NO MERGING
+  FAST PATH: NO MERGING (unchanged)
   ----------------------------------
   */
-
   if (!merge) {
     for (let i = 0; i < keysArray.length; i++) {
       const t = keysArray[i];
@@ -3373,127 +3372,110 @@ function updateDetectionState({
 
   /*
   ----------------------------------
-  MERGE MODE (STATEFUL)
+  MERGE MODE (Map-based)
   ----------------------------------
   */
 
   const detectionState = STATE.detectionState;
 
   if (!detectionState[file]) {
-    detectionState[file] = {
-      species: [],
-      start: [],
-      end: [],
-      maxConf: [],
-      count: []
-    };
+    detectionState[file] = new Map();
   }
 
   const state = detectionState[file];
-
+  console.log('species:', speciesIDBatch[9], 'confidenceBatch:', confidenceBatch[9], 'time', keysArray[9])
   for (let i = 0; i < keysArray.length; i++) {
     const t = keysArray[i];
     const ids = speciesIDBatch[i];
     const confs = confidenceBatch[i];
-    const seen = new Array(state.species.length).fill(false);
+
+    /*
+    ----------------------------------
+    CLOSE EXPIRED DETECTIONS
+    ----------------------------------
+    */
+
+    for (const [species, det] of state) {
+      if (t > det.end) {
+        if (!dropSingles || det.count > 1) {
+          completed.push({
+            species,
+            start: det.start,
+            end: det.end,
+            confidence: det.maxConf
+          });
+        }
+        state.delete(species);
+      }
+    }
+
+    /*
+    ----------------------------------
+    PROCESS DETECTIONS (START / EXTEND)
+    ----------------------------------
+    */
 
     for (let j = 0; j < ids.length; j++) {
       const species = ids[j];
       const conf = confs[j] * 1000;
 
-      // find existing detection
-      let idx = -1;
-      for (let k = 0; k < state.species.length; k++) {
-        if (state.species[k] === species) {
-          idx = k;
-          break;
-        }
-      }
-
-      const isActive = idx !== -1;
-
-      /*
-      ----------------------------------
-      START vs CONTINUE LOGIC
-      ----------------------------------
-      */
-
-      // START requires threshold
-      if (!isActive && conf < threshold) {
+      if (conf < threshold) {
         if (isCustomList) continue;
         else break;
       }
 
-      if (isActive && conf > threshold/4) {
-        // CONTINUE: 5% requirement
-        state.end[idx] = t + predictionLength;
+      const existing = state.get(species);
 
-        if (conf > state.maxConf[idx]) {
-          state.maxConf[idx] = conf;
-        }
-
-        state.count[idx]++;
-        seen[idx] = true;
-
+      if (existing) {
+        existing.end = t + predictionLength;
+        if (conf > existing.maxConf) existing.maxConf = conf;
+        existing.count++;
       } else {
-        // START new detection
-        state.species.push(species);
-        state.start.push(t);
-        state.end.push(t + predictionLength);
-        state.maxConf.push(conf);
-        state.count.push(1);
-
-        seen.push(true);
-      }
-
-      // preserve original behaviour
-      if (!isCustomList) break;
-    }
-
-    /*
-    ----------------------------------
-    CLOSE DETECTIONS
-    ----------------------------------
-    */
-
-    for (let k = state.species.length - 1; k >= 0; k--) {
-      if (!seen[k]) {
-
-        if (!dropSingles || state.count[k] > 1) {
-          completed.push({
-            species: state.species[k],
-            start: state.start[k],
-            end: state.end[k],
-            confidence: state.maxConf[k]
-          });
-        }
-
-        state.species.splice(k, 1);
-        state.start.splice(k, 1);
-        state.end.splice(k, 1);
-        state.maxConf.splice(k, 1);
-        state.count.splice(k, 1);
+        state.set(species, {
+          start: t,
+          end: t + predictionLength,
+          maxConf: conf,
+          count: 1
+        });
       }
     }
   }
 
   return completed;
 }
+
+// This because we need detection processing to be serialised
+function enqueueDetectionUpdate(file, task) {
+  if (!STATE.detectionQueues[file]) {
+    STATE.detectionQueues[file] = [];
+  }
+  STATE.detectionQueues[file].push(task);
+  if (STATE.detectionRunning[file]) return;
+  STATE.detectionRunning[file] = true;
+  while (STATE.detectionQueues[file].length) {
+    const nextTask = STATE.detectionQueues[file].shift();
+    nextTask(); // synchronous execution
+  }
+  STATE.detectionRunning[file] = false;
+}
+
 function flushDetectionState(file, dropSingles) {
   const state = STATE.detectionState[file];
   if (!state) return [];
 
   const completed = [];
-  for (let i = 0; i < state.species.length; i++) {
-    if (!dropSingles || state.count[i] > 1) {
+
+  for (const [species, det] of state) {
+    if (!dropSingles || det.count > 1) {
       completed.push({
-        species: state.species[i],
-        start: state.start[i],
-        end: state.end[i],
-        confidence: state.maxConf[i]
+        species,
+        start: det.start,
+        end: det.end,
+        confidence: det.maxConf
       });
     }
   }
+
   delete STATE.detectionState[file];
 
   return completed;
@@ -3545,16 +3527,20 @@ const parsePredictions = async (response) => {
   */
 
   const threshold = selection ? 50 : detect.confidence;
-  const dropSingles = !selection && STATE.detect.overlap;
-  const detections = updateDetectionState({
-    file,
-    keysArray,
-    speciesIDBatch,
-    confidenceBatch,
-    threshold,
-    predictionLength,
-    dropSingles, 
-    isCustomList
+  const dropSingles = !selection && !!STATE.detect.overlap;
+  let detections;
+
+  enqueueDetectionUpdate(file, () => {
+    detections = updateDetectionState({
+      file,
+      keysArray,
+      speciesIDBatch,
+      confidenceBatch,
+      threshold,
+      predictionLength,
+      dropSingles, 
+      isCustomList
+    });
   });
 
   /*
@@ -3618,11 +3604,11 @@ const parsePredictions = async (response) => {
       modelID,
       isCustomList
     ).catch(console.warn);
-    await sendResultsToUI (detections, file, modelID, lat, lon, isCustomList)
+    if (remaining.length) await sendResultsToUI (remaining, file, modelID, lat, lon, isCustomList)
 
     if (QUEUE.allComplete()) {
       if (index === 0) {
-        if (STATE.selection) {
+        if (selection) {
           generateAlert({ message: "noDetections" });
         } else {
           generateAlert({
@@ -3646,17 +3632,17 @@ async function sendResultsToUI (detections, file, modelID, lat, lon, isCustomLis
   const included = await getIncludedIDs(file).catch(console.warn);
   const metadata = METADATA[file];
     for (const det of detections) {      
-      const speciesID = STATE.speciesMap.get(modelID).get(det.species);
-      if (included.length && !included.includes(speciesID)) {
+      const {species: species, start, end} = det;
+      if (included.length && !included.includes(species + 1)) {
         continue;
       }
-      const timestamp = metadata.fileStart + det.start * 1000;
+      const timestamp = metadata.fileStart + start * 1000;
       const [sname, cname] =
-        STATE.allLabels[det.species].split(getSplitChar());
+        STATE.modelLabels[species].split(getSplitChar());
       const result = {
         timestamp,
-        position: det.start,
-        end: det.end,
+        position: start,
+        end,
         file,
         cname,
         sname,
@@ -4830,7 +4816,7 @@ const getValidSpecies = async (file) => {
     );
   }
   const splitChar = getSplitChar();
-  for (const [index, speciesName] of STATE.allLabels.entries()) {
+  for (const [index, speciesName] of STATE.modelLabels.entries()) {
     const i = index + 1;
     const [cname, sname] = speciesName.split(splitChar).reverse();
     if (cname.includes("ackground") || cname.includes("Unknown")) continue; // skip background and unknown species
@@ -5605,7 +5591,7 @@ async function setIncludedIDs(lat, lon, week) {
   DEBUG && console.log("calling for a new list");
   // Store the promise in the cache immediately
   LIST_CACHE[key] = (async () => {
-    const { model, modelPath, allLabels:labels, list:listType, customLabels, local:localBirdsOnly, speciesThreshold:threshold, useWeek } = STATE;
+    const { model, modelPath, modelLabels:labels, list:listType, customLabels, local:localBirdsOnly, speciesThreshold:threshold, useWeek } = STATE;
     const { result, messages } = await LIST_WORKER({
       message: "get-list",
       model,
@@ -5622,7 +5608,7 @@ async function setIncludedIDs(lat, lon, week) {
     });
     // // Add the *label* id of "Unknown Sp." to all lists
     STATE.list !== "everything" 
-      && result.push(STATE.allLabels.indexOf('Unknown Sp.,Unknown Sp.') + 1);
+      && result.push(STATE.modelLabels.indexOf('Unknown Sp.,Unknown Sp.') + 1);
 
     let includedObject = {};
     if (
