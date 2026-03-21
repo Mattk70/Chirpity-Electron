@@ -3946,7 +3946,7 @@ function onAnalysisComplete({ quiet }) {
       rate.toFixed(0) + "x faster than real time performance.";
     generateToast({ message: "complete" });
     displayProgress({percent: 100});
-  } else {worker.postMessage({ action: "update-state", selection: false });} 
+  }
 }
 
 function removeNoEntry() {
@@ -5562,6 +5562,7 @@ async function handleUIClicks(e) {
       break;
     }
     case "clear-database-location": {
+      if (PREDICTING) break;
       config.database.location = undefined;
       document.getElementById("database-location").value = "";
       worker.postMessage({
@@ -6931,9 +6932,7 @@ async function createContextMenu(e) {
     return;
   } else if (target.classList.contains("circle") || target.closest("thead"))
     return;
-  let hideInSummary = "",
-    hideInSelection = "",
-    plural = "";
+  let hideInSummary = "", hideInSelection = "", disableWhenPredicting = "", plural = "";
   const inSummary = target.closest("#speciesFilter");
   const resultContext = !target.closest("#summaryTable");
   if (inSummary) {
@@ -6942,6 +6941,7 @@ async function createContextMenu(e) {
   } else if (target.closest("#selectionResultTableBody")) {
     hideInSelection = "d-none";
   }
+  if (PREDICTING) disableWhenPredicting = "disabled";
   const hideFindSimilar = (['analyse', 'archive']).includes(STATE.mode) && ! ['chirpity', 'nocmig'].includes(config.selectedModel) ? '' : 'd-none';
   // If we haven't clicked the active row or we cleared the region, load the row we clicked
   if (resultContext || hideInSelection || hideInSummary) {
@@ -6964,36 +6964,28 @@ async function createContextMenu(e) {
   DOM.contextMenu.innerHTML = `
     <div id="${inSummary ? "inSummary" : "inResults"}">
       <ul class="list-unstyled mb-1">
-        <li class="dropdown-item ${hideInSummary}" id="play-region"><span class='material-symbols-outlined'>play_circle</span> ${
-    i18.play
-  }</li>
-        <li class="dropdown-item ${hideInSummary} ${hideInSelection}" id="context-analyse-selection">
-        <span class="material-symbols-outlined">search</span> ${i18.analyse}
+        <li class="dropdown-item ${hideInSummary}" id="play-region"><span class='material-symbols-outlined'>play_circle</span> ${i18.play}</li>
+        <li class="dropdown-item ${hideInSummary} ${hideInSelection} ${disableWhenPredicting}" id="context-analyse-selection">
+          <span class="material-symbols-outlined">search</span> ${i18.analyse}
         </li>
-        <li class="dropdown-item ${hideFindSimilar} ${hideInSummary} ${hideInSelection} ${disabled}" id="context-find-similar">
-        <span class="material-symbols-outlined">search</span> ${i18.find}
+        <li class="dropdown-item ${disableWhenPredicting} ${hideFindSimilar} ${hideInSummary} ${hideInSelection} ${disabled}" id="context-find-similar">
+          <span class="material-symbols-outlined">search</span> ${i18.find}
         </li>
         <div class="dropdown-divider ${hideInSummary}"></div>
         <li class="dropdown-item  ${hideInSelection}" id="create-manual-record">
-        <span class="material-symbols-outlined">edit_document</span> ${createOrEdit} ${
-    i18.record
-  }
+          <span class="material-symbols-outlined">edit_document</span> ${createOrEdit} ${i18.record}
         </li>
         <li class="dropdown-item" id="context-create-clip">
-        <span class="material-symbols-outlined">music_note</span> ${i18.export}
+          <span class="material-symbols-outlined">music_note</span> ${i18.export}
         </li>
-        <span class="dropdown-item" id="context-xc" target="xc">
-        <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> ${
-          i18.compare
-        }
-        </span>
+          <span class="dropdown-item" id="context-xc" target="xc">
+            <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> ${i18.compare}
+          </span>
         <div class="dropdown-divider ${hideInSelection}"></div>
         <li class="dropdown-item ${hideInSelection}" id="context-delete">
-        <span class='delete material-symbols-outlined'>delete_forever</span> ${
-          i18.delete
-        }
+          <span class='delete material-symbols-outlined'>delete_forever</span> ${i18.delete}
         </li>
-        </ul>
+      </ul>
     </div>
     `;
   const modalTitle = document.getElementById("record-entry-modal-label");
@@ -7576,7 +7568,7 @@ async function getXCComparisons() {
     const defaultLength = bats ? '+len:"0.5-10"' : '+len:"3-15"';
     sname = XCtaxon[sname] || sname;
     const types = bats
-      ? ['distress call', 'feeding buzz', 'social call', 'ecolocation', 'song']
+      ? ['distress call', 'feeding buzz', 'social call', 'echolocation', 'song']
       : ['nocturnal flight call', 'flight call', 'call', 'song'];
     const filteredLists = {}
     types.forEach((type) => {
