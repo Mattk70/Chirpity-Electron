@@ -101,7 +101,8 @@ onmessage = async (e) => {
             confidence,
             worker,
             resetResults,
-            id
+            id,
+            batchIndex
           } = data;
           const selection = !resetResults;
           if (cancelled) return;
@@ -121,6 +122,7 @@ onmessage = async (e) => {
             fileStart,
             worker,
             selection,
+            batchIndex
           };
           postMessage(response);
         }

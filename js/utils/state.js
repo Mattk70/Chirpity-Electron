@@ -112,7 +112,9 @@ export class WorkerState {
     (this.openFiles = []),
     this.detectionState = Object.create(null),
     this.detectionQueues = Object.create(null),
-    this.detectionRunning = Object.create(null);
+    this.nextExpectedIndex = Object.create(null), 
+    this.detectionRunning = Object.create(null),
+    this.lastProcessedBatch = Object.create(null)
   }
 
   update(updates) {

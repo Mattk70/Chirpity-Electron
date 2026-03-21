@@ -105,7 +105,8 @@ onmessage = async (e) => {
           confidence,
           context,
           resetResults,
-          id
+          id,
+          batchIndex
         } = data;
         myModel.useContext = context;
         myModel.selection = !resetResults;
@@ -122,6 +123,7 @@ onmessage = async (e) => {
           fileStart,
           worker: worker,
           selection: myModel.selection,
+          batchIndex
         };
         postMessage(response);
         myModel.result = [];

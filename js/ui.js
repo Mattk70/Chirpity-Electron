@@ -3729,7 +3729,25 @@ function updatePagination(species) {
   }
 }
 
+function deepEqual(a, b) {
+  if (a === b) return true;
+  if (typeof a !== "object" || typeof b !== "object" || a == null || b == null) {
+    return false;
+  }
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+
+  for (const key of keysA) {
+    if (!keysB.includes(key) || !deepEqual(a[key], b[key])) {
+      return false;
+    }
+  }
+  return true;
+}
+
 const updateSummary = ({ summary = [], filterSpecies = "" }) => {
+  if (deepEqual(STATE.summary, summary)) return
   STATE.summary = summary;
   const i18 = i18n.get(i18n.Headings);
   const showIUCN = config.detect.iucn;
@@ -3946,6 +3964,7 @@ function onAnalysisComplete({ quiet }) {
       rate.toFixed(0) + "x faster than real time performance.";
     generateToast({ message: "complete" });
     displayProgress({percent: 100});
+    activateResultSort();
   }
 }
 
@@ -3962,7 +3981,7 @@ function removeNoEntry() {
  * @param {Array} [options.summary=[]] - Array of summary records to render in the summary table.
  */
 function onSummaryComplete({ filterSpecies = undefined, summary = [] }) {
-  updateSummary({ summary: summary, filterSpecies: filterSpecies });
+  if (summary.length) updateSummary({ summary: summary, filterSpecies: filterSpecies });
 
   // Add hover to the summary
   const summaryNode = document.getElementById("resultSummary");

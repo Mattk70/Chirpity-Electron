@@ -1818,7 +1818,13 @@ async function onAnalyse({
   STATE.incrementor = 1;
   STATE.clippedBatches = 0;
   STATE.clippedFilesDuration = 0;
-  STATE.detectionState = Object.create(null)
+
+  STATE.detectionState = Object.create(null),
+  STATE.detectionQueues = Object.create(null),
+  STATE.nextExpectedIndex = Object.create(null), 
+  STATE.detectionRunning = Object.create(null),
+  STATE.nextExpectedIndex = Object.create(null);
+
   predictionsReceived = {};
   batchesToSend = {};
   predictionStart = new Date();
@@ -1911,9 +1917,7 @@ async function onAnalyse({
     await onChangeMode("analyse");
     await resetEmbeddings();
   }
-  STATE.workerQueue = createMultiWorkerQueue(predictWorkers, parsePredictions, {
-    timeoutMs: 120_000, // 2 minutes
-  });
+  STATE.workerQueue = createMultiWorkerQueue(predictWorkers, parsePredictions);
   for (let i = 0; i < predictWorkers.length; i++) {
     processNextFile({ start, end, worker: i });
   }
@@ -2602,8 +2606,8 @@ async function processAudio(
   const workerQueue = STATE.workerQueue;
   const sendToModel = createPredictSender(workerQueue);
   // As there is a queue per file, we don't want the concurrency across all queues
-  // to exceed the number of workers
-  const concurrency = Math.max(1, Math.round(predictWorkers.length / QUEUE.getSize()));
+  // to exceed 2x the number of workers
+  const concurrency = Math.max(2, Math.round(predictWorkers.length / QUEUE.getSize()));
   
   const bufferAndSend = new PredictionWritable(sendToModel, {batchSize: BATCH_SIZE, concurrency});
 
@@ -2783,7 +2787,7 @@ function isDuringDaylight(datetime, lat, lon) {
 }
 
 function createPredictSender(workerQueue) {
-  return function sendToModel(channelDataArray, chunkStarts, file, endTime) {
+  return function sendToModel(channelDataArray, chunkStarts, file, endTime, batchIndex) {
 
     const payload = {
       message: "predict",
@@ -2794,7 +2798,8 @@ function createPredictSender(workerQueue) {
       resetResults: !STATE.selection,
       context: STATE.detect.contextAware,
       confidence: STATE.detect.confidence,
-      chunks: channelDataArray
+      chunks: channelDataArray,
+      batchIndex
     };
 
     const transferList = channelDataArray.map(a => a.buffer);
@@ -3313,8 +3318,6 @@ async function prepareQuery(query){
         fileID);
       if (! row) continue
       const {file} = row;
-      
-      const keysArray = [[offset]], speciesIDBatch = [[1]], confidenceBatch = [[score]];
       const detection = {start: offset, end: offset + WINDOW_SIZE, species: 1, confidence: Math.round(score*1000)}
       await generateInsertQuery([detection], file, 0, false);
     }
@@ -3333,7 +3336,7 @@ function updateDetectionState({
   predictionLength,
   dropSingles,
   isCustomList,
-  merge = true
+  merge = true,
 }) {
   const completed = [];
 
@@ -3383,7 +3386,6 @@ function updateDetectionState({
   }
 
   const state = detectionState[file];
-  console.log('species:', speciesIDBatch[9], 'confidenceBatch:', confidenceBatch[9], 'time', keysArray[9])
   for (let i = 0; i < keysArray.length; i++) {
     const t = keysArray[i];
     const ids = speciesIDBatch[i];
@@ -3445,16 +3447,50 @@ function updateDetectionState({
 }
 
 // This because we need detection processing to be serialised
-function enqueueDetectionUpdate(file, task) {
+function enqueueDetectionUpdate(file, batchIndex, task) {
   if (!STATE.detectionQueues[file]) {
-    STATE.detectionQueues[file] = [];
+    STATE.detectionQueues[file] = new Map();
+    STATE.nextExpectedIndex[file] = 0;
   }
-  STATE.detectionQueues[file].push(task);
+  const queue = STATE.detectionQueues[file];
+  queue.set(batchIndex, task);
+  processDetectionQueue(file);
+}
+
+function processDetectionQueue(file) {
   if (STATE.detectionRunning[file]) return;
   STATE.detectionRunning[file] = true;
-  while (STATE.detectionQueues[file].length) {
-    const nextTask = STATE.detectionQueues[file].shift();
-    nextTask(); // synchronous execution
+  const queue = STATE.detectionQueues[file];
+  let {lat, lon} = METADATA[file];
+  const {modelID, list, selection} = STATE;
+  const isCustomList = list === 'custom';
+
+  while (true) {
+    const nextIndex = STATE.nextExpectedIndex[file];
+    if (!queue.has(nextIndex)) break;
+    const task = queue.get(nextIndex);
+    queue.delete(nextIndex);
+    const result = task(); // synchronous
+    if (result.length){
+      generateInsertQuery( result, file, modelID, isCustomList)
+        .then(() => selection || getSummary()).catch(console.warn);
+      sendResultsToUI(
+        result,
+        file,
+        modelID,
+        lat,
+        lon,
+        isCustomList
+      );
+    }
+    STATE.lastProcessedBatch[file] = nextIndex;
+    STATE.nextExpectedIndex[file]++;
+    if (
+      STATE.lastProcessedBatch[file] === batchesToSend[file] &&
+      STATE.detectionQueues[file].size === 0
+    ) {
+      onDetectionComplete(file);
+    } 
   }
   STATE.detectionRunning[file] = false;
 }
@@ -3482,7 +3518,7 @@ function flushDetectionState(file, dropSingles) {
 }
 
 const parsePredictions = async (response) => {
-  const { file, worker, result: latestResult } = response;
+  const { file, worker, batchIndex, result: latestResult } = response;
   const predictionLength =
     STATE.model.includes("bats") ? 0.3 : WINDOW_SIZE;
   if (!latestResult.length) {
@@ -3528,10 +3564,10 @@ const parsePredictions = async (response) => {
 
   const threshold = selection ? 50 : detect.confidence;
   const dropSingles = !selection && !!STATE.detect.overlap;
-  let detections;
+  let detections = [];
 
-  enqueueDetectionUpdate(file, () => {
-    detections = updateDetectionState({
+  enqueueDetectionUpdate(file, batchIndex, () => {
+    return updateDetectionState({
       file,
       keysArray,
       speciesIDBatch,
@@ -3539,24 +3575,26 @@ const parsePredictions = async (response) => {
       threshold,
       predictionLength,
       dropSingles, 
-      isCustomList
+      isCustomList,
+      merge: dropSingles,
     });
   });
 
   /*
   ----------------------------------
-  STORE RAW PREDICTIONS
+  STORE EMBEDDINGS
   ----------------------------------
   */
 
-  if (!selection && detections.length) {
-    const fileID = await generateInsertQuery( detections, 
-      file,
-      modelID,
-      isCustomList
-    ).catch(console.warn);
-
-    if (embeddingsBatch && fileID !== undefined) {
+  if (!selection && embeddingsBatch) {
+    STATE.fileIDMap ??= new Map;
+    const fileIDMap = STATE.fileIDMap
+    if (!fileIDMap.has(file)) {
+      const id = await STATE.db.getAsync('SELECT id FROM files WHERE name = ?', file);
+      fileIDMap.set(file, id);
+    }
+    const fileID = fileIDMap.get(file);
+    if (fileID !== undefined) {
       await storeEmbeddings({
         db: STATE.db,
         dbMutex,
@@ -3597,16 +3635,51 @@ const parsePredictions = async (response) => {
   if (fileProgress === 1) {
     updateQueue(file, worker);
 
-    const remaining = flushDetectionState(file, dropSingles);
-    detections.push(...remaining);
-    await generateInsertQuery( detections, 
-      file,
-      modelID,
-      isCustomList
-    ).catch(console.warn);
-    if (remaining.length) await sendResultsToUI (remaining, file, modelID, lat, lon, isCustomList)
+    // const remaining = flushDetectionState(file, dropSingles);
+    // detections.push(...remaining);
+    // await generateInsertQuery( detections, 
+    //   file,
+    //   modelID,
+    //   isCustomList
+    // ).catch(console.warn);
+    // if (remaining.length) await sendResultsToUI (remaining, file, modelID, lat, lon, isCustomList)
 
-    if (QUEUE.allComplete()) {
+    
+  }
+  return worker;
+};
+
+async function onDetectionComplete(file) {
+
+  const dropSingles = !STATE.selection && !!STATE.detect.overlap;
+  const { modelID } = STATE;
+  const metadata = METADATA[file];
+  const lat = metadata.lat || STATE.lat;
+  const lon = metadata.lon || STATE.lon;
+  const isCustomList = STATE.list === "custom";
+
+  const remaining = flushDetectionState(file, dropSingles);
+
+  if (!remaining.length) return;
+
+  await generateInsertQuery(
+    remaining,
+    file,
+    modelID,
+    isCustomList
+  ).catch(console.warn);
+
+  await sendResultsToUI(
+    remaining,
+    file,
+    modelID,
+    lat,
+    lon,
+    isCustomList
+  );
+  STATE.selection || getSummary();
+
+  if (QUEUE.allComplete()) {
       if (index === 0) {
         if (selection) {
           generateAlert({ message: "noDetections" });
@@ -3621,12 +3694,8 @@ const parsePredictions = async (response) => {
           });
         }
       }
-      STATE.selection || getSummary();
     }
-  }
-  return worker;
-};
-
+}
 
 async function sendResultsToUI (detections, file, modelID, lat, lon, isCustomList){
   const included = await getIncludedIDs(file).catch(console.warn);
@@ -3844,6 +3913,7 @@ async function processNextFile({
     }
   });
   if (found) {
+    STATE.lastProcessedBatch[file] = -1;
     let boundaries = [];
     if (start === undefined)
       try {

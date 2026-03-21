@@ -94,7 +94,8 @@ onmessage = async (e) => {
             worker,
             context,
             resetResults,
-            id
+            id,
+            batchIndex
           } = data;
           Model.useContext = context;
           Model.selection = !resetResults;
@@ -107,6 +108,7 @@ onmessage = async (e) => {
             fileStart,
             worker,
             selection: Model.selection,
+            batchIndex
           };
           postMessage(response);
           Model.result = [];
@@ -222,7 +224,7 @@ class NightHawkModel extends BaseModel {
       reshapedValues.push(topValues);
       reshapedIndices.push(topIndices);
     }
-
+    DEBUG && console.log("Predict Batch end", tf.memory().numTensors);
     return [keys, reshapedIndices, reshapedValues];
   }
 }

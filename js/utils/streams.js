@@ -194,6 +194,7 @@ class PredictionWritable extends Writable {
 
     this.batchSize = batchSize;
     this.batch = [];
+    this.nextBatchIndex = 0;
 
     this.concurrency = concurrency;
     this.maxConcurrency = maxConcurrency;
@@ -236,13 +237,13 @@ class PredictionWritable extends Writable {
 
     const batch = this.batch;
     this.batch = [];
-
-    this._sendBatch(batch, callback);
+    const batchIndex = this.nextBatchIndex++;
+    this._sendBatch(batch, batchIndex, callback);
   }
 
-  _sendBatch(batch, callback) {
+  _sendBatch(batch, batchIndex, callback) {
     if (this.inFlight >= this.concurrency) {
-      this.pendingCallbacks.push(() => this._sendBatch(batch, callback));
+      this.pendingCallbacks.push(() => this._sendBatch(batch, batchIndex, callback));
       return;
     }
 
@@ -256,7 +257,7 @@ class PredictionWritable extends Writable {
     const file = batch[0].file;
     const endTime = batch[0].endTime;
 
-    this.sendToModel(channelData, chunkStarts, file, endTime)
+    this.sendToModel(channelData, chunkStarts, file, endTime, batchIndex)
       .catch(e => {
         if (!["Prediction aborted", "Queue cancelled"].includes(e.message)) {
           console.error("Error in sendToModel", e);
@@ -280,7 +281,8 @@ class PredictionWritable extends Writable {
     clearInterval(this._logInterval);
 
     if (this.batch.length > 0) {
-      this._sendBatch(this.batch, () => {});
+      const batchIndex = this.nextBatchIndex++;
+      this._sendBatch(this.batch, batchIndex,  () => {});
       this.batch = [];
     }
 
@@ -300,14 +302,9 @@ class PredictionWritable extends Writable {
 /**
  * @param {*} workers An array of web workers
  * @param {*} consumer A function to handle worker output
- * @param {Object} timeoutMs a timeout for worker responses
  * @returns
  */
-function createMultiWorkerQueue(
-  workers,
-  consumer,
-  { timeoutMs = 60_000 } = {},
-) {
+function createMultiWorkerQueue(workers, consumer) {
   let nextId = 1;
   let nextWorker = 0;
   let cancelled = false;
@@ -325,7 +322,6 @@ function createMultiWorkerQueue(
       const entry = pending.get(id);
       if (!entry) return;
 
-      clearTimeout(entry.timeout);
       pending.delete(id);
 
       if (error) entry.reject(new Error(error));
@@ -338,8 +334,7 @@ function createMultiWorkerQueue(
 
     worker.onerror = (err) => {
       fallbackOnError?.(err);
-      for (const { reject, timeout } of pending.values()) {
-        clearTimeout(timeout);
+      for (const { reject } of pending.values()) {
         reject(err);
       }
       pending.clear();
@@ -349,8 +344,7 @@ function createMultiWorkerQueue(
     cancelled = true;
     for (const entry of pending.values()) {
       if (!entry) continue;
-      const { reject, timeout } = entry;
-      clearTimeout(timeout);
+      const { reject } = entry;
       reject(new Error(reason));
     }
     pending.clear();
@@ -364,25 +358,12 @@ function createMultiWorkerQueue(
     nextWorker = (nextWorker + 1) % workers.length;
 
     return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        const entry = pending.get(id);
-        if (!entry) return;
-        pending.delete(id);
-        // Mark this chunk as completed with empty output so file progress can advance.
-        consumer({ file: payload.file, worker: workerIndex, result: [] }).catch(
-          () => {},
-        );
-        entry.reject(new Error("Worker timeout"));
-      }, timeoutMs);
-
       pending.set(id, {
         resolve,
         reject,
-        timeout,
         file: payload.file,
         workerIndex,
       });
-
       workers[workerIndex].postMessage(
         { ...payload, worker: workerIndex, id },
         transfer,
