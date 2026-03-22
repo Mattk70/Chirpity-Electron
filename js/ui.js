@@ -4139,7 +4139,7 @@ async function renderResult({
       modelID
     } = result;
 
-    const logo = ['birdnet', 'nocmig', 'chirpity', 'perch', 'user'].includes(result.model) ? model : 'custom';
+    const logo = ['birdnet', 'nocmig', 'chirpity', 'perch', 'nighthawk', 'user'].includes(result.model) ? model : 'custom';
     const modelName = config.models[model]? utils.escapeHTML(config.models[model].displayName) : 'User';
     const dayNight = isDaylight ? "daytime" : "nighttime";
     const commentHTML = comment

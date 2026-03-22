@@ -181,69 +181,72 @@ class NightHawkModel extends BaseModel {
     const calibratedResults = batchedResults.map(result => this.applyCalibration(result));
     raw.forEach(t => t.dispose());
     
-    const probsBatch = calibratedResults.map(r => ({
-      family: r.slice(0, 19),
-      species: r.slice(19, 149),
-      order: r.slice(149, 153),
-      group: r.slice(153, 170)
-    }));
+const probsBatch = calibratedResults.map(r => ({
+  family: r.slice(0, 19),
+  species: r.slice(19, 149),
+  order: r.slice(149, 153),
+  group: r.slice(153, 170)
+}));
 
-    if (this.selection) {
-      keys = keys.slice(0, 1);
+if (this.selection) {
+  keys = keys.slice(0, 1);
+}
+
+keys = keys.map(
+  key => Math.round((key / this.config.sampleRate) * 10000) / 10000
+);
+
+const adjustedBatchSize = keys.length;
+
+const reshapedIndices = [];
+const reshapedValues = [];
+
+function collectAboveThreshold(arr, threshold) {
+  const indices = [];
+  const values = [];
+
+  for (let i = 0; i < arr.length; i++) {
+    const v = arr[i];
+    if (Number.isNaN(v)) continue;
+
+    if (v >= threshold) {
+      indices.push(i);
+      values.push(v);
     }
+  }
 
-    keys = keys.map(
-      key => Math.round((key / this.config.sampleRate) * 10000) / 10000
-    );
+  return { indices, values };
+}
 
-    const adjustedBatchSize = keys.length;
+for (let i = 0; i < adjustedBatchSize; i++) {
+  const { species, group, family, order } = probsBatch[i];
 
-    const reshapedIndices = [];
-    const reshapedValues = [];
+  let offset = 0;
+  let result = collectAboveThreshold(species, this.confidence);
 
-    function findMax(arr) {
-      let maxVal = -Infinity;
-      let maxIdx = -1;
+  if (result.indices.length === 0) {
+    offset += species.length;
+    result = collectAboveThreshold(group, this.confidence);
 
-      for (let i = 0; i < arr.length; i++) {
-        const v = arr[i];
-        if (Number.isNaN(v)) continue;
+    if (result.indices.length === 0) {
+      offset += group.length;
+      result = collectAboveThreshold(family, this.confidence);
 
-        if (v > maxVal) {
-          maxVal = v;
-          maxIdx = i;
-        }
+      if (result.indices.length === 0) {
+        offset += family.length;
+        result = collectAboveThreshold(order, this.confidence);
       }
-
-      return { maxVal, maxIdx };
     }
+  }
 
-    for (let i = 0; i < adjustedBatchSize; i++) {
-      const { species, group, family, order } = probsBatch[i];
+  // Apply offset to indices
+  const adjustedIndices = result.indices.map(idx => idx + offset);
 
-      let offset = 0;
-      let result = findMax(species);
+  reshapedIndices.push(adjustedIndices);
+  reshapedValues.push(result.values);
+}
 
-      if (result.maxVal < this.confidence) {
-        offset += species.length;
-        result = findMax(group);
-
-        if (result.maxVal < this.confidence) {
-          offset += group.length;
-          result = findMax(family);
-
-          if (result.maxVal < this.confidence) {
-            offset += family.length;
-            result = findMax(order);
-          }
-        }
-      }
-
-      reshapedValues.push([result.maxVal]);
-      reshapedIndices.push([result.maxIdx + offset]);
-    }
-    DEBUG && console.log("Predict Batch end", tf.memory().numTensors);
-    return [keys, reshapedIndices, reshapedValues];
+return [keys, reshapedIndices, reshapedValues];
   }
 }
 
