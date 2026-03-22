@@ -4163,7 +4163,7 @@ async function renderResult({
     const spliceStart = position < 3600 ? 14 : 11;
     const UI_position = new Date(position * 1000)
       .toISOString()
-      .substring(spliceStart, 19);
+      .substring(spliceStart, 23);
     const showTimeOfDay = config.timeOfDay ? "" : "d-none";
     const showTimestamp = config.timeOfDay ? "d-none" : "";
     const activeTable = active ? "table-active" : "";
