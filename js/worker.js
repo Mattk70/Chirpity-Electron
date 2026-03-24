@@ -1823,7 +1823,7 @@ async function onAnalyse({
   STATE.detectionQueues = Object.create(null),
   STATE.nextExpectedIndex = Object.create(null), 
   STATE.detectionRunning = Object.create(null),
-  STATE.nextExpectedIndex = Object.create(null);
+  STATE.lastProcessedBatch = Object.create(null);
 
   predictionsReceived = {};
   batchesToSend = {};

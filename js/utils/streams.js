@@ -40,7 +40,7 @@ class PCMChunker extends Transform {
     this.totalSamples = startTime;
 
     this.remainingTrim =
-      trimSeconds > 0 ? Math.floor(sampleRate * trimSeconds * 2) : 0;
+      trimSeconds > 0 ? Math.floor(sampleRate * trimSeconds * this.bytesPerSample) : 0;
   }
 
   _getMonoChannelData(audio) {
@@ -122,8 +122,12 @@ class PCMChunker extends Transform {
       let offset = 0;
 
       while (offset < chunk.length) {
-        const space = this.bufferBytes - this.writePos;
-        const toCopy = Math.min(space, chunk.length - offset);
+        const freeBytes = this.bufferBytes - this.availableBytes;
+        const contiguousFree =
+          this.writePos >= this.readPos
+            ? Math.min(this.bufferBytes - this.writePos, freeBytes)
+            : Math.min(this.readPos - this.writePos, freeBytes);
+        const toCopy = Math.min(contiguousFree, chunk.length - offset);
 
         chunk.copy(
           this.buffer,

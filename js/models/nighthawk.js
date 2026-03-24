@@ -86,34 +86,44 @@ onmessage = async (e) => {
       }
 
       case "predict": {
-        if (Model?.model_loaded) {
-          const {
-            chunks,
-            start,
-            fileStart,
-            file,
-            worker,
-            confidence,
-            resetResults,
-            id,
-            batchIndex
-          } = data;
-          Model.confidence = confidence / 1000;
-          Model.selection = !resetResults;
-          const result = await Model.predictChunk(chunks, start);
-          const response = {
+        const {
+          chunks,
+          start,
+          fileStart,
+          file,
+          worker,
+          confidence,
+          resetResults,
+          id,
+          batchIndex
+        } = data;
+        if (!Model?.model_loaded) {
+          postMessage({
             message: "prediction",
             id,
+            batchIndex,
             file,
-            result,
             fileStart,
             worker,
-            selection: Model.selection,
-            batchIndex
-          };
-          postMessage(response);
-          Model.result = [];
+            error: "Model not ready",
+          });
+          break;
         }
+        Model.confidence = confidence / 1000;
+        Model.selection = !resetResults;
+        const result = await Model.predictChunk(chunks, start);
+        const response = {
+          message: "prediction",
+          id,
+          file,
+          result,
+          fileStart,
+          worker,
+          selection: Model.selection,
+          batchIndex
+        };
+        postMessage(response);
+        Model.result = [];
         break;
       }
       case "terminate": {
