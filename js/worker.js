@@ -3610,8 +3610,8 @@ const parsePredictions = async (response) => {
     STATE.fileIDMap ??= new Map;
     const fileIDMap = STATE.fileIDMap
     if (!fileIDMap.has(file)) {
-      const id = await STATE.db.getAsync('SELECT id FROM files WHERE name = ?', file);
-      fileIDMap.set(file, id);
+      const row = await STATE.db.getAsync('SELECT id FROM files WHERE name = ?', file);
+      fileIDMap.set(file, row?.id);
     }
     const fileID = fileIDMap.get(file);
     if (fileID !== undefined) {
