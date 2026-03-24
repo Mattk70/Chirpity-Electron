@@ -125,7 +125,8 @@ onmessage = async (e) => {
             worker,
             context,
             resetResults,
-            id
+            id,
+            batchIndex
           } = data;
           Model.useContext = context;
           Model.selection = !resetResults;
@@ -138,6 +139,7 @@ onmessage = async (e) => {
             fileStart,
             worker,
             selection: Model.selection,
+            batchIndex
           };
           postMessage(response);
           Model.result = [];
@@ -163,15 +165,6 @@ class BirdNETModel extends BaseModel {
     this.chunkLength = this.config.sampleRate * this.config.specLength;
   }
 
-  async predictChunk(audioBuffer, start) {
-    DEBUG && console.log("predictChunk begin", tf.memory().numTensors);
-    const audioBatch = this.createAudioTensorBatch(audioBuffer);
-    const maxKeys = Math.ceil(audioBuffer.length / this.chunkLength)
-    const batchKeys = this.getKeys(maxKeys, start);
-    const result = await this.predictBatch(audioBatch, batchKeys );
-    DEBUG && console.log("predictChunk end", tf.memory().numTensors);
-    return result;
-  }
   async getSpectrogram(data){
     const {buffer, file:specFile, filepath} = data;
     if (buffer.length < Model.chunkLength) {

@@ -105,7 +105,8 @@ onmessage = async (e) => {
           confidence,
           context,
           resetResults,
-          id
+          id,
+          batchIndex
         } = data;
         myModel.useContext = context;
         myModel.selection = !resetResults;
@@ -122,6 +123,7 @@ onmessage = async (e) => {
           fileStart,
           worker: worker,
           selection: myModel.selection,
+          batchIndex
         };
         postMessage(response);
         myModel.result = [];
@@ -270,7 +272,6 @@ class ChirpityModel extends BaseModel {
     values.dispose();
     finalPrediction.dispose();
     newPrediction && newPrediction.dispose();
-    keys = keys.map((key) => (key / CONFIG.sampleRate).toFixed(3));
     if (keys.length < topIndices.length){
       // Trim return values to eliminate GPU padded silence from the results
       const len = keys.length;
@@ -292,11 +293,12 @@ class ChirpityModel extends BaseModel {
     });
 
     buffers.dispose();
-    const maxKeys = Math.ceil(audioBuffer.length / this.chunkLength);
-    const batchKeys = this.getKeys(maxKeys, start);
+    const keys = start.map(
+      key => Math.round((key / this.config.sampleRate) * 10000) / 10000
+    );
     const result = await this.predictBatch(
       specBatch,
-      batchKeys,
+      keys,
       confidence
     );
     specBatch.dispose();

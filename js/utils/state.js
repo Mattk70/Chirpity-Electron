@@ -48,7 +48,10 @@ export class WorkerState {
       combine: true, // Whether to split or merge results from different models
       iucn: false,
       iucnScope: "Global",
-      topRankin: 1
+      topRankin: 1,
+      overlap: 0,
+      mergeOverlaps: false,
+      dropSingles: false
     }),
     (this.chart = {
       range: { start: undefined, end: undefined },
@@ -108,7 +111,12 @@ export class WorkerState {
     (this.clippedBatches = 0),
     (this.originalFiles = undefined),
     (this.perchWorker = []),
-    (this.openFiles = [])
+    (this.openFiles = []),
+    this.detectionState = Object.create(null),
+    this.detectionQueues = Object.create(null),
+    this.nextExpectedIndex = Object.create(null), 
+    this.detectionRunning = Object.create(null),
+    this.lastProcessedBatch = Object.create(null)
   }
 
   update(updates) {

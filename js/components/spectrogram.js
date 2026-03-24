@@ -154,7 +154,9 @@ export class ChirpityWS {
       r.setOptions({ content: " " });
       this.handlers.setActiveRegion(r, false);
     });
-
+    REGIONS.on("region-removed", (r) => {
+      r.unAll()
+    })
     return REGIONS;
   }
 
@@ -383,7 +385,7 @@ export class ChirpityWS {
   formatTimeCallback = (secs) => {
     const config = this.getConfig();
     const STATE = this.getState();
-    secs = secs.toFixed(2);
+    secs = Math.round(Number(secs)*100)/100;
     // Add 500 to deal with overflow errors
     let now = new Date(STATE.bufferStartTime.getTime() + secs * 1000);
     let milliseconds = now.getMilliseconds();
@@ -451,17 +453,19 @@ export class ChirpityWS {
    * @returns {Object} The timeline plugin instance, either as a registered plugin with WaveSurfer or as a standalone object.
    */
   createTimeline(windowLength) {
-    const primaryLabelInterval = Math.ceil(windowLength / 5);
-    const secondaryLabelInterval = 0;
-    const timeinterval = primaryLabelInterval / 10;
+    const interval = windowLength < 5 ? 0.5 : Math.ceil(windowLength / 5)
+    const primaryLabelInterval = interval;
+    const secondaryLabelInterval = primaryLabelInterval <= 2 ? primaryLabelInterval / 2 : 0;
+    const timeInterval = primaryLabelInterval / 10;
     const colour = this.wsTextColour();
+
     this.timeline = TimelinePlugin.create({
       insertPosition: "beforebegin",
       formatTimeCallback: this.formatTimeCallback,
-      timeInterval: timeinterval,
-      primaryLabelInterval: primaryLabelInterval,
-      secondaryLabelInterval: secondaryLabelInterval,
-      secondaryLabelOpacity: 0.35,
+      timeInterval,
+      primaryLabelInterval,
+      secondaryLabelInterval,
+      secondaryLabelOpacity: 0.5,
       style: {
         fontSize: "0.75rem",
         color: colour,
@@ -515,10 +519,8 @@ export class ChirpityWS {
 
   refreshTimeline = () => {
     const STATE = this.getState();
-    const primaryLabelInterval = STATE.windowLength / 5;
-    this.timeline.options.primaryLabelInterval = primaryLabelInterval;
-    this.timeline.options.timeInterval = primaryLabelInterval / 10;
-    this.timeline.options.style.color = this.wsTextColour();
+    this.timeline.destroy()
+    this.createTimeline(STATE.windowLength)
   };
 
   /**
@@ -588,7 +590,6 @@ export class ChirpityWS {
         windowOffsetSecs,
         activeRegion,
       });
-      this.refreshTimeline();
       this.handlers.postBufferUpdate({
         begin: windowOffsetSecs,
         position: position,
@@ -626,10 +627,10 @@ export class ChirpityWS {
     const middle = windowOffsetSecs + this.wavesurfer.getCurrentTime();
     windowOffsetSecs = middle - windowLength / 2;
     windowOffsetSecs = Math.max(0, windowOffsetSecs);
-    windowOffsetSecs = Math.min(
+    windowOffsetSecs = Math.max(0,Math.min(
       windowOffsetSecs,
       currentFileDuration - windowLength
-    );
+    ));
 
     if (activeRegion) {
       const shift = saveBufferBegin - windowOffsetSecs;
@@ -673,6 +674,8 @@ export class ChirpityWS {
     const STATE = this.getState();
     audio ??= STATE.currentBuffer;
     const [blob, peaks, duration] = this.makeBlob(audio);
+    this.timeline.subscriptions = []; // Hack to prevent runaway accumulations
+    this.refreshTimeline();
     await this.wavesurfer.loadBlob(blob, peaks, duration);
   }
 
@@ -751,6 +754,7 @@ export class ChirpityWS {
       // const newLabel = this.formatLabel(' / ' + label, colour);
       existingRegion.content.textContent += ' / ' + label;
     } else {
+      REGIONS.subscriptions = []; // hack to prevent massive accumulation bug in wavesurfer.js
       REGIONS.addRegion({
         start: start,
         end: end,
