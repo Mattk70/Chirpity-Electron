@@ -16,6 +16,7 @@ const orders = ["Passeriformes", "Charadriiformes", "Pelecaniformes", "Cuculifor
 const groups = ["CUPS", "SWLI", "SFHS", "HSSP", "SBUF", "DESP", "DEWA", "BUNT", "GROS", "THSH", "GCBI", "ZEEP", "DBUP", "BZWA", "CCBRS", "MWAR", "TANA"];
 
 const allEntries = [...families, ...species, ...orders, ...groups];
+const allCategories = [...species, ...groups, ...families, ...orders]; // heaven knows why i did the calibration based on the order of allEntries, but this is for formating the results
 onmessage = async (e) => {
   const data = e.data;
   const modelRequest = data.message;
@@ -181,73 +182,100 @@ class NightHawkModel extends BaseModel {
     const calibratedResults = batchedResults.map(result => this.applyCalibration(result));
     raw.forEach(t => t.dispose());
     
-const probsBatch = calibratedResults.map(r => ({
-  family: r.slice(0, 19),
-  species: r.slice(19, 149),
-  order: r.slice(149, 153),
-  group: r.slice(153, 170)
-}));
+    const probsBatch = calibratedResults.map(r => ({
+      family: r.slice(0, 19),
+      species: r.slice(19, 149),
+      order: r.slice(149, 153),
+      group: r.slice(153, 170)
+    }));
 
-if (this.selection) {
-  keys = keys.slice(0, 1);
-}
+    // 1. For each window, find which taxa exceeded the threshold at each level
+    const detections = probsBatch.map(window => {
+      const detected = {
+        order:   orders.filter((name, i)   => window.order[i]   > this.confidence),
+        family:  families.filter((name, i)  => window.family[i]  > this.confidence),
+        group:   groups.filter((name, i)   => window.group[i]   > this.confidence),
+        species: species.filter((name, i) => window.species[i] > this.confidence),
+      };
 
-keys = keys.map(
-  key => Math.round((key / this.config.sampleRate) * 10000) / 10000
-);
+      const windowDetections = [];
+      // 2. Pick the most specific level that is taxonomically consistent
+      // Try species first, then group, then family, then order
 
-const adjustedBatchSize = keys.length;
+      for (const sp of detected.species) {
+        const spFamily = speciesFamilyMap.get(sp);
+        const spGroup  = speciesGroupMap.get(sp);   // may be null
+        const spOrder  = familyOrderMap.get(spFamily);
 
-const reshapedIndices = [];
-const reshapedValues = [];
+        const familyOk = detected.family.includes(spFamily);
+        const orderOk  = detected.order.includes(spOrder);
+        const groupOk  = spGroup == null || detected.group.includes(spGroup);
 
-function collectAboveThreshold(arr, threshold) {
-  const indices = [];
-  const values = [];
-
-  for (let i = 0; i < arr.length; i++) {
-    const v = arr[i];
-    if (Number.isNaN(v)) continue;
-
-    if (v >= threshold) {
-      indices.push(i);
-      values.push(v);
-    }
-  }
-
-  return { indices, values };
-}
-
-for (let i = 0; i < adjustedBatchSize; i++) {
-  const { species, group, family, order } = probsBatch[i];
-
-  let offset = 0;
-  let result = collectAboveThreshold(species, this.confidence);
-
-  if (result.indices.length === 0) {
-    offset += species.length;
-    result = collectAboveThreshold(group, this.confidence);
-
-    if (result.indices.length === 0) {
-      offset += group.length;
-      result = collectAboveThreshold(family, this.confidence);
-
-      if (result.indices.length === 0) {
-        offset += family.length;
-        result = collectAboveThreshold(order, this.confidence);
+        if (familyOk && orderOk && groupOk) {
+          const prob = window.species[species.indexOf(sp)];
+          windowDetections.push( { predicted_category: sp, prob, level: 'species' } );
+        }
       }
+      if (windowDetections.length) return windowDetections;
+
+      for (const grp of detected.group) {
+        const grpFamily = groupFamilyMap.get(grp);
+        const grpOrder  = familyOrderMap.get(grpFamily);
+
+        if (detected.family.includes(grpFamily) && detected.order.includes(grpOrder)) {
+          const prob = window.group[groups.indexOf(grp)];
+          windowDetections.push( { predicted_category: grp, prob, level: 'group' });
+        }
+      }
+      if (windowDetections.length) return windowDetections;
+
+      for (const fam of detected.family) {
+        const famOrder = familyOrderMap.get(fam);
+
+        if (detected.order.includes(famOrder)) {
+          const prob = window.family[families.indexOf(fam)];
+          windowDetections.push( { predicted_category: fam, prob, level: 'family' } );
+        }
+      }
+      if (windowDetections.length) return windowDetections;
+
+      for (const ord of detected.order) {
+        const prob = window.order[orders.indexOf(ord)];
+        windowDetections.push( { predicted_category: ord, prob, level: 'order' });
+      }
+
+      return windowDetections.length ? windowDetections : null; // nothing detected in this window
+    });
+
+    if (this.selection) {
+      keys = keys.slice(0, 1);
     }
+
+    keys = keys.map(
+      key => Math.round((key / this.config.sampleRate) * 10000) / 10000
+    );
+
+    const adjustedBatchSize = keys.length;
+
+    const reshapedIndices = [];
+    const reshapedValues = [];
+
+    for (const [i, windowDets] of detections.entries()) {
+      const theseIndices = [];
+      const theseValues = [];
+      if (i >= adjustedBatchSize) break;
+      if (windowDets){
+        for (const det of windowDets) {
+          theseIndices.push(allCategories.indexOf(det.predicted_category));
+          theseValues.push(det.prob);
+        }
+      }
+      reshapedIndices.push(theseIndices);
+      reshapedValues.push(theseValues);
+    }
+    return [keys, reshapedIndices, reshapedValues];
   }
-
-  // Apply offset to indices
-  const adjustedIndices = result.indices.map(idx => idx + offset);
-
-  reshapedIndices.push(adjustedIndices);
-  reshapedValues.push(result.values);
-}
-
-return [keys, reshapedIndices, reshapedValues];
-  }
+  
 }
 
 
@@ -286,3 +314,282 @@ class SigmoidProbabilityCalibration {
   }
 }
 
+function createMap(csv){
+  const lines = csv.trim().split('\n');
+  let map = new Map();
+  for (let i = 0; i < lines.length; i++) {
+    const [group, species] = lines[i].split(',');
+    map.set(species, group);
+  }
+  return map;
+}
+
+const speciesGroups = `
+CUPS,chispa
+CUPS,amtspa
+SWLI,swaspa
+SWLI,linspa
+SFHS,foxspa
+SFHS,sonspa
+SFHS,harspa
+SFHS,gocspa
+SFHS,whtspa
+HSSP,graspa
+HSSP,vesspa
+HSSP,whcspa
+HSSP,seaspa
+SBUF,yerwar
+SBUF,palwar
+SBUF,btbwar
+SBUF,prowar
+SBUF,swawar
+SBUF,ovenbi1
+SBUF,buwwar
+SBUF,gowwar
+DESP,fiespa
+DESP,nstspa
+DESP,sstspa
+DESP,lecspa
+DESP,henspa
+DESP,bacspa
+DESP,savspa
+DEWA,yetwar
+DEWA,norpar
+DEWA,pinwar
+BUNT,indbun
+BUNT,blugrb1
+BUNT,paibun
+BUNT,lazbun
+BUNT,varbun
+TANA,scatan
+TANA,sumtan
+TANA,westan
+GROS,robgro
+GROS,bkhgro
+THSH,veery
+THSH,swathr
+THSH,woothr
+THSH,herthr
+GCBI,gycthr
+GCBI,bicthr
+ZEEP,norwat
+ZEEP,louwat
+ZEEP,kenwar
+ZEEP,magwar
+ZEEP,babwar
+ZEEP,bkbwar
+ZEEP,bkpwar
+ZEEP,conwar
+ZEEP,yelwar
+ZEEP,cerwar
+ZEEP,woewar1
+ZEEP,camwar
+ZEEP,refwar
+DBUP,tenwar
+DBUP,naswar
+DBUP,orcwar
+DBUP,btnwar
+DBUP,gchwar
+DBUP,herwar
+DBUP,towwar
+DBUP,lucwar
+DBUP,virwar
+DBUP,colwar
+DBUP,grawar
+DBUP,btywar
+BZWA,chswar
+BZWA,kirwar
+BZWA,hoowar
+BZWA,comyel
+BLUEB,easblu
+BLUEB,wesblu
+BLUEB,moublu
+CCBRS,clcspa
+CCBRS,brespa
+MWAR,macwar
+MWAR,mouwar
+WITH,dusthr2
+WITH,dusthr1
+WITH,retthr1
+WITH,datthr1`;
+
+const speciesFamilies = `
+Parulidae,amered
+Passerellidae,amtspa
+Parulidae,bawwar
+Parulidae,btbwar
+Parulidae,camwar
+Passerellidae,chispa
+Parulidae,chswar
+Parulidae,comyel
+Passerellidae,daejun
+Turdidae,gycthr
+Turdidae,herthr
+Parulidae,norpar
+Parulidae,ovenbi1
+Cardinalidae,robgro
+Passerellidae,savspa
+Turdidae,swathr
+Turdidae,veery
+Passerellidae,whtspa
+Turdidae,woothr
+Passerellidae,whcspa
+Parulidae,canwar
+Passerellidae,graspa
+Cardinalidae,indbun
+Parulidae,wlswar
+Icteridae,boboli
+Parulidae,norwat
+Parulidae,palwar
+Parulidae,mouwar
+Parulidae,yerwar
+Passerellidae,clcspa
+Parulidae,hoowar
+Passerellidae,lecspa
+Passerellidae,fiespa
+Cardinalidae,scatan
+Cuculidae,yebcuc
+Cuculidae,bkbcuc
+Ardeidae,bcnher
+Passerellidae,vesspa
+Ardeidae,leabit
+Scolopacidae,uplsan
+Ardeidae,amebit
+Ardeidae,grnher
+Parulidae,macwar
+Cardinalidae,dickci
+Motacillidae,amepip
+Turdidae,amerob
+Scolopacidae,greyel
+Scolopacidae,leasan
+Charadriidae,semplo
+Scolopacidae,shbdow
+Scolopacidae,sposan
+Scolopacidae,solsan
+Calcariidae,laplon
+Sittidae,rebnut
+Parulidae,babwar
+Parulidae,bkpwar
+Parulidae,btnwar
+Parulidae,magwar
+Parulidae,naswar
+Parulidae,tenwar
+Icteridae,balori
+Turdidae,bicthr
+Charadriidae,bkbplo
+Parulidae,bkbwar
+Recurvirostridae,bknsti
+Laridae,blkski
+Cardinalidae,blugrb1
+Passerellidae,brespa
+Parulidae,btywar
+Parulidae,buwwar
+Laridae,caster1
+Parulidae,cerwar
+Laridae,comter
+Parulidae,conwar
+Icteridae,easmea
+Laridae,forter
+Passerellidae,foxspa
+Regulidae,gockin
+Passerellidae,gocspa
+Parulidae,gowwar
+Ardeidae,grbher3
+Ardeidae,greegr
+Passerellidae,henspa
+Passerellidae,harspa
+Parulidae,herwar
+Alaudidae,horlar
+Parulidae,kenwar
+Charadriidae,killde
+Parulidae,kirwar
+Cardinalidae,lazbun
+Passerellidae,larspa
+Scolopacidae,lesyel
+Passerellidae,linspa
+Scolopacidae,lobcur
+Scolopacidae,lobdow
+Passerellidae,nstspa
+Icteridae,orcori
+Parulidae,orcwar
+Cardinalidae,paibun
+Parulidae,pinwar
+Parulidae,prawar
+Parulidae,prowar
+Scolopacidae,sander
+Passerellidae,seaspa
+Calcariidae,smilon
+Calcariidae,snobun
+Passerellidae,sonspa
+Motacillidae,sprpip
+Cardinalidae,sumtan
+Parulidae,swawar
+Parulidae,towwar
+Icteridae,wesmea
+Scolopacidae,whimbr
+Scolopacidae,willet1
+Scolopacidae,wilsni1
+Parulidae,woewar1
+Ardeidae,ycnher
+Parulidae,yelwar
+Parulidae,yetwar
+Passerellidae,swaspa
+Parulidae,virwar
+Ardeidae,triher
+Parulidae,grawar
+Bombycillidae,cedwax
+Charadriidae,amgplo
+Recurvirostridae,ameavo
+Haematopodidae,ameoys
+Scolopacidae,baisan
+Haematopodidae,blkoys
+Scolopacidae,dunlin`;
+
+const familyOrders = `
+Passeriformes,Turdidae
+Passeriformes,Parulidae
+Passeriformes,Passerellidae
+Passeriformes,Cardinalidae
+Pelecaniformes,Ardeidae
+Charadriiformes,Charadriidae
+Passeriformes,Regulidae
+Charadriiformes,Scolopacidae
+Passeriformes,Icteridae
+Cuculiformes,Cuculidae
+Passeriformes,Motacillidae
+Passeriformes,Calcariidae
+Passeriformes,Sittidae
+Charadriiformes,Laridae
+Passeriformes,Corvidae
+Charadriiformes,Recurvirostridae
+Passeriformes,Alaudidae
+Passeriformes,Bombycillidae
+Charadriiformes,Haematopodidae
+`;
+
+const groupFamilies = `
+Passerellidae,CUPS
+Passerellidae,SWLI
+Passerellidae,SFHS
+Passerellidae,HSSP
+Passerellidae,SBUF
+Passerellidae,DESP
+Passerellidae,DEWA
+Passerellidae,BUNT
+Passerellidae,TANA
+Passerellidae,GROS
+Passerellidae,GCBI
+Parulidae,ZEEP
+Parulidae,DBUP
+Parulidae,BZWA
+Parulidae,BLUEB
+Parulidae,CCBRS
+Parulidae,MWAR
+Parulidae,WITH
+Turdidae,THSH
+`;
+
+const groupFamilyMap =  createMap(groupFamilies)
+const speciesGroupMap = createMap(speciesGroups)
+const speciesFamilyMap = createMap(speciesFamilies)
+const familyOrderMap = createMap(familyOrders)

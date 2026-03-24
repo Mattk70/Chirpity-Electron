@@ -224,10 +224,10 @@ const GLOBAL_ACTIONS = {
         STATE.windowOffsetSecs = 0;
         position = 0;
       } else {
-        STATE.windowOffsetSecs = Math.min(
+        STATE.windowOffsetSecs = Math.max(0,Math.min(
           STATE.windowOffsetSecs,
           STATE.currentFileDuration - STATE.windowLength
-        );
+        ));
         fileToLoad = STATE.currentFile;
       }
       postBufferUpdate({
@@ -1956,6 +1956,8 @@ const defaultConfig = {
     contextAware: false,
     merge: false,
     combine: false,
+    mergeOverlaps: false,
+    dropSingles: false,
     confidence: 45,
     iucn: true,
     iucnScope: "Global",
@@ -2080,9 +2082,7 @@ window.onload = async () => {
       missingFiles.push(modelPath);
     } else if (config.selectedModel === 'perch v2'){
       requiredFiles.push('perch_v2.onnx', 'labels.txt');
-    } else if (config.selectedModel === 'nighthawk'){
-      requiredFiles.push('group1-shard1of21.bin', 'model.json', 'labels.txt');
-    }else {
+    } else {
       requiredFiles.push('model.json', 'weights.bin', 'labels.txt');
     }
     // Check for required files
@@ -2233,6 +2233,13 @@ window.onload = async () => {
   DOM.audioFade.disabled = !DOM.audioPadding.checked;
   DOM.audioDownmix.checked = audio.downmix;
   setNocmig(detect.nocmig);
+  if (config.detect.combine) document.getElementById('model-icon').classList.remove('d-none')
+  document.getElementById("merge-overlaps").checked = detect.mergeOverlaps;
+  document.getElementById("drop-uncertain").checked = detect.dropSingles;
+  document.getElementById("auto-load").checked = detect.autoLoad;
+  document.getElementById("iucn").checked = detect.iucn;
+  document.getElementById("iucn-scope").selected = detect.iucnScope;
+  handleModelChange(selectedModel, false)
   // Detection options
   const mergeSwitch = document.getElementById("merge-detections");
   mergeSwitch.checked = detect.merge;
@@ -2242,11 +2249,6 @@ window.onload = async () => {
   } else {
     document.getElementById("combine-detections").checked = config.detect.combine;  
   }
-  if (config.detect.combine) document.getElementById('model-icon').classList.remove('d-none')
-  document.getElementById("auto-load").checked = detect.autoLoad;
-  document.getElementById("iucn").checked = detect.iucn;
-  document.getElementById("iucn-scope").selected = detect.iucnScope;
-  handleModelChange(selectedModel, false)
   // List appearance in settings
   DOM.speciesThreshold.value = config.speciesThreshold;
   document.getElementById("species-week").checked = config.useWeek;
@@ -3689,7 +3691,7 @@ async function onWorkerLoadedAudio({
     : new Date(0, 0, 0, 0, 0, 0, 0).getTime();
   STATE.bufferStartTime = new Date(initialTime + windowBegin * 1000);
 
-  if (STATE.windowLength > STATE.currentFileDuration) STATE.windowLength = STATE.currentFileDuration;
+  STATE.windowLength = contents.byteLength / 48_000; // bufferbytes / (samplerate / 2)
 
   resetRegions();
   await spec.updateSpec({
@@ -4725,7 +4727,7 @@ function filterResults({
 }
 
 const modelSettingsDisplay = () => {
-  // Sets system options according to model or machine cababilities
+  // Sets system options according to model or machine capabilities
   // cf. setListUIState
   const chirpityOnly = document.querySelectorAll(
     ".chirpity-only, .chirpity-only-visible"
@@ -4749,7 +4751,26 @@ const modelSettingsDisplay = () => {
     });
     DOM.contextAware.checked = config.detect.contextAware;
     DOM.contextAwareIcon.classList.remove("d-none");
-  }    
+  }
+  // Nighthawk
+  const notNighthawk = document.querySelectorAll(".not-nh");
+  if (config.selectedModel === 'nighthawk'){
+    notNighthawk.forEach((element) => {
+      element.classList.add("d-none");
+    });
+    // Turn off detect & combine
+    config.detect.combine = false;
+    config.detect.merge = false;
+    const combineEl = document.getElementById("combine-detections")
+    combineEl.checked = false;
+    combineEl.disabled = false;
+    document.getElementById("merge-detections").checked = false;
+    worker.postMessage({action: "update-state", detect: config.detect});
+  } else {
+    notNighthawk.forEach((element) => {
+      element.classList.remove("d-none");
+    });
+  }
 
   isMac && noMac.forEach((element) => element.classList.add("d-none"));
   if (config.hasNode) {
@@ -5126,6 +5147,8 @@ const showOverlap = (e) => {
   const overlap = e instanceof Event ? e.target.valueAsNumber : e * 100;  
   document.getElementById('overlap-value').innerHTML = `<b>${overlap}%</b>`;
   document.getElementById('overlap').value = overlap;
+  document.getElementById('drop-uncertain').disabled = !overlap;
+  document.getElementById('merge-overlaps').disabled = !overlap;
 }
 /**
  * Updates the radius display in the location modal.
@@ -5742,8 +5765,7 @@ async function handleUIClicks(e) {
       const modelName = displayName.toLowerCase();
       const modelLocation = document.getElementById('import-location').value;
       const requiredFiles = modelName === 'perch v2' 
-      ? ['perch_v2.onnx', 'labels.txt'] : modelName === 'nighthawk'
-      ? ['group1-shard1of21.bin', 'model.json', 'labels.txt']
+      ? ['perch_v2.onnx', 'labels.txt'] 
       : ['weights.bin', 'labels.txt', 'model.json'];
       if (config.models[modelName] !== undefined){
         generateToast({message: 'A model with that name already exists', type:'error'})
@@ -6375,10 +6397,17 @@ document.addEventListener("change", async function (e) {
             document.getElementById('merge-detections').checked = false;
             config.detect.merge = false;
           }
-          worker.postMessage({
-            action: "update-state",
-            detect: config.detect,
-          });
+          worker.postMessage({ action: "update-state", detect: config.detect });
+          break;
+        }
+        case "merge-overlaps": {
+          config.detect.mergeOverlaps = element.checked;
+          worker.postMessage({ action: "update-state", detect: config.detect });
+          break;
+        }
+        case "drop-uncertain": {
+          config.detect.dropSingles = element.checked;
+          worker.postMessage({ action: "update-state", detect: config.detect });
           break;
         }
         case "auto-load": {

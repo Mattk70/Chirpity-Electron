@@ -3462,6 +3462,8 @@ function processDetectionQueue(file) {
   STATE.detectionRunning[file] = true;
   const queue = STATE.detectionQueues[file];
   let {lat, lon} = METADATA[file];
+  lat ??= STATE.lat;
+  lon ??= STATE.lon;
   const {modelID, list, selection} = STATE;
   const isCustomList = list === 'custom';
 
@@ -3486,7 +3488,7 @@ function processDetectionQueue(file) {
     STATE.lastProcessedBatch[file] = nextIndex;
     STATE.nextExpectedIndex[file]++;
     if (
-      STATE.lastProcessedBatch[file] === batchesToSend[file] &&
+      STATE.lastProcessedBatch[file] === batchesToSend[file] - 1 &&
       STATE.detectionQueues[file].size === 0
     ) {
       onDetectionComplete(file);
@@ -3543,7 +3545,7 @@ const parsePredictions = async (response) => {
     if (!embeddingsBatch?.length) {
       predictionsReceived[file]++;
       if (predictionsReceived[file] >= (batchesToSend[file] || 1)) {
-        updateQueue(file, worker);
+        updateQueue(file);
       }
       return worker;
     }
@@ -3551,7 +3553,7 @@ const parsePredictions = async (response) => {
     await prepareQuery(embeddingsBatch[0]);
     predictionsReceived[file]++;
     if (predictionsReceived[file] >= (batchesToSend[file] || 1)) {
-      updateQueue(file, worker);
+      updateQueue(file);
     }
     return worker;
   }
@@ -3563,8 +3565,10 @@ const parsePredictions = async (response) => {
   */
 
   const threshold = selection ? 50 : detect.confidence;
-  const dropSingles = !selection && !!STATE.detect.overlap;
-  let detections = [];
+  const {overlap, mergeOverlaps, dropSingles} = STATE.detect;
+  const dropSingle = !selection && !!overlap && dropSingles;
+  const mergeOverlap = !!overlap && mergeOverlaps;
+
 
   enqueueDetectionUpdate(file, batchIndex, () => {
     return updateDetectionState({
@@ -3574,9 +3578,9 @@ const parsePredictions = async (response) => {
       confidenceBatch,
       threshold,
       predictionLength,
-      dropSingles, 
+      dropSingles: dropSingle,
       isCustomList,
-      merge: dropSingles,
+      merge: mergeOverlap,
     });
   });
 
@@ -3608,16 +3612,6 @@ const parsePredictions = async (response) => {
 
   /*
   ----------------------------------
-  UI RESULTS
-  ----------------------------------
-  */
-
-  if (index < 500) {
-    await sendResultsToUI (detections, file, modelID, lat, lon, isCustomList)
-  }
-
-  /*
-  ----------------------------------
   PIPELINE MANAGEMENT
   ----------------------------------
   */
@@ -3633,51 +3627,41 @@ const parsePredictions = async (response) => {
     getSummary({ interim: true });
   }
   if (fileProgress === 1) {
-    updateQueue(file, worker);
-
-    // const remaining = flushDetectionState(file, dropSingles);
-    // detections.push(...remaining);
-    // await generateInsertQuery( detections, 
-    //   file,
-    //   modelID,
-    //   isCustomList
-    // ).catch(console.warn);
-    // if (remaining.length) await sendResultsToUI (remaining, file, modelID, lat, lon, isCustomList)
-
     
   }
   return worker;
 };
 
 async function onDetectionComplete(file) {
-
-  const dropSingles = !STATE.selection && !!STATE.detect.overlap;
-  const { modelID } = STATE;
+  const { modelID, detect, selection } = STATE;
+  const {overlap, dropSingles} = detect;
+  const dropSingle = !selection && !!overlap && dropSingles;
   const metadata = METADATA[file];
   const lat = metadata.lat || STATE.lat;
   const lon = metadata.lon || STATE.lon;
   const isCustomList = STATE.list === "custom";
 
-  const remaining = flushDetectionState(file, dropSingles);
+  const remaining = flushDetectionState(file, dropSingle);
 
-  if (!remaining.length) return;
+  if (remaining.length) {
+    await generateInsertQuery(
+      remaining,
+      file,
+      modelID,
+      isCustomList
+    ).catch(console.warn);
 
-  await generateInsertQuery(
-    remaining,
-    file,
-    modelID,
-    isCustomList
-  ).catch(console.warn);
-
-  await sendResultsToUI(
-    remaining,
-    file,
-    modelID,
-    lat,
-    lon,
-    isCustomList
-  );
-  STATE.selection || getSummary();
+    await sendResultsToUI(
+      remaining,
+      file,
+      modelID,
+      lat,
+      lon,
+      isCustomList
+    );
+    STATE.selection || getSummary();
+  }
+  updateQueue(file);
 
   if (QUEUE.allComplete()) {
       if (index === 0) {
@@ -3863,13 +3847,13 @@ async function parseMessage(e) {
  *
  * @param {string|object} file - File identifier (file path or file record) to remove from the processing list.
  */
-function updateQueue(file, worker) {
+function updateQueue(file) {
   // This method to determine file complete
   QUEUE.markComplete(file)
   if (DEBUG) console.log(
     "queue length is: ", QUEUE.getSize('inProgress') + QUEUE.getSize('pending')
     );
-  processNextFile({ worker: worker });
+  processNextFile();
 }
 
 
@@ -3885,8 +3869,7 @@ function updateQueue(file, worker) {
  */
 async function processNextFile({
   start = undefined,
-  end = undefined,
-  worker = undefined,
+  end = undefined
 } = {}) {
   const files = QUEUE.getAllPaths('pending');
   if (files.length === 0) {
@@ -3920,7 +3903,7 @@ async function processNextFile({
         boundaries = await setStartEnd(file);
       } catch (error) {
         console.warn("Error in setStartEnd", error);
-        updateQueue(file, worker);
+        updateQueue(file);
         return;
       }
     else {
@@ -3933,7 +3916,7 @@ async function processNextFile({
         // Nothing to do for this file
         generateAlert({ message: "noNight", variables: { file } });
         DEBUG && console.log("Recursion: start = end");
-        updateQueue(file, worker);
+        updateQueue(file);
         continue;
       } else {
         if (!STATE.selection && !sumObjectValues(predictionsReceived)) {
@@ -3960,7 +3943,7 @@ async function processNextFile({
           await getPredictBuffers({ file, start, end });
         } catch (error) {
           console.warn(error);
-          updateQueue(file, worker);
+          updateQueue(file);
           return; // stop processing this file after queue advancement
         }
       }
@@ -3968,7 +3951,7 @@ async function processNextFile({
   } else {
     DEBUG && console.log("Recursion: file not found");
     QUEUE.transition(file, 'inProgress', 'missing'); // Ensure missing files are marked as such in the queue
-    updateQueue(file, worker); // advances queue; markComplete no-ops on terminal states
+    updateQueue(file); // advances queue; markComplete no-ops on terminal states
   }
 }
 

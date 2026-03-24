@@ -794,7 +794,7 @@
                             </select>
                         </div>
                     </div>
-                    <div class="form-group rounded p-2 pe-0 mb-2">
+                    <div class="form-group rounded p-2 pe-0 mb-2 not-nh">
                         <div class="form-check form-switch">
                             <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="">
                                 <span class="pointer locked material-symbols-outlined">lock</span></a>
@@ -803,7 +803,7 @@
                             <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-html="true" data-bs-title="Combine model detections" id="Combine-circle-help"  data-bs-content="When enabled, repeating the analysis of open files with a different model will add the model's detections to the list. Note: during the new analysis, only the results of the current model will be shown">?</a>
                         </div>
                     </div>
-                    <div class="form-group rounded p-2 pe-0 mb-2">
+                    <div class="form-group rounded p-2 pe-0 mb-2 not-nh">
                         <div class="form-check form-switch">
                             <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="">
                                 <span class="pointer locked material-symbols-outlined">lock</span></a>
@@ -811,7 +811,7 @@
                             <label class="form-check-label" for="merge-detections">Merge model detections</label>
                             <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-html="true" data-bs-title="Merge model detections" id="Merge-circle-help"  data-bs-content="When enabled, detections for each model will be merged, only the detection with the highest confidence from the models will be displayed. Note: during the new analysis, only the results of the current model will be shown">?</a>
                         </div>
-                    </div>
+                    </div>                
                     <div class="form-group rounded p-2 pe-0 mb-2">
                         <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Confidence Threshold" id="Confidence Threshold-circle-help"  data-bs-content="Determines the minimum confidence required for results to be returned">?</a>
                         <label for="confidence">Confidence threshold:</label>
@@ -831,8 +831,22 @@
                                 <span class="input-group-text" id="overlap-value">50%</span>
                             </div>
                         </div>
-                    </div>                    
+                    </div>
                     <div class="form-group rounded p-2 pe-0 mb-2">
+                        <div class="form-check form-switch">
+                            <input class="locked form-check-input" type="checkbox" role="switch" id="merge-overlaps">
+                            <label class="form-check-label" for="merge-overlaps">Merge Overlaps</label>
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-html="true" data-bs-title="Merge Overlaps" id="Merge Overlaps-circle-help"  data-bs-content="When enabled, will merge overlapping detections into a single detection.">?</a>
+                        </div>
+                    </div>
+                    <div class="form-group rounded p-2 pe-0 mb-2">
+                        <div class="form-check form-switch">
+                            <input class="locked form-check-input" type="checkbox" role="switch" id="drop-uncertain">
+                            <label class="form-check-label" for="drop-uncertain">Drop Uncertain</label>
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-html="true" data-bs-title="Drop Uncertain" id="Drop Uncertain-circle-help"  data-bs-content="When enabled, will apply postprocessing to remove less certain detections.">?</a>
+                        </div>
+                    </div>
+                    <div class="form-group rounded p-2 pe-0 mb-2 not-nh">
                         <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Detections Per Segment" id="Detections Per Segment-circle-help"  data-bs-content="Select the maximum number of detections that will be shown in any 3 second period">?</a>
                         <label for="top-rankin">Detections per segment:</label>
                         <div class="input-group">

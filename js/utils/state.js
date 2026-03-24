@@ -50,6 +50,8 @@ export class WorkerState {
       iucnScope: "Global",
       topRankin: 1,
       overlap: 0,
+      mergeOverlaps: false,
+      dropSingles: false
     }),
     (this.chart = {
       range: { start: undefined, end: undefined },
