@@ -2778,7 +2778,7 @@ function setAudioFilters() {
   if (normalise) {
     filters.push({
       filter: "loudnorm",
-      options: "I=-16:LRA=11:TP=-1.5"
+      options: "TP=-3.0"
     });
   }
 
