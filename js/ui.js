@@ -1665,6 +1665,7 @@ async function showCharts() {
 async function showExplore() {
   // Change STATE.fileLoaded this one time, so a file will load!
   STATE.fileLoaded = true;
+  STATE.summary = null;
   saveAnalyseState();
   STATE.openFiles = [];
   const state = STATE.currentAnalysis;
@@ -1956,8 +1957,8 @@ const defaultConfig = {
     contextAware: false,
     merge: false,
     combine: false,
-    mergeOverlaps: false,
-    dropSingles: false,
+    mergeOverlaps: true,
+    dropSingles: true,
     confidence: 45,
     iucn: true,
     iucnScope: "Global",
@@ -5684,9 +5685,9 @@ async function handleUIClicks(e) {
           const modelFolder = files.filePaths[0]
           document.getElementById("import-location").value = modelFolder;
           const modelNameInput = document.getElementById("model-name");
-          // Prevent people changing Perch v2 name
+          // Prevent people changing Perch v2 or Nighthawk name
           modelNameInput.value = p.basename(modelFolder).replace(/^perch v2.*$/i, 'Perch v2');
-          modelNameInput.disabled = modelNameInput.value === 'Perch v2';
+          modelNameInput.disabled = ['perch v2', "nighthawk"].includes(modelNameInput.value.toLowerCase());
         }
       })();
       break;
