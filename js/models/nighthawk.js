@@ -120,6 +120,7 @@ onmessage = async (e) => {
         abortController.abort();
         tf.backend().dispose();
         self.close(); // Terminate the worker
+        break;
       }
     }
   } catch (error) {

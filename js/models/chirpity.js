@@ -98,7 +98,17 @@ onmessage = async (e) => {
         break;
       }
       case "predict": {
+        const { id, batchIndex, file, fileStart } = data;
         if (!myModel?.model_loaded) {
+          postMessage({
+            message: "prediction",
+            id,
+            batchIndex,
+            file,
+            fileStart,
+            worker,
+            error: "Model not ready",
+          });
           return console.log(
             "worker",
             worker,
@@ -108,13 +118,9 @@ onmessage = async (e) => {
         const {
           chunks,
           start,
-          fileStart,
-          file,
           confidence,
           context,
           resetResults,
-          id,
-          batchIndex
         } = data;
         myModel.useContext = context;
         myModel.selection = !resetResults;

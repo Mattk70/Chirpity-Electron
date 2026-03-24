@@ -2239,7 +2239,7 @@ window.onload = async () => {
   document.getElementById("drop-uncertain").checked = detect.dropSingles;
   document.getElementById("auto-load").checked = detect.autoLoad;
   document.getElementById("iucn").checked = detect.iucn;
-  document.getElementById("iucn-scope").selected = detect.iucnScope;
+  document.getElementById("iucn-scope").value = detect.iucnScope;
   handleModelChange(selectedModel, false)
   // Detection options
   const mergeSwitch = document.getElementById("merge-detections");
@@ -2277,7 +2277,7 @@ window.onload = async () => {
   DOM.sendFilteredAudio.checked = config.filters.sendToModel;
   filterIconDisplay();
   if (config.models[config.selectedModel].backend === "webgpu") {
-    DOM.threadSlider.max = 16;
+    DOM.threadSlider.max = 6;
   } else {
     DOM.threadSlider.max = DIAGNOSTICS["Cores"];
   }

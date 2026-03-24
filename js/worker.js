@@ -1020,7 +1020,7 @@ async function onLaunch({
     'perch v2': 32_000,
     nighthawk: 22_050,
   };
-  const perch = model === 'perch v2';
+  let perch = model === 'perch v2';
   const nighthawk = model === 'nighthawk';
   // Check correct perch model being used
   if (perch && ! fs.existsSync(p.join(modelPath, 'perch_v2.onnx'))) {
@@ -3213,7 +3213,7 @@ const insertDurations = async (file, id) => {
 
 const generateInsertQuery = async (detections, file, modelID) => { 
   const db = STATE.db;
-  let { fileStart, metadata, duration, locationID } = METADATA[file];
+  let { fileStart, metadata, duration, lat, lon, locationID } = METADATA[file];
   const predictionLength = STATE.model.includes("bats") ? 0.3 : WINDOW_SIZE;
   let fileID;
   await dbMutex.lock();
@@ -3224,7 +3224,14 @@ const generateInsertQuery = async (detections, file, modelID) => {
     fileID = res?.id; 
     locationID = res?.locationID ?? locationID;
     const start = res?.filestart;
-    let lat, lon;
+    if ((lat == null || lon == null) && locationID) {
+      const locationRow = await db.getAsync(
+        "SELECT lat, lon FROM locations WHERE id = ?",
+        locationID
+      );
+      lat ??= locationRow?.lat;
+      lon ??= locationRow?.lon;
+    }
     if (!start) {
       // If we need it, extract location from GUANO metadata
       if (!locationID && metadata) {
@@ -3454,29 +3461,29 @@ function enqueueDetectionUpdate(file, batchIndex, task) {
   }
   const queue = STATE.detectionQueues[file];
   queue.set(batchIndex, task);
-  processDetectionQueue(file);
+  void processDetectionQueue(file);
 }
 
-function processDetectionQueue(file) {
+async function processDetectionQueue(file) {
   if (STATE.detectionRunning[file]) return;
   STATE.detectionRunning[file] = true;
-  const queue = STATE.detectionQueues[file];
-  let {lat, lon} = METADATA[file];
-  lat ??= STATE.lat;
-  lon ??= STATE.lon;
-  const {modelID, list, selection} = STATE;
-  const isCustomList = list === 'custom';
+  try {
+    const queue = STATE.detectionQueues[file];
+    let {lat, lon} = METADATA[file];
+    lat ??= STATE.lat;
+    lon ??= STATE.lon;
+    const {modelID, list, selection} = STATE;
+    const isCustomList = list === 'custom';
 
-  while (true) {
+    while (true) {
     const nextIndex = STATE.nextExpectedIndex[file];
     if (!queue.has(nextIndex)) break;
     const task = queue.get(nextIndex);
     queue.delete(nextIndex);
     const result = task(); // synchronous
     if (result.length){
-      generateInsertQuery( result, file, modelID, isCustomList)
-        .then(() => selection || getSummary()).catch(console.warn);
-      sendResultsToUI(
+        await generateInsertQuery(result, file, modelID, isCustomList);
+        await sendResultsToUI(
         result,
         file,
         modelID,
@@ -3484,6 +3491,7 @@ function processDetectionQueue(file) {
         lon,
         isCustomList
       );
+      if (!selection) await getSummary();
     }
     STATE.lastProcessedBatch[file] = nextIndex;
     STATE.nextExpectedIndex[file]++;
@@ -3493,8 +3501,10 @@ function processDetectionQueue(file) {
     ) {
       onDetectionComplete(file);
     } 
+    }
+  } finally {
+    STATE.detectionRunning[file] = false;
   }
-  STATE.detectionRunning[file] = false;
 }
 
 function flushDetectionState(file, dropSingles) {
@@ -3525,7 +3535,13 @@ const parsePredictions = async (response) => {
     STATE.model.includes("bats") ? 0.3 : WINDOW_SIZE;
   if (!latestResult.length) {
     predictionsReceived[file]++;
-    return worker;
+    if (STATE.queryMetadata) {
+      if (predictionsReceived[file] >= (batchesToSend[file] || 1)) {
+        updateQueue(file);
+      }
+    } else {
+      enqueueDetectionUpdate(file, batchIndex, () => []);
+    }
   }
   const [keysArray, speciesIDBatch, confidenceBatch, embeddingsBatch] =
     latestResult;
@@ -3995,7 +4011,10 @@ function calculateTimeBoundaries(
   // Update global state
   STATE.clippedBatches += getBatchesToSend(clippedSeconds);
   STATE.clippedFilesDuration += clippedSeconds;
-  batchesToSend[file] = getBatchesToSend(keptSeconds - EPSILON);
+  batchesToSend[file] = intervals.reduce((total, interval) => {
+    if (interval.start == null || interval.end == null) return total;
+    return total + getBatchesToSend(interval.end - interval.start - EPSILON);
+  }, 0);
   return intervals;
 }
 
@@ -4195,8 +4214,7 @@ const getResults = async ({
     topRankin,
     format
   );
-  const test = await STATE.db.allAsync('select * from records');
-  const test2 = await STATE.db.allAsync('select * from species where modelid = 0');
+
   let result = await STATE.db.allAsync(sql, ...params);
   // Apply custom list filtering
   if (STATE.list === 'custom'){

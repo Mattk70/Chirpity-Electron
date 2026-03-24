@@ -158,8 +158,14 @@ class PCMChunker extends Transform {
       while (remaining > 0) {
         const tmp = Buffer.alloc(this.windowBytes);
 
-        const part = this._readWindow(offset);
-        part.copy(tmp);
+        const validBytes = Math.min(remaining, this.windowBytes);
+        if (offset + validBytes <= this.bufferBytes) {
+          this.buffer.copy(tmp, 0, offset, offset + validBytes);
+        } else {
+          const firstLen = this.bufferBytes - offset;
+          this.buffer.copy(tmp, 0, offset, this.bufferBytes);
+          this.buffer.copy(tmp, firstLen, 0, validBytes - firstLen);
+        }
 
         const channelData = this._getMonoChannelData(tmp);
 

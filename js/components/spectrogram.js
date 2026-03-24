@@ -385,7 +385,7 @@ export class ChirpityWS {
   formatTimeCallback = (secs) => {
     const config = this.getConfig();
     const STATE = this.getState();
-    secs = Math.round(Number(secs)*100)/100;
+    secs = Math.round(Number(secs)*1000)/1000;
     // Add 500 to deal with overflow errors
     let now = new Date(STATE.bufferStartTime.getTime() + secs * 1000);
     let milliseconds = now.getMilliseconds();
@@ -519,8 +519,9 @@ export class ChirpityWS {
 
   refreshTimeline = () => {
     const STATE = this.getState();
-    this.timeline.destroy()
-    this.createTimeline(STATE.windowLength)
+    this.timeline?.destroy();
+    this.WSPluginPurge();
+    this.timeline = this.createTimeline(STATE.windowLength);
   };
 
   /**
