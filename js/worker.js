@@ -48,7 +48,7 @@ let INITIALISED = new Promise((resolve, reject) => {
   initialiseResolve = resolve;
   initialiseReject = reject;
 });
-const EPSILON = 0.025;
+const EPSILON = 1e-6;
 const generateAlert = ({
   message,
   type,
@@ -115,19 +115,7 @@ self.addEventListener("rejectionhandled", function (event) {
 const STATE = new State();
 
 let WINDOW_SIZE = 3;
-const SUPPORTED_FILES = [
-  ".wav",
-  ".flac",
-  ".opus",
-  ".m4a",
-  ".mp3",
-  ".mpga",
-  ".ogg",
-  ".aac",
-  ".mpeg",
-  ".mp4",
-  ".mov",
-];
+const SUPPORTED_FILES = [".wav",".flac",".opus",".m4a",".mp3",".mpga",".ogg",".aac",".mpeg",".mp4",".mov",];
 
 let NUM_WORKERS;
 let appPath,
@@ -357,7 +345,7 @@ const getSplitChar = () => STATE.model === "perch v2" ? /[,~]/ : /[,_]/;
  * @param {boolean} options.regenerate - If true, forces reloading of labels from the database.
  */
 async function setLabelState({ regenerate }) {
-  if (regenerate || !STATE.allLabelsMap) {
+  if (regenerate || !STATE.modelLabelsMap) {
     DEBUG && console.log("Getting labels from disk db");
     const res = await diskDB.allAsync(
       `SELECT classIndex + 1 as id, sname || ',' || cname AS labels, modelID 
@@ -365,17 +353,17 @@ async function setLabelState({ regenerate }) {
     );
 
     // Map from species ID to label
-    STATE.allLabelsMap = new Map(res.map(obj => [obj.id, obj.labels]));
+    STATE.modelLabelsMap = new Map(res.map(obj => [obj.id, obj.labels]));
 
     // Also keep a flat list of all labels (optional, if still useful for 'everything')
-    STATE.allLabels = res.map(obj => obj.labels);
+    STATE.modelLabels = res.map(obj => obj.labels);
   }
 
   const included = await getIncludedIDs(); // assumes array of species.id values
 
   STATE.filteredLabels = STATE.list === 'everything'
-    ? STATE.allLabels
-    : included.map(id => STATE.allLabelsMap.get(id)).filter(Boolean);
+    ? STATE.modelLabels
+    : included.map(id => STATE.modelLabelsMap.get(id)).filter(Boolean);
 
   UI.postMessage({ event: "labels", labels: STATE.filteredLabels });
 }
@@ -724,6 +712,10 @@ async function handleMessage(e) {
       await getSummary(args);
       break;
     }
+    case "update-total-batches": {
+      processFilesInBatches(args.files);
+      break;
+    }
     case "update-state": {
       const {path, temp, lat, lon, place, radius} = args;
       appPath = path || appPath;
@@ -1026,8 +1018,10 @@ async function onLaunch({
     chirpity: 24_000,
     nocmig: 24_000,
     'perch v2': 32_000,
+    nighthawk: 22_050,
   };
   let perch = model === 'perch v2';
+  const nighthawk = model === 'nighthawk';
   // Check correct perch model being used
   if (perch && ! fs.existsSync(p.join(modelPath, 'perch_v2.onnx'))) {
     let message = `<b>'perch_v2.onnx'</b> was not found in ${modelPath}. `;
@@ -1039,7 +1033,8 @@ async function onLaunch({
     model = 'birdnet'; perch = false; modelPath = null;
     generateAlert({message, type:'error'})
   }
-  const newWindowSize = perch ? 5 : 3;
+  const newWindowSize = perch ? 5 : nighthawk ? 1 : 3;
+
   if (newWindowSize !== WINDOW_SIZE) {
     // Update totalBatches so time estimates remain accurate
     WINDOW_SIZE = newWindowSize;
@@ -1264,7 +1259,7 @@ async function processFilesInBatches(filePaths, batchSize = 20) {
         setMetadata({ file }).then(fileMetadata => {
           const duration = fileMetadata.duration || 0;
           STATE.allFilesDuration += duration;
-          STATE.totalBatches += Math.ceil(duration / (BATCH_SIZE * WINDOW_SIZE));
+          STATE.totalBatches += getBatchesToSend(duration);
           return fileMetadata;
         }).catch ((_e) => {
           console.warn(`Failed to get metadata for file: ${file}`);
@@ -1361,10 +1356,10 @@ function getFileSQLAndParams(range) {
  * Compute indices between 1 and fullRange (inclusive) that are not present in the sorted `included` list.
  *
  * @param {number[]} included - Sorted array of indices to include.
- * @param {number} [fullRange=STATE.allLabels.length] - Maximum index to check (inclusive).
+ * @param {number} [fullRange=STATE.modelLabels.length] - Maximum index to check (inclusive).
  * @returns {number[]} Array of indices between 1 and `fullRange` (inclusive) that are not in `included`.
  */
-function getExcluded(included, fullRange = STATE.allLabels.length) {
+function getExcluded(included, fullRange = STATE.modelLabels.length) {
   const missing = [];
   let currentIndex = 0;
 
@@ -1450,7 +1445,7 @@ async function getMatchingIds(cnames) {
  */
 async function getSpeciesSQLAsync(file){
   let not = "", SQL = "";
-  const {list, allLabels} = STATE;
+  const {list, modelLabels} = STATE;
   
   // If we don't have a file, use the first analysed file if available
   file ??=
@@ -1469,7 +1464,7 @@ async function getSpeciesSQLAsync(file){
     const cnames = result.map(row => row.cname);
     included = cnames.length ? await getMatchingIds(cnames) : [-1];
     DEBUG &&
-      console.log("included", included.length, "# labels", allLabels.length);
+      console.log("included", included.length, "# labels", modelLabels.length);
     SQL = ` AND (s.id ${not} IN (${included}) OR r.modelID = 0) `; // always include records with modelID 0 (manual records)
   }
   return SQL
@@ -1823,6 +1818,13 @@ async function onAnalyse({
   STATE.incrementor = 1;
   STATE.clippedBatches = 0;
   STATE.clippedFilesDuration = 0;
+
+  STATE.detectionState = Object.create(null),
+  STATE.detectionQueues = Object.create(null),
+  STATE.nextExpectedIndex = Object.create(null), 
+  STATE.detectionRunning = Object.create(null),
+  STATE.lastProcessedBatch = Object.create(null);
+
   predictionsReceived = {};
   batchesToSend = {};
   predictionStart = new Date();
@@ -1839,10 +1841,13 @@ async function onAnalyse({
     selection: end ? getSelectionRange(filesInScope[0], start, end) : undefined,
   });
   const selection = STATE.selection; // we only get 'end' during selection analysis
+
+  // We can analyse many files, but if analysing a selection we don't want to reset the queue unless 
+  // the named file isn't in the queue (i.e. after switch to explore).
   if (selection) {
     if (! QUEUE.setStatus(filesInScope[0], 'pending')) QUEUE.setFiles(filesInScope, 'pending')
   } else {
-    QUEUE.moveAll(['inProgress', 'complete'], 'pending');
+    QUEUE.setFiles(filesInScope, 'pending');
     const {combine, merge} = STATE.detect;
     // Clear records from the memory db
     if (!(combine || merge)){
@@ -1851,12 +1856,6 @@ async function onAnalyse({
     // Clear any location filters set in explore/charts
     STATE.location = undefined;
   }
-
-  DEBUG &&
-    console.log(
-      `Worker received message: ${filesInScope}, ${STATE.detect.confidence}, start: ${start}, end: ${end}`
-    );
-
 
   let count = 0;
   const files = QUEUE.getAllPaths('pending')
@@ -1890,11 +1889,23 @@ async function onAnalyse({
         await getResults({ topRankin: 5, offset: 0 });
       } else {
         await onChangeMode("archive");
-        UI.postMessage({
-          event: "update-audio-duration",
-          value: 0,
-        })
-        QUEUE.moveAll(['pending', 'inProgress'], 'complete');
+        files.forEach((file) => {
+          if (!METADATA[file]) {
+            const entry = Object.values(METADATA)
+              .find(item => item.archiveName === file);
+            if (entry) {
+              METADATA[file] = entry;
+            } else {
+              console.warn(`Metadata for file ${file} not found in updateMetadata results`);
+              METADATA[file] = { duration: 0 }; // fallback to prevent errors
+            }
+          }
+          UI.postMessage({
+            event: "update-audio-duration",
+            value: METADATA[file].duration,
+          })
+        });
+        QUEUE.setAll('complete');
         await Promise.all([getSummary(), getResults()] );
       }
       return;
@@ -1906,9 +1917,7 @@ async function onAnalyse({
     await onChangeMode("analyse");
     await resetEmbeddings();
   }
-  STATE.workerQueue = createMultiWorkerQueue(predictWorkers, parsePredictions, {
-    timeoutMs: 120_000, // 2 minutes
-  });
+  STATE.workerQueue = createMultiWorkerQueue(predictWorkers, parsePredictions);
   for (let i = 0; i < predictWorkers.length; i++) {
     processNextFile({ start, end, worker: i });
   }
@@ -2553,25 +2562,8 @@ const getPredictBuffers = async ({ file = "", start = 0, end = undefined }) => {
   if (start > fileDuration) {
     return;
   }
-  const batchDuration = BATCH_SIZE * WINDOW_SIZE;
-  //reduce highWaterMark for small analyses
-  const samplesInWindow = sampleRate * WINDOW_SIZE;
-  let samplesInBatch;
-  if (end && end - start < batchDuration) {
-    const audioDuration = end - start;
-    samplesInBatch = Math.ceil(audioDuration / WINDOW_SIZE) * samplesInWindow;
-  } else {
-    samplesInBatch = samplesInWindow * BATCH_SIZE;
-  }
-  const highWaterMark = samplesInBatch * 2;
-  
-  await processAudio(
-    file,
-    start,
-    end,
-    highWaterMark,
-    samplesInBatch
-  );
+
+  await processAudio(file, start, end);
 };
 
 /**
@@ -2581,18 +2573,13 @@ const getPredictBuffers = async ({ file = "", start = 0, end = undefined }) => {
  *
  * @param {string} file - Path to the audio file to process.
  * @param {number} start - Start time in seconds for extraction (may be adjusted slightly to compensate encoder padding).
- * @param {number} end - End time in seconds for extraction.
- * @param {number} chunkStart - Index (in samples) of the first sample for the first chunk produced from this stream.
- * @param {number} highWaterMark - Number of bytes per chunk buffer used to accumulate PCM before sending to the model.
- * @param {number} samplesInBatch - Number of audio samples contained in each batch sent to the model.
+ * @param {number} endTime - End time in seconds for extraction.
  * @returns {Promise<void>} Resolves when all audio chunks for the requested range have been prepared and queued for prediction.
  */
 async function processAudio(
   file,
   start,
-  endTime,
-  highWaterMark,
-  samplesInBatch
+  endTime
 ) {
   let remainingTrimSeconds = 0;
   if (!(file.toLowerCase().endsWith(".wav") || file.toLowerCase().endsWith(".flac"))) { 
@@ -2606,9 +2593,9 @@ async function processAudio(
   const command = await setupFfmpegCommand({ file, start, end:endTime, sampleRate, additionalFilters, });
   
   const prepareAudio = new PCMChunker({
-    highWaterMarkBytes: highWaterMark,
-    samplesInBatch,
     sampleRate,
+    windowSeconds: WINDOW_SIZE,
+    overlap: STATE.detect.overlap,
     startTime: Math.round(start * sampleRate),
     file,
     endTime,
@@ -2619,10 +2606,10 @@ async function processAudio(
   const workerQueue = STATE.workerQueue;
   const sendToModel = createPredictSender(workerQueue);
   // As there is a queue per file, we don't want the concurrency across all queues
-  // to exceed the number of workers
-  const concurrency = Math.max(1, Math.round(predictWorkers.length / QUEUE.getSize()));
+  // to exceed 2x the number of workers
+  const concurrency = Math.max(2, Math.round(predictWorkers.length / QUEUE.getSize()));
   
-  const bufferAndSend = new PredictionWritable(sendToModel, {concurrency});
+  const bufferAndSend = new PredictionWritable(sendToModel, {batchSize: BATCH_SIZE, concurrency});
 
   try {
     await pipeline(
@@ -2778,7 +2765,7 @@ function setAudioFilters() {
   if (normalise) {
     filters.push({
       filter: "loudnorm",
-      options: "I=-16:LRA=11:TP=-1.5"
+      options: "TP=-3.0"
     });
   }
 
@@ -2800,20 +2787,24 @@ function isDuringDaylight(datetime, lat, lon) {
 }
 
 function createPredictSender(workerQueue) {
-  return function sendToModel(channelData, chunkStart, file, endTime) {
+  return function sendToModel(channelDataArray, chunkStarts, file, endTime, batchIndex) {
+
     const payload = {
       message: "predict",
       fileStart: METADATA[file].fileStart,
       file,
-      start: chunkStart,
+      start: chunkStarts,
       duration: endTime,
       resetResults: !STATE.selection,
       context: STATE.detect.contextAware,
       confidence: STATE.detect.confidence,
-      chunks: channelData
+      chunks: channelDataArray,
+      batchIndex
     };
 
-    return workerQueue.send(payload, [channelData.buffer]);
+    const transferList = channelDataArray.map(a => a.buffer);
+
+    return workerQueue.send(payload, transferList);
   };
 }
 
@@ -2980,9 +2971,22 @@ function spawnPredictWorkers(model, batchSize, toSpawn) {
   const startAt = predictWorkers.length;
   for (let i = startAt; i < startAt + toSpawn; i++) {
     if (isPerch && i > startAt) break; // Perch v2 only needs one worker, even if multiple threads requested
-    const workerSrc = ['nocmig', 'chirpity', 'perch v2'].includes(model) ? model : "BirdNet2.4";
+    const workerSrc = ['nocmig', 'chirpity', 'perch v2', 'nighthawk'].includes(model) ? model : "BirdNet2.4";
     const worker = new Worker(`./js/models/${workerSrc}.js`, { type: "module" });
-
+    // Web worker message event handler
+    worker.onmessage = async (msg) => {
+      await parseMessage(msg).catch((error) => {
+        console.warn("Parse message error", error, msg);
+      });
+    };
+    worker.onerror = (e) => {
+      console.warn(
+        `Worker ${i} is suffering, shutting it down.`,
+        e.message
+      );
+      predictWorkers.splice(i, 1);
+      worker.terminate();
+    };
     worker.name = model;
     predictWorkers.push(worker);
     DEBUG && console.log("loading a worker");
@@ -2999,20 +3003,6 @@ function spawnPredictWorkers(model, batchSize, toSpawn) {
       locale: STATE.locale.slice(0,2)
     });
 
-    // Web worker message event handler
-    worker.onmessage = async (msg) => {
-      await parseMessage(msg).catch((error) => {
-        console.warn("Parse message error", error, msg);
-      });
-    };
-    worker.onerror = (e) => {
-      console.warn(
-        `Worker ${i} is suffering, shutting it down.`,
-        e.message
-      );
-      predictWorkers.splice(i, 1);
-      worker.terminate();
-    };
   }
 }
 
@@ -3221,9 +3211,9 @@ const insertDurations = async (file, id) => {
   );
 };
 
-const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, file, modelID, isCustomList) => {
+const generateInsertQuery = async (detections, file, modelID) => { 
   const db = STATE.db;
-  let { fileStart, metadata, duration, locationID } = METADATA[file];
+  let { fileStart, metadata, duration, lat, lon, locationID } = METADATA[file];
   const predictionLength = STATE.model.includes("bats") ? 0.3 : WINDOW_SIZE;
   let fileID;
   await dbMutex.lock();
@@ -3234,14 +3224,21 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
     fileID = res?.id; 
     locationID = res?.locationID ?? locationID;
     const start = res?.filestart;
-
+    if ((lat == null || lon == null) && locationID) {
+      const locationRow = await db.getAsync(
+        "SELECT lat, lon FROM locations WHERE id = ?",
+        locationID
+      );
+      lat ??= locationRow?.lat;
+      lon ??= locationRow?.lon;
+    }
     if (!start) {
       // If we need it, extract location from GUANO metadata
       if (!locationID && metadata) {
         const meta = JSON.parse(metadata);
         const guano = meta.guano;
         if (guano && guano["Loc Position"]) {
-          const [lat, lon] = guano["Loc Position"].split(" ");
+          [lat, lon] = guano["Loc Position"].split(" ");
           const place = guano["Site Name"] || guano["Loc Position"];
 
           // Use INSERT OR IGNORE + RETURNING to avoid extra SELECT
@@ -3283,29 +3280,17 @@ const generateInsertQuery = async (keysArray, speciesIDBatch, confidenceBatch, f
     // **Use batch inserts instead of string concatenation**
     const insertValues = [];
     const insertPlaceholders = [];
-    for (let i = 0; i < keysArray.length; i++) {
-      const key = parseFloat(keysArray[i]);
-      const timestamp = fileStart + key * 1000;
-      const isDaylight = isDuringDaylight(timestamp, STATE.lat, STATE.lon);
-      const confidenceArray = confidenceBatch[i];
-      const speciesIDArray = speciesIDBatch[i];
-
-      for (let j = 0; j < confidenceArray.length; j++) {
-        const confidence = Math.round(confidenceArray[j] * 1000);
-        const modelSpeciesID = speciesIDArray[j];
-        const speciesID = STATE.speciesMap.get(modelID).get(modelSpeciesID);
-
-        if (!speciesID) continue; // Skip unknown species
-        if (isCustomList){
-          const cname = STATE.allLabels[modelSpeciesID].split(getSplitChar())[1];
-          // To ensure results don't fail the confidence threshold when they would otherwise be allowed by the list, 
-          // we assign a score of 1001  so that it will be included regardless of confidence value
-          // And therefore be available if the confidence or list is changed later
-          if (! allowedByList({cname, timestamp, score: confidence, confidenceCheck: true})) continue;
-        } else if (confidence < minConfidence) break;
-        insertPlaceholders.push("(?, ?, ?, ?, ?, ?, ?, ?)");
-        insertValues.push(key, fileID, speciesID, modelID, confidence, key + predictionLength, isDaylight, 0);
-      }
+    for (let i = 0; i < detections.length; i++) {
+      const detection = detections[i];
+      const key = parseFloat(detection.start);
+      const timestamp = fileStart + (key * 1000);
+      const isDaylight = isDuringDaylight(timestamp, lat ?? STATE.lat, lon ?? STATE.lon);
+      const confidence = detection.confidence;
+      const modelSpeciesID = detection.species;
+      const speciesID = STATE.speciesMap.get(modelID).get(modelSpeciesID);
+      const end = detection.end;
+      insertPlaceholders.push("(?, ?, ?, ?, ?, ?, ?, ?)");
+      insertValues.push(key, fileID, speciesID, modelID, confidence, end, isDaylight, 0); 
     }
 
     if (insertValues.length) {
@@ -3340,9 +3325,8 @@ async function prepareQuery(query){
         fileID);
       if (! row) continue
       const {file} = row;
-      
-      const keysArray = [[offset]], speciesIDBatch = [[1]], confidenceBatch = [[score]];
-      await generateInsertQuery(keysArray, speciesIDBatch, confidenceBatch, file, 0, false);
+      const detection = {start: offset, end: offset + WINDOW_SIZE, species: 1, confidence: Math.round(score*1000)}
+      await generateInsertQuery([detection], file, 0, false);
     }
     STATE.selection = false;
     await Promise.all([getResults({species: cname}), getSummary({species: cname})])
@@ -3350,118 +3334,354 @@ async function prepareQuery(query){
     STATE.queryMetadata = undefined;
   }
 }
+function updateDetectionState({
+  file,
+  keysArray,
+  speciesIDBatch,
+  confidenceBatch,
+  threshold,
+  predictionLength,
+  dropSingles,
+  isCustomList,
+  merge = true,
+}) {
+  const completed = [];
+
+  /*
+  ----------------------------------
+  FAST PATH: NO MERGING (unchanged)
+  ----------------------------------
+  */
+  if (!merge) {
+    for (let i = 0; i < keysArray.length; i++) {
+      const t = keysArray[i];
+      const ids = speciesIDBatch[i];
+      const confs = confidenceBatch[i];
+
+      for (let j = 0; j < ids.length; j++) {
+        const species = ids[j];
+        const conf = confs[j] * 1000;
+
+        if (conf < threshold) {
+          if (isCustomList) continue;
+          else break;
+        }
+
+        completed.push({
+          species,
+          start: t,
+          end: t + predictionLength,
+          confidence: conf
+        });
+
+        if (!isCustomList) break;
+      }
+    }
+    return completed;
+  }
+
+  /*
+  ----------------------------------
+  MERGE MODE (Map-based)
+  ----------------------------------
+  */
+
+  const detectionState = STATE.detectionState;
+
+  if (!detectionState[file]) {
+    detectionState[file] = new Map();
+  }
+
+  const state = detectionState[file];
+  for (let i = 0; i < keysArray.length; i++) {
+    const t = keysArray[i];
+    const ids = speciesIDBatch[i];
+    const confs = confidenceBatch[i];
+
+    /*
+    ----------------------------------
+    CLOSE EXPIRED DETECTIONS
+    ----------------------------------
+    */
+
+    for (const [species, det] of state) {
+      if (t > det.end) {
+        if (!dropSingles || det.count > 1) {
+          completed.push({
+            species,
+            start: det.start,
+            end: det.end,
+            confidence: det.maxConf
+          });
+        }
+        state.delete(species);
+      }
+    }
+
+    /*
+    ----------------------------------
+    PROCESS DETECTIONS (START / EXTEND)
+    ----------------------------------
+    */
+
+    for (let j = 0; j < ids.length; j++) {
+      const species = ids[j];
+      const conf = confs[j] * 1000;
+
+      if (conf < threshold) {
+        if (isCustomList) continue;
+        else break;
+      }
+
+      const existing = state.get(species);
+
+      if (existing) {
+        existing.end = t + predictionLength;
+        if (conf > existing.maxConf) existing.maxConf = conf;
+        existing.count++;
+      } else {
+        state.set(species, {
+          start: t,
+          end: t + predictionLength,
+          maxConf: conf,
+          count: 1
+        });
+      }
+    }
+  }
+
+  return completed;
+}
+
+// This because we need detection processing to be serialised
+function enqueueDetectionUpdate(file, batchIndex, task) {
+  if (!STATE.detectionQueues[file]) {
+    STATE.detectionQueues[file] = new Map();
+    STATE.nextExpectedIndex[file] = 0;
+  }
+  const queue = STATE.detectionQueues[file];
+  queue.set(batchIndex, task);
+  void processDetectionQueue(file);
+}
+
+async function processDetectionQueue(file) {
+  if (STATE.detectionRunning[file]) return;
+  STATE.detectionRunning[file] = true;
+  try {
+    const queue = STATE.detectionQueues[file];
+    let {lat, lon} = METADATA[file];
+    lat ??= STATE.lat;
+    lon ??= STATE.lon;
+    const {modelID, list, selection} = STATE;
+    const isCustomList = list === 'custom';
+
+    while (true) {
+    const nextIndex = STATE.nextExpectedIndex[file];
+    if (!queue.has(nextIndex)) break;
+    const task = queue.get(nextIndex);
+    queue.delete(nextIndex);
+    const result = task(); // synchronous
+    if (result.length){
+        await generateInsertQuery(result, file, modelID, isCustomList);
+        await sendResultsToUI(
+        result,
+        file,
+        modelID,
+        lat,
+        lon,
+        isCustomList
+      );
+      if (!selection) await getSummary();
+    }
+    STATE.lastProcessedBatch[file] = nextIndex;
+    STATE.nextExpectedIndex[file]++;
+    if (
+      STATE.lastProcessedBatch[file] === batchesToSend[file] - 1 &&
+      STATE.detectionQueues[file].size === 0
+    ) {
+      onDetectionComplete(file);
+    } 
+    }
+  } finally {
+    STATE.detectionRunning[file] = false;
+  }
+}
+
+function flushDetectionState(file, dropSingles) {
+  const state = STATE.detectionState[file];
+  if (!state) return [];
+
+  const completed = [];
+
+  for (const [species, det] of state) {
+    if (!dropSingles || det.count > 1) {
+      completed.push({
+        species,
+        start: det.start,
+        end: det.end,
+        confidence: det.maxConf
+      });
+    }
+  }
+
+  delete STATE.detectionState[file];
+
+  return completed;
+}
 
 const parsePredictions = async (response) => {
-  const {file, worker, result:latestResult} = response;
-  const predictionLength = STATE.model.includes("bats") ? 0.3 : WINDOW_SIZE;
+  const { file, worker, batchIndex, result: latestResult } = response;
+  const predictionLength =
+    STATE.model.includes("bats") ? 0.3 : WINDOW_SIZE;
   if (!latestResult.length) {
     predictionsReceived[file]++;
-    return worker;
+    if (STATE.queryMetadata) {
+      if (predictionsReceived[file] >= (batchesToSend[file] || 1)) {
+        updateQueue(file);
+      }
+    } else {
+      enqueueDetectionUpdate(file, batchIndex, () => []);
+    }
   }
-  DEBUG && console.log("worker being used:", worker);
-  const [keysArray, speciesIDBatch, confidenceBatch, embeddingsBatch] = latestResult;
-  const {modelID, selection, detect} = STATE;
-  const isCustomList = STATE.list === 'custom';
-  if (STATE.queryMetadata){
+  const [keysArray, speciesIDBatch, confidenceBatch, embeddingsBatch] =
+    latestResult;
+  const { modelID, selection, detect } = STATE;
+  const metadata = METADATA[file];
+  const lat = metadata.lat || STATE.lat;
+  const lon = metadata.lon || STATE.lon;
+  const isCustomList = STATE.list === "custom";
+
+  /*
+  ----------------------------------
+  QUERY MODE (embeddings only)
+  ----------------------------------
+  */
+
+  if (STATE.queryMetadata) {
     if (!embeddingsBatch?.length) {
       predictionsReceived[file]++;
       if (predictionsReceived[file] >= (batchesToSend[file] || 1)) {
-        updateQueue(file, worker);
+        updateQueue(file);
       }
       return worker;
     }
+
     await prepareQuery(embeddingsBatch[0]);
     predictionsReceived[file]++;
     if (predictionsReceived[file] >= (batchesToSend[file] || 1)) {
-      updateQueue(file, worker);
+      updateQueue(file);
     }
     return worker;
   }
-  if (!selection) {
-    let fileID = await generateInsertQuery(keysArray, speciesIDBatch, confidenceBatch, file, modelID, isCustomList).catch((error) =>
-      console.warn("Error generating insert query", error)
-    );
-    if (embeddingsBatch && fileID !== undefined){
-      await storeEmbeddings({db: STATE.db, dbMutex, fileID, embeddings: embeddingsBatch, keys: keysArray})
+
+  /*
+  ----------------------------------
+  DETECTION EXTRACTION
+  ----------------------------------
+  */
+
+  const threshold = selection ? 50 : detect.confidence;
+  const {overlap, mergeOverlaps, dropSingles} = STATE.detect;
+  const dropSingle = !selection && !!overlap && dropSingles;
+  const mergeOverlap = !!overlap && mergeOverlaps;
+
+
+  enqueueDetectionUpdate(file, batchIndex, () => {
+    return updateDetectionState({
+      file,
+      keysArray,
+      speciesIDBatch,
+      confidenceBatch,
+      threshold,
+      predictionLength,
+      dropSingles: dropSingle,
+      isCustomList,
+      merge: mergeOverlap,
+    });
+  });
+
+  /*
+  ----------------------------------
+  STORE EMBEDDINGS
+  ----------------------------------
+  */
+
+  if (!selection && embeddingsBatch) {
+    STATE.fileIDMap ??= new Map;
+    const fileIDMap = STATE.fileIDMap
+    if (!fileIDMap.has(file)) {
+      const row = await STATE.db.getAsync('SELECT id FROM files WHERE name = ?', file);
+      fileIDMap.set(file, row?.id);
+    }
+    const fileID = fileIDMap.get(file);
+    if (fileID !== undefined) {
+      await storeEmbeddings({
+        db: STATE.db,
+        dbMutex,
+        fileID,
+        embeddings: embeddingsBatch,
+        keys: keysArray
+      });
     }
   }
-  if (index < 500) {
-    const included = await getIncludedIDs(file).catch((error) =>
-      console.warn("Error getting included IDs", error)
-    );
-    const loopConfidence =  selection ? 50 : detect.confidence;
-    
-    for (let i = 0; i < keysArray.length; i++) {
-      let updateUI = false;
-      let key = parseFloat(keysArray[i]);
-      const timestamp = METADATA[file].fileStart + key * 1000;
-      const confidenceArray = confidenceBatch[i];
-      const speciesIDArray = speciesIDBatch[i];
-      for (let j = 0; j < confidenceArray.length; j++) {
-        let confidence = Math.round(confidenceArray[j] * 1000);
-        const species = speciesIDArray[j]
-        const speciesID = species + 1; //STATE.speciesMap.get(modelID).get(species);
-        updateUI = selection || !included.length || included.includes(speciesID);
-        if (updateUI) {
-          let end;
-          if (selection) {
-            const duration = (selection.end - selection.start) / 1000;
-            end = key + duration;
-          } else { end = key + predictionLength }
 
-          const [sname, cname] = STATE.allLabels[species].split(getSplitChar());
-          const lat = METADATA[file].lat || STATE.lat;
-          const lon = METADATA[file].lon || STATE.lon;
-          const isDaylight = isDuringDaylight(timestamp, lat, lon);
-          const result = {
-            timestamp,
-            position: key,
-            end,
-            file,
-            cname,
-            sname,
-            isDaylight,
-            score: confidence,
-            model: STATE.model,
-          };
-          if (isCustomList && !selection){
-            if (!allowedByList(result)) continue;
-          } else if (confidence < loopConfidence) break;
 
-          sendResult(++index, result, false);
-          if (index > 499) {
-            setGetSummaryQueryInterval(NUM_WORKERS);
-            DEBUG &&
-              console.log("Reducing summary updates to one every", STATE.incrementor);
-          }
-          // Only show the highest confidence detection, unless it's a selection analysis
-          if (!selection) break;
-        }
-      }
-    }
-  } else if (index++ === 5_000) {
-    STATE.incrementor = 1000;
-    DEBUG && console.log("Reducing summary updates to one every 1000");
-  }
+  /*
+  ----------------------------------
+  PIPELINE MANAGEMENT
+  ----------------------------------
+  */
+
   predictionsReceived[file]++;
   const received = sumObjectValues(predictionsReceived);
-  if (!selection && worker === 0) estimateTimeRemaining(received);
+  if (!selection && worker === 0) {
+    estimateTimeRemaining(received);
+  }
   const batches = batchesToSend[file] || 1;
   const fileProgress = predictionsReceived[file] / batches;
   if (!selection && STATE.increment() === 0) {
     getSummary({ interim: true });
   }
   if (fileProgress === 1) {
-    updateQueue(response.file, worker);
-    DEBUG &&
-      console.log(
-        `File ${file} processed after ${
-          (new Date() - predictionStart) / 1000
-        } seconds: ${QUEUE.getSize('pending') + QUEUE.getSize('inProgress')} files to go`
-      );
-    if (QUEUE.allComplete()) {
+    
+  }
+  return worker;
+};
+
+async function onDetectionComplete(file) {
+  const { modelID, detect, selection } = STATE;
+  const {overlap, dropSingles} = detect;
+  const dropSingle = !selection && !!overlap && dropSingles;
+  const metadata = METADATA[file];
+  const lat = metadata.lat || STATE.lat;
+  const lon = metadata.lon || STATE.lon;
+  const isCustomList = STATE.list === "custom";
+
+  const remaining = flushDetectionState(file, dropSingle);
+
+  if (remaining.length) {
+    await generateInsertQuery(
+      remaining,
+      file,
+      modelID,
+      isCustomList
+    ).catch(console.warn);
+
+    await sendResultsToUI(
+      remaining,
+      file,
+      modelID,
+      lat,
+      lon,
+      isCustomList
+    );
+    STATE.selection || getSummary();
+  }
+  updateQueue(file);
+
+  if (QUEUE.allComplete()) {
       if (index === 0) {
-        if (STATE.selection) {
+        if (selection) {
           generateAlert({ message: "noDetections" });
         } else {
           generateAlert({
@@ -3469,18 +3689,45 @@ const parsePredictions = async (response) => {
             variables: {
               file,
               list: STATE.list,
-              confidence: STATE.detect.confidence / 10,
-            },
+              confidence: STATE.detect.confidence / 10
+            }
           });
         }
       }
-      STATE.selection || getSummary(); 
     }
-  }
-  return worker;
-};
+}
 
-
+async function sendResultsToUI (detections, file, modelID, lat, lon, isCustomList){
+  const included = await getIncludedIDs(file).catch(console.warn);
+  const metadata = METADATA[file];
+    for (const det of detections) {      
+      const {species: species, start, end} = det;
+      if (included.length && !included.includes(species + 1)) {
+        continue;
+      }
+      const timestamp = metadata.fileStart + start * 1000;
+      const [sname, cname] =
+        STATE.modelLabels[species].split(getSplitChar());
+      const result = {
+        timestamp,
+        position: start,
+        end,
+        file,
+        cname,
+        sname,
+        isDaylight: isDuringDaylight(timestamp, lat, lon),
+        score: det.confidence,
+        model: STATE.model
+      };
+      if (isCustomList && !STATE.selection) {
+        if (!allowedByList(result)) continue;
+      }
+      sendResult(++index, result, false);
+      if (index > 499) {
+        setGetSummaryQueryInterval(NUM_WORKERS);
+      }
+    }
+}
 /**
  * Estimate remaining analysis time from processed batches and post localized progress to the UI footer.
  *
@@ -3616,13 +3863,13 @@ async function parseMessage(e) {
  *
  * @param {string|object} file - File identifier (file path or file record) to remove from the processing list.
  */
-function updateQueue(file, worker) {
+function updateQueue(file) {
   // This method to determine file complete
   QUEUE.markComplete(file)
   if (DEBUG) console.log(
     "queue length is: ", QUEUE.getSize('inProgress') + QUEUE.getSize('pending')
     );
-  processNextFile({ worker: worker });
+  processNextFile();
 }
 
 
@@ -3638,8 +3885,7 @@ function updateQueue(file, worker) {
  */
 async function processNextFile({
   start = undefined,
-  end = undefined,
-  worker = undefined,
+  end = undefined
 } = {}) {
   const files = QUEUE.getAllPaths('pending');
   if (files.length === 0) {
@@ -3666,19 +3912,19 @@ async function processNextFile({
     }
   });
   if (found) {
+    STATE.lastProcessedBatch[file] = -1;
     let boundaries = [];
     if (start === undefined)
       try {
         boundaries = await setStartEnd(file);
       } catch (error) {
         console.warn("Error in setStartEnd", error);
-        updateQueue(file, worker);
+        updateQueue(file);
         return;
       }
     else {
       boundaries.push({ start: start, end: end });
-      const batches = Math.ceil((end - start - EPSILON) / (BATCH_SIZE * WINDOW_SIZE));
-      batchesToSend[file] = batches;
+      batchesToSend[file] = getBatchesToSend(end - start - EPSILON);
     }
     for (let i = 0; i < boundaries.length; i++) {
       const { start, end } = boundaries[i];
@@ -3686,7 +3932,7 @@ async function processNextFile({
         // Nothing to do for this file
         generateAlert({ message: "noNight", variables: { file } });
         DEBUG && console.log("Recursion: start = end");
-        updateQueue(file, worker);
+        updateQueue(file);
         continue;
       } else {
         if (!STATE.selection && !sumObjectValues(predictionsReceived)) {
@@ -3713,7 +3959,7 @@ async function processNextFile({
           await getPredictBuffers({ file, start, end });
         } catch (error) {
           console.warn(error);
-          updateQueue(file, worker);
+          updateQueue(file);
           return; // stop processing this file after queue advancement
         }
       }
@@ -3721,7 +3967,7 @@ async function processNextFile({
   } else {
     DEBUG && console.log("Recursion: file not found");
     QUEUE.transition(file, 'inProgress', 'missing'); // Ensure missing files are marked as such in the queue
-    updateQueue(file, worker); // advances queue; markComplete no-ops on terminal states
+    updateQueue(file); // advances queue; markComplete no-ops on terminal states
   }
 }
 
@@ -3763,10 +4009,12 @@ function calculateTimeBoundaries(
   // Amount clipped from the file
   const clippedSeconds = Math.max(0, fileDurationSeconds - keptSeconds);
   // Update global state
-  STATE.clippedBatches += Math.ceil(clippedSeconds / (BATCH_SIZE * WINDOW_SIZE));
+  STATE.clippedBatches += getBatchesToSend(clippedSeconds);
   STATE.clippedFilesDuration += clippedSeconds;
-  const batches = Math.ceil((keptSeconds - EPSILON) / (BATCH_SIZE * WINDOW_SIZE));
-  batchesToSend[file] = batches;
+  batchesToSend[file] = intervals.reduce((total, interval) => {
+    if (interval.start == null || interval.end == null) return total;
+    return total + getBatchesToSend(interval.end - interval.start - EPSILON);
+  }, 0);
   return intervals;
 }
 
@@ -3844,10 +4092,22 @@ async function setStartEnd(file) {
     );
   } else {
     boundaries = [{ start: 0, end: meta.duration }];
-    const batches = Math.ceil((meta.duration - EPSILON) / (BATCH_SIZE * WINDOW_SIZE));
-    batchesToSend[file] = Math.max(1, batches);
+    batchesToSend[file] = getBatchesToSend(meta.duration);
   }
   return boundaries;
+}
+
+function getBatchesToSend(duration) {
+  const overlap = STATE.detect.overlap;
+  const stepSamples = Math.round(sampleRate * WINDOW_SIZE * (1 - overlap));
+  const windowSamples = Math.round(sampleRate * WINDOW_SIZE);
+  const durationSamples = Math.round(duration * sampleRate);
+  if (durationSamples <= windowSamples) {
+    const windows = Math.floor((durationSamples - 1) / stepSamples) + 1;
+    return Math.max(1, Math.ceil(windows / BATCH_SIZE));
+  }
+  const windows = Math.floor((durationSamples - windowSamples) / stepSamples) + 1;
+  return Math.max(1, Math.ceil(windows / BATCH_SIZE));
 }
 
 const getSummary = async ({
@@ -4627,7 +4887,7 @@ const getValidSpecies = async (file) => {
     );
   }
   const splitChar = getSplitChar();
-  for (const [index, speciesName] of STATE.allLabels.entries()) {
+  for (const [index, speciesName] of STATE.modelLabels.entries()) {
     const i = index + 1;
     const [cname, sname] = speciesName.split(splitChar).reverse();
     if (cname.includes("ackground") || cname.includes("Unknown")) continue; // skip background and unknown species
@@ -5402,7 +5662,7 @@ async function setIncludedIDs(lat, lon, week) {
   DEBUG && console.log("calling for a new list");
   // Store the promise in the cache immediately
   LIST_CACHE[key] = (async () => {
-    const { model, modelPath, allLabels:labels, list:listType, customLabels, local:localBirdsOnly, speciesThreshold:threshold, useWeek } = STATE;
+    const { model, modelPath, modelLabels:labels, list:listType, customLabels, local:localBirdsOnly, speciesThreshold:threshold, useWeek } = STATE;
     const { result, messages } = await LIST_WORKER({
       message: "get-list",
       model,
@@ -5419,7 +5679,7 @@ async function setIncludedIDs(lat, lon, week) {
     });
     // // Add the *label* id of "Unknown Sp." to all lists
     STATE.list !== "everything" 
-      && result.push(STATE.allLabels.indexOf('Unknown Sp.,Unknown Sp.') + 1);
+      && result.push(STATE.modelLabels.indexOf('Unknown Sp.,Unknown Sp.') + 1);
 
     let includedObject = {};
     if (

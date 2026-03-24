@@ -98,7 +98,17 @@ onmessage = async (e) => {
         break;
       }
       case "predict": {
+        const { id, batchIndex, file, fileStart } = data;
         if (!myModel?.model_loaded) {
+          postMessage({
+            message: "prediction",
+            id,
+            batchIndex,
+            file,
+            fileStart,
+            worker,
+            error: "Model not ready",
+          });
           return console.log(
             "worker",
             worker,
@@ -108,12 +118,9 @@ onmessage = async (e) => {
         const {
           chunks,
           start,
-          fileStart,
-          file,
           confidence,
           context,
           resetResults,
-          id
         } = data;
         myModel.useContext = context;
         myModel.selection = !resetResults;
@@ -130,6 +137,7 @@ onmessage = async (e) => {
           fileStart,
           worker,
           selection: myModel.selection,
+          batchIndex
         };
         postMessage(response);
         myModel.result = [];
@@ -282,7 +290,6 @@ class ChirpityModel extends BaseModel {
     values.dispose();
     finalPrediction.dispose();
     newPrediction && newPrediction.dispose();
-    keys = keys.map((key) => (key / CONFIG.sampleRate).toFixed(3));
     if (keys.length < topIndices.length){
       // Trim return values to eliminate GPU padded silence from the results
       const len = keys.length;
@@ -316,13 +323,16 @@ class ChirpityModel extends BaseModel {
     });
 
     bufferList.dispose();
-    const maxKeys = Math.ceil(audioBuffer.length / this.chunkLength)
-    const batchKeys = [...Array(maxKeys).keys()].map(
-      (i) => start + this.chunkLength * i
+    // const maxKeys = Math.ceil(audioBuffer.length / this.chunkLength)
+    // const batchKeys = [...Array(maxKeys).keys()].map(
+    //   (i) => start + this.chunkLength * i
+    // );
+    const keys = start.map(
+      key => Math.round((key / this.config.sampleRate) * 10000) / 10000
     );
     const result = await this.predictBatch(
       specBatch,
-      batchKeys,
+      keys,
       confidence
     );
     specBatch.dispose();

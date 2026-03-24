@@ -224,10 +224,10 @@ const GLOBAL_ACTIONS = {
         STATE.windowOffsetSecs = 0;
         position = 0;
       } else {
-        STATE.windowOffsetSecs = Math.min(
+        STATE.windowOffsetSecs = Math.max(0,Math.min(
           STATE.windowOffsetSecs,
           STATE.currentFileDuration - STATE.windowLength
-        );
+        ));
         fileToLoad = STATE.currentFile;
       }
       postBufferUpdate({
@@ -277,7 +277,7 @@ const GLOBAL_ACTIONS = {
   F1: () => document.getElementById("navbarSettings").click(),
   F4: () =>  STATE.fileLoaded && (spec.wavesurfer && (config.FFT = spec.increaseFFT())),
   F5: () =>  STATE.fileLoaded && (spec.wavesurfer && (config.FFT = spec.reduceFFT())),
-  " ": () => { STATE.fileLoaded && WSPlayPause()},
+  " ": (e) => { STATE.fileLoaded  && WSPlayPause()},
   Tab: (e) => {
     if ((e.metaKey || e.ctrlKey) && !PREDICTING && STATE.diskHasRecords) {
       // If you did this when predicting, your results would go straight to the archive
@@ -1665,6 +1665,7 @@ async function showCharts() {
 async function showExplore() {
   // Change STATE.fileLoaded this one time, so a file will load!
   STATE.fileLoaded = true;
+  STATE.summary = null;
   saveAnalyseState();
   STATE.openFiles = [];
   const state = STATE.currentAnalysis;
@@ -1956,10 +1957,13 @@ const defaultConfig = {
     contextAware: false,
     merge: false,
     combine: false,
+    mergeOverlaps: true,
+    dropSingles: true,
     confidence: 45,
     iucn: true,
     iucnScope: "Global",
-    topRankin: 1
+    topRankin: 1,
+    overlap: 0,
   },
   filters: {
     active: false,
@@ -2230,6 +2234,13 @@ window.onload = async () => {
   DOM.audioFade.disabled = !DOM.audioPadding.checked;
   DOM.audioDownmix.checked = audio.downmix;
   setNocmig(detect.nocmig);
+  if (config.detect.combine) document.getElementById('model-icon').classList.remove('d-none')
+  document.getElementById("merge-overlaps").checked = detect.mergeOverlaps;
+  document.getElementById("drop-uncertain").checked = detect.dropSingles;
+  document.getElementById("auto-load").checked = detect.autoLoad;
+  document.getElementById("iucn").checked = detect.iucn;
+  document.getElementById("iucn-scope").value = detect.iucnScope;
+  handleModelChange(selectedModel, false)
   // Detection options
   const mergeSwitch = document.getElementById("merge-detections");
   mergeSwitch.checked = detect.merge;
@@ -2239,11 +2250,6 @@ window.onload = async () => {
   } else {
     document.getElementById("combine-detections").checked = config.detect.combine;  
   }
-  if (config.detect.combine) document.getElementById('model-icon').classList.remove('d-none')
-  document.getElementById("auto-load").checked = detect.autoLoad;
-  document.getElementById("iucn").checked = detect.iucn;
-  document.getElementById("iucn-scope").selected = detect.iucnScope;
-  handleModelChange(selectedModel, false)
   // List appearance in settings
   DOM.speciesThreshold.value = config.speciesThreshold;
   document.getElementById("species-week").checked = config.useWeek;
@@ -2256,6 +2262,7 @@ window.onload = async () => {
   DOM.debugMode.checked = config.debug;
   showThreshold(detect.confidence);
   showTopRankin(detect.topRankin)
+  showOverlap(detect.overlap);
 
   // Filters
   document.getElementById("HP-threshold").textContent = formatHz(config.filters.highPassFrequency);
@@ -3007,11 +3014,15 @@ window.addEventListener("resize", function () {
  * @param {KeyboardEvent} e - The keydown event.
  */
 function handleKeyDownDeBounce(e) {
+  const el = e.target;
+  if (['range','checkbox','radio','button','submit'].includes(el.type)) {
+      e.stopPropagation();
+  }
   if (
     !(
-      e.target instanceof HTMLInputElement ||
-      e.target instanceof HTMLTextAreaElement ||
-      e.target instanceof CustomSelect
+      el instanceof HTMLInputElement ||
+      el instanceof HTMLTextAreaElement ||
+      el instanceof CustomSelect
     )
   ) {
     e.preventDefault();
@@ -3681,7 +3692,7 @@ async function onWorkerLoadedAudio({
     : new Date(0, 0, 0, 0, 0, 0, 0).getTime();
   STATE.bufferStartTime = new Date(initialTime + windowBegin * 1000);
 
-  if (STATE.windowLength > STATE.currentFileDuration) STATE.windowLength = STATE.currentFileDuration;
+  STATE.windowLength = contents.byteLength / 48_000; // bufferbytes / (samplerate / 2)
 
   resetRegions();
   await spec.updateSpec({
@@ -3721,7 +3732,25 @@ function updatePagination(species) {
   }
 }
 
+function deepEqual(a, b) {
+  if (a === b) return true;
+  if (typeof a !== "object" || typeof b !== "object" || a == null || b == null) {
+    return false;
+  }
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+
+  for (const key of keysA) {
+    if (!keysB.includes(key) || !deepEqual(a[key], b[key])) {
+      return false;
+    }
+  }
+  return true;
+}
+
 const updateSummary = ({ summary = [], filterSpecies = "" }) => {
+  if (deepEqual(STATE.summary, summary)) return
   STATE.summary = summary;
   const i18 = i18n.get(i18n.Headings);
   const showIUCN = config.detect.iucn;
@@ -3938,6 +3967,7 @@ function onAnalysisComplete({ quiet }) {
       rate.toFixed(0) + "x faster than real time performance.";
     generateToast({ message: "complete" });
     displayProgress({percent: 100});
+    activateResultSort();
   }
 }
 
@@ -3954,7 +3984,7 @@ function removeNoEntry() {
  * @param {Array} [options.summary=[]] - Array of summary records to render in the summary table.
  */
 function onSummaryComplete({ filterSpecies = undefined, summary = [] }) {
-  updateSummary({ summary: summary, filterSpecies: filterSpecies });
+  if (summary.length) updateSummary({ summary: summary, filterSpecies: filterSpecies });
 
   // Add hover to the summary
   const summaryNode = document.getElementById("resultSummary");
@@ -4112,7 +4142,7 @@ async function renderResult({
       modelID
     } = result;
 
-    const logo = ['birdnet', 'nocmig', 'chirpity', 'perch', 'user'].includes(result.model) ? model : 'custom';
+    const logo = ['birdnet', 'nocmig', 'chirpity', 'perch', 'nighthawk', 'user'].includes(result.model) ? model : 'custom';
     const modelName = config.models[model]? utils.escapeHTML(config.models[model].displayName) : 'User';
     const dayNight = isDaylight ? "daytime" : "nighttime";
     const commentHTML = comment
@@ -4136,7 +4166,7 @@ async function renderResult({
     const spliceStart = position < 3600 ? 14 : 11;
     const UI_position = new Date(position * 1000)
       .toISOString()
-      .substring(spliceStart, 19);
+      .substring(spliceStart, 23);
     const showTimeOfDay = config.timeOfDay ? "" : "d-none";
     const showTimestamp = config.timeOfDay ? "d-none" : "";
     const activeTable = active ? "table-active" : "";
@@ -4698,7 +4728,7 @@ function filterResults({
 }
 
 const modelSettingsDisplay = () => {
-  // Sets system options according to model or machine cababilities
+  // Sets system options according to model or machine capabilities
   // cf. setListUIState
   const chirpityOnly = document.querySelectorAll(
     ".chirpity-only, .chirpity-only-visible"
@@ -4722,7 +4752,26 @@ const modelSettingsDisplay = () => {
     });
     DOM.contextAware.checked = config.detect.contextAware;
     DOM.contextAwareIcon.classList.remove("d-none");
-  }    
+  }
+  // Nighthawk
+  const notNighthawk = document.querySelectorAll(".not-nh");
+  if (config.selectedModel === 'nighthawk'){
+    notNighthawk.forEach((element) => {
+      element.classList.add("d-none");
+    });
+    // Turn off detect & combine
+    config.detect.combine = false;
+    config.detect.merge = false;
+    const combineEl = document.getElementById("combine-detections")
+    combineEl.checked = false;
+    combineEl.disabled = false;
+    document.getElementById("merge-detections").checked = false;
+    worker.postMessage({action: "update-state", detect: config.detect});
+  } else {
+    notNighthawk.forEach((element) => {
+      element.classList.remove("d-none");
+    });
+  }
 
   isMac && noMac.forEach((element) => element.classList.add("d-none"));
   if (config.hasNode) {
@@ -5083,18 +5132,25 @@ const hideConfidenceSlider = () => {
   confidenceSliderDisplay.classList.add("d-none");
 };
 
-/**
- * Updates the threshold display and input values in both the filter and settings panels.
- * @param {Event|number} e - The input event or numeric threshold value to display and set.
- */
-function showThreshold(e) {
-  const threshold = e instanceof Event ? e.target.valueAsNumber : e;
-  filterPanelThresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
-  settingsPanelThresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
-  filterPanelRangeInput.value = threshold;
-  settingsPanelRangeInput.value = threshold;
-}
+  /**
+   * Updates the threshold display and input values in both the filter and settings panels.
+   * @param {Event|number} e - The input event or numeric threshold value to display and set.
+   */
+  function showThreshold(e) {
+    const threshold = e instanceof Event ? e.target.valueAsNumber : e;
+    filterPanelThresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
+    settingsPanelThresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
+    filterPanelRangeInput.value = threshold;
+    settingsPanelRangeInput.value = threshold;
+  }
 
+const showOverlap = (e) => {
+  const overlap = e instanceof Event ? e.target.valueAsNumber : e * 100;  
+  document.getElementById('overlap-value').innerHTML = `<b>${overlap}%</b>`;
+  document.getElementById('overlap').value = overlap;
+  document.getElementById('drop-uncertain').disabled = !overlap;
+  document.getElementById('merge-overlaps').disabled = !overlap;
+}
 /**
  * Updates the radius display in the location modal.
  * @param {Event|number} e - The input event or numeric threshold value to display and set.
@@ -5145,6 +5201,20 @@ const handleThresholdChange = (e) => {
     filterResults();
   }
 };
+
+
+
+const handleOverlapChange = (e) => {
+  const overlap = e.target.valueAsNumber;
+  config.detect.overlap = overlap / 100;
+  updatePrefs("config.json", config);
+  worker.postMessage({
+    action: "update-state",
+    detect: { overlap: config.detect.overlap },
+  });
+  worker.postMessage({ action: "update-total-batches", files: STATE.openFiles });
+}
+
 
 // Filter handling
 const filterIconDisplay = () => {
@@ -5243,6 +5313,10 @@ document.addEventListener('input', (e) =>{
       showThreshold(e)
       break;
     }
+    case "overlap": {
+      showOverlap(e);
+      break; 
+    }
     case "location-radius": {
       showRadiusValue(e);
       break
@@ -5286,7 +5360,7 @@ const handlePassFilterchange = (el) => {
   });
   showFilterEffect();
   filterIconDisplay();
-  el.blur(); // Fix slider capturing the focus so you can't use spaceBar or hit 'p' directly
+  // el.blur(); // Fix slider capturing the focus so you can't use spaceBar or hit 'p' directly
 };
 
 
@@ -5300,7 +5374,7 @@ const handleLowShelfchange = () => {
   });
   showFilterEffect();
   filterIconDisplay();
-  DOM.LowShelfSlider.blur(); // Fix slider capturing thefocus so you can't use spaceBar or hit 'p' directly
+  // DOM.LowShelfSlider.blur(); // Fix slider capturing thefocus so you can't use spaceBar or hit 'p' directly
 };
 
 
@@ -5611,9 +5685,9 @@ async function handleUIClicks(e) {
           const modelFolder = files.filePaths[0]
           document.getElementById("import-location").value = modelFolder;
           const modelNameInput = document.getElementById("model-name");
-          // Prevent people changing Perch v2 name
+          // Prevent people changing Perch v2 or Nighthawk name
           modelNameInput.value = p.basename(modelFolder).replace(/^perch v2.*$/i, 'Perch v2');
-          modelNameInput.disabled = modelNameInput.value === 'Perch v2';
+          modelNameInput.disabled = ['perch v2', "nighthawk"].includes(modelNameInput.value.toLowerCase());
         }
       })();
       break;
@@ -5691,7 +5765,9 @@ async function handleUIClicks(e) {
 
       const modelName = displayName.toLowerCase();
       const modelLocation = document.getElementById('import-location').value;
-      const requiredFiles = modelName === 'perch v2' ? ['perch_v2.onnx', 'labels.txt'] : ['weights.bin', 'labels.txt', 'model.json'];
+      const requiredFiles = modelName === 'perch v2' 
+      ? ['perch_v2.onnx', 'labels.txt'] 
+      : ['weights.bin', 'labels.txt', 'model.json'];
       if (config.models[modelName] !== undefined){
         generateToast({message: 'A model with that name already exists', type:'error'})
         break;
@@ -6322,10 +6398,17 @@ document.addEventListener("change", async function (e) {
             document.getElementById('merge-detections').checked = false;
             config.detect.merge = false;
           }
-          worker.postMessage({
-            action: "update-state",
-            detect: config.detect,
-          });
+          worker.postMessage({ action: "update-state", detect: config.detect });
+          break;
+        }
+        case "merge-overlaps": {
+          config.detect.mergeOverlaps = element.checked;
+          worker.postMessage({ action: "update-state", detect: config.detect });
+          break;
+        }
+        case "drop-uncertain": {
+          config.detect.dropSingles = element.checked;
+          worker.postMessage({ action: "update-state", detect: config.detect });
           break;
         }
         case "auto-load": {
@@ -6383,6 +6466,10 @@ document.addEventListener("change", async function (e) {
         case "confidenceValue":
         case "confidence": {
           handleThresholdChange(e);
+          break;
+        }
+        case "overlap": {
+          handleOverlapChange(e);
           break;
         }
         case "context": {
@@ -6830,20 +6917,16 @@ async function readLabels(labelFile, updating) {
       });
     }
   } catch (error) {
-    if (error?.message?.startsWith("ENOENT")) {
-      generateToast({
-        type: "error",
-        message: "listNotFound",
-        variables: { file: labelFile },
-      });
-      DOM.customListSelector.classList.add("btn-outline-danger");
-      if (!document.getElementById("settings").classList.contains("show")) {
-        document.getElementById("navbarSettings").click();
-      }
-      document.getElementById("list-file-selector").focus();
-    } else {
-      console.error(`Error reading label file ${labelFile}:`, error);
+    generateToast({
+      type: "error",
+      message: "listNotFound",
+      variables: { file: labelFile || 'undefined' },
+    });
+    DOM.customListSelector.classList.add("btn-outline-danger");
+    if (!document.getElementById("settings").classList.contains("show")) {
+      document.getElementById("navbarSettings").click();
     }
+    document.getElementById("list-file-selector").focus();
   }
 }
 
