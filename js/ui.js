@@ -1507,6 +1507,7 @@ async function importData(format){
   const file = files.filePaths[0]
   const lastSaveFolder = p.dirname(file);
   localStorage.setItem("lastSaveFolder", lastSaveFolder);
+  STATE.summary = null;
   DOM.loadingScreen.classList.remove("d-none");
   worker.postMessage({
     action: "import-results",

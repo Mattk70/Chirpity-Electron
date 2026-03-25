@@ -495,7 +495,15 @@ async function handleMessage(e) {
           
         })
       if (result) {
-        const {files, meta} = result;
+        const {files, meta, missing} = result;
+        if (missing.length) {
+          const max = 5;
+          const hasMore = missing.length > max;
+          const variables = {
+            error: missing.slice(0, max).join('<br>') + (hasMore ? '<br>…' : '')
+          }
+          generateAlert({message: 'noFile', type: 'warning', variables})
+        }
         METADATA = meta;
         QUEUE.setFiles(await getFiles({
           files, 
@@ -3482,7 +3490,7 @@ async function processDetectionQueue(file) {
     queue.delete(nextIndex);
     const result = task(); // synchronous
     if (result.length){
-        await generateInsertQuery(result, file, modelID, isCustomList);
+        selection || await generateInsertQuery(result, file, modelID, isCustomList);
         await sendResultsToUI(
         result,
         file,
@@ -3649,8 +3657,8 @@ const parsePredictions = async (response) => {
 };
 
 async function onDetectionComplete(file) {
-  const { modelID, detect, selection } = STATE;
-  const {overlap, dropSingles} = detect;
+  const { modelID, detect, selection, list } = STATE;
+  const {overlap, dropSingles, confidence} = detect;
   const dropSingle = !selection && !!overlap && dropSingles;
   const metadata = METADATA[file];
   const lat = metadata.lat || STATE.lat;
@@ -3660,7 +3668,7 @@ async function onDetectionComplete(file) {
   const remaining = flushDetectionState(file, dropSingle);
 
   if (remaining.length) {
-    await generateInsertQuery(
+    selection || await generateInsertQuery(
       remaining,
       file,
       modelID,
@@ -3675,7 +3683,7 @@ async function onDetectionComplete(file) {
       lon,
       isCustomList
     );
-    STATE.selection || getSummary();
+    selection || getSummary();
   }
   updateQueue(file);
 
@@ -3688,8 +3696,8 @@ async function onDetectionComplete(file) {
             message: "noDetectionsDetailed2",
             variables: {
               file,
-              list: STATE.list,
-              confidence: STATE.detect.confidence / 10
+              list,
+              confidence: confidence / 10
             }
           });
         }
