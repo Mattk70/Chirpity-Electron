@@ -8,6 +8,7 @@ export class UIState {
       this.update = this.update.bind(this);
   
       this._state = {
+        XCcontroller: null, //holds an abortcontroller for XC requests
         metadata: {},
         lastGestureTime: 0,
         mode: "analyse",

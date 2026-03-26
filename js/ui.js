@@ -7873,6 +7873,28 @@ import Spectrogram from "../node_modules/wavesurfer.js/dist/plugins/spectrogram.
 
 let ws;
 
+/**
+ * Fetch an audio url to load into wavesurfer
+ * @param {*} url 
+ * @param {*} wavesurfer a wavesurfer instance
+ * @returns abortcontroller instance
+ */
+
+function loadXCFile(url, wavesurfer) {
+  const controller = new AbortController();
+  const startTime = Date.now();
+  fetch(url, { signal: controller.signal })
+    .then(res => res.blob())
+    .then(blob => wavesurfer.loadBlob(blob))
+    .catch(err => {
+      if (err.name === 'AbortError') {
+        console.warn(`User Cancelled XC API call after ${Math.round((Date.now() - startTime)/1000)} seconds`);
+        return
+      }
+      throw err
+    });
+  return controller; // so caller can cancel
+}
 const createCompareWS = (mediaContainer) => {
   ws?.destroy();
   const bats = config.selectedModel.includes('bats');
@@ -7908,6 +7930,8 @@ const createCompareWS = (mediaContainer) => {
 };
 
 function showCompareSpec() {
+  // cancel previous request
+  STATE.XCcontroller?.abort();
   const activeCarouselItem = document.querySelector(
     "#recordings .tab-pane.active .carousel-item.active"
   );
@@ -7920,6 +7944,7 @@ function showCompareSpec() {
   activeXCLink && activeXCLink.classList.remove("d-none");
 
   const mediaContainer = activeCarouselItem.lastChild;
+
   // need to prevent accumulation, and find event for show/hide loading
   const loading = DOM.loading.cloneNode(true);
   loading.classList.remove("d-none", "text-white");
@@ -7931,7 +7956,8 @@ function showCompareSpec() {
   ws.once("decode", function () {
     mediaContainer.removeChild(loading);
   });
-  ws.load(file);
+  setTimeout(() => loading?.remove(), 10_000) // Clear loading after 10 seconds
+  STATE.XCcontroller = loadXCFile(file, ws);
 }
 
 
