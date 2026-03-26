@@ -166,7 +166,7 @@ const setupFfmpegCommand = async ({
     // No sample rate is supplied when exporting audio.
     // If the sampleRate is 256k, Wavesurfer will handle the tempo/pitch conversion
     if ((training || sampleRate) && sampleRate !== 256000) {
-      const { getAudioMetadata } = require("./models/training.js");
+      const { getAudioMetadata } = await import("./models/training.js");
       const {bitrate} = await getAudioMetadata(file);
       const MIN_EXPECTED_BITRATE = 96000; // Lower bitrates aren't capturing ultrasonic frequencies
       if (bitrate < MIN_EXPECTED_BITRATE) console.warn(file, 'has bitrate', bitrate)
