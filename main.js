@@ -5,6 +5,7 @@ const isMac = process.platform === "darwin"; // macOS check
 const arch = process.arch;
 const {
   app,
+  session,
   Menu,
   dialog,
   ipcMain,
@@ -576,7 +577,17 @@ app.whenReady().then(async () => {
     ipcMain.handle("getVersion", () => version);
   }
 
+  // Set referer for openstreetmap
+  const filter = {
+    urls: ['https://*.tile.openstreetmap.org/*']
+  };
 
+  session.defaultSession.webRequest.onBeforeSendHeaders(filter, (details, callback) => {
+    // Set a custom referer
+    details.requestHeaders['Referer'] = 'https://chirpity.app/map';
+
+    callback({ requestHeaders: details.requestHeaders });
+  });
     
     // Debug mode
     try {

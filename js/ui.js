@@ -50,11 +50,11 @@ window.addEventListener("unhandledrejection", function (event) {
 
   // Track the unhandled promise rejection
   trackEvent(
-    {uuid:config.UUID,
+    {uuid:config?.UUID,
     event: "Unhandled UI PR",
     action: errorMessage,
     name: customURLEncode(stackTrace),
-    version: config.VERSION}
+    version: config?.VERSION}
   );
 });
 
@@ -66,11 +66,11 @@ window.addEventListener("rejectionhandled", function (event) {
 
   // Track the unhandled promise rejection
   trackEvent(
-      {uuid:config.UUID,
+      {uuid:config?.UUID,
       event: "Handled UI PR",
       action: errorMessage,
       name: customURLEncode(stackTrace),
-      version: config.VERSION}
+      version: config?.VERSION}
   );
 });
 
