@@ -48,7 +48,7 @@ let INITIALISED = new Promise((resolve, reject) => {
   initialiseResolve = resolve;
   initialiseReject = reject;
 });
-const EPSILON = 1e-6;
+const EPSILON = 1e-5;
 const generateAlert = ({
   message,
   type,
@@ -179,6 +179,7 @@ const setupFfmpegCommand = async ({
     // }
   } 
   let duration = end - start;
+
   if (training) duration *= 10 // Dilate 10x for bat training
   
   additionalFilters.forEach(filter => command.audioFilters(filter))
@@ -216,6 +217,21 @@ const setupFfmpegCommand = async ({
     }
   });
   return command;
+};
+
+const updateBatches = (file, actualDuration, start, end) => {
+  const metaDuration = METADATA[file].duration;
+  if (start === 0 && end === metaDuration && isFinite(actualDuration) && actualDuration + EPSILON < metaDuration) {
+    // If we have a short file (header duration > processed duration)
+    // *and* were looking for the whole file, we'll fix # of expected chunks here
+    const before = batchesToSend[file]
+    batchesToSend[file] = getBatchesToSend(actualDuration);
+    if (before > batchesToSend[file]) {
+      if (fs.existsSync(file)) console.warn("File duration mismatch", before - batchesToSend[file])
+      else console.warn("File duration mismatch", "File missing");
+    }
+    METADATA[file].duration = actualDuration;
+  }
 };
 
 const getSelectionRange = (file, start, end) => {
@@ -2608,7 +2624,11 @@ async function processAudio(
     file,
     endTime,
     trimSeconds: remainingTrimSeconds,
-    alertFn: generateAlert
+    alertFn: generateAlert,
+    onComplete: (bytes) => {
+      const durationMeasured = bytes / (2 * sampleRate);
+      updateBatches(file, durationMeasured, start, endTime);
+    }
   });
 
   const workerQueue = STATE.workerQueue;
@@ -3499,7 +3519,7 @@ async function processDetectionQueue(file) {
         lon,
         isCustomList
       );
-      if (!selection) await getSummary();
+      if (!selection) await getSummary({interim: true});
     }
     STATE.lastProcessedBatch[file] = nextIndex;
     STATE.nextExpectedIndex[file]++;
@@ -3645,14 +3665,6 @@ const parsePredictions = async (response) => {
   if (!selection && worker === 0) {
     estimateTimeRemaining(received);
   }
-  const batches = batchesToSend[file] || 1;
-  const fileProgress = predictionsReceived[file] / batches;
-  if (!selection && STATE.increment() === 0) {
-    getSummary({ interim: true });
-  }
-  if (fileProgress === 1) {
-    
-  }
   return worker;
 };
 
@@ -3683,7 +3695,7 @@ async function onDetectionComplete(file) {
       lon,
       isCustomList
     );
-    selection || getSummary();
+    selection || getSummary({interim: true});
   }
   updateQueue(file);
 
@@ -3898,6 +3910,7 @@ async function processNextFile({
   const files = QUEUE.getAllPaths('pending');
   if (files.length === 0) {
     if (QUEUE.getSize('inProgress') === 0) {
+      await getSummary();
       DEBUG && console.log("All files processed.");
       UI.postMessage({ event: "analysis-complete" });
     }
@@ -4108,13 +4121,8 @@ async function setStartEnd(file) {
 function getBatchesToSend(duration) {
   const overlap = STATE.detect.overlap;
   const stepSamples = Math.round(sampleRate * WINDOW_SIZE * (1 - overlap));
-  const windowSamples = Math.round(sampleRate * WINDOW_SIZE);
   const durationSamples = Math.round(duration * sampleRate);
-  if (durationSamples <= windowSamples) {
-    const windows = Math.floor((durationSamples - 1) / stepSamples) + 1;
-    return Math.max(1, Math.ceil(windows / BATCH_SIZE));
-  }
-  const windows = Math.floor((durationSamples - windowSamples) / stepSamples) + 1;
+  const windows = Math.floor((durationSamples - 1) / stepSamples) + 1;
   return Math.max(1, Math.ceil(windows / BATCH_SIZE));
 }
 
@@ -4127,6 +4135,8 @@ const getSummary = async ({
   interim,
   action,
 } = {}) => {
+  if (interim && STATE.summaryRunning) return;
+  STATE.summaryRunning = true;
   const {sql, params} = await prepSummaryStatement();
   const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
   const rows = await STATE.db.allAsync(sql, ...params);
@@ -4134,7 +4144,7 @@ const getSummary = async ({
     STATE.list === 'custom'
       ? rows.filter(allowedByList)
       : rows;
-  let summary = {};
+  let summary = Object.create(null);
 
   for (const row of allowedRows) {
     const key = row.cname;
@@ -4175,6 +4185,7 @@ const getSummary = async ({
       action: action,
     });
   }
+  STATE.summaryRunning = false;
 };
 
 /**

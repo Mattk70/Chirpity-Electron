@@ -116,7 +116,8 @@ export class WorkerState {
     this.detectionQueues = Object.create(null),
     this.nextExpectedIndex = Object.create(null), 
     this.detectionRunning = Object.create(null),
-    this.lastProcessedBatch = Object.create(null)
+    this.lastProcessedBatch = Object.create(null),
+    this.summaryRunning = false
   }
 
   update(updates) {
@@ -159,12 +160,4 @@ export class WorkerState {
     this.originalFiles = undefined;
   }
 
-  // Used to decrease calls to get summary when prepping a dataset
-  // because it's an expensive op when the memory db is v. large
-  increment() {
-    if (++this.predictionCount >= this.incrementor) {
-      this.predictionCount = 0;
-    }
-    return this.predictionCount;
-  }
 }
