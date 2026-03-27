@@ -3519,7 +3519,7 @@ async function processDetectionQueue(file) {
         lon,
         isCustomList
       );
-      if (!selection) await getSummary({interim: true});
+      if (!selection) await getSummary({interim: true}).catch(console.warn);
     }
     STATE.lastProcessedBatch[file] = nextIndex;
     STATE.nextExpectedIndex[file]++;

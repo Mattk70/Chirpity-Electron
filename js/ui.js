@@ -7877,10 +7877,11 @@ let ws;
  * Fetch an audio url to load into wavesurfer
  * @param {*} url 
  * @param {*} wavesurfer a wavesurfer instance
+ * @param {function} onCleanup callback to clear loading overlay
  * @returns abortcontroller instance
  */
 
-function loadXCFile(url, wavesurfer) {
+function loadXCFile(url, wavesurfer, onCleanup) {
   const controller = new AbortController();
   const startTime = Date.now();
   fetch(url, { signal: controller.signal })
@@ -7894,10 +7895,12 @@ function loadXCFile(url, wavesurfer) {
     .catch(err => {
       if (err.name === 'AbortError') {
         console.warn(`User Cancelled XC API call after ${Math.round((Date.now() - startTime)/1000)} seconds`);
+        onCleanup && onCleanup();
         return;
       }
       console.warn("Failed to load XC audio", err);
       generateToast({ type: "warning", message: "noComparisons" });
+      onCleanup && onCleanup();
     });
   return controller; // so caller can cancel
 }
@@ -7962,7 +7965,7 @@ function showCompareSpec() {
   const clearLoading = () => loading.remove();
   ws.once("decode", clearLoading);
   setTimeout(clearLoading, 10_000); // Clear loading after 10 seconds
-  STATE.XCcontroller = loadXCFile(file, ws);
+  STATE.XCcontroller = loadXCFile(file, ws, clearLoading);
 }
 
 
