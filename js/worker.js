@@ -3695,7 +3695,7 @@ async function onDetectionComplete(file) {
       lon,
       isCustomList
     );
-    selection || getSummary({interim: true});
+    selection || getSummary({interim: true}).catch(console.warn);
   }
   updateQueue(file);
 

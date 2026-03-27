@@ -7860,6 +7860,8 @@ function renderComparisons(lists, cname) {
   callTypeHeader.addEventListener("click", showCompareSpec);
   const comparisonModal = new bootstrap.Modal(compareDiv);
   compareDiv.addEventListener("hidden.bs.modal", () => {
+    STATE.XCcontroller?.abort();
+    STATE.XCcontroller = null;
     ws && ws.destroy();
     ws = null;
     compareDiv.remove();
