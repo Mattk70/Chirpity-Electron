@@ -45,8 +45,9 @@ let LABELS = [],
 window.addEventListener("unhandledrejection", function (event) {
   if (isTestEnv) return
   // Extract the error message and stack trace from the event
-  const errorMessage = event.reason.message;
-  const stackTrace = event.reason.stack;
+  const reason = event.reason;
+  const errorMessage = reason?.message ?? String(reason ?? "Unknown rejection");
+  const stackTrace = reason?.stack ?? "";
 
   // Track the unhandled promise rejection
   trackEvent(
@@ -61,8 +62,9 @@ window.addEventListener("unhandledrejection", function (event) {
 window.addEventListener("rejectionhandled", function (event) {
   if (isTestEnv) return
   // Extract the error message and stack trace from the event
-  const errorMessage = event.reason.message;
-  const stackTrace = event.reason.stack;
+  const reason = event.reason;
+  const errorMessage = reason?.message ?? String(reason ?? "Unknown rejection");
+  const stackTrace = reason?.stack ?? "";
 
   // Track the unhandled promise rejection
   trackEvent(
