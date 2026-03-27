@@ -26,7 +26,7 @@ async function countLines(filePath) {
    * @param {Object} options.METADATA - Metadata object to be updated during import.
    * @param {Object} options.defaultLocation - Default location object used for new entries.
    * @param {Function} options.setMetadata - Callback to update metadata for new files.
-   * @returns {Promise<{files: string[], meta: Object}>} Resolves with a list of unique files processed and the updated metadata.
+   * @returns {Promise<{files: string[], meta: Object, missing: string[]}>} Resolves with a list of unique files processed and the updated metadata.
    *
    * @throws {Error} If a parsing or database error occurs, or if required entities are missing.
    */

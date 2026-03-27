@@ -579,7 +579,7 @@ app.whenReady().then(async () => {
 
   // Set referer for openstreetmap
   const filter = {
-    urls: ['https://*.tile.openstreetmap.org/*']
+    urls: ['https://tile.openstreetmap.org/*','https://*.tile.openstreetmap.org/*']
   };
 
   session.defaultSession.webRequest.onBeforeSendHeaders(filter, (details, callback) => {

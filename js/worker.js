@@ -3910,7 +3910,9 @@ async function processNextFile({
   const files = QUEUE.getAllPaths('pending');
   if (files.length === 0) {
     if (QUEUE.getSize('inProgress') === 0) {
-      await getSummary();
+      if (!STATE.selection) {
+        await getSummary().catch(console.warn);
+      }
       DEBUG && console.log("All files processed.");
       UI.postMessage({ event: "analysis-complete" });
     }
@@ -4136,56 +4138,59 @@ const getSummary = async ({
   action,
 } = {}) => {
   if (interim && STATE.summaryRunning) return;
-  STATE.summaryRunning = true;
-  const {sql, params} = await prepSummaryStatement();
-  const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
-  const rows = await STATE.db.allAsync(sql, ...params);
-  const allowedRows =
-    STATE.list === 'custom'
-      ? rows.filter(allowedByList)
-      : rows;
-  let summary = Object.create(null);
+  try{
+    STATE.summaryRunning = true;
+    const {sql, params} = await prepSummaryStatement();
+    const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
+    const rows = await STATE.db.allAsync(sql, ...params);
+    const allowedRows =
+      STATE.list === 'custom'
+        ? rows.filter(allowedByList)
+        : rows;
+    let summary = Object.create(null);
 
-  for (const row of allowedRows) {
-    const key = row.cname;
+    for (const row of allowedRows) {
+      const key = row.cname;
 
-    if (!summary[key]) {
-      summary[key] = {
-        cname: row.cname,
-        sname: row.sname,
-        count: 0,
-        calls: 0,
-        max: 0
-      };
+      if (!summary[key]) {
+        summary[key] = {
+          cname: row.cname,
+          sname: row.sname,
+          count: 0,
+          calls: 0,
+          max: 0
+        };
+      }
+
+      summary[key].count += 1;
+      summary[key].calls += row.callCount || 1;
+      summary[key].max = Math.max(summary[key].max, row.score);
     }
-
-    summary[key].count += 1;
-    summary[key].calls += row.callCount || 1;
-    summary[key].max = Math.max(summary[key].max, row.score);
+    const [field, direction] = STATE.summarySortOrder.split(" ");
+    const sortFunctions = {
+      count: (a, b) => direction === "ASC" ? a.count - b.count : b.count - a.count, 
+      calls: (a, b) => direction === "ASC" ? a.calls - b.calls : b.calls - a.calls,
+      max: (a, b) => direction === "ASC" ? a.max - b.max : b.max - a.max,
+      cname: (a, b) => direction === "ASC" ? a.cname.localeCompare(b.cname) : b.cname.localeCompare(a.cname),
+      sname: (a, b) => direction === "ASC" ? a.sname.localeCompare(b.sname) : b.sname.localeCompare(a.sname),
+    };
+    summary = Object.values(summary).sort(sortFunctions[field]);
+    if (format){ // Export called
+      await exportData(summary, path, format, headers);
+    } else {
+      const event = interim ? "update-summary" : "summary-complete";
+      UI.postMessage({
+        event: event,
+        summary: summary,
+        offset: offset,
+        filterSpecies: species,
+        active: active,
+        action: action,
+      });
+    }
+  } finally{
+    STATE.summaryRunning = false;
   }
-  const [field, direction] = STATE.summarySortOrder.split(" ");
-  const sortFunctions = {
-    count: (a, b) => direction === "ASC" ? a.count - b.count : b.count - a.count, 
-    calls: (a, b) => direction === "ASC" ? a.calls - b.calls : b.calls - a.calls,
-    max: (a, b) => direction === "ASC" ? a.max - b.max : b.max - a.max,
-    cname: (a, b) => direction === "ASC" ? a.cname.localeCompare(b.cname) : b.cname.localeCompare(a.cname),
-    sname: (a, b) => direction === "ASC" ? a.sname.localeCompare(b.sname) : b.sname.localeCompare(a.sname),
-  };
-  summary = Object.values(summary).sort(sortFunctions[field]);
-  if (format){ // Export called
-    await exportData(summary, path, format, headers);
-  } else {
-    const event = interim ? "update-summary" : "summary-complete";
-    UI.postMessage({
-      event: event,
-      summary: summary,
-      offset: offset,
-      filterSpecies: species,
-      active: active,
-      action: action,
-    });
-  }
-  STATE.summaryRunning = false;
 };
 
 /**

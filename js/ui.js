@@ -1507,7 +1507,7 @@ async function importData(format){
   const file = files.filePaths[0]
   const lastSaveFolder = p.dirname(file);
   localStorage.setItem("lastSaveFolder", lastSaveFolder);
-  STATE.summary = null;
+  STATE.summary = [];
   DOM.loadingScreen.classList.remove("d-none");
   worker.postMessage({
     action: "import-results",
@@ -1666,7 +1666,7 @@ async function showCharts() {
 async function showExplore() {
   // Change STATE.fileLoaded this one time, so a file will load!
   STATE.fileLoaded = true;
-  STATE.summary = null;
+  STATE.summary = [];
   saveAnalyseState();
   STATE.openFiles = [];
   const state = STATE.currentAnalysis;
@@ -7884,14 +7884,20 @@ function loadXCFile(url, wavesurfer) {
   const controller = new AbortController();
   const startTime = Date.now();
   fetch(url, { signal: controller.signal })
-    .then(res => res.blob())
+    .then((res) => {
+      if (!res.ok) {
+        throw new Error(`XC audio download failed with HTTP ${res.status}`);
+      }
+      return res.blob();
+    })
     .then(blob => wavesurfer.loadBlob(blob))
     .catch(err => {
       if (err.name === 'AbortError') {
         console.warn(`User Cancelled XC API call after ${Math.round((Date.now() - startTime)/1000)} seconds`);
-        return
+        return;
       }
-      throw err
+      console.warn("Failed to load XC audio", err);
+      generateToast({ type: "warning", message: "noComparisons" });
     });
   return controller; // so caller can cancel
 }
@@ -7953,10 +7959,9 @@ function showCompareSpec() {
   const [_, file] = mediaContainer.getAttribute("name").split("|");
   // Create an instance of WaveSurfer
   createCompareWS(mediaContainer);
-  ws.once("decode", function () {
-    mediaContainer.removeChild(loading);
-  });
-  setTimeout(() => loading?.remove(), 10_000) // Clear loading after 10 seconds
+  const clearLoading = () => loading.remove();
+  ws.once("decode", clearLoading);
+  setTimeout(clearLoading, 10_000); // Clear loading after 10 seconds
   STATE.XCcontroller = loadXCFile(file, ws);
 }
 
