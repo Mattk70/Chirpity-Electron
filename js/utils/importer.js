@@ -26,7 +26,7 @@ async function countLines(filePath) {
    * @param {Object} options.METADATA - Metadata object to be updated during import.
    * @param {Object} options.defaultLocation - Default location object used for new entries.
    * @param {Function} options.setMetadata - Callback to update metadata for new files.
-   * @returns {Promise<{files: string[], meta: Object}>} Resolves with a list of unique files processed and the updated metadata.
+   * @returns {Promise<{files: string[], meta: Object, missing: string[]}>} Resolves with a list of unique files processed and the updated metadata.
    *
    * @throws {Error} If a parsing or database error occurs, or if required entities are missing.
    */
@@ -50,6 +50,7 @@ async function countLines(filePath) {
     let t0 = Date.now()
     const stream = fs.createReadStream(file);
     const fileSet = new Set();
+    const missing = new Set();
     // let processing = Promise.resolve();
     return new Promise((resolve, reject) =>{
         csv.parseStream(stream, 
@@ -91,6 +92,8 @@ async function countLines(filePath) {
             }
             if (exists) {
               fileSet.add(row.file);
+            } else {
+              missing.add(row.file)
             }
             });
               processingTasks.push(task);
@@ -99,7 +102,7 @@ async function countLines(filePath) {
             // await processing;
             await Promise.all(processingTasks);
             console.log(`Parsed ${rowCount} rows in ${Date.now() - t0}ms`)
-            resolve({files: Array.from(fileSet), meta:METADATA})
+            resolve({files: Array.from(fileSet), meta:METADATA, missing: Array.from(missing)})
         });
     })
   }

@@ -1,5 +1,6 @@
 const { Transform, Writable } = require("stream");
 const DEBUG = false;
+
 class PCMChunker extends Transform {
   constructor({
     sampleRate,
@@ -41,6 +42,7 @@ class PCMChunker extends Transform {
 
     this.remainingTrim =
       trimSeconds > 0 ? Math.floor(sampleRate * trimSeconds * this.bytesPerSample) : 0;
+    this.totalBytesSeen = 0;
   }
 
   _getMonoChannelData(audio) {
@@ -109,6 +111,7 @@ class PCMChunker extends Transform {
 
   _transform(chunk, _, callback) {
     try {
+      this.totalBytesSeen += chunk.length;
       if (this.remainingTrim > 0) {
         if (chunk.length <= this.remainingTrim) {
           this.remainingTrim -= chunk.length;
@@ -185,7 +188,9 @@ class PCMChunker extends Transform {
 
         remaining -= this.stepBytes;
       }
-
+      if (this.onComplete) {
+        this.onComplete(this.totalBytesSeen);
+      }
       callback();
     } catch (err) {
       callback(err);
@@ -212,26 +217,6 @@ class PredictionWritable extends Writable {
 
     this.inFlight = 0; 
     this.pendingCallbacks = [];
-
-    this._completedSinceLastCheck = 0;
-    this._totalDuration = 0;
-
-    this._logInterval = setInterval(() => this._adjustConcurrency(), 2000);
-  }
-
-  _adjustConcurrency() {
-    const completed = this._completedSinceLastCheck;
-    if (!completed) return;
-
-    const avgDuration = this._totalDuration / completed;
-
-    if (this.inFlight >= this.concurrency && this.concurrency < this.maxConcurrency) {
-      this.concurrency++;
-      DEBUG && console.log(`[PredictionWritable] concurrency ↑ ${this.concurrency} (${avgDuration.toFixed(0)}ms)`);
-    } else if (this.inFlight < this.concurrency && this.concurrency > this.minConcurrency) {
-      this.concurrency--;
-      DEBUG && console.log(`[PredictionWritable] concurrency ↓ ${this.concurrency}`);
-    }
 
     this._completedSinceLastCheck = 0;
     this._totalDuration = 0;
@@ -288,8 +273,6 @@ class PredictionWritable extends Writable {
   }
 
   _final(callback) {
-    clearInterval(this._logInterval);
-
     if (this.batch.length > 0) {
       const batchIndex = this.nextBatchIndex++;
       this._sendBatch(this.batch, batchIndex,  () => {});
@@ -304,7 +287,6 @@ class PredictionWritable extends Writable {
   }
 
   _destroy(err, callback) {
-    clearInterval(this._logInterval);
     callback(err);
   }
 }

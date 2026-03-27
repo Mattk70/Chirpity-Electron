@@ -48,7 +48,7 @@ let INITIALISED = new Promise((resolve, reject) => {
   initialiseResolve = resolve;
   initialiseReject = reject;
 });
-const EPSILON = 1e-6;
+const EPSILON = 1e-5;
 const generateAlert = ({
   message,
   type,
@@ -166,7 +166,7 @@ const setupFfmpegCommand = async ({
     // No sample rate is supplied when exporting audio.
     // If the sampleRate is 256k, Wavesurfer will handle the tempo/pitch conversion
     if ((training || sampleRate) && sampleRate !== 256000) {
-      const { getAudioMetadata } = require("./models/training.js");
+      const { getAudioMetadata } = await import("./models/training.js");
       const {bitrate} = await getAudioMetadata(file);
       const MIN_EXPECTED_BITRATE = 96000; // Lower bitrates aren't capturing ultrasonic frequencies
       if (bitrate < MIN_EXPECTED_BITRATE) console.warn(file, 'has bitrate', bitrate)
@@ -179,6 +179,7 @@ const setupFfmpegCommand = async ({
     // }
   } 
   let duration = end - start;
+
   if (training) duration *= 10 // Dilate 10x for bat training
   
   additionalFilters.forEach(filter => command.audioFilters(filter))
@@ -216,6 +217,21 @@ const setupFfmpegCommand = async ({
     }
   });
   return command;
+};
+
+const updateBatches = (file, actualDuration, start, end) => {
+  const metaDuration = METADATA[file].duration;
+  if (start === 0 && end === metaDuration && isFinite(actualDuration) && actualDuration + EPSILON < metaDuration) {
+    // If we have a short file (header duration > processed duration)
+    // *and* were looking for the whole file, we'll fix # of expected chunks here
+    const before = batchesToSend[file]
+    batchesToSend[file] = getBatchesToSend(actualDuration);
+    if (before > batchesToSend[file]) {
+      if (fs.existsSync(file)) console.warn("File duration mismatch", before - batchesToSend[file])
+      else console.warn("File duration mismatch", "File missing");
+    }
+    METADATA[file].duration = actualDuration;
+  }
 };
 
 const getSelectionRange = (file, start, end) => {
@@ -495,7 +511,15 @@ async function handleMessage(e) {
           
         })
       if (result) {
-        const {files, meta} = result;
+        const {files, meta, missing} = result;
+        if (missing.length) {
+          const max = 5;
+          const hasMore = missing.length > max;
+          const variables = {
+            error: missing.slice(0, max).join('<br>') + (hasMore ? '<br>…' : '')
+          }
+          generateAlert({message: 'noFile', type: 'warning', variables})
+        }
         METADATA = meta;
         QUEUE.setFiles(await getFiles({
           files, 
@@ -2600,7 +2624,11 @@ async function processAudio(
     file,
     endTime,
     trimSeconds: remainingTrimSeconds,
-    alertFn: generateAlert
+    alertFn: generateAlert,
+    onComplete: (bytes) => {
+      const durationMeasured = bytes / (2 * sampleRate);
+      updateBatches(file, durationMeasured, start, endTime);
+    }
   });
 
   const workerQueue = STATE.workerQueue;
@@ -3482,7 +3510,7 @@ async function processDetectionQueue(file) {
     queue.delete(nextIndex);
     const result = task(); // synchronous
     if (result.length){
-        await generateInsertQuery(result, file, modelID, isCustomList);
+        selection || await generateInsertQuery(result, file, modelID, isCustomList);
         await sendResultsToUI(
         result,
         file,
@@ -3491,7 +3519,7 @@ async function processDetectionQueue(file) {
         lon,
         isCustomList
       );
-      if (!selection) await getSummary();
+      if (!selection) await getSummary({interim: true}).catch(console.warn);
     }
     STATE.lastProcessedBatch[file] = nextIndex;
     STATE.nextExpectedIndex[file]++;
@@ -3637,20 +3665,12 @@ const parsePredictions = async (response) => {
   if (!selection && worker === 0) {
     estimateTimeRemaining(received);
   }
-  const batches = batchesToSend[file] || 1;
-  const fileProgress = predictionsReceived[file] / batches;
-  if (!selection && STATE.increment() === 0) {
-    getSummary({ interim: true });
-  }
-  if (fileProgress === 1) {
-    
-  }
   return worker;
 };
 
 async function onDetectionComplete(file) {
-  const { modelID, detect, selection } = STATE;
-  const {overlap, dropSingles} = detect;
+  const { modelID, detect, selection, list } = STATE;
+  const {overlap, dropSingles, confidence} = detect;
   const dropSingle = !selection && !!overlap && dropSingles;
   const metadata = METADATA[file];
   const lat = metadata.lat || STATE.lat;
@@ -3660,7 +3680,7 @@ async function onDetectionComplete(file) {
   const remaining = flushDetectionState(file, dropSingle);
 
   if (remaining.length) {
-    await generateInsertQuery(
+    selection || await generateInsertQuery(
       remaining,
       file,
       modelID,
@@ -3675,7 +3695,7 @@ async function onDetectionComplete(file) {
       lon,
       isCustomList
     );
-    STATE.selection || getSummary();
+    selection || getSummary({interim: true}).catch(console.warn);
   }
   updateQueue(file);
 
@@ -3688,8 +3708,8 @@ async function onDetectionComplete(file) {
             message: "noDetectionsDetailed2",
             variables: {
               file,
-              list: STATE.list,
-              confidence: STATE.detect.confidence / 10
+              list,
+              confidence: confidence / 10
             }
           });
         }
@@ -3890,6 +3910,9 @@ async function processNextFile({
   const files = QUEUE.getAllPaths('pending');
   if (files.length === 0) {
     if (QUEUE.getSize('inProgress') === 0) {
+      if (!STATE.selection) {
+        await getSummary().catch(console.warn);
+      }
       DEBUG && console.log("All files processed.");
       UI.postMessage({ event: "analysis-complete" });
     }
@@ -4100,13 +4123,8 @@ async function setStartEnd(file) {
 function getBatchesToSend(duration) {
   const overlap = STATE.detect.overlap;
   const stepSamples = Math.round(sampleRate * WINDOW_SIZE * (1 - overlap));
-  const windowSamples = Math.round(sampleRate * WINDOW_SIZE);
   const durationSamples = Math.round(duration * sampleRate);
-  if (durationSamples <= windowSamples) {
-    const windows = Math.floor((durationSamples - 1) / stepSamples) + 1;
-    return Math.max(1, Math.ceil(windows / BATCH_SIZE));
-  }
-  const windows = Math.floor((durationSamples - windowSamples) / stepSamples) + 1;
+  const windows = Math.floor((durationSamples - 1) / stepSamples) + 1;
   return Math.max(1, Math.ceil(windows / BATCH_SIZE));
 }
 
@@ -4119,53 +4137,59 @@ const getSummary = async ({
   interim,
   action,
 } = {}) => {
-  const {sql, params} = await prepSummaryStatement();
-  const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
-  const rows = await STATE.db.allAsync(sql, ...params);
-  const allowedRows =
-    STATE.list === 'custom'
-      ? rows.filter(allowedByList)
-      : rows;
-  let summary = {};
+  if (interim && STATE.summaryRunning) return;
+  try{
+    STATE.summaryRunning = true;
+    const {sql, params} = await prepSummaryStatement();
+    const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
+    const rows = await STATE.db.allAsync(sql, ...params);
+    const allowedRows =
+      STATE.list === 'custom'
+        ? rows.filter(allowedByList)
+        : rows;
+    let summary = Object.create(null);
 
-  for (const row of allowedRows) {
-    const key = row.cname;
+    for (const row of allowedRows) {
+      const key = row.cname;
 
-    if (!summary[key]) {
-      summary[key] = {
-        cname: row.cname,
-        sname: row.sname,
-        count: 0,
-        calls: 0,
-        max: 0
-      };
+      if (!summary[key]) {
+        summary[key] = {
+          cname: row.cname,
+          sname: row.sname,
+          count: 0,
+          calls: 0,
+          max: 0
+        };
+      }
+
+      summary[key].count += 1;
+      summary[key].calls += row.callCount || 1;
+      summary[key].max = Math.max(summary[key].max, row.score);
     }
-
-    summary[key].count += 1;
-    summary[key].calls += row.callCount || 1;
-    summary[key].max = Math.max(summary[key].max, row.score);
-  }
-  const [field, direction] = STATE.summarySortOrder.split(" ");
-  const sortFunctions = {
-    count: (a, b) => direction === "ASC" ? a.count - b.count : b.count - a.count, 
-    calls: (a, b) => direction === "ASC" ? a.calls - b.calls : b.calls - a.calls,
-    max: (a, b) => direction === "ASC" ? a.max - b.max : b.max - a.max,
-    cname: (a, b) => direction === "ASC" ? a.cname.localeCompare(b.cname) : b.cname.localeCompare(a.cname),
-    sname: (a, b) => direction === "ASC" ? a.sname.localeCompare(b.sname) : b.sname.localeCompare(a.sname),
-  };
-  summary = Object.values(summary).sort(sortFunctions[field]);
-  if (format){ // Export called
-    await exportData(summary, path, format, headers);
-  } else {
-    const event = interim ? "update-summary" : "summary-complete";
-    UI.postMessage({
-      event: event,
-      summary: summary,
-      offset: offset,
-      filterSpecies: species,
-      active: active,
-      action: action,
-    });
+    const [field, direction] = STATE.summarySortOrder.split(" ");
+    const sortFunctions = {
+      count: (a, b) => direction === "ASC" ? a.count - b.count : b.count - a.count, 
+      calls: (a, b) => direction === "ASC" ? a.calls - b.calls : b.calls - a.calls,
+      max: (a, b) => direction === "ASC" ? a.max - b.max : b.max - a.max,
+      cname: (a, b) => direction === "ASC" ? a.cname.localeCompare(b.cname) : b.cname.localeCompare(a.cname),
+      sname: (a, b) => direction === "ASC" ? a.sname.localeCompare(b.sname) : b.sname.localeCompare(a.sname),
+    };
+    summary = Object.values(summary).sort(sortFunctions[field]);
+    if (format){ // Export called
+      await exportData(summary, path, format, headers);
+    } else {
+      const event = interim ? "update-summary" : "summary-complete";
+      UI.postMessage({
+        event: event,
+        summary: summary,
+        offset: offset,
+        filterSpecies: species,
+        active: active,
+        action: action,
+      });
+    }
+  } finally{
+    STATE.summaryRunning = false;
   }
 };
 

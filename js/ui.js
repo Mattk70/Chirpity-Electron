@@ -45,32 +45,34 @@ let LABELS = [],
 window.addEventListener("unhandledrejection", function (event) {
   if (isTestEnv) return
   // Extract the error message and stack trace from the event
-  const errorMessage = event.reason.message;
-  const stackTrace = event.reason.stack;
+  const reason = event.reason;
+  const errorMessage = reason?.message ?? String(reason ?? "Unknown rejection");
+  const stackTrace = reason?.stack ?? "";
 
   // Track the unhandled promise rejection
   trackEvent(
-    {uuid:config.UUID,
+    {uuid:config?.UUID,
     event: "Unhandled UI PR",
     action: errorMessage,
     name: customURLEncode(stackTrace),
-    version: config.VERSION}
+    version: config?.VERSION}
   );
 });
 
 window.addEventListener("rejectionhandled", function (event) {
   if (isTestEnv) return
   // Extract the error message and stack trace from the event
-  const errorMessage = event.reason.message;
-  const stackTrace = event.reason.stack;
+  const reason = event.reason;
+  const errorMessage = reason?.message ?? String(reason ?? "Unknown rejection");
+  const stackTrace = reason?.stack ?? "";
 
   // Track the unhandled promise rejection
   trackEvent(
-      {uuid:config.UUID,
+      {uuid:config?.UUID,
       event: "Handled UI PR",
       action: errorMessage,
       name: customURLEncode(stackTrace),
-      version: config.VERSION}
+      version: config?.VERSION}
   );
 });
 
@@ -1507,6 +1509,7 @@ async function importData(format){
   const file = files.filePaths[0]
   const lastSaveFolder = p.dirname(file);
   localStorage.setItem("lastSaveFolder", lastSaveFolder);
+  STATE.summary = [];
   DOM.loadingScreen.classList.remove("d-none");
   worker.postMessage({
     action: "import-results",
@@ -1665,7 +1668,7 @@ async function showCharts() {
 async function showExplore() {
   // Change STATE.fileLoaded this one time, so a file will load!
   STATE.fileLoaded = true;
-  STATE.summary = null;
+  STATE.summary = [];
   saveAnalyseState();
   STATE.openFiles = [];
   const state = STATE.currentAnalysis;
@@ -7859,6 +7862,8 @@ function renderComparisons(lists, cname) {
   callTypeHeader.addEventListener("click", showCompareSpec);
   const comparisonModal = new bootstrap.Modal(compareDiv);
   compareDiv.addEventListener("hidden.bs.modal", () => {
+    STATE.XCcontroller?.abort();
+    STATE.XCcontroller = null;
     ws && ws.destroy();
     ws = null;
     compareDiv.remove();
@@ -7872,6 +7877,37 @@ import Spectrogram from "../node_modules/wavesurfer.js/dist/plugins/spectrogram.
 
 let ws;
 
+/**
+ * Fetch an audio url to load into wavesurfer
+ * @param {*} url 
+ * @param {*} wavesurfer a wavesurfer instance
+ * @param {function} onCleanup callback to clear loading overlay
+ * @returns abortcontroller instance
+ */
+
+function loadXCFile(url, wavesurfer, onCleanup) {
+  const controller = new AbortController();
+  const startTime = Date.now();
+  fetch(url, { signal: controller.signal })
+    .then((res) => {
+      if (!res.ok) {
+        throw new Error(`XC audio download failed with HTTP ${res.status}`);
+      }
+      return res.blob();
+    })
+    .then(blob => wavesurfer.loadBlob(blob))
+    .catch(err => {
+      if (err.name === 'AbortError') {
+        console.warn(`User Cancelled XC API call after ${Math.round((Date.now() - startTime)/1000)} seconds`);
+        onCleanup && onCleanup();
+        return;
+      }
+      console.warn("Failed to load XC audio", err);
+      generateToast({ type: "warning", message: "noComparisons" });
+      onCleanup && onCleanup();
+    });
+  return controller; // so caller can cancel
+}
 const createCompareWS = (mediaContainer) => {
   ws?.destroy();
   const bats = config.selectedModel.includes('bats');
@@ -7907,6 +7943,8 @@ const createCompareWS = (mediaContainer) => {
 };
 
 function showCompareSpec() {
+  // cancel previous request
+  STATE.XCcontroller?.abort();
   const activeCarouselItem = document.querySelector(
     "#recordings .tab-pane.active .carousel-item.active"
   );
@@ -7919,6 +7957,7 @@ function showCompareSpec() {
   activeXCLink && activeXCLink.classList.remove("d-none");
 
   const mediaContainer = activeCarouselItem.lastChild;
+
   // need to prevent accumulation, and find event for show/hide loading
   const loading = DOM.loading.cloneNode(true);
   loading.classList.remove("d-none", "text-white");
@@ -7927,10 +7966,10 @@ function showCompareSpec() {
   const [_, file] = mediaContainer.getAttribute("name").split("|");
   // Create an instance of WaveSurfer
   createCompareWS(mediaContainer);
-  ws.once("decode", function () {
-    mediaContainer.removeChild(loading);
-  });
-  ws.load(file);
+  const clearLoading = () => loading.remove();
+  ws.once("decode", clearLoading);
+  setTimeout(clearLoading, 10_000); // Clear loading after 10 seconds
+  STATE.XCcontroller = loadXCFile(file, ws, clearLoading);
 }
 
 
