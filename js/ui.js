@@ -1378,6 +1378,7 @@ function postAnalyseMessage(args) {
       disableSettingsDuringAnalysis(true);
     }
     if (!selection) {
+      STATE.summary = [];
       analyseReset();
       refreshResultsView();
       resetResults();
