@@ -3694,9 +3694,8 @@ async function onWorkerLoadedAudio({
     ? fileStart
     : new Date(0, 0, 0, 0, 0, 0, 0).getTime();
   STATE.bufferStartTime = new Date(initialTime + windowBegin * 1000);
-
-  STATE.windowLength = contents.byteLength / 48_000; // bufferbytes / (samplerate / 2)
-
+  const sr = config.selectedModel.includes("bats") ? 256_000 : 24_000
+  STATE.windowLength = contents.byteLength / (sr * 2);
   resetRegions();
   await spec.updateSpec({
     buffer: STATE.currentBuffer,

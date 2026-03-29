@@ -4121,6 +4121,7 @@ async function setStartEnd(file) {
 }
 
 function getBatchesToSend(duration) {
+  if (STATE.model.includes('bats')) duration *= 10;
   const overlap = STATE.detect.overlap;
   const stepSamples = Math.round(sampleRate * WINDOW_SIZE * (1 - overlap));
   const durationSamples = Math.round(duration * sampleRate);
