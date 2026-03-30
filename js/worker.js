@@ -3381,6 +3381,7 @@ function updateDetectionState({
   ----------------------------------
   */
   if (!merge) {
+    threshold = Math.min(150, threshold);
     for (let i = 0; i < keysArray.length; i++) {
       const t = keysArray[i];
       const ids = speciesIDBatch[i];
@@ -3402,7 +3403,6 @@ function updateDetectionState({
           confidence: conf
         });
 
-        if (!isCustomList) break;
       }
     }
     return completed;
@@ -3477,7 +3477,6 @@ function updateDetectionState({
       }
     }
   }
-
   return completed;
 }
 
@@ -3608,8 +3607,8 @@ const parsePredictions = async (response) => {
   ----------------------------------
   */
 
-  const threshold = selection ? 50 : detect.confidence;
-  const {overlap, mergeOverlaps, dropSingles} = STATE.detect;
+  const {overlap, mergeOverlaps, dropSingles, confidence} = STATE.detect;
+  const threshold = selection ? 50 : confidence;
   const dropSingle = !selection && !!overlap && dropSingles;
   const mergeOverlap = !!overlap && mergeOverlaps;
 
@@ -3720,8 +3719,10 @@ async function onDetectionComplete(file) {
 async function sendResultsToUI (detections, file, modelID, lat, lon, isCustomList){
   const included = await getIncludedIDs(file).catch(console.warn);
   const metadata = METADATA[file];
+  const threshold = STATE.selection ? 50 : STATE.detect.confidence;
     for (const det of detections) {      
-      const {species: species, start, end} = det;
+      const {species, start, end, confidence} = det;
+      if (confidence < threshold) continue;
       if (included.length && !included.includes(species + 1)) {
         continue;
       }
