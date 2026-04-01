@@ -1,3 +1,31 @@
+const MODEL_DEFAULTS = {
+  list: "birds",
+  webgpu: { threads: 1, batchSize: 8 },
+  tensorflow: { threads: null, batchSize: 8 },
+};
+
+function normaliseModels(models) {
+  Object.keys(models).forEach((name) => {
+    const model = models[name];
+
+    models[name] = {
+      ...MODEL_DEFAULTS,
+      ...model,
+
+      // Merge nested objects separately so we don't overwrite them
+      webgpu: {
+        ...MODEL_DEFAULTS.webgpu,
+        ...(model.webgpu || {}),
+      },
+      tensorflow: {
+        ...MODEL_DEFAULTS.tensorflow,
+        ...(model.tensorflow || {}),
+      },
+    };
+  });
+}
+
+
 /**
  * Synchronizes a configuration object with a default configuration.
  *
@@ -29,6 +57,8 @@ function syncConfig(config, defaultConfig) {
     ) {
       // Recursively sync nested objects (but allow key assignment to be empty)
       key === "keyAssignment" || syncConfig(config[key], defaultConfig[key]);
+    } else if (key === 'models'){
+      normaliseModels(config[key])
     }
   });
 }

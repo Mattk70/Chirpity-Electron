@@ -34,7 +34,6 @@ export class WorkerState {
       lowPassFrequency: 15000,
       lowShelfFrequency: 0,
       lowShelfAttenuation: 0,
-      SNR: 0,
       normalise: false,
       sendToModel: false,
     }),

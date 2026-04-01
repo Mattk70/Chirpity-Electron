@@ -11,10 +11,12 @@ class PCMChunker extends Transform {
     endTime,
     trimSeconds = 0,
     alertFn,
+    onComplete
   }) {
     super({ readableObjectMode: true });
 
     this.alertFn = alertFn;
+    this.onComplete = onComplete;
     this.file = file;
     this.endTime = endTime;
     this.sampleRate = sampleRate;

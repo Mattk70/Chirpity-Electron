@@ -162,14 +162,14 @@ const setupFfmpegCommand = async ({
   if (channels) command.audioChannels(channels);
   // todo: consider whether to expose bat model training
   const training = false
-  if (STATE.model.includes('bats')) { 
+  if (STATE.model.includes('batpack')) { 
     // No sample rate is supplied when exporting audio.
     // If the sampleRate is 256k, Wavesurfer will handle the tempo/pitch conversion
     if ((training || sampleRate) && sampleRate !== 256000) {
       const { getAudioMetadata } = await import("./models/training.js");
       const {bitrate} = await getAudioMetadata(file);
-      const MIN_EXPECTED_BITRATE = 96000; // Lower bitrates aren't capturing ultrasonic frequencies
-      if (bitrate < MIN_EXPECTED_BITRATE) console.warn(file, 'has bitrate', bitrate)
+      // const MIN_EXPECTED_BITRATE = 96000; // Lower bitrates aren't capturing ultrasonic frequencies
+      // if (bitrate < MIN_EXPECTED_BITRATE) console.warn(file, 'has bitrate', bitrate)
       const rate = Math.floor(bitrate/10)
       command.audioFilters([`asetrate=${rate}`]);
     }
@@ -221,13 +221,23 @@ const setupFfmpegCommand = async ({
 
 const updateBatches = (file, actualDuration, start, end) => {
   const metaDuration = METADATA[file].duration;
-  if (start === 0 && end === metaDuration && isFinite(actualDuration) && actualDuration + EPSILON < metaDuration) {
+  if (STATE.model.includes('batpack')) actualDuration /= 10;
+  if (start === 0 && end >= metaDuration && isFinite(actualDuration) && actualDuration + EPSILON < metaDuration) {
     // If we have a short file (header duration > processed duration)
     // *and* were looking for the whole file, we'll fix # of expected chunks here
     const before = batchesToSend[file]
-    batchesToSend[file] = getBatchesToSend(actualDuration);
-    if (before > batchesToSend[file]) {
-      if (fs.existsSync(file)) console.warn("File duration mismatch", before - batchesToSend[file])
+    const after = getBatchesToSend(actualDuration);
+    batchesToSend[file] = after;
+    const diff = before - after;
+    STATE.totalBatches -= diff;
+    if (before > after) {
+      if (fs.existsSync(file)) {
+        console.warn(`File duration mismatch`, `File: ${file} ${diff}`)
+        const meta = JSON.parse(METADATA[file].metadata)
+        const firmware = meta.guano['Firmware Version'];
+        const model = meta.guano.Model;
+        console.warn(`Firmware version: ${firmware}`, `Model: ${model}`)
+      }
       else console.warn("File duration mismatch", "File missing");
     }
     METADATA[file].duration = actualDuration;
@@ -2440,7 +2450,7 @@ const setMetadata = async ({ file, source_file = file }) => {
       fileMeta.duration = await getDuration(file);
       if (file.toLowerCase().endsWith("wav")) {
         const t0 = Date.now();
-        const wavMetadata = await extractWaveMetadata(file);
+        const wavMetadata = await extractWaveMetadata(file).catch(console.warn);
         const metaKeys = wavMetadata ? Object.keys(wavMetadata): [];
         if (metaKeys.length){
           if (metaKeys.includes("guano")) {
@@ -2458,7 +2468,13 @@ const setMetadata = async ({ file, source_file = file }) => {
             guanoTimestamp = Date.parse(guano.Timestamp);
             if (guanoTimestamp) fileMeta.fileStart = guanoTimestamp;
             if (guano.Length){
-              fileMeta.duration = parseFloat(guano.Length);
+              let duration = parseFloat(guano.Length);
+              if (guano.Model?.startsWith('Echo Meter Touch 2')
+                && guano['Firmware Version']?.startsWith('App 2')) {
+                  // This firmware records length in milliseconds
+                  duration /= 1000
+                }
+              fileMeta.duration = duration;
             }
           }
           else if (metaKeys.includes("bext")) {
@@ -2576,7 +2592,7 @@ const getPredictBuffers = async ({ file = "", start = 0, end = undefined }) => {
   start = Math.max(0, start);
   
   let fileDuration = METADATA[file].duration;
-  const slow = STATE.model.includes("bats");
+  const slow = STATE.model.includes("batpack");
   if (slow) {
     end = (end - start) * 10 + start;
   } else {
@@ -2673,9 +2689,9 @@ const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sam
     if (!result) throw new Error(`Cannot locate ${file}`);
     file = result;
   }
-  if (!sampleRate) sampleRate = STATE.model.includes("bats") ? 256_000 : 24_000;
+  if (!sampleRate) sampleRate = STATE.model.includes("batpack") ? 256_000 : 24_000;
   await setMetadata({ file });
-  const fileDuration = METADATA[file].duration// (STATE.model === 'bats') ? METADATA[file].duration*10 : METADATA[file].duration;
+  const fileDuration = METADATA[file].duration// (STATE.model === 'batpack') ? METADATA[file].duration*10 : METADATA[file].duration;
   if (!fileDuration) return [null, start]
   end ??= fileDuration;
 
@@ -2758,7 +2774,7 @@ function setAudioFilters() {
   const filters = [];
 
   // === Filter chain logic ===
-  const batModel = STATE.model.includes('bats');
+  const batModel = STATE.model.includes('batpack');
   if (!batModel && (highPass || (lowPass < 15_000 && lowPass > 0))) {
     const options = {};
     if (highPass) options.hp = highPass;
@@ -3242,7 +3258,7 @@ const insertDurations = async (file, id) => {
 const generateInsertQuery = async (detections, file, modelID) => { 
   const db = STATE.db;
   let { fileStart, metadata, duration, lat, lon, locationID } = METADATA[file];
-  const predictionLength = STATE.model.includes("bats") ? 0.3 : WINDOW_SIZE;
+  const predictionLength = STATE.model.includes("batpack") ? 0.3 : WINDOW_SIZE;
   let fileID;
   await dbMutex.lock();
   try {
@@ -3503,31 +3519,31 @@ async function processDetectionQueue(file) {
     const isCustomList = list === 'custom';
 
     while (true) {
-    const nextIndex = STATE.nextExpectedIndex[file];
-    if (!queue.has(nextIndex)) break;
-    const task = queue.get(nextIndex);
-    queue.delete(nextIndex);
-    const result = task(); // synchronous
-    if (result.length){
-        selection || await generateInsertQuery(result, file, modelID, isCustomList);
-        await sendResultsToUI(
-        result,
-        file,
-        modelID,
-        lat,
-        lon,
-        isCustomList
-      );
-      if (!selection) await getSummary({interim: true}).catch(console.warn);
-    }
-    STATE.lastProcessedBatch[file] = nextIndex;
-    STATE.nextExpectedIndex[file]++;
-    if (
-      STATE.lastProcessedBatch[file] === batchesToSend[file] - 1 &&
-      STATE.detectionQueues[file].size === 0
-    ) {
-      onDetectionComplete(file);
-    } 
+      const nextIndex = STATE.nextExpectedIndex[file];
+      if (!queue.has(nextIndex)) break;
+      const task = queue.get(nextIndex);
+      queue.delete(nextIndex);
+      const result = task(); // synchronous
+      if (result.length){
+          selection || await generateInsertQuery(result, file, modelID, isCustomList);
+          await sendResultsToUI(
+          result,
+          file,
+          modelID,
+          lat,
+          lon,
+          isCustomList
+        );
+        if (!selection) await getSummary({interim: true}).catch(console.warn);
+      }
+      STATE.lastProcessedBatch[file] = nextIndex;
+      STATE.nextExpectedIndex[file]++;
+      if (
+        STATE.lastProcessedBatch[file] === batchesToSend[file] - 1 &&
+        STATE.detectionQueues[file].size === 0
+      ) {
+        onDetectionComplete(file);
+      } 
     }
   } finally {
     STATE.detectionRunning[file] = false;
@@ -3559,7 +3575,7 @@ function flushDetectionState(file, dropSingles) {
 const parsePredictions = async (response) => {
   const { file, worker, batchIndex, result: latestResult } = response;
   const predictionLength =
-    STATE.model.includes("bats") ? 0.3 : WINDOW_SIZE;
+    STATE.model.includes("batpack") ? 0.3 : WINDOW_SIZE;
   if (!latestResult.length) {
     predictionsReceived[file]++;
     if (STATE.queryMetadata) {
@@ -3664,6 +3680,7 @@ const parsePredictions = async (response) => {
   if (!selection && worker === 0) {
     estimateTimeRemaining(received);
   }
+  DEBUG && console.log(`file: ${file}, duration: ${METADATA[file].duration}, batches: ${batchesToSend[file]}, received: ${predictionsReceived[file]}`)
   return worker;
 };
 
@@ -3758,8 +3775,8 @@ async function sendResultsToUI (detections, file, modelID, lat, lon, isCustomLis
  * @param {number} batchesReceived - Number of analysis batches processed so far for the current run.
  */
 async function estimateTimeRemaining(batchesReceived) {
-  if (! STATE.totalBatches) return;
   const {totalBatches, clippedBatches} = STATE;
+  if (!totalBatches) return;
   const remainingBatches = totalBatches - clippedBatches;
   const progress = remainingBatches > 0 ? batchesReceived / remainingBatches : 0;
   if (progress === 0 || remainingBatches === 0) return; // No batches to process
@@ -4122,7 +4139,7 @@ async function setStartEnd(file) {
 }
 
 function getBatchesToSend(duration) {
-  if (STATE.model.includes('bats')) duration *= 10;
+  if (STATE.model.includes('batpack')) duration *= 10;
   const overlap = STATE.detect.overlap;
   const stepSamples = Math.round(sampleRate * WINDOW_SIZE * (1 - overlap));
   const durationSamples = Math.round(duration * sampleRate);
@@ -4651,8 +4668,8 @@ function allowedByList(result){
 }
 
 const sendResult = (index, result, fromDBQuery) => {
-  const model = result.model.includes('bats')  
-  ? 'bats'
+  const model = result.model.includes('batpack')  
+  ? 'batpack'
   : result.model;
 
   result.model = model.replace(' v2','');

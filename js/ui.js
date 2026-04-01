@@ -1248,7 +1248,7 @@ async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults 
 
   // Reset the buffer playhead and zoom:
   STATE.windowOffsetSecs = 0;
-  STATE.windowLength = config.selectedModel.includes('bats') ? 5 : 20;
+  STATE.windowLength = config.selectedModel.includes('batpack') ? 5 : 20;
   // Reset the mode
 
   STATE.mode = 'analyse';
@@ -1391,7 +1391,6 @@ function postAnalyseMessage(args) {
       end: args.end,
       filesInScope: filesInScope,
       reanalyse: args.reanalyse,
-      SNR: config.filters.SNR,
       circleClicked: args.fromDB,
     });
   } else {
@@ -1942,9 +1941,9 @@ const defaultConfig = {
   timeOfDay: true,
   list: "birds",
   models: {
-    birdnet: {displayName: 'BirdNET', backend: 'webgpu', customListFile: ''},
-    chirpity: {displayName: 'Nocmig', backend: 'webgpu', customListFile: ''},
-    nocmig: {displayName: 'Nocmig V2 (Beta)', backend: 'webgpu', customListFile: ''},
+    birdnet: {displayName: 'BirdNET', backend: 'webgpu', list: 'birds', webgpu: {threads: 1, batchSize: 8}, tensorflow: {threads: null, batchSize: 8},  customListFile: ''},
+    chirpity: {displayName: 'Nocmig', backend: 'webgpu', list: 'birds', webgpu: {threads: 1, batchSize: 8}, tensorflow: {threads: null, batchSize: 8},  customListFile: ''},
+    nocmig: {displayName: 'Nocmig V2 (Beta)', backend: 'webgpu', list: 'birds', webgpu: {threads: 1, batchSize: 8}, tensorflow: {threads: null, batchSize: 8},  customListFile: ''},
   },
   local: true,
   speciesThreshold: 0.03,
@@ -1975,7 +1974,6 @@ const defaultConfig = {
     lowPassFrequency: 15000,
     lowShelfFrequency: 0,
     lowShelfAttenuation: 0,
-    SNR: 0,
     normalise: false,
     sendToModel: false,
   },
@@ -2142,19 +2140,20 @@ window.onload = async () => {
   if (isTestEnv) {
     config.models[selectedModel].backend = "tensorflow";
   }
-  const backend = config.models[selectedModel].backend;
-
+  const modelOptions = config.models[selectedModel];
+  const backend = modelOptions.backend;
+  config.models[selectedModel].tensorflow.threads ??= DIAGNOSTICS['Physical Cores'] || 2;
+  const {batchSize, threads} = modelOptions[backend];
+  config[backend] = {batchSize, threads};
   worker.postMessage({
     action: "_init_",
     model: selectedModel,
-    batchSize: config[backend].batchSize,
-    threads: config[backend].threads,
+    batchSize,
+    threads,
     backend,
     list,
     modelPath
   });
-  // Disable SNR
-  config.filters.SNR = 0;
 
   // set version
   config.VERSION = VERSION;
@@ -2165,17 +2164,15 @@ window.onload = async () => {
   config.fontScale === 1 || setFontSizeScale(true);
 
   // Map slider value to batch size
-  DOM.batchSizeSlider.value = 
-    config[config.models[selectedModel].backend].batchSize;
-  DOM.batchSizeValue.textContent =
-    config[config.models[selectedModel].backend].batchSize;
+  DOM.batchSizeSlider.value = batchSize;
+  DOM.batchSizeValue.textContent = batchSize;
   DOM.modelToUse.value = selectedModel;
-  const backendEL = document.getElementById(config.models[selectedModel].backend);
+  const backendEL = document.getElementById(backend);
   backendEL.checked = true;
   // Show time of day in results?
   setTimelinePreferences();
   // Show the list in use
-  DOM.listToUse.value = config.list;
+  DOM.listToUse.value = modelOptions.list;
   DOM.localSwitch.checked = config.local;
   // Show Locale
   DOM.locale.value = config.locale;
@@ -3158,6 +3155,7 @@ const updateListOptions = (model) => {
   });
   if (!options.includes(config.list)) {
     config.list = "birds";
+    config.models[model].list = 'birds';
     updatePrefs("config.json", config);
     select.value = config.list;
   }
@@ -3207,9 +3205,9 @@ const updateModelIcon = (model) => {
       model = 'perch';
       break;
     default:
-      if (/bats/i.test(model)) {
+      if (/batpack/i.test(model)) {
         title = "Bats";
-        model = "bats";
+        model = "batpack";
       } else {
         title = i18n.get(i18n.Lists).custom;
         model = "custom"
@@ -3229,10 +3227,12 @@ DOM.listIcon.addEventListener("click", () => {
     generateToast({ message: "changeListBlocked", type: "warning" });
     return;
   }
-  const keys = config.selectedModel !== 'perch v2' ? ["location", "nocturnal", "birds", "everything", "custom"] : ["birds", "Amphibia", "Insecta", "Mammalia", "Reptilia", "Animalia", "everything", "custom"];
+  const model = config.selectedModel;
+  const keys = model !== 'perch v2' ? ["location", "nocturnal", "birds", "everything", "custom"] : ["birds", "Amphibia", "Insecta", "Mammalia", "Reptilia", "Animalia", "everything", "custom"];
   const currentListIndex = keys.indexOf(config.list);
   const next = currentListIndex === keys.length - 1 ? 0 : currentListIndex + 1;
   config.list = keys[next];
+  config.models[model].list = keys[next];
   updatePrefs("config.json", config);
   updateList();
 });
@@ -3273,6 +3273,7 @@ const loadModel = () => {
 };
 
 const handleModelChange = async (model, reload = true) => {
+  flushSpec();
   modelSettingsDisplay();
   DOM.customListFile.value = config.models[model].customListFile;
   DOM.customListFile.value
@@ -3303,10 +3304,13 @@ const handleBackendChange = (backend) => {
     }
   }
   // Update threads and batch Size in UI
-  DOM.threadSlider.value = config[backend].threads;
-  DOM.numberOfThreads.textContent = config[backend].threads;
-  DOM.batchSizeSlider.value = config[backend].batchSize;
-  DOM.batchSizeValue.textContent = DOM.batchSizeSlider.value
+  config.models[config.selectedModel][backend].threads ??= DIAGNOSTICS['Physical Cores'] || 2;
+  const {threads, batchSize} = config.models[config.selectedModel][backend];
+
+  DOM.threadSlider.value = threads;
+  DOM.numberOfThreads.textContent = threads;
+  DOM.batchSizeSlider.value = batchSize;
+  DOM.batchSizeValue.textContent = batchSize;
   updatePrefs("config.json", config);
   loadModel();
 };
@@ -3695,7 +3699,7 @@ async function onWorkerLoadedAudio({
     ? fileStart
     : new Date(0, 0, 0, 0, 0, 0, 0).getTime();
   STATE.bufferStartTime = new Date(initialTime + windowBegin * 1000);
-  const sr = config.selectedModel.includes("bats") ? 256_000 : 24_000
+  const sr = config.selectedModel.includes("batpack") ? 256_000 : 24_000
   STATE.windowLength = contents.byteLength / (sr * 2);
   resetRegions();
   await spec.updateSpec({
@@ -4145,8 +4149,13 @@ async function renderResult({
       modelID
     } = result;
 
-    const logo = ['birdnet', 'nocmig', 'chirpity', 'perch', 'nighthawk', 'user'].includes(result.model) ? model : 'custom';
-    const modelName = config.models[model]? utils.escapeHTML(config.models[model].displayName) : 'User';
+    const logo = ['birdnet', 'nocmig', 'chirpity', 'perch', 'nighthawk', 'user', 'batpack'].includes(model) ? model : 'custom';
+
+    const modelName = model.includes('batpack') 
+      ? "Bats" 
+      : config.models[model]
+      ? utils.escapeHTML(config.models[model].displayName)
+      : 'User';
     const dayNight = isDaylight ? "daytime" : "nighttime";
     const commentHTML = comment
       ? `<span title="${comment.replaceAll(
@@ -4823,7 +4832,6 @@ const toggleContextAwareMode = () => {
   worker.postMessage({
     action: "update-state",
     detect: { contextAware: config.detect.contextAware },
-    filters: { SNR: config.filters.SNR },
   });
   updatePrefs("config.json", config);
 };
@@ -4837,7 +4845,6 @@ diagnosticMenu.addEventListener("click", async function () {
   DIAGNOSTICS["Batch size"] = config[backend].batchSize;
   DIAGNOSTICS["Threads"] = config[backend].threads;
   DIAGNOSTICS["Context"] = config.detect.contextAware;
-  DIAGNOSTICS["SNR"] = config.filters.SNR;
   DIAGNOSTICS["List"] = config.list;
   let diagnosticTable = "<table class='table-hover table-striped p-2 w-100'>";
   for (let [key, value] of Object.entries(DIAGNOSTICS)) {
@@ -5594,9 +5601,11 @@ async function handleUIClicks(e) {
       break;
     }
     case "clear-custom-list": {
-      config.models[config.selectedModel].customListFile = "";
+      const model = config.selectedModel;
+      config.models[model].customListFile = "";
       delete LIST_MAP.custom;
       config.list = "birds";
+      config.models[model].list = "birds";
       DOM.customListFile.value = "";
       updatePrefs("config.json", config);
       resetResults({
@@ -5616,6 +5625,7 @@ async function handleUIClicks(e) {
         database: config.database,
       });
       config.list = 'everything';
+      config.models[config.selectedModel].list = 'everything'; 
       updateList();
       updatePrefs("config.json", config);
       if (STATE.mode !== "analyse") showAnalyse();
@@ -5690,7 +5700,7 @@ async function handleUIClicks(e) {
           const modelNameInput = document.getElementById("model-name");
           // Prevent people changing Perch v2 or Nighthawk name
           modelNameInput.value = p.basename(modelFolder).replace(/^perch v2.*$/i, 'Perch v2');
-          modelNameInput.disabled = ['perch v2', "nighthawk"].includes(modelNameInput.value.toLowerCase());
+          modelNameInput.disabled = ['perch v2', "nighthawk", "european batpack"].includes(modelNameInput.value.toLowerCase());
         }
       })();
       break;
@@ -5804,6 +5814,7 @@ async function handleUIClicks(e) {
       select.appendChild(newOption);
       // Set list to everything
       config.list = 'everything';
+      config.models[modelName].list = 'everything';
       updatePrefs('config.json', config);
       updateList();
       updateModelOptions();
@@ -5913,7 +5924,7 @@ async function handleUIClicks(e) {
     }
     // XC compare play/pause
     case "playComparison": {
-      config.selectedModel.includes("bats") && ws.setPlaybackRate(0.1, false);
+      config.selectedModel.includes("batpack") && ws.setPlaybackRate(0.1, false);
       ws.playPause();
       break;
     }
@@ -5975,6 +5986,7 @@ async function handleUIClicks(e) {
             database: config.database,
           });
           config.list = 'everything';
+          config.models[config.selectedModel].list = 'everything';
           updateList()
           updatePrefs("config.json", config);
           if (STATE.mode !== "analyse") showAnalyse();
@@ -6540,6 +6552,7 @@ document.addEventListener("change", async function (e) {
         }
         case "list-to-use": {
           config.list = element.value;
+          config.models[config.selectedModel].list = element.value;
           updateList();
           break;
         }
@@ -6582,7 +6595,9 @@ document.addEventListener("change", async function (e) {
         case "thread-slider": {
           // change number of threads
           DOM.numberOfThreads.textContent = DOM.threadSlider.value;
-          config[config.models[config.selectedModel].backend].threads =
+          // get backend
+          const backend = config.models[config.selectedModel].backend;
+          config.models[config.selectedModel][backend].threads =
             DOM.threadSlider.valueAsNumber;
           worker.postMessage({
             action: "change-threads",
@@ -6592,7 +6607,9 @@ document.addEventListener("change", async function (e) {
         }
         case "batch-size": {
           DOM.batchSizeValue.textContent = DOM.batchSizeSlider.value;
-          config[config.models[config.selectedModel].backend].batchSize =
+          // get backend
+          const backend = config.models[config.selectedModel].backend;
+          config.models[config.selectedModel][backend].batchSize =
             DOM.batchSizeSlider.valueAsNumber;
           worker.postMessage({
             action: "change-batch-size",
@@ -6880,6 +6897,7 @@ async function readLabels(labelFile, updating) {
           type: 'warning'
         });
         config.list = 'birds';
+        config.models[config.selectedModel].list = 'birds';
         updatePrefs("config.json", config);
         updateList()
         return;
@@ -6898,6 +6916,7 @@ async function readLabels(labelFile, updating) {
           type: 'warning'
         });
         config.list = 'birds';
+        config.models[config.selectedModel].list = 'birds';
         updatePrefs("config.json", config);
         updateList()
         return;
@@ -7615,7 +7634,7 @@ async function getXCComparisons() {
   else {
     const content = "Loading Xeno-Canto data...";
     loadingFiles({hide:false, content})
-    const bats = config.selectedModel.includes('bats');
+    const bats = config.selectedModel.includes('batpack');
     const quality = '+q:">C"';
     const defaultLength = bats ? '+len:"0.5-10"' : '+len:"3-15"';
     sname = XCtaxon[sname] || sname;
@@ -7910,7 +7929,7 @@ function loadXCFile(url, wavesurfer, onCleanup) {
 }
 const createCompareWS = (mediaContainer) => {
   ws?.destroy();
-  const bats = config.selectedModel.includes('bats');
+  const bats = config.selectedModel.includes('batpack');
   ws = WaveSurfer.create({
     container: mediaContainer,
     backgroundColor: "rgba(0,0,0,0)",

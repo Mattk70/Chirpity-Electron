@@ -162,7 +162,7 @@ export class ChirpityWS {
 
   initWavesurfer = (container, plugins) => {
     const config = this.getConfig();
-    this.sampleRate = config.selectedModel.includes("bats") 
+    this.sampleRate = config.selectedModel.includes("batpack") 
       ? 256000
       : 24000;
     return WaveSurfer.create({
@@ -217,7 +217,7 @@ export class ChirpityWS {
     });
     
     wavesurfer.on("play", () => {
-      if (config.selectedModel.includes('bats')) {
+      if (config.selectedModel.includes('batpack')) {
         wavesurfer.setPlaybackRate(0.1, false);
       }
       wavesurfer.isPaused = false;
@@ -291,9 +291,9 @@ export class ChirpityWS {
     const spectrogram = this.spectrogram;
     const STATE = this.getState();
     const windowLength = STATE.windowLength;
-    fftSamples ??= config.FFT;
+    fftSamples ??= config?.FFT;
     config.debug && console.log("initializing spectrogram");
-    spectrogram && spectrogram.destroy() && this.WSPluginPurge();
+    spectrogram && this.WSPluginPurge();
     if (!fftSamples) {
       if (windowLength < 5) {
         fftSamples = 256;
@@ -309,7 +309,7 @@ export class ChirpityWS {
     // set colormap
     const colorMap = this.createColormap();
     const {windowFn:windowFunc, alpha} = config.customColormap;
-    const scaleFactor = config.selectedModel.includes('bats') ? 10 : 1;
+    const scaleFactor = config.selectedModel.includes('batpack') ? 10 : 1;
     const {frequencyMin, frequencyMax} = config.audio;
     const scaledFrequencyMin = frequencyMin * scaleFactor;
     const scaledFrequencyMax = frequencyMax * scaleFactor;
@@ -562,7 +562,7 @@ export class ChirpityWS {
       let timeNow = windowOffsetSecs + playedSeconds;
       const oldBufferBegin = windowOffsetSecs;
       if (direction === "In") {
-        const minZoom = selectedModel.includes('bats') ? 0.05 : 0.5;
+        const minZoom = selectedModel.includes('batpack') ? 0.05 : 0.5;
         if (windowLength < minZoom) return;
         windowLength /= 2;
         windowOffsetSecs += windowLength * position;
@@ -941,7 +941,7 @@ export class ChirpityWS {
           (specDimensions.bottom - event.clientY) *
             (frequencyRange / specDimensions.height)
         ) + Number(config.audio.frequencyMin);
-      const pitchShifted = config.selectedModel.includes('bats');
+      const pitchShifted = config.selectedModel.includes('batpack');
       const yPos = pitchShifted ? yPosition*10 : yPosition
       tooltip.textContent = `${i18.frequency}: ${yPos}Hz`;
       if (inRegion) {

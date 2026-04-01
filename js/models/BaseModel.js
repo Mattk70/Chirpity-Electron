@@ -24,7 +24,7 @@ class BaseModel {
     this.appPath = appPath;
     this.useContext = undefined;
     this.version = version;
-    this.scaleFactor = this.version.includes('bats') ? 10 : 1;
+    this.scaleFactor = this.version.includes('batpack') ? 10 : 1;
     this.selection = false;
     this.scalarFive = tf.scalar(5);
     this.two  = tf.scalar(2);
