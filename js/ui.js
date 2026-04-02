@@ -5804,8 +5804,18 @@ async function handleUIClicks(e) {
         backend: modelName === 'perch v2' 
           ? 'tensorflow' 
           : config.models['birdnet'].backend, 
-          displayName, 
-          modelPath:modelLocation};
+        displayName, 
+        list: 'everything',
+        modelPath:modelLocation,
+        tensorflow: {
+          threads: config.models['birdnet']['tensorflow'].threads,
+          batchSize: config.models['birdnet']['tensorflow'].batchSize
+          },
+        webgpu: {
+          threads: config.models['birdnet']['webgpu'].threads,
+          batchSize: config.models['birdnet']['webgpu'].batchSize
+          },
+      };
       config.selectedModel = modelName;
       const select = document.getElementById('model-to-use');
       const newOption = document.createElement('option');
@@ -5814,7 +5824,6 @@ async function handleUIClicks(e) {
       select.appendChild(newOption);
       // Set list to everything
       config.list = 'everything';
-      config.models[modelName].list = 'everything';
       updatePrefs('config.json', config);
       updateList();
       updateModelOptions();

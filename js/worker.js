@@ -2875,7 +2875,7 @@ const bufferToAudio = async ({
   const {padding, downmix, fade, bitrate, quality} = STATE.audio;
   const rate = ["mp3", "aac", "opus"].includes(format) ? bitrate : undefined;
   let compression = ["flac"].includes(format) ? parseInt(quality) : undefined;
-  
+
   const formatMap = {
     mp3: { audioCodec: "libmp3lame", soundFormat: "mp3" },
     aac: { audioCodec: "aac", soundFormat: "mp4" },
