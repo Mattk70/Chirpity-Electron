@@ -161,7 +161,7 @@ const setupFfmpegCommand = async ({
     .format(format);
   if (channels) command.audioChannels(channels);
   // todo: consider whether to expose bat model training
-  const training = false
+  const training = true;
   if (STATE.model.includes('batpack')) { 
     // No sample rate is supplied when exporting audio.
     // If the sampleRate is 256k, Wavesurfer will handle the tempo/pitch conversion
@@ -3727,39 +3727,74 @@ async function onDetectionComplete(file) {
       }
     }
 }
+function filterDetectionsByRank(detections, topRankin) {
+  const result = [];
+  let i = 0;
 
+  while (i < detections.length) {
+    const current = detections[i];
+    const { start, end } = current;
+
+    // Collect all items with same start/end
+    let j = i;
+    while (
+      j < detections.length &&
+      detections[j].start === start &&
+      detections[j].end === end
+    ) {
+      j++;
+    }
+
+    // Slice only topRanking items from this group
+    const groupSize = j - i;
+    const limit = Math.min(groupSize, topRankin);
+
+    for (let k = 0; k < limit; k++) {
+      result.push(detections[i + k]);
+    }
+
+    // Skip entire group
+    i = j;
+  }
+
+  return result;
+}
 async function sendResultsToUI (detections, file, modelID, lat, lon, isCustomList){
+  const {selection, detect, modelLabels, model} = STATE;
+  const {confidence, topRankin} = detect;
+  detections = filterDetectionsByRank(detections, topRankin);
   const included = await getIncludedIDs(file).catch(console.warn);
   const metadata = METADATA[file];
-  const threshold = STATE.selection ? 50 : STATE.detect.confidence;
-    for (const det of detections) {      
-      const {species, start, end, confidence} = det;
-      if (confidence < threshold) continue;
-      if (included.length && !included.includes(species + 1)) {
-        continue;
-      }
-      const timestamp = metadata.fileStart + start * 1000;
-      const [sname, cname] =
-        STATE.modelLabels[species].split(getSplitChar());
-      const result = {
-        timestamp,
-        position: start,
-        end,
-        file,
-        cname,
-        sname,
-        isDaylight: isDuringDaylight(timestamp, lat, lon),
-        score: det.confidence,
-        model: STATE.model
-      };
-      if (isCustomList && !STATE.selection) {
-        if (!allowedByList(result)) continue;
-      }
-      sendResult(++index, result, false);
-      if (index > 499) {
-        setGetSummaryQueryInterval(NUM_WORKERS);
-      }
+  const threshold = selection ? 50 : confidence;
+  
+  for (const det of detections) {
+    const {species, start, end, confidence} = det;
+    if (confidence < threshold) continue;
+    if (included.length && !included.includes(species + 1)) {
+      continue;
     }
+    const timestamp = metadata.fileStart + start * 1000;
+    const [sname, cname] =
+      modelLabels[species].split(getSplitChar());
+    const result = {
+      timestamp,
+      position: start,
+      end,
+      file,
+      cname,
+      sname,
+      isDaylight: isDuringDaylight(timestamp, lat, lon),
+      score: det.confidence,
+      model,
+    };
+    if (isCustomList && !selection) {
+      if (!allowedByList(result)) continue;
+    }
+    sendResult(++index, result, false);
+    if (index > 499) {
+      setGetSummaryQueryInterval(NUM_WORKERS);
+    }
+  }
 }
 /**
  * Estimate remaining analysis time from processed batches and post localized progress to the UI footer.
