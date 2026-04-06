@@ -161,7 +161,7 @@ const setupFfmpegCommand = async ({
     .format(format);
   if (channels) command.audioChannels(channels);
   // todo: consider whether to expose bat model training
-  const training = true;
+  const training = false;
   if (STATE.model.includes('batpack')) { 
     // No sample rate is supplied when exporting audio.
     // If the sampleRate is 256k, Wavesurfer will handle the tempo/pitch conversion
@@ -3762,7 +3762,7 @@ function filterDetectionsByRank(detections, topRankin) {
 async function sendResultsToUI (detections, file, modelID, lat, lon, isCustomList){
   const {selection, detect, modelLabels, model} = STATE;
   const {confidence, topRankin} = detect;
-  detections = filterDetectionsByRank(detections, topRankin);
+  selection || (detections = filterDetectionsByRank(detections, topRankin));
   const included = await getIncludedIDs(file).catch(console.warn);
   const metadata = METADATA[file];
   const threshold = selection ? 50 : confidence;
