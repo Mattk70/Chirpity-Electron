@@ -819,6 +819,7 @@ export class ChirpityWS {
    */
 
   async adjustDims(redraw, fftSamples, newHeight = 0) {
+    newHeight = Math.max(1, newHeight);
     const config = this.getConfig();
     const STATE = this.getState();
     const {footer, navPadding, contentWrapper, exploreWrapper, 
