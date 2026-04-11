@@ -168,8 +168,6 @@ const setupFfmpegCommand = async ({
     if ((training || sampleRate) && sampleRate !== 256000) {
       const { getAudioMetadata } = await import("./models/training.js");
       const {bitrate} = await getAudioMetadata(file);
-      // const MIN_EXPECTED_BITRATE = 96000; // Lower bitrates aren't capturing ultrasonic frequencies
-      // if (bitrate < MIN_EXPECTED_BITRATE) console.warn(file, 'has bitrate', bitrate)
       const rate = Math.floor(bitrate/10)
       command.audioFilters([`asetrate=${rate}`]);
     }
@@ -3647,7 +3645,7 @@ const parsePredictions = async (response) => {
   if (!selection && embeddingsBatch) {
     STATE.fileIDMap ??= new Map;
     const fileIDMap = STATE.fileIDMap
-    if (!fileIDMap.has(file)) {
+    if (!fileIDMap.get(file)) {
       const row = await STATE.db.getAsync('SELECT id FROM files WHERE name = ?', file);
       fileIDMap.set(file, row?.id);
     }

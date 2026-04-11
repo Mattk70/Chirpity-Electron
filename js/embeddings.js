@@ -26,7 +26,6 @@ async function createEmbeddingTable(db, path, dim){
     fs.closeSync(fd);
     fd = undefined;
   }
-  fs.rmSync(BIN_PATH, { force: true });
   fd = fs.openSync(BIN_PATH, 'w')
 }
 async function storeEmbeddings({db, dbMutex, fileID, embeddings, keys}) {
