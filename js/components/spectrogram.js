@@ -180,11 +180,11 @@ export class ChirpityWS {
         plugins
       });
   }
-   initAll = async ({ audio = undefined, height = 0 }) => {
+   initAll = async ({ audio = undefined, height }) => {
     const config = this.getConfig();
     const STATE = this.getState();
     const windowLength = STATE.windowLength;
-
+    height ??= config.specMaxHeight;
     this.wavesurfer && this.wavesurfer.destroy();
     this.REGIONS = this.initRegion();
     this.spectrogram = this.initSpectrogram('#spectrogram', height);
@@ -818,13 +818,13 @@ export class ChirpityWS {
    * @returns {Promise<void>} A promise that resolves once the UI adjustments and spectrogram rendering updates are complete.
    */
 
-  async adjustDims(redraw, fftSamples, newHeight = 0) {
-    newHeight = Math.max(1, newHeight);
+  async adjustDims(redraw, fftSamples, newHeight) {
     const config = this.getConfig();
     const STATE = this.getState();
     const {footer, navPadding, contentWrapper, exploreWrapper, 
       spectrogramWrapper, resultTableElement} = DOM;
     const wavesurfer = this.wavesurfer;
+    newHeight ??= Math.max(1, config.specMaxHeight);
     let specOffset = 0;
     if (!spectrogramWrapper.classList.contains("d-none")) {
       const specHeight =
