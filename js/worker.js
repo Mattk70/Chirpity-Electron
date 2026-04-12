@@ -1887,6 +1887,8 @@ async function onAnalyse({
     }
     // Clear any location filters set in explore/charts
     STATE.location = undefined;
+    // Recaclutate analysis time estimates based on the files in scope
+    await resetEstimates();
   }
 
   let count = 0;
