@@ -4197,6 +4197,8 @@ function getIntervals(fileStartMs, fileEndMs, latitude, longitude, period) {
  *
  * @param {string} file - The file key used to look up metadata in METADATA.
  * @returns {Promise<Array<{start: number, end: number}>>} An array of intervals with `start` and `end` in seconds, relative to the start of the file.
+ 
+*/
 async function setStartEnd(file) {
   const meta = METADATA[file];
   const nocmig = STATE.detect.nocmig;

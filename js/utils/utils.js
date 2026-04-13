@@ -12,6 +12,8 @@ const MODEL_DEFAULTS = {
  * and `tensorflow` properties merged separately with their respective defaults.
  *
  * @param {Object<string, Object>} models - Map of model names to model config objects; mutated in place.
+ * @param {Object<string, Object>} defaultModels - Map of model names to default model config objects.
+ * @returns {Object<string, Object>} - The normalized model configurations.
  */
 
 function normaliseModels(models = {}, defaultModels = {}) {

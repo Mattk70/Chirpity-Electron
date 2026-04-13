@@ -3660,7 +3660,7 @@ function onModelReady() {
  * @param {boolean} [params.play=false] - Whether playback should start immediately after loading.
  * @param {Object} [params.metadata] - Optional metadata for the audio file to store in STATE.metadata.
  * @returns {Promise<void>} Resolves when the UI state and spectrogram have been updated.
-
+*/
 async function onWorkerLoadedAudio({
   location,
   fileStart = 0,
