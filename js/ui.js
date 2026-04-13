@@ -3306,7 +3306,7 @@ const handleBackendChange = (backend) => {
   // Update threads and batch Size in UI
   config.models[config.selectedModel][backend].threads ??= DIAGNOSTICS['Physical Cores'] || 2;
   const {threads, batchSize} = config.models[config.selectedModel][backend];
-
+  config[backend] = { ...config[backend], threads, batchSize };
   DOM.threadSlider.value = threads;
   DOM.numberOfThreads.textContent = threads;
   DOM.batchSizeSlider.value = batchSize;
@@ -4149,10 +4149,15 @@ async function renderResult({
       modelID
     } = result;
 
-    const logo = ['birdnet', 'nocmig', 'chirpity', 'perch', 'nighthawk', 'user', 'batpack'].includes(model) ? model : 'custom';
+    const isBatpack = /batpack/i.test(model ?? "");
+    const logo = isBatpack
+      ? "batpack"
+      : ['birdnet', 'nocmig', 'chirpity', 'perch', 'nighthawk', 'user'].includes(model)
+        ? model
+        : 'custom';
 
-    const modelName = model.includes('batpack') 
-      ? "Bats" 
+    const modelName = isBatpack
+      ? "Bats"
       : config.models[model]
       ? utils.escapeHTML(config.models[model].displayName)
       : 'User';
@@ -5815,6 +5820,7 @@ async function handleUIClicks(e) {
           threads: config.models['birdnet']['webgpu'].threads,
           batchSize: config.models['birdnet']['webgpu'].batchSize
           },
+        customListFile: ""
       };
       config.selectedModel = modelName;
       const select = document.getElementById('model-to-use');
@@ -6608,6 +6614,7 @@ document.addEventListener("change", async function (e) {
           const backend = config.models[config.selectedModel].backend;
           config.models[config.selectedModel][backend].threads =
             DOM.threadSlider.valueAsNumber;
+          config[backend].threads = DOM.threadSlider.valueAsNumber;
           worker.postMessage({
             action: "change-threads",
             threads: DOM.threadSlider.valueAsNumber,
@@ -6620,6 +6627,7 @@ document.addEventListener("change", async function (e) {
           const backend = config.models[config.selectedModel].backend;
           config.models[config.selectedModel][backend].batchSize =
             DOM.batchSizeSlider.valueAsNumber;
+          config[backend].batchSize = DOM.batchSizeSlider.valueAsNumber;
           worker.postMessage({
             action: "change-batch-size",
             batchSize: DOM.batchSizeSlider.valueAsNumber,
