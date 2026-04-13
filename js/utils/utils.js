@@ -4,6 +4,15 @@ const MODEL_DEFAULTS = {
   tensorflow: { threads: null, batchSize: 8 },
 };
 
+/**
+ * Merge each model entry with default model settings, normalizing nested runtime configs.
+ *
+ * For every key in `models` this mutates the object in place so each entry becomes a merged
+ * object containing top-level defaults plus any provided model overrides, and with `webgpu`
+ * and `tensorflow` properties merged separately with their respective defaults.
+ *
+ * @param {Object<string, Object>} models - Map of model names to model config objects; mutated in place.
+ */
 function normaliseModels(models) {
   Object.keys(models).forEach((name) => {
     const model = models[name];
@@ -27,15 +36,16 @@ function normaliseModels(models) {
 
 
 /**
- * Synchronizes a configuration object with a default configuration.
+ * Aligns a configuration object to the shape and keys of a default configuration.
  *
- * Removes keys from the configuration that are not found in the default configuration,
- * and adds any missing keys from the default configuration. For keys with values that
- * are both objects in the configuration and the default configuration, the merge is
- * performed recursively, except when the key is "keyAssignment", which is left untouched.
+ * Mutates `config` in place by removing keys not present in `defaultConfig` and ensuring
+ * every key in `defaultConfig` exists in `config`. When both values for a key are objects,
+ * the function recurses to synchronize nested keys except for the `"keyAssignment"` key,
+ * which is left unchanged. The `"models"` key is handled by calling `normaliseModels` to
+ * merge per-model defaults instead of performing a recursive merge.
  *
- * @param {Object} config - The configuration object to be synchronized (modified in place).
- * @param {Object} defaultConfig - The default configuration serving as the reference.
+ * @param {Object} config - The configuration object to update (modified in place).
+ * @param {Object} defaultConfig - Reference configuration whose structure and keys should be enforced.
  */
 function syncConfig(config, defaultConfig) {
   // First, remove keys from config that are not in defaultConfig
