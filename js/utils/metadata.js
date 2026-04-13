@@ -7,9 +7,9 @@
 const fs = require("node:fs");
 
 /**
- * Extract metadata from a WAV file, without reading the entire file into memory.
- * @param {string} filePath - Path to the WAV file.
- * @returns {Promise<object|null>} - The extracted metadata or null if not found.
+ * Scan a WAV file and extract GUANO and BWF `bext` metadata without reading the entire file into memory.
+ * @param {string} filePath - Path to the WAV file to scan.
+ * @returns {Promise<object>} An object containing found metadata; `guano` and/or `bext` keys are present when those chunks are found, or an empty object if no metadata was extracted.
  */
 function extractWaveMetadata(filePath, getDuration = false) {
   let metadata = {}, guanoText = "";

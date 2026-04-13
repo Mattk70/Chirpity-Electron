@@ -8,6 +8,15 @@ let DIM, BIN_PATH, BYTES_PER_VECTOR;
 let fd;
 
 
+/**
+ * Initialize embedding storage: prepare the temporary database table and open the binary file used for vector storage.
+ *
+ * Sets module-scoped DIM and BYTES_PER_VECTOR, creates (if needed) a TEMPORARY `embeddings` table and clears its rows, sets BIN_PATH to `<path>/embeddings.bin`, closes any previously opened descriptor, and opens the binary file for writing (assigning its descriptor to the module-scoped `fd`).
+ *
+ * @param {object} db - SQLite database instance with `runAsync` method for executing SQL.
+ * @param {string} path - Filesystem directory where `embeddings.bin` will be created/opened.
+ * @param {number} dim - Embedding vector dimensionality; used to compute BYTES_PER_VECTOR.
+ */
 async function createEmbeddingTable(db, path, dim){
   DIM = dim;
   BYTES_PER_VECTOR = dim * 2;
@@ -28,6 +37,18 @@ async function createEmbeddingTable(db, path, dim){
   }
   fd = fs.openSync(BIN_PATH, 'w')
 }
+/**
+ * Persist a batch of embedding vectors and their offsets for a given file, storing vectors in the binary store and inserting corresponding metadata into the embeddings table atomically.
+ *
+ * This function appends each provided embedding (converted to Float16) to the on-disk embedding binary and creates a matching metadata row (fileID, offset, vectorIndex) for each vector. If metadata insertion does not affect all rows, or any error occurs while writing, the binary file is truncated back to its original size and the database transaction is rolled back.
+ *
+ * @param {number} fileID - Identifier of the file these embeddings belong to.
+ * @param {Array<Array<number>>} embeddings - Array of embedding vectors; each vector must have length equal to the module DIM.
+ * @param {Array<string|number>} keys - Array of offsets corresponding to each embedding; length must equal `embeddings.length`.
+ * @throws {Error} If `embeddings` is empty or `embeddings.length !== keys.length`.
+ * @throws {Error} If any embedding's length does not equal DIM.
+ * @throws {Error} If a filesystem or database error occurs while writing; on such errors the binary store and DB are rolled back to their prior state.
+ */
 async function storeEmbeddings({db, dbMutex, fileID, embeddings, keys}) {
   const emLength = embeddings.length;
   if ( ! emLength || emLength !== keys.length) {

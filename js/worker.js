@@ -1831,16 +1831,16 @@ async function getEmbedding({file,cname, sname, max, threshold, queryRegion }){
 
 
 /**
- * Prepare and start analysis for the specified audio files, deciding whether to reuse cached results or run fresh processing.
+ * Prepare and start analysis for the given audio files, using cached archive results when available or dispatching files for fresh processing.
  *
- * If all files are present in the disk database (or `circleClicked` is true) this will retrieve summary and results from the archive; otherwise it initializes analysis state, updates metadata, populates the processing queue, and dispatches files to worker processors.
+ * If all files are present in the disk archive (and `reanalyse` is false) or `circleClicked` is true, summary/results are fetched from the archive; otherwise the function initializes analysis state, refreshes metadata, populates the processing queue, and begins sending work to prediction workers.
  *
  * @param {Object} params - Analysis parameters.
- * @param {string[]} [params.filesInScope=[]] - File paths to include in the analysis.
- * @param {number} [params.start] - Optional start time (seconds) to limit analysis range for the first file.
- * @param {number} [params.end] - Optional end time (seconds) to limit analysis range for the first file.
- * @param {boolean} [params.reanalyse=false] - Force reanalysis even if cached results exist.
- * @param {boolean} [params.circleClicked=false] - If true, retrieve top results/summary from the archive instead of running a full analysis.
+ * @param {string[]} [params.filesInScope=[]] - File paths to analyse (queue order is preserved).
+ * @param {number} [params.start] - Optional start time in seconds to restrict analysis for the first file (selection mode).
+ * @param {number} [params.end] - Optional end time in seconds to restrict analysis for the first file (selection mode).
+ * @param {boolean} [params.reanalyse=false] - When true, force fresh analysis even if cached results exist.
+ * @param {boolean} [params.circleClicked=false] - When true, retrieve top results/summary from the archive instead of running a full analysis.
  */
 async function onAnalyse({
   filesInScope = [],
@@ -2757,11 +2757,10 @@ const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sam
 };
 
 /**
- * Build the chain of audio filter configurations based on current STATE.filters and STATE.audio settings.
+ * Constructs the audio filter chain from the current STATE.filters and STATE.audio settings.
  *
- * When filters are not active an empty array is returned. 
-
- * @returns {Array<Object>} An array of filter configuration objects suitable for ffmpeg-style filter chains; empty if no filters are active.
+ * If filters are not active, returns an empty array.
+ * @returns {Array<Object>} An array of filter configuration objects representing an ffmpeg-style filter chain; empty if no filters are active.
  */
 function setAudioFilters() {
   const {
@@ -3377,6 +3376,23 @@ async function prepareQuery(query){
     STATE.queryMetadata = undefined;
   }
 }
+/**
+ * Update in-memory detection merging state from a batch of model predictions and return any completed detections.
+ *
+ * When `merge` is true, the function updates STATE.detectionState[file] by extending or creating per-species open detections using the provided timestamps, species ids, and confidences; it closes and returns detections whose end time is passed by incoming timestamps (honoring `dropSingles` to omit single-frame detections). When `merge` is false, the function performs a fast pass that emits detections per timestamp without modifying STATE.detectionState (threshold is clamped to at most 150 in this path). In both modes confidences from `confidenceBatch` are scaled by 1000. If `isCustomList` is true, low-confidence entries are skipped rather than terminating the candidate list for that timestamp.
+ *
+ * @param {Object} params
+ * @param {string} params.file - File key used to scope detection state.
+ * @param {number[]} params.keysArray - Array of timestamps (start times in the model's time units) corresponding to each prediction frame.
+ * @param {number[][]} params.speciesIDBatch - Parallel array where each element is an array of predicted species IDs for the corresponding timestamp.
+ * @param {number[][]} params.confidenceBatch - Parallel array of confidence arrays matching speciesIDBatch; values in [0,1] prior to scaling.
+ * @param {number} params.threshold - Confidence threshold (same units as returned confidences after scaling to 0–1000); used to filter low-confidence predictions.
+ * @param {number} params.predictionLength - Duration to assign to a single prediction frame; used to set detection `end = start + predictionLength`.
+ * @param {boolean} params.dropSingles - If true, completed detections with count === 1 are omitted from returned results.
+ * @param {boolean} params.isCustomList - If true, low-confidence entries are skipped rather than breaking out of per-frame candidate lists.
+ * @param {boolean} [params.merge=true] - If true, enable merge-mode which maintains and updates per-species open detections; if false, use the fast non-merging path.
+ * @returns {Array<{species:number,start:number,end:number,confidence:number}>} An array of completed detection objects (species id, absolute start, end, and max confidence scaled to 0–1000). In merge mode this contains detections closed by the processed timestamps; in non-merge mode it contains detections emitted directly from the batch.
+ */
 function updateDetectionState({
   file,
   keysArray,
@@ -3506,6 +3522,13 @@ function enqueueDetectionUpdate(file, batchIndex, task) {
   void processDetectionQueue(file);
 }
 
+/**
+ * Serially processes queued detection-update tasks for a single file and finalizes detections when the queue drains.
+ *
+ * Runs only one processor per file; it consumes tasks in order starting at STATE.nextExpectedIndex[file], invokes each task (synchronously) to produce detection objects, and for non-selection runs inserts detections into the disk DB, sends detections to the UI, and requests an interim summary. When the final expected batch is processed and the per-file queue is empty, it triggers onDetectionComplete(file). The function updates per-file STATE flags and indices (STATE.detectionRunning, STATE.lastProcessedBatch, STATE.nextExpectedIndex) as it progresses.
+ *
+ * @param {string} file - The file path (key) whose detection queue will be processed.
+ */
 async function processDetectionQueue(file) {
   if (STATE.detectionRunning[file]) return;
   STATE.detectionRunning[file] = true;
@@ -3683,6 +3706,13 @@ const parsePredictions = async (response) => {
   return worker;
 };
 
+/**
+ * Finalize merged detections for a file: flush in-memory detections, persist them when appropriate, send them to the UI, update the processing queue, and emit completion alerts if the run produced no detections.
+ *
+ * If detections remain after flushing, this function inserts them into the disk database unless a selection is active, posts them to the UI, and requests an interim summary. It uses file metadata (latitude/longitude) and current STATE (model, detection settings, list) to determine persistence and alert behavior. When all queued files are complete and this worker produced no detections (global index === 0), it emits a `noDetections` or `noDetectionsDetailed2` alert depending on whether the run was a selection.
+ *
+ * @param {string} file - Path of the audio file whose detection processing is completing.
+ */
 async function onDetectionComplete(file) {
   const { modelID, detect, selection, list } = STATE;
   const {overlap, dropSingles, confidence} = detect;
@@ -3731,6 +3761,17 @@ async function onDetectionComplete(file) {
       }
     }
 }
+/**
+ * Limit detections to the top-ranked entries within each identical time window.
+ *
+ * Groups consecutive detections that share the same `start` and `end` and keeps
+ * up to `topRankin` items from each group. The function relies on the input
+ * order to represent ranking (earlier items are considered higher-ranked).
+ *
+ * @param {Array<Object>} detections - Array of detection objects containing at least `start` and `end` numeric properties, ordered by desired rank.
+ * @param {number} topRankin - Maximum number of detections to keep per identical `(start,end)` group.
+ * @returns {Array<Object>} An array of detections preserving input order with at most `topRankin` items per identical time window.
+ */
 function filterDetectionsByRank(detections, topRankin) {
   const result = [];
   let i = 0;
@@ -3763,6 +3804,21 @@ function filterDetectionsByRank(detections, topRankin) {
 
   return result;
 }
+/**
+ * Filters detection objects, converts them to UI-ready result records, and emits them to the UI.
+ *
+ * Processes each detection by applying confidence and inclusion-list thresholds, computes absolute
+ * timestamps and daylight status, splits model labels into scientific/common names, optionally
+ * applies custom-list acceptance, and sends each approved result via sendResult. When many results
+ * are emitted, schedules interim summary queries.
+ *
+ * @param {Array<Object>} detections - Array of detection objects with keys `{species, start, end, confidence}` where `start`/`end` are seconds relative to the file and `confidence` is a numeric score.
+ * @param {string} file - File path or identifier for the audio file the detections belong to.
+ * @param {number} modelID - Model identifier (passed for context; not used to transform results here).
+ * @param {number} lat - Latitude used to compute daylight for each detection timestamp.
+ * @param {number} lon - Longitude used to compute daylight for each detection timestamp.
+ * @param {boolean} isCustomList - If true, apply additional per-result acceptance via allowedByList (skipped for selection mode).
+ */
 async function sendResultsToUI (detections, file, modelID, lat, lon, isCustomList){
   const {selection, detect, modelLabels, model} = STATE;
   const {confidence, topRankin} = detect;
@@ -3801,10 +3857,10 @@ async function sendResultsToUI (detections, file, modelID, lat, lon, isCustomLis
   }
 }
 /**
- * Estimate remaining analysis time from processed batches and post localized progress to the UI footer.
+ * Update the UI footer with a localized estimate of remaining analysis time based on processed batches.
  *
- * Computes progress, estimated minutes remaining, and processing speed based on the global analysis start
- * timestamp and STATE counters, then sends a progress message to the UI with percent and localized text.
+ * Calculates percent complete, estimated minutes remaining, and processing speed, then sends a localized
+ * progress message to the UI. If there are no total batches or progress cannot be determined, no message is sent.
  *
  * @param {number} batchesReceived - Number of analysis batches processed so far for the current run.
  */
@@ -4135,13 +4191,12 @@ function getIntervals(fileStartMs, fileEndMs, latitude, longitude, period) {
 }
 
 /**
- * Compute active time intervals for an audio file based on its metadata and detection mode.
+ * Determine the processing intervals within an audio file based on metadata and detection mode.
  *
- * When nocturnal-migration mode is enabled, returns intervals clipped to the computed day/night boundaries for the file (using file start/end and location). When nocturnal-migration is disabled, returns a single interval covering the entire file duration and updates batchesToSend[file] with the number of processing batches (at least 1).
+ * If nocturnal-migration mode is enabled, returns intervals clipped to computed dawn/dusk (or dusk→dawn) boundaries for the file using its timestamp and location; otherwise returns a single interval covering the file and sets batchesToSend[file] to the number of processing batches for that duration.
  *
- * @param {string} file - Key or filename used to look up the file's metadata in METADATA.
- * @returns {Promise<Array<{start: number, end: number}>>} An array of intervals with `start` and `end` expressed in seconds relative to the file.
- */
+ * @param {string} file - The file key used to look up metadata in METADATA.
+ * @returns {Promise<Array<{start: number, end: number}>>} An array of intervals with `start` and `end` in seconds, relative to the start of the file.
 async function setStartEnd(file) {
   const meta = METADATA[file];
   const nocmig = STATE.detect.nocmig;
@@ -4172,6 +4227,15 @@ async function setStartEnd(file) {
   return boundaries;
 }
 
+/**
+ * Compute how many prediction batches are required to cover an audio segment.
+ *
+ * If the current model includes "batpack", the duration is treated as ten times longer
+ * to account for model-specific time scaling.
+ *
+ * @param {number} duration - Audio segment length in seconds.
+ * @returns {number} The positive integer count of batches needed to process the segment.
+ */
 function getBatchesToSend(duration) {
   if (STATE.model.includes('batpack')) duration *= 10;
   const overlap = STATE.detect.overlap;
