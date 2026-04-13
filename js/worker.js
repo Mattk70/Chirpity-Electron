@@ -231,10 +231,14 @@ const updateBatches = (file, actualDuration, start, end) => {
     if (before > after) {
       if (fs.existsSync(file)) {
         console.warn(`File duration mismatch`, `File: ${file} ${diff}`)
-        const meta = JSON.parse(METADATA[file].metadata)
-        const firmware = meta.guano['Firmware Version'];
-        const model = meta.guano.Model;
-        console.warn(`Firmware version: ${firmware}`, `Model: ${model}`)
+        try {
+          const meta = JSON.parse(METADATA[file].metadata);
+          const firmware = meta?.guano?.['Firmware Version'];
+          const model = meta?.guano?.Model;
+          console.warn(`Firmware version: ${firmware}`, `Model: ${model}`);
+        } catch {
+          console.warn('Could not parse file metadata');
+        }
       }
       else console.warn("File duration mismatch", "File missing");
     }

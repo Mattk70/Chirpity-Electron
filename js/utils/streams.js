@@ -113,7 +113,6 @@ class PCMChunker extends Transform {
 
   _transform(chunk, _, callback) {
     try {
-      this.totalBytesSeen += chunk.length;
       if (this.remainingTrim > 0) {
         if (chunk.length <= this.remainingTrim) {
           this.remainingTrim -= chunk.length;
@@ -123,6 +122,7 @@ class PCMChunker extends Transform {
           this.remainingTrim = 0;
         }
       }
+      this.totalBytesSeen += chunk.length;
 
       let offset = 0;
 

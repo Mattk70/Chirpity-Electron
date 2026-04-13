@@ -184,10 +184,13 @@ export class ChirpityWS {
     const config = this.getConfig();
     const STATE = this.getState();
     const windowLength = STATE.windowLength;
-    height ??= config.specMaxHeight;
+    const resolvedHeight =
+      height != null && height > 0
+        ? height
+        : Math.min(config.specMaxHeight, this.maxHeight());
     this.wavesurfer && this.wavesurfer.destroy();
     this.REGIONS = this.initRegion();
-    this.spectrogram = this.initSpectrogram('#spectrogram', height);
+    this.spectrogram = this.initSpectrogram('#spectrogram', resolvedHeight);
     this.timeline = this.createTimeline(windowLength);
     // Setup waveform and spec views
     const plugins = [this.spectrogram, this.timeline, this.REGIONS];
@@ -824,12 +827,13 @@ export class ChirpityWS {
     const {footer, navPadding, contentWrapper, exploreWrapper, 
       spectrogramWrapper, resultTableElement} = DOM;
     const wavesurfer = this.wavesurfer;
-    newHeight ??= Math.max(1, config.specMaxHeight);
+    const hasExplicitHeight = newHeight != null && newHeight > 0;
     let specOffset = 0;
     if (!spectrogramWrapper.classList.contains("d-none")) {
-      const specHeight =
-        newHeight || Math.min(config.specMaxHeight, this.maxHeight());
-      if (newHeight) {
+      const specHeight = hasExplicitHeight
+        ? Math.max(1, newHeight)
+        : Math.min(config.specMaxHeight, this.maxHeight());
+      if (hasExplicitHeight) {
         config.specMaxHeight = specHeight;
         this.handlers.updatePrefs("config.json", config);
       }

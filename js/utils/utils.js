@@ -13,27 +13,36 @@ const MODEL_DEFAULTS = {
  *
  * @param {Object<string, Object>} models - Map of model names to model config objects; mutated in place.
  */
-function normaliseModels(models) {
-  Object.keys(models).forEach((name) => {
-    const model = models[name];
 
-    models[name] = {
-      ...MODEL_DEFAULTS,
+function normaliseModels(models = {}, defaultModels = {}) {
+  const normalised = {};
+  const names = new Set([
+    ...Object.keys(defaultModels),
+    ...Object.keys(models),
+  ]);
+
+  for (const name of names) {
+    const defaults = defaultModels[name] ?? MODEL_DEFAULTS;
+    const model = models[name] ?? {};
+
+    normalised[name] = {
+      ...defaults,
       ...model,
-
-      // Merge nested objects separately so we don't overwrite them
       webgpu: {
         ...MODEL_DEFAULTS.webgpu,
+        ...(defaults.webgpu || {}),
         ...(model.webgpu || {}),
       },
       tensorflow: {
         ...MODEL_DEFAULTS.tensorflow,
+        ...(defaults.tensorflow || {}),
         ...(model.tensorflow || {}),
       },
     };
-  });
-}
+  }
 
+  return normalised;
+}
 
 /**
  * Aligns a configuration object to the shape and keys of a default configuration.
@@ -68,7 +77,7 @@ function syncConfig(config, defaultConfig) {
       // Recursively sync nested objects (but allow key assignment to be empty)
       key === "keyAssignment" || syncConfig(config[key], defaultConfig[key]);
     } else if (key === 'models'){
-      normaliseModels(config[key])
+      config[key] = normaliseModels(config[key], defaultConfig[key]);
     }
   });
 }
