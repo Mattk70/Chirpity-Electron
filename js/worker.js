@@ -154,6 +154,7 @@ const setupFfmpegCommand = async ({
   metadata = {},
   audioCodec = null,
   audioBitrate = null,
+  audioQuality = null,
   outputOptions = [],
 }) => {
 
@@ -199,6 +200,9 @@ const setupFfmpegCommand = async ({
 
   // Set bitRate if provided
   if (audioBitrate) command.audioBitrate(audioBitrate);
+
+  // Set quality if provided (for codecs that support it, like flac)
+  if (audioQuality) command.audioQuality(audioQuality);
 
   // Add any additional output options
   if (outputOptions.length) command.addOutputOptions(...outputOptions);
@@ -971,8 +975,9 @@ async function savedFileCheckAsync(fileList) {
 }
 
 function setGetSummaryQueryInterval(threads) {
+  const scaleFactor = Math.max(1, Math.floor(index / 1000));
   STATE.incrementor =
-    STATE.detect.backend !== "tensorflow" ? threads * 10 : threads;
+    STATE.detect.backend !== "tensorflow" ? threads * 10 * scaleFactor: threads * scaleFactor;
 }
 
 async function resetEstimates() {
@@ -2884,7 +2889,7 @@ const bufferToAudio = async ({
   }
   const {padding, downmix, fade, bitrate, quality} = STATE.audio;
   const rate = ["mp3", "aac", "opus"].includes(format) ? bitrate : undefined;
-  let compression = ["flac"].includes(format) ? parseInt(quality) : undefined;
+  const audioQuality = ["flac"].includes(format) ? parseInt(quality) : undefined;
 
   const formatMap = {
     mp3: { audioCodec: "libmp3lame", soundFormat: "mp3" },
@@ -2917,7 +2922,7 @@ const bufferToAudio = async ({
       end,
       sampleRate: undefined,
       audioBitrate: rate,
-      audioQuality: compression,
+      audioQuality,
       audioCodec,
       format: soundFormat,
       channels: downmix ? 1 : 0,
@@ -3563,7 +3568,7 @@ async function processDetectionQueue(file) {
           lon,
           isCustomList
         );
-        if (!selection) await getSummary({interim: true}).catch(console.warn);
+        if (!selection && STATE.increment() === 0) await getSummary({interim: true}).catch(console.warn);
       }
       STATE.lastProcessedBatch[file] = nextIndex;
       STATE.nextExpectedIndex[file]++;
@@ -3614,6 +3619,7 @@ const parsePredictions = async (response) => {
     } else {
       enqueueDetectionUpdate(file, batchIndex, () => []);
     }
+    return worker;
   }
   const [keysArray, speciesIDBatch, confidenceBatch, embeddingsBatch] =
     latestResult;
@@ -3771,13 +3777,13 @@ async function onDetectionComplete(file) {
 /**
  * Limit detections to the top-ranked entries within each identical time window.
  *
- * Groups consecutive detections that share the same `start` and `end` and keeps
- * up to `topRankin` items from each group. The function relies on the input
- * order to represent ranking (earlier items are considered higher-ranked).
+ * Groups consecutive detections that share the same `start` and `end`, sorts each
+ * group by confidence score (descending), and keeps up to `topRankin` items from
+ * each group.
  *
- * @param {Array<Object>} detections - Array of detection objects containing at least `start` and `end` numeric properties, ordered by desired rank.
+ * @param {Array<Object>} detections - Array of detection objects containing at least `start`, `end`, and `confidence` (or `score`) numeric properties.
  * @param {number} topRankin - Maximum number of detections to keep per identical `(start,end)` group.
- * @returns {Array<Object>} An array of detections preserving input order with at most `topRankin` items per identical time window.
+ * @returns {Array<Object>} An array of detections with at most `topRankin` items per identical time window, sorted by confidence within each group.
  */
 function filterDetectionsByRank(detections, topRankin) {
   const result = [];
@@ -3797,12 +3803,14 @@ function filterDetectionsByRank(detections, topRankin) {
       j++;
     }
 
-    // Slice only topRanking items from this group
-    const groupSize = j - i;
-    const limit = Math.min(groupSize, topRankin);
+    // Extract the group and sort by confidence descending
+    const group = detections.slice(i, j);
+    group.sort((a, b) => (b.confidence || b.score || 0) - (a.confidence || a.score || 0));
 
+    // Take top topRankin items from the sorted group
+    const limit = Math.min(group.length, topRankin);
     for (let k = 0; k < limit; k++) {
-      result.push(detections[i + k]);
+      result.push(group[k]);
     }
 
     // Skip entire group

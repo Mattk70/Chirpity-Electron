@@ -366,7 +366,7 @@ const Toasts = { // UI.js
         libraryUpToDate: "La bibliothèque est à jour. Aucune action nécessaire",
         badModel: 'Le modèle "${model}" n’a pas été trouvé dans la base de données.',
         noModel: "La colonne de modèle requise n’a pas été trouvée dans le fichier",
-        noDBPath: "La ubicación de la base de datos especificada no existe. Usando la base de datos predeterminada.",
+        noDBPath: "Le chemin de la base de données spécifié n’existe pas. Utilisation de la base de données par défaut.",
 
         noBackground: "Vous avez sélectionné 'Mélanger avec le bruit de fond', mais il n'y a pas de dossier nommé 'background' dans votre jeu de données."
 
