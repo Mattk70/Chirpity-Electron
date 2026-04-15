@@ -232,7 +232,7 @@ const updateBatches = (file, actualDuration, start, end) => {
     batchesToSend[file] = after;
     const diff = before - after;
     STATE.totalBatches -= diff;
-    if (before > after) {
+    if (DEBUG && before > after) {
       if (fs.existsSync(file)) {
         console.warn(`File duration mismatch`, `File: ${file} ${diff}`)
         try {
@@ -3753,7 +3753,7 @@ async function onDetectionComplete(file) {
       lon,
       isCustomList
     );
-    selection || getSummary({interim: true}).catch(console.warn);
+    if (!selection && STATE.increment() === 0) await getSummary({interim: true}).catch(console.warn);
   }
   updateQueue(file);
 
