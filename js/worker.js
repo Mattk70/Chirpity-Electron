@@ -288,7 +288,7 @@ function resolveDatabaseFile(path) {
 async function loadDB(modelPath) {
   const pathExists = fs.existsSync(STATE.database.location);
   const path = pathExists ? STATE.database.location : appPath;
-  if (!pathExists) {
+  if (!fs.existsSync((path))) {
     generateAlert({
       type: "error",
       message: 'noDBPath'
