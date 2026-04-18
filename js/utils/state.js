@@ -34,7 +34,6 @@ export class WorkerState {
       lowPassFrequency: 15000,
       lowShelfFrequency: 0,
       lowShelfAttenuation: 0,
-      SNR: 0,
       normalise: false,
       sendToModel: false,
     }),
@@ -159,5 +158,12 @@ export class WorkerState {
     this.filteredOffset = {};
     this.originalFiles = undefined;
   }
-
+  // Used to decrease calls to get summary when prepping a dataset
+  // because it's an expensive op when the memory db is v. large
+  increment() {
+    if (++this.predictionCount >= this.incrementor) {
+      this.predictionCount = 0;
+    }
+    return this.predictionCount;
+  }
 }

@@ -11,10 +11,12 @@ class PCMChunker extends Transform {
     endTime,
     trimSeconds = 0,
     alertFn,
+    onComplete
   }) {
     super({ readableObjectMode: true });
 
     this.alertFn = alertFn;
+    this.onComplete = onComplete;
     this.file = file;
     this.endTime = endTime;
     this.sampleRate = sampleRate;
@@ -111,7 +113,6 @@ class PCMChunker extends Transform {
 
   _transform(chunk, _, callback) {
     try {
-      this.totalBytesSeen += chunk.length;
       if (this.remainingTrim > 0) {
         if (chunk.length <= this.remainingTrim) {
           this.remainingTrim -= chunk.length;
@@ -121,6 +122,7 @@ class PCMChunker extends Transform {
           this.remainingTrim = 0;
         }
       }
+      this.totalBytesSeen += chunk.length;
 
       let offset = 0;
 

@@ -7,9 +7,9 @@
 const fs = require("node:fs");
 
 /**
- * Extract metadata from a WAV file, without reading the entire file into memory.
- * @param {string} filePath - Path to the WAV file.
- * @returns {Promise<object|null>} - The extracted metadata or null if not found.
+ * Scan a WAV file and extract GUANO and BWF `bext` metadata without reading the entire file into memory.
+ * @param {string} filePath - Path to the WAV file to scan.
+ * @returns {Promise<object>} An object containing found metadata; `guano` and/or `bext` keys are present when those chunks are found, or an empty object if no metadata was extracted.
  */
 function extractWaveMetadata(filePath, getDuration = false) {
   let metadata = {}, guanoText = "";
@@ -35,6 +35,7 @@ function extractWaveMetadata(filePath, getDuration = false) {
         const validHeaders = ["RIFF", "RF64", "BW64"];
         if (!validHeaders.includes(chunkId) || format !== "WAVE") {
           fs.close(fd, () => {}); // Close the file descriptor
+          if (chunkId.startsWith('ID3')) return reject(new Error("WAV file has ID3: " + filePath));
           return reject(new Error("Invalid WAV file: " + filePath));
         }
 
@@ -254,7 +255,8 @@ function getWaveDuration(filePath) {
     const waveId = header.toString("ascii", 8, 12);
     const validHeaders = new Set(["RIFF", "RF64", "BW64"]);
     if (!validHeaders.has(riffId) || waveId !== "WAVE") {
-        throw new Error(`Not a WAV file: ${filePath}`);
+      if (riffId.startsWith('ID3')) throw new Error(`ID3 in WAV header: ${filePath}`);
+      throw new Error(`Not a WAV file: ${filePath}`);
     }
 
     const isRF64 = riffId === "RF64" || riffId === "BW64";

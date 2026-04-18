@@ -154,6 +154,7 @@ const setupFfmpegCommand = async ({
   metadata = {},
   audioCodec = null,
   audioBitrate = null,
+  audioQuality = null,
   outputOptions = [],
 }) => {
 
@@ -161,15 +162,13 @@ const setupFfmpegCommand = async ({
     .format(format);
   if (channels) command.audioChannels(channels);
   // todo: consider whether to expose bat model training
-  const training = false
-  if (STATE.model.includes('bats')) { 
+  const training = false;
+  if (STATE.model.includes('batpack')) { 
     // No sample rate is supplied when exporting audio.
     // If the sampleRate is 256k, Wavesurfer will handle the tempo/pitch conversion
     if ((training || sampleRate) && sampleRate !== 256000) {
       const { getAudioMetadata } = await import("./models/training.js");
       const {bitrate} = await getAudioMetadata(file);
-      const MIN_EXPECTED_BITRATE = 96000; // Lower bitrates aren't capturing ultrasonic frequencies
-      if (bitrate < MIN_EXPECTED_BITRATE) console.warn(file, 'has bitrate', bitrate)
       const rate = Math.floor(bitrate/10)
       command.audioFilters([`asetrate=${rate}`]);
     }
@@ -202,6 +201,9 @@ const setupFfmpegCommand = async ({
   // Set bitRate if provided
   if (audioBitrate) command.audioBitrate(audioBitrate);
 
+  // Set quality if provided (for codecs that support it, like flac)
+  if (audioQuality) command.audioQuality(audioQuality);
+
   // Add any additional output options
   if (outputOptions.length) command.addOutputOptions(...outputOptions);
 
@@ -221,13 +223,27 @@ const setupFfmpegCommand = async ({
 
 const updateBatches = (file, actualDuration, start, end) => {
   const metaDuration = METADATA[file].duration;
-  if (start === 0 && end === metaDuration && isFinite(actualDuration) && actualDuration + EPSILON < metaDuration) {
+  if (STATE.model.includes('batpack')) actualDuration /= 10;
+  if (start === 0 && end >= metaDuration && isFinite(actualDuration) && actualDuration + EPSILON < metaDuration) {
     // If we have a short file (header duration > processed duration)
     // *and* were looking for the whole file, we'll fix # of expected chunks here
     const before = batchesToSend[file]
-    batchesToSend[file] = getBatchesToSend(actualDuration);
-    if (before > batchesToSend[file]) {
-      if (fs.existsSync(file)) console.warn("File duration mismatch", before - batchesToSend[file])
+    const after = getBatchesToSend(actualDuration);
+    batchesToSend[file] = after;
+    const diff = before - after;
+    STATE.totalBatches -= diff;
+    if (DEBUG && before > after) {
+      if (fs.existsSync(file)) {
+        console.warn(`File duration mismatch`, `File: ${file} ${diff}`)
+        try {
+          const meta = JSON.parse(METADATA[file].metadata);
+          const firmware = meta?.guano?.['Firmware Version'];
+          const model = meta?.guano?.Model;
+          console.warn(`Firmware version: ${firmware}`, `Model: ${model}`);
+        } catch {
+          console.warn('Could not parse file metadata');
+        }
+      }
       else console.warn("File duration mismatch", "File missing");
     }
     METADATA[file].duration = actualDuration;
@@ -270,7 +286,14 @@ function resolveDatabaseFile(path) {
  * @returns {sqlite3.Database} The opened or newly created archive database instance.
  */
 async function loadDB(modelPath) {
-  const path = STATE.database.location || appPath;
+  let pathExists;
+  if (STATE.database.location) {
+    pathExists = fs.existsSync(STATE.database.location);
+    if (!pathExists) {
+      generateAlert({ type: "error", message: 'noDBPath' });
+    }
+  }
+  const path = pathExists ? STATE.database.location : appPath;
   DEBUG && console.log("Loading db " + path);
   const model = STATE.model;
   let modelID, needsTranslation;
@@ -952,8 +975,9 @@ async function savedFileCheckAsync(fileList) {
 }
 
 function setGetSummaryQueryInterval(threads) {
+  const scaleFactor = Math.max(1, Math.floor(index / 1000));
   STATE.incrementor =
-    STATE.detect.backend !== "tensorflow" ? threads * 10 : threads;
+    STATE.detect.backend !== "tensorflow" ? threads * 10 * scaleFactor: threads * scaleFactor;
 }
 
 async function resetEstimates() {
@@ -1819,16 +1843,16 @@ async function getEmbedding({file,cname, sname, max, threshold, queryRegion }){
 
 
 /**
- * Prepare and start analysis for the specified audio files, deciding whether to reuse cached results or run fresh processing.
+ * Prepare and start analysis for the given audio files, using cached archive results when available or dispatching files for fresh processing.
  *
- * If all files are present in the disk database (or `circleClicked` is true) this will retrieve summary and results from the archive; otherwise it initializes analysis state, updates metadata, populates the processing queue, and dispatches files to worker processors.
+ * If all files are present in the disk archive (and `reanalyse` is false) or `circleClicked` is true, summary/results are fetched from the archive; otherwise the function initializes analysis state, refreshes metadata, populates the processing queue, and begins sending work to prediction workers.
  *
  * @param {Object} params - Analysis parameters.
- * @param {string[]} [params.filesInScope=[]] - File paths to include in the analysis.
- * @param {number} [params.start] - Optional start time (seconds) to limit analysis range for the first file.
- * @param {number} [params.end] - Optional end time (seconds) to limit analysis range for the first file.
- * @param {boolean} [params.reanalyse=false] - Force reanalysis even if cached results exist.
- * @param {boolean} [params.circleClicked=false] - If true, retrieve top results/summary from the archive instead of running a full analysis.
+ * @param {string[]} [params.filesInScope=[]] - File paths to analyse (queue order is preserved).
+ * @param {number} [params.start] - Optional start time in seconds to restrict analysis for the first file (selection mode).
+ * @param {number} [params.end] - Optional end time in seconds to restrict analysis for the first file (selection mode).
+ * @param {boolean} [params.reanalyse=false] - When true, force fresh analysis even if cached results exist.
+ * @param {boolean} [params.circleClicked=false] - When true, retrieve top results/summary from the archive instead of running a full analysis.
  */
 async function onAnalyse({
   filesInScope = [],
@@ -1879,6 +1903,8 @@ async function onAnalyse({
     }
     // Clear any location filters set in explore/charts
     STATE.location = undefined;
+    // Recaclutate analysis time estimates based on the files in scope
+    await resetEstimates();
   }
 
   let count = 0;
@@ -2440,7 +2466,7 @@ const setMetadata = async ({ file, source_file = file }) => {
       fileMeta.duration = await getDuration(file);
       if (file.toLowerCase().endsWith("wav")) {
         const t0 = Date.now();
-        const wavMetadata = await extractWaveMetadata(file);
+        const wavMetadata = await extractWaveMetadata(file).catch(console.warn);
         const metaKeys = wavMetadata ? Object.keys(wavMetadata): [];
         if (metaKeys.length){
           if (metaKeys.includes("guano")) {
@@ -2458,7 +2484,13 @@ const setMetadata = async ({ file, source_file = file }) => {
             guanoTimestamp = Date.parse(guano.Timestamp);
             if (guanoTimestamp) fileMeta.fileStart = guanoTimestamp;
             if (guano.Length){
-              fileMeta.duration = parseFloat(guano.Length);
+              let duration = parseFloat(guano.Length);
+              if (guano.Model?.startsWith('Echo Meter Touch 2')
+                && guano['Firmware Version']?.startsWith('App 2')) {
+                  // This firmware records length in milliseconds
+                  duration /= 1000
+                }
+              fileMeta.duration = duration;
             }
           }
           else if (metaKeys.includes("bext")) {
@@ -2576,7 +2608,7 @@ const getPredictBuffers = async ({ file = "", start = 0, end = undefined }) => {
   start = Math.max(0, start);
   
   let fileDuration = METADATA[file].duration;
-  const slow = STATE.model.includes("bats");
+  const slow = STATE.model.includes("batpack");
   if (slow) {
     end = (end - start) * 10 + start;
   } else {
@@ -2673,9 +2705,9 @@ const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sam
     if (!result) throw new Error(`Cannot locate ${file}`);
     file = result;
   }
-  if (!sampleRate) sampleRate = STATE.model.includes("bats") ? 256_000 : 24_000;
+  if (!sampleRate) sampleRate = STATE.model.includes("batpack") ? 256_000 : 24_000;
   await setMetadata({ file });
-  const fileDuration = METADATA[file].duration// (STATE.model === 'bats') ? METADATA[file].duration*10 : METADATA[file].duration;
+  const fileDuration = METADATA[file].duration// (STATE.model === 'batpack') ? METADATA[file].duration*10 : METADATA[file].duration;
   if (!fileDuration) return [null, start]
   end ??= fileDuration;
 
@@ -2737,11 +2769,10 @@ const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sam
 };
 
 /**
- * Build the chain of audio filter configurations based on current STATE.filters and STATE.audio settings.
+ * Constructs the audio filter chain from the current STATE.filters and STATE.audio settings.
  *
- * When filters are not active an empty array is returned. 
-
- * @returns {Array<Object>} An array of filter configuration objects suitable for ffmpeg-style filter chains; empty if no filters are active.
+ * If filters are not active, returns an empty array.
+ * @returns {Array<Object>} An array of filter configuration objects representing an ffmpeg-style filter chain; empty if no filters are active.
  */
 function setAudioFilters() {
   const {
@@ -2758,7 +2789,7 @@ function setAudioFilters() {
   const filters = [];
 
   // === Filter chain logic ===
-  const batModel = STATE.model.includes('bats');
+  const batModel = STATE.model.includes('batpack');
   if (!batModel && (highPass || (lowPass < 15_000 && lowPass > 0))) {
     const options = {};
     if (highPass) options.hp = highPass;
@@ -2856,15 +2887,10 @@ const bufferToAudio = async ({
   if (slow) {
     end = (end - start) * 10 + start;
   }
-  let padding = STATE.audio.padding;
-  let fade = STATE.audio.fade;
-  let bitrate = ["mp3", "aac", "opus"].includes(format)
-    ? STATE.audio.bitrate
-    : undefined;
-  let quality = ["flac"].includes(format)
-    ? parseInt(STATE.audio.quality)
-    : undefined;
-  let downmix = STATE.audio.downmix;
+  const {padding, downmix, fade, bitrate, quality} = STATE.audio;
+  const rate = ["mp3", "aac", "opus"].includes(format) ? bitrate : undefined;
+  const audioQuality = ["flac"].includes(format) ? parseInt(quality) : undefined;
+
   const formatMap = {
     mp3: { audioCodec: "libmp3lame", soundFormat: "mp3" },
     aac: { audioCodec: "aac", soundFormat: "mp4" },
@@ -2895,8 +2921,8 @@ const bufferToAudio = async ({
       start,
       end,
       sampleRate: undefined,
-      audioBitrate: bitrate,
-      audioQuality: quality,
+      audioBitrate: rate,
+      audioQuality,
       audioCodec,
       format: soundFormat,
       channels: downmix ? 1 : 0,
@@ -3242,7 +3268,7 @@ const insertDurations = async (file, id) => {
 const generateInsertQuery = async (detections, file, modelID) => { 
   const db = STATE.db;
   let { fileStart, metadata, duration, lat, lon, locationID } = METADATA[file];
-  const predictionLength = STATE.model.includes("bats") ? 0.3 : WINDOW_SIZE;
+  const predictionLength = STATE.model.includes("batpack") ? 0.3 : WINDOW_SIZE;
   let fileID;
   await dbMutex.lock();
   try {
@@ -3362,6 +3388,23 @@ async function prepareQuery(query){
     STATE.queryMetadata = undefined;
   }
 }
+/**
+ * Update in-memory detection merging state from a batch of model predictions and return any completed detections.
+ *
+ * When `merge` is true, the function updates STATE.detectionState[file] by extending or creating per-species open detections using the provided timestamps, species ids, and confidences; it closes and returns detections whose end time is passed by incoming timestamps (honoring `dropSingles` to omit single-frame detections). When `merge` is false, the function performs a fast pass that emits detections per timestamp without modifying STATE.detectionState (threshold is clamped to at most 150 in this path). In both modes confidences from `confidenceBatch` are scaled by 1000. If `isCustomList` is true, low-confidence entries are skipped rather than terminating the candidate list for that timestamp.
+ *
+ * @param {Object} params
+ * @param {string} params.file - File key used to scope detection state.
+ * @param {number[]} params.keysArray - Array of timestamps (start times in the model's time units) corresponding to each prediction frame.
+ * @param {number[][]} params.speciesIDBatch - Parallel array where each element is an array of predicted species IDs for the corresponding timestamp.
+ * @param {number[][]} params.confidenceBatch - Parallel array of confidence arrays matching speciesIDBatch; values in [0,1] prior to scaling.
+ * @param {number} params.threshold - Confidence threshold (same units as returned confidences after scaling to 0–1000); used to filter low-confidence predictions.
+ * @param {number} params.predictionLength - Duration to assign to a single prediction frame; used to set detection `end = start + predictionLength`.
+ * @param {boolean} params.dropSingles - If true, completed detections with count === 1 are omitted from returned results.
+ * @param {boolean} params.isCustomList - If true, low-confidence entries are skipped rather than breaking out of per-frame candidate lists.
+ * @param {boolean} [params.merge=true] - If true, enable merge-mode which maintains and updates per-species open detections; if false, use the fast non-merging path.
+ * @returns {Array<{species:number,start:number,end:number,confidence:number}>} An array of completed detection objects (species id, absolute start, end, and max confidence scaled to 0–1000). In merge mode this contains detections closed by the processed timestamps; in non-merge mode it contains detections emitted directly from the batch.
+ */
 function updateDetectionState({
   file,
   keysArray,
@@ -3381,6 +3424,7 @@ function updateDetectionState({
   ----------------------------------
   */
   if (!merge) {
+    threshold = Math.min(150, threshold);
     for (let i = 0; i < keysArray.length; i++) {
       const t = keysArray[i];
       const ids = speciesIDBatch[i];
@@ -3402,7 +3446,6 @@ function updateDetectionState({
           confidence: conf
         });
 
-        if (!isCustomList) break;
       }
     }
     return completed;
@@ -3477,7 +3520,6 @@ function updateDetectionState({
       }
     }
   }
-
   return completed;
 }
 
@@ -3492,6 +3534,13 @@ function enqueueDetectionUpdate(file, batchIndex, task) {
   void processDetectionQueue(file);
 }
 
+/**
+ * Serially processes queued detection-update tasks for a single file and finalizes detections when the queue drains.
+ *
+ * Runs only one processor per file; it consumes tasks in order starting at STATE.nextExpectedIndex[file], invokes each task (synchronously) to produce detection objects, and for non-selection runs inserts detections into the disk DB, sends detections to the UI, and requests an interim summary. When the final expected batch is processed and the per-file queue is empty, it triggers onDetectionComplete(file). The function updates per-file STATE flags and indices (STATE.detectionRunning, STATE.lastProcessedBatch, STATE.nextExpectedIndex) as it progresses.
+ *
+ * @param {string} file - The file path (key) whose detection queue will be processed.
+ */
 async function processDetectionQueue(file) {
   if (STATE.detectionRunning[file]) return;
   STATE.detectionRunning[file] = true;
@@ -3504,31 +3553,31 @@ async function processDetectionQueue(file) {
     const isCustomList = list === 'custom';
 
     while (true) {
-    const nextIndex = STATE.nextExpectedIndex[file];
-    if (!queue.has(nextIndex)) break;
-    const task = queue.get(nextIndex);
-    queue.delete(nextIndex);
-    const result = task(); // synchronous
-    if (result.length){
-        selection || await generateInsertQuery(result, file, modelID, isCustomList);
-        await sendResultsToUI(
-        result,
-        file,
-        modelID,
-        lat,
-        lon,
-        isCustomList
-      );
-      if (!selection) await getSummary({interim: true}).catch(console.warn);
-    }
-    STATE.lastProcessedBatch[file] = nextIndex;
-    STATE.nextExpectedIndex[file]++;
-    if (
-      STATE.lastProcessedBatch[file] === batchesToSend[file] - 1 &&
-      STATE.detectionQueues[file].size === 0
-    ) {
-      onDetectionComplete(file);
-    } 
+      const nextIndex = STATE.nextExpectedIndex[file];
+      if (!queue.has(nextIndex)) break;
+      const task = queue.get(nextIndex);
+      queue.delete(nextIndex);
+      const result = task(); // synchronous
+      if (result.length){
+          selection || await generateInsertQuery(result, file, modelID, isCustomList);
+          await sendResultsToUI(
+          result,
+          file,
+          modelID,
+          lat,
+          lon,
+          isCustomList
+        );
+        if (!selection && STATE.increment() === 0) await getSummary({interim: true}).catch(console.warn);
+      }
+      STATE.lastProcessedBatch[file] = nextIndex;
+      STATE.nextExpectedIndex[file]++;
+      if (
+        STATE.lastProcessedBatch[file] === batchesToSend[file] - 1 &&
+        STATE.detectionQueues[file].size === 0
+      ) {
+        await onDetectionComplete(file);
+      } 
     }
   } finally {
     STATE.detectionRunning[file] = false;
@@ -3560,7 +3609,7 @@ function flushDetectionState(file, dropSingles) {
 const parsePredictions = async (response) => {
   const { file, worker, batchIndex, result: latestResult } = response;
   const predictionLength =
-    STATE.model.includes("bats") ? 0.3 : WINDOW_SIZE;
+    STATE.model.includes("batpack") ? 0.3 : WINDOW_SIZE;
   if (!latestResult.length) {
     predictionsReceived[file]++;
     if (STATE.queryMetadata) {
@@ -3570,6 +3619,7 @@ const parsePredictions = async (response) => {
     } else {
       enqueueDetectionUpdate(file, batchIndex, () => []);
     }
+    return worker;
   }
   const [keysArray, speciesIDBatch, confidenceBatch, embeddingsBatch] =
     latestResult;
@@ -3608,8 +3658,8 @@ const parsePredictions = async (response) => {
   ----------------------------------
   */
 
-  const threshold = selection ? 50 : detect.confidence;
-  const {overlap, mergeOverlaps, dropSingles} = STATE.detect;
+  const {overlap, mergeOverlaps, dropSingles, confidence} = STATE.detect;
+  const threshold = selection ? 50 : confidence;
   const dropSingle = !selection && !!overlap && dropSingles;
   const mergeOverlap = !!overlap && mergeOverlaps;
 
@@ -3637,7 +3687,7 @@ const parsePredictions = async (response) => {
   if (!selection && embeddingsBatch) {
     STATE.fileIDMap ??= new Map;
     const fileIDMap = STATE.fileIDMap
-    if (!fileIDMap.has(file)) {
+    if (!fileIDMap.get(file)) {
       const row = await STATE.db.getAsync('SELECT id FROM files WHERE name = ?', file);
       fileIDMap.set(file, row?.id);
     }
@@ -3665,9 +3715,17 @@ const parsePredictions = async (response) => {
   if (!selection && worker === 0) {
     estimateTimeRemaining(received);
   }
+  DEBUG && console.log(`file: ${file}, duration: ${METADATA[file].duration}, batches: ${batchesToSend[file]}, received: ${predictionsReceived[file]}`)
   return worker;
 };
 
+/**
+ * Finalize merged detections for a file: flush in-memory detections, persist them when appropriate, send them to the UI, update the processing queue, and emit completion alerts if the run produced no detections.
+ *
+ * If detections remain after flushing, this function inserts them into the disk database unless a selection is active, posts them to the UI, and requests an interim summary. It uses file metadata (latitude/longitude) and current STATE (model, detection settings, list) to determine persistence and alert behavior. When all queued files are complete and this worker produced no detections (global index === 0), it emits a `noDetections` or `noDetectionsDetailed2` alert depending on whether the run was a selection.
+ *
+ * @param {string} file - Path of the audio file whose detection processing is completing.
+ */
 async function onDetectionComplete(file) {
   const { modelID, detect, selection, list } = STATE;
   const {overlap, dropSingles, confidence} = detect;
@@ -3695,7 +3753,7 @@ async function onDetectionComplete(file) {
       lon,
       isCustomList
     );
-    selection || getSummary({interim: true}).catch(console.warn);
+    if (!selection && STATE.increment() === 0) await getSummary({interim: true}).catch(console.warn);
   }
   updateQueue(file);
 
@@ -3716,49 +3774,114 @@ async function onDetectionComplete(file) {
       }
     }
 }
+/**
+ * Limit detections to the top-ranked entries within each identical time window.
+ *
+ * Groups consecutive detections that share the same `start` and `end`, sorts each
+ * group by confidence score (descending), and keeps up to `topRankin` items from
+ * each group.
+ *
+ * @param {Array<Object>} detections - Array of detection objects containing at least `start`, `end`, and `confidence` (or `score`) numeric properties.
+ * @param {number} topRankin - Maximum number of detections to keep per identical `(start,end)` group.
+ * @returns {Array<Object>} An array of detections with at most `topRankin` items per identical time window, sorted by confidence within each group.
+ */
+function filterDetectionsByRank(detections, topRankin) {
+  const result = [];
+  let i = 0;
 
-async function sendResultsToUI (detections, file, modelID, lat, lon, isCustomList){
-  const included = await getIncludedIDs(file).catch(console.warn);
-  const metadata = METADATA[file];
-    for (const det of detections) {      
-      const {species: species, start, end} = det;
-      if (included.length && !included.includes(species + 1)) {
-        continue;
-      }
-      const timestamp = metadata.fileStart + start * 1000;
-      const [sname, cname] =
-        STATE.modelLabels[species].split(getSplitChar());
-      const result = {
-        timestamp,
-        position: start,
-        end,
-        file,
-        cname,
-        sname,
-        isDaylight: isDuringDaylight(timestamp, lat, lon),
-        score: det.confidence,
-        model: STATE.model
-      };
-      if (isCustomList && !STATE.selection) {
-        if (!allowedByList(result)) continue;
-      }
-      sendResult(++index, result, false);
-      if (index > 499) {
-        setGetSummaryQueryInterval(NUM_WORKERS);
-      }
+  while (i < detections.length) {
+    const current = detections[i];
+    const { start, end } = current;
+
+    // Collect all items with same start/end
+    let j = i;
+    while (
+      j < detections.length &&
+      detections[j].start === start &&
+      detections[j].end === end
+    ) {
+      j++;
     }
+
+    // Extract the group and sort by confidence descending
+    const group = detections.slice(i, j);
+    group.sort((a, b) => (b.confidence || b.score || 0) - (a.confidence || a.score || 0));
+
+    // Take top topRankin items from the sorted group
+    const limit = Math.min(group.length, topRankin);
+    for (let k = 0; k < limit; k++) {
+      result.push(group[k]);
+    }
+
+    // Skip entire group
+    i = j;
+  }
+
+  return result;
 }
 /**
- * Estimate remaining analysis time from processed batches and post localized progress to the UI footer.
+ * Filters detection objects, converts them to UI-ready result records, and emits them to the UI.
  *
- * Computes progress, estimated minutes remaining, and processing speed based on the global analysis start
- * timestamp and STATE counters, then sends a progress message to the UI with percent and localized text.
+ * Processes each detection by applying confidence and inclusion-list thresholds, computes absolute
+ * timestamps and daylight status, splits model labels into scientific/common names, optionally
+ * applies custom-list acceptance, and sends each approved result via sendResult. When many results
+ * are emitted, schedules interim summary queries.
+ *
+ * @param {Array<Object>} detections - Array of detection objects with keys `{species, start, end, confidence}` where `start`/`end` are seconds relative to the file and `confidence` is a numeric score.
+ * @param {string} file - File path or identifier for the audio file the detections belong to.
+ * @param {number} modelID - Model identifier (passed for context; not used to transform results here).
+ * @param {number} lat - Latitude used to compute daylight for each detection timestamp.
+ * @param {number} lon - Longitude used to compute daylight for each detection timestamp.
+ * @param {boolean} isCustomList - If true, apply additional per-result acceptance via allowedByList (skipped for selection mode).
+ */
+async function sendResultsToUI (detections, file, modelID, lat, lon, isCustomList){
+  const {selection, detect, modelLabels, model} = STATE;
+  const {confidence, topRankin} = detect;
+  selection || (detections = filterDetectionsByRank(detections, topRankin));
+  const included = await getIncludedIDs(file).catch(console.warn);
+  const metadata = METADATA[file];
+  const threshold = selection ? 50 : confidence;
+  
+  for (const det of detections) {
+    const {species, start, end, confidence} = det;
+    if (confidence < threshold) continue;
+    if (included.length && !included.includes(species + 1)) {
+      continue;
+    }
+    const timestamp = metadata.fileStart + start * 1000;
+    const [sname, cname] =
+      modelLabels[species].split(getSplitChar());
+    const result = {
+      timestamp,
+      position: start,
+      end,
+      file,
+      cname,
+      sname,
+      isDaylight: isDuringDaylight(timestamp, lat, lon),
+      score: det.confidence,
+      model,
+    };
+    if (isCustomList && !selection) {
+      if (!allowedByList(result)) continue;
+    }
+    sendResult(++index, result, false);
+    if (index > 499) {
+      setGetSummaryQueryInterval(NUM_WORKERS);
+    }
+  }
+}
+/**
+ * Update the UI footer with a localized estimate of remaining analysis time based on processed batches.
+ *
+ * Calculates percent complete, estimated minutes remaining, and processing speed, then sends a localized
+ * progress message to the UI. If there are no total batches or progress cannot be determined, no message is sent.
  *
  * @param {number} batchesReceived - Number of analysis batches processed so far for the current run.
  */
 async function estimateTimeRemaining(batchesReceived) {
-  if (! STATE.totalBatches) return;
   const {totalBatches, clippedBatches} = STATE;
+  if (!totalBatches) return;
   const remainingBatches = totalBatches - clippedBatches;
   const progress = remainingBatches > 0 ? batchesReceived / remainingBatches : 0;
   if (progress === 0 || remainingBatches === 0) return; // No batches to process
@@ -4083,13 +4206,14 @@ function getIntervals(fileStartMs, fileEndMs, latitude, longitude, period) {
 }
 
 /**
- * Compute active time intervals for an audio file based on its metadata and detection mode.
+ * Determine the processing intervals within an audio file based on metadata and detection mode.
  *
- * When nocturnal-migration mode is enabled, returns intervals clipped to the computed day/night boundaries for the file (using file start/end and location). When nocturnal-migration is disabled, returns a single interval covering the entire file duration and updates batchesToSend[file] with the number of processing batches (at least 1).
+ * If nocturnal-migration mode is enabled, returns intervals clipped to computed dawn/dusk (or dusk→dawn) boundaries for the file using its timestamp and location; otherwise returns a single interval covering the file and sets batchesToSend[file] to the number of processing batches for that duration.
  *
- * @param {string} file - Key or filename used to look up the file's metadata in METADATA.
- * @returns {Promise<Array<{start: number, end: number}>>} An array of intervals with `start` and `end` expressed in seconds relative to the file.
- */
+ * @param {string} file - The file key used to look up metadata in METADATA.
+ * @returns {Promise<Array<{start: number, end: number}>>} An array of intervals with `start` and `end` in seconds, relative to the start of the file.
+ 
+*/
 async function setStartEnd(file) {
   const meta = METADATA[file];
   const nocmig = STATE.detect.nocmig;
@@ -4120,7 +4244,17 @@ async function setStartEnd(file) {
   return boundaries;
 }
 
+/**
+ * Compute how many prediction batches are required to cover an audio segment.
+ *
+ * If the current model includes "batpack", the duration is treated as ten times longer
+ * to account for model-specific time scaling.
+ *
+ * @param {number} duration - Audio segment length in seconds.
+ * @returns {number} The positive integer count of batches needed to process the segment.
+ */
 function getBatchesToSend(duration) {
+  if (STATE.model.includes('batpack')) duration *= 10;
   const overlap = STATE.detect.overlap;
   const stepSamples = Math.round(sampleRate * WINDOW_SIZE * (1 - overlap));
   const durationSamples = Math.round(duration * sampleRate);
@@ -4649,8 +4783,8 @@ function allowedByList(result){
 }
 
 const sendResult = (index, result, fromDBQuery) => {
-  const model = result.model.includes('bats')  
-  ? 'bats'
+  const model = result.model.includes('batpack')  
+  ? 'batpack'
   : result.model;
 
   result.model = model.replace(' v2','');

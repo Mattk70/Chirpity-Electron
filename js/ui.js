@@ -1248,7 +1248,7 @@ async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults 
 
   // Reset the buffer playhead and zoom:
   STATE.windowOffsetSecs = 0;
-  STATE.windowLength = config.selectedModel.includes('bats') ? 5 : 20;
+  STATE.windowLength = config.selectedModel.includes('batpack') ? 5 : 20;
   // Reset the mode
 
   STATE.mode = 'analyse';
@@ -1359,11 +1359,16 @@ const showQueryModal = () => {
 }
 
 /**
- * Sends an analysis request to the worker thread to initiate audio analysis, managing UI state and preventing concurrent analyses.
+ * Initiates an analysis request to the worker and updates UI state to prevent concurrent analyses.
  *
- * Disables relevant UI controls and resets results if not analyzing a selection. If an analysis is already in progress, displays a warning notification and does not start a new analysis.
+ * Disables analysis-related controls and, when the request targets the whole file (not a selection), clears and resets the results view before posting the analyse action to the worker. If an analysis is already in progress, shows a warning and does nothing.
  *
- * @param {Object} args - Parameters for the analysis request, including start and end positions, file scope, reanalysis flag, and source indicator.
+ * @param {Object} args - Analysis request parameters.
+ * @param {number} args.start - Start position (seconds) for the analysis window.
+ * @param {number} [args.end] - Optional end position (seconds) for a selection-based analysis.
+ * @param {string[]|undefined} [args.filesInScope] - Optional list of file paths to restrict the analysis scope.
+ * @param {boolean} [args.reanalyse=false] - If true, instructs the worker to reanalyse already-processed data.
+ * @param {boolean} [args.fromDB=false] - If true, indicates the request originates from database navigation (affects UI state handling).
  */
 function postAnalyseMessage(args) {
   if (!PREDICTING) {
@@ -1378,6 +1383,7 @@ function postAnalyseMessage(args) {
       disableSettingsDuringAnalysis(true);
     }
     if (!selection) {
+      STATE.summary = [];
       analyseReset();
       refreshResultsView();
       resetResults();
@@ -1390,7 +1396,6 @@ function postAnalyseMessage(args) {
       end: args.end,
       filesInScope: filesInScope,
       reanalyse: args.reanalyse,
-      SNR: config.filters.SNR,
       circleClicked: args.fromDB,
     });
   } else {
@@ -1941,9 +1946,9 @@ const defaultConfig = {
   timeOfDay: true,
   list: "birds",
   models: {
-    birdnet: {displayName: 'BirdNET', backend: 'webgpu', customListFile: ''},
-    chirpity: {displayName: 'Nocmig', backend: 'webgpu', customListFile: ''},
-    nocmig: {displayName: 'Nocmig V2 (Beta)', backend: 'webgpu', customListFile: ''},
+    birdnet: {displayName: 'BirdNET', backend: 'webgpu', list: 'birds', webgpu: {threads: 1, batchSize: 8}, tensorflow: {threads: null, batchSize: 8},  customListFile: ''},
+    chirpity: {displayName: 'Nocmig', backend: 'webgpu', list: 'birds', webgpu: {threads: 1, batchSize: 8}, tensorflow: {threads: null, batchSize: 8},  customListFile: ''},
+    nocmig: {displayName: 'Nocmig V2 (Beta)', backend: 'webgpu', list: 'birds', webgpu: {threads: 1, batchSize: 8}, tensorflow: {threads: null, batchSize: 8},  customListFile: ''},
   },
   local: true,
   speciesThreshold: 0.03,
@@ -1974,7 +1979,6 @@ const defaultConfig = {
     lowPassFrequency: 15000,
     lowShelfFrequency: 0,
     lowShelfAttenuation: 0,
-    SNR: 0,
     normalise: false,
     sendToModel: false,
   },
@@ -2141,19 +2145,20 @@ window.onload = async () => {
   if (isTestEnv) {
     config.models[selectedModel].backend = "tensorflow";
   }
-  const backend = config.models[selectedModel].backend;
-
+  const modelOptions = config.models[selectedModel];
+  const backend = modelOptions.backend;
+  config.models[selectedModel].tensorflow.threads ??= DIAGNOSTICS['Physical Cores'] || 2;
+  const {batchSize, threads} = modelOptions[backend];
+  config[backend] = {batchSize, threads};
   worker.postMessage({
     action: "_init_",
     model: selectedModel,
-    batchSize: config[backend].batchSize,
-    threads: config[backend].threads,
+    batchSize,
+    threads,
     backend,
     list,
     modelPath
   });
-  // Disable SNR
-  config.filters.SNR = 0;
 
   // set version
   config.VERSION = VERSION;
@@ -2164,17 +2169,15 @@ window.onload = async () => {
   config.fontScale === 1 || setFontSizeScale(true);
 
   // Map slider value to batch size
-  DOM.batchSizeSlider.value = 
-    config[config.models[selectedModel].backend].batchSize;
-  DOM.batchSizeValue.textContent =
-    config[config.models[selectedModel].backend].batchSize;
+  DOM.batchSizeSlider.value = batchSize;
+  DOM.batchSizeValue.textContent = batchSize;
   DOM.modelToUse.value = selectedModel;
-  const backendEL = document.getElementById(config.models[selectedModel].backend);
+  const backendEL = document.getElementById(backend);
   backendEL.checked = true;
   // Show time of day in results?
   setTimelinePreferences();
   // Show the list in use
-  DOM.listToUse.value = config.list;
+  DOM.listToUse.value = modelOptions.list;
   DOM.localSwitch.checked = config.local;
   // Show Locale
   DOM.locale.value = config.locale;
@@ -3157,6 +3160,7 @@ const updateListOptions = (model) => {
   });
   if (!options.includes(config.list)) {
     config.list = "birds";
+    config.models[model].list = 'birds';
     updatePrefs("config.json", config);
     select.value = config.list;
   }
@@ -3206,9 +3210,9 @@ const updateModelIcon = (model) => {
       model = 'perch';
       break;
     default:
-      if (/bats/i.test(model)) {
+      if (/batpack/i.test(model)) {
         title = "Bats";
-        model = "bats";
+        model = "batpack";
       } else {
         title = i18n.get(i18n.Lists).custom;
         model = "custom"
@@ -3228,10 +3232,12 @@ DOM.listIcon.addEventListener("click", () => {
     generateToast({ message: "changeListBlocked", type: "warning" });
     return;
   }
-  const keys = config.selectedModel !== 'perch v2' ? ["location", "nocturnal", "birds", "everything", "custom"] : ["birds", "Amphibia", "Insecta", "Mammalia", "Reptilia", "Animalia", "everything", "custom"];
+  const model = config.selectedModel;
+  const keys = model !== 'perch v2' ? ["location", "nocturnal", "birds", "everything", "custom"] : ["birds", "Amphibia", "Insecta", "Mammalia", "Reptilia", "Animalia", "everything", "custom"];
   const currentListIndex = keys.indexOf(config.list);
   const next = currentListIndex === keys.length - 1 ? 0 : currentListIndex + 1;
   config.list = keys[next];
+  config.models[model].list = keys[next];
   updatePrefs("config.json", config);
   updateList();
 });
@@ -3272,6 +3278,7 @@ const loadModel = () => {
 };
 
 const handleModelChange = async (model, reload = true) => {
+  flushSpec();
   modelSettingsDisplay();
   DOM.customListFile.value = config.models[model].customListFile;
   DOM.customListFile.value
@@ -3302,10 +3309,13 @@ const handleBackendChange = (backend) => {
     }
   }
   // Update threads and batch Size in UI
-  DOM.threadSlider.value = config[backend].threads;
-  DOM.numberOfThreads.textContent = config[backend].threads;
-  DOM.batchSizeSlider.value = config[backend].batchSize;
-  DOM.batchSizeValue.textContent = DOM.batchSizeSlider.value
+  config.models[config.selectedModel][backend].threads ??= DIAGNOSTICS['Physical Cores'] || 2;
+  const {threads, batchSize} = config.models[config.selectedModel][backend];
+  config[backend] = { ...config[backend], threads, batchSize };
+  DOM.threadSlider.value = threads;
+  DOM.numberOfThreads.textContent = threads;
+  DOM.batchSizeSlider.value = batchSize;
+  DOM.batchSizeValue.textContent = batchSize;
   updatePrefs("config.json", config);
   loadModel();
 };
@@ -3635,23 +3645,22 @@ function onModelReady() {
 }
 
 /**
- * Handles audio data loaded by the worker, updating application state, resetting regions, and refreshing the spectrogram and UI.
+ * Handle an audio buffer provided by the worker, update application state and metadata, reset regions, refresh the spectrogram, and adjust UI controls.
  *
- * Updates the current audio buffer, file metadata, timing, and UI elements after an audio file is loaded. Resets audio regions, refreshes the spectrogram display, and enables analysis menu options if a model is ready.
+ * Updates the current buffer, file identifier, start time, and window-length; clears existing regions; instructs the spectrogram to load the buffer at the requested position and playback state; and enables analysis actions when a model is available.
  *
  * @param {Object} params - Parameters for the loaded audio.
  * @param {*} params.location - Identifier for the audio source location.
- * @param {number} [params.fileStart=0] - Start time of the audio file in milliseconds since the Unix epoch.
- * @param {number} [params.fileDuration=0] - Duration of the audio file in seconds.
- * @param {number} [params.windowBegin=0] - Offset in seconds from the file start for the audio window.
- * @param {string} [params.file=""] - Full path to the audio file.
- * @param {number} [params.position=0] - Normalized playhead position (0 to 1).
- * @param {*} [params.contents] - Audio buffer containing the loaded data.
- * @param {boolean} [params.play=false] - Whether to automatically play the audio after loading.
- * @param {Object} [params.metadata] - Optional metadata for the audio file.
- * @returns {Promise<void>}
- */
-
+ * @param {number} [params.fileStart=0] - File start time in milliseconds since the Unix epoch.
+ * @param {number} [params.fileDuration] - File duration in seconds.
+ * @param {number} [params.windowBegin=0] - Offset in seconds from the file start for the provided window.
+ * @param {string} [params.file=""] - Full path or identifier of the audio file.
+ * @param {number} [params.position=0] - Normalized playhead position (0 to 1) for the spectrogram.
+ * @param {*} [params.contents] - Raw audio buffer (ArrayBuffer/TypedArray) delivered by the worker.
+ * @param {boolean} [params.play=false] - Whether playback should start immediately after loading.
+ * @param {Object} [params.metadata] - Optional metadata for the audio file to store in STATE.metadata.
+ * @returns {Promise<void>} Resolves when the UI state and spectrogram have been updated.
+*/
 async function onWorkerLoadedAudio({
   location,
   fileStart = 0,
@@ -3694,9 +3703,8 @@ async function onWorkerLoadedAudio({
     ? fileStart
     : new Date(0, 0, 0, 0, 0, 0, 0).getTime();
   STATE.bufferStartTime = new Date(initialTime + windowBegin * 1000);
-
-  STATE.windowLength = contents.byteLength / 48_000; // bufferbytes / (samplerate / 2)
-
+  const sr = config.selectedModel.includes("batpack") ? 256_000 : 24_000
+  STATE.windowLength = contents.byteLength / (sr * 2);
   resetRegions();
   await spec.updateSpec({
     buffer: STATE.currentBuffer,
@@ -4066,16 +4074,15 @@ function setAutocomplete(species) {
 /**
  * Render a single detection row into the results table and update table headers, pagination, and related UI state.
  *
- * Renders or resets the results header when index is 1, appends a table row for the provided detection data,
- * updates pagination when results exceed page limits, and triggers a buffer update for visible detections when appropriate.
+ * When called with index === 1 this ensures the results table header is initialized or reset.
+ * Adds pagination entries when results exceed the configured page limit and skips rendering rows beyond that limit for non-database results.
  *
  * @param {Object} options - Rendering options.
  * @param {number} [options.index=1] - Sequential index of the detection within the current result set.
- * @param {Object} [options.result={}] - Detection record containing fields like `timestamp`, `position`, `sname`, `cname`, `score`, `label`, `reviewed`, `model`, `modelID`, `count`, `callCount`, `comment`, `isDaylight`, `active`, and `end`.
- * @param {*} [options.file] - Reference to the associated audio file (used for buffer updates/navigation).
- * @param {boolean} [options.isFromDB=false] - When true, treat the result as originating from the database (affects pagination and rendering choices).
- * @param {boolean} [options.selection=false] - When true, render for a selection-specific view (hides certain UI elements and does not store prediction state).
- * @returns {Promise<void>} Nothing.
+ * @param {Object} [options.result={}] - Detection record (e.g., `timestamp`, `position`, `sname`, `cname`, `score`, `label`, `reviewed`, `model`, `modelID`, `count`, `callCount`, `comment`, `isDaylight`, `active`, `end`).
+ * @param {*} [options.file] - Associated audio file reference used for buffer/navigation updates.
+ * @param {boolean} [options.isFromDB=false] - If true, treat the result as originating from the database (affects pagination and rendering limits).
+ * @param {boolean} [options.selection=false] - If true, render for a selection-specific view (hides per-row UI elements and avoids storing prediction state).
  */
 
 async function renderResult({
@@ -4145,8 +4152,18 @@ async function renderResult({
       modelID
     } = result;
 
-    const logo = ['birdnet', 'nocmig', 'chirpity', 'perch', 'nighthawk', 'user'].includes(result.model) ? model : 'custom';
-    const modelName = config.models[model]? utils.escapeHTML(config.models[model].displayName) : 'User';
+    const isBatpack = /batpack/i.test(model ?? "");
+    const logo = isBatpack
+      ? "batpack"
+      : ['birdnet', 'nocmig', 'chirpity', 'perch', 'nighthawk', 'user'].includes(model)
+        ? model
+        : 'custom';
+
+    const modelName = isBatpack
+      ? "Bats"
+      : config.models[model]
+      ? utils.escapeHTML(config.models[model].displayName)
+      : 'User';
     const dayNight = isDaylight ? "daytime" : "nighttime";
     const commentHTML = comment
       ? `<span title="${comment.replaceAll(
@@ -4823,7 +4840,6 @@ const toggleContextAwareMode = () => {
   worker.postMessage({
     action: "update-state",
     detect: { contextAware: config.detect.contextAware },
-    filters: { SNR: config.filters.SNR },
   });
   updatePrefs("config.json", config);
 };
@@ -4837,7 +4853,6 @@ diagnosticMenu.addEventListener("click", async function () {
   DIAGNOSTICS["Batch size"] = config[backend].batchSize;
   DIAGNOSTICS["Threads"] = config[backend].threads;
   DIAGNOSTICS["Context"] = config.detect.contextAware;
-  DIAGNOSTICS["SNR"] = config.filters.SNR;
   DIAGNOSTICS["List"] = config.list;
   let diagnosticTable = "<table class='table-hover table-striped p-2 w-100'>";
   for (let [key, value] of Object.entries(DIAGNOSTICS)) {
@@ -5594,9 +5609,11 @@ async function handleUIClicks(e) {
       break;
     }
     case "clear-custom-list": {
-      config.models[config.selectedModel].customListFile = "";
+      const model = config.selectedModel;
+      config.models[model].customListFile = "";
       delete LIST_MAP.custom;
       config.list = "birds";
+      config.models[model].list = "birds";
       DOM.customListFile.value = "";
       updatePrefs("config.json", config);
       resetResults({
@@ -5616,6 +5633,7 @@ async function handleUIClicks(e) {
         database: config.database,
       });
       config.list = 'everything';
+      config.models[config.selectedModel].list = 'everything'; 
       updateList();
       updatePrefs("config.json", config);
       if (STATE.mode !== "analyse") showAnalyse();
@@ -5690,7 +5708,7 @@ async function handleUIClicks(e) {
           const modelNameInput = document.getElementById("model-name");
           // Prevent people changing Perch v2 or Nighthawk name
           modelNameInput.value = p.basename(modelFolder).replace(/^perch v2.*$/i, 'Perch v2');
-          modelNameInput.disabled = ['perch v2', "nighthawk"].includes(modelNameInput.value.toLowerCase());
+          modelNameInput.disabled = ['perch v2', "nighthawk", "european batpack"].includes(modelNameInput.value.toLowerCase());
         }
       })();
       break;
@@ -5794,8 +5812,19 @@ async function handleUIClicks(e) {
         backend: modelName === 'perch v2' 
           ? 'tensorflow' 
           : config.models['birdnet'].backend, 
-          displayName, 
-          modelPath:modelLocation};
+        displayName, 
+        list: 'everything',
+        modelPath:modelLocation,
+        tensorflow: {
+          threads: config.models['birdnet']['tensorflow'].threads,
+          batchSize: config.models['birdnet']['tensorflow'].batchSize
+          },
+        webgpu: {
+          threads: config.models['birdnet']['webgpu'].threads,
+          batchSize: config.models['birdnet']['webgpu'].batchSize
+          },
+        customListFile: ""
+      };
       config.selectedModel = modelName;
       const select = document.getElementById('model-to-use');
       const newOption = document.createElement('option');
@@ -5913,7 +5942,7 @@ async function handleUIClicks(e) {
     }
     // XC compare play/pause
     case "playComparison": {
-      config.selectedModel.includes("bats") && ws.setPlaybackRate(0.1, false);
+      config.selectedModel.includes("batpack") && ws.setPlaybackRate(0.1, false);
       ws.playPause();
       break;
     }
@@ -5975,6 +6004,7 @@ async function handleUIClicks(e) {
             database: config.database,
           });
           config.list = 'everything';
+          config.models[config.selectedModel].list = 'everything';
           updateList()
           updatePrefs("config.json", config);
           if (STATE.mode !== "analyse") showAnalyse();
@@ -6540,6 +6570,7 @@ document.addEventListener("change", async function (e) {
         }
         case "list-to-use": {
           config.list = element.value;
+          config.models[config.selectedModel].list = element.value;
           updateList();
           break;
         }
@@ -6582,8 +6613,11 @@ document.addEventListener("change", async function (e) {
         case "thread-slider": {
           // change number of threads
           DOM.numberOfThreads.textContent = DOM.threadSlider.value;
-          config[config.models[config.selectedModel].backend].threads =
+          // get backend
+          const backend = config.models[config.selectedModel].backend;
+          config.models[config.selectedModel][backend].threads =
             DOM.threadSlider.valueAsNumber;
+          config[backend].threads = DOM.threadSlider.valueAsNumber;
           worker.postMessage({
             action: "change-threads",
             threads: DOM.threadSlider.valueAsNumber,
@@ -6592,8 +6626,11 @@ document.addEventListener("change", async function (e) {
         }
         case "batch-size": {
           DOM.batchSizeValue.textContent = DOM.batchSizeSlider.value;
-          config[config.models[config.selectedModel].backend].batchSize =
+          // get backend
+          const backend = config.models[config.selectedModel].backend;
+          config.models[config.selectedModel][backend].batchSize =
             DOM.batchSizeSlider.valueAsNumber;
+          config[backend].batchSize = DOM.batchSizeSlider.valueAsNumber;
           worker.postMessage({
             action: "change-batch-size",
             batchSize: DOM.batchSizeSlider.valueAsNumber,
@@ -6880,6 +6917,7 @@ async function readLabels(labelFile, updating) {
           type: 'warning'
         });
         config.list = 'birds';
+        config.models[config.selectedModel].list = 'birds';
         updatePrefs("config.json", config);
         updateList()
         return;
@@ -6898,6 +6936,7 @@ async function readLabels(labelFile, updating) {
           type: 'warning'
         });
         config.list = 'birds';
+        config.models[config.selectedModel].list = 'birds';
         updatePrefs("config.json", config);
         updateList()
         return;
@@ -7591,9 +7630,9 @@ function generateToast({
 }
 
 /**
- * Fetches and displays Xeno-Canto audio comparisons for the currently selected species and call type.
+ * Fetch and display Xeno-Canto audio comparisons for the currently selected species and call type.
  *
- * Attempts to load cached comparison data; if unavailable, queries the Xeno-Canto API for relevant recordings, supporting both bird and bat models with appropriate call types and duration filters. Deduplicates and limits results per call type, updates the cache, and renders the comparison UI. Notifies the user if no suitable comparisons are found.
+ * Loads cached comparison lists when available; otherwise queries the Xeno-Canto API for several call/type categories, deduplicates and limits results per category, updates the cache, and renders the comparison UI. Shows a user notification when no comparisons are found or when a fetch error occurs.
  */
 async function getXCComparisons() {
   if (! activeRow) return
@@ -7615,7 +7654,7 @@ async function getXCComparisons() {
   else {
     const content = "Loading Xeno-Canto data...";
     loadingFiles({hide:false, content})
-    const bats = config.selectedModel.includes('bats');
+    const bats = config.selectedModel.includes('batpack');
     const quality = '+q:">C"';
     const defaultLength = bats ? '+len:"0.5-10"' : '+len:"3-15"';
     sname = XCtaxon[sname] || sname;
@@ -7878,11 +7917,14 @@ import Spectrogram from "../node_modules/wavesurfer.js/dist/plugins/spectrogram.
 let ws;
 
 /**
- * Fetch an audio url to load into wavesurfer
- * @param {*} url 
- * @param {*} wavesurfer a wavesurfer instance
- * @param {function} onCleanup callback to clear loading overlay
- * @returns abortcontroller instance
+ * Download an audio file from the given URL and load it into the provided Wavesurfer instance.
+ *
+ * If the fetch is aborted or fails, the optional onCleanup callback is invoked and a warning toast is shown.
+ *
+ * @param {string} url - The remote audio file URL to fetch.
+ * @param {Object} wavesurfer - A Wavesurfer instance with a `loadBlob` method.
+ * @param {function} [onCleanup] - Optional callback invoked when loading is aborted or on error to clear any loading UI state.
+ * @returns {AbortController} An AbortController whose signal can be used to cancel the in-flight fetch.
  */
 
 function loadXCFile(url, wavesurfer, onCleanup) {
@@ -7910,7 +7952,7 @@ function loadXCFile(url, wavesurfer, onCleanup) {
 }
 const createCompareWS = (mediaContainer) => {
   ws?.destroy();
-  const bats = config.selectedModel.includes('bats');
+  const bats = config.selectedModel.includes('batpack');
   ws = WaveSurfer.create({
     container: mediaContainer,
     backgroundColor: "rgba(0,0,0,0)",

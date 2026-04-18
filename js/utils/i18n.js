@@ -43,6 +43,7 @@ const Toasts = { // UI.js
         noDetectionsDetailed: 'No ${nocmig} ${species} detections found ${archive} using the ${list} list.',
         noDetectionsDetailed2: 'No detections found in ${file}. Searched for records using the ${list} list and having a minimum confidence of ${confidence}%',
         dbNotLoaded: "The database has not finished loading. The check for the presence of the file in the archive has been skipped",
+        noDBPath: "The specified database path does not exist. Using the default database.",
         noSnameFound: "Cannot find '${sname}' (at line ${line} of the custom list) in the <strong>${model}</strong> model list. <strong>Tips:</strong> <ol><li>Is your list formatted as: <code>'Scientific name,Common name'</code></li><li>Is your list for the <strong>${model}</strong> model? If not, change the model in settings</li><li>Check for a typo in your species name</li></ol>",
         noSpecies: "No species found with the name ${cname}",
         noArchive: "Cannot access archive location: ${location}. <br> Operation aborted",
@@ -116,6 +117,7 @@ const Toasts = { // UI.js
         noDetectionsDetailed: 'Ingen ${nocmig} ${species} detektioner fundet ${archive} ved brug af ${list}-listen.',
         noDetectionsDetailed2: 'Ingen detektioner fundet i ${file}. Søgte efter poster ved hjælp af ${list}-listen og med en minimumskonfidens på ${confidence}%',
         dbNotLoaded: "Databasen er ikke færdig med at indlæse. Tjekket for filens tilstedeværelse i arkivet er blevet sprunget over",
+        noDBPath: "Den angivne databaseplacering findes ikke. Bruger standarddatabasen.",
         noSnameFound: "Kan ikke finde '${sname}' (på linje ${line} i den brugerdefinerede liste) i <strong>${model}</strong>-listen. <strong>Tips:</strong> <ol><li>Er din liste formateret som: <code>'Videnskabeligt navn,Almindeligt navn'</code></li><li>Er din liste til <strong>${model}</strong>-modellen? Hvis ikke, skal du ændre modellen i indstillingerne</li><li>Kontroller for en stavefejl i dit artsnavn</li></ol>",
         noSpecies: "Ingen arter fundet med navnet ${cname}",
         noArchive: "Kan ikke få adgang til arkivplaceringen: ${location}. <br> Operationen blev afbrudt",
@@ -216,6 +218,7 @@ const Toasts = { // UI.js
         libraryUpToDate: "Die Bibliothek ist auf dem neuesten Stand. Keine Aktion erforderlich",
         badModel: 'Modell "${model}" wurde nicht in der Datenbank gefunden.',
         noModel: "Die erforderliche Modellspalte wurde in der Datei nicht gefunden",
+        noDBPath: "Die angegebene Datenbankpfad existiert nicht. Verwenden Sie die Standarddatenbank.",
 
         noBackground: "Du hast 'Hintergrundgeräusche mischen' ausgewählt, aber es gibt keinen Ordner namens 'background' in deinem Datensatz."
     },
@@ -289,7 +292,7 @@ const Toasts = { // UI.js
         libraryUpToDate: "La biblioteca está actualizada. No hay nada que hacer",
         badModel: 'El modelo "${model}" no se encontró en la base de datos.',
         noModel: "La columna de modelo necesaria no se encontró en el archivo",
-
+        noDBPath: "La ubicación de la base de datos especificada no existe. Usando la base de datos predeterminada.",
         noBackground: "Has seleccionado 'Mezclar con ruido de fondo', pero no hay ninguna carpeta llamada 'background' en tu conjunto de datos."
 
     },
@@ -363,6 +366,7 @@ const Toasts = { // UI.js
         libraryUpToDate: "La bibliothèque est à jour. Aucune action nécessaire",
         badModel: 'Le modèle "${model}" n’a pas été trouvé dans la base de données.',
         noModel: "La colonne de modèle requise n’a pas été trouvée dans le fichier",
+        noDBPath: "Le chemin de la base de données spécifié n’existe pas. Utilisation de la base de données par défaut.",
 
         noBackground: "Vous avez sélectionné 'Mélanger avec le bruit de fond', mais il n'y a pas de dossier nommé 'background' dans votre jeu de données."
 
@@ -436,6 +440,7 @@ const Toasts = { // UI.js
         libraryUpToDate: 'ライブラリは最新です。何もすることはありません',
         badModel: 'モデル "${model}" はデータベースに見つかりませんでした。',
         noModel: "必要なモデル列がファイルに見つかりませんでした",
+        noDBPath: "指定されたデータベースの場所が存在しません。デフォルトのデータベースを使用します。",
 
         noBackground: "「背景ノイズを混ぜる」を選択しましたが、データセットに「background」という名前のフォルダがありません。"
     },
@@ -509,6 +514,7 @@ const Toasts = { // UI.js
         libraryUpToDate: "De bibliotheek is up-to-date. Niets te doen",
         badModel: 'Model "${model}" is niet gevonden in de database.',
         noModel: "De vereiste modelkolom is niet gevonden in het bestand",
+        noDBPath: "De opgegeven database locatie bestaat niet. De standaard database wordt gebruikt.",
 
         noBackground: "Je hebt 'Achtergrondgeluid mengen' geselecteerd, maar er is geen map genaamd 'background' in je dataset."
 
@@ -584,6 +590,7 @@ const Toasts = { // UI.js
         libraryUpToDate: "A biblioteca está atualizada. Nada a fazer",
         badModel: 'O modelo "${model}" não foi encontrado na base de dados.',
         noModel: "A coluna de modelo necessária não foi encontrada no ficheiro",
+        noDBPath: "O local do banco de dados especificado não existe. Usando o banco de dados padrão.",
 
         noBackground: "Você selecionou 'Misturar com ruído de fundo', mas não há uma pasta chamada 'background' no seu conjunto de dados."
 
@@ -659,6 +666,7 @@ const Toasts = { // UI.js
         libraryUpToDate: "Библиотека актуальна. Действий не требуется",
         badModel: 'Модель "${model}" не найдена в базе данных.',
         noModel: "Необходимый столбец модели не найден в файле",
+        noDBPath: "Указанное расположение базы данных не существует. Используется база данных по умолчанию.",
 
         noBackground: "Вы выбрали 'Смешать с фоновым шумом', но в вашем наборе данных нет папки с названием 'background'."
 
@@ -734,6 +742,7 @@ const Toasts = { // UI.js
         libraryUpToDate: "Biblioteket är uppdaterat. Inget att göra",
         badModel: 'Modellen "${model}" hittades inte i databasen.',
         noModel: "Den nödvändiga modellkolumnen hittades inte i filen",
+        noDBPath: "Den angivna databasplatsen finns inte. Använder standarddatabasen.",
 
         noBackground: "Du har valt 'Blanda in bakgrundsljud', men det finns ingen mapp som heter 'background' i ditt dataset."
 
@@ -809,6 +818,7 @@ const Toasts = { // UI.js
         libraryUpToDate: "资料库已是最新，无需操作",
         badModel: '模型 "${model}" 未在数据库中找到。',
         noModel: "文件中未找到所需的模型列",
+        noDBPath: "指定的数据库位置不存在。正在使用默认数据库。",
 
         noBackground: "你已选择“混合背景噪声”，但在你的数据集中找不到名为“background”的文件夹。"
 

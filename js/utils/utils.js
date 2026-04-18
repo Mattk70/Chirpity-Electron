@@ -1,13 +1,62 @@
+const MODEL_DEFAULTS = {
+  list: "birds",
+  webgpu: { threads: 1, batchSize: 8 },
+  tensorflow: { threads: null, batchSize: 8 },
+};
+
 /**
- * Synchronizes a configuration object with a default configuration.
+ * Merge each model entry with default model settings, normalizing nested runtime configs.
  *
- * Removes keys from the configuration that are not found in the default configuration,
- * and adds any missing keys from the default configuration. For keys with values that
- * are both objects in the configuration and the default configuration, the merge is
- * performed recursively, except when the key is "keyAssignment", which is left untouched.
+ * For every key in `models` this mutates the object in place so each entry becomes a merged
+ * object containing top-level defaults plus any provided model overrides, and with `webgpu`
+ * and `tensorflow` properties merged separately with their respective defaults.
  *
- * @param {Object} config - The configuration object to be synchronized (modified in place).
- * @param {Object} defaultConfig - The default configuration serving as the reference.
+ * @param {Object<string, Object>} models - Map of model names to model config objects; mutated in place.
+ * @param {Object<string, Object>} defaultModels - Map of model names to default model config objects.
+ * @returns {Object<string, Object>} - The normalized model configurations.
+ */
+
+function normaliseModels(models = {}, defaultModels = {}) {
+  const normalised = {};
+  const names = new Set([
+    ...Object.keys(defaultModels),
+    ...Object.keys(models),
+  ]);
+
+  for (const name of names) {
+    const defaults = defaultModels[name] ?? MODEL_DEFAULTS;
+    const model = models[name] ?? {};
+
+    normalised[name] = {
+      ...defaults,
+      ...model,
+      webgpu: {
+        ...MODEL_DEFAULTS.webgpu,
+        ...(defaults.webgpu || {}),
+        ...(model.webgpu || {}),
+      },
+      tensorflow: {
+        ...MODEL_DEFAULTS.tensorflow,
+        ...(defaults.tensorflow || {}),
+        ...(model.tensorflow || {}),
+      },
+    };
+  }
+
+  return normalised;
+}
+
+/**
+ * Aligns a configuration object to the shape and keys of a default configuration.
+ *
+ * Mutates `config` in place by removing keys not present in `defaultConfig` and ensuring
+ * every key in `defaultConfig` exists in `config`. When both values for a key are objects,
+ * the function recurses to synchronize nested keys except for the `"keyAssignment"` key,
+ * which is left unchanged. The `"models"` key is handled by calling `normaliseModels` to
+ * merge per-model defaults instead of performing a recursive merge.
+ *
+ * @param {Object} config - The configuration object to update (modified in place).
+ * @param {Object} defaultConfig - Reference configuration whose structure and keys should be enforced.
  */
 function syncConfig(config, defaultConfig) {
   // First, remove keys from config that are not in defaultConfig
@@ -29,6 +78,8 @@ function syncConfig(config, defaultConfig) {
     ) {
       // Recursively sync nested objects (but allow key assignment to be empty)
       key === "keyAssignment" || syncConfig(config[key], defaultConfig[key]);
+    } else if (key === 'models'){
+      config[key] = normaliseModels(config[key], defaultConfig[key]);
     }
   });
 }
