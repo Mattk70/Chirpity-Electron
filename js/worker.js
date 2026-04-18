@@ -286,14 +286,14 @@ function resolveDatabaseFile(path) {
  * @returns {sqlite3.Database} The opened or newly created archive database instance.
  */
 async function loadDB(modelPath) {
-  const pathExists = fs.existsSync(STATE.database.location);
-  const path = pathExists ? STATE.database.location : appPath;
-  if (!fs.existsSync((path))) {
-    generateAlert({
-      type: "error",
-      message: 'noDBPath'
-    });
+  let pathExists;
+  if (STATE.database.location) {
+    pathExists = fs.existsSync(STATE.database.location);
+    if (!pathExists) {
+      generateAlert({ type: "error", message: 'noDBPath' });
+    }
   }
+  const path = pathExists ? STATE.database.location : appPath;
   DEBUG && console.log("Loading db " + path);
   const model = STATE.model;
   let modelID, needsTranslation;
