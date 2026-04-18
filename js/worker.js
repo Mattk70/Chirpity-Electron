@@ -3576,7 +3576,7 @@ async function processDetectionQueue(file) {
         STATE.lastProcessedBatch[file] === batchesToSend[file] - 1 &&
         STATE.detectionQueues[file].size === 0
       ) {
-        onDetectionComplete(file);
+        await onDetectionComplete(file);
       } 
     }
   } finally {
