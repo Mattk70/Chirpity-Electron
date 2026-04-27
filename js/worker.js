@@ -166,7 +166,7 @@ const setupFfmpegCommand = async ({
   if (STATE.model.includes('batpack')) { 
     // No sample rate is supplied when exporting audio.
     // If the sampleRate is 256k, Wavesurfer will handle the tempo/pitch conversion
-    if ((training || sampleRate) && sampleRate !== 256000) {
+    if ((training || sampleRate) && sampleRate !== 240_000) {
       const { getAudioMetadata } = await import("./models/training.js");
       const {bitrate} = await getAudioMetadata(file);
       const rate = Math.floor(bitrate/10)
@@ -179,7 +179,7 @@ const setupFfmpegCommand = async ({
   } 
   let duration = end - start;
 
-  if (training) duration *= 10 // Dilate 10x for bat training
+  if (training && sampleRate !== 240_000) duration *= 10 // Dilate 10x for bat training
   
   additionalFilters.forEach(filter => command.audioFilters(filter))
     
@@ -258,10 +258,11 @@ const getSelectionRange = (file, start, end) => {
 };
 
 function resolveDatabaseFile(path) {
-  const newFile = p.join(path, 'archive_v2.sqlite');
+  const batDB = STATE.model.includes('batpack') ? 'bat_' : '';
+  const newFile = p.join(path, `${batDB}archive_v2.sqlite`);
   if (fs.existsSync(newFile)) return newFile;
   const oldFile = p.join(path, 'archive.sqlite');
-  if (fs.existsSync(oldFile)) {
+  if (!batDB && fs.existsSync(oldFile)) {
     try {
       fs.renameSync(oldFile, newFile);
       return newFile;
@@ -2705,7 +2706,7 @@ const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sam
     if (!result) throw new Error(`Cannot locate ${file}`);
     file = result;
   }
-  if (!sampleRate) sampleRate = STATE.model.includes("batpack") ? 256_000 : 24_000;
+  if (!sampleRate) sampleRate = STATE.model.includes("batpack") ? 240_000 : 24_000;
   await setMetadata({ file });
   const fileDuration = METADATA[file].duration// (STATE.model === 'batpack') ? METADATA[file].duration*10 : METADATA[file].duration;
   if (!fileDuration) return [null, start]
