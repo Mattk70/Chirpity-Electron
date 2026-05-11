@@ -152,7 +152,7 @@
       "target": {
         "target": "default",
         "arch": [
-          "arm64"
+          "arm64", "x64"
         ]
       },
       "artifactName": "${productName}-${arch}.${ext}",
