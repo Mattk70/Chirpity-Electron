@@ -301,7 +301,7 @@ function getWaveDuration(filePath) {
     // prefer sample count (more precise, avoids blockAlign=0 risk)
     if (sampleCount != null && sampleRate) return sampleCount / sampleRate;
 
-    if (dataSize === null || sampleRate === null || blockAlign === null)
+    if (dataSize === 0 || dataSize === null || sampleRate === null || blockAlign === null)
       throw new Error(`Could not determine duration: ${filePath}`);
     if (blockAlign === 0) throw new Error(`Invalid blockAlign=0: ${filePath}`);
 
