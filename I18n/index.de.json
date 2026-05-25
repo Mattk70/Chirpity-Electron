@@ -8,7 +8,7 @@
     "Clear Call Cache-circle-help": ["Daten, die für Referenzaufrufe verwendet werden, werden zwischengespeichert. Durch das Löschen des Caches werden die Aufrufe für jede Spezies aktualisiert, wenn das nächste Mal eine Vergleichsanfrage erfolgt."],
     "Confidence Threshold-circle-help": ["Bestimmt die minimale Konfidenzschwelle, die erforderlich ist, damit Ergebnisse zurückgegeben werden."],
     "Overlap-circle-help": ["Bestimmt, wie viel aufeinanderfolgende Erkennungsfenster überlappen werden."],
-    "Merge Overlaps-circle-help": ["Wenn aktiviert, werden overlappende Erkennungen in eine einzelne Erkennung mit der höchsten Konfidenz der zusammengeführten Erkennungen verschmolzen. Wenn deaktiviert, werden overlappende Erkennungen separat angezeigt."],
+    "Merge Overlaps-circle-help": ["Wenn aktiviert, werden überlappende Erkennungen in eine einzelne Erkennung mit der höchsten Konfidenz der zusammengeführten Erkennungen verschmolzen. Wenn deaktiviert, werden überlappende Erkennungen separat angezeigt."],
     "Drop Uncertain-circle-help": ["Wenn aktiviert, werden Erkennungen, die nur in einem einzelnen überlappenden Fenster erscheinen, aus den Ergebnissen gelöscht. Dies kann helfen, falsche Positive zu reduzieren."],
     "Detections Per Segment-circle-help": ["Legt die maximale Anzahl von Erkennungen fest, die in einem Zeitraum von 3 Sekunden angezeigt werden"],
     "Context Mode-circle-help": ["Wenn aktiviert, passt der Kontextmodus die Vorhersagen durch Analyse des umgebenden Kontexts an. Er kann nur vor einer Analyse geändert werden, und eine anfängliche niedrige Konfidenzschwelle wird empfohlen, z. B. 20-30%. Der Kontextmodus ist im BirdNET-Modell nicht verfügbar."],
