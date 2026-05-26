@@ -92,6 +92,7 @@ let DEBUG = false;
  */
 
 async function getInstallInfo(date) {
+  if (!!process.env.CI) return { appId: 0, installedAt: Date.now() }; // Don't use keychain in CI, just return dummy data
   // First, try the current key (ACCOUNT = 'uuid')
   try {
     const raw = await keytar.getPassword(SERVICE, ACCOUNT);
