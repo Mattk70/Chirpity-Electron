@@ -41,7 +41,7 @@
         "path": "/Applications"
       }
     ],
-    "format": "ULFO",
+    "format": "ULMO",
     "internetEnabled": true
   },
   "build": {
