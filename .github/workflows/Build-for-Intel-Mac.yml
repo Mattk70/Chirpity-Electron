@@ -116,7 +116,7 @@ jobs:
       
       # Step to set up Python 3.11
       - name: Set up Python 3.11
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
        
@@ -217,7 +217,7 @@ jobs:
 
       - name: Cache Perch model archive
         id: cache-perch
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: Perch.v2.7z
           key: perch-model-v2-7z
