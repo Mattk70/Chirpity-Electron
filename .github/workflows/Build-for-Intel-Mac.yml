@@ -108,9 +108,9 @@ jobs:
       #     git push origin v$PACKAGE_VERSION
 
       - name: Setup node
-        uses: actions/setup-node@v3
-        with:
-            node-version: 22.16.0
+        uses: actions/setup-node@v6
+        # with:
+        #     node-version: 22.16.0
             # cache: 'npm' 
       - run: echo "🍏 Node setup status is ${{ job.status }}."
       
