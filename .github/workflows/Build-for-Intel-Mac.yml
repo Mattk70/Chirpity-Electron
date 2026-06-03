@@ -103,9 +103,18 @@ jobs:
 
 
       - name: Create and push a Git tag
+        shell: bash
         run: |
-          git tag v$PACKAGE_VERSION
-          git push origin v$PACKAGE_VERSION
+          NEW_TAG="v$PACKAGE_VERSION"
+
+          if [[ "$NEW_TAG" == "$LATEST_TAG" ]]; then
+            echo "Tag $NEW_TAG already exists. Skipping tag creation."
+            exit 0
+          fi
+
+          echo "Creating tag $NEW_TAG"
+          git tag "$NEW_TAG"
+          git push origin "$NEW_TAG"
 
       - name: Setup node
         uses: actions/setup-node@v6
