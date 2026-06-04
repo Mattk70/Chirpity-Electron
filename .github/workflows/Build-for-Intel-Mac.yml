@@ -10,10 +10,17 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 permissions:
-  contents: read
+  contents: write
 jobs:
   Build-Chirpity:
-    runs-on: macos-15-intel
+    name: Build on ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - macos-15-intel
+          - macos-26-intel
+    runs-on: ${{ matrix.runner }}
     env: 
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
       APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -95,21 +102,30 @@ jobs:
           fi
 
 
-      # - name: Create and push a Git tag
-      #   run: |
-      #     git tag v$PACKAGE_VERSION
-      #     git push origin v$PACKAGE_VERSION
+      - name: Create and push a Git tag
+        shell: bash
+        run: |
+          NEW_TAG="v$PACKAGE_VERSION"
+
+          if [[ "$NEW_TAG" == "$LATEST_TAG" ]]; then
+            echo "Tag $NEW_TAG already exists. Skipping tag creation."
+            exit 0
+          fi
+
+          echo "Creating tag $NEW_TAG"
+          git tag "$NEW_TAG"
+          git push origin "$NEW_TAG"
 
       - name: Setup node
-        uses: actions/setup-node@v3
-        with:
-            node-version: 22.16.0
+        uses: actions/setup-node@v6
+        # with:
+        #     node-version: 22.16.0
             # cache: 'npm' 
       - run: echo "🍏 Node setup status is ${{ job.status }}."
       
       # Step to set up Python 3.11
       - name: Set up Python 3.11
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
        
@@ -210,7 +226,7 @@ jobs:
 
       - name: Cache Perch model archive
         id: cache-perch
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: Perch.v2.7z
           key: perch-model-v2-7z
