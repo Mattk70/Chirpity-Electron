@@ -7872,7 +7872,7 @@ function renderComparisons(lists, cname) {
         creditContainer.appendChild(creditText);
         carouselItem.appendChild(creditContainer);
         carouselItem.appendChild(mediaDiv);
-        creditLink.setAttribute("href", "https:" + recording.url);
+        creditLink.setAttribute("href", recording.url);
         creditLink.setAttribute("target", "_blank");
         creditLink.innerHTML = "Source: Xeno-Canto &copy; " + recording.rec;
         carouselInner.appendChild(carouselItem);

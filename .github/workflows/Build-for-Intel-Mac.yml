@@ -1,20 +1,117 @@
-name: Build Intel Mac version 
+name: Build Intel Mac version
 run-name: ${{ github.actor }} is building Chirpity for Intel Mac
+
 on:
   push:
     branches:
-        - 'Development'
-        - 'bug-fix'
+      - 'Development'
+      - 'bug-fix'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
 permissions:
-  contents: read
+  contents: write
+
 jobs:
-  Build-Chirpity:
-    runs-on: macos-15-intel
-    env: 
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Runs ONCE (not in the matrix): version check, git tag, draft-release creation.
+  # Keeping this outside the matrix guarantees exactly one draft release is
+  # created even when both mac runners start at the same time.
+  # ─────────────────────────────────────────────────────────────────────────────
+  prepare:
+    name: Prepare release
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
+    outputs:
+      new_tag: ${{ steps.resolve.outputs.new_tag }}
+      skip:    ${{ steps.resolve.outputs.skip }}
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v6
+        with:
+          lfs: true
+          fetch-depth: 0
+
+      - name: Resolve version and release state
+        id: resolve
+        shell: bash
+        run: |
+          PACKAGE_VERSION=$(jq -r .version package.json)
+          NEW_TAG="v$PACKAGE_VERSION"
+          LATEST_TAG=$(gh api repos/${{ github.repository }}/tags --jq '.[0].name' 2>/dev/null || echo "")
+
+          echo "package_version : $PACKAGE_VERSION"
+          echo "new_tag         : $NEW_TAG"
+          echo "latest_tag      : $LATEST_TAG"
+
+          echo "new_tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
+
+          # Skip the build if this version is already a published (non-draft) release
+          if [[ "$NEW_TAG" == "$LATEST_TAG" ]]; then
+            RELEASE_INFO=$(gh api repos/${{ github.repository }}/releases/tags/$NEW_TAG 2>/dev/null || echo "")
+            if [[ -n "$RELEASE_INFO" ]]; then
+              IS_DRAFT=$(echo "$RELEASE_INFO" | jq -r '.draft')
+              if [[ "$IS_DRAFT" == "false" ]]; then
+                echo "⏭️  $NEW_TAG is already a published release – skipping build."
+                echo "skip=true" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+            fi
+          fi
+
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push Git tag
+        if: steps.resolve.outputs.skip != 'true'
+        shell: bash
+        run: |
+          NEW_TAG="${{ steps.resolve.outputs.new_tag }}"
+          if git ls-remote --tags origin "refs/tags/$NEW_TAG" | grep -q "$NEW_TAG"; then
+            echo "Tag $NEW_TAG already exists on remote – skipping."
+          else
+            git tag "$NEW_TAG"
+            git push origin "$NEW_TAG"
+            echo "✅ Pushed tag $NEW_TAG"
+          fi
+
+      # Creating the draft release here (once) means electron-builder on both
+      # matrix runners will find an existing release and upload into it rather
+      # than each trying to create their own — which was causing the duplicates.
+      - name: Create draft release
+        if: steps.resolve.outputs.skip != 'true'
+        shell: bash
+        run: |
+          NEW_TAG="${{ steps.resolve.outputs.new_tag }}"
+          if gh release view "$NEW_TAG" &>/dev/null; then
+            echo "Release $NEW_TAG already exists – skipping creation."
+          else
+            gh release create "$NEW_TAG" \
+              --draft \
+              --title "Chirpity $NEW_TAG" \
+              --generate-notes
+            echo "✅ Draft release $NEW_TAG created."
+          fi
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Runs on both Intel Mac runners in parallel.
+  # The draft release already exists by this point so electron-builder
+  # (via npm run build-mac-x64) will upload into it rather than create a new one.
+  # ─────────────────────────────────────────────────────────────────────────────
+  build:
+    name: Build on ${{ matrix.runner }}
+    needs: prepare
+    if: needs.prepare.result == 'success' && needs.prepare.outputs.skip != 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - macos-15-intel
+          - macos-26-intel
+    runs-on: ${{ matrix.runner }}
+    env:
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
       APPLE_ID: ${{ secrets.APPLE_ID }}
       APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
@@ -23,134 +120,52 @@ jobs:
       CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
       CI: true
     steps:
-      - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
-      - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
-      - run: echo "🔎 The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
       - name: Check out repository code
         uses: actions/checkout@v6
         with:
-          lfs: true 
+          lfs: true
           fetch-depth: 0
-      - run: echo "💡 The ${{ github.repository }} repository has been cloned to the runner."
-      - run: echo "🖥️ The workflow is now ready to test your code on the runner."
 
-      # Get the latest tag from origin/master
-      - name: Get the latest tag on origin/master
-        id: get_latest_tag
-        shell: bash
-        run: |
-          LATEST_TAG=$(gh api repos/${{ github.repository }}/tags --jq '.[0].name') 
-          echo "LATEST_TAG=$LATEST_TAG"
-          echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
 
-      # Get the version from package.json
-      - name: Get the package version
-        id: get_package_version
-        shell: bash
-        run: |
-          PACKAGE_VERSION=$(jq -r .version package.json)
-          echo "PACKAGE_VERSION=$PACKAGE_VERSION"
-          echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> $GITHUB_ENV
-
-      # Check if latest tag is a published release
-      - name: Check if latest tag is a published release
-        id: check_published
-        shell: bash
-        run: |
-          echo "Checking if the latest tag ($LATEST_TAG) is a published release..."
-
-          RELEASE_INFO=$(gh api repos/Mattk70/Chirpity-Electron/releases/tags/$LATEST_TAG 2>/dev/null) || RELEASE_INFO="not_found"
-
-          if [[ "$RELEASE_INFO" == "not_found" ]]; then
-            echo "No release found for $LATEST_TAG. Assuming it is not published."
-            LATEST_TAG_PUBLISHED=false
-            echo "LATEST_TAG_PUBLISHED=$LATEST_TAG_PUBLISHED" >> $GITHUB_ENV
-          else
-            IS_DRAFT=$(echo "$RELEASE_INFO" | jq -r '.draft')
-            if [[ "$IS_DRAFT" == "true" ]]; then
-              echo "Latest tag ($LATEST_TAG) is a draft."
-              LATEST_TAG_PUBLISHED=false
-              echo "LATEST_TAG_PUBLISHED=false" >> $GITHUB_ENV
-            else
-              echo "Latest tag ($LATEST_TAG) is published."
-              LATEST_TAG_PUBLISHED=true
-              echo "LATEST_TAG_PUBLISHED=true" >> $GITHUB_ENV
-            fi
-          fi
-
-          echo "LATEST_TAG_PUBLISHED=$LATEST_TAG_PUBLISHED"
-
-      # Compare package version with latest tag and decide if build should proceed
-      - name: Compare package version with latest tag
-        id: check_tag
-        shell: bash
-        run: |
-          echo "Comparing package.json version ($PACKAGE_VERSION) with latest tag ($LATEST_TAG)..."
-
-          if [[ "v$PACKAGE_VERSION" == "$LATEST_TAG" && "$LATEST_TAG_PUBLISHED" == "true" ]]; then
-            echo "Package version ($PACKAGE_VERSION) matches latest published tag ($LATEST_TAG). Aborting build."
-            exit 1
-          else
-            echo "Package version ($PACKAGE_VERSION) does not match latest published tag ($LATEST_TAG) or the latest tag is a draft. Proceeding with build."
-          fi
-
-
-      # - name: Create and push a Git tag
-      #   run: |
-      #     git tag v$PACKAGE_VERSION
-      #     git push origin v$PACKAGE_VERSION
-
-      - name: Setup node
-        uses: actions/setup-node@v3
-        with:
-            node-version: 22.16.0
-            # cache: 'npm' 
-      - run: echo "🍏 Node setup status is ${{ job.status }}."
-      
-      # Step to set up Python 3.11
       - name: Set up Python 3.11
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
-       
+
       - name: Install dependencies
         run: |
           npm install
-          # lock onnxruntime-node to 1.23.2 to avoid build issues with 1.24.1 on Intel Mac
+          # Lock onnxruntime-node to 1.23.2 – 1.24.1 has build issues on Intel Mac
           npm install onnxruntime-node@1.23.2 --no-save
-          echo "Install's status is ${{ job.status }}."
-          
-      - name: Set platform-specific ffmpeg path
+
+      - name: Set platform env vars for ffmpeg
         shell: bash
         run: |
-          PLATFORM="darwin-x64"
-          BINARY="ffmpeg"
-          echo "Platform is $PLATFORM, Binary is $BINARY"
-          # Persist environment variables to the GitHub Actions environment
-          echo "PLATFORM=$PLATFORM" >> $GITHUB_ENV
-          echo "BINARY=$BINARY" >> $GITHUB_ENV
-          
-      - name: Modify fluent-ffmpeg processor.js
-        run: |
-          sed -i.bak 's/, 20);/, 5000);/' ./node_modules/fluent-ffmpeg/lib/processor.js && rm -f ./node_modules/fluent-ffmpeg/lib/processor.js.bak
-          grep -A 10 '5000' ./node_modules/fluent-ffmpeg/lib/processor.js
-        shell: bash
+          echo "PLATFORM=darwin-x64" >> $GITHUB_ENV
+          echo "BINARY=ffmpeg"       >> $GITHUB_ENV
 
-      - name: Patch locale error for Portuguese in easepick
+      - name: Patch fluent-ffmpeg - increase spawn timeout
         shell: bash
         run: |
-          sed -i.bak "s/toLocaleString(this.picker.options.lang/toLocaleString(this.picker.options.lang.replace(\/_.*$\/,'')/g" ./node_modules/@easepick/bundle/dist/index.umd.js && rm -f ./node_modules/@easepick/bundle/dist/index.umd.js.bak
+          sed -i.bak 's/, 20);/, 5000);/' ./node_modules/fluent-ffmpeg/lib/processor.js
+          rm -f ./node_modules/fluent-ffmpeg/lib/processor.js.bak
 
+      - name: Patch easepick - fix Portuguese locale
+        shell: bash
+        run: |
+          sed -i.bak "s/toLocaleString(this.picker.options.lang/toLocaleString(this.picker.options.lang.replace(\/_.*$\/,'')/g" \
+            ./node_modules/@easepick/bundle/dist/index.umd.js
+          rm -f ./node_modules/@easepick/bundle/dist/index.umd.js.bak
 
-      - name: Patch wavesurfer.js play() to handle AbortError
+      - name: Patch wavesurfer.js - handle AbortError in play()
         run: |
           node <<'EOF'
           const fs = require('fs');
           const path = require('path');
-
           const filePath = path.resolve('./node_modules/wavesurfer.js/dist/player.js');
           let contents = fs.readFileSync(filePath, 'utf8');
-
           const patched = contents.replace(
             /return this\.media\.play\(\);/,
             `try {
@@ -168,19 +183,15 @@ jobs:
           console.log('✅ Patched wavesurfer.js play()');
           EOF
 
-          grep -A 10 'play()' ./node_modules/wavesurfer.js/dist/player.js
-
-      - name: Modify tracking code
-        run: |
-          # Replace development tracking ID with production ID
-          sed -i.bak '1,30s/const ID_SITE = 3;/const ID_SITE = 2;/' ./js/utils/tracking.js && rm -f ./js/utils/tracking.js.bak
-          grep -A 10 'ID_SITE'  ./js/utils/tracking.js
-      
+      - name: Switch tracking to production ID
         shell: bash
+        run: |
+          sed -i.bak '1,30s/const ID_SITE = 3;/const ID_SITE = 2;/' ./js/utils/tracking.js
+          rm -f ./js/utils/tracking.js.bak
 
       - name: Run unit tests
         run: npm run unittest
-        
+
       - name: Build Electron application
         shell: bash
         env:
@@ -188,29 +199,19 @@ jobs:
         run: |
           chmod -Rv u+w ./node_modules
           npm run build-mac-x64
-      - run: echo "Build status is ${{ job.status }}."
-      - name: Check installer exists
+
+      - name: Verify installer artifact
         shell: bash
         run: |
-          # Retrieve the version from package.json
-          VERSION=$(jq -r '.version' package.json)
-          # Construct the filename
-          FILENAME="Chirpity-x64.dmg"
-          # Check if the file exists
-          if [ -f "./dist/$FILENAME" ]; then
-            echo "Executable $FILENAME found in ./dist"
+          if [ -f "./dist/Chirpity-x64.dmg" ]; then
+            echo "✅ Chirpity-x64.dmg found in ./dist"
           else
-            echo "Executable $FILENAME not found in ./dist" && exit 1
+            echo "❌ Chirpity-x64.dmg not found in ./dist" && exit 1
           fi
-      - run: echo "File check status is ${{ job.status }}."
-
-      # Tests
-
-      # Download Perch
 
       - name: Cache Perch model archive
         id: cache-perch
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: Perch.v2.7z
           key: perch-model-v2-7z
@@ -221,14 +222,12 @@ jobs:
           curl -L -o Perch.v2.7z \
             https://github.com/Mattk70/Chirpity-Website/releases/download/v4.0.0/Perch.v2.7z
 
-      - name: Extract Perch Model into "Perch v2"
-        run: |
-          7z x Perch.v2.7z 
+      - name: Extract Perch model
+        run: 7z x Perch.v2.7z
 
-      - name: Make model available to Playwright
+      - name: Export Perch model path for Playwright
         run: echo "PERCH_MODEL_PATH=$PWD/Perch v2" >> $GITHUB_ENV
 
-       
       - name: Test packaged application
         if: runner.os != 'Linux'
         run: npm test
