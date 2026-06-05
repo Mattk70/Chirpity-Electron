@@ -230,18 +230,19 @@ jobs:
         shell: bash
         run: |
           VERSION=$(jq -r '.version' package.json)
+          # Derive arch from the runner: uname -m returns arm64 or x86_64
+          ARCH=$(uname -m)
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             FILENAME="Chirpity Setup $VERSION.exe"
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            # Derive arch from the runner: uname -m returns arm64 or x86_64
             ARCH=$(uname -m | sed 's/x86_64/x64/')
             FILENAME="Chirpity-${ARCH}.dmg"
           else
-            FILENAME="Chirpity-x64.AppImage"
+            FILENAME="Chirpity-${ARCH}.AppImage"
           fi
           if [ -f "./dist/$FILENAME" ]; then
             echo "✅ $FILENAME found in ./dist"
-          else
+          else  
             echo "❌ $FILENAME not found in ./dist" && exit 1
           fi
 
