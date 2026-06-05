@@ -3420,6 +3420,8 @@ function disableSettingsDuringAnalysis(bool) {
     "speciesWeek",
     "contextAware",
     "sendFilteredAudio",
+    "databaseLocationSelect",
+    "clearDatabaseLocation"
   ];
   elements.forEach((el) => {
     if (DOM[el]) DOM[el].disabled = bool;
