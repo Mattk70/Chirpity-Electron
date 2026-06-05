@@ -1,83 +1,186 @@
 name: Test Chirpity Compilation
-run-name: ${{ github.actor }} is building chirpity
+run-name: ${{ github.actor }} is building Chirpity
+
 on:
   push:
     branches:
-        - 'master'
+      - 'master'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
 permissions:
   contents: write
+
 jobs:
-  Build-Chirpity:
-    runs-on: ${{ matrix.os }}
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Runs ONCE: version check, git tag, and draft-release creation.
+  # Avoids duplicate drafts when all three platform runners start simultaneously.
+  # ─────────────────────────────────────────────────────────────────────────────
+  prepare:
+    name: Prepare release
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
+    outputs:
+      new_tag: ${{ steps.resolve.outputs.new_tag }}
+      skip:    ${{ steps.resolve.outputs.skip }}
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v6
+        with:
+          lfs: true
+          fetch-depth: 0
+
+      - name: Resolve version and release state
+        id: resolve
+        shell: bash
+        run: |
+          PACKAGE_VERSION=$(jq -r .version package.json)
+          NEW_TAG="v$PACKAGE_VERSION"
+          LATEST_TAG=$(gh api repos/${{ github.repository }}/tags --jq '.[0].name' 2>/dev/null || echo "")
+
+          echo "package_version : $PACKAGE_VERSION"
+          echo "new_tag         : $NEW_TAG"
+          echo "latest_tag      : $LATEST_TAG"
+
+          echo "new_tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
+
+          # Skip if this exact version is already a published (non-draft) release
+          if [[ "$NEW_TAG" == "$LATEST_TAG" ]]; then
+            RELEASE_INFO=$(gh api repos/${{ github.repository }}/releases/tags/$NEW_TAG 2>/dev/null || echo "")
+            if [[ -n "$RELEASE_INFO" ]]; then
+              IS_DRAFT=$(echo "$RELEASE_INFO" | jq -r '.draft')
+              if [[ "$IS_DRAFT" == "false" ]]; then
+                echo "⏭️  $NEW_TAG is already a published release – skipping build."
+                echo "skip=true" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+            fi
+          fi
+
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push Git tag
+        if: steps.resolve.outputs.skip != 'true'
+        shell: bash
+        run: |
+          NEW_TAG="${{ steps.resolve.outputs.new_tag }}"
+          if git ls-remote --tags origin "refs/tags/$NEW_TAG" | grep -q "$NEW_TAG"; then
+            echo "Tag $NEW_TAG already exists on remote – skipping."
+          else
+            git tag "$NEW_TAG"
+            git push origin "$NEW_TAG"
+            echo "✅ Pushed tag $NEW_TAG"
+          fi
+
+      # Creating the draft here means all three platform runners upload into the
+      # same existing release rather than each racing to create their own.
+      - name: Create draft release
+        if: steps.resolve.outputs.skip != 'true'
+        shell: bash
+        run: |
+          NEW_TAG="${{ steps.resolve.outputs.new_tag }}"
+          if gh release view "$NEW_TAG" &>/dev/null; then
+            echo "Release $NEW_TAG already exists – skipping creation."
+          else
+            gh release create "$NEW_TAG" \
+              --draft \
+              --title "Chirpity $NEW_TAG" \
+              --generate-notes
+            echo "✅ Draft release $NEW_TAG created."
+          fi
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Matrix build across all three platforms.
+  # fail-fast: false ensures all results are collected even if one OS fails.
+  # ─────────────────────────────────────────────────────────────────────────────
+  build:
+    name: Build on ${{ matrix.os }}
+    needs: prepare
+    if: needs.prepare.result == 'success' && needs.prepare.outputs.skip != 'true'
     strategy:
+      fail-fast: false
       matrix:
-        # Use macos-13 so Perch will work on old macs (Ventura+)
-        os: [windows-latest, macos-latest, ubuntu-latest] 
-    env: 
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    env:
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
       CI: true
     steps:
-      - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
-      - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
-      - run: echo "🔎 The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
       - name: Check out repository code
         uses: actions/checkout@v6
-      - run: echo "💡 The ${{ github.repository }} repository has been cloned to the runner."
-      - run: echo "🖥️ The workflow is now ready to test your code on the runner."
+        with:
+          lfs: true
+          fetch-depth: 0
 
-      - name: Check 7zip
-        if: runner.os == 'Windows'
-        run: where 7z
-
-      - name: Setup node
+      - name: Setup Node.js
         uses: actions/setup-node@v6
-        # with:
-        #     node-version: 22.16.0
-        #     # cache: 'npm' 
-      - run: echo "🍏 Node setup status is ${{ job.status }}."
 
-
-      # Step to set up Python 3.11
       - name: Set up Python 3.11
         uses: actions/setup-python@v6
         with:
           python-version: '3.11'
-       
-      - name: Install dependencies
-        run: |
-          npm install
-          echo "Install's status is ${{ job.status }}."
 
-      # - name: Audit fix
-      #   run: |
-      #     npm audit fix
-      #     echo "Audit fix applied, status is ${{ job.status }}."
-    
+      - name: Install dependencies
+        # npm audit fix is intentionally omitted: it mutates package-lock.json at
+        # runtime, making builds non-reproducible. Fix vulnerabilities locally and
+        # commit the updated lock file instead.
+        run: npm install
 
       - name: Copy tensorflow.dll to napi-v8 folder
         if: runner.os == 'Windows'
         shell: bash
         run: |
-          ls -l ./node_modules/@tensorflow/tfjs-node/deps/lib
-          ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v8
           cp ./node_modules/@tensorflow/tfjs-node/deps/lib/tensorflow.dll \
-          ./node_modules/@tensorflow/tfjs-node/lib/napi-v8/tensorflow.dll
-          ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v8
+             ./node_modules/@tensorflow/tfjs-node/lib/napi-v8/tensorflow.dll
 
-      - name: Patch wavesurfer.js play() to handle AbortError
+      - name: Set platform-specific ffmpeg vars
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            PLATFORM="win32-x64"
+            BINARY="ffmpeg.exe"
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            PLATFORM="darwin-arm64"
+            chmod +x ./build/$PLATFORM/ffmpeg
+            BINARY="ffmpeg"
+          elif [[ "$RUNNER_OS" == "Linux" ]]; then
+            PLATFORM="linux-x64"
+            chmod +x ./build/$PLATFORM/ffmpeg
+            BINARY="ffmpeg"
+          fi
+          echo "PLATFORM=$PLATFORM" >> $GITHUB_ENV
+          echo "BINARY=$BINARY"     >> $GITHUB_ENV
+
+      - name: Overwrite FFmpeg binary
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          cp ./build/$PLATFORM/$BINARY ./node_modules/@ffmpeg-installer/$PLATFORM/$BINARY
+
+      - name: Patch fluent-ffmpeg - increase spawn timeout
+        shell: bash
+        run: |
+          sed -i.bak 's/, 20);/, 5000);/' ./node_modules/fluent-ffmpeg/lib/processor.js
+          rm -f ./node_modules/fluent-ffmpeg/lib/processor.js.bak
+
+      - name: Patch easepick - fix Portuguese locale
+        shell: bash
+        run: |
+          sed -i.bak "s/toLocaleString(this.picker.options.lang/toLocaleString(this.picker.options.lang.replace(\/_.*$\/,'')/g" \
+            ./node_modules/@easepick/bundle/dist/index.umd.js
+          rm -f ./node_modules/@easepick/bundle/dist/index.umd.js.bak
+
+      - name: Patch wavesurfer.js - handle AbortError in play()
         shell: bash
         run: |
           node <<'EOF'
           const fs = require('fs');
           const path = require('path');
-
           const filePath = path.resolve('./node_modules/wavesurfer.js/dist/player.js');
           let contents = fs.readFileSync(filePath, 'utf8');
-
           const patched = contents.replace(
             /return this\.media\.play\(\);/,
             `try {
@@ -95,156 +198,52 @@ jobs:
           console.log('✅ Patched wavesurfer.js play()');
           EOF
 
-          grep -A 10 'play()' ./node_modules/wavesurfer.js/dist/player.js
-
-      - name: Patch locale error for Portuguese in easepick
+      - name: Switch tracking to production ID
         shell: bash
         run: |
-          sed -i.bak "s/toLocaleString(this.picker.options.lang/toLocaleString(this.picker.options.lang.replace(\/_.*$\/,'')/g" ./node_modules/@easepick/bundle/dist/index.umd.js && rm -f ./node_modules/@easepick/bundle/dist/index.umd.js.bak
-          grep -A 10 'replace' ./node_modules/@easepick/bundle/dist/index.umd.js
+          sed -i.bak '1,30s/const ID_SITE = 3;/const ID_SITE = 2;/' ./js/utils/tracking.js
+          rm -f ./js/utils/tracking.js.bak
 
-      - name: Set platform-specific ffmpeg path
-        shell: bash
-        run: |
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            PLATFORM="win32-x64"
-            BINARY="ffmpeg.exe"
-          elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            PLATFORM="darwin-arm64"
-            chmod +x ./build/$PLATFORM/ffmpeg
-            BINARY="ffmpeg"
-            echo "Made ffmpeg binary executable for $PLATFORM."
-          elif [[ "$RUNNER_OS" == "Linux" ]]; then
-            PLATFORM="linux-x64"
-            BINARY="ffmpeg"
-            chmod +x ./build/$PLATFORM/ffmpeg
-            echo "Made ffmpeg binary executable for $PLATFORM."
-          fi
-          echo "Platform is $PLATFORM, Binary is $BINARY"
-          # Persist environment variables to the GitHub Actions environment
-          echo "PLATFORM=$PLATFORM" >> $GITHUB_ENV
-          echo "BINARY=$BINARY" >> $GITHUB_ENV
-          
-      - name: Overwrite FFmpeg binary
-        if: runner.os == 'macOS'
-        run: |
-          echo "copying  ./build/$PLATFORM/$BINARY to ./node_modules/@ffmpeg-installer/$PLATFORM/$BINARY"
-          cp ./build/$PLATFORM/$BINARY ./node_modules/@ffmpeg-installer/$PLATFORM/$BINARY
-        shell: bash
-
-      - name: Modify fluent-ffmpeg processor.js
-        run: |
-          sed -i.bak 's/, 20);/, 5000);/' ./node_modules/fluent-ffmpeg/lib/processor.js && rm -f ./node_modules/fluent-ffmpeg/lib/processor.js.bak
-          # uncomment below to view changed line
-          grep -A 10 '5000' ./node_modules/fluent-ffmpeg/lib/processor.js
-        shell: bash
-
-      - name: Modify tracking code
-        run: |
-          # Replace development with production tracking
-          sed -i.bak '1,30s/const ID_SITE = 3;/const ID_SITE = 2;/' ./js/utils/tracking.js && rm -f ./js/utils/tracking.js.bak
-          grep -A 10 'ID_SITE'  ./js/utils/tracking.js
-        shell: bash
-
-      # test application here
-
-      - name: Start Xvfb
-        if: runner.os == 'Linux'
-        run: |
-          Xvfb :99 -screen 0 1280x1024x24 &
-          # Set DISPLAY environment variable
-          echo "DISPLAY=:99" >> $GITHUB_ENV
-
-      # - name: Fire up Application
-      #   env:
-      #     DISPLAY: :99
-      # run: npm run test -- --disable-gpu --disable-software-rasterizer --disable-audio-output
-      # end test application
-      
-      # Get the latest tag from origin/master
-      - name: Get the latest tag on origin/master
-        id: get_latest_tag
-        shell: bash
-        run: |
-          LATEST_TAG=$(gh api repos/${{ github.repository }}/tags --jq '.[0].name') 
-          echo "LATEST_TAG=$LATEST_TAG" >> $GITHUB_ENV
-
-      # Get the current pushed tag
-      - name: Get the current pushed tag
-        id: get_current_tag
-        shell: bash
-        run: |
-          current_tag="${GITHUB_REF##*/}"
-          echo "CURRENT_TAG=$current_tag" >> $GITHUB_ENV
-
-      # Compare tags to decide if build should proceed
-      - name: Check if current tag is greater than the latest tag
-        id: check_tag
-        shell: bash
-        run: |
-          if [ "$(printf "%s\n%s" "$LATEST_TAG" "$CURRENT_TAG" | sort -V | tail -n 1)" != "$CURRENT_TAG" ]; then
-            echo "New tag is not greater than the latest tag on origin/master. Skipping build."
-            echo "skip_build=true" >> $GITHUB_ENV
-          fi
-
-      # Run unit tests
       - name: Run unit tests
         run: npm run unittest
-        
-      # Conditional build command for each OS
+
       - name: Build Electron application
+        shell: bash
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          
-        # if: env.skip_build != 'true'  # Only run this if the tag comparison was true
-        shell: bash
         run: |
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             npm run build
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            # Fix autoUpdater for mac - failing due to no write permissions
             chmod -Rv u+w ./node_modules
             npm run export
           else
             chmod -Rv u+w ./node_modules
-            npx electron-builder build --linux --x64  -p always
+            npm run build-linux
           fi
-      - run: echo "Build status is ${{ job.status }}."
-      - name: Check installer exists
-        if: env.skip_build != 'true' # Only run this if the tag comparison was true
+
+      - name: Verify installer artifact
         shell: bash
         run: |
-          # Retrieve the version from package.json
           VERSION=$(jq -r '.version' package.json)
-          # Construct the filename
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             FILENAME="Chirpity Setup $VERSION.exe"
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
-            FILENAME="Chirpity-${arch}.dmg"
+            # Derive arch from the runner: uname -m returns arm64 or x86_64
+            ARCH=$(uname -m | sed 's/x86_64/x64/')
+            FILENAME="Chirpity-${ARCH}.dmg"
           else
             FILENAME="Chirpity-x64.AppImage"
           fi
-          # Check if the file exists
           if [ -f "./dist/$FILENAME" ]; then
-            echo "Executable $FILENAME found in ./dist"
+            echo "✅ $FILENAME found in ./dist"
           else
-            echo "Executable $FILENAME not found in ./dist" && exit 1
+            echo "❌ $FILENAME not found in ./dist" && exit 1
           fi
-      - run: echo "File check status is ${{ job.status }}."
-      - name: GH Release - upload legacy latest.yml file for windows 
-
-        uses: softprops/action-gh-release@v2.5.0
-        if: github.ref_type == 'tag'
-        with:
-          files: ./dist/latest.yml
-            
-      # Tests
-          
-      # Download Perch
 
       - name: Cache Perch model archive
         if: runner.os != 'Linux'
@@ -256,44 +255,23 @@ jobs:
 
       - name: Download Perch Sound Model
         if: runner.os != 'Linux' && steps.cache-perch.outputs.cache-hit != 'true'
+        shell: bash
         run: |
           curl -L -o Perch.v2.7z \
             https://github.com/Mattk70/Chirpity-Website/releases/download/v4.0.0/Perch.v2.7z
-        shell: bash
-       
 
-      - name: Extract Perch Model
+      - name: Extract Perch model
+        # 7zip is pre-installed on all GitHub-hosted runners (Windows, macOS, Linux).
+        # choco install 7zip is not needed.
         if: runner.os != 'Linux'
         shell: bash
-        run: |
-          echo "Extracting Perch model on $RUNNER_OS"
+        run: 7z x "Perch.v2.7z" -o"$PWD"
 
-          # Windows does NOT have 7z by default → install it
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            echo "Installing p7zip via chocolatey..."
-            choco install 7zip -y
-          fi
-
-          echo "Running 7z extraction..."
-          7z x "Perch.v2.7z" -o"$PWD"
-
-          echo "Extraction complete. Contents:"
-          ls -R "Perch v2"
-
-
-      - name: Make model available to Playwright
+      - name: Export Perch model path for Playwright
         if: runner.os != 'Linux'
         shell: bash
-        run: |
-          # Cross-platform: use GITHUB_WORKSPACE for Windows paths
-          MODEL_PATH="$GITHUB_WORKSPACE/Perch v2"
-
-          echo "PERCH_MODEL_PATH=$MODEL_PATH" >> $GITHUB_ENV
-          echo "Model path set to: $MODEL_PATH"
-
-
+        run: echo "PERCH_MODEL_PATH=$GITHUB_WORKSPACE/Perch v2" >> $GITHUB_ENV
 
       - name: Test packaged application
         if: runner.os != 'Linux'
         run: npm test
-

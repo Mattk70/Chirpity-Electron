@@ -150,10 +150,7 @@
     ],
     "mac": {
       "target": {
-        "target": "default",
-        "arch": [
-          "arm64", "x64"
-        ]
+        "target": "default"
       },
       "artifactName": "${productName}-${arch}.${ext}",
       "type": "distribution",
