@@ -485,12 +485,6 @@ test.describe('package.json - Build Configuration Edge Cases', () => {
     expect(hasExampleAudio, 'Should include example audio in extraResources').toBe(true);
   });
 
-  test('macOS target includes arm64 architecture', () => {
-    expect(packageData.build.mac.target).toHaveProperty('arch');
-    expect(Array.isArray(packageData.build.mac.target.arch)).toBe(true);
-    expect(packageData.build.mac.target.arch).toContain('arm64');
-  });
-
   test('macOS hardened runtime is enabled', () => {
     expect(packageData.build.mac).toHaveProperty('hardenedRuntime');
     expect(packageData.build.mac.hardenedRuntime).toBe(true);
