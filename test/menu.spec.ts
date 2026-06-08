@@ -212,7 +212,7 @@ test(`Perch works and second result is 35%`, async () => {
   await page.locator('#import').click();
   await page.waitForTimeout(3000);
   await runExampleAnalysis(page,'perch v2');
-  const callID = page.locator('#speciesFilter').getByText('Redwing (call)');
+  const callID = page.locator('#speciesFilter').getByText('Redwing');
   console.log('Perch first ID:', await callID.innerText());
   expect(callID).not.toBe(null)
   const secondResult = await (await page.waitForSelector('#result2 span.confidence-row > span')).textContent()
