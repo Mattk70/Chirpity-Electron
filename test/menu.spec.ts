@@ -137,6 +137,10 @@ test(`BirdNET analyse works and second result is 34%`, async () => {
 
   await runExampleAnalysis(page, 'birdnet');
   const callID = page.locator('#speciesFilter').getByText('Redwing (call)');
+    const locator = page.locator('#speciesFilter').getByText('Common chaffinch');
+
+console.log('Matches:', await locator?.count());
+console.log('First match:', await locator?.first().innerText());
   expect(callID).not.toBe(undefined)
   const secondResult = await (await page.waitForSelector('#result2 span.confidence-row > span')).textContent()
   // console.log(secondResult, 'second result');
@@ -163,6 +167,10 @@ test(`BirdNET finds a Chaffinch @ 78%`, async () => {
     ])
   await runExampleAnalysis(page, 'birdnet');
   const callID = page.locator('#speciesFilter').getByText('Common chaffinch');
+  const locator = page.locator('#speciesFilter').getByText('Common chaffinch');
+
+console.log('Matches:', await locator.count());
+console.log('First match:', await locator.first().innerText());
   expect(callID).not.toBe(undefined)
   const firstResult = await (await page.waitForSelector('#result1 span.confidence-row > span')).textContent()
   // console.log(firstResult, 'first result');
