@@ -170,7 +170,23 @@ test(`BirdNET finds a Chaffinch @ 78%`, async () => {
 })
 
 test(`Nocmig analyse works and second result is 61%`, async () => {
-  // Set a custom timeout for this specific test (in milliseconds)
+  // Override the stub for the example file
+  await stubMultipleDialogs(electronApp, [
+      {
+        method: 'showOpenDialog',
+        value: {
+          filePaths: [process.env.CHAFFINCH_MP3_PATH || ""],
+          canceled: false,
+        },
+      },
+      {
+        method: 'showSaveDialog',
+        value: {
+          filePath: '/path/to/file',
+          canceled: false,
+        },
+      },
+    ])
 
   await runExampleAnalysis(page,'chirpity');
   const callID = page.locator('#speciesFilter').getByText('Redwing (call)');
