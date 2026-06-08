@@ -228,6 +228,14 @@ jobs:
       - name: Export Perch model path for Playwright
         run: echo "PERCH_MODEL_PATH=$PWD/Perch v2" >> $GITHUB_ENV
 
+
+      - name: Download Chaffinch Sound file
+        run: |
+          curl -L -o chaffinch.mp3 \
+            https://chirpity.net/downloads/chaffinch.mp3
+
+      - name: Export Chaffinch.mp3 path for Playwright
+        run: echo "CHAFFINCH_MP3_PATH=$PWD/chaffinch.mp3" >> $GITHUB_ENV
+
       - name: Test packaged application
-        if: runner.os != 'Linux'
         run: npm test
