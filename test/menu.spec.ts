@@ -137,7 +137,7 @@ test(`BirdNET analyse works and second result is 34%`, async () => {
 
   await runExampleAnalysis(page, 'birdnet');
   const callID = page.locator('#speciesFilter').getByText('Redwing (call)');
-    const locator = page.locator('#speciesFilter').getByText('Common chaffinch');
+    const locator = page.locator('#speciesFilter').getByText('Redwing (call)');
 
 console.log('Matches:', await locator?.count());
 console.log('First match:', await locator?.first().innerText());
