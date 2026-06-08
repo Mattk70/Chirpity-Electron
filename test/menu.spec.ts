@@ -143,7 +143,7 @@ console.log('Matches:', await locator.count());
 console.log('First match:', await locator.first().innerText());
   expect(callID).not.toBe(null)
   const secondResult = await (await page.waitForSelector('#result2 span.confidence-row > span')).textContent()
-  // console.log(secondResult, 'second result');
+  console.log(secondResult, '= BirdNET second result');
   expect(secondResult).toBe('34%');
 })
 
@@ -173,7 +173,7 @@ console.log('Matches:', await locator.count());
 console.log('First match:', await locator.first().innerText());
   expect(callID).not.toBe(null)
   const firstResult = await (await page.waitForSelector('#result1 span.confidence-row > span')).textContent()
-  // console.log(firstResult, 'first result');
+  console.log(firstResult, '= BirdNET chaffinch first result');
   expect(firstResult).toBe('78%');
 })
 
@@ -184,7 +184,7 @@ test(`Nocmig analyse works and second result is 61%`, async () => {
   const callID = page.locator('#speciesFilter').getByText('Redwing (call)');
   expect(callID).not.toBe(null)
   const secondResult = await (await page.waitForSelector('#result2 span.confidence-row > span')).textContent()
-  // console.log(secondResult, 'second result');
+  console.log(secondResult, 'Nocmig second result');
   expect(secondResult).toBe('61%');
 })
 
@@ -213,9 +213,10 @@ test(`Perch works and second result is 35%`, async () => {
   await page.waitForTimeout(3000);
   await runExampleAnalysis(page,'perch v2');
   const callID = page.locator('#speciesFilter').getByText('Redwing (call)');
+  console.log('Perch first ID:', await callID.innerText());
   expect(callID).not.toBe(null)
   const secondResult = await (await page.waitForSelector('#result2 span.confidence-row > span')).textContent()
-  // console.log(secondResult, 'second result');
+  console.log(secondResult, '= Perch second result');
   expect(secondResult).toBe('35%');
 })
 
