@@ -136,12 +136,12 @@ test(`BirdNET analyse works and second result is 34%`, async () => {
   // Set a custom timeout for this specific test (in milliseconds)
 
   await runExampleAnalysis(page, 'birdnet');
-  const callID = page.locator('#speciesFilter').getByText('Redwing (call)');
-    const locator = page.locator('#speciesFilter').getByText('Redwing (call)');
+  const callID = page.locator('#speciesFilter').getByText('Redwing');
+    const locator = page.locator('#speciesFilter').getByText('Redwing');
 
-console.log('Matches:', await locator?.count());
-console.log('First match:', await locator?.first().innerText());
-  expect(callID).not.toBe(undefined)
+console.log('Matches:', await locator.count());
+console.log('First match:', await locator.first().innerText());
+  expect(callID).not.toBe(null)
   const secondResult = await (await page.waitForSelector('#result2 span.confidence-row > span')).textContent()
   // console.log(secondResult, 'second result');
   expect(secondResult).toBe('34%');
@@ -171,7 +171,7 @@ test(`BirdNET finds a Chaffinch @ 78%`, async () => {
 
 console.log('Matches:', await locator.count());
 console.log('First match:', await locator.first().innerText());
-  expect(callID).not.toBe(undefined)
+  expect(callID).not.toBe(null)
   const firstResult = await (await page.waitForSelector('#result1 span.confidence-row > span')).textContent()
   // console.log(firstResult, 'first result');
   expect(firstResult).toBe('78%');
@@ -182,7 +182,7 @@ test(`Nocmig analyse works and second result is 61%`, async () => {
 
   await runExampleAnalysis(page,'chirpity');
   const callID = page.locator('#speciesFilter').getByText('Redwing (call)');
-  expect(callID).not.toBe(undefined)
+  expect(callID).not.toBe(null)
   const secondResult = await (await page.waitForSelector('#result2 span.confidence-row > span')).textContent()
   // console.log(secondResult, 'second result');
   expect(secondResult).toBe('61%');
@@ -213,7 +213,7 @@ test(`Perch works and second result is 35%`, async () => {
   await page.waitForTimeout(3000);
   await runExampleAnalysis(page,'perch v2');
   const callID = page.locator('#speciesFilter').getByText('Redwing (call)');
-  expect(callID).not.toBe(undefined)
+  expect(callID).not.toBe(null)
   const secondResult = await (await page.waitForSelector('#result2 span.confidence-row > span')).textContent()
   // console.log(secondResult, 'second result');
   expect(secondResult).toBe('35%');
