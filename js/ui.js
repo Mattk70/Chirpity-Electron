@@ -7663,11 +7663,13 @@ async function getXCComparisons() {
     const types = bats
       ? ['distress call', 'feeding buzz', 'social call', 'echolocation', 'song']
       : ['nocturnal flight call', 'flight call', 'call', 'song'];
+    const frogs = config.selectedModel.includes('frog');
+    if (frogs) types.push('advertisement call', 'territorial call', 'distress call');
     const filteredLists = {}
     types.forEach((type) => {
       filteredLists[type] = []; // Initialize each type with an empty array
     });
-    
+
     // Create an array of promises—one for each call type
     const fetchRequests = types.map((type) => {
       type = type.replaceAll(" ", "%20"); // Replace spaces with entities for the API query
