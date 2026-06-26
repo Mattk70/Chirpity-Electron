@@ -117,6 +117,8 @@ jobs:
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
+        with:
+          node-version: '20'  # Latest LTS with tfjs-node@4.22.0 pre-built binaries
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v6
