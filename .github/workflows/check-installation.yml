@@ -117,8 +117,6 @@ jobs:
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
-        with:
-          node-version: '20'  # Latest LTS with tfjs-node@4.22.0 pre-built binaries
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v6
@@ -137,6 +135,7 @@ jobs:
         run: |
           cp ./node_modules/@tensorflow/tfjs-node/deps/lib/tensorflow.dll \
              ./node_modules/@tensorflow/tfjs-node/lib/napi-v8/tensorflow.dll
+          ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v8/tensorflow.dll
 
       - name: Set platform-specific ffmpeg vars
         shell: bash
