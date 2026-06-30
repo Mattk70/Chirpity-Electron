@@ -136,7 +136,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          npm install
+          npm ci
           # Lock onnxruntime-node to 1.23.2 – 1.24.1 has build issues on Intel Mac
           npm install onnxruntime-node@1.23.2 --no-save
 
