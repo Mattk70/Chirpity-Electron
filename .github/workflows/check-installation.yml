@@ -223,7 +223,7 @@ jobs:
             chmod -Rv u+w ./node_modules
             npm run export
           else
-            chmod -Rv u+w ./node_modules
+            chmod -R u+w ./node_modules
             npm run build-linux
           fi
 
