@@ -182,7 +182,7 @@
       ]
     },
     "linux": {
-      "icon": "./build/icon.icns",
+      "icon": "./img/icon/icon.png",
       "artifactName": "${productName}-${arch}.${ext}",
       "target": [
         "AppImage"
