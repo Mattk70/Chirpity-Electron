@@ -61,4 +61,40 @@ try {
   process.exit(1);
 }
 
+
+// Strip UTF-8 BOM from files:
+
+// Extensions we consider text (add more as needed) 
+const textExt = new Set(['.txt', '.md', '.json', '.plist', '.js', '.jsx', '.ts', '.tsx']);
+
+function stripBOMFromFile(file) { 
+  try { 
+    const buf = fs.readFileSync(file); // check for UTF-8 BOM (0xEF 0xBB 0xBF) 
+    if (buf.length >= 3 && buf[0] === 0xEF && buf[1] === 0xBB && buf[2] === 0xBF) { 
+      const newBuf = buf.slice(3); 
+      fs.writeFileSync(file, newBuf); 
+      console.log('Stripped BOM:', file); } 
+    } catch (err) { 
+      // ignore binary read errors 
+    } 
+  }
+
+function walk(dir) { 
+  const entries = fs.readdirSync(dir, { withFileTypes: true }); 
+  for (const e of entries) { 
+    const full = path.join(dir, e.name); 
+    if (e.isDirectory()) { 
+      if (full.includes('node_modules') || full.includes('.git')) continue; 
+      walk(full);
+    } else { 
+      const ext = path.extname(e.name).toLowerCase(); 
+      if (textExt.has(ext) || e.name === 'LICENSE' || e.name === 'LICENSE.txt') { 
+        stripBOMFromFile(full);
+      } 
+    } 
+  } 
+}
+
+walk(process.cwd());
+
 //Todo: insert app release date logic
