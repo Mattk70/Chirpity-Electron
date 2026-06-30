@@ -123,7 +123,7 @@ dist/
 Dockerfile
 poetry.lock
 pyproject.toml
-package-lock.json
+# package-lock.json
 
 scratchpad.txt
 /test-results/

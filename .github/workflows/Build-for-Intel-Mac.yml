@@ -128,6 +128,9 @@ jobs:
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
+        with:
+          node-version: '19.x'
+          cache: 'npm'
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v6
@@ -136,7 +139,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          npm install
+          npm ci
           # Lock onnxruntime-node to 1.23.2 – 1.24.1 has build issues on Intel Mac
           npm install onnxruntime-node@1.23.2 --no-save
 
