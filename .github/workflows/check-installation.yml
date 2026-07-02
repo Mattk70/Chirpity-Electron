@@ -117,9 +117,9 @@ jobs:
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
-        with:
-          node-version: '19.x'
-          cache: 'npm'
+        # with:
+        #   node-version: '19.x'
+        #   cache: 'npm'
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v6
