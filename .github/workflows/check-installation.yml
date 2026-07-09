@@ -121,11 +121,6 @@ jobs:
         #   node-version: '19.x'
         #   cache: 'npm'
 
-      # - name: install npm v 8.19.4
-      #   shell: bash
-      #   run: |
-      #     npm install -g npm@8.19.4
-
       - name: Set up Python 3.11
         uses: actions/setup-python@v6
         with:
@@ -135,6 +130,12 @@ jobs:
         run: |
             npm cache verify
             npm view @tensorflow/tfjs-node@4.22.0 dist.tarball
+
+      - name: Debug tfjs-node package
+        run: |
+          npm view @tensorflow/tfjs-node@4.22.0 dist.integrity
+          npm view @tensorflow/tfjs-node@4.22.0 dist.tarball
+          npm ls @tensorflow/tfjs-node --package-lock-only
 
       - name: Install dependencies
         # npm audit fix is intentionally omitted: it mutates package-lock.json at
