@@ -4255,6 +4255,7 @@ async function setStartEnd(file) {
  * @returns {number} The positive integer count of batches needed to process the segment.
  */
 function getBatchesToSend(duration) {
+  if (!duration || duration <= 0) return 0;
   if (STATE.model.includes('batpack')) duration *= 10;
   const overlap = STATE.detect.overlap;
   const stepSamples = Math.round(sampleRate * WINDOW_SIZE * (1 - overlap));
