@@ -131,11 +131,24 @@ jobs:
             npm cache verify
             npm view @tensorflow/tfjs-node@4.22.0 dist.tarball
 
-      - name: Debug tfjs-node package
+      - name: Inspect existing tfjs-node
+        shell: pwsh
         run: |
-          npm view @tensorflow/tfjs-node@4.22.0 dist.integrity
-          npm view @tensorflow/tfjs-node@4.22.0 dist.tarball
-          npm ls @tensorflow/tfjs-node --package-lock-only
+          if (Test-Path node_modules/@tensorflow/tfjs-node) {
+            Get-ChildItem node_modules/@tensorflow/tfjs-node -Recurse | Select-String tfjs_binding
+          } else {
+            Write-Host "tfjs-node does not exist"
+          }
+
+      - name: Clean node_modules
+        shell: pwsh
+        run: |
+          if (Test-Path node_modules) {
+            Remove-Item node_modules -Recurse -Force
+          }
+          if (Test-Path package-lock.json) {
+            Write-Host "lockfile exists"
+          }
 
       - name: Install dependencies
         # npm audit fix is intentionally omitted: it mutates package-lock.json at
