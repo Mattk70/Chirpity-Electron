@@ -121,16 +121,26 @@ jobs:
         #   node-version: '19.x'
         #   cache: 'npm'
 
+      # - name: install npm v 8.19.4
+      #   shell: bash
+      #   run: |
+      #     npm install -g npm@8.19.4
+
       - name: Set up Python 3.11
         uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
+      - name: Check cache
+        run: |
+            npm cache verify
+            npm view @tensorflow/tfjs-node@4.22.0 dist.tarball
+
       - name: Install dependencies
         # npm audit fix is intentionally omitted: it mutates package-lock.json at
         # runtime, making builds non-reproducible. Fix vulnerabilities locally and
         # commit the updated lock file instead.
-        run: npm install
+        run: npm ci
 
       - name: Copy tensorflow.dll to napi-v8 folder
         if: runner.os == 'Windows'
