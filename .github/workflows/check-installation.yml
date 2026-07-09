@@ -103,7 +103,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        os: [windows-2025, macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     env:
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
@@ -116,7 +116,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v6
         # with:
         #   node-version: '19.x'
         #   cache: 'npm'
@@ -125,26 +125,6 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: '3.11'
-
-
-      - name: Inspect existing tfjs-node
-        shell: pwsh
-        run: |
-          if (Test-Path node_modules/@tensorflow/tfjs-node) {
-            Get-ChildItem node_modules/@tensorflow/tfjs-node -Recurse | Select-String tfjs_binding
-          } else {
-            Write-Host "tfjs-node does not exist"
-          }
-
-      - name: Clean node_modules
-        shell: pwsh
-        run: |
-          if (Test-Path node_modules) {
-            Remove-Item node_modules -Recurse -Force
-          }
-          if (Test-Path package-lock.json) {
-            Write-Host "lockfile exists"
-          }
 
       - name: Install dependencies
         # npm audit fix is intentionally omitted: it mutates package-lock.json at
@@ -158,8 +138,7 @@ jobs:
         shell: pwsh
         run: |
           Get-ChildItem node_modules/@tensorflow/tfjs-node -Recurse | Select-Object FullName
-
-
+          
       - name: Copy tensorflow.dll to napi-v8 folder
         if: runner.os == 'Windows'
         shell: bash
