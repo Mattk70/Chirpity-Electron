@@ -126,10 +126,6 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Check cache
-        run: |
-            npm cache verify
-            npm view @tensorflow/tfjs-node@4.22.0 dist.tarball
 
       - name: Inspect existing tfjs-node
         shell: pwsh
@@ -156,6 +152,14 @@ jobs:
         # commit the updated lock file instead.
         run: npm ci
 
+
+      - name: Inspect tfjs-node after failure
+        if: failure()
+        shell: pwsh
+        run: |
+          Get-ChildItem node_modules/@tensorflow/tfjs-node -Recurse | Select-Object FullName
+
+          
       - name: Copy tensorflow.dll to napi-v8 folder
         if: runner.os == 'Windows'
         shell: bash
