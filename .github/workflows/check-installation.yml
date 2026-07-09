@@ -132,7 +132,10 @@ jobs:
         # commit the updated lock file instead.
         run: npm install  --ignore-scripts
 
-
+      - name: check tfjs files
+        shell: bash
+        run: |
+          find node_modules/@tensorflow/tfjs-node -type f
           
       - name: Copy tensorflow.dll to napi-v8 folder
         if: runner.os == 'Windows'
