@@ -116,7 +116,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v3
         # with:
         #   node-version: '19.x'
         #   cache: 'npm'
@@ -159,7 +159,7 @@ jobs:
         run: |
           Get-ChildItem node_modules/@tensorflow/tfjs-node -Recurse | Select-Object FullName
 
-          
+
       - name: Copy tensorflow.dll to napi-v8 folder
         if: runner.os == 'Windows'
         shell: bash
