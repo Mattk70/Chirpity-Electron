@@ -117,9 +117,9 @@ jobs:
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
-        with:
-          node-version: '19.x'
-          cache: 'npm'
+        # with:
+        #   node-version: '19.x'
+        #   cache: 'npm'
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v6
@@ -130,7 +130,7 @@ jobs:
         # npm audit fix is intentionally omitted: it mutates package-lock.json at
         # runtime, making builds non-reproducible. Fix vulnerabilities locally and
         # commit the updated lock file instead.
-        run: npm ci
+        run: npm install
 
       - name: Copy tensorflow.dll to napi-v8 folder
         if: runner.os == 'Windows'
