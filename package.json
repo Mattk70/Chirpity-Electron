@@ -234,7 +234,6 @@
     "@tensorflow/tfjs": "4.22.0",
     "@tensorflow/tfjs-backend-webgpu": "4.22.0",
     "@tensorflow/tfjs-core": "4.22.0",
-    "@tensorflow/tfjs-node": "4.22.0",
     "bootstrap": "5.2.3",
     "browser-id3-writer": "^4.4.0",
     "chart.js": "^4.4.0",
