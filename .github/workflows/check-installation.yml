@@ -103,7 +103,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-2025, macos-latest, ubuntu-latest]
+        os: [windows-latest, macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     env:
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
@@ -121,21 +121,16 @@ jobs:
         #   node-version: '19.x'
         #   cache: 'npm'
 
-      - name: Set up Python 3.11
+      - name: Set up Python 3.13
         uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
+          python-version: '3.13'
 
       - name: Install dependencies
         # npm audit fix is intentionally omitted: it mutates package-lock.json at
         # runtime, making builds non-reproducible. Fix vulnerabilities locally and
         # commit the updated lock file instead.
-        run: npm install  || true # Allow non-zero exit code to avoid failing the workflow on warnings
-
-      - name: Add tfjs node
-        shell: bash
-        run: |
-          npm install @tensorflow/tfjs-node --save
+        run: npm install
           
       - name: Copy tensorflow.dll to napi-v8 folder
         if: runner.os == 'Windows'
