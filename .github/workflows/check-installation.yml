@@ -135,7 +135,7 @@ jobs:
       - name: Add tfjs node
         shell: bash
         run: |
-          npm install @tensorflow/tfjs-node@4.22.0 --save-exact
+          npm install @tensorflow/tfjs-node --save
           
       - name: Copy tensorflow.dll to napi-v8 folder
         if: runner.os == 'Windows'
