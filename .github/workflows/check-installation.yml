@@ -132,7 +132,7 @@ jobs:
         # commit the updated lock file instead.
         shell: bash
         run: |
-          npm install --target=8 
+          npm install --target=18.15.0
 
           
       - name: Copy tensorflow.dll to napi-v8 folder
