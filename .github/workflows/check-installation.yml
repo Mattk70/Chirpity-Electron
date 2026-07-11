@@ -130,7 +130,10 @@ jobs:
         # npm audit fix is intentionally omitted: it mutates package-lock.json at
         # runtime, making builds non-reproducible. Fix vulnerabilities locally and
         # commit the updated lock file instead.
-        run: npm install
+        shell: bash
+        run: |
+          npm install --target=8 --runtime=napi
+
           
       - name: Copy tensorflow.dll to napi-v8 folder
         if: runner.os == 'Windows'
