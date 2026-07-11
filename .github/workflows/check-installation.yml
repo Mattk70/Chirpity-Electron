@@ -117,14 +117,14 @@ jobs:
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
-        # with:
-        #   node-version: '19.x'
-        #   cache: 'npm'
+        with:
+          node-version: '18.16.1'
+          cache: 'npm'
 
-      - name: Set up Python 3.13
+      - name: Set up Python 3.11
         uses: actions/setup-python@v6
         with:
-          python-version: '3.13'
+          python-version: '3.11'
 
       - name: Install dependencies
         # npm audit fix is intentionally omitted: it mutates package-lock.json at
@@ -132,7 +132,7 @@ jobs:
         # commit the updated lock file instead.
         shell: bash
         run: |
-          npm install --target=18.15.0
+          npm install
 
           
       - name: Copy tensorflow.dll to napi-v8 folder
