@@ -9,7 +9,7 @@
     "Vis filåbningsdialog"
   ],
   "save-detections": [
-    "Gem detektioner til rekordarkivet."
+    "Gem detektioner i optagelsesarkivet."
   ],
   "analysis": [
     "Analyse"
@@ -27,16 +27,16 @@
     "Skift mellem at udforske arkivet og de nyeste analyseresultater. Dette giver dig mulighed for at sammenligne aktuelle detektioner med dem, du tidligere har optaget."
   ],
   "navigate-audio": [
-    "Navigere i lyd"
+    "Naviger i lyd"
   ],
   "play-pause": [
-    "Skift mellem Afspil/Pause lyden"
+    "Skift mellem at Afspille/Pause lyden"
   ],
   "play-region": [
-    "Afspil den valgte region. Kun aktiv, hvis en region er valgt."
+    "Afspil det valgte område. Kun aktiv, hvis et område er valgt."
   ],
   "center-spec": [
-    "Centrum spektrogrammet ved den aktuelle afspilningsposition. Desuden, hvis du dobbeltklikker med musen på et punkt i lyden, vil det centrere spektrogrammet på dette punkt."
+    "Centrer spektrogrammet ved den aktuelle afspilningsposition. Hvis du dobbeltklikker med musen på et punkt i lyden, vil det desuden centrere spektrogrammet omkring dette punkt."
   ],
   "go-to": [
     "Gå til position i filen"
@@ -69,13 +69,13 @@
     "Spektrogramjusteringer"
   ],
   "zoom-in": [
-    "Zoom ind på spektrogrammet. Når du zoomer, justerer Chirpity automatisk korttids Fourier-transformvinduesstørrelsen for at optimere den spektrale opløsning"
+    "Zoom ind på spektrogrammet. Når du zoomer, justerer Chirpity automatisk korttids-Fourier-transformationsvinduesstørrelsen for at optimere den spektrale opløsning"
   ],
   "zoom-out": [
-    "Zoom ud på spektrogrammet. Når du zoomer, justerer Chirpity automatisk STFT-vinduesstørrelsen for at optimere den spektrale opløsning"
+    "Zoom ud på spektrogrammet. Når du zoomer, justerer Chirpity automatisk KTFT-vinduesstørrelsen for at optimere den spektrale opløsning"
   ],
   "reduce-fft": [
-    "Reducer manuelt spektrogramvinduesstørrelsen. Justering af vinduesstørrelsen vil skærpe/sudse kald i spektrogrammet."
+    "Reducer manuelt spektrogramvinduesstørrelsen. Justering af vinduesstørrelsen vil skærpe/sløre kald i spektrogrammet."
   ],
   "increase-fft": [
     "Øg manuelt spektrogramvinduesstørrelsen"
@@ -89,7 +89,7 @@
   "delete": [
     "Slet aktuel post"
   ],
-  "shift-delete": ["Når resultaterne filtreres efter art <b>og</b> sorteres efter sikkerhed, vil dette slette den valgte post og alle poster med lavere sikkerhed"],
+  "shift-delete": ["Når resultaterne filtreres efter art <b>og</b> sorteres efter konfidensniveau, vil dette slette den valgte post og alle poster med lavere konfidensniveau"],
   "undo": [
     "Gendan slettede post(er)"
   ],
