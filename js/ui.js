@@ -3189,7 +3189,12 @@ const updateListIcon = () => {
     node.setAttribute("src", `img/${list}.png`);
     node.setAttribute("alt", list);
   }
-  node.setAttribute("title", LIST_MAP[list] || "Unknown List");
+  let customListFile = config.models[config.selectedModel].customListFile;
+  let title= LIST_MAP[list] || "Unknown List";
+  if (list === "custom") {
+    title += customListFile ? ': ' + customListFile.split(/[\\/]/).pop() : "No custom list selected";
+  } 
+  node.setAttribute("title", title);
   DOM.listIcon.replaceChildren(node);
 };
 

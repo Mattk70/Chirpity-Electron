@@ -1555,6 +1555,11 @@ const LIST_MAP = {
         nocturnal: 'Søger efter natlige kald',
         birds: 'Søger efter alle fugle',
         everything: 'Søger efter alt',
+        Mammalia: 'Søger efter pattedyr',
+        Reptilia: 'Søger efter reptiler',
+        Insecta: 'Søger efter insekter',
+        Animalia: 'Ekskluderer miljøstøj',
+        Amphibia: 'Søger efter amfibier',
         custom: 'Bruger en brugerdefineret liste'
     },
     de: {
@@ -1562,6 +1567,11 @@ const LIST_MAP = {
         nocturnal: 'Suche nach nächtlichen Rufen',
         birds: 'Suche nach allen Vögeln',
         everything: 'Suche nach allem',
+        Mammalia: 'Suche nach Säugetieren',
+        Reptilia: 'Suche nach Reptilien',
+        Insecta: 'Suche nach Insekten',
+        Animalia: 'Exklusion von Umweltgeräuschen',
+        Amphibia: 'Suche nach Amphibien',
         custom: 'Verwenden einer benutzerdefinierten Liste'
     },
     es: {
@@ -1569,6 +1579,11 @@ const LIST_MAP = {
         nocturnal: 'Buscando reclamos nocturno',
         birds: 'Buscando cualquier ave identificable',
         everything: 'Buscando cualquier sonido identificable',
+        Mammalia: 'Buscando mamíferos',
+        Reptilia: 'Buscando reptiles',
+        Insecta: 'Buscando insectos',
+        Animalia: 'Excluyendo Ruido Ambiental',
+        Amphibia: 'Buscando anfibios',
         custom: 'Usando una lista personalizada'
     },
     fr: {
@@ -1576,6 +1591,11 @@ const LIST_MAP = {
         nocturnal: 'Recherche des cris nocturnes',
         birds: 'Recherche de tous les oiseaux',
         everything: 'Recherche de tout',
+        Mammalia: 'Recherche de mammifères',
+        Reptilia: 'Recherche de reptiles',
+        Insecta: 'Recherche d\'insectes',
+        Animalia: 'Exclusion du bruit environnemental',
+        Amphibia: 'Recherche d\'amphibiens',
         custom: 'Utilisation d\'une liste personnalisée'
     },
     ja: {
@@ -1583,8 +1603,14 @@ const LIST_MAP = {
         nocturnal: '夜間のコールを探しています',
         birds: 'すべての鳥を探しています',
         everything: 'すべてを探しています',
+        Mammalia: '哺乳類を探しています',
+        Reptilia: '爬虫類を探しています',
+        Insecta: '昆虫を探しています',
+        Animalia: '環境ノイズを除外',
+        Amphibia: '両生類を探しています',
         custom: 'カスタムリストを使用しています'
     },
+
     // it: {
     //     location: 'Cercando uccelli nella tua regione',
     //     nocturnal: 'Cercando uccelli notturni',
@@ -1597,6 +1623,11 @@ const LIST_MAP = {
         nocturnal: 'Zoeken naar nachtelijke roepen',
         birds: 'Zoeken naar alle vogels',
         everything: 'Zoeken naar alles',
+        Mammalia: 'Zoeken naar zoogdieren',
+        Reptilia: 'Zoeken naar reptielen',
+        Insecta: 'Zoeken naar insecten',
+        Animalia: 'Uitsluiten van omgevingsgeluid',
+        Amphibia: 'Zoeken naar amfibien',
         custom: 'Gebruik van een aangepaste lijst'
     },
     // pl: {
@@ -1611,6 +1642,11 @@ const LIST_MAP = {
         nocturnal: 'Procurando por chamadas noturnos',
         birds: 'Procurando todos os pássaros',
         everything: 'Procurando tudo',
+        Mammalia: 'Procurando por mamíferos',
+        Reptilia: 'Procurando por répteis',
+        Insecta: 'Procurando por insetos',
+        Animalia: 'Excluindo Ruído Ambiental',
+        Amphibia: 'Procurando por anfíbios',
         custom: 'Usando uma lista personalizada'
     },
     ru: {
@@ -1618,6 +1654,11 @@ const LIST_MAP = {
         nocturnal: 'Поиск ночных звуков',
         birds: 'Поиск всех птиц',
         everything: 'Поиск всего',
+        Mammalia: 'Поиск млекопитающих',
+        Reptilia: 'Поиск рептилий',
+        Insecta: 'Поиск насекомых',
+        Animalia: 'Исключение шума окружающей среды',
+        Amphibia: 'Поиск амфибий',
         custom: 'Использование пользовательского списка'
     },
     sv: {
@@ -1625,6 +1666,11 @@ const LIST_MAP = {
         nocturnal: 'Söker efter nattaktiva läten',
         birds: 'Söker efter alla fåglar',
         everything: 'Söker efter allt',
+        Mammalia: 'Söker efter däggdjur',
+        Reptilia: 'Söker efter reptiler',
+        Insecta: 'Söker efter insekter',
+        Animalia: 'Exkluderar miljöbuller',
+        Amphibia: 'Söker efter amfibier',
         custom: 'Använder en anpassad lista'
     },
     zh: {
@@ -1632,6 +1678,11 @@ const LIST_MAP = {
         nocturnal: '正在寻找夜间叫声',
         birds: '正在寻找所有鸟类',
         everything: '正在寻找一切',
+        Mammalia: '正在寻找哺乳动物',
+        Reptilia: '正在寻找爬行动物',
+        Insecta: '正在寻找昆虫',
+        Animalia: '排除环境噪音',
+        Amphibia: '正在寻找两栖动物',
         custom: '使用自定义列表'
     }
 };
