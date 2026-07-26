@@ -331,9 +331,11 @@ function getWaveDuration(filePath) {
       return factSampleCount / sampleRate;
     }
 
-    if (dataSize === 0 || dataSize === null || sampleRate === null || blockAlign === null)
+    if (dataSize === null || sampleRate === null || blockAlign === null)
       throw new Error(`Could not determine duration: ${filePath}`);
+    if (sampleRate === 0) throw new Error(`Invalid sampleRate=0: ${filePath}`);
     if (blockAlign === 0) throw new Error(`Invalid blockAlign=0: ${filePath}`);
+    if (dataSize === 0) return 0;
 
     // 3. ADPCM with a missing or unfilled (0) fact chunk:
     //    derive sample count from block count * samples-per-block instead.
