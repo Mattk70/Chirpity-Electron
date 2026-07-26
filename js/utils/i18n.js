@@ -1627,7 +1627,7 @@ const LIST_MAP = {
         Reptilia: 'Zoeken naar reptielen',
         Insecta: 'Zoeken naar insecten',
         Animalia: 'Uitsluiten van omgevingsgeluid',
-        Amphibia: 'Zoeken naar amfibien',
+        Amphibia: 'Zoeken naar amfibieën',
         custom: 'Gebruik van een aangepaste lijst'
     },
     // pl: {
