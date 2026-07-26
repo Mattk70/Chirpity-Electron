@@ -343,7 +343,10 @@ function getWaveDuration(filePath) {
       if (!samplesPerBlock) {
         throw new Error(`ADPCM file missing usable fact chunk and samplesPerBlock: ${filePath}`);
       }
-      const numBlocks = Math.ceil(dataSize / blockAlign);
+      if (dataSize % blockAlign !== 0) {
+        throw new Error(`ADPCM file has a partial final block without a usable fact chunk: ${filePath}`);
+      }
+      const numBlocks = dataSize / blockAlign;
       const totalSamples = numBlocks * samplesPerBlock;
       return totalSamples / sampleRate;
     }
