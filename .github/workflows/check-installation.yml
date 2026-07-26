@@ -118,7 +118,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '18.16.1'
+          node-version: '22'
           cache: 'npm'
 
       - name: Set up Python 3.11
@@ -135,11 +135,11 @@ jobs:
           npm install
 
           
-      - name: Copy tensorflow.dll to napi-v8 folder
+      - name: Move tensorflow.dll to napi-v8 folder
         if: runner.os == 'Windows'
         shell: bash
         run: |
-          cp ./node_modules/@tensorflow/tfjs-node/deps/lib/tensorflow.dll \
+          mv ./node_modules/@tensorflow/tfjs-node/deps/lib/tensorflow.dll \
              ./node_modules/@tensorflow/tfjs-node/lib/napi-v8/tensorflow.dll
           ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v8/tensorflow.dll
 

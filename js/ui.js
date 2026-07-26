@@ -2316,6 +2316,7 @@ window.onload = async () => {
   if (config.database.location) {
     document.getElementById("database-location").value =
       config.database.location;
+    showDBLocation(config.database.location);
   }
   
 
@@ -3189,7 +3190,12 @@ const updateListIcon = () => {
     node.setAttribute("src", `img/${list}.png`);
     node.setAttribute("alt", list);
   }
-  node.setAttribute("title", LIST_MAP[list] || "Unknown List");
+  let customListFile = config.models[config.selectedModel].customListFile;
+  let title= LIST_MAP[list] || "Unknown List";
+  if (list === "custom") {
+    title += customListFile ? ': ' + customListFile.split(/[\\/]/).pop() : "No custom list selected";
+  } 
+  node.setAttribute("title", title);
   DOM.listIcon.replaceChildren(node);
 };
 
@@ -5639,6 +5645,7 @@ async function handleUIClicks(e) {
       updateList();
       updatePrefs("config.json", config);
       if (STATE.mode !== "analyse") showAnalyse();
+      showDBLocation(null); // removes the database location from the footer
       break;
     }
     // Custom models
@@ -5995,6 +6002,7 @@ async function handleUIClicks(e) {
           // Assume no records in it until we hear otherwise from the worker
           DOM.chartsLink.classList.add("disabled");
           DOM.exploreLink.classList.add("disabled");
+          showDBLocation(archiveFolder);
           config.library.location &&
             document
               .getElementById("compress-and-organise")
@@ -6277,6 +6285,25 @@ function changeSettingsMode(target) {
       element.classList.replace("advanced-visible", "advanced");
     }
   });
+}
+
+/**
+ * Displays the database location in the UI.
+ * @param {string} location - The database path, from which to display the location.
+ */
+function showDBLocation(location) {
+  document.getElementById('database-display')?.remove();
+  if (location) {
+    const dbLocation = location.replace(/^.*[\\\/]/g, "");
+    const span = document.createElement("span");
+    span.id = "database-display";
+    span.classList.add("text-truncate", "small", "text-bg-primary", "float-end");
+    span.textContent = dbLocation;
+    const icon = document.createElement("span");
+    icon.innerHTML = '<span class="material-symbols-outlined text-info">database</span>';
+    span.prepend(icon);
+    DOM.footer.appendChild(span);
+  }
 }
 
 /**
@@ -8128,7 +8155,6 @@ async function membershipCheck() {
         }
       }
       if (!isMember){
-        const footer = document.getElementById('footer');
         const span = document.createElement('span');
         span.type = 'button';
         span.id = 'trial-notification';
@@ -8137,7 +8163,7 @@ async function membershipCheck() {
           ? `<span class="badge text-bg-info border border-light gb-2">${trialDaysLeft}</span> ` + i18n.get(i18n.Trial) 
           : `<i>${i18n.get(i18n.TrialExpired)}</i>`;
         span.innerHTML = `<small>${trialText}</small>`;
-        footer.appendChild(span);
+        DOM.footer.appendChild(span);
       }
       console.info(
         `Version: ${VERSION}. Trial: ${inTrial} Subscriber: ${isMember}`, trialDaysLeft
