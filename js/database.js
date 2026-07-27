@@ -412,13 +412,25 @@ const addNewModel = async ({model, db = diskDB, dbMutex, labelsLocation}) => {
          "BirdNET_GLOBAL_6K_V2.4_Labels_en.txt");
         const fileContents = readFileSync(labelFile, "utf8");
           labels = fileContents.trim().split(/\r?\n/);
+    } else if (model === "birdnet3") {
+      const labelFile = path.join(__dirname, "BirdNET3",
+         "BirdNET+_V3.0-preview3.1_Global_11K_Labels.csv");
+      const fileContents = readFileSync(labelFile, "utf8");
+      labels = fileContents
+              .trim()
+              .split(/\r?\n/)
+              .slice(1) // skip header
+              .map(line => {
+                const [, , sci_name, com_name, ,] = line.split(";");
+                return `${sci_name}_${com_name}`;
+              });
     } else if (['chirpity', 'nocmig'].includes(model)){
       labels = JSON.parse(
         readFileSync(path.join(__dirname, `${model}_model_config.json`), "utf8")
       ).labels;
     } else {
       // Custom model
-      const labelFile = labelsLocation
+      const labelFile = labelsLocation;
       const fileContents = readFileSync(labelFile, "utf8");
       // Trim whitespace and split by new lines, ignoring empty lines
       labels = fileContents.split(/\r?\n/).map(line => line.trim()).filter(line => line.length);

@@ -1115,7 +1115,8 @@ async function onLaunch({
     ? memoryDB
     : diskDB;
   STATE.update({ db });
-  NUM_WORKERS = perch ? 1 : threads;
+  const onnx = perch || STATE.model === 'birdnet3';
+  NUM_WORKERS = onnx ? 1 : threads;
   spawnPredictWorkers(model, batchSize, threads);
 }
 
@@ -1810,7 +1811,7 @@ async function updateMetadata(fileNames) {
 
 const resetEmbeddings = async () =>{
   STATE.queryMetadata = undefined;
-  const dim = STATE.model === 'perch v2' ? 1536 : 1024;
+  const dim = STATE.model === 'perch v2' ? 1536 : STATE.model === 'birdnet3' ? 1280 : 1024;
   await createEmbeddingTable(memoryDB, tempPath, dim);
 }
 async function getEmbedding({file,cname, sname, max, threshold, queryRegion }){
@@ -3026,7 +3027,7 @@ function spawnPredictWorkers(model, batchSize, toSpawn) {
   const startAt = predictWorkers.length;
   for (let i = startAt; i < startAt + toSpawn; i++) {
     if (isPerch && i > startAt) break; // Perch v2 only needs one worker, even if multiple threads requested
-    const workerSrc = ['nocmig', 'chirpity', 'perch v2', 'nighthawk'].includes(model) ? model : "BirdNet2.4";
+    const workerSrc = ['nocmig', 'chirpity', 'perch v2', 'nighthawk', 'birdnet3'].includes(model) ? model : "BirdNet2.4";
     const worker = new Worker(`./js/models/${workerSrc}.js`, { type: "module" });
     // Web worker message event handler
     worker.onmessage = async (msg) => {

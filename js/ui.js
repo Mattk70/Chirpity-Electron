@@ -1946,6 +1946,7 @@ const defaultConfig = {
   list: "birds",
   models: {
     birdnet: {displayName: 'BirdNET', backend: 'webgpu', list: 'birds', webgpu: {threads: 1, batchSize: 8}, tensorflow: {threads: null, batchSize: 8},  customListFile: ''},
+    birdnet3: {displayName: 'BirdNET3', backend: 'webgpu', list: 'birds', webgpu: {threads: 1, batchSize: 8}, tensorflow: {threads: null, batchSize: 8},  customListFile: ''},
     chirpity: {displayName: 'Nocmig', backend: 'webgpu', list: 'birds', webgpu: {threads: 1, batchSize: 8}, tensorflow: {threads: null, batchSize: 8},  customListFile: ''},
     nocmig: {displayName: 'Nocmig V2 (Beta)', backend: 'webgpu', list: 'birds', webgpu: {threads: 1, batchSize: 8}, tensorflow: {threads: null, batchSize: 8},  customListFile: ''},
   },
