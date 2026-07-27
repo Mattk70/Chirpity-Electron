@@ -157,7 +157,7 @@ function initialiseDatePicker(state, worker, config, resetResults, filterResults
       } else if (element.id === "exploreRange") {
         state.explore.range = { start: start.getTime(), end: end.getTime() };
         resetResults({
-          clearSummary: true,
+          clearSummary: false,
           clearPagination: true,
           clearResults: false,
         });
@@ -193,12 +193,12 @@ function initialiseDatePicker(state, worker, config, resetResults, filterResults
           explore: state.explore,
         });
         resetResults({
-          clearSummary: true,
+          clearSummary: false,
           clearPagination: true,
           clearResults: false,
         });
         filterResults({
-          species: state.explore.species,
+          //species: state.explore.species,
           range: state.explore.range,
         });
       }
