@@ -829,7 +829,6 @@ function renderFilenamePanel() {
   showMetadata();
   let filenameElement = DOM.filename;
   filenameElement.innerHTML = "";
-  //let label = openFile.replace(/^.*[\\\/]/, "");
   const { parentFolder, fileName } = utils.extractFileNameAndFolder(openFile);
   const label = `${parentFolder}/${fileName}`;
   let appendStr;
@@ -850,7 +849,7 @@ function renderFilenamePanel() {
         <div class="dropdown-menu dropdown-menu-dark" aria-labelledby="dropdownMenuButton">`;
     files.forEach((item) => {
       if (item !== openFile) {
-        const label = item.replace(/^.*[\\/]/, "");
+        const label = item.split(/[\\/]/).pop();
         appendStr += `<a id="${item}" class="dropdown-item openFiles" href="#">
                 <span class="material-symbols-outlined align-bottom">audio_file</span>${label}</a>`;
       }
@@ -6294,7 +6293,7 @@ function changeSettingsMode(target) {
 function showDBLocation(location) {
   document.getElementById('database-display')?.remove();
   if (location) {
-    const dbLocation = location.replace(/^.*[\\\/]/g, "");
+    const dbLocation = location.split(/[\\/]/).pop();
     const span = document.createElement("span");
     span.id = "database-display";
     span.classList.add("text-truncate", "small", "text-bg-primary", "float-end");
