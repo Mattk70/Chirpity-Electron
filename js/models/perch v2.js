@@ -25,8 +25,8 @@ async function loadModel(mpath, backend, batchSize) {
     'spatial_embedding': 'gpu-buffer',   // keep other outputs on GPU buffer to save copying effort
     'spectrogram': 'gpu-buffer'
   }
-  const threadOptions = gpu ? { intraOpNumThreads:1, interOpNumThreads: 1 } : {};
- const executionProviderConfig = gpu ? { webgpu: {  validationMode: 'disabled' } } : {};
+  const threadOptions = { intraOpNumThreads:1, interOpNumThreads: 1 };
+  const executionProviderConfig = gpu ? { webgpu: {  validationMode: 'disabled' } } : {};
   const sessionOptions = { 
     executionProviders: providers,
     enableGraphCapture: true, 
