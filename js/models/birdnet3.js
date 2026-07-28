@@ -17,17 +17,16 @@ let modelPath;
  
 async function loadModel(mpath, backend, batchSize) {
   const gpu = backend === 'webgpu';
-  const providers = gpu ? ['webgpu', 'cpu'] : ['wasm', 'cpu'];
+  const providers = gpu ? ['webgpu', 'cpu'] : ['cpu'];
   const freeDimensionOverrides = { 'batch': batchSize };
   const   preferredOutputLocation = {
     'predictions': 'cpu'
   }
-  const threadOptions = gpu ? { intraOpNumThreads:1, interOpNumThreads: 1 } : {};
- const executionProviderConfig = gpu ? { webgpu: { validationMode: 'full' } } : {};
+  const threadOptions = { intraOpNumThreads:4, interOpNumThreads: 2 };
+ const executionProviderConfig = gpu ? { webgpu: { validationMode: 'basic' } } : {};
   const sessionOptions = { 
     executionProviders: providers,
-    enableGraphCapture: 1, 
-    graphOptimizationLevel: 'all',
+    enableGraphCapture: true, 
     ...threadOptions,
     executionProviderConfig,
     executionMode: 'sequential',

@@ -4857,7 +4857,7 @@ diagnosticMenu.addEventListener("click", async function () {
   const backend = config.models[config.selectedModel].backend;
   DIAGNOSTICS["Model"] =
     DOM.modelToUse.options[DOM.modelToUse.selectedIndex].text;
-  DIAGNOSTICS["Backend"] = backend;
+  DIAGNOSTICS["Backend"] = backend.replace('tensorflow', 'CPU');
   DIAGNOSTICS["Batch size"] = config[backend].batchSize;
   DIAGNOSTICS["Threads"] = config[backend].threads;
   DIAGNOSTICS["Context"] = config.detect.contextAware;

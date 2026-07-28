@@ -472,10 +472,11 @@ async function handleMessage(e) {
       break;
     }
     case "change-threads": {
-      // if (STATE.model.includes('perch')) break; // perch v2 only works with 1 thread
+      const onnxGPU = ['birdnet3', 'perch v2'].includes(STATE.model) && STATE.detect.backend === 'webgpu';
+      // if (onnxGPU) return; // ONNX GPU models are single-threaded
       const delta = args.threads - predictWorkers.length;
       NUM_WORKERS += delta;
-      if (delta > 0) {
+      if (!onnxGPU && delta > 0) {
         spawnPredictWorkers(STATE.model, BATCH_SIZE, delta);
       } else {
         for (let i = delta; i < 0; i++) {
@@ -1115,8 +1116,8 @@ async function onLaunch({
     ? memoryDB
     : diskDB;
   STATE.update({ db });
-  const onnx = perch || STATE.model === 'birdnet3';
-  NUM_WORKERS = onnx ? 1 : threads;
+  const onnxGPU = (perch || STATE.model === 'birdnet3') && STATE.detect.backend === 'webgpu';
+  NUM_WORKERS = onnxGPU ? 1 : threads;
   spawnPredictWorkers(model, batchSize, threads);
 }
 
@@ -3011,6 +3012,7 @@ async function saveAudio(file, start, end, filename, metadata, folder) {
  */
 function spawnPredictWorkers(model, batchSize, toSpawn) {
   const isPerch = model === 'perch v2';
+  const isGPU = STATE.detect.backend === 'webgpu';
   // Perch worker cannot be terminated due to ONNX runtime global memory management,
   // so we preserve it in STATE.perchWorker for reuse across model switches
   if (! STATE.perchWorker?.length){
@@ -3026,7 +3028,7 @@ function spawnPredictWorkers(model, batchSize, toSpawn) {
   }
   const startAt = predictWorkers.length;
   for (let i = startAt; i < startAt + toSpawn; i++) {
-    if (isPerch && i > startAt) break; // Perch v2 only needs one worker, even if multiple threads requested
+    if (isGPU && isPerch && i > startAt) break; // Perch v2 only needs one worker, even if multiple threads requested
     const workerSrc = ['nocmig', 'chirpity', 'perch v2', 'nighthawk', 'birdnet3'].includes(model) ? model : "BirdNet2.4";
     const worker = new Worker(`./js/models/${workerSrc}.js`, { type: "module" });
     // Web worker message event handler
