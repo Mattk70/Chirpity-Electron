@@ -437,7 +437,7 @@ DOM.controlsWrapper.addEventListener("mousedown", (e) => {
     if (!animating) {
       animating = true;
       requestAnimationFrame(() => {
-        spec.adjustDims(true, config.FFT, newHeight);
+        spec.adjustDims(true, newHeight);
         animating = false;
       });
     }
