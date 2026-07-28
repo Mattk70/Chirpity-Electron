@@ -20,7 +20,7 @@ async function loadModel(mpath, backend, batchSize) {
   const   preferredOutputLocation = {
     'predictions': 'cpu'
   }
-  const threadOptions = { intraOpNumThreads:1, interOpNumThreads: 1 };
+  const threadOptions = { intraOpNumThreads:2, interOpNumThreads: 1 };
   const executionProviderConfig = gpu ? { webgpu: { validationMode: 'disabled' } } : {};
   const sessionOptions = { 
     executionProviders: providers,
