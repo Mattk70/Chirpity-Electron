@@ -17,7 +17,7 @@ let modelPath;
  
 async function loadModel(mpath, backend, batchSize) {
   const gpu = backend === 'webgpu';
-  const providers = gpu ? ['webgpu', 'cpu'] : ['cpu'];
+  const providers = gpu ? ['webgpu', 'cpu'] : ['wasm', 'cpu'];
   const freeDimensionOverrides = { 'batch': batchSize };
   const   preferredOutputLocation = {
     'predictions': 'cpu'
@@ -27,7 +27,7 @@ async function loadModel(mpath, backend, batchSize) {
   const sessionOptions = { 
     executionProviders: providers,
     enableGraphCapture: 1, 
-    
+    graphOptimizationLevel: 'all',
     ...threadOptions,
     executionProviderConfig,
     executionMode: 'sequential',

@@ -3043,6 +3043,9 @@ function spawnPredictWorkers(model, batchSize, toSpawn) {
       predictWorkers.splice(i, 1);
       worker.terminate();
     };
+    worker.onmessageerror = (event) => {
+      console.error('Worker message error:', event);
+    };
     worker.name = model;
     predictWorkers.push(worker);
     DEBUG && console.log("loading a worker");
