@@ -1,7 +1,5 @@
-let ort = require ("onnxruntime-node");
-
+const ort = require ("onnxruntime-node");
 const fs = require("node:fs");
-const path = require("node:path");
 
 let session = null;
 let currentGeneration = 0;
@@ -18,6 +16,7 @@ let modelPath;
 async function loadModel(mpath, backend, batchSize) {
   const gpu = backend === 'webgpu';
   const providers = gpu ? ['webgpu', 'cpu'] : ['cpu'];
+  const providers = gpu ? ['webgpu', 'cpu'] : ['cpu'];
   const freeDimensionOverrides = { 'batch': batchSize };
   const   preferredOutputLocation = {
     'predictions': 'cpu'
@@ -29,7 +28,7 @@ async function loadModel(mpath, backend, batchSize) {
     enableGraphCapture: true, 
     ...threadOptions,
     executionProviderConfig,
-    executionMode: 'sequential',
+    executionMode: 'parallel',
     enableCpuMemArena: true,
     freeDimensionOverrides,
     preferredOutputLocation,
@@ -194,29 +193,76 @@ async function predictBatch(audio, keys) {
     }
     return [keys, batchedIndices, batchedProbs, batchedEmbeds];
 }
+function topKProbs(probs) {
+  // Initialise with first five values
+  let p0 = probs[0], i0 = 0;
+  let p1 = probs[1], i1 = 1;
+  let p2 = probs[2], i2 = 2;
+  let p3 = probs[3], i3 = 3;
+  let p4 = probs[4], i4 = 4;
 
-function topKProbs(probs, k = 5) {
-  const top = [];
+  // Find current minimum
+  let minPos = 0;
+  let minVal = p0;
 
-  for (let i = 0; i < probs.length; i++) {
+  if (p1 < minVal) { minVal = p1; minPos = 1; }
+  if (p2 < minVal) { minVal = p2; minPos = 2; }
+  if (p3 < minVal) { minVal = p3; minPos = 3; }
+  if (p4 < minVal) { minVal = p4; minPos = 4; }
+
+  for (let i = 5; i < probs.length; i++) {
     const p = probs[i];
 
-    if (top.length < k) {
-      top.push({ prob: p, idx: i });
-      top.sort((a, b) => a.prob - b.prob); // smallest first
-    } else if (p > top[0].prob) {
-      top[0] = { prob: p, idx: i };
-      top.sort((a, b) => a.prob - b.prob);
+    if (p <= minVal)
+      continue;
+
+    // Replace current minimum
+    switch (minPos) {
+      case 0: p0 = p; i0 = i; break;
+      case 1: p1 = p; i1 = i; break;
+      case 2: p2 = p; i2 = i; break;
+      case 3: p3 = p; i3 = i; break;
+      case 4: p4 = p; i4 = i; break;
+    }
+
+    // Recompute minimum
+    minPos = 0;
+    minVal = p0;
+
+    if (p1 < minVal) { minVal = p1; minPos = 1; }
+    if (p2 < minVal) { minVal = p2; minPos = 2; }
+    if (p3 < minVal) { minVal = p3; minPos = 3; }
+    if (p4 < minVal) { minVal = p4; minPos = 4; }
+  }
+
+  // Sort descending (only five values)
+  function swap(a, b) {
+    switch ((a << 3) | b) {
+      case 0b000001: if (p0 < p1) { [p0,p1]=[p1,p0]; [i0,i1]=[i1,i0]; } break;
+      case 0b000010: if (p0 < p2) { [p0,p2]=[p2,p0]; [i0,i2]=[i2,i0]; } break;
+      case 0b000011: if (p0 < p3) { [p0,p3]=[p3,p0]; [i0,i3]=[i3,i0]; } break;
+      case 0b000100: if (p0 < p4) { [p0,p4]=[p4,p0]; [i0,i4]=[i4,i0]; } break;
+      case 0b001010: if (p1 < p2) { [p1,p2]=[p2,p1]; [i1,i2]=[i2,i1]; } break;
+      case 0b001011: if (p1 < p3) { [p1,p3]=[p3,p1]; [i1,i3]=[i3,i1]; } break;
+      case 0b001100: if (p1 < p4) { [p1,p4]=[p4,p1]; [i1,i4]=[i4,i1]; } break;
+      case 0b010011: if (p2 < p3) { [p2,p3]=[p3,p2]; [i2,i3]=[i3,i2]; } break;
+      case 0b010100: if (p2 < p4) { [p2,p4]=[p4,p2]; [i2,i4]=[i4,i2]; } break;
+      case 0b011100: if (p3 < p4) { [p3,p4]=[p4,p3]; [i3,i4]=[i4,i3]; } break;
     }
   }
 
-  top.sort((a, b) => b.prob - a.prob);
+  // Bubble-sort network for 5 elements
+  swap(0,1); swap(0,2); swap(0,3); swap(0,4);
+  swap(1,2); swap(1,3); swap(1,4);
+  swap(2,3); swap(2,4);
+  swap(3,4);
 
   return {
-    probs: top.map(x => x.prob),
-    idx: top.map(x => x.idx)
+    probs: [p0, p1, p2, p3, p4],
+    idx:   [i0, i1, i2, i3, i4]
   };
 }
+
 function l2Normalize(vec) {
   let sum = 0.0;
   // Compute squared norm
