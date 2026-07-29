@@ -1946,7 +1946,7 @@ const defaultConfig = {
   list: "birds",
   models: {
     birdnet: {displayName: 'BirdNET', backend: 'webgpu', list: 'birds', webgpu: {threads: 1, batchSize: 8}, tensorflow: {threads: null, batchSize: 8},  customListFile: ''},
-    birdnet3: {displayName: 'BirdNET3', backend: 'webgpu', list: 'birds', webgpu: {threads: 1, batchSize: 8}, tensorflow: {threads: null, batchSize: 8},  customListFile: ''},
+    birdnet3: {displayName: 'BirdNET+ (preview 3.1)', backend: 'webgpu', list: 'birds', webgpu: {threads: 1, batchSize: 8}, tensorflow: {threads: null, batchSize: 8},  customListFile: '', windowSize: 3},
     chirpity: {displayName: 'Nocmig', backend: 'webgpu', list: 'birds', webgpu: {threads: 1, batchSize: 8}, tensorflow: {threads: null, batchSize: 8},  customListFile: ''},
     nocmig: {displayName: 'Nocmig V2 (Beta)', backend: 'webgpu', list: 'birds', webgpu: {threads: 1, batchSize: 8}, tensorflow: {threads: null, batchSize: 8},  customListFile: ''},
   },
@@ -2157,7 +2157,8 @@ window.onload = async () => {
     threads,
     backend,
     list,
-    modelPath
+    modelPath,
+    windowSize: modelOptions.windowSize,
   });
 
   // set version
@@ -2290,6 +2291,9 @@ window.onload = async () => {
   DOM.batchSizeSlider.max = Math.max(parseInt(160 / (24576 / GPU_RAM)), 32);
   DOM.threadSlider.value = config[config.models[config.selectedModel].backend].threads;
   DOM.numberOfThreads.textContent = DOM.threadSlider.value;
+  const windowSize = config.models['birdnet3'].windowSize;
+  DOM.windowSizeSlider.value = windowSize;
+  DOM.windowSizeValue.textContent = windowSize;
   DOM.defaultLat.value = config.latitude;
   DOM.defaultLon.value = config.longitude;
   place.innerHTML =
@@ -3201,10 +3205,16 @@ const updateListIcon = () => {
 
 const updateModelIcon = (model) => {
   let title;
+  let showVersion3 = false;
   switch (model) {
     case 'birdnet':
       title = "BirdNET";
       break;
+    case 'birdnet3':
+      title = "BirdNET+ (preview 3.1)";
+      model = 'birdnet';
+      showVersion3 = true;
+      break;      
     case 'chirpity':
       title = "Nocmig";
       break;
@@ -3231,6 +3241,12 @@ const updateModelIcon = (model) => {
   img.setAttribute("alt", title);
   img.setAttribute("title", title);
   DOM.modelIcon.replaceChildren(img); // Clear existing content
+  if (showVersion3) {
+    const badge = document.createElement("span");
+    badge.className = "position-absolute top-0 start-0 ms-2 mt-1 translate-middle badge rounded-pill";
+    badge.textContent = "+";
+    DOM.modelIcon.appendChild(badge);
+  }
 }
 
 DOM.listIcon.addEventListener("click", () => {
@@ -3279,7 +3295,8 @@ const loadModel = () => {
     warmup,
     threads: config[backend].threads,
     backend,
-    modelPath
+    modelPath,
+    windowSize: config.models[selectedModel].windowSize,
   });
 };
 
@@ -3427,7 +3444,8 @@ function disableSettingsDuringAnalysis(bool) {
     "contextAware",
     "sendFilteredAudio",
     "databaseLocationSelect",
-    "clearDatabaseLocation"
+    "clearDatabaseLocation",
+    "windowSizeSlider",
   ];
   elements.forEach((el) => {
     if (DOM[el]) DOM[el].disabled = bool;
@@ -4156,11 +4174,16 @@ async function renderResult({
       callCount,
       isDaylight,
       reviewed,
-      model,
       modelID
     } = result;
-
+    let model = result.model;
     const isBatpack = /batpack/i.test(model ?? "");
+    const isBN3 = model === "birdnet3";
+    let bn3Badge = '';
+    if (isBN3) {
+      model = model.slice(0, -1);
+      bn3Badge = '<span class="position-absolute top-0 start-100 translate-middle badge rounded-pill text-dark fs-5">+</span>';
+    }
     const logo = isBatpack
       ? "batpack"
       : ['birdnet', 'nocmig', 'chirpity', 'perch', 'nighthawk', 'user'].includes(model)
@@ -4224,7 +4247,7 @@ async function renderResult({
             <td class="label ${hide}">${labelHTML}</td>
             <td class="comment text-end ${hide}">${commentHTML}</td>
             <td class="reviewed text-end ${hide}">${reviewHTML}</td>
-            <td class="text-end"><img class="model-logo" src="img/icon/${logo}_logo.png" title="${modelName}" alt="${modelName}"></td>
+            <td class="text-end"><span class="position-relative me-1"><img class="model-logo" src="img/icon/${logo}_logo.png" title="${modelName}" alt="${modelName}">${bn3Badge}</span></span></td>
             </tr>`;
   }
   updateResultTable(tr, isFromDB, selection);
@@ -4810,8 +4833,10 @@ const modelSettingsDisplay = () => {
   // Hide train unless BirdNET (and a member)
   const blockTrain = config.selectedModel !== 'birdnet' || ! STATE.isMember;
   DOM.trainNav.classList.toggle('disabled', blockTrain);
-  const isPerch = config.selectedModel === 'perch v2';
-  DOM.threadSlider.disabled = isPerch;
+  const isOnnx = ['perch v2', 'birdnet3'].includes(config.selectedModel);
+  const isGPU = config.models[config.selectedModel].backend === 'webgpu';
+  DOM.threadSlider.disabled = isOnnx && isGPU;
+  DOM.windowSize.classList.toggle('d-none', config.selectedModel !== 'birdnet3');
 };
 
 const contextAwareIconDisplay = () => {
@@ -5361,6 +5386,10 @@ document.addEventListener('input', (e) =>{
       DOM.numberOfThreads.textContent = DOM.threadSlider.value;
       break;
     }
+    case "window-size-slider": {
+      DOM.windowSizeValue.textContent = DOM.windowSizeSlider.value;
+      break;
+    }    
     case "gain": {
       DOM.gainAdjustment.textContent = DOM.gain.value + "dB";
       break;
@@ -6653,6 +6682,19 @@ document.addEventListener("change", async function (e) {
           });
           break;
         }
+        case "window-size-slider": {
+          // change window size
+          DOM.windowSizeValue.textContent = DOM.windowSizeSlider.value;
+          const windowSize = DOM.windowSizeSlider.valueAsNumber;
+          // get backend
+          const backend = config.models[config.selectedModel].backend;
+          config.models['birdnet3'].windowSize = windowSize;
+          worker.postMessage({
+            action: "change-window-size",
+            windowSize,
+          });
+          break;
+        }        
         case "batch-size": {
           DOM.batchSizeValue.textContent = DOM.batchSizeSlider.value;
           // get backend

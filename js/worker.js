@@ -425,7 +425,7 @@ async function handleMessage(e) {
   }
   switch (action) {
     case "_init_": {
-      let { model, batchSize, threads, backend, list, modelPath } = args;
+      let { model, batchSize, threads, backend, list, modelPath, windowSize } = args;
       const t0 = Date.now();
       STATE.detect.backend = backend;
       try {
@@ -438,7 +438,8 @@ async function handleMessage(e) {
             threads,
             backend,
             list,
-            modelPath
+            modelPath,
+            windowSize
           });
         })();  
         initialiseResolve();        // resolve INITIALISED
@@ -489,6 +490,12 @@ async function handleMessage(e) {
     case "change-mode": {
       const mode = args.mode;
       INITIALISED = await onChangeMode(mode);
+      break;
+    }
+    case "change-window-size": {
+      WINDOW_SIZE = args.windowSize;
+      predictWorkers.forEach(worker => worker.postMessage({ message: "change-window-size", windowSize: WINDOW_SIZE }));
+      resetEstimates();
       break;
     }
     case "chart": {
@@ -1061,6 +1068,7 @@ async function onLaunch({
   threads = 1,
   backend = "tensorflow",
   modelPath,
+  windowSize = 3
 }) {
   SEEN_MODEL_READY = false;
   LIST_CACHE = {};
@@ -1083,7 +1091,7 @@ async function onLaunch({
     model = 'birdnet'; perch = false; modelPath = null;
     generateAlert({message, type:'error'})
   }
-  const newWindowSize = perch ? 5 : nighthawk ? 1 : 3;
+  const newWindowSize = perch ? 5 : nighthawk ? 1 : windowSize || 3;
 
   if (newWindowSize !== WINDOW_SIZE) {
     // Update totalBatches so time estimates remain accurate
@@ -3061,7 +3069,8 @@ function spawnPredictWorkers(model, batchSize, toSpawn) {
       threads: toSpawn,
       backend: STATE.detect.backend,
       worker: i,
-      locale: STATE.locale.slice(0,2)
+      locale: STATE.locale.slice(0,2),
+      windowSize: WINDOW_SIZE,
     });
 
   }

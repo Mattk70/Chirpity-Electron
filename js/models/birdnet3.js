@@ -6,7 +6,7 @@ let currentGeneration = 0;
 let cancelled = false;
 let labels;
 let backend;
-const chunkLength = 96000; // 3 seconds at 32kHz
+let chunkLength = 96000; // 3 seconds at 32kHz
 let batchSize = 8;
 const sampleRate = 32000;
 const numClasses = 11560;
@@ -57,14 +57,15 @@ onmessage = async (e) => {
         await loadModel(modelPath, backend, batchSize);
         break;
       }
-      case "change-threads": {
-        // Optimal threads are set - can ignore this message
+      case "change-window-size": {
+        chunkLength = data.windowSize * sampleRate;
         break;
       }
       case "load": {
         if (!session) {
           backend = data.backend;
           batchSize = data.batchSize;
+          chunkLength = data.windowSize * sampleRate;
           await loadModel(modelPath, backend, batchSize);
           DEBUG && console.log(`Using backend: ${backend}`);
 
