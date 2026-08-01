@@ -629,7 +629,7 @@ function clearActive() {
 
 
 async function showOpenDialog(fileOrFolder) {
-  const defaultPath = localStorage.getItem("lastFolder") || "";
+  const defaultPath = localStorage.getItem("lastOpenFolder") || "";
   const files = await window.electron.openDialog("showOpenDialog", {
     type: "audio",
     fileOrFolder: fileOrFolder,
@@ -638,7 +638,7 @@ async function showOpenDialog(fileOrFolder) {
   });
   if (!files.canceled) {
     filterValidFiles({ filePaths: files.filePaths });
-    localStorage.setItem("lastFolder", p.dirname(files.filePaths[0]));
+    localStorage.setItem("lastOpenFolder", p.dirname(files.filePaths[0]));
   }
 }
 
