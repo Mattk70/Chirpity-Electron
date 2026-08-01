@@ -32,7 +32,7 @@ async function loadModel(mpath, backend, batchSize) {
     freeDimensionOverrides,
     preferredOutputLocation,
   };
-  const modelPath = './BirdNET3/BirdNET_GeM_WebGPU.onnx';
+  const modelPath = './BirdNET3/birdnet_gem_webgpu_fast.onnx';
   session = await ort.InferenceSession.create(modelPath, sessionOptions);
   cancelled = false;
 }
