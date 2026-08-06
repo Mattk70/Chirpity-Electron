@@ -67,6 +67,7 @@
     ],
     "charts": ["Ver la gráfica"],
     "manage-locations": ["Gestionar ubicaciones"],
+    "manage-files": ["Gestionar archivos"],
     "explore": ["Explorar el archivo"],
     "chart-datefilter": ["Aplicar un filtro de fecha"],
     "explore-datefilter": ["Aplicar un filtro de fecha"],
@@ -215,5 +216,6 @@
       "Biblioteca de audio",
       "Preferencias del sonograma",
       "Avanzado"
-    ]   
+    ],
+    "databaseModalLabel": ["Gestión de Archivos de Base de Datos"]
 }

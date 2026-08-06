@@ -1106,6 +1106,174 @@ const setDefaultLocation = () => {
   button.innerHTML = 'Set <span class="material-symbols-outlined">done</span>';
 };
 
+
+function generateFileRows(fileList, i18n) {
+  const tbody = document.createElement("tbody");
+
+  for (const file of fileList) {
+    const tr = document.createElement("tr");
+    tr.className = "file-row";
+
+    const addCell = (text, className) => {
+      const td = document.createElement("td");
+      td.textContent = text;
+      if (className) td.className = className;
+      tr.appendChild(td);
+      return td;
+    };
+
+    addCell(file.name);
+    addCell(file.archived ? i18n["yes"] : i18n["no"]);
+    addCell(new Date(file.filestart).toLocaleString());
+    addCell(file.location ?? i18n["default"]);
+
+    const td = addCell("", "text-center");
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.className = "form-check-input rm";
+    checkbox.dataset.fileId = file.id;
+    td.appendChild(checkbox);
+
+    tbody.appendChild(tr);
+  }
+
+  return tbody;
+}
+
+function onDatabaseFiles(fileList) {
+    const i18 = i18n.get(i18n.Database);
+  const databaseModalDiv = document.getElementById("databaseModal");
+  const contentDiv = databaseModalDiv.querySelector(".modal-body");
+  // Clear previous contents
+  contentDiv.replaceChildren();
+  const table = document.createElement("table");
+  table.className = "table table-striped table-hover";
+  const thead = document.createElement("thead");
+  thead.className = "sticky-top text-bg-dark";
+  const headerRow = document.createElement("tr");
+  ["Filename", "In Audio Library", "File Start", "Location", "Delete Record"].map(text => i18[text])
+    .forEach(text => {
+      const th = document.createElement("th");
+      th.textContent = text;
+      headerRow.appendChild(th);
+    });
+  thead.appendChild(headerRow);
+  table.appendChild(thead);
+  table.appendChild(generateFileRows(fileList, i18));
+  contentDiv.appendChild(table);
+  // Make row click select the record and shift click select multiple rows
+  let mouseDownX;
+  let mouseDownY;
+  let lastClickedRow = null;
+
+  table.querySelector("tbody").addEventListener("mousedown", event => {
+    mouseDownX = event.clientX;
+    mouseDownY = event.clientY;
+    // Prevent browser text selection flash during shift-click selection
+    if (event.shiftKey) {
+      event.preventDefault();
+    }
+  });
+
+  table.querySelector("tbody").addEventListener("click", event => {
+    const row = event.target.closest(".file-row");
+    if (!row) return;
+    const moved = Math.abs(event.clientX - mouseDownX) > 5 ||
+                Math.abs(event.clientY - mouseDownY) > 5;
+
+    // Ignore clicks that were actually a drag selection
+    if (moved) return;
+    // Ignore direct checkbox clicks
+    if (event.target.classList.contains("rm")) {
+      lastClickedRow = row;
+      return;
+    }
+    const rows = [...table.querySelectorAll("tbody .file-row")].filter(row => !row.hidden);
+    const checkbox = row.querySelector(".rm");
+
+    if (event.shiftKey && lastClickedRow) {
+      const start = rows.indexOf(lastClickedRow);
+      const end = rows.indexOf(row);
+
+      const from = Math.min(start, end);
+      const to = Math.max(start, end);
+
+      const selectState = checkbox.checked = true;
+
+      rows.slice(from, to + 1).forEach(r => {
+        const cb = r.querySelector(".rm");
+        cb.checked = selectState;
+      });
+    } else {
+      checkbox.checked = !checkbox.checked;
+    }
+
+    lastClickedRow = row;
+    updateSubmitButton();
+  });
+  // Select all button
+  const selectAllButton = databaseModalDiv.querySelector("#selectAllFiles");
+  function updateButtonText() {
+    const checkboxes = [...databaseModalDiv.querySelectorAll(".rm")]
+      .filter(cb => !cb.closest("tr").hidden);
+
+    const allSelected = checkboxes.length > 0 && checkboxes.every(cb => cb.checked);
+
+    selectAllButton.textContent =
+      `${allSelected ? i18["Deselect All"] : i18["Select All"]} (${checkboxes.length})`;
+  }
+  updateButtonText();
+
+  databaseModalDiv.addEventListener("change", event => {
+    if (event.target.classList.contains("rm")) {
+      updateSubmitButton();
+    }
+  });
+
+  selectAllButton.onclick = () => {
+    const checkboxes = [...databaseModalDiv.querySelectorAll(".rm")]
+      .filter(cb => !cb.closest("tr").hidden);
+    const allSelected = checkboxes.every(cb => cb.checked);
+    checkboxes.forEach(cb => {
+      cb.checked = !allSelected;
+    });
+    updateButtonText();
+    updateSubmitButton();
+  };
+  // Search / filter files
+  const search = document.getElementById("db-filter");
+  search.addEventListener("input", e => {
+    e.stopPropagation();
+    const filter = e.target.value.trim().toLowerCase();
+
+    table.querySelectorAll("tbody tr").forEach(row => {
+      row.hidden = filter && !row.textContent.toLowerCase().includes(filter);
+    });
+    updateButtonText();
+  });
+  // Submit button
+  const deleteButton = databaseModalDiv.querySelector("#deleteSelectedFiles");
+  deleteButton.onclick = () => {
+    const selectedFiles = [...databaseModalDiv.querySelectorAll(".rm:checked")];
+    if (selectedFiles.length > 0) {
+      const fileIDs = selectedFiles.map(cb => parseInt(cb.dataset.fileId));
+      worker.postMessage({ action: "delete-files", fileIDs });
+    }
+  };
+
+  function updateSubmitButton() {
+    const selected = databaseModalDiv.querySelectorAll(".rm:checked").length;
+    deleteButton.disabled = selected === 0;
+    deleteButton.textContent = i18["Delete Entries"];
+    selected && (deleteButton.textContent += ` (${selected})`);
+  }
+  const databaseModel = new bootstrap.Modal(databaseModalDiv);
+  updateButtonText();
+  updateSubmitButton();
+  databaseModel.show();
+}
+
+
 async function setCustomLocation(manage = false) {
   const savedLocationSelect = await generateLocationList("savedLocations", !manage);
   const latEl = document.getElementById("customLat");
@@ -2113,7 +2281,7 @@ window.onload = async () => {
   updateListOptions(selectedModel);
   // debug && document.getElementById('dataset').classList.remove('d-none')
   isMember && updateModelOptions();
-
+  
   worker.postMessage({
     action: "update-state",
     model: selectedModel,
@@ -2385,6 +2553,10 @@ const setUpWorkerMessaging = () => {
         case "clear-loading": {
           loadingFiles({hide:true})
           DOM.loadingScreen.classList.add('d-none')
+          break;
+        }
+        case "database-files": {
+          onDatabaseFiles(args.files);
           break;
         }
         case "footer-progress": {
@@ -5567,6 +5739,14 @@ async function handleUIClicks(e) {
     }
     case "manage-locations": {
       setCustomLocation(true)
+      break;
+    }
+    case "manage-locations": {
+      setCustomLocation(true)
+      break;
+    }
+    case "manage-files": {
+      worker.postMessage({ action: "manage-files" });
       break;
     }
     case "compress-and-organise": {

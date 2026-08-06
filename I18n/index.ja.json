@@ -65,6 +65,7 @@
     "save2db": ["アーカイブに保存","Ctrl+S"],
 "charts": ["チャートを見る"],
     "manage-locations": ["位置を管理"],
+    "manage-files": ["ファイルを管理"],
 "explore": ["アーカイブを探索"],
 "chart-datefilter": ["日付フィルターを適用"],
 "explore-datefilter": ["日付フィルターを適用"],
@@ -211,5 +212,6 @@
   "オーディオライブラリ",
   "スペクトログラム設定",
   "高度な設定"
-]
+],
+    "databaseModalLabel": ["データベースファイル管理"]
 }

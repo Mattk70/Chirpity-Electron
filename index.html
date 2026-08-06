@@ -631,6 +631,27 @@
             </div>
         </div>
     </div>
+    <!-- Database management modal -->
+    <div class="modal fade" id="databaseModal" tabindex="-1" aria-labelledby="databaseModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="databaseModalLabel">Database File Management</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body pt-0" style="max-height: 90vh; overflow-y: auto; font-size: small;">
+                    <!-- Database management content goes here -->
+                     dummy text
+                </div>
+                <div class="modal-footer justify-content-evenly flex-nowrap">
+                    <input type="search" class="form-control w-50" placeholder="Filter by filename, time or location..." id="db-filter" spellcheck="false" autocomplete="off">
+                    <button type="button" class="btn btn-primary float-start" id="selectAllFiles">Select All</button>
+                    <button type="submit" class="btn btn-danger" id="deleteSelectedFiles" disabled>Delete Entries</button>
+                </div>
+                
+            </div>
+        </div>
+    </div>
     <!-- context menu-->
     <div class="dropdown-menu dropdown-menu-sm" id="context-menu"> </div>
             <!-- End context menu -->
@@ -1737,6 +1758,9 @@
                             <li class="dropdown-item disabled" id="purge-file">
                                 <span class="material-symbols-outlined">unarchive</span> Remove Current File From
                                 Archive
+                            </li>
+                            <li class="dropdown-item" id="manage-files">
+                                <span class="material-symbols-outlined">drive_file_move</span> Manage files
                             </li>
                             <!-- <li class="dropdown-item d-none" id="dataset">
                                 <span class="material-symbols-outlined">dataset</span> Create Dataset

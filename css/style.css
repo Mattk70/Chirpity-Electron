@@ -288,7 +288,7 @@ ul {
   /*cursor: default; */
 }
 
-#summary td.cname, #summary td.cname *  {
+#summary td.cname, #summary td.cname, #databaseModal tbody *  {
   user-select: text;
 }
 

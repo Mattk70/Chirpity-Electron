@@ -67,6 +67,7 @@
   ],
   "charts": ["查看图表"],
   "manage-locations": ["管理位置"],
+  "manage-files": ["管理文件"],
   "explore": ["浏览档案"],
   "chart-datefilter": ["应用日期过滤器"],
   "explore-datefilter": ["应用日期过滤器"],
@@ -214,5 +215,6 @@
     "音频库",
     "频谱图偏好设置",
     "高级"
-  ]  
+  ],
+    "databaseModalLabel": ["数据库文件管理"]
 }

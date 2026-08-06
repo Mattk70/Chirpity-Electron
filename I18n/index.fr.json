@@ -67,6 +67,7 @@
     ],
     "charts": ["Voir les graphiques"],
     "manage-locations": ["Gérer les emplacements"],
+    "manage-files": ["Gérer les fichiers"],
     "explore": ["Explorer l'archive"],
     "chart-datefilter": ["Appliquer un filtre de date"],
     "explore-datefilter": ["Appliquer un filtre de date"],
@@ -214,5 +215,6 @@
       "Bibliothèque audio",
       "Préférences spectrogramme",
       "Avancé"
-    ]   
+    ],
+    "databaseModalLabel": ["Gestion des fichiers de base de données"]
 }

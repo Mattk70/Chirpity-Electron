@@ -63,8 +63,8 @@ const Toasts = { // UI.js
         durationMismatch: '<span class="text-danger">No changes made</span>. The selected file has a different duration to the original file.',
         duplicateFIle: '<span class="text-danger">No changes made</span>. The selected file already exists in the Archive.',
         fileUpdateError: '<span class="text-danger">An error occurred while updating the file: ${message}</span>',
-        goodFilePurge: '${file} and its associated records were deleted successfully',
-        failedFilePurge: '${file} was not found in in the Archive',
+        goodFilePurge: '${file} and the associated records were deleted successfully',
+        failedFilePurge: '${file} was not found in the Archive',
         fileToConvertNotFound: 'Cannot find ${file}, skipping conversion.',
         mkDirFailed: 'Failed to create directory: ${path}<br>Error: ${error}',
         conversionComplete: 'Conversion complete, ${successTotal} successful, ${failedTotal} failed.',
@@ -358,7 +358,7 @@ const Toasts = { // UI.js
         durationMismatch: '<span class="text-danger">Aucun changement effectué</span>. Le fichier sélectionné a une durée différente de celle du fichier original.',
         duplicateFIle: '<span class="text-danger">Aucun changement effectué</span>. Le fichier sélectionné existe déjà dans l\'Archive.',
         fileUpdateError: '<span class="text-danger">Une erreur est survenue lors de la mise à jour du fichier : ${message}</span>',
-        goodFilePurge: '${file} et ses enregistrements associés ont été supprimés avec succès',
+        goodFilePurge: '${file} et les enregistrements associés ont été supprimés avec succès',
         failedFilePurge: "${file} n'a pas été trouvé dans l'Archive",
         fileToConvertNotFound: "Impossible de trouver ${file}, conversion ignorée.",
         mkDirFailed: "Échec de la création du répertoire : ${path}<br>Erreur : ${error}",
@@ -582,7 +582,7 @@ const Toasts = { // UI.js
         durationMismatch: '<span class="text-danger">Nenhuma alteração feita</span>. O arquivo selecionado tem uma duração diferente do arquivo original.',
         duplicateFIle: '<span class="text-danger">Nenhuma alteração feita</span>. O arquivo selecionado já existe no Arquivo.',
         fileUpdateError: '<span class="text-danger">Ocorreu um erro ao atualizar o arquivo: ${message}</span>',
-        goodFilePurge: "${file} e seus registros associados foram excluídos com sucesso",
+        goodFilePurge: "${file} e los registros associados foram excluídos com sucesso",
         failedFilePurge: "${file} não foi encontrado no Arquivo",
         fileToConvertNotFound: "Não foi possível encontrar ${file}, conversão ignorada.",
         mkDirFailed: "Falha ao criar o diretório: ${path}<br>Erro: ${error}",
@@ -3236,6 +3236,174 @@ zh: {
     },
 };
 
+const Database = {
+    en: {
+        "yes": "Yes",
+        "no": "No",
+        "default": "Default",
+        "database-modal-label": "Database File Management",
+        "Filename": "Filename",
+        "In Audio Library": "In Audio Library",
+        "File Start": "File Start",
+        "Location": "Location",
+        "Delete Record": "Delete Record",
+        "Select All": "Select All",
+        "Deselect All": "Deselect All",
+        "Delete Entries": "Delete Entries",
+        "placeholder": "Filter by filename, date or location"
+    },
+    da: {
+        "yes": "Ja",
+        "no": "Nej",
+        "default": "Standard",
+        "database-modal-label": "Database Filhåndtering",
+        "Filename": "Filnavn",
+        "In Audio Library": "I Lydbiblioteket",
+        "File Start": "Filstart",
+        "Location": "Placering",
+        "Delete Record": "Slet Filpost",
+        "Select All": "Vælg Alle",
+        "Deselect All": "Fravælg Alle",
+        "Delete Entries": "Slet Poster",
+        "placeholder": "Filtrer efter filnavn, dato eller placering"
+    },
+    de: {
+        "yes": "Ja",
+        "no": "Nein",
+        "default": "Standard",
+        "database-modal-label": "Datenbankverwaltung",
+        "Filename": "Dateiname",
+        "In Audio Library": "In der Audiobibliothek",
+        "File Start": "Dateianfang",
+        "Location": "Ort",
+        "Delete Record": "Eintrag löschen",
+        "Select All": "Alle auswählen",
+        "Deselect All": "Alle abwählen",
+        "Delete Entries": "Einträge löschen",
+        "placeholder": "Nach Dateiname, Datum oder Ort filtern"
+    },
+    es: {
+        "yes": "Sí",
+        "no": "No",
+        "default": "Predeterminado",
+        "database-modal-label": "Gestión de Archivos de Base de Datos",
+        "Filename": "Nombre del Archivo",
+        "In Audio Library": "En la Biblioteca de Audio",
+        "File Start": "Inicio del Archivo",
+        "Location": "Ubicación",
+        "Delete Record": "Eliminar Registro",
+        "Select All": "Seleccionar Todos",
+        "Deselect All": "Deseleccionar Todos",
+        "Delete Entries": "Eliminar Entradas",
+        "placeholder": "Filtrar por nombre de archivo, fecha o ubicación"
+    },
+    fr: {
+        "yes": "Oui",
+        "no": "Non",
+        "default": "Par défaut",
+        "database-modal-label": "Gestion des Fichiers de Base de Données",
+        "Filename": "Nom du Fichier",
+        "In Audio Library": "Dans la Bibliothèque Audio",
+        "File Start": "Début du Fichier",
+        "Location": "Emplacement",
+        "Delete Record": "Supprimer l'Enregistrement",
+        "Select All": "Tout Sélectionner",
+        "Deselect All": "Tout Désélectionner",
+        "Delete Entries": "Supprimer les Entrées",
+        "placeholder": "Filtrer par nom de fichier, date ou emplacement"
+    },
+    ja: {
+        "yes": "はい",
+        "no": "いいえ",
+        "default": "デフォルト",
+        "database-modal-label": "データベースファイル管理",
+        "Filename": "ファイル名",
+        "In Audio Library": "オーディオライブラリ内",
+        "File Start": "ファイル開始",
+        "Location": "場所",
+        "Delete Record": "レコードを削除",
+        "Select All": "すべて選択",
+        "Deselect All": "すべて解除",
+        "Delete Entries": "エントリを削除",
+        "placeholder": "ファイル名、日付、または場所でフィルタリング"
+    },
+    nl: {
+        "yes": "Ja",
+        "no": "Nee",
+        "default": "Standaard",
+        "database-modal-label": "Database Bestandsbeheer",
+        "Filename": "Bestandsnaam",
+        "In Audio Library": "In de Audiobibliotheek",
+        "File Start": "Bestand Start",
+        "Location": "Locatie",
+        "Delete Record": "Verwijder Record",
+        "Select All": "Selecteer Alles",
+        "Deselect All": "Deselecteer Alles",
+        "Delete Entries": "Verwijder Items",
+        "placeholder": "Filter op bestandsnaam, datum of locatie"
+    },
+    pt: {
+        "yes": "Sim",
+        "no": "Não",
+        "default": "Padrão",
+        "database-modal-label": "Gerenciamento de Arquivos de Banco de Dados",
+        "Filename": "Nome do Arquivo",
+        "In Audio Library": "Na Biblioteca de Áudio",
+        "File Start": "Início do Arquivo",
+        "Location": "Localização",
+        "Delete Record": "Excluir Registro",
+        "Select All": "Selecionar Todos",
+        "Deselect All": "Deseleccionar Todos",
+        "Delete Entries": "Excluir Entradas",
+        "placeholder": "Filtrar por nome de arquivo, data ou localização"
+    },
+    ru: {
+        "yes": "Да",
+        "no": "Нет",
+        "default": "По умолчанию",
+        "database-modal-label": "Управление файлами базы данных",
+        "Filename": "Имя файла",
+        "In Audio Library": "В аудиотеке",
+        "File Start": "Начало файла",
+        "Location": "Местоположение",
+        "Delete Record": "Удалить запись",
+        "Select All": "Выбрать все",
+        "Deselect All": "Снять выделение",
+        "Delete Entries": "Удалить записи",
+        "placeholder": "Фильтровать по имени файла, дате или местоположению"
+    },
+    sv: {
+        "yes": "Ja",
+        "no": "Nej",
+        "default": "Standard",
+        "database-modal-label": "Databasfilshantering",
+        "Filename": "Filnamn",
+        "In Audio Library": "I ljudbiblioteket",
+        "File Start": "Filstart",
+        "Location": "Plats",
+        "Delete Record": "Ta bort post",
+        "Select All": "Välj alla",
+        "Deselect All": "Avmarkera alla",
+        "Delete Entries": "Ta bort poster",
+        "placeholder": "Filtrera efter filnamn, datum eller plats"
+    },
+    zh: {
+        "yes": "是",
+        "no": "否",
+        "default": "默认",
+        "database-modal-label": "数据库文件管理",
+        "Filename": "文件名",
+        "In Audio Library": "在音频库中",
+        "File Start": "文件开始",
+        "Location": "位置",
+        "Delete Record": "删除记录",
+        "Select All": "选择所有",
+        "Deselect All": "取消选择所有",
+        "Delete Entries": "删除条目",
+        "placeholder": "按文件名、日期或位置过滤"
+    }
+};
+
 const ManageModels = {
     en: {
         "import-model-label": "Import Model",
@@ -3992,6 +4160,9 @@ async function localiseUI(locale) {
                 else label.textContent = settings[id]
             }
         })
+        // Database modal title
+        const dbModalTitle = document.getElementById('databaseModalLabel');
+        dbModalTitle.textContent = localisationData['databaseModalLabel'][0];
         // Padlock items
         const padlocks = document.querySelectorAll('#unsaved-icon, .padlock')
         padlocks.forEach(lock => {
@@ -4056,6 +4227,7 @@ async function localiseUI(locale) {
         // placeholholders
         document.getElementById("custom-list-location").setAttribute('placeholder', options['customListPH'])
         document.getElementById("library-location").setAttribute('placeholder', options['libraryLocationPH'])
+        document.getElementById("db-filter").setAttribute('placeholder', get(Database)['placeholder'])
         // //Explore location header
         document.querySelector("label[for='explore-locations']").textContent = Headings[locale].location;
         document.getElementById('exploreRange').innerHTML = `<span class="material-symbols-outlined align-bottom">date_range</span><span>${localisationData['explore-datefilter']}</span> <span class="material-symbols-outlined float-end">expand_more</span>`;
@@ -4070,5 +4242,5 @@ async function localiseUI(locale) {
     }
 }
 
-export {All, SpeciesList,Headings, Context, Location, Form, Help, Toasts, Titles, Training, ManageModels,
+export {All, SpeciesList,Headings, Context, Location, Database, Form, Help, Toasts, Titles, Training, ManageModels,
      LIST_MAP, Lists, IUCNLabel, ChartUI, Locate,Select, UpdateMessage, Trial, TrialExpired, localiseUI, get}

@@ -67,6 +67,7 @@
     ],
     "charts": ["Diagramme anzeigen"],
     "manage-locations": ["Standorte verwalten"],
+    "manage-files": ["Dateien verwalten"],
     "explore": ["Archiv durchsuchen"],
     "chart-datefilter": ["Ein Datumsfilter anwenden"],
     "explore-datefilter": ["Ein Datumsfilter anwenden"],
@@ -214,5 +215,6 @@
       "Audiobibliothek",
       "Spektrogrammeinstellungen",
       "Erweitert"
-    ]    
+    ],
+    "databaseModalLabel": ["Database Datei Verwaltung"]
 }

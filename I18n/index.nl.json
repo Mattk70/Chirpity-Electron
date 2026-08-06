@@ -67,6 +67,7 @@
     ],
     "charts": ["Bekijk grafieken"],
     "manage-locations": ["Locaties beheren"],
+    "manage-files": ["Bestanden beheren"],
     "explore": ["Verken Archief"],
     "chart-datefilter": ["Een datumfilter toepassen"],
     "explore-datefilter": ["Een datumfilter toepassen"],
@@ -214,5 +215,6 @@
         "Audio bibliotheek",
         "Spectrogramvoorkeuren",
         "Geavanceerd"
-    ]   
+    ],
+    "databaseModalLabel": ["Databasebestanden Beheren"]
 }

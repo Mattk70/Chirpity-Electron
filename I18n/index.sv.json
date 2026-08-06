@@ -67,6 +67,7 @@
     ],
     "charts": ["Visa diagram"],
     "manage-locations": ["Hantera platser"],
+    "manage-files": ["Hantera filer"],
     "explore": ["Utforska arkiv"],
     "chart-datefilter": ["Tillämpa ett datumfilter"],
     "explore-datefilter": ["Tillämpa ett datumfilter"],
@@ -214,5 +215,6 @@
         "Ljudbibliotek",
         "Spektrograminställningar",
         "Avancerat"
-    ]  
+    ],
+    "databaseModalLabel": ["Databasfilhantering"]
 }

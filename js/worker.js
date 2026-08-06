@@ -600,9 +600,45 @@ async function handleMessage(e) {
       getLocations(args);
       break;
     }
+    case "manage-files": {
+      const files = await diskDB.allAsync(`
+        SELECT 
+            f.id,
+            f.name,
+            CASE WHEN f.archivename IS NOT NULL THEN 1 ELSE 0 END AS archived,
+            f.filestart,
+            l.place as location
+        FROM files f
+        LEFT JOIN locations l ON f.locationID = l.id;`);
+      UI.postMessage({ event: "database-files", files });
+      break;
+    }
     case "get-tags": {
       const result = await diskDB.allAsync("SELECT id, name FROM tags");
       UI.postMessage({ event: "tags", tags: result, init: true });
+      break;
+    }
+    case "delete-files": {
+      try {
+        const fileIDs = args.fileIDs;
+        const numberOfFiles = fileIDs.length;
+        const message = numberOfFiles === 1 ? '1 file ' : `${numberOfFiles} files `;
+        const result = await diskDB.runAsync(
+          "DELETE FROM files WHERE id IN (" + fileIDs.join(",") + ")"
+        );
+        if (result?.changes) {
+          // remove the saved flag
+          //await onChangeMode('analyse');
+          getDetectedSpecies();
+          generateAlert({
+            message: "goodFilePurge",
+            variables: { file: message },
+          });
+        }
+      } catch (error) {
+        generateAlert({ message: `File deletion failed: ${error.message}` });
+        console.error(error);
+      }
       break;
     }
     case "delete-tag": {
