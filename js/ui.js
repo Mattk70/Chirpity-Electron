@@ -628,6 +628,10 @@ function clearActive() {
 
 
 
+/**
+ * Opens an audio file or folder selection dialog and processes the selected paths.
+ * @param {string} fileOrFolder - Specifies whether the dialog selects files or a folder.
+ */
 async function showOpenDialog(fileOrFolder) {
   const defaultPath = localStorage.getItem("lastOpenFolder") || "";
   const files = await window.electron.openDialog("showOpenDialog", {
@@ -1107,6 +1111,12 @@ const setDefaultLocation = () => {
 };
 
 
+/**
+ * Creates a table body containing database file rows and deletion checkboxes.
+ * @param {Array<Object>} fileList - The files to display.
+ * @param {Object} i18n - Localized labels used for boolean and default-location values.
+ * @return {HTMLTableSectionElement} The populated table body.
+ */
 function generateFileRows(fileList, i18n) {
   const tbody = document.createElement("tbody");
 
@@ -1140,6 +1150,10 @@ function generateFileRows(fileList, i18n) {
   return tbody;
 }
 
+/**
+ * Displays database files in a searchable modal with row selection and deletion controls.
+ * @param {Array} fileList - The database files to display.
+ */
 function onDatabaseFiles(fileList) {
     const i18 = i18n.get(i18n.Database);
   const databaseModalDiv = document.getElementById("databaseModal");
@@ -1274,6 +1288,10 @@ function onDatabaseFiles(fileList) {
 }
 
 
+/**
+ * Opens the location editor for the current file or saved locations.
+ * @param {boolean} [manage=false] - Whether to enable saved-location management controls.
+ */
 async function setCustomLocation(manage = false) {
   const savedLocationSelect = await generateLocationList("savedLocations", !manage);
   const latEl = document.getElementById("customLat");
