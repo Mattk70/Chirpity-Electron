@@ -4077,12 +4077,12 @@ const setLocale = (locale) => LOCALE = locale;
 const get = (context) => context[LOCALE] || context["en"];
 
 /**
- * Dynamically loads and applies localized UI text for the specified locale.
+ * Loads localization data and applies translated text to the user interface.
  *
- * Fetches a localization JSON file for the given locale, falling back to English if unavailable, and updates UI elements—including labels, buttons, tooltips, popovers, form controls, and carousel content—with the corresponding localized strings. If no localization file is found, the UI remains unchanged.
+ * Locale suffixes after an underscore are ignored. If loading the requested locale fails, English is used as a fallback; if the localization file is unavailable, the interface remains unchanged.
  *
- * @param {string} locale - The locale code (e.g., "en", "de_CA"). Any suffix after an underscore is ignored.
- * @returns {Promise<Object|undefined>} Resolves to the localization data object if successful, or undefined if no localization file is found.
+ * @param {string} locale - Locale code, such as `"en"` or `"de_CA"`.
+ * @return {Promise<Object|undefined>} The loaded localization data, or `undefined` if no data is available.
  */
 async function localiseUI(locale) {
     locale = locale.replace(/_.*$/, '');
