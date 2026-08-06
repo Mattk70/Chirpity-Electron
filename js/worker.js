@@ -753,6 +753,7 @@ async function handleMessage(e) {
       STATE.included = {}
       STATE.globalOffset = 0;
       STATE.filteredOffset = {};
+      STATE.detect.classes = args.classes || STATE.detect.classes;
       await INITIALISED;
       await setLabelState({regenerate:true});
       LIST_WORKER && (await getIncludedIDs());
@@ -1160,7 +1161,7 @@ function checkNewModel(modelID){
 /**
  * Spawns a list worker and returns a function to interact with it.
  *
- * This asynchronous function creates a new Web Worker from "./js/models/listWorker.js" and waits until the worker signals it is ready
+ * This asynchronous function creates a new Web Worker from "./js/models/listWorker3.js" and waits until the worker signals it is ready
  * by sending a "list-model-ready" message. During initialization, if a "tfjs-node" message is received, it updates internal state and notifies the UI
  * about backend availability. Once the worker is ready, the function returns another function that sends a message to the worker under a mutex lock
  * and returns a Promise that resolves with the worker's response containing a result and supplemental messages.
@@ -1173,7 +1174,7 @@ function checkNewModel(modelID){
  */
 async function spawnListWorker() {
   const worker_1 = await new Promise((resolve, reject) => {
-    const worker = new Worker("./js/models/listWorker.js", { type: "module" });
+    const worker = new Worker("./js/models/listWorker3.js", { type: "module" });
     worker.onmessage = function (event) {
       // Resolve the promise once the worker sends a message indicating it's ready
       const message = event.data.message;
@@ -5741,7 +5742,7 @@ async function _getNearbyLocations(lat, lon) {
 async function getIncludedIDs(file) {
   if (STATE.list === "everything") return [];
   let latitude, longitude, week;
-  const {list, local, lat, lon, useWeek, included, model, modelID, speciesMap} = STATE;
+  const {list, local, lat, lon, useWeek, included, model, modelID, speciesMap, detect} = STATE;
   if (
     list === "location" ||
     (list === "nocturnal" && local)
@@ -5851,6 +5852,7 @@ async function setIncludedIDs(lat, lon, week) {
       useWeek,
       localBirdsOnly,
       threshold,
+      classes: STATE.detect.classes,
     });
     // // Add the *label* id of "Unknown Sp." to all lists
     STATE.list !== "everything" 

@@ -205,7 +205,7 @@
       "LAR": "Dernier enregistrement de l’automne",
       "MC": "Appels les plus nombreux en 24 heures"
    },
-    "headings": ["Paramètres","Détections", "Assignations de clavier",
+    "headings": ["Paramètres","Détections", "Classes supplémentaires", "Assignations de clavier",
       "Emplacement par défaut",
       "Système",
       "Préférences audio",

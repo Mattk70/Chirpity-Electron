@@ -206,7 +206,7 @@
       "MC": "Mayor número de cantos en 24 horas"
     },
 
-    "headings": ["Configuración","Detecciones", "Asignaciones de teclado",
+    "headings": ["Configuración","Detecciones", "Clases Adicionales", "Asignaciones de teclado",
       "Ubicación predeterminada",
       "Sistema",
       "Preferencias de audio",

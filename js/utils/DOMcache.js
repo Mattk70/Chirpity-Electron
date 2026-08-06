@@ -27,6 +27,7 @@ const DOM = {
   get batchSizeSlider() { return this._batchSizeSlider ??= document.getElementById("batch-size") },
   get batchSizeValue() { return this._batchSizeValue ??= document.getElementById("batch-size-value") },
   get chartsLink() { return this._chartsLink ??= document.getElementById("charts") },
+  get classes() { return this._classes ??= document.getElementById("classes") },
   get colourmap() { return this._colourmap ??= document.getElementById("colourmap") },
   get contentWrapper() { return this._contentWrapper ??= document.getElementById("contentWrapper") },
   get controlsWrapper() { return this._controlsWrapper ??= document.getElementById("controlsWrapper") },

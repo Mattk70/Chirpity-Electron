@@ -1972,6 +1972,7 @@ const defaultConfig = {
     iucnScope: "Global",
     topRankin: 1,
     overlap: 0,
+    classes: ['Aves'],
   },
   filters: {
     active: false,
@@ -2111,6 +2112,10 @@ window.onload = async () => {
     }
   }
   const selectedModel = config.selectedModel;
+
+  // Set Local classes to include for BirdNET3
+  detect.classes.forEach(cls => document.getElementById(cls).checked = true );
+
   updateListOptions(selectedModel);
   // debug && document.getElementById('dataset').classList.remove('d-none')
   isMember && updateModelOptions();
@@ -4617,6 +4622,9 @@ const populateSpeciesModal = async ({included, excluded, place}) => {
     });
   }
   const includedList = generateBirdIDList(included);
+  const classes = model === "BirdNET3" ? config.detect.classes.join(', ') : "";
+  const classesText = model === "BirdNET3" && ["nocturnal", "location", "birds"].includes(config.list) 
+    ? utils.interpolate(i18.classesText, { classes: classes }) : "";
   const depending =
     config.useWeek &&
     config.list === "location" &&
@@ -4629,6 +4637,7 @@ const populateSpeciesModal = async ({included, excluded, place}) => {
     listInUse: listLabel,
     location_filter_text: location_filter_text,
     localBirdsOnly: localBirdsOnly,
+    classesText,
     upTo: i18.upTo,
     count: included.length,
     depending: depending,
@@ -4837,6 +4846,7 @@ const modelSettingsDisplay = () => {
   const isGPU = config.models[config.selectedModel].backend === 'webgpu';
   DOM.threadSlider.disabled = isOnnx && isGPU;
   DOM.windowSize.classList.toggle('d-none', config.selectedModel !== 'birdnet3');
+  DOM.classes.classList.toggle('d-none', config.selectedModel !== 'birdnet3');
 };
 
 const contextAwareIconDisplay = () => {
@@ -6350,6 +6360,7 @@ async function updateList() {
     worker.postMessage({
       action: "update-list",
       list: config.list,
+      classes: config.detect.classes,
       refreshResults: STATE.analysisDone && STATE.mode !== 'chart',
     });
   }
@@ -6629,6 +6640,22 @@ document.addEventListener("change", async function (e) {
         case "list-to-use": {
           config.list = element.value;
           config.models[config.selectedModel].list = element.value;
+          updateList();
+          break;
+        }
+        case "Aves":
+        case "Amphibia":
+        case "Insecta":
+        case "Mammalia":
+        case "Reptilia": {
+          const includedClasses = [];
+          ["Aves", "Amphibia", "Insecta", "Mammalia", "Reptilia"].forEach(cls => {
+            const checkbox = document.getElementById(cls);
+            if (checkbox.checked) {
+              includedClasses.push(cls);
+            }
+          });
+          config.detect.classes = includedClasses;
           updateList();
           break;
         }

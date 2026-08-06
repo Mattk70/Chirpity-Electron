@@ -205,7 +205,7 @@
     "LAR": "Registo mais tardio do outono",
     "MC": "Maior número de cantos em 24 horas"
   },
-  "headings": ["Configurações","Detecções", "Atribuições de teclado",
+  "headings": ["Configurações","Detecções", "Classes Adicionais", "Atribuições de teclado",
     "Localização padrão",
     "Sistema",
     "Preferências de áudio",

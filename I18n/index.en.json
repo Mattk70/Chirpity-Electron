@@ -208,7 +208,11 @@
         "MC": "Most Calls in 24 hours"
     },
 
-    "headings": ["Settings","Detections", "Keyboard Assignments",
+    "headings": [
+      "Settings",
+      "Detections", 
+      "Additional Classes", 
+      "Keyboard Assignments",
       "Default Location",
       "System",
       "Audio Preferences",

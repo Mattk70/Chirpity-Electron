@@ -71,14 +71,21 @@ function syncConfig(config, defaultConfig) {
     if (!(key in config)) {
       config[key] = defaultConfig[key];
     } else if (
+      Array.isArray(config[key]) &&
+      Array.isArray(defaultConfig[key])
+    ) {
+      // Preserve custom array values
+      config[key] = [...new Set([...defaultConfig[key], ...config[key]])];
+    } else if (
       typeof config[key] === "object" &&
-      typeof defaultConfig[key] === "object" && 
-      // Allow unknown models keys
+      typeof defaultConfig[key] === "object" &&
+      config[key] !== null &&
+      defaultConfig[key] !== null &&
       key !== 'models'
     ) {
       // Recursively sync nested objects (but allow key assignment to be empty)
       key === "keyAssignment" || syncConfig(config[key], defaultConfig[key]);
-    } else if (key === 'models'){
+    } else if (key === 'models') {
       config[key] = normaliseModels(config[key], defaultConfig[key]);
     }
   });

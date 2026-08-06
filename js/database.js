@@ -421,8 +421,8 @@ const addNewModel = async ({model, db = diskDB, dbMutex, labelsLocation}) => {
               .split(/\r?\n/)
               .slice(1) // skip header
               .map(line => {
-                const [, , sci_name, com_name, ,] = line.split(";");
-                return `${sci_name}_${com_name}`;
+                const [, , sci_name, com_name, _class_ ,] = line.split(",");
+                return `${sci_name}_${com_name}_${_class_}`;
               });
     } else if (['chirpity', 'nocmig'].includes(model)){
       labels = JSON.parse(
@@ -436,10 +436,11 @@ const addNewModel = async ({model, db = diskDB, dbMutex, labelsLocation}) => {
       labels = fileContents.split(/\r?\n/).map(line => line.trim()).filter(line => line.length);
     }
     const perch = model === 'perch v2';
+    const birdNET3 = model === 'birdnet3';
     const splitChar = perch ? '~' : '_'; // Perch uses ~, others use _
-    const expectedParts = perch ? 3 : 2; // Perch labels include Taxon
+    const expectedParts = perch || birdNET3 ? 3 : 2; // Perch labels include Taxon
     // Add Unknown Sp.
-    if (perch) labels.push(`Unknown Sp.${splitChar}Unknown Sp.${splitChar}None`);
+    if (perch || birdNET3) labels.push(`Unknown Sp.${splitChar}Unknown Sp.${splitChar}None`);
     else labels.push(`Unknown Sp.${splitChar}Unknown Sp.`);
 
     // Insert labels in batches to avoid exceeding SQLite parameter limits

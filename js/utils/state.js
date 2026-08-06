@@ -50,7 +50,8 @@ export class WorkerState {
       topRankin: 1,
       overlap: 0,
       mergeOverlaps: false,
-      dropSingles: false
+      dropSingles: false,
+      classes: ['Aves'],
     }),
     (this.chart = {
       range: { start: undefined, end: undefined },
