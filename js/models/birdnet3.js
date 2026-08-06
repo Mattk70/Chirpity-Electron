@@ -24,6 +24,7 @@ async function loadModel(mpath, backend, batchSize) {
  const executionProviderConfig = gpu ? { webgpu: { validationMode: 'basic' } } : {};
   const sessionOptions = { 
     executionProviders: providers,
+    logSeverityLevel: DEBUG ? 0 : 4,
     enableGraphCapture: true, 
     ...threadOptions,
     executionProviderConfig,

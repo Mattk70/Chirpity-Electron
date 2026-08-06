@@ -3344,6 +3344,7 @@ const handleBackendChange = (backend) => {
   DOM.numberOfThreads.textContent = threads;
   DOM.batchSizeSlider.value = batchSize;
   DOM.batchSizeValue.textContent = batchSize;
+  updateThreadsSlider();
   updatePrefs("config.json", config);
   loadModel();
 };
@@ -4187,7 +4188,7 @@ async function renderResult({
     let bn3Badge = '';
     if (isBN3) {
       model = model.slice(0, -1);
-      bn3Badge = '<span class="position-absolute top-0 start-100 translate-middle badge rounded-pill text-dark fs-5">+</span>';
+      bn3Badge = '<span class="position-absolute top-0 start-100 translate-middle badge rounded-pill text-dark fs-5 p-0">+</span>';
     }
     const logo = isBatpack
       ? "batpack"
@@ -4787,6 +4788,12 @@ function filterResults({
     });
 }
 
+const updateThreadsSlider = () => {
+  const isOnnx = ['perch v2', 'birdnet3'].includes(config.selectedModel);
+  const isGPU = config.models[config.selectedModel].backend === 'webgpu';
+  DOM.threadSlider.disabled = isOnnx && isGPU;
+}
+
 const modelSettingsDisplay = () => {
   // Sets system options according to model or machine capabilities
   // cf. setListUIState
@@ -4842,9 +4849,7 @@ const modelSettingsDisplay = () => {
   // Hide train unless BirdNET (and a member)
   const blockTrain = config.selectedModel !== 'birdnet' || ! STATE.isMember;
   DOM.trainNav.classList.toggle('disabled', blockTrain);
-  const isOnnx = ['perch v2', 'birdnet3'].includes(config.selectedModel);
-  const isGPU = config.models[config.selectedModel].backend === 'webgpu';
-  DOM.threadSlider.disabled = isOnnx && isGPU;
+  updateThreadsSlider();
   DOM.windowSize.classList.toggle('d-none', config.selectedModel !== 'birdnet3');
   DOM.classes.classList.toggle('d-none', config.selectedModel !== 'birdnet3');
 };
