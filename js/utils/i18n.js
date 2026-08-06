@@ -582,9 +582,10 @@ const Toasts = { // UI.js
         durationMismatch: '<span class="text-danger">Nenhuma alteração feita</span>. O arquivo selecionado tem uma duração diferente do arquivo original.',
         duplicateFIle: '<span class="text-danger">Nenhuma alteração feita</span>. O arquivo selecionado já existe no Arquivo.',
         fileUpdateError: '<span class="text-danger">Ocorreu um erro ao atualizar o arquivo: ${message}</span>',
-        goodFilePurge: "${file} e los registros associados foram excluídos com sucesso",
+        goodFilePurge: "${file} e os registros associados foram excluídos com sucesso",
         failedFilePurge: "${file} não foi encontrado no Arquivo",
         fileToConvertNotFound: "Não foi possível encontrar ${file}, conversão ignorada.",
+
         mkDirFailed: "Falha ao criar o diretório: ${path}<br>Erro: ${error}",
         conversionComplete: "Conversão concluída, ${successTotal} bem-sucedida(s), ${failedTotal} falhada(s).",
         libraryUpToDate: "A biblioteca está atualizada. Nada a fazer",
@@ -3353,7 +3354,7 @@ const Database = {
         "Location": "Localização",
         "Delete Record": "Excluir Registro",
         "Select All": "Selecionar Todos",
-        "Deselect All": "Deseleccionar Todos",
+        "Deselect All": "Desmarcar Todos",
         "Delete Entries": "Excluir Entradas",
         "placeholder": "Filtrar por nome de arquivo, data ou localização"
     },
@@ -4160,9 +4161,7 @@ async function localiseUI(locale) {
                 else label.textContent = settings[id]
             }
         })
-        // Database modal title
-        const dbModalTitle = document.getElementById('databaseModalLabel');
-        dbModalTitle.textContent = localisationData['databaseModalLabel'][0];
+        // Database modal title is handled by the generic element-ID translation loop above
         // Padlock items
         const padlocks = document.querySelectorAll('#unsaved-icon, .padlock')
         padlocks.forEach(lock => {

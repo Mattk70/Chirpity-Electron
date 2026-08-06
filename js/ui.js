@@ -1109,7 +1109,10 @@ const setDefaultLocation = () => {
 
 function generateFileRows(fileList, i18n) {
   const tbody = document.createElement("tbody");
-
+  const dateFormat = new Intl.DateTimeFormat(undefined, {
+    dateStyle: "short",
+    timeStyle: "medium",
+  });
   for (const file of fileList) {
     const tr = document.createElement("tr");
     tr.className = "file-row";
@@ -1124,7 +1127,7 @@ function generateFileRows(fileList, i18n) {
 
     addCell(file.name);
     addCell(file.archived ? i18n["yes"] : i18n["no"]);
-    addCell(new Date(file.filestart).toLocaleString());
+    addCell(Number.isFinite(file.filestart) ? dateFormat.format(file.filestart) : "");
     addCell(file.location ?? i18n["default"]);
 
     const td = addCell("", "text-center");
@@ -1144,6 +1147,75 @@ function onDatabaseFiles(fileList) {
     const i18 = i18n.get(i18n.Database);
   const databaseModalDiv = document.getElementById("databaseModal");
   const contentDiv = databaseModalDiv.querySelector(".modal-body");
+  const selectAllButton = databaseModalDiv.querySelector("#selectAllFiles");
+  const deleteButton = databaseModalDiv.querySelector("#deleteSelectedFiles");
+  const search = document.getElementById("db-filter");
+
+  function getVisibleCheckboxes() {
+    return [...databaseModalDiv.querySelectorAll(".rm")]
+      .filter(cb => !cb.closest("tr").hidden);
+  }
+
+  function updateButtonText() {
+    const checkboxes = getVisibleCheckboxes();
+    const allSelected = checkboxes.length > 0 && checkboxes.every(cb => cb.checked);
+
+    selectAllButton.textContent =
+      `${allSelected ? i18["Deselect All"] : i18["Select All"]} (${checkboxes.length})`;
+  }
+
+  function updateSubmitButton() {
+    const selected = databaseModalDiv.querySelectorAll(".rm:checked").length;
+    deleteButton.disabled = selected === 0;
+    deleteButton.textContent = i18["Delete Entries"];
+    selected && (deleteButton.textContent += ` (${selected})`);
+  }
+
+  function applyFilter() {
+    const filter = search.value.trim().toLowerCase();
+    contentDiv.querySelectorAll("tbody tr").forEach(row => {
+      row.hidden = filter && !row.textContent.toLowerCase().includes(filter);
+    });
+  }
+
+  if (!databaseModalDiv.__dbUIInitialized) {
+    databaseModalDiv.addEventListener("change", event => {
+      if (event.target.classList.contains("rm")) {
+        updateSubmitButton();
+        updateButtonText();
+      }
+    });
+
+    selectAllButton.addEventListener("click", () => {
+      const checkboxes = getVisibleCheckboxes();
+      const allSelected = checkboxes.every(cb => cb.checked);
+      checkboxes.forEach(cb => {
+        cb.checked = !allSelected;
+      });
+      updateButtonText();
+      updateSubmitButton();
+    });
+
+    search.addEventListener("input", e => {
+      e.stopPropagation();
+      applyFilter();
+      updateButtonText();
+    });
+
+    deleteButton.addEventListener("click", () => {
+      const selectedFiles = [...databaseModalDiv.querySelectorAll(".rm:checked")];
+      if (selectedFiles.length > 0) {
+        const fileIDs = selectedFiles.map(cb => parseInt(cb.dataset.fileId, 10));
+        deleteButton.disabled = true;
+        worker.postMessage({ action: "delete-files", fileIDs });
+        databaseModalDiv.__dbModal.hide();
+      }
+    });
+
+    databaseModalDiv.__dbModal = new bootstrap.Modal(databaseModalDiv);
+    databaseModalDiv.__dbUIInitialized = true;
+  }
+
   // Clear previous contents
   contentDiv.replaceChildren();
   const table = document.createElement("table");
@@ -1191,18 +1263,14 @@ function onDatabaseFiles(fileList) {
     const rows = [...table.querySelectorAll("tbody .file-row")].filter(row => !row.hidden);
     const checkbox = row.querySelector(".rm");
 
-    if (event.shiftKey && lastClickedRow) {
-      const start = rows.indexOf(lastClickedRow);
+    const start = event.shiftKey && lastClickedRow ? rows.indexOf(lastClickedRow) : -1;
+    if (start !== -1) {
       const end = rows.indexOf(row);
-
       const from = Math.min(start, end);
       const to = Math.max(start, end);
-
-      const selectState = checkbox.checked = true;
-
+      const selectState = !checkbox.checked;
       rows.slice(from, to + 1).forEach(r => {
-        const cb = r.querySelector(".rm");
-        cb.checked = selectState;
+        r.querySelector(".rm").checked = selectState;
       });
     } else {
       checkbox.checked = !checkbox.checked;
@@ -1211,66 +1279,12 @@ function onDatabaseFiles(fileList) {
     lastClickedRow = row;
     updateSubmitButton();
   });
-  // Select all button
-  const selectAllButton = databaseModalDiv.querySelector("#selectAllFiles");
-  function updateButtonText() {
-    const checkboxes = [...databaseModalDiv.querySelectorAll(".rm")]
-      .filter(cb => !cb.closest("tr").hidden);
 
-    const allSelected = checkboxes.length > 0 && checkboxes.every(cb => cb.checked);
-
-    selectAllButton.textContent =
-      `${allSelected ? i18["Deselect All"] : i18["Select All"]} (${checkboxes.length})`;
-  }
-  updateButtonText();
-
-  databaseModalDiv.addEventListener("change", event => {
-    if (event.target.classList.contains("rm")) {
-      updateSubmitButton();
-    }
-  });
-
-  selectAllButton.onclick = () => {
-    const checkboxes = [...databaseModalDiv.querySelectorAll(".rm")]
-      .filter(cb => !cb.closest("tr").hidden);
-    const allSelected = checkboxes.every(cb => cb.checked);
-    checkboxes.forEach(cb => {
-      cb.checked = !allSelected;
-    });
-    updateButtonText();
-    updateSubmitButton();
-  };
-  // Search / filter files
-  const search = document.getElementById("db-filter");
-  search.addEventListener("input", e => {
-    e.stopPropagation();
-    const filter = e.target.value.trim().toLowerCase();
-
-    table.querySelectorAll("tbody tr").forEach(row => {
-      row.hidden = filter && !row.textContent.toLowerCase().includes(filter);
-    });
-    updateButtonText();
-  });
-  // Submit button
-  const deleteButton = databaseModalDiv.querySelector("#deleteSelectedFiles");
-  deleteButton.onclick = () => {
-    const selectedFiles = [...databaseModalDiv.querySelectorAll(".rm:checked")];
-    if (selectedFiles.length > 0) {
-      const fileIDs = selectedFiles.map(cb => parseInt(cb.dataset.fileId));
-      worker.postMessage({ action: "delete-files", fileIDs });
-    }
-  };
-
-  function updateSubmitButton() {
-    const selected = databaseModalDiv.querySelectorAll(".rm:checked").length;
-    deleteButton.disabled = selected === 0;
-    deleteButton.textContent = i18["Delete Entries"];
-    selected && (deleteButton.textContent += ` (${selected})`);
-  }
-  const databaseModel = new bootstrap.Modal(databaseModalDiv);
+  search.value = "";
+  applyFilter();
   updateButtonText();
   updateSubmitButton();
-  databaseModel.show();
+  databaseModalDiv.__dbModal.show();
 }
 
 
@@ -5735,10 +5749,6 @@ async function handleUIClicks(e) {
     }
     case "active-analysis": {
       showAnalyse();
-      break;
-    }
-    case "manage-locations": {
-      setCustomLocation(true)
       break;
     }
     case "manage-locations": {

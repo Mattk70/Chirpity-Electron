@@ -601,16 +601,20 @@ async function handleMessage(e) {
       break;
     }
     case "manage-files": {
-      const files = await diskDB.allAsync(`
-        SELECT 
-            f.id,
-            f.name,
-            CASE WHEN f.archivename IS NOT NULL THEN 1 ELSE 0 END AS archived,
-            f.filestart,
-            l.place as location
-        FROM files f
-        LEFT JOIN locations l ON f.locationID = l.id;`);
-      UI.postMessage({ event: "database-files", files });
+      try {
+        if (!diskDB) throw new Error("No archive database is loaded");
+        const files = await diskDB.allAsync(`
+          SELECT 
+              f.id, f.name,
+              CASE WHEN f.archiveName IS NOT NULL THEN 1 ELSE 0 END AS archived,
+              f.filestart, l.place as location
+          FROM files f
+          LEFT JOIN locations l ON f.locationID = l.id;`);
+        UI.postMessage({ event: "database-files", files });
+      } catch (error) {
+        generateAlert({ type: "error", message: `File list failed: ${error.message}` });
+        console.error(error);
+      }
       break;
     }
     case "get-tags": {
@@ -620,15 +624,18 @@ async function handleMessage(e) {
     }
     case "delete-files": {
       try {
-        const fileIDs = args.fileIDs;
+        const fileIDs = (args.fileIDs ?? [])
+          .map(id => Number(id))
+          .filter(id => Number.isInteger(id));
+        if (!fileIDs.length) break;
         const numberOfFiles = fileIDs.length;
         const message = numberOfFiles === 1 ? '1 file ' : `${numberOfFiles} files `;
+        const placeholders = fileIDs.map(() => "?").join(",");
         const result = await diskDB.runAsync(
-          "DELETE FROM files WHERE id IN (" + fileIDs.join(",") + ")"
+          "DELETE FROM files WHERE id IN (" + placeholders + ")",
+          ...fileIDs
         );
         if (result?.changes) {
-          // remove the saved flag
-          //await onChangeMode('analyse');
           getDetectedSpecies();
           generateAlert({
             message: "goodFilePurge",
