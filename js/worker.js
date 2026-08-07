@@ -43,7 +43,19 @@ let predictWorkers = [];
 let UI;
 let initialiseResolve;
 let initialiseReject;
-
+const i18nFiles = {
+  en: ["file", "files"],
+  fr: ["fichier", "fichiers"],
+  es: ["archivo", "archivos"],
+  de: ["Datei", "Dateien"],
+  pt: ["arquivo", "arquivos"],
+  nl: ["bestand", "bestanden"],
+  sv: ["fil", "filer"],
+  da: ["fil", "filer"],
+  ru: ["файл", "файлы"],
+  ja: ["ファイル", "ファイル"],
+  zh: ["文件", "文件"],
+};
 let INITIALISED = new Promise((resolve, reject) => {
   initialiseResolve = resolve;
   initialiseReject = reject;
@@ -628,14 +640,15 @@ async function handleMessage(e) {
           .map(id => Number(id))
           .filter(id => Number.isInteger(id));
         if (!fileIDs.length) break;
-        const numberOfFiles = fileIDs.length;
-        const message = numberOfFiles === 1 ? '1 file ' : `${numberOfFiles} files `;
         const placeholders = fileIDs.map(() => "?").join(",");
         const result = await diskDB.runAsync(
           "DELETE FROM files WHERE id IN (" + placeholders + ")",
           ...fileIDs
         );
         if (result?.changes) {
+          const numberOfFiles = result.changes;
+          const msg = i18nFiles[STATE.locale] || i18nFiles["en"];
+          const message = numberOfFiles === 1 ? `1 ${msg[0]}` : `${numberOfFiles} ${msg[1]}`;
           getDetectedSpecies();
           generateAlert({
             message: "goodFilePurge",
@@ -643,7 +656,50 @@ async function handleMessage(e) {
           });
         }
       } catch (error) {
-        generateAlert({ message: `File deletion failed: ${error.message}` });
+        generateAlert({ message: `File deletion failed: ${error.message}`, type: 'error' });
+        console.error(error);
+      }
+      break;
+    }
+    case "update-files": {
+      try {
+        const fileIDs = (args.fileIDs ?? [])
+          .map(id => Number(id))
+          .filter(id => Number.isInteger(id));
+        if (!fileIDs.length) break;
+        const oldValue = args.oldValue;
+        const newValue = args.newValue;
+        const placeholders = fileIDs.map(() => "?").join(",");
+        const result = await diskDB.runAsync(
+          `UPDATE files
+            SET name = REPLACE(name, ?, ?)
+            WHERE id IN (${placeholders})
+              AND name LIKE '%' || ? || '%'`,
+            oldValue,
+            newValue,
+            ...fileIDs,
+            oldValue
+        );
+        if (result?.changes) {
+          const numberOfFiles = result.changes;
+          const msg = i18nFiles[STATE.locale] || i18nFiles["en"];
+          const message = numberOfFiles === 1 ? `1 ${msg[0]}` : `${numberOfFiles} ${msg[1]}`;
+          generateAlert({
+            message: "goodFileUpdate",
+            variables: { file: message },
+          });
+        } else {
+          // oldValue not found in the selected files
+          const numberOfFiles = result.changes;
+          const msg = i18nFiles[STATE.locale] || i18nFiles["en"];
+          const message = numberOfFiles === 1 ? `1 ${msg[0]}` : `${numberOfFiles} ${msg[1]}`;
+          generateAlert({
+            message: "noFileUpdate",
+            variables: { file: message },
+          });
+        }
+      } catch (error) {
+        generateAlert({ message: `File update failed: ${error.message}`, type: 'error' });
         console.error(error);
       }
       break;

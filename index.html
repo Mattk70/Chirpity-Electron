@@ -644,9 +644,10 @@
                      dummy text
                 </div>
                 <div class="modal-footer justify-content-evenly flex-nowrap">
-                    <input type="search" class="form-control w-50" placeholder="Filter by filename, time or location..." id="db-filter" spellcheck="false" autocomplete="off">
+                    <input type="search" class="form-control" placeholder="Filter by filename, time or location..." id="db-filter" spellcheck="false" autocomplete="off">
+                    <input type="search" class="form-control" placeholder="Add replace text..." id="db-replace" spellcheck="false" autocomplete="off" disabled>
                     <button type="button" class="btn btn-primary float-start" id="selectAllFiles">Select All</button>
-                    <button type="submit" class="btn btn-danger" id="deleteSelectedFiles" disabled>Delete Entries</button>
+                    <button type="submit" class="btn btn-danger" id="processSelectedFiles" disabled>Delete Entries</button>
                 </div>
                 
             </div>

@@ -1126,6 +1126,7 @@ function generateFileRows(fileList, i18n) {
   for (const file of fileList) {
     const tr = document.createElement("tr");
     tr.className = "file-row";
+    tr.dataset.search = file.name.toLowerCase();
 
     const addCell = (text, className) => {
       const td = document.createElement("td");
@@ -1135,7 +1136,7 @@ function generateFileRows(fileList, i18n) {
       return td;
     };
 
-    addCell(file.name);
+    addCell(file.name, 'filename');
     addCell(file.archived ? i18n["yes"] : i18n["no"]);
     addCell(Number.isFinite(file.filestart) ? dateFormat.format(file.filestart) : "");
     addCell(file.location ?? i18n["default"]);
@@ -1158,12 +1159,13 @@ function generateFileRows(fileList, i18n) {
  * @param {Array} fileList - The database files to display.
  */
 function onDatabaseFiles(fileList) {
-    const i18 = i18n.get(i18n.Database);
+  const i18 = i18n.get(i18n.Database);
   const databaseModalDiv = document.getElementById("databaseModal");
   const contentDiv = databaseModalDiv.querySelector(".modal-body");
   const selectAllButton = databaseModalDiv.querySelector("#selectAllFiles");
-  const deleteButton = databaseModalDiv.querySelector("#deleteSelectedFiles");
+  const submitButton = databaseModalDiv.querySelector("#processSelectedFiles");
   const search = document.getElementById("db-filter");
+  const replace = document.getElementById("db-replace");
 
   function getVisibleCheckboxes() {
     return [...databaseModalDiv.querySelectorAll(".rm")]
@@ -1180,16 +1182,43 @@ function onDatabaseFiles(fileList) {
 
   function updateSubmitButton() {
     const selected = databaseModalDiv.querySelectorAll(".rm:checked").length;
-    deleteButton.disabled = selected === 0;
-    deleteButton.textContent = i18["Delete Entries"];
-    selected && (deleteButton.textContent += ` (${selected})`);
+    submitButton.disabled = selected === 0;
+    // If the replace input has text, make the delete button trigger a replace action instead of delete
+    submitButton.textContent = replace.value.trim() ? i18["Update Entries"] : i18["Delete Entries"];
+    selected && (submitButton.textContent += ` (${selected})`);
   }
 
-  function applyFilter() {
-    const filter = search.value.trim().toLowerCase();
-    contentDiv.querySelectorAll("tbody tr").forEach(row => {
-      row.hidden = filter && !row.textContent.toLowerCase().includes(filter);
+function applyFilter() {
+  const filter = search.value.trim().toLowerCase();
+  contentDiv.querySelectorAll("tbody tr").forEach(row => {
+    row.hidden = filter && !row.textContent.toLowerCase().includes(filter);
+    row.querySelectorAll("td").forEach(cell => {
+      // Remove previous highlighting
+      cell.querySelectorAll("mark").forEach(mark => {
+        mark.replaceWith(document.createTextNode(mark.textContent));
+      });
+      if (!filter || row.hidden) return;
+      const text = cell.textContent;
+      const lowerText = text.toLowerCase();
+      if (!lowerText.includes(filter)) return;
+      const fragment = document.createDocumentFragment();
+      let start = 0;
+      let index;
+      while ((index = lowerText.indexOf(filter, start)) !== -1) {
+        fragment.appendChild(document.createTextNode(text.slice(start, index)));
+        const mark = document.createElement("mark");
+        // Stronger highlight for filename column
+        if (cell.className === "filename") {
+          mark.style.backgroundColor = "#ffc107"; // Bootstrap warning color
+        }
+        mark.textContent = text.slice(index, index + filter.length);
+        fragment.appendChild(mark);
+        start = index + filter.length;
+      }
+      fragment.appendChild(document.createTextNode(text.slice(start)));
+      cell.replaceChildren(fragment);
     });
+  });
   }
 
   if (!databaseModalDiv.__dbUIInitialized) {
@@ -1212,16 +1241,33 @@ function onDatabaseFiles(fileList) {
 
     search.addEventListener("input", e => {
       e.stopPropagation();
+      if (search.value.trim() === ''){
+        replace.value = '';
+        replace.disabled =  true;
+        updateSubmitButton();
+      } else { replace.disabled = false }
       applyFilter();
       updateButtonText();
     });
 
-    deleteButton.addEventListener("click", () => {
+    replace.addEventListener("input", e => {
+      e.stopPropagation();
+      updateSubmitButton();
+    });
+
+    submitButton.addEventListener("click", () => {
       const selectedFiles = [...databaseModalDiv.querySelectorAll(".rm:checked")];
       if (selectedFiles.length > 0) {
         const fileIDs = selectedFiles.map(cb => parseInt(cb.dataset.fileId, 10));
-        deleteButton.disabled = true;
-        worker.postMessage({ action: "delete-files", fileIDs });
+        submitButton.disabled = true;
+        if (replace.value.trim()) {
+          const oldValue = search.value.trim();
+          if (!oldValue) return;
+          const newValue = replace.value.trim();
+          worker.postMessage({ action: "update-files", fileIDs, oldValue, newValue });
+        } else {
+          worker.postMessage({ action: "delete-files", fileIDs });
+        }
         databaseModalDiv.__dbModal.hide();
       }
     });
@@ -1233,11 +1279,11 @@ function onDatabaseFiles(fileList) {
   // Clear previous contents
   contentDiv.replaceChildren();
   const table = document.createElement("table");
-  table.className = "table table-striped table-hover";
+  table.className = "table table-hover";
   const thead = document.createElement("thead");
   thead.className = "sticky-top text-bg-dark";
   const headerRow = document.createElement("tr");
-  ["Filename", "In Audio Library", "File Start", "Location", "Delete Record"].map(text => i18[text])
+  ["Filename", "In Audio Library", "File Start", "Location", "Selected"].map(text => i18[text])
     .forEach(text => {
       const th = document.createElement("th");
       th.textContent = text;
@@ -1294,7 +1340,7 @@ function onDatabaseFiles(fileList) {
     updateSubmitButton();
   });
 
-  search.value = "";
+  search.value = ""; replace.value = ""; replace.disabled = true;
   applyFilter();
   updateButtonText();
   updateSubmitButton();

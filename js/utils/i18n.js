@@ -64,6 +64,8 @@ const Toasts = { // UI.js
         duplicateFIle: '<span class="text-danger">No changes made</span>. The selected file already exists in the Archive.',
         fileUpdateError: '<span class="text-danger">An error occurred while updating the file: ${message}</span>',
         goodFilePurge: '${file} and the associated records were deleted successfully',
+        goodFileUpdate: '${file} updated successfully',
+        noFileUpdate: 'No files were changed. Only the file name can be updated and the search string was not found in the selected filenames.',
         failedFilePurge: '${file} was not found in the Archive',
         fileToConvertNotFound: 'Cannot find ${file}, skipping conversion.',
         mkDirFailed: 'Failed to create directory: ${path}<br>Error: ${error}',
@@ -138,6 +140,8 @@ const Toasts = { // UI.js
         duplicateFIle: '<span class="text-danger">Ingen ændringer foretaget</span>. Den valgte fil findes allerede i Arkivet.',
         fileUpdateError: '<span class="text-danger">Der opstod en fejl under opdatering af filen: ${message}</span>',
         goodFilePurge: '${file} og de tilknyttede poster blev slettet med succes',
+        goodFileUpdate: '${file} blev opdateret med succes',
+        noFileUpdate: 'Ingen filer blev ændret. Kun filnavnet kan opdateres, og søgestrengen blev ikke fundet i de valgte filnavne.',
         failedFilePurge: "${file} blev ikke fundet i Arkivet",
         fileToConvertNotFound: "Kan ikke finde ${file}, springer over konvertering.",
         mkDirFailed: "Kunne ikke oprette mappen: ${path}<br>Fejl: ${error}",
@@ -211,6 +215,8 @@ const Toasts = { // UI.js
         duplicateFIle: '<span class="text-danger">Keine Änderungen vorgenommen</span>. Die ausgewählte Datei ist bereits im Archiv vorhanden.',
         fileUpdateError: '<span class="text-danger">Beim Aktualisieren der Datei ist ein Fehler aufgetreten: ${message}</span>',
         goodFilePurge: "${file} und die zugehörigen Datensätze wurden erfolgreich gelöscht",
+        goodFileUpdate: '${file} erfolgreich aktualisiert',
+        noFileUpdate: 'Keine Dateien wurden geändert. Nur der Dateiname kann aktualisiert werden, und der Suchtext wurde in den ausgewählten Dateinamen nicht gefunden.',
         failedFilePurge: "${file} wurde im Archiv nicht gefunden",
         fileToConvertNotFound: "Kann ${file} nicht finden, Überspringe Konvertierung.",
         mkDirFailed: "Fehler beim Erstellen des Verzeichnisses: ${path}<br>Fehler: ${error}",
@@ -285,6 +291,8 @@ const Toasts = { // UI.js
         duplicateFIle: '<span class="text-danger">No se realizaron cambios</span>. El archivo seleccionado ya existe en el Archivo.',
         fileUpdateError: '<span class="text-danger">Ocurrió un error al actualizar el archivo: ${message}</span>',
         goodFilePurge: "${file} y sus registros asociados fueron eliminados correctamente",
+        goodFileUpdate: "${file} actualizado correctamente",
+        noFileUpdate: 'No se modificó ningún archivo. Solo se puede actualizar el nombre del archivo y no se encontró la cadena de búsqueda en los nombres de archivo seleccionados.',
         failedFilePurge: "${file} no se encontró en el Archivo",
         fileToConvertNotFound: "No se puede encontrar ${file}, se omite la conversión.",
         mkDirFailed: "Error al crear el directorio: ${path}<br>Error: ${error}",
@@ -359,6 +367,8 @@ const Toasts = { // UI.js
         duplicateFIle: '<span class="text-danger">Aucun changement effectué</span>. Le fichier sélectionné existe déjà dans l\'Archive.',
         fileUpdateError: '<span class="text-danger">Une erreur est survenue lors de la mise à jour du fichier : ${message}</span>',
         goodFilePurge: '${file} et les enregistrements associés ont été supprimés avec succès',
+        goodFileUpdate: '${file} mis à jour avec succès',
+        noFileUpdate: 'Aucun fichier n’a été modifié. Seul le nom du fichier peut être mis à jour et le texte recherché n’a pas été trouvé dans les noms des fichiers sélectionnés.',
         failedFilePurge: "${file} n'a pas été trouvé dans l'Archive",
         fileToConvertNotFound: "Impossible de trouver ${file}, conversion ignorée.",
         mkDirFailed: "Échec de la création du répertoire : ${path}<br>Erreur : ${error}",
@@ -433,6 +443,8 @@ const Toasts = { // UI.js
         duplicateFIle: '<span class="text-danger">変更なし</span>。選択されたファイルは既にアーカイブに存在します。',
         fileUpdateError: '<span class="text-danger">ファイルの更新中にエラーが発生しました: ${message}</span>',
         goodFilePurge: '${file}とその関連レコードが正常に削除されました',
+        goodFileUpdate: '${file}が正常に更新されました',
+        noFileUpdate: 'ファイルは変更されませんでした。更新できるのはファイル名のみで、選択したファイル名に検索文字列が見つかりませんでした。',
         failedFilePurge: '${file}はアーカイブに見つかりませんでした',
         fileToConvertNotFound: '${file}が見つかりません、変換をスキップします。',
         mkDirFailed: 'ディレクトリの作成に失敗しました: ${path}<br>エラー: ${error}',
@@ -507,6 +519,8 @@ const Toasts = { // UI.js
         duplicateFIle: '<span class="text-danger">Geen wijzigingen aangebracht</span>. Het geselecteerde bestand bestaat al in het Archief.',
         fileUpdateError: '<span class="text-danger">Er is een fout opgetreden bij het bijwerken van het bestand: ${message}</span>',
         goodFilePurge: "${file} en de bijbehorende records zijn succesvol verwijderd",
+        goodFileUpdate: "${file} succesvol bijgewerkt",
+        noFileUpdate: 'Er zijn geen bestanden gewijzigd. Alleen de bestandsnaam kan worden bijgewerkt en de zoektekst is niet gevonden in de geselecteerde bestandsnamen.',
         failedFilePurge: "${file} werd niet gevonden in het Archief",
         fileToConvertNotFound: "Kan ${file} niet vinden, conversie overgeslagen.",
         mkDirFailed: "Kan map niet aanmaken: ${path}<br>Fout: ${error}",
@@ -583,6 +597,8 @@ const Toasts = { // UI.js
         duplicateFIle: '<span class="text-danger">Nenhuma alteração feita</span>. O arquivo selecionado já existe no Arquivo.',
         fileUpdateError: '<span class="text-danger">Ocorreu um erro ao atualizar o arquivo: ${message}</span>',
         goodFilePurge: "${file} e os registros associados foram excluídos com sucesso",
+        goodFileUpdate: "${file} atualizado com sucesso",
+        noFileUpdate: 'Nenhum ficheiro foi alterado. Apenas o nome do ficheiro pode ser atualizado e a cadeia de pesquisa não foi encontrada nos nomes dos ficheiros selecionados.',
         failedFilePurge: "${file} não foi encontrado no Arquivo",
         fileToConvertNotFound: "Não foi possível encontrar ${file}, conversão ignorada.",
 
@@ -660,6 +676,8 @@ const Toasts = { // UI.js
         duplicateFIle: '<span class="text-danger">Изменений не внесено</span>. Выбранный файл уже существует в архиве.',
         fileUpdateError: '<span class="text-danger">Произошла ошибка при обновлении файла: ${message}</span>',
         goodFilePurge: "${file} и связанные с ним записи успешно удалены",
+        goodFileUpdate: "${file} успешно обновлен",
+        noFileUpdate: 'Файлы не были изменены. Можно обновить только имя файла, а строка поиска не найдена в именах выбранных файлов.',
         failedFilePurge: "${file} не найден в архиве",
         fileToConvertNotFound: "Не удалось найти ${file}, пропуск конвертации.",
         mkDirFailed: "Не удалось создать директорию: ${path}<br>Ошибка: ${error}",
@@ -736,6 +754,8 @@ const Toasts = { // UI.js
         duplicateFIle: '<span class="text-danger">Inga ändringar gjorda</span>. Den valda filen finns redan i arkivet.',
         fileUpdateError: '<span class="text-danger">Ett fel uppstod vid uppdatering av filen: ${message}</span>',
         goodFilePurge: "${file} och dess associerade poster raderades framgångsrikt",
+        goodFileUpdate: "${file} uppdaterades framgångsrikt",
+        noFileUpdate: 'Inga filer ändrades. Endast filnamnet kan uppdateras och söktexten hittades inte i de valda filnamnen.',
         failedFilePurge: "${file} hittades inte i arkivet",
         fileToConvertNotFound: "Kan inte hitta ${file}, hoppar över konverteringen.",
         mkDirFailed: "Kunde inte skapa katalog: ${path}<br>Fel: ${error}",
@@ -812,6 +832,8 @@ const Toasts = { // UI.js
         duplicateFIle: '<span class="text-danger">未作任何更改</span>。选定的文件已存在于档案中。',
         fileUpdateError: '<span class="text-danger">更新文件时出错：${message}</span>',
         goodFilePurge: "${file} 及其相关记录已成功删除",
+        goodFileUpdate: "${file} 已成功更新",
+        noFileUpdate: '没有文件被更改。只能更新文件名，并且在所选文件名中未找到搜索字符串。',
         failedFilePurge: "未在档案中找到 ${file}",
         fileToConvertNotFound: "无法找到 ${file}，跳过转换。",
         mkDirFailed: "无法创建目录：${path}<br>错误：${error}",
@@ -839,7 +861,19 @@ const All = {
     "zh": ["(默认)", "所有"],
     "ja": ["(デフォルト)", "すべて"]
 };
-
+const Files = {
+    en: ["file", "files"],
+    fr: ["fichier", "fichiers"],
+    es: ["archivo", "archivos"],
+    de: ["Datei", "Dateien"],
+    pt: ["arquivo", "arquivos"],
+    nl: ["bestand", "bestanden"],
+    sv: ["fil", "filer"],
+    da: ["fil", "filer"],
+    ru: ["файл", "файлы"],
+    ja: ["ファイル", "ファイル"],
+    zh: ["文件", "文件"],
+};
 const Headings = {
     en: {
         position: ['Position', "Sort results by detection time"],
@@ -1225,7 +1259,7 @@ const Context = {
         create: 'Create', edit: 'Edit', record: 'Record',
         export: 'Export Audio Clip',
         compare: 'Compare with Reference Calls',
-        delete: 'Delete Record',
+        delete: 'Selected',
         location: 'Amend File Recording Location',
         time: 'Amend File Start Time',
         frequency: 'Frequency',
@@ -3247,11 +3281,13 @@ const Database = {
         "In Audio Library": "In Audio Library",
         "File Start": "File Start",
         "Location": "Location",
-        "Delete Record": "Delete Record",
+        "Selected": "Selected",
         "Select All": "Select All",
         "Deselect All": "Deselect All",
         "Delete Entries": "Delete Entries",
-        "placeholder": "Filter by filename, date or location"
+        "filter-placeholder": "Filter by filename, date or location",
+        "replace-placeholder": "Replace match with...",
+        "Update Entries": "Update Entries",
     },
     da: {
         "yes": "Ja",
@@ -3262,11 +3298,13 @@ const Database = {
         "In Audio Library": "I Lydbiblioteket",
         "File Start": "Filstart",
         "Location": "Placering",
-        "Delete Record": "Slet Filpost",
+        "Selected": "Valgt",
         "Select All": "Vælg Alle",
         "Deselect All": "Fravælg Alle",
         "Delete Entries": "Slet Poster",
-        "placeholder": "Filtrer efter filnavn, dato eller placering"
+        "filter-placeholder": "Filtrer efter filnavn, dato eller placering",
+        "replace-placeholder": "Erstat match med...",
+        "Update Entries": "Opdater Poster"
     },
     de: {
         "yes": "Ja",
@@ -3277,11 +3315,13 @@ const Database = {
         "In Audio Library": "In der Audiobibliothek",
         "File Start": "Dateianfang",
         "Location": "Ort",
-        "Delete Record": "Eintrag löschen",
+        "Selected": "Ausgewählt",
         "Select All": "Alle auswählen",
         "Deselect All": "Alle abwählen",
         "Delete Entries": "Einträge löschen",
-        "placeholder": "Nach Dateiname, Datum oder Ort filtern"
+        "filter-placeholder": "Nach Dateiname, Datum oder Ort filtern",
+        "replace-placeholder": "Übereinstimmung ersetzen mit...",
+        "Update Entries": "Einträge aktualisieren"
     },
     es: {
         "yes": "Sí",
@@ -3292,11 +3332,13 @@ const Database = {
         "In Audio Library": "En la Biblioteca de Audio",
         "File Start": "Inicio del Archivo",
         "Location": "Ubicación",
-        "Delete Record": "Eliminar Registro",
+        "Selected": "Seleccionado",
         "Select All": "Seleccionar Todos",
         "Deselect All": "Deseleccionar Todos",
         "Delete Entries": "Eliminar Entradas",
-        "placeholder": "Filtrar por nombre de archivo, fecha o ubicación"
+        "filter-placeholder": "Filtrar por nombre de archivo, fecha o ubicación",
+        "replace-placeholder": "Reemplazar coincidencia con...",
+        "Update Entries": "Actualizar Entradas"
     },
     fr: {
         "yes": "Oui",
@@ -3307,11 +3349,13 @@ const Database = {
         "In Audio Library": "Dans la Bibliothèque Audio",
         "File Start": "Début du Fichier",
         "Location": "Emplacement",
-        "Delete Record": "Supprimer l'Enregistrement",
+        "Selected": "Sélectionné",
         "Select All": "Tout Sélectionner",
         "Deselect All": "Tout Désélectionner",
         "Delete Entries": "Supprimer les Entrées",
-        "placeholder": "Filtrer par nom de fichier, date ou emplacement"
+        "filter-placeholder": "Filtrer par nom de fichier, date ou emplacement",
+        "replace-placeholder": "Remplacer la correspondance par...",
+        "Update Entries": "Mettre à jour les entrées"
     },
     ja: {
         "yes": "はい",
@@ -3322,11 +3366,13 @@ const Database = {
         "In Audio Library": "オーディオライブラリ内",
         "File Start": "ファイル開始",
         "Location": "場所",
-        "Delete Record": "レコードを削除",
+        "Selected": "選択済み",
         "Select All": "すべて選択",
         "Deselect All": "すべて解除",
         "Delete Entries": "エントリを削除",
-        "placeholder": "ファイル名、日付、または場所でフィルタリング"
+        "filter-placeholder": "ファイル名、日付、または場所でフィルタリング",
+        "replace-placeholder": "一致するテキストに置き換え",
+        "Update Entries": "エントリを更新"
     },
     nl: {
         "yes": "Ja",
@@ -3337,11 +3383,13 @@ const Database = {
         "In Audio Library": "In de Audiobibliotheek",
         "File Start": "Bestand Start",
         "Location": "Locatie",
-        "Delete Record": "Verwijder Record",
+        "Selected": "Geselecteerd",
         "Select All": "Selecteer Alles",
         "Deselect All": "Deselecteer Alles",
         "Delete Entries": "Verwijder Items",
-        "placeholder": "Filter op bestandsnaam, datum of locatie"
+        "filter-placeholder": "Filter op bestandsnaam, datum of locatie",
+        "replace-placeholder": "Vervang overeenkomst met...",
+        "Update Entries": "Items bijwerken"
     },
     pt: {
         "yes": "Sim",
@@ -3352,11 +3400,13 @@ const Database = {
         "In Audio Library": "Na Biblioteca de Áudio",
         "File Start": "Início do Arquivo",
         "Location": "Localização",
-        "Delete Record": "Excluir Registro",
+        "Selected": "Selecionado",
         "Select All": "Selecionar Todos",
         "Deselect All": "Desmarcar Todos",
         "Delete Entries": "Excluir Entradas",
-        "placeholder": "Filtrar por nome de arquivo, data ou localização"
+        "filter-placeholder": "Filtrar por nome de arquivo, data ou localização",
+        "replace-placeholder": "Substituir correspondência por...",
+        "Update Entries": "Atualizar Entradas"
     },
     ru: {
         "yes": "Да",
@@ -3367,11 +3417,13 @@ const Database = {
         "In Audio Library": "В аудиотеке",
         "File Start": "Начало файла",
         "Location": "Местоположение",
-        "Delete Record": "Удалить запись",
+        "Selected": "Выбрано",
         "Select All": "Выбрать все",
         "Deselect All": "Снять выделение",
         "Delete Entries": "Удалить записи",
-        "placeholder": "Фильтровать по имени файла, дате или местоположению"
+        "filter-placeholder": "Фильтровать по имени файла, дате или местоположению",
+        "replace-placeholder": "Заменить совпадение на...",
+        "Update Entries": "Обновить записи"
     },
     sv: {
         "yes": "Ja",
@@ -3382,11 +3434,13 @@ const Database = {
         "In Audio Library": "I ljudbiblioteket",
         "File Start": "Filstart",
         "Location": "Plats",
-        "Delete Record": "Ta bort post",
+        "Selected": "Vald",
         "Select All": "Välj alla",
         "Deselect All": "Avmarkera alla",
         "Delete Entries": "Ta bort poster",
-        "placeholder": "Filtrera efter filnamn, datum eller plats"
+        "filter-placeholder": "Filtrera efter filnamn, datum eller plats",
+        "replace-placeholder": "Ersätt match med...",
+        "Update Entries": "Uppdatera poster"
     },
     zh: {
         "yes": "是",
@@ -3397,11 +3451,13 @@ const Database = {
         "In Audio Library": "在音频库中",
         "File Start": "文件开始",
         "Location": "位置",
-        "Delete Record": "删除记录",
+        "Selected": "选中",
         "Select All": "选择所有",
         "Deselect All": "取消选择所有",
         "Delete Entries": "删除条目",
-        "placeholder": "按文件名、日期或位置过滤"
+        "filter-placeholder": "按文件名、日期或位置过滤",
+        "replace-placeholder": "将匹配项替换为...",
+        "Update Entries": "更新条目"
     }
 };
 
@@ -4226,7 +4282,8 @@ async function localiseUI(locale) {
         // placeholholders
         document.getElementById("custom-list-location").setAttribute('placeholder', options['customListPH'])
         document.getElementById("library-location").setAttribute('placeholder', options['libraryLocationPH'])
-        document.getElementById("db-filter").setAttribute('placeholder', get(Database)['placeholder'])
+        document.getElementById("db-filter").setAttribute('placeholder', get(Database)['filter-placeholder']  + '...');
+        document.getElementById("db-replace").setAttribute('placeholder', get(Database)['replace-placeholder'])
         // //Explore location header
         document.querySelector("label[for='explore-locations']").textContent = Headings[locale].location;
         document.getElementById('exploreRange').innerHTML = `<span class="material-symbols-outlined align-bottom">date_range</span><span>${localisationData['explore-datefilter']}</span> <span class="material-symbols-outlined float-end">expand_more</span>`;
@@ -4241,5 +4298,5 @@ async function localiseUI(locale) {
     }
 }
 
-export {All, SpeciesList,Headings, Context, Location, Database, Form, Help, Toasts, Titles, Training, ManageModels,
+export {All, Files, SpeciesList,Headings, Context, Location, Database, Form, Help, Toasts, Titles, Training, ManageModels,
      LIST_MAP, Lists, IUCNLabel, ChartUI, Locate,Select, UpdateMessage, Trial, TrialExpired, localiseUI, get}

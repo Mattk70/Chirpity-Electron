@@ -948,3 +948,8 @@ input[type="range"].vertical {
   background-color: #dddddd;
   cursor: pointer;
 }
+
+#databaseModal input[type="search"] {
+  max-width: 20rem;
+  font-size: 0.8rem;
+}
