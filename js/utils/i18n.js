@@ -4196,6 +4196,7 @@ async function localiseUI(locale) {
             console.info(`Failed to fetch JSON file: index.${locale}.json`);
             // go for english
             locale = 'en';
+            setLocale(locale);
             const jsonResponse = await fetch(`./I18n/index.en.json`)
             if (jsonResponse.ok) {
                 localisationData = await jsonResponse.json();

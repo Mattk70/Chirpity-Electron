@@ -674,7 +674,7 @@ async function handleMessage(e) {
           `UPDATE files
             SET name = REPLACE(name, ?, ?)
             WHERE id IN (${placeholders})
-              AND name LIKE '%' || ? || '%'`,
+              AND instr(name, ?) > 0`,
             oldValue,
             newValue,
             ...fileIDs,
