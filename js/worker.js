@@ -617,7 +617,7 @@ async function handleMessage(e) {
         if (!diskDB) throw new Error("No archive database is loaded");
         const files = await diskDB.allAsync(`
           SELECT 
-              f.id, f.name,
+              f.id, f.name, f.archiveName,
               CASE WHEN f.archiveName IS NOT NULL THEN 1 ELSE 0 END AS archived,
               f.filestart, l.place as location
           FROM files f

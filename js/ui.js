@@ -1140,6 +1140,7 @@ function generateFileRows(fileList, i18n) {
     addCell(file.archived ? i18n["yes"] : i18n["no"]);
     addCell(Number.isFinite(file.filestart) ? dateFormat.format(file.filestart) : "");
     addCell(file.location ?? i18n["default"]);
+    addCell(i18n['Pending'], 'status');
 
     const td = addCell("", "text-center");
     const checkbox = document.createElement("input");
@@ -1283,7 +1284,7 @@ function applyFilter() {
   const thead = document.createElement("thead");
   thead.className = "sticky-top text-bg-dark";
   const headerRow = document.createElement("tr");
-  ["Filename", "In Audio Library", "File Start", "Location", "Selected"].map(text => i18[text])
+  ["Filename", "In Audio Library", "File Start", "Location", "Link Status", "Selected"].map(text => i18[text])
     .forEach(text => {
       const th = document.createElement("th");
       th.textContent = text;
@@ -1344,8 +1345,51 @@ function applyFilter() {
   applyFilter();
   updateButtonText();
   updateSubmitButton();
+  // Check files status in the background
+  validateFileExistence(fileList, table);
   databaseModalDiv.__dbModal.show();
 }
+
+const checkFileExists = (path) =>  fs.promises.access(path).then(() => true).catch(() => false);
+
+async function validateFileExistence(files, table) {
+  const t0 = Date.now();
+  const i18 = i18n.get(i18n.Database);
+  const batchSize = 20;
+  for (let i = 0; i < files.length; i += batchSize) {
+    const batch = files.slice(i, i + batchSize);
+    await Promise.all(
+      batch.map(async file => {
+        const exists = await checkFileExists(file.name);
+        const checkbox = table.querySelector(
+          `input.rm[data-file-id="${file.id}"]`
+        );
+        const row = checkbox?.closest("tr");
+        if (row) {
+          const linkCell = row.querySelector('td.status');
+          if (exists) linkCell.textContent = 'OK';
+          else {
+            if (file.archived){
+              if (await checkFileExists(p.join(config.library.location,file.archiveName))){
+                row.classList.add("text-bg-warning")
+                linkCell.textContent = i18['OK'];
+              } else {
+                row.classList.add("text-bg-danger");
+                linkCell.textContent = i18['Missing'];
+              }
+            } else { 
+              row.classList.add("text-bg-danger") 
+              linkCell.textContent = i18['Missing'];
+            }
+          }
+        }
+      })
+    );
+  }
+  console.log(`Checking ${files.length} files' existence took ${Date.now() - t0}ms`)
+}
+
+  
 
 
 /**
