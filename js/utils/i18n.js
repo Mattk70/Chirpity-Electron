@@ -1259,7 +1259,7 @@ const Context = {
         create: 'Create', edit: 'Edit', record: 'Record',
         export: 'Export Audio Clip',
         compare: 'Compare with Reference Calls',
-        delete: 'Selected',
+        delete: 'Delete Record',
         location: 'Amend File Recording Location',
         time: 'Amend File Start Time',
         frequency: 'Frequency',
