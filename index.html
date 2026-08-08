@@ -1761,8 +1761,11 @@
                                 <span class="material-symbols-outlined">unarchive</span> Remove Current File From
                                 Archive
                             </li>
-                            <li class="dropdown-item" id="manage-files">
-                                <span class="material-symbols-outlined">drive_file_move</span> Manage files
+                            <li class="dropdown-item locked d-flex disabled col" id="manage-files">
+                                <span class="material-symbols-outlined">drive_file_move</span> 
+                                <span class="padlock col" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="">
+                                        <span class="pointer locked material-symbols-outlined float-end mt-1">lock</span>
+                                </span>
                             </li>
                             <!-- <li class="dropdown-item d-none" id="dataset">
                                 <span class="material-symbols-outlined">dataset</span> Create Dataset
