@@ -1119,6 +1119,7 @@ const setDefaultLocation = () => {
  */
 function generateFileRows(fileList, i18n) {
   const tbody = document.createElement("tbody");
+  tbody.className = "text-center";
   const dateFormat = new Intl.DateTimeFormat(undefined, {
     dateStyle: "short",
     timeStyle: "medium",
@@ -1136,19 +1137,18 @@ function generateFileRows(fileList, i18n) {
       return td;
     };
 
-    addCell(file.name, 'filename');
-    addCell(file.archived ? i18n["yes"] : i18n["no"]);
+    addCell(file.name, 'filename text-start');
+    addCell(file.archived ? i18n["yes"] : i18n["no"], );
     addCell(Number.isFinite(file.filestart) ? dateFormat.format(file.filestart) : "");
     addCell(file.location ?? i18n["default"]);
     addCell(i18n['Pending'], 'status');
 
-    const td = addCell("", "text-center");
+    const td = addCell("");
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.className = "form-check-input rm";
     checkbox.dataset.fileId = file.id;
     td.appendChild(checkbox);
-
     tbody.appendChild(tr);
   }
 
@@ -1189,42 +1189,43 @@ function onDatabaseFiles(fileList) {
     selected && (submitButton.textContent += ` (${selected})`);
   }
 
-function applyFilter() {
-  const filter = search.value.trim().toLowerCase();
-  contentDiv.querySelectorAll("tbody tr").forEach(row => {
-    row.hidden = filter && !row.textContent.toLowerCase().includes(filter);
-    row.querySelectorAll("td").forEach(cell => {
-      // Remove previous highlighting
-      cell.querySelectorAll("mark").forEach(mark => {
-        mark.replaceWith(document.createTextNode(mark.textContent));
-      });
-      if (!filter || row.hidden) return;
-      const text = cell.textContent;
-      const lowerText = text.toLowerCase();
-      if (!lowerText.includes(filter)) return;
-      const fragment = document.createDocumentFragment();
-      let start = 0;
-      let index;
-      while ((index = lowerText.indexOf(filter, start)) !== -1) {
-        fragment.appendChild(document.createTextNode(text.slice(start, index)));
-        const mark = document.createElement("mark");
-        // Stronger highlight for filename column
-        if (cell.className === "filename") {
-          mark.style.backgroundColor = "#ffc107"; // Bootstrap warning color
+  function applyFilter() {
+    const filter = search.value.trim().toLowerCase();
+    contentDiv.querySelectorAll("tbody tr").forEach(row => {
+      row.hidden = filter && !row.textContent.toLowerCase().includes(filter);
+      row.querySelectorAll("td").forEach(cell => {
+        // Remove previous highlighting
+        cell.querySelectorAll("mark").forEach(mark => {
+          mark.replaceWith(document.createTextNode(mark.textContent));
+        });
+        if (!filter || row.hidden) return;
+        const text = cell.textContent;
+        const lowerText = text.toLowerCase();
+        if (!lowerText.includes(filter)) return;
+        const fragment = document.createDocumentFragment();
+        let start = 0;
+        let index;
+        while ((index = lowerText.indexOf(filter, start)) !== -1) {
+          fragment.appendChild(document.createTextNode(text.slice(start, index)));
+          const mark = document.createElement("mark");
+          // Stronger highlight for filename column
+          if (cell.className === "filename") {
+            mark.style.backgroundColor = "#ffc107"; // Bootstrap warning color
+          }
+          mark.textContent = text.slice(index, index + filter.length);
+          fragment.appendChild(mark);
+          start = index + filter.length;
         }
-        mark.textContent = text.slice(index, index + filter.length);
-        fragment.appendChild(mark);
-        start = index + filter.length;
-      }
-      fragment.appendChild(document.createTextNode(text.slice(start)));
-      cell.replaceChildren(fragment);
+        fragment.appendChild(document.createTextNode(text.slice(start)));
+        cell.replaceChildren(fragment);
+      });
     });
-  });
   }
 
   if (!databaseModalDiv.__dbUIInitialized) {
     databaseModalDiv.addEventListener("change", event => {
       if (event.target.classList.contains("rm")) {
+        event.stopPropagation();
         updateSubmitButton();
         updateButtonText();
       }
@@ -1274,6 +1275,11 @@ function applyFilter() {
     });
 
     databaseModalDiv.__dbModal = new bootstrap.Modal(databaseModalDiv);
+    const onModalDismiss = () => {
+      STATE.fileValidationController?.abort();
+      databaseModalDiv.removeEventListener("hide.bs.modal", onModalDismiss);
+    };
+    databaseModalDiv.addEventListener("hide.bs.modal", onModalDismiss);
     databaseModalDiv.__dbUIInitialized = true;
   }
 
@@ -1282,12 +1288,16 @@ function applyFilter() {
   const table = document.createElement("table");
   table.className = "table table-hover";
   const thead = document.createElement("thead");
-  thead.className = "sticky-top text-bg-dark";
+  thead.className = "sticky-top text-bg-dark text-center";
   const headerRow = document.createElement("tr");
-  ["Filename", "In Audio Library", "File Start", "Location", "Link Status", "Selected"].map(text => i18[text])
+  let count = 0;
+  ["Filename", "In Audio Library", "File Start", "Location", "Link Status", "Selected"]
+    .map(text => i18[text])
     .forEach(text => {
+      count++;
       const th = document.createElement("th");
       th.textContent = text;
+      if (count === 5) th.id = 'link-check';
       headerRow.appendChild(th);
     });
   thead.appendChild(headerRow);
@@ -1346,16 +1356,45 @@ function applyFilter() {
   updateButtonText();
   updateSubmitButton();
   // Check files status in the background
-  validateFileExistence(fileList, table);
+  if (fileList.length > 1000) {
+    // Trigger check manually
+    const linkHeader = document.getElementById('link-check');
+    const linkText = linkHeader.textContent;
+    const button = document.createElement('button');
+    button.id = 'manual-file-check';
+    button.value = fileList.length;
+    button.innerHTML = '<span class="material-symbols-outlined">rule</span> ' + linkText;
+    button.className = 'btn btn-outline-secondary text-white fw-bold p-0';
+    linkHeader.replaceChildren(button)
+    const action = () => {
+      linkHeader.replaceChildren(linkText);
+      linkHeader.removeEventListener('click', action)
+      STATE.fileValidationController = new AbortController();
+      const status = databaseModalDiv.querySelector('#validation-status');
+      validateFileExistence(fileList, table, (checked, total, missing) => {
+        if (checked % ((DIAGNOSTICS["Cores"] || 20)*10 ) !== 0) return
+        status.textContent = `Checking files... ${checked} / ${total} (${missing} missing)`;
+      }, STATE.fileValidationController.signal).then(result => {
+        status.textContent = '';
+        STATE.fileValidationController = null;
+      });
+    }
+    linkHeader.addEventListener('click', action)
+  } else {
+    validateFileExistence(fileList, table);
+  }
   databaseModalDiv.__dbModal.show();
 }
 
 const checkFileExists = (path) =>  fs.promises.access(path).then(() => true).catch(() => false);
 
-async function validateFileExistence(files, table) {
+
+async function validateFileExistence(files, table, progressCallback = null) {
   const t0 = Date.now();
   const i18 = i18n.get(i18n.Database);
-  const batchSize = 20;
+  const batchSize = DIAGNOSTICS["Cores"] || 20;
+  let checked = 0;
+  let missing = 0;
   for (let i = 0; i < files.length; i += batchSize) {
     const batch = files.slice(i, i + batchSize);
     await Promise.all(
@@ -1376,17 +1415,23 @@ async function validateFileExistence(files, table) {
               } else {
                 row.classList.add("text-bg-danger");
                 linkCell.textContent = i18['Missing'];
+                missing++;
               }
             } else { 
               row.classList.add("text-bg-danger") 
               linkCell.textContent = i18['Missing'];
+              missing++;
             }
           }
         }
+        checked++;
       })
     );
+    if (progressCallback) {
+      progressCallback(checked, files.length, missing);
+    }
   }
-  console.log(`Checking ${files.length} files' existence took ${Date.now() - t0}ms`)
+  console.log(`Checking ${files.length} files' existence took ${((Date.now() - t0)/1000).toFixed(0)} seconds`)
 }
 
   
@@ -6548,7 +6593,7 @@ async function handleUIClicks(e) {
   config.debug && console.log("clicked", target);
   target &&
     target !== "result1" &&
-    trackEvent({uuid:config.UUID, event: "UI", action: "Click", name: target, version: VERSION});
+    trackEvent({uuid:config.UUID, event: "UI", action: "Click", name: target, value:element.value, version: VERSION});
 };
 
 /**

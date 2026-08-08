@@ -65,7 +65,7 @@
       "exit": ["Afslut"],
       "save2db": ["Gem til arkiv","Ctrl+S"],
       "manage-locations": ["Administrer placeringer"],
-      "manage-files": ["Administrer filer"],
+      "manage-files": ["Administrer arkivfiler"],
       "charts": ["Vis diagrammer"],
       "explore": ["Udforsk arkiv"],
       "chart-datefilter": ["Anvend en datofiltrering"],

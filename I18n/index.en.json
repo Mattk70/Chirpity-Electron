@@ -69,7 +69,7 @@
     ],
     "charts": ["View charts"],
     "manage-locations": ["Manage locations"],
-    "manage-files": ["Manage files"],
+    "manage-files": ["Manage Archive Files"],
     "explore": ["Explore Archive"],
     "chart-datefilter": ["Apply a date filter"],
     "explore-datefilter": ["Apply a date filter"],

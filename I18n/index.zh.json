@@ -67,7 +67,7 @@
   ],
   "charts": ["查看图表"],
   "manage-locations": ["管理位置"],
-  "manage-files": ["管理文件"],
+  "manage-files": ["管理归档文件"],
   "explore": ["浏览档案"],
   "chart-datefilter": ["应用日期过滤器"],
   "explore-datefilter": ["应用日期过滤器"],

@@ -67,7 +67,7 @@
   ],
   "charts": ["Ver Gráficos"],
   "manage-locations": ["Gerir localizações"],
-  "manage-files": ["Gerenciar arquivos"],
+  "manage-files": ["Gerir ficheiros do arquivo"],
   "explore": ["Explorar Arquivo"],  
   "chart-datefilter": ["Aplicar um filtro de data"],
   "explore-datefilter": ["Aplicar um filtro de data"],
