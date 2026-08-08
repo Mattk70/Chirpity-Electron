@@ -1363,7 +1363,10 @@ function onDatabaseFiles(fileList) {
     const button = document.createElement('button');
     button.id = 'manual-file-check';
     button.value = fileList.length;
-    button.innerHTML = '<span class="material-symbols-outlined">rule</span> ' + linkText;
+    const icon = document.createElement('span');
+    icon.className = 'material-symbols-outlined';
+    icon.textContent = 'rule';
+    button.append(icon, document.createTextNode(linkText));
     button.className = 'btn btn-outline-secondary text-white fw-bold p-0';
     linkHeader.replaceChildren(button)
     const action = () => {
