@@ -101,6 +101,7 @@
       "using-custom-lists": ["Brug af brugerdefinerede lister"],
       "understanding-locations": ["Forståelse af placeringer"],
       "training-custom-models": ["Træning af brugerdefinerede modeller"],
+      "database-file-management": ["Administrer arkivfiler"],
       "update-progress-text": ["Henter opdatering:"],
       "record-add": ["Tilføj"],
       "record-dismiss": ["Afvis"],

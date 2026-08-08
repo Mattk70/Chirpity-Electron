@@ -102,6 +102,7 @@
     "using-custom-lists": ["Användning av anpassade listor"],
     "understanding-locations": ["Förståelse av platser"],
     "training-custom-models": ["Träning av anpassade modeller"],
+    "database-file-management": ["Hantera arkivfiler"],
     "update-progress-text": ["Laddar ner uppdatering:"],
     "record-add": ["Lägg till"],
     "record-dismiss": ["Avvisa"],

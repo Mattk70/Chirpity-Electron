@@ -102,6 +102,7 @@
     "using-custom-lists": ["Uso de listas personalizadas"],
     "understanding-locations": ["Entendiendo ubicaciones"],
     "training-custom-models": ["Entrenamiento de modelos personalizados"],
+    "database-file-management": ["Gestionar archivos del archivo"],
     "update-progress-text": ["Descargando la actualización:"],
     "record-add": ["Añadir"],
     "record-dismiss": ["Descartar"],

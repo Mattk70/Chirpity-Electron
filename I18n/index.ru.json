@@ -102,6 +102,7 @@
     "using-custom-lists": ["Использование пользовательских списков"],
     "understanding-locations": ["Понимание местоположений"],
     "training-custom-models": ["Обучение пользовательских моделей"],
+    "database-file-management": ["Управление файлами архива"],
     "update-progress-text": ["Загрузка обновления:"],
     "record-add": ["Добавить"],
     "record-dismiss": ["Отклонить"],

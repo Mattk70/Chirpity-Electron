@@ -1209,8 +1209,8 @@ function onDatabaseFiles(fileList) {
           fragment.appendChild(document.createTextNode(text.slice(start, index)));
           const mark = document.createElement("mark");
           // Stronger highlight for filename column
-          if (cell.className === "filename") {
-            mark.style.backgroundColor = "#ffc107"; // Bootstrap warning color
+          if (cell.className.includes("filename")) {
+            mark.className = "text-bg-info"; // Bootstrap warning color
           }
           mark.textContent = text.slice(index, index + filter.length);
           fragment.appendChild(mark);
@@ -1243,12 +1243,12 @@ function onDatabaseFiles(fileList) {
 
     search.addEventListener("input", e => {
       e.stopPropagation();
-      if (search.value.trim() === ''){
+      applyFilter();
+      if (!databaseModalDiv.querySelector("tbody td.filename mark")){
         replace.value = '';
         replace.disabled =  true;
         updateSubmitButton();
       } else { replace.disabled = false }
-      applyFilter();
       updateButtonText();
     });
 

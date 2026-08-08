@@ -102,6 +102,7 @@
   "using-custom-lists": ["使用自定义列表"],
   "understanding-locations": ["理解位置"],
   "training-custom-models": ["训练自定义模型"],
+  "database-file-management":["管理归档文件"],
   "update-progress-text": ["正在下载更新："],
   "record-add": ["添加"],
   "record-dismiss": ["取消"],
