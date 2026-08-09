@@ -1277,7 +1277,6 @@ function onDatabaseFiles(fileList) {
     databaseModalDiv.__dbModal = new bootstrap.Modal(databaseModalDiv);
     const onModalDismiss = () => {
       STATE.fileValidationController?.abort();
-      databaseModalDiv.removeEventListener("hide.bs.modal", onModalDismiss);
     };
     databaseModalDiv.addEventListener("hide.bs.modal", onModalDismiss);
     databaseModalDiv.__dbUIInitialized = true;
@@ -1392,17 +1391,20 @@ function onDatabaseFiles(fileList) {
 const checkFileExists = (path) =>  fs.promises.access(path).then(() => true).catch(() => false);
 
 
-async function validateFileExistence(files, table, progressCallback = null) {
+async function validateFileExistence(files, table, progressCallback = null, signal = null) {
   const t0 = Date.now();
   const i18 = i18n.get(i18n.Database);
   const batchSize = DIAGNOSTICS["Cores"] || 20;
   let checked = 0;
   let missing = 0;
   for (let i = 0; i < files.length; i += batchSize) {
+    if (signal?.aborted) break;
     const batch = files.slice(i, i + batchSize);
     await Promise.all(
       batch.map(async file => {
+        if (signal?.aborted) return;
         const exists = await checkFileExists(file.name);
+        if (signal?.aborted) return;
         const checkbox = table.querySelector(
           `input.rm[data-file-id="${file.id}"]`
         );
@@ -1430,6 +1432,7 @@ async function validateFileExistence(files, table, progressCallback = null) {
         checked++;
       })
     );
+    if (signal?.aborted) break;
     if (progressCallback) {
       progressCallback(checked, files.length, missing);
     }
@@ -6596,7 +6599,7 @@ async function handleUIClicks(e) {
   config.debug && console.log("clicked", target);
   target &&
     target !== "result1" &&
-    trackEvent({uuid:config.UUID, event: "UI", action: "Click", name: target, value:element.value, version: VERSION});
+    trackEvent({uuid:config.UUID, event: "UI", action: "Click", name: target, version: VERSION});
 };
 
 /**
