@@ -1411,7 +1411,7 @@ async function validateFileExistence(files, table, progressCallback = null, sign
         const row = checkbox?.closest("tr");
         if (row) {
           const linkCell = row.querySelector('td.status');
-          if (exists) linkCell.textContent = 'OK';
+          if (exists) linkCell.textContent = i18['OK'];
           else {
             if (file.archived){
               if (await checkFileExists(p.join(config.library.location,file.archiveName))){
