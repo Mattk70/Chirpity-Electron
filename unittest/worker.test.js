@@ -161,7 +161,7 @@ test('STATE uses WorkerState class', () => {
 });
 
 test('defines QUEUE', () => {
-  assert.ok(/const\s+analyseQueue\s*=\s*new\s+FileQueueManager/.test(workerContent), 'Should define QUEUE class');
+  assert.ok(/QUEUE\s*=\s*new\s+FileQueueManager/.test(workerContent), 'Should define QUEUE class');
 });
 
 test('defines predictWorkers array', () => {
