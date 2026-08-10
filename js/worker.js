@@ -134,10 +134,9 @@ let appPath,
   tempPath,
   BATCH_SIZE,
   batchesToSend = {};
-let LIST_WORKER, QUEUE;
+let LIST_WORKER, QUEUE  = new FileQueueManager();
+let processFilesInBatchesRunID = 0;
 
-const analyseQueue = new FileQueueManager();
-QUEUE = analyseQueue;
 // Adapted from https://stackoverflow.com/questions/6117814/get-week-of-year-in-javascript-like-in-php
 Date.prototype.getWeekNumber = function () {
   var d = new Date(
@@ -1396,28 +1395,37 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true, skipM
  * @param {number} [batchSize=20] - Maximum number of files to process concurrently per batch.
  */
 async function processFilesInBatches(filePaths, batchSize = 20) {
+  const runId = ++processFilesInBatchesRunID;
+  const isStale = () => runId !== processFilesInBatchesRunID;
   STATE.totalBatches = 0;
   STATE.allFilesDuration = 0;
   const t0 = Date.now();
   for (let i = 0; i < filePaths.length; i += batchSize) {
+    if (isStale()) {
+      DEBUG && console.log(`Run ${runId} superseded — stopping before batch at ${i}`);
+      return;
+    }
     const batch = filePaths.slice(i, i + batchSize);
     // Run the batch in parallel
     const results = await Promise.all(
       batch.map(file =>
         setMetadata({ file }).then(fileMetadata => {
+          if (isStale()) return fileMetadata;
           const duration = fileMetadata.duration || 0;
           STATE.allFilesDuration += duration;
           STATE.totalBatches += getBatchesToSend(duration);
           return fileMetadata;
         }).catch ((_e) => {
           console.warn(`Failed to get metadata for file: ${file}`);
-          QUEUE.setStatus(file, 'invalid')
-          return null; // or handle the error as needed
+          if (!isStale()) QUEUE.setStatus(file, 'invalid')
+          return null; 
         }
       ))
     );
+    if (isStale()) return; // check again after the await
     DEBUG && console.log(`Processed ${i + results.length} of ${filePaths.length}`);
   }
+  if (isStale()) return;
   if (QUEUE.any('invalid')) {
     generateAlert({
       type: "warning",
@@ -2004,7 +2012,7 @@ async function onAnalyse({
     // Clear any location filters set in explore/charts
     STATE.location = undefined;
     // Recaclutate analysis time estimates based on the files in scope
-    await resetEstimates();
+    resetEstimates();
   }
 
   let count = 0;
