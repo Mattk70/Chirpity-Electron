@@ -67,6 +67,7 @@
   ],
   "charts": ["查看图表"],
   "manage-locations": ["管理位置"],
+  "manage-files": ["管理归档文件"],
   "explore": ["浏览档案"],
   "chart-datefilter": ["应用日期过滤器"],
   "explore-datefilter": ["应用日期过滤器"],
@@ -101,6 +102,7 @@
   "using-custom-lists": ["使用自定义列表"],
   "understanding-locations": ["理解位置"],
   "training-custom-models": ["训练自定义模型"],
+  "database-file-management":["管理归档文件"],
   "update-progress-text": ["正在下载更新："],
   "record-add": ["添加"],
   "record-dismiss": ["取消"],
@@ -214,5 +216,6 @@
     "音频库",
     "频谱图偏好设置",
     "高级"
-  ]  
+  ],
+    "databaseModalLabel": ["数据库文件管理"]
 }

@@ -43,7 +43,19 @@ let predictWorkers = [];
 let UI;
 let initialiseResolve;
 let initialiseReject;
-
+const i18nFiles = {
+  en: ["file", "files"],
+  fr: ["fichier", "fichiers"],
+  es: ["archivo", "archivos"],
+  de: ["Datei", "Dateien"],
+  pt: ["arquivo", "arquivos"],
+  nl: ["bestand", "bestanden"],
+  sv: ["fil", "filer"],
+  da: ["fil", "filer"],
+  ru: ["файл", "файлы"],
+  ja: ["ファイル", "ファイル"],
+  zh: ["文件", "文件"],
+};
 let INITIALISED = new Promise((resolve, reject) => {
   initialiseResolve = resolve;
   initialiseReject = reject;
@@ -122,10 +134,9 @@ let appPath,
   tempPath,
   BATCH_SIZE,
   batchesToSend = {};
-let LIST_WORKER, QUEUE;
+let LIST_WORKER, QUEUE  = new FileQueueManager();
+let processFilesInBatchesRunID = 0;
 
-const analyseQueue = new FileQueueManager();
-QUEUE = analyseQueue;
 // Adapted from https://stackoverflow.com/questions/6117814/get-week-of-year-in-javascript-like-in-php
 Date.prototype.getWeekNumber = function () {
   var d = new Date(
@@ -600,9 +611,96 @@ async function handleMessage(e) {
       getLocations(args);
       break;
     }
+    case "manage-files": {
+      try {
+        if (!diskDB) throw new Error("No archive database is loaded");
+        const files = await diskDB.allAsync(`
+          SELECT 
+              f.id, f.name, f.archiveName,
+              CASE WHEN f.archiveName IS NOT NULL THEN 1 ELSE 0 END AS archived,
+              f.filestart, l.place as location
+          FROM files f
+          LEFT JOIN locations l ON f.locationID = l.id;`);
+        UI.postMessage({ event: "database-files", files });
+      } catch (error) {
+        generateAlert({ type: "error", message: `File list failed: ${error.message}` });
+        console.error(error);
+      }
+      break;
+    }
     case "get-tags": {
       const result = await diskDB.allAsync("SELECT id, name FROM tags");
       UI.postMessage({ event: "tags", tags: result, init: true });
+      break;
+    }
+    case "delete-files": {
+      try {
+        const fileIDs = (args.fileIDs ?? [])
+          .map(id => Number(id))
+          .filter(id => Number.isInteger(id));
+        if (!fileIDs.length) break;
+        const placeholders = fileIDs.map(() => "?").join(",");
+        const result = await diskDB.runAsync(
+          "DELETE FROM files WHERE id IN (" + placeholders + ")",
+          ...fileIDs
+        );
+        if (result?.changes) {
+          const numberOfFiles = result.changes;
+          const msg = i18nFiles[STATE.locale] || i18nFiles["en"];
+          const message = numberOfFiles === 1 ? `1 ${msg[0]}` : `${numberOfFiles} ${msg[1]}`;
+          getDetectedSpecies();
+          generateAlert({
+            message: "goodFilePurge",
+            variables: { file: message },
+          });
+        }
+      } catch (error) {
+        generateAlert({ message: `File deletion failed: ${error.message}`, type: 'error' });
+        console.error(error);
+      }
+      break;
+    }
+    case "update-files": {
+      try {
+        const fileIDs = (args.fileIDs ?? [])
+          .map(id => Number(id))
+          .filter(id => Number.isInteger(id));
+        if (!fileIDs.length) break;
+        const oldValue = args.oldValue;
+        const newValue = args.newValue;
+        const placeholders = fileIDs.map(() => "?").join(",");
+        const result = await diskDB.runAsync(
+          `UPDATE files
+            SET name = REPLACE(name, ?, ?)
+            WHERE id IN (${placeholders})
+              AND instr(name, ?) > 0`,
+            oldValue,
+            newValue,
+            ...fileIDs,
+            oldValue
+        );
+        if (result?.changes) {
+          const numberOfFiles = result.changes;
+          const msg = i18nFiles[STATE.locale] || i18nFiles["en"];
+          const message = numberOfFiles === 1 ? `1 ${msg[0]}` : `${numberOfFiles} ${msg[1]}`;
+          generateAlert({
+            message: "goodFileUpdate",
+            variables: { file: message },
+          });
+        } else {
+          // oldValue not found in the selected files
+          const numberOfFiles = result.changes;
+          const msg = i18nFiles[STATE.locale] || i18nFiles["en"];
+          const message = numberOfFiles === 1 ? `1 ${msg[0]}` : `${numberOfFiles} ${msg[1]}`;
+          generateAlert({
+            message: "noFileUpdate",
+            variables: { file: message },
+          });
+        }
+      } catch (error) {
+        generateAlert({ message: `File update failed: ${error.message}`, type: 'error' });
+        console.error(error);
+      }
       break;
     }
     case "delete-tag": {
@@ -1297,28 +1395,37 @@ const getFiles = async ({files, image, preserveResults, checkSaved = true, skipM
  * @param {number} [batchSize=20] - Maximum number of files to process concurrently per batch.
  */
 async function processFilesInBatches(filePaths, batchSize = 20) {
+  const runId = ++processFilesInBatchesRunID;
+  const isStale = () => runId !== processFilesInBatchesRunID;
   STATE.totalBatches = 0;
   STATE.allFilesDuration = 0;
   const t0 = Date.now();
   for (let i = 0; i < filePaths.length; i += batchSize) {
+    if (isStale()) {
+      DEBUG && console.log(`Run ${runId} superseded — stopping before batch at ${i}`);
+      return;
+    }
     const batch = filePaths.slice(i, i + batchSize);
     // Run the batch in parallel
     const results = await Promise.all(
       batch.map(file =>
         setMetadata({ file }).then(fileMetadata => {
+          if (isStale()) return fileMetadata;
           const duration = fileMetadata.duration || 0;
           STATE.allFilesDuration += duration;
           STATE.totalBatches += getBatchesToSend(duration);
           return fileMetadata;
         }).catch ((_e) => {
           console.warn(`Failed to get metadata for file: ${file}`);
-          QUEUE.setStatus(file, 'invalid')
-          return null; // or handle the error as needed
+          if (!isStale()) QUEUE.setStatus(file, 'invalid')
+          return null; 
         }
       ))
     );
+    if (isStale()) return; // check again after the await
     DEBUG && console.log(`Processed ${i + results.length} of ${filePaths.length}`);
   }
+  if (isStale()) return;
   if (QUEUE.any('invalid')) {
     generateAlert({
       type: "warning",
@@ -1905,7 +2012,7 @@ async function onAnalyse({
     // Clear any location filters set in explore/charts
     STATE.location = undefined;
     // Recaclutate analysis time estimates based on the files in scope
-    await resetEstimates();
+    resetEstimates();
   }
 
   let count = 0;

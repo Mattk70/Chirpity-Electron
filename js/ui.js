@@ -437,7 +437,7 @@ DOM.controlsWrapper.addEventListener("mousedown", (e) => {
     if (!animating) {
       animating = true;
       requestAnimationFrame(() => {
-        spec.adjustDims(true, config.FFT, newHeight);
+        spec.adjustDims(true, newHeight);
         animating = false;
       });
     }
@@ -628,8 +628,12 @@ function clearActive() {
 
 
 
+/**
+ * Opens an audio file or folder selection dialog and processes the selected paths.
+ * @param {string} fileOrFolder - Specifies whether the dialog selects files or a folder.
+ */
 async function showOpenDialog(fileOrFolder) {
-  const defaultPath = localStorage.getItem("lastFolder") || "";
+  const defaultPath = localStorage.getItem("lastOpenFolder") || "";
   const files = await window.electron.openDialog("showOpenDialog", {
     type: "audio",
     fileOrFolder: fileOrFolder,
@@ -638,7 +642,7 @@ async function showOpenDialog(fileOrFolder) {
   });
   if (!files.canceled) {
     filterValidFiles({ filePaths: files.filePaths });
-    localStorage.setItem("lastFolder", p.dirname(files.filePaths[0]));
+    localStorage.setItem("lastOpenFolder", p.dirname(files.filePaths[0]));
   }
 }
 
@@ -1106,6 +1110,343 @@ const setDefaultLocation = () => {
   button.innerHTML = 'Set <span class="material-symbols-outlined">done</span>';
 };
 
+
+/**
+ * Creates a table body containing database file rows and deletion checkboxes.
+ * @param {Array<Object>} fileList - The files to display.
+ * @param {Object} i18n - Localized labels used for boolean and default-location values.
+ * @return {HTMLTableSectionElement} The populated table body.
+ */
+function generateFileRows(fileList, i18n) {
+  const tbody = document.createElement("tbody");
+  tbody.className = "text-center";
+  const dateFormat = new Intl.DateTimeFormat(undefined, {
+    dateStyle: "short",
+    timeStyle: "medium",
+  });
+  for (const file of fileList) {
+    const tr = document.createElement("tr");
+    tr.className = "file-row";
+    tr.dataset.search = file.name.toLowerCase();
+
+    const addCell = (text, className) => {
+      const td = document.createElement("td");
+      td.textContent = text;
+      if (className) td.className = className;
+      tr.appendChild(td);
+      return td;
+    };
+
+    addCell(file.name, 'filename text-start');
+    addCell(file.archived ? i18n["yes"] : i18n["no"], );
+    addCell(Number.isFinite(file.filestart) ? dateFormat.format(file.filestart) : "");
+    addCell(file.location ?? i18n["default"]);
+    addCell(i18n['Pending'], 'status');
+
+    const td = addCell("");
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.className = "form-check-input rm";
+    checkbox.dataset.fileId = file.id;
+    td.appendChild(checkbox);
+    tbody.appendChild(tr);
+  }
+
+  return tbody;
+}
+
+/**
+ * Displays database files in a searchable modal with row selection and deletion controls.
+ * @param {Array} fileList - The database files to display.
+ */
+function onDatabaseFiles(fileList) {
+  const i18 = i18n.get(i18n.Database);
+  const databaseModalDiv = document.getElementById("databaseModal");
+  const contentDiv = databaseModalDiv.querySelector(".modal-body");
+  const selectAllButton = databaseModalDiv.querySelector("#selectAllFiles");
+  const submitButton = databaseModalDiv.querySelector("#processSelectedFiles");
+  const search = document.getElementById("db-filter");
+  const replace = document.getElementById("db-replace");
+
+  function getVisibleCheckboxes() {
+    return [...databaseModalDiv.querySelectorAll(".rm")]
+      .filter(cb => !cb.closest("tr").hidden);
+  }
+
+  function updateButtonText() {
+    const checkboxes = getVisibleCheckboxes();
+    const allSelected = checkboxes.length > 0 && checkboxes.every(cb => cb.checked);
+
+    selectAllButton.textContent =
+      `${allSelected ? i18["Deselect All"] : i18["Select All"]} (${checkboxes.length})`;
+  }
+
+  function updateSubmitButton() {
+    const selected = databaseModalDiv.querySelectorAll(".rm:checked").length;
+    submitButton.disabled = selected === 0;
+    // If the replace input has text, make the delete button trigger a replace action instead of delete
+    submitButton.textContent = replace.value.trim() ? i18["Update Entries"] : i18["Delete Entries"];
+    selected && (submitButton.textContent += ` (${selected})`);
+  }
+
+  function applyFilter() {
+    const filter = search.value.trim().toLowerCase();
+    contentDiv.querySelectorAll("tbody tr").forEach(row => {
+      row.hidden = filter && !row.textContent.toLowerCase().includes(filter);
+      row.querySelectorAll("td").forEach(cell => {
+        // Remove previous highlighting
+        cell.querySelectorAll("mark").forEach(mark => {
+          mark.replaceWith(document.createTextNode(mark.textContent));
+        });
+        if (!filter || row.hidden) return;
+        const text = cell.textContent;
+        const lowerText = text.toLowerCase();
+        if (!lowerText.includes(filter)) return;
+        const fragment = document.createDocumentFragment();
+        let start = 0;
+        let index;
+        while ((index = lowerText.indexOf(filter, start)) !== -1) {
+          fragment.appendChild(document.createTextNode(text.slice(start, index)));
+          const mark = document.createElement("mark");
+          // Stronger highlight for filename column
+          if (cell.className.includes("filename")) {
+            mark.className = "text-bg-info"; // Bootstrap warning color
+          }
+          mark.textContent = text.slice(index, index + filter.length);
+          fragment.appendChild(mark);
+          start = index + filter.length;
+        }
+        fragment.appendChild(document.createTextNode(text.slice(start)));
+        cell.replaceChildren(fragment);
+      });
+    });
+  }
+
+  if (!databaseModalDiv.__dbUIInitialized) {
+    databaseModalDiv.addEventListener("change", event => {
+      if (event.target.classList.contains("rm")) {
+        event.stopPropagation();
+        updateSubmitButton();
+        updateButtonText();
+      }
+    });
+
+    selectAllButton.addEventListener("click", () => {
+      const checkboxes = getVisibleCheckboxes();
+      const allSelected = checkboxes.every(cb => cb.checked);
+      checkboxes.forEach(cb => {
+        cb.checked = !allSelected;
+      });
+      updateButtonText();
+      updateSubmitButton();
+    });
+
+    search.addEventListener("input", e => {
+      e.stopPropagation();
+      applyFilter();
+      if (!databaseModalDiv.querySelector("tbody td.filename mark")){
+        replace.value = '';
+        replace.disabled =  true;
+        updateSubmitButton();
+      } else { replace.disabled = false }
+      updateButtonText();
+    });
+
+    replace.addEventListener("input", e => {
+      e.stopPropagation();
+      updateSubmitButton();
+    });
+
+    submitButton.addEventListener("click", () => {
+      const selectedFiles = [...databaseModalDiv.querySelectorAll(".rm:checked")];
+      if (selectedFiles.length > 0) {
+        const fileIDs = selectedFiles.map(cb => parseInt(cb.dataset.fileId, 10));
+        submitButton.disabled = true;
+        if (replace.value.trim()) {
+          const oldValue = search.value.trim();
+          if (!oldValue) return;
+          const newValue = replace.value.trim();
+          worker.postMessage({ action: "update-files", fileIDs, oldValue, newValue });
+        } else {
+          worker.postMessage({ action: "delete-files", fileIDs });
+        }
+        databaseModalDiv.__dbModal.hide();
+      }
+    });
+
+    databaseModalDiv.__dbModal = new bootstrap.Modal(databaseModalDiv);
+    const onModalDismiss = () => {
+      STATE.fileValidationController?.abort();
+    };
+    databaseModalDiv.addEventListener("hide.bs.modal", onModalDismiss);
+    databaseModalDiv.__dbUIInitialized = true;
+  }
+
+  // Clear previous contents
+  contentDiv.replaceChildren();
+  const table = document.createElement("table");
+  table.className = "table table-hover";
+  const thead = document.createElement("thead");
+  thead.className = "sticky-top text-bg-dark text-center";
+  const headerRow = document.createElement("tr");
+  let count = 0;
+  ["Filename", "In Audio Library", "File Start", "Location", "Link Status", "Selected"]
+    .map(text => i18[text])
+    .forEach(text => {
+      count++;
+      const th = document.createElement("th");
+      th.textContent = text;
+      if (count === 5) th.id = 'link-check';
+      headerRow.appendChild(th);
+    });
+  thead.appendChild(headerRow);
+  table.appendChild(thead);
+  table.appendChild(generateFileRows(fileList, i18));
+  contentDiv.appendChild(table);
+  // Make row click select the record and shift click select multiple rows
+  let mouseDownX;
+  let mouseDownY;
+  let lastClickedRow = null;
+
+  table.querySelector("tbody").addEventListener("mousedown", event => {
+    mouseDownX = event.clientX;
+    mouseDownY = event.clientY;
+    // Prevent browser text selection flash during shift-click selection
+    if (event.shiftKey) {
+      event.preventDefault();
+    }
+  });
+
+  table.querySelector("tbody").addEventListener("click", event => {
+    const row = event.target.closest(".file-row");
+    if (!row) return;
+    const moved = Math.abs(event.clientX - mouseDownX) > 5 ||
+                Math.abs(event.clientY - mouseDownY) > 5;
+
+    // Ignore clicks that were actually a drag selection
+    if (moved) return;
+    // Ignore direct checkbox clicks
+    if (event.target.classList.contains("rm")) {
+      lastClickedRow = row;
+      return;
+    }
+    const rows = [...table.querySelectorAll("tbody .file-row")].filter(row => !row.hidden);
+    const checkbox = row.querySelector(".rm");
+
+    const start = event.shiftKey && lastClickedRow ? rows.indexOf(lastClickedRow) : -1;
+    if (start !== -1) {
+      const end = rows.indexOf(row);
+      const from = Math.min(start, end);
+      const to = Math.max(start, end);
+      const selectState = !checkbox.checked;
+      rows.slice(from, to + 1).forEach(r => {
+        r.querySelector(".rm").checked = selectState;
+      });
+    } else {
+      checkbox.checked = !checkbox.checked;
+    }
+
+    lastClickedRow = row;
+    updateSubmitButton();
+  });
+
+  search.value = ""; replace.value = ""; replace.disabled = true;
+  applyFilter();
+  updateButtonText();
+  updateSubmitButton();
+  // Check files status in the background
+  if (fileList.length > 1000) {
+    // Trigger check manually
+    const linkHeader = document.getElementById('link-check');
+    const linkText = linkHeader.textContent;
+    const button = document.createElement('button');
+    button.id = 'manual-file-check';
+    button.value = fileList.length;
+    const icon = document.createElement('span');
+    icon.className = 'material-symbols-outlined';
+    icon.textContent = 'rule';
+    button.append(icon, document.createTextNode(linkText));
+    button.className = 'btn btn-outline-secondary text-white fw-bold p-0';
+    linkHeader.replaceChildren(button)
+    const action = () => {
+      linkHeader.replaceChildren(linkText);
+      linkHeader.removeEventListener('click', action)
+      STATE.fileValidationController = new AbortController();
+      const status = databaseModalDiv.querySelector('#validation-status');
+      validateFileExistence(fileList, table, (checked, total, missing) => {
+        if (checked % ((DIAGNOSTICS["Cores"] || 20)*10 ) !== 0) return
+        status.textContent = `Checking files... ${checked} / ${total} (${missing} missing)`;
+      }, STATE.fileValidationController.signal).then(result => {
+        status.textContent = '';
+        STATE.fileValidationController = null;
+      });
+    }
+    linkHeader.addEventListener('click', action)
+  } else {
+    validateFileExistence(fileList, table);
+  }
+  databaseModalDiv.__dbModal.show();
+}
+
+const checkFileExists = (path) =>  fs.promises.access(path).then(() => true).catch(() => false);
+
+
+async function validateFileExistence(files, table, progressCallback = null, signal = null) {
+  const t0 = Date.now();
+  const i18 = i18n.get(i18n.Database);
+  const batchSize = DIAGNOSTICS["Cores"] || 20;
+  let checked = 0;
+  let missing = 0;
+  for (let i = 0; i < files.length; i += batchSize) {
+    if (signal?.aborted) break;
+    const batch = files.slice(i, i + batchSize);
+    await Promise.all(
+      batch.map(async file => {
+        if (signal?.aborted) return;
+        const exists = await checkFileExists(file.name);
+        if (signal?.aborted) return;
+        const checkbox = table.querySelector(
+          `input.rm[data-file-id="${file.id}"]`
+        );
+        const row = checkbox?.closest("tr");
+        if (row) {
+          const linkCell = row.querySelector('td.status');
+          if (exists) linkCell.textContent = i18['OK'];
+          else {
+            if (file.archived){
+              if (await checkFileExists(p.join(config.library.location,file.archiveName))){
+                row.classList.add("text-bg-warning")
+                linkCell.textContent = i18['OK'];
+              } else {
+                row.classList.add("text-bg-danger");
+                linkCell.textContent = i18['Missing'];
+                missing++;
+              }
+            } else { 
+              row.classList.add("text-bg-danger") 
+              linkCell.textContent = i18['Missing'];
+              missing++;
+            }
+          }
+        }
+        checked++;
+      })
+    );
+    if (signal?.aborted) break;
+    if (progressCallback) {
+      progressCallback(checked, files.length, missing);
+    }
+  }
+  console.log(`Checking ${files.length} files' existence took ${((Date.now() - t0)/1000).toFixed(0)} seconds`)
+}
+
+  
+
+
+/**
+ * Opens the location editor for the current file or saved locations.
+ * @param {boolean} [manage=false] - Whether to enable saved-location management controls.
+ */
 async function setCustomLocation(manage = false) {
   const savedLocationSelect = await generateLocationList("savedLocations", !manage);
   const latEl = document.getElementById("customLat");
@@ -2113,7 +2454,7 @@ window.onload = async () => {
   updateListOptions(selectedModel);
   // debug && document.getElementById('dataset').classList.remove('d-none')
   isMember && updateModelOptions();
-
+  
   worker.postMessage({
     action: "update-state",
     model: selectedModel,
@@ -2385,6 +2726,10 @@ const setUpWorkerMessaging = () => {
         case "clear-loading": {
           loadingFiles({hide:true})
           DOM.loadingScreen.classList.add('d-none')
+          break;
+        }
+        case "database-files": {
+          onDatabaseFiles(args.files);
           break;
         }
         case "footer-progress": {
@@ -5567,6 +5912,10 @@ async function handleUIClicks(e) {
     }
     case "manage-locations": {
       setCustomLocation(true)
+      break;
+    }
+    case "manage-files": {
+      worker.postMessage({ action: "manage-files" });
       break;
     }
     case "compress-and-organise": {

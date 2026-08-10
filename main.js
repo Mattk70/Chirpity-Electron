@@ -641,10 +641,11 @@ app.whenReady().then(async () => {
     });
     
     ipcMain.handle('openFiles', async (_event, _method, config) => {
-        const {type, fileOrFolder, multi, buttonLabel, title} = config;
-        let options;
+        const {type, fileOrFolder, multi, buttonLabel, title, defaultPath} = config;
+        let options = {defaultPath};
         if (type === 'audio') {
             options = {
+                ...options,
                 properties: [fileOrFolder, multi].filter(Boolean),
                 buttonLabel: buttonLabel,
                 title: title
@@ -656,6 +657,7 @@ app.whenReady().then(async () => {
           const ext = type === 'Text' ? ['txt', 'csv'] : ['csv'];
           console.log('selecting ', type, ext )
           options = {
+              ...options,
               filters: [
                   { name: `${type} Files`, extensions: ext }
               ],

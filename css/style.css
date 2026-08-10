@@ -288,7 +288,7 @@ ul {
   /*cursor: default; */
 }
 
-#summary td.cname, #summary td.cname *  {
+#summary td.cname, #summary td.cname, #databaseModal tbody *  {
   user-select: text;
 }
 
@@ -947,4 +947,11 @@ input[type="range"].vertical {
 .filter-dropdown label:hover {
   background-color: #dddddd;
   cursor: pointer;
+}
+#databaseModal button{
+  font-size: 0.8rem;
+}
+#databaseModal input[type="search"] {
+  max-width: 20rem;
+  font-size: 0.8rem;
 }

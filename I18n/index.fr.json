@@ -67,6 +67,7 @@
     ],
     "charts": ["Voir les graphiques"],
     "manage-locations": ["Gérer les emplacements"],
+    "manage-files": ["Gérer les fichiers d’archive"],
     "explore": ["Explorer l'archive"],
     "chart-datefilter": ["Appliquer un filtre de date"],
     "explore-datefilter": ["Appliquer un filtre de date"],
@@ -101,6 +102,7 @@
     "using-custom-lists": ["Utilisation de listes personnalisées"],
     "understanding-locations": ["Comprendre les emplacements"],
     "training-custom-models": ["Entraînement de modèles personnalisés"],
+    "database-file-management": ["Gérer les fichiers d’archive"],
     "update-progress-text": ["Téléchargement de la mise à jour :"],
     "record-add": ["Ajouter"],
     "record-dismiss": ["Ignorer"],
@@ -214,5 +216,6 @@
       "Bibliothèque audio",
       "Préférences spectrogramme",
       "Avancé"
-    ]   
+    ],
+    "databaseModalLabel": ["Gestion des fichiers de base de données"]
 }

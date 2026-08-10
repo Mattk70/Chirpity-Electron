@@ -811,17 +811,16 @@ export class ChirpityWS {
    * Depending on whether WaveSurfer is already initialized, the function will either:
    * - Initialize a new WaveSurfer instance with the current audio buffer and updated height.
    * - Update the existing WaveSurfer instance's options (including height and cursor color), re-register the spectrogram
-   *   plugin with the new settings (using `fftSamples` if provided), and reload the audio buffer.
+   *   plugin with the new settings and reload the audio buffer.
    *
    * Finally, it adjusts the height of the result table to fill the remaining vertical space.
    *
    * @param {boolean} redraw - Indicates whether the spectrogram should be re-rendered and WaveSurfer updated.
-   * @param {number} [fftSamples] - Optional. The number of FFT samples to use for rendering; must be a power of two.
    * @param {number} [newHeight=0] - Optional. Overrides the dynamic height calculation for the spectrogram; a value of 0 triggers dynamic sizing.
    * @returns {Promise<void>} A promise that resolves once the UI adjustments and spectrogram rendering updates are complete.
    */
 
-  async adjustDims(redraw, fftSamples, newHeight) {
+  async adjustDims(redraw, newHeight) {
     const config = this.getConfig();
     const STATE = this.getState();
     const {footer, navPadding, contentWrapper, exploreWrapper, 
@@ -858,7 +857,6 @@ export class ChirpityWS {
 
     const footerHeight = footer.offsetHeight;
     const navHeight = navPadding.clientHeight;
-    fftSamples ??= config.FFT;
     contentWrapper.style.top = navHeight.toString() + "px"; // for padding
     contentWrapper.style.height =
       (document.body.clientHeight - footerHeight - navHeight).toString() + "px";
