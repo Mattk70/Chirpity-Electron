@@ -2728,6 +2728,18 @@ const setUpWorkerMessaging = () => {
           DOM.loadingScreen.classList.add('d-none')
           break;
         }
+        case "corrupt-file": {
+          const file = args.file;
+          const index = STATE.openFiles.indexOf(file);
+          if (index !== -1) {
+              STATE.openFiles.splice(index, 1);
+          }
+          if (index === 0 && STATE.openFiles.length > 0){
+            // Try opening the next file
+            loadAudioFileSync({ filePath: STATE.openFiles[0] });
+          }
+          break;
+        }
         case "database-files": {
           onDatabaseFiles(args.files);
           break;
@@ -8785,12 +8797,17 @@ function updateSuggestions(input, element, preserveInput) {
       }
 
       if (input.id === "bird-autocomplete-explore") {
-        filterResults({ species: item.cname, updateSummary: true });
-        resetResults({
-          clearSummary: false,
-          clearPagination: false,
-          clearResults: false,
+        // Mark the summary table row for the species selected
+        const td = [...document.querySelectorAll('#speciesFilter td.cname')]
+          .find(td => td.querySelector('span.cname')?.textContent.trim() === item.cname);
+
+        td?.click();
+
+        td?.scrollIntoView({
+          behaviour: 'smooth',
+          block: 'center'
         });
+
       } else if (input.id === "bird-autocomplete-chart") {
         STATE.chart.species = item.cname;
         callForChart();

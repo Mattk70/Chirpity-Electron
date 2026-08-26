@@ -571,15 +571,15 @@ async function handleMessage(e) {
       index = 0;
       QUEUE.any('inProgress') && onAbort({model});
       DEBUG && console.log("Worker received audio " + file);
-      await loadAudioFile(args).catch((_e) =>
-        console.warn("Error opening file:", file)
-      );
+      await loadAudioFile(args).catch((e) => {
+        UI.postMessage({event: 'corrupt-file', file})
+      });
       if (!preserveResults) {
         // Clear records from the memory db
         await memoryDB.runAsync("DELETE FROM records; VACUUM");
-        const mode = METADATA[file]?.isSaved ? "archive" : "analyse";
-        await onChangeMode(mode);
-        STATE.openFiles = [file];
+        // const mode = METADATA[file]?.isSaved ? "archive" : "analyse";
+        // await onChangeMode(mode);
+        // STATE.openFiles = [file];
       }
       break;
     }
@@ -669,16 +669,19 @@ async function handleMessage(e) {
         const oldValue = args.oldValue;
         const newValue = args.newValue;
         const placeholders = fileIDs.map(() => "?").join(",");
-        const result = await diskDB.runAsync(
-          `UPDATE files
-            SET name = REPLACE(name, ?, ?)
+        const sql = `UPDATE files SET name = REPLACE(name, ?, ?)
             WHERE id IN (${placeholders})
-              AND instr(name, ?) > 0`,
-            oldValue,
-            newValue,
-            ...fileIDs,
-            oldValue
-        );
+              AND instr(name, ?) > 0`;
+        const [diskResult, memoryResult] = await Promise.all([
+          diskDB.runAsync(sql, oldValue, newValue, ...fileIDs, oldValue),
+          memoryDB.runAsync(sql, oldValue, newValue, ...fileIDs, oldValue)
+        ]);
+        if (diskResult.changes !== memoryResult.changes) {
+          console.warn(
+            `Database mismatch: disk files changed=${diskResult.changes}, memory files changed=${memoryResult.changes}`
+          );
+        }
+        const result = diskResult;
         if (result?.changes) {
           const numberOfFiles = result.changes;
           const msg = i18nFiles[STATE.locale] || i18nFiles["en"];
@@ -2362,7 +2365,7 @@ async function loadAudioFile({
       fetchAudioBuffer({ file, start, end })
         .then(([audio, start]) => {
           if (!audio || audio.length === 0) {
-            return reject('no file duration') 
+            return reject({message: 'No audio data found in file'}) 
           }
           UI.postMessage(
             {
@@ -4182,7 +4185,7 @@ async function processNextFile({
     }
     for (let i = 0; i < boundaries.length; i++) {
       const { start, end } = boundaries[i];
-      if (start === null) {
+      if (start === null || start === end) {
         // Nothing to do for this file
         generateAlert({ message: "noNight", variables: { file } });
         DEBUG && console.log("Recursion: start = end");
@@ -4969,6 +4972,7 @@ const onSave2DiskDB = async ({ file }) => {
   await dbMutex.lock();
   let inserted = 0;
   try {
+    const result = await memoryDB.allAsync("SELECT * FROM files");
     await memoryDB.runAsync("BEGIN");
     await memoryDB.runAsync(`
       INSERT OR IGNORE INTO disk.locations (id, lat, lon, place, radius)
