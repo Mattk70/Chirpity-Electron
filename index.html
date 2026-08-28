@@ -631,6 +631,29 @@
             </div>
         </div>
     </div>
+    <!-- Database management modal -->
+    <div class="modal fade" id="databaseModal" tabindex="-1" aria-labelledby="databaseModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="databaseModalLabel">Database File Management</h5>
+                    <div class="ms-3 small text-muted float-end" id="validation-status"></div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body pt-0" style="max-height: 90vh; overflow-y: auto; font-size: small;">
+                    <!-- Database management content goes here -->
+                     dummy text
+                </div>
+                <div class="modal-footer justify-content-evenly flex-nowrap">
+                    <input type="search" class="form-control" placeholder="Filter by filename, time or location..." id="db-filter" spellcheck="false" autocomplete="off">
+                    <input type="search" class="form-control" placeholder="Add replace text..." id="db-replace" spellcheck="false" autocomplete="off" disabled>
+                    <button type="button" class="btn btn-primary float-start" id="selectAllFiles">Select All</button>
+                    <button type="submit" class="btn btn-danger" id="processSelectedFiles" disabled>Delete Entries</button>
+                </div>
+                
+            </div>
+        </div>
+    </div>
     <!-- context menu-->
     <div class="dropdown-menu dropdown-menu-sm" id="context-menu"> </div>
             <!-- End context menu -->
@@ -1771,6 +1794,12 @@
                                 <span class="material-symbols-outlined">unarchive</span> Remove Current File From
                                 Archive
                             </li>
+                            <li class="dropdown-item locked d-flex disabled col" id="manage-files">
+                                <span class="material-symbols-outlined">drive_file_move</span> 
+                                <span class="padlock col" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-placement="right" data-bs-title="Feature Locked" data-bs-sanitize="false" data-bs-html="true" data-bs-content="">
+                                        <span class="pointer locked material-symbols-outlined float-end mt-1">lock</span>
+                                </span>
+                            </li>
                             <!-- <li class="dropdown-item d-none" id="dataset">
                                 <span class="material-symbols-outlined">dataset</span> Create Dataset
                             </li> -->
@@ -1887,6 +1916,9 @@
                         <a class="dropdown-item" id="training-custom-models" target="_blank" href="https://github.com/Mattk70/Chirpity-Electron/discussions/330">
                             <span class="material-symbols-outlined">menu_book</span> Training custom models
                         </a>
+                        <a class="dropdown-item" id="database-file-management" target="_blank" href="https://github.com/Mattk70/Chirpity-Electron/discussions/657">
+                            <span class="material-symbols-outlined">menu_book</span> Database File Management
+                        </a>                        
                     </ul>
                 </li>
             <div class="nav-item">

@@ -811,7 +811,7 @@ export class ChirpityWS {
    * Depending on whether WaveSurfer is already initialized, the function will either:
    * - Initialize a new WaveSurfer instance with the current audio buffer and updated height.
    * - Update the existing WaveSurfer instance's options (including height and cursor color), re-register the spectrogram
-   *   plugin with the new settings (using `fftSamples` if provided), and reload the audio buffer.
+   *   plugin with the new settings and reload the audio buffer.
    *
    * Finally, it adjusts the height of the result table to fill the remaining vertical space.
    *

@@ -69,6 +69,7 @@
     ],
     "charts": ["View charts"],
     "manage-locations": ["Manage locations"],
+    "manage-files": ["Manage Archive Files"],
     "explore": ["Explore Archive"],
     "chart-datefilter": ["Apply a date filter"],
     "explore-datefilter": ["Apply a date filter"],
@@ -103,8 +104,8 @@
     "using-custom-lists": ["Using Custom Lists"],
     "understanding-locations": ["Understanding Locations"],
     "training-custom-models": ["Training Custom Models"],
+    "database-file-management": ["Manage Archive Files"],
     "update-progress-text": ["Downloading update:"],
-
 
     "record-add": ["Add"],
     "record-dismiss": ["Dismiss"],
@@ -146,7 +147,7 @@
       "latitude": "Lat:", "longitude": "Lon:",
       "decorators": "Decorators:",
       "tensorflow": "CPU",
-            "webgpu": "GPU",
+      "webgpu": "GPU",
       "thread-slider": "Threads:",
       "batch-size": "Batch Size:",
       "audio-notification": "Enable analysis completion notifications",
@@ -175,7 +176,7 @@
       "mid-color": "Mid colour",
       "quiet-color": "Quiet colour",
       "mid-color-threshold-slider": "Mid Position:",
-        "quiet-color-threshold-slider":  "Quiet Threshold:",
+      "quiet-color-threshold-slider":  "Quiet Threshold:",
       "window-function": "Window function:",
       "timelineSetting": "Timeline:",
       "send-filtered-audio-to-model": "Send Filtered Audio for Analysis",
@@ -221,6 +222,7 @@
       "Audio Library",
       "Spectrogram Preferences",
       "Advanced"
-    ]
+    ],
+    "databaseModalLabel": ["Database File Management"]
   }
 

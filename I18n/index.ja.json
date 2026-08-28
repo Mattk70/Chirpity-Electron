@@ -65,6 +65,7 @@
     "save2db": ["アーカイブに保存","Ctrl+S"],
 "charts": ["チャートを見る"],
     "manage-locations": ["位置を管理"],
+    "manage-files": ["アーカイブファイルを管理"],
 "explore": ["アーカイブを探索"],
 "chart-datefilter": ["日付フィルターを適用"],
 "explore-datefilter": ["日付フィルターを適用"],
@@ -97,6 +98,7 @@
 "using-custom-lists": ["カスタムリストの使用"],
 "understanding-locations": ["場所の理解"],
 "training-custom-models": ["カスタムモデルのトレーニング"],
+"database-file-management": ["アーカイブファイルを管理"],
 "update-progress-text": ["アップデートをダウンロード中："],
 
 "record-add": ["追加"],
@@ -211,5 +213,6 @@
   "オーディオライブラリ",
   "スペクトログラム設定",
   "高度な設定"
-]
+],
+    "databaseModalLabel": ["データベースファイル管理"]
 }

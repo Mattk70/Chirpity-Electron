@@ -67,6 +67,7 @@
     ],
     "charts": ["Ver la gráfica"],
     "manage-locations": ["Gestionar ubicaciones"],
+    "manage-files": ["Gestionar archivos del archivo"],
     "explore": ["Explorar el archivo"],
     "chart-datefilter": ["Aplicar un filtro de fecha"],
     "explore-datefilter": ["Aplicar un filtro de fecha"],
@@ -101,6 +102,7 @@
     "using-custom-lists": ["Uso de listas personalizadas"],
     "understanding-locations": ["Entendiendo ubicaciones"],
     "training-custom-models": ["Entrenamiento de modelos personalizados"],
+    "database-file-management": ["Gestionar archivos del archivo"],
     "update-progress-text": ["Descargando la actualización:"],
     "record-add": ["Añadir"],
     "record-dismiss": ["Descartar"],
@@ -215,5 +217,6 @@
       "Biblioteca de audio",
       "Preferencias del sonograma",
       "Avanzado"
-    ]   
+    ],
+    "databaseModalLabel": ["Gestión de Archivos de Base de Datos"]
 }
