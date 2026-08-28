@@ -2100,7 +2100,7 @@ function onAbort({ model = STATE.model }) {
     run.abortController.abort();
     // Reject all pending worker promises
     try {
-      STATE.workerQueue.cancelAll("Prediction aborted");
+      STATE.workerQueue?.cancelAll("Prediction aborted");
     } catch (e) {
         console.error("Error occurred while cancelling worker queue", e);
     }

@@ -1,10 +1,7 @@
 const fs = require('node:fs');
 const p = require('node:path');
 
-// const TEST_PATH = "E:/DATASETS/Chirpity-Hoplite"
-
 let DIM, BIN_PATH, BYTES_PER_VECTOR;
-// const BIN_PATH = p.join(TEST_PATH,'embeddings.bin')
 let fd;
 
 
