@@ -2730,12 +2730,7 @@ const setUpWorkerMessaging = () => {
           break;
         }
         case "corrupt-file": {
-          const file = args.file;
-          const index = removeOpenFile(file);
-          if (index === 0 && STATE.openFiles.length > 0){
-            // Try opening the next file
-            loadAudioFileSync({ filePath: STATE.openFiles[0] });
-          }
+          removeOpenFile(args.file);
           break;
         }
         case "database-files": {
@@ -3012,16 +3007,26 @@ const setUpWorkerMessaging = () => {
 /**
  * Removes the file from the list of open files and re-render the filename panel
  * @param {string} A file path.
- * @returns {integer} The position the removed file had in the openFiles list.
  */
-function removeOpenFile(file){
+function removeOpenFile(file) {
   const index = STATE.openFiles.indexOf(file);
-  if (index !== -1) {
-      STATE.openFiles.splice(index, 1);
+  if (index === -1) return index;
+
+  const removedCurrentFile = STATE.currentFile === file || ! STATE.currentFile;
+  STATE.openFiles.splice(index, 1);
+
+  if (removedCurrentFile) {
+    const nextIndex = Math.min(index, STATE.openFiles.length - 1);
+    const replacementFile = STATE.openFiles[nextIndex] ?? null;
+    STATE.currentFile = replacementFile;
+    STATE.fileLoaded = false;
+
+    if (replacementFile) {
+      loadAudioFileSync({ filePath: replacementFile });
+    }
   }
-  // Update the list of files
+
   renderFilenamePanel();
-  return index;
 }
 /**
  * Display regions for detections that fall within the current spectrogram window.
@@ -7937,8 +7942,11 @@ function generateToast({
     // Alow further interactions!!
     STATE.currentFile && (STATE.fileLoaded = true);
   } else if (message === 'corruptFile') {
-    const files = variables.files.split('<br>');
-    files.forEach(f => removeOpenFile(f))
+    const files = variables.files.split('<br>').filter(f => f !== '');
+    files.forEach(f => removeOpenFile(f));
+    if (!STATE.currentFile) {
+      STATE.fileLoaded = false;
+    }
   }
   message = variables
     ? utils.interpolate(i18[message], variables)
