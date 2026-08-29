@@ -255,7 +255,7 @@ function getWaveDuration(filePath) {
     const validHeaders = new Set(["RIFF", "RF64", "BW64"]);
     if (!validHeaders.has(riffId) || waveId !== "WAVE") {
       if (riffId.startsWith('ID3')) throw new Error(`ID3 in WAV header: ${filePath}`);
-      throw new Error(`Not a WAV file: ${filePath}`);
+      throw new Error(`Not a WAV file: ${filePath}, riffID:${riffId}, waveId: ${waveId}`);
     }
 
     const isRF64 = riffId === "RF64" || riffId === "BW64";

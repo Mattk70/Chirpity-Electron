@@ -262,9 +262,10 @@ const updateBatches = (file, actualDuration, start, end) => {
 };
 
 const getSelectionRange = (file, start, end) => {
+  const fileStart = METADATA[file]?.fileStart || 0;
   return {
-    start: start * 1000 + METADATA[file].fileStart,
-    end: end * 1000 + METADATA[file].fileStart,
+    start: start * 1000 + fileStart,
+    end: end * 1000 + fileStart,
   };
 };
 
@@ -672,16 +673,32 @@ async function handleMessage(e) {
         const sql = `UPDATE files SET name = REPLACE(name, ?, ?)
             WHERE id IN (${placeholders})
               AND instr(name, ?) > 0`;
-        const [diskResult, memoryResult] = await Promise.all([
-          diskDB.runAsync(sql, oldValue, newValue, ...fileIDs, oldValue),
-          memoryDB.runAsync(sql, oldValue, newValue, ...fileIDs, oldValue)
-        ]);
-        if (diskResult.changes !== memoryResult.changes) {
-          console.warn(
-            `Database mismatch: disk files changed=${diskResult.changes}, memory files changed=${memoryResult.changes}`
-          );
+        const diskSql = `UPDATE disk.files SET name = REPLACE(name, ?, ?)
+            WHERE id IN (${placeholders})
+              AND instr(name, ?) > 0`;
+
+        let result;
+        await dbMutex.lock();
+        try {
+          await memoryDB.runAsync("BEGIN");
+          const diskResult = await memoryDB.runAsync(diskSql, oldValue, newValue, ...fileIDs, oldValue);
+          const memoryResult = await memoryDB.runAsync(sql, oldValue, newValue, ...fileIDs, oldValue);
+
+          if (diskResult.changes !== memoryResult.changes) {
+            throw new Error(
+              `Database mismatch: disk files changed=${diskResult.changes}, memory files changed=${memoryResult.changes}`
+            );
+          }
+
+          await memoryDB.runAsync("COMMIT");
+          result = memoryResult;
+        } catch (error) {
+          await memoryDB.runAsync("ROLLBACK");
+          throw error;
+        } finally {
+          dbMutex.unlock();
         }
-        const result = diskResult;
+
         if (result?.changes) {
           const numberOfFiles = result.changes;
           const msg = i18nFiles[STATE.locale] || i18nFiles["en"];
