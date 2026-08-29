@@ -4989,7 +4989,6 @@ const onSave2DiskDB = async ({ file }) => {
   await dbMutex.lock();
   let inserted = 0;
   try {
-    const result = await memoryDB.allAsync("SELECT * FROM files");
     await memoryDB.runAsync("BEGIN");
     await memoryDB.runAsync(`
       INSERT OR IGNORE INTO disk.locations (id, lat, lon, place, radius)
