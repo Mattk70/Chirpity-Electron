@@ -7,13 +7,19 @@ const { ipcRenderer } = require("electron");
 const fs = require("node:fs");
 const p = require("node:path");
 const SunCalc = require("suncalc");
+const ffprobe = require('@ffprobe-installer/ffprobe');
 const ffmpeg = require("fluent-ffmpeg");
 const { extractWaveMetadata, getWaveDuration } = require("./js/utils/metadata.js");
 const ffmpegPath = require("@ffmpeg-installer/ffmpeg").path.replace(
   "app.asar",
   "app.asar.unpacked"
 );
+const ffprobePath = require('@ffprobe-installer/ffprobe').path.replace(
+	'app.asar',
+	'app.asar.unpacked'
+);
 ffmpeg.setFfmpegPath(ffmpegPath);
+ffmpeg.setFfprobePath(ffprobePath);
 const merge = require("lodash.merge");
 import { WorkerState as State } from "./utils/state.js";
 import {
