@@ -2902,7 +2902,7 @@ const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sam
  * If filters are not active, returns an empty array.
  * @returns {Array<Object>} An array of filter configuration objects representing an ffmpeg-style filter chain; empty if no filters are active.
  */
-function setAudioFilters() {
+function setAudioFilters(codec) {
   const {
     active,
     lowShelfAttenuation: attenuation,
@@ -2911,7 +2911,7 @@ function setAudioFilters() {
     lowPassFrequency: lowPass,
     normalise
   } = STATE.filters;
-
+  const useAdvanced = !['pcm_s32le', 'pcm_s24le'].includes(codec);
   if (!active) return [];
 
   const filters = [];
@@ -2949,7 +2949,7 @@ function setAudioFilters() {
   }
 
   // Normalisation
-  if (normalise) {
+  if (normalise && useAdvanced) {
     filters.push({
       filter: "loudnorm",
       options: "TP=-3.0"
@@ -2994,6 +2994,24 @@ function createPredictSender(workerQueue) {
     return workerQueue.send(payload, transferList);
   };
 }
+const getAudioCodec = (file) => {
+  return new Promise((resolve, reject) => {
+    ffmpeg.ffprobe("file:" + file, (err, metadata) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+
+      const audioStream = metadata.streams.find(
+        stream => stream.codec_type === "audio"
+      );
+      const audioCodec = audioStream?.codec_name
+                          .replace('mp3', 'libmp3lame') ?? null;
+      const sampleRate = audioStream?.sample_rate ?? null
+      resolve({audioCodec, sampleRate});
+    });
+  });
+};
 
 const bufferToAudio = async ({
   file = "",
@@ -3005,7 +3023,6 @@ const bufferToAudio = async ({
   filename = undefined
 }) => {
   const destination = p.join(folder || tempPath, filename);
-  if (fs.existsSync(destination)) return; // Don't overwrite existing files
   if (!fs.existsSync(file)) {
     const found = await getWorkingFile(file);
     if (!found) return;
@@ -3026,7 +3043,12 @@ const bufferToAudio = async ({
     flac: { audioCodec: "flac", soundFormat: "flac" },
     opus: { audioCodec: "libopus", soundFormat: "opus" },
   };
-  const { audioCodec, soundFormat } = formatMap[format] || {};
+  
+  const extension = p.extname(file).toLowerCase();
+  if (extension === '.' + format) {
+    formatMap[format] = {...formatMap[format], ...await getAudioCodec(file)};
+  }
+  const { audioCodec, soundFormat, sampleRate } = formatMap[format];
 
   if (padding) {
     start = Math.max(0, start - 1);
@@ -3036,7 +3058,7 @@ const bufferToAudio = async ({
   }
 
   return new Promise(function (resolve, reject) {
-    const filters = setAudioFilters();
+    const filters = setAudioFilters(audioCodec);
     if (fade && padding) {
       filters.push(
         { filter: "afade", options: `t=in:ss=${start}:d=1` },
@@ -3048,7 +3070,7 @@ const bufferToAudio = async ({
       file,
       start,
       end,
-      sampleRate: undefined,
+      sampleRate,
       audioBitrate: rate,
       audioQuality,
       audioCodec,
