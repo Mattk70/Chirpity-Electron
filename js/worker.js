@@ -3006,8 +3006,10 @@ const getAudioCodec = (file) => {
         stream => stream.codec_type === "audio"
       );
       const audioCodec = audioStream?.codec_name
-                          .replace('mp3', 'libmp3lame') ?? null;
-      const sampleRate = audioStream?.sample_rate ?? null
+                          ?.replace('mp3', 'libmp3lame') ?? null;
+      const sampleRate = audioStream?.sample_rate
+                          ? parseInt(audioStream.sample_rate)
+                          : null;
       resolve({audioCodec, sampleRate});
     });
   });
