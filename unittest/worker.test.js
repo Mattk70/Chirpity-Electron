@@ -25,19 +25,29 @@ const colors = {
 let passed = 0;
 let failed = 0;
 const failures = [];
+const pendingTests = [];
 
 // Test helper function
 function test(description, testFn) {
-  try {
-    testFn();
-    passed++;
-    console.log(`${colors.green}✓${colors.reset} ${description}`);
-  } catch (error) {
-    failed++;
-    failures.push({ description, error: error.message });
-    console.log(`${colors.red}✗${colors.reset} ${description}`);
-    console.log(`  ${colors.red}${error.message}${colors.reset}`);
-  }
+  const promise = Promise.resolve()
+    .then(async () => {
+      try {
+        const result = testFn();
+        if (result && typeof result.then === 'function') {
+          await result;
+        }
+        passed++;
+        console.log(`${colors.green}✓${colors.reset} ${description}`);
+      } catch (error) {
+        failed++;
+        failures.push({ description, error: error.message });
+        console.log(`${colors.red}✗${colors.reset} ${description}`);
+        console.log(`  ${colors.red}${error.message}${colors.reset}`);
+      }
+    });
+
+  pendingTests.push(promise);
+  return promise;
 }
 
 const workerPath = path.join(process.cwd(), 'js', 'worker.js');
@@ -863,22 +873,29 @@ test('has initial imports at the top of file', () => {
     'Should have initial imports near the top of the file');
 });
 
-// Print summary
-console.log(`\n${colors.cyan}${'='.repeat(60)}${colors.reset}`);
-console.log(`${colors.cyan}Test Results Summary${colors.reset}`);
-console.log(`${colors.cyan}${'='.repeat(60)}${colors.reset}`);
-console.log(`${colors.green}Passed: ${passed}${colors.reset}`);
-console.log(`${colors.red}Failed: ${failed}${colors.reset}`);
-console.log(`Total: ${passed + failed}`);
+async function printSummary() {
+  await Promise.allSettled(pendingTests);
 
-if (failed > 0) {
-  console.log(`\n${colors.red}Failed Tests:${colors.reset}`);
-  failures.forEach(({ description, error }) => {
-    console.log(`  - ${description}`);
-    console.log(`    ${error}`);
-  });
-  process.exit(1);
-} else {
-  console.log(`\n${colors.green}All tests passed!${colors.reset}\n`);
-  // process.exit(0);
+  console.log(`\n${colors.cyan}${'='.repeat(60)}${colors.reset}`);
+  console.log(`${colors.cyan}Test Results Summary${colors.reset}`);
+  console.log(`${colors.cyan}${'='.repeat(60)}${colors.reset}`);
+  console.log(`${colors.green}Passed: ${passed}${colors.reset}`);
+  console.log(`${colors.red}Failed: ${failed}${colors.reset}`);
+  console.log(`Total: ${passed + failed}`);
+
+  if (failed > 0) {
+    console.log(`\n${colors.red}Failed Tests:${colors.reset}`);
+    failures.forEach(({ description, error }) => {
+      console.log(`  - ${description}`);
+      console.log(`    ${error}`);
+    });
+    process.exit(1);
+  } else {
+    console.log(`\n${colors.green}All tests passed!${colors.reset}\n`);
+  }
 }
+
+Promise.allSettled(pendingTests).then(() => printSummary()).catch((error) => {
+  console.error(`Runner failed: ${error.message}`);
+  process.exit(1);
+});
