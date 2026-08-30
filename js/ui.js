@@ -836,37 +836,68 @@ function renderFilenamePanel() {
   const { parentFolder, fileName } = utils.extractFileNameAndFolder(openFile);
   const label = `${parentFolder}/${fileName}`;
   let appendStr;
-  const title = ` title="${openFile}\n---\n${i18.filename}" `;
+  const titleText = `${openFile}\n---\n${i18.filename}`;
   const isSaved = ["archive", "explore"].includes(STATE.mode)
     ? "text-info"
     : "text-warning";
+  // Build DOM elements to avoid injecting unescaped HTML into attributes
+  const container = document.createElement("div");
+  container.id = "fileContainer";
   if (files.length > 1) {
-    appendStr = `<div id="fileContainer" class="btn-group dropup pointer">
-        <span ${title} class="filename ${isSaved}">${label}</span>
-        </button>
-        <button id="filecount" class="btn btn-dark dropdown-toggle dropdown-toggle-split" type="button" 
-        data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">+${
-          files.length - 1
-        }
-        <span class="visually-hidden">Toggle Dropdown</span>
-        </button>
-        <div class="dropdown-menu dropdown-menu-dark" aria-labelledby="dropdownMenuButton">`;
+    container.className = "btn-group dropup pointer";
+
+    const nameSpan = document.createElement("span");
+    nameSpan.className = `filename ${isSaved}`;
+    nameSpan.textContent = label;
+    nameSpan.setAttribute("title", titleText);
+    container.appendChild(nameSpan);
+
+    const countBtn = document.createElement("button");
+    countBtn.id = "filecount";
+    countBtn.className = "btn btn-dark dropdown-toggle dropdown-toggle-split";
+    countBtn.type = "button";
+    countBtn.setAttribute("data-bs-toggle", "dropdown");
+    countBtn.setAttribute("aria-haspopup", "true");
+    countBtn.setAttribute("aria-expanded", "false");
+    countBtn.innerHTML = `+${files.length - 1} <span class="visually-hidden">Toggle Dropdown</span>`;
+    container.appendChild(countBtn);
+
+    const menu = document.createElement("div");
+    menu.className = "dropdown-menu dropdown-menu-dark";
+    menu.setAttribute("aria-labelledby", "dropdownMenuButton");
+
     files.forEach((item) => {
       if (item !== openFile) {
-        const label = item.split(/[\\/]/).pop();
-        appendStr += `<a id="${item}" class="dropdown-item openFiles" href="#">
-                <span class="material-symbols-outlined align-bottom">audio_file</span>${label}</a>`;
+        const a = document.createElement("a");
+        a.setAttribute("id", item);
+        a.className = "dropdown-item openFiles";
+        a.href = "#";
+        const icon = document.createElement("span");
+        icon.className = "material-symbols-outlined align-bottom";
+        icon.textContent = "audio_file";
+        const itemLabel = document.createTextNode(item.split(/[\\/]/).pop());
+        a.appendChild(icon);
+        a.appendChild(itemLabel);
+        menu.appendChild(a);
       }
     });
-    appendStr += `</div></div>`;
+    container.appendChild(menu);
   } else {
-    appendStr = `<div id="fileContainer">
-        <button class="btn btn-dark" type="button" id="dropdownMenuButton">
-        <span ${title} class="filename ${isSaved}">${label}</span>
-        </button></div>`;
+    const button = document.createElement("button");
+    button.className = "btn btn-dark";
+    button.type = "button";
+    button.id = "dropdownMenuButton";
+
+    const nameSpan = document.createElement("span");
+    nameSpan.className = `filename ${isSaved}`;
+    nameSpan.textContent = label;
+    nameSpan.setAttribute("title", titleText);
+    button.appendChild(nameSpan);
+    container.appendChild(button);
   }
 
-  filenameElement.innerHTML = appendStr;
+  // Replace container contents safely
+  filenameElement.appendChild(container);
   // Adapt menu
   customiseAnalysisMenu(isSaved === "text-info");
 }
