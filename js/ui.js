@@ -836,7 +836,7 @@ function renderFilenamePanel() {
   const { parentFolder, fileName } = utils.extractFileNameAndFolder(openFile);
   const label = `${parentFolder}/${fileName}`;
   let appendStr;
-  const title = ` title="${i18.filename}" `;
+  const title = ` title="${openFile}\n---\n${i18.filename}" `;
   const isSaved = ["archive", "explore"].includes(STATE.mode)
     ? "text-info"
     : "text-warning";
@@ -8324,6 +8324,7 @@ function renderComparisons(lists, cname) {
 }
 import WaveSurfer from "../node_modules/wavesurfer.js/dist/wavesurfer.esm.js";
 import Spectrogram from "../node_modules/wavesurfer.js/dist/plugins/spectrogram.esm.js";
+import TimelinePlugin from "../node_modules/wavesurfer.js/dist/plugins/timeline.esm.js";
 
 let ws;
 
@@ -8393,6 +8394,21 @@ const createCompareWS = (mediaContainer) => {
       })
     );
   createCmpSpec();
+  const createTimeline = () =>
+    ws.registerPlugin(
+    TimelinePlugin.create({
+      timeInterval: 0.25,
+      primaryLabelInterval: 1,
+      secondaryLabelInterval: 0.25,
+      secondaryLabelOpacity: 0,
+      style: {
+        // boostrap light and dark
+        color: '#f8f9fa',
+        backgroundColor: '#212529'
+      },
+    })
+  );
+  createTimeline();
 };
 
 function showCompareSpec() {
