@@ -3032,8 +3032,10 @@ const bufferToAudio = async ({
 
   const destination = p.join(folder || tempPath, filename);
   const sourcePath = fs.realpathSync.native(file);
-  const destinationPath = p.resolve(destination);
-  const samePath = p.resolve(sourcePath).toLowerCase() === destinationPath.toLowerCase();
+  const destinationPath = fs.existsSync(destination)
+    ? fs.realpathSync.native(p.resolve(destination))
+    : p.resolve(destination);
+  const samePath = p.resolve(sourcePath).toLowerCase() === p.resolve(destinationPath).toLowerCase();
   const tempDestination = samePath
     ? p.join(tempPath, `.${Date.now()}-${Math.random().toString(16).slice(2)}-${p.basename(filename)}`)
     : destination;
@@ -3118,16 +3120,30 @@ const bufferToAudio = async ({
       }
     })
     command.on("error", (err) => {
+      if (samePath && fs.existsSync(tempDestination)) {
+        try {
+          fs.rmSync(tempDestination, { force: true });
+        } catch (cleanupError) {
+          console.warn("Failed to clean up temp export after ffmpeg error:", cleanupError.message);
+        }
+      }
       generateAlert({ type: "error", message: "ffmpeg", variables: { error: err.message } });
       reject(console.error("An ffmpeg error occurred: ", err.message));
     });
     command.on("end", function () {
       DEBUG && console.log(format + " file rendered");
       if (samePath) {
+        const backupDestination = `${destination}.bak-${Date.now()}`;
         try {
-          fs.rmSync(destination, { force: true });
+          if (fs.existsSync(destination)) {
+            fs.renameSync(destination, backupDestination);
+          }
           fs.renameSync(tempDestination, destination);
+          fs.rmSync(backupDestination, { force: true });
         } catch (error) {
+          if (fs.existsSync(backupDestination)) {
+            fs.renameSync(backupDestination, destination);
+          }
           return reject(new Error(`Failed to replace destination after export: ${error.message}`));
         }
       }

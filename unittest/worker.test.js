@@ -9,6 +9,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 const assert = require('assert');
 
 // Colors for terminal output
@@ -66,11 +67,173 @@ test('has JSDoc file header', () => {
   assert.ok(/\/\*\*[\s\S]*?@file/.test(workerContent), 'Should have JSDoc file header with `@file` tag');
 });
 
-test('guards against in-place export destinations before ffmpeg runs', () => {
-  const hasPathResolution = /(realpathSync\.native\(file\)|p\.resolve\(sourcePath\)|p\.resolve\(destination\))/.test(workerContent);
-  assert.ok(hasPathResolution, 'Should resolve the input file and destination before FFmpeg starts');
-  assert.ok(/samePath|tempDestination|renameSync\(tempDestination, destination\)/.test(workerContent),
-    'Should either reject same-path exports or render to a temp file before replacing the destination');
+function getBufferToAudio() {
+  const start = workerContent.indexOf('const bufferToAudio = async');
+  const end = workerContent.indexOf('async function saveAudio');
+  assert.ok(start >= 0 && end > start, 'Worker should define bufferToAudio before saveAudio');
+  const source = workerContent.slice(start, end).trim();
+
+  return vm.runInNewContext(`${source}; bufferToAudio;`, {
+    console,
+    setTimeout,
+    clearTimeout,
+    Math,
+    Date,
+    Object,
+    Array,
+    RegExp,
+    Promise,
+    Buffer,
+  });
+}
+
+async function runBufferToAudioScenario({
+  sourcePath,
+  destinationPath,
+  destinationExists = false,
+  samePath = false,
+  onSetup,
+  onCommand,
+  folder = '/tmp',
+  filename = 'out.wav',
+}) {
+  const normalizedSource = sourcePath;
+  const normalizedDestination = destinationPath || path.join(folder, filename);
+  if (samePath && !destinationPath) {
+    destinationPath = sourcePath;
+  }
+  if (!destinationPath) {
+    destinationPath = path.join(folder, filename);
+  }
+  const fsStub = {
+    existsSync: (target) => target === destinationPath ? destinationExists : target === sourcePath,
+    realpathSync: { native: (target) => target === sourcePath ? normalizedSource : normalizedDestination },
+    rmSync: (...args) => {
+      if (onCommand) onCommand('rmSync', ...args);
+    },
+    renameSync: (...args) => {
+      if (onCommand) onCommand('renameSync', ...args);
+    },
+  };
+
+  const pathStub = {
+    join: (...parts) => parts.join('/').replace(/\/+/g, '/'),
+    resolve: (...parts) => parts.join('/').replace(/\/+/g, '/'),
+    extname: (file) => {
+      const match = /\.[^./\\]+$/.exec(file);
+      return match ? match[0] : '';
+    },
+    basename: (file) => file.split(/[\\/]/).pop(),
+  };
+
+  const recorded = { setupArgs: null, ffprobePath: null, savedPath: null, handlers: {} };
+  const command = {
+    on(event, handler) {
+      recorded.handlers[event] = handler;
+      return this;
+    },
+    save(file) {
+      recorded.savedPath = file;
+      if (recorded.handlers.end) {
+        recorded.handlers.end();
+      }
+    },
+  };
+
+  const context = {
+    console,
+    DEBUG: false,
+    WINDOW_SIZE: 10,
+    fs: fsStub,
+    p: pathStub,
+    STATE: {
+      model: 'birdnet',
+      locale: 'en',
+      audio: {
+        format: 'wav',
+        padding: false,
+        downmix: false,
+        fade: false,
+        bitrate: 128,
+        quality: '0',
+      },
+    },
+    METADATA: {},
+    tempPath: '/tmp',
+    getWorkingFile: async () => null,
+    setMetadata: async () => {},
+    setAudioFilters: () => [],
+    generateAlert: () => {},
+    ffmpeg: {
+      ffprobe: (file, cb) => {
+        recorded.ffprobePath = file;
+        cb(null, { streams: [{ codec_type: 'audio', codec_name: 'pcm_s16le', sample_rate: '22050' }] });
+      },
+    },
+    setupFfmpegCommand: async (...args) => {
+      recorded.setupArgs = args[0];
+      if (onSetup) onSetup(args[0]);
+      return command;
+    },
+  };
+
+  const helperStart = workerContent.indexOf('const getAudioCodec = (file) => {');
+  const helperEnd = workerContent.indexOf('const bufferToAudio = async');
+  const helperSource = helperStart >= 0 && helperEnd > helperStart
+    ? workerContent.slice(helperStart, helperEnd).trim()
+    : '';
+  const fnSource = `${helperSource}\n${workerContent.slice(workerContent.indexOf('const bufferToAudio = async'), workerContent.indexOf('async function saveAudio')).trim()};\nbufferToAudio;`;
+  const fn = vm.runInNewContext(fnSource, context);
+  const resultReady = fn.call(context, {
+    file: sourcePath,
+    start: 0,
+    end: 5,
+    folder: samePath ? path.dirname(sourcePath) : folder,
+    filename: samePath ? path.basename(sourcePath) : filename,
+    format: 'wav',
+  });
+
+  await resultReady.then((value) => {
+    if (onCommand) onCommand('result', value);
+  });
+
+  return { recorded, fsStub, pathStub, samePath };
+}
+
+test('bufferToAudio resolves input and destination before ffmpeg starts', async () => {
+  const calls = [];
+  const result = await runBufferToAudioScenario({
+    sourcePath: '/real/source.wav',
+    destinationPath: '/real/out.wav',
+    destinationExists: false,
+    onSetup: (args) => calls.push(['setup', args.file]),
+    onCommand: (event, ...args) => calls.push([event, ...args]),
+  });
+
+  assert.ok(calls.some(([event]) => event === 'setup'), 'ffmpeg setup should start after path resolution');
+  assert.ok(result.recorded.ffprobePath === '/real/source.wav' || result.recorded.ffprobePath === 'file:/real/source.wav', 'ffprobe should be called with the real input path');
+  assert.ok(result.recorded.savedPath.startsWith('/tmp/'), 'export should render to a temp output before final replacement');
+});
+
+test('same-path exports render to a temp file and then replace the destination', async () => {
+  const renameCalls = [];
+  const result = await runBufferToAudioScenario({
+    sourcePath: '/real/source.wav',
+    destinationPath: '/real/source.wav',
+    destinationExists: true,
+    samePath: true,
+    folder: '/real',
+    filename: 'source.wav',
+    onCommand: (event, ...args) => {
+      if (event === 'renameSync') renameCalls.push(args);
+    },
+  });
+
+  assert.ok(renameCalls.length >= 2, 'same-path export should rename the destination to backup and then move temp into place');
+  assert.deepStrictEqual(renameCalls[0][0], '/real/source.wav', 'original destination should be backed up before replacement');
+  assert.strictEqual(renameCalls[1][0].startsWith('/tmp/.'), true, 'temp export should be placed in the temp directory');
+  assert.strictEqual(renameCalls[1][1], '/real/source.wav', 'temp output should be moved into the original destination path');
+  assert.ok(result.recorded.savedPath.startsWith('/tmp/.'), 'same-path export should save to a temporary destination before final replacement');
 });
 
 // Test Suite 2: Required Dependencies
