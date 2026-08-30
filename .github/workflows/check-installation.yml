@@ -142,29 +142,29 @@ jobs:
              ./node_modules/@tensorflow/tfjs-node/lib/napi-v8/tensorflow.dll
           ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v8/tensorflow.dll
 
-      # - name: Set platform-specific ffmpeg vars
-      #   shell: bash
-      #   run: |
-      #     if [[ "$RUNNER_OS" == "Windows" ]]; then
-      #       PLATFORM="win32-x64"
-      #       BINARY="ffmpeg.exe"
-      #     elif [[ "$RUNNER_OS" == "macOS" ]]; then
-      #       PLATFORM="darwin-arm64"
-      #       chmod +x ./build/$PLATFORM/ffmpeg
-      #       BINARY="ffmpeg"
-      #     elif [[ "$RUNNER_OS" == "Linux" ]]; then
-      #       PLATFORM="linux-x64"
-      #       chmod +x ./build/$PLATFORM/ffmpeg
-      #       BINARY="ffmpeg"
-      #     fi
-      #     echo "PLATFORM=$PLATFORM" >> $GITHUB_ENV
-      #     echo "BINARY=$BINARY"     >> $GITHUB_ENV
+      - name: Set platform-specific ffmpeg vars
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            PLATFORM="win32-x64"
+            BINARY="ffmpeg.exe"
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            PLATFORM="darwin-arm64"
+            chmod +x ./build/$PLATFORM/ffmpeg
+            BINARY="ffmpeg"
+          elif [[ "$RUNNER_OS" == "Linux" ]]; then
+            PLATFORM="linux-x64"
+            chmod +x ./build/$PLATFORM/ffmpeg
+            BINARY="ffmpeg"
+          fi
+          echo "PLATFORM=$PLATFORM" >> $GITHUB_ENV
+          echo "BINARY=$BINARY"     >> $GITHUB_ENV
 
-      # - name: Overwrite FFmpeg binary
-      #   if: runner.os == 'macOS'
-      #   shell: bash
-      #   run: |
-      #     cp ./build/$PLATFORM/$BINARY ./node_modules/@ffmpeg-installer/$PLATFORM/$BINARY
+      - name: Overwrite FFmpeg binary
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          cp ./build/$PLATFORM/$BINARY ./node_modules/@ffmpeg-installer/$PLATFORM/$BINARY
 
       - name: Patch fluent-ffmpeg - increase spawn timeout
         shell: bash
