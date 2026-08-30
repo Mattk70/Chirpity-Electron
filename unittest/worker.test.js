@@ -66,6 +66,13 @@ test('has JSDoc file header', () => {
   assert.ok(/\/\*\*[\s\S]*?@file/.test(workerContent), 'Should have JSDoc file header with `@file` tag');
 });
 
+test('guards against in-place export destinations before ffmpeg runs', () => {
+  const hasPathResolution = /(realpathSync\.native\(file\)|p\.resolve\(sourcePath\)|p\.resolve\(destination\))/.test(workerContent);
+  assert.ok(hasPathResolution, 'Should resolve the input file and destination before FFmpeg starts');
+  assert.ok(/samePath|tempDestination|renameSync\(tempDestination, destination\)/.test(workerContent),
+    'Should either reject same-path exports or render to a temp file before replacing the destination');
+});
+
 // Test Suite 2: Required Dependencies
 console.log(`\n${colors.yellow}Test Suite: Required Dependencies${colors.reset}`);
 

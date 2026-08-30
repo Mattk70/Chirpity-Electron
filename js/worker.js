@@ -3022,12 +3022,20 @@ const bufferToAudio = async ({
   folder = undefined,
   filename = undefined
 }) => {
-  const destination = p.join(folder || tempPath, filename);
   if (!fs.existsSync(file)) {
     const found = await getWorkingFile(file);
     if (!found) return;
     file = found;
   }
+
+  const destination = p.join(folder || tempPath, filename);
+  const sourcePath = fs.realpathSync.native(file);
+  const destinationPath = p.resolve(destination);
+  const samePath = p.resolve(sourcePath).toLowerCase() === destinationPath.toLowerCase();
+  const tempDestination = samePath
+    ? p.join(tempPath, `.${Date.now()}-${Math.random().toString(16).slice(2)}-${p.basename(filename)}`)
+    : destination;
+
   const slow = STATE.model.includes("slow");
   if (slow) {
     end = (end - start) * 10 + start;
@@ -3113,6 +3121,14 @@ const bufferToAudio = async ({
     });
     command.on("end", function () {
       DEBUG && console.log(format + " file rendered");
+      if (samePath) {
+        try {
+          fs.rmSync(destination, { force: true });
+          fs.renameSync(tempDestination, destination);
+        } catch (error) {
+          return reject(new Error(`Failed to replace destination after export: ${error.message}`));
+        }
+      }
       // ToDo: do we want to write guano metadata?
       // if (format === 'wav'){
       //   const { addGuano } = require("./js/utils/metadata.js");
@@ -3120,7 +3136,7 @@ const bufferToAudio = async ({
       // }
       resolve(destination);
     });
-    command.save(destination);
+    command.save(tempDestination);
     })
   });
 };
