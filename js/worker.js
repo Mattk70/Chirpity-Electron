@@ -262,9 +262,10 @@ const updateBatches = (file, actualDuration, start, end) => {
 };
 
 const getSelectionRange = (file, start, end) => {
+  const fileStart = METADATA[file]?.fileStart || 0;
   return {
-    start: start * 1000 + METADATA[file].fileStart,
-    end: end * 1000 + METADATA[file].fileStart,
+    start: start * 1000 + fileStart,
+    end: end * 1000 + fileStart,
   };
 };
 
@@ -571,15 +572,15 @@ async function handleMessage(e) {
       index = 0;
       QUEUE.any('inProgress') && onAbort({model});
       DEBUG && console.log("Worker received audio " + file);
-      await loadAudioFile(args).catch((_e) =>
-        console.warn("Error opening file:", file)
-      );
+      await loadAudioFile(args).catch((e) => {
+        UI.postMessage({event: 'corrupt-file', file})
+      });
       if (!preserveResults) {
         // Clear records from the memory db
         await memoryDB.runAsync("DELETE FROM records; VACUUM");
-        const mode = METADATA[file]?.isSaved ? "archive" : "analyse";
-        await onChangeMode(mode);
-        STATE.openFiles = [file];
+        // const mode = METADATA[file]?.isSaved ? "archive" : "analyse";
+        // await onChangeMode(mode);
+        // STATE.openFiles = [file];
       }
       break;
     }
@@ -669,16 +670,35 @@ async function handleMessage(e) {
         const oldValue = args.oldValue;
         const newValue = args.newValue;
         const placeholders = fileIDs.map(() => "?").join(",");
-        const result = await diskDB.runAsync(
-          `UPDATE files
-            SET name = REPLACE(name, ?, ?)
+        const sql = `UPDATE files SET name = REPLACE(name, ?, ?)
             WHERE id IN (${placeholders})
-              AND instr(name, ?) > 0`,
-            oldValue,
-            newValue,
-            ...fileIDs,
-            oldValue
-        );
+              AND instr(name, ?) > 0`;
+        const diskSql = `UPDATE disk.files SET name = REPLACE(name, ?, ?)
+            WHERE id IN (${placeholders})
+              AND instr(name, ?) > 0`;
+
+        let result;
+        await dbMutex.lock();
+        try {
+          await memoryDB.runAsync("BEGIN");
+          const diskResult = await memoryDB.runAsync(diskSql, oldValue, newValue, ...fileIDs, oldValue);
+          const memoryResult = await memoryDB.runAsync(sql, oldValue, newValue, ...fileIDs, oldValue);
+
+          if (diskResult.changes !== memoryResult.changes) {
+            throw new Error(
+              `Database mismatch: disk files changed=${diskResult.changes}, memory files changed=${memoryResult.changes}`
+            );
+          }
+
+          await memoryDB.runAsync("COMMIT");
+          result = memoryResult;
+        } catch (error) {
+          await memoryDB.runAsync("ROLLBACK");
+          throw error;
+        } finally {
+          dbMutex.unlock();
+        }
+
         if (result?.changes) {
           const numberOfFiles = result.changes;
           const msg = i18nFiles[STATE.locale] || i18nFiles["en"];
@@ -2097,7 +2117,7 @@ function onAbort({ model = STATE.model }) {
     run.abortController.abort();
     // Reject all pending worker promises
     try {
-      STATE.workerQueue.cancelAll("Prediction aborted");
+      STATE.workerQueue?.cancelAll("Prediction aborted");
     } catch (e) {
         console.error("Error occurred while cancelling worker queue", e);
     }
@@ -2362,7 +2382,7 @@ async function loadAudioFile({
       fetchAudioBuffer({ file, start, end })
         .then(([audio, start]) => {
           if (!audio || audio.length === 0) {
-            return reject('no file duration') 
+            return reject({message: 'No audio data found in file'}) 
           }
           UI.postMessage(
             {
@@ -2882,7 +2902,7 @@ const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sam
  * If filters are not active, returns an empty array.
  * @returns {Array<Object>} An array of filter configuration objects representing an ffmpeg-style filter chain; empty if no filters are active.
  */
-function setAudioFilters() {
+function setAudioFilters(codec) {
   const {
     active,
     lowShelfAttenuation: attenuation,
@@ -2891,7 +2911,7 @@ function setAudioFilters() {
     lowPassFrequency: lowPass,
     normalise
   } = STATE.filters;
-
+  const useAdvanced = !['pcm_s32le', 'pcm_s24le'].includes(codec);
   if (!active) return [];
 
   const filters = [];
@@ -2929,7 +2949,7 @@ function setAudioFilters() {
   }
 
   // Normalisation
-  if (normalise) {
+  if (normalise && useAdvanced) {
     filters.push({
       filter: "loudnorm",
       options: "TP=-3.0"
@@ -2974,6 +2994,26 @@ function createPredictSender(workerQueue) {
     return workerQueue.send(payload, transferList);
   };
 }
+const getAudioCodec = (file) => {
+  return new Promise((resolve, reject) => {
+    ffmpeg.ffprobe("file:" + file, (err, metadata) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+
+      const audioStream = metadata.streams.find(
+        stream => stream.codec_type === "audio"
+      );
+      const audioCodec = audioStream?.codec_name
+                          ?.replace('mp3', 'libmp3lame') ?? null;
+      const sampleRate = audioStream?.sample_rate
+                          ? parseInt(audioStream.sample_rate)
+                          : null;
+      resolve({audioCodec, sampleRate});
+    });
+  });
+};
 
 const bufferToAudio = async ({
   file = "",
@@ -2984,13 +3024,22 @@ const bufferToAudio = async ({
   folder = undefined,
   filename = undefined
 }) => {
-  const destination = p.join(folder || tempPath, filename);
-  if (fs.existsSync(destination)) return; // Don't overwrite existing files
   if (!fs.existsSync(file)) {
     const found = await getWorkingFile(file);
     if (!found) return;
     file = found;
   }
+
+  const destination = p.join(folder || tempPath, filename);
+  const sourcePath = fs.realpathSync.native(file);
+  const destinationPath = fs.existsSync(destination)
+    ? fs.realpathSync.native(p.resolve(destination))
+    : p.resolve(destination);
+  const samePath = p.resolve(sourcePath).toLowerCase() === p.resolve(destinationPath).toLowerCase();
+  const tempDestination = samePath
+    ? p.join(tempPath, `.${Date.now()}-${Math.random().toString(16).slice(2)}-${p.basename(filename)}`)
+    : destination;
+
   const slow = STATE.model.includes("slow");
   if (slow) {
     end = (end - start) * 10 + start;
@@ -3006,7 +3055,12 @@ const bufferToAudio = async ({
     flac: { audioCodec: "flac", soundFormat: "flac" },
     opus: { audioCodec: "libopus", soundFormat: "opus" },
   };
-  const { audioCodec, soundFormat } = formatMap[format] || {};
+  
+  const extension = p.extname(file).toLowerCase();
+  if (extension === '.' + format) {
+    formatMap[format] = {...formatMap[format], ...await getAudioCodec(file)};
+  }
+  const { audioCodec, soundFormat, sampleRate } = formatMap[format];
 
   if (padding) {
     start = Math.max(0, start - 1);
@@ -3016,7 +3070,7 @@ const bufferToAudio = async ({
   }
 
   return new Promise(function (resolve, reject) {
-    const filters = setAudioFilters();
+    const filters = setAudioFilters(audioCodec);
     if (fade && padding) {
       filters.push(
         { filter: "afade", options: `t=in:ss=${start}:d=1` },
@@ -3028,7 +3082,7 @@ const bufferToAudio = async ({
       file,
       start,
       end,
-      sampleRate: undefined,
+      sampleRate,
       audioBitrate: rate,
       audioQuality,
       audioCodec,
@@ -3066,11 +3120,33 @@ const bufferToAudio = async ({
       }
     })
     command.on("error", (err) => {
+      if (samePath && fs.existsSync(tempDestination)) {
+        try {
+          fs.rmSync(tempDestination, { force: true });
+        } catch (cleanupError) {
+          console.warn("Failed to clean up temp export after ffmpeg error:", cleanupError.message);
+        }
+      }
       generateAlert({ type: "error", message: "ffmpeg", variables: { error: err.message } });
       reject(console.error("An ffmpeg error occurred: ", err.message));
     });
     command.on("end", function () {
       DEBUG && console.log(format + " file rendered");
+      if (samePath) {
+        const backupDestination = `${destination}.bak-${Date.now()}`;
+        try {
+          if (fs.existsSync(destination)) {
+            fs.renameSync(destination, backupDestination);
+          }
+          fs.renameSync(tempDestination, destination);
+          fs.rmSync(backupDestination, { force: true });
+        } catch (error) {
+          if (fs.existsSync(backupDestination)) {
+            fs.renameSync(backupDestination, destination);
+          }
+          return reject(new Error(`Failed to replace destination after export: ${error.message}`));
+        }
+      }
       // ToDo: do we want to write guano metadata?
       // if (format === 'wav'){
       //   const { addGuano } = require("./js/utils/metadata.js");
@@ -3078,7 +3154,7 @@ const bufferToAudio = async ({
       // }
       resolve(destination);
     });
-    command.save(destination);
+    command.save(tempDestination);
     })
   });
 };
@@ -4182,7 +4258,7 @@ async function processNextFile({
     }
     for (let i = 0; i < boundaries.length; i++) {
       const { start, end } = boundaries[i];
-      if (start === null) {
+      if (start === null || start === end) {
         // Nothing to do for this file
         generateAlert({ message: "noNight", variables: { file } });
         DEBUG && console.log("Recursion: start = end");

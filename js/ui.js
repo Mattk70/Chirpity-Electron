@@ -1654,6 +1654,7 @@ function refreshResultsView() {
 
 // fromDB is requested when circle clicked
 const getSelectionResults = (fromDB) => {
+  if (!STATE.currentFile) return;
   if (fromDB instanceof PointerEvent) fromDB = false;
   let start = STATE.activeRegion.start + STATE.windowOffsetSecs;
   // Remove small amount of region to avoid pulling in results from 'end'
@@ -2728,6 +2729,10 @@ const setUpWorkerMessaging = () => {
           DOM.loadingScreen.classList.add('d-none')
           break;
         }
+        case "corrupt-file": {
+          removeOpenFile(args.file);
+          break;
+        }
         case "database-files": {
           onDatabaseFiles(args.files);
           break;
@@ -3000,6 +3005,30 @@ const setUpWorkerMessaging = () => {
 };
 
 /**
+ * Removes the file from the list of open files and re-render the filename panel
+ * @param {string} A file path.
+ */
+function removeOpenFile(file) {
+  const index = STATE.openFiles.indexOf(file);
+  if (index === -1) return index;
+
+  const removedCurrentFile = STATE.currentFile === file || ! STATE.currentFile;
+  STATE.openFiles.splice(index, 1);
+
+  if (removedCurrentFile) {
+    const nextIndex = Math.min(index, STATE.openFiles.length - 1);
+    const replacementFile = STATE.openFiles[nextIndex] ?? null;
+    STATE.currentFile = replacementFile;
+    STATE.fileLoaded = false;
+
+    if (replacementFile) {
+      loadAudioFileSync({ filePath: replacementFile });
+    }
+  }
+
+  renderFilenamePanel();
+}
+/**
  * Display regions for detections that fall within the current spectrogram window.
  *
  * For each detection whose start time lies inside the current window, a region is created using times adjusted by the window offset. Only the active detection or detections allowed by configuration are shown. If `goToRegion` is true and a detection is active, the view is repositioned to that region.
@@ -3008,6 +3037,7 @@ const setUpWorkerMessaging = () => {
  * @param {Array<Object>} options.detections - Array of detection objects. Each object should include `start` and `end` (seconds) and may include `label` or `cname` used for region labeling.
  * @param {boolean} options.goToRegion - If true, reposition the view to the active region when one is present.
  */
+
 function showWindowDetections({ detections, goToRegion }) {
   for (const detection of detections) {
     const start = detection.start - STATE.windowOffsetSecs;
@@ -7386,6 +7416,7 @@ function filterLabels(e) {
  * @returns {Promise<void>} Resolves once the context menu is setup and positioned.
  */
 async function createContextMenu(e) {
+  if (!STATE.fileLoaded) return;
   e.stopPropagation();
   if (this.closest("#spectrogramWrapper")){
     const region = spec.checkForRegion(e, true);
@@ -7910,6 +7941,12 @@ function generateToast({
   if (message === "noFile") {
     // Alow further interactions!!
     STATE.currentFile && (STATE.fileLoaded = true);
+  } else if (message === 'corruptFile') {
+    const files = variables.files.split('<br>').filter(f => f !== '');
+    files.forEach(f => removeOpenFile(f));
+    if (!STATE.currentFile) {
+      STATE.fileLoaded = false;
+    }
   }
   message = variables
     ? utils.interpolate(i18[message], variables)
@@ -7947,10 +7984,6 @@ function generateToast({
   strong.className = "me-auto";
   strong.textContent = typeText[type];
 
-  const small = document.createElement("small");
-  small.className = "text-muted";
-  small.textContent = ""; //just now';
-
   const button = document.createElement("button");
   button.type = "button";
   button.className = "btn-close";
@@ -7960,7 +7993,6 @@ function generateToast({
   // Append elements to toastHeader
   toastHeader.appendChild(iconSpan);
   toastHeader.appendChild(strong);
-  toastHeader.appendChild(small);
   toastHeader.appendChild(button);
 
   // Create toast body
@@ -8785,12 +8817,17 @@ function updateSuggestions(input, element, preserveInput) {
       }
 
       if (input.id === "bird-autocomplete-explore") {
-        filterResults({ species: item.cname, updateSummary: true });
-        resetResults({
-          clearSummary: false,
-          clearPagination: false,
-          clearResults: false,
+        // Mark the summary table row for the species selected
+        const td = [...document.querySelectorAll('#speciesFilter td.cname')]
+          .find(td => td.querySelector('span.cname')?.textContent.trim() === item.cname);
+
+        td?.click();
+
+        td?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center'
         });
+
       } else if (input.id === "bird-autocomplete-chart") {
         STATE.chart.species = item.cname;
         callForChart();

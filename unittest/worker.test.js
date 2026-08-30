@@ -9,6 +9,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 const assert = require('assert');
 
 // Colors for terminal output
@@ -24,19 +25,29 @@ const colors = {
 let passed = 0;
 let failed = 0;
 const failures = [];
+const pendingTests = [];
 
 // Test helper function
 function test(description, testFn) {
-  try {
-    testFn();
-    passed++;
-    console.log(`${colors.green}✓${colors.reset} ${description}`);
-  } catch (error) {
-    failed++;
-    failures.push({ description, error: error.message });
-    console.log(`${colors.red}✗${colors.reset} ${description}`);
-    console.log(`  ${colors.red}${error.message}${colors.reset}`);
-  }
+  const promise = Promise.resolve()
+    .then(async () => {
+      try {
+        const result = testFn();
+        if (result && typeof result.then === 'function') {
+          await result;
+        }
+        passed++;
+        console.log(`${colors.green}✓${colors.reset} ${description}`);
+      } catch (error) {
+        failed++;
+        failures.push({ description, error: error.message });
+        console.log(`${colors.red}✗${colors.reset} ${description}`);
+        console.log(`  ${colors.red}${error.message}${colors.reset}`);
+      }
+    });
+
+  pendingTests.push(promise);
+  return promise;
 }
 
 const workerPath = path.join(process.cwd(), 'js', 'worker.js');
@@ -64,6 +75,175 @@ test('file is a substantial worker script', () => {
 
 test('has JSDoc file header', () => {
   assert.ok(/\/\*\*[\s\S]*?@file/.test(workerContent), 'Should have JSDoc file header with `@file` tag');
+});
+
+function getBufferToAudio() {
+  const start = workerContent.indexOf('const bufferToAudio = async');
+  const end = workerContent.indexOf('async function saveAudio');
+  assert.ok(start >= 0 && end > start, 'Worker should define bufferToAudio before saveAudio');
+  const source = workerContent.slice(start, end).trim();
+
+  return vm.runInNewContext(`${source}; bufferToAudio;`, {
+    console,
+    setTimeout,
+    clearTimeout,
+    Math,
+    Date,
+    Object,
+    Array,
+    RegExp,
+    Promise,
+    Buffer,
+  });
+}
+
+async function runBufferToAudioScenario({
+  sourcePath,
+  destinationPath,
+  destinationExists = false,
+  samePath = false,
+  onSetup,
+  onCommand,
+  folder = '/tmp',
+  filename = 'out.wav',
+}) {
+  const normalizedSource = sourcePath;
+  const normalizedDestination = destinationPath || path.join(folder, filename);
+  if (samePath && !destinationPath) {
+    destinationPath = sourcePath;
+  }
+  if (!destinationPath) {
+    destinationPath = path.join(folder, filename);
+  }
+  const fsStub = {
+    existsSync: (target) => target === destinationPath ? destinationExists : target === sourcePath,
+    realpathSync: { native: (target) => target === sourcePath ? normalizedSource : normalizedDestination },
+    rmSync: (...args) => {
+      if (onCommand) onCommand('rmSync', ...args);
+    },
+    renameSync: (...args) => {
+      if (onCommand) onCommand('renameSync', ...args);
+    },
+  };
+
+  const pathStub = {
+    join: (...parts) => parts.join('/').replace(/\/+/g, '/'),
+    resolve: (...parts) => parts.join('/').replace(/\/+/g, '/'),
+    extname: (file) => {
+      const match = /\.[^./\\]+$/.exec(file);
+      return match ? match[0] : '';
+    },
+    basename: (file) => file.split(/[\\/]/).pop(),
+  };
+
+  const recorded = { setupArgs: null, ffprobePath: null, savedPath: null, handlers: {} };
+  const command = {
+    on(event, handler) {
+      recorded.handlers[event] = handler;
+      return this;
+    },
+    save(file) {
+      recorded.savedPath = file;
+      if (recorded.handlers.end) {
+        recorded.handlers.end();
+      }
+    },
+  };
+
+  const context = {
+    console,
+    DEBUG: false,
+    WINDOW_SIZE: 10,
+    fs: fsStub,
+    p: pathStub,
+    STATE: {
+      model: 'birdnet',
+      locale: 'en',
+      audio: {
+        format: 'wav',
+        padding: false,
+        downmix: false,
+        fade: false,
+        bitrate: 128,
+        quality: '0',
+      },
+    },
+    METADATA: {},
+    tempPath: '/tmp',
+    getWorkingFile: async () => null,
+    setMetadata: async () => {},
+    setAudioFilters: () => [],
+    generateAlert: () => {},
+    ffmpeg: {
+      ffprobe: (file, cb) => {
+        recorded.ffprobePath = file;
+        cb(null, { streams: [{ codec_type: 'audio', codec_name: 'pcm_s16le', sample_rate: '22050' }] });
+      },
+    },
+    setupFfmpegCommand: async (...args) => {
+      recorded.setupArgs = args[0];
+      if (onSetup) onSetup(args[0]);
+      return command;
+    },
+  };
+
+  const helperStart = workerContent.indexOf('const getAudioCodec = (file) => {');
+  const helperEnd = workerContent.indexOf('const bufferToAudio = async');
+  const helperSource = helperStart >= 0 && helperEnd > helperStart
+    ? workerContent.slice(helperStart, helperEnd).trim()
+    : '';
+  const fnSource = `${helperSource}\n${workerContent.slice(workerContent.indexOf('const bufferToAudio = async'), workerContent.indexOf('async function saveAudio')).trim()};\nbufferToAudio;`;
+  const fn = vm.runInNewContext(fnSource, context);
+  const resultReady = fn.call(context, {
+    file: sourcePath,
+    start: 0,
+    end: 5,
+    folder: samePath ? path.dirname(sourcePath) : folder,
+    filename: samePath ? path.basename(sourcePath) : filename,
+    format: 'wav',
+  });
+
+  await resultReady.then((value) => {
+    if (onCommand) onCommand('result', value);
+  });
+
+  return { recorded, fsStub, pathStub, samePath };
+}
+
+test('bufferToAudio resolves input and destination before ffmpeg starts', async () => {
+  const calls = [];
+  const result = await runBufferToAudioScenario({
+    sourcePath: '/real/source.wav',
+    destinationPath: '/real/out.wav',
+    destinationExists: false,
+    onSetup: (args) => calls.push(['setup', args.file]),
+    onCommand: (event, ...args) => calls.push([event, ...args]),
+  });
+
+  assert.ok(calls.some(([event]) => event === 'setup'), 'ffmpeg setup should start after path resolution');
+  assert.ok(result.recorded.ffprobePath === '/real/source.wav' || result.recorded.ffprobePath === 'file:/real/source.wav', 'ffprobe should be called with the real input path');
+  assert.ok(result.recorded.savedPath.startsWith('/tmp/'), 'export should render to a temp output before final replacement');
+});
+
+test('same-path exports render to a temp file and then replace the destination', async () => {
+  const renameCalls = [];
+  const result = await runBufferToAudioScenario({
+    sourcePath: '/real/source.wav',
+    destinationPath: '/real/source.wav',
+    destinationExists: true,
+    samePath: true,
+    folder: '/real',
+    filename: 'source.wav',
+    onCommand: (event, ...args) => {
+      if (event === 'renameSync') renameCalls.push(args);
+    },
+  });
+
+  assert.ok(renameCalls.length >= 2, 'same-path export should rename the destination to backup and then move temp into place');
+  assert.deepStrictEqual(renameCalls[0][0], '/real/source.wav', 'original destination should be backed up before replacement');
+  assert.strictEqual(renameCalls[1][0].startsWith('/tmp/.'), true, 'temp export should be placed in the temp directory');
+  assert.strictEqual(renameCalls[1][1], '/real/source.wav', 'temp output should be moved into the original destination path');
+  assert.ok(result.recorded.savedPath.startsWith('/tmp/.'), 'same-path export should save to a temporary destination before final replacement');
 });
 
 // Test Suite 2: Required Dependencies
@@ -693,22 +873,29 @@ test('has initial imports at the top of file', () => {
     'Should have initial imports near the top of the file');
 });
 
-// Print summary
-console.log(`\n${colors.cyan}${'='.repeat(60)}${colors.reset}`);
-console.log(`${colors.cyan}Test Results Summary${colors.reset}`);
-console.log(`${colors.cyan}${'='.repeat(60)}${colors.reset}`);
-console.log(`${colors.green}Passed: ${passed}${colors.reset}`);
-console.log(`${colors.red}Failed: ${failed}${colors.reset}`);
-console.log(`Total: ${passed + failed}`);
+async function printSummary() {
+  await Promise.allSettled(pendingTests);
 
-if (failed > 0) {
-  console.log(`\n${colors.red}Failed Tests:${colors.reset}`);
-  failures.forEach(({ description, error }) => {
-    console.log(`  - ${description}`);
-    console.log(`    ${error}`);
-  });
-  process.exit(1);
-} else {
-  console.log(`\n${colors.green}All tests passed!${colors.reset}\n`);
-  // process.exit(0);
+  console.log(`\n${colors.cyan}${'='.repeat(60)}${colors.reset}`);
+  console.log(`${colors.cyan}Test Results Summary${colors.reset}`);
+  console.log(`${colors.cyan}${'='.repeat(60)}${colors.reset}`);
+  console.log(`${colors.green}Passed: ${passed}${colors.reset}`);
+  console.log(`${colors.red}Failed: ${failed}${colors.reset}`);
+  console.log(`Total: ${passed + failed}`);
+
+  if (failed > 0) {
+    console.log(`\n${colors.red}Failed Tests:${colors.reset}`);
+    failures.forEach(({ description, error }) => {
+      console.log(`  - ${description}`);
+      console.log(`    ${error}`);
+    });
+    process.exit(1);
+  } else {
+    console.log(`\n${colors.green}All tests passed!${colors.reset}\n`);
+  }
 }
+
+Promise.allSettled(pendingTests).then(() => printSummary()).catch((error) => {
+  console.error(`Runner failed: ${error.message}`);
+  process.exit(1);
+});

@@ -793,8 +793,8 @@ ipcMain.handle("saveFile", async (event, arg) => {
         // Check if the user cancelled the operation
         const { canceled, filePath } = saveObj;
         if (canceled) {
-          DEBUG && console.log("User cancelled the save operation.");
           fs.rmSync(file);
+          DEBUG && console.log("User cancelled the save operation. '" + file + "' was removed");
           return;
         }
         try {
