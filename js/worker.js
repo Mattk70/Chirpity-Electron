@@ -3016,7 +3016,10 @@ const getAudioCodec = (file) => {
       const sampleRate = audioStream?.sample_rate
                           ? parseInt(audioStream.sample_rate)
                           : null;
-      resolve({audioCodec, sampleRate});
+      const channels = audioStream?.channels
+                          ? parseInt(audioStream.channels)
+                          : null;           
+      resolve({audioCodec, sampleRate, channels});
     });
   });
 };
@@ -3071,7 +3074,6 @@ const bufferToAudio = async ({
   if (padding) {
     start = Math.max(0, start - 1);
     await setMetadata({ file });
-
     end = Math.min(METADATA[file].duration, end + 1);
   }
 
@@ -3097,34 +3099,7 @@ const bufferToAudio = async ({
       metadata: meta,
       additionalFilters: filters
     }).then(command => {
-    
 
-    command.on("codecData", async function (data) {
-      const channelStr = data.audio_details?.[2]?.toLowerCase() ?? '';
-      // Allow: mono (1ch), stereo/2ch (2ch), dual-mono
-      const isSafe = /^(mono|stereo|1[\s.]?0|2[\s.]?0|dual[\s-]?mono|1\s+channels?|2\s+channels?)$/
-        .test(channelStr);
-      if (format === "mp3" && !STATE.audio.downmix) {
-        if (channelStr && !isSafe) {
-          const i18n = {
-            en: "Cannot export multichannel audio to MP3. Either enable downmixing, or choose a different export format.",
-            da: "Kan ikke eksportere multikanalslyd til MP3. Aktiver enten nedmiksning, eller vælg et andet eksportformat.",
-            de: "Mehrkanal-Audio kann nicht als MP3 exportiert werden. Aktivieren Sie entweder das Downmixing oder wählen Sie ein anderes Exportformat.",
-            es: "No se puede exportar audio multicanal a MP3. Active la mezcla descendente o elija un formato de exportación diferente.",
-            fr: "Impossible d’exporter un audio multicanal en MP3. Activez le mixage vers le bas ou choisissez un autre format d’exportation.",
-            ja: "マルチチャンネル音声をMP3に書き出すことはできません。ダウンミックスを有効にするか、別の書き出し形式を選択してください。",
-            nl: "Kan geen meerkanaalsaudio exporteren naar MP3. Schakel downmixen in of kies een ander exportformaat.",
-            pt: "Não é possível exportar áudio multicanal para MP3. Ative a mixagem para baixo ou escolha um formato de exportação diferente.",
-            ru: "Невозможно экспортировать многоканальное аудио в MP3. Включите даунмиксинг или выберите другой формат экспорта.",
-            sv: "Kan inte exportera flerkanalsljud till MP3. Aktivera antingen nedmixning eller välj ett annat exportformat.",
-            zh: "无法将多声道音频导出为 MP3。请启用混缩，或选择其他导出格式。"
-          };
-          const error = i18n[STATE.locale] || i18n["en"];
-          generateAlert({ type: "error", message: error});
-          return reject(console.warn("Export polyWAV to mp3 attempted."))
-        }
-      }
-    })
     command.on("error", (err) => {
       if (samePath && fs.existsSync(tempDestination)) {
         try {
@@ -3166,6 +3141,30 @@ const bufferToAudio = async ({
 };
 
 async function saveAudio(file, start, end, filename, metadata, folder) {
+  const {format, downmix} = STATE.audio;
+  if (format === 'mp3' && ! downmix){
+    // Do a polywav check
+    const {channels} = await getAudioCodec(file);
+    if (channels > 2) {
+      const i18n = {
+            en: "Cannot export multichannel audio to MP3. Either enable downmixing, or choose a different export format.",
+            da: "Kan ikke eksportere multikanalslyd til MP3. Aktiver enten nedmiksning, eller vælg et andet eksportformat.",
+            de: "Mehrkanal-Audio kann nicht als MP3 exportiert werden. Aktivieren Sie entweder das Downmixing oder wählen Sie ein anderes Exportformat.",
+            es: "No se puede exportar audio multicanal a MP3. Active la mezcla descendente o elija un formato de exportación diferente.",
+            fr: "Impossible d’exporter un audio multicanal en MP3. Activez le mixage vers le bas ou choisissez un autre format d’exportation.",
+            ja: "マルチチャンネル音声をMP3に書き出すことはできません。ダウンミックスを有効にするか、別の書き出し形式を選択してください。",
+            nl: "Kan geen meerkanaalsaudio exporteren naar MP3. Schakel downmixen in of kies een ander exportformaat.",
+            pt: "Não é possível exportar áudio multicanal para MP3. Ative a mixagem para baixo ou escolha um formato de exportação diferente.",
+            ru: "Невозможно экспортировать многоканальное аудио в MP3. Включите даунмиксинг или выберите другой формат экспорта.",
+            sv: "Kan inte exportera flerkanalsljud till MP3. Aktivera antingen nedmixning eller välj ett annat exportformat.",
+            zh: "无法将多声道音频导出为 MP3。请启用混缩，或选择其他导出格式。"
+          };
+          const error = i18n[STATE.locale] || i18n["en"];
+          generateAlert({ type: "error", message: error});
+          console.warn("Export polyWAV to mp3 attempted.");
+          return
+    }
+  }
   filename = filename.replaceAll(":", "-");
   const convertedFilePath = await bufferToAudio({
     file,
@@ -3182,7 +3181,7 @@ async function saveAudio(file, start, end, filename, metadata, folder) {
       event: "audio-file-to-save",
       file: convertedFilePath,
       filename: filename,
-      extension: STATE.audio.format,
+      extension: format,
     });
   }
 }
