@@ -7,13 +7,19 @@ const { ipcRenderer } = require("electron");
 const fs = require("node:fs");
 const p = require("node:path");
 const SunCalc = require("suncalc");
+const ffprobe = require('@ffprobe-installer/ffprobe');
 const ffmpeg = require("fluent-ffmpeg");
 const { extractWaveMetadata, getWaveDuration } = require("./js/utils/metadata.js");
 const ffmpegPath = require("@ffmpeg-installer/ffmpeg").path.replace(
   "app.asar",
   "app.asar.unpacked"
 );
+const ffprobePath = require('@ffprobe-installer/ffprobe').path.replace(
+	'app.asar',
+	'app.asar.unpacked'
+);
 ffmpeg.setFfmpegPath(ffmpegPath);
+ffmpeg.setFfprobePath(ffprobePath);
 const merge = require("lodash.merge");
 import { WorkerState as State } from "./utils/state.js";
 import {
@@ -262,9 +268,10 @@ const updateBatches = (file, actualDuration, start, end) => {
 };
 
 const getSelectionRange = (file, start, end) => {
+  const fileStart = METADATA[file]?.fileStart || 0;
   return {
-    start: start * 1000 + METADATA[file].fileStart,
-    end: end * 1000 + METADATA[file].fileStart,
+    start: start * 1000 + fileStart,
+    end: end * 1000 + fileStart,
   };
 };
 
@@ -680,16 +687,32 @@ async function handleMessage(e) {
         const sql = `UPDATE files SET name = REPLACE(name, ?, ?)
             WHERE id IN (${placeholders})
               AND instr(name, ?) > 0`;
-        const [diskResult, memoryResult] = await Promise.all([
-          diskDB.runAsync(sql, oldValue, newValue, ...fileIDs, oldValue),
-          memoryDB.runAsync(sql, oldValue, newValue, ...fileIDs, oldValue)
-        ]);
-        if (diskResult.changes !== memoryResult.changes) {
-          console.warn(
-            `Database mismatch: disk files changed=${diskResult.changes}, memory files changed=${memoryResult.changes}`
-          );
+        const diskSql = `UPDATE disk.files SET name = REPLACE(name, ?, ?)
+            WHERE id IN (${placeholders})
+              AND instr(name, ?) > 0`;
+
+        let result;
+        await dbMutex.lock();
+        try {
+          await memoryDB.runAsync("BEGIN");
+          const diskResult = await memoryDB.runAsync(diskSql, oldValue, newValue, ...fileIDs, oldValue);
+          const memoryResult = await memoryDB.runAsync(sql, oldValue, newValue, ...fileIDs, oldValue);
+
+          if (diskResult.changes !== memoryResult.changes) {
+            throw new Error(
+              `Database mismatch: disk files changed=${diskResult.changes}, memory files changed=${memoryResult.changes}`
+            );
+          }
+
+          await memoryDB.runAsync("COMMIT");
+          result = memoryResult;
+        } catch (error) {
+          await memoryDB.runAsync("ROLLBACK");
+          throw error;
+        } finally {
+          dbMutex.unlock();
         }
-        const result = diskResult;
+
         if (result?.changes) {
           const numberOfFiles = result.changes;
           const msg = i18nFiles[STATE.locale] || i18nFiles["en"];
@@ -2896,7 +2919,7 @@ const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sam
  * If filters are not active, returns an empty array.
  * @returns {Array<Object>} An array of filter configuration objects representing an ffmpeg-style filter chain; empty if no filters are active.
  */
-function setAudioFilters() {
+function setAudioFilters(codec) {
   const {
     active,
     lowShelfAttenuation: attenuation,
@@ -2905,7 +2928,7 @@ function setAudioFilters() {
     lowPassFrequency: lowPass,
     normalise
   } = STATE.filters;
-
+  const useAdvanced = !['pcm_s32le', 'pcm_s24le'].includes(codec);
   if (!active) return [];
 
   const filters = [];
@@ -2943,7 +2966,7 @@ function setAudioFilters() {
   }
 
   // Normalisation
-  if (normalise) {
+  if (normalise && useAdvanced) {
     filters.push({
       filter: "loudnorm",
       options: "TP=-3.0"
@@ -2988,6 +3011,29 @@ function createPredictSender(workerQueue) {
     return workerQueue.send(payload, transferList);
   };
 }
+const getAudioCodec = (file) => {
+  return new Promise((resolve, reject) => {
+    ffmpeg.ffprobe("file:" + file, (err, metadata) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+
+      const audioStream = metadata.streams.find(
+        stream => stream.codec_type === "audio"
+      );
+      const audioCodec = audioStream?.codec_name
+                          ?.replace('mp3', 'libmp3lame') ?? null;
+      const sampleRate = audioStream?.sample_rate
+                          ? parseInt(audioStream.sample_rate)
+                          : null;
+      const channels = audioStream?.channels
+                          ? parseInt(audioStream.channels)
+                          : null;           
+      resolve({audioCodec, sampleRate, channels});
+    });
+  });
+};
 
 const bufferToAudio = async ({
   file = "",
@@ -2998,13 +3044,22 @@ const bufferToAudio = async ({
   folder = undefined,
   filename = undefined
 }) => {
-  const destination = p.join(folder || tempPath, filename);
-  if (fs.existsSync(destination)) return; // Don't overwrite existing files
   if (!fs.existsSync(file)) {
     const found = await getWorkingFile(file);
     if (!found) return;
     file = found;
   }
+
+  const destination = p.join(folder || tempPath, filename);
+  const sourcePath = fs.realpathSync.native(file);
+  const destinationPath = fs.existsSync(destination)
+    ? fs.realpathSync.native(p.resolve(destination))
+    : p.resolve(destination);
+  const samePath = p.resolve(sourcePath).toLowerCase() === p.resolve(destinationPath).toLowerCase();
+  const tempDestination = samePath
+    ? p.join(tempPath, `.${Date.now()}-${Math.random().toString(16).slice(2)}-${p.basename(filename)}`)
+    : destination;
+
   const slow = STATE.model.includes("slow");
   if (slow) {
     end = (end - start) * 10 + start;
@@ -3020,17 +3075,21 @@ const bufferToAudio = async ({
     flac: { audioCodec: "flac", soundFormat: "flac" },
     opus: { audioCodec: "libopus", soundFormat: "opus" },
   };
-  const { audioCodec, soundFormat } = formatMap[format] || {};
+  
+  const extension = p.extname(file).toLowerCase();
+  if (extension === '.' + format) {
+    formatMap[format] = {...formatMap[format], ...await getAudioCodec(file)};
+  }
+  const { audioCodec, soundFormat, sampleRate } = formatMap[format];
 
   if (padding) {
     start = Math.max(0, start - 1);
     await setMetadata({ file });
-
     end = Math.min(METADATA[file].duration, end + 1);
   }
 
   return new Promise(function (resolve, reject) {
-    const filters = setAudioFilters();
+    const filters = setAudioFilters(audioCodec);
     if (fade && padding) {
       filters.push(
         { filter: "afade", options: `t=in:ss=${start}:d=1` },
@@ -3042,7 +3101,7 @@ const bufferToAudio = async ({
       file,
       start,
       end,
-      sampleRate: undefined,
+      sampleRate,
       audioBitrate: rate,
       audioQuality,
       audioCodec,
@@ -3051,16 +3110,54 @@ const bufferToAudio = async ({
       metadata: meta,
       additionalFilters: filters
     }).then(command => {
-    
 
-    command.on("codecData", async function (data) {
-      const channelStr = data.audio_details?.[2]?.toLowerCase() ?? '';
-      // Allow: mono (1ch), stereo/2ch (2ch), dual-mono
-      const isSafe = /^(mono|stereo|1[\s.]?0|2[\s.]?0|dual[\s-]?mono|1\s+channels?|2\s+channels?)$/
-        .test(channelStr);
-      if (format === "mp3" && !STATE.audio.downmix) {
-        if (channelStr && !isSafe) {
-          const i18n = {
+    command.on("error", (err) => {
+      if (samePath && fs.existsSync(tempDestination)) {
+        try {
+          fs.rmSync(tempDestination, { force: true });
+        } catch (cleanupError) {
+          console.warn("Failed to clean up temp export after ffmpeg error:", cleanupError.message);
+        }
+      }
+      generateAlert({ type: "error", message: "ffmpeg", variables: { error: err.message } });
+      reject(console.error("An ffmpeg error occurred: ", err.message));
+    });
+    command.on("end", function () {
+      DEBUG && console.log(format + " file rendered");
+      if (samePath) {
+        const backupDestination = `${destination}.bak-${Date.now()}`;
+        try {
+          if (fs.existsSync(destination)) {
+            fs.renameSync(destination, backupDestination);
+          }
+          fs.renameSync(tempDestination, destination);
+          fs.rmSync(backupDestination, { force: true });
+        } catch (error) {
+          if (fs.existsSync(backupDestination)) {
+            fs.renameSync(backupDestination, destination);
+          }
+          return reject(new Error(`Failed to replace destination after export: ${error.message}`));
+        }
+      }
+      // ToDo: do we want to write guano metadata?
+      // if (format === 'wav'){
+      //   const { addGuano } = require("./js/utils/metadata.js");
+      //   addGuano(destination)
+      // }
+      resolve(destination);
+    });
+    command.save(tempDestination);
+    })
+  });
+};
+
+async function saveAudio(file, start, end, filename, metadata, folder) {
+  const {format, downmix} = STATE.audio;
+  if (format === 'mp3' && ! downmix){
+    // Do a polywav check
+    const {channels} = await getAudioCodec(file);
+    if (channels > 2) {
+      const i18n = {
             en: "Cannot export multichannel audio to MP3. Either enable downmixing, or choose a different export format.",
             da: "Kan ikke eksportere multikanalslyd til MP3. Aktiver enten nedmiksning, eller vælg et andet eksportformat.",
             de: "Mehrkanal-Audio kann nicht als MP3 exportiert werden. Aktivieren Sie entweder das Downmixing oder wählen Sie ein anderes Exportformat.",
@@ -3075,29 +3172,10 @@ const bufferToAudio = async ({
           };
           const error = i18n[STATE.locale] || i18n["en"];
           generateAlert({ type: "error", message: error});
-          return reject(console.warn("Export polyWAV to mp3 attempted."))
-        }
-      }
-    })
-    command.on("error", (err) => {
-      generateAlert({ type: "error", message: "ffmpeg", variables: { error: err.message } });
-      reject(console.error("An ffmpeg error occurred: ", err.message));
-    });
-    command.on("end", function () {
-      DEBUG && console.log(format + " file rendered");
-      // ToDo: do we want to write guano metadata?
-      // if (format === 'wav'){
-      //   const { addGuano } = require("./js/utils/metadata.js");
-      //   addGuano(destination)
-      // }
-      resolve(destination);
-    });
-    command.save(destination);
-    })
-  });
-};
-
-async function saveAudio(file, start, end, filename, metadata, folder) {
+          console.warn("Export polyWAV to mp3 attempted.");
+          return
+    }
+  }
   filename = filename.replaceAll(":", "-");
   const convertedFilePath = await bufferToAudio({
     file,
@@ -3114,7 +3192,7 @@ async function saveAudio(file, start, end, filename, metadata, folder) {
       event: "audio-file-to-save",
       file: convertedFilePath,
       filename: filename,
-      extension: STATE.audio.format,
+      extension: format,
     });
   }
 }
@@ -4988,7 +5066,6 @@ const onSave2DiskDB = async ({ file }) => {
   await dbMutex.lock();
   let inserted = 0;
   try {
-    const result = await memoryDB.allAsync("SELECT * FROM files");
     await memoryDB.runAsync("BEGIN");
     await memoryDB.runAsync(`
       INSERT OR IGNORE INTO disk.locations (id, lat, lon, place, radius)

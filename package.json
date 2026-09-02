@@ -1,6 +1,6 @@
 {
   "name": "Chirpity",
-  "version": "5.18.0",
+  "version": "5.19.0",
   "description": "Chirpity is a bioacoustics platform for the analysis of bird song and other wildlife sounds. It uses machine learning models to identify bird species from audio recordings.",
   "main": "main.js",
   "scripts": {
@@ -235,6 +235,7 @@
   "dependencies": {
     "@easepick/bundle": "^1.2.1",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@ffprobe-installer/ffprobe": "^2.1.2",
     "@popperjs/core": "^2.9.2",
     "@tensorflow/tfjs": "4.22.0",
     "@tensorflow/tfjs-backend-webgpu": "4.22.0",

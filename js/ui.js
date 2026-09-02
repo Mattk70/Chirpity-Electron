@@ -836,37 +836,68 @@ function renderFilenamePanel() {
   const { parentFolder, fileName } = utils.extractFileNameAndFolder(openFile);
   const label = `${parentFolder}/${fileName}`;
   let appendStr;
-  const title = ` title="${i18.filename}" `;
+  const titleText = `${openFile}\n---\n${i18.filename}`;
   const isSaved = ["archive", "explore"].includes(STATE.mode)
     ? "text-info"
     : "text-warning";
+  // Build DOM elements to avoid injecting unescaped HTML into attributes
+  const container = document.createElement("div");
+  container.id = "fileContainer";
   if (files.length > 1) {
-    appendStr = `<div id="fileContainer" class="btn-group dropup pointer">
-        <span ${title} class="filename ${isSaved}">${label}</span>
-        </button>
-        <button id="filecount" class="btn btn-dark dropdown-toggle dropdown-toggle-split" type="button" 
-        data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">+${
-          files.length - 1
-        }
-        <span class="visually-hidden">Toggle Dropdown</span>
-        </button>
-        <div class="dropdown-menu dropdown-menu-dark" aria-labelledby="dropdownMenuButton">`;
+    container.className = "btn-group dropup pointer";
+
+    const nameSpan = document.createElement("span");
+    nameSpan.className = `filename ${isSaved}`;
+    nameSpan.textContent = label;
+    nameSpan.setAttribute("title", titleText);
+    container.appendChild(nameSpan);
+
+    const countBtn = document.createElement("button");
+    countBtn.id = "filecount";
+    countBtn.className = "btn btn-dark dropdown-toggle dropdown-toggle-split";
+    countBtn.type = "button";
+    countBtn.setAttribute("data-bs-toggle", "dropdown");
+    countBtn.setAttribute("aria-haspopup", "true");
+    countBtn.setAttribute("aria-expanded", "false");
+    countBtn.innerHTML = `+${files.length - 1} <span class="visually-hidden">Toggle Dropdown</span>`;
+    container.appendChild(countBtn);
+
+    const menu = document.createElement("div");
+    menu.className = "dropdown-menu dropdown-menu-dark";
+    menu.setAttribute("aria-labelledby", "dropdownMenuButton");
+
     files.forEach((item) => {
       if (item !== openFile) {
-        const label = item.split(/[\\/]/).pop();
-        appendStr += `<a id="${item}" class="dropdown-item openFiles" href="#">
-                <span class="material-symbols-outlined align-bottom">audio_file</span>${label}</a>`;
+        const a = document.createElement("a");
+        a.setAttribute("id", item);
+        a.className = "dropdown-item openFiles";
+        a.href = "#";
+        const icon = document.createElement("span");
+        icon.className = "material-symbols-outlined align-bottom";
+        icon.textContent = "audio_file";
+        const itemLabel = document.createTextNode(item.split(/[\\/]/).pop());
+        a.appendChild(icon);
+        a.appendChild(itemLabel);
+        menu.appendChild(a);
       }
     });
-    appendStr += `</div></div>`;
+    container.appendChild(menu);
   } else {
-    appendStr = `<div id="fileContainer">
-        <button class="btn btn-dark" type="button" id="dropdownMenuButton">
-        <span ${title} class="filename ${isSaved}">${label}</span>
-        </button></div>`;
+    const button = document.createElement("button");
+    button.className = "btn btn-dark";
+    button.type = "button";
+    button.id = "dropdownMenuButton";
+
+    const nameSpan = document.createElement("span");
+    nameSpan.className = `filename ${isSaved}`;
+    nameSpan.textContent = label;
+    nameSpan.setAttribute("title", titleText);
+    button.appendChild(nameSpan);
+    container.appendChild(button);
   }
 
-  filenameElement.innerHTML = appendStr;
+  // Replace container contents safely
+  filenameElement.appendChild(container);
   // Adapt menu
   customiseAnalysisMenu(isSaved === "text-info");
 }
@@ -1654,6 +1685,7 @@ function refreshResultsView() {
 
 // fromDB is requested when circle clicked
 const getSelectionResults = (fromDB) => {
+  if (!STATE.currentFile) return;
   if (fromDB instanceof PointerEvent) fromDB = false;
   let start = STATE.activeRegion.start + STATE.windowOffsetSecs;
   // Remove small amount of region to avoid pulling in results from 'end'
@@ -2739,15 +2771,7 @@ const setUpWorkerMessaging = () => {
           break;
         }
         case "corrupt-file": {
-          const file = args.file;
-          const index = STATE.openFiles.indexOf(file);
-          if (index !== -1) {
-              STATE.openFiles.splice(index, 1);
-          }
-          if (index === 0 && STATE.openFiles.length > 0){
-            // Try opening the next file
-            loadAudioFileSync({ filePath: STATE.openFiles[0] });
-          }
+          removeOpenFile(args.file);
           break;
         }
         case "database-files": {
@@ -3022,6 +3046,30 @@ const setUpWorkerMessaging = () => {
 };
 
 /**
+ * Removes the file from the list of open files and re-render the filename panel
+ * @param {string} A file path.
+ */
+function removeOpenFile(file) {
+  const index = STATE.openFiles.indexOf(file);
+  if (index === -1) return index;
+
+  const removedCurrentFile = STATE.currentFile === file || ! STATE.currentFile;
+  STATE.openFiles.splice(index, 1);
+
+  if (removedCurrentFile) {
+    const nextIndex = Math.min(index, STATE.openFiles.length - 1);
+    const replacementFile = STATE.openFiles[nextIndex] ?? null;
+    STATE.currentFile = replacementFile;
+    STATE.fileLoaded = false;
+
+    if (replacementFile) {
+      loadAudioFileSync({ filePath: replacementFile });
+    }
+  }
+
+  renderFilenamePanel();
+}
+/**
  * Display regions for detections that fall within the current spectrogram window.
  *
  * For each detection whose start time lies inside the current window, a region is created using times adjusted by the window offset. Only the active detection or detections allowed by configuration are shown. If `goToRegion` is true and a detection is active, the view is repositioned to that region.
@@ -3030,6 +3078,7 @@ const setUpWorkerMessaging = () => {
  * @param {Array<Object>} options.detections - Array of detection objects. Each object should include `start` and `end` (seconds) and may include `label` or `cname` used for region labeling.
  * @param {boolean} options.goToRegion - If true, reposition the view to the active region when one is present.
  */
+
 function showWindowDetections({ detections, goToRegion }) {
   for (const detection of detections) {
     const start = detection.start - STATE.windowOffsetSecs;
@@ -7473,6 +7522,7 @@ function filterLabels(e) {
  * @returns {Promise<void>} Resolves once the context menu is setup and positioned.
  */
 async function createContextMenu(e) {
+  if (!STATE.fileLoaded) return;
   e.stopPropagation();
   if (this.closest("#spectrogramWrapper")){
     const region = spec.checkForRegion(e, true);
@@ -7997,6 +8047,12 @@ function generateToast({
   if (message === "noFile") {
     // Alow further interactions!!
     STATE.currentFile && (STATE.fileLoaded = true);
+  } else if (message === 'corruptFile') {
+    const files = variables.files.split('<br>').filter(f => f !== '');
+    files.forEach(f => removeOpenFile(f));
+    if (!STATE.currentFile) {
+      STATE.fileLoaded = false;
+    }
   }
   message = variables
     ? utils.interpolate(i18[message], variables)
@@ -8034,10 +8090,6 @@ function generateToast({
   strong.className = "me-auto";
   strong.textContent = typeText[type];
 
-  const small = document.createElement("small");
-  small.className = "text-muted";
-  small.textContent = ""; //just now';
-
   const button = document.createElement("button");
   button.type = "button";
   button.className = "btn-close";
@@ -8047,7 +8099,6 @@ function generateToast({
   // Append elements to toastHeader
   toastHeader.appendChild(iconSpan);
   toastHeader.appendChild(strong);
-  toastHeader.appendChild(small);
   toastHeader.appendChild(button);
 
   // Create toast body
@@ -8379,6 +8430,7 @@ function renderComparisons(lists, cname) {
 }
 import WaveSurfer from "../node_modules/wavesurfer.js/dist/wavesurfer.esm.js";
 import Spectrogram from "../node_modules/wavesurfer.js/dist/plugins/spectrogram.esm.js";
+import TimelinePlugin from "../node_modules/wavesurfer.js/dist/plugins/timeline.esm.js";
 
 let ws;
 
@@ -8448,6 +8500,21 @@ const createCompareWS = (mediaContainer) => {
       })
     );
   createCmpSpec();
+  const createTimeline = () =>
+    ws.registerPlugin(
+    TimelinePlugin.create({
+      timeInterval: 0.25,
+      primaryLabelInterval: 1,
+      secondaryLabelInterval: 0.25,
+      secondaryLabelOpacity: 0,
+      style: {
+        // boostrap light and dark
+        color: '#f8f9fa',
+        backgroundColor: '#212529'
+      },
+    })
+  );
+  createTimeline();
 };
 
 function showCompareSpec() {
@@ -8879,7 +8946,7 @@ function updateSuggestions(input, element, preserveInput) {
         td?.click();
 
         td?.scrollIntoView({
-          behaviour: 'smooth',
+          behavior: 'smooth',
           block: 'center'
         });
 
