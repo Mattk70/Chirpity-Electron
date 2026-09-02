@@ -138,7 +138,7 @@ jobs:
         run: |
           npm install
           # Lock onnxruntime-node to 1.23.2 – 1.24.1 has build issues on Intel Mac
-          # npm install onnxruntime-node@1.23.2 --no-save
+          npm install onnxruntime-node@1.23.2 --no-save
 
       - name: Set platform env vars for ffmpeg
         shell: bash
