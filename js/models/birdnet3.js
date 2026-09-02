@@ -13,14 +13,14 @@ const numClasses = 11560;
 const DEBUG = false;
 let modelPath;
  
-async function loadModel(mpath, backend, batchSize) {
+async function loadModel(_mpath, backend, batchSize) {
   const gpu = backend === 'webgpu';
   const providers = gpu ? ['webgpu', 'cpu'] : ['cpu'];
   const freeDimensionOverrides = { 'batch': batchSize };
   const   preferredOutputLocation = {
     'predictions': 'cpu'
   }
-  const threadOptions = { intraOpNumThreads:4, interOpNumThreads: 2 };
+  const threadOptions = { intraOpNumThreads:2, interOpNumThreads: 1 };
  const executionProviderConfig = gpu ? { webgpu: { validationMode: 'basic' } } : {};
   const sessionOptions = { 
     executionProviders: providers,
@@ -28,7 +28,7 @@ async function loadModel(mpath, backend, batchSize) {
     enableGraphCapture: true, 
     ...threadOptions,
     executionProviderConfig,
-    executionMode: 'parallel',
+    executionMode: 'sequential',
     enableCpuMemArena: true,
     freeDimensionOverrides,
     preferredOutputLocation,

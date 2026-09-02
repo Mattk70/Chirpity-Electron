@@ -5249,7 +5249,7 @@ const modelSettingsDisplay = () => {
   // Hide threads slider for Onnx models
   const model = config.selectedModel;
   const backend = config.models[model].backend;
-  const onnxGPU = model === 'perch v2' && backend === 'webgpu';
+  const onnxGPU = ['birdnet3', 'perch v2'].includes(model) && backend === 'webgpu';
   notOnnx.forEach((element) => element.classList.toggle("d-none", onnxGPU));
 
   const noMac = document.querySelectorAll(".no-mac");

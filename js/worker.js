@@ -492,10 +492,10 @@ async function handleMessage(e) {
     }
     case "change-threads": {
       const onnxGPU = ['birdnet3', 'perch v2'].includes(STATE.model) && STATE.detect.backend === 'webgpu';
-      // if (onnxGPU) return; // ONNX GPU models are single-threaded
+      if (onnxGPU) return; // ONNX GPU models only work with 1 thread
       const delta = args.threads - predictWorkers.length;
       NUM_WORKERS += delta;
-      if (!onnxGPU && delta > 0) {
+      if (delta > 0) {
         spawnPredictWorkers(STATE.model, BATCH_SIZE, delta);
       } else {
         for (let i = delta; i < 0; i++) {
@@ -1637,7 +1637,7 @@ async function getMatchingIds(cnames) {
 async function getSpeciesSQLAsync(file){
   let not = "", SQL = "";
   const {list, modelLabels} = STATE;
-  
+  let typeOfList = 'Included';
   // If we don't have a file, use the first analysed file if available
   file ??=
     QUEUE.getAllPaths('pending')[0] ??
@@ -1648,6 +1648,7 @@ async function getSpeciesSQLAsync(file){
     if (["birds", 'Animalia'].includes(list)) {
       included = getExcluded(included);
       if (!included.length) return SQL; // nothing filtered out
+      typeOfList = 'Excluded';
       not = "NOT";
     }
     // Get the speciesID for all models
@@ -1655,7 +1656,7 @@ async function getSpeciesSQLAsync(file){
     const cnames = result.map(row => row.cname);
     included = cnames.length ? await getMatchingIds(cnames) : [-1];
     DEBUG &&
-      console.log("included", included.length, "# labels", modelLabels.length);
+      console.log(typeOfList, included.length, "# labels", modelLabels.length);
     SQL = ` AND (s.id ${not} IN (${included}) OR r.modelID = 0) `; // always include records with modelID 0 (manual records)
   }
   return SQL
@@ -3205,8 +3206,7 @@ async function saveAudio(file, start, end, filename, metadata, folder) {
 function spawnPredictWorkers(model, batchSize, toSpawn) {
   const startAt = predictWorkers.length;
   for (let i = startAt; i < startAt + toSpawn; i++) {
-    const workerSrc = ['nocmig', 'chirpity', 'perch v2', 'nighthawk'].includes(model) ? model : "BirdNet2.4";
-    const worker = new Worker(`./js/models/${workerSrc}.js`, { type: "module" });
+    const worker = new Worker(`./js/models/${model}.js`, { type: "module" });
     // Web worker message event handler
     worker.onmessage = async (msg) => {
       await parseMessage(msg).catch((error) => {
