@@ -1115,11 +1115,9 @@ function setGetSummaryQueryInterval(threads) {
 }
 
 async function resetEstimates() {
-  if (STATE.totalBatches > 0) {
-    // Update time estimates based on new batch size
-    const files = QUEUE.getAllPaths();
-    await processFilesInBatches(files);
-  }
+  // Update time estimates based on file information and current batch/window size
+  const files = QUEUE.getAllPaths();
+  await processFilesInBatches(files);
 }
 function findFileAtTime(timeMs) {
   const match = Object.entries(METADATA)
