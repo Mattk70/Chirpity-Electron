@@ -490,7 +490,7 @@ async function handleMessage(e) {
       break;
     }
     case "change-threads": {
-      // if (STATE.model.includes('perch')) break; // perch v2 only works with 1 thread
+      if (STATE.model.includes('perch')) break; // perch v2 only works with 1 thread
       const delta = args.threads - predictWorkers.length;
       NUM_WORKERS += delta;
       if (delta > 0) {
@@ -1238,7 +1238,7 @@ async function onLaunch({
     : diskDB;
   STATE.update({ db });
   NUM_WORKERS = perch ? 1 : threads;
-  spawnPredictWorkers(model, batchSize, threads);
+  spawnPredictWorkers(model, batchSize, NUM_WORKERS);
 }
 
 /**
@@ -2134,16 +2134,13 @@ function onAbort({ model = STATE.model }) {
     batchSize: BATCH_SIZE,
     backend: STATE.detect.backend})
   });
-  
 
   //restart the workers
-  if (model !== 'perch v2'){
-    terminateWorkers();
-    setTimeout(
-      () => spawnPredictWorkers(model, BATCH_SIZE, NUM_WORKERS),
-      200
-    );
-  }
+  terminateWorkers();
+  setTimeout(
+    () => spawnPredictWorkers(model, BATCH_SIZE, NUM_WORKERS),
+    200
+  );
 }
 
 const measureDurationWithFfmpeg = (src) => {
@@ -3195,23 +3192,8 @@ async function saveAudio(file, start, end, filename, metadata, folder) {
  * @param {number} toSpawn - Number of worker threads to spawn.
  */
 function spawnPredictWorkers(model, batchSize, toSpawn) {
-  const isPerch = model === 'perch v2';
-  // Perch worker cannot be terminated due to ONNX runtime global memory management,
-  // so we preserve it in STATE.perchWorker for reuse across model switches
-  if (! STATE.perchWorker?.length){
-    STATE.perchWorker = predictWorkers.filter(w => w.name === 'perch v2');
-  }
-
-  if (isPerch && STATE.perchWorker.length) {
-    predictWorkers = STATE.perchWorker;
-    setLabelState({regenerate: true})
-    return
-  } else if (STATE.perchWorker.length) {
-    predictWorkers = predictWorkers.filter(w => w.name !== 'perch v2');
-  }
   const startAt = predictWorkers.length;
   for (let i = startAt; i < startAt + toSpawn; i++) {
-    if (isPerch && i > startAt) break; // Perch v2 only needs one worker, even if multiple threads requested
     const workerSrc = ['nocmig', 'chirpity', 'perch v2', 'nighthawk'].includes(model) ? model : "BirdNet2.4";
     const worker = new Worker(`./js/models/${workerSrc}.js`, { type: "module" });
     // Web worker message event handler
@@ -3250,7 +3232,7 @@ function spawnPredictWorkers(model, batchSize, toSpawn) {
 const terminateWorkers = () => {
   predictWorkers.forEach((worker) => {
     worker.postMessage({message: 'terminate'})
-    if (worker.name !== 'perch v2') worker.terminate()
+    worker.terminate()
   });
   predictWorkers = []
 };

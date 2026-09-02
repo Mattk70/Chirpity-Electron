@@ -3728,6 +3728,7 @@ const handleBackendChange = (backend) => {
   DOM.batchSizeSlider.value = batchSize;
   DOM.batchSizeValue.textContent = batchSize;
   updatePrefs("config.json", config);
+  modelSettingsDisplay();
   loadModel();
 };
 
@@ -5166,8 +5167,7 @@ const modelSettingsDisplay = () => {
   const chirpityOnly = document.querySelectorAll(
     ".chirpity-only, .chirpity-only-visible"
   );
-  const noMac = document.querySelectorAll(".no-mac");
-  const nodeOnly = document.querySelectorAll(".node-only");
+  const notOnnx = document.querySelectorAll(".not-onnx-gpu");
   if (!['chirpity', 'nocmig'].includes(config.selectedModel)) {
     // hide chirpity-only features
     chirpityOnly.forEach((element) => {
@@ -5188,6 +5188,7 @@ const modelSettingsDisplay = () => {
   }
   // Nighthawk
   const notNighthawk = document.querySelectorAll(".not-nh");
+
   if (config.selectedModel === 'nighthawk'){
     notNighthawk.forEach((element) => {
       element.classList.add("d-none");
@@ -5205,18 +5206,19 @@ const modelSettingsDisplay = () => {
       element.classList.remove("d-none");
     });
   }
+  // Hide threads slider for Onnx models
+  const model = config.selectedModel;
+  const backend = config.models[model].backend;
+  const onnxGPU = model === 'perch v2' && backend === 'webgpu';
+  notOnnx.forEach((element) => element.classList.toggle("d-none", onnxGPU));
 
+  const noMac = document.querySelectorAll(".no-mac");
   isMac && noMac.forEach((element) => element.classList.add("d-none"));
-  if (config.hasNode) {
-    nodeOnly.forEach((element) => element.classList.remove("d-none"));
-  } else {
-    nodeOnly.forEach((element) => element.classList.add("d-none"));
-  }
+  const nodeOnly = document.querySelectorAll(".node-only");
+  nodeOnly.forEach((element) => element.classList.toggle("d-none", !config.hasNode));
   // Hide train unless BirdNET (and a member)
   const blockTrain = config.selectedModel !== 'birdnet' || ! STATE.isMember;
   DOM.trainNav.classList.toggle('disabled', blockTrain);
-  const isPerch = config.selectedModel === 'perch v2';
-  DOM.threadSlider.disabled = isPerch;
 };
 
 const contextAwareIconDisplay = () => {
