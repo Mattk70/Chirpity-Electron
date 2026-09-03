@@ -3813,14 +3813,14 @@ function recordUpdate(e) {
     if (setCallCount && STATE.isMember){
       // Ctrl/Cmd + number to set call count
       newCallCount = Number(key);
-    } else {
+    } else if (assignment  && STATE.isMember) {
       const {column, value} = assignment;
       // If we set a new species, we want to give the record a 2000 confidence
       newName = column === "species" ? value : null;
       newConfidence = column === "species" ? 2000 : null;
       newLabel = column === "label" ? value : null;
       newComment = column === "comment" ? value : null;
-    }
+    } else { return }
     // Save record for undo
     const {species, start, end,  label, callCount, 
       comment, confidence, file, modelID
