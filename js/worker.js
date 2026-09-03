@@ -491,12 +491,12 @@ async function handleMessage(e) {
       break;
     }
     case "change-threads": {
+      const threads = args.threads;
       const onnxGPU = ['birdnet3', 'perch v2'].includes(STATE.model) && STATE.detect.backend === 'webgpu';
       if (onnxGPU) return; // ONNX GPU models only work with 1 thread
-      const delta = args.threads - predictWorkers.length;
-      NUM_WORKERS += delta;
+      const delta = threads - predictWorkers.length;
       if (delta > 0) {
-        spawnPredictWorkers(STATE.model, BATCH_SIZE, delta);
+        spawnPredictWorkers(STATE.model, BATCH_SIZE, threads);
       } else {
         for (let i = delta; i < 0; i++) {
           const worker = predictWorkers.pop();
@@ -1248,8 +1248,8 @@ async function onLaunch({
     : diskDB;
   STATE.update({ db });
   const onnxGPU = (perch || STATE.model === 'birdnet3') && STATE.detect.backend === 'webgpu';
-  NUM_WORKERS = onnxGPU ? 1 : threads;
-  spawnPredictWorkers(model, batchSize, NUM_WORKERS);
+  threads = onnxGPU ? 1 : threads;
+  spawnPredictWorkers(model, batchSize, threads);
 }
 
 /**
@@ -2150,7 +2150,7 @@ function onAbort({ model = STATE.model }) {
   //restart the workers
   terminateWorkers();
   setTimeout(
-    () => spawnPredictWorkers(model, BATCH_SIZE, NUM_WORKERS),
+    () => spawnPredictWorkers(model, BATCH_SIZE, NUM_WORKERS, false),
     200
   );
 }
@@ -3202,10 +3202,22 @@ async function saveAudio(file, start, end, filename, metadata, folder) {
  * @param {string} model - The AI model to load for prediction; "birdnet" uses the "BirdNet2.4" worker script.
  * @param {number} batchSize - Number of items each worker processes per batch.
  * @param {number} toSpawn - Number of worker threads to spawn.
+ * @param {boolean} adjustThreads - Whether to adjust the number of threads based on the model.
  */
-function spawnPredictWorkers(model, batchSize, toSpawn) {
-  const startAt = predictWorkers.length;
-  for (let i = startAt; i < startAt + toSpawn; i++) {
+function spawnPredictWorkers(model, batchSize, threads, adjustThreads = true) {
+  const currentThreads = predictWorkers.length;
+  if (adjustThreads) {
+  // Normallise threads across models
+    if (model === 'perch v2'){
+      // Perch v2 has 4 intraOp threads
+      threads = Math.max(1, Math.floor(threads / 4));
+    } else if (model === 'birdnet3') {
+      // BirdNET 3 has 2 intraOp threads
+      threads = Math.max(1, Math.floor(threads / 2));
+    }
+  }
+  NUM_WORKERS = threads;
+  for (let i = currentThreads; i < threads; i++) {
     const worker = new Worker(`./js/models/${model}.js`, { type: "module" });
     // Web worker message event handler
     worker.onmessage = async (msg) => {
@@ -3234,7 +3246,7 @@ function spawnPredictWorkers(model, batchSize, toSpawn) {
       model,
       modelPath: STATE.modelPath,
       batchSize,
-      threads: toSpawn,
+      threads,
       backend: STATE.detect.backend,
       worker: i,
       locale: STATE.locale.slice(0,2),

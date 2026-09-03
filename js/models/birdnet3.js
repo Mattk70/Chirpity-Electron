@@ -21,7 +21,7 @@ async function loadModel(_mpath, backend, batchSize) {
     'predictions': 'cpu'
   }
   const threadOptions = { intraOpNumThreads:2, interOpNumThreads: 1 };
- const executionProviderConfig = gpu ? { webgpu: { validationMode: 'basic' } } : {};
+  const executionProviderConfig = gpu ? { webgpu: { validationMode: 'basic' } } : {};
   const sessionOptions = { 
     executionProviders: providers,
     logSeverityLevel: DEBUG ? 0 : 4,
