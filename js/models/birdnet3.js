@@ -70,7 +70,7 @@ onmessage = async (e) => {
           await loadModel(modelPath, backend, batchSize);
           DEBUG && console.log(`Using backend: ${backend}`);
 
-          const labelFile = './BirdNET3/BirdNET+_V3.0-preview3.1_Global_11K_Labels.csv';
+          const labelFile = './BirdNET3/BirdNET3_geomodel_labels.csv';
           const fileContents = fs.readFileSync(labelFile, 'utf-8');
           labels = fileContents.trim().split(/\r?\n/);
           DEBUG && console.log(
@@ -151,13 +151,6 @@ async function predictChunk(audioBuffer, startSamples) {
     const audioBatch = createAudioTensorBatch(audioBuffer);
     const result = await predictBatch( audioBatch, startSamples );
     return result;
-}
-
-
-async function disposeGPUTensors(prediction) {
-  // const {spectrogram, spatial_embedding} = prediction;
-  // spectrogram.dispose();
-  // spatial_embedding.dispose();
 }
 
 /**

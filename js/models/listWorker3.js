@@ -10,15 +10,15 @@ let DEBUG = false;
 
 function getBN3Labels() {
   const labelFile = path.join( "BirdNET3",
-         "BirdNET+_V3.0-preview3.1_Global_11K_Labels.csv");
+         "BirdNET3_geomodel_labels.csv");
   const fileContents = fs.readFileSync(labelFile, "utf8");
   return fileContents
     .trim()
     .split(/\r?\n/)
     .slice(1) // skip header
     .map(line => {
-      const [, , sci_name, com_name, _class_ ,] = line.split(",");
-      return `${sci_name}_${com_name}_${_class_}`;
+      const [sci_name, com_name, class_name] = line.split(",");
+      return `${sci_name}_${com_name}_${class_name}`;
     });
 }
 const BIRDNET3_LABELS = getBN3Labels();
@@ -329,7 +329,8 @@ const geomodelLabelFile = path.resolve('BirdNET3/BirdNET+_Geomodel_V3.0.3_Global
  *
  * Usage: NEW_TO_OLD_TAXONOMY['Astur gentilis'] // -> 'Accipiter gentilis'
  */
-const NEW_TO_OLD_TAXONOMY = {
+const NEW_TO_OLD_TAXONOMY = 
+{
   "Acritillas indica": "Iole indica",
   "Acrochordopus burmeisteri": "Phyllomyias burmeisteri",
   "Aerospiza tachiro": "Accipiter tachiro",
@@ -784,7 +785,7 @@ class Model {
           const latin = this.mdata_labels[index].split(",")[0];
           // Translate new-taxonomy name -> old-taxonomy name, if it was renamed.
           // If it's not in the map, the name is unchanged between the two lists.
-          const oldLatin = NEW_TO_OLD_TAXONOMY[latin] || latin;
+          const oldLatin = model !== 'birdnet3' ? NEW_TO_OLD_TAXONOMY[latin] || latin : latin;
           // Use the reduce() method to accumulate the indices of species containing the latin name
           const foundIndices = this.labels.reduce(
             (indices, element, index) => {
@@ -794,11 +795,12 @@ class Model {
             },
             []
           );
+          const classes = listModel.classes;
           foundIndices.forEach((index) => {
             // Ensure at least one class is included
-            this.classes.length > 0 || (this.classes = ['Aves'])
+            classes.length > 0 || (classes = ['Aves'])
             // Exclude unselected classes for birdnet3
-            if (model === 'birdnet3' && !this.classes.some(cls => this.labels[index].includes(cls))) return;
+            if (model === 'birdnet3' && !classes.some(cls => this.labels[index].includes(cls))) return;
             includedIDs.push(index + 1);
             DEBUG &&
               console.log(
@@ -947,8 +949,6 @@ class Model {
  * @async
  */
 async function _init_() {
-  DEBUG && console.log("load loading metadata_model");
-  // const appPath = "../" + location + "/";
   DEBUG && console.log(`List generating model received load instruction.`);
   listModel = new Model(
       "BirdNET3/BirdNET+_Geomodel_V3.0.3_Global_12K_FP16.onnx"
