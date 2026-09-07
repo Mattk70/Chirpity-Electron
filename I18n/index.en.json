@@ -22,7 +22,7 @@
     "Low Pass Filter-circle-help": ["When set, removes high frequency noise above the threshold."],
     "IUCN-circle-help": ["When enabled, the latest Global IUCN assessment status is displayed for each species in the summary. The icon links to the assessment page on the IUCN website. The Assessment Scope will display the IUCN assessment of the species in that region (where available)."],
     "Language-circle-help": ["Select your preferred language for birds' common names"],
-    "List-circle-help": ["Filters the detections returned in results. Local Birds: excludes birds unlikely to be found in your region. Nocturnal Calls: excludes bird song and species not known to call at night. The custom list allows you to upload a file listing the species to detect"],
+    "List-circle-help": ["Filters the detections returned in results. Local Species: excludes species unlikely to be found in your region. Nocturnal Calls: excludes bird song and species not known to call at night. The custom list allows you to upload a file listing the species to detect"],
     "Low Shelf Filter-circle-help": ["When used, attenuates low frequency noise below the cut-off frequency."],
     "Model-circle-help": ["Select whether to use the Nocmig model, optimised for Nocturnal Migration Calls in Europe, or BirdNET, which can detect over 6000 species across the globe."],
     "Nocmig Mode-circle-help": ["When enabled, this 'Nocmig mode' only searches for and only displays detections found during the night"],
@@ -212,7 +212,7 @@
     "headings": [
       "Settings",
       "Detections", 
-      "Additional Classes", 
+      "Included Classes", 
       "Keyboard Assignments",
       "Default Location",
       "System",

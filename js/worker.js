@@ -880,7 +880,7 @@ async function handleMessage(e) {
       STATE.detect.classes = args.classes || STATE.detect.classes;
       await INITIALISED;
       await setLabelState({regenerate:true});
-      LIST_WORKER && (await getIncludedIDs());
+
       
       args.refreshResults && (await Promise.all([getSummary(), getResults()]));
       break;

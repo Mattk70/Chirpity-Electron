@@ -22,7 +22,7 @@
     "Low Pass Filter-circle-help": ["När det är inställt tas högfrekvent brus över tröskeln bort."],
     "IUCN-circle-help": ["När aktiverat, visas den senaste globala IUCN-bedömningsstatusen för varje art i sammanfattningen. Ikonen länkar till bedömningssidan på IUCN:s webbplats. Bedömningsområdet visar IUCN-bedömningen av arten i den regionen (om tillgänglig)."],
     "Language-circle-help": ["Välj ditt föredragna språk för fåglars vanliga namn."],
-    "List-circle-help": ["Filtrerar de detektioner som returneras i resultaten. Lokala fåglar: utesluter fåglar som är osannolika att hittas i din region. Nattliga läten: utesluter fågelsång och arter som inte är kända för att ropa på natten. Den anpassade listan låter dig ladda upp en fil som listar de arter som ska detekteras."],
+    "List-circle-help": ["Filtrerar de detektioner som returneras i resultaten. Lokala arter: utesluter arter som är osannolika att hittas i din region. Nattliga läten: utesluter fågelsång och arter som inte är kända för att ropa på natten. Den anpassade listan låter dig ladda upp en fil som listar de arter som ska detekteras."],
     "Low Shelf Filter-circle-help": ["När använt, dämpar lågfrekvent brus under gränsfrekvensen."],
     "Model-circle-help": ["Välj om du vill använda Nocmig-modellen, optimerad för nattliga migrationsanrop i Europa, eller BirdNET, som kan detektera över 6000 arter över hela världen."],
     "Nocmig Mode-circle-help": ["När aktiverat, söker detta 'Nocmig-läge' endast efter och visar endast detekteringar som hittas under natten."],
@@ -207,7 +207,7 @@
         "LAR": "Senaste höstregistrering",
         "MC": "Flest läten på 24 timmar"
     },
-    "headings": ["Inställningar","Detektioner", "Ytterligare klasser", "Tangentbordsuppdrag",
+    "headings": ["Inställningar","Detektioner", "Inkluderede klasser", "Tangentbordsuppdrag",
         "Standardplats",
         "System",
         "Ljudinställningar",

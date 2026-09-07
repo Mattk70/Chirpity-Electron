@@ -3564,7 +3564,7 @@ const updateListOptions = (model) => {
   select.replaceChildren();
   let options;
   if (/perch/i.test(model)) {
-    options = ["birds", "Amphibia", "Insecta", "Mammalia", "Reptilia", "Animalia", "everything", "custom"]
+    options = ["location", "birds", "everything", "custom"]
   } else  {
     options = ["location", "nocturnal", "birds", "everything", "custom"];
   }
@@ -3586,12 +3586,9 @@ const updateListIcon = () => {
   const LIST_MAP = i18n.get(i18n.LIST_MAP);
   const {list} = config;
   let node;
-  if (["custom", "Mammalia", "Insecta", "Animalia"].includes(list)) {
+  if (["custom"].includes(list)) {
     const iconName = {
-      custom: "fact_check",
-      Mammalia: "pets",
-      Insecta: "bug_report",
-      Animalia: "voice_over_off"
+      custom: "fact_check"
     }
     node = document.createElement("span");
     node.className = "material-symbols-outlined mt-1";
@@ -3599,7 +3596,7 @@ const updateListIcon = () => {
     node.style.height =  "1.6rem";
     node.textContent = iconName[list];
   } else {
-    if (!['location', 'birds', 'nocturnal', 'everything', 'Amphibia', "Reptilia"].includes(list)) return
+    if (!['location', 'birds', 'nocturnal', 'everything'].includes(list)) return
     node = document.createElement("img");
     node.className = "icon filter";
     node.setAttribute("src", `img/${list}.png`);
@@ -3660,19 +3657,21 @@ const updateModelIcon = (model) => {
   }
 }
 
-DOM.listIcon.addEventListener("click", () => {
+DOM.listIcon.addEventListener("click", (e) => {
+  e.stopPropagation();
   if (PREDICTING) {
     generateToast({ message: "changeListBlocked", type: "warning" });
     return;
   }
   const model = config.selectedModel;
-  const keys = model !== 'perch v2' ? ["location", "nocturnal", "birds", "everything", "custom"] : ["birds", "Amphibia", "Insecta", "Mammalia", "Reptilia", "Animalia", "everything", "custom"];
+  const keys = model !== 'perch v2' ? ["location", "nocturnal", "birds", "everything", "custom"] : ["location", "birds", "everything", "custom"];
   const currentListIndex = keys.indexOf(config.list);
   const next = currentListIndex === keys.length - 1 ? 0 : currentListIndex + 1;
   config.list = keys[next];
   config.models[model].list = keys[next];
   updatePrefs("config.json", config);
   updateList();
+  setClassesUIState();
 });
 
 DOM.customListSelector.addEventListener("click", async () => {
@@ -5030,8 +5029,8 @@ const populateSpeciesModal = async ({included, excluded, place}) => {
     });
   }
   const includedList = generateBirdIDList(included);
-  const classes = model === "BirdNET3" ? config.detect.classes.join(', ') : "";
-  const classesText = model === "BirdNET3" && ["nocturnal", "location", "birds"].includes(config.list) 
+  const classes = ["BirdNET3","Perch v2"].includes(model) ? config.detect.classes.join(', ') : "";
+  const classesText = ["BirdNET3","Perch v2"].includes(model) && ["nocturnal", "location", "birds"].includes(config.list) 
     ? utils.interpolate(i18.classesText, { classes: classes }) : "";
   const depending =
     config.useWeek &&
@@ -5261,8 +5260,14 @@ const modelSettingsDisplay = () => {
   DOM.trainNav.classList.toggle('disabled', blockTrain);
   updateThreadsSlider();
   DOM.windowSize.classList.toggle('d-none', config.selectedModel !== 'birdnet3');
-  DOM.classes.classList.toggle('d-none', config.selectedModel !== 'birdnet3');
+  setClassesUIState();
 };
+
+const setClassesUIState = () => {
+  const showClasses = ["birdnet3", "perch v2"].includes(config.selectedModel) 
+    && ["location", "birds"].includes(config.list);
+  DOM.classes.classList.toggle('d-none', !showClasses);
+}
 
 const contextAwareIconDisplay = () => {
   const i18 = i18n.get(i18n.Titles);
@@ -7060,6 +7065,7 @@ document.addEventListener("change", async function (e) {
           config.list = element.value;
           config.models[config.selectedModel].list = element.value;
           updateList();
+          setClassesUIState();
           break;
         }
         case "Aves":

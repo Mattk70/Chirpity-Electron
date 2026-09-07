@@ -22,7 +22,7 @@
     "Low Pass Filter-circle-help": ["Wanneer ingesteld, verwijdert het hoogfrequente ruis boven de drempel."],
     "IUCN-circle-help": ["Wanneer ingeschakeld, wordt de nieuwste wereldwijde IUCN-beoordelingsstatus voor elke soort weergegeven in het overzicht. Het pictogram linkt naar de beoordelingspagina op de IUCN-website. De beoordelingsscope toont de beoordeling van de soort in die regio (indien beschikbaar)."],
     "Language-circle-help": ["Selecteer je voorkeurstaal voor de algemene namen van vogels."],
-    "List-circle-help": ["Filtert de detecties die in de resultaten worden geretourneerd. Lokale vogels: sluit vogels uit die waarschijnlijk niet in jouw regio voorkomen. Nachtelijke roepen: sluit vogelzang en soorten die niet bekend staan om 's nachts te roepen, uit. De aangepaste lijst stelt je in staat een bestand te uploaden waarin de te detecteren soorten worden vermeld."],
+    "List-circle-help": ["Filtert de detecties die in de resultaten worden geretourneerd. Lokale soorten: sluit soorten uit die waarschijnlijk niet in jouw regio voorkomen. Nachtelijke roepen: sluit vogelzang en soorten die niet bekend staan om 's nachts te roepen, uit. De aangepaste lijst stelt je in staat een bestand te uploaden waarin de te detecteren soorten worden vermeld."],
     "Low Shelf Filter-circle-help": ["Verzwakt, indien gebruikt, laagfrequent geluid onder de dkantelfrequentie."],
     "Model-circle-help": ["Kies of je het Nocmig-model wilt gebruiken, geoptimaliseerd voor nachtelijke migratieoproepen in Europa, of BirdNET, dat meer dan 6000 soorten wereldwijd kan detecteren."],
     "Nocmig Mode-circle-help": ["Wanneer ingeschakeld, zoekt deze 'Nocmig-modus' alleen naar en toont alleen detecties die 's nachts zijn gevonden."],
@@ -207,7 +207,7 @@
         "LAR": "Laatste herfst-observatie",
         "MC": "Meeste oproepen in 24 uur"
     },
-    "headings": ["Instellingen","Detecties", "Aanvullende klassen", "Toetsenbordtoewijzingen",
+    "headings": ["Instellingen","Detecties", "Inkluderede klassen", "Toetsenbordtoewijzingen",
         "Standaardlocatie",
         "Systeem",
         "Audio-instellingen",

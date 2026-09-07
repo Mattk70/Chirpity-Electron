@@ -389,6 +389,30 @@ const NEW_TO_OLD_TAXONOMY =
   "Zanda funerea": "Calyptorhynchus funereus",
   "Zanda latirostris": "Calyptorhynchus latirostris",
   "Zonibyx modestus": "Charadrius modestus",
+  //Perch taxonomy changes
+  "Hyla gratiosa":"Dryophytes gratiosus",
+  "Hyla avivoca":"Dryophytes avivoca",
+  "Rana draytonii":"Rana aurora draytonii",
+  "Neotamias dorsalis":"Tamias dorsalis",
+  "Hyla chrysoscelis":"Dryophytes chrysoscelis",
+  "Vini margarethae":"Charmosynoides margarethae",
+  "Chalcopsitta fuscata":"Pseudeos fuscata",
+  "Thinornis forbesi":"Charadrius forbesi",
+  "Hyla versicolor":"Dryophytes versicolor",
+  "Hyla cinerea":"Dryophytes cinereus",
+  "Lama guanicoe":"Lama glama",
+  "Anarhynchus javanicus":"Charadrius javanicus",
+  "Aquarana septentrionalis":"Lithobates septentrionalis",
+  "Pachyglossa olivacea":"Prionochilus olivaceus",
+  "Anarhynchus veredus":"Charadrius veredus",
+  "Lycalopex gymnocerca":"Lycalopex gymnocercus",
+  "Sus domesticus":"Sus scrofa",
+  "Aquarana grylio":"Lithobates grylio",
+  "Hyla andersonii":"Dryophytes andersonii",
+  "Physeter macrocephalus":"Physeter catodon",
+  "Hyla squirella":"Dryophytes squirellus",
+  "Pachyglossa propria":"Dicaeum proprium",
+  "Boreorana sylvatica":"Lithobates sylvaticus",
 };
 
 const OLD_TO_NEW_TAXONOMY = Object.fromEntries(
@@ -600,7 +624,6 @@ class Model {
               this.mdata_labels[index] + ": " + mdata_probs[index]
             );
         } else {
-          count++;
           const latin = this.mdata_labels[index].split(",")[0];
           // Translate new-taxonomy name -> old-taxonomy name, if it was renamed.
           // If it's not in the map, the name is unchanged between the two lists.
@@ -619,8 +642,9 @@ class Model {
             // Ensure at least one class is included
             classes.length > 0 || (classes = ['Aves'])
             // Exclude unselected classes for birdnet3
-            if (model === 'birdnet3' && !classes.some(cls => this.labels[index].includes(cls))) return;
+            if (["birdnet3", "perch v2"].includes(model) && !classes.some(cls => this.labels[index].includes(cls))) return;
             includedIDs.push(index + 1);
+            count++;
             DEBUG &&
               console.log(
                 "Including: ",
@@ -713,14 +737,13 @@ class Model {
       includedIDs = this.labels
         .map((label, index) => {
           const firstPart = this.getFirstElement(label);
-          if (this.perch) {
-            listType === "Animalia" && (listType = "None");
+          if (this.perch_TEST) {
             // Perch has different format, so we need to check differently
             const list = listType === "birds" ? "~Aves" : '~' + listType;
             // None type means exclude these labels
             if (listType === "None") return label.indexOf(list) === -1 ? index + 1 : null;
             return label.indexOf(list) !== -1 ? index + 1 : null;
-          } else if (this.birdnet3) { // TODO: not working
+          } else if (this.perch ||this.birdnet3) { // TODO: not working
             // Exclude unselected classes for birdnet3
             if (!this.classes.some(cls => this.labels[index].includes(cls))) return;
             return index + 1;
