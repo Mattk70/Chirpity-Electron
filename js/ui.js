@@ -2396,9 +2396,9 @@ window.onload = async () => {
   DOM.contentWrapper.classList.add("loaded");
 
   // Set default locale
-  systemLocale = systemLocale.replace("en-GB", "en_uk");
+  systemLocale = systemLocale.replace("en-GB", "en_GB");
   systemLocale =
-    systemLocale === "en_uk"
+    systemLocale === "en_GB"
       ? systemLocale
       : systemLocale.slice(0, 2).toLowerCase();
   if (STATE.translations.includes(systemLocale)) {
@@ -2420,8 +2420,9 @@ window.onload = async () => {
     config = JSON.parse(configFile);
     //fill in defaults - after updates add new items
     utils.syncConfig(config, defaultConfig);
+    // Migrate from old locale format if necessary
+    if (config.locale === "en_uk") config.locale = "en_GB";
   }
-
   const installDate = localStorage.getItem("installDate");
   const {appId, installedAt} = await window.electron.getInstallInfo(installDate);
   if (!installDate || ! isNaN(Number(installDate))) {
@@ -2564,7 +2565,7 @@ window.onload = async () => {
   // Localise UI
   i18n.localiseUI(DOM.locale.value).then((result) => (STATE.i18n = result));
   initialiseDatePicker(STATE, worker, config, resetResults, filterResults, generateToast);
-  STATE.picker.options.lang = DOM.locale.value.replace("_uk", "");
+  STATE.picker.options.lang = DOM.locale.value.replace("_GB", "");
 
   // remember audio notification setting
   DOM.audioNotification.checked = config.audio.notification;
@@ -2905,10 +2906,7 @@ const setUpWorkerMessaging = () => {
         case "label-translation-needed": {
           // Called when the initial system locale isn't english
           let locale = args.locale;
-          let labelFile;
-          locale === "pt" && (locale = "pt_PT");
-          labelFile = p.join(dirname,`labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_${locale}.txt`);
-
+          const labelFile = getLabelFile(locale);
           readLabels(labelFile);
           break;
         }
@@ -3069,6 +3067,22 @@ function removeOpenFile(file) {
 
   renderFilenamePanel();
 }
+
+/**
+ * getLabelFile determines the appropriate label file path based on the selected model and locale.
+ * If the selected model is "birdnet3" or "perch v2", it uses the BirdNET3 label file. Otherwise, it constructs the path to the BirdNET_GLOBAL label file based on the locale.
+ * @param {string} locale - The locale for which to determine the label file path.
+ * @returns {string} The function returns the determined label file path.
+ */
+
+const getLabelFile = (locale) => {
+    if (["birdnet3", "perch v2"].includes(config.selectedModel)) {
+    return p.join(dirname, "BirdNET3/BirdNET3_geomodel_labels.csv");
+  } else {
+    locale === "pt" && (locale = "pt_PT");
+    return p.join(dirname,`labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_${locale}.txt`);
+  }
+}
 /**
  * Display regions for detections that fall within the current spectrogram window.
  *
@@ -3206,7 +3220,7 @@ function getDateOfISOWeek(week, year) {
 }
 
 function formatWeekRange(week, year) {
-  const locale = config.locale.replace("en_uk", "en-GB").replace('_', '-');
+  const locale = config.locale.replace("en_GB", "en-GB").replace('_', '-');
 
   const start = getDateOfISOWeek(week, year);
   if (isNaN(start.getTime())) return week;
@@ -3389,7 +3403,8 @@ function generateDateLabels(aggregation, datapoints, pointstart, startX) {
 function formatDate(date, aggregation) {
   const options = {};
   let formattedDate = "";
-  const locale = config.locale.replace("en_uk", "en-GB").replace('_', '-');
+  // Convert to BCP 47 language tag for Intl API (e.g., "en-US" instead of "en_US")
+  const locale = config.locale.replace('_', '-');
   if (aggregation === "week") {
     // Add 1 day to the startDate
     date.setHours(date.getDate() );
@@ -5005,6 +5020,8 @@ function replaceCtrlWithCommand() {
 
 const populateSpeciesModal = async ({included, excluded, place}) => {
   const i18 = i18n.get(i18n.SpeciesList);
+  const headings = i18n.get(i18n.Headings);
+  i18.search = headings.search;
   const current_file_text =
     STATE.week !== -1 && STATE.week
       ? utils.interpolate(i18.week, { week: STATE.week })
@@ -5064,21 +5081,82 @@ const populateSpeciesModal = async ({included, excluded, place}) => {
   } else {
     disable = " disabled";
   }
-  let modalContent = `
+let modalContent = `
+    <div class="d-flex align-items-start justify-content-between">
         <ul class="nav nav-tabs" id="myTab" role="tablist">
-        <li class="nav-item" role="presentation">
-        <button class="nav-link active" id="included-tab" data-bs-toggle="tab" data-bs-target="#included-tab-pane" type="button" role="tab" aria-controls="included-tab-pane" aria-selected="true">${i18.includedButton}</button>
-        </li>
-        <li class="nav-item" role="presentation">
-        <button class="nav-link" id="excluded-tab" data-bs-toggle="tab" data-bs-target="#excluded-tab-pane" type="button" role="tab" aria-controls="excluded-tab-pane" aria-selected="false" ${disable}>${i18.excludedButton}</button>
-        </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active"
+                    id="included-tab"
+                    data-bs-toggle="tab"
+                    data-bs-target="#included-tab-pane"
+                    type="button"
+                    role="tab"
+                    aria-controls="included-tab-pane"
+                    aria-selected="true">
+                    ${i18.includedButton}
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link"
+                    id="excluded-tab"
+                    data-bs-toggle="tab"
+                    data-bs-target="#excluded-tab-pane"
+                    type="button"
+                    role="tab"
+                    aria-controls="excluded-tab-pane"
+                    aria-selected="false"
+                    ${disable}>
+                    ${i18.excludedButton}
+                </button>
+            </li>
         </ul>
-        <div class="tab-content" id="myTabContent">
-        <div class="tab-pane fade show active" id="included-tab-pane" role="tabpanel" aria-labelledby="included-tab" tabindex="0" style="max-height: 50vh;overflow: auto">${includedContent}</div>
-        <div class="tab-pane fade" id="excluded-tab-pane" role="tabpanel" aria-labelledby="excluded-tab" tabindex="0" style="max-height: 50vh;overflow: auto">${excludedContent}</div>
+
+        <div class="input-group ms-3 me-3" style="width: 250px;">
+            <input type="search"
+                id="species-search"
+                class="form-control"
+                placeholder="&#x1F50E; ${i18.search}"
+                aria-label="Search species">
         </div>
-        `;
-  document.getElementById("speciesModalBody").innerHTML = modalContent;
+    </div>
+
+    <div class="tab-content" id="myTabContent">
+        <div class="tab-pane fade show active"
+            id="included-tab-pane"
+            role="tabpanel"
+            aria-labelledby="included-tab"
+            tabindex="0"
+            style="max-height: 50vh; overflow: auto">
+            ${includedContent}
+        </div>
+
+        <div class="tab-pane fade"
+            id="excluded-tab-pane"
+            role="tabpanel"
+            aria-labelledby="excluded-tab"
+            tabindex="0"
+            style="max-height: 50vh; overflow: auto">
+            ${excludedContent}
+        </div>
+    </div>
+`;
+
+document.getElementById("speciesModalBody").innerHTML = modalContent;
+
+document.getElementById("species-search").addEventListener("input", (event) => {
+    const search = event.target.value.trim().toLowerCase();
+
+    const activePane = document.querySelector("#myTabContent .tab-pane.active");
+
+    if (!activePane) return;
+
+    activePane.querySelectorAll("tbody>tr").forEach((item) => {
+        item.classList.toggle(
+            "d-none",
+            search && !item.textContent.toLowerCase().includes(search)
+        );
+    });
+});
   document.getElementById("speciesModalLabel").textContent = i18.title;
   const species = new bootstrap.Modal(document.getElementById("speciesModal"));
   species.show();
@@ -7093,7 +7171,7 @@ document.addEventListener("change", async function (e) {
               return;
             }
           } else {
-            labelFile = p.join(dirname,`labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_${element.value}.txt`);
+            labelFile = getLabelFile(DOM.locale.value);
             i18n
               .localiseUI(DOM.locale.value)
               .then((result) => (STATE.i18n = result));

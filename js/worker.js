@@ -5644,10 +5644,11 @@ async function _updateSpeciesLocale(db, labels) {
  */
 async function onUpdateLocale(locale, labels, refreshResults) {
   if (DEBUG) t0 = Date.now();
-  let db;
+  labels = prepareLocalLabels(labels, locale);
+  DEBUG && console.log(`Preparing labels took ${t0-Date.now()}ms `);
   try {
     STATE.update({ locale });
-    for (db of [diskDB, memoryDB]) {
+    for (const db of [diskDB, memoryDB]) {
       db.locale = locale;
       await _updateSpeciesLocale(db, labels);
     }
@@ -5660,6 +5661,18 @@ async function onUpdateLocale(locale, labels, refreshResults) {
     
   }
   await setLabelState({regenerate:true})
+}
+
+const prepareLocalLabels = (labels, locale) => {
+  const headers = labels[0].split(",");
+  const names = ["sci_name", `common_name_${locale}`];
+  const indices = names.map(name => headers.indexOf(name));
+  if (indices[0] === -1 ) return labels;
+  if (indices[1] === -1)  indices[1] = headers.indexOf("com_name"); // English fallback
+  return labels.map(row => {
+    const values = row.split(",");
+    return indices.map(index => values[index] || values[0]).join(","); // Use sci_name if there is no translation for the locale
+  });
 }
 
 /**
