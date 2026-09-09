@@ -4254,15 +4254,6 @@ const updateSummary = ({ summary = [], filterSpecies = "" }) => {
                     </td>`;
 
     if (showIUCN) {
-      let found = 0, missing = 0;
-      LABELS.forEach(l => {
-        const sname = l.split(',')[0];
-        const species = IUCNtaxonomy[sname] || sname;
-        const record = IUCNCache[species];
-        record ? found++ : missing++;
-        record || console.log(`Missing species: ${sname}`);
-      })
-      console.warn(`Found ${found} IUCN records, ${missing} are missing`)
       const species = IUCNtaxonomy[item.sname] || item.sname;
       const record = IUCNCache[species];
       // there might not be a record...
