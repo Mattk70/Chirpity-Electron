@@ -12,7 +12,15 @@ const sampleRate = 32000;
 const numClasses = 11560;
 const DEBUG = false;
 let modelPath;
- 
+
+/**
+ * Create the shared BirdNET3 inference session for the requested backend and batch size.
+ *
+ * @param {string} _mpath - Reserved model-path argument; the bundled BirdNET3 model is used.
+ * @param {string} backend - `webgpu` to prefer WebGPU, or another value to use CPU only.
+ * @param {number} batchSize - Fixed batch dimension supplied to ONNX Runtime.
+ * @returns {Promise<void>} Resolves when the session is ready.
+ */
 async function loadModel(_mpath, backend, batchSize) {
   const gpu = backend === 'webgpu';
   const providers = gpu ? ['webgpu', 'cpu'] : ['cpu'];
@@ -37,6 +45,16 @@ async function loadModel(_mpath, backend, batchSize) {
   session = await ort.InferenceSession.create(modelPath, sessionOptions);
   cancelled = false;
 }
+
+/**
+ * Handle model lifecycle, window-size, and prediction messages from the parent worker.
+ *
+ * Load requests post model metadata and labels; prediction requests post ranked
+ * results unless cancellation made them stale.
+ *
+ * @param {MessageEvent} e - Worker message containing the requested operation and payload.
+ * @returns {Promise<void>} Resolves after the request is handled or its error is logged.
+ */
 onmessage = async (e) => {
   const data = e.data;
   const modelRequest = data.message;
@@ -132,6 +150,12 @@ onmessage = async (e) => {
 };
 
 
+/**
+ * Pack audio chunks into a fixed-width ONNX tensor, truncating or zero-padding each chunk.
+ *
+ * @param {Float32Array[]} audioArray - Audio chunks to place in the batch.
+ * @returns {ort.Tensor} A tensor shaped as batch size by the active chunk length.
+ */
 const createAudioTensorBatch = (audioArray) => {
     const batch = audioArray.length;
     const data = new Float32Array(batch * chunkLength);
@@ -147,6 +171,13 @@ const createAudioTensorBatch = (audioArray) => {
     return new ort.Tensor('float32', data, [batch, chunkLength]);
 };
 
+/**
+ * Run inference for a batch of audio chunks and their sample offsets.
+ *
+ * @param {Float32Array[]} audioBuffer - Audio chunks to analyze.
+ * @param {number[]} startSamples - Start offsets, in samples, for the chunks.
+ * @returns {Promise<Array>} Processed timestamps, top class indices and probabilities, and embeddings.
+ */
 async function predictChunk(audioBuffer, startSamples) {
     const audioBatch = createAudioTensorBatch(audioBuffer);
     const result = await predictBatch( audioBatch, startSamples );
@@ -154,9 +185,13 @@ async function predictChunk(audioBuffer, startSamples) {
 }
 
 /**
- * Predict batch post-process: returns [keys, batchedIndices, batchedProbs]
- * - flat: Float32Array of length batchSize * numClasses (logits)
- * - batchSize, numClasses, sampleRate available in outer scope / params
+ * Run BirdNET3 inference and extract the five highest-scoring classes and a normalized embedding for each input.
+ *
+ * The `keys` array is converted in place from sample offsets to seconds.
+ *
+ * @param {ort.Tensor} audio - Batched audio tensor.
+ * @param {number[]} keys - Sample offsets corresponding to the batch rows.
+ * @returns {Promise<Array>} A tuple of timestamps, class-index arrays, probability arrays, and float16 embeddings.
  */
 async function predictBatch(audio, keys) {
     const length = keys.length;
@@ -187,6 +222,12 @@ async function predictBatch(audio, keys) {
     }
     return [keys, batchedIndices, batchedProbs, batchedEmbeds];
 }
+/**
+ * Select the five highest values and their indices in descending order.
+ *
+ * @param {Float32Array} probs - Class scores to rank.
+ * @returns {{probs: number[], idx: number[]}} Ranked scores and their original indices.
+ */
 function topKProbs(probs) {
   // Initialise with first five values
   let p0 = probs[0], i0 = 0;
@@ -257,6 +298,14 @@ function topKProbs(probs) {
   };
 }
 
+/**
+ * Normalize a numeric vector to unit L2 length in place.
+ *
+ * Zero vectors are left unchanged.
+ *
+ * @param {Float32Array} vec - Vector to normalize.
+ * @returns {Float32Array} The same vector instance.
+ */
 function l2Normalize(vec) {
   let sum = 0.0;
   // Compute squared norm

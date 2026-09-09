@@ -15,6 +15,14 @@ const numClasses = 14795;
 const DEBUG = false;
 let modelPath;
 
+/**
+ * Create the shared Perch inference session for a backend and fixed batch size.
+ *
+ * @param {string} mpath - Directory containing `perch_v2.onnx`.
+ * @param {string} backend - `webgpu` to prefer WebGPU, or another value to use CPU only.
+ * @param {number} batchSize - Fixed batch dimension supplied to ONNX Runtime.
+ * @returns {Promise<void>} Resolves when the session is ready.
+ */
 async function loadModel(mpath, backend, batchSize) {
   const gpu = backend === 'webgpu';
   const providers = gpu ? ['webgpu', 'cpu'] : ['cpu'];

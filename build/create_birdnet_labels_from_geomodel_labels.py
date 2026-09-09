@@ -46,6 +46,11 @@ def first_by(rows: list[dict[str, str]], column: str) -> dict[str, dict[str, str
 
 
 def main(argv: list[str]) -> int:
+    """Combine taxonomy translations with model labels and write the result CSV.
+
+    Return 2 after printing usage for an invalid argument count, or 0 after
+    writing the output and a match summary. CSV and filesystem errors propagate.
+    """
     if len(argv) not in (1, 4):
         print(__doc__.strip(), file=sys.stderr)
         return 2

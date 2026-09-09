@@ -394,7 +394,20 @@ const createDB = async ({file, diskDB, dbMutex}) => {
   return db;
 };
 
-
+/**
+ * Add a model and its labels to a database in one transaction.
+ *
+ * Built-in models load their bundled labels; custom models use
+ * `labelsLocation`. Invalid labels or database failures are rolled back and
+ * returned as the error object instead of being thrown.
+ *
+ * @param {Object} options - Model registration options.
+ * @param {string} options.model - Model name stored in the database.
+ * @param {Object} [options.db=diskDB] - Database that receives the model and species rows.
+ * @param {Object} options.dbMutex - Mutex used to serialize the transaction.
+ * @param {string} [options.labelsLocation] - Label file for a custom model.
+ * @returns {Promise<number|Error>} The new model ID, or the transaction error.
+ */
 const addNewModel = async ({model, db = diskDB, dbMutex, labelsLocation}) => {
   let modelID;
   try {

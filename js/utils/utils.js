@@ -50,7 +50,8 @@ function normaliseModels(models = {}, defaultModels = {}) {
  * Aligns a configuration object to the shape and keys of a default configuration.
  *
  * Mutates `config` in place by removing keys not present in `defaultConfig` and ensuring
- * every key in `defaultConfig` exists in `config`. When both values for a key are objects,
+ * every key in `defaultConfig` exists in `config`. Arrays are merged with the default
+ * values first and duplicates removed. When both values for a key are objects,
  * the function recurses to synchronize nested keys except for the `"keyAssignment"` key,
  * which is left unchanged. The `"models"` key is handled by calling `normaliseModels` to
  * merge per-model defaults instead of performing a recursive merge.

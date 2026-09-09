@@ -966,31 +966,6 @@ ipcRenderer.on("close-database", async () => {
 });
 
 /**
- * Checks whether all files in the provided list are present in the database.
- *
- * This asynchronous function processes the given file list in batches (up to 25,000 files per batch) to accommodate SQLite's parameter limits.
- * For each batch, it constructs a parameterized SQL query that counts how many of the files exist in the database's "files" table.
- * If any batch has a count lower than the number of files in that batch, the function immediately posts a failure event to the UI and returns false.
- * If all batches are successfully verified, it posts a success event to the UI and returns true.
- * If the database (diskDB) is not loaded, an error alert is generated and the function returns undefined.
- *
- * @param {Array.<string>} fileList - An array of file names to verify in the database.
- * @return {Promise<boolean|undefined>} A promise that resolves to true if every file is found in the database, false if one or more files are missing, or undefined if the database is not loaded.
- *
- * @example
- * const files = ['track1.mp3', 'track2.wav'];
- * savedFileCheckAsync(files).then(result => {
- *   if (result === true) {
- *     console.log('All files exist in the database.');
- *   } else if (result === false) {
- *     console.log('Some files are missing in the database.');
- *   } else {
- *     console.log('Database not loaded.');
- *   }
- * });
- */
-
-/**
  * Creates a custom list mapping from species names to call types, along with optional date ranges and confidence thresholds.
  *
  * This function processes an array of custom label strings, each expected to contain species name, call type, optional start/end dates, and an optional confidence value, separated by a delimiter (comma or tilde depending on the model).
@@ -1066,6 +1041,16 @@ async function createCustomListMap(customLabels, splitOn, member) {
   }
 }
 
+/**
+ * Check whether every requested file is represented in the disk database.
+ *
+ * Files may match by their source name or by an archive-relative name. The
+ * result is also posted to the UI; a missing database produces an alert and
+ * returns `false`.
+ *
+ * @param {string[]} fileList - File paths or names to check.
+ * @returns {Promise<boolean>} Whether all files were found.
+ */
 async function savedFileCheckAsync(fileList) {
   if (diskDB) {
     fileList = fileList.map(f => (METADATA[f]?.name || f));
@@ -1140,6 +1125,11 @@ function setGetSummaryQueryInterval(threads) {
     STATE.detect.backend !== "tensorflow" ? threads * 10 * scaleFactor: threads * scaleFactor;
 }
 
+/**
+ * Recalculate queued-file estimates using the current batch and window sizes.
+ *
+ * @returns {Promise<void>} Resolves after queued files have been reprocessed for estimation.
+ */
 async function resetEstimates() {
   // Update time estimates based on file information and current batch/window size
   const files = QUEUE.getAllPaths();
@@ -1209,6 +1199,7 @@ async function onChangeMode(mode) {
  * @param {number} [options.threads=1] - Number of prediction worker threads to spawn.
  * @param {string} [options.backend="tensorflow"] - Detection backend to use.
  * @param {string} [options.modelPath] - Filesystem path containing model files and label definitions; used when adding a new model.
+ * @param {number} [options.windowSize=3] - Analysis window in seconds, except for models with a fixed window.
  */
 
 async function onLaunch({
@@ -1642,14 +1633,13 @@ async function getMatchingIds(cnames) {
 }
 
 /**
- * Build an SQL fragment that filters species according to the current STATE.list selection.
+ * Build an SQL fragment and bound value that filter species for the active list.
  *
- * When STATE.list is "everything" the function returns an empty string. For other lists it resolves the set
- * of included species IDs (handling the special "birds" exclusion case and CNAMES with suffixes) and
- * returns an SQL snippet that restricts s.id to that set.
+ * For the `birds` and `Animalia` lists, the resolved list is treated as an
+ * exclusion. Manual records remain included regardless of the list.
  *
- * @returns {Promise<object>}  SQL: a fragment restricting species by id (for example " AND s.id IN (1,2) "),
- * or an empty string when no filtering is required. param : an json string array of parameters for the SQL fragment (currently unused).
+ * @param {string} [file] - File whose location and week should determine a location-based list.
+ * @returns {Promise<{SQL: string, param: string}|string>} SQL and its JSON-array parameter, or an empty string when an exclusion list removes nothing.
  */
 async function getSpeciesSQLAsync(file){
   let not = "", SQL = "", param = '';
@@ -1959,6 +1949,11 @@ async function updateMetadata(fileNames) {
   return finalResult;
 }
 
+/**
+ * Recreate the temporary embedding table with the active model's vector dimension.
+ *
+ * @returns {Promise<void>} Resolves after the table is ready.
+ */
 const resetEmbeddings = async () =>{
   STATE.queryMetadata = undefined;
   const dim = STATE.model === 'perch v2' ? 1536 : STATE.model === 'birdnet3' ? 1280 : 1024;
@@ -2126,12 +2121,12 @@ async function onAnalyse({
 }
 
 /**
- * Stop ongoing audio processing and prediction, clear in-memory queues and transient tracking state, and (unless the model is "perch v2") restart prediction workers using the specified model.
+ * Stop ongoing audio processing and prediction, clear transient run state, and restart prediction workers.
  *
  * This sets the abort flag, clears file and prediction queues, cancels backlog intervals, terminates existing prediction workers, and spawns a fresh set of workers for the provided model identifier.
  *
  * @param {Object} params - Options for aborting and restarting.
- * @param {string} [params.model=STATE.model] - Model identifier to use when restarting prediction workers; if equal to `"perch v2"`, workers are not restarted.
+ * @param {string} [params.model=STATE.model] - Model identifier for the replacement workers.
  */
 function onAbort({ model = STATE.model }) {
   const run = STATE.currentRun;
@@ -3017,6 +3012,12 @@ function createPredictSender(workerQueue) {
     return workerQueue.send(payload, transferList);
   };
 }
+/**
+ * Probe the first audio stream in a file.
+ *
+ * @param {string} file - Audio file to inspect.
+ * @returns {Promise<{audioCodec: string|null, sampleRate: number|null, channels: number|null}>} Stream codec, sample rate, and channel count.
+ */
 const getAudioCodec = (file) => {
   return new Promise((resolve, reject) => {
     ffmpeg.ffprobe("file:" + file, (err, metadata) => {
@@ -3041,6 +3042,23 @@ const getAudioCodec = (file) => {
   });
 };
 
+/**
+ * Export an audio segment with the configured filters and encoding settings.
+ *
+ * Missing source files are resolved through the application's file lookup. If
+ * source and destination are the same, the original is replaced only after a
+ * successful temporary export.
+ *
+ * @param {Object} options - Export options.
+ * @param {string} options.file - Source audio path.
+ * @param {number} [options.start=0] - Segment start in seconds.
+ * @param {number} [options.end=WINDOW_SIZE] - Segment end in seconds.
+ * @param {Object} [options.meta={}] - Metadata passed to FFmpeg.
+ * @param {string} [options.format=STATE.audio.format] - Output format.
+ * @param {string} [options.folder] - Destination directory, defaulting to the temporary directory.
+ * @param {string} options.filename - Destination filename.
+ * @returns {Promise<string|undefined>} Exported path, or `undefined` when the source cannot be found.
+ */
 const bufferToAudio = async ({
   file = "",
   start = 0,
@@ -3157,6 +3175,20 @@ const bufferToAudio = async ({
   });
 };
 
+/**
+ * Export an audio segment or ask the UI to save the temporary export.
+ *
+ * Multichannel MP3 export is refused when downmixing is disabled, with a
+ * localized error shown to the user.
+ *
+ * @param {string} file - Source audio path.
+ * @param {number} start - Segment start in seconds.
+ * @param {number} end - Segment end in seconds.
+ * @param {string} filename - Output filename.
+ * @param {Object} metadata - Metadata passed to the encoder.
+ * @param {string} [folder] - Direct destination directory; when omitted, the UI receives a save request.
+ * @returns {Promise<void>} Resolves after export or after refusing an unsupported MP3 export.
+ */
 async function saveAudio(file, start, end, filename, metadata, folder) {
   const {format, downmix} = STATE.audio;
   if (format === 'mp3' && ! downmix){
@@ -3205,14 +3237,16 @@ async function saveAudio(file, start, end, filename, metadata, folder) {
 
 
 /**
- * Spawns multiple Web Workers for parallel AI model prediction.
+ * Ensure the requested number of prediction workers exist for a model.
  *
- * Initializes the specified number of prediction worker threads, each loading the given AI model (using "BirdNet2.4" for "birdnet"). Workers are configured with batch size and backend settings, and set up for asynchronous communication and error handling.
+ * Perch and BirdNET3 CPU thread settings are converted to worker counts unless
+ * adjustment is disabled. Existing workers are retained; only missing workers
+ * are created and sent their load configuration.
  *
- * @param {string} model - The AI model to load for prediction; "birdnet" uses the "BirdNet2.4" worker script.
+ * @param {string} model - Model identifier and worker script basename.
  * @param {number} batchSize - Number of items each worker processes per batch.
- * @param {number} toSpawn - Number of worker threads to spawn.
- * @param {boolean} adjustThreads - Whether to adjust the number of threads based on the model.
+ * @param {number} threads - Requested CPU-thread budget or, when adjustment is disabled, worker count.
+ * @param {boolean} [adjustThreads=true] - Whether to convert the thread budget for models with intra-op threading.
  */
 function spawnPredictWorkers(model, batchSize, threads, adjustThreads = true) {
   const currentThreads = predictWorkers.length;
@@ -3266,6 +3300,9 @@ function spawnPredictWorkers(model, batchSize, threads, adjustThreads = true) {
   }
 }
 
+/**
+ * Notify and terminate every prediction worker, then clear the worker list.
+ */
 const terminateWorkers = () => {
   predictWorkers.forEach((worker) => {
     worker.postMessage({message: 'terminate'})
@@ -5048,8 +5085,15 @@ function recordRowToAllowedInput(row) {
 }
 
 /**
- *  Transfers data in memoryDB to diskDB
- * @returns {Promise<unknown>}
+ * Persist eligible in-memory files, metadata, and detections to the disk database.
+ *
+ * Detection rows are filtered by the active list, confidence, daylight, and
+ * custom-list settings. The operation is transactional and reports success or
+ * failure through application alerts.
+ *
+ * @param {Object} options - Save options.
+ * @param {string} options.file - File used when refreshing locations after a successful save.
+ * @returns {Promise<void>} Resolves after the transaction and UI notifications complete.
  */
 const onSave2DiskDB = async ({ file }) => {
   const t0 = Date.now();
@@ -5584,10 +5628,12 @@ const onFileDelete = async (fileName) => {
 /**
  * Updates species common names in the database based on provided label mappings.
  *
- * For each label in the format "speciesName_commonName", updates the corresponding species entry's common name (`cname`) in the database. Handles call type suffixes in common names and applies updates per model ID, ensuring that only changed values are written. All updates are performed within a single transaction for atomicity.
+ * Updates matching scientific names, including old-taxonomy equivalents, while
+ * retaining supported call-type suffixes from existing common names. All
+ * updates are performed within one transaction.
  *
  * @param {object} db - Database connection supporting async methods (`runAsync`, `prepare`, `finalize`).
- * @param {Array<string>} labels - Array of label strings in the format "speciesName_commonName".
+ * @param {string[]} labels - Scientific and localized common names separated by the active model's label delimiter.
  * @returns {Promise<void>} Resolves when all updates are committed.
  *
  * @throws {Error} If any database operation fails during the transaction.
@@ -5664,8 +5710,8 @@ async function _updateSpeciesLocale(db, labels) {
  *
  * Sets the new locale in the global state and updates species labels in both disk and memory databases. If requested, refreshes the application's results and summary to reflect the new locale.
  *
- * @param {string} locale - The locale identifier to set (e.g., "en-US").
- * @param {Object} labels - Mapping of species IDs to localized labels.
+ * @param {string} locale - Locale column suffix to select, such as `en` or `en_GB`.
+ * @param {string[]} labels - Label lines, either already paired or from the multilingual label CSV.
  * @param {boolean} refreshResults - Whether to refresh results and summary after updating the locale.
  */
 async function onUpdateLocale(locale, labels, refreshResults) {
@@ -5689,6 +5735,16 @@ async function onUpdateLocale(locale, labels, refreshResults) {
   await setLabelState({regenerate:true})
 }
 
+/**
+ * Select scientific and localized common-name columns from multilingual CSV rows.
+ *
+ * If the requested translation column is absent, English common names are
+ * used. Inputs without a `sci_name` header are returned unchanged.
+ *
+ * @param {string[]} labels - CSV rows including the header row.
+ * @param {string} locale - Locale suffix used to select `common_name_<locale>`.
+ * @returns {string[]} Scientific/common-name pairs, including the transformed header row.
+ */
 const prepareLocalLabels = (labels, locale) => {
   const headers = labels[0].split(",");
   const names = ["sci_name", `common_name_${locale}`];
@@ -6042,7 +6098,7 @@ let LIST_CACHE = {};
 /**
  * Load and cache the species ID inclusion list for a given location and week and merge it into STATE.included.
  *
- * Requests an inclusion list from the list worker using the current model, labels, list settings and the provided
+ * Requests an inclusion list from the list worker using the current model, labels, list settings, selected taxonomic classes, and the provided
  * latitude/longitude/week (falling back to STATE values), caches the in-flight request to avoid duplicate calls,
  * merges the returned IDs into STATE.included, and emits warnings for any unrecognized labels reported by the worker.
  *
