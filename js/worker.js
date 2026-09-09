@@ -36,6 +36,7 @@ import {createEmbeddingTable, storeEmbeddings, queryEmbeddings} from './embeddin
 import { customURLEncode, installConsoleTracking, trackEvent as _trackEvent } from "./utils/tracking.js";
 import { onChartRequest, getIncludedLocations }  from "./components/charts.js";
 import {PCMChunker, PredictionWritable, createMultiWorkerQueue, FileQueueManager} from './utils/streams.js';
+import { NEW_TO_OLD_TAXONOMY } from "./utils/new_to_old_taxonomy.js";
 const { pipeline } = require("stream/promises");
 
 const dbMutex = new Mutex();
@@ -1067,36 +1068,61 @@ async function createCustomListMap(customLabels, splitOn, member) {
 
 async function savedFileCheckAsync(fileList) {
   if (diskDB) {
-    // Slice the list into a # of params SQLITE can handle
-    const batchSize = 10_000;
-    let totalFilesChecked = 0;
     fileList = fileList.map(f => (METADATA[f]?.name || f));
     const library = STATE.library.location + p.sep;
-    for (let i = 0; i < fileList.length; i += batchSize) {
-      const fileSlice = fileList.slice(i, i + batchSize);
-      const newList = fileSlice.map(file => file.replace(library, ''));
-      // detect if any changes were made
-      const libraryFiles = newList.filter((item, i) => item !== fileSlice[i]);
-      const placeholders = prepParams(fileSlice);
-      let countResult, parameters = fileSlice.slice(); // make a copy
-      let query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${placeholders})`;
-      if (libraryFiles.length) {
-        const archivePlaceholders = prepParams(libraryFiles);
-        query += ` OR archiveName IN (${archivePlaceholders})`;
-        parameters.push(...libraryFiles)
+    const newList = fileList.map(file => file.replace(library, ''));
+    // detect which entries had the library prefix stripped
+    const libraryFiles = newList.filter((item, i) => item !== fileList[i]);
+
+    // Helper to run the count query against a given slice of names/libraryFiles
+    const countSaved = async (names, libFiles) => {
+      const query1 = `SELECT COUNT(*) AS count FROM files WHERE name IN (SELECT value FROM json_each(?))`;
+      let query = query1;
+      const parameters = [JSON.stringify(names)];
+
+      if (libFiles.length) {
+        query += ` OR archiveName IN (SELECT value FROM json_each(?))`;
+        parameters.push(JSON.stringify(libFiles));
       }
-      countResult = await diskDB.getAsync(query, ...parameters);
-      const count = countResult?.count || 0;
-      if (count < fileSlice.length) {
-        UI.postMessage({
-          event: "all-files-saved-check-result",
-          result: false,
-        });
-        return false;
-      }
-      totalFilesChecked += count;
+
+      const result = await diskDB.getAsync(query, ...parameters);
+      return result?.count || 0;
+    };
+
+    // 1. Quick check: first 10 files only
+    const firstSliceSize = Math.min(10, fileList.length);
+    const firstNames = fileList.slice(0, firstSliceSize);
+    //  derive libraryFiles specific to this slice 
+    const firstNewList = newList.slice(0, firstSliceSize);
+    const firstLibFiles = firstNewList.filter((item, i) => item !== firstNames[i]);
+
+    const firstCount = await countSaved(firstNames, firstLibFiles);
+
+    if (firstCount < firstSliceSize) {
+      UI.postMessage({
+        event: "all-files-saved-check-result",
+        result: false,
+      });
+      return false;
     }
-    const allSaved = totalFilesChecked === fileList.length;
+
+    // 2. If the whole list was <= 10, we're already done
+    if (fileList.length <= firstSliceSize) {
+      UI.postMessage({
+        event: "all-files-saved-check-result",
+        result: true,
+      });
+      return true;
+    }
+
+    // 3. Otherwise, check the remaining files in one go
+    const restNames = fileList.slice(firstSliceSize);
+    const restNewList = newList.slice(firstSliceSize);
+    const restLibFiles = restNewList.filter((item, i) => item !== restNames[i]);
+
+    const restCount = await countSaved(restNames, restLibFiles);
+    const allSaved = (firstCount + restCount) === fileList.length;
+
     UI.postMessage({
       event: "all-files-saved-check-result",
       result: allSaved,
@@ -1530,16 +1556,17 @@ function getFileSQLAndParams(range) {
       SQL += " AND 1 = 0 ";
       return [SQL, params];
     }
-    const fileParams = prepParams(files);
-    SQL += ` AND ( file IN  (${fileParams}) `;
+    const fileParams = JSON.stringify(files);
+    SQL += ` AND ( file IN  (SELECT value FROM json_each(?)) `;
     const originalFiles = files.map((item) => (METADATA[item]?.name || item));
     STATE.originalFiles = originalFiles;
-    params.push(...originalFiles);
-    SQL += ` OR archiveName IN  (${fileParams}) ) `;
+    params.push(fileParams);
+    SQL += ` OR archiveName IN  (SELECT value FROM json_each(?)) ) `;
 
     const archivePath = STATE.library.location + p.sep;
     const archive_names = files.map((item) => item.replace(archivePath, ""));
-    params.push(...archive_names);
+    const archiveParams = JSON.stringify(archive_names);
+    params.push(archiveParams);
   }
   return [SQL, params];
 }
@@ -1604,23 +1631,13 @@ async function getMatchingIds(cnames) {
   }
   if (nameSet.size === 0) return [];
   const names = [...nameSet];
-
-  // Chunk if too many parameters
-  const chunkSize = 999;
   const results = [];
-
-  for (let i = 0; i < names.length; i += chunkSize) {
-    const chunk = names.slice(i, i + chunkSize);
-    const placeholders = chunk.map(() => "?").join(",");
-    const sql = `
-      SELECT id FROM species
-      WHERE modelID = ?
-        AND cname IN (${placeholders})
-    `;
-    const rows = await STATE.db.allAsync(sql, STATE.modelID, ...chunk);
-    results.push(...rows.map(r => r.id));
-  }
-
+  const restrictToModel = STATE.detect.combine || STATE.detect.merge ? "" : ` modelID = ${STATE.modelID} AND `;
+  const query = `SELECT id FROM species
+    WHERE ${restrictToModel} cname IN (SELECT value FROM json_each(?))
+  `;
+  const rows = await STATE.db.allAsync(query, JSON.stringify(names));
+  results.push(...rows.map(r => r.id));
   return results;
 }
 
@@ -1631,11 +1648,11 @@ async function getMatchingIds(cnames) {
  * of included species IDs (handling the special "birds" exclusion case and CNAMES with suffixes) and
  * returns an SQL snippet that restricts s.id to that set.
  *
- * @returns {Promise<string>} An SQL fragment restricting species by id (for example " AND s.id IN (1,2) "),
- * or an empty string when no filtering is required.
+ * @returns {Promise<object>}  SQL: a fragment restricting species by id (for example " AND s.id IN (1,2) "),
+ * or an empty string when no filtering is required. param : an json string array of parameters for the SQL fragment (currently unused).
  */
 async function getSpeciesSQLAsync(file){
-  let not = "", SQL = "";
+  let not = "", SQL = "", param = '';
   const {list, modelLabels} = STATE;
   let typeOfList = 'Included';
   // If we don't have a file, use the first analysed file if available
@@ -1652,14 +1669,22 @@ async function getSpeciesSQLAsync(file){
       not = "NOT";
     }
     // Get the speciesID for all models
-    const result = await STATE.db.allAsync(`SELECT cname FROM species WHERE classIndex + 1 IN (${included}) AND modelID = ${STATE.modelID}`);
-    const cnames = result.map(row => row.cname);
+    // json is fastest here
+    const limitToModel = STATE.detect.combine || STATE.detect.merge ? "" : ` AND modelID = ${STATE.modelID} `;
+    const query = `
+      SELECT cname FROM species 
+      WHERE classIndex + 1 IN (SELECT value FROM json_each(?))
+      ${limitToModel}
+    `;
+    const jsonResult = await STATE.db.allAsync(query, JSON.stringify(included));
+    const cnames = jsonResult.map(row => row.cname);
     included = cnames.length ? await getMatchingIds(cnames) : [-1];
     DEBUG &&
       console.log(typeOfList, included.length, "# labels", modelLabels.length);
-    SQL = ` AND (s.id ${not} IN (${included}) OR r.modelID = 0) `; // always include records with modelID 0 (manual records)
+    SQL = ` AND (s.id ${not} IN (SELECT value FROM json_each(?)) OR r.modelID = 0) `; // always include records with modelID 0 (manual records)
+    param = JSON.stringify(included);
   }
-  return SQL
+  return {SQL, param}
 }
 
 /**
@@ -1696,7 +1721,9 @@ async function addQueryQualifiers(stmt, range, caller) {
       stmt += ` AND 1 = 0 `;
     }
   } else {
-    stmt += await getSpeciesSQLAsync()
+    const res = await getSpeciesSQLAsync();
+    stmt += res.SQL;
+    if (res.SQL) params.push(res.param);
   }
   if (detect.nocmig) {
     stmt += ` AND isDaylight = ${detect.nocmig === 'day' ? 1 : 0} `;
@@ -1840,20 +1867,6 @@ const prepResultsStatement = async (
 
 
 /**
- * Split an array into consecutive chunks of the given size.
- * @param {Array} array - The array to split.
- * @param {number} size - Maximum size of each chunk; the final chunk may be smaller.
- * @returns {Array<Array>} An array of chunk arrays in the same order as the input.
- */
-function chunkArray(array, size) {
-  const result = [];
-  for (let i = 0; i < array.length; i += size) {
-      result.push(array.slice(i, i + size));
-  }
-  return result;
-}
-
-/**
  * Retrieves and merges metadata for a list of audio files from the database and in-memory cache.
  *
  * For each file name, fetches file details, associated location, and per-day durations from the database, then merges these with any existing in-memory metadata. Returns an object keyed by file name containing the combined metadata.
@@ -1862,90 +1875,85 @@ function chunkArray(array, size) {
  * @returns {Promise<Object>} An object mapping each file name to its metadata, including duration, start time, location, and completion status.
  */
 async function updateMetadata(fileNames) {
-  const batchSize = 10000;
-  const batches = chunkArray(fileNames, batchSize);
   const finalResult = {};
-  for (let batch of batches) {
-    // Build placeholders (?, ?, ?) dynamically based on number of file names
-    const placeholders = prepParams(batch);
-    if (STATE.library.location) {
-      const prefix = STATE.library.location + p.sep;
-      batch = batch.map(fileName => fileName.replace(prefix, '')  );
-    }
 
-    // 1. Get files and locations
-    const fileQuery = `
-        SELECT 
-            f.id,
-            f.name,
-            f.archiveName,
-            f.duration,
-            f.filestart as fileStart,
-            f.metadata,
-            f.locationID,
-            l.lat,
-            l.lon
-        FROM files f
-        LEFT JOIN locations l ON f.locationID = l.id
-        WHERE f.name IN (${placeholders}) OR f.archiveName IN (${placeholders})
-    `;
+  // Strip library location prefix if present
+  let names = fileNames;
+  if (STATE.library.location) {
+    const prefix = STATE.library.location + p.sep;
+    names = names.map(fileName => fileName.replace(prefix, ''));
+  }
 
-    const fileRows = await diskDB.allAsync(fileQuery, ...batch, ...batch);
+  const namesJSON = JSON.stringify(names);
 
-    if (fileRows.length === 0) {
-        continue
-    }
+  // 1. Get files and locations — match against name OR archiveName using json_each twice
+  const fileQuery = `
+      SELECT 
+          f.id,
+          f.name,
+          f.archiveName,
+          f.duration,
+          f.filestart as fileStart,
+          f.metadata,
+          f.locationID,
+          l.lat,
+          l.lon
+      FROM files f
+      LEFT JOIN locations l ON f.locationID = l.id
+      WHERE f.name IN (SELECT value FROM json_each(?))
+         OR f.archiveName IN (SELECT value FROM json_each(?))
+  `;
 
+  const fileRows = await diskDB.allAsync(fileQuery, namesJSON, namesJSON);
+
+  if (fileRows.length > 0) {
     // Extract file IDs for duration query
     const fileIDs = fileRows.map(row => row.id);
-    const durationPlaceholders = fileIDs.map(() => '?').join(', ');
+    const fileIDsJSON = JSON.stringify(fileIDs);
 
     // 2. Get durations
     const durationQuery = `
         SELECT day, duration, fileID 
         FROM duration 
-        WHERE fileID IN (${durationPlaceholders})
+        WHERE fileID IN (SELECT value FROM json_each(?))
     `;
-    const durationRows = await diskDB.allAsync(durationQuery, ...fileIDs);
+    const durationRows = await diskDB.allAsync(durationQuery, fileIDsJSON);
 
     // 3. Organise durations by fileID
     const durationMap = {};
     durationRows.forEach(row => {
-        if (!durationMap[row.fileID]) durationMap[row.fileID] = {};
-        durationMap[row.fileID][row.day] = row.duration;
+      if (!durationMap[row.fileID]) durationMap[row.fileID] = {};
+      durationMap[row.fileID][row.day] = row.duration;
     });
 
     // 4. Build object keyed by file name
-
     fileRows.forEach(row => {
-      let {name, archiveName, duration, fileStart, metadata, locationID, lat, lon} = row;
+      let { id, name, archiveName, duration, fileStart, metadata, locationID, lat, lon } = row;
 
       const complete = !!duration && !!fileStart;
       finalResult[name] = {
-            archiveName,
-            duration,
-            fileStart,
-            metadata,
-            locationID,
-            dateDuration: durationMap[row.id] || {},
-            lat,
-            lon,
-            isSaved: true,
-            isComplete: complete
-        };
+        archiveName,
+        duration,
+        fileStart,
+        metadata,
+        locationID,
+        dateDuration: durationMap[id] || {},
+        lat,
+        lon,
+        isSaved: true,
+        isComplete: complete
+      };
     });
   }
   // 5. Merge with METADATA
   for (const [fileName, metadataObj] of Object.entries(METADATA)) {
     if (finalResult[fileName]) {
-        // Shallow merge: overwrite keys in finalResult[fileName] with METADATA[fileName]
-        finalResult[fileName] = {
-            ...finalResult[fileName],
-            ...metadataObj
-        };
+      finalResult[fileName] = {
+        ...finalResult[fileName],
+        ...metadataObj
+      };
     } else {
-        // Add new entry if fileName not in finalResult
-        finalResult[fileName] = { ...metadataObj };
+      finalResult[fileName] = { ...metadataObj };
     }
   }
   return finalResult;
@@ -2508,7 +2516,9 @@ async function sendDetections(file, start, end, goToRegion) {
   const customList = list === "custom";
   const confidence = customList ? 0 : detect.confidence;
   const params = [confidence, file, start, end];
-  const includedSQL = await getSpeciesSQLAsync(file);
+  const res = await getSpeciesSQLAsync(file);
+  const includedSQL = res.SQL
+  if (includedSQL) params.push(res.param);
 
   let SQL =     `
         WITH RankedRecords AS (
@@ -5047,12 +5057,7 @@ const onSave2DiskDB = async ({ file }) => {
     generateAlert({ message: "NoOP" });
     return; // nothing to do. Also will crash if trying to update disk from disk.
   }
-  let filterClause = await getSpeciesSQLAsync();
 
-  if (STATE.detect.nocmig) {
-    const condition = STATE.detect.nocmig === 'day';
-    filterClause += ` AND isDaylight = ${condition} `;
-  }
   let response;
   await dbMutex.lock();
   let inserted = 0;
@@ -5090,6 +5095,13 @@ const onSave2DiskDB = async ({ file }) => {
     DEBUG &&
       console.log(response.changes + " date durations added to disk database");
     // now update records
+    let res = await getSpeciesSQLAsync();
+    let filterClause = res.SQL;
+    const param = res.param;
+    if (STATE.detect.nocmig) {
+      const condition = STATE.detect.nocmig === 'day';
+      filterClause += ` AND isDaylight = ${condition} `;
+    }
     const candidates =  await memoryDB.allAsync(`
       SELECT 
           r.position, r.fileID, r.speciesID, r.modelID, r.confidence, 
@@ -5098,7 +5110,7 @@ const onSave2DiskDB = async ({ file }) => {
       FROM records r
       JOIN species s ON r.speciesID = s.id
       JOIN files f ON r.fileID = f.id
-      ${filterClause}`);
+      ${filterClause}`,param);
     
     let allowed = [];
     if (STATE.list === 'custom') {
@@ -5112,31 +5124,41 @@ const onSave2DiskDB = async ({ file }) => {
 
     // Build bulk INSERT using filestart as stable identifier to resolve disk DB fileIDs
     if (allowed.length > 0) {
-      const batchSize = 2500;
-      for (let i = 0; i < allowed.length; i += batchSize) {
-        const batch = allowed.slice(i, i + batchSize);
-        const rowPlaceholders = batch.map(() =>
-          '(?,?,?,?,?,?,?,?,?,?,?)'
-        ).join(',');
-        const insertValues = batch.flatMap(row => [
-          row.position, row.speciesID, row.modelID, row.confidence,
-          row.comment ?? null, row.end, row.callCount ?? null,
-          row.isDaylight, row.reviewed, row.tagID ?? null, row.fileName
-        ]);
-        await memoryDB.runAsync(`
-          WITH v(position, speciesID, modelID, confidence,
-                comment, end, callCount, isDaylight, reviewed, tagID, fileName)
-          AS (VALUES ${rowPlaceholders})
-          INSERT OR IGNORE INTO disk.records (
-            position, speciesID, modelID, confidence,
-            comment, end, callCount, isDaylight, reviewed, tagID, fileID
-          )
-          SELECT v.position, v.speciesID, v.modelID, v.confidence,
-                v.comment, v.end, v.callCount, v.isDaylight, v.reviewed, v.tagID,
-                d.id
-          FROM v JOIN disk.files d ON v.fileName = d.name
-        `, ...insertValues);
-      }
+      const rowsJSON = JSON.stringify(allowed.map(row => ({
+        position: row.position,
+        speciesID: row.speciesID,
+        modelID: row.modelID,
+        confidence: row.confidence,
+        comment: row.comment ?? null,
+        end: row.end,
+        callCount: row.callCount ?? null,
+        isDaylight: row.isDaylight,
+        reviewed: row.reviewed,
+        tagID: row.tagID ?? null,
+        fileName: row.fileName
+      })));
+
+      await memoryDB.runAsync(`
+        INSERT OR IGNORE INTO disk.records (
+          position, speciesID, modelID, confidence,
+          comment, end, callCount, isDaylight, reviewed, tagID, fileID
+        )
+        SELECT
+          json_extract(v.value, '$.position'),
+          json_extract(v.value, '$.speciesID'),
+          json_extract(v.value, '$.modelID'),
+          json_extract(v.value, '$.confidence'),
+          json_extract(v.value, '$.comment'),
+          json_extract(v.value, '$.end'),
+          json_extract(v.value, '$.callCount'),
+          json_extract(v.value, '$.isDaylight'),
+          json_extract(v.value, '$.reviewed'),
+          json_extract(v.value, '$.tagID'),
+          d.id
+        FROM json_each(?) v
+        JOIN disk.files d ON json_extract(v.value, '$.fileName') = d.name
+      `, rowsJSON);
+
       inserted = allowed.length;
     }
     DEBUG && console.log(inserted + " records added to disk database");
@@ -5587,18 +5609,22 @@ async function _updateSpeciesLocale(db, labels) {
     for (const label of labels) {
       const [sname, translatedCname] = label.split(splitChar);
       labelMap.set(sname, translatedCname); // only one cname per sname in labels
+      if (NEW_TO_OLD_TAXONOMY[sname]) {
+        const oldSname = NEW_TO_OLD_TAXONOMY[sname];
+        labelMap.set(oldSname, translatedCname); // also map old sname to the same cname
+      }
     }
 
     // 2. Query all matching species rows
     const snames = [...labelMap.keys()];
-    const placeholders = snames.map(() => "?").join(",");
     const speciesRows = await db.allAsync(
-      `SELECT sname, cname, modelID FROM species WHERE sname IN (${placeholders})`,
-      ...snames
+      `SELECT sname, cname, modelID FROM species WHERE sname IN (SELECT value from json_each(?))`,
+      JSON.stringify(snames)
     );
 
     // 3. Helpers
-    const extractCallType = str => str.match(/\s+\([^)]+\)$|-$/u)?.[0] || "";
+    const extractCallType = str =>
+    str.match(/\s+\((?:call|flight call|song|booming)\)$|-$/u)?.[0] || "";
     // const stripCallType = str => str.replace(/\s+\([^)]+\)$|[^\p{L}\p{N}\s]+$/u, "");
 
     // 4. Determine required updates
@@ -5667,11 +5693,15 @@ const prepareLocalLabels = (labels, locale) => {
   const headers = labels[0].split(",");
   const names = ["sci_name", `common_name_${locale}`];
   const indices = names.map(name => headers.indexOf(name));
+  const com_name_index = headers.indexOf("com_name");
   if (indices[0] === -1 ) return labels;
-  if (indices[1] === -1)  indices[1] = headers.indexOf("com_name"); // English fallback
+  if (indices[1] === -1)  {
+    locale !== 'en' && console.warn('Missing translation', `No translation available for ${locale}`)
+    indices[1] = com_name_index; // English fallback
+  }
   return labels.map(row => {
     const values = row.split(",");
-    return indices.map(index => values[index] || values[0]).join(","); // Use sci_name if there is no translation for the locale
+    return indices.map(index => values[index] || values[com_name_index]).join(","); // Use com_name if there is no translation for the locale
   });
 }
 

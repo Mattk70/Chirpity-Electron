@@ -2485,13 +2485,15 @@ window.onload = async () => {
       modelPath = undefined;
     }
   }
+  if (config.selectedModel === 'birdnet3' && !isMember){
+    config.selectedModel = 'birdnet';
+  }
   const selectedModel = config.selectedModel;
 
   // Set Local classes to include for BirdNET3
   detect.classes.forEach(cls => document.getElementById(cls).checked = true );
 
   updateListOptions(selectedModel);
-  // debug && document.getElementById('dataset').classList.remove('d-none')
   isMember && updateModelOptions();
   
   worker.postMessage({
@@ -3076,12 +3078,8 @@ function removeOpenFile(file) {
  */
 
 const getLabelFile = (locale) => {
-    if (["birdnet3", "perch v2"].includes(config.selectedModel)) {
     return p.join(dirname, "BirdNET3/BirdNET3_geomodel_labels.csv");
-  } else {
-    locale === "pt" && (locale = "pt_PT");
-    return p.join(dirname,`labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_${locale}.txt`);
-  }
+
 }
 /**
  * Display regions for detections that fall within the current spectrogram window.
@@ -4256,6 +4254,15 @@ const updateSummary = ({ summary = [], filterSpecies = "" }) => {
                     </td>`;
 
     if (showIUCN) {
+      let found = 0, missing = 0;
+      LABELS.forEach(l => {
+        const sname = l.split(',')[0];
+        const species = IUCNtaxonomy[sname] || sname;
+        const record = IUCNCache[species];
+        record ? found++ : missing++;
+        record || console.log(`Missing species: ${sname}`);
+      })
+      console.warn(`Found ${found} IUCN records, ${missing} are missing`)
       const species = IUCNtaxonomy[item.sname] || item.sname;
       const record = IUCNCache[species];
       // there might not be a record...
@@ -4365,7 +4372,7 @@ function onResultsComplete({ active = undefined, select = undefined } = {}) {
   }
 
   if (activeRow) {
-    utils.waitFor(() => STATE.fileLoaded).then(() => activeRow.click());
+    utils.waitFor(() => STATE.fileLoaded).then(() => activeRow?.click());
   }
   renderFilenamePanel();
   activateResultSort();
@@ -5026,7 +5033,7 @@ const populateSpeciesModal = async ({included, excluded, place}) => {
     STATE.week !== -1 && STATE.week
       ? utils.interpolate(i18.week, { week: STATE.week })
       : "";
-  const model = config.models[config.selectedModel].displayName;
+  let model = config.models[config.selectedModel].displayName;
   const localBirdsOnly =
     config.local && config.selectedModel === "birdnet" && config.list === "nocturnal"
       ? i18.localBirds
@@ -5046,8 +5053,9 @@ const populateSpeciesModal = async ({included, excluded, place}) => {
     });
   }
   const includedList = generateBirdIDList(included);
-  const classes = ["BirdNET3","Perch v2"].includes(model) ? config.detect.classes.join(', ') : "";
-  const classesText = ["BirdNET3","Perch v2"].includes(model) && ["nocturnal", "location", "birds"].includes(config.list) 
+  model = config.selectedModel;
+  const classes = ["birdnet3","perch v2"].includes(model) ? config.detect.classes.join(', ') : "";
+  const classesText = ["birdnet3","perch v2"].includes(model) && ["nocturnal", "location", "birds"].includes(config.list) 
     ? utils.interpolate(i18.classesText, { classes: classes }) : "";
   const depending =
     config.useWeek &&
@@ -6296,12 +6304,11 @@ async function handleUIClicks(e) {
         }
       }
       if (modelType === 'append'){
-        function findDuplicateLines(labelFile) {
-          const labels = new Set(fs.readFileSync(labelFile, 'utf8').split('\n').map(l => l.trim()));
+        function findDuplicateLines() {
+          const labels = new Set(LABELS.map(l => l.replace(',', '_'())));
           return folders.filter(f => labels.has(f) && f !== '');
         }
-        const labelFile = p.join(dirname,`labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_${config.locale}.txt`)
-        const duplicates = findDuplicateLines(labelFile);
+        const duplicates = findDuplicateLines();
         if (duplicates.length){
           generateToast({message:`There are audio folders which have the same name as BirdNET labels. 
             When appending labels, the new labels must be unique:<br>
@@ -9148,12 +9155,13 @@ function updateModelOptions(customOnly){
   // Add options
   const modelOptions = customOnly 
     ? Object.fromEntries(Object.entries(config.models)
-    .filter(([model, _]) => !['nocmig', 'chirpity','birdnet'].includes(model)))
+    .filter(([model, _]) => !['nocmig', 'chirpity','birdnet', 'birdnet3'].includes(model)))
     : config.models;
   // Add new options from the object
   for (const [model, opt] of Object.entries(modelOptions)) {
     const option = document.createElement('option');
     option.value = model;
+    option.disabled = model === 'birdnet3' && !STATE.isMember; // Disable birdnet3 if not a member
     option.textContent = opt.displayName;
     select.appendChild(option);
   }
