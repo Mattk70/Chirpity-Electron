@@ -115,12 +115,7 @@ const DOM = {
   get summary() {
     return document.getElementById("summary");
   },
-  get specElement() {
-    return document.getElementById("spectrogram");
-  },
-  get specCanvasElement() {
-    return document.querySelector("#spectrogram canvas");
-  },
+
   get waveCanvasElement() {
     return document.querySelector("#waveform canvas");
   },

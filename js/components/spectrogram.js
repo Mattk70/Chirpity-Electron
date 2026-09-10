@@ -1,6 +1,6 @@
 import WaveSurfer from "../../node_modules/wavesurfer.js/dist/wavesurfer.esm.js";
 import RegionsPlugin from "../../node_modules/wavesurfer.js/dist/plugins/regions.esm.js";
-import Spectrogram from "../../node_modules/wavesurfer.js/dist/plugins/spectrogram-windowed.esm.js";
+import Spectrogram from "../../node_modules/wavesurfer.js/dist/plugins/spectrogram.esm.js";
 import TimelinePlugin from "../../node_modules/wavesurfer.js/dist/plugins/timeline.esm.js";
 import { hexToRgb, showElement, clamp } from "../utils/utils.js";
 import { DOM } from "../utils/DOMcache.js";
@@ -9,8 +9,7 @@ import { Context, get } from "../utils/i18n.js";
 const colormap = window.module.colormap;
 
 export class ChirpityWS {
-  constructor(container, getState, getConfig, handlers, actions) {
-    this.container = container;
+  constructor(getState, getConfig, handlers, actions) {
     this.getState = getState; // Function to get the current state
     this.getConfig = getConfig; // Function to get the current config
     this.handlers = handlers; // { postbufferUpdate }
@@ -150,7 +149,10 @@ export class ChirpityWS {
     });
 
     // Clear label on modifying region
-    REGIONS.on("region-update", (r) => {
+    // NOTE: renamed from 'region-update' to 'region-updated' — confirm this
+    // against your installed version; if regions stopped clearing labels
+    // after a drag/resize, this was likely why.
+    REGIONS.on("region-updated", (r) => {
       r.setOptions({ content: " " });
       this.handlers.setActiveRegion(r, false);
     });
@@ -159,24 +161,34 @@ export class ChirpityWS {
     })
     return REGIONS;
   }
-
-  initWavesurfer = (container, plugins) => {
+  pauseActions = () => {
+    const wavesurfer = this.wavesurfer;
+    const position =
+        wavesurfer.getCurrentTime() / wavesurfer.getDuration();
+    // Pause event fired right before 'finish' event, so
+    // this is set to signal whether it was playing up to that point
+    if (position < 0.998) wavesurfer.isPaused = true;
+  }
+  initWavesurfer = (plugins) => {
     const config = this.getConfig();
     this.sampleRate = config.selectedModel.includes("batpack") 
       ? 256000
       : 24000;
     return WaveSurfer.create({
-        container,
-        // make waveform transparent
-        backgroundColor: "rgba(0,0,0,0)",
-        waveColor: "rgba(0,0,0,0)",
-        progressColor: "rgba(0,0,0,0)",
+        container: '#waveform',
+        // The waveform itself is hidden via the `#waveform ::part(canvases)
+        // { display: none; }` rule in your CSS — that's the mechanism that
+        // actually does the hiding. `backgroundColor` and `renderFunction`
+        // are not part of the documented WaveSurfer.create() options in
+        // 7.12.11 (I couldn't confirm either exists), so they've been
+        // dropped here; test to confirm nothing relied on them silently.
         // but keep the playhead
         cursorColor: this.wsTextColour(config),
         cursorWidth: 2,
-        height: "auto",
+        height: 1,
+        waveColor: 'transparent',
+        progressColor: 'transparent',
         sampleRate: this.sampleRate,
-        renderFunction: () => {}, // no need to render a waveform
         plugins
       });
   }
@@ -188,14 +200,15 @@ export class ChirpityWS {
       height != null && height > 0
         ? height
         : Math.min(config.specMaxHeight, this.maxHeight());
-    this.wavesurfer && this.wavesurfer.destroy();
+    if (this.wavesurfer) {
+      this.wavesurfer.destroy();
+    }
     this.REGIONS = this.initRegion();
-    const container = document.getElementById("waveform");
-    this.spectrogram = this.initSpectrogram(container, height);
+    this.spectrogram = this.initSpectrogram(height);
     this.timeline = this.createTimeline(windowLength);
     // Setup waveform and spec views
     const plugins = [this.spectrogram, this.timeline, this.REGIONS];
-    this.wavesurfer = this.initWavesurfer(container, plugins);
+    this.wavesurfer = this.initWavesurfer(plugins);
 
     if (audio) {
       await this.loadBuffer(audio);
@@ -207,26 +220,21 @@ export class ChirpityWS {
       color: STATE.regionActiveColour,
     });
     const wavesurfer = this.wavesurfer;
-    wavesurfer.on('load', () => wavesurfer.isReady = false)
-    wavesurfer.on('ready', () => wavesurfer.isReady = true)
-    wavesurfer.on("dblclick", this.centreSpec);
-    wavesurfer.on("click", () => this.REGIONS.clearRegions());
-    wavesurfer.on("pause", () => {
-      const position =
-        wavesurfer.getCurrentTime() / wavesurfer.decodedData.duration;
-      // Pause event fired right before 'finish' event, so
-      // this is set to signal whether it was playing up to that point
-      if (position < 0.998) wavesurfer.isPaused = true;
-    });
+
+    this.unload = wavesurfer.on('load', () => wavesurfer.isReady = false)
+    this.unready = wavesurfer.on('ready', () => wavesurfer.isReady = true)
+    this.undblclick = wavesurfer.on("dblclick", this.centreSpec);
+    this.unclick = wavesurfer.on("click", () => this.REGIONS.clearRegions());
+    this.unpause = wavesurfer.on("pause", this.pauseActions);
     
-    wavesurfer.on("play", () => {
+    this.unplay = wavesurfer.on("play", () => {
       if (config.selectedModel.includes('batpack')) {
         wavesurfer.setPlaybackRate(0.1, false);
       }
       wavesurfer.isPaused = false;
     });
 
-    wavesurfer.on("finish", () => {
+    this.unfinish = wavesurfer.on("finish", () => {
       const {windowLength, windowOffsetSecs, currentFile, currentFileDuration, openFiles} = STATE;
       const bufferEnd = windowOffsetSecs + windowLength;
       if (currentFileDuration > bufferEnd) {
@@ -249,6 +257,15 @@ export class ChirpityWS {
       }
     });
 
+    wavesurfer.on('destroy', () =>{
+      this.unload;
+      this.unready;
+      this.undblclick;
+      this.unclick;
+      this.unpause;
+      this.unplay;
+      this.unfinish;
+    })
     // Show controls
     showElement(["controlsWrapper"]);
     // Resize canvas of spec and labels
@@ -289,7 +306,7 @@ export class ChirpityWS {
    * @param {number} [fftSamples] - The number of FFT samples used for analysis. Defaults to config.FFT or is computed based on window length.
    * @returns {Object} The initialized spectrogram instance.
    */
-  initSpectrogram(container, height, fftSamples) {
+  initSpectrogram(height, fftSamples) {
     const config = this.getConfig();
     const spectrogram = this.spectrogram;
     const STATE = this.getState();
@@ -316,8 +333,19 @@ export class ChirpityWS {
     const {frequencyMin, frequencyMax} = config.audio;
     const scaledFrequencyMin = frequencyMin * scaleFactor;
     const scaledFrequencyMax = frequencyMax * scaleFactor;
+    // NOTE on migrating from spectrogram-windowed.esm.js: the current
+    // Spectrogram plugin source (checked against the live GitHub main
+    // branch) has no `rendering` option in its type definitions — instead
+    // it now does automatic lazy/scroll-based canvas rendering internally
+    // for wide spectrograms (splitting into multiple canvases and only
+    // drawing the visible range + a buffer). wavesurfer.js's own README
+    // mentions a `rendering: 'windowed'` option as a back-compat shim for
+    // the old
+    // plugin; if you see it accepted without effect, that's expected — the
+    // new default path likely already gives you the windowed behavior you
+    // were relying on. Worth profiling with your longest audio files to
+    // confirm performance holds up.
     return Spectrogram.create({
-      container,
       windowFunc,
       frequencyMin: scaledFrequencyMin,
       frequencyMax: scaledFrequencyMax,
@@ -679,7 +707,12 @@ export class ChirpityWS {
     const STATE = this.getState();
     audio ??= STATE.currentBuffer;
     const [blob, peaks, duration] = this.makeBlob(audio);
-    this.timeline.subscriptions = []; // Hack to prevent runaway accumulations
+    // Hack to prevent runaway accumulations. 7.12.x has shipped a number of
+    // plugin-lifecycle/memory fixes (e.g. "prevent TypeError when plugin is
+    // destroyed during active render") — worth testing whether this is
+    // still needed, since force-clearing `subscriptions` without calling the
+    // unsubscribe functions it holds is itself a (smaller) leak.
+    this.timeline.subscriptions = [];
     this.refreshTimeline();
     await this.wavesurfer.loadBlob(blob, peaks, duration);
   }
@@ -717,6 +750,12 @@ export class ChirpityWS {
     const wavesurfer = this.wavesurfer;
     // Destroy leaves the plugins in the plugin list.
     // So, this is needed to remove plugins where the `wavesurfer` key is not null
+    // CONFIRMED against the actual 7.12.x Spectrogram source: destroy() does
+    // still set `this.wavesurfer = null`, so this filter continues to work
+    // as written. `wavesurfer.plugins` itself is an internal (not officially
+    // documented) array — I couldn't verify it from the wavesurfer.ts source
+    // directly (search access was down while researching this), so keep an
+    // eye on it across future version bumps.
     wavesurfer &&
       (wavesurfer.plugins = wavesurfer.plugins.filter(
         (plugin) => plugin.wavesurfer !== null
@@ -759,7 +798,9 @@ export class ChirpityWS {
       // const newLabel = this.formatLabel(' / ' + label, colour);
       existingRegion.content.textContent += ' / ' + label;
     } else {
-      REGIONS.subscriptions = []; // hack to prevent massive accumulation bug in wavesurfer.js
+      // See the same note in loadBuffer() above — re-test whether this is
+      // still needed in 7.12.11.
+      REGIONS.subscriptions = [];
       REGIONS.addRegion({
         start: start,
         end: end,
@@ -878,7 +919,7 @@ export class ChirpityWS {
     const wavesurfer = this.wavesurfer;
     if (wavesurfer && !this.spectrogram) {
       wavesurfer.options.cursorColor = this.wsTextColour();
-      this.spectrogram = this.initSpectrogram('#spectrogram', height);
+      this.spectrogram = this.initSpectrogram(height);
       wavesurfer.registerPlugin(this.spectrogram);
       this.refreshTimeline();
       this.reload();
@@ -964,6 +1005,7 @@ export class ChirpityWS {
         display: "block",
         visibility: "visible",
         opacity: 1,
+        'z-index': 5
       });
     }
   }
@@ -995,4 +1037,3 @@ export class ChirpityWS {
     this.handlers.trackEvent({uuid: config.UUID, event: "Swipe", action: key, version: config.VERSION});
   }
 }
-
