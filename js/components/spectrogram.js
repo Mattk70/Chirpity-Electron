@@ -154,13 +154,15 @@ export class ChirpityWS {
       r.setOptions({ content: " " });
       this.handlers.setActiveRegion(r, false);
     });
-
+    REGIONS.on("region-removed", (r) => {
+      r.unAll()
+    })
     return REGIONS;
   }
 
   initWavesurfer = (container, plugins) => {
     const config = this.getConfig();
-    this.sampleRate = config.selectedModel.includes("bats") 
+    this.sampleRate = config.selectedModel.includes("batpack") 
       ? 256000
       : 24000;
     return WaveSurfer.create({
@@ -178,11 +180,14 @@ export class ChirpityWS {
         plugins
       });
   }
-   initAll = async ({ audio = undefined, height = 0 }) => {
+   initAll = async ({ audio = undefined, height }) => {
     const config = this.getConfig();
     const STATE = this.getState();
     const windowLength = STATE.windowLength;
-
+    const resolvedHeight =
+      height != null && height > 0
+        ? height
+        : Math.min(config.specMaxHeight, this.maxHeight());
     this.wavesurfer && this.wavesurfer.destroy();
     this.REGIONS = this.initRegion();
     const container = document.getElementById("waveform");
@@ -215,7 +220,7 @@ export class ChirpityWS {
     });
     
     wavesurfer.on("play", () => {
-      if (config.selectedModel.includes('bats')) {
+      if (config.selectedModel.includes('batpack')) {
         wavesurfer.setPlaybackRate(0.1, false);
       }
       wavesurfer.isPaused = false;
@@ -289,9 +294,9 @@ export class ChirpityWS {
     const spectrogram = this.spectrogram;
     const STATE = this.getState();
     const windowLength = STATE.windowLength;
-    fftSamples ??= config.FFT;
+    fftSamples ??= config?.FFT;
     config.debug && console.log("initializing spectrogram");
-    spectrogram && spectrogram.destroy() && this.WSPluginPurge();
+    spectrogram && this.WSPluginPurge();
     if (!fftSamples) {
       if (windowLength < 5) {
         fftSamples = 256;
@@ -307,7 +312,7 @@ export class ChirpityWS {
     // set colormap
     const colorMap = this.createColormap();
     const {windowFn:windowFunc, alpha} = config.customColormap;
-    const scaleFactor = config.selectedModel.includes('bats') ? 10 : 1;
+    const scaleFactor = config.selectedModel.includes('batpack') ? 10 : 1;
     const {frequencyMin, frequencyMax} = config.audio;
     const scaledFrequencyMin = frequencyMin * scaleFactor;
     const scaledFrequencyMax = frequencyMax * scaleFactor;
@@ -384,7 +389,7 @@ export class ChirpityWS {
   formatTimeCallback = (secs) => {
     const config = this.getConfig();
     const STATE = this.getState();
-    secs = secs.toFixed(2);
+    secs = Math.round(Number(secs)*1000)/1000;
     // Add 500 to deal with overflow errors
     let now = new Date(STATE.bufferStartTime.getTime() + secs * 1000);
     let milliseconds = now.getMilliseconds();
@@ -452,17 +457,19 @@ export class ChirpityWS {
    * @returns {Object} The timeline plugin instance, either as a registered plugin with WaveSurfer or as a standalone object.
    */
   createTimeline(windowLength) {
-    const primaryLabelInterval = Math.ceil(windowLength / 5);
-    const secondaryLabelInterval = 0;
-    const timeinterval = primaryLabelInterval / 10;
+    const interval = windowLength < 5 ? 0.5 : Math.ceil(windowLength / 5)
+    const primaryLabelInterval = interval;
+    const secondaryLabelInterval = primaryLabelInterval <= 2 ? primaryLabelInterval / 2 : 0;
+    const timeInterval = primaryLabelInterval / 10;
     const colour = this.wsTextColour();
+
     this.timeline = TimelinePlugin.create({
       insertPosition: "beforebegin",
       formatTimeCallback: this.formatTimeCallback,
-      timeInterval: timeinterval,
-      primaryLabelInterval: primaryLabelInterval,
-      secondaryLabelInterval: secondaryLabelInterval,
-      secondaryLabelOpacity: 0.35,
+      timeInterval,
+      primaryLabelInterval,
+      secondaryLabelInterval,
+      secondaryLabelOpacity: 0.5,
       style: {
         fontSize: "0.75rem",
         color: colour,
@@ -516,10 +523,9 @@ export class ChirpityWS {
 
   refreshTimeline = () => {
     const STATE = this.getState();
-    const primaryLabelInterval = STATE.windowLength / 5;
-    this.timeline.options.primaryLabelInterval = primaryLabelInterval;
-    this.timeline.options.timeInterval = primaryLabelInterval / 10;
-    this.timeline.options.style.color = this.wsTextColour();
+    this.timeline?.destroy();
+    this.WSPluginPurge();
+    this.timeline = this.createTimeline(STATE.windowLength);
   };
 
   /**
@@ -560,7 +566,7 @@ export class ChirpityWS {
       let timeNow = windowOffsetSecs + playedSeconds;
       const oldBufferBegin = windowOffsetSecs;
       if (direction === "In") {
-        const minZoom = selectedModel.includes('bats') ? 0.05 : 0.5;
+        const minZoom = selectedModel.includes('batpack') ? 0.05 : 0.5;
         if (windowLength < minZoom) return;
         windowLength /= 2;
         windowOffsetSecs += windowLength * position;
@@ -589,7 +595,6 @@ export class ChirpityWS {
         windowOffsetSecs,
         activeRegion,
       });
-      this.refreshTimeline();
       this.handlers.postBufferUpdate({
         begin: windowOffsetSecs,
         position: position,
@@ -627,10 +632,10 @@ export class ChirpityWS {
     const middle = windowOffsetSecs + this.wavesurfer.getCurrentTime();
     windowOffsetSecs = middle - windowLength / 2;
     windowOffsetSecs = Math.max(0, windowOffsetSecs);
-    windowOffsetSecs = Math.min(
+    windowOffsetSecs = Math.max(0,Math.min(
       windowOffsetSecs,
       currentFileDuration - windowLength
-    );
+    ));
 
     if (activeRegion) {
       const shift = saveBufferBegin - windowOffsetSecs;
@@ -674,6 +679,8 @@ export class ChirpityWS {
     const STATE = this.getState();
     audio ??= STATE.currentBuffer;
     const [blob, peaks, duration] = this.makeBlob(audio);
+    this.timeline.subscriptions = []; // Hack to prevent runaway accumulations
+    this.refreshTimeline();
     await this.wavesurfer.loadBlob(blob, peaks, duration);
   }
 
@@ -752,6 +759,7 @@ export class ChirpityWS {
       // const newLabel = this.formatLabel(' / ' + label, colour);
       existingRegion.content.textContent += ' / ' + label;
     } else {
+      REGIONS.subscriptions = []; // hack to prevent massive accumulation bug in wavesurfer.js
       REGIONS.addRegion({
         start: start,
         end: end,
@@ -804,27 +812,28 @@ export class ChirpityWS {
    * Depending on whether WaveSurfer is already initialized, the function will either:
    * - Initialize a new WaveSurfer instance with the current audio buffer and updated height.
    * - Update the existing WaveSurfer instance's options (including height and cursor color), re-register the spectrogram
-   *   plugin with the new settings (using `fftSamples` if provided), and reload the audio buffer.
+   *   plugin with the new settings and reload the audio buffer.
    *
    * Finally, it adjusts the height of the result table to fill the remaining vertical space.
    *
    * @param {boolean} redraw - Indicates whether the spectrogram should be re-rendered and WaveSurfer updated.
-   * @param {number} [fftSamples] - Optional. The number of FFT samples to use for rendering; must be a power of two.
    * @param {number} [newHeight=0] - Optional. Overrides the dynamic height calculation for the spectrogram; a value of 0 triggers dynamic sizing.
    * @returns {Promise<void>} A promise that resolves once the UI adjustments and spectrogram rendering updates are complete.
    */
 
-  async adjustDims(redraw, fftSamples, newHeight = 0) {
+  async adjustDims(redraw, newHeight) {
     const config = this.getConfig();
     const STATE = this.getState();
     const {footer, navPadding, contentWrapper, exploreWrapper, 
       spectrogramWrapper, resultTableElement} = DOM;
     const wavesurfer = this.wavesurfer;
+    const hasExplicitHeight = newHeight != null && newHeight > 0;
     let specOffset = 0;
     if (!spectrogramWrapper.classList.contains("d-none")) {
-      const specHeight =
-        newHeight || Math.min(config.specMaxHeight, this.maxHeight());
-      if (newHeight) {
+      const specHeight = hasExplicitHeight
+        ? Math.max(1, newHeight)
+        : Math.min(config.specMaxHeight, this.maxHeight());
+      if (hasExplicitHeight) {
         config.specMaxHeight = specHeight;
         this.handlers.updatePrefs("config.json", config);
       }
@@ -849,7 +858,6 @@ export class ChirpityWS {
 
     const footerHeight = footer.offsetHeight;
     const navHeight = navPadding.clientHeight;
-    fftSamples ??= config.FFT;
     contentWrapper.style.top = navHeight.toString() + "px"; // for padding
     contentWrapper.style.height =
       (document.body.clientHeight - footerHeight - navHeight).toString() + "px";
@@ -897,7 +905,7 @@ export class ChirpityWS {
     const STATE = this.getState();
     const relativePosition = e.clientX / e.currentTarget.clientWidth;
     const time = relativePosition * STATE.windowLength;
-    const region = this.REGIONS.regions.find(
+    const region = this.REGIONS?.regions.find(
       (r) => r.start < time && r.end > time
     );
     region && setActive && this.handlers.setActiveRegion(region, false);
@@ -937,7 +945,7 @@ export class ChirpityWS {
           (specDimensions.bottom - event.clientY) *
             (frequencyRange / specDimensions.height)
         ) + Number(config.audio.frequencyMin);
-      const pitchShifted = config.selectedModel.includes('bats');
+      const pitchShifted = config.selectedModel.includes('batpack');
       const yPos = pitchShifted ? yPosition*10 : yPosition
       tooltip.textContent = `${i18.frequency}: ${yPos}Hz`;
       if (inRegion) {
@@ -975,17 +983,16 @@ export class ChirpityWS {
   handleGesture(e) {
     const STATE = this.getState();
     const config = this.getConfig();
-    const currentTime = Date.now();
-    if (currentTime - STATE.lastGestureTime < 1200) {
-      return; // Ignore successive events within 1.2 second
+    const now = Date.now();
+    if (now - STATE.lastGestureTime < 500) {
+      return; // Ignore successive events within 0.5 second
     }
-    STATE.lastGestureTime = currentTime;
+    STATE.lastGestureTime = now;
     const moveDirection = e.deltaX || e.deltaY; // If deltaX is 0, use deltaY
     const key = moveDirection > 0 ? "PageDown" : "PageUp";
     config.debug && console.log(`scrolling x: ${e.deltaX} y: ${e.deltaY}`);
-    // waitForFinalEvent(() => {
     this.actions[key](e);
-    this.handlers.trackEvent(config.UUID, "Swipe", key, "");
-    // }, 200, 'swipe');
+    this.handlers.trackEvent({uuid: config.UUID, event: "Swipe", action: key, version: config.VERSION});
   }
 }
+

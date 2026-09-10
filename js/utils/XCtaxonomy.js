@@ -60,6 +60,7 @@ const XCtaxonomy = {
     "Dryobates villosus":"Leuconotopicus villosus",
     "Dryotriorchis spectabilis":"Circaetus spectabilis",
     "Empidonomus aurantioatrocristatus":"Griseotyrannus aurantioatrocristatus",
+    "Eudromias morinellus":"Charadrius morinellus",
     "Eupodotis afra":"Afrotis afra",
     "Eupodotis afraoides":"Afrotis afraoides",
     "Eupodotis ruficrista":"Lophotis ruficrista",

@@ -59,19 +59,19 @@ contextBridge.exposeInMainWorld("electron", {
   selectDirectory: (path) => ipcRenderer.invoke("selectDirectory", path),
   openDialog: (method, config) =>
     ipcRenderer.invoke("openFiles", method, config),
-  getInstallDate: (date) => ipcRenderer.invoke("getInstallDate", date),
+  getInstallInfo: (date) => ipcRenderer.invoke("getInstallInfo", date),
   getPath: () => ipcRenderer.invoke("getPath"),
   getAppPath: () => ipcRenderer.invoke("getAppPath"),
   getLocale: () => ipcRenderer.invoke("getLocale"),
   getTemp: () => ipcRenderer.invoke("getTemp"),
   getVersion: () => ipcRenderer.invoke("getVersion"),
   getAudio: () => ipcRenderer.invoke("getAudio"),
-  getUUID: () => ipcRenderer.invoke("getUUID"),
   trialPeriod: () => ipcRenderer.invoke("trialPeriod"),
   isMac: () => ipcRenderer.invoke("isMac"),
   isIntelMac: () => isIntelMac,
   exitApplication: () => ipcRenderer.invoke("exitApplication"),
   powerSaveBlocker: (onOff) => ipcRenderer.send("powerSaveControl", onOff),
+  debugMode: (onOff) => ipcRenderer.send("debug-mode", onOff),
   onFileOpen: (callback) => ipcRenderer.on('open-file', (event, filePath) => callback(filePath)),
   MEMBERSHIP_API_ENDPOINT: () => process.env.MEMBERSHIP_API_ENDPOINT
 });

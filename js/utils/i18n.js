@@ -9,7 +9,7 @@ const Toasts = { // UI.js
         placeNotFound: "Failed to look up this location. Please check your internet connection or try again later.",
         mustFilterSpecies: "Filter results by species to export audio files",
         noNode: "The standard backend could not be loaded on this machine. An experimental backend (webGPU) has been used instead.",
-        badMessage: "Unrecognised message from worker:${args.event}",
+        badMessage: "Unrecognised message from worker:${event}",
         changeListBlocked:"It is not possible to change the list settings while an analysis is underway. However, the list <b>can</b> be changed after the analysis completes",
         cancelled: "Operation cancelled",
         badTime: "Invalid time format. Please enter time in one of the following formats: \n1. Float (for seconds) \n2. Two numbers separated by a colon (for minutes and seconds) \n3. Three numbers separated by colons (for hours, minutes, and seconds)",
@@ -23,26 +23,28 @@ const Toasts = { // UI.js
         labelFileNeeded: "You must select a label file in the list settings to use the custom language option.",
         listFileNeeded: "You need to upload a custom list for the model before using the custom list option.",
         listNotFound: 'The custom list file: ${file} could not be found, <b class="text-danger">no detections will be shown</b>.',
+        badListFormat: "Custom list format is incorrect at line ${line}: ${value}",
         leafletError: 'There was an error showing the map: ${error}',
         noXC: "The Xeno-canto API is not responding",
         noComparisons: "The Xeno-canto site has no comparisons available",
         noIUCNRecord: "There is no record of <b>${sname}</b> on the IUCN Red List.",
         membershipExpiry: "Your membership is due to expire in ${expiresIn} days, you can visit <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>the membership page</a> to renew",
         modelPathNotFound: "The model path specified (${modelPath}) could not be found. Reverting to BirdNET model.",
-
-        corruptFile: "Corrupt file(s) encountered",
+        badLocationUpdate: "There is an existing location at this latitude and longitude.",
+        corruptFile: "<b>Corrupt file(s) encountered:</b> ${files}",
         noLoad: 'The ${model} model is not loaded. Restart Chirpity to continue. If you see this message repeatedly, it is likely your computer does not support AVX2 and Chirpity will not run on your system.',
         noDLL: 'There has been an error loading the model. This may be due to missing AVX support. Chirpity AI models require the AVX2 instructions set to run. If you have AVX2 enabled and still see this notice, please refer to <a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">this issue</a> on Github.',
         noFile: "Cannot open: ${error}",
         ffmpeg: 'FFMPEG error extracting audio: ${error}',
-        noNight: 'No detections. ${file} has no period within it where predictions would be given. <b>Tip:</b> To see detections in this file, disable nocmig mode and run the analysis again.',
+        noNight: 'No detections. ${file} has no period within it where predictions would be given. <b>Tip:</b> To see detections in this file, disable Nocmig mode and run the analysis again.',
         saveBlocked: "Cannot save file ${filePath}\nbecause it is open in another application",
         goodSave: '${filePath} has been written successfully.',
         noDetections: "No detections found in the selection",
         noDetectionsDetailed: 'No ${nocmig} ${species} detections found ${archive} using the ${list} list.',
         noDetectionsDetailed2: 'No detections found in ${file}. Searched for records using the ${list} list and having a minimum confidence of ${confidence}%',
         dbNotLoaded: "The database has not finished loading. The check for the presence of the file in the archive has been skipped",
-        noSnameFound: "Cannot find '${sname}' (at line ${line} of the custom list) in the <strong>${model}</strong> model list. <strong>Tips:</strong> <ol><li>Is your list formatted as: <code>'Scientific name${splitChar}Common name'</code></li><li>Is your list for the <strong>${model}</strong> model? If not, change the model in settings</li><li>Check for a typo in your species name</li></ol>",
+        noDBPath: "The specified database path does not exist. Using the default database.",
+        noSnameFound: "Cannot find '${sname}' (at line ${line} of the custom list) in the <strong>${model}</strong> model list. <strong>Tips:</strong> <ol><li>Is your list formatted as: <code>'Scientific name,Common name'</code></li><li>Is your list for the <strong>${model}</strong> model? If not, change the model in settings</li><li>Check for a typo in your species name</li></ol>",
         noSpecies: "No species found with the name ${cname}",
         noArchive: "Cannot access archive location: ${location}. <br> Operation aborted",
         noWriteArchive: "Cannot write to archive location: ${location}. <br> Operation aborted",
@@ -61,8 +63,10 @@ const Toasts = { // UI.js
         durationMismatch: '<span class="text-danger">No changes made</span>. The selected file has a different duration to the original file.',
         duplicateFIle: '<span class="text-danger">No changes made</span>. The selected file already exists in the Archive.',
         fileUpdateError: '<span class="text-danger">An error occurred while updating the file: ${message}</span>',
-        goodFilePurge: '${file} and its associated records were deleted successfully',
-        failedFilePurge: '${file} was not found in in the Archive',
+        goodFilePurge: '${file} and the associated records were deleted successfully',
+        goodFileUpdate: '${file} updated successfully',
+        noFileUpdate: 'No files were changed. Only the file name can be updated and the search string was not found in the selected filenames.',
+        failedFilePurge: '${file} was not found in the Archive',
         fileToConvertNotFound: 'Cannot find ${file}, skipping conversion.',
         mkDirFailed: 'Failed to create directory: ${path}<br>Error: ${error}',
         conversionComplete: 'Conversion complete, ${successTotal} successful, ${failedTotal} failed.',
@@ -80,7 +84,7 @@ const Toasts = { // UI.js
         placeNotFound: "Kunne ikke finde denne placering. Kontroller din internetforbindelse eller prøv igen senere.",
         mustFilterSpecies: "Filtrer resultater efter arter for at eksportere lydfiler",
         noNode: "Den standard backend kunne ikke indlæses på denne maskine. En eksperimentel backend (webGPU) er blevet brugt i stedet.",
-        badMessage: "Ugenkendt besked fra worker:${args.event}",
+        badMessage: "Ugenkendt besked fra worker:${event}",
         changeListBlocked: "Det er ikke muligt at ændre listeindstillingerne, mens en analyse er i gang. Listen <b>kan</b> dog ændres, når analysen er færdig.",
         cancelled: "Handling annulleret",
         badTime: "Ugyldigt tidsformat. Indtast tid i et af følgende formater: \n1. Flydende tal (for sekunder) \n2. To tal adskilt af et kolon (for minutter og sekunder) \n3. Tre tal adskilt af kolon (for timer, minutter og sekunder)",
@@ -94,27 +98,29 @@ const Toasts = { // UI.js
         labelFileNeeded: "Du skal vælge en etiketfil i listeindstillingerne for at bruge den tilpassede sprogindstilling.",
         listFileNeeded: "Du skal uploade en tilpasset liste til modellen, før du bruger den tilpassede listeindstilling.",
         listNotFound: 'Den brugerdefinerede listefil: ${file} blev ikke fundet, <b class="text-danger">ingen registreringer vil blive vist</b>.',
+        badListFormat: "Formatet for den brugerdefinerede liste er forkert ved linje ${line}: ${value}",
         leafletError: 'Der opstod en fejl under visning af kortet: ${error}',
         noXC: "Xeno-canto API svarer ikke",
         noComparisons: "Xeno-canto-webstedet har ingen sammenligninger tilgængelige",
         noIUCNRecord: "Der er ingen registrering af <b>${sname}</b> på IUCN's rødliste.",
         membershipExpiry: "Dit medlemskab udløber om ${expiresIn} dage, du kan besøge <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>medlemskabsiden</a> for at forny",
         modelPathNotFound: "Den angivne modelsti (${modelPath}) blev ikke fundet. Skifter tilbage til BirdNET-modellen.",
-        
+        badLocationUpdate: "Der findes allerede en placering på denne bredde- og længdegrad.",
 
-        corruptFile: "Der blev fundet beskadigede fil(er)",
+        corruptFile: "<b><b>Der blev fundet beskadigede fil(er):</b></b> ${files}",
         noLoad: 'Modellen ${model} er ikke indlæst. Genstart Chirpity for at fortsætte. Hvis du ser denne besked gentagne gange, er det sandsynligt, at din computer ikke understøtter AVX2, og Chirpity vil ikke køre på dit system.',
         noDLL: 'Der opstod en fejl ved indlæsning af modellen. Dette kan skyldes manglende AVX-understøttelse. Chirpity AI-modeller kræver AVX2-instruktionssættet for at køre. Hvis AVX2 er aktiveret, og du stadig ser denne meddelelse, skal du henvises til <a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">denne sag</a> på Github.',
         noFile: "Kan ikke åbne: ${error}",
         ffmpeg: 'FFMPEG-fejl ved udtrækning af lyd: ${error}',
-        noNight: 'Ingen detektioner. ${file} har ikke noget tidsrum, hvor forudsigelser ville blive givet. <b>Tip:</b> For at se detektioner i denne fil, skal du deaktivere nocmig-tilstand og køre analysen igen.',
+        noNight: 'Ingen detektioner. ${file} har ikke noget tidsrum, hvor forudsigelser ville blive givet. <b>Tip:</b> For at se detektioner i denne fil, skal du deaktivere Nocmig-tilstand og køre analysen igen.',
         saveBlocked: "Kan ikke gemme filen ${filePath}\nfordi den er åben i en anden applikation",
         goodSave: '${filePath} er blevet gemt med succes.',
         noDetections: "Ingen detektioner fundet i udvalget",
         noDetectionsDetailed: 'Ingen ${nocmig} ${species} detektioner fundet ${archive} ved brug af ${list}-listen.',
         noDetectionsDetailed2: 'Ingen detektioner fundet i ${file}. Søgte efter poster ved hjælp af ${list}-listen og med en minimumskonfidens på ${confidence}%',
         dbNotLoaded: "Databasen er ikke færdig med at indlæse. Tjekket for filens tilstedeværelse i arkivet er blevet sprunget over",
-        noSnameFound: "Kan ikke finde '${sname}' (på linje ${line} i den brugerdefinerede liste) i <strong>${model}</strong>-listen. <strong>Tips:</strong> <ol><li>Er din liste formateret som: <code>'Videnskabeligt navn${splitChar}Almindeligt navn'</code></li><li>Er din liste til <strong>${model}</strong>-modellen? Hvis ikke, skal du ændre modellen i indstillingerne</li><li>Kontroller for en stavefejl i dit artsnavn</li></ol>",
+        noDBPath: "Den angivne databaseplacering findes ikke. Bruger standarddatabasen.",
+        noSnameFound: "Kan ikke finde '${sname}' (på linje ${line} i den brugerdefinerede liste) i <strong>${model}</strong>-listen. <strong>Tips:</strong> <ol><li>Er din liste formateret som: <code>'Videnskabeligt navn,Almindeligt navn'</code></li><li>Er din liste til <strong>${model}</strong>-modellen? Hvis ikke, skal du ændre modellen i indstillingerne</li><li>Kontroller for en stavefejl i dit artsnavn</li></ol>",
         noSpecies: "Ingen arter fundet med navnet ${cname}",
         noArchive: "Kan ikke få adgang til arkivplaceringen: ${location}. <br> Operationen blev afbrudt",
         noWriteArchive: "Kan ikke skrive til arkivplaceringen: ${location}. <br> Operationen blev afbrudt",
@@ -134,6 +140,8 @@ const Toasts = { // UI.js
         duplicateFIle: '<span class="text-danger">Ingen ændringer foretaget</span>. Den valgte fil findes allerede i Arkivet.',
         fileUpdateError: '<span class="text-danger">Der opstod en fejl under opdatering af filen: ${message}</span>',
         goodFilePurge: '${file} og de tilknyttede poster blev slettet med succes',
+        goodFileUpdate: '${file} blev opdateret med succes',
+        noFileUpdate: 'Ingen filer blev ændret. Kun filnavnet kan opdateres, og søgestrengen blev ikke fundet i de valgte filnavne.',
         failedFilePurge: "${file} blev ikke fundet i Arkivet",
         fileToConvertNotFound: "Kan ikke finde ${file}, springer over konvertering.",
         mkDirFailed: "Kunne ikke oprette mappen: ${path}<br>Fejl: ${error}",
@@ -152,7 +160,7 @@ const Toasts = { // UI.js
         placeNotFound: "Der Ort konnte nicht gefunden werden. Bitte überprüfen Sie Ihre Internetverbindung oder versuchen Sie es später erneut.",
         mustFilterSpecies: "Filtern Sie die Ergebnisse nach Arten, um Audiodateien zu exportieren.",
         noNode: "Das Standard-Backend konnte auf diesem Computer nicht geladen werden. Stattdessen wurde ein experimentelles Backend (webGPU) verwendet.",
-        badMessage: "Unbekannte Nachricht vom Worker: ${args.event}",
+        badMessage: "Unbekannte Nachricht vom Worker: ${event}",
         changeListBlocked: "Es ist nicht möglich, die Listeneinstellungen während einer laufenden Analyse zu ändern. Die Liste <b>kann</b> jedoch nach Abschluss der Analyse geändert werden.",
         cancelled: "Vorgang abgebrochen",
         badTime: "Ungültiges Zeitformat. Bitte geben Sie die Zeit in einem der folgenden Formate ein: \n1. Dezimalzahl (für Sekunden) \n2. Zwei Zahlen getrennt durch einen Doppelpunkt (für Minuten und Sekunden) \n3. Drei Zahlen getrennt durch Doppelpunkte (für Stunden, Minuten und Sekunden)",
@@ -166,26 +174,28 @@ const Toasts = { // UI.js
         labelFileNeeded: "Sie müssen eine Beschriftungsdatei in den Listeneinstellungen auswählen, um die benutzerdefinierte Sprachoption zu verwenden.",
         listFileNeeded: "Sie müssen eine benutzerdefinierte Liste für das Modell hochladen, bevor Sie die benutzerdefinierte Listenoption verwenden können.",
         listNotFound: 'Die benutzerdefinierte Listen-Datei: ${file} konnte nicht gefunden werden, <b class="text-danger">es werden keine Erkennungen angezeigt</b>.',
+        badListFormat: "Das Format der benutzerdefinierten Liste ist in Zeile ${line} falsch: ${value}",
         leafletError: 'Beim Anzeigen der Karte ist ein Fehler aufgetreten: ${error}',
         noXC: "Die Xeno-canto-API antwortet nicht.",
         noComparisons: "Auf der Xeno-canto-Website sind keine Vergleiche verfügbar.",
         noIUCNRecord: "Es gibt keinen Eintrag für <b>${sname}</b> auf der Roten Liste der IUCN.",
         membershipExpiry: "Ihre Mitgliedschaft läuft in ${expiresIn} Tagen ab, Sie können die <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>Mitgliedsseite</a> besuchen, um sie zu verlängern",
         modelPathNotFound: "Der angegebene Modellpfad (${modelPath}) wurde nicht gefunden. Es wird auf das BirdNET-Modell zurückgegriffen.",
+        badLocationUpdate: "An diesem Breitengrad und Längengrad existiert bereits ein Standort.",
 
-        corruptFile: "Beschädigte Datei(en) gefunden",
+        corruptFile: "<b>Beschädigte Datei(en) gefunden:</b> ${files}",
         noLoad: 'Das Modell ${model} wurde nicht geladen. Starten Sie Chirpity neu, um fortzufahren. Wenn diese Nachricht wiederholt angezeigt wird, unterstützt Ihr Computer möglicherweise kein AVX2, und Chirpity wird auf Ihrem System nicht ausgeführt.',
         noDLL: 'Beim Laden des Modells ist ein Fehler aufgetreten. Dies könnte an fehlender AVX-Unterstützung liegen. Chirpity AI-Modelle benötigen das AVX2-Instruktionsset zum Ausführen. Wenn AVX2 aktiviert ist und Sie diese Nachricht trotzdem sehen, beziehen Sie sich bitte auf <a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">dieses Problem</a> auf Github.',
         noFile: "Kann nicht öffnen: ${error}",
         ffmpeg: 'FFMPEG-Fehler bei der Extraktion von Audio: ${error}',
-        noNight: 'Keine Detektionen. ${file} hat keinen Zeitraum, in dem Vorhersagen gegeben würden. <b>Tip:</b> Um Detektionen in dieser Datei zu sehen, deaktivieren Sie den nocmig-Modus und führen Sie die Analyse erneut durch.',
+        noNight: 'Keine Detektionen. ${file} hat keinen Zeitraum, in dem Vorhersagen gegeben würden. <b>Tip:</b> Um Detektionen in dieser Datei zu sehen, deaktivieren Sie den Nocmig-Modus und führen Sie die Analyse erneut durch.',
         saveBlocked: "Kann die Datei ${filePath} nicht speichern, weil sie in einer anderen Anwendung geöffnet ist",
         goodSave: '${filePath} wurde erfolgreich gespeichert.',
         noDetections: "Keine Detektionen im Auswahlbereich gefunden",
         noDetectionsDetailed: 'Keine ${nocmig} ${species} Detektionen in ${archive} mit der ${list}-Liste gefunden.',
         noDetectionsDetailed2: 'Keine Detektionen in ${file} gefunden. Es wurde nach Einträgen mit der ${list}-Liste und einer Mindestkonfidenz von ${confidence}% gesucht.',
         dbNotLoaded: "Die Datenbank ist noch nicht vollständig geladen. Die Überprüfung auf das Vorhandensein der Datei im Archiv wurde übersprungen.",
-        noSnameFound: "Kann '${sname}' (in Zeile ${line} der benutzerdefinierten Liste) nicht in der <strong>${model}</strong>-Liste finden. <strong>Tipps:</strong> <ol><<li>Ist Ihre Liste formatiert als: <code>'Wissenschaftlicher Name${splitChar}Allgemeiner Name'</code></li>li>Ist Ihre Liste für das <strong>${model}</strong>-Modell? Wenn nicht, ändern Sie das Modell in den Einstellungen</li><li>Überprüfen Sie auf Tippfehler im Artbegriff</li></ol>",
+        noSnameFound: "Kann '${sname}' (in Zeile ${line} der benutzerdefinierten Liste) nicht in der <strong>${model}</strong>-Liste finden. <strong>Tipps:</strong> <ol><li>Ist Ihre Liste formatiert als: <code>'Wissenschaftlicher Name,Allgemeiner Name'</code></li><li>Ist Ihre Liste für das <strong>${model}</strong>-Modell? Wenn nicht, ändern Sie das Modell in den Einstellungen</li><li>Überprüfen Sie auf Tippfehler im Artbegriff</li></ol>",
         noSpecies: "Keine Arten mit dem Namen ${cname} gefunden",
         noArchive: "Kann auf Archivstandort ${location} nicht zugreifen. <br> Vorgang abgebrochen",
         noWriteArchive: "Kann nicht in Archivstandort ${location} schreiben. <br> Vorgang abgebrochen",
@@ -205,6 +215,8 @@ const Toasts = { // UI.js
         duplicateFIle: '<span class="text-danger">Keine Änderungen vorgenommen</span>. Die ausgewählte Datei ist bereits im Archiv vorhanden.',
         fileUpdateError: '<span class="text-danger">Beim Aktualisieren der Datei ist ein Fehler aufgetreten: ${message}</span>',
         goodFilePurge: "${file} und die zugehörigen Datensätze wurden erfolgreich gelöscht",
+        goodFileUpdate: '${file} erfolgreich aktualisiert',
+        noFileUpdate: 'Keine Dateien wurden geändert. Nur der Dateiname kann aktualisiert werden, und der Suchtext wurde in den ausgewählten Dateinamen nicht gefunden.',
         failedFilePurge: "${file} wurde im Archiv nicht gefunden",
         fileToConvertNotFound: "Kann ${file} nicht finden, Überspringe Konvertierung.",
         mkDirFailed: "Fehler beim Erstellen des Verzeichnisses: ${path}<br>Fehler: ${error}",
@@ -212,6 +224,7 @@ const Toasts = { // UI.js
         libraryUpToDate: "Die Bibliothek ist auf dem neuesten Stand. Keine Aktion erforderlich",
         badModel: 'Modell "${model}" wurde nicht in der Datenbank gefunden.',
         noModel: "Die erforderliche Modellspalte wurde in der Datei nicht gefunden",
+        noDBPath: "Die angegebene Datenbankpfad existiert nicht. Verwenden Sie die Standarddatenbank.",
 
         noBackground: "Du hast 'Hintergrundgeräusche mischen' ausgewählt, aber es gibt keinen Ordner namens 'background' in deinem Datensatz."
     },
@@ -223,7 +236,7 @@ const Toasts = { // UI.js
         placeNotFound: "No se ha podido localizar ese lugar. Verifique su conexión a internet o inténtelo de nuevo más tarde.",
         mustFilterSpecies: "Filtre los resultados por especie para exportar archivos de audio.",
         noNode: "No se ha podido cargar el motor estándar en esta máquina. En su lugar, se ha utilizado un motor experimental (webGPU).",
-        badMessage: "Mensaje no reconocido del worker: ${args.event}",
+        badMessage: "Mensaje no reconocido del worker: ${event}",
         changeListBlocked: "No es posible cambiar la configuración de la lista mientras se está realizando un análisis. No obstante, la configuración <b>sí</b> se puede cambiar después de que termine el análisis.",
         cancelled: "Operación cancelada",
         badTime: "No se admite ese formato de hora. Indíquelo de alguno de los siguientes modos: \n1. Decimal (para segundos) \n2. Dos números separados por dos puntos (para minutos y segundos) \n3. Tres números separados por dos puntos (para horas, minutos y segundos)",
@@ -237,26 +250,28 @@ const Toasts = { // UI.js
         labelFileNeeded: "Debe seleccionar un archivo de etiquetas en la configuración de la lista para usar la opción de idioma personalizado.",
         listFileNeeded: "Debe cargar una lista personalizada para el modelo antes de usar la opción de lista personalizada.",
         listNotFound: 'El archivo de lista personalizada: ${file} no se pudo encontrar, <b class="text-danger">no se mostrarán detecciones</b>.',
+        badListFormat: "El formato de la lista personalizada es incorrecto en la línea ${line}: ${value}",
         leafletError: 'Hubo un error al mostrar el mapa: ${error}',
         noXC: "La API de Xeno-canto no responde ahora mismo.",
         noComparisons: "Parece que l sitio de Xeno-canto no tiene comparaciones disponibles.",
         noIUCNRecord: "No hay registro de <b>${sname}</b> en la Lista Roja de la UICN.",
         membershipExpiry: "Su membresía vencerá en ${expiresIn} días, puede visitar <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>la página de membresía</a> para renovarla",
         modelPathNotFound: "La ruta del modelo especificada (${modelPath}) no se pudo encontrar. Volviendo al modelo BirdNET.",
+        badLocationUpdate: "Ya existe una ubicación en esta latitud y longitud.",
 
-        corruptFile: "Se encontraron archivos corruptos",
+        corruptFile: "<b>Se encontraron archivos corruptos:</b> ${files}",
         noLoad: 'El modelo ${model} no está cargado. Reinicie Chirpity para continuar. Si ve este mensaje repetidamente es probable que su ordenador no sea compatible con AVX2 y que Chirpity no pueda ejecutarse en su sistema.',
         noDLL: 'Ha ocurrido un error al cargar el modelo. Esto puede deberse a la falta de soporte para AVX. Los modelos de inteligencia artificial de Chirpity requieren el conjunto de instrucciones AVX2 para funcionar. Si tiene AVX2 habilitado y sigue viendo este mensaje, consulte <a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">este problema</a> en Github.',
         noFile: "No se puede abrir: ${error}",
         ffmpeg: 'Error de FFMPEG al extraer audio: ${error}',
-        noNight: 'No se encontraron detecciones. ${file} no tiene un periodo en el que se puedan hacer predicciones. <b>Consejo:</b> Para ver detecciones en este archivo desactive el modo nocmig y ejecute otra vez el análisis.',
+        noNight: 'No se encontraron detecciones. ${file} no tiene un periodo en el que se puedan hacer predicciones. <b>Consejo:</b> Para ver detecciones en este archivo desactive el modo Nocmig y ejecute otra vez el análisis.',
         saveBlocked: "No se puede guardar el archivo ${filePath} porque está abierto en otra aplicación",
         goodSave: '${filePath} se ha guardado correctamente.',
         noDetections: "No se ha detectado nada en la selección",
         noDetectionsDetailed: 'No se han encontrado detecciones de ${nocmig} ${species} en ${archive} usando la lista ${list}.',
         noDetectionsDetailed2: 'No se han encontrado detecciones en ${file}. Se han buscado registros usando la lista ${list} con una confianza mínima de ${confidence}%',
         dbNotLoaded: "La base de datos no ha terminado de cargarse. Se ha omitido la comprobación de la presencia de la grabación en el archivo",
-        noSnameFound: "No se puede encontrar '${sname}' (en la línea ${line} de la lista personalizada) en la lista <strong>${model}</strong>. <strong>Consejos:</strong> <ol><li>¿Está su lista formateada como: <code>'Nombre científico${splitChar}Nombre común'</code>?</li><li>¿Está su lista para el modelo <strong>${model}</strong>? Si no es así, cambie el modelo en la configuración</li><li>Mire si hay algún error ortográfico en el nombre de la especie</li></ol>",
+        noSnameFound: "No se puede encontrar '${sname}' (en la línea ${line} de la lista personalizada) en la lista <strong>${model}</strong>. <strong>Consejos:</strong> <ol><li>¿Está su lista formateada como: <code>'Nombre científico,Nombre común'</code>?</li><li>¿Está su lista para el modelo <strong>${model}</strong>? Si no es así, cambie el modelo en la configuración</li><li>Mire si hay algún error ortográfico en el nombre de la especie</li></ol>",
         noSpecies: "No se encontraron especies con el nombre ${cname}",
         noArchive: "No se puede acceder a la ubicación del archivo: ${location}. <br> Operación interrumpida",
         noWriteArchive: "No se puede escribir en la ubicación del archivo: ${location}. <br> Operación abortada",
@@ -276,6 +291,8 @@ const Toasts = { // UI.js
         duplicateFIle: '<span class="text-danger">No se realizaron cambios</span>. El archivo seleccionado ya existe en el Archivo.',
         fileUpdateError: '<span class="text-danger">Ocurrió un error al actualizar el archivo: ${message}</span>',
         goodFilePurge: "${file} y sus registros asociados fueron eliminados correctamente",
+        goodFileUpdate: "${file} actualizado correctamente",
+        noFileUpdate: 'No se modificó ningún archivo. Solo se puede actualizar el nombre del archivo y no se encontró la cadena de búsqueda en los nombres de archivo seleccionados.',
         failedFilePurge: "${file} no se encontró en el Archivo",
         fileToConvertNotFound: "No se puede encontrar ${file}, se omite la conversión.",
         mkDirFailed: "Error al crear el directorio: ${path}<br>Error: ${error}",
@@ -283,7 +300,7 @@ const Toasts = { // UI.js
         libraryUpToDate: "La biblioteca está actualizada. No hay nada que hacer",
         badModel: 'El modelo "${model}" no se encontró en la base de datos.',
         noModel: "La columna de modelo necesaria no se encontró en el archivo",
-
+        noDBPath: "La ubicación de la base de datos especificada no existe. Usando la base de datos predeterminada.",
         noBackground: "Has seleccionado 'Mezclar con ruido de fondo', pero no hay ninguna carpeta llamada 'background' en tu conjunto de datos."
 
     },
@@ -295,7 +312,7 @@ const Toasts = { // UI.js
         placeNotFound: "Échec de la recherche de cet emplacement. Veuillez vérifier votre connexion Internet ou réessayer plus tard.",
         mustFilterSpecies: "Filtrez les résultats par espèce pour exporter des fichiers audio.",
         noNode: "Le backend standard n'a pas pu être chargé sur cette machine. Un backend expérimental (webGPU) a été utilisé à la place.",
-        badMessage: "Message non reconnu du worker: ${args.event}",
+        badMessage: "Message non reconnu du worker: ${event}",
         changeListBlocked: "Il n'est pas possible de changer les paramètres de la liste pendant qu'une analyse est en cours. Cependant, la liste <b>peut</b> être modifiée après la fin de l'analyse.",
         cancelled: "Opération annulée",
         badTime: "Format de temps invalide. Veuillez entrer l'heure dans l'un des formats suivants : \n1. Flottant (pour les secondes) \n2. Deux chiffres séparés par un deux-points (pour les minutes et les secondes) \n3. Trois chiffres séparés par des deux-points (pour les heures, les minutes et les secondes)",
@@ -309,14 +326,16 @@ const Toasts = { // UI.js
         labelFileNeeded: "Vous devez sélectionner un fichier d'étiquettes dans les paramètres de la liste pour utiliser l'option de langue personnalisée.",
         listFileNeeded: "Vous devez télécharger une liste personnalisée pour le modèle avant d'utiliser l'option de liste personnalisée.",
         listNotFound: 'Le fichier de liste personnalisé : ${file} est introuvable, <b class="text-danger">aucune détection ne sera affichée</b>.',
+        badListFormat: "Le format de la liste personnalisée est incorrect à la ligne ${line} : ${value}",
         leafletError: 'Une erreur est survenue lors de l\'affichage de la carte : ${error}',
         noXC: "L'API Xeno-canto ne répond pas.",
         noComparisons: "Le site Xeno-canto ne propose aucune comparaison disponible.",
         noIUCNRecord: "Il n'y a aucun enregistrement de <b>${sname}</b> sur la Liste Rouge de l'UICN.",
         membershipExpiry: "Votre abonnement expire dans ${expiresIn} jours, vous pouvez visiter <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>la page d'abonnement</a> pour le renouveler",
         modelPathNotFound: "Le chemin du modèle spécifié (${modelPath}) est introuvable. Retour au modèle BirdNET.",
-        
-        corruptFile: "Fichier(s) corrompu(s) détecté(s)",
+        badLocationUpdate: "Il existe déjà un emplacement à cette latitude et longitude.",
+
+        corruptFile: "<b>Fichier(s) corrompu(s) détecté(s):</b> ${files}",
         noLoad: 'Le modèle ${model} n\'est pas chargé. Redémarrez Chirpity pour continuer. Si vous voyez ce message à plusieurs reprises, il est probable que votre ordinateur ne prenne pas en charge AVX2 et Chirpity ne fonctionnera pas sur votre système.',
         noDLL: 'Une erreur est survenue lors du chargement du modèle. Cela peut être dû à un manque de prise en charge d\'AVX. Les modèles AI de Chirpity nécessitent le jeu d\'instructions AVX2 pour fonctionner. Si vous avez AVX2 activé et que vous voyez toujours cet avertissement, veuillez vous référer à <a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">ce problème</a> sur Github.',
         noFile: "Impossible d'ouvrir : ${error}",
@@ -328,7 +347,7 @@ const Toasts = { // UI.js
         noDetectionsDetailed: 'Aucune détection de ${nocmig} ${species} trouvée ${archive} en utilisant la liste ${list}.',
         noDetectionsDetailed2: 'Aucune détection trouvée dans ${file}. Recherche de dossiers utilisant la liste ${list} avec une confiance minimale de ${confidence}%',
         dbNotLoaded: "La base de données n'a pas encore fini de se charger. La vérification de la présence du fichier dans l'archive a été ignorée",
-        noSnameFound: "Impossible de trouver '${sname}' (à la ligne ${line} de la liste personnalisée) dans la liste <strong>${model}</strong>. <strong>Conseils :</strong> <ol><li>Votre liste est-elle formatée comme : <code>'Nom scientifique${splitChar}Nom commun'</code> ?</li><li>Votre liste est-elle pour le modèle <strong>${model}</strong> ? Si ce n'est pas le cas, changez le modèle dans les paramètres</li><li>Vérifiez s'il y a une faute de frappe dans le nom de votre espèce</li></ol>",
+        noSnameFound: "Impossible de trouver '${sname}' (à la ligne ${line} de la liste personnalisée) dans la liste <strong>${model}</strong>. <strong>Conseils :</strong> <ol><li>Votre liste est-elle formatée comme : <code>'Nom scientifique,Nom commun'</code> ?</li><li>Votre liste est-elle pour le modèle <strong>${model}</strong> ? Si ce n'est pas le cas, changez le modèle dans les paramètres</li><li>Vérifiez s'il y a une faute de frappe dans le nom de votre espèce</li></ol>",
         noSpecies: "Aucune espèce trouvée avec le nom ${cname}",
         noArchive: "Impossible d'accéder à l'emplacement de l'archive : ${location}. <br> Opération abandonnée",
         noWriteArchive: "Impossible d'écrire dans l'emplacement de l'archive : ${location}. <br> Opération abandonnée",
@@ -347,7 +366,9 @@ const Toasts = { // UI.js
         durationMismatch: '<span class="text-danger">Aucun changement effectué</span>. Le fichier sélectionné a une durée différente de celle du fichier original.',
         duplicateFIle: '<span class="text-danger">Aucun changement effectué</span>. Le fichier sélectionné existe déjà dans l\'Archive.',
         fileUpdateError: '<span class="text-danger">Une erreur est survenue lors de la mise à jour du fichier : ${message}</span>',
-        goodFilePurge: '${file} et ses enregistrements associés ont été supprimés avec succès',
+        goodFilePurge: '${file} et les enregistrements associés ont été supprimés avec succès',
+        goodFileUpdate: '${file} mis à jour avec succès',
+        noFileUpdate: 'Aucun fichier n’a été modifié. Seul le nom du fichier peut être mis à jour et le texte recherché n’a pas été trouvé dans les noms des fichiers sélectionnés.',
         failedFilePurge: "${file} n'a pas été trouvé dans l'Archive",
         fileToConvertNotFound: "Impossible de trouver ${file}, conversion ignorée.",
         mkDirFailed: "Échec de la création du répertoire : ${path}<br>Erreur : ${error}",
@@ -355,6 +376,7 @@ const Toasts = { // UI.js
         libraryUpToDate: "La bibliothèque est à jour. Aucune action nécessaire",
         badModel: 'Le modèle "${model}" n’a pas été trouvé dans la base de données.',
         noModel: "La colonne de modèle requise n’a pas été trouvée dans le fichier",
+        noDBPath: "Le chemin de la base de données spécifié n’existe pas. Utilisation de la base de données par défaut.",
 
         noBackground: "Vous avez sélectionné 'Mélanger avec le bruit de fond', mais il n'y a pas de dossier nommé 'background' dans votre jeu de données."
 
@@ -367,7 +389,7 @@ const Toasts = { // UI.js
         placeNotFound: "この場所の検索に失敗しました。インターネット接続を確認するか、後でもう一度試してください。",
         mustFilterSpecies: "オーディオファイルをエクスポートするには、種別で結果をフィルタリングしてください",
         noNode: "このマシンで標準のバックエンドをロードできませんでした。代わりに実験的なバックエンド（webGPU）が使用されました。",
-        badMessage: "ワーカーからの認識されないメッセージ:${args.event}",
+        badMessage: "ワーカーからの認識されないメッセージ:${event}",
         changeListBlocked:"分析が進行中のため、リスト設定を変更することはできません。ただし、分析が完了した後にリストを変更することは<b>可能</b>です",
         cancelled: "操作がキャンセルされました",
         badTime: "無効な時間形式です。次の形式のいずれかで時間を入力してください：\n1. 浮動小数点数（秒）\n2. コロンで区切られた2つの数字（分と秒）\n3. コロンで区切られた3つの数字（時、分、秒）",
@@ -381,26 +403,28 @@ const Toasts = { // UI.js
         labelFileNeeded: "カスタム言語オプションを使用するには、リスト設定でラベルファイルを選択する必要があります。",
         listFileNeeded: "カスタムリストオプションを使用する前に、モデルのカスタムリストをアップロードする必要があります。",
         listNotFound: 'カスタムリストファイル: ${file}が見つかりませんでした。<b class="text-danger">検出は表示されません</b>。',
+        badListFormat: "カスタムリストの形式が${line}行目で正しくありません: ${value}",
         leafletError: 'マップの表示中にエラーが発生しました: ${error}',
         noXC: "Xeno-canto APIが応答していません",
         noComparisons: "Xeno-cantoサイトには比較可能なデータがありません",
         noIUCNRecord: "IUCNレッドリストに<b>${sname}</b>の記録がありません。",
         membershipExpiry: "会員期限が${expiresIn}日後に迫っています。<a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>会員ページ</a>にアクセスして更新してください",
         modelPathNotFound: "指定されたモデルパス (${modelPath}) が見つかりません。BirdNETモデルに戻します。",
+        badLocationUpdate: "この緯度と経度には既に位置が存在します。",
 
-        corruptFile: "破損したファイルが見つかりました",
+        corruptFile: "<b>破損したファイルが見つかりました:</b> ${files}",
         noLoad: '${model}モデルがロードされていません。Chirpityを再起動して続行してください。このメッセージが繰り返し表示される場合、お使いのコンピュータがAVX2をサポートしていない可能性があります。',
         noDLL: 'モデルのロード中にエラーが発生しました。これはAVXサポートが欠如しているためかもしれません。Chirpity AIモデルはAVX2命令セットを必要とします。AVX2が有効であるにもかかわらずこの通知が表示される場合は、<a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">この問題</a>を参照してください。',
         noFile: "開くことができません: ${error}",
         ffmpeg: 'オーディオ抽出中のFFMPEGエラー: ${error}',
-        noNight: '検出なし。${file}には予測が行われる期間が含まれていません。<b>ヒント:</b> このファイルで検出を表示するには、nocmigモードを無効にして再度分析を実行してください。',
+        noNight: '検出なし。${file}には予測が行われる期間が含まれていません。<b>ヒント:</b> このファイルで検出を表示するには、Nocmigモードを無効にして再度分析を実行してください。',
         saveBlocked: "他のアプリケーションで開かれているため、ファイル${filePath}を保存できません",
         goodSave: '${filePath}が正常に書き込まれました。',
         noDetections: "選択範囲に検出が見つかりません",
         noDetectionsDetailed: '${nocmig} ${species}の検出が${archive}で見つかりませんでした。${list}リストを使用して検索しました。',
         noDetectionsDetailed2: '${file}に検出が見つかりませんでした。${list}リストを使用して、最小信頼度${confidence}%のレコードを検索しました。',
         dbNotLoaded: "データベースの読み込みが完了していません。アーカイブ内のファイルの存在確認はスキップされました",
-        noSnameFound: "カスタムリストの${line}行目にある'${sname}'が<strong>${model}</strong>モデルリストに見つかりません。<strong>ヒント:</strong> <ol><li>リストの形式は次のようになっていますか：<code>'学名${splitChar}一般名'</code></li><li>リストは<strong>${model}</strong>モデル用ですか？そうでない場合は、設定でモデルを変更してください</li><li>種名にタイプミスがないか確認してください</li></ol>",
+        noSnameFound: "カスタムリストの${line}行目にある'${sname}'が<strong>${model}</strong>モデルリストに見つかりません。<strong>ヒント:</strong> <ol><li>リストの形式は次のようになっていますか：<code>'学名,一般名'</code></li><li>リストは<strong>${model}</strong>モデル用ですか？そうでない場合は、設定でモデルを変更してください</li><li>種名にタイプミスがないか確認してください</li></ol>",
         noSpecies: "名前が ${cname} の種は見つかりませんでした",
         noArchive: "アーカイブ場所にアクセスできません: ${location}. <br> 操作が中止されました",
         noWriteArchive: "アーカイブ場所に書き込めません: ${location}. <br> 操作が中止されました",
@@ -419,6 +443,8 @@ const Toasts = { // UI.js
         duplicateFIle: '<span class="text-danger">変更なし</span>。選択されたファイルは既にアーカイブに存在します。',
         fileUpdateError: '<span class="text-danger">ファイルの更新中にエラーが発生しました: ${message}</span>',
         goodFilePurge: '${file}とその関連レコードが正常に削除されました',
+        goodFileUpdate: '${file}が正常に更新されました',
+        noFileUpdate: 'ファイルは変更されませんでした。更新できるのはファイル名のみで、選択したファイル名に検索文字列が見つかりませんでした。',
         failedFilePurge: '${file}はアーカイブに見つかりませんでした',
         fileToConvertNotFound: '${file}が見つかりません、変換をスキップします。',
         mkDirFailed: 'ディレクトリの作成に失敗しました: ${path}<br>エラー: ${error}',
@@ -426,6 +452,7 @@ const Toasts = { // UI.js
         libraryUpToDate: 'ライブラリは最新です。何もすることはありません',
         badModel: 'モデル "${model}" はデータベースに見つかりませんでした。',
         noModel: "必要なモデル列がファイルに見つかりませんでした",
+        noDBPath: "指定されたデータベースの場所が存在しません。デフォルトのデータベースを使用します。",
 
         noBackground: "「背景ノイズを混ぜる」を選択しましたが、データセットに「background」という名前のフォルダがありません。"
     },
@@ -437,7 +464,7 @@ const Toasts = { // UI.js
         placeNotFound: "Het is niet gelukt om deze locatie op te zoeken. Controleer je internetverbinding of probeer het later opnieuw.",
         mustFilterSpecies: "Filter de resultaten op soort om audiobestanden te exporteren.",
         noNode: "De standaard backend kon niet op deze machine worden geladen. In plaats daarvan is een experimentele backend (webGPU) gebruikt.",
-        badMessage: "Onherkenbaar bericht van de worker: ${args.event}",
+        badMessage: "Onherkenbaar bericht van de worker: ${event}",
         changeListBlocked: "Het is niet mogelijk om de lijstinstellingen te wijzigen terwijl een analyse bezig is. De lijst <b>kan</b> echter worden gewijzigd nadat de analyse is voltooid.",
         cancelled: "Operatie geannuleerd",
         badTime: "Ongeldig tijdformaat. Voer de tijd in een van de volgende formaten in: \n1. Float (voor seconden) \n2. Twee getallen gescheiden door een dubbele punt (voor minuten en seconden) \n3. Drie getallen gescheiden door dubbele punten (voor uren, minuten en seconden)",
@@ -451,26 +478,28 @@ const Toasts = { // UI.js
         labelFileNeeded: "Je moet een etiketbestand selecteren in de lijstinstellingen om de aangepaste taaloptie te gebruiken.",
         listFileNeeded: "Je moet een aangepaste lijst voor het model uploaden voordat je de aangepaste lijstoptie kunt gebruiken.",
         listNotFound: 'Het aangepaste lijstbestand: ${file} kon niet worden gevonden, <b class="text-danger">er worden geen detecties weergegeven</b>.',
+        badListFormat: "Het formaat van de aangepaste lijst is onjuist op regel ${line}: ${value}",
         leafletError: 'Er is een fout opgetreden bij het weergeven van de kaart: ${error}',
         noXC: "De Xeno-canto API reageert niet.",
         noComparisons: "De Xeno-canto-site heeft geen vergelijkingen beschikbaar.",
         noIUCNRecord: "Er is geen record van <b>${sname}</b> op de IUCN Rode Lijst.",
         membershipExpiry: "Je lidmaatschap verloopt over ${expiresIn} dagen, je kunt de <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>lidmaatschaps pagina</a> bezoeken om het te verlengen",
         modelPathNotFound: "Het opgegeven modelpad (${modelPath}) is niet gevonden. Terugschakelen naar het BirdNET-model.",
+        badLocationUpdate: "Er is al een locatie op deze breedte- en lengtegraad.",
 
-        corruptFile: "Beschadigde bestand(en) aangetroffen",
+        corruptFile: "<b>Beschadigde bestand(en) aangetroffen:</b> ${files}",
         noLoad: 'Het ${model} model is niet geladen. Herstart Chirpity om door te gaan. Als je dit bericht herhaaldelijk ziet, ondersteunt je computer waarschijnlijk geen AVX2 en zal Chirpity niet op je systeem werken.',
         noDLL: 'Er is een fout opgetreden bij het laden van het model. Dit kan te maken hebben met ontbrekende AVX-ondersteuning. Chirpity AI-modellen vereisen de AVX2-instructieset om te draaien. Als je AVX2 hebt ingeschakeld en nog steeds deze melding ziet, raadpleeg dan <a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">dit probleem</a> op Github.',
         noFile: "Kan niet openen: ${error}",
         ffmpeg: 'FFMPEG-fout bij het extraheren van audio: ${error}',
-        noNight: 'Geen detecties. ${file} heeft geen periode waarin voorspellingen zouden worden gegeven. <b>Tip:</b> Om detecties in dit bestand te zien, schakel je de nocmig-modus uit en voer je de analyse opnieuw uit.',
+        noNight: 'Geen detecties. ${file} heeft geen periode waarin voorspellingen zouden worden gegeven. <b>Tip:</b> Om detecties in dit bestand te zien, schakel je de Nocmig-modus uit en voer je de analyse opnieuw uit.',
         saveBlocked: "Kan bestand ${filePath} niet opslaan\nomdat het geopend is in een andere toepassing",
         goodSave: '${filePath} is succesvol opgeslagen.',
         noDetections: "Geen detecties gevonden in de selectie",
         noDetectionsDetailed: 'Geen ${nocmig} ${species} detecties gevonden ${archive} met de ${list} lijst.',
         noDetectionsDetailed2: 'Geen detecties gevonden in ${file}. Zocht naar records met de ${list} lijst en een minimale betrouwbaarheid van ${confidence}%',
         dbNotLoaded: "De database is nog niet volledig geladen. De controle op de aanwezigheid van het bestand in het archief is overgeslagen",
-        noSnameFound: "Kan '${sname}' niet vinden (op regel ${line} van de aangepaste lijst) in de <strong>${model}</strong> lijst. <strong>Tips:</strong> <ol><li>Is je lijst opgemaakt als: <code>'Wetenschappelijke naam${splitChar}Gewone naam'</code>?</li><li>Is je lijst voor het <strong>${model}</strong> model? Zo niet, wijzig het model in de instellingen</li><li>Controleer op typfouten in de naam van je soort</li></ol>",
+        noSnameFound: "Kan '${sname}' niet vinden (op regel ${line} van de aangepaste lijst) in de <strong>${model}</strong> lijst. <strong>Tips:</strong> <ol><li>Is je lijst opgemaakt als: <code>'Wetenschappelijke naam,Gewone naam'</code>?</li><li>Is je lijst voor het <strong>${model}</strong> model? Zo niet, wijzig het model in de instellingen</li><li>Controleer op typfouten in de naam van je soort</li></ol>",
         noSpecies: "Geen soorten gevonden met de naam ${cname}",
         noArchive: "Kan archieflocatie niet openen: ${location}. <br> Operatie afgebroken",
         noWriteArchive: "Kan niet schrijven naar archieflocatie: ${location}. <br> Operatie afgebroken",
@@ -490,6 +519,8 @@ const Toasts = { // UI.js
         duplicateFIle: '<span class="text-danger">Geen wijzigingen aangebracht</span>. Het geselecteerde bestand bestaat al in het Archief.',
         fileUpdateError: '<span class="text-danger">Er is een fout opgetreden bij het bijwerken van het bestand: ${message}</span>',
         goodFilePurge: "${file} en de bijbehorende records zijn succesvol verwijderd",
+        goodFileUpdate: "${file} succesvol bijgewerkt",
+        noFileUpdate: 'Er zijn geen bestanden gewijzigd. Alleen de bestandsnaam kan worden bijgewerkt en de zoektekst is niet gevonden in de geselecteerde bestandsnamen.',
         failedFilePurge: "${file} werd niet gevonden in het Archief",
         fileToConvertNotFound: "Kan ${file} niet vinden, conversie overgeslagen.",
         mkDirFailed: "Kan map niet aanmaken: ${path}<br>Fout: ${error}",
@@ -497,6 +528,7 @@ const Toasts = { // UI.js
         libraryUpToDate: "De bibliotheek is up-to-date. Niets te doen",
         badModel: 'Model "${model}" is niet gevonden in de database.',
         noModel: "De vereiste modelkolom is niet gevonden in het bestand",
+        noDBPath: "De opgegeven database locatie bestaat niet. De standaard database wordt gebruikt.",
 
         noBackground: "Je hebt 'Achtergrondgeluid mengen' geselecteerd, maar er is geen map genaamd 'background' in je dataset."
 
@@ -510,7 +542,7 @@ const Toasts = { // UI.js
         placeNotFound: "Falha ao procurar esta localização. Verifique sua conexão com a internet ou tente novamente mais tarde.",
         mustFilterSpecies: "Filtre os resultados por espécie para exportar arquivos de áudio.",
         noNode: "A backend padrão não pôde ser carregada nesta máquina. Em vez disso, foi usada uma backend experimental (webGPU).",
-        badMessage: "Mensagem não reconhecida do worker: ${args.event}",
+        badMessage: "Mensagem não reconhecida do worker: ${event}",
         changeListBlocked: "Não é possível alterar as configurações da lista enquanto uma análise está em andamento. No entanto, a lista <b>pode</b> ser alterada após a conclusão da análise.",
         cancelled: "Operação cancelada",
         badTime: "Formato de hora inválido. Por favor, insira a hora em um dos seguintes formatos: \n1. Float (para segundos) \n2. Dois números separados por dois pontos (para minutos e segundos) \n3. Três números separados por dois pontos (para horas, minutos e segundos)",
@@ -524,26 +556,28 @@ const Toasts = { // UI.js
         labelFileNeeded: "Você deve selecionar um arquivo de rótulos nas configurações da lista para usar a opção de idioma personalizado.",
         listFileNeeded: "Você precisa carregar uma lista personalizada para o modelo antes de usar a opção de lista personalizada.",
         listNotFound: 'O arquivo de lista personalizada: ${file} não foi encontrado, <b class="text-danger">nenhuma detecção será exibida</b>.',
+        badListFormat: "O formato da lista personalizada está incorreto na linha ${line}: ${value}",
         leafletError: 'Ocorreu um erro ao exibir o mapa: ${error}',
         noXC: "A API Xeno-canto não está respondendo.",
         noComparisons: "O site Xeno-canto não tem comparações disponíveis.",
         noIUCNRecord: "Não há registro de <b>${sname}</b> na Lista Vermelha da IUCN.",
         membershipExpiry: "Sua adesão vai expirar em ${expiresIn} dias, você pode visitar <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>a página de adesão</a> para renová-la",
         modelPathNotFound: "O caminho do modelo especificado (${modelPath}) não foi encontrado. Revertendo para o modelo BirdNET.",
+        badLocationUpdate: "Já existe uma localização nesta latitude e longitude.",
 
-        corruptFile: "Ficheiro(s) corrompido(s) encontrado(s)",
+        corruptFile: "<b>Ficheiro(s) corrompido(s) encontrado(s):</b> ${files}",
         noLoad: 'O modelo ${model} não está carregado. Reinicie o Chirpity para continuar. Se você ver esta mensagem repetidamente, é provável que seu computador não suporte AVX2 e o Chirpity não funcionará no seu sistema.',
         noDLL: 'Ocorreu um erro ao carregar o modelo. Isso pode ser devido à falta de suporte AVX. Os modelos de IA do Chirpity exigem o conjunto de instruções AVX2 para funcionar. Se você tiver o AVX2 ativado e ainda ver este aviso, consulte <a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">este problema</a> no Github.',
         noFile: "Não é possível abrir: ${error}",
         ffmpeg: 'Erro FFMPEG ao extrair áudio: ${error}',
-        noNight: 'Sem detecções. ${file} não possui um período dentro dele onde previsões seriam fornecidas. <b>Dica:</b> Para ver as detecções neste arquivo, desative o modo nocmig e execute a análise novamente.',
+        noNight: 'Sem detecções. ${file} não possui um período dentro dele onde previsões seriam fornecidas. <b>Dica:</b> Para ver as detecções neste arquivo, desative o modo Nocmig e execute a análise novamente.',
         saveBlocked: "Não foi possível salvar o arquivo ${filePath}\nporque está aberto em outro aplicativo",
         goodSave: '${filePath} foi salvo com sucesso.',
         noDetections: "Nenhuma detecção encontrada na seleção",
         noDetectionsDetailed: 'Nenhuma detecção ${nocmig} ${species} encontrada ${archive} usando a lista ${list}.',
         noDetectionsDetailed2: 'Nenhuma detecção encontrada em ${file}. Buscou por registros usando a lista ${list} com uma confiança mínima de ${confidence}%',
         dbNotLoaded: "O banco de dados não terminou de carregar. A verificação da presença do arquivo no arquivo foi ignorada",
-        noSnameFound: "Não foi possível encontrar '${sname}' (na linha ${line} da lista personalizada) na lista <strong>${model}</strong>. <strong>Dicas:</strong> <ol><li>A sua lista está formatada como: <code>'Nome científico${splitChar}Nome comum'</code>?</li><li>Sua lista é para o modelo <strong>${model}</strong>? Se não, altere o modelo nas configurações</li><li>Verifique se há erros de digitação no nome da espécie</li></ol>",
+        noSnameFound: "Não foi possível encontrar '${sname}' (na linha ${line} da lista personalizada) na lista <strong>${model}</strong>. <strong>Dicas:</strong> <ol><li>A sua lista está formatada como: <code>'Nome científico,Nome comum'</code>?</li><li>Sua lista é para o modelo <strong>${model}</strong>? Se não, altere o modelo nas configurações</li><li>Verifique se há erros de digitação no nome da espécie</li></ol>",
         noSpecies: "Nenhuma espécie encontrada com o nome ${cname}",
         noArchive: "Não foi possível acessar a localização do arquivo: ${location}. <br> Operação abortada",
         noWriteArchive: "Não foi possível gravar na localização do arquivo: ${location}. <br> Operação abortada",
@@ -562,14 +596,18 @@ const Toasts = { // UI.js
         durationMismatch: '<span class="text-danger">Nenhuma alteração feita</span>. O arquivo selecionado tem uma duração diferente do arquivo original.',
         duplicateFIle: '<span class="text-danger">Nenhuma alteração feita</span>. O arquivo selecionado já existe no Arquivo.',
         fileUpdateError: '<span class="text-danger">Ocorreu um erro ao atualizar o arquivo: ${message}</span>',
-        goodFilePurge: "${file} e seus registros associados foram excluídos com sucesso",
+        goodFilePurge: "${file} e os registros associados foram excluídos com sucesso",
+        goodFileUpdate: "${file} atualizado com sucesso",
+        noFileUpdate: 'Nenhum ficheiro foi alterado. Apenas o nome do ficheiro pode ser atualizado e a cadeia de pesquisa não foi encontrada nos nomes dos ficheiros selecionados.',
         failedFilePurge: "${file} não foi encontrado no Arquivo",
         fileToConvertNotFound: "Não foi possível encontrar ${file}, conversão ignorada.",
+
         mkDirFailed: "Falha ao criar o diretório: ${path}<br>Erro: ${error}",
         conversionComplete: "Conversão concluída, ${successTotal} bem-sucedida(s), ${failedTotal} falhada(s).",
         libraryUpToDate: "A biblioteca está atualizada. Nada a fazer",
         badModel: 'O modelo "${model}" não foi encontrado na base de dados.',
         noModel: "A coluna de modelo necessária não foi encontrada no ficheiro",
+        noDBPath: "O local do banco de dados especificado não existe. Usando o banco de dados padrão.",
 
         noBackground: "Você selecionou 'Misturar com ruído de fundo', mas não há uma pasta chamada 'background' no seu conjunto de dados."
 
@@ -583,7 +621,7 @@ const Toasts = { // UI.js
         placeNotFound: "Не удалось найти указанное местоположение. Пожалуйста, проверьте ваше интернет-соединение или попробуйте позже.",
         mustFilterSpecies: "Отфильтруйте результаты по видам для экспорта аудиофайлов.",
         noNode: "Стандартный бэкенд не удалось загрузить на этом устройстве. Вместо него был использован экспериментальный модуль (webGPU).",
-        badMessage: "Неизвестное сообщение от worker: ${args.event}",
+        badMessage: "Неизвестное сообщение от worker: ${event}",
         changeListBlocked: "Невозможно изменить настройки списка во время анализа. Однако список <b>можно</b> изменить после его завершения.",
         cancelled: "Операция отменена",
         badTime: "Неверный формат времени. Пожалуйста, введите время в одном из следующих форматов: \n1. Время с плавающей точкой (в секундах) \n2. Два числа, разделенные двоеточием (для минут и секунд) \n3. Три числа, разделенные двоеточием (для часов, минут и секунд)",
@@ -597,26 +635,28 @@ const Toasts = { // UI.js
         labelFileNeeded: "Вы должны выбрать файл меток в настройках списка, чтобы использовать опцию пользовательского языка.",
         listFileNeeded: "Вам необходимо загрузить пользовательский список для модели, прежде чем использовать опцию пользовательского списка.",
         listNotFound: 'Файл пользовательского списка: ${file} не найден, <b class="text-danger">обнаружения не будут отображаться</b>.',
+        badListFormat: "Формат пользовательского списка неверный на строке ${line}: ${value}",
         leafletError: 'Произошла ошибка при отображении карты: ${error}',
         noXC: "API Xeno-canto не отвечает.",
         noComparisons: "На сайте Xeno-canto нет доступных сравнений.",
         noIUCNRecord: "Нет записи о <b>${sname}</b> в Красном списке IUCH.",
         membershipExpiry: "Ваша подписка истекает через ${expiresIn} дней, вы можете посетить <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>страницу подписки</a>, чтобы продлить её",
         modelPathNotFound: "Указанный путь к модели (${modelPath}) не найден. Возврат к модели BirdNET.",
+        badLocationUpdate: "На этой широте и долготе уже существует местоположение.",
 
-        corruptFile: "Обнаружены повреждённые файлы",
+        corruptFile: "<b>Обнаружены повреждённые файлы:</b> ${files}",
         noLoad: 'Модель ${model} не загружена. Для продолжения работы перезапустите Chirpity. Если вы постоянно видите это сообщение, скорее всего, ваш компьютер не поддерживает AVX2 и Chirpity не будет работать в вашей системе.',
         noDLL: 'Произошла ошибка при загрузке модели. Это может быть связано с отсутствием поддержки AVX. Для запуска моделей AI Chirpity требуется набор инструкций AVX2. Если у вас включен AVX2 и вы по-прежнему видите это уведомление, пожалуйста, обратитесь к <a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">этому вопросу</a> на Github.',
         noFile: "Не удается открыть: ${error}",
         ffmpeg: 'Ошибка FFMPEG при извлечении аудио: ${error}',
-        noNight: 'Нет обнаружений. В ${file} нет периода, в течение которого можно было бы давать прогнозы. <b>Совет:</b> Чтобы увидеть обнаружения в этом файле, отключите режим nocmig и запустите анализ еще раз.',
+        noNight: 'Нет обнаружений. В ${file} нет периода, в течение которого можно было бы давать прогнозы. <b>Совет:</b> Чтобы увидеть обнаружения в этом файле, отключите режим Nocmig и запустите анализ еще раз.',
         saveBlocked: "Не удается сохранить файл ${filePath}\n потому, что он открыт в другом приложении",
         goodSave: '${filePath} был успешно записан.',
-        noDetections: "В выборке не найдено  никаких обнаружений",
+        noDetections: "В выборке не найдено никаких обнаружений",
         noDetectionsDetailed: 'Не найдено обнаружений ${nocmig} ${species} в ${archive} с использованием списка ${list}.',
         noDetectionsDetailed2: 'Не найдено обнаружеий в ${file}.  Поиск записей производился с использованием списка  ${list} с минимальной достоверностью ${confidence}%',
         dbNotLoaded: "Загрузка базы данных не завершена. Проверка наличия файла в архиве была пропущена",
-        noSnameFound: "Не удалось найти '${sname}' (в строке ${line} пользовательского списка) в списке <strong>${model}</strong>. <strong>Советы:</strong> <ol><li>Ваш список отформатирован так: <code>'Научное название${splitChar}Обычное название'</code>?</li><li>Подходит ли ваш список для модели <strong>${model}</strong>? Если нет, измените модель в настройках</li><li>Проверьте, нет ли опечатки в названии вашего вида</li></ol>",
+        noSnameFound: "Не удалось найти '${sname}' (в строке ${line} пользовательского списка) в списке <strong>${model}</strong>. <strong>Советы:</strong> <ol><li>Ваш список отформатирован так: <code>'Научное название,Обычное название'</code>?</li><li>Подходит ли ваш список для модели <strong>${model}</strong>? Если нет, измените модель в настройках</li><li>Проверьте, нет ли опечатки в названии вашего вида</li></ol>",
         noSpecies: "Не найдено видов с именем ${cname}",
         noArchive: "Не удается получить доступ к архиву: ${location}. <br> Операция прервана",
         noWriteArchive: "Не удается записать в архив по адресу: ${location}. <br> Операция прервана",
@@ -636,6 +676,8 @@ const Toasts = { // UI.js
         duplicateFIle: '<span class="text-danger">Изменений не внесено</span>. Выбранный файл уже существует в архиве.',
         fileUpdateError: '<span class="text-danger">Произошла ошибка при обновлении файла: ${message}</span>',
         goodFilePurge: "${file} и связанные с ним записи успешно удалены",
+        goodFileUpdate: "${file} успешно обновлен",
+        noFileUpdate: 'Файлы не были изменены. Можно обновить только имя файла, а строка поиска не найдена в именах выбранных файлов.',
         failedFilePurge: "${file} не найден в архиве",
         fileToConvertNotFound: "Не удалось найти ${file}, пропуск конвертации.",
         mkDirFailed: "Не удалось создать директорию: ${path}<br>Ошибка: ${error}",
@@ -643,6 +685,7 @@ const Toasts = { // UI.js
         libraryUpToDate: "Библиотека актуальна. Действий не требуется",
         badModel: 'Модель "${model}" не найдена в базе данных.',
         noModel: "Необходимый столбец модели не найден в файле",
+        noDBPath: "Указанное расположение базы данных не существует. Используется база данных по умолчанию.",
 
         noBackground: "Вы выбрали 'Смешать с фоновым шумом', но в вашем наборе данных нет папки с названием 'background'."
 
@@ -656,7 +699,7 @@ const Toasts = { // UI.js
         placeNotFound: "Det gick inte att hitta den här platsen. Kontrollera din internetanslutning eller försök igen senare.",
         mustFilterSpecies: "Filtrera resultaten efter art för att exportera ljudfiler.",
         noNode: "Den standardmässiga backend-tjänsten kunde inte laddas på den här maskinen. En experimentell backend (webGPU) har istället använts.",
-        badMessage: "Oigenkännligt meddelande från arbetaren: ${args.event}",
+        badMessage: "Oigenkännligt meddelande från arbetaren: ${event}",
         changeListBlocked: "Det går inte att ändra listinställningarna medan en analys pågår. Listan <b>kan</b> dock ändras efter att analysen är klar.",
         cancelled: "Operationen avbröts",
         badTime: "Ogiltigt tidsformat. Vänligen ange tid i ett av följande format: \n1. Flyttal (i sekunder) \n2. Två siffror separerade med kolon (för minuter och sekunder) \n3. Tre siffror separerade med kolon (för timmar, minuter och sekunder)",
@@ -664,32 +707,34 @@ const Toasts = { // UI.js
         complete: "Analys klar.",
         feedback: "Tack, din feedback hjälper oss att förbättra Chirpity-prediktionerna.",
         contextBlocked: "Det går inte att ändra inställningarna för kontextläge medan en analys pågår.",
-        noCallCache: "Inget samtalscache hittades.",
-        callCacheCleared: "Samtalscachen har rensats.",
+        noCallCache: "Inget Ropcache hittades.",
+        callCacheCleared: "Ropscachen har rensats.",
         badThreshold: "Tröskelvärdet måste vara ett tal mellan 0,001 och 1.",
         labelFileNeeded: "Du måste välja en etikettfil i listinställningarna för att använda alternativet för anpassat språk.",
         listFileNeeded: "Du behöver ladda upp en anpassad lista för modellen innan du använder alternativet för anpassad lista.",
-        listNotFound: 'Den anpassade listfilen: ${file} kunde inte hittas, <b class="text-danger">inga detektioner kommer att visas</b>.',
+        listNotFound: 'Den anpassade listfilen: ${file} kunde inte hittas, <b class="text-danger">inga detektioner kommer att visas</b>.',        
         leafletError: 'Ett fel uppstod vid visning av kartan: ${error}',
+        badListFormat: "Formatet på den anpassade listan är felaktigt på rad ${line}: ${value}",
         noXC: "Xeno-canto API svarar inte.",
         noComparisons: "Xeno-canto-sajten har inga jämförelser tillgängliga.",
         noIUCNRecord: "Det finns ingen post om <b>${sname}</b> i IUCN Röda listan.",
         membershipExpiry: "Ditt medlemskap löper ut om ${expiresIn} dagar, du kan besöka <a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>medlemssidan</a> för att förnya",
         modelPathNotFound: "Den angivna modellsökvägen (${modelPath}) kunde inte hittas. Återgår till BirdNET-modellen.",
+        badLocationUpdate: "Det finns redan en plats på denna latitud och longitud.",
 
-        corruptFile: "Skadade fil(er) påträffades",
+        corruptFile: "<b>Skadade fil(er) påträffades:</b> ${files}",
         noLoad: 'Modellen ${model} är inte laddad. Starta om Chirpity för att fortsätta. Om du ser detta meddelande upprepade gånger, är det troligt att din dator inte stöder AVX2 och Chirpity kommer inte att fungera på ditt system.',
         noDLL: 'Det har uppstått ett fel vid inläsning av modellen. Detta kan bero på att AVX-stöd saknas. Chirpity AI-modeller kräver AVX2-instruktionsuppsättningen för att fungera. Om du har AVX2 aktiverat och fortfarande ser detta meddelande, vänligen hänvisa till <a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">detta problem</a> på Github.',
         noFile: "Kan inte öppna: ${error}",
         ffmpeg: 'FFMPEG-fel vid extrahering av ljud: ${error}',
-        noNight: 'Inga detektioner. ${file} har ingen period inom den där förutsägelser skulle göras. <b>Tips:</b> För att se detektioner i denna fil, inaktivera nocmig-läget och kör analysen igen.',
+        noNight: 'Inga detektioner. ${file} har ingen period inom den där förutsägelser skulle göras. <b>Tips:</b> För att se detektioner i denna fil, inaktivera Nocmig-läget och kör analysen igen.',
         saveBlocked: "Kan inte spara filen ${filePath}\nför att den är öppen i ett annat program",
         goodSave: '${filePath} har skrivits framgångsrikt.',
         noDetections: "Inga detektioner hittades i urvalet",
         noDetectionsDetailed: 'Inga ${nocmig} ${species} detektioner hittades ${archive} med hjälp av ${list} listan.',
         noDetectionsDetailed2: 'Inga detektioner hittades i ${file}. Sökta efter poster med hjälp av ${list} listan och med en minimi-konfidens på ${confidence}%',
         dbNotLoaded: "Databasen har inte laddats klart. Kontroll av filens närvaro i arkivet har hoppats över",
-        noSnameFound: "Kunde inte hitta '${sname}' (på rad ${line} i den anpassade listan) i <strong>${model}</strong> listan. <strong>Tips:</strong> <ol><li>Är din lista formaterad som: <code>'Vetenskapligt namn${splitChar}Allmänt namn'</code>?</li><li>Är din lista för modellen <strong>${model}</strong>? Om inte, ändra modellen i inställningarna</li><li>Kontrollera om det finns ett stavfel i artnamnet</li></ol>",
+        noSnameFound: "Kunde inte hitta '${sname}' (på rad ${line} i den anpassade listan) i <strong>${model}</strong> listan. <strong>Tips:</strong> <ol><li>Är din lista formaterad som: <code>'Vetenskapligt namn,Allmänt namn'</code>?</li><li>Är din lista för modellen <strong>${model}</strong>? Om inte, ändra modellen i inställningarna</li><li>Kontrollera om det finns ett stavfel i artnamnet</li></ol>",
         noSpecies: "Inga arter hittades med namnet ${cname}",
         noArchive: "Kunde inte komma åt arkivplats: ${location}. <br> Åtgärden avbröts",
         noWriteArchive: "Kunde inte skriva till arkivplats: ${location}. <br> Åtgärden avbröts",
@@ -709,6 +754,8 @@ const Toasts = { // UI.js
         duplicateFIle: '<span class="text-danger">Inga ändringar gjorda</span>. Den valda filen finns redan i arkivet.',
         fileUpdateError: '<span class="text-danger">Ett fel uppstod vid uppdatering av filen: ${message}</span>',
         goodFilePurge: "${file} och dess associerade poster raderades framgångsrikt",
+        goodFileUpdate: "${file} uppdaterades framgångsrikt",
+        noFileUpdate: 'Inga filer ändrades. Endast filnamnet kan uppdateras och söktexten hittades inte i de valda filnamnen.',
         failedFilePurge: "${file} hittades inte i arkivet",
         fileToConvertNotFound: "Kan inte hitta ${file}, hoppar över konverteringen.",
         mkDirFailed: "Kunde inte skapa katalog: ${path}<br>Fel: ${error}",
@@ -716,6 +763,7 @@ const Toasts = { // UI.js
         libraryUpToDate: "Biblioteket är uppdaterat. Inget att göra",
         badModel: 'Modellen "${model}" hittades inte i databasen.',
         noModel: "Den nödvändiga modellkolumnen hittades inte i filen",
+        noDBPath: "Den angivna databasplatsen finns inte. Använder standarddatabasen.",
 
         noBackground: "Du har valt 'Blanda in bakgrundsljud', men det finns ingen mapp som heter 'background' i ditt dataset."
 
@@ -729,7 +777,7 @@ const Toasts = { // UI.js
         placeNotFound: "无法查找此位置。请检查您的互联网连接或稍后再试。",
         mustFilterSpecies: "按物种过滤结果以导出音频文件。",
         noNode: "无法加载标准后端。已使用实验性后端（webGPU）替代。",
-        badMessage: "来自工作线程的无法识别消息: ${args.event}",
+        badMessage: "来自工作线程的无法识别消息: ${event}",
         badRange: "无效的范围。开始时间和结束时间相同",
         changeListBlocked: "在分析进行时无法更改列表设置。但可以在分析完成后更改列表。",
         cancelled: "操作已取消",
@@ -743,26 +791,28 @@ const Toasts = { // UI.js
         labelFileNeeded: "必须在列表设置中选择标签文件才能使用自定义语言选项。",
         listFileNeeded: "在使用自定义列表选项之前，您需要上传一个自定义列表供模型使用。",
         listNotFound: '自定义列表文件：${file} 无法找到，<b class="text-danger">不会显示任何检测结果</b>。',
+        badListFormat: "自定义列表格式在第 ${line} 行无效：${value}",
         leafletError: '显示地图时出错：${error}',
         noXC: "Xeno-canto API 没有响应。",
         noComparisons: "Xeno-canto 网站没有可用的比较。",
         noIUCNRecord: "在 IUCN 红色名录中没有关于 <b>${sname}</b> 的记录。",
         membershipExpiry: "您的会员资格将在${expiresIn}天后到期，您可以访问<a href='https://buymeacoffee.com/matthew_kirkland' target='_blank'>会员页面</a>进行续订",
         modelPathNotFound: "指定的模型路径 (${modelPath}) 未找到。正在恢复为 BirdNET 模型。",
+        badLocationUpdate: "此纬度和经度上已存在一个位置。",
 
-        corruptFile: "发现损坏的文件",
+        corruptFile: "<b>发现损坏的文件:</b> ${files}",
         noLoad: '模型 ${model} 未加载。请重新启动 Chirpity 以继续。如果您重复看到此消息，可能是您的计算机不支持 AVX2，Chirpity 将无法在您的系统上运行。',
         noDLL: '加载模型时发生错误。这可能是由于缺少 AVX 支持。Chirpity AI 模型需要 AVX2 指令集才能运行。如果您已启用 AVX2 但仍然看到此通知，请参考 <a href="https://github.com/Mattk70/Chirpity-Electron/issues/84" target="_blank">此问题</a> 以获取更多信息。',
         noFile: "无法打开：${error}",
         ffmpeg: 'FFMPEG 提取音频时出错: ${error}',
-        noNight: '没有检测到。${file} 中没有任何预测应该给出的时间段。<b>提示：</b> 若要查看此文件中的检测结果，请禁用 nocmig 模式并重新运行分析。',
+        noNight: '没有检测到。${file} 中没有任何预测应该给出的时间段。<b>提示：</b> 若要查看此文件中的检测结果，请禁用 Nocmig 模式并重新运行分析。',
         saveBlocked: "无法保存文件 ${filePath}\n因为文件正在另一个应用程序中打开",
         goodSave: '${filePath} 已成功写入。',
         noDetections: "在选择中没有检测到任何结果",
         noDetectionsDetailed: '在 ${archive} 使用 ${list} 列表没有找到 ${nocmig} ${species} 检测结果。',
         noDetectionsDetailed2: '在 ${file} 中没有找到检测结果。搜索了 ${list} 列表中符合最低置信度 ${confidence}% 的记录。',
         dbNotLoaded: "数据库尚未加载完成。跳过了检查文件是否存在于档案中的步骤",
-        noSnameFound: "无法在 <strong>${model}</strong> 列表中找到 '${sname}'（位于自定义列表的第 ${line} 行）。<strong>提示：</strong><ol><li>您的列表格式是否如下：<code>'学名${splitChar}常用名'</code>？</li><li>您的列表是针对 <strong>${model}</strong> 模型的吗？如果不是，请在设置中更改模型。</li><li>检查物种名称是否有拼写错误。</li></ol>",
+        noSnameFound: "无法在 <strong>${model}</strong> 列表中找到 '${sname}'（位于自定义列表的第 ${line} 行）。<strong>提示：</strong><ol><li>您的列表格式是否如下：<code>'学名,常用名'</code>？</li><li>您的列表是针对 <strong>${model}</strong> 模型的吗？如果不是，请在设置中更改模型。</li><li>检查物种名称是否有拼写错误。</li></ol>",
         noSpecies: "未找到名称为 ${cname} 的物种",
         noArchive: "无法访问档案位置: ${location}. <br> 操作已中止",
         noWriteArchive: "无法写入档案位置: ${location}. <br> 操作已中止",
@@ -782,6 +832,8 @@ const Toasts = { // UI.js
         duplicateFIle: '<span class="text-danger">未作任何更改</span>。选定的文件已存在于档案中。',
         fileUpdateError: '<span class="text-danger">更新文件时出错：${message}</span>',
         goodFilePurge: "${file} 及其相关记录已成功删除",
+        goodFileUpdate: "${file} 已成功更新",
+        noFileUpdate: '没有文件被更改。只能更新文件名，并且在所选文件名中未找到搜索字符串。',
         failedFilePurge: "未在档案中找到 ${file}",
         fileToConvertNotFound: "无法找到 ${file}，跳过转换。",
         mkDirFailed: "无法创建目录：${path}<br>错误：${error}",
@@ -789,6 +841,7 @@ const Toasts = { // UI.js
         libraryUpToDate: "资料库已是最新，无需操作",
         badModel: '模型 "${model}" 未在数据库中找到。',
         noModel: "文件中未找到所需的模型列",
+        noDBPath: "指定的数据库位置不存在。正在使用默认数据库。",
 
         noBackground: "你已选择“混合背景噪声”，但在你的数据集中找不到名为“background”的文件夹。"
 
@@ -808,7 +861,19 @@ const All = {
     "zh": ["(默认)", "所有"],
     "ja": ["(デフォルト)", "すべて"]
 };
-
+const Files = {
+    en: ["file", "files"],
+    fr: ["fichier", "fichiers"],
+    es: ["archivo", "archivos"],
+    de: ["Datei", "Dateien"],
+    pt: ["arquivo", "arquivos"],
+    nl: ["bestand", "bestanden"],
+    sv: ["fil", "filer"],
+    da: ["fil", "filer"],
+    ru: ["файл", "файлы"],
+    ja: ["ファイル", "ファイル"],
+    zh: ["文件", "文件"],
+};
 const Headings = {
     en: {
         position: ['Position', "Sort results by detection time"],
@@ -940,7 +1005,7 @@ const Headings = {
         position: ['Position', "Sortera resultat efter upptäcktstid"],
         time: ['Tid', "Sortera resultat efter upptäcktstid"],
         species: ['Art', "Sortera resultat efter upptäcktsförtroende"],
-        calls: 'Samtal',
+        calls: 'Rop',
         label: 'Etikett',
         notes: 'Anteckningar',
         max: 'Maximum',
@@ -1049,95 +1114,132 @@ const Help = {
   
 
 const Location = {
-    en: [
-        'Set Location', 
-        'Delete Location', 
-        'Pick A Saved Location', 
-        'Add, Edit or Delete Location', 
-        'Update ALL open files to this location',
-        "Lat:", "Lon:"
-    ],
-    da: [
-        'Angiv placering', 
-        'Slet placering', 
-        'Vælg en gemt placering', 
-        'Tilføj, rediger eller slet placering', 
-        'Opdater ALLE åbne filer til denne placering',
-        "Bredde:", "Længde:"
-    ],
-    de: [
-        'Standort festlegen', 
-        'Standort löschen', 
-        'Gespeicherten Standort auswählen', 
-        'Standort hinzufügen, bearbeiten oder löschen', 
-        'Alle geöffneten Dateien auf diesen Standort aktualisieren',
-        "Breitengrad:", "Längengrad:"
-    ],
-    es: [
-        'Establecer ubicación', 
-        'Eliminar ubicación', 
-        'Seleccionar una ubicación guardada', 
-        'Añadir, editar o eliminar una ubicación', 
-        'Actualizar TODOS los archivos abiertos a esta ubicación',
-        "Latitud:", "Longitud:"
-    ],
-    fr: [
-        'Définir l’emplacement', 
-        'Supprimer l’emplacement', 
-        'Choisir un emplacement enregistré', 
-        'Ajouter, modifier ou supprimer un emplacement', 
-        'Mettre à jour TOUS les fichiers ouverts à cet emplacement',
-        "Lat:", "Long:"
-    ],
-    ja: [
-        '位置を設定', 
-        '位置を削除', 
-        '保存された位置を選択', 
-        '位置を追加、編集、または削除', 
-        'すべての開いているファイルをこの位置に更新',
-        "緯度:", "経度:"
-    ],
-    nl: [
-        'Locatie instellen', 
-        'Locatie verwijderen', 
-        'Kies een opgeslagen locatie', 
-        'Locatie toevoegen, bewerken of verwijderen', 
-        'Werk ALLE geopende bestanden bij naar deze locatie',
-        "Breedte:", "Lengte:"
-    ],
-    pt: [
-        'Definir localização', 
-        'Excluir localização', 
-        'Escolher uma localização salva', 
-        'Adicionar, editar ou excluir localização', 
-        'Atualizar TODOS os arquivos abertos para esta localização',
-        "Lat:", "Lon:"
-    ],
-    ru: [
-        'Установить местоположение', 
-        'Удалить местоположение', 
-        'Выбрать сохранённое местоположение', 
-        'Добавить, изменить или удалить местоположение', 
-        'Обновить ВСЕ открытые файлы до этого местоположения',
-        "Широта:", "Долгота:"
-    ],
-    sv: [
-        'Ange plats', 
-        'Radera plats', 
-        'Välj en sparad plats', 
-        'Lägg till, redigera eller radera plats', 
-        'Uppdatera ALLA öppna filer till denna plats',
-        "Latitud:", "Longitud:"
-    ],
-    zh: [
-        '设置位置', 
-        '删除位置', 
-        '选择一个保存的位置', 
-        '添加、编辑或删除位置', 
-        '更新所有打开的文件到此位置',
-        "纬度:", "经度:"
-    ]
+    en: {
+        update: 'Update Location',
+        delete: 'Delete Location',
+        pick: 'Pick A Location',
+        add: 'Add a New Location',
+        edit: 'Edit Location',
+        radius: 'Location radius',
+        all: 'Update ALL open files to this location',
+        lat: 'Lat:',
+        lon: 'Lon:'
+    },
+    da: {
+        update: 'Opdater placering',
+        delete: 'Slet placering',
+        pick: 'Vælg en placering',
+        add: 'Tilføj en ny placering',
+        edit: 'Rediger placering',
+        radius: 'Placeringsradius',
+        all: 'Opdater ALLE åbne filer til denne placering',
+        lat: 'Bredde:',
+        lon: 'Længde:'
+    },
+    de: {
+        update: 'Standort aktualisieren',
+        delete: 'Standort löschen',
+        pick: 'Standort auswählen',
+        add: 'Neuen Standort hinzufügen',
+        edit: 'Standort bearbeiten',
+        radius: 'Standortradius',
+        all: 'Alle geöffneten Dateien auf diesen Standort aktualisieren',
+        lat: 'Breitengrad:',
+        lon: 'Längengrad:'
+    },
+    es: {
+        update: 'Actualizar ubicación',
+        delete: 'Eliminar ubicación',
+        pick: 'Seleccionar una ubicación',
+        add: 'Añadir una nueva ubicación',
+        edit: 'Editar ubicación',
+        radius: 'Radio de ubicación',
+        all: 'Actualizar TODOS los archivos abiertos a esta ubicación',
+        lat: 'Latitud:',
+        lon: 'Longitud:'
+    },
+    fr: {
+        update: 'Mettre à jour l’emplacement',
+        delete: 'Supprimer l’emplacement',
+        pick: 'Choisir un emplacement',
+        add: 'Ajouter un nouvel emplacement',
+        edit: 'Modifier l’emplacement',
+        radius: 'Rayon de l’emplacement',
+        all: 'Mettre à jour TOUS les fichiers ouverts à cet emplacement',
+        lat: 'Lat:',
+        lon: 'Long:'
+    },
+    ja: {
+        update: '位置を更新',
+        delete: '位置を削除',
+        pick: '位置を選択',
+        add: '新しい位置を追加',
+        edit: '位置を編集',
+        radius: '位置の半径',
+        all: 'すべての開いているファイルをこの位置に更新',
+        lat: '緯度:',
+        lon: '経度:'
+    },
+    nl: {
+        update: 'Locatie bijwerken',
+        delete: 'Locatie verwijderen',
+        pick: 'Kies een locatie',
+        add: 'Nieuwe locatie toevoegen',
+        edit: 'Locatie bewerken',
+        radius: 'Locatiestraal',
+        all: 'Werk ALLE geopende bestanden bij naar deze locatie',
+        lat: 'Breedte:',
+        lon: 'Lengte:'
+    },
+    pt: {
+        update: 'Atualizar localização',
+        delete: 'Excluir localização',
+        pick: 'Escolher uma localização',
+        add: 'Adicionar uma nova localização',
+        edit: 'Editar localização',
+        radius: 'Raio da localização',
+        all: 'Atualizar TODOS os arquivos abertos para esta localização',
+        lat: 'Lat:',
+        lon: 'Lon:'
+    },
+    ru: {
+        update: 'Обновить местоположение',
+        delete: 'Удалить местоположение',
+        pick: 'Выбрать местоположение',
+        add: 'Добавить новое местоположение',
+        edit: 'Редактировать местоположение',
+        radius: 'Радиус местоположения',
+        all: 'Обновить ВСЕ открытые файлы до этого местоположения',
+        lat: 'Широта:',
+        lon: 'Долгота:'
+    },
+    sv: {
+        update: 'Uppdatera plats',
+        delete: 'Radera plats',
+        pick: 'Välj en plats',
+        add: 'Lägg till en ny plats',
+        edit: 'Redigera plats',
+        radius: 'Platsradie',
+        all: 'Uppdatera ALLA öppna filer till denna plats',
+        lat: 'Latitud:',
+        lon: 'Longitud:'
+    },
+    zh: {
+        update: '更新位置',
+        delete: '删除位置',
+        pick: '选择一个位置',
+        add: '添加新位置',
+        edit: '编辑位置',
+        radius: '位置半径',
+        all: '更新所有打开的文件到此位置',
+        lat: '纬度:',
+        lon: '经度:'
+    }
 };
+
+
+
+
 
 const Context = {
     en: {
@@ -1145,10 +1247,15 @@ const Context = {
         midnight: "Midnight", noon: 'Noon', one: 'day', other: 'days',
         apply: 'Apply', cancel: 'Cancel', filter: 'Apply a date Filter',
         'nocturnal flight call': 'Nocturnal Flight Call', 'flight call': 'Flight Call', call: 'Call', song: 'Song',
-        ecolocation: 'Echolocation', 'feeding buzz': 'Feeding Buzz', 'distress call': 'Distress Call', 'social call': 'Social Call',
+        echolocation: 'Echolocation', 'feeding buzz': 'Feeding Buzz', 'distress call': 'Distress Call', 'social call': 'Social Call',
+        'advertisement call': 'Advertisement Call', 'territorial call': 'Territorial Call', 'distress call': 'Distress Call',
         play: 'Play',
         pause: 'Pause',
         analyse: 'Analyse',
+        find: "Find Similar Sounds",
+        enterLabel: "Enter a label for the results",
+        max: "Max Results",
+        similarity: "Min Similarity",
         create: 'Create', edit: 'Edit', record: 'Record',
         export: 'Export Audio Clip',
         compare: 'Compare with Reference Calls',
@@ -1167,9 +1274,14 @@ const Context = {
         midnight: "Midnat", noon: "Middag", one: "dag", other: "dage",
         apply: 'Anvend', cancel: 'Annuller', filter: 'Anvend en datofiltrering',
         'nocturnal flight call': 'Natterflyvningskald', 'flight call': 'Flyvekald', call: 'Kald', song: 'Sang',
+        'advertisement call': 'Reklamekald', 'territorial call': 'Territorialt kald', 'distress call': 'Distresskald',
         play: 'Afspil',
         pause: 'Pause',
         analyse: 'Analysér',
+        find: "Find lignende lyde",
+        enterLabel: "Indtast en etiket for resultaterne",
+        max: "Maks. resultater",
+        similarity: "Min. lighed",
         create: 'Opret', edit: 'Rediger', record: 'post',
         export: 'Eksportér lydklip',
         compare: 'Sammenlign med referenceopkald',
@@ -1187,9 +1299,14 @@ const Context = {
          midnight: "Mitternacht", noon: "Mittag", one: "Tag", other: "Tage",
         apply: 'Anwenden', cancel: 'Abbrechen', filter: 'Datumsfilter anwenden',
         'nocturnal flight call': 'Nächtlicher Flugruf', 'flight call': 'Flugruf', call: 'Ruf', song: 'Gesang',
+            'advertisement call': 'Werberuf', 'territorial call': 'Territorialruf', 'distress call': 'Distressruf',
         play: 'Abspielen',
         pause: 'Pause',
         analyse: 'Analysieren',
+        find: "Ähnliche Geräusche finden",
+        max: "Max. Ergebnisse",
+        similarity: "Min. Ähnlichkeit",
+        enterLabel: "Geben Sie eine Bezeichnung für die Ergebnisse ein",
         create: 'Erstellen', edit: 'Bearbeiten', record: 'den Eintrag',
         export: 'Audioausschnitt exportieren',
         compare: 'Mit Referenzaufnahmen vergleichen',
@@ -1208,9 +1325,14 @@ const Context = {
         apply: 'Aplicar', cancel: 'Cancelar', filter: 'Aplicar un filtro de fecha',
         midnight: "Medianoche", noon: "Mediodía", one: "día", other: "días",
         'nocturnal flight call': 'Reclamos de vuelo nocturno', 'flight call': 'Reclamos de vuelo', call: 'Reclamos', song: 'Canto',
+        'advertisement call': 'Reclamos de publicidad', 'territorial call': 'Reclamos territoriales', 'distress call': 'Reclamos de distress',
         play: 'Reproducir',
         pause: 'Pausa',
         analyse: 'Analizar',
+        find: "Buscar sonidos similares",
+        enterLabel: "Introduzca una etiqueta para los resultados",
+        max: "Máx. resultados",
+        similarity: "Similitud mín.",
         create: 'Crear', edit: 'Editar', record: 'el registro',
         export: 'Exportar audio(s)',
         compare: 'Comparar con reclamos de referencia',
@@ -1229,9 +1351,14 @@ const Context = {
         apply: 'Appliquer', cancel: 'Annuler', filter: 'Appliquer un filtre de date',
         midnight: "Minuit", noon: "Midi", one: "jour", other: "jours",
         'nocturnal flight call': 'Cri de vol nocturne', 'flight call': 'Cri de vol', call: 'Cri', song: 'Chant',
+        'advertisement call': 'Cri de publicité', 'territorial call': 'Cri territorial', 'distress call': 'Cri de distress',
         play: 'Lecture',
         pause: 'Pause',
         analyse: 'Analyser',
+        find: "Trouver des sons similaires",
+        enterLabel: "Saisissez une étiquette pour les résultats",
+        max: "Résultats max.",
+        similarity: "Similarité min.",
         create: 'Créer', edit: 'Modifier', record: 'l’Enregistrement',
         export: 'Exporter un extrait audio',
         compare: 'Comparer avec des cris de référence',
@@ -1250,9 +1377,14 @@ const Context = {
         apply: '適用', cancel: 'キャンセル', filter: '日付フィルターを適用',
         midnight: "真夜中", noon: "正午", one: "日", other: "日間",
         'nocturnal flight call': '夜間飛行コール', 'flight call': '飛行コール', call: 'コール', song: '歌',
+        'advertisement call': '広告コール', 'territorial call': 'テリトリーコール', 'distress call': ' DISTRESSコール',
         play: '再生',
         pause: '一時停止',
         analyse: '分析',
+        find: "類似した音を探す",
+        enterLabel: "結果のラベルを入力してください",
+        max: "最大結果数",
+        similarity: "最小類似度",
         create: '作成', edit: '編集', record: '記録',
         export: 'オーディオクリップをエクスポート',
         compare: '参照コールと比較',
@@ -1271,9 +1403,14 @@ const Context = {
         apply: 'Toepassen', cancel: 'Annuleren', filter: 'Een datumfilter toepassen',
         midnight: "Middernacht", noon: "Middag", one: "dag", other: "dagen",
         'nocturnal flight call': 'Nachtelijke vluchtroep', 'flight call': 'Vluchtroep', call: 'Roep', song: 'Zang',
+        'advertisement call': 'Advertentiereep', 'territorial call': 'Territoriale roep', 'distress call': 'Distressroep',
         play: 'Afspelen',
         pause: 'Pauze',
         analyse: 'Analyseren',
+        find: "Vergelijkbare geluiden vinden",
+        enterLabel: "Voer een label in voor de resultaten",
+        max: "Max. resultaten",
+        similarity: "Min. overeenkomst",
         create: 'Aanmaken', edit: 'Bewerken', record: 'de Record',
         export: 'Audiofragment exporteren',
         compare: 'Vergelijk met referentieoproepen',
@@ -1292,9 +1429,14 @@ const Context = {
         apply: 'Aplicar', cancel: 'Cancelar', filter: 'Aplicar um filtro de data',
         midnight: "Meia-noite", noon: "Meio-dia", one: "dia", other: "dias",
         'nocturnal flight call': 'Chamado de voo noturno', 'flight call': 'Chamado de voo', call: 'Chamado', song: 'Canto',
+        'advertisement call': 'Chamado de publicidade', 'territorial call': 'Chamado territorial', 'distress call': 'Chamado de distress',
         play: 'Reproduzir',
         pause: 'Pausar',
         analyse: 'Analisar',
+        find: "Encontrar sons semelhantes",
+        enterLabel: "Introduza um rótulo para os resultados",
+        max: "Máx. resultados",
+        similarity: "Similaridade mín.",
         create: 'Criar', edit: 'Editar', record: 'o Registro',
         export: 'Exportar trecho de áudio',
         compare: 'Comparar com chamadas de referência',
@@ -1312,10 +1454,15 @@ const Context = {
         lastNight: 'Прошлой ночью', thisWeek: 'На этой неделе', lastWeek: 'На прошлой неделе', thisMonth: 'В этом месяце', lastMonth: 'В прошлом месяце', thisYear: 'В этом году', lastYear: 'В прошлом году',
         apply: 'Применить', cancel: 'Отмена', filter: 'Применить фильтр по дате',
         midnight: "Полночь", noon: "Полдень", one: "день", other: "дня",
-        'nocturnal flight call': 'Ночной полётный крик', 'flight call': 'Полётный крик', call: 'Крик', song: 'Песня',        
+        'nocturnal flight call': 'Ночной полётный крик', 'flight call': 'Полётный крик', call: 'Крик', song: 'Песня',
+        'advertisement call': 'Рекламный крик', 'territorial call': 'Территориальный крик', 'distress call': 'Крик distress',
         play: 'Воспроизвести',
         pause: 'Пауза',
         analyse: 'Анализировать',
+        find: "Найти похожие звуки",
+        enterLabel: "Введите метку для результатов",
+        max: "Макс. результатов",
+        similarity: "Мин. сходство",
         create: 'Создать', edit: 'Редактировать', record: 'запись',
         export: 'Экспортировать аудиофрагмент',
         compare: 'Сравнить с эталонными записями',
@@ -1334,12 +1481,17 @@ const Context = {
         apply: 'Tillämpa', cancel: 'Avbryt', filter: 'Tillämpa ett datumfilter',
         midnight: "Midnatt", noon: "Middag", one: "dag", other: "dagar",
         'nocturnal flight call': 'Nattlig flyktrop', 'flight call': 'Flyktrop', call: 'Rop', song: 'Sång',
+        'advertisement call': 'Reklameep', 'territorial call': 'Territorialt kald', 'distress call': 'Distresskald',
         play: 'Spela upp',
         pause: 'Paus',
         analyse: 'Analysera',
+        find: "Hitta liknande ljud",
+        enterLabel: "Ange en etikett för resultaten",
+        max: "Max. resultat",
+        similarity: "Min. likhet",
         create: 'Skapa', edit: 'Redigera', record: 'posten',
         export: 'Exportera ljudklipp',
-        compare: 'Jämför med referenssamtal',
+        compare: 'Jämför med referensrop',
         delete: 'Ta bort post',
         location: 'Ändra filens inspelningsplats',
         time: 'Ändra filens starttid',
@@ -1355,10 +1507,15 @@ const Context = {
         apply: '应用', cancel: '取消', filter: '应用日期过滤器',
         midnight: "午夜", noon: "中午", one: "天", other: "天",
         'nocturnal flight call': '夜间飞行叫声', 'flight call': '飞行叫声', call: '叫声', song: '歌声',
+        'advertisement call': '广告叫声', 'territorial call': '领域叫声', 'distress call': ' distress叫声',
         play: '播放',
         pause: '暂停',
         analyse: '分析',
-         create: '创建', edit: '编辑', record: '记录',
+        find: "查找相似的声音",
+        enterLabel: "输入结果的标签",
+        max: "最大结果数",
+        similarity: "最小相似度",
+        create: '创建', edit: '编辑', record: '记录',
         export: '导出音频片段',
         compare: '与参考调用进行比较',
         delete: '删除记录',
@@ -1371,6 +1528,34 @@ const Context = {
         selectAll: '全选',
         clearAll: '清除全部'
     }
+};
+
+const Trial = {
+    en: "Days left in your trial period",
+    da: "Dage tilbage i din prøveperiode",
+    de: "Tage verbleibend in Ihrer Testphase",
+    es: "Días restantes en tu periodo de prueba",
+    fr: "Jours restants dans votre période d'essai",
+    ja: "トライアル期間の残り日数",
+    nl: "Dagen over in je proefperiode",
+    pt: "Dias restantes no seu período de teste",
+    ru: "Осталось дней пробного периода",
+    sv: "Dagar kvar i din testperiod",
+    zh: "试用期剩余天数"
+};
+
+const TrialExpired = { 
+    en: "Your trial period has expired",
+    da: "Din prøveperiode er udløbet",
+    de: "Ihre Testphase ist abgelaufen",
+    es: "Tu período de prueba ha expirado",
+    fr: "Votre période d'essai est terminée",
+    ja: "トライアル期間が終了しました",
+    nl: "Je proefperiode is verlopen",
+    pt: "O seu período de teste expirou",
+    ru: "Ваш пробный период закончился",
+    sv: "Din testperiod har gått ut",
+    zh: "您的试用期已结束"
 };
 
 const Form = {
@@ -1393,11 +1578,6 @@ const LIST_MAP = {
         nocturnal: 'Searching for nocturnal calls',
         birds: 'Searching for all birds',
         everything: 'Searching for everything',
-        Mammalia: 'Searching for Mammals',
-        Reptilia: 'Searching for Reptiles',
-        Insecta: 'Searching for Insects',
-        Animalia: 'Excluding Environmental Noise',
-        Amphibia: 'Searching for Amphibians',
         custom: 'Using a custom list'
     },
     da: {
@@ -1435,6 +1615,7 @@ const LIST_MAP = {
         everything: 'すべてを探しています',
         custom: 'カスタムリストを使用しています'
     },
+
     // it: {
     //     location: 'Cercando uccelli nella tua regione',
     //     nocturnal: 'Cercando uccelli notturni',
@@ -1495,8 +1676,9 @@ const Titles = {
         playToggle: "Afspil / Pause (Mellemrumstasten)",
         zoomIn: "Zoom ind på spektrogrammet (Genvejstast: +)",
         zoomOut: "Zoom ud på spektrogrammet (Genvejstast: -)",
-        nocmigOn: "Nocmig-tilstand aktiveret",
-        nocmigOff: "Nocmig-tilstand deaktiveret",
+        nocmigDay: "Analyserer dagperioder",
+        nocmigNight: "Analyserer natperioder",
+        nocmigOff: "Analyserer alle tidsperioder",
         audioFiltersOn: "Lydfiltre anvendt",
         audioFiltersOff: "Ingen lydfiltre",
         contextModeOn: "Kontekstafhængig tilstand aktiveret",
@@ -1513,8 +1695,9 @@ const Titles = {
         playToggle: "Abspielen / Pause (Leertaste)",
         zoomIn: "Ins Spektrogramm zoomen (Tastenkürzel: +)",
         zoomOut: "Aus dem Spektrogramm herauszoomen (Tastenkürzel: -)",
-        nocmigOn: "Nocmig-Modus aktiviert",
-        nocmigOff: "Nocmig-Modus deaktiviert",
+        nocmigDay: "Analyse der Tageszeiträume",
+        nocmigNight: "Analyse der Nachtzeiträume",
+        nocmigOff: "Analyse aller Zeiträume",
         audioFiltersOn: "Audiofilter angewendet",
         audioFiltersOff: "Keine Audiofilter",
         contextModeOn: "Kontextbewusster Modus aktiviert",
@@ -1530,8 +1713,9 @@ const Titles = {
         controlsWrapper: "Drag to resize the Spectrogram window.",
         playToggle: "Play / Pause (SpaceBar)",
         zoomIn: "Zoom into the spectrogram (Keyboard Shortcut: + key)",
-        nocmigOn: "Nocmig mode on",
-        nocmigOff: "Nocmig mode off",
+        nocmigDay: "Analysing daytime periods", 
+        nocmigNight: "Analysing nighttime periods", 
+        nocmigOff: "Analysing all time periods",
         zoomOut: "Zoom out of the spectrogram (Keyboard Shortcut: - key)",
         audioFiltersOn: "Audio filters applied",
         audioFiltersOff: "No Audio filters",
@@ -1546,39 +1730,41 @@ const Titles = {
     },
     es: {
         filename: "Haz clic derecho para actualizar la hora de inicio o la ubicación del archivo",
-      controlsWrapper: "Arrastra para cambiar el tamaño de la ventana del sonograma.",
-      playToggle: "Reproducir / Pausa (Barra espaciadora)",
-      zoomIn: "Acercar el sonograma (Atajo de teclado: tecla +)",
-      zoomOut: "Alejar el sonograma (Atajo de teclado: tecla -)",
-      nocmigOn: "Modo Nocmig activado",
-      nocmigOff: "Modo Nocmig desactivado",
-      audioFiltersOn: "Filtros de audio aplicados",
-      audioFiltersOff: "Sin filtros de audio",
-      contextModeOn: "Modo contexto activado",
-      contextModeOff: "Modo contexto desactivado",
-      "frequency-range": "Ajustar el rango de frecuencias del sonograma",
-      "threshold-value": "Umbral de confianza de la predicción",
-      "clear-custom-list": "Borrar lista personalizada",
-      "clear-database-location": "Borrar ubicación personalizada de la base de datos",
-      primaryLogoLink: "Visita la web de Chirpity"
+        controlsWrapper: "Arrastra para cambiar el tamaño de la ventana del sonograma.",
+        playToggle: "Reproducir / Pausa (Barra espaciadora)",
+        zoomIn: "Acercar el sonograma (Atajo de teclado: tecla +)",
+        zoomOut: "Alejar el sonograma (Atajo de teclado: tecla -)",
+        nocmigDay: "Analizando periodos diurnos",
+        nocmigNight: "Analizando periodos nocturnos",
+        nocmigOff: "Analizando todos los periodos de tiempo",
+        audioFiltersOn: "Filtros de audio aplicados",
+        audioFiltersOff: "Sin filtros de audio",
+        contextModeOn: "Modo contexto activado",
+        contextModeOff: "Modo contexto desactivado",
+        "frequency-range": "Ajustar el rango de frecuencias del sonograma",
+        "threshold-value": "Umbral de confianza de la predicción",
+        "clear-custom-list": "Borrar lista personalizada",
+        "clear-database-location": "Borrar ubicación personalizada de la base de datos",
+        primaryLogoLink: "Visita la web de Chirpity"
     },
     fr: {
         filename: "Clic droit pour mettre à jour l'heure de début ou l'emplacement du fichier",
-      controlsWrapper: "Faites glisser pour redimensionner la fenêtre du spectrogramme.",
-      playToggle: "Lecture / Pause (Barre d'espace)",
-      zoomIn: "Zoomer sur le spectrogramme (Raccourci clavier : touche +)",
-      zoomOut: "Dézoomer sur le spectrogramme (Raccourci clavier : touche -)",
-      nocmigOn: "Mode Nocmig activé",
-      nocmigOff: "Mode Nocmig désactivé",
-      audioFiltersOn: "Filtres audio appliqués",
-      audioFiltersOff: "Pas de filtres audio",
-      contextModeOn: "Mode contextuel activé",
-      contextModeOff: "Mode contextuel désactivé",
-      "frequency-range": "Ajuster la plage de fréquences du spectrogramme",
-      "threshold-value": "Seuil de confiance pour les prédictions",
-      "clear-custom-list": "Effacer la liste personnalisée",
-      "clear-database-location": "Effacer l'emplacement personnalisé de la base de données",
-      primaryLogoLink: "Visitez le site Web de Chirpity"
+        controlsWrapper: "Faites glisser pour redimensionner la fenêtre du spectrogramme.",
+        playToggle: "Lecture / Pause (Barre d'espace)",
+        zoomIn: "Zoomer sur le spectrogramme (Raccourci clavier : touche +)",
+        zoomOut: "Dézoomer sur le spectrogramme (Raccourci clavier : touche -)",
+        nocmigDay: "Analyse des périodes diurnes",
+        nocmigNight: "Analyse des périodes nocturnes",
+        nocmigOff: "Analyse de toutes les périodes",
+        audioFiltersOn: "Filtres audio appliqués",
+        audioFiltersOff: "Pas de filtres audio",
+        contextModeOn: "Mode contextuel activé",
+        contextModeOff: "Mode contextuel désactivé",
+        "frequency-range": "Ajuster la plage de fréquences du spectrogramme",
+        "threshold-value": "Seuil de confiance pour les prédictions",
+        "clear-custom-list": "Effacer la liste personnalisée",
+        "clear-database-location": "Effacer l'emplacement personnalisé de la base de données",
+        primaryLogoLink: "Visitez le site Web de Chirpity"
     },
     ja: {
         filename: "右クリックしてファイルの開始時間または場所を更新",
@@ -1586,8 +1772,9 @@ const Titles = {
         playToggle: "再生 / 一時停止 (スペースキー)",
         zoomIn: "スペクトログラムをズームイン (ショートカットキー: + キー)",
         zoomOut: "スペクトログラムをズームアウト (ショートカットキー: - キー)",
-        nocmigOn: "Nocmigモードオン",
-        nocmigOff: "Nocmigモードオフ",
+        nocmigDay: "昼間の時間帯を解析中",
+        nocmigNight: "夜間の時間帯を解析中",
+        nocmigOff: "すべての時間帯を解析中",
         audioFiltersOn: "オーディオフィルターが適用されました",
         audioFiltersOff: "オーディオフィルターなし",
         contextModeOn: "コンテキストモードが有効",
@@ -1604,8 +1791,9 @@ const Titles = {
         playToggle: "Afspelen / Pauzeren (Spatiebalk)",
         zoomIn: "Inzoomen op het spectrogram (Sneltoets: + toets)",
         zoomOut: "Uitzoomen op het spectrogram (Sneltoets: - toets)",
-        nocmigOn: "Nocmig-modus ingeschakeld",
-        nocmigOff: "Nocmig-modus uitgeschakeld",
+        nocmigDay: "Analyseren van dagperiodes",
+        nocmigNight: "Analyseren van nachtperiodes",
+        nocmigOff: "Analyseren van alle tijdsperiodes",
         audioFiltersOn: "Audiostanden toegepast",
         audioFiltersOff: "Geen audiostanden",
         contextModeOn: "Contextbewuste modus ingeschakeld",
@@ -1622,8 +1810,9 @@ const Titles = {
         playToggle: "Reproduzir / Pausar (Tecla Espaço)",
         zoomIn: "Aproximar no espectrograma (Atalho: tecla +)",
         zoomOut: "Afastar no espectrograma (Atalho: tecla -)",
-        nocmigOn: "Modo Nocmig ativado",
-        nocmigOff: "Modo Nocmig desativado",
+        nocmigDay: "A analisar períodos diurnos",
+        nocmigNight: "A analisar períodos noturnos",
+        nocmigOff: "A analisar todos os períodos",
         audioFiltersOn: "Filtros de áudio aplicados",
         audioFiltersOff: "Sem filtros de áudio",
         contextModeOn: "Modo contextual ativado",
@@ -1640,8 +1829,9 @@ const Titles = {
         playToggle: "Воспроизведение / Пауза (Пробел)",
         zoomIn: "Увеличить спектрограмму (Горячая клавиша: +)",
         zoomOut: "Уменьшить спектрограмму (Горячая клавиша: -)",
-        nocmigOn: "Режим Nocmig включён",
-        nocmigOff: "Режим Nocmig выключен",
+        nocmigDay: "Анализ дневных периодов",
+        nocmigNight: "Анализ ночных периодов",
+        nocmigOff: "Анализ всех периодов времени",
         audioFiltersOn: "Применены аудиофильтры",
         audioFiltersOff: "Аудиофильтры отсутствуют",
         contextModeOn: "Контекстный режим включён",
@@ -1658,8 +1848,9 @@ const Titles = {
         playToggle: "Spela / Pausa (Mellanslag)",
         zoomIn: "Zooma in på spektrogrammet (Kortkommando: +)",
         zoomOut: "Zooma ut på spektrogrammet (Kortkommando: -)",
-        nocmigOn: "Nocmig-läge på",
-        nocmigOff: "Nocmig-läge av",
+        nocmigDay: "Analyserar dagperioder",
+        nocmigNight: "Analyserar nattperioder",
+        nocmigOff: "Analyserar alla tidsperioder",
         audioFiltersOn: "Ljudfilter aktiverade",
         audioFiltersOff: "Inga ljudfilter",
         contextModeOn: "Kontextmedvetet läge aktiverat",
@@ -1672,63 +1863,30 @@ const Titles = {
     },
     zh: {
         filename: "右键单击以更新文件的开始时间或位置",
-      controlsWrapper: "拖动以调整光谱窗口的大小。",
-      playToggle: "播放 / 暂停（空格键）",
-      zoomIn: "放大光谱图（快捷键：+ 键）",
-      zoomOut: "缩小光谱图（快捷键：- 键）",
-      nocmigOn: "Nocmig 模式已开启",
-      nocmigOff: "Nocmig 模式已关闭",
-      audioFiltersOn: "已应用音频过滤器",
-      audioFiltersOff: "无音频过滤器",
-      contextModeOn: "上下文感知模式已启用",
-      contextModeOff: "上下文感知模式已禁用",
-      "frequency-range": "调整光谱图的频率范围",
-      "threshold-value": "预测置信度阈值",
-      "clear-custom-list": "清除自定义列表",
-      "clear-database-location": "清除自定义数据库位置",
-      primaryLogoLink: "访问 Chirpity 网站"
-    },
-    it: { // random! But will leave in. Italian
-        filename: "Fai clic destro per aggiornare l'ora di inizio o la posizione del file",
-        controlsWrapper: "Trascina per ridimensionare la finestra dello spettrogramma.",
-        playToggle: "Riproduci / Pausa (Barra spaziatrice)",
-        zoomIn: "Ingrandisci lo spettrogramma (Scorciatoia: tasto +)",
-        zoomOut: "Riduci lo spettrogramma (Scorciatoia: tasto -)",
-        nocmigOn: "Modalità Nocmig attivata",
-        nocmigOff: "Modalità Nocmig disattivata",
-        audioFiltersOn: "Filtri audio applicati",
-        audioFiltersOff: "Nessun filtro audio",
-        contextModeOn: "Modalità contestuale abilitata",
-        contextModeOff: "Modalità contestuale disabilitata",
-        "frequency-range": "Regola l'intervallo di frequenza dello spettrogramma",
-        "threshold-value": "Soglia di confidenza della previsione",
-        "clear-custom-list": "Cancella lista personalizzata",
-        primaryLogoLink: "Visita il sito web di Chirpity"
-    },
-    pl: { // Also random! Polish
-        filename: "Kliknij prawym przyciskiem myszy, aby zaktualizować czas rozpoczęcia lub lokalizację pliku",
-      controlsWrapper: "Przeciągnij, aby zmienić rozmiar okna spektrogramu.",
-      playToggle: "Odtwórz / Pauza (Spacja)",
-      zoomIn: "Powiększ spektrogram (Skrót klawiaturowy: klawisz +)",
-      zoomOut: "Pomniejsz spektrogram (Skrót klawiaturowy: klawisz -)",
-      nocmigOn: "Tryb Nocmig włączony",
-      nocmigOff: "Tryb Nocmig wyłączony",
-      audioFiltersOn: "Zastosowano filtry audio",
-      audioFiltersOff: "Brak filtrów audio",
-      contextModeOn: "Włączono tryb kontekstowy",
-      contextModeOff: "Wyłączono tryb kontekstowy",
-      "frequency-range": "Dostosuj zakres częstotliwości spektrogramu",
-      "threshold-value": "Próg pewności predykcji",
-      "clear-custom-list": "Wyczyść niestandardową listę",
-      primaryLogoLink: "Odwiedź stronę internetową Chirpity"
+        controlsWrapper: "拖动以调整光谱窗口的大小。",
+        playToggle: "播放 / 暂停（空格键）",
+        zoomIn: "放大光谱图（快捷键：+ 键）",
+        zoomOut: "缩小光谱图（快捷键：- 键）",
+        nocmigDay: "正在分析白天时段",
+        nocmigNight: "正在分析夜间时段",
+        nocmigOff: "正在分析所有时段",
+        audioFiltersOn: "已应用音频过滤器",
+        audioFiltersOff: "无音频过滤器",
+        contextModeOn: "上下文感知模式已启用",
+        contextModeOff: "上下文感知模式已禁用",
+        "frequency-range": "调整光谱图的频率范围",
+        "threshold-value": "预测置信度阈值",
+        "clear-custom-list": "清除自定义列表",
+        "clear-database-location": "清除自定义数据库位置",
+        primaryLogoLink: "访问 Chirpity 网站"
     }
   };
   
   const Lists = {
     en: { 
-        location: 'Local Birds', 
+        location: 'Local Species', 
         nocturnal: 'Nocturnal Calls', 
-        birds: 'All Birds', 
+        birds: 'All Species', 
         everything: 'Everything', 
         custom: 'Custom',
         timecode: 'Timecode',
@@ -1740,16 +1898,11 @@ const Titles = {
         Mediterranean: "Mediterranean",
         customListPH: 'No custom list set',
         libraryLocationPH: 'No location set',
-        Mammalia: 'Mammals',
-        Reptilia: 'Reptiles',
-        Insecta: 'Insects',
-        Animalia: 'Exclude Environmental Noise',
-        Amphibia: 'Amphibians'
     },
     da: {
-        location: 'Lokale fugle',
+        location: 'Lokale arter',
         nocturnal: 'Natlige kald',
-        birds: 'Alle fugle',
+        birds: 'Alle arter',
         everything: 'Alt',
         custom: 'Brugerdefineret',
         timecode: "Tidskode",
@@ -1763,9 +1916,9 @@ const Titles = {
         libraryLocationPH: "Ingen placering angivet" 
     },
     de: {
-        location: 'Einheimische Vögel',
+        location: 'Einheimische Arten',
         nocturnal: 'Nächtliche Rufen',
-        birds: 'Alle Vögel',
+        birds: 'Alle Arten',
         everything: 'Alles',
         custom: 'Benutzerdefiniert',
         timecode: "Zeitcode",
@@ -1779,9 +1932,9 @@ const Titles = {
         libraryLocationPH: "Kein Standort festgelegt" 
     },
     es: {
-        location: 'Aves de la zona',
+        location: 'Especies de la zona',
         nocturnal: 'Reclamos nocturnos',
-        birds: 'Todas las aves',
+        birds: 'Todas las especies',
         everything: 'Cualquier sonido',
         custom: 'Personalizado',
         timecode: "Código de tiempo",
@@ -1795,9 +1948,9 @@ const Titles = {
         libraryLocationPH: "Sin ubicación" 
     },
     fr: {
-        location: 'Oiseaux locaux',
+        location: 'Espèces locales',
         nocturnal: 'Cris nocturnes',
-        birds: 'Tous les oiseaux',
+        birds: 'Toutes les espèces',
         everything: 'Tout',
         custom: 'Personnalisé',
         timecode: "Code temporel",
@@ -1811,9 +1964,9 @@ const Titles = {
         libraryLocationPH: "Aucun emplacement défini" 
     },
     ja: {
-        location: '地域の鳥',
+        location: '地域の種',
         nocturnal: '夜間のコール',
-        birds: 'すべての鳥',
+        birds: 'すべての種',
         everything: 'すべて',
         custom: 'カスタム',
         timecode: 'タイムコード',
@@ -1834,9 +1987,9 @@ const Titles = {
     //     custom: 'Personalizzato'
     // },
     nl: {
-        location: 'Lokale vogels',
+        location: 'Lokale soorten',
         nocturnal: 'Nachtelijke roepen',
-        birds: 'Alle vogels',
+        birds: 'Alle soorten',
         everything: 'Alles',
         custom: 'Aangepast',
         timecode: "Tijdcode",
@@ -1857,9 +2010,9 @@ const Titles = {
     //     custom: 'Niestandardowe'
     // },
     pt: {
-        location: 'Pássaros locais',
+        location: 'Espécies locais',
         nocturnal: 'Chamadas noturnos',
-        birds: 'Todos os pássaros',
+        birds: 'Todas as espécies',
         everything: 'Tudo',
         custom: 'Personalizado',
         timecode: "Código de tempo",
@@ -1889,9 +2042,9 @@ const Titles = {
         libraryLocationPH: "Без места" 
     },
     sv: {
-        location: 'Lokala fåglar',
+        location: 'Lokala arter',
         nocturnal: 'Nattliga läten',
-        birds: 'Alla fåglar',
+        birds: 'Alla arter',
         everything: 'Allt',
         custom: 'Anpassad',
         timecode: "Tidskod",
@@ -1905,9 +2058,9 @@ const Titles = {
         libraryLocationPH: "Ingen plats angiven" 
     },
     zh: {
-        location: '本地鸟类',
+        location: '本地物种',
         nocturnal: '夜间叫声',
-        birds: '所有鸟类',
+        birds: '所有物种',
         everything: '所有',
         custom: '自定义',
         timecode: "时间码",
@@ -3058,6 +3211,234 @@ zh: {
     },
 };
 
+const Database = {
+    en: {
+        "yes": "Yes",
+        "no": "No",
+        "Pending":"Pending", "OK":"OK", "Missing":"Missing",
+        "default": "Default",
+        "database-modal-label": "Database File Management",
+        "Filename": "Filename",
+        "In Audio Library": "In Audio Library",
+        "File Start": "File Start",
+        "Location": "Location",
+        "Link Status": "Link Status",
+        "Selected": "Selected",
+        "Select All": "Select All",
+        "Deselect All": "Deselect All",
+        "Delete Entries": "Delete Entries",
+        "filter-placeholder": "Filter by filename, date or location",
+        "replace-placeholder": "Replace match with...",
+        "Update Entries": "Update Entries",
+    },
+    da: {
+        "yes": "Ja",
+        "no": "Nej",
+        "Pending": "Afventer",
+        "OK": "OK",
+        "Missing": "Mangler",
+        "default": "Standard",
+        "database-modal-label": "Database Filhåndtering",
+        "Filename": "Filnavn",
+        "In Audio Library": "I Lydbiblioteket",
+        "File Start": "Filstart",
+        "Location": "Placering",
+        "Link Status": "Linkstatus",
+        "Selected": "Valgt",
+        "Select All": "Vælg Alle",
+        "Deselect All": "Fravælg Alle",
+        "Delete Entries": "Slet Poster",
+        "filter-placeholder": "Filtrer efter filnavn, dato eller placering",
+        "replace-placeholder": "Erstat match med...",
+        "Update Entries": "Opdater Poster"
+    },
+    de: {
+        "yes": "Ja",
+        "no": "Nein",
+        "Pending": "Ausstehend",
+        "OK": "OK",
+        "Missing": "Fehlt",
+        "default": "Standard",
+        "database-modal-label": "Datenbankverwaltung",
+        "Filename": "Dateiname",
+        "In Audio Library": "In der Audiobibliothek",
+        "File Start": "Dateianfang",
+        "Location": "Ort",
+        "Link Status": "Verknüpfungsstatus",
+        "Selected": "Ausgewählt",
+        "Select All": "Alle auswählen",
+        "Deselect All": "Alle abwählen",
+        "Delete Entries": "Einträge löschen",
+        "filter-placeholder": "Nach Dateiname, Datum oder Ort filtern",
+        "replace-placeholder": "Übereinstimmung ersetzen mit...",
+        "Update Entries": "Einträge aktualisieren"
+    },
+    es: {
+        "yes": "Sí",
+        "no": "No","Pending": "Pendiente",
+        "OK": "OK",
+        "Missing": "Falta",
+        "default": "Predeterminado",
+        "database-modal-label": "Gestión de Archivos de Base de Datos",
+        "Filename": "Nombre del Archivo",
+        "In Audio Library": "En la Biblioteca de Audio",
+        "File Start": "Inicio del Archivo",
+        "Location": "Ubicación",
+        "Link Status": "Estado del enlace",
+        "Selected": "Seleccionado",
+        "Select All": "Seleccionar Todos",
+        "Deselect All": "Deseleccionar Todos",
+        "Delete Entries": "Eliminar Entradas",
+        "filter-placeholder": "Filtrar por nombre de archivo, fecha o ubicación",
+        "replace-placeholder": "Reemplazar coincidencia con...",
+        "Update Entries": "Actualizar Entradas"
+    },
+    fr: {
+        "yes": "Oui",
+        "no": "Non",
+        "Pending": "En attente",
+        "OK": "OK",
+        "Missing": "Manquant",
+        "default": "Par défaut",
+        "database-modal-label": "Gestion des Fichiers de Base de Données",
+        "Filename": "Nom du Fichier",
+        "In Audio Library": "Dans la Bibliothèque Audio",
+        "File Start": "Début du Fichier",
+        "Location": "Emplacement",
+        "Link Status": "État du lien",
+        "Selected": "Sélectionné",
+        "Select All": "Tout Sélectionner",
+        "Deselect All": "Tout Désélectionner",
+        "Delete Entries": "Supprimer les Entrées",
+        "filter-placeholder": "Filtrer par nom de fichier, date ou emplacement",
+        "replace-placeholder": "Remplacer la correspondance par...",
+        "Update Entries": "Mettre à jour les entrées"
+    },
+    ja: {
+        "yes": "はい",
+        "no": "いいえ",
+        "Pending": "保留中",
+        "OK": "OK",
+        "Missing": "見つかりません",
+        "default": "デフォルト",
+        "database-modal-label": "データベースファイル管理",
+        "Filename": "ファイル名",
+        "In Audio Library": "オーディオライブラリ内",
+        "File Start": "ファイル開始",
+        "Location": "場所",
+        "Link Status": "リンクの状態",
+        "Selected": "選択済み",
+        "Select All": "すべて選択",
+        "Deselect All": "すべて解除",
+        "Delete Entries": "エントリを削除",
+        "filter-placeholder": "ファイル名、日付、または場所でフィルタリング",
+        "replace-placeholder": "一致するテキストに置き換え",
+        "Update Entries": "エントリを更新"
+    },
+    nl: {
+        "yes": "Ja",
+        "no": "Nee","Pending": "In behandeling",
+        "OK": "OK",
+        "Missing": "Ontbreekt",
+        "default": "Standaard",
+        "database-modal-label": "Database Bestandsbeheer",
+        "Filename": "Bestandsnaam",
+        "In Audio Library": "In de Audiobibliotheek",
+        "File Start": "Bestand Start",
+        "Location": "Locatie",
+        "Link Status": "Linkstatus",
+        "Selected": "Geselecteerd",
+        "Select All": "Selecteer Alles",
+        "Deselect All": "Deselecteer Alles",
+        "Delete Entries": "Verwijder Items",
+        "filter-placeholder": "Filter op bestandsnaam, datum of locatie",
+        "replace-placeholder": "Vervang overeenkomst met...",
+        "Update Entries": "Items bijwerken"
+    },
+    pt: {
+        "yes": "Sim",
+        "no": "Não",
+        "Pending": "Pendente",
+        "OK": "OK",
+        "Missing": "Em falta",
+        "default": "Padrão",
+        "database-modal-label": "Gerenciamento de Arquivos de Banco de Dados",
+        "Filename": "Nome do Arquivo",
+        "In Audio Library": "Na Biblioteca de Áudio",
+        "File Start": "Início do Arquivo",
+        "Location": "Localização",
+        "Link Status": "Estado do link",
+        "Selected": "Selecionado",
+        "Select All": "Selecionar Todos",
+        "Deselect All": "Desmarcar Todos",
+        "Delete Entries": "Excluir Entradas",
+        "filter-placeholder": "Filtrar por nome de arquivo, data ou localização",
+        "replace-placeholder": "Substituir correspondência por...",
+        "Update Entries": "Atualizar Entradas"
+    },
+    ru: {
+        "yes": "Да",
+        "no": "Нет","Pending": "Ожидание",
+        "OK": "OK",
+        "Missing": "Отсутствует",
+        "default": "По умолчанию",
+        "database-modal-label": "Управление файлами базы данных",
+        "Filename": "Имя файла",
+        "In Audio Library": "В аудиотеке",
+        "File Start": "Начало файла",
+        "Location": "Местоположение",
+        "Link Status": "Состояние ссылки",
+        "Selected": "Выбрано",
+        "Select All": "Выбрать все",
+        "Deselect All": "Снять выделение",
+        "Delete Entries": "Удалить записи",
+        "filter-placeholder": "Фильтровать по имени файла, дате или местоположению",
+        "replace-placeholder": "Заменить совпадение на...",
+        "Update Entries": "Обновить записи"
+    },
+    sv: {
+        "yes": "Ja",
+        "no": "Nej","Pending": "Väntar",
+        "OK": "OK",
+        "Missing": "Saknas",
+        "default": "Standard",
+        "database-modal-label": "Databasfilshantering",
+        "Filename": "Filnamn",
+        "In Audio Library": "I ljudbiblioteket",
+        "File Start": "Filstart",
+        "Location": "Plats",
+        "Link Status": "Länkstatus",
+        "Selected": "Vald",
+        "Select All": "Välj alla",
+        "Deselect All": "Avmarkera alla",
+        "Delete Entries": "Ta bort poster",
+        "filter-placeholder": "Filtrera efter filnamn, datum eller plats",
+        "replace-placeholder": "Ersätt match med...",
+        "Update Entries": "Uppdatera poster"
+    },
+    zh: {
+        "yes": "是",
+        "no": "否",
+        "Pending": "待处理",
+        "OK": "正常",
+        "Missing": "缺失",
+        "default": "默认",
+        "database-modal-label": "数据库文件管理",
+        "Filename": "文件名",
+        "In Audio Library": "在音频库中",
+        "File Start": "文件开始",
+        "Location": "位置",
+        "Link Status": "链接状态",
+        "Selected": "选中",
+        "Select All": "选择所有",
+        "Deselect All": "取消选择所有",
+        "Delete Entries": "删除条目",
+        "filter-placeholder": "按文件名、日期或位置过滤",
+        "replace-placeholder": "将匹配项替换为...",
+        "Update Entries": "更新条目"
+    }
+};
+
 const ManageModels = {
     en: {
         "import-model-label": "Import Model",
@@ -3207,8 +3588,9 @@ const SpeciesList = {
         location: ' fokuseret på <b>${place}</b>, med en ${species_filter_text}${current_file_text}',
         depending: ', afhængigt af datoen for den fil, du analyserer',
         upTo: ' op til ',
+        classesText: ' inkluderer følgende arters klasser <b>"${classes}"</b>',
         included: '<br/><p>Antallet af opdagede arter afhænger af modellen, den anvendte liste og i tilfælde af lokalitetsfilteret af artsfiltergrænsen og muligvis den uge, optagelsen blev lavet.<p>\
-        Du bruger modellen <b>${model}</b> og listen <b>${listInUse}</b>${localBirdsOnly}${location_filter_text}. Med disse indstillinger vil Chirpity vise detektioner for ${upTo} \
+        Du bruger modellen <b>${model}</b> og listen <b>${listInUse}</b>${classesText}${localBirdsOnly}${location_filter_text}. Med disse indstillinger vil Chirpity vise detektioner for ${upTo} \
         <b>${count}</b> klasser${depending}:</p>\
         <table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Almindeligt navn</th><th>Videnskabeligt navn</th></tr></thead><tbody>${includedList}</tbody></table>',
         excluded: '<br/><p>Omvendt vil applikationen ikke vise detektioner blandt følgende ${excludedCount} klasser:</p><table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>${cname}</th><th>${sname}</th></tr></thead><tbody>${excludedList}</tbody></table>'
@@ -3226,8 +3608,9 @@ const SpeciesList = {
         location: ' fokussiert auf <b>${place}</b>, mit einem ${species_filter_text}${current_file_text}',
         depending: ', abhängig vom Datum der Datei, die Sie analysieren',
         upTo: ' bis zu ',
+        classesText: ' einschließlich der folgenden Artenklassen <b>"${classes}"</b>',
         included: '<br/><p>Die Anzahl der erkannten Arten hängt vom Modell, der verwendeten Liste und im Falle des Standortfilters von der Artenfiltergrenze und möglicherweise der Woche ab, in der die Aufnahme gemacht wurde.<p>\
-        Sie verwenden das Modell <b>${model}</b> und die Liste <b>${listInUse}</b>${localBirdsOnly}${location_filter_text}. Mit diesen Einstellungen zeigt Chirpity Erkennungen für bis zu \
+        Sie verwenden das Modell <b>${model}</b> und die Liste <b>${listInUse}</b>${classesText}${localBirdsOnly}${location_filter_text}. Mit diesen Einstellungen zeigt Chirpity Erkennungen für bis zu \
         <b>${count}</b> Klassen${depending}:</p>\
         <table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Trivialname</th><th>Wissenschaftlicher Name</th></tr></thead><tbody>${includedList}</tbody></table>',
         excluded: '<br/><p>Umgekehrt zeigt die Anwendung keine Erkennungen unter den folgenden ${excludedCount} Klassen an:</p><table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>${cname}</th><th>${sname}</th></tr></thead><tbody>${excludedList}</tbody></table>'
@@ -3245,8 +3628,9 @@ const SpeciesList = {
         location: ' focused on <b>${place}</b>, with a ${species_filter_text}${current_file_text}',
         depending: ', depending on the date of the file you analyse',
         upTo: ' up to ',
+        classesText: ' including the following species&apos; Classes <b>"${classes}"</b>',
         included: '<br/><p>The number of species detected depends on the model, the list being used and in the case of the location filter, the species filter threshold and possibly the week in which the recording was made.<p>\
-        You are using the <b>${model}</b> model and the <b>${listInUse}</b> list${localBirdsOnly}${location_filter_text}. With these settings, Chirpity will display detections for ${upTo} \
+        You are using the <b>${model}</b> model and the <b>${listInUse}</b> list${classesText}${localBirdsOnly}${location_filter_text}. With these settings, Chirpity will display detections for ${upTo} \
         <b>${count}</b> classes${depending}:</p>\
         <table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Common Name</th><th>Scientific Name</th></tr></thead><tbody>${includedList}</tbody></table>',
         excluded: '<br/><p>Conversely, the application will not display detections among the following ${excludedCount} classes:</p><table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>${cname}</th><th>${sname}</th></tr></thead><tbody>${excludedList}</tbody></table>'
@@ -3264,8 +3648,9 @@ const SpeciesList = {
         location: ' centrado en <b>${place}</b>, con un ${species_filter_text}${current_file_text}',
         depending: ', dependiendo de la fecha del archivo que analices',
         upTo: ' hasta ',
+        classesText: ' incluyendo las siguientes clases de especies <b>"${classes}"</b>',
         included: '<br/><p>El número de especies detectadas depende del modelo, la lista utilizada y, en el caso del filtro de ubicación, del umbral del filtro de especies y posiblemente de la semana en que se realizó la grabación.<p>\
-        Estás utilizando el modelo <b>${model}</b> y la lista <b>${listInUse}</b>${localBirdsOnly}${location_filter_text}. Con estas configuraciones, Chirpity mostrará detecciones para hasta \
+        Estás utilizando el modelo <b>${model}</b> y la lista <b>${listInUse}</b>${classesText}${localBirdsOnly}${location_filter_text}. Con estas configuraciones, Chirpity mostrará detecciones para hasta \
         <b>${count}</b> clases${depending}:</p>\
         <table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Nombre común</th><th>Nombre científico</th></tr></thead><tbody>${includedList}</tbody></table>',
         excluded: '<br/><p>Por el contrario, la aplicación no mostrará detecciones entre las siguientes ${excludedCount} clases:</p><table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>${cname}</th><th>${sname}</th></tr></thead><tbody>${excludedList}</tbody></table>'
@@ -3283,8 +3668,9 @@ const SpeciesList = {
         location: ' centré sur <b>${place}</b>, avec un ${species_filter_text}${current_file_text}',
         depending: ', selon la date du fichier que vous analysez',
         upTo: ' jusqu’à ',
+        classesText: ' incluant les classes d’espèces suivantes <b>"${classes}"</b>',
         included: '<br/><p>Le nombre d’espèces détectées dépend du modèle, de la liste utilisée et, dans le cas du filtre de localisation, du seuil du filtre d’espèces et éventuellement de la semaine dans laquelle l’enregistrement a été réalisé.<p>\
-        Vous utilisez le modèle <b>${model}</b> et la liste <b>${listInUse}</b>${localBirdsOnly}${location_filter_text}. Avec ces paramètres, Chirpity affichera les détections pour ${upTo} \
+        Vous utilisez le modèle <b>${model}</b> et la liste <b>${listInUse}</b>${classesText}${localBirdsOnly}${location_filter_text}. Avec ces paramètres, Chirpity affichera les détections pour ${upTo} \
         <b>${count}</b> classes${depending} :</p>\
         <table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Nom commun</th><th>Nom scientifique</th></tr></thead><tbody>${includedList}</tbody></table>',
         excluded: '<br/><p>En revanche, l’application n’affichera pas de détections parmi les ${excludedCount} classes suivantes :</p><table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>${cname}</th><th>${sname}</th></tr></thead><tbody>${excludedList}</tbody></table>'
@@ -3302,8 +3688,9 @@ const SpeciesList = {
         location: ' <b>${place}</b> に焦点を当て、${species_filter_text}${current_file_text}',
         depending: '、分析するファイルの日付に依存します',
         upTo: ' 最大 ',
+        classesText: ' <b>"${classes}"</b> の種のクラスを含む',
         included: '<br/><p>検出された種の数は、モデル、使用されているリスト、および場所フィルターの場合、種フィルターのしきい値と録音が行われた週に依存します。<p>\
-        あなたは <b>${model}</b> モデルと <b>${listInUse}</b> リストを使用しています${localBirdsOnly}${location_filter_text}。これらの設定では、Chirpity は最大 ${upTo} \
+        あなたは <b>${model}</b> モデルと <b>${listInUse}</b> リストを使用しています${classesText}${localBirdsOnly}${location_filter_text}。これらの設定では、Chirpity は最大 ${upTo} \
         <b>${count}</b> クラスの検出を表示します${depending}：</p>\
         <table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>一般名</th><th>学名</th></tr></thead><tbody>${includedList}</tbody></table>',
         excluded: '<br/><p>逆に、アプリケーションは次の ${excludedCount} クラスの検出を表示しません：</p><table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>${cname}</th><th>${sname}</th></tr></thead><tbody>${excludedList}</tbody></table>'
@@ -3321,8 +3708,9 @@ const SpeciesList = {
         location: ' gericht op <b>${place}</b>, met een ${species_filter_text}${current_file_text}',
         depending: ', afhankelijk van de datum van het bestand dat u analyseert',
         upTo: ' tot ',
+        classesText: ' inclusief de volgende klassen van soorten <b>"${classes}"</b>',
         included: '<br/><p>Het aantal gedetecteerde soorten hangt af van het model, de gebruikte lijst en in het geval van de locatiefilter van de drempelwaarde voor soortenfilters en mogelijk de week waarin de opname is gemaakt.<p>\
-        U gebruikt het <b>${model}</b>-model en de <b>${listInUse}</b>-lijst${localBirdsOnly}${location_filter_text}. Met deze instellingen toont Chirpity detecties voor ${upTo} \
+        U gebruikt het <b>${model}</b>-model en de <b>${listInUse}</b>-lijst${classesText}${localBirdsOnly}${location_filter_text}. Met deze instellingen toont Chirpity detecties voor ${upTo} \
         <b>${count}</b> klassen${depending}:</p>\
         <table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Gewone naam</th><th>Wetenschappelijke naam</th></tr></thead><tbody>${includedList}</tbody></table>',
         excluded: '<br/><p>Daarentegen zal de applicatie geen detecties weergeven van de volgende ${excludedCount} klassen:</p><table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>${cname}</th><th>${sname}</th></tr></thead><tbody>${excludedList}</tbody></table>'
@@ -3340,8 +3728,9 @@ const SpeciesList = {
         location: ' focado em <b>${place}</b>, com um ${species_filter_text}${current_file_text}',
         depending: ', dependendo da data do arquivo que você analisa',
         upTo: ' até ',
+        classesText: ' incluindo as seguintes Classes de Espécies <b>"${classes}"</b>',
         included: '<br/><p>O número de espécies detectadas depende do modelo, da lista utilizada e, no caso do filtro de localização, do limite do filtro de espécies e possivelmente da semana em que a gravação foi feita.<p>\
-        Você está usando o modelo <b>${model}</b> e a lista <b>${listInUse}</b>${localBirdsOnly}${location_filter_text}. Com essas configurações, o Chirpity exibirá detecções para ${upTo} \
+        Você está usando o modelo <b>${model}</b> e a lista <b>${listInUse}</b>${classesText}${localBirdsOnly}${location_filter_text}. Com essas configurações, o Chirpity exibirá detecções para ${upTo} \
         <b>${count}</b> classes${depending}:</p>\
         <table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Nome Comum</th><th>Nome Científico</th></tr></thead><tbody>${includedList}</tbody></table>',
         excluded: '<br/><p>Por outro lado, o aplicativo não exibirá detecções entre as seguintes ${excludedCount} classes:</p><table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>${cname}</th><th>${sname}</th></tr></thead><tbody>${excludedList}</tbody></table>'
@@ -3359,8 +3748,9 @@ const SpeciesList = {
         location: ' ориентирован на <b>${place}</b>, с ${species_filter_text}${current_file_text}',
         depending: ', в зависимости от даты файла, который вы анализируете',
         upTo: ' до ',
+        classesText: ' включая следующие классы видов <b>"${classes}"</b> ',
         included: '<br/><p>Количество обнаруженных видов зависит от модели, используемого списка и, в случае фильтра по местоположению, порога фильтра видов и, возможно, недели, в которой была сделана запись.<p>\
-        Вы используете модель <b>${model}</b> и список <b>${listInUse}</b>${localBirdsOnly}${location_filter_text}. С этими настройками Chirpity покажет обнаружения для ${upTo} \
+        Вы используете модель <b>${model}</b> и список <b>${listInUse}</b>${classesText}${localBirdsOnly}${location_filter_text}. С этими настройками Chirpity покажет обнаружения для ${upTo} \
         <b>${count}</b> классов${depending}:</p>\
         <table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Обычное название</th><th>Научное название</th></tr></thead><tbody>${includedList}</tbody></table>',
         excluded: '<br/><p>В то же время, приложение не будет показывать обнаружения среди следующих ${excludedCount} классов:</p><table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>${cname}</th><th>${sname}</th></tr></thead><tbody>${excludedList}</tbody></table>'
@@ -3378,8 +3768,9 @@ const SpeciesList = {
         location: ' fokuserad på <b>${place}</b>, med en ${species_filter_text}${current_file_text}',
         depending: ', beroende på datumet för filen du analyserar',
         upTo: ' upp till ',
+        classesText: ' inkluderar följande arters klasser <b>"${classes}"</b>',
         included: '<br/><p>Antalet detekterade arter beror på modellen, den använda listan och, i fallet med platsfiltret, artfiltergränsen och eventuellt veckan då inspelningen gjordes.<p>\
-        Du använder modellen <b>${model}</b> och listan <b>${listInUse}</b>${localBirdsOnly}${location_filter_text}. Med dessa inställningar kommer Chirpity att visa detektioner för ${upTo} \
+        Du använder modellen <b>${model}</b> och listan <b>${listInUse}</b>${classesText}${localBirdsOnly}${location_filter_text}. Med dessa inställningar kommer Chirpity att visa detektioner för ${upTo} \
         <b>${count}</b> klasser${depending}:</p>\
         <table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>Vanligt namn</th><th>Vetenskapligt namn</th></tr></thead><tbody>${includedList}</tbody></table>',
         excluded: '<br/><p>Å andra sidan kommer applikationen inte att visa detektioner bland följande ${excludedCount} klasser:</p><table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>${cname}</th><th>${sname}</th></tr></thead><tbody>${excludedList}</tbody></table>'
@@ -3397,8 +3788,9 @@ const SpeciesList = {
         location: ' 专注于 <b>${place}</b>，包含 ${species_filter_text}${current_file_text}',
         depending: '，具体取决于您分析的文件日期',
         upTo: ' 高达 ',
+        classesText: ' 包含以下物种类别 <b>"${classes}"</b> ',
         included: '<br/><p>检测到的物种数量取决于模型、使用的列表，在位置过滤的情况下，还取决于物种过滤阈值以及录音的周数。<p>\
-        您正在使用 <b>${model}</b> 模型和 <b>${listInUse}</b> 列表${localBirdsOnly}${location_filter_text}。根据这些设置，Chirpity 将显示最多 ${upTo} \
+        您正在使用 <b>${model}</b> 模型和 <b>${listInUse}</b> 列表${classesText}${localBirdsOnly}${location_filter_text}。根据这些设置，Chirpity 将显示最多 ${upTo} \
         <b>${count}</b> 类别的检测结果${depending}：</p>\
         <table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>常见名称</th><th>学名</th></tr></thead><tbody>${includedList}</tbody></table>',
         excluded: '<br/><p>另一方面，应用程序不会显示以下 ${excludedCount} 类别的检测结果：</p><table class="table table-striped"><thead class="sticky-top text-bg-dark"><tr><th>${cname}</th><th>${sname}</th></tr></thead><tbody>${excludedList}</tbody></table>'
@@ -3618,7 +4010,98 @@ const Select = {
       enterNewLabel: "输入新标签",
       removeLabel: "删除标签"
     }
-  };
+}
+const ChartUI = {
+  en: {
+    "NoD": "Number of detections (${species})",
+    "NR": "No Records",
+    "HoR": "Hours of Recordings",
+    "HR": "Hours Recorded",
+    "AY": "All Years",
+    "WiY": "Week in Year"
+  },
+  da: {
+    "NoD": "Antal registreringer (${species})",
+    "NR": "Ingen registreringer",
+    "HoR": "Optagede timer",
+    "HR": "Timer optaget",
+    "AY": "Alle år",
+    "WiY": "Uge i året"
+  },
+  de: {
+    "NoD": "Anzahl der Erkennungen (${species})",
+    "NR": "Keine Aufzeichnungen",
+    "HoR": "Aufnahmestunden",
+    "HR": "Stunden aufgenommen",
+    "AY": "Alle Jahre",
+    "WiY": "Woche im Jahr"
+  },
+  es: {
+    "NoD": "Número de detecciones (${species})",
+    "NR": "Sin registros",
+    "HoR": "Horas de grabaciones",
+    "HR": "Horas grabadas",
+    "AY": "Todos los años",
+    "WiY": "Semana del año"
+  },
+  fr: {
+    "NoD": "Nombre de détections (${species})",
+    "NR": "Aucun enregistrement",
+    "HoR": "Heures d’enregistrements",
+    "HR": "Heures enregistrées",
+    "AY": "Toutes les années",
+    "WiY": "Semaine de l’année"
+  },
+  ja: {
+    "NoD": "検出数（${species}）",
+    "NR": "記録なし",
+    "HoR": "録音時間（時間）",
+    "HR": "録音された時間",
+    "AY": "すべての年",
+    "WiY": "年内の週"
+  },
+  nl: {
+    "NoD": "Aantal detecties (${species})",
+    "NR": "Geen gegevens",
+    "HoR": "Uren aan opnames",
+    "HR": "Uren opgenomen",
+    "AY": "Alle jaren",
+    "WiY": "Week in het jaar"
+  },
+  pt: {
+    "NoD": "Número de detecções (${species})",
+    "NR": "Sem registos",
+    "HoR": "Horas de gravações",
+    "HR": "Horas gravadas",
+    "AY": "Todos os anos",
+    "WiY": "Semana do ano"
+  },
+  ru: {
+    "NoD": "Количество обнаружений (${species})",
+    "NR": "Нет записей",
+    "HoR": "Часы записей",
+    "HR": "Записанные часы",
+    "AY": "Все годы",
+    "WiY": "Неделя в году"
+  },
+  sv: {
+    "NoD": "Antal detektioner (${species})",
+    "NR": "Inga poster",
+    "HoR": "Inspelningstimmar",
+    "HR": "Timmar inspelade",
+    "AY": "Alla år",
+    "WiY": "Vecka i året"
+  },
+  zh: {
+    "NoD": "检测数量（${species}）",
+    "NR": "无记录",
+    "HoR": "录音小时数",
+    "HR": "已录制小时数",
+    "AY": "所有年份",
+    "WiY": "一年中的周"
+  }
+};
+
   
 
   const UpdateMessage = {
@@ -3639,12 +4122,12 @@ const setLocale = (locale) => LOCALE = locale;
 const get = (context) => context[LOCALE] || context["en"];
 
 /**
- * Dynamically loads and applies localized UI text for the specified locale.
+ * Loads localization data and applies translated text to the user interface.
  *
- * Fetches a localization JSON file for the given locale, falling back to English if unavailable, and updates UI elements—including labels, buttons, tooltips, popovers, form controls, and carousel content—with the corresponding localized strings. If no localization file is found, the UI remains unchanged.
+ * Locale suffixes after an underscore are ignored. If loading the requested locale fails, English is used as a fallback; if the localization file is unavailable, the interface remains unchanged.
  *
- * @param {string} locale - The locale code (e.g., "en", "de_CA"). Any suffix after an underscore is ignored.
- * @returns {Promise<Object|undefined>} Resolves to the localization data object if successful, or undefined if no localization file is found.
+ * @param {string} locale - Locale code, such as `"en"` or `"de_CA"`.
+ * @return {Promise<Object|undefined>} The loaded localization data, or `undefined` if no data is available.
  */
 async function localiseUI(locale) {
     locale = locale.replace(/_.*$/, '');
@@ -3664,6 +4147,7 @@ async function localiseUI(locale) {
             console.info(`Failed to fetch JSON file: index.${locale}.json`);
             // go for english
             locale = 'en';
+            setLocale(locale);
             const jsonResponse = await fetch(`./I18n/index.en.json`)
             if (jsonResponse.ok) {
                 localisationData = await jsonResponse.json();
@@ -3713,6 +4197,17 @@ async function localiseUI(locale) {
                 label.textContent = settings[id]
             }
         })
+        // Chart form
+        const chartForm = document.getElementById('recordsContainer').querySelectorAll('legend, label, button, th')
+        settings = localisationData['ChartUI'];
+        chartForm.forEach(label => {
+            const id = label.getAttribute('for') || label.id;
+            if (settings[id]){
+                if (id === 'chart-locations') label.innerHTML = label.innerHTML.replace(/^[^<]+/, settings[id]);
+                else label.textContent = settings[id]
+            }
+        })
+        // Database modal title is handled by the generic element-ID translation loop above
         // Padlock items
         const padlocks = document.querySelectorAll('#unsaved-icon, .padlock')
         padlocks.forEach(lock => {
@@ -3777,6 +4272,8 @@ async function localiseUI(locale) {
         // placeholholders
         document.getElementById("custom-list-location").setAttribute('placeholder', options['customListPH'])
         document.getElementById("library-location").setAttribute('placeholder', options['libraryLocationPH'])
+        document.getElementById("db-filter").setAttribute('placeholder', get(Database)['filter-placeholder']  + '...');
+        document.getElementById("db-replace").setAttribute('placeholder', get(Database)['replace-placeholder'])
         // //Explore location header
         document.querySelector("label[for='explore-locations']").textContent = Headings[locale].location;
         document.getElementById('exploreRange').innerHTML = `<span class="material-symbols-outlined align-bottom">date_range</span><span>${localisationData['explore-datefilter']}</span> <span class="material-symbols-outlined float-end">expand_more</span>`;
@@ -3791,5 +4288,5 @@ async function localiseUI(locale) {
     }
 }
 
-export {All, SpeciesList,Headings, Context, Location, Form, Help, Toasts, Titles, Training, ManageModels,
-     LIST_MAP, Lists, IUCNLabel, Locate,Select, UpdateMessage, localiseUI, get}
+export {All, Files, SpeciesList,Headings, Context, Location, Database, Form, Help, Toasts, Titles, Training, ManageModels,
+     LIST_MAP, Lists, IUCNLabel, ChartUI, Locate,Select, UpdateMessage, Trial, TrialExpired, localiseUI, get}

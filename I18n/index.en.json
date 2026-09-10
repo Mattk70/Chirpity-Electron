@@ -7,10 +7,13 @@
     "Batch Size-circle-help": ["Optimising the batch size can increase processing speed on longer files."],
     "Clear Call Cache-circle-help": ["The data used for the reference call comparisons are cached. Clearing the cache will refresh the calls for each species the next time a comparison is requested"],
     "Confidence Threshold-circle-help": ["Determines the minimum confidence required for results to be returned"],
+    "Overlap-circle-help": ["Determines the amount successive detection windows will overlap"],
+    "Merge Overlaps-circle-help": ["When enabled, overlapping detections will be merged into a single detection with the highest confidence of the merged detections. When disabled, overlapping detections will be shown separately."],
+    "Drop Uncertain-circle-help": ["When enabled, detections that appear in only a single overlapping window will be dropped from the results. This can help to reduce false positives."],
     "Detections Per Segment-circle-help": ["Sets the maximum number of detections that will be shown in any 3 second period"],
     "Context Mode-circle-help": ["When enabled, context mode adapts predictions by analysing the surrounding context. It can only be changed prior to an analysis, and a low initial confidence threshold is recommended e.g 20-30%. Context mode is not available in the BirdNET model"],
     "Crop Library-circle-help": ["When enabled, audio files containing daylight periods are cropped, so the audio is only saved for nocturnal periods."],
-    "Debug Mode-circle-help": ["Enter debug mode (changes to this setting require a Chirpity relaunch to take effect)"],
+    "Debug Mode-circle-help": ["Enter debug mode"],
     "Decorators-circle-help": ["'Pad' adds 2 seconds before and after a selection to the exported audio. 'Fade' adds a 1 second fade effect to the start and end of the audio"],
     "Default Location-circle-help": ["Chirpity uses location information to determine the dawn and dusk times for recordings"],
     "Default Settings-circle-help": ["Reset the configuration settings to their default values. N.B. Relaunch Chirpity to see changes, also, language settings will need to be re-set manually"],
@@ -19,7 +22,7 @@
     "Low Pass Filter-circle-help": ["When set, removes high frequency noise above the threshold."],
     "IUCN-circle-help": ["When enabled, the latest Global IUCN assessment status is displayed for each species in the summary. The icon links to the assessment page on the IUCN website. The Assessment Scope will display the IUCN assessment of the species in that region (where available)."],
     "Language-circle-help": ["Select your preferred language for birds' common names"],
-    "List-circle-help": ["Filters the detections returned in results. Local Birds: excludes birds unlikely to be found in your region. Nocturnal Calls: excludes bird song and species not known to call at night. The custom list allows you to upload a file listing the species to detect"],
+    "List-circle-help": ["Filters the detections returned in results. Local Species: excludes species unlikely to be found in your region. Nocturnal Calls: excludes bird song and species not known to call at night. The custom list allows you to upload a file listing the species to detect"],
     "Low Shelf Filter-circle-help": ["When used, attenuates low frequency noise below the cut-off frequency."],
     "Model-circle-help": ["Select whether to use the Nocmig model, optimised for Nocturnal Migration Calls in Europe, or BirdNET, which can detect over 6000 species across the globe."],
     "Nocmig Mode-circle-help": ["When enabled, this 'Nocmig mode' only searches for and only displays detections found during the night"],
@@ -65,6 +68,8 @@
     "save2db": ["Save to Archive","Ctrl+S"
     ],
     "charts": ["View charts"],
+    "manage-locations": ["Manage locations"],
+    "manage-files": ["Manage Archive Files"],
     "explore": ["Explore Archive"],
     "chart-datefilter": ["Apply a date filter"],
     "explore-datefilter": ["Apply a date filter"],
@@ -94,8 +99,13 @@
     "FAQ": ["FAQs"],
     "species": ["What species are detected?"],
     "eBird": ["What is an eBird Record?"],
+    "guides": ["Guides (on Github)"],
+    "false-positives": ["Handling False Positives"],
+    "using-custom-lists": ["Using Custom Lists"],
+    "understanding-locations": ["Understanding Locations"],
+    "training-custom-models": ["Training Custom Models"],
+    "database-file-management": ["Manage Archive Files"],
     "update-progress-text": ["Downloading update:"],
-
 
     "record-add": ["Add"],
     "record-dismiss": ["Dismiss"],
@@ -121,6 +131,9 @@
       "combine-detections": "Combine model detections",
       "merge-detections": "Merge model detections",
       "confidence": "Confidence threshold:",
+      "drop-uncertain": "Drop Uncertain",
+      "merge-overlaps": "Merge Overlaps",
+      "overlap": "Overlap of detection windows:",
       "top-rankin": "Detections per segment:",
       "list-to-use": "List:",
       "local": "Use Location settings",
@@ -134,7 +147,7 @@
       "latitude": "Lat:", "longitude": "Lon:",
       "decorators": "Decorators:",
       "tensorflow": "CPU",
-            "webgpu": "GPU",
+      "webgpu": "GPU",
       "thread-slider": "Threads:",
       "batch-size": "Batch Size:",
       "audio-notification": "Enable analysis completion notifications",
@@ -163,7 +176,7 @@
       "mid-color": "Mid colour",
       "quiet-color": "Quiet colour",
       "mid-color-threshold-slider": "Mid Position:",
-        "quiet-color-threshold-slider":  "Quiet Threshold:",
+      "quiet-color-threshold-slider":  "Quiet Threshold:",
       "window-function": "Window function:",
       "timelineSetting": "Timeline:",
       "send-filtered-audio-to-model": "Send Filtered Audio for Analysis",
@@ -183,8 +196,24 @@
       "record-comment": "Comments",
       "record-add": "Add"
     },
+    "ChartUI": {
+        "chart-locations": "Location",
+        "GroupBy": "Group detections by:",
+        "hour": "Hour", "day": "Day", "week": "Week",
+        "stackYears": "Split results by year",
+        "downloadChart": "Export Chart Image",
+        "ESR": "Earliest Spring Record",
+        "LSR": "Latest Spring Record",
+        "EAR": "Earliest Autumn Record",
+        "LAR": "Latest Autumn Record",
+        "MC": "Most Calls in 24 hours"
+    },
 
-    "headings": ["Settings","Detections", "Keyboard Assignments",
+    "headings": [
+      "Settings",
+      "Detections", 
+      "Included Classes", 
+      "Keyboard Assignments",
       "Default Location",
       "System",
       "Audio Preferences",
@@ -193,5 +222,7 @@
       "Audio Library",
       "Spectrogram Preferences",
       "Advanced"
-    ]    
+    ],
+    "databaseModalLabel": ["Database File Management"]
   }
+

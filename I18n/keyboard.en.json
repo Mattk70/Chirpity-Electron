@@ -90,6 +90,7 @@
 "delete": [
   "Delete current record"
 ],
+"shift-delete": ["When results are filtered by species <b>and</b> sorted by confidence, this will delete the selected record and all records with lower confidence"],
 "undo": [
   "Restore deleted record(s)"
 ],

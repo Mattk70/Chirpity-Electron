@@ -4,13 +4,15 @@
 const sqlite3 = require("sqlite3");
 export class WorkerState {
 
+  /**
+   * Initialize worker state with analysis, filtering, model, and UI defaults.
+   */
   constructor() {
     (this.db = null),
     (this.mode = "analyse"), // archive, explore, chart
     (this.resultsSortOrder = "dateTime"),
     this.resultsMetaSortOrder = '',
     (this.summarySortOrder = "cname ASC"),
-    (this.filesToAnalyse = []),
     (this.limit = 500),
     (this.saved = new Set()), // list of files requested that are in the disk database
     (this.globalOffset = 0), // Current start number for unfiltered results
@@ -35,7 +37,6 @@ export class WorkerState {
       lowPassFrequency: 15000,
       lowShelfFrequency: 0,
       lowShelfAttenuation: 0,
-      SNR: 0,
       normalise: false,
       sendToModel: false,
     }),
@@ -49,11 +50,17 @@ export class WorkerState {
       combine: true, // Whether to split or merge results from different models
       iucn: false,
       iucnScope: "Global",
-      topRankin: 1
+      topRankin: 1,
+      overlap: 0,
+      mergeOverlaps: false,
+      dropSingles: false,
+      classes: ['Aves'],
     }),
     (this.chart = {
       range: { start: undefined, end: undefined },
       species: undefined,
+      aggregation: "week",
+      stackYears: false,
     }),
     (this.explore = {
       species: undefined,
@@ -69,36 +76,51 @@ export class WorkerState {
     (this.lat = undefined),
     (this.lon = undefined),
     (this.place = undefined),
-    (this.locationID = undefined),
+    (this.radius = 30),
+    (this.nearbyLocationCache = new Map()),
+    (this.location = undefined),
     (this.locale = "en"),
     (this.speciesThreshold = undefined),
     (this.useWeek = false),
     (this.week = -1),
     (this.list = "everything"),
     (this.customList = undefined),
+    (this.customLabels = []),
+    (this.customLabelsMap = {}),
     (this.notFound = {}), // try to prevent spamming errors
     (this.local = true),
     (this.incrementor = 2),
-    (this.UUID = 0),
+    (this.UUID = null),
+    (this.VERSION = 0),
     (this.track = true),
-    (this.powerSaveBlocker = false),
     (this.library = {
       location: undefined,
+      backfill: true,
       format: "ogg",
       auto: false,
       trim: false,
       clips: false,
     }),
     (this.useGUANO = true),
+    (this.recorderModel = null),
     (this.debug = false),
     (this.fileStartMtime = false),
     (this.specDetections = false),
     (this.labelFilters = []),
     (this.speciesMap = new Map()),
-    (this.totalDuration = 0),
+    (this.totalBatches = 0),
     (this.allFilesDuration = 0),
-    (this.corruptFiles = []),
-    (this.originalFiles = undefined);
+    (this.clippedFilesDuration = 0),
+    (this.clippedBatches = 0),
+    (this.originalFiles = undefined),
+    (this.perchWorker = []),
+    (this.openFiles = []),
+    this.detectionState = Object.create(null),
+    this.detectionQueues = Object.create(null),
+    this.nextExpectedIndex = Object.create(null), 
+    this.detectionRunning = Object.create(null),
+    this.lastProcessedBatch = Object.create(null),
+    this.summaryRunning = false
   }
 
   update(updates) {
@@ -140,12 +162,6 @@ export class WorkerState {
     this.filteredOffset = {};
     this.originalFiles = undefined;
   }
-
-  setFiles(files) {
-    //console.log("Setting STATE, filesToAnalyse " + files);
-    this.update({ filesToAnalyse: files });
-  }
-
   // Used to decrease calls to get summary when prepping a dataset
   // because it's an expensive op when the memory db is v. large
   increment() {

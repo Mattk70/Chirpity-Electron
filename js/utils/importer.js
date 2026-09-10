@@ -1,7 +1,10 @@
 const fs = require('node:fs');
 const csv = require('@fast-csv/parse');
 const readline = require('readline');
+const pLimit = require('p-limit');
+const limit = pLimit(8);
 
+const processingTasks = [];
 async function countLines(filePath) {
   const fileStream = fs.createReadStream(filePath);
   const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
@@ -23,7 +26,7 @@ async function countLines(filePath) {
    * @param {Object} options.METADATA - Metadata object to be updated during import.
    * @param {Object} options.defaultLocation - Default location object used for new entries.
    * @param {Function} options.setMetadata - Callback to update metadata for new files.
-   * @returns {Promise<{files: string[], meta: Object}>} Resolves with a list of unique files processed and the updated metadata.
+   * @returns {Promise<{files: string[], meta: Object, missing: string[]}>} Resolves with a list of unique files processed and the updated metadata.
    *
    * @throws {Error} If a parsing or database error occurs, or if required entities are missing.
    */
@@ -33,14 +36,22 @@ async function countLines(filePath) {
         species: new Map(),
         tags: new Map(),
         locations: new Map(),
-        files: new Map()
+        files: new Map(),
+        fileExists: new Map()
       };
+
+    // Set up the model cache initially
+    const models = await db.allAsync('SELECT id, name FROM MODELS');
+    models.forEach(m => caches.models.set(m.name, m.id))
+
+    const processingTasks = [];
     const totalLines = await countLines(file);
     let rowCounter = 0, lastPercentReported = -1;
     let t0 = Date.now()
     const stream = fs.createReadStream(file);
     const fileSet = new Set();
-    let processing = Promise.resolve();
+    const missing = new Set();
+    // let processing = Promise.resolve();
     return new Promise((resolve, reject) =>{
         csv.parseStream(stream, 
         {
@@ -52,13 +63,16 @@ async function countLines(filePath) {
             trim: true
         }
         )
-        .on('error', error => {
+        .on('error', async error => {
             console.error(error);
             return reject(error)
         })
         .on('data',  row =>  {
             // Chain processing to ensure sequential execution
-            processing = processing.then(async () => {
+            // processing = processing.then(async () => {
+                const task = limit(async () => {
+
+
             try {
                 METADATA = await prepInsertParams({db, row, METADATA, setMetadata, defaultLocation, caches})
                 rowCounter++;
@@ -71,13 +85,24 @@ async function countLines(filePath) {
             } catch (error) {
                 return reject(error)
             }
-            fs.existsSync(row.file) && fileSet.add(row.file);
+            let exists = caches.fileExists.get(row.file);
+            if (exists === undefined) {
+              exists = fs.existsSync(row.file);
+              caches.fileExists.set(row.file, exists);
+            }
+            if (exists) {
+              fileSet.add(row.file);
+            } else {
+              missing.add(row.file)
+            }
             });
+              processingTasks.push(task);
         })
         .on('end', async rowCount => {
-            await processing;
+            // await processing;
+            await Promise.all(processingTasks);
             console.log(`Parsed ${rowCount} rows in ${Date.now() - t0}ms`)
-            resolve({files: Array.from(fileSet), meta:METADATA})
+            resolve({files: Array.from(fileSet), meta:METADATA, missing: Array.from(missing)})
         });
     })
   }
@@ -226,10 +251,10 @@ async function countLines(filePath) {
     // Final insert
     await db.runAsync(
       `INSERT OR IGNORE INTO records (
-        dateTime, position, fileID, speciesID, 
+        position, fileID, speciesID, 
         modelID, confidence, comment, end, callCount, tagID
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      dateTime, position, fileID, speciesID, modelID, confidence, comment, end, callCount || undefined, tagID
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      position, fileID, speciesID, modelID, confidence, comment, end, callCount ?? undefined, tagID
     );
   
     return METADATA;

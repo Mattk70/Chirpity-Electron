@@ -277,8 +277,12 @@ ul {
   color: coral;
 }
 
-.unlocked {
+.trial {
   color: greenyellow;
+}
+
+.unlocked {
+  display: none;
 }
 
 .table {
@@ -290,7 +294,15 @@ ul {
 :not(input):not(textarea)::after,
 :not(input):not(textarea)::before {
   user-select: none;
-  /*cursor: default; */
+}
+
+#summary td.cname *, #summary td.sname, #databaseModal tbody *  {
+  user-select: text;
+}
+
+td.cname ::selection {
+  background: #555;
+  color: inherit;
 }
 
 .chart-outer {
@@ -947,4 +959,11 @@ my-canvasses::part(label) {
 .filter-dropdown label:hover {
   background-color: #dddddd;
   cursor: pointer;
+}
+#databaseModal button{
+  font-size: 0.8rem;
+}
+#databaseModal input[type="search"] {
+  max-width: 20rem;
+  font-size: 0.8rem;
 }

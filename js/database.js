@@ -77,7 +77,7 @@ class Mutex {
     return new Promise((resolve) => {
       if (this.locked) {
         this.queue.push(resolve);
-        console.log("mutex queue ", this.queue.length);
+        DEBUG && console.log("mutex queue ", this.queue.length);
       } else {
         this.locked = true;
         resolve();
@@ -88,7 +88,7 @@ class Mutex {
   unlock() {
     if (this.queue.length > 0) {
       const nextResolve = this.queue.shift();
-      console.log("mutex queue shifted", this.queue.length);
+      DEBUG && console.log("mutex queue shifted", this.queue.length);
       nextResolve();
     } else {
       this.locked = false;
@@ -164,87 +164,7 @@ function closeDatabase(db) {
   });
 }
 
-async function upgrade_to_v1(diskDB, dbMutex) {
-  let t0 = Date.now();
-  try {
-    await dbMutex.lock();
-    await diskDB.runAsync("PRAGMA foreign_keys=OFF");
-    await diskDB.runAsync("BEGIN");
-    //1.10.x update
-    await diskDB.runAsync(
-      "CREATE INDEX IF NOT EXISTS idx_species_sname ON species(sname)"
-    );
-    await diskDB.runAsync(
-      "CREATE INDEX IF NOT EXISTS idx_species_cname ON species(cname)"
-    );
-    const fileColumns = (await diskDB.allAsync("PRAGMA table_info(files)")).map(
-      (row) => row.name
-    );
-    if (!fileColumns.includes("archiveName")) {
-      await diskDB.runAsync("ALTER TABLE files ADD COLUMN archiveName TEXT");
-    }
-    if (!fileColumns.includes("metadata")) {
-      await diskDB.runAsync("ALTER TABLE files ADD COLUMN metadata TEXT");
-    }
 
-    await diskDB.runAsync(
-      "CREATE TABLE IF NOT EXISTS tags(id INTEGER PRIMARY KEY, name TEXT NOT NULL, UNIQUE(name))"
-    );
-    await diskDB.runAsync(
-      "INSERT OR IGNORE INTO tags VALUES(0, 'Nocmig'), (1, 'Local')"
-    );
-    await diskDB.runAsync("ALTER TABLE records ADD COLUMN tagID INTEGER");
-    await diskDB.runAsync(
-      "UPDATE records SET tagID = 0 WHERE label = 'Nocmig'"
-    );
-    await diskDB.runAsync("UPDATE records SET tagID = 1 WHERE label = 'Local'");
-    await diskDB.runAsync("ALTER TABLE records DROP COLUMN label");
-    // Change label names to labelIDs
-    await diskDB.runAsync("ALTER TABLE records ADD COLUMN reviewed INTEGER");
-
-    await diskDB.runAsync(`CREATE TABLE records_temp( dateTime INTEGER, position INTEGER, fileID INTEGER, speciesID INTEGER, confidence INTEGER, 
-      comment  TEXT, end INTEGER, callCount INTEGER, isDaylight INTEGER, reviewed INTEGER, tagID INTEGER,
-      UNIQUE (dateTime, fileID, speciesID), 
-      CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,
-      CONSTRAINT fk_species FOREIGN KEY (speciesID) REFERENCES species(id),
-      CONSTRAINT fk_tags FOREIGN KEY (tagID) REFERENCES tags(id) ON DELETE SET NULL)`);
-    await diskDB.runAsync("INSERT INTO records_temp SELECT * from records");
-    await diskDB.runAsync("DROP TABLE records");
-    await diskDB.runAsync("ALTER TABLE records_temp RENAME TO records");
-    // Add old files table update
-    await diskDB.runAsync(`
-      CREATE TABLE files_new (
-          id INTEGER PRIMARY KEY, 
-          name TEXT NOT NULL, 
-          duration REAL,
-          filestart INTEGER, 
-          locationID INTEGER, 
-          archiveName TEXT, 
-          metadata TEXT, 
-          UNIQUE (name),
-          CONSTRAINT fk_locations FOREIGN KEY (locationID) REFERENCES locations(id) ON DELETE SET NULL
-      )`);
-    await diskDB.runAsync("INSERT INTO files_new SELECT * FROM files");
-    await diskDB.runAsync("DROP TABLE files");
-    await diskDB.runAsync("ALTER TABLE files_new RENAME TO files");
-    await diskDB.runAsync("UPDATE schema_version SET version = 1");
-    await diskDB.runAsync("END");
-    await diskDB.runAsync("PRAGMA foreign_keys=ON");
-    await diskDB.runAsync("PRAGMA integrity_check");
-    await diskDB.runAsync("PRAGMA foreign_key_check");
-    console.info(
-      "Migrated tags and added 'reviewed' column to ",
-      diskDB.filename
-    );
-  } catch (e) {
-    console.error("Error adding column and updating version", e.message, e);
-    await diskDB.runAsync("ROLLBACK");
-  } finally {
-    await checkpoint(diskDB);
-    dbMutex.unlock();
-    console.info(`DB migration took ${Date.now() - t0}ms`);
-  }
-}
 
 /**
  * Migrates the database schema to version 2 by adding a unique constraint on the `species` table.
@@ -274,6 +194,51 @@ async function upgrade_to_v2(diskDB, dbMutex) {
     console.info(`Adding species unique constraint took ${Date.now() - t0}ms`);
   } catch (e) {
     console.error("Error adding unique constraint ", e.message, e);
+    await diskDB.runAsync("ROLLBACK");
+  } finally {
+    await checkpoint(diskDB);
+    dbMutex.unlock();
+  }
+}
+
+/**
+ * Migrates the database schema to version 4 by dropping datetime from the `records` table.
+ *
+ * @remark Rolls back the transaction if an error occurs during migration.
+ */
+async function upgrade_to_v4(diskDB, dbMutex) {
+  let t0 = Date.now();
+  try {
+    await dbMutex.lock();
+    await diskDB.runAsync("PRAGMA foreign_keys=OFF");
+    await diskDB.runAsync("BEGIN");
+    await diskDB.runAsync(
+      `CREATE TABLE records_new
+        (position REAL, fileID INT, speciesID INT, modelID INT, 
+        confidence INT, comment TEXT, end REAL, callcount INT, isDaylight BOOL, 
+        reviewed BOOL, tagID INT,
+        UNIQUE (position, fileID, speciesID, modelID), 
+        CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE, 
+        CONSTRAINT fk_tags FOREIGN KEY (tagID) REFERENCES tags(id) ON DELETE SET NULL)`
+    );
+    await diskDB.runAsync(
+      // Insert or ignore to remove duplicate records causing UNIQUE constraint violations
+      `INSERT OR IGNORE INTO records_new (position, fileID, speciesID, modelID, confidence, 
+        comment, end, callcount, isDaylight, reviewed, tagid)
+        SELECT position, fileID, speciesID, modelID, confidence, 
+        comment, end, callcount, isDaylight, reviewed, tagid FROM records;`
+    );
+    await diskDB.runAsync("DROP TABLE records");
+    await diskDB.runAsync("ALTER TABLE records_new RENAME TO records");
+    await diskDB.runAsync("CREATE INDEX idx_records_modelID ON records(modelID)");
+    await diskDB.runAsync("UPDATE schema_version SET version = 4");
+    await diskDB.runAsync("PRAGMA foreign_keys=ON");
+    await diskDB.runAsync("PRAGMA integrity_check");
+    await diskDB.runAsync("PRAGMA foreign_key_check");
+    await diskDB.runAsync("END");
+    console.info(`Dropping records datetime took ${Date.now() - t0}ms`);
+  } catch (e) {
+    console.error("Error dropping datetime", e.message, e);
     await diskDB.runAsync("ROLLBACK");
   } finally {
     await checkpoint(diskDB);
@@ -325,22 +290,17 @@ const createDB = async ({file, diskDB, dbMutex}) => {
         FOREIGN KEY (modelID) REFERENCES models(id) ON DELETE CASCADE
       )`
     );
-    // await db.runAsync(
-    //   `CREATE TABLE species_translations (
-    //       id INTEGER PRIMARY KEY,
-    //       sname TEXT NOT NULL,
-    //       language TEXT NOT NULL,
-    //       cname TEXT NOT NULL,
-    //       UNIQUE (cname, sname), -- Ensure one cname / sname combo. Start with en
-    //       FOREIGN KEY (sname) REFERENCES species(sname) ON DELETE CASCADE
-    //   );`
-    // );
+    await db.runAsync(`
+      CREATE TABLE  confidence_overrides(
+      speciesID INTEGER PRIMARY KEY, 
+      minConfidence INTEGER)`);
     await db.runAsync(
       `CREATE TABLE locations(
         id INTEGER PRIMARY KEY, 
         lat REAL NOT NULL,
         lon REAL NOT NULL,
-        place TEXT NOT NULL, 
+        place TEXT NOT NULL,
+        radius INTEGER,
         UNIQUE (lat, lon)
       )`
     );
@@ -360,7 +320,6 @@ const createDB = async ({file, diskDB, dbMutex}) => {
 
     await db.runAsync(
       `CREATE TABLE records( 
-        dateTime INTEGER, 
         position INTEGER,
         fileID INTEGER, 
         speciesID INTEGER,
@@ -372,10 +331,8 @@ const createDB = async ({file, diskDB, dbMutex}) => {
         isDaylight INTEGER, 
         reviewed INTEGER, 
         tagID INTEGER,
-        UNIQUE (dateTime, fileID, speciesID, modelID), 
-        CONSTRAINT fk_models FOREIGN KEY (modelID) REFERENCES models(id) ON DELETE CASCADE,
+        UNIQUE (position, fileID, speciesID, modelID), 
         CONSTRAINT fk_files FOREIGN KEY (fileID) REFERENCES files(id) ON DELETE CASCADE,
-        CONSTRAINT fk_species FOREIGN KEY (speciesID) REFERENCES species(id),
         CONSTRAINT fk_tags FOREIGN KEY (tagID) REFERENCES tags(id) ON DELETE SET NULL
       )`
     );
@@ -396,7 +353,7 @@ const createDB = async ({file, diskDB, dbMutex}) => {
           version INTEGER NOT NULL
         )`
       );
-      await diskDB.runAsync("INSERT INTO schema_version (version) VALUES (3)");
+      await diskDB.runAsync("INSERT INTO schema_version (version) VALUES (4)");
       console.log('version table created')
     } else {
       const filename = diskDB?.filename;
@@ -432,13 +389,25 @@ const createDB = async ({file, diskDB, dbMutex}) => {
     console.error("Error during DB transaction:", error);
     await db.runAsync("ROLLBACK"); // Rollback the transaction in case of error
   } finally {
-    //insertTranslations(diskDB)
     dbMutex.unlock();
   }
   return db;
 };
 
-
+/**
+ * Add a model and its labels to a database in one transaction.
+ *
+ * Built-in models load their bundled labels; custom models use
+ * `labelsLocation`. Invalid labels or database failures are rolled back and
+ * returned as the error object instead of being thrown.
+ *
+ * @param {Object} options - Model registration options.
+ * @param {string} options.model - Model name stored in the database.
+ * @param {Object} [options.db=diskDB] - Database that receives the model and species rows.
+ * @param {Object} options.dbMutex - Mutex used to serialize the transaction.
+ * @param {string} [options.labelsLocation] - Label file for a custom model.
+ * @returns {Promise<number|Error>} The new model ID, or the transaction error.
+ */
 const addNewModel = async ({model, db = diskDB, dbMutex, labelsLocation}) => {
   let modelID;
   try {
@@ -456,22 +425,35 @@ const addNewModel = async ({model, db = diskDB, dbMutex, labelsLocation}) => {
          "BirdNET_GLOBAL_6K_V2.4_Labels_en.txt");
         const fileContents = readFileSync(labelFile, "utf8");
           labels = fileContents.trim().split(/\r?\n/);
+    } else if (model === "birdnet3") {
+      const labelFile = path.join(__dirname, "BirdNET3",
+         "BirdNET3_geomodel_labels.csv");
+      const fileContents = readFileSync(labelFile, "utf8");
+      labels = fileContents
+              .trim()
+              .split(/\r?\n/)
+              .slice(1) // skip header
+              .map(line => {
+                const [sci_name, com_name, class_name] = line.split(",");
+                return `${sci_name}_${com_name}_${class_name}`;
+              });
     } else if (['chirpity', 'nocmig'].includes(model)){
       labels = JSON.parse(
         readFileSync(path.join(__dirname, `${model}_model_config.json`), "utf8")
       ).labels;
     } else {
       // Custom model
-      const labelFile = labelsLocation
+      const labelFile = labelsLocation;
       const fileContents = readFileSync(labelFile, "utf8");
       // Trim whitespace and split by new lines, ignoring empty lines
       labels = fileContents.split(/\r?\n/).map(line => line.trim()).filter(line => line.length);
     }
     const perch = model === 'perch v2';
+    const birdNET3 = model === 'birdnet3';
     const splitChar = perch ? '~' : '_'; // Perch uses ~, others use _
-    const expectedParts = perch ? 3 : 2; // Perch labels include Taxon
+    const expectedParts = perch || birdNET3 ? 3 : 2; // Perch labels include Taxon
     // Add Unknown Sp.
-    if (perch) labels.push(`Unknown Sp.${splitChar}Unknown Sp.${splitChar}None`);
+    if (perch || birdNET3) labels.push(`Unknown Sp.${splitChar}Unknown Sp.${splitChar}None`);
     else labels.push(`Unknown Sp.${splitChar}Unknown Sp.`);
 
     // Insert labels in batches to avoid exceeding SQLite parameter limits
@@ -510,7 +492,8 @@ const addNewModel = async ({model, db = diskDB, dbMutex, labelsLocation}) => {
 
 const mergeDbIfNeeded = async ({diskDB, model, appPath, dbMutex, labelsLocation}) => {
   // Check if we have this model already
-  const modelRow = await diskDB.getAsync(`SELECT id FROM models WHERE name = ?`, model)
+  const modelRow = await diskDB.getAsync(`SELECT id FROM models WHERE name = ?`, model);
+
   if (modelRow) return [modelRow.id, false]
   // If not, let's look for a legacy database
   const models = {birdnet: '6523', chirpity: '409', nocmig: '432'}
@@ -548,12 +531,11 @@ const mergeDbIfNeeded = async ({diskDB, model, appPath, dbMutex, labelsLocation}
     } else {
       user_version = row.version;
     }
-    if (user_version < 1) {
-      await upgrade_to_v1(legacyDB, dbMutex);
-    }
+
     if (user_version < 2) {
       await upgrade_to_v2(legacyDB, dbMutex);
     }
+
     await dbMutex.lock();
     await diskDB.runAsync('BEGIN');
     await diskDB.runAsync('ATTACH DATABASE ? AS modelDb', legacyDbPath)
@@ -630,8 +612,8 @@ const mergeDbIfNeeded = async ({diskDB, model, appPath, dbMutex, labelsLocation}
 
       // Migrate records with updated foreign keys
       await diskDB.runAsync(`
-        INSERT INTO records (dateTime, position, fileID, speciesID, modelID, confidence, comment, end, callCount, isDaylight, reviewed, tagID)
-        SELECT r.dateTime, r.position, fm.newID, sm.newID, ?, r.confidence, r.comment, r.end, r.callCount, r.isDaylight, r.reviewed, tm.newID
+        INSERT INTO records (position, fileID, speciesID, modelID, confidence, comment, end, callCount, isDaylight, reviewed, tagID)
+        SELECT r.position, fm.newID, sm.newID, ?, r.confidence, r.comment, r.end, r.callCount, r.isDaylight, r.reviewed, tm.newID
         FROM modelDb.records r
         JOIN file_map fm ON r.fileID = fm.oldID
         JOIN species_map sm ON r.speciesID = sm.oldID
@@ -657,70 +639,6 @@ const mergeDbIfNeeded = async ({diskDB, model, appPath, dbMutex, labelsLocation}
   return [modelID, false]
 }
 
-/**
- * Inserts species name translations from label files into the database.
- *
- * Reads translation files from the `labels/V2.4` directory, parses each file for language-specific species names, and inserts them into the `species_translations` table. Skips files with unexpected formats and malformed lines.
- *
- * @remark Assumes the existence of a `species_translations` table with columns `(sname, language, cname)`. Foreign key constraints are temporarily disabled during insertion.
- *
- * @param {object} db - The SQLite database instance supporting `runAsync`.
- */
-async function insertTranslations(db){
-  let t0 = Date.now()
-  const fs = require("fs");
-  const path = require("path");
-  const labelsDir = 'labels/V2.4';
-  const files = fs.readdirSync(labelsDir)
-  .filter(file => file.endsWith(".txt"))
-  // Make sure we start with birdnet en
-  .sort((a, b) => (a === "BirdNET_GLOBAL_6K_V2.4_Labels_en.txt" ? -1 : (b === "BirdNET_GLOBAL_6K_V2.4_Labels_en.txt" ? 1 : 0)));
-  
-  try{
-    await db.runAsync('PRAGMA FOREIGN_KEYS=OFF')
-    // await db.runAsync('BEGIN')
-    for (const file of files) {
-      let insertStmt = "INSERT OR IGNORE INTO species_translations (sname, language, cname) VALUES ";
-      const params = [];
-      const match = file.match(/Labels_([a-z]{2}(?:_[a-zA-Z]{2})?)\.txt$/);
-      if (!match) {
-        console.warn(`Skipping file with unexpected format: ${file}`);
-        continue;
-      }
-
-      const language = match[1]; // Extract language code (e.g., "fi", "pt_BR")
-      const filePath = path.join(labelsDir, file);
-      const content = fs.readFileSync(filePath, "utf8");
-
-
-
-      const lines = content.split("\n").map(line => line.trim()).filter(line => line);
-      for (const line of lines) {
-        const [sname, cname] = line.split("_");
-        if (!sname || !cname) {
-          console.warn(`Skipping malformed line in ${file}: ${line}`);
-          continue;
-        }
-        params.push(sname, language, cname)
-        insertStmt+="(?,?,?),"
-      }
-      insertStmt = insertStmt.slice(0,-1)
-
-      await db.runAsync(insertStmt, ...params)
-      console.log(`Inserted translations from ${file}`);
-
-    }
-  } catch (error) {
-    console.error("Error inserting translations:", error);
-    // await db.runAsync('ROLLBACK')
-  } finally {
-    console.log(`filling translations took ${Date.now() - t0}ms`)
-    // await db.runAsync('COMMIT')
-    // await db.runAsync('PRAGMA FOREIGN_KEYS=ON')
-  }
-}
-
-
 export {
   sqlite3,
   createDB,
@@ -728,5 +646,6 @@ export {
   checkpoint,
   Mutex,
   mergeDbIfNeeded,
-  addNewModel
+  addNewModel,
+  upgrade_to_v4
 };

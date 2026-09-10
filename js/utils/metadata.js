@@ -7,11 +7,11 @@
 const fs = require("node:fs");
 
 /**
- * Extract metadata from a WAV file, without reading the entire file into memory.
- * @param {string} filePath - Path to the WAV file.
- * @returns {Promise<object|null>} - The extracted metadata or null if not found.
+ * Scan a WAV file and extract GUANO and BWF `bext` metadata without reading the entire file into memory.
+ * @param {string} filePath - Path to the WAV file to scan.
+ * @returns {Promise<object>} An object containing found metadata; `guano` and/or `bext` keys are present when those chunks are found, or an empty object if no metadata was extracted.
  */
-function extractWaveMetadata(filePath) {
+function extractWaveMetadata(filePath, getDuration = false) {
   let metadata = {}, guanoText = "";
   return new Promise((resolve, reject) => {
     // Open the file
@@ -32,8 +32,10 @@ function extractWaveMetadata(filePath) {
         const chunkId = buffer.toString("utf-8", 0, 4); // Should be "RIFF"
         const format = buffer.toString("utf-8", 8, 12); // Should be "WAVE"
 
-        if (!(chunkId === "RIFF" || chunkId === "RF64") || format !== "WAVE") {
+        const validHeaders = ["RIFF", "RF64", "BW64"];
+        if (!validHeaders.includes(chunkId) || format !== "WAVE") {
           fs.close(fd, () => {}); // Close the file descriptor
+          if (chunkId.startsWith('ID3')) return reject(new Error("WAV file has ID3: " + filePath));
           return reject(new Error("Invalid WAV file: " + filePath));
         }
 
@@ -228,4 +230,135 @@ function _parseMetadataText(text) {
 
 // }
 
-module.exports = { extractWaveMetadata };
+
+function readUInt64LE(buf, offset) {
+  const low = buf.readUInt32LE(offset);
+  const high = buf.readUInt32LE(offset + 4);
+  return high * 0x100000000 + low;
+}
+
+/**
+ * Compute the duration of a WAV file without decoding audio data; supports RF64/ds64 large-file variants.
+ * @param {string} filePath - Path to the WAV file.
+ * @returns {number} Duration in seconds.
+ */
+function getWaveDuration(filePath) {
+  const fd = fs.openSync(filePath, "r");
+  try {
+    const header = Buffer.alloc(12);
+    if (fs.readSync(fd, header, 0, 12, 0) !== 12) {
+      throw new Error(`Truncated WAV header: ${filePath}`);
+    }
+
+    const riffId = header.toString("ascii", 0, 4);
+    const waveId = header.toString("ascii", 8, 12);
+    const validHeaders = new Set(["RIFF", "RF64", "BW64"]);
+    if (!validHeaders.has(riffId) || waveId !== "WAVE") {
+      if (riffId.startsWith('ID3')) throw new Error(`ID3 in WAV header: ${filePath}`);
+      throw new Error(`Not a WAV file: ${filePath}, riffID:${riffId}, waveId: ${waveId}`);
+    }
+
+    const isRF64 = riffId === "RF64" || riffId === "BW64";
+
+    // WAVE_FORMAT_ADPCM = 0x0002 (Microsoft ADPCM), WAVE_FORMAT_DVI_ADPCM = 0x0011 (IMA ADPCM)
+    const ADPCM_FORMAT_TAGS = new Set([0x0002, 0x0011]);
+
+    let sampleRate = null, blockAlign = null, dataSize = null, sampleCount = null;
+    let formatTag = null, samplesPerBlock = null, factSampleCount = null;
+    let pos = 12;
+    const chunkHeader = Buffer.allocUnsafe(8);
+    let chunksRead = 0;
+
+    while (chunksRead++ < 100) { // guard by chunk count, not byte offset
+      if (fs.readSync(fd, chunkHeader, 0, 8, pos) < 8) break;
+
+      const chunkId = chunkHeader.toString("ascii", 0, 4);
+      const chunkSize = chunkHeader.readUInt32LE(4);
+      pos += 8;
+
+      if (chunkId === "fmt ") {
+        // Read enough of the fmt chunk to get wFormatTag (offset 0) and, for
+        // ADPCM, cbSize + wSamplesPerBlock (offset 18) which live past the
+        // standard 16-byte PCM fmt block.
+        const needed = Math.min(chunkSize, 20);
+        const fmt = Buffer.alloc(needed);
+        if (fs.readSync(fd, fmt, 0, needed, pos) !== needed) {
+          throw new Error(`Truncated fmt chunk: ${filePath}`);
+        }
+        if (needed >= 16) {
+          formatTag = fmt.readUInt16LE(0);
+          sampleRate = fmt.readUInt32LE(4);
+          blockAlign = fmt.readUInt16LE(12);
+        }
+        if (needed >= 20 && ADPCM_FORMAT_TAGS.has(formatTag)) {
+          samplesPerBlock = fmt.readUInt16LE(18);
+        }
+      } else if (chunkId === "fact") {
+        // The fact chunk's dwSampleLength is the authoritative total sample
+        // count for compressed formats (ADPCM, etc). Prefer this over any
+        // byte-size-based calculation whenever it's present.
+        const needed = Math.min(chunkSize, 4);
+        const fact = Buffer.alloc(needed);
+        if (fs.readSync(fd, fact, 0, needed, pos) !== needed) {
+          throw new Error(`Truncated fact chunk: ${filePath}`);
+        }
+        if (needed >= 4) factSampleCount = fact.readUInt32LE(0);
+      } else if (chunkId === "ds64") {
+        const ds64 = Buffer.alloc(24);
+        if (fs.readSync(fd, ds64, 0, 24, pos) !== 24) {
+          throw new Error(`Truncated ds64 chunk: ${filePath}`);
+        }
+        dataSize = readUInt64LE(ds64, 8);
+        sampleCount = readUInt64LE(ds64, 16);
+      } else if (chunkId === "data") {
+        if (!isRF64 || dataSize === null) dataSize = chunkSize;
+        break;
+      }
+
+      pos += chunkSize + (chunkSize & 1); // pad to even byte boundary
+    }
+
+    // 1. RF64/BW64 ds64 chunk gives an explicit sample count — most authoritative.
+    //    (A value of 0 here would be nonsensical/unset, so treat it as unusable too.)
+    if (sampleCount != null && sampleCount > 0 && sampleRate) return sampleCount / sampleRate;
+
+    // 2. fact chunk gives an explicit total sample count — correct for ADPCM
+    //    (and any other compressed format) regardless of block packing.
+    //    NOTE: some encoders (particularly streaming/non-seekable writers) leave
+    //    dwSampleLength as an unfilled placeholder of 0, so a 0 here is treated
+    //    as "not actually known" rather than a real duration of zero.
+    if (factSampleCount != null && factSampleCount > 0 && sampleRate) {
+      return factSampleCount / sampleRate;
+    }
+
+    if (dataSize === null || sampleRate === null || blockAlign === null)
+      throw new Error(`Could not determine duration: ${filePath}`);
+    if (sampleRate === 0) throw new Error(`Invalid sampleRate=0: ${filePath}`);
+    if (blockAlign === 0) throw new Error(`Invalid blockAlign=0: ${filePath}`);
+    if (dataSize === 0) return 0;
+
+    // 3. ADPCM with a missing or unfilled (0) fact chunk:
+    //    derive sample count from block count * samples-per-block instead.
+    if (ADPCM_FORMAT_TAGS.has(formatTag)) {
+      if (!samplesPerBlock) {
+        throw new Error(`ADPCM file missing usable fact chunk and samplesPerBlock: ${filePath}`);
+      }
+      if (dataSize % blockAlign !== 0) {
+        throw new Error(`ADPCM file has a partial final block without a usable fact chunk: ${filePath}`);
+      }
+      const numBlocks = dataSize / blockAlign;
+      const totalSamples = numBlocks * samplesPerBlock;
+      return totalSamples / sampleRate;
+    }
+
+    // 4. Plain PCM (or anything else uncompressed): byte-size based calc is valid.
+    return dataSize / (sampleRate * blockAlign);
+
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+
+
+module.exports = { extractWaveMetadata, getWaveDuration };

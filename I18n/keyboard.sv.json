@@ -89,6 +89,7 @@
   "delete": [
     "Radera aktuell post"
   ],
+  "shift-delete": ["När resultaten filtreras efter art <b>och</b> sorteras efter säkerhet, raderas den valda posten och alla poster med lägre säkerhet"],
   "undo": [
     "Återställ raderad post(er)"
   ],

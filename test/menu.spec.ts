@@ -136,11 +136,45 @@ test(`BirdNET analyse works and second result is 34%`, async () => {
   // Set a custom timeout for this specific test (in milliseconds)
 
   await runExampleAnalysis(page, 'birdnet');
-  const callID = page.locator('#speciesFilter').getByText('Redwing (call)');
-  expect(callID).not.toBe(undefined)
+  const callID = page.locator('#speciesFilter').getByText('Redwing');
+    const locator = page.locator('#speciesFilter').getByText('Redwing');
+
+console.log('Matches:', await locator.count());
+console.log('First match:', await locator.first().innerText());
+  expect(callID).not.toBe(null)
   const secondResult = await (await page.waitForSelector('#result2 span.confidence-row > span')).textContent()
-  // console.log(secondResult, 'second result');
+  console.log(secondResult, '= BirdNET second result');
   expect(secondResult).toBe('34%');
+})
+
+test(`BirdNET finds a Chaffinch @ 78%`, async () => {
+  // Override the stub for the chaffinch file
+  await stubMultipleDialogs(electronApp, [
+      {
+        method: 'showOpenDialog',
+        value: {
+          filePaths: [process.env.CHAFFINCH_MP3_PATH || ""],
+          canceled: false,
+        },
+      },
+      {
+        method: 'showSaveDialog',
+        value: {
+          filePath: '/path/to/file',
+          canceled: false,
+        },
+      },
+    ])
+  await runExampleAnalysis(page, 'birdnet');
+  const callID = page.locator('#speciesFilter').getByText('Common chaffinch');
+  const locator = page.locator('#speciesFilter').getByText('Common chaffinch');
+
+console.log('Matches:', await locator.count());
+console.log('First match:', await locator.first().innerText());
+  expect(callID).not.toBe(null)
+  const firstResult = await (await page.waitForSelector('#result1 span.confidence-row > span')).textContent()
+  console.log(firstResult, '= BirdNET chaffinch first result');
+  expect(firstResult).toBe('78%');
 })
 
 test(`Nocmig analyse works and second result is 61%`, async () => {
@@ -148,9 +182,9 @@ test(`Nocmig analyse works and second result is 61%`, async () => {
 
   await runExampleAnalysis(page,'chirpity');
   const callID = page.locator('#speciesFilter').getByText('Redwing (call)');
-  expect(callID).not.toBe(undefined)
+  expect(callID).not.toBe(null)
   const secondResult = await (await page.waitForSelector('#result2 span.confidence-row > span')).textContent()
-  // console.log(secondResult, 'second result');
+  console.log(secondResult, 'Nocmig second result');
   expect(secondResult).toBe('61%');
 })
 
@@ -161,7 +195,7 @@ test(`Perch works and second result is 35%`, async () => {
   await page.waitForTimeout(300);
   await page.locator('#import-model').click();
   await page.waitForTimeout(750);
-  const modelPath = process.env.PERCH_MODEL_PATH;
+  const modelPath = process.env.PERCH_MODEL_PATH || "";
   console.log(`model path is:${modelPath}`);
   try {
     const files = fs.readdirSync(modelPath);
@@ -178,10 +212,11 @@ test(`Perch works and second result is 35%`, async () => {
   await page.locator('#import').click();
   await page.waitForTimeout(3000);
   await runExampleAnalysis(page,'perch v2');
-  const callID = page.locator('#speciesFilter').getByText('Redwing (call)');
-  expect(callID).not.toBe(undefined)
+  const callID = page.locator('#speciesFilter').getByText('Redwing');
+  console.log('Perch first ID:', await callID.innerText());
+  expect(callID).not.toBe(null)
   const secondResult = await (await page.waitForSelector('#result2 span.confidence-row > span')).textContent()
-  // console.log(secondResult, 'second result');
+  console.log(secondResult, '= Perch second result');
   expect(secondResult).toBe('35%');
 })
 

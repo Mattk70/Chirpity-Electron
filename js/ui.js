@@ -5,7 +5,6 @@
 // Get the modules loaded in preload.js
 const fs = window.module.fs;
 const p = window.module.p;
-
 const si = window.module.si;
 import {
   customURLEncode,
@@ -33,11 +32,12 @@ import * as utils from "./utils/utils.js";
 import { UIState as State } from "./utils/UIState.js";
 import { ChirpityWS } from './components/spectrogram.js';
 
-let LOCATIONS,
+let LOCATIONS, pagination,
   locationID = undefined,
   loadingTimeout,
   LIST_MAP;
 
+let VERSION;
 let APPLICATION_LOADED = false;
 let LABELS = [],
   HISTORY = [];
@@ -45,30 +45,34 @@ let LABELS = [],
 window.addEventListener("unhandledrejection", function (event) {
   if (isTestEnv) return
   // Extract the error message and stack trace from the event
-  const errorMessage = event.reason.message;
-  const stackTrace = event.reason.stack;
+  const reason = event.reason;
+  const errorMessage = reason?.message ?? String(reason ?? "Unknown rejection");
+  const stackTrace = reason?.stack ?? "";
 
   // Track the unhandled promise rejection
   trackEvent(
-    config.UUID,
-    "Unhandled UI PR",
-    errorMessage,
-    customURLEncode(stackTrace)
+    {uuid:config?.UUID,
+    event: "Unhandled UI PR",
+    action: errorMessage,
+    name: customURLEncode(stackTrace),
+    version: config?.VERSION}
   );
 });
 
 window.addEventListener("rejectionhandled", function (event) {
   if (isTestEnv) return
   // Extract the error message and stack trace from the event
-  const errorMessage = event.reason.message;
-  const stackTrace = event.reason.stack;
+  const reason = event.reason;
+  const errorMessage = reason?.message ?? String(reason ?? "Unknown rejection");
+  const stackTrace = reason?.stack ?? "";
 
   // Track the unhandled promise rejection
   trackEvent(
-    config.UUID,
-    "Handled UI PR",
-    errorMessage,
-    customURLEncode(stackTrace)
+      {uuid:config?.UUID,
+      event: "Handled UI PR",
+      action: errorMessage,
+      name: customURLEncode(stackTrace),
+      version: config?.VERSION}
   );
 });
 
@@ -98,7 +102,15 @@ const GLOBAL_ACTIONS = {
       STATE.currentFile &&
       document.getElementById("analyseAll").click();
   },
-  c: (e) => (e.ctrlKey || e.metaKey) && STATE.fileLoaded && spec.centreSpec(),
+  c: (e) => {
+    const selection = window.getSelection().toString();
+    if (selection) {
+      navigator.clipboard.writeText(selection).catch((err) => {
+        console.warn("Clipboard write failed:", err)
+      })
+      return
+    }
+    (e.ctrlKey || e.metaKey) && STATE.fileLoaded && spec.centreSpec()},
   // D: (e) => {
   //     if (( e.ctrlKey || e.metaKey)) worker.postMessage({ action: 'create-dataset' });
   // },
@@ -193,7 +205,6 @@ const GLOBAL_ACTIONS = {
       activeRow.classList.remove("table-active");
       activeRow = activeRow.previousSibling || activeRow;
       if (!activeRow.classList.contains("text-bg-dark")) activeRow.click();
-      // activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   },
   PageDown: () => {
@@ -215,10 +226,10 @@ const GLOBAL_ACTIONS = {
         STATE.windowOffsetSecs = 0;
         position = 0;
       } else {
-        STATE.windowOffsetSecs = Math.min(
+        STATE.windowOffsetSecs = Math.max(0,Math.min(
           STATE.windowOffsetSecs,
           STATE.currentFileDuration - STATE.windowLength
-        );
+        ));
         fileToLoad = STATE.currentFile;
       }
       postBufferUpdate({
@@ -233,7 +244,6 @@ const GLOBAL_ACTIONS = {
       activeRow.classList.remove("table-active");
       activeRow = activeRow.nextSibling || activeRow;
       if (!activeRow.classList.contains("text-bg-dark")) activeRow.click();
-      // activeRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   },
   ArrowLeft: () => {
@@ -269,7 +279,7 @@ const GLOBAL_ACTIONS = {
   F1: () => document.getElementById("navbarSettings").click(),
   F4: () =>  STATE.fileLoaded && (spec.wavesurfer && (config.FFT = spec.increaseFFT())),
   F5: () =>  STATE.fileLoaded && (spec.wavesurfer && (config.FFT = spec.reduceFFT())),
-  " ": () => { STATE.fileLoaded && WSPlayPause()},
+  " ": (e) => { STATE.fileLoaded  && WSPlayPause()},
   Tab: (e) => {
     if ((e.metaKey || e.ctrlKey) && !PREDICTING && STATE.diskHasRecords) {
       // If you did this when predicting, your results would go straight to the archive
@@ -290,8 +300,8 @@ const GLOBAL_ACTIONS = {
       }
     }
   },
-  Delete: () => STATE.fileLoaded && activeRow && deleteRecord(activeRow),
-  Backspace: () => STATE.fileLoaded && activeRow && deleteRecord(activeRow),
+  Delete: (e) => STATE.fileLoaded && activeRow && deleteRecord(e),
+  Backspace: (e) => STATE.fileLoaded && activeRow && deleteRecord(e),
 };
 
 /**
@@ -333,7 +343,7 @@ function WSPlayPause(){
 //Open Files from OS "open with"
 let OS_FILE_QUEUE = [];
 window.electron.onFileOpen((filePath) => {
-  if (APPLICATION_LOADED) onOpenFiles({ filePaths: [filePath], checkSaved: true });
+  if (APPLICATION_LOADED) filterValidFiles({ filePaths: [filePath] });
   else OS_FILE_QUEUE.push(filePath);
 });
 
@@ -341,7 +351,7 @@ window.electron.onFileOpen((filePath) => {
 // Is this CI / playwright?
 const isTestEnv = window.env.TEST_ENV === "true";
 const trackVisit = isTestEnv ? () => {} : _trackVisit;
-isTestEnv || installConsoleTracking(() => config.UUID, "UI");
+isTestEnv || installConsoleTracking(() => [config.UUID, config.VERSION], "UI");
 const trackEvent = isTestEnv ? () => {} : _trackEvent;
 isTestEnv && console.log("Running in test environment");
 
@@ -382,7 +392,6 @@ async function getPaths() {
   return [appPath, tempPath, locale, dirname];
 }
 
-let VERSION;
 let DIAGNOSTICS = {};
 
 let appVersionLoaded = new Promise((resolve, reject) => {
@@ -411,36 +420,63 @@ let predictions = new Map(),
   clickedIndex;
 // Set content container height
 DOM.contentWrapper.style.height = document.body.clientHeight - 80 + "px";
-
+let animating = false;
 // Mouse down event to start dragging
 DOM.controlsWrapper.addEventListener("mousedown", (e) => {
   if (e.target.tagName !== "DIV") return;
   const startY = e.clientY;
   const initialHeight = DOM.spectrogram.offsetHeight;
   let newHeight;
-  let debounceTimer;
 
   const onMouseMove = (e) => {
-    clearTimeout(debounceTimer);
     // Calculate the delta y (drag distance)
     newHeight = initialHeight + e.clientY - startY;
     // Clamp newHeight to ensure it doesn't exceed the available height
     newHeight = Math.min(newHeight, spec.maxHeight(DOM));
     // Adjust the spectrogram dimensions accordingly
-    debounceTimer = setTimeout(() => {
-      spec.adjustDims(true, config.FFT, newHeight);
-    }, 100);
+    if (!animating) {
+      animating = true;
+      requestAnimationFrame(() => {
+        spec.adjustDims(true, newHeight);
+        animating = false;
+      });
+    }
   };
-
   // Remove event listener on mouseup
   const onMouseUp = () => {
     document.removeEventListener("mousemove", onMouseMove);
-    trackEvent(config.UUID, "Drag", "Spec Resize", newHeight);
+    trackEvent({uuid: config.UUID, event: "Drag", action: "Spec Resize", value: newHeight, version: config.VERSION});
   };
   // Attach event listeners for mousemove and mouseup
   document.addEventListener("mousemove", onMouseMove);
   document.addEventListener("mouseup", onMouseUp, { once: true });
 });
+
+//Drag to resize chart
+const chartContainer = document.getElementById("chart-outer");
+chartContainer.addEventListener("mousedown", (e) => {
+  if (e.target.tagName !== "CANVAS") return;
+  document.body.style.cursor = "ns-resize";
+  const startY = e.clientY;
+  const initialHeight = chartContainer.offsetHeight;
+  let newHeight;
+  const onMouseMove = (e) => {
+    newHeight = initialHeight + e.clientY - startY;
+    // Clamp newHeight to ensure it doesn't exceed the available height
+    newHeight = Math.min(newHeight, document.body.clientHeight - 300);
+    chartContainer.style.height = newHeight + "px";
+};
+  // Remove event listener on mouseup
+  const onMouseUp = () => {
+    document.body.style.cursor = "default";
+    document.removeEventListener("mousemove", onMouseMove);
+    trackEvent({uuid: config.UUID, event: "Drag", action: "Chart Resize", value: newHeight, version: config.VERSION});
+  };
+  // Attach event listeners for mousemove and mouseup
+  document.addEventListener("mousemove", onMouseMove);
+  document.addEventListener("mouseup", onMouseUp, { once: true });
+});
+
 
 // Set default Options
 let config;
@@ -548,6 +584,7 @@ const postBufferUpdate = ({
   resetSpec = false,
   goToRegion = false,
 }) => {
+  if (!file) return;
   STATE.fileLoaded = false;
   worker.postMessage({
     action: "update-buffer",
@@ -591,8 +628,12 @@ function clearActive() {
 
 
 
+/**
+ * Opens an audio file or folder selection dialog and processes the selected paths.
+ * @param {string} fileOrFolder - Specifies whether the dialog selects files or a folder.
+ */
 async function showOpenDialog(fileOrFolder) {
-  const defaultPath = localStorage.getItem("lastFolder") || "";
+  const defaultPath = localStorage.getItem("lastOpenFolder") || "";
   const files = await window.electron.openDialog("showOpenDialog", {
     type: "audio",
     fileOrFolder: fileOrFolder,
@@ -601,7 +642,7 @@ async function showOpenDialog(fileOrFolder) {
   });
   if (!files.canceled) {
     filterValidFiles({ filePaths: files.filePaths });
-    localStorage.setItem("lastFolder", p.dirname(files.filePaths[0]));
+    localStorage.setItem("lastOpenFolder", p.dirname(files.filePaths[0]));
   }
 }
 
@@ -644,6 +685,10 @@ const buildFileMenu = (e) => {
  * @returns {void}
  */
 function showDatePicker() {
+  // Check for a form already existing to prevent multiple forms being opened if the user clicks repeatedly before the first form is removed
+  const existingForm = document.getElementById("fileStart");
+  if (existingForm) return;
+
   // Create a form element
   const i18 = i18n.get(i18n.Form);
   const form = document.createElement("form");
@@ -665,6 +710,7 @@ function showDatePicker() {
   // Create the datetime-local input
   const datetimeInput = document.createElement("input");
   datetimeInput.setAttribute("type", "datetime-local");
+  datetimeInput.setAttribute("step", "1");
   datetimeInput.setAttribute("id", "fileStart");
   datetimeInput.setAttribute(
     "value",
@@ -705,8 +751,9 @@ function showDatePicker() {
       action: "update-file-start",
       file: STATE.currentFile,
       start: timestamp,
+      refreshResults: STATE.analysisDone, // Only refresh results if analysis has already been done
     });
-    trackEvent(config.UUID, "Settings Change", "fileStart", newStart);
+    trackEvent({uuid: config.UUID, event: "Settings Change", action: "fileStart", name: newStart, version: config.VERSION});
     resetResults();
     STATE.fileStart = timestamp;
     // Remove the form from the DOM
@@ -786,41 +833,71 @@ function renderFilenamePanel() {
   showMetadata();
   let filenameElement = DOM.filename;
   filenameElement.innerHTML = "";
-  //let label = openFile.replace(/^.*[\\\/]/, "");
   const { parentFolder, fileName } = utils.extractFileNameAndFolder(openFile);
   const label = `${parentFolder}/${fileName}`;
   let appendStr;
-  const title = ` title="${i18.filename}" `;
+  const titleText = `${openFile}\n---\n${i18.filename}`;
   const isSaved = ["archive", "explore"].includes(STATE.mode)
     ? "text-info"
     : "text-warning";
+  // Build DOM elements to avoid injecting unescaped HTML into attributes
+  const container = document.createElement("div");
+  container.id = "fileContainer";
   if (files.length > 1) {
-    appendStr = `<div id="fileContainer" class="btn-group dropup pointer">
-        <span ${title} class="filename ${isSaved}">${label}</span>
-        </button>
-        <button id="filecount" class="btn btn-dark dropdown-toggle dropdown-toggle-split" type="button" 
-        data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">+${
-          files.length - 1
-        }
-        <span class="visually-hidden">Toggle Dropdown</span>
-        </button>
-        <div class="dropdown-menu dropdown-menu-dark" aria-labelledby="dropdownMenuButton">`;
+    container.className = "btn-group dropup pointer";
+
+    const nameSpan = document.createElement("span");
+    nameSpan.className = `filename ${isSaved}`;
+    nameSpan.textContent = label;
+    nameSpan.setAttribute("title", titleText);
+    container.appendChild(nameSpan);
+
+    const countBtn = document.createElement("button");
+    countBtn.id = "filecount";
+    countBtn.className = "btn btn-dark dropdown-toggle dropdown-toggle-split";
+    countBtn.type = "button";
+    countBtn.setAttribute("data-bs-toggle", "dropdown");
+    countBtn.setAttribute("aria-haspopup", "true");
+    countBtn.setAttribute("aria-expanded", "false");
+    countBtn.innerHTML = `+${files.length - 1} <span class="visually-hidden">Toggle Dropdown</span>`;
+    container.appendChild(countBtn);
+
+    const menu = document.createElement("div");
+    menu.className = "dropdown-menu dropdown-menu-dark";
+    menu.setAttribute("aria-labelledby", "dropdownMenuButton");
+
     files.forEach((item) => {
       if (item !== openFile) {
-        const label = item.replace(/^.*[\\/]/, "");
-        appendStr += `<a id="${item}" class="dropdown-item openFiles" href="#">
-                <span class="material-symbols-outlined align-bottom">audio_file</span>${label}</a>`;
+        const a = document.createElement("a");
+        a.setAttribute("id", item);
+        a.className = "dropdown-item openFiles";
+        a.href = "#";
+        const icon = document.createElement("span");
+        icon.className = "material-symbols-outlined align-bottom";
+        icon.textContent = "audio_file";
+        const itemLabel = document.createTextNode(item.split(/[\\/]/).pop());
+        a.appendChild(icon);
+        a.appendChild(itemLabel);
+        menu.appendChild(a);
       }
     });
-    appendStr += `</div></div>`;
+    container.appendChild(menu);
   } else {
-    appendStr = `<div id="fileContainer">
-        <button class="btn btn-dark" type="button" id="dropdownMenuButton">
-        <span ${title} class="filename ${isSaved}">${label}</span>
-        </button></div>`;
+    const button = document.createElement("button");
+    button.className = "btn btn-dark";
+    button.type = "button";
+    button.id = "dropdownMenuButton";
+
+    const nameSpan = document.createElement("span");
+    nameSpan.className = `filename ${isSaved}`;
+    nameSpan.textContent = label;
+    nameSpan.setAttribute("title", titleText);
+    button.appendChild(nameSpan);
+    container.appendChild(button);
   }
 
-  filenameElement.innerHTML = appendStr;
+  // Replace container contents safely
+  filenameElement.appendChild(container);
   // Adapt menu
   customiseAnalysisMenu(isSaved === "text-info");
 }
@@ -869,18 +946,31 @@ function customiseAnalysisMenu(saved) {
   }
 }
 
-async function generateLocationList(id) {
+async function generateLocationList(elID, skipDefault = false) {
   const i18 = i18n.get(i18n.All);
-  const defaultText = id === "savedLocations" ? i18[0] : i18[1];
-  const el = document.getElementById(id);
-  LOCATIONS = await utils.requestFromWorker(worker, "get-locations", {
+
+  const el = document.getElementById(elID);
+  el.replaceChildren(); // clear options
+  LOCATIONS ??= await utils.requestFromWorker(worker, "get-locations", {
     file: STATE.currentFile
   });
-  el.innerHTML = `<option value="">${defaultText}</option>`; // clear options
-  LOCATIONS.forEach((loc) => {
+  if (skipDefault) {}
+  else if (elID === "savedLocations"){
+    el.innerHTML = `<option value="">${i18n.get(i18n.Location)['add']}</option>`; 
+  } else {
+    const defaultText =  i18[1];
+    el.innerHTML = `<option value="">${defaultText}</option>`; 
+  }
+  LOCATIONS.slice() // avoid mutating the original array, just in case
+  .sort((a, b) => { // put the default location at the top of the list
+    if (a.id === 0) return -1;
+    if (b.id === 0) return 1;
+    return 0;
+  }).forEach((loc) => {
+    const {id, place} = loc;
     const option = document.createElement("option");
-    option.value = loc.id;
-    option.textContent = loc.place;
+    option.value = id;
+    option.textContent = id === 0 ? place + '*': place;
     el.appendChild(option);
   });
   return el;
@@ -888,50 +978,82 @@ async function generateLocationList(id) {
 
 const FILE_LOCATION_MAP = {};
 const onFileLocationID = ({ file, id }) => (FILE_LOCATION_MAP[file] = id);
+const onLocationDeleted = ({ id }) => {
+  Object.keys(FILE_LOCATION_MAP).forEach(file => {
+    if (FILE_LOCATION_MAP[file] === id) {
+      delete FILE_LOCATION_MAP[file];
+    }
+  });
+}
 const locationModalDiv = document.getElementById("locationModal");
-locationModalDiv.addEventListener("shown.bs.modal", () => {
-  const locationID = FILE_LOCATION_MAP[STATE.currentFile]
-  placeMap("customLocationMap", locationID);
+locationModalDiv.addEventListener("shown.bs.modal", async () => {
+  const locationID = FILE_LOCATION_MAP[STATE.currentFile] ?? undefined
+  await placeMap("customLocationMap", locationID);
 });
 //document
+const locationRadius = document.getElementById("location-radius");
+const onRadiusUpdated = (e) => {
+  const radius = e.target.valueAsNumber;
+  const latEl = document.getElementById("customLat");
+  const lonEl = document.getElementById("customLon");
+  updateMap(latEl.valueAsNumber, lonEl.valueAsNumber, radius);
+}
+
+locationRadius.addEventListener("change", onRadiusUpdated);
+
 
 // showLocation: Show the currently selected location in the form inputs
 const showLocation = async (fromSelect) => {
-  let newLocation;
   const latEl = document.getElementById("customLat");
   const lonEl = document.getElementById("customLon");
   const customPlaceEl = document.getElementById("customPlace");
   const locationSelect = document.getElementById("savedLocations");
+  const locationDelete = document.getElementById("delete-location");
+  const locationAdd = document.getElementById("set-location");
   // Check if current file has a location id
   const id = fromSelect
-    ? parseInt(locationSelect.value)
+    ? locationSelect.value
     : FILE_LOCATION_MAP[STATE.currentFile];
 
-  if (id) {
-    newLocation = LOCATIONS.find((obj) => obj.id === id);
-    //locationSelect.value = id;
-    if (newLocation) {
-      (latEl.value = newLocation.lat),
-        (lonEl.value = newLocation.lon),
-        (customPlaceEl.value = newLocation.place),
-        (locationSelect.value = id);
-    } else {
-      (latEl.value = config.latitude),
-        (lonEl.value = config.longitude),
-        (customPlaceEl.value = config.location),
-        (locationSelect.value = "");
-    }
-  } else {
-    //Default location
-    await generateLocationList("savedLocations");
-    (latEl.value = config.latitude),
-      (lonEl.value = config.longitude),
-      (customPlaceEl.value = config.location);
-  }
+  const location = !id || id === 0
+     ? LOCATIONS.find(obj => obj.id === 0) // default location if no selection
+     : LOCATIONS.find(obj => obj.id === parseInt(id)) ?? LOCATIONS.find(obj => obj.id === 0);
+
+  const { id: locId, lat, lon, place, radius} = location;
+  const radiusValue = radius ?? 30;
+  latEl.value = lat;
+  lonEl.value = lon;
+  customPlaceEl.value = place;
+  locationSelect.value = id ?? "0";
+  locationRadius.value = radiusValue;
+  showRadiusValue(radiusValue);
+  locationAdd.classList.toggle("disabled", !customPlaceEl.value.trim());
+  locationDelete.classList.toggle('disabled', locationSelect.selectedIndex < 2); // disable delete for default and placeholder options
   // make sure the  map is initialised
-  if (!map) placeMap("customLocationMap", id);
-  updateMap(latEl.value, lonEl.value);
+  if (!window.map) await placeMap("customLocationMap", locId);
+  const latVal = lat === "" ? config.latitude : parseFloat(lat);
+  const lonVal = lon === "" ? config.longitude : parseFloat(lon);
+  updateMap(latVal, lonVal, radiusValue);
 };
+
+/**
+ * Helper function to sanitise tained input from API call
+ * 
+ * @param {*} el container for tainted input
+ * @param {*} tainted tainted content
+ */
+
+const renderLocation = (el, tainted) =>{
+    // Clear existing content
+  el.replaceChildren();
+  // Icon
+  const icon = document.createElement("span");
+  icon.className = "material-symbols-outlined";
+  icon.textContent = "fmd_good";
+  // Text (tainted input)
+  const text = document.createTextNode(" " + tainted);
+  el.append(icon, text);
+}
 
 const displayLocationAddress = async (where) => {
   const custom = where.includes("custom");
@@ -940,18 +1062,18 @@ const displayLocationAddress = async (where) => {
     latEl = document.getElementById("customLat");
     lonEl = document.getElementById("customLon");
     placeEl = document.getElementById("customPlace");
-    address = await fetchLocationAddress(latEl.value, lonEl.value, false);
+    address = await fetchLocationAddress(latEl.valueAsNumber, lonEl.valueAsNumber, false);
     if (address === false) return;
     placeEl.value = address || "Location not available";
+    const locationAdd = document.getElementById("set-location")
+    locationAdd.classList.remove('disabled')
   } else {
     latEl = DOM.defaultLat;
     lonEl = DOM.defaultLon;
     placeEl = DOM.place;
-    address = await fetchLocationAddress(latEl.value, lonEl.value, false);
+    address = await fetchLocationAddress(latEl.valueAsNumber, lonEl.valueAsNumber, false);
     if (address === false) return;
-    const content =
-      '<span class="material-symbols-outlined">fmd_good</span> ' + address;
-    placeEl.innerHTML = content;
+    renderLocation(placeEl, address)
     const button = document.getElementById("apply-location");
     button.classList.replace("btn-primary", "btn-danger");
     button.textContent = "Apply";
@@ -962,113 +1084,484 @@ const cancelDefaultLocation = () => {
   const latEl = DOM.defaultLat;
   const lonEl = DOM.defaultLon;
   const placeEl = DOM.place;
-  latEl.value = config.latitude;
-  lonEl.value = config.longitude;
-  placeEl.innerHTML =
-    '<span class="material-symbols-outlined">fmd_good</span> ' +
-    config.location;
-  updateMap(latEl.value, lonEl.value);
+  const {lat, lon, place, radius} = LOCATIONS.find((obj) => obj.id === 0);
+  latEl.value = lat;
+  lonEl.value = lon;
+  renderLocation(placeEl, place)
+  updateMap(latEl.value, lonEl.value, radius);
   const button = document.getElementById("apply-location");
   button.classList.replace("btn-danger","btn-primary");
   button.innerHTML = 'Set <span class="material-symbols-outlined">done</span>';
 };
 
+const checkCoords = (latVal, lonVal) => {
+    if (!Number.isFinite(latVal) || !Number.isFinite(lonVal)) return false;
+    if (latVal < -90 || latVal > 90 || lonVal < -180 || lonVal > 180) {
+      generateToast({ type: "warning", message: "placeOutOfBounds" });
+      return false;
+    }
+    return true;
+  }
+
 const setDefaultLocation = () => {
-  config.latitude = parseFloat(DOM.defaultLat.value).toFixed(4);
-  config.longitude = parseFloat(parseFloat(DOM.defaultLon.value)).toFixed(4);
-  config.location = DOM.place.textContent.replace("fmd_good", "");
-  updateMap(parseFloat(DOM.defaultLat.value), parseFloat(DOM.defaultLon.value));
+  const latVal = DOM.defaultLat.valueAsNumber;
+  const lonVal = DOM.defaultLon.valueAsNumber;
+  if (!checkCoords(latVal, lonVal)) return;
+  config.latitude = parseFloat(latVal).toFixed(4);
+  config.longitude = parseFloat(lonVal).toFixed(4);
+  const locationText = DOM.place.textContent.replace("fmd_good", "").trim();
+  const isPlaceholder =
+    locationText.startsWith("Getting location") ||
+    locationText.startsWith("No location found");
+  config.location = isPlaceholder
+     ? `${config.latitude} ${config.longitude}`
+     : locationText;
+  const defaultLoc = LOCATIONS.findIndex((obj) => obj.id === 0);
+  LOCATIONS[defaultLoc] = {...LOCATIONS[defaultLoc], lat: config.latitude, lon: config.longitude, place: config.location}
+  renderLocation(DOM.place, config.location)
+  updateMap(config.latitude, config.longitude);
   updatePrefs("config.json", config);
   worker.postMessage({
     action: "update-state",
     lat: config.latitude,
     lon: config.longitude,
     place: config.location,
+    radius: config.radius // can only change radius in custom file location
   });
-  // Initially, so changes to the default location are immediately reflected in subsequent analyses
-  // We will switch to location filtering when the default location is changed.
-  config.list = "location";
-  DOM.speciesThresholdEl.classList.remove("d-none");
-  updateList();
-
-  resetResults();
-  worker.postMessage({
-    action: "update-list",
-    list: "location",
-  });
+  if (config.list === "location") {
+    DOM.speciesThresholdEl.classList.remove("d-none");
+    resetResults();
+    worker.postMessage({
+      action: "update-list",
+      list: "location",
+    });
+  }
   const button = document.getElementById("apply-location");
   button.classList.replace("btn-danger","btn-primary");
   button.innerHTML = 'Set <span class="material-symbols-outlined">done</span>';
 };
 
-async function setCustomLocation() {
-  const savedLocationSelect = await generateLocationList("savedLocations");
+
+/**
+ * Creates a table body containing database file rows and deletion checkboxes.
+ * @param {Array<Object>} fileList - The files to display.
+ * @param {Object} i18n - Localized labels used for boolean and default-location values.
+ * @return {HTMLTableSectionElement} The populated table body.
+ */
+function generateFileRows(fileList, i18n) {
+  const tbody = document.createElement("tbody");
+  tbody.className = "text-center";
+  const dateFormat = new Intl.DateTimeFormat(undefined, {
+    dateStyle: "short",
+    timeStyle: "medium",
+  });
+  for (const file of fileList) {
+    const tr = document.createElement("tr");
+    tr.className = "file-row";
+    tr.dataset.search = file.name.toLowerCase();
+
+    const addCell = (text, className) => {
+      const td = document.createElement("td");
+      td.textContent = text;
+      if (className) td.className = className;
+      tr.appendChild(td);
+      return td;
+    };
+
+    addCell(file.name, 'filename text-start');
+    addCell(file.archived ? i18n["yes"] : i18n["no"], );
+    addCell(Number.isFinite(file.filestart) ? dateFormat.format(file.filestart) : "");
+    addCell(file.location ?? i18n["default"]);
+    addCell(i18n['Pending'], 'status');
+
+    const td = addCell("");
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.className = "form-check-input rm";
+    checkbox.dataset.fileId = file.id;
+    td.appendChild(checkbox);
+    tbody.appendChild(tr);
+  }
+
+  return tbody;
+}
+
+/**
+ * Displays database files in a searchable modal with row selection and deletion controls.
+ * @param {Array} fileList - The database files to display.
+ */
+function onDatabaseFiles(fileList) {
+  const i18 = i18n.get(i18n.Database);
+  const databaseModalDiv = document.getElementById("databaseModal");
+  const contentDiv = databaseModalDiv.querySelector(".modal-body");
+  const selectAllButton = databaseModalDiv.querySelector("#selectAllFiles");
+  const submitButton = databaseModalDiv.querySelector("#processSelectedFiles");
+  const search = document.getElementById("db-filter");
+  const replace = document.getElementById("db-replace");
+
+  function getVisibleCheckboxes() {
+    return [...databaseModalDiv.querySelectorAll(".rm")]
+      .filter(cb => !cb.closest("tr").hidden);
+  }
+
+  function updateButtonText() {
+    const checkboxes = getVisibleCheckboxes();
+    const allSelected = checkboxes.length > 0 && checkboxes.every(cb => cb.checked);
+
+    selectAllButton.textContent =
+      `${allSelected ? i18["Deselect All"] : i18["Select All"]} (${checkboxes.length})`;
+  }
+
+  function updateSubmitButton() {
+    const selected = databaseModalDiv.querySelectorAll(".rm:checked").length;
+    submitButton.disabled = selected === 0;
+    // If the replace input has text, make the delete button trigger a replace action instead of delete
+    submitButton.textContent = replace.value.trim() ? i18["Update Entries"] : i18["Delete Entries"];
+    selected && (submitButton.textContent += ` (${selected})`);
+  }
+
+  function applyFilter() {
+    const filter = search.value.trim().toLowerCase();
+    contentDiv.querySelectorAll("tbody tr").forEach(row => {
+      row.hidden = filter && !row.textContent.toLowerCase().includes(filter);
+      row.querySelectorAll("td").forEach(cell => {
+        // Remove previous highlighting
+        cell.querySelectorAll("mark").forEach(mark => {
+          mark.replaceWith(document.createTextNode(mark.textContent));
+        });
+        if (!filter || row.hidden) return;
+        const text = cell.textContent;
+        const lowerText = text.toLowerCase();
+        if (!lowerText.includes(filter)) return;
+        const fragment = document.createDocumentFragment();
+        let start = 0;
+        let index;
+        while ((index = lowerText.indexOf(filter, start)) !== -1) {
+          fragment.appendChild(document.createTextNode(text.slice(start, index)));
+          const mark = document.createElement("mark");
+          // Stronger highlight for filename column
+          if (cell.className.includes("filename")) {
+            mark.className = "text-bg-info"; // Bootstrap warning color
+          }
+          mark.textContent = text.slice(index, index + filter.length);
+          fragment.appendChild(mark);
+          start = index + filter.length;
+        }
+        fragment.appendChild(document.createTextNode(text.slice(start)));
+        cell.replaceChildren(fragment);
+      });
+    });
+  }
+
+  if (!databaseModalDiv.__dbUIInitialized) {
+    databaseModalDiv.addEventListener("change", event => {
+      if (event.target.classList.contains("rm")) {
+        event.stopPropagation();
+        updateSubmitButton();
+        updateButtonText();
+      }
+    });
+
+    selectAllButton.addEventListener("click", () => {
+      const checkboxes = getVisibleCheckboxes();
+      const allSelected = checkboxes.every(cb => cb.checked);
+      checkboxes.forEach(cb => {
+        cb.checked = !allSelected;
+      });
+      updateButtonText();
+      updateSubmitButton();
+    });
+
+    search.addEventListener("input", e => {
+      e.stopPropagation();
+      applyFilter();
+      if (!databaseModalDiv.querySelector("tbody td.filename mark")){
+        replace.value = '';
+        replace.disabled =  true;
+        updateSubmitButton();
+      } else { replace.disabled = false }
+      updateButtonText();
+    });
+
+    replace.addEventListener("input", e => {
+      e.stopPropagation();
+      updateSubmitButton();
+    });
+
+    submitButton.addEventListener("click", () => {
+      const selectedFiles = [...databaseModalDiv.querySelectorAll(".rm:checked")];
+      if (selectedFiles.length > 0) {
+        const fileIDs = selectedFiles.map(cb => parseInt(cb.dataset.fileId, 10));
+        submitButton.disabled = true;
+        if (replace.value.trim()) {
+          const oldValue = search.value.trim();
+          if (!oldValue) return;
+          const newValue = replace.value.trim();
+          worker.postMessage({ action: "update-files", fileIDs, oldValue, newValue });
+        } else {
+          worker.postMessage({ action: "delete-files", fileIDs });
+        }
+        databaseModalDiv.__dbModal.hide();
+      }
+    });
+
+    databaseModalDiv.__dbModal = new bootstrap.Modal(databaseModalDiv);
+    const onModalDismiss = () => {
+      STATE.fileValidationController?.abort();
+    };
+    databaseModalDiv.addEventListener("hide.bs.modal", onModalDismiss);
+    databaseModalDiv.__dbUIInitialized = true;
+  }
+
+  // Clear previous contents
+  contentDiv.replaceChildren();
+  const table = document.createElement("table");
+  table.className = "table table-hover";
+  const thead = document.createElement("thead");
+  thead.className = "sticky-top text-bg-dark text-center";
+  const headerRow = document.createElement("tr");
+  let count = 0;
+  ["Filename", "In Audio Library", "File Start", "Location", "Link Status", "Selected"]
+    .map(text => i18[text])
+    .forEach(text => {
+      count++;
+      const th = document.createElement("th");
+      th.textContent = text;
+      if (count === 5) th.id = 'link-check';
+      headerRow.appendChild(th);
+    });
+  thead.appendChild(headerRow);
+  table.appendChild(thead);
+  table.appendChild(generateFileRows(fileList, i18));
+  contentDiv.appendChild(table);
+  // Make row click select the record and shift click select multiple rows
+  let mouseDownX;
+  let mouseDownY;
+  let lastClickedRow = null;
+
+  table.querySelector("tbody").addEventListener("mousedown", event => {
+    mouseDownX = event.clientX;
+    mouseDownY = event.clientY;
+    // Prevent browser text selection flash during shift-click selection
+    if (event.shiftKey) {
+      event.preventDefault();
+    }
+  });
+
+  table.querySelector("tbody").addEventListener("click", event => {
+    const row = event.target.closest(".file-row");
+    if (!row) return;
+    const moved = Math.abs(event.clientX - mouseDownX) > 5 ||
+                Math.abs(event.clientY - mouseDownY) > 5;
+
+    // Ignore clicks that were actually a drag selection
+    if (moved) return;
+    // Ignore direct checkbox clicks
+    if (event.target.classList.contains("rm")) {
+      lastClickedRow = row;
+      return;
+    }
+    const rows = [...table.querySelectorAll("tbody .file-row")].filter(row => !row.hidden);
+    const checkbox = row.querySelector(".rm");
+
+    const start = event.shiftKey && lastClickedRow ? rows.indexOf(lastClickedRow) : -1;
+    if (start !== -1) {
+      const end = rows.indexOf(row);
+      const from = Math.min(start, end);
+      const to = Math.max(start, end);
+      const selectState = !checkbox.checked;
+      rows.slice(from, to + 1).forEach(r => {
+        r.querySelector(".rm").checked = selectState;
+      });
+    } else {
+      checkbox.checked = !checkbox.checked;
+    }
+
+    lastClickedRow = row;
+    updateSubmitButton();
+  });
+
+  search.value = ""; replace.value = ""; replace.disabled = true;
+  applyFilter();
+  updateButtonText();
+  updateSubmitButton();
+  // Check files status in the background
+  if (fileList.length > 1000) {
+    // Trigger check manually
+    const linkHeader = document.getElementById('link-check');
+    const linkText = linkHeader.textContent;
+    const button = document.createElement('button');
+    button.id = 'manual-file-check';
+    button.value = fileList.length;
+    const icon = document.createElement('span');
+    icon.className = 'material-symbols-outlined';
+    icon.textContent = 'rule';
+    button.append(icon, document.createTextNode(linkText));
+    button.className = 'btn btn-outline-secondary text-white fw-bold p-0';
+    linkHeader.replaceChildren(button)
+    const action = () => {
+      linkHeader.replaceChildren(linkText);
+      linkHeader.removeEventListener('click', action)
+      STATE.fileValidationController = new AbortController();
+      const status = databaseModalDiv.querySelector('#validation-status');
+      validateFileExistence(fileList, table, (checked, total, missing) => {
+        if (checked % ((DIAGNOSTICS["Cores"] || 20)*10 ) !== 0) return
+        status.textContent = `Checking files... ${checked} / ${total} (${missing} missing)`;
+      }, STATE.fileValidationController.signal).then(result => {
+        status.textContent = '';
+        STATE.fileValidationController = null;
+      });
+    }
+    linkHeader.addEventListener('click', action)
+  } else {
+    validateFileExistence(fileList, table);
+  }
+  databaseModalDiv.__dbModal.show();
+}
+
+const checkFileExists = (path) =>  fs.promises.access(path).then(() => true).catch(() => false);
+
+
+async function validateFileExistence(files, table, progressCallback = null, signal = null) {
+  const t0 = Date.now();
+  const i18 = i18n.get(i18n.Database);
+  const batchSize = DIAGNOSTICS["Cores"] || 20;
+  let checked = 0;
+  let missing = 0;
+  for (let i = 0; i < files.length; i += batchSize) {
+    if (signal?.aborted) break;
+    const batch = files.slice(i, i + batchSize);
+    await Promise.all(
+      batch.map(async file => {
+        if (signal?.aborted) return;
+        const exists = await checkFileExists(file.name);
+        if (signal?.aborted) return;
+        const checkbox = table.querySelector(
+          `input.rm[data-file-id="${file.id}"]`
+        );
+        const row = checkbox?.closest("tr");
+        if (row) {
+          const linkCell = row.querySelector('td.status');
+          if (exists) linkCell.textContent = i18['OK'];
+          else {
+            if (file.archived){
+              if (await checkFileExists(p.join(config.library.location,file.archiveName))){
+                row.classList.add("text-bg-warning")
+                linkCell.textContent = i18['OK'];
+              } else {
+                row.classList.add("text-bg-danger");
+                linkCell.textContent = i18['Missing'];
+                missing++;
+              }
+            } else { 
+              row.classList.add("text-bg-danger") 
+              linkCell.textContent = i18['Missing'];
+              missing++;
+            }
+          }
+        }
+        checked++;
+      })
+    );
+    if (signal?.aborted) break;
+    if (progressCallback) {
+      progressCallback(checked, files.length, missing);
+    }
+  }
+  console.log(`Checking ${files.length} files' existence took ${((Date.now() - t0)/1000).toFixed(0)} seconds`)
+}
+
+  
+
+
+/**
+ * Opens the location editor for the current file or saved locations.
+ * @param {boolean} [manage=false] - Whether to enable saved-location management controls.
+ */
+async function setCustomLocation(manage = false) {
+  const savedLocationSelect = await generateLocationList("savedLocations", !manage);
   const latEl = document.getElementById("customLat");
   const lonEl = document.getElementById("customLon");
   const customPlaceEl = document.getElementById("customPlace");
   const locationAdd = document.getElementById("set-location");
+  const locationDelete = document.getElementById("delete-location");
+  const editSection = document.getElementById("edit-section");
+  editSection.classList.toggle("d-none", !manage);
+  locationDelete.classList.toggle('d-none', !manage);
+  customPlaceEl.toggleAttribute('readonly', !manage);
   const batchWrapper = document.getElementById("location-batch-wrapper");
-  STATE.openFiles.length > 1
-    ? batchWrapper.classList.remove("d-none")
-    : batchWrapper.classList.add("d-none");
-  // Use the current file location for lat, lon, place or use defaults
-  showLocation(false);
-  savedLocationSelect.addEventListener("change", function () {
-    showLocation(true);
-  });
+  batchWrapper.classList.toggle("d-none", !(STATE.openFiles.length > 1 && !manage));
+  const locationRadius = document.getElementById("location-radius");
 
+  // Use the current file location for lat, lon, place or use defaults
+  showLocation(manage);
+  const onSavedLocationChange = () => showLocation(true);
+  savedLocationSelect.addEventListener("change", onSavedLocationChange);
+  // Translate modal content
   const i18 = i18n.get(i18n.Location);
-  const addOrDelete = () => {
-    if (customPlaceEl.value) {
-      locationAdd.textContent = i18[0];
-      locationAdd.classList.remove("btn-danger");
-      locationAdd.classList.add("button-primary");
-    } else {
-      locationAdd.textContent = i18[1];
-      locationAdd.classList.add("btn-danger");
-      locationAdd.classList.remove("button-primary");
-    }
-  };
-  // Highlight delete
-  customPlaceEl.addEventListener("keyup", addOrDelete);
-  addOrDelete();
-  locationModalDiv.querySelector("h5").textContent = i18[0];
+  // savedLocationSelect.querySelector("option").textContent = i18['add'];
+  locationDelete.textContent = i18['delete'];
+  locationModalDiv.querySelector("h5").textContent = i18['update'];
   const legends = locationModalDiv.querySelectorAll("legend");
+  const items = ['pick','edit', 'radius'];
   for (let i = 0; i < legends.length; i++) {
-    legends[i].textContent = i18[i + 2]; // process each node
+    legends[i].textContent = i18[items[i]]; // process each node
   }
   locationModalDiv.querySelector('label[for="batchLocations"]').textContent =
-    i18[4];
-  document.getElementById("customLatLabel").textContent = i18[5];
-  document.getElementById("customLonLabel").textContent = i18[6];
+    i18['all'];
+  document.getElementById("customLatLabel").textContent = i18['lat'];
+  document.getElementById("customLonLabel").textContent = i18['lon'];
   const locationModal = new bootstrap.Modal(locationModalDiv);
   locationModal.show();
 
   // Submit action
   const locationForm = document.getElementById("locationForm");
 
-  const addLocation = () => {
-    locationID = savedLocationSelect.value;
+  const addLocation = (e) => {
+    const remove = e.target.id === 'delete-location';
+    const parsed = parseInt(savedLocationSelect.value);
+    const locationID = Number.isFinite(parsed) ? parsed : undefined;
     const batch = document.getElementById("batchLocations").checked;
-    const files = batch ? STATE.openFiles : [STATE.currentFile];
+    const files = batch ? STATE.openFiles : !manage && STATE.currentFile ? [STATE.currentFile] : [];
+    const place = customPlaceEl.value;
+    const radius = locationRadius.valueAsNumber;
+    const lat = latEl.valueAsNumber;
+    const lon = lonEl.valueAsNumber;
+    if (!checkCoords(lat, lon)) return;
     worker.postMessage({
-      action: "set-custom-file-location",
-      lat: latEl.value,
-      lon: lonEl.value,
-      place: customPlaceEl.value,
-      files: files,
+      action: "set-location",
+      lat,lon,place,radius,files, id: locationID, remove
     });
+    if (locationID === 0){
+      // Default location updated - update config and UI
+      config.latitude = lat;
+      config.longitude = lon;
+      config.location = place;
+      config.radius = radius;
+      updatePrefs('config.json', config)
+      DOM.defaultLat.value = lat;
+      DOM.defaultLon.value = lon;
+      renderLocation(DOM.place, place);
+    }
     generateLocationList("explore-locations");
-
+    e.target.blur();
     locationModal.hide();
   };
+  const toggleSetButton = () => {
+    locationAdd.classList.toggle("disabled", isNaN(savedLocationSelect.value) || !customPlaceEl.value.trim());
+  };
+  toggleSetButton();
   locationAdd.addEventListener("click", addLocation);
+  locationDelete.addEventListener("click", addLocation);
+  customPlaceEl.addEventListener("input", toggleSetButton);
   const onModalDismiss = () => {
     locationForm.reset();
+    locationDelete.classList.add('d-none');
     locationAdd.removeEventListener("click", addLocation);
+    locationDelete.removeEventListener("click", addLocation);
+    customPlaceEl.removeEventListener("input", toggleSetButton);
+    savedLocationSelect.removeEventListener("change", onSavedLocationChange);
     locationModalDiv.removeEventListener("hide.bs.modal", onModalDismiss);
-    if (showLocation)
-      savedLocationSelect.removeEventListener("change", setCustomLocation);
   };
   locationModalDiv.addEventListener("hide.bs.modal", onModalDismiss);
 }
@@ -1086,7 +1579,7 @@ async function sortFilesByTime(fileNames) {
   const fileData = await Promise.all(
     fileNames.map(async (fileName) => {
       const stats = await fs.promises.stat(fileName);
-      return { name: fileName, time: stats.mtimeMs };
+      return { name: fileName, time: stats.mtimeMs, start: stats.birthtimeMs };
     })
   );
 
@@ -1095,19 +1588,21 @@ async function sortFilesByTime(fileNames) {
     .map((file) => file.name); // Return sorted file names
 }
 /**
- * Opens one or more audio files, resets analysis state, and updates the UI for new input.
+ * Open one or more audio files and prepare the application state and UI for analysis.
  *
- * Loads the provided audio files, resets analysis results and diagnostics, updates menu items, and initializes the spectrogram. If multiple files are selected, sorts them by creation time and enables batch analysis options. Begins loading the first file in the list.
+ * Loads the specified files (sorting by creation time when multiple are provided), resets pagination, diagnostics, and result state, adjusts relevant menu items and spectrogram visibility, sets the UI mode to analysis, and begins loading the first file.
  *
- * @param {Object} args - Arguments for file opening.
+ * @param {Object} args
  * @param {string[]} args.filePaths - Paths of audio files to open.
- * @param {boolean} [args.preserveResults] - If true, preserves previous analysis results.
+ * @param {boolean} [args.checkSaved=true] - If false, mark analysis as complete for the opened files.
+ * @param {boolean} [args.preserveResults] - If true, preserve previous analysis results when loading the file.
  */
 async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults } = {}) {
   if (!filePaths.length) return;
-  loadingFiles({hide:false})
+  if (STATE.mode === 'chart') showAnalyse()
+
   // Store the sanitised file list and Load First audio file
-  // utils.hideAll();
+  pagination.reset();
   resetResults();
   resetDiagnostics();
   utils.disableMenuItem([
@@ -1124,9 +1619,11 @@ async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults 
 
   // Reset the buffer playhead and zoom:
   STATE.windowOffsetSecs = 0;
-  STATE.windowLength = config.selectedModel.includes('bats') ? 5 : 20;
+  STATE.windowLength = config.selectedModel.includes('batpack') ? 5 : 20;
   // Reset the mode
+
   STATE.mode = 'analyse';
+
   // Reset analysis status - when importing, we want to set analysis done = true
   STATE.analysisDone = !checkSaved;
 
@@ -1135,9 +1632,9 @@ async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults 
     if (modelReady) utils.enableMenuItem(["analyseAll", "reanalyseAll"]);
     STATE.openFiles = await sortFilesByTime(STATE.openFiles);
   }
-
+  utils.showElement(["spectrogramWrapper"], false);
+  spec.reInitSpec(config.specMaxHeight);
   loadAudioFileSync({ filePath: STATE.openFiles[0], preserveResults });
-
   // Clear unsaved records warning
   window.electron.unsavedRecords(false);
   document.getElementById("unsaved-icon").classList.add("d-none");
@@ -1188,6 +1685,7 @@ function refreshResultsView() {
 
 // fromDB is requested when circle clicked
 const getSelectionResults = (fromDB) => {
+  if (!STATE.currentFile) return;
   if (fromDB instanceof PointerEvent) fromDB = false;
   let start = STATE.activeRegion.start + STATE.windowOffsetSecs;
   // Remove small amount of region to avoid pulling in results from 'end'
@@ -1205,12 +1703,44 @@ const getSelectionResults = (fromDB) => {
   });
 };
 
+
+const showQueryModal = () => {
+  // i18n
+  const modalEl = document.getElementById("query-modal");
+  const {find, enterLabel, similarity, max } = i18n.get(i18n.Context);
+  const titleEl = document.getElementById('queryModalLabel'); 
+  titleEl.textContent = find;
+  const {cname, sname} = i18n.get(i18n.SpeciesList);
+  const cnameEl = document.getElementById('cnameInput');
+  modalEl.querySelector('label[for="cnameInput"]').textContent = cname;
+  modalEl.querySelector('label[for="snameInput"]').textContent = sname;
+  modalEl.querySelector('legend').textContent = enterLabel;
+  const limitEl = document.getElementById('query-limit');
+  limitEl.textContent = max;
+  const thresholdEl = document.getElementById('query-threshold');
+  document.getElementById('similarity-threshold').value = config.detect.confidence;
+  thresholdEl.textContent = similarity;
+  const submitEl = document.getElementById('query')
+  submitEl.textContent = find;
+
+  const queryModel = new bootstrap.Modal(modalEl);
+  modalEl.addEventListener('shown.bs.modal', e => {
+    cnameEl.focus();
+  }, {once: true});
+  queryModel.show();
+}
+
 /**
- * Sends an analysis request to the worker thread to initiate audio analysis, managing UI state and preventing concurrent analyses.
+ * Initiates an analysis request to the worker and updates UI state to prevent concurrent analyses.
  *
- * Disables relevant UI controls and resets results if not analyzing a selection. If an analysis is already in progress, displays a warning notification and does not start a new analysis.
+ * Disables analysis-related controls and, when the request targets the whole file (not a selection), clears and resets the results view before posting the analyse action to the worker. If an analysis is already in progress, shows a warning and does nothing.
  *
- * @param {Object} args - Parameters for the analysis request, including start and end positions, file scope, reanalysis flag, and source indicator.
+ * @param {Object} args - Analysis request parameters.
+ * @param {number} args.start - Start position (seconds) for the analysis window.
+ * @param {number} [args.end] - Optional end position (seconds) for a selection-based analysis.
+ * @param {string[]|undefined} [args.filesInScope] - Optional list of file paths to restrict the analysis scope.
+ * @param {boolean} [args.reanalyse=false] - If true, instructs the worker to reanalyse already-processed data.
+ * @param {boolean} [args.fromDB=false] - If true, indicates the request originates from database navigation (affects UI state handling).
  */
 function postAnalyseMessage(args) {
   if (!PREDICTING) {
@@ -1225,6 +1755,7 @@ function postAnalyseMessage(args) {
       disableSettingsDuringAnalysis(true);
     }
     if (!selection) {
+      STATE.summary = [];
       analyseReset();
       refreshResultsView();
       resetResults();
@@ -1237,7 +1768,6 @@ function postAnalyseMessage(args) {
       end: args.end,
       filesInScope: filesInScope,
       reanalyse: args.reanalyse,
-      SNR: config.filters.SNR,
       circleClicked: args.fromDB,
     });
   } else {
@@ -1248,22 +1778,27 @@ function postAnalyseMessage(args) {
 let openStreetMapTimer,
   currentRequest = null;
 async function fetchLocationAddress(lat, lon, pushLocations) {
-  const isInvalidLatitude = isNaN(lat) || lat === null || lat < -90 || lat > 90;
-  const isInvalidLongitude =
-    isNaN(lon) || lon === null || lon < -180 || lon > 180;
-
-  if (isInvalidLatitude || isInvalidLongitude) {
-    generateToast({ type: "warning", message: "placeOutOfBounds" });
-    return false;
-  }
-
+  if (!checkCoords(lat, lon)) return;
   currentRequest && clearTimeout(openStreetMapTimer); // Cancel pending request
 
   return new Promise((resolve, reject) => {
     currentRequest = { lat, lon }; // Store the current request details
-    const storedLocation = LOCATIONS?.find(
-      (obj) => obj.lat === lat && obj.lon === lon
-    );
+    const storedLocation = LOCATIONS?.find(obj => {
+      // Convert place string to numbers if it exists
+      const [placeLatStr, placeLonStr] = (obj.place || "").split(" ");
+      const placeLat = parseFloat(placeLatStr);
+      const placeLon = parseFloat(placeLonStr);
+      // Check if lat/lon match
+      if (obj.lat === lat && obj.lon === lon) {
+        // If place exactly matches "lat lon" string, treat as falsey
+        if (placeLat === lat && placeLon === lon) return false;
+        // Otherwise, lat/lon match but place is something else → truthy
+        return true;
+      }
+      // Lat/lon do not match → skip
+      return false;
+    });
+
     if (storedLocation) {
       return resolve(storedLocation.place);
     }
@@ -1275,10 +1810,14 @@ async function fetchLocationAddress(lat, lon, pushLocations) {
             });
         }
         const response = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=14`
+          `https://subscriber.mattkirkland.co.uk/nominatim/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=14`,
+          {  headers: {'X-App-Version': config.VERSION, 'X-User-ID': config.UUID}} 
         );
 
         if (!response.ok) {
+          if (response.status === 429){
+            generateToast({message: "Too many map clicks, please wait", type: 'warning'})
+          }
           return reject(
             new Error(
               `Network error: code ${response.status} fetching location from OpenStreetMap.`
@@ -1342,9 +1881,12 @@ async function importData(format){
     defaultPath,
   });
   if (files.canceled) return;
+  // remove the d-none class so wavesurfer can render
+  utils.showElement(["spectrogramWrapper"], false);
   const file = files.filePaths[0]
   const lastSaveFolder = p.dirname(file);
   localStorage.setItem("lastSaveFolder", lastSaveFolder);
+  STATE.summary = [];
   DOM.loadingScreen.classList.remove("d-none");
   worker.postMessage({
     action: "import-results",
@@ -1410,8 +1952,12 @@ async function exportData(
 }
 
 const handleLocationFilterChange = (e) => {
-  const location = parseInt(e.target.value) || undefined;
-  worker.postMessage({ action: "update-state", locationID: location });
+  const value = e.target.value;
+  const parsed = value === "" ? undefined : parseInt(value, 10);
+  const locationID = Number.isFinite(parsed) ? parsed : undefined;
+  const location = LOCATIONS.find(loc => loc.id === locationID);
+
+  worker.postMessage({ action: "update-state", location });
   // Update the seen species list
   worker.postMessage({ action: "get-detected-species-list" });
   worker.postMessage({
@@ -1435,6 +1981,8 @@ function saveAnalyseState() {
       active: active,
       analysisDone: STATE.analysisDone,
       resultsSortOrder: STATE.resultsSortOrder,
+      resultsMetaSortOrder: STATE.resultsMetaSortOrder,
+      summarySortOrder: STATE.summarySortOrder
     };
   }
 }
@@ -1485,11 +2033,7 @@ async function showCharts() {
   utils.hideAll();
  
   utils.showElement(["recordsContainer"]);
-  worker.postMessage({
-    action: "chart",
-    species: undefined,
-    range: STATE.chart.range,
-  });
+  callForChart();
 }
 
 
@@ -1501,6 +2045,7 @@ async function showCharts() {
 async function showExplore() {
   // Change STATE.fileLoaded this one time, so a file will load!
   STATE.fileLoaded = true;
+  STATE.summary = [];
   saveAnalyseState();
   STATE.openFiles = [];
   const state = STATE.currentAnalysis;
@@ -1525,8 +2070,7 @@ async function showExplore() {
   utils.hideAll();
   utils.showElement(["exploreWrapper", "spectrogramWrapper"], false);
   spec.reInitSpec(config.specMaxHeight);
-  worker.postMessage({ action: "update-state", filesToAnalyse: [] });
-  // Analysis is done
+    // Analysis is done
   STATE.analysisDone = true;
   filterResults({
     species: undefined,
@@ -1538,14 +2082,11 @@ async function showExplore() {
 }
 
 /**
- * Initiates the audio analysis workflow.
+ * Prepare the application and worker for performing analysis on the current file.
  *
- * This asynchronous function restores the previously saved analysis state and configures the UI and worker
- * process for a new analysis cycle. It disables the active analysis menu item, updates the worker mode,
- * and destroys any existing spectrogram instance to avoid conflicts. If an audio file is loaded, it
- * reveals the spectrogram UI, reinitializes the spectrogram, and updates the worker with the current state.
- * Depending on whether analysis was already completed, it either filters the results or reloads the audio file for analysis.
- * Finally, it resets the displayed results.
+ * Restores the saved analysis state, switches the UI and worker into analysis mode, ensures the spectrogram
+ * is initialized for analysis, updates the worker with the open-files and sort state, and either filters
+ * existing results or loads the current file for analysis. Finally, clears and resets the visible results.
  *
  * @async
  */
@@ -1566,8 +2107,9 @@ async function showAnalyse() {
     spec.reInitSpec(config.specMaxHeight);
     worker.postMessage({
       action: "update-state",
-      filesToAnalyse: STATE.openFiles,
       resultsSortOrder: STATE.resultsSortOrder,
+      resultsMetaSortOrder: STATE.resultsMetaSortOrder,
+      summarySortOrder: STATE.summarySortOrder,
     });
     if (STATE.analysisDone) {
       filterResults({
@@ -1734,10 +2276,10 @@ const defaultConfig = {
     cacheLocation: '',
     customModel: {location:'', type:'replace'},
     settings: {
-      useCache: false, 
-      lr: 0.0001, 
-      hidden: 0, 
-      dropout: 0, 
+      useCache: false,
+      lr: 0.0001,
+      hidden: 0,
+      dropout: 0,
       epochs: 10,
       validation: 0.2,
       decay: false,
@@ -1776,9 +2318,10 @@ const defaultConfig = {
   timeOfDay: true,
   list: "birds",
   models: {
-    birdnet: {displayName: 'BirdNET', backend: 'webgpu', customListFile: ''},
-    chirpity: {displayName: 'Nocmig', backend: 'webgpu', customListFile: ''},
-    nocmig: {displayName: 'Nocmig V2 (Beta)', backend: 'webgpu', customListFile: ''},
+    birdnet: {displayName: 'BirdNET', backend: 'webgpu', list: 'birds', webgpu: {threads: 1, batchSize: 8}, tensorflow: {threads: null, batchSize: 8},  customListFile: ''},
+    birdnet3: {displayName: 'BirdNET+ (preview 3.1)', backend: 'webgpu', list: 'birds', webgpu: {threads: 1, batchSize: 8}, tensorflow: {threads: 2, batchSize: 8},  customListFile: '', windowSize: 3},
+    chirpity: {displayName: 'Nocmig', backend: 'webgpu', list: 'birds', webgpu: {threads: 1, batchSize: 8}, tensorflow: {threads: null, batchSize: 8},  customListFile: ''},
+    nocmig: {displayName: 'Nocmig V2 (Beta)', backend: 'webgpu', list: 'birds', webgpu: {threads: 1, batchSize: 8}, tensorflow: {threads: null, batchSize: 8},  customListFile: ''},
   },
   local: true,
   speciesThreshold: 0.03,
@@ -1788,16 +2331,21 @@ const defaultConfig = {
   latitude: 52.87,
   longitude: 0.89,
   location: "Great Snoring, North Norfolk",
+  radius: 30,
   detect: {
     nocmig: false,
     autoLoad: false,
     contextAware: false,
     merge: false,
     combine: false,
+    mergeOverlaps: true,
+    dropSingles: true,
     confidence: 45,
     iucn: true,
     iucnScope: "Global",
-    topRankin: 1
+    topRankin: 1,
+    overlap: 0,
+    classes: ['Aves'],
   },
   filters: {
     active: false,
@@ -1805,7 +2353,6 @@ const defaultConfig = {
     lowPassFrequency: 15000,
     lowShelfFrequency: 0,
     lowShelfAttenuation: 0,
-    SNR: 0,
     normalise: false,
     sendToModel: false,
   },
@@ -1832,20 +2379,32 @@ const defaultConfig = {
   keyAssignment: {},
 };
 let dirname, appPath, tempPath, systemLocale, isMac;
+
+/**
+ * Initialize application configuration, model workers, localization, and UI state after the window loads.
+ *
+ * @returns {Promise<void>} Resolves after startup wiring and initial UI rendering complete.
+ */
 window.onload = async () => {
-  window.electron.requestWorkerChannel();
-  await diagnosticsReady;
+
+  const [, , mac, paths] = await Promise.all([
+    window.electron.requestWorkerChannel(),
+    diagnosticsReady,
+    window.electron.isMac(),
+    getPaths(),
+    appVersionLoaded
+  ]);
+
+  isMac = mac;
+  [appPath, tempPath, systemLocale, dirname] = paths;
   defaultConfig.tensorflow.threads = DIAGNOSTICS["Physical Cores"] || 2;
-  isMac = await window.electron.isMac();
   if (isMac) replaceCtrlWithCommand();
   DOM.contentWrapper.classList.add("loaded");
 
-  // Load preferences and override defaults
-  [appPath, tempPath, systemLocale, dirname] = await getPaths();
   // Set default locale
-  systemLocale = systemLocale.replace("en-GB", "en_uk");
+  systemLocale = systemLocale.replace("en-GB", "en_GB");
   systemLocale =
-    systemLocale === "en_uk"
+    systemLocale === "en_GB"
       ? systemLocale
       : systemLocale.slice(0, 2).toLowerCase();
   if (STATE.translations.includes(systemLocale)) {
@@ -1856,277 +2415,348 @@ window.onload = async () => {
 
   // Set footer year
   document.getElementById("year").textContent = new Date().getFullYear();
-  await appVersionLoaded;
   document.getElementById("version").textContent = VERSION;
-  const configFile = p.join(appPath, "config.json");
-  fs.readFile(configFile, "utf8", async (err, data) => {
-    if (err) {
-      console.log("Config not loaded, using defaults");
-      // Use defaults if no config file
-      if (!fs.existsSync(configFile)) config = defaultConfig;
-      else {
-        generateToast({ type: "error", message: "configReadError" });
-        config = defaultConfig;
-      }
-    } else {
-      config = JSON.parse(data);
-    }
-    config.UUID ??= await window.electron.getUUID();
-    // Attach an error event listener to the window object
-    window.onerror = function (message, file, lineno, colno, error) {
-      trackEvent(
-        config.UUID,
-        "Error",
-        error.message,
-        encodeURIComponent(error.stack)
-      );
-      // Return false not to inhibit the default error handling
-      return false;
-    };
+  const configPath = p.join(appPath, "config.json");
+  const configFile = await fs.promises.readFile(configPath, "utf8").catch(err =>{
+    console.log("Config not found, using defaults", err);
+    config = defaultConfig
+  });
+  
+  if (configFile) {
+    config = JSON.parse(configFile);
     //fill in defaults - after updates add new items
     utils.syncConfig(config, defaultConfig);
+    // Migrate from old locale format if necessary
+    if (config.locale === "en_uk") config.locale = "en_GB";
+  }
+  const installDate = localStorage.getItem("installDate");
+  const {appId, installedAt} = await window.electron.getInstallInfo(installDate);
+  if (!installDate || ! isNaN(Number(installDate))) {
+    let effectiveDate = installedAt;
+    if (installDate) {
+      const localDate = Number(installDate);
+      if (!isNaN(localDate) && localDate < new Date(installedAt).getTime())  {
+        effectiveDate = new Date(localDate).toISOString();
+      }
+      console.log('converting install date to', effectiveDate)
+    } 
+    localStorage.setItem("installDate", effectiveDate)
+  }
+  config.UUID ??= appId;
+  config.installedAt = installedAt;
+  if (isTestEnv) console.log(`UUID: ${config.UUID}, `)
+  // Attach an error event listener to the window object
+  window.onerror = function (message, file, lineno, colno, error) {
+    trackEvent(
+      {uuid: config.UUID, event: "Error", action: error.message, name: encodeURIComponent(error.stack), version: config.VERSION}
+    );
+    // Return false not to inhibit the default error handling
+    return false;
+  };
 
-    const isMember = await membershipCheck()
-      .catch(err => {console.error(err); return false});
-    STATE.isMember = isMember;
 
-    
-    const { library, database, detect, filters, audio, 
-      limit, locale, speciesThreshold, list, useWeek, UUID, 
-      local, debug, fileStartMtime, specDetections } = config;
-    
-    let modelPath = config.models[config.selectedModel].modelPath;
-    if (modelPath){
-      if (!fs.existsSync(modelPath)) {
-        generateToast({ type: "error", message: "modelPathNotFound", variables: {modelPath} });
-        worker.postMessage({action: "update-state",
-          modelPath: undefined,
-          model: 'birdnet'
-        });
-        config.selectedModel = 'birdnet';
-        modelPath = undefined;
+  const isMember = await membershipCheck()
+    .catch(err => {console.error(err); return false});
+  STATE.isMember = isMember;
+
+  
+  const { library, database, detect, filters, audio, 
+    limit, locale, speciesThreshold, list, useWeek, 
+    local, debug, fileStartMtime, specDetections, specLabels, UUID } = config;
+  
+  let modelPath = config.models[config.selectedModel].modelPath;
+  if (modelPath){
+    const requiredFiles = [], missingFiles = [];
+    if (!fs.existsSync(modelPath)) {
+      missingFiles.push(modelPath);
+    } else if (config.selectedModel === 'perch v2'){
+      requiredFiles.push('perch_v2.onnx', 'labels.txt');
+    } else {
+      requiredFiles.push('model.json', 'weights.bin', 'labels.txt');
+    }
+    // Check for required files
+    for (const file of requiredFiles) {
+      if (!fs.existsSync(p.join(modelPath, file))) {
+        missingFiles.push(p.join(modelPath, file));
       }
     }
-    const selectedModel = config.selectedModel;
-
-    updateListOptions(selectedModel);
-    if (detect.combine) document.getElementById('model-icon').classList.remove('d-none')
-    debug && document.getElementById('dataset').classList.remove('d-none')
-    isMember && updateModelOptions();
-
-    worker.postMessage({
-      action: "update-state",
-      model: selectedModel,
-      library,
-      database,
-      path: appPath,
-      temp: tempPath,
-      lat: config.latitude,
-      lon: config.longitude,
-      place: config.location,
-      detect,
-      filters,
-      audio,
-      limit,
-      locale,
-      speciesThreshold,
-      list,
-      useWeek,
-      local,
-      UUID,
-      debug,
-      fileStartMtime,
-      specDetections,
-    });
-    t0_warmup = Date.now();
-    if (isTestEnv) {
-      config.models[selectedModel].backend = "tensorflow";
+    if (missingFiles.length > 0){
+      modelPath = missingFiles.join(', ');
+      generateToast({ type: "error", message: "modelPathNotFound", variables: {modelPath} });
+      worker.postMessage({action: "update-state",
+        modelPath: undefined,
+        model: 'birdnet'
+      });
+      config.selectedModel = 'birdnet';
+      modelPath = undefined;
     }
-    const backend = config.models[config.selectedModel].backend;
+  }
+  if (config.selectedModel === 'birdnet3' && !isMember){
+    config.selectedModel = 'birdnet';
+  }
+  const selectedModel = config.selectedModel;
 
-    worker.postMessage({
-      action: "_init_",
-      model: selectedModel,
-      batchSize: config[backend].batchSize,
-      threads: config[backend].threads,
-      backend,
-      list,
-      modelPath
-    });
-    // Disable SNR
-    config.filters.SNR = 0;
-
-    // set version
-    config.VERSION = VERSION;
-    DIAGNOSTICS["UUID"] = config.UUID;
-
-    // Set UI option state
-    // Fontsize
-    config.fontScale === 1 || setFontSizeScale(true);
-
-    // Map slider value to batch size
-    DOM.batchSizeSlider.value = 
-      config[config.models[config.selectedModel].backend].batchSize;
-    DOM.batchSizeValue.textContent =
-      config[config.models[config.selectedModel].backend].batchSize;
-    DOM.modelToUse.value = config.selectedModel;
-    const backendEL = document.getElementById(config.models[config.selectedModel].backend);
-    backendEL.checked = true;
-    // Show time of day in results?
-    setTimelinePreferences();
-    // Show the list in use
-    DOM.listToUse.value = config.list;
-    DOM.localSwitch.checked = config.local;
-    // Show Locale
-    DOM.locale.value = config.locale;
-    LIST_MAP = i18n.get(i18n.LIST_MAP);
-    // Localise UI
-    i18n.localiseUI(DOM.locale.value).then((result) => (STATE.i18n = result));
-    initialiseDatePicker(STATE, worker, config, resetResults, filterResults, generateToast);
-    STATE.picker.options.lang = DOM.locale.value.replace("_uk", "");
-
-    // remember audio notification setting
-    DOM.audioNotification.checked = config.audio.notification;
-    // Zoom H1E filestart handling:
-    document.getElementById("file-timestamp").checked = config.fileStartMtime;
-
-    // timeline
-    DOM.timelineSetting.value = config.timeOfDay ? "timeOfDay" : "timecode";
-    // Spectrogram colour
-    if (config.colormap === "igreys") config.colormap = "gray";
-    DOM.colourmap.value = config.colormap;
-
-    // Spectrogram labels
-    DOM.specLabels.checked = config.specLabels;
-    // Show all detections
-    DOM.specDetections.checked = config.specDetections;
-    // Spectrogram frequencies
-    DOM.fromInput.value = config.audio.frequencyMin;
-    DOM.fromSlider.value = config.audio.frequencyMin;
-    DOM.toInput.value = config.audio.frequencyMax;
-    DOM.toSlider.value = config.audio.frequencyMax;
-    fillSlider(DOM.fromInput, DOM.toInput, "#C6C6C6", "#0d6efd", DOM.toSlider);
-    checkFilteredFrequency();
-    // Window function & colormap
-    document.getElementById("window-function").value =
-      config.customColormap.windowFn;
-    config.customColormap.windowFn === "gauss" &&
-      document.getElementById("alpha").classList.remove("d-none");
-    config.colormap === "custom" &&
-      document.getElementById("colormap-fieldset").classList.remove("d-none");
-    const {loud, mid, quiet, quietThreshold, midThreshold, alpha} = config.customColormap;
-    document.getElementById("quiet-color-threshold").textContent = quietThreshold;
-    document.getElementById("quiet-color-threshold-slider").value = quietThreshold;
-    document.getElementById("mid-color-threshold").textContent = midThreshold;
-    document.getElementById("mid-color-threshold-slider").value = midThreshold;
-    document.getElementById("loud-color").value = loud;
-    document.getElementById("mid-color").value = mid;
-    document.getElementById("quiet-color").value = quiet;
-    document.getElementById("alpha-slider").value = alpha;
-    document.getElementById("alpha-value").textContent = alpha;
-    
-    // Audio preferences:
-    DOM.gain.value = config.audio.gain;
-    DOM.gainAdjustment.textContent = config.audio.gain + "dB";
-    DOM.normalise.checked = config.filters.normalise;
-    DOM.audioFormat.value = config.audio.format;
-    DOM.audioBitrate.value = config.audio.bitrate;
-    DOM.audioQuality.value = config.audio.quality;
-    showRelevantAudioQuality();
-    DOM.audioFade.checked = config.audio.fade;
-    DOM.audioPadding.checked = config.audio.padding;
-    DOM.audioFade.disabled = !DOM.audioPadding.checked;
-    DOM.audioDownmix.checked = config.audio.downmix;
-    setNocmig(config.detect.nocmig);
-    document.getElementById("merge-detections").checked = config.detect.merge;
-    document.getElementById("combine-detections").checked = config.detect.combine;
-    document.getElementById("auto-load").checked = config.detect.autoLoad;
-    document.getElementById("iucn").checked = config.detect.iucn;
-    document.getElementById("iucn-scope").selected = config.detect.iucnScope;
-    handleModelChange(config.selectedModel, false)
-    // List appearance in settings
-    DOM.speciesThreshold.value = config.speciesThreshold;
-    document.getElementById("species-week").checked = config.useWeek;
-    DOM.customListFile.value = config.models[config.selectedModel].customListFile;
-    if (!DOM.customListFile.value) delete LIST_MAP.custom;
-    // And update the icon
-    updateListIcon();
-    setListUIState(list)
-    contextAwareIconDisplay();
-    DOM.debugMode.checked = config.debug;
-    showThreshold(config.detect.confidence);
-    showTopRankin(config.detect.topRankin)
-
-    // Filters
-    document.getElementById("HP-threshold").textContent = formatHz(config.filters.highPassFrequency);
-    document.getElementById("highPassFrequency").value = config.filters.highPassFrequency;
-    const lowPass = document.getElementById("lowPassFrequency")
-    lowPass.value = Number(lowPass.max) - config.filters.lowPassFrequency;
-    document.getElementById("LP-threshold").textContent = formatHz(config.filters.lowPassFrequency);
-    document.getElementById("lowShelfFrequency").value = config.filters.lowShelfFrequency;
-    document.getElementById("LowShelf-threshold").textContent = formatHz(config.filters.lowShelfFrequency);
-    DOM.attenuation.value = -config.filters.lowShelfAttenuation;
-    document.getElementById("attenuation-threshold").textContent = DOM.attenuation.value + "dB";
-    DOM.sendFilteredAudio.checked = config.filters.sendToModel;
-    filterIconDisplay();
-    if (config.models[config.selectedModel].backend === "webgpu") {
-      DOM.threadSlider.max = 6;
-    } else {
-      DOM.threadSlider.max = DIAGNOSTICS["Cores"];
-    }
-    DOM.batchSizeSlider.max = Math.max(parseInt(160 / (24576 / GPU_RAM)), 32);
-    DOM.threadSlider.value = config[config.models[config.selectedModel].backend].threads;
-    DOM.numberOfThreads.textContent = DOM.threadSlider.value;
-    DOM.defaultLat.value = config.latitude;
-    DOM.defaultLon.value = config.longitude;
-    place.innerHTML =
-      '<span class="material-symbols-outlined">fmd_good</span>' +
-      config.location;
-    if (config.library.location) {
-      document.getElementById("library-location").value =
-        config.library.location;
-      document.getElementById("library-format").value = config.library.format;
-      document.getElementById("library-trim").checked = config.library.trim;
-      document.getElementById("library-clips").checked = config.library.clips;
-      const autoArchive = document.getElementById("auto-library");
-      autoArchive.checked = config.library.auto;
-    }
-    if (config.database.location) {
-      document.getElementById("database-location").value =
-        config.database.location;
-    }
-    
-
-
-    // Enable popovers
-    const myAllowList = bootstrap.Tooltip.Default.allowList;
-    myAllowList.table = []; // Allow <table> element with no attributes
-    myAllowList.thead = [];
-    myAllowList.tbody = [];
-    myAllowList.tr = [];
-    myAllowList.td = [];
-    myAllowList.th = [];
-    const popoverTriggerList = document.querySelectorAll(
-      '[data-bs-toggle="popover"]'
-    );
-    const _ = [...popoverTriggerList].map(
-      (popoverTriggerEl) =>
-        new bootstrap.Popover(popoverTriggerEl, { allowList: myAllowList })
-    );
-    // Add cpu model & memory to config
-    config.CPU = DIAGNOSTICS["CPU"];
-    config.RAM = DIAGNOSTICS["System Memory"];
-    config.GPUs = DIAGNOSTICS["GPUs"];
-    trackVisit(config);
-
-    // check for new version on Intel mac platform. dmg auto-update not yet working
-    // window.electron.isIntelMac() && !isTestEnv && checkForIntelMacUpdates();
-
+  // Set Local classes to include for BirdNET3
+  detect.classes.forEach(cls => {
+    const box = document.getElementById(cls);
+    if (box) box.checked = true 
   });
+
+  updateListOptions(selectedModel);
+  isMember && updateModelOptions();
+  
+  worker.postMessage({
+    action: "update-state",
+    model: selectedModel,
+    library,
+    database,
+    path: appPath,
+    temp: tempPath,
+    lat: config.latitude,
+    lon: config.longitude,
+    place: config.location,
+    radius: config.radius,
+    detect,
+    filters,
+    audio,
+    limit,
+    locale,
+    speciesThreshold,
+    list,
+    useWeek,
+    local,
+    UUID,
+    debug,
+    fileStartMtime,
+    specDetections,
+    VERSION
+  });
+  t0_warmup = Date.now();
+  if (isTestEnv) {
+    config.models[selectedModel].backend = "tensorflow";
+  }
+  const modelOptions = config.models[selectedModel];
+  const backend = modelOptions.backend;
+  config.models[selectedModel].tensorflow.threads ??= DIAGNOSTICS['Physical Cores'] || 2;
+  const {batchSize, threads} = modelOptions[backend];
+  config[backend] = {batchSize, threads};
+  worker.postMessage({
+    action: "_init_",
+    model: selectedModel,
+    batchSize,
+    threads,
+    backend,
+    list,
+    modelPath,
+    windowSize: modelOptions.windowSize,
+  });
+
+  // set version
+  config.VERSION = VERSION;
+  DIAGNOSTICS["UUID"] = config.UUID;
+
+  // Set UI option state
+  // Fontsize
+  config.fontScale === 1 || setFontSizeScale(true);
+
+  // Map slider value to batch size
+  DOM.batchSizeSlider.value = batchSize;
+  DOM.batchSizeValue.textContent = batchSize;
+  DOM.modelToUse.value = selectedModel;
+  const backendEL = document.getElementById(backend);
+  backendEL.checked = true;
+  // Show time of day in results?
+  setTimelinePreferences();
+  // Show the list in use
+  DOM.listToUse.value = modelOptions.list;
+  DOM.localSwitch.checked = config.local;
+  // Show Locale
+  DOM.locale.value = config.locale;
+  LIST_MAP = i18n.get(i18n.LIST_MAP);
+  // Localise UI
+  i18n.localiseUI(DOM.locale.value).then((result) => (STATE.i18n = result));
+  initialiseDatePicker(STATE, worker, config, resetResults, filterResults, generateToast);
+  STATE.picker.options.lang = DOM.locale.value.replace("_GB", "");
+
+  // remember audio notification setting
+  DOM.audioNotification.checked = config.audio.notification;
+  // Zoom H1E filestart handling:
+  document.getElementById("file-timestamp").checked = config.fileStartMtime;
+
+  // timeline
+  DOM.timelineSetting.value = config.timeOfDay ? "timeOfDay" : "timecode";
+  // Spectrogram colour
+  if (config.colormap === "igreys") config.colormap = "gray";
+  DOM.colourmap.value = config.colormap;
+
+  // Spectrogram labels
+  DOM.specLabels.checked = specLabels;
+  // Show all detections
+  DOM.specDetections.checked = specDetections;
+  // Spectrogram frequencies
+  DOM.fromInput.value = audio.frequencyMin;
+  DOM.fromSlider.value = audio.frequencyMin;
+  DOM.toInput.value = audio.frequencyMax;
+  DOM.toSlider.value = audio.frequencyMax;
+  fillSlider(DOM.fromInput, DOM.toInput, "#C6C6C6", "#0d6efd", DOM.toSlider);
+  checkFilteredFrequency();
+  // Window function & colormap
+  document.getElementById("window-function").value =
+    config.customColormap.windowFn;
+  config.customColormap.windowFn === "gauss" &&
+    document.getElementById("alpha").classList.remove("d-none");
+  config.colormap === "custom" &&
+    document.getElementById("colormap-fieldset").classList.remove("d-none");
+  const {loud, mid, quiet, quietThreshold, midThreshold, alpha} = config.customColormap;
+  document.getElementById("quiet-color-threshold").textContent = quietThreshold;
+  document.getElementById("quiet-color-threshold-slider").value = quietThreshold;
+  document.getElementById("mid-color-threshold").textContent = midThreshold;
+  document.getElementById("mid-color-threshold-slider").value = midThreshold;
+  document.getElementById("loud-color").value = loud;
+  document.getElementById("mid-color").value = mid;
+  document.getElementById("quiet-color").value = quiet;
+  document.getElementById("alpha-slider").value = alpha;
+  document.getElementById("alpha-value").textContent = alpha;
+  
+  // Audio preferences:
+  DOM.gain.value = audio.gain;
+  DOM.gainAdjustment.textContent = audio.gain + "dB";
+  DOM.normalise.checked = config.filters.normalise;
+  DOM.audioFormat.value = audio.format;
+  DOM.audioBitrate.value = audio.bitrate;
+  DOM.audioQuality.value = audio.quality;
+  showRelevantAudioQuality();
+  DOM.audioFade.checked = audio.fade;
+  DOM.audioPadding.checked = audio.padding;
+  DOM.audioFade.disabled = !DOM.audioPadding.checked;
+  DOM.audioDownmix.checked = audio.downmix;
+  setNocmig(detect.nocmig);
+  if (config.detect.combine) document.getElementById('model-icon').classList.remove('d-none')
+  document.getElementById("merge-overlaps").checked = detect.mergeOverlaps;
+  document.getElementById("drop-uncertain").checked = detect.dropSingles;
+  document.getElementById("auto-load").checked = detect.autoLoad;
+  document.getElementById("iucn").checked = detect.iucn;
+  document.getElementById("iucn-scope").value = detect.iucnScope;
+  handleModelChange(selectedModel, false)
+  // Detection options
+  const mergeSwitch = document.getElementById("merge-detections");
+  mergeSwitch.checked = detect.merge;
+  if (mergeSwitch.checked) {
+    config.detect.combine = true;
+    document.getElementById("combine-detections").checked = true;
+  } else {
+    document.getElementById("combine-detections").checked = config.detect.combine;  
+  }
+  // List appearance in settings
+  DOM.speciesThreshold.value = config.speciesThreshold;
+  document.getElementById("species-week").checked = config.useWeek;
+  DOM.customListFile.value = config.models[selectedModel].customListFile;
+  if (!DOM.customListFile.value) delete LIST_MAP.custom;
+  // And update the icon
+  updateListIcon();
+  setListUIState(list)
+  contextAwareIconDisplay();
+  DOM.debugMode.checked = config.debug;
+  showThreshold(detect.confidence);
+  showTopRankin(detect.topRankin)
+  showOverlap(detect.overlap);
+
+  // Filters
+  document.getElementById("HP-threshold").textContent = formatHz(config.filters.highPassFrequency);
+  document.getElementById("highPassFrequency").value = config.filters.highPassFrequency;
+  const lowPass = document.getElementById("lowPassFrequency")
+  lowPass.value = Number(lowPass.max) - config.filters.lowPassFrequency;
+  document.getElementById("LP-threshold").textContent = formatHz(config.filters.lowPassFrequency);
+  document.getElementById("lowShelfFrequency").value = config.filters.lowShelfFrequency;
+  document.getElementById("LowShelf-threshold").textContent = formatHz(config.filters.lowShelfFrequency);
+  DOM.attenuation.value = -config.filters.lowShelfAttenuation;
+  document.getElementById("attenuation-threshold").textContent = DOM.attenuation.value + "dB";
+  DOM.sendFilteredAudio.checked = config.filters.sendToModel;
+  filterIconDisplay();
+  if (config.models[config.selectedModel].backend === "webgpu") {
+    DOM.threadSlider.max = 6;
+  } else {
+    DOM.threadSlider.max = DIAGNOSTICS["Cores"];
+  }
+  DOM.batchSizeSlider.max = Math.max(parseInt(160 / (24576 / GPU_RAM)), 32);
+  DOM.threadSlider.value = config[config.models[config.selectedModel].backend].threads;
+  DOM.numberOfThreads.textContent = DOM.threadSlider.value;
+  const windowSize = config.models['birdnet3'].windowSize;
+  DOM.windowSizeSlider.value = windowSize;
+  DOM.windowSizeValue.textContent = windowSize;
+  DOM.defaultLat.value = config.latitude;
+  DOM.defaultLon.value = config.longitude;
+  place.innerHTML =
+    '<span class="material-symbols-outlined">fmd_good</span>' +
+    config.location;
+  if (config.library.location) {
+    document.getElementById("library-location").value =
+      config.library.location;
+    document.getElementById("library-format").value = config.library.format;
+    const libraryTrim = document.getElementById("library-trim");
+    libraryTrim.disabled = false;
+    libraryTrim.checked = config.library.trim;
+    const libraryClips = document.getElementById("library-clips");
+    if (isMember){
+      libraryClips.checked = config.library.clips;
+      libraryClips.disabled = false;
+    } else {
+      config.library.clips = false;
+    }
+    const autoArchive = document.getElementById("auto-library");
+    autoArchive.checked = config.library.auto;
+    autoArchive.disabled = false;
+  }
+  if (config.database.location) {
+    document.getElementById("database-location").value =
+      config.database.location;
+    showDBLocation(config.database.location);
+  }
+  
+
+
+  // Enable popovers
+  const myAllowList = bootstrap.Tooltip.Default.allowList;
+  myAllowList.table = []; // Allow <table> element with no attributes
+  myAllowList.thead = [];
+  myAllowList.tbody = [];
+  myAllowList.tr = [];
+  myAllowList.td = [];
+  myAllowList.th = [];
+  const popoverTriggerList = document.querySelectorAll(
+    '[data-bs-toggle="popover"]'
+  );
+  const _ = [...popoverTriggerList].map(
+    (popoverTriggerEl) =>
+      new bootstrap.Popover(popoverTriggerEl, { allowList: myAllowList })
+  );
+  // Add cpu model & memory to config
+  config.CPU = DIAGNOSTICS["CPU"];
+  config.RAM = DIAGNOSTICS["System Memory"];
+  config.GPUs = DIAGNOSTICS["GPUs"];
+  trackVisit(config);
+
+  // check for new version on Intel mac platform. dmg auto-update not yet working
+  // window.electron.isIntelMac() && !isTestEnv && checkForIntelMacUpdates();
+
+  // Set up pagination
+  pagination = new Pagination(
+    document.querySelector(".pagination"),
+    () => STATE, // Returns the current state
+    limit, //the current limit
+    () => worker,
+    {
+      isSpeciesViewFiltered,
+      filterResults,
+      resetResults,
+    }
+  );
+  pagination.init();
 };
 
-let MISSING_FILE;
-
+/**
+ * Attach the renderer's message listener after its worker channel is established.
+ */
 const setUpWorkerMessaging = () => {
   establishMessageChannel.then(() => {
     worker.addEventListener("message", async function (e) {
@@ -2154,6 +2784,14 @@ const setUpWorkerMessaging = () => {
           DOM.loadingScreen.classList.add('d-none')
           break;
         }
+        case "corrupt-file": {
+          removeOpenFile(args.file);
+          break;
+        }
+        case "database-files": {
+          onDatabaseFiles(args.files);
+          break;
+        }
         case "footer-progress": {
           displayProgress(args.progress, args.text);
           break;
@@ -2176,8 +2814,27 @@ const setUpWorkerMessaging = () => {
           onFileLocationID(args);
           break;
         }
+        case "delete-location-id": {
+          onLocationDeleted(args);
+          break;
+        }
         case "files": {
           onOpenFiles(args);
+          break;
+        }
+        case "found-time": {
+          const result = args.result;
+          if (result.length){
+            const {file, offset} = result[0];
+            STATE.windowLength = 20;
+            postBufferUpdate({
+              file,
+              begin: Math.max(offset - STATE.windowLength / 2, 0),
+              position: 0.5,
+            });
+          } else {
+            generateToast({type: "info", message: "Time not found in any file"});
+          }
           break;
         }
         case "generate-alert": {
@@ -2207,14 +2864,14 @@ const setUpWorkerMessaging = () => {
           if (args.file) {
             // Clear the file loading overlay:
             loadingFiles({hide: true})
-            MISSING_FILE = args.file;
+            const file = args.file;
             const i18 = i18n.get(i18n.Locate);
             args.locate = `
                             <div class="d-flex justify-content-center mt-2">
-                                <button id="locate-missing-file" class="btn btn-primary border-dark text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
+                                <button id="locate-missing-file"  name="${file}" class="btn btn-primary border-dark text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
                                     ${i18.locate}
                                 </button>
-                                <button id="purge-from-toast" class="ms-3 btn btn-warning text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
+                                <button id="purge-from-toast" name="${file}" class="ms-3 btn btn-warning text-nowrap" style="--bs-btn-padding-y: .25rem;" type="button">
                                 ${i18.remove}
                                 </button>
                             </div>
@@ -2234,15 +2891,24 @@ const setUpWorkerMessaging = () => {
         case "labels": {
           // Remove duplicate labels
           LABELS = [...new Set(args.labels)];
+          let range;
+          if (STATE.mode === "explore") { range = STATE.explore.range }
+          else if (STATE.mode === "chart") { range = STATE.chart.range }
+          worker.postMessage({
+            action: "get-detected-species-list",
+            range
+          });
           // Code below to retrieve Red list data
-          // if (!done){
+          // if (!done && LABELS.length){
+          //   STATE.IUCNcache = {};
           //   done = true;
           //               for (let i = 0;i< LABELS.length; i++){
           //                   const label = LABELS[i];
           //                   let  sname = label.split(getSplitChar())[0];
           //                   sname = IUCNtaxonomy[sname] || sname;
-          //                   if (sname && ! STATE.IUCNcache[sname]) { 
-          //                       await getIUCNStatus(sname)
+          //                   if (sname && !  STATE.IUCNcache[sname]) { 
+          //                       const result = await getIUCNStatus(sname)
+          //                       if (!result) break
           //                       await new Promise(resolve => setTimeout(resolve, 500))
           //                   }
           //               }
@@ -2253,20 +2919,24 @@ const setUpWorkerMessaging = () => {
         case "label-translation-needed": {
           // Called when the initial system locale isn't english
           let locale = args.locale;
-          let labelFile;
-          locale === "pt" && (locale = "pt_PT");
-          labelFile = p.join(dirname,`labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_${locale}.txt`);
-
+          const labelFile = getLabelFile();
           readLabels(labelFile);
           break;
         }
         case "location-list": {
-          LOCATIONS = args.locations;
-          locationID = args.currentLocation;
+          LOCATIONS = args.data;
+          locationID = args.currentLocation || locationID;
+          generateLocationList("explore-locations");
+          generateLocationList("chart-locations");
           break;
         }
         case "model-ready": {
-          onModelReady();
+          if (args.message === "Model failed to load") {
+              DOM.loadingScreen.classList.add("d-none");
+              APPLICATION_LOADED = true;
+          } else {
+            onModelReady();
+          }
           break;
         }
         case "mode-changed": {
@@ -2277,10 +2947,12 @@ const setUpWorkerMessaging = () => {
               STATE.diskHasRecords &&
                 !PREDICTING &&
                 utils.enableMenuItem(["explore", "charts"]);
+              utils.hideElement(["exploreWrapper"]);
               break;
             }
             case "archive": {
               utils.enableMenuItem(["save2db", "explore", "charts"]);
+              utils.hideElement(["exploreWrapper"]);
               break;
             }
           }
@@ -2350,10 +3022,6 @@ const setUpWorkerMessaging = () => {
           args.init && setKeyAssignmentUI(config.keyAssignment);
           break;
         }
-        case "total-records": {
-          updatePagination(args.total, args.offset);
-          break;
-        }
         case "unsaved-records": {
           window.electron.unsavedRecords(true);
           document.getElementById("unsaved-icon").classList.remove("d-none");
@@ -2380,7 +3048,7 @@ const setUpWorkerMessaging = () => {
           generateToast({
             type: "error",
             message: "badMessage",
-            variables: { "args.event": args.event },
+            variables: { event: args.event ?? args.message ?? "unknown" },
           });
         }
       }
@@ -2389,14 +3057,50 @@ const setUpWorkerMessaging = () => {
 };
 
 /**
- * Creates and displays audio regions for detections within the current spectrogram window.
+ * Removes the file from the list of open files and re-render the filename panel
+ * @param {string} A file path.
+ */
+function removeOpenFile(file) {
+  const index = STATE.openFiles.indexOf(file);
+  if (index === -1) return index;
+
+  const removedCurrentFile = STATE.currentFile === file || ! STATE.currentFile;
+  STATE.openFiles.splice(index, 1);
+
+  if (removedCurrentFile) {
+    const nextIndex = Math.min(index, STATE.openFiles.length - 1);
+    const replacementFile = STATE.openFiles[nextIndex] ?? null;
+    STATE.currentFile = replacementFile;
+    STATE.fileLoaded = false;
+
+    if (replacementFile) {
+      loadAudioFileSync({ filePath: replacementFile });
+    }
+  }
+
+  renderFilenamePanel();
+}
+
+/**
+ * Return the bundled multilingual BirdNET3 label CSV.
  *
- * Adjusts detection times relative to the current window offset and creates regions for those visible in the window. Only active detections or those allowed by configuration are processed. Optionally repositions the view to an active region.
+ * @param {string} locale - Reserved for callers selecting a locale; the CSV contains all locales.
+ * @returns {string} Path to the bundled label CSV.
+ */
+
+const getLabelFile = () => {
+    return p.join(dirname, "BirdNET3/BirdNET3_geomodel_labels.csv");
+}
+/**
+ * Display regions for detections that fall within the current spectrogram window.
+ *
+ * For each detection whose start time lies inside the current window, a region is created using times adjusted by the window offset. Only the active detection or detections allowed by configuration are shown. If `goToRegion` is true and a detection is active, the view is repositioned to that region.
  *
  * @param {Object} options - Options for region creation.
- * @param {Array<Object>} options.detections - Detections to display, each with `start`, `end`, and `label` properties.
- * @param {boolean} options.goToRegion - Whether to reposition the view to the active region.
+ * @param {Array<Object>} options.detections - Array of detection objects. Each object should include `start` and `end` (seconds) and may include `label` or `cname` used for region labeling.
+ * @param {boolean} options.goToRegion - If true, reposition the view to the active region when one is present.
  */
+
 function showWindowDetections({ detections, goToRegion }) {
   for (const detection of detections) {
     const start = detection.start - STATE.windowOffsetSecs;
@@ -2406,7 +3110,7 @@ function showWindowDetections({ detections, goToRegion }) {
       if (!config.specDetections && !active) continue;
       const colour = active ? STATE.regionActiveColour : null;
       const setPosition = active && goToRegion;
-      spec.createRegion(start, end, detection.label, setPosition, colour);
+      spec.createRegion(start, end, detection.cname, setPosition, colour);
     }
   }
 }
@@ -2488,17 +3192,7 @@ async function onSaveAudio({ file, filename, extension }) {
   });
 }
 
-// Chart functions
-function getDateOfISOWeek(w) {
-  const options = { month: "long", day: "numeric" };
-  const y = new Date().getFullYear();
-  const simple = new Date(y, 0, 1 + (w - 1) * 7);
-  const dow = simple.getDay();
-  const ISOweekStart = simple;
-  if (dow <= 4) ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
-  else ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
-  return ISOweekStart.toLocaleDateString("en-GB", options);
-}
+
 
 /**
  * Processes chart data to update the UI and render a new Chart.js chart.
@@ -2521,11 +3215,59 @@ function getDateOfISOWeek(w) {
  * @param {number} args.dataPoints - The number of data points to generate date labels for the x-axis.
  * @param {number} args.rate - A data rate value included in the arguments (currently unused in chart rendering).
  */
+
+let chartInstance;
+
+function getDateOfISOWeek(week, year) {
+  const simple = new Date(year, 0, 1 + (week - 1) * 7);
+  const dayOfWeek = simple.getDay();
+  const isoWeekStart = new Date(simple);
+  const diff = (dayOfWeek === 0 ? -6 : 1) - dayOfWeek;
+  isoWeekStart.setDate(simple.getDate() + diff);
+  return isoWeekStart;
+}
+
+/**
+ * Format an ISO week as a localized start-to-end date range.
+ *
+ * @param {number} week - ISO week number.
+ * @param {number} year - Year containing the ISO week.
+ * @returns {string|number} Localized range, or the original week when its date is invalid.
+ */
+function formatWeekRange(week, year) {
+  const locale = config.locale.replace("en_GB", "en-GB").replace('_', '-');
+
+  const start = getDateOfISOWeek(week, year);
+  if (isNaN(start.getTime())) return week;
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+
+  const monthOpts = { month: 'long' };
+
+  const startStr = `${start.toLocaleDateString(locale, { day: 'numeric' })}`;
+  const endStr =
+    end.toLocaleDateString(locale, { day: 'numeric', ...monthOpts });
+
+  // If start and end are in different months, show both
+  if (start.getMonth() !== end.getMonth()) {
+    const startFull =
+      `${start.toLocaleDateString(locale, { day: 'numeric', ...monthOpts })}`;
+    return `${startFull} – ${endStr}`;
+  }
+
+  // Same month → “5–11 February”
+  return `${startStr}–${endStr}`;
+}
+
 function onChartData(args) {
-  if (args.species) {
+  const i18 = i18n.get(i18n.ChartUI)
+  const {records, aggregation, pointStart, results, rate, startX} = args;
+  const dataPoints = Object.values(results)[0]?.length;
+  const species = args.species || "";
+  if (species) {
     utils.showElement(["recordsTableBody"], false);
     const title = document.getElementById("speciesName");
-    title.textContent = args.species;
+    title.textContent = species;
   } else {
     utils.hideElement(["recordsTableBody"]);
   }
@@ -2538,11 +3280,10 @@ function onChartData(args) {
   // Get the Chart.js canvas
   const chartCanvas = document.getElementById("chart-week");
 
-  const records = args.records;
   for (const [key, value] of Object.entries(records)) {
     const element = document.getElementById(key);
     if (value?.constructor === Array) {
-      if (isNaN(value[0])) element.textContent = "N/A";
+      if (isNaN(value[0])) element.textContent = i18.NR
       else {
         element.textContent =
           value[0].toString() +
@@ -2557,20 +3298,17 @@ function onChartData(args) {
             month: "short",
             day: "numeric",
           })
-        : "No Records";
+        : i18.NR;
     }
   }
 
-  const aggregation = args.aggregation;
-  const results = args.results;
   const total = args.total;
-  const dataPoints = args.dataPoints;
   // start hourly charts at midday if no filter applied
-  const pointStart =
-    STATE.chart.range.start || aggregation !== "Hour"
-      ? args.pointStart
-      : args.pointStart + 12 * 60 * 60 * 1000;
-  const dateLabels = generateDateLabels(aggregation, dataPoints, pointStart);
+  const start =
+    STATE.chart.range.start || aggregation !== "hour"
+      ? pointStart
+      : pointStart + 12 * 60 * 60 * 1000;
+  const dateLabels = generateDateLabels(aggregation, dataPoints, start, startX);
 
   // Initialize Chart.js
   const plugin = {
@@ -2589,15 +3327,11 @@ function onChartData(args) {
     data: {
       labels: dateLabels,
       datasets: Object.entries(results).map(([year, data]) => ({
-        label: year,
-        //shift data to midday - midday rather than nidnight to midnight if hourly chart and filter not set
-        data:
-          aggregation !== "Hour"
-            ? data
-            : data.slice(12).join(data.slice(0, 12)),
-        //backgroundColor: 'rgba(255, 0, 64, 0.5)',
+        label: isNaN(year) ? i18.AY : year,
+        data,
+        // backgroundColor: 'rgba(255, 0, 64, 0.5)',
         borderWidth: 1,
-        //borderColor: 'rgba(255, 0, 64, 0.9)',
+        // borderColor: 'rgba(255, 0, 64, 0.9)',
         borderSkipped: "bottom", // Lines will appear to rise from the bottom
       })),
     },
@@ -2616,18 +3350,28 @@ function onChartData(args) {
       plugins: {
         title: {
           display: true,
-          text: args.species ? `${args.species} Detections` : "",
+          text: utils.interpolate(i18.NoD, {species}).replace("()", ""),
         },
         customCanvasBackgroundColor: {
           color: "GhostWhite",
         },
+        tooltip: aggregation === "week" ? { 
+        callbacks: {
+          title: (items) => {
+            const week = items[0].label;
+            const key = items[0].dataset.label;
+            const year = isNaN(parseInt(key)) ? new Date().getFullYear() : parseInt(key);
+            return formatWeekRange(week, year);
+          }
+        }
+      } : undefined
       },
     },
     plugins: [plugin],
   };
   if (total) {
     chartOptions.data.datasets.unshift({
-      label: "Hours Recorded",
+      label: i18.HR,
       type: "line",
       data: total,
       fill: true,
@@ -2640,34 +3384,42 @@ function onChartData(args) {
     });
     chartOptions.options.scales["y1"] = {
       position: "right",
-      title: { display: true, text: "Hours of Recordings" },
+      title: { display: true, text: i18.HoR },
     };
     chartOptions.options.scales.x = {
       max: 53,
-      title: { display: true, text: "Week in Year" },
+      title: { display: true, text: i18.WiY },
     };
   }
-  new Chart(chartCanvas, chartOptions);
+  chartInstance = new Chart(chartCanvas, chartOptions);
 }
 
-function generateDateLabels(aggregation, datapoints, pointstart) {
+/**
+ * Generate chart-axis labels for consecutive hours, days, or week numbers.
+ *
+ * @param {string} aggregation - Chart interval: `hour`, `day`, or `week`.
+ * @param {number} datapoints - Number of labels to generate.
+ * @param {number|string|Date} pointstart - Starting date for hour and day labels.
+ * @param {number} startX - First week number for week labels.
+ * @returns {Array<string|number>} Generated axis labels.
+ */
+function generateDateLabels(aggregation, datapoints, pointstart, startX) {
   const dateLabels = [];
   const startDate = new Date(pointstart);
-
+  if (aggregation === "week") {
+    return Array.from({length: datapoints }, (_, i) => startX + i);
+  }
   for (let i = 0; i < datapoints; i++) {
     // Push the formatted date label to the array
     dateLabels.push(formatDate(startDate, aggregation));
 
     // Increment the startDate based on the aggregation
-    if (aggregation === "Hour") {
+    if (aggregation === "hour") {
       startDate.setTime(startDate.getTime() + 60 * 60 * 1000); // Add 1 hour
-    } else if (aggregation === "Day") {
+    } else if (aggregation === "day") {
       startDate.setDate(startDate.getDate() + 1); // Add 1 day
-    } else if (aggregation === "Week") {
-      startDate.setDate(startDate.getDate() + 7); // Add 7 days (1 week)
     }
   }
-
   return dateLabels;
 }
 
@@ -2675,55 +3427,34 @@ function generateDateLabels(aggregation, datapoints, pointstart) {
 function formatDate(date, aggregation) {
   const options = {};
   let formattedDate = "";
-  if (aggregation === "Week") {
+  // Convert to BCP 47 language tag for Intl API (e.g., "en-US" instead of "en_US")
+  const locale = config.locale.replace('_', '-');
+  if (aggregation === "week") {
     // Add 1 day to the startDate
-    date.setHours(date.getDate() + 1);
+    date.setHours(date.getDate() );
     const year = date.getFullYear();
     const oneJan = new Date(year, 0, 1);
     const weekNumber = Math.ceil(
-      ((date - oneJan) / (24 * 60 * 60 * 1000) + oneJan.getDay() + 1) / 7
+      ((date - oneJan) / (24 * 60 * 60 * 1000) + oneJan.getDay() ) / 7
     );
     return weekNumber;
-  } else if (aggregation === "Day") {
+  } else if (aggregation === "day") {
     options.day = "numeric";
-    options.weekday = "short";
+    // options.weekday = "short";
     options.month = "short";
-  } else if (aggregation === "Hour") {
-    const hour = date.getHours();
-    const period = hour >= 12 ? "PM" : "AM";
-    const formattedHour = hour % 12 || 12; // Convert 0 to 12
-    return `${formattedHour}${period}`;
+  } else if (aggregation === "hour") {
+    const timeString = new Intl.DateTimeFormat(locale, {
+      hour: 'numeric',
+      hour12: true
+    }).format(date);
+    // const hour = date.getHours();
+    // const period = hour >= 12 ? "PM" : "AM";
+    // const formattedHour = hour % 12 || 12; // Convert 0 to 12
+    // return `${formattedHour}${period}`;
+    return timeString;
   }
-
-  return formattedDate + date.toLocaleDateString("en-GB", options);
-}
-
-
-function getTooltipTitle(date, aggregation) {
-  if (aggregation === "Week") {
-    // Customize for week view
-    return `Week ${getISOWeek(date)} (${getDateOfISOWeek(
-      getISOWeek(date)
-    )} - ${getDateOfISOWeek(getISOWeek(date) + 1)})`;
-  } else if (aggregation === "Day") {
-    // Customize for day view
-    return date.toLocaleDateString("en-GB", {
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    });
-  } else {
-    // Customize for hour view
-    return (
-      date.toLocaleDateString("en-GB", { month: "short", day: "numeric" }) +
-      ", " +
-      date.toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "numeric",
-        hour12: true,
-      })
-    );
-  }
+  
+  return formattedDate + date.toLocaleDateString(locale, options);
 }
 
 window.addEventListener("resize", function () {
@@ -2744,11 +3475,15 @@ window.addEventListener("resize", function () {
  * @param {KeyboardEvent} e - The keydown event.
  */
 function handleKeyDownDeBounce(e) {
+  const el = e.target;
+  if (['range','checkbox','radio','button','submit'].includes(el.type)) {
+      e.stopPropagation();
+  }
   if (
     !(
-      e.target instanceof HTMLInputElement ||
-      e.target instanceof HTMLTextAreaElement ||
-      e.target instanceof CustomSelect
+      el instanceof HTMLInputElement ||
+      el instanceof HTMLTextAreaElement ||
+      el instanceof CustomSelect
     )
   ) {
     e.preventDefault();
@@ -2789,6 +3524,7 @@ function debounceClick(handler, delay = 250) {
  */
 function handleKeyDown(e) {
   let action = e.key;
+  if (!config) return;
   config.debug && console.log(`${action} key pressed`);
   if (action in GLOBAL_ACTIONS) {
     DOM.contextMenu.classList.add("d-none");
@@ -2805,7 +3541,7 @@ function handleKeyDown(e) {
       : e.metaKey
       ? "Alt"
       : "no";
-    trackEvent(config.UUID, "KeyPress", action, modifier);
+    trackEvent({uuid: config.UUID, event: "KeyPress", action, name:modifier, version: config.VERSION});
     GLOBAL_ACTIONS[action](e);
   } else {
     GLOBAL_ACTIONS.handleNumberKeys(e);
@@ -2862,12 +3598,17 @@ let spec = new ChirpityWS(
   GLOBAL_ACTIONS
 );
 
+/**
+ * Rebuild the available list-mode options for a model and persist a valid fallback when needed.
+ *
+ * @param {string} model - Model whose supported list modes should be displayed.
+ */
 const updateListOptions = (model) => {
   const select = document.getElementById('list-to-use');
   select.replaceChildren();
   let options;
   if (/perch/i.test(model)) {
-    options = ["birds", "Amphibia", "Insecta", "Mammalia", "Reptilia", "Animalia", "everything", "custom"]
+    options = ["location", "birds", "everything", "custom"]
   } else  {
     options = ["location", "nocturnal", "birds", "everything", "custom"];
   }
@@ -2879,21 +3620,22 @@ const updateListOptions = (model) => {
   });
   if (!options.includes(config.list)) {
     config.list = "birds";
+    config.models[model].list = 'birds';
     updatePrefs("config.json", config);
     select.value = config.list;
   }
 }
 
+/**
+ * Render the icon and tooltip for the configured species-list mode.
+ */
 const updateListIcon = () => {
   const LIST_MAP = i18n.get(i18n.LIST_MAP);
   const {list} = config;
   let node;
-  if (["custom", "Mammalia", "Insecta", "Animalia"].includes(list)) {
+  if (["custom"].includes(list)) {
     const iconName = {
-      custom: "fact_check",
-      Mammalia: "pets",
-      Insecta: "bug_report",
-      Animalia: "voice_over_off"
+      custom: "fact_check"
     }
     node = document.createElement("span");
     node.className = "material-symbols-outlined mt-1";
@@ -2901,22 +3643,38 @@ const updateListIcon = () => {
     node.style.height =  "1.6rem";
     node.textContent = iconName[list];
   } else {
-    if (!['location', 'birds', 'nocturnal', 'everything', 'Amphibia', "Reptilia"].includes(list)) return
+    if (!['location', 'birds', 'nocturnal', 'everything'].includes(list)) return
     node = document.createElement("img");
     node.className = "icon filter";
     node.setAttribute("src", `img/${list}.png`);
     node.setAttribute("alt", list);
   }
-  node.setAttribute("title", LIST_MAP[list] || "Unknown List");
+  let customListFile = config.models[config.selectedModel].customListFile;
+  let title= LIST_MAP[list] || "Unknown List";
+  if (list === "custom") {
+    title += customListFile ? ': ' + customListFile.split(/[\\/]/).pop() : "No custom list selected";
+  } 
+  node.setAttribute("title", title);
   DOM.listIcon.replaceChildren(node);
 };
 
+/**
+ * Render the selected model's logo, including the BirdNET3 preview badge.
+ *
+ * @param {string} model - Configured model identifier.
+ */
 const updateModelIcon = (model) => {
   let title;
+  let showVersion3 = false;
   switch (model) {
     case 'birdnet':
       title = "BirdNET";
       break;
+    case 'birdnet3':
+      title = "BirdNET+ (preview 3.1)";
+      model = 'birdnet';
+      showVersion3 = true;
+      break;      
     case 'chirpity':
       title = "Nocmig";
       break;
@@ -2928,9 +3686,9 @@ const updateModelIcon = (model) => {
       model = 'perch';
       break;
     default:
-      if (/bats/i.test(model)) {
+      if (/batpack/i.test(model)) {
         title = "Bats";
-        model = "bats";
+        model = "batpack";
       } else {
         title = i18n.get(i18n.Lists).custom;
         model = "custom"
@@ -2943,19 +3701,29 @@ const updateModelIcon = (model) => {
   img.setAttribute("alt", title);
   img.setAttribute("title", title);
   DOM.modelIcon.replaceChildren(img); // Clear existing content
+  if (showVersion3) {
+    const badge = document.createElement("span");
+    badge.className = "position-absolute top-0 start-0 ms-2 mt-1 translate-middle badge rounded-pill";
+    badge.textContent = "+";
+    DOM.modelIcon.appendChild(badge);
+  }
 }
 
-DOM.listIcon.addEventListener("click", () => {
+DOM.listIcon.addEventListener("click", (e) => {
+  e.stopPropagation();
   if (PREDICTING) {
     generateToast({ message: "changeListBlocked", type: "warning" });
     return;
   }
-  const keys = config.selectedModel !== 'perch v2' ? ["location", "nocturnal", "birds", "everything", "custom"] : ["birds", "Amphibia", "Insecta", "Mammalia", "Reptilia", "Animalia", "everything", "custom"];
+  const model = config.selectedModel;
+  const keys = model !== 'perch v2' ? ["location", "nocturnal", "birds", "everything", "custom"] : ["location", "birds", "everything", "custom"];
   const currentListIndex = keys.indexOf(config.list);
   const next = currentListIndex === keys.length - 1 ? 0 : currentListIndex + 1;
   config.list = keys[next];
+  config.models[model].list = keys[next];
   updatePrefs("config.json", config);
   updateList();
+  setClassesUIState();
 });
 
 DOM.customListSelector.addEventListener("click", async () => {
@@ -2976,6 +3744,9 @@ DOM.customListSelector.addEventListener("click", async () => {
   }
 });
 
+/**
+ * Request that the analysis worker load the currently configured model.
+ */
 const loadModel = () => {
   PREDICTING = false;
   t0_warmup = Date.now();
@@ -2989,11 +3760,13 @@ const loadModel = () => {
     warmup,
     threads: config[backend].threads,
     backend,
-    modelPath
+    modelPath,
+    windowSize: config.models[selectedModel].windowSize,
   });
 };
 
 const handleModelChange = async (model, reload = true) => {
+  flushSpec();
   modelSettingsDisplay();
   DOM.customListFile.value = config.models[model].customListFile;
   DOM.customListFile.value
@@ -3009,6 +3782,11 @@ const handleModelChange = async (model, reload = true) => {
   updateListIcon();
 }
 
+/**
+ * Apply a backend selection, refresh its controls, persist it, and reload the model.
+ *
+ * @param {string|Event} backend - Backend name or change event carrying the name.
+ */
 const handleBackendChange = (backend) => {
   backend = backend instanceof Event ? backend.target.value : backend;
   config.models[config.selectedModel].backend = backend;
@@ -3024,11 +3802,16 @@ const handleBackendChange = (backend) => {
     }
   }
   // Update threads and batch Size in UI
-  DOM.threadSlider.value = config[backend].threads;
-  DOM.numberOfThreads.textContent = config[backend].threads;
-  DOM.batchSizeSlider.value = config[backend].batchSize;
-  DOM.batchSizeValue.textContent = DOM.batchSizeSlider.value
+  config.models[config.selectedModel][backend].threads ??= DIAGNOSTICS['Physical Cores'] || 2;
+  const {threads, batchSize} = config.models[config.selectedModel][backend];
+  config[backend] = { ...config[backend], threads, batchSize };
+  DOM.threadSlider.value = threads;
+  DOM.numberOfThreads.textContent = threads;
+  DOM.batchSizeSlider.value = batchSize;
+  DOM.batchSizeValue.textContent = batchSize;
+  updateThreadsSlider();
   updatePrefs("config.json", config);
+  modelSettingsDisplay();
   loadModel();
 };
 
@@ -3071,7 +3854,7 @@ const timelineToggle = (fromKeys) => {
 /**
  * Updates the currently selected record using a key assignment or sets the call count with a modifier key.
  *
- * If a key assignment exists for the pressed key, updates the corresponding field (species, label, or comment) in the active row and inserts the modified record. If Ctrl or Cmd is held, sets the call count to the key's numeric value (for members only). Does nothing if no row is selected.
+ * For members, a configured key updates the corresponding species, label, or comment; Ctrl or Cmd plus a number updates the call count. Does nothing when no row is selected or the user is not a member.
  *
  * @param {KeyboardEvent} e - The keyboard event triggering the update.
  */
@@ -3089,14 +3872,14 @@ function recordUpdate(e) {
     if (setCallCount && STATE.isMember){
       // Ctrl/Cmd + number to set call count
       newCallCount = Number(key);
-    } else {
+    } else if (assignment  && STATE.isMember) {
       const {column, value} = assignment;
       // If we set a new species, we want to give the record a 2000 confidence
       newName = column === "species" ? value : null;
       newConfidence = column === "species" ? 2000 : null;
       newLabel = column === "label" ? value : null;
       newComment = column === "comment" ? value : null;
-    }
+    } else { return }
     // Save record for undo
     const {species, start, end,  label, callCount, 
       comment, confidence, file, modelID
@@ -3119,6 +3902,12 @@ function recordUpdate(e) {
   }
 }
 
+/**
+ * Enable or disable settings that cannot change during analysis.
+ *
+ * @param {boolean} bool - Whether to disable the settings.
+ * @throws {Error} If a required control is absent from the DOM cache.
+ */
 function disableSettingsDuringAnalysis(bool) {
   const elements = [
     "modelToUse",
@@ -3132,6 +3921,9 @@ function disableSettingsDuringAnalysis(bool) {
     "speciesWeek",
     "contextAware",
     "sendFilteredAudio",
+    "databaseLocationSelect",
+    "clearDatabaseLocation",
+    "windowSizeSlider",
   ];
   elements.forEach((el) => {
     if (DOM[el]) DOM[el].disabled = bool;
@@ -3148,70 +3940,52 @@ const goto = new bootstrap.Modal(document.getElementById("gotoModal"));
 const showGoToPosition = () => {
   if (STATE.currentFile) {
     const gotoLabel = document.getElementById("gotoModalLabel");
-    const timeHeading = config.timeOfDay
-      ? i18n.get(i18n.Context).gotoTimeOfDay
-      : i18n.get(i18n.Context).gotoPosition;
+    const timeHeading = i18n.get(i18n.Context).gotoTimeOfDay;
     gotoLabel.textContent = timeHeading;
+    const timeInput = document.getElementById("timeInput");
+    timeInput.value = 
+    utils.getDatetimeLocalFromEpoch(STATE.fileStart 
+      + (spec.wavesurfer.getCurrentTime() + STATE.windowOffsetSecs) * 1000);
+    timeInput.focus();
     goto.show();
   }
 };
 
-const gotoModal = document.getElementById("gotoModal");
-//gotoModal.addEventListener('hidden.bs.modal', enableKeyDownEvent)
-
-gotoModal.addEventListener("shown.bs.modal", () => {
-  const timeInput = document.getElementById("timeInput");
-  timeInput.value = "";
-  timeInput.focus();
-});
 
 const gotoTime = (e) => {
   if (STATE.currentFile) {
     e.preventDefault();
     const time = document.getElementById("timeInput").value;
-    // Nothing entered?
-    if (!time) {
-      // generateToast({type: 'warning',  message:'badTime'});
-      return;
-    }
-    let [hours, minutes, seconds] = time.split(":").map(Number);
-    hours ??= 0;
-    minutes ??= 0;
-    seconds ??= 0;
-    let initialTime, start;
-    if (config.timeOfDay) {
-      initialTime = new Date(STATE.fileStart);
-      // Create a Date object for the input time on the same day as the file start
-      const inputDate = new Date(
-        initialTime.getFullYear(),
-        initialTime.getMonth(),
-        initialTime.getDate(),
-        hours,
-        minutes,
-        seconds
-      );
-      // Calculate the offset in milliseconds
-      const offsetMillis = inputDate - STATE.fileStart;
-      start = offsetMillis / 1000;
-      //if we move to a new day... add 24 hours
-      start += start < 0 ? 86400 : 0;
-    } else {
-      start = hours * 3600 + minutes * 60 + seconds;
-    }
-    STATE.windowLength = 20;
-
-    start = Math.min(start, STATE.currentFileDuration);
-    STATE.windowOffsetSecs = Math.max(start - STATE.windowLength / 2, 0);
-    const position = start === 0 ? 0 : 0.5;
-    postBufferUpdate({ begin: STATE.windowOffsetSecs, position: position });
+    const dateTime = Date.parse(time);
+    if (isNaN(dateTime)) return;
+    worker.postMessage({ action: "find-time", time: dateTime});
     // Close the modal
     goto.hide();
   }
 };
 
-const gotoForm = document.getElementById("gotoForm");
-gotoForm.addEventListener("submit", gotoTime);
-
+const findSimilar = (e) => {
+  e.preventDefault();
+  const form = document.getElementById('queryForm');
+  if (!form.reportValidity()) return;
+  if (! STATE.activeRegion) return;
+  const cname = document.getElementById("cnameInput")?.value;
+  const sname = document.getElementById("snameInput")?.value;
+  const max = document.getElementById("maxResults")?.valueAsNumber;
+  const threshold = document.getElementById("similarity-threshold")?.valueAsNumber;
+  const {start, end} = STATE.activeRegion;
+  const queryRegion = {
+    start: start + STATE.windowOffsetSecs,
+    end: end + STATE.windowOffsetSecs
+  }
+  worker.postMessage({ 
+    action: "find-similar", 
+    cname, sname, threshold, max,
+    queryRegion, file: STATE.currentFile});
+  const modalEl = document.getElementById("query-modal");
+  const modal = bootstrap.Modal.getInstance(modalEl);
+  if (modal) modal.hide();
+}
 /**
  * Custom model modals
  */
@@ -3369,29 +4143,28 @@ function onModelReady() {
     prepTour();
   }
   if (OS_FILE_QUEUE.length) {
-    onOpenFiles({ filePaths: OS_FILE_QUEUE, checkSaved: true });
+    filterValidFiles({ filePaths: OS_FILE_QUEUE });
     OS_FILE_QUEUE = []; // Clear the queue
   }
 }
 
 /**
- * Handles audio data loaded by the worker, updating application state, resetting regions, and refreshing the spectrogram and UI.
+ * Handle an audio buffer provided by the worker, update application state and metadata, reset regions, refresh the spectrogram, and adjust UI controls.
  *
- * Updates the current audio buffer, file metadata, timing, and UI elements after an audio file is loaded. Resets audio regions, refreshes the spectrogram display, and enables analysis menu options if a model is ready.
+ * Updates the current buffer, file identifier, start time, and window-length; clears existing regions; instructs the spectrogram to load the buffer at the requested position and playback state; and enables analysis actions when a model is available.
  *
  * @param {Object} params - Parameters for the loaded audio.
  * @param {*} params.location - Identifier for the audio source location.
- * @param {number} [params.fileStart=0] - Start time of the audio file in milliseconds since the Unix epoch.
- * @param {number} [params.fileDuration=0] - Duration of the audio file in seconds.
- * @param {number} [params.windowBegin=0] - Offset in seconds from the file start for the audio window.
- * @param {string} [params.file=""] - Full path to the audio file.
- * @param {number} [params.position=0] - Normalized playhead position (0 to 1).
- * @param {*} [params.contents] - Audio buffer containing the loaded data.
- * @param {boolean} [params.play=false] - Whether to automatically play the audio after loading.
- * @param {Object} [params.metadata] - Optional metadata for the audio file.
- * @returns {Promise<void>}
- */
-
+ * @param {number} [params.fileStart=0] - File start time in milliseconds since the Unix epoch.
+ * @param {number} [params.fileDuration] - File duration in seconds.
+ * @param {number} [params.windowBegin=0] - Offset in seconds from the file start for the provided window.
+ * @param {string} [params.file=""] - Full path or identifier of the audio file.
+ * @param {number} [params.position=0] - Normalized playhead position (0 to 1) for the spectrogram.
+ * @param {*} [params.contents] - Raw audio buffer (ArrayBuffer/TypedArray) delivered by the worker.
+ * @param {boolean} [params.play=false] - Whether playback should start immediately after loading.
+ * @param {Object} [params.metadata] - Optional metadata for the audio file to store in STATE.metadata.
+ * @returns {Promise<void>} Resolves when the UI state and spectrogram have been updated.
+*/
 async function onWorkerLoadedAudio({
   location,
   fileStart = 0,
@@ -3434,15 +4207,14 @@ async function onWorkerLoadedAudio({
     ? fileStart
     : new Date(0, 0, 0, 0, 0, 0, 0).getTime();
   STATE.bufferStartTime = new Date(initialTime + windowBegin * 1000);
-
-  if (STATE.windowLength > STATE.currentFileDuration) STATE.windowLength = STATE.currentFileDuration;
-
+  const sr = config.selectedModel.includes("batpack") ? 256_000 : 24_000
+  STATE.windowLength = contents.byteLength / (sr * 2);
   resetRegions();
   await spec.updateSpec({
     buffer: STATE.currentBuffer,
-    position: position,
-    play: play,
-    resetSpec: resetSpec,
+    position,
+    play,
+    resetSpec,
   });
   // Do this after the spec has loaded the file
   STATE.fileLoaded = true;
@@ -3455,19 +4227,46 @@ async function onWorkerLoadedAudio({
 
 
 /**
- * Updates the pagination controls based on the total number of items.
+ * Configure UI pagination based on the total number of items for the current view.
  *
- * If the total exceeds the configured limit, pagination controls are rendered using the given offset.
- * Otherwise, all pagination elements are hidden.
+ * When the computed total exceeds the configured per-page limit, pagination controls are enabled and configured for the total count; otherwise pagination controls are hidden. This function also updates STATE.paginationPending to reflect whether pagination needs to be rendered.
  *
- * @param {number} total - The total number of items.
- * @param {number} [offset=STATE.offset] - The starting offset for pagination.
+ * @param {string} [species] - Optional canonical species name; when provided, only that species' count is considered. If omitted, the total count across all summary items is used.
  */
-function updatePagination(total, offset = STATE.offset) {
-  total > config.limit ? pagination.add(total, offset) : pagination.hide();
+function updatePagination(species) {
+  const limit = config.limit;
+  const total = species 
+    ? STATE.summary.find(item => item.cname === species)?.count || 0
+    : STATE.summary.reduce((acc, item) => acc + item.count, 0);
+  if (total > limit){
+      pagination.add(total);
+      STATE.paginationPending = true;
+   } else {
+    pagination.hide(); 
+    STATE.paginationPending = false;
+  }
 }
 
-const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
+function deepEqual(a, b) {
+  if (a === b) return true;
+  if (typeof a !== "object" || typeof b !== "object" || a == null || b == null) {
+    return false;
+  }
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+
+  for (const key of keysA) {
+    if (!keysB.includes(key) || !deepEqual(a[key], b[key])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+const updateSummary = ({ summary = [], filterSpecies = "" }) => {
+  if (deepEqual(STATE.summary, summary)) return
+  STATE.summary = summary;
   const i18 = i18n.get(i18n.Headings);
   const showIUCN = config.detect.iucn;
 
@@ -3502,9 +4301,7 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
     summaryHTML += `<tr tabindex="-1" class="${selected}">
                 <td class="max">${iconizeScore(item.max)}</td>
                     <td class="cname not-allowed">
-                        <span class="cname">${item.cname}</span> <br><i>${
-      item.sname
-    }</i>
+        <span class="cname">${item.cname}</span> <br><i>${item.sname}</i>
                     </td>`;
 
     if (showIUCN) {
@@ -3545,12 +4342,13 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
   Array.from(tempDiv.childNodes).forEach((node) => fragment.appendChild(node));
 
   // Replace the contents of the #summaryTable
-  old_summary.replaceChildren(); // Clear existing children
-
-  old_summary.appendChild(fragment);
-
+  old_summary.replaceChildren(fragment); // Replace existing content
   showSummarySortIcon();
   setAutocomplete(selectedRow ? filterSpecies : "");
+
+  
+  updatePagination(filterSpecies);
+
   // scroll to the selected species
   if (selectedRow) {
     const table = document.getElementById("resultSummary");
@@ -3563,13 +4361,13 @@ const updateSummary = async ({ summary = [], filterSpecies = "" }) => {
 };
 
 /**
- * Finalizes result processing by updating the results table UI and activating the appropriate result row.
+ * Finalizes result rendering and ensures an appropriate result row is activated in the UI.
  *
- * Replaces the results table with the latest data, resets analysis state, and determines which row to activate based on the provided options or current table state. Ensures the selected row is activated and scrolled into view, updates sorting indicators, and refreshes related UI panels.
+ * Replaces the results table with the prepared content, clears analysis state, updates sorting and label indicators, and activates (and scrolls to) a result row determined by the provided options or current table state. Also refreshes the filename panel and pagination display as needed.
  *
- * @param {Object} [options={}] - Options for determining which result row to activate.
- * @param {number} [options.active] - Index of the row to activate, if specified.
- * @param {*} [options.select] - Value used to identify the row to activate via a helper function.
+ * @param {Object} [options={}] - Options controlling which result row to activate.
+ * @param {number} [options.active] - Zero-based row index to activate; if not present the function will use `select` or the current/first row.
+ * @param {*} [options.select] - Value used to locate a row via the selection helper; used when `active` is not provided.
  */
 function onResultsComplete({ active = undefined, select = undefined } = {}) {
   PREDICTING = false; powerSave(false);
@@ -3613,11 +4411,11 @@ function onResultsComplete({ active = undefined, select = undefined } = {}) {
   }
 
   if (activeRow) {
-    utils.waitFor(() => STATE.fileLoaded).then(() => activeRow.click());
-    activeRow.scrollIntoView({ behavior: "instant", block: "center" });
+    utils.waitFor(() => STATE.fileLoaded).then(() => activeRow?.click());
   }
   renderFilenamePanel();
   activateResultSort();
+  STATE.paginationPending && pagination.show();
 }
 
 
@@ -3661,52 +4459,43 @@ function onAnalysisComplete({ quiet }) {
     ? STATE.selection.end - STATE.selection.start
     : DIAGNOSTICS["Audio Duration"];
   const rate = duration / parseFloat(analysisTime);
-
+  if (rate > 10_000) return // must be a database fetch - skip the diagnostics which are only relevant to audio analysis
+  const backend = config.models[config.selectedModel].backend;
+  const event = `${config.selectedModel}-${backend}`
   trackEvent(
-    config.UUID,
-    `${config.selectedModel}-${config.models[config.selectedModel].backend}`,
-    "Audio Duration",
-    config.models[config.selectedModel].backend,
-    Math.round(duration)
+      {uuid:config.UUID, event, action:"Audio Duration", name: backend, value:Math.round(duration), version: config.VERSION}
   );
-
   if (!STATE.selection) {
     trackEvent(
-      config.UUID,
-      `${config.selectedModel}-${config.models[config.selectedModel].backend}`,
-      "Analysis Rate",
-      config.models[config.selectedModel].backend,
-      parseInt(rate)
+      {uuid: config.UUID, event, action: "Analysis Rate", name: backend, value: parseInt(rate), version: config.VERSION}
     );
     trackEvent(
-      config.UUID,
-      `${config.selectedModel}-${config.models[config.selectedModel].backend}`,
-      "Analysis Duration",
-      config.models[config.selectedModel].backend,
-      parseInt(analysisTime)
+      {uuid: config.UUID, event, action: "Analysis Duration", name: backend, value: parseInt(analysisTime), version: config.VERSION}
     );
     DIAGNOSTICS["Analysis Duration"] = utils.formatDuration(analysisTime);
     DIAGNOSTICS["Analysis Rate"] =
       rate.toFixed(0) + "x faster than real time performance.";
     generateToast({ message: "complete" });
     displayProgress({percent: 100});
+    activateResultSort();
   }
-  worker.postMessage({ action: "update-state", selection: false });
+}
+
+function removeNoEntry() {
+  const summarySpecies = DOM.summary.querySelectorAll(".cname");
+  summarySpecies.forEach((row) => {row.classList.replace("not-allowed","pointer")} );
 }
 
 /**
- * Updates the UI after summary data is loaded, refreshing the summary table, enabling or disabling menu items, and applying species filters if provided.
+ * Refreshes the UI summary view after summary data is available, applying an optional species filter, updating the summary table rows and hover styling, and enabling or disabling related menu actions.
  *
  * @param {Object} options - Parameters for updating the summary view.
- * @param {*} [options.filterSpecies] - Optional filter to restrict summary to specific species.
- * @param {Array} [options.summary=[]] - Summary records to display in the UI.
+ * @param {*} [options.filterSpecies] - Optional species identifier or filter to restrict which species are shown in the summary.
+ * @param {Array} [options.summary=[]] - Array of summary records to render in the summary table.
  */
 function onSummaryComplete({ filterSpecies = undefined, summary = [] }) {
-  updateSummary({ summary: summary, filterSpecies: filterSpecies });
-  // Add pointer icon to species summaries
-  const summarySpecies = DOM.summaryTable.querySelectorAll(".cname");
-  summarySpecies.forEach((row) => row.classList.replace("not-allowed","pointer"));
-  
+  if (summary.length) updateSummary({ summary: summary, filterSpecies: filterSpecies });
+
   // Add hover to the summary
   const summaryNode = document.getElementById("resultSummary");
   if (summaryNode) {
@@ -3727,42 +4516,28 @@ function onSummaryComplete({ filterSpecies = undefined, summary = [] }) {
     ]);
   }
   if (STATE.currentFile) utils.enableMenuItem(["analyse"]);
+  // Add pointer icon to species summaries
+  removeNoEntry();
 }
 
-// Set up pagination
-const pagination = new Pagination(
-  document.querySelector(".pagination"),
-  () => STATE, // Returns the current state
-  () => config, // Returns the current config
-  () => worker,
-  {
-    isSpeciesViewFiltered,
-    filterResults,
-    resetResults,
-  }
-);
-pagination.init();
+
 
 /**
- * Toggles the species filter based on user interaction with the summary table.
+ * Toggle the species filter from a click on the summary table.
  *
- * Validates the event against non-interactive elements and current analysis state before proceeding.
- * If the selected row is already highlighted (indicating an active filter), the highlight is removed;
- * otherwise, all highlighted rows are cleared, the current row is marked, and the corresponding species
- * is extracted from the clicked element. In explore mode, the species value is set in the bird list display.
- * Subsequently, the function refreshes the results filtering and resets the UI components without clearing
- * the summary, pagination, or result listings.
+ * When a summary row is clicked, either clear an existing species filter (if the
+ * row was active) or activate a new species filter by highlighting the row,
+ * setting the autocomplete value, updating pagination, refreshing filtered
+ * results, and resetting UI components without clearing the summary, pagination,
+ * or current result listings.
  *
- * @param {Event} e - The DOM event triggered by the user's click on a table row.
- *
- * @example
- * // Apply species filtering when a table row is clicked.
- * speciesFilter(event);
+ * @param {Event} e - Click event originating from the summary table row.
  */
 function speciesFilter(e) {
   if (
     PREDICTING ||
-    ["TBODY", "TH", "DIV"].includes(e.target.tagName)
+    ["TBODY", "TH", "DIV"].includes(e.target.tagName) ||
+    window.getSelection().toString()
   )
     return; // on Drag or clicked header
   let species;
@@ -3779,6 +4554,7 @@ function speciesFilter(e) {
     species = getSpecies(e.target);
   }
   setAutocomplete(species);
+  updatePagination(species);
   filterResults({ updateSummary: false });
   resetResults({
     clearSummary: false,
@@ -3795,20 +4571,17 @@ function setAutocomplete(species) {
 }
 
 /**
- * Renders a detection result row in the results table, updating headers, pagination, and UI as needed.
+ * Render a single detection row into the results table and update table headers, pagination, and related UI state.
  *
- * For the first result, resets the table and sets up localized headers. Handles pagination and result limits for non-database results. Formats and displays detection details including timestamps, species, call counts, labels, comments, review status, and model information. Stores results for feedback and updates the UI accordingly.
+ * When called with index === 1 this ensures the results table header is initialized or reset.
+ * Adds pagination entries when results exceed the configured page limit and skips rendering rows beyond that limit for non-database results.
  *
  * @param {Object} options - Rendering options.
- * @param {number} [options.index=1] - The sequential index of the detection result.
- * @param {Object} [options.result={}] - Detection result data, including timestamp, position, species, score, label, and related fields.
- * @param {*} [options.file=undefined] - The audio file reference for the detection.
- * @param {boolean} [options.isFromDB=false] - Whether the result is from the database.
- * @param {boolean} [options.selection=false] - Whether rendering is for a selection-specific view.
- *
- * @returns {Promise<void>} Resolves when the result has been rendered and the UI updated.
- *
- * @remark Results detected as daytime are skipped if nocturnal migration detection is enabled and not in selection mode.
+ * @param {number} [options.index=1] - Sequential index of the detection within the current result set.
+ * @param {Object} [options.result={}] - Detection record (e.g., `timestamp`, `position`, `sname`, `cname`, `score`, `label`, `reviewed`, `model`, `modelID`, `count`, `callCount`, `comment`, `isDaylight`, `active`, `end`).
+ * @param {*} [options.file] - Associated audio file reference used for buffer/navigation updates.
+ * @param {boolean} [options.isFromDB=false] - If true, treat the result as originating from the database (affects pagination and rendering limits).
+ * @param {boolean} [options.selection=false] - If true, render for a selection-specific view (hides per-row UI elements and avoids storing prediction state).
  */
 
 async function renderResult({
@@ -3854,7 +4627,7 @@ async function renderResult({
     )
       postBufferUpdate({ file, begin: STATE.windowOffsetSecs });
   } else if (!isFromDB && index % (config.limit + 1) === 0) {
-    pagination.add(index, 0);
+    pagination.add(index);
   }
   if (!isFromDB && index > config.limit) {
     return;
@@ -3874,13 +4647,28 @@ async function renderResult({
       callCount,
       isDaylight,
       reviewed,
-      model,
       modelID
     } = result;
-    const dayNight = isDaylight ? "daytime" : "nighttime";
-    // Todo: move this logic so pre dark sections of file are not even analysed
-    if (config.detect.nocmig && !selection && dayNight === "daytime") return;
+    let model = result.model;
+    const isBatpack = /batpack/i.test(model ?? "");
+    const isBN3 = model === "birdnet3";
+    let bn3Badge = '';
+    if (isBN3) {
+      model = model.slice(0, -1);
+      bn3Badge = '<span class="position-absolute top-0 start-100 translate-middle badge rounded-pill text-dark fs-5 p-0">+</span>';
+    }
+    const logo = isBatpack
+      ? "batpack"
+      : ['birdnet', 'nocmig', 'chirpity', 'perch', 'nighthawk', 'user'].includes(model)
+        ? model
+        : 'custom';
 
+    const modelName = isBatpack
+      ? "Bats"
+      : config.models[model]
+      ? utils.escapeHTML(config.models[model].displayName)
+      : 'User';
+    const dayNight = isDaylight ? "daytime" : "nighttime";
     const commentHTML = comment
       ? `<span title="${comment.replaceAll(
           '"',
@@ -3902,7 +4690,7 @@ async function renderResult({
     const spliceStart = position < 3600 ? 14 : 11;
     const UI_position = new Date(position * 1000)
       .toISOString()
-      .substring(spliceStart, 19);
+      .substring(spliceStart, 23);
     const showTimeOfDay = config.timeOfDay ? "" : "d-none";
     const showTimestamp = config.timeOfDay ? "d-none" : "";
     const activeTable = active ? "table-active" : "";
@@ -3932,7 +4720,7 @@ async function renderResult({
             <td class="label ${hide}">${labelHTML}</td>
             <td class="comment text-end ${hide}">${commentHTML}</td>
             <td class="reviewed text-end ${hide}">${reviewHTML}</td>
-            <td class="text-end"><img class="model-logo" src="img/icon/${model}_logo.png" title="${model}" alt="${model}"></td>
+            <td class="text-end"><span class="position-relative me-1"><img class="model-logo" src="img/icon/${logo}_logo.png" title="${modelName}" alt="${modelName}">${bn3Badge}</span></td>
             </tr>`;
   }
   updateResultTable(tr, isFromDB, selection);
@@ -3986,13 +4774,37 @@ function setClickedIndex(target) {
   clickedIndex = clickedNode?.rowIndex;
 }
 
-const deleteRecord = (target) => {
-  if (! STATE.fileLoaded ) return;
-  if (target instanceof PointerEvent) target = activeRow;
+const deleteSpeciesByConfidence = (species, confidence, modelID) => {
+  if (!(STATE.resultsSortOrder.includes("score") && isSpeciesViewFiltered())) return;
+  const { start, end } = STATE.mode === "explore" ? STATE.explore.range : {};
+  worker.postMessage({
+    action: "delete-confidence",
+    start,
+    end,
+    species,
+    confidence,
+    modelID
+  });
+  // const currentRow = activeRow.rowIndex;
+  // const table = document.getElementById("resultTableBody");
+  // for (let i = table.rows.length - 1; i >= currentRow; i--) {
+  //   table.deleteRow(i);
+  // }
+  filterResults();
+}
+
+
+const deleteRecord = (e) => {
+  if (! (STATE.fileLoaded && activeRow)) return;
+  let target = activeRow;
   setClickedIndex(target);
   // If there is no row (deleted last record and hit delete again):
   if (clickedIndex === -1 || clickedIndex === undefined) return;
-  const { species, start, end, file, setting, modelID } = addToHistory(target);
+  const { species, start, end, confidence, file, setting, modelID } = addToHistory(target);
+  if (e?.shiftKey) {
+    deleteSpeciesByConfidence(species, confidence, modelID);
+    return;
+  }
   worker.postMessage({
     action: "delete",
     file,
@@ -4252,13 +5064,27 @@ function replaceCtrlWithCommand() {
   }
 }
 
+/**
+ * Render and show the included/excluded species modal for the active list.
+ *
+ * The modal records `included` for later export and filters the visible tab as
+ * the user types in its search field.
+ *
+ * @param {Object} options - Species-list details.
+ * @param {Object[]} options.included - Included species displayed and retained for export.
+ * @param {Object[]} [options.excluded] - Excluded species, if that tab is available.
+ * @param {string} [options.place] - Location name used in the list explanation.
+ * @returns {Promise<void>} Resolves after the modal is displayed.
+ */
 const populateSpeciesModal = async ({included, excluded, place}) => {
   const i18 = i18n.get(i18n.SpeciesList);
+  const headings = i18n.get(i18n.Headings);
+  i18.search = headings.search;
   const current_file_text =
     STATE.week !== -1 && STATE.week
       ? utils.interpolate(i18.week, { week: STATE.week })
       : "";
-  const model = config.models[config.selectedModel].displayName;
+  let model = config.models[config.selectedModel].displayName;
   const localBirdsOnly =
     config.local && config.selectedModel === "birdnet" && config.list === "nocturnal"
       ? i18.localBirds
@@ -4278,6 +5104,10 @@ const populateSpeciesModal = async ({included, excluded, place}) => {
     });
   }
   const includedList = generateBirdIDList(included);
+  const internalModel = config.selectedModel;
+  const classes = ["birdnet3","perch v2"].includes(internalModel) ? config.detect.classes.join(', ') : "";
+  const classesText = ["birdnet3","perch v2"].includes(internalModel) && ["nocturnal", "location", "birds"].includes(config.list) 
+    ? utils.interpolate(i18.classesText, { classes: classes }) : "";
   const depending =
     config.useWeek &&
     config.list === "location" &&
@@ -4290,13 +5120,13 @@ const populateSpeciesModal = async ({included, excluded, place}) => {
     listInUse: listLabel,
     location_filter_text: location_filter_text,
     localBirdsOnly: localBirdsOnly,
+    classesText,
     upTo: i18.upTo,
     count: included.length,
     depending: depending,
     includedList: includedList,
   });
-  let excludedContent = "",
-    disable = "";
+  let excludedContent = "", disable = "";
   if (excluded) {
     const excludedList = generateBirdIDList(excluded);
 
@@ -4309,68 +5139,150 @@ const populateSpeciesModal = async ({included, excluded, place}) => {
   } else {
     disable = " disabled";
   }
-  let modalContent = `
+let modalContent = `
+    <div class="d-flex align-items-start justify-content-between">
         <ul class="nav nav-tabs" id="myTab" role="tablist">
-        <li class="nav-item" role="presentation">
-        <button class="nav-link active" id="included-tab" data-bs-toggle="tab" data-bs-target="#included-tab-pane" type="button" role="tab" aria-controls="included-tab-pane" aria-selected="true">${i18.includedButton}</button>
-        </li>
-        <li class="nav-item" role="presentation">
-        <button class="nav-link" id="excluded-tab" data-bs-toggle="tab" data-bs-target="#excluded-tab-pane" type="button" role="tab" aria-controls="excluded-tab-pane" aria-selected="false" ${disable}>${i18.excludedButton}</button>
-        </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active"
+                    id="included-tab"
+                    data-bs-toggle="tab"
+                    data-bs-target="#included-tab-pane"
+                    type="button"
+                    role="tab"
+                    aria-controls="included-tab-pane"
+                    aria-selected="true">
+                    ${i18.includedButton}
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link"
+                    id="excluded-tab"
+                    data-bs-toggle="tab"
+                    data-bs-target="#excluded-tab-pane"
+                    type="button"
+                    role="tab"
+                    aria-controls="excluded-tab-pane"
+                    aria-selected="false"
+                    ${disable}>
+                    ${i18.excludedButton}
+                </button>
+            </li>
         </ul>
-        <div class="tab-content" id="myTabContent">
-        <div class="tab-pane fade show active" id="included-tab-pane" role="tabpanel" aria-labelledby="included-tab" tabindex="0" style="max-height: 50vh;overflow: auto">${includedContent}</div>
-        <div class="tab-pane fade" id="excluded-tab-pane" role="tabpanel" aria-labelledby="excluded-tab" tabindex="0" style="max-height: 50vh;overflow: auto">${excludedContent}</div>
+
+        <div class="input-group ms-3 me-3" style="width: 250px;">
+            <input type="search"
+                id="species-search"
+                class="form-control"
+                placeholder="&#x1F50E; ${i18.search}"
+                aria-label="Search species">
         </div>
-        `;
-  document.getElementById("speciesModalBody").innerHTML = modalContent;
+    </div>
+
+    <div class="tab-content" id="included-tabs">
+        <div class="tab-pane fade show active"
+            id="included-tab-pane"
+            role="tabpanel"
+            aria-labelledby="included-tab"
+            tabindex="0"
+            style="max-height: 50vh; overflow: auto">
+            ${includedContent}
+        </div>
+
+        <div class="tab-pane fade"
+            id="excluded-tab-pane"
+            role="tabpanel"
+            aria-labelledby="excluded-tab"
+            tabindex="0"
+            style="max-height: 50vh; overflow: auto">
+            ${excludedContent}
+        </div>
+    </div>
+`;
+
+document.getElementById("speciesModalBody").innerHTML = modalContent;
+
+document.getElementById("species-search").addEventListener("input", (event) => {
+    const search = event.target.value.trim().toLowerCase();
+
+    const activePane = document.querySelector("#included-tabs .tab-pane.active");
+
+    if (!activePane) return;
+
+    activePane.querySelectorAll("tbody>tr").forEach((item) => {
+        item.classList.toggle(
+            "d-none",
+            search && !item.textContent.toLowerCase().includes(search)
+        );
+    });
+});
   document.getElementById("speciesModalLabel").textContent = i18.title;
   const species = new bootstrap.Modal(document.getElementById("speciesModal"));
   species.show();
   STATE.includedList = included;
 };
 
-// exporting a list
+/**
+ * Save the current included species list as a plain-text CSV file and start a download named "species_list.csv".
+ *
+ * Each line contains the species scientific name and common name separated by a comma.
+ */
 function exportSpeciesList() {
   const included = STATE.includedList;
   // Create a blob containing the content of included array
   const content = included
-    .map((item) => `${item.sname}${getSplitChar()}${item.cname}`)
+    .map((item) => `${item.sname},${item.cname}`)
     .join("\n");
-  const blob = new Blob([content], { type: "text/plain" });
+  const blob = new Blob([content], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "species_list.txt";
+  a.download = "species_list.csv";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
 
-function setNocmig(on) {
+/**
+ * Update the nocmig control's icon, tooltip, and checked state to reflect the given mode.
+ *
+ * @param {boolean|'day'} on - Mode to set: `true` enables nocmig (night mode), `false` disables it, `'day'` enables day mode styling.
+ */
+function setNocmig(on = config.detect.nocmig) {
   const i18 = i18n.get(i18n.Titles);
-  if (on) {
-    DOM.nocmigButton.textContent = "nights_stay";
-    DOM.nocmigButton.title = i18.nocmigOn;
-    DOM.nocmigButton.classList.add("text-info");
+  const btn = DOM.nocmigButton;
+  if (on === 'day') {
+    btn.textContent = "wb_sunny";
+    btn.title = i18.nocmigDay;
+    btn.classList.add("text-warning");
+    btn.classList.remove("text-info");
+  } else if (on) {
+    btn.textContent = "nights_stay";
+    btn.title = i18.nocmigNight;
+    btn.classList.add("text-info");
+    btn.classList.remove("text-warning");
   } else {
-    DOM.nocmigButton.textContent = "bedtime_off";
-    DOM.nocmigButton.title = i18.nocmigOff;
-    DOM.nocmigButton.classList.remove("text-info");
+    btn.textContent = "bedtime_off";
+    btn.title = i18.nocmigOff;
+    btn.classList.remove("text-info","text-warning");
   }
-  DOM.nocmig.checked = config.detect.nocmig;
+  const checked = on === true;
+  DOM.nocmig.checked = checked;
 }
 
 const changeNocmigMode = () => {
-  config.detect.nocmig = !config.detect.nocmig;
-  setNocmig(config.detect.nocmig);
+  const modes = [true, 'day', false]
+  let nocmigMode = config.detect.nocmig;
+  const index = (modes.indexOf(nocmigMode) + 1) % modes.length
+  nocmigMode = modes[index]
+  setNocmig(nocmigMode);
   worker.postMessage({
     action: "update-state",
-    detect: { nocmig: config.detect.nocmig },
+    detect: { nocmig: nocmigMode },
     globalOffset: 0,
     filteredOffset: {},
   });
+  config.detect.nocmig = nocmigMode;
   updatePrefs("config.json", config);
   if (STATE.analysisDone) {
     resetResults({
@@ -4390,7 +5302,7 @@ const changeNocmigMode = () => {
  * and range parameters. The filtering is applied only if the analysis has been completed.
  *
  * @param {Object} [options={}] - Filter configuration options.
- * @param {*} [options.species=isSpeciesViewFiltered(true)] - Criteria for filtering by species.
+ * @param {*} [options.species] - Species criterion. When omitted, the current species view is used; an explicitly supplied `undefined` is preserved.
  * @param {boolean} [options.updateSummary=true] - Flag indicating whether to update the summary after filtering.
  * @param {number} [options.offset] - Optional starting index for pagination.
  * @param {number} [options.limit=500] - Maximum number of results to process.
@@ -4418,14 +5330,25 @@ function filterResults({
     });
 }
 
+/**
+ * Disable thread selection for ONNX models using WebGPU.
+ */
+const updateThreadsSlider = () => {
+  const isOnnx = ['perch v2', 'birdnet3'].includes(config.selectedModel);
+  const isGPU = config.models[config.selectedModel].backend === 'webgpu';
+  DOM.threadSlider.disabled = isOnnx && isGPU;
+}
+
+/**
+ * Update model-specific settings visibility and availability for the active platform and backend.
+ */
 const modelSettingsDisplay = () => {
-  // Sets system options according to model or machine cababilities
+  // Sets system options according to model or machine capabilities
   // cf. setListUIState
   const chirpityOnly = document.querySelectorAll(
     ".chirpity-only, .chirpity-only-visible"
   );
-  const noMac = document.querySelectorAll(".no-mac");
-  const nodeOnly = document.querySelectorAll(".node-only");
+  const notOnnx = document.querySelectorAll(".not-onnx-gpu");
   if (!['chirpity', 'nocmig'].includes(config.selectedModel)) {
     // hide chirpity-only features
     chirpityOnly.forEach((element) => {
@@ -4443,18 +5366,53 @@ const modelSettingsDisplay = () => {
     });
     DOM.contextAware.checked = config.detect.contextAware;
     DOM.contextAwareIcon.classList.remove("d-none");
-  }    
-
-  isMac && noMac.forEach((element) => element.classList.add("d-none"));
-  if (config.hasNode) {
-    nodeOnly.forEach((element) => element.classList.remove("d-none"));
-  } else {
-    nodeOnly.forEach((element) => element.classList.add("d-none"));
   }
+  // Nighthawk
+  const notNighthawk = document.querySelectorAll(".not-nh");
+
+  if (config.selectedModel === 'nighthawk'){
+    notNighthawk.forEach((element) => {
+      element.classList.add("d-none");
+    });
+    // Turn off detect & combine
+    config.detect.combine = false;
+    config.detect.merge = false;
+    const combineEl = document.getElementById("combine-detections")
+    combineEl.checked = false;
+    combineEl.disabled = false;
+    document.getElementById("merge-detections").checked = false;
+    worker.postMessage({action: "update-state", detect: config.detect});
+  } else {
+    notNighthawk.forEach((element) => {
+      element.classList.remove("d-none");
+    });
+  }
+  // Hide threads slider for Onnx models
+  const model = config.selectedModel;
+  const backend = config.models[model].backend;
+  const onnxGPU = ['birdnet3', 'perch v2'].includes(model) && backend === 'webgpu';
+  notOnnx.forEach((element) => element.classList.toggle("d-none", onnxGPU));
+
+  const noMac = document.querySelectorAll(".no-mac");
+  isMac && noMac.forEach((element) => element.classList.add("d-none"));
+  const nodeOnly = document.querySelectorAll(".node-only");
+  nodeOnly.forEach((element) => element.classList.toggle("d-none", !config.hasNode));
   // Hide train unless BirdNET (and a member)
   const blockTrain = config.selectedModel !== 'birdnet' || ! STATE.isMember;
   DOM.trainNav.classList.toggle('disabled', blockTrain);
+  updateThreadsSlider();
+  DOM.windowSize.classList.toggle('d-none', config.selectedModel !== 'birdnet3');
+  setClassesUIState();
 };
+
+/**
+ * Show taxonomic-class filters only for supported model and list combinations.
+ */
+const setClassesUIState = () => {
+  const showClasses = ["birdnet3", "perch v2"].includes(config.selectedModel) 
+    && ["location", "birds"].includes(config.list);
+  DOM.classes.classList.toggle('d-none', !showClasses);
+}
 
 const contextAwareIconDisplay = () => {
   const i18 = i18n.get(i18n.Titles);
@@ -4490,7 +5448,6 @@ const toggleContextAwareMode = () => {
   worker.postMessage({
     action: "update-state",
     detect: { contextAware: config.detect.contextAware },
-    filters: { SNR: config.filters.SNR },
   });
   updatePrefs("config.json", config);
 };
@@ -4500,11 +5457,10 @@ diagnosticMenu.addEventListener("click", async function () {
   const backend = config.models[config.selectedModel].backend;
   DIAGNOSTICS["Model"] =
     DOM.modelToUse.options[DOM.modelToUse.selectedIndex].text;
-  DIAGNOSTICS["Backend"] = backend;
+  DIAGNOSTICS["Backend"] = backend.replace('tensorflow', 'CPU');
   DIAGNOSTICS["Batch size"] = config[backend].batchSize;
   DIAGNOSTICS["Threads"] = config[backend].threads;
   DIAGNOSTICS["Context"] = config.detect.contextAware;
-  DIAGNOSTICS["SNR"] = config.filters.SNR;
   DIAGNOSTICS["List"] = config.list;
   let diagnosticTable = "<table class='table-hover table-striped p-2 w-100'>";
   for (let [key, value] of Object.entries(DIAGNOSTICS)) {
@@ -4655,7 +5611,7 @@ document.addEventListener("drop", (event) => {
     );
   if (fileList.length){
     const audioFiles = fileList.map(file => window.electron.showFilePath(file));
-    worker.postMessage({ action: "get-valid-files-list", files: audioFiles });
+    filterValidFiles({ filePaths:audioFiles });
   } else {
     const noSupport = {
         en: 'File type not supported',
@@ -4802,16 +5758,34 @@ const hideConfidenceSlider = () => {
   confidenceSliderDisplay.classList.add("d-none");
 };
 
+  /**
+   * Updates the threshold display and input values in both the filter and settings panels.
+   * @param {Event|number} e - The input event or numeric threshold value to display and set.
+   */
+  function showThreshold(e) {
+    const threshold = e instanceof Event ? e.target.valueAsNumber : e;
+    filterPanelThresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
+    settingsPanelThresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
+    filterPanelRangeInput.value = threshold;
+    settingsPanelRangeInput.value = threshold;
+  }
+
+const showOverlap = (e) => {
+  const overlap = e instanceof Event ? e.target.valueAsNumber : e * 100;  
+  document.getElementById('overlap-value').innerHTML = `<b>${overlap}%</b>`;
+  document.getElementById('overlap').value = overlap;
+  document.getElementById('drop-uncertain').disabled = !overlap;
+  document.getElementById('merge-overlaps').disabled = !overlap;
+}
 /**
- * Updates the threshold display and input values in both the filter and settings panels.
+ * Updates the radius display in the location modal.
  * @param {Event|number} e - The input event or numeric threshold value to display and set.
+ * `@returns` {number} The resolved radius value.
  */
-function showThreshold(e) {
-  const threshold = e instanceof Event ? e.target.valueAsNumber : e;
-  filterPanelThresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
-  settingsPanelThresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
-  filterPanelRangeInput.value = threshold;
-  settingsPanelRangeInput.value = threshold;
+function showRadiusValue(e) {
+  const radius = e instanceof Event ? e.target.valueAsNumber : e;
+  document.getElementById('radius-value').innerHTML = `<b>${radius}m</b>`;
+  return radius
 }
 
 /**
@@ -4834,6 +5808,7 @@ const handleThresholdChange = (e) => {
     action: "update-state",
     detect: { confidence: config.detect.confidence },
   });
+  pagination.reset();
   if (STATE.mode === "explore") {
     // Update the seen species list
     worker.postMessage({ action: "get-detected-species-list" });
@@ -4852,6 +5827,20 @@ const handleThresholdChange = (e) => {
     filterResults();
   }
 };
+
+
+
+const handleOverlapChange = (e) => {
+  const overlap = e.target.valueAsNumber;
+  config.detect.overlap = overlap / 100;
+  updatePrefs("config.json", config);
+  worker.postMessage({
+    action: "update-state",
+    detect: { overlap: config.detect.overlap },
+  });
+  worker.postMessage({ action: "update-total-batches", files: STATE.openFiles });
+}
+
 
 // Filter handling
 const filterIconDisplay = () => {
@@ -4950,6 +5939,14 @@ document.addEventListener('input', (e) =>{
       showThreshold(e)
       break;
     }
+    case "overlap": {
+      showOverlap(e);
+      break; 
+    }
+    case "location-radius": {
+      showRadiusValue(e);
+      break
+    }
     case "top-rankin": {
       showTopRankin(e);
       config.detect.topRankin = el.valueAsNumber;
@@ -4964,6 +5961,10 @@ document.addEventListener('input', (e) =>{
       DOM.numberOfThreads.textContent = DOM.threadSlider.value;
       break;
     }
+    case "window-size-slider": {
+      DOM.windowSizeValue.textContent = DOM.windowSizeSlider.value;
+      break;
+    }    
     case "gain": {
       DOM.gainAdjustment.textContent = DOM.gain.value + "dB";
       break;
@@ -4989,7 +5990,7 @@ const handlePassFilterchange = (el) => {
   });
   showFilterEffect();
   filterIconDisplay();
-  el.blur(); // Fix slider capturing the focus so you can't use spaceBar or hit 'p' directly
+  // el.blur(); // Fix slider capturing the focus so you can't use spaceBar or hit 'p' directly
 };
 
 
@@ -5003,7 +6004,7 @@ const handleLowShelfchange = () => {
   });
   showFilterEffect();
   filterIconDisplay();
-  DOM.LowShelfSlider.blur(); // Fix slider capturing thefocus so you can't use spaceBar or hit 'p' directly
+  // DOM.LowShelfSlider.blur(); // Fix slider capturing thefocus so you can't use spaceBar or hit 'p' directly
 };
 
 
@@ -5068,11 +6069,11 @@ const showRelevantAudioQuality = () => {
 };
 document.addEventListener("click", debounceClick(handleUIClicks));
 /**
- * Handles all UI click events by dispatching actions based on the clicked element's ID.
+ * Dispatches application actions based on the clicked element's ID.
  *
- * Routes user clicks to the appropriate application logic, including file operations, analysis commands, model management, settings adjustments, help dialogs, sorting, context menu actions, and UI updates. Updates application state, communicates with the worker thread, manages configuration, and triggers relevant UI changes as needed.
+ * Routes click events to the appropriate UI handlers (file and export operations, analysis and training commands, model management, settings and help dialogs, sorting and filtering, context-menu actions, and other UI updates). Events are ignored until the application has finished loading.
  *
- * @param {MouseEvent} e - The click event object.
+ * @param {MouseEvent} e - Click event whose target (or nearest ancestor with an id) determines which action to invoke.
  */
 async function handleUIClicks(e) {
   if (!APPLICATION_LOADED) return;
@@ -5120,7 +6121,7 @@ async function handleUIClicks(e) {
     }
     case "import-csv": {
       STATE.fileLoaded = false;
-      showAnalyse();
+      if (STATE.mode !== "analyse") showAnalyse();
       importData('csv');
       break;
     }
@@ -5138,11 +6139,27 @@ async function handleUIClicks(e) {
 
     // Records menu
     case "save2db": {
-      worker.postMessage({ action: "save2db", file: STATE.currentFile });
+      if (!element.classList.contains('disabled')) worker.postMessage({ action: "save2db", file: STATE.currentFile });
       break;
     }
     case "charts": {
       showCharts();
+      break;
+    }
+    case "downloadChart": {
+      // Download the chart
+      element.disabled = true;
+      const imageURL = chartInstance.toBase64Image();
+      const a = document.createElement('a');
+      a.href = imageURL;
+      a.download = 'chart.png';
+      a.click();
+      a.remove();
+      element.disabled = false;
+      break;
+    }
+    case "fullscreen-button":{
+      goFullscreen();
       break;
     }
     case "explore": {
@@ -5151,6 +6168,14 @@ async function handleUIClicks(e) {
     }
     case "active-analysis": {
       showAnalyse();
+      break;
+    }
+    case "manage-locations": {
+      setCustomLocation(true)
+      break;
+    }
+    case "manage-files": {
+      worker.postMessage({ action: "manage-files" });
       break;
     }
     case "compress-and-organise": {
@@ -5188,19 +6213,23 @@ async function handleUIClicks(e) {
     }
 
     case "purge-from-toast": {
-      deleteFile(MISSING_FILE);
+      const file = element.name;
+      deleteFile(file);
       break;
     }
 
     // ----
     case "locate-missing-file": {
-      (async () => await locateFile(MISSING_FILE))();
+      const file = element.name;
+      (async () => await locateFile(file))();
       break;
     }
     case "clear-custom-list": {
-      config.models[config.selectedModel].customListFile = "";
+      const model = config.selectedModel;
+      config.models[model].customListFile = "";
       delete LIST_MAP.custom;
       config.list = "birds";
+      config.models[model].list = "birds";
       DOM.customListFile.value = "";
       updatePrefs("config.json", config);
       resetResults({
@@ -5212,6 +6241,7 @@ async function handleUIClicks(e) {
       break;
     }
     case "clear-database-location": {
+      if (PREDICTING) break;
       config.database.location = undefined;
       document.getElementById("database-location").value = "";
       worker.postMessage({
@@ -5219,20 +6249,16 @@ async function handleUIClicks(e) {
         database: config.database,
       });
       config.list = 'everything';
+      config.models[config.selectedModel].list = 'everything'; 
       updateList();
       updatePrefs("config.json", config);
-      showAnalyse();
+      if (STATE.mode !== "analyse") showAnalyse();
+      showDBLocation(null); // removes the database location from the footer
       break;
     }
     // Custom models
-    case "open-training": {
-      showTraining();
-      break;
-    }
-    case "import-model": {
-      showImport();
-      break;
-    }
+    case "open-training": { showTraining(); break }
+    case "import-model": { showImport(); break }
     case "remove-model": {
       // Just present custom models to choose from
       updateModelOptions('customOnly');
@@ -5297,9 +6323,9 @@ async function handleUIClicks(e) {
           const modelFolder = files.filePaths[0]
           document.getElementById("import-location").value = modelFolder;
           const modelNameInput = document.getElementById("model-name");
-          // Prevent people changing Perch v2 name
+          // Prevent people changing Perch v2 or Nighthawk name
           modelNameInput.value = p.basename(modelFolder).replace(/^perch v2.*$/i, 'Perch v2');
-          modelNameInput.disabled = modelNameInput.value === 'Perch v2';
+          modelNameInput.disabled = ['perch v2', "nighthawk", "european batpack"].includes(modelNameInput.value.toLowerCase());
         }
       })();
       break;
@@ -5337,12 +6363,11 @@ async function handleUIClicks(e) {
         }
       }
       if (modelType === 'append'){
-        function findDuplicateLines(labelFile) {
-          const labels = new Set(fs.readFileSync(labelFile, 'utf8').split('\n').map(l => l.trim()));
+        function findDuplicateLines() {
+          const labels = new Set(LABELS.map(l => l.replace(',', '_')));
           return folders.filter(f => labels.has(f) && f !== '');
         }
-        const labelFile = p.join(dirname,`labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_${config.locale}.txt`)
-        const duplicates = findDuplicateLines(labelFile);
+        const duplicates = findDuplicateLines();
         if (duplicates.length){
           generateToast({message:`There are audio folders which have the same name as BirdNET labels. 
             When appending labels, the new labels must be unique:<br>
@@ -5377,7 +6402,9 @@ async function handleUIClicks(e) {
 
       const modelName = displayName.toLowerCase();
       const modelLocation = document.getElementById('import-location').value;
-      const requiredFiles = modelName === 'perch v2' ? ['perch_v2.onnx', 'labels.txt'] : ['weights.bin', 'labels.txt', 'model.json'];
+      const requiredFiles = modelName === 'perch v2' 
+      ? ['perch_v2.onnx', 'labels.txt'] 
+      : ['weights.bin', 'labels.txt', 'model.json'];
       if (config.models[modelName] !== undefined){
         generateToast({message: 'A model with that name already exists', type:'error'})
         break;
@@ -5401,15 +6428,29 @@ async function handleUIClicks(e) {
         backend: modelName === 'perch v2' 
           ? 'tensorflow' 
           : config.models['birdnet'].backend, 
-          displayName, 
-          modelPath:modelLocation};
+        displayName, 
+        list: 'everything',
+        modelPath:modelLocation,
+        tensorflow: {
+          threads: config.models['birdnet']['tensorflow'].threads,
+          batchSize: config.models['birdnet']['tensorflow'].batchSize
+          },
+        webgpu: {
+          threads: config.models['birdnet']['webgpu'].threads,
+          batchSize: config.models['birdnet']['webgpu'].batchSize
+          },
+        customListFile: ""
+      };
       config.selectedModel = modelName;
       const select = document.getElementById('model-to-use');
       const newOption = document.createElement('option');
       newOption.value = modelName;
       newOption.textContent = displayName;
       select.appendChild(newOption);
-      updatePrefs('config.json', config)
+      // Set list to everything
+      config.list = 'everything';
+      updatePrefs('config.json', config);
+      updateList();
       updateModelOptions();
       handleModelChange(modelName);
       select.value = modelName;
@@ -5429,7 +6470,8 @@ async function handleUIClicks(e) {
       delete config.models[model];
       config.selectedModel ===  model && (config.selectedModel = 'birdnet');
       updateModelOptions();
-      document.querySelector(`#model-to-use option[value="${model}"]`)?.remove();
+      const modelSelect = document.getElementById("model-to-use");
+      [...modelSelect.options].find((opt) => opt.value === model)?.remove();
       updatePrefs('config.json', config);
       break;
     }
@@ -5462,16 +6504,14 @@ async function handleUIClicks(e) {
     }
     case "show-species":
     case "species": {
+      e.preventDefault();
       worker.postMessage({
         action: "get-valid-species",
         file: STATE.currentFile,
       });
       break;
     }
-    case "startTour": {
-      prepTour();
-      break;
-    }
+    case "startTour": { prepTour(); break }
     case "eBird": {
       (async () => await populateHelpModal("ebird", i18n.Help.eBird[locale]))();
       break;
@@ -5506,30 +6546,25 @@ async function handleUIClicks(e) {
 
     // Settings
     case "basic":
-    case "advanced": {
-      changeSettingsMode(target);
-      break;
-    }
+    case "advanced": { changeSettingsMode(target); break }
 
     // Context-menu
-    case "play-region": {
-      playRegion();
-      break;
-    }
-    case "context-analyse-selection": {
-      getSelectionResults();
-      break;
-    }
+    case "play-region": { playRegion(); break }
+    case "context-analyse-selection": { getSelectionResults(); break}
+    case "context-find-similar":{ showQueryModal(); break }
     case "context-create-clip": {
       element.closest("#inSummary") ? batchExportAudio() : exportAudio();
       break;
     }
     // XC compare play/pause
     case "playComparison": {
-      config.selectedModel.includes("bats") && ws.setPlaybackRate(0.1, false);
+      config.selectedModel.includes("batpack") && ws.setPlaybackRate(0.1, false);
       ws.playPause();
       break;
     }
+    // Modal forms
+    case "go": { gotoTime(e); break }
+    case "query":{ findSimilar(e) ;break }
 
     case "library-location-select": {
       (async () => {
@@ -5544,6 +6579,14 @@ async function handleUIClicks(e) {
               .getElementById("compress-and-organise")
               .classList.remove("disabled");
           document.getElementById("library-location").value = archiveFolder;
+          const libraryTrim = document.getElementById("library-trim");
+          libraryTrim.disabled = false;
+          if (STATE.isMember){
+            const libraryClips = document.getElementById("library-clips");
+            libraryClips.disabled = false;
+          }
+          const autoArchive = document.getElementById("auto-library");
+          autoArchive.disabled = false;
           updatePrefs("config.json", config);
           worker.postMessage({
             action: "update-state",
@@ -5562,23 +6605,31 @@ async function handleUIClicks(e) {
           const archiveFolder = files.filePaths[0];
           config.database.location = archiveFolder;
           document.getElementById("database-location").value = archiveFolder;
+          console.info('New database location selected:', archiveFolder);
+          // Assume no records in it until we hear otherwise from the worker
+          DOM.chartsLink.classList.add("disabled");
+          DOM.exploreLink.classList.add("disabled");
+          showDBLocation(archiveFolder);
+          config.library.location &&
+            document
+              .getElementById("compress-and-organise")
+              .classList.add("disabled");
+          STATE.diskHasRecords = false;          
           updatePrefs("config.json", config);
           worker.postMessage({
             action: "update-state",
             database: config.database,
           });
           config.list = 'everything';
+          config.models[config.selectedModel].list = 'everything';
           updateList()
           updatePrefs("config.json", config);
-          showAnalyse();
+          if (STATE.mode !== "analyse") showAnalyse();
         }
       })();
       break;
     }
-    case "export-list": {
-      exportSpeciesList();
-      break;
-    }
+    case "export-list": { exportSpeciesList(); break }
     case "sort-label":
     case "sort-comment":
     case "sort-reviewed":
@@ -5654,6 +6705,7 @@ async function handleUIClicks(e) {
       break;
     }
     case "reset-defaults": {
+      e.preventDefault();
       const i18 = {
         en: "Are you sure you want to revert to the default settings? You will need to relaunch Chirpity to see the changes.",
         da: "Er du sikker på, at du vil gendanne standardindstillingerne? Du skal genstarte Chirpity for at se ændringerne.",
@@ -5721,18 +6773,9 @@ async function handleUIClicks(e) {
       await setFontSizeScale();
       break;
     }
-    case "speciesFilter": {
-      speciesFilter(e);
-      break;
-    }
-    case "audioFiltersIcon": {
-      toggleFilters();
-      break;
-    }
-    case "context-mode": {
-      toggleContextAwareMode();
-      break;
-    }
+    case "speciesFilter": { speciesFilter(e); break }
+    case "audioFiltersIcon": { toggleFilters(); break }
+    case "context-mode": { toggleContextAwareMode(); break }
     case "frequency-range": {
       document
         .getElementById("frequency-range-panel")
@@ -5752,24 +6795,20 @@ async function handleUIClicks(e) {
       }
       break;
     }
-    case "nocmigMode": {
-      changeNocmigMode();
-      break;
-    }
+    case "nocmigMode": { changeNocmigMode(); break }
     case "apply-location": {
+      e.preventDefault();
       setDefaultLocation();
       break;
     }
     case "cancel-location": {
+      e.preventDefault();
       cancelDefaultLocation();
       break;
     }
 
     case "zoomIn":
-    case "zoomOut": {
-      spec.zoom(e);
-      break;
-    }
+    case "zoomOut": { spec.zoom(e); break }
     case "cmpZoomIn":
     case "cmpZoomOut": {
       let minPxPerSec = ws.options.minPxPerSec;
@@ -5781,6 +6820,7 @@ async function handleUIClicks(e) {
       break;
     }
     case "clear-call-cache": {
+      e.preventDefault();
       const data = fs.rm(p.join(appPath, "XCcache.json"), (err) => {
         if (err)
           generateToast({ type: "error", message: "noCallCache" }) &&
@@ -5794,20 +6834,11 @@ async function handleUIClicks(e) {
       if (spec.wavesurfer) WSPlayPause();
         break;      
     }
-    case "setCustomLocation": {
-      setCustomLocation();
-      break;
-    }
-    case "setFileStart": {
-      showDatePicker();
-      break;
-    }
+    case "setCustomLocation": { setCustomLocation(false); break }
+    case "setFileStart": { showDatePicker(); break }
 
     // XC API calls (no await)
-    case "context-xc": {
-      getXCComparisons();
-      break;
-    }
+    case "context-xc": { getXCComparisons(); break }
 
   }
   DOM.contextMenu.classList.add("d-none");
@@ -5827,7 +6858,7 @@ async function handleUIClicks(e) {
   config.debug && console.log("clicked", target);
   target &&
     target !== "result1" &&
-    trackEvent(config.UUID, "UI", "Click", target);
+    trackEvent({uuid:config.UUID, event: "UI", action: "Click", name: target, version: VERSION});
 };
 
 /**
@@ -5864,20 +6895,41 @@ function changeSettingsMode(target) {
 }
 
 /**
+ * Displays the database location in the UI.
+ * @param {string} location - The database path, from which to display the location.
+ */
+function showDBLocation(location) {
+  document.getElementById('database-display')?.remove();
+  if (location) {
+    const dbLocation = location.split(/[\\/]/).pop();
+    const span = document.createElement("span");
+    span.id = "database-display";
+    span.classList.add("text-truncate", "small", "text-bg-primary", "float-end");
+    span.textContent = dbLocation;
+    const icon = document.createElement("span");
+    icon.innerHTML = '<span class="material-symbols-outlined text-info">database</span>';
+    span.prepend(icon);
+    DOM.footer.appendChild(span);
+  }
+}
+
+/**
  * Updates the species list UI and synchronizes the active list with the worker.
  *
- * If a custom list is selected, loads labels from the specified custom list file. Otherwise, notifies the worker to update the list and optionally refresh results based on analysis state.
+ * If a custom list is selected, loads labels from the specified custom list file. Otherwise, notifies the worker of the list and selected taxonomic classes, and optionally refreshes results based on analysis state.
  */
 async function updateList() {
   updateListIcon();
-  setListUIState(config.list)
+  setListUIState(config.list);
+  pagination.reset();
   if (config.list === "custom") {
     await readLabels(config.models[config.selectedModel].customListFile, "list");
   } else {
     worker.postMessage({
       action: "update-list",
       list: config.list,
-      refreshResults: STATE.analysisDone,
+      classes: config.detect.classes,
+      refreshResults: STATE.analysisDone && STATE.mode !== 'chart',
     });
   }
 }
@@ -5992,6 +7044,16 @@ document.addEventListener("change", async function (e) {
         }
         case "merge-detections": {
           config.detect.merge = element.checked;
+          // If merge is enabled, ensure combine is also on
+          const combineSwitch = document.getElementById('combine-detections');
+          if (element.checked) {
+            config.detect.combine = true;
+            document.getElementById('model-icon').classList.toggle('d-none', !element.checked)
+            combineSwitch.checked = true;
+            combineSwitch.disabled = true;
+          } else {
+            combineSwitch.disabled = false;
+          }
           worker.postMessage({
             action: "update-state",
             detect: config.detect,
@@ -6001,11 +7063,22 @@ document.addEventListener("change", async function (e) {
         }
         case "combine-detections": {
           config.detect.combine = element.checked;
-          document.getElementById('model-icon').classList.toggle('d-none', !element.checked)
-          worker.postMessage({
-            action: "update-state",
-            detect: config.detect,
-          });
+          document.getElementById('model-icon').classList.toggle('d-none', !element.checked);
+          if (!element.checked){
+            document.getElementById('merge-detections').checked = false;
+            config.detect.merge = false;
+          }
+          worker.postMessage({ action: "update-state", detect: config.detect });
+          break;
+        }
+        case "merge-overlaps": {
+          config.detect.mergeOverlaps = element.checked;
+          worker.postMessage({ action: "update-state", detect: config.detect });
+          break;
+        }
+        case "drop-uncertain": {
+          config.detect.dropSingles = element.checked;
+          worker.postMessage({ action: "update-state", detect: config.detect });
           break;
         }
         case "auto-load": {
@@ -6065,6 +7138,10 @@ document.addEventListener("change", async function (e) {
           handleThresholdChange(e);
           break;
         }
+        case "overlap": {
+          handleOverlapChange(e);
+          break;
+        }
         case "context": {
           toggleContextAwareMode(e);
           break;
@@ -6085,10 +7162,26 @@ document.addEventListener("change", async function (e) {
           handlePassFilterchange(DOM.LPSlider);
           break;
         }
-        // case "snrValue": {
-        //   handleSNRchange(e);
-        //   break;
-        // }
+        // Charts
+        case "hour":
+        case "day":
+        case "week": {
+          STATE.chart.aggregation = element.value;
+          callForChart();
+          break;
+        }
+        case "stackYears": {
+          STATE.chart.stackYears = element.checked;
+          callForChart();
+          break;
+        }
+        case "chart-locations": {
+          const location = element.value ? Number(element.value) : undefined;
+          STATE.chart.location = location;
+          callForChart();
+          break;
+        }
+
         case "file-timestamp": {
           config.fileStartMtime = element.checked;
           worker.postMessage({
@@ -6114,6 +7207,24 @@ document.addEventListener("change", async function (e) {
         }
         case "list-to-use": {
           config.list = element.value;
+          config.models[config.selectedModel].list = element.value;
+          updateList();
+          setClassesUIState();
+          break;
+        }
+        case "Aves":
+        case "Amphibia":
+        case "Insecta":
+        case "Mammalia":
+        case "Reptilia": {
+          const includedClasses = ["Aves", "Amphibia", "Insecta", "Mammalia", "Reptilia"]
+            .filter(cls => document.getElementById(cls)?.checked);
+
+          if (includedClasses.length === 0) {
+            document.getElementById("Aves").checked = true;
+            includedClasses.push("Aves");
+            }
+          config.detect.classes = includedClasses;
           updateList();
           break;
         }
@@ -6126,12 +7237,12 @@ document.addEventListener("change", async function (e) {
               return;
             }
           } else {
-            labelFile = p.join(dirname,`labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_${element.value}.txt`);
+            labelFile = getLabelFile();
             i18n
               .localiseUI(DOM.locale.value)
               .then((result) => (STATE.i18n = result));
             config.locale = element.value;
-            setNocmig();
+            setNocmig(config.detect.nocmig);
             contextAwareIconDisplay();
             updateListIcon();
             filterIconDisplay();
@@ -6156,18 +7267,35 @@ document.addEventListener("change", async function (e) {
         case "thread-slider": {
           // change number of threads
           DOM.numberOfThreads.textContent = DOM.threadSlider.value;
-          config[config.models[config.selectedModel].backend].threads =
+          // get backend
+          const backend = config.models[config.selectedModel].backend;
+          config.models[config.selectedModel][backend].threads =
             DOM.threadSlider.valueAsNumber;
+          config[backend].threads = DOM.threadSlider.valueAsNumber;
           worker.postMessage({
             action: "change-threads",
             threads: DOM.threadSlider.valueAsNumber,
           });
           break;
         }
+        case "window-size-slider": {
+          // change window size
+          DOM.windowSizeValue.textContent = DOM.windowSizeSlider.value;
+          const windowSize = DOM.windowSizeSlider.valueAsNumber;
+          config.models['birdnet3'].windowSize = windowSize;
+          worker.postMessage({
+            action: "change-window-size",
+            windowSize,
+          });
+          break;
+        }        
         case "batch-size": {
           DOM.batchSizeValue.textContent = DOM.batchSizeSlider.value;
-          config[config.models[config.selectedModel].backend].batchSize =
+          // get backend
+          const backend = config.models[config.selectedModel].backend;
+          config.models[config.selectedModel][backend].batchSize =
             DOM.batchSizeSlider.valueAsNumber;
+          config[backend].batchSize = DOM.batchSizeSlider.valueAsNumber;
           worker.postMessage({
             action: "change-batch-size",
             batchSize: DOM.batchSizeSlider.valueAsNumber,
@@ -6353,6 +7481,9 @@ document.addEventListener("change", async function (e) {
         }
         case "debug-mode": {
           config.debug = !config.debug;
+          window.electron.debugMode(config.debug);
+          // Tell the worker
+          worker.postMessage({ action: "update-state", debug: config.debug });
           break;
         }
       }
@@ -6360,7 +7491,7 @@ document.addEventListener("change", async function (e) {
     updatePrefs("config.json", config);
     const value = element.type === "checkbox" ? element.checked : element.value;
     target === "fileStart" ||
-      trackEvent(config.UUID, "Settings Change", target, value);
+      trackEvent({uuid:config.UUID, event: "Settings Change", action: target, value: value, version: VERSION});
   }
 });
 
@@ -6381,6 +7512,17 @@ const flushSpec = async () =>{
   }
 }
 
+function callForChart() {
+  const {species, range, location, aggregation, stackYears: byYear} = STATE.chart;
+  worker.postMessage({
+    action: "chart",
+    species,
+    range,
+    location,
+    aggregation,
+    byYear,
+  });
+}
 /**
  * Updates the UI to reflect the selected species list type and displays relevant controls.
  *
@@ -6409,54 +7551,89 @@ function setListUIState(list) {
 }
 
 /**
- * Loads and processes a label file, updating species labels or custom lists for the application.
+ * Load labels from a file and apply them to the application's locale labels or custom species list.
  *
- * If the label file cannot be fetched, displays an error toast and updates the UI to prompt for correction.
- * On success, updates the worker with the new labels or custom list, and ensures an "Unknown Sp._Unknown Sp." entry is present.
+ * Ensures an "Unknown Sp.<splitChar>Unknown Sp." entry is present. On success, sends an update to the worker to replace
+ * either the locale labels or the custom list and triggers a results refresh when appropriate. On failure, surfaces a
+ * user-facing error and highlights the list selector in the UI to prompt correction.
  *
  * @param {string} labelFile - Path or URL to the label file to load.
- * @param {string} [updating] - If set to "list", updates the custom species list; otherwise, updates locale labels.
- *
- * @throws {Error} If the label file cannot be fetched or read.
+ * @param {string} [updating] - If set to `"list"`, update the custom species list; otherwise update locale labels.
  */
 async function readLabels(labelFile, updating) {
   try {
     const filecontents = await fs.promises.readFile(labelFile, "utf8");
     const labels = filecontents.trim().split(/\r?\n/);
-    const unknown = `Unknown Sp.${getSplitChar()}Unknown Sp.`;
-    if (!labels.includes(unknown)) labels.push(unknown);
+    const unknown = `Unknown Sp.,Unknown Sp.`;
+    const unknownPattern = /^Unknown Sp\.[,_~]Unknown Sp\.$/;
+    if (!labels.some(l => unknownPattern.test(l))) labels.push(unknown);
     if (updating === "list") {
+      const MAX_LABELS = 15_000;
+      const lines = labels.length;
+      const validLinePattern = /^[^,_~]+[,_~][^,_~]+([,_~][^,_~]*){0,3}$/;
+      // 1️⃣ Guard maximum line count first
+      if (lines > MAX_LABELS) {
+        generateToast({
+          message: 'badListFormat',
+          variables: {
+            line: MAX_LABELS,
+            value: "Too many labels"
+          },
+          type: 'warning'
+        });
+        config.list = 'birds';
+        config.models[config.selectedModel].list = 'birds';
+        updatePrefs("config.json", config);
+        updateList()
+        return;
+      }
+
+      // 2️⃣ Then validate format
+      const invalidIndex = labels.findIndex(l => !validLinePattern.test(l));
+
+      if (invalidIndex !== -1) {
+        generateToast({
+          message: 'badListFormat',
+          variables: {
+            line: invalidIndex + 1,
+            value: labels[invalidIndex]
+          },
+          type: 'warning'
+        });
+        config.list = 'birds';
+        config.models[config.selectedModel].list = 'birds';
+        updatePrefs("config.json", config);
+        updateList()
+        return;
+      }
       worker.postMessage({
         action: "update-list",
         list: config.list,
         customLabels: labels,
-        refreshResults: STATE.analysisDone,
+        refreshResults: STATE.analysisDone && STATE.mode !== 'chart',
+        member: STATE.isMember,
       });
-      trackEvent(config.UUID, "UI", "Create", "Custom list", labels.length);
+      trackEvent({uuid:config.UUID, event: "UI", action: "Create", name: "Custom list", value: labels.length, version: VERSION});
     } else {
       LABELS = labels;
       worker.postMessage({
         action: "update-locale",
         locale: config.locale,
         labels: LABELS,
-        refreshResults: STATE.analysisDone,
+        refreshResults: STATE.analysisDone && STATE.mode !== 'chart',
       });
     }
   } catch (error) {
-    if (error?.message?.startsWith("ENOENT")) {
-      generateToast({
-        type: "error",
-        message: "listNotFound",
-        variables: { file: labelFile },
-      });
-      DOM.customListSelector.classList.add("btn-outline-danger");
-      if (!document.getElementById("settings").classList.contains("show")) {
-        document.getElementById("navbarSettings").click();
-      }
-      document.getElementById("list-file-selector").focus();
-    } else {
-      console.error(`Error reading label file ${labelFile}:`, error);
+    generateToast({
+      type: "error",
+      message: "listNotFound",
+      variables: { file: labelFile || 'undefined' },
+    });
+    DOM.customListSelector.classList.add("btn-outline-danger");
+    if (!document.getElementById("settings").classList.contains("show")) {
+      document.getElementById("navbarSettings").click();
     }
+    document.getElementById("list-file-selector").focus();
   }
 }
 
@@ -6497,6 +7674,7 @@ function filterLabels(e) {
  * @returns {Promise<void>} Resolves once the context menu is setup and positioned.
  */
 async function createContextMenu(e) {
+  if (!STATE.fileLoaded) return;
   e.stopPropagation();
   if (this.closest("#spectrogramWrapper")){
     const region = spec.checkForRegion(e, true);
@@ -6511,9 +7689,7 @@ async function createContextMenu(e) {
     return;
   } else if (target.classList.contains("circle") || target.closest("thead"))
     return;
-  let hideInSummary = "",
-    hideInSelection = "",
-    plural = "";
+  let hideInSummary = "", hideInSelection = "", disableWhenPredicting = "", plural = "";
   const inSummary = target.closest("#speciesFilter");
   const resultContext = !target.closest("#summaryTable");
   if (inSummary) {
@@ -6522,7 +7698,8 @@ async function createContextMenu(e) {
   } else if (target.closest("#selectionResultTableBody")) {
     hideInSelection = "d-none";
   }
-
+  if (PREDICTING) disableWhenPredicting = "disabled";
+  const hideFindSimilar = (['analyse', 'archive']).includes(STATE.mode) && ! ['chirpity', 'nocmig'].includes(config.selectedModel) ? '' : 'd-none';
   // If we haven't clicked the active row or we cleared the region, load the row we clicked
   if (resultContext || hideInSelection || hideInSummary) {
     // Lets check if the summary needs to be filtered
@@ -6539,35 +7716,33 @@ async function createContextMenu(e) {
 
   const createOrEdit =
     STATE.activeRegion?.label || target.closest("#summary") ? i18.edit : i18.create;
-
+  const disabled = STATE.isMember 
+    && STATE.analysisDone ? '' : 'disabled';
   DOM.contextMenu.innerHTML = `
     <div id="${inSummary ? "inSummary" : "inResults"}">
-        <a class="dropdown-item ${hideInSummary}" id="play-region"><span class='material-symbols-outlined'>play_circle</span> ${
-    i18.play
-  }</a>
-        <a class="dropdown-item ${hideInSummary} ${hideInSelection}" href="#" id="context-analyse-selection">
-        <span class="material-symbols-outlined">search</span> ${i18.analyse}
-        </a>
+      <ul class="list-unstyled mb-1">
+        <li class="dropdown-item ${hideInSummary}" id="play-region"><span class='material-symbols-outlined'>play_circle</span> ${i18.play}</li>
+        <li class="dropdown-item ${hideInSummary} ${hideInSelection} ${disableWhenPredicting}" id="context-analyse-selection">
+          <span class="material-symbols-outlined">search</span> ${i18.analyse}
+        </li>
+        <li class="dropdown-item ${disableWhenPredicting} ${hideFindSimilar} ${hideInSummary} ${hideInSelection} ${disabled}" id="context-find-similar">
+          <span class="material-symbols-outlined">search</span> ${i18.find}
+        </li>
         <div class="dropdown-divider ${hideInSummary}"></div>
-        <a class="dropdown-item" id="create-manual-record" href="#">
-        <span class="material-symbols-outlined">edit_document</span> ${createOrEdit} ${
-    i18.record
-  }
-        </a>
-        <a class="dropdown-item" id="context-create-clip" href="#">
-        <span class="material-symbols-outlined">music_note</span> ${i18.export}
-        </a>
-        <span class="dropdown-item" id="context-xc" href='#' target="xc">
-        <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> ${
-          i18.compare
-        }
-        </span>
+        <li class="dropdown-item  ${hideInSelection}" id="create-manual-record">
+          <span class="material-symbols-outlined">edit_document</span> ${createOrEdit} ${i18.record}
+        </li>
+        <li class="dropdown-item" id="context-create-clip">
+          <span class="material-symbols-outlined">music_note</span> ${i18.export}
+        </li>
+          <span class="dropdown-item" id="context-xc" target="xc">
+            <img src='img/logo/XC.png' alt='' style="filter:grayscale(100%);height: 1.5em"> ${i18.compare}
+          </span>
         <div class="dropdown-divider ${hideInSelection}"></div>
-        <a class="dropdown-item ${hideInSelection}" id="context-delete" href="#">
-        <span class='delete material-symbols-outlined'>delete_forever</span> ${
-          i18.delete
-        }
-        </a>
+        <li class="dropdown-item ${hideInSelection}" id="context-delete">
+          <span class='delete material-symbols-outlined'>delete_forever</span> ${i18.delete}
+        </li>
+      </ul>
     </div>
     `;
   const modalTitle = document.getElementById("record-entry-modal-label");
@@ -6643,7 +7818,7 @@ const recordEntryModal = new bootstrap.Modal(recordEntryModalDiv, {
 
 const recordEntryForm = document.getElementById("record-entry-form");
 
-const getSplitChar = () => config.selectedModel.includes('perch') ? '~' : '_';
+const getSplitChar = () => config.selectedModel === "perch v2" ? /[,~]/ : /[,_]/;
 /**
  * Displays and populates the record entry modal for adding or updating audio record details.
  *
@@ -6654,11 +7829,16 @@ const getSplitChar = () => config.selectedModel.includes('perch') ? '~' : '_';
  * @returns {Promise<void>} Resolves when the record entry form is ready and displayed.
  */
 async function showRecordEntryForm(mode, batch) {
+  const { activeRegion, windowOffsetSecs} = STATE;
+  if (!activeRegion || windowOffsetSecs == null || Number.isNaN(windowOffsetSecs)) {
+    console.warn("showRecordEntryForm called without a valid activeRegion/windowOffsetSecs");
+    return;
+  }
+
   const i18 = i18n.get(i18n.Headings);
   const cname = batch
-    ? document.querySelector("#speciesFilter .text-warning .cname .cname")
-        .textContent
-    : STATE.activeRegion?.label || "";
+    ? document.querySelector("#speciesFilter .text-warning .cname .cname")?.textContent ?? ""
+    : activeRegion.label || "";
   let callCount = "",
     commentText = "",
     modelID, score;
@@ -6681,9 +7861,9 @@ async function showRecordEntryForm(mode, batch) {
   const speciesDisplay = document.createElement("div");
   speciesDisplay.className = "border rounded w-100";
   if (cname) {
-    const species = LABELS.find(sp => sp.split(getSplitChar())[1] === cname);
+    const species = LABELS.find(sp => sp.split(getSplitChar(LABELS))[1] === cname);
     if (species) {
-      const [sciName, commonName] = species.split(getSplitChar());
+      const [sciName, commonName] = species.split(getSplitChar(LABELS));
       const styled = `${commonName}<br/><i>${sciName}</i>`;
       selectedBird.innerHTML = styled;
     } else {
@@ -6723,7 +7903,12 @@ async function showRecordEntryForm(mode, batch) {
 }
 
 recordEntryForm.addEventListener("submit", function (e) {
+  const { activeRegion, windowOffsetSecs} = STATE;
   e.preventDefault();
+  if (!activeRegion || windowOffsetSecs == null || Number.isNaN(windowOffsetSecs)) {
+    console.warn("submit showRecordEntryForm called without a valid activeRegion/windowOffsetSecs");
+    return;
+  }
   const action = document.getElementById("DBmode").value;
   // cast boolstring to boolean
   const batch = document.getElementById("batch-mode").value === "true";
@@ -6733,15 +7918,13 @@ recordEntryForm.addEventListener("submit", function (e) {
   // Check we selected a species
   if (!LABELS.some((item) => item.includes(cname))) return;
   let start, end;
-  if (STATE.activeRegion) {
-    start = STATE.windowOffsetSecs + STATE.activeRegion.start;
-    end = STATE.windowOffsetSecs + STATE.activeRegion.end;
-    const region = spec.REGIONS.regions.find(
-      (region) => region.start === STATE.activeRegion.start
-    );
-    // You can still add a record if you cleared the regions
-    region?.setOptions({ content: cname });
-  }
+  start = windowOffsetSecs + activeRegion.start;
+  end = windowOffsetSecs + activeRegion.end;
+  const region = spec.REGIONS.regions.find(
+    (region) => region.start === STATE.activeRegion.start
+  );
+  // You can still add a record if you cleared the regions
+  region?.setOptions({ content: cname });
   const originalCname = document.getElementById("original-id").value || cname;
   // Update the region label
   const count = document.getElementById("call-count")?.valueAsNumber;
@@ -6784,6 +7967,8 @@ const insertManualRecord = ( {
   modelID,
   undo
 }  = {}) => {
+  // Prevent null/NaN start/datetime entries
+  if (start == null || Number.isNaN(start)) return;
   worker.postMessage({
     action: "insert-manual-record",
     cname,
@@ -6962,6 +8147,7 @@ const prepTour = async () => {
 const tracking = document.getElementById("update-progress");
 const updateProgressBar = document.getElementById("update-progress-bar");
 const displayProgress = (progressObj, text) => {
+  if (isNaN(progressObj.percent)) return;
   tracking.querySelector('span').textContent = text;
   tracking.classList.remove("d-none");
   // Update your UI with the progress information
@@ -7013,6 +8199,12 @@ function generateToast({
   if (message === "noFile") {
     // Alow further interactions!!
     STATE.currentFile && (STATE.fileLoaded = true);
+  } else if (message === 'corruptFile') {
+    const files = variables.files.split('<br>').filter(f => f !== '');
+    files.forEach(f => removeOpenFile(f));
+    if (!STATE.currentFile) {
+      STATE.fileLoaded = false;
+    }
   }
   message = variables
     ? utils.interpolate(i18[message], variables)
@@ -7050,10 +8242,6 @@ function generateToast({
   strong.className = "me-auto";
   strong.textContent = typeText[type];
 
-  const small = document.createElement("small");
-  small.className = "text-muted";
-  small.textContent = ""; //just now';
-
   const button = document.createElement("button");
   button.type = "button";
   button.className = "btn-close";
@@ -7063,7 +8251,6 @@ function generateToast({
   // Append elements to toastHeader
   toastHeader.appendChild(iconSpan);
   toastHeader.appendChild(strong);
-  toastHeader.appendChild(small);
   toastHeader.appendChild(button);
 
   // Create toast body
@@ -7110,11 +8297,12 @@ function generateToast({
 }
 
 /**
- * Fetches and displays Xeno-Canto audio comparisons for the currently selected species and call type.
+ * Fetch and display Xeno-Canto audio comparisons for the currently selected species and call type.
  *
- * Attempts to load cached comparison data; if unavailable, queries the Xeno-Canto API for relevant recordings, supporting both bird and bat models with appropriate call types and duration filters. Deduplicates and limits results per call type, updates the cache, and renders the comparison UI. Notifies the user if no suitable comparisons are found.
+ * Loads cached comparison lists when available; otherwise queries the Xeno-Canto API for several call/type categories, deduplicates and limits results per category, updates the cache, and renders the comparison UI. Shows a user notification when no comparisons are found or when a fetch error occurs.
  */
 async function getXCComparisons() {
+  if (! activeRow) return
   let {sname, cname} = unpackNameAttr(activeRow);
   cname.includes("call)") ? "call" : "";
   let XCcache;
@@ -7133,23 +8321,25 @@ async function getXCComparisons() {
   else {
     const content = "Loading Xeno-Canto data...";
     loadingFiles({hide:false, content})
-    const bats = config.selectedModel.includes('bats');
-    const quality = "+q:%22>C%22";
-    const defaultLength = bats ? "+len:0.5-10" : "+len:3-15";
+    const bats = config.selectedModel.includes('batpack');
+    const quality = '+q:">C"';
+    const defaultLength = bats ? '+len:"0.5-10"' : '+len:"3-15"';
     sname = XCtaxon[sname] || sname;
     const types = bats
-      ? ["distress call", "feeding buzz", "social call", "ecolocation", "song"]
-      : ["nocturnal flight call", "flight call", "call", "song"];
+      ? ['distress call', 'feeding buzz', 'social call', 'echolocation', 'song']
+      : ['nocturnal flight call', 'flight call', 'call', 'song'];
+    const frogs = config.selectedModel.includes('frog');
+    if (frogs) types.push('advertisement call', 'territorial call', 'distress call');
     const filteredLists = {}
     types.forEach((type) => {
       filteredLists[type] = []; // Initialize each type with an empty array
     });
-    
+
     // Create an array of promises—one for each call type
     const fetchRequests = types.map((type) => {
-      type = type.replaceAll(" ", "%20"); // Replace spaces with underscores for the API query
+      type = type.replaceAll(" ", "%20"); // Replace spaces with entities for the API query
       // Use a different length parameter for "song"
-      const typeLength = type === "song" ? "+len:10-30" : defaultLength;
+      const typeLength = type === "song" ? '+len:"10-30"' : defaultLength;
       const query = `https://xeno-canto.org/api/3/recordings?key=d5e2d2775c7f2b2fb8325ffacc41b9e6aa94679e&query=sp:"${sname}"${quality}${typeLength}+type:"${type}"`;
       
       return fetch(query)
@@ -7182,7 +8372,7 @@ async function getXCComparisons() {
         })
         .catch((error) => {
           loadingFiles({hide:true})
-          console.warn("Error getting XC data for type", type, error);
+          console.warn(`Error getting XC data for type:${type}`, error);
           return [];
         });
     });
@@ -7273,7 +8463,7 @@ function renderComparisons(lists, cname) {
   let count = 0;
   Object.keys(lists).forEach((callType) => {
     const active = count === 0 ? "active" : "";
-    const callTypePrefix = callType.replaceAll(" ", "-");
+    const callTypePrefix = callType.replaceAll(" ", "-").replaceAll('"', '');
     if (lists[callType]?.length) {
       // tab headings
       const tabHeading = document.createElement("li");
@@ -7281,7 +8471,7 @@ function renderComparisons(lists, cname) {
       tabHeading.setAttribute("role", "presentation");
       const button = `<button class="nav-link text-nowrap ${active}" id="${callTypePrefix}-tab" data-bs-toggle="tab" data-bs-target="#${callTypePrefix}-tab-pane" type="button" role="tab" aria-controls="${callTypePrefix}-tab-pane" aria-selected="${
         count === 0
-      }">${i18[callType]}</button>`;
+      }">${i18[callType.replaceAll('"', '')]}</button>`;
       tabHeading.innerHTML = button;
       callTypeHeader.appendChild(tabHeading);
 
@@ -7349,7 +8539,7 @@ function renderComparisons(lists, cname) {
         creditContainer.appendChild(creditText);
         carouselItem.appendChild(creditContainer);
         carouselItem.appendChild(mediaDiv);
-        creditLink.setAttribute("href", "https:" + recording.url);
+        creditLink.setAttribute("href", recording.url);
         creditLink.setAttribute("target", "_blank");
         creditLink.innerHTML = "Source: Xeno-Canto &copy; " + recording.rec;
         carouselInner.appendChild(carouselItem);
@@ -7380,6 +8570,8 @@ function renderComparisons(lists, cname) {
   callTypeHeader.addEventListener("click", showCompareSpec);
   const comparisonModal = new bootstrap.Modal(compareDiv);
   compareDiv.addEventListener("hidden.bs.modal", () => {
+    STATE.XCcontroller?.abort();
+    STATE.XCcontroller = null;
     ws && ws.destroy();
     ws = null;
     compareDiv.remove();
@@ -7390,12 +8582,47 @@ function renderComparisons(lists, cname) {
 }
 import WaveSurfer from "../node_modules/wavesurfer.js/dist/wavesurfer.esm.js";
 import Spectrogram from "../node_modules/wavesurfer.js/dist/plugins/spectrogram.esm.js";
+import TimelinePlugin from "../node_modules/wavesurfer.js/dist/plugins/timeline.esm.js";
 
 let ws;
 
+/**
+ * Download an audio file from the given URL and load it into the provided Wavesurfer instance.
+ *
+ * If the fetch is aborted or fails, the optional onCleanup callback is invoked and a warning toast is shown.
+ *
+ * @param {string} url - The remote audio file URL to fetch.
+ * @param {Object} wavesurfer - A Wavesurfer instance with a `loadBlob` method.
+ * @param {function} [onCleanup] - Optional callback invoked when loading is aborted or on error to clear any loading UI state.
+ * @returns {AbortController} An AbortController whose signal can be used to cancel the in-flight fetch.
+ */
+
+function loadXCFile(url, wavesurfer, onCleanup) {
+  const controller = new AbortController();
+  const startTime = Date.now();
+  fetch(url, { signal: controller.signal })
+    .then((res) => {
+      if (!res.ok) {
+        throw new Error(`XC audio download failed with HTTP ${res.status}`);
+      }
+      return res.blob();
+    })
+    .then(blob => wavesurfer.loadBlob(blob))
+    .catch(err => {
+      if (err.name === 'AbortError') {
+        console.warn(`User Cancelled XC API call after ${Math.round((Date.now() - startTime)/1000)} seconds`);
+        onCleanup && onCleanup();
+        return;
+      }
+      console.warn("Failed to load XC audio", err);
+      generateToast({ type: "warning", message: "noComparisons" });
+      onCleanup && onCleanup();
+    });
+  return controller; // so caller can cancel
+}
 const createCompareWS = (mediaContainer) => {
   ws?.destroy();
-  const bats = config.selectedModel.includes('bats');
+  const bats = config.selectedModel.includes('batpack');
   ws = WaveSurfer.create({
     container: mediaContainer,
     backgroundColor: "rgba(0,0,0,0)",
@@ -7425,9 +8652,26 @@ const createCompareWS = (mediaContainer) => {
       })
     );
   createCmpSpec();
+  const createTimeline = () =>
+    ws.registerPlugin(
+    TimelinePlugin.create({
+      timeInterval: 0.25,
+      primaryLabelInterval: 1,
+      secondaryLabelInterval: 0.25,
+      secondaryLabelOpacity: 0,
+      style: {
+        // boostrap light and dark
+        color: '#f8f9fa',
+        backgroundColor: '#212529'
+      },
+    })
+  );
+  createTimeline();
 };
 
 function showCompareSpec() {
+  // cancel previous request
+  STATE.XCcontroller?.abort();
   const activeCarouselItem = document.querySelector(
     "#recordings .tab-pane.active .carousel-item.active"
   );
@@ -7440,6 +8684,7 @@ function showCompareSpec() {
   activeXCLink && activeXCLink.classList.remove("d-none");
 
   const mediaContainer = activeCarouselItem.lastChild;
+
   // need to prevent accumulation, and find event for show/hide loading
   const loading = DOM.loading.cloneNode(true);
   loading.classList.remove("d-none", "text-white");
@@ -7448,10 +8693,10 @@ function showCompareSpec() {
   const [_, file] = mediaContainer.getAttribute("name").split("|");
   // Create an instance of WaveSurfer
   createCompareWS(mediaContainer);
-  ws.once("decode", function () {
-    mediaContainer.removeChild(loading);
-  });
-  ws.load(file);
+  const clearLoading = () => loading.remove();
+  ws.once("decode", clearLoading);
+  setTimeout(clearLoading, 10_000); // Clear loading after 10 seconds
+  STATE.XCcontroller = loadXCFile(file, ws, clearLoading);
 }
 
 
@@ -7468,8 +8713,8 @@ const IUCNMap = {
   EX: "text-bg-dark",
 };
 
-// Make config, LOCATIONS and displayLocationAddress and toasts available to the map script in index.html
-export { config, displayLocationAddress, LOCATIONS, generateToast };
+// Make functions available to the map script in index.html
+export { config, displayLocationAddress, LOCATIONS, generateToast, checkCoords};
 
 /**
  * Checks the user's membership status via a remote API and updates the UI to reflect feature access.
@@ -7484,20 +8729,18 @@ async function membershipCheck() {
   config.debug && console.log('cached membership is', cachedStatus)
   const cachedTimestamp = Number(localStorage.getItem("memberTimestamp"));
   const now = Date.now();
-  let installDate = Number(localStorage.getItem("installDate"))
-  installDate = await window.electron.getInstallDate(installDate);
-  installDate = new Date(installDate).getTime();
-  // Fallback if access to keychain denied
-  window.localStorage.setItem("installDate", installDate);
+  const installDate = new Date(config.installedAt ?? 0).getTime();
   const trialPeriod = await window.electron.trialPeriod();
-  const installPeriod = Date.now() - installDate;
+  const installPeriod = now - installDate;
   const trialDaysLeft = Math.max(Math.ceil((trialPeriod - installPeriod)/86_400_000), 0)
   const inTrial = installPeriod < trialPeriod;
+
   const lockedElements = document.querySelectorAll(".locked, .unlocked");
-  const unlockElements = () => {
+  const unlockElements = (inTrial) => {
+    const lockClass = inTrial ? 'trial' : 'unlocked';
     lockedElements.forEach((el) => {
       if (el instanceof HTMLSpanElement) {
-        el.classList.replace("locked", "unlocked");
+        el.classList.replace("locked", lockClass);
         el.textContent = "lock_open";
       } else {
         el.classList.remove("locked", "disabled");
@@ -7549,7 +8792,7 @@ async function membershipCheck() {
             variables: { expiresIn },
           });
         }
-        unlockElements();
+        unlockElements(inTrial);
         if (isMember) {
           document.getElementById("primaryLogo").src =
             `img/logo/chirpity_logo_subscriber_${level}.png`; // bronze / Silver (& Gold) available
@@ -7565,7 +8808,17 @@ async function membershipCheck() {
           config.selectedModel = 'birdnet'      
         }
       }
-
+      if (!isMember){
+        const span = document.createElement('span');
+        span.type = 'button';
+        span.id = 'trial-notification';
+        span.className = 'float-end pe-3';
+        const trialText = trialDaysLeft > 0 
+          ? `<span class="badge text-bg-info border border-light gb-2">${trialDaysLeft}</span> ` + i18n.get(i18n.Trial) 
+          : `<i>${i18n.get(i18n.TrialExpired)}</i>`;
+        span.innerHTML = `<small>${trialText}</small>`;
+        DOM.footer.appendChild(span);
+      }
       console.info(
         `Version: ${VERSION}. Trial: ${inTrial} Subscriber: ${isMember}`, trialDaysLeft
       );
@@ -7709,6 +8962,8 @@ function changeInputElement(column, element, key, preSelected = null) {
   }
 }
 
+
+
 document.addEventListener("labelsUpdated", (e) => {
   const tags = e.detail.tags;
   const tagObjects = tags.map((name, index) => ({ id: index, name }));
@@ -7746,7 +9001,7 @@ function getFilteredBirds(search, list) {
   const sortedList = list.filter(bird => typeof bird === "string" && bird.toLowerCase().includes(search))
     .map((item) => {
       // Flip sname and cname from "sname_/~cname"
-      const [cname, sname] = item.split(getSplitChar()).reverse();
+      const [cname, sname] = item.split(getSplitChar(list)).reverse();
       return { cname, sname, styled: `${cname} <br/><i>${sname}</i>` };
     })
     .sort((a, b) =>
@@ -7796,6 +9051,9 @@ function updateSuggestions(input, element, preserveInput) {
     span.textContent = ` (${list.length})`; // Update existing span
   }
   if (search.length < 2) {
+    const oldSpecies = STATE.chart.species;
+    STATE.chart.species = null;
+    if (oldSpecies) callForChart();
     element.style.display = "none";
     return;
   }
@@ -7833,18 +9091,20 @@ function updateSuggestions(input, element, preserveInput) {
       }
 
       if (input.id === "bird-autocomplete-explore") {
-        filterResults({ species: item.cname, updateSummary: true });
-        resetResults({
-          clearSummary: false,
-          clearPagination: false,
-          clearResults: false,
+        // Mark the summary table row for the species selected
+        const td = [...document.querySelectorAll('#speciesFilter td.cname')]
+          .find(td => td.querySelector('span.cname')?.textContent.trim() === item.cname);
+
+        td?.click();
+
+        td?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center'
         });
+
       } else if (input.id === "bird-autocomplete-chart") {
-        worker.postMessage({
-          action: "chart",
-          species: item.cname,
-          range: STATE.chart.range,
-        });
+        STATE.chart.species = item.cname;
+        callForChart();
       }
       input.dispatchEvent(new Event("change", { bubbles: true })); // fire the change event
       element.style.display = "none";
@@ -7944,6 +9204,14 @@ document.addEventListener("filter-labels", (e) => {
 });
 
 
+/**
+ * Rebuild a model selector from configuration.
+ *
+ * Custom-only selectors exclude bundled models. The main selector includes all
+ * models but disables BirdNET3 for non-members.
+ *
+ * @param {boolean} customOnly - Whether to populate only custom models.
+ */
 function updateModelOptions(customOnly){
   const formElement = customOnly ? 'custom-models' : 'model-to-use';
   const select = document.getElementById(formElement);
@@ -7952,19 +9220,25 @@ function updateModelOptions(customOnly){
   // Add options
   const modelOptions = customOnly 
     ? Object.fromEntries(Object.entries(config.models)
-    .filter(([model, _]) => !['nocmig', 'chirpity','birdnet'].includes(model)))
+    .filter(([model, _]) => !['nocmig', 'chirpity','birdnet', 'birdnet3'].includes(model)))
     : config.models;
   // Add new options from the object
   for (const [model, opt] of Object.entries(modelOptions)) {
     const option = document.createElement('option');
     option.value = model;
+    option.disabled = model === 'birdnet3' && !STATE.isMember; // Disable birdnet3 if not a member
     option.textContent = opt.displayName;
     select.appendChild(option);
   }
   customOnly || (select.value = config.selectedModel)
 }
 
-// Update checking for Intel Mac
+/**
+ * Checks GitHub for a newer release of the Intel Mac build and, if one exists, shows an in-app update alert.
+ *
+ * Performs the check at most once per day; when a newer release is detected it appends a warning alert to the
+ * "updateAlert" element, records an analytics event, updates config.lastUpdateCheck, and persists the config.
+ */
 
 function checkForIntelMacUpdates() {
   // Do this at most daily
@@ -7992,7 +9266,7 @@ function checkForIntelMacUpdates() {
             ].join("");
             alertPlaceholder.append(wrapper);
           };
-          const link = `<a href="https://chirpity.mattkirkland.co.uk?fromVersion=${VERSION}" target="_blank">`;
+          const link = `<a href="https://chirpity.net?fromVersion=${VERSION}" target="_blank">`;
           const message = utils.interpolate(i18n.get(i18n.UpdateMessage), {
             link: link,
           });
@@ -8001,10 +9275,7 @@ function checkForIntelMacUpdates() {
             "warning"
           );
           trackEvent(
-            config.UUID,
-            "Update message",
-            `From ${VERSION}`,
-            `To: ${latestVersion}`
+            {uuid:config.UUID, event: "Update message", action: `From ${VERSION}`, name: `To: ${latestVersion}`, version: VERSION}
           );
         }
         config.lastUpdateCheck = latestCheck;
@@ -8015,3 +9286,111 @@ function checkForIntelMacUpdates() {
       });
   }
 }
+
+// async function getIUCNStatus(sname = "Anser anser") {
+//   if (!Object.keys(STATE.IUCNcache).length) {
+//     const path = p.join(appPath, 'IUCNcache.json');
+//     // const path = window.location.pathname
+//     //   .replace(/^\/(\w:)/, "$1")
+//     //   .replace("index.html", "IUCNcache.json");
+//     // window.electron.getPath()
+//     if (fs.existsSync(path)) {
+//       const data = await fs.promises.readFile(path, "utf8").catch((err) => {});
+//       STATE.IUCNcache = JSON.parse(data);
+//     } else {
+//       STATE.IUCNcache = {};
+//     }
+//   }
+//   Object.entries(STATE.IUCNcache).forEach(([key, entry]) => {
+//     if (
+//         !Array.isArray(entry.scopes) ||
+//         entry.scopes.length === 0 ||
+//         entry.scopes.some(scope => scope.url == null)
+//     ) {
+//         delete STATE.IUCNcache[key];
+//     }
+// });
+
+//     updatePrefs("IUCNcache.json", STATE.IUCNcache);
+//     return true; // Optionally return the data if you need to use it elsewhere
+
+//   // return STATE.IUCNcache[sname];
+
+//   /* The following code should not be called in the packaged app */
+
+//   const [genus, species] = sname.split(" ");
+
+//   const headers = {
+//     Accept: "application/json",
+//     Authorization:"API_KEY", // Replace with the actual API key
+//     keepalive: true,
+//   };
+
+//   try {
+//     const response = await fetch(
+//       `https://api.iucnredlist.org/api/v4/taxa/scientific_name?genus_name=${genus}&species_name=${species}`,
+//       { headers }
+//     );
+
+//     if (!response.ok) {
+//       throw new Error(
+//         `Network error: code ${response.status} fetching IUCN data.`
+//       );
+//     }
+
+//     const data = await response.json();
+
+//     // Filter out all but the latest assessments
+//     const filteredAssessments = data.assessments.filter(
+//       (assessment) => assessment.latest
+//     );
+//     const speciesData = { scopes: [] };
+
+//     // Fetch all the assessments concurrently
+//     const assessmentResults = await Promise.all(
+//       filteredAssessments.map(async (item) => {
+//         const response = await fetch(
+//           `https://api.iucnredlist.org/api/v4/assessment/${item.assessment_id}`,
+//           { headers }
+//         );
+//         if (!response.ok) {
+//           throw new Error(
+//             `Network error: code ${response.status} fetching IUCN data.`
+//           );
+//         }
+//         const data = await response.json();
+//         await new Promise((resolve) => setTimeout(resolve, 500));
+//         return data;
+//       })
+//     );
+
+//     // Process each result
+//     for (let item of assessmentResults) {
+//       const scope = item.scopes?.[0]?.description?.en || "Unknown";
+//       const status = item.red_list_category?.code || "Unknown";
+//       const url = item.url.replace('https://www.iucnredlist.org/species/', '') || "No URL provided";
+//       speciesData.scopes.push({ scope, status, url });
+//     }
+
+//     console.log(speciesData);
+//     STATE.IUCNcache[sname] = speciesData;
+//     updatePrefs("IUCNcache.json", STATE.IUCNcache);
+//     return true; // Optionally return the data if you need to use it elsewhere
+//   } catch (error) {
+//     if (error.message.includes("404")) {
+//       generateToast({
+//         message: "noIUCNRecord",
+//         variables: { sname: sname },
+//         type: "warning",
+//       });
+//       STATE.IUCNcache[sname] = {
+//         scopes: [{ scope: "Global", status: "NA", url: null }],
+//       };
+//       updatePrefs("IUCNcache.json", STATE.IUCNcache);
+//       return true;
+//     }
+//     console.error("Error fetching IUCN data:", error.message);
+//     throw error
+    
+//   }
+// }

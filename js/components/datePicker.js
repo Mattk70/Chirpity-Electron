@@ -148,7 +148,6 @@ function initialiseDatePicker(state, worker, config, resetResults, filterResults
       if (element.id === "chartRange") {
         state.chart.range = { start: start.getTime(), end: end.getTime() };
         worker.postMessage({ action: "update-state", chart: state.chart });
-        t0 = Date.now();
         worker.postMessage({
           action: "chart",
           species: state.chart.species,
@@ -158,7 +157,7 @@ function initialiseDatePicker(state, worker, config, resetResults, filterResults
       } else if (element.id === "exploreRange") {
         state.explore.range = { start: start.getTime(), end: end.getTime() };
         resetResults({
-          clearSummary: true,
+          clearSummary: false,
           clearPagination: true,
           clearResults: false,
         });
@@ -179,7 +178,6 @@ function initialiseDatePicker(state, worker, config, resetResults, filterResults
       if (element.id === "chartRange") {
         state.chart.range = { start: undefined, end: undefined };
         worker.postMessage({ action: "update-state", chart: state.chart });
-        t0 = Date.now();
         worker.postMessage({
           action: "chart",
           species: state.chart.species,
@@ -195,12 +193,12 @@ function initialiseDatePicker(state, worker, config, resetResults, filterResults
           explore: state.explore,
         });
         resetResults({
-          clearSummary: true,
+          clearSummary: false,
           clearPagination: true,
           clearResults: false,
         });
         filterResults({
-          species: state.explore.species,
+          //species: state.explore.species,
           range: state.explore.range,
         });
       }

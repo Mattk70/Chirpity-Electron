@@ -2,10 +2,10 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const isMac = process.platform === "darwin"; // macOS check
-const arch = process.arch
-const isIntelMac = isMac && arch === 'x64';
+const arch = process.arch;
 const {
   app,
+  session,
   Menu,
   dialog,
   ipcMain,
@@ -16,43 +16,63 @@ const {
 app.commandLine.appendSwitch("disable-renderer-backgrounding");
 app.commandLine.appendSwitch("force-high-performance-gpu");
 app.commandLine.appendSwitch("xdg-portal-required-version", "4");
-// WebGPU flags needed for Linux
-app.commandLine.appendSwitch("enable-unsafe-webgpu");
-app.commandLine.appendSwitch("enable-features", "Vulkan");
+
+const isX11 = process.platform === 'linux' && !!process.env.DISPLAY && !process.env.WAYLAND_DISPLAY;
+if (isX11) {
+  // WebGPU flags needed for Linux
+  app.commandLine.appendSwitch("enable-unsafe-webgpu");
+  app.commandLine.appendSwitch("enable-features", "Vulkan");
+}
+process.env["TF_ENABLE_ONEDNN_OPTS"] = "1";
 
 // Set the AppUserModelID (to prevent the two pinned icons bug)
 app.setAppUserModelId('com.electron.chirpity');
-
-// function copyFilesOnly(srcDir, destDir) {
-//   for (const item of fs.readdirSync(srcDir)) {
-//     if (['config.json', 
-//       'archive.sqlite', 
-//       'archive.sqlite.shm', 
-//       'archive.sqlite.wal', 
-//       'XCcache.json', 
-//       'settings.json'].includes(item)){
-//       const srcPath = path.join(srcDir, item);
-//       const destPath = path.join(destDir, item);
-//       // Copy files
-//       fs.copyFileSync(srcPath, destPath);
-//     }
-//   }
-// }
+const version = app.getVersion();
+function copyFilesOnly(srcDir, destDir) {
+  for (const item of fs.readdirSync(srcDir)) {
+    if (['config.json', 
+      'archive.sqlite', 
+      'archive.sqlite.shm', 
+      'archive.sqlite.wal', 
+      'XCcache.json', 
+      'settings.json'].includes(item)){
+      const srcPath = path.join(srcDir, item);
+      const destPath = path.join(destDir, item);
+      // Copy files
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
 // // When dmg is installed over a pkg installation, the app crashes, so...
 const userData = app.getPath("userData");
-// if (isMac && ! fs.existsSync(path.join(userData, 'pkg2dmg')) && fs.existsSync(path.join(userData, 'config.json'))){
-//   console.log(`existing config found`)
-//   try {
-//     const movedSettings = userData+' old'
-//     fs.renameSync(userData, movedSettings);
-//     fs.mkdirSync(userData)
-//     copyFilesOnly(movedSettings, userData)
-//     fs.writeFileSync(path.join(userData, 'pkg2dmg'), "");
-//     console.log('Migration done')
-//   } catch (err) {
-//     console.error(err);
-//   }
-// }
+const CONFIG_FILE = path.join(userData, 'config.json');
+    
+function checkForMigration() {
+  if (isMac && ! fs.existsSync(path.join(userData, 'pkg2dmg')) && fs.existsSync(CONFIG_FILE)){
+    console.log(`existing config found`)
+    try {
+      const data = fs.readFileSync(CONFIG_FILE);
+      const semver = require('semver');
+      const {VERSION} = JSON.parse(data);
+      if (semver.gt(VERSION, '5.6.1')) {
+        console.log(`No migrating needed for version ${VERSION}`)
+        fs.writeFileSync(path.join(userData, 'pkg2dmg'), "");
+        return; // no migration needed
+      }
+      console.log(`migrating settings from version ${VERSION}`)
+
+      const movedSettings = userData+' old'
+      fs.renameSync(userData, movedSettings);
+      fs.mkdirSync(userData)
+      copyFilesOnly(movedSettings, userData)
+      fs.writeFileSync(path.join(userData, 'pkg2dmg'), "");
+      console.log('Migration done')
+    } catch (err) {
+      console.error(err);
+    }
+  }
+}
+checkForMigration();
 
 const { autoUpdater } = require("electron-updater");
 const log = require("electron-log");
@@ -61,46 +81,103 @@ const crypto = require("node:crypto");
 const settings = require("electron-settings");
 const keytar = require('keytar');
 const SERVICE = 'Chirpity';
-const ACCOUNT = 'install-info';
+const ACCOUNT = 'uuid';
 let DEBUG = false;
 
+/**
+ * Ensure and return persistent install information, creating and storing it in the system keychain if missing or invalid.
+ * Attempts to read an existing record from the keychain; if none exists or it lacks a valid `installedAt`, a new record is generated and persisted. If a provided `date` is invalid, the current time is used. Keychain read/write failures are logged and the new record is returned (but may not be persisted).
+ * @param {string|Date|number} [date] - Optional install timestamp (ISO string, Date object, or epoch milliseconds) to use when creating a new record.
+ * @returns {{appId: string, installedAt: string}} An object containing `appId` (a UUID) and `installedAt` (an ISO 8601 timestamp).
+ */
+
 async function getInstallInfo(date) {
+  //if (!!process.env.CI) return { appId: crypto.randomUUID(), installedAt: Date.now().toISOString() }; // Don't use keychain in CI, just return dummy data
+  // First, try the current key (ACCOUNT = 'uuid')
   try {
     const raw = await keytar.getPassword(SERVICE, ACCOUNT);
 
     if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed.installedAt === "string") {
-        // This is an ISO date string
-        return parsed.installedAt;
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed.installedAt === "string") {
+          return parsed;
+        }
+        console.warn("getInstallInfo: keychain entry missing valid installedAt, will attempt migration or recreate", date);
+      } catch (e) {
+        console.warn("getInstallInfo: failed to parse current keychain entry, will attempt migration or recreate", e.message);
       }
-      console.warn("getInstallInfo: keychain entry missing valid installedAt, recreating with", date);
     }
   } catch (error) {
-    console.warn("getInstallInfo: keychain read/parse failed, recreating:", error.message);
+    console.warn("getInstallInfo: keychain read failed for current key, will attempt migration or recreate:", error.message);
+  }
+
+  // If no current entry, try legacy key 'install-info' and migrate it if present
+  try {
+    const legacyRaw = await keytar.getPassword(SERVICE, 'install-info');
+    if (legacyRaw) {
+      let migratedDateStr = null;
+      let legacyAppId = null;
+      try {
+        const legacyParsed = JSON.parse(legacyRaw);
+        // Accept either { installedAt: '...' } or { installedAt: '...', appId: '...' }
+        if (legacyParsed && typeof legacyParsed.installedAt === 'string') {
+          migratedDateStr = legacyParsed.installedAt;
+          if (legacyParsed.appId) legacyAppId = legacyParsed.appId;
+        }
+      } catch (e) {
+        // Not JSON — maybe it's a raw date string
+        const maybeDate = new Date(legacyRaw);
+        if (!Number.isNaN(maybeDate.getTime())) {
+          migratedDateStr = maybeDate.toISOString();
+        }
+      }
+
+      if (migratedDateStr) {
+        const installInfo = {
+          appId: legacyAppId || crypto.randomUUID(),
+          installedAt: migratedDateStr,
+        };
+        try {
+          await keytar.setPassword(SERVICE, ACCOUNT, JSON.stringify(installInfo));
+          try {
+            // Remove legacy key to avoid confusion; ignore failures
+            await keytar.deletePassword(SERVICE, 'install-info');
+          } catch (delErr) {
+            console.warn('getInstallInfo: failed to delete legacy install-info key:', delErr.message);
+          }
+          console.info('getInstallInfo: migrated legacy install-info to', ACCOUNT);
+        } catch (writeErr) {
+          console.warn('getInstallInfo: failed to write migrated installInfo to keychain:', writeErr.message);
+        }
+        return installInfo;
+      } else {
+        console.warn('getInstallInfo: legacy install-info found but no usable date; will recreate.');
+      }
+    }
+  } catch (legacyErr) {
+    console.warn('getInstallInfo: error reading legacy install-info key:', legacyErr.message);
   }
 
   let effectiveDate = date ? new Date(date) : new Date();
   if (Number.isNaN(effectiveDate.getTime())) {
-    console.warn("getInstallInfo: invalid date provided, falling back to now.");
+    console.warn("getInstallInfo: invalid date provided, falling back to now. Date:", effectiveDate);
     effectiveDate = new Date();
   }
-
   const installInfo = {
     appId: crypto.randomUUID(),
     installedAt: effectiveDate.toISOString(),
   };
-
+  console.log('attempt to set new service password, using ', installInfo)
+  
   try {
     await keytar.setPassword(SERVICE, ACCOUNT, JSON.stringify(installInfo));
   } catch (error) {
     console.warn("getInstallInfo: keychain write failed (using in‑memory date only):", error.message);
   }
-
-  return installInfo.installedAt;
+  return installInfo;
 }
 
-process.env["TF_ENABLE_ONEDNN_OPTS"] = "1";
 
 //require('update-electron-app')();
 let files = [];
@@ -324,10 +401,10 @@ ipcMain.handle('getAppPath', () => app.getAppPath());
 ipcMain.handle('trialPeriod', () => 14*24*3600*1000); // 14 days
 ipcMain.handle('getLocale', () => app.getLocale());
 ipcMain.handle('getTemp', () => app.getPath('temp'));
-ipcMain.handle('getUUID', () => crypto.randomUUID())
 ipcMain.handle('isMac', () => isMac);
 ipcMain.handle('getAudio', () => path.join(__dirname.replace('app.asar', ''), 'Help', 'example.mp3'));
 ipcMain.handle('exitApplication', () => app.quit()); 
+ipcMain.handle('getInstallInfo', (_e, date) => getInstallInfo(date));
 
 let mainWindow;
 let workerWindow;
@@ -496,12 +573,22 @@ app.whenReady().then(async () => {
       "userData",
       path.join(process.env.PORTABLE_EXECUTABLE_DIR, "chirpity-data")
     );
-    ipcMain.handle("getVersion", () => app.getVersion() + " (Portable)");
+    ipcMain.handle("getVersion", () => version + " (Portable)");
   } else {
-    ipcMain.handle("getVersion", () => app.getVersion());
+    ipcMain.handle("getVersion", () => version);
   }
 
-    ipcMain.handle('getInstallDate', (_e, date) => getInstallInfo(date));
+  // Set referer for openstreetmap
+  const filter = {
+    urls: ['https://tile.openstreetmap.org/*','https://*.tile.openstreetmap.org/*']
+  };
+
+  session.defaultSession.webRequest.onBeforeSendHeaders(filter, (details, callback) => {
+    // Set a custom referer
+    details.requestHeaders['Referer'] = 'https://chirpity.app/map';
+
+    callback({ requestHeaders: details.requestHeaders });
+  });
     
     // Debug mode
     try {
@@ -554,10 +641,11 @@ app.whenReady().then(async () => {
     });
     
     ipcMain.handle('openFiles', async (_event, _method, config) => {
-        const {type, fileOrFolder, multi, buttonLabel, title} = config;
-        let options;
+        const {type, fileOrFolder, multi, buttonLabel, title, defaultPath} = config;
+        let options = {defaultPath};
         if (type === 'audio') {
             options = {
+                ...options,
                 properties: [fileOrFolder, multi].filter(Boolean),
                 buttonLabel: buttonLabel,
                 title: title
@@ -566,10 +654,12 @@ app.whenReady().then(async () => {
                 options.filters = [{ name: 'Audio Files', extensions: ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a', 'mpga', 'mpeg', 'mp4', 'opus', 'mov'] } ]
             }
         } else {
-          const ext = type === 'Text' ? 'txt' : 'csv';
+          const ext = type === 'Text' ? ['txt', 'csv'] : ['csv'];
+          console.log('selecting ', type, ext )
           options = {
+              ...options,
               filters: [
-                  { name: `${type} Files`, extensions: [ext] }
+                  { name: `${type} Files`, extensions: ext }
               ],
               properties: ['openFile']
           }
@@ -615,7 +705,7 @@ app.whenReady().then(async () => {
         const dialogOpts = {
             type: 'warning',
             title: 'Crash report',
-            detail: 'Oh no! Chirpity has crashed. It is most likely that it has run out of memory.\nTry lowering the batch size and / or number of threads in settings'
+            detail: 'Oh no! Chirpity has crashed. It is most likely that it has run out of memory.\nTry lowering the batch size and / or number of threads\nYou will find those options in the Expert tab of Settings'
         };
         
         dialog.showMessageBox(dialogOpts).then((returnValue) => {
@@ -626,8 +716,8 @@ app.whenReady().then(async () => {
         })
     });
     //Update handling
-    if (process.env.CI || isIntelMac) {
-        console.log("Auto-updater disabled in CI environment. And doesn't work for Intel mac");
+    if (process.env.CI) {
+        console.log("Auto-updater disabled in CI environment");
     } else {
         autoUpdater.autoDownload = false;
         autoUpdater.checkForUpdates().catch(error => console.warn('Error checking for updates', error))
@@ -638,19 +728,6 @@ app.whenReady().then(async () => {
 let DB_CLOSED = false;
 let DB_CLOSE_REQUESTED = false;
 app.on('before-quit', async (event) => {
-  if (!DB_CLOSE_REQUESTED && unsavedRecords && !process.env.CI) {
-    const choice = dialog.showMessageBoxSync(mainWindow, {
-      type: "warning",
-      buttons: ["Yes", "No"],
-      title: "Unsaved Records",
-      message: "There are unsaved records, are you sure you want to exit?",
-    });
-
-    if (choice === 1) {
-      event.preventDefault(); // Prevent the app from closing
-      return
-    }
-  }
   if (DB_CLOSED) return;
   // Always block quit while DB is still open
   event.preventDefault();
@@ -675,7 +752,7 @@ ipcMain.on('database-closed', () =>{
   DB_CLOSED = true;
   app.quit()
  })
-ipcMain.handle("request-worker-channel", async (_event) => {
+ipcMain.handle("request-worker-channel", (_event) => {
   // Create a new channel ...
   const { port1, port2 } = new MessageChannelMain();
   // ... send one end to the worker ...
@@ -716,8 +793,8 @@ ipcMain.handle("saveFile", async (event, arg) => {
         // Check if the user cancelled the operation
         const { canceled, filePath } = saveObj;
         if (canceled) {
-          DEBUG && console.log("User cancelled the save operation.");
           fs.rmSync(file);
+          DEBUG && console.log("User cancelled the save operation. '" + file + "' was removed");
           return;
         }
         try {
@@ -741,5 +818,18 @@ ipcMain.on("powerSaveControl", (e, on) => {
   } else {
     if (powerSaveID !== null) powerSaveBlocker.stop(powerSaveID);
     //DEBUG && console.log(powerSaveBlocker.isStarted(powerSaveID), powerSaveID)
+  }
+});
+
+ipcMain.on("debug-mode", (e, on) => {
+  DEBUG = !!on;
+  if (on) {
+    mainWindow?.webContents.openDevTools({ mode: "detach" });
+    workerWindow?.show();
+    workerWindow?.webContents.openDevTools();
+  } else {
+    mainWindow?.webContents.closeDevTools();
+    workerWindow?.webContents.closeDevTools();
+    workerWindow?.hide();
   }
 });

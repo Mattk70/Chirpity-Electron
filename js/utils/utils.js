@@ -1,13 +1,63 @@
+const MODEL_DEFAULTS = {
+  list: "birds",
+  webgpu: { threads: 1, batchSize: 8 },
+  tensorflow: { threads: null, batchSize: 8 },
+};
+
 /**
- * Synchronizes a configuration object with a default configuration.
+ * Merge each model entry with default model settings, normalizing nested runtime configs.
  *
- * Removes keys from the configuration that are not found in the default configuration,
- * and adds any missing keys from the default configuration. For keys with values that
- * are both objects in the configuration and the default configuration, the merge is
- * performed recursively, except when the key is "keyAssignment", which is left untouched.
+ * For every key in `models` this mutates the object in place so each entry becomes a merged
+ * object containing top-level defaults plus any provided model overrides, and with `webgpu`
+ * and `tensorflow` properties merged separately with their respective defaults.
  *
- * @param {Object} config - The configuration object to be synchronized (modified in place).
- * @param {Object} defaultConfig - The default configuration serving as the reference.
+ * @param {Object<string, Object>} models - Map of model names to model config objects; mutated in place.
+ * @param {Object<string, Object>} defaultModels - Map of model names to default model config objects.
+ * @returns {Object<string, Object>} - The normalized model configurations.
+ */
+
+function normaliseModels(models = {}, defaultModels = {}) {
+  const normalised = {};
+  const names = new Set([
+    ...Object.keys(defaultModels),
+    ...Object.keys(models),
+  ]);
+
+  for (const name of names) {
+    const defaults = defaultModels[name] ?? MODEL_DEFAULTS;
+    const model = models[name] ?? {};
+
+    normalised[name] = {
+      ...defaults,
+      ...model,
+      webgpu: {
+        ...MODEL_DEFAULTS.webgpu,
+        ...(defaults.webgpu || {}),
+        ...(model.webgpu || {}),
+      },
+      tensorflow: {
+        ...MODEL_DEFAULTS.tensorflow,
+        ...(defaults.tensorflow || {}),
+        ...(model.tensorflow || {}),
+      },
+    };
+  }
+
+  return normalised;
+}
+
+/**
+ * Aligns a configuration object to the shape and keys of a default configuration.
+ *
+ * Mutates `config` in place by removing keys not present in `defaultConfig` and ensuring
+ * every key in `defaultConfig` exists in `config`. Arrays are merged with the default
+ * values first and duplicates removed. When both values for a key are objects,
+ * the function recurses to synchronize nested keys except for the `"keyAssignment"` key,
+ * which is left unchanged. The `"models"` key is handled by calling `normaliseModels` to
+ * merge per-model defaults instead of performing a recursive merge.
+ *
+ * @param {Object} config - The configuration object to update (modified in place).
+ * @param {Object} defaultConfig - Reference configuration whose structure and keys should be enforced.
  */
 function syncConfig(config, defaultConfig) {
   // First, remove keys from config that are not in defaultConfig
@@ -22,16 +72,39 @@ function syncConfig(config, defaultConfig) {
     if (!(key in config)) {
       config[key] = defaultConfig[key];
     } else if (
+      Array.isArray(config[key]) &&
+      Array.isArray(defaultConfig[key])
+    ) {
+      // detect.classes is a replaceable setting; other arrays are additive.
+      config[key] = key === "classes"
+        ? [...config[key]]
+        : [...new Set([...defaultConfig[key], ...config[key]])];
+    } else if (
       typeof config[key] === "object" &&
-      typeof defaultConfig[key] === "object" && 
-      // Allow unknown models keys
+      typeof defaultConfig[key] === "object" &&
+      config[key] !== null &&
+      defaultConfig[key] !== null &&
       key !== 'models'
     ) {
       // Recursively sync nested objects (but allow key assignment to be empty)
       key === "keyAssignment" || syncConfig(config[key], defaultConfig[key]);
+    } else if (key === 'models') {
+      config[key] = normaliseModels(config[key], defaultConfig[key]);
     }
   });
 }
+
+/**
+ * 
+ * @param {*} str 
+ * @returns {string} An escaped string suitable for insertion in HTML attributes
+ */
+const escapeHTML = str => str
+  .replace(/&/g, "&amp;")
+  .replace(/</g, "&lt;")
+  .replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;")
+  .replace(/'/g, "&#39;");
 
 function hexToRgb(hex) {
   // Remove the '#' character if present
@@ -73,28 +146,19 @@ function extractFileNameAndFolder(path) {
 /**
  * Converts a Date object or timestamp into a string formatted for HTML datetime-local input fields.
  *
- * @param {Date|number|string} date - The date value to convert, as a Date object, timestamp, or date string.
- * @returns {string} A string in the format "YYYY-MM-DDTHH:mm" suitable for use in datetime-local inputs.
+ * @param {Date|number} date - The date value to convert, as a Date object or timestamp.
+ * @returns {string} A string in the format "YYYY-MM-DDTHH:mm:ss" suitable for use in datetime-local inputs.
  */
-function getDatetimeLocalFromEpoch(date) {
-  // Assuming you have a Date object, for example:
-  const myDate = new Date(date);
-  let datePart = myDate.toLocaleDateString("en-GB", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  datePart = datePart.split("/").reverse().join("-");
-  const timePart = myDate
-    .toLocaleTimeString([], {
-      hour12: false,
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-    .replace(/\s.M$/, "");
-  // Combine date and time parts in the format expected by datetime-local input
-  const isoDate = datePart + "T" + timePart;
-  return isoDate;
+function getDatetimeLocalFromEpoch(epoch) {
+  const date = new Date(epoch);
+
+  // Adjust for local timezone offset
+  const tzOffset = date.getTimezoneOffset() * 60000;
+  const localISOTime = new Date(epoch - tzOffset)
+    .toISOString()
+    .slice(0, 19);
+
+  return localISOTime;
 }
 
 
@@ -254,7 +318,7 @@ function requestFromWorker(worker, action, payload = {}) {
    timeoutId = setTimeout(() => {
       worker.removeEventListener("message", handleMessage);
       reject(new Error(`Worker request timed out for action: ${action}`));
-    }, 60000); // 60 second timeout
+    }, 15_000); // 15 second timeout
 
     worker.addEventListener("message", handleMessage);
     worker.postMessage({ id: messageId, action, ...payload });
@@ -264,7 +328,7 @@ function requestFromWorker(worker, action, payload = {}) {
 /**
  * Returns a Promise that resolves when the provided check function returns a truthy value or after a maximum number of retries.
  *
- * The check function is evaluated every 100 milliseconds, up to 250 times.
+ * The check function is evaluated every 10 milliseconds, up to 250 times.
  *
  * @param {Function} checkFn - A function that is repeatedly called until it returns a truthy value.
  * @returns {Promise<void>} Resolves when {@link checkFn} returns a truthy value or after the maximum retries.
@@ -294,6 +358,7 @@ function shuffle(array) {
 }
 
 export {
+  escapeHTML,
   syncConfig,
   hexToRgb,
   interpolate,
