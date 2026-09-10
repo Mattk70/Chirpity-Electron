@@ -2379,6 +2379,12 @@ const defaultConfig = {
   keyAssignment: {},
 };
 let dirname, appPath, tempPath, systemLocale, isMac;
+
+/**
+ * Initialize application configuration, model workers, localization, and UI state after the window loads.
+ *
+ * @returns {Promise<void>} Resolves after startup wiring and initial UI rendering complete.
+ */
 window.onload = async () => {
 
   const [, , mac, paths] = await Promise.all([
@@ -2748,7 +2754,9 @@ window.onload = async () => {
   pagination.init();
 };
 
-
+/**
+ * Attach the renderer's message listener after its worker channel is established.
+ */
 const setUpWorkerMessaging = () => {
   establishMessageChannel.then(() => {
     worker.addEventListener("message", async function (e) {
@@ -3074,8 +3082,10 @@ function removeOpenFile(file) {
 }
 
 /**
- * Helper function to return the label file path
- * @returns {string} the label file path.
+ * Return the bundled multilingual BirdNET3 label CSV.
+ *
+ * @param {string} locale - Reserved for callers selecting a locale; the CSV contains all locales.
+ * @returns {string} Path to the bundled label CSV.
  */
 
 const getLabelFile = () => {
@@ -3217,6 +3227,13 @@ function getDateOfISOWeek(week, year) {
   return isoWeekStart;
 }
 
+/**
+ * Format an ISO week as a localized start-to-end date range.
+ *
+ * @param {number} week - ISO week number.
+ * @param {number} year - Year containing the ISO week.
+ * @returns {string|number} Localized range, or the original week when its date is invalid.
+ */
 function formatWeekRange(week, year) {
   const locale = config.locale.replace("en_GB", "en-GB").replace('_', '-');
 
@@ -3377,6 +3394,15 @@ function onChartData(args) {
   chartInstance = new Chart(chartCanvas, chartOptions);
 }
 
+/**
+ * Generate chart-axis labels for consecutive hours, days, or week numbers.
+ *
+ * @param {string} aggregation - Chart interval: `hour`, `day`, or `week`.
+ * @param {number} datapoints - Number of labels to generate.
+ * @param {number|string|Date} pointstart - Starting date for hour and day labels.
+ * @param {number} startX - First week number for week labels.
+ * @returns {Array<string|number>} Generated axis labels.
+ */
 function generateDateLabels(aggregation, datapoints, pointstart, startX) {
   const dateLabels = [];
   const startDate = new Date(pointstart);
@@ -3572,6 +3598,11 @@ let spec = new ChirpityWS(
   GLOBAL_ACTIONS
 );
 
+/**
+ * Rebuild the available list-mode options for a model and persist a valid fallback when needed.
+ *
+ * @param {string} model - Model whose supported list modes should be displayed.
+ */
 const updateListOptions = (model) => {
   const select = document.getElementById('list-to-use');
   select.replaceChildren();
@@ -3595,6 +3626,9 @@ const updateListOptions = (model) => {
   }
 }
 
+/**
+ * Render the icon and tooltip for the configured species-list mode.
+ */
 const updateListIcon = () => {
   const LIST_MAP = i18n.get(i18n.LIST_MAP);
   const {list} = config;
@@ -3624,6 +3658,11 @@ const updateListIcon = () => {
   DOM.listIcon.replaceChildren(node);
 };
 
+/**
+ * Render the selected model's logo, including the BirdNET3 preview badge.
+ *
+ * @param {string} model - Configured model identifier.
+ */
 const updateModelIcon = (model) => {
   let title;
   let showVersion3 = false;
@@ -3705,6 +3744,9 @@ DOM.customListSelector.addEventListener("click", async () => {
   }
 });
 
+/**
+ * Request that the analysis worker load the currently configured model.
+ */
 const loadModel = () => {
   PREDICTING = false;
   t0_warmup = Date.now();
@@ -3740,6 +3782,11 @@ const handleModelChange = async (model, reload = true) => {
   updateListIcon();
 }
 
+/**
+ * Apply a backend selection, refresh its controls, persist it, and reload the model.
+ *
+ * @param {string|Event} backend - Backend name or change event carrying the name.
+ */
 const handleBackendChange = (backend) => {
   backend = backend instanceof Event ? backend.target.value : backend;
   config.models[config.selectedModel].backend = backend;
@@ -3807,7 +3854,7 @@ const timelineToggle = (fromKeys) => {
 /**
  * Updates the currently selected record using a key assignment or sets the call count with a modifier key.
  *
- * If a key assignment exists for the pressed key, updates the corresponding field (species, label, or comment) in the active row and inserts the modified record. If Ctrl or Cmd is held, sets the call count to the key's numeric value (for members only). Does nothing if no row is selected.
+ * For members, a configured key updates the corresponding species, label, or comment; Ctrl or Cmd plus a number updates the call count. Does nothing when no row is selected or the user is not a member.
  *
  * @param {KeyboardEvent} e - The keyboard event triggering the update.
  */
@@ -3855,6 +3902,12 @@ function recordUpdate(e) {
   }
 }
 
+/**
+ * Enable or disable settings that cannot change during analysis.
+ *
+ * @param {boolean} bool - Whether to disable the settings.
+ * @throws {Error} If a required control is absent from the DOM cache.
+ */
 function disableSettingsDuringAnalysis(bool) {
   const elements = [
     "modelToUse",
@@ -5011,6 +5064,18 @@ function replaceCtrlWithCommand() {
   }
 }
 
+/**
+ * Render and show the included/excluded species modal for the active list.
+ *
+ * The modal records `included` for later export and filters the visible tab as
+ * the user types in its search field.
+ *
+ * @param {Object} options - Species-list details.
+ * @param {Object[]} options.included - Included species displayed and retained for export.
+ * @param {Object[]} [options.excluded] - Excluded species, if that tab is available.
+ * @param {string} [options.place] - Location name used in the list explanation.
+ * @returns {Promise<void>} Resolves after the modal is displayed.
+ */
 const populateSpeciesModal = async ({included, excluded, place}) => {
   const i18 = i18n.get(i18n.SpeciesList);
   const headings = i18n.get(i18n.Headings);
@@ -5237,7 +5302,7 @@ const changeNocmigMode = () => {
  * and range parameters. The filtering is applied only if the analysis has been completed.
  *
  * @param {Object} [options={}] - Filter configuration options.
- * @param {*} [options.species=isSpeciesViewFiltered(true)] - Criteria for filtering by species.
+ * @param {*} [options.species] - Species criterion. When omitted, the current species view is used; an explicitly supplied `undefined` is preserved.
  * @param {boolean} [options.updateSummary=true] - Flag indicating whether to update the summary after filtering.
  * @param {number} [options.offset] - Optional starting index for pagination.
  * @param {number} [options.limit=500] - Maximum number of results to process.
@@ -5265,12 +5330,18 @@ function filterResults({
     });
 }
 
+/**
+ * Disable thread selection for ONNX models using WebGPU.
+ */
 const updateThreadsSlider = () => {
   const isOnnx = ['perch v2', 'birdnet3'].includes(config.selectedModel);
   const isGPU = config.models[config.selectedModel].backend === 'webgpu';
   DOM.threadSlider.disabled = isOnnx && isGPU;
 }
 
+/**
+ * Update model-specific settings visibility and availability for the active platform and backend.
+ */
 const modelSettingsDisplay = () => {
   // Sets system options according to model or machine capabilities
   // cf. setListUIState
@@ -5334,6 +5405,9 @@ const modelSettingsDisplay = () => {
   setClassesUIState();
 };
 
+/**
+ * Show taxonomic-class filters only for supported model and list combinations.
+ */
 const setClassesUIState = () => {
   const showClasses = ["birdnet3", "perch v2"].includes(config.selectedModel) 
     && ["location", "birds"].includes(config.list);
@@ -6842,7 +6916,7 @@ function showDBLocation(location) {
 /**
  * Updates the species list UI and synchronizes the active list with the worker.
  *
- * If a custom list is selected, loads labels from the specified custom list file. Otherwise, notifies the worker to update the list and optionally refresh results based on analysis state.
+ * If a custom list is selected, loads labels from the specified custom list file. Otherwise, notifies the worker of the list and selected taxonomic classes, and optionally refreshes results based on analysis state.
  */
 async function updateList() {
   updateListIcon();
@@ -9130,6 +9204,14 @@ document.addEventListener("filter-labels", (e) => {
 });
 
 
+/**
+ * Rebuild a model selector from configuration.
+ *
+ * Custom-only selectors exclude bundled models. The main selector includes all
+ * models but disables BirdNET3 for non-members.
+ *
+ * @param {boolean} customOnly - Whether to populate only custom models.
+ */
 function updateModelOptions(customOnly){
   const formElement = customOnly ? 'custom-models' : 'model-to-use';
   const select = document.getElementById(formElement);

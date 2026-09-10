@@ -6,6 +6,11 @@ const path = require("node:path");
 
 let DEBUG = false;
 
+/**
+ * Load BirdNET3's CSV labels in the model's scientific/common/class label format.
+ *
+ * @returns {string[]} Labels formatted as `scientific_common_class`.
+ */
 function getBN3Labels() {
   const labelFile = path.join(__dirname, "../../BirdNET3",
          "BirdNET3_geomodel_labels.csv");
@@ -137,13 +142,12 @@ const OLD_TO_NEW_TAXONOMY = Object.fromEntries(
 );
 
 /**
- * Loads and returns bird labels from a file.
+ * Load tilde-delimited labels while preserving an optional class component.
  *
- * This function reads the text content from the file specified by `filePath`.
- * The content is trimmed and split by newline characters into an array of label strings.
- * If the read operation fails, the error is logged and the function returns undefined.
+ * Read failures are logged and produce `undefined`.
  *
- * @returns {Promise<string[]|undefined>} A promise that resolves to an array of label strings on success, or undefined if an error occurs.
+ * @param {string} filePath - Label file to read.
+ * @returns {string[]|undefined} Normalized label lines, or `undefined` when reading fails.
  */
 function loadLabels(filePath) {
   try {
@@ -157,6 +161,14 @@ function loadLabels(filePath) {
   }
 }
 
+/**
+ * Download the current Perch labels, replace the local label file, and return its lines.
+ *
+ * Network and write failures are logged and resolve to `undefined`.
+ *
+ * @param {string} labelsPath - Destination label-file path.
+ * @returns {Promise<string[]|undefined>} Downloaded label lines, if the update succeeds.
+ */
 async function updateLabels(labelsPath) {
   return fetch("https://github.com/Mattk70/Chirpity-Website/releases/download/v2.0.0/newLabels.txt")
     .then((response) => {
@@ -188,6 +200,12 @@ listWorker.postMessage({message: 'load'})
 listWorker.postMessage({message: 'get-list', model: 'chirpity', listType: 'location', useWeek: true, lat: 52.0, lon: -0.5, week: 40, threshold: 0.01 })
 */
 
+/**
+ * Generate an inclusion list requested by the parent worker and post the result.
+ *
+ * @param {MessageEvent} e - `get-list` request with model, list, location, and filtering options.
+ * @returns {Promise<void>} Resolves after the list response is posted or an error is logged.
+ */
 onmessage = async (e) => {
   DEBUG && console.log("got a message", e.data);
   const { message } = e.data;
@@ -249,7 +267,13 @@ onmessage = async (e) => {
   }
 };
 
+/**
+ * Generate model label indices for location, activity, taxonomic-class, or custom-list filters.
+ */
 class Model {
+  /**
+   * @param {string} appPath - Path to the BirdNET3 geographic model.
+   */
   constructor(appPath) {
     this.model_loaded = false;
     this.appPath = appPath;
@@ -258,6 +282,14 @@ class Model {
     this.splitChar = '_';
   }
 
+  /**
+   * Load the geographic ONNX model used for location-based filtering.
+   *
+   * @param {string} mpath - Reserved path argument; `appPath` from construction is used.
+   * @param {string} backend - `webgpu` to prefer WebGPU, or another value to use CPU only.
+   * @param {number} batchSize - Fixed batch dimension supplied to ONNX Runtime.
+   * @returns {Promise<void>} Resolves when the inference session and geographic labels are ready.
+   */
   async loadModel(mpath, backend, batchSize) {
     const gpu = backend === 'webgpu';
     const providers = gpu ? ['webgpu', 'cpu'] : ['cpu'];
@@ -282,6 +314,23 @@ class Model {
   }
 
   getFirstElement = (label) => label.split(this.splitChar)[0];
+  /**
+   * Build the active model-label index list for the requested filtering mode.
+   *
+   * Location lists use the geographic model and threshold; nocturnal lists may
+   * be intersected with that location result. Custom lists also report labels
+   * that could not be matched.
+   *
+   * @param {Object} options - List selection options.
+   * @param {number} options.lat - Latitude for a location-derived list.
+   * @param {number} options.lon - Longitude for a location-derived list.
+   * @param {number} options.week - Geographic-model week, ignored when `useWeek` is false.
+   * @param {string} options.listType - List mode to generate.
+   * @param {boolean} options.useWeek - Whether to use the supplied week.
+   * @param {number} options.threshold - Minimum geographic-model probability.
+   * @param {boolean} options.localBirdsOnly - Whether to restrict a nocturnal list to local species.
+   * @returns {Promise<Array>} A tuple of sorted label indices and unmatched custom-label messages.
+   */
   async setList({
     lat,
     lon,
@@ -475,7 +524,7 @@ class Model {
   }
 
     /**
-   * Returns all indices at which a specified value occurs in an array.
+   * Return indices matching a value or its old-to-new taxonomy equivalent.
    *
    * @param {Array} array - The array to search.
    * @param {*} value - The value to find within the array.
@@ -497,13 +546,9 @@ class Model {
 
 
 /**
- * Initializes TensorFlow.js with the specified backend and loads the bird identification model.
+ * Load the geographic ONNX model and notify the parent worker that list generation is ready.
  *
- * This asynchronous function sets the TensorFlow.js backend to the value specified in BACKEND, enables production mode, 
- * and creates an instance of the Model class with the provided model path. Once the model is successfully loaded,
- * it signals readiness by sending a "list-model-ready" message via postMessage.
- *
- * @async
+ * @returns {Promise<void>} Resolves after the readiness message is posted.
  */
 async function _init_() {
   DEBUG && console.log(`List generating model received load instruction.`);
