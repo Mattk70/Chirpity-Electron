@@ -94,7 +94,10 @@ def main(argv: list[str]) -> int:
                     **{header: "" for header in locale_headers},
                 }
             else:
-                output = {header: match[header] for header in output_headers}
+                output = {
+                    **{header: match[header] for header in output_headers},
+                    "sci_name": label["sci_name"],
+                }
             writer.writerow(output)
 
     print(
