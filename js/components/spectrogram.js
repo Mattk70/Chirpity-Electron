@@ -20,6 +20,8 @@ export class ChirpityWS {
     this.audioContext = new AudioContext();
     this.sampleRate = 24_000;
     this.actions = actions;
+    // Wavesurfer hack to work around double event firing
+    this.finishTime = 0;
 
     this.specTooltip = this.specTooltip.bind(this);
     this.centreSpec = this.centreSpec.bind(this);
@@ -176,15 +178,9 @@ export class ChirpityWS {
       : 24000;
     return WaveSurfer.create({
         container: '#waveform',
-        // The waveform itself is hidden via the `#waveform ::part(canvases)
-        // { display: none; }` rule in your CSS — that's the mechanism that
-        // actually does the hiding. `backgroundColor` and `renderFunction`
-        // are not part of the documented WaveSurfer.create() options in
-        // 7.12.11 (I couldn't confirm either exists), so they've been
-        // dropped here; test to confirm nothing relied on them silently.
-        // but keep the playhead
         cursorColor: this.wsTextColour(config),
         cursorWidth: 2,
+        minPxPerSec: 10,
         height: 1,
         waveColor: 'transparent',
         progressColor: 'transparent',
@@ -204,7 +200,7 @@ export class ChirpityWS {
       this.wavesurfer.destroy();
     }
     this.REGIONS = this.initRegion();
-    this.spectrogram = this.initSpectrogram(height);
+    this.spectrogram = this.initSpectrogram(resolvedHeight);
     this.timeline = this.createTimeline(windowLength);
     // Setup waveform and spec views
     const plugins = [this.spectrogram, this.timeline, this.REGIONS];
@@ -235,6 +231,9 @@ export class ChirpityWS {
     });
 
     this.unfinish = wavesurfer.on("finish", () => {
+      const now = new Date().getTime();
+      if (now - this.finishTime < 20 ) return;
+      this.finishTime = now;
       const {windowLength, windowOffsetSecs, currentFile, currentFileDuration, openFiles} = STATE;
       const bufferEnd = windowOffsetSecs + windowLength;
       if (currentFileDuration > bufferEnd) {
@@ -737,6 +736,8 @@ export class ChirpityWS {
   async updateSpec({ buffer, play = false, position = 0 }) {
     
     DOM.spectrogramWrapper.classList.remove("d-none");
+    this.wavesurfer?.destroy();
+    this.wavesurfer = null;
     if (!this.wavesurfer) await this.adjustDims(true);
     else {
       await this.loadBuffer(buffer);
