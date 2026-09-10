@@ -2497,7 +2497,10 @@ window.onload = async () => {
   const selectedModel = config.selectedModel;
 
   // Set Local classes to include for BirdNET3
-  detect.classes.forEach(cls => document.getElementById(cls).checked = true );
+  detect.classes.forEach(cls => {
+    const box = document.getElementById(cls);
+    if (box) box.checked = true 
+  });
 
   updateListOptions(selectedModel);
   isMember && updateModelOptions();
@@ -2916,7 +2919,7 @@ const setUpWorkerMessaging = () => {
         case "label-translation-needed": {
           // Called when the initial system locale isn't english
           let locale = args.locale;
-          const labelFile = getLabelFile(locale);
+          const labelFile = getLabelFile();
           readLabels(labelFile);
           break;
         }
@@ -3085,9 +3088,8 @@ function removeOpenFile(file) {
  * @returns {string} Path to the bundled label CSV.
  */
 
-const getLabelFile = (locale) => {
+const getLabelFile = () => {
     return p.join(dirname, "BirdNET3/BirdNET3_geomodel_labels.csv");
-
 }
 /**
  * Display regions for detections that fall within the current spectrogram window.
@@ -4299,9 +4301,7 @@ const updateSummary = ({ summary = [], filterSpecies = "" }) => {
     summaryHTML += `<tr tabindex="-1" class="${selected}">
                 <td class="max">${iconizeScore(item.max)}</td>
                     <td class="cname not-allowed">
-                        <span class="cname">${item.cname}</span> <br><i>${
-      item.sname
-    }</i>
+        <span class="cname">${item.cname}</span> <br><i>${item.sname}</i>
                     </td>`;
 
     if (showIUCN) {
@@ -4342,10 +4342,7 @@ const updateSummary = ({ summary = [], filterSpecies = "" }) => {
   Array.from(tempDiv.childNodes).forEach((node) => fragment.appendChild(node));
 
   // Replace the contents of the #summaryTable
-  old_summary.replaceChildren(); // Clear existing children
-
-  old_summary.appendChild(fragment);
-
+  old_summary.replaceChildren(fragment); // Replace existing content
   showSummarySortIcon();
   setAutocomplete(selectedRow ? filterSpecies : "");
 
@@ -4723,7 +4720,7 @@ async function renderResult({
             <td class="label ${hide}">${labelHTML}</td>
             <td class="comment text-end ${hide}">${commentHTML}</td>
             <td class="reviewed text-end ${hide}">${reviewHTML}</td>
-            <td class="text-end"><span class="position-relative me-1"><img class="model-logo" src="img/icon/${logo}_logo.png" title="${modelName}" alt="${modelName}">${bn3Badge}</span></span></td>
+            <td class="text-end"><span class="position-relative me-1"><img class="model-logo" src="img/icon/${logo}_logo.png" title="${modelName}" alt="${modelName}">${bn3Badge}</span></td>
             </tr>`;
   }
   updateResultTable(tr, isFromDB, selection);
@@ -5107,9 +5104,9 @@ const populateSpeciesModal = async ({included, excluded, place}) => {
     });
   }
   const includedList = generateBirdIDList(included);
-  model = config.selectedModel;
-  const classes = ["birdnet3","perch v2"].includes(model) ? config.detect.classes.join(', ') : "";
-  const classesText = ["birdnet3","perch v2"].includes(model) && ["nocturnal", "location", "birds"].includes(config.list) 
+  const internalModel = config.selectedModel;
+  const classes = ["birdnet3","perch v2"].includes(internalModel) ? config.detect.classes.join(', ') : "";
+  const classesText = ["birdnet3","perch v2"].includes(internalModel) && ["nocturnal", "location", "birds"].includes(config.list) 
     ? utils.interpolate(i18.classesText, { classes: classes }) : "";
   const depending =
     config.useWeek &&
@@ -5129,8 +5126,7 @@ const populateSpeciesModal = async ({included, excluded, place}) => {
     depending: depending,
     includedList: includedList,
   });
-  let excludedContent = "",
-    disable = "";
+  let excludedContent = "", disable = "";
   if (excluded) {
     const excludedList = generateBirdIDList(excluded);
 
@@ -5182,7 +5178,7 @@ let modalContent = `
         </div>
     </div>
 
-    <div class="tab-content" id="myTabContent">
+    <div class="tab-content" id="included-tabs">
         <div class="tab-pane fade show active"
             id="included-tab-pane"
             role="tabpanel"
@@ -5208,7 +5204,7 @@ document.getElementById("speciesModalBody").innerHTML = modalContent;
 document.getElementById("species-search").addEventListener("input", (event) => {
     const search = event.target.value.trim().toLowerCase();
 
-    const activePane = document.querySelector("#myTabContent .tab-pane.active");
+    const activePane = document.querySelector("#included-tabs .tab-pane.active");
 
     if (!activePane) return;
 
@@ -6368,7 +6364,7 @@ async function handleUIClicks(e) {
       }
       if (modelType === 'append'){
         function findDuplicateLines() {
-          const labels = new Set(LABELS.map(l => l.replace(',', '_'())));
+          const labels = new Set(LABELS.map(l => l.replace(',', '_')));
           return folders.filter(f => labels.has(f) && f !== '');
         }
         const duplicates = findDuplicateLines();
@@ -7221,13 +7217,13 @@ document.addEventListener("change", async function (e) {
         case "Insecta":
         case "Mammalia":
         case "Reptilia": {
-          const includedClasses = [];
-          ["Aves", "Amphibia", "Insecta", "Mammalia", "Reptilia"].forEach(cls => {
-            const checkbox = document.getElementById(cls);
-            if (checkbox.checked) {
-              includedClasses.push(cls);
+          const includedClasses = ["Aves", "Amphibia", "Insecta", "Mammalia", "Reptilia"]
+            .filter(cls => document.getElementById(cls)?.checked);
+
+          if (includedClasses.length === 0) {
+            document.getElementById("Aves").checked = true;
+            includedClasses.push("Aves");
             }
-          });
           config.detect.classes = includedClasses;
           updateList();
           break;
@@ -7241,7 +7237,7 @@ document.addEventListener("change", async function (e) {
               return;
             }
           } else {
-            labelFile = getLabelFile(DOM.locale.value);
+            labelFile = getLabelFile();
             i18n
               .localiseUI(DOM.locale.value)
               .then((result) => (STATE.i18n = result));
@@ -7286,8 +7282,6 @@ document.addEventListener("change", async function (e) {
           // change window size
           DOM.windowSizeValue.textContent = DOM.windowSizeSlider.value;
           const windowSize = DOM.windowSizeSlider.valueAsNumber;
-          // get backend
-          const backend = config.models[config.selectedModel].backend;
           config.models['birdnet3'].windowSize = windowSize;
           worker.postMessage({
             action: "change-window-size",

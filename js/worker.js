@@ -1652,9 +1652,9 @@ async function getSpeciesSQLAsync(file){
     QUEUE.getAllPaths('complete')[0];
   if (list !== 'everything') {
     let included = await getIncludedIDs(file);
-    if (["birds", 'Animalia'].includes(list)) {
+    if (list === "birds") {
       included = getExcluded(included);
-      if (!included.length) return SQL; // nothing filtered out
+      if (!included.length) return {SQL}; // nothing filtered out
       typeOfList = 'Excluded';
       not = "NOT";
     }
@@ -3193,7 +3193,10 @@ async function saveAudio(file, start, end, filename, metadata, folder) {
   const {format, downmix} = STATE.audio;
   if (format === 'mp3' && ! downmix){
     // Do a polywav check
-    const {channels} = await getAudioCodec(file);
+    const source = fs.existsSync(file) ? file : await getWorkingFile(file).catch(() => null);
+    const {channels} = source
+      ? await getAudioCodec(source).catch(() => ({}))
+      : {};
     if (channels > 2) {
       const i18n = {
             en: "Cannot export multichannel audio to MP3. Either enable downmixing, or choose a different export format.",
@@ -3262,7 +3265,10 @@ function spawnPredictWorkers(model, batchSize, threads, adjustThreads = true) {
   }
   NUM_WORKERS = threads;
   for (let i = currentThreads; i < threads; i++) {
-    const worker = new Worker(`./js/models/${model}.js`, { type: "module" });
+    const modelFile = 
+      ['birdnet3','chirpity','nighthawk','nocmig','perch v2'].includes(model)
+      ? model : 'birdnet';
+    const worker = new Worker(`./js/models/${modelFile}.js`, { type: "module" });
     // Web worker message event handler
     worker.onmessage = async (msg) => {
       await parseMessage(msg).catch((error) => {
@@ -5141,7 +5147,7 @@ const onSave2DiskDB = async ({ file }) => {
     // now update records
     let res = await getSpeciesSQLAsync();
     let filterClause = res.SQL;
-    const param = res.param;
+    const param = res.param || '';
     if (STATE.detect.nocmig) {
       const condition = STATE.detect.nocmig === 'day';
       filterClause += ` AND isDaylight = ${condition} `;
@@ -5182,7 +5188,7 @@ const onSave2DiskDB = async ({ file }) => {
         fileName: row.fileName
       })));
 
-      await memoryDB.runAsync(`
+      const insertResult = await memoryDB.runAsync(`
         INSERT OR IGNORE INTO disk.records (
           position, speciesID, modelID, confidence,
           comment, end, callCount, isDaylight, reviewed, tagID, fileID
@@ -5203,7 +5209,7 @@ const onSave2DiskDB = async ({ file }) => {
         JOIN disk.files d ON json_extract(v.value, '$.fileName') = d.name
       `, rowsJSON);
 
-      inserted = allowed.length;
+      inserted = insertResult?.changes ?? 0;
     }
     DEBUG && console.log(inserted + " records added to disk database");
     await memoryDB.runAsync("END");
@@ -5717,7 +5723,7 @@ async function _updateSpeciesLocale(db, labels) {
 async function onUpdateLocale(locale, labels, refreshResults) {
   if (DEBUG) t0 = Date.now();
   labels = prepareLocalLabels(labels, locale);
-  DEBUG && console.log(`Preparing labels took ${t0-Date.now()}ms `);
+  DEBUG && console.log(`Preparing labels took ${Date.now() - t0}ms `);
   try {
     STATE.update({ locale });
     for (const db of [diskDB, memoryDB]) {
@@ -5746,6 +5752,7 @@ async function onUpdateLocale(locale, labels, refreshResults) {
  * @returns {string[]} Scientific/common-name pairs, including the transformed header row.
  */
 const prepareLocalLabels = (labels, locale) => {
+  if (!labels?.length) return [];
   const headers = labels[0].split(",");
   const names = ["sci_name", `common_name_${locale}`];
   const indices = names.map(name => headers.indexOf(name));

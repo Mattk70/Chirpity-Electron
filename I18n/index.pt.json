@@ -22,7 +22,7 @@
   "Low Pass Filter-circle-help": ["Quando ativado, remove ruído de alta frequência acima do limite."],
   "IUCN-circle-help": ["Quando ativada, o estado mais recente da avaliação global da IUCN é exibido para cada espécie no resumo. O ícone liga à página de avaliação no site da IUCN. O Escopo da Avaliação exibirá a avaliação da espécie nessa região (quando disponível)."],
   "Language-circle-help": ["Selecione o seu idioma preferido para os nomes comuns das aves."],
-  "List-circle-help": ["Filtra as deteções retornadas nos resultados. Espécies locais: exclui espécies que provavelmente não estão presentes na sua região. Chamadas noturnos: exclui cantos de aves e espécies que não são conhecidas por chamar à noite. A lista personalizada permite enviar um ficheiro que lista as espécies a detetar."],
+  "List-circle-help": ["Filtra as deteções retornadas nos resultados. Espécies locais: exclui espécies que provavelmente não estão presentes na sua região. Chamadas noturnas: exclui cantos de aves e espécies que não são conhecidas por chamar à noite. A lista personalizada permite enviar um ficheiro que lista as espécies a detetar."],
   "Low Shelf Filter-circle-help": ["Quando utilizado, atenua o ruído de baixa frequência abaixo da frequência de corte."],
   "Model-circle-help": ["Selecione se deseja usar o modelo Nocmig, otimizado para Chamadas de Migração Noturna na Europa, ou BirdNET, que pode detetar mais de 6000 espécies em todo o mundo."],
   "Nocmig Mode-circle-help": ["Quando ativado, este 'modo Nocmig' apenas procura e exibe deteções encontradas durante a noite."],
@@ -207,7 +207,7 @@
     "LAR": "Registo mais tardio do outono",
     "MC": "Maior número de cantos em 24 horas"
   },
-  "headings": ["Configurações","Detecções", "Classes Incluidas", "Atribuições de teclado",
+  "headings": ["Configurações","Detecções", "Classes Incluídas", "Atribuições de teclado",
     "Localização padrão",
     "Sistema",
     "Preferências de áudio",

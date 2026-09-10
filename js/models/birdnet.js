@@ -167,7 +167,8 @@ class BirdNETModel extends BaseModel {
 
   async getSpectrogram(data){
     const {buffer, file:specFile, filepath} = data;
-    if (buffer.length < Model.chunkLength) {
+    const bufferLength = buffer.shape ? buffer.size : buffer.length;
+    if (bufferLength < Model.chunkLength) {
       return;
     }
     const image = tf.tidy(() => {

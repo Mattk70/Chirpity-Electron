@@ -285,10 +285,9 @@ ul {
 :not(input):not(textarea)::after,
 :not(input):not(textarea)::before {
   user-select: none;
-  /*cursor: default; */
 }
 
-#summary td.cname, #summary td.cname, #databaseModal tbody *  {
+#summary td.cname *, #summary td.sname, #databaseModal tbody *  {
   user-select: text;
 }
 

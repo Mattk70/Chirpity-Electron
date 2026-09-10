@@ -75,8 +75,10 @@ function syncConfig(config, defaultConfig) {
       Array.isArray(config[key]) &&
       Array.isArray(defaultConfig[key])
     ) {
-      // Preserve custom array values
-      config[key] = [...new Set([...defaultConfig[key], ...config[key]])];
+      // detect.classes is a replaceable setting; other arrays are additive.
+      config[key] = key === "classes"
+        ? [...config[key]]
+        : [...new Set([...defaultConfig[key], ...config[key]])];
     } else if (
       typeof config[key] === "object" &&
       typeof defaultConfig[key] === "object" &&

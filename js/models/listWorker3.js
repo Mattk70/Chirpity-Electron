@@ -12,7 +12,7 @@ let DEBUG = false;
  * @returns {string[]} Labels formatted as `scientific_common_class`.
  */
 function getBN3Labels() {
-  const labelFile = path.join( "BirdNET3",
+  const labelFile = path.join(__dirname, "../../BirdNET3",
          "BirdNET3_geomodel_labels.csv");
   const fileContents = fs.readFileSync(labelFile, "utf8");
   return fileContents
@@ -218,7 +218,7 @@ onmessage = async (e) => {
         let { lat, lon, week, threshold } = e.data;
         listModel.customLabels = customLabels;
         listModel.model = model;
-        listModel.classes = classes;
+        listModel.classes = classes?.length ? classes : ['Aves'];
         const perch = model === "perch v2";
         const birdnet3 = model === "birdnet3";
         listModel.perch = perch;
@@ -310,7 +310,7 @@ class Model {
       preferredOutputLocation,
     };
     session = await ort.InferenceSession.create(this.appPath, sessionOptions);
-    this.mdata_labels = GEOMODEL_LABELS;
+    this.mdata_labels = GEOMODEL_LABELS || [];
   }
 
   getFirstElement = (label) => label.split(this.splitChar)[0];
@@ -405,9 +405,7 @@ class Model {
           );
           const classes = listModel.classes;
           foundIndices.forEach((index) => {
-            // Ensure at least one class is included
-            classes.length > 0 || (classes = ['Aves'])
-            // Exclude unselected classes for birdnet3
+            // Exclude unselected classes for birdnet3 & perch
             if (["birdnet3", "perch v2"].includes(model) && !classes.some(cls => this.labels[index].includes(cls))) return;
             includedIDs.push(index + 1);
             count++;
