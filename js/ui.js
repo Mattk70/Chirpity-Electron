@@ -279,7 +279,7 @@ const GLOBAL_ACTIONS = {
   F1: () => document.getElementById("navbarSettings").click(),
   F4: () =>  STATE.fileLoaded && (spec.wavesurfer && (config.FFT = spec.increaseFFT())),
   F5: () =>  STATE.fileLoaded && (spec.wavesurfer && (config.FFT = spec.reduceFFT())),
-  " ": (e) => { STATE.fileLoaded  && WSPlayPause()},
+  " ": async (e) => { STATE.fileLoaded  && await WSPlayPause()},
   Tab: (e) => {
     if ((e.metaKey || e.ctrlKey) && !PREDICTING && STATE.diskHasRecords) {
       // If you did this when predicting, your results would go straight to the archive
@@ -305,40 +305,10 @@ const GLOBAL_ACTIONS = {
 };
 
 /**
- * Returns a promise that resolves when the Wavesurfer instance is ready.
- *
- * Use this to ensure audio waveform rendering and related operations only proceed after initialization is complete.
- * 
- * @returns {Promise<void>} Resolves when the Wavesurfer instance emits the 'ready' event.
- */
-function waitForWavesurferReady() {
-  return new Promise(resolve => {
-    const wavesurfer = spec.wavesurfer;
-    if (wavesurfer.isReady) {
-      resolve();
-    } else {
-      const onReady = () => { 
-        wavesurfer.un('ready', onReady);
-        resolve();
-      };
-      wavesurfer.on('ready', onReady);
-    }
-  });
-}
-
-/**
  * Helper function to ensure play promise has resolved before calling ws.pause().
  * A workaround for https://github.com/katspaugh/wavesurfer.js/issues/4047
  */
-function WSPlayPause(){
-  waitForWavesurferReady().then(() => {
-    if (spec.wavesurfer.isPlaying() ){
-      spec.wavesurfer.once('audioprocess', () => spec.wavesurfer.pause() )
-    } else {
-      spec.wavesurfer.play() 
-    }
-  })
-}
+const WSPlayPause = async () => await spec.wavesurfer?.playPause();
 
 //Open Files from OS "open with"
 let OS_FILE_QUEUE = [];
@@ -6559,7 +6529,7 @@ async function handleUIClicks(e) {
     // XC compare play/pause
     case "playComparison": {
       config.selectedModel.includes("batpack") && ws.setPlaybackRate(0.1, false);
-      ws.playPause();
+      await ws.playPause();
       break;
     }
     // Modal forms
@@ -6831,7 +6801,7 @@ async function handleUIClicks(e) {
       break;
     }
     case "playToggle": {
-      if (spec.wavesurfer) WSPlayPause();
+      if (spec.wavesurfer) await WSPlayPause();
         break;      
     }
     case "setCustomLocation": { setCustomLocation(false); break }
@@ -7680,7 +7650,7 @@ async function createContextMenu(e) {
     const region = spec.checkForRegion(e, true);
     if (!region)  return
       // If we let the playback continue, the region may get wiped
-    if (spec.wavesurfer?.isPlaying()) WSPlayPause();
+    if (spec.wavesurfer?.isPlaying()) await WSPlayPause();
   }
   const i18 = i18n.get(i18n.Context);
   const target = e.target;
