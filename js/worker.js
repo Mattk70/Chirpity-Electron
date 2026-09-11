@@ -2412,8 +2412,7 @@ async function loadAudioFile({
               contents: audio,
               play: play,
               metadata: METADATA[file].metadata,
-            },
-            [audio.buffer]
+            }
           );
           let week;
 

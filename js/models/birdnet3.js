@@ -32,7 +32,7 @@ async function loadModel(_mpath, backend, batchSize) {
   const executionProviderConfig = gpu ? { webgpu: { validationMode: 'basic' } } : {};
   const sessionOptions = { 
     executionProviders: providers,
-    logSeverityLevel: DEBUG ? 0 : 4,
+    logSeverityLevel: DEBUG ? 0 : 3,
     enableGraphCapture: true, 
     ...threadOptions,
     executionProviderConfig,
@@ -72,8 +72,6 @@ onmessage = async (e) => {
           try { await session.release() } catch (e) { console.error(e) }
           session = null;
         }
-    
-        await loadModel(modelPath, backend, batchSize);
         break;
       }
       case "change-window-size": {

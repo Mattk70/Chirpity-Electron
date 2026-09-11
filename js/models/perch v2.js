@@ -44,7 +44,7 @@ async function loadModel(mpath, backend, batchSize) {
     enableCpuMemArena: true,
     freeDimensionOverrides,
     preferredOutputLocation,
-    logSeverityLevel: DEBUG ? 0 : 4,
+    logSeverityLevel: DEBUG ? 0 : 3,
   };
   const modelPath = path.join(mpath, 'perch_v2.onnx')
   session = await ort.InferenceSession.create(modelPath, sessionOptions);
@@ -68,7 +68,6 @@ onmessage = async (e) => {
           session = null;
         }
     
-        await loadModel(modelPath, backend, batchSize);
         break;
       }
       case "change-threads": {
