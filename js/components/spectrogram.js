@@ -222,6 +222,7 @@ export class ChirpityWS {
     this.undblclick = wavesurfer.on("dblclick", this.centreSpec);
     this.unclick = wavesurfer.on("click", () => this.REGIONS.clearRegions());
     this.unpause = wavesurfer.on("pause", this.pauseActions);
+    wavesurfer.on('decode', () => this.spectrogram.render());
     
     this.unplay = wavesurfer.on("play", () => {
       if (config.selectedModel.includes('batpack')) {
@@ -306,6 +307,8 @@ export class ChirpityWS {
    * @returns {Object} The initialized spectrogram instance.
    */
   initSpectrogram(height, fftSamples) {
+    height ??= this.height;
+    this.height = height;
     const config = this.getConfig();
     const spectrogram = this.spectrogram;
     const STATE = this.getState();
@@ -358,7 +361,7 @@ export class ChirpityWS {
       scale: "linear",
       colorMap,
       alpha,
-      useWebWorker: true,
+      useWebWorker: false,
     });
   }
 
