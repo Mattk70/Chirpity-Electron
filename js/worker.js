@@ -36,6 +36,7 @@ import {createEmbeddingTable, storeEmbeddings, queryEmbeddings} from './embeddin
 import { customURLEncode, installConsoleTracking, trackEvent as _trackEvent } from "./utils/tracking.js";
 import { onChartRequest, getIncludedLocations }  from "./components/charts.js";
 import {PCMChunker, PredictionWritable, createMultiWorkerQueue, FileQueueManager} from './utils/streams.js';
+import { NEW_TO_OLD_TAXONOMY } from "./utils/new_to_old_taxonomy.js";
 const { pipeline } = require("stream/promises");
 
 const dbMutex = new Mutex();
@@ -443,7 +444,7 @@ async function handleMessage(e) {
   }
   switch (action) {
     case "_init_": {
-      let { model, batchSize, threads, backend, list, modelPath } = args;
+      let { model, batchSize, threads, backend, list, modelPath, windowSize } = args;
       const t0 = Date.now();
       STATE.detect.backend = backend;
       try {
@@ -456,7 +457,8 @@ async function handleMessage(e) {
             threads,
             backend,
             list,
-            modelPath
+            modelPath,
+            windowSize
           });
         })();  
         initialiseResolve();        // resolve INITIALISED
@@ -490,11 +492,12 @@ async function handleMessage(e) {
       break;
     }
     case "change-threads": {
-      // if (STATE.model.includes('perch')) break; // perch v2 only works with 1 thread
-      const delta = args.threads - predictWorkers.length;
-      NUM_WORKERS += delta;
+      const threads = args.threads;
+      const onnxGPU = ['birdnet3', 'perch v2'].includes(STATE.model) && STATE.detect.backend === 'webgpu';
+      if (onnxGPU) return; // ONNX GPU models only work with 1 thread
+      const delta = threads - predictWorkers.length;
       if (delta > 0) {
-        spawnPredictWorkers(STATE.model, BATCH_SIZE, delta);
+        spawnPredictWorkers(STATE.model, BATCH_SIZE, threads);
       } else {
         for (let i = delta; i < 0; i++) {
           const worker = predictWorkers.pop();
@@ -506,6 +509,12 @@ async function handleMessage(e) {
     case "change-mode": {
       const mode = args.mode;
       INITIALISED = await onChangeMode(mode);
+      break;
+    }
+    case "change-window-size": {
+      WINDOW_SIZE = args.windowSize;
+      predictWorkers.forEach(worker => worker.postMessage({ message: "change-window-size", windowSize: WINDOW_SIZE }));
+      resetEstimates();
       break;
     }
     case "chart": {
@@ -869,9 +878,10 @@ async function handleMessage(e) {
       STATE.included = {}
       STATE.globalOffset = 0;
       STATE.filteredOffset = {};
+      STATE.detect.classes = args.classes || STATE.detect.classes;
       await INITIALISED;
       await setLabelState({regenerate:true});
-      LIST_WORKER && (await getIncludedIDs());
+
       
       args.refreshResults && (await Promise.all([getSummary(), getResults()]));
       break;
@@ -956,31 +966,6 @@ ipcRenderer.on("close-database", async () => {
 });
 
 /**
- * Checks whether all files in the provided list are present in the database.
- *
- * This asynchronous function processes the given file list in batches (up to 25,000 files per batch) to accommodate SQLite's parameter limits.
- * For each batch, it constructs a parameterized SQL query that counts how many of the files exist in the database's "files" table.
- * If any batch has a count lower than the number of files in that batch, the function immediately posts a failure event to the UI and returns false.
- * If all batches are successfully verified, it posts a success event to the UI and returns true.
- * If the database (diskDB) is not loaded, an error alert is generated and the function returns undefined.
- *
- * @param {Array.<string>} fileList - An array of file names to verify in the database.
- * @return {Promise<boolean|undefined>} A promise that resolves to true if every file is found in the database, false if one or more files are missing, or undefined if the database is not loaded.
- *
- * @example
- * const files = ['track1.mp3', 'track2.wav'];
- * savedFileCheckAsync(files).then(result => {
- *   if (result === true) {
- *     console.log('All files exist in the database.');
- *   } else if (result === false) {
- *     console.log('Some files are missing in the database.');
- *   } else {
- *     console.log('Database not loaded.');
- *   }
- * });
- */
-
-/**
  * Creates a custom list mapping from species names to call types, along with optional date ranges and confidence thresholds.
  *
  * This function processes an array of custom label strings, each expected to contain species name, call type, optional start/end dates, and an optional confidence value, separated by a delimiter (comma or tilde depending on the model).
@@ -1056,38 +1041,73 @@ async function createCustomListMap(customLabels, splitOn, member) {
   }
 }
 
+/**
+ * Check whether every requested file is represented in the disk database.
+ *
+ * Files may match by their source name or by an archive-relative name. The
+ * result is also posted to the UI; a missing database produces an alert and
+ * returns `false`.
+ *
+ * @param {string[]} fileList - File paths or names to check.
+ * @returns {Promise<boolean>} Whether all files were found.
+ */
 async function savedFileCheckAsync(fileList) {
   if (diskDB) {
-    // Slice the list into a # of params SQLITE can handle
-    const batchSize = 10_000;
-    let totalFilesChecked = 0;
     fileList = fileList.map(f => (METADATA[f]?.name || f));
     const library = STATE.library.location + p.sep;
-    for (let i = 0; i < fileList.length; i += batchSize) {
-      const fileSlice = fileList.slice(i, i + batchSize);
-      const newList = fileSlice.map(file => file.replace(library, ''));
-      // detect if any changes were made
-      const libraryFiles = newList.filter((item, i) => item !== fileSlice[i]);
-      const placeholders = prepParams(fileSlice);
-      let countResult, parameters = fileSlice.slice(); // make a copy
-      let query = `SELECT COUNT(*) AS count FROM files WHERE name IN (${placeholders})`;
-      if (libraryFiles.length) {
-        const archivePlaceholders = prepParams(libraryFiles);
-        query += ` OR archiveName IN (${archivePlaceholders})`;
-        parameters.push(...libraryFiles)
+    const newList = fileList.map(file => file.replace(library, ''));
+    // detect which entries had the library prefix stripped
+    const libraryFiles = newList.filter((item, i) => item !== fileList[i]);
+
+    // Helper to run the count query against a given slice of names/libraryFiles
+    const countSaved = async (names, libFiles) => {
+      const query1 = `SELECT COUNT(*) AS count FROM files WHERE name IN (SELECT value FROM json_each(?))`;
+      let query = query1;
+      const parameters = [JSON.stringify(names)];
+
+      if (libFiles.length) {
+        query += ` OR archiveName IN (SELECT value FROM json_each(?))`;
+        parameters.push(JSON.stringify(libFiles));
       }
-      countResult = await diskDB.getAsync(query, ...parameters);
-      const count = countResult?.count || 0;
-      if (count < fileSlice.length) {
-        UI.postMessage({
-          event: "all-files-saved-check-result",
-          result: false,
-        });
-        return false;
-      }
-      totalFilesChecked += count;
+
+      const result = await diskDB.getAsync(query, ...parameters);
+      return result?.count || 0;
+    };
+
+    // 1. Quick check: first 10 files only
+    const firstSliceSize = Math.min(10, fileList.length);
+    const firstNames = fileList.slice(0, firstSliceSize);
+    //  derive libraryFiles specific to this slice 
+    const firstNewList = newList.slice(0, firstSliceSize);
+    const firstLibFiles = firstNewList.filter((item, i) => item !== firstNames[i]);
+
+    const firstCount = await countSaved(firstNames, firstLibFiles);
+
+    if (firstCount < firstSliceSize) {
+      UI.postMessage({
+        event: "all-files-saved-check-result",
+        result: false,
+      });
+      return false;
     }
-    const allSaved = totalFilesChecked === fileList.length;
+
+    // 2. If the whole list was <= 10, we're already done
+    if (fileList.length <= firstSliceSize) {
+      UI.postMessage({
+        event: "all-files-saved-check-result",
+        result: true,
+      });
+      return true;
+    }
+
+    // 3. Otherwise, check the remaining files in one go
+    const restNames = fileList.slice(firstSliceSize);
+    const restNewList = newList.slice(firstSliceSize);
+    const restLibFiles = restNewList.filter((item, i) => item !== restNames[i]);
+
+    const restCount = await countSaved(restNames, restLibFiles);
+    const allSaved = (firstCount + restCount) === fileList.length;
+
     UI.postMessage({
       event: "all-files-saved-check-result",
       result: allSaved,
@@ -1105,12 +1125,15 @@ function setGetSummaryQueryInterval(threads) {
     STATE.detect.backend !== "tensorflow" ? threads * 10 * scaleFactor: threads * scaleFactor;
 }
 
+/**
+ * Recalculate queued-file estimates using the current batch and window sizes.
+ *
+ * @returns {Promise<void>} Resolves after queued files have been reprocessed for estimation.
+ */
 async function resetEstimates() {
-  if (STATE.totalBatches > 0) {
-    // Update time estimates based on new batch size
-    const files = QUEUE.getAllPaths();
-    await processFilesInBatches(files);
-  }
+  // Update time estimates based on file information and current batch/window size
+  const files = QUEUE.getAllPaths();
+  await processFilesInBatches(files);
 }
 function findFileAtTime(timeMs) {
   const match = Object.entries(METADATA)
@@ -1176,6 +1199,7 @@ async function onChangeMode(mode) {
  * @param {number} [options.threads=1] - Number of prediction worker threads to spawn.
  * @param {string} [options.backend="tensorflow"] - Detection backend to use.
  * @param {string} [options.modelPath] - Filesystem path containing model files and label definitions; used when adding a new model.
+ * @param {number} [options.windowSize=3] - Analysis window in seconds, except for models with a fixed window.
  */
 
 async function onLaunch({
@@ -1184,6 +1208,7 @@ async function onLaunch({
   threads = 1,
   backend = "tensorflow",
   modelPath,
+  windowSize = 3
 }) {
   SEEN_MODEL_READY = false;
   LIST_CACHE = {};
@@ -1206,7 +1231,7 @@ async function onLaunch({
     model = 'birdnet'; perch = false; modelPath = null;
     generateAlert({message, type:'error'})
   }
-  const newWindowSize = perch ? 5 : nighthawk ? 1 : 3;
+  const newWindowSize = perch ? 5 : nighthawk ? 1 : windowSize || 3;
 
   if (newWindowSize !== WINDOW_SIZE) {
     // Update totalBatches so time estimates remain accurate
@@ -1239,7 +1264,8 @@ async function onLaunch({
     ? memoryDB
     : diskDB;
   STATE.update({ db });
-  NUM_WORKERS = perch ? 1 : threads;
+  const onnxGPU = (perch || STATE.model === 'birdnet3') && STATE.detect.backend === 'webgpu';
+  threads = onnxGPU ? 1 : threads;
   spawnPredictWorkers(model, batchSize, threads);
 }
 
@@ -1274,7 +1300,7 @@ function checkNewModel(modelID){
 /**
  * Spawns a list worker and returns a function to interact with it.
  *
- * This asynchronous function creates a new Web Worker from "./js/models/listWorker.js" and waits until the worker signals it is ready
+ * This asynchronous function creates a new Web Worker from "./js/models/listWorker3.js" and waits until the worker signals it is ready
  * by sending a "list-model-ready" message. During initialization, if a "tfjs-node" message is received, it updates internal state and notifies the UI
  * about backend availability. Once the worker is ready, the function returns another function that sends a message to the worker under a mutex lock
  * and returns a Promise that resolves with the worker's response containing a result and supplemental messages.
@@ -1287,7 +1313,7 @@ function checkNewModel(modelID){
  */
 async function spawnListWorker() {
   const worker_1 = await new Promise((resolve, reject) => {
-    const worker = new Worker("./js/models/listWorker.js", { type: "module" });
+    const worker = new Worker("./js/models/listWorker3.js", { type: "module" });
     worker.onmessage = function (event) {
       // Resolve the promise once the worker sends a message indicating it's ready
       const message = event.data.message;
@@ -1521,16 +1547,17 @@ function getFileSQLAndParams(range) {
       SQL += " AND 1 = 0 ";
       return [SQL, params];
     }
-    const fileParams = prepParams(files);
-    SQL += ` AND ( file IN  (${fileParams}) `;
+    const fileParams = JSON.stringify(files);
+    SQL += ` AND ( file IN  (SELECT value FROM json_each(?)) `;
     const originalFiles = files.map((item) => (METADATA[item]?.name || item));
     STATE.originalFiles = originalFiles;
-    params.push(...originalFiles);
-    SQL += ` OR archiveName IN  (${fileParams}) ) `;
+    params.push(fileParams);
+    SQL += ` OR archiveName IN  (SELECT value FROM json_each(?)) ) `;
 
     const archivePath = STATE.library.location + p.sep;
     const archive_names = files.map((item) => item.replace(archivePath, ""));
-    params.push(...archive_names);
+    const archiveParams = JSON.stringify(archive_names);
+    params.push(archiveParams);
   }
   return [SQL, params];
 }
@@ -1595,40 +1622,29 @@ async function getMatchingIds(cnames) {
   }
   if (nameSet.size === 0) return [];
   const names = [...nameSet];
-
-  // Chunk if too many parameters
-  const chunkSize = 999;
   const results = [];
-
-  for (let i = 0; i < names.length; i += chunkSize) {
-    const chunk = names.slice(i, i + chunkSize);
-    const placeholders = chunk.map(() => "?").join(",");
-    const sql = `
-      SELECT id FROM species
-      WHERE modelID = ?
-        AND cname IN (${placeholders})
-    `;
-    const rows = await STATE.db.allAsync(sql, STATE.modelID, ...chunk);
-    results.push(...rows.map(r => r.id));
-  }
-
+  const restrictToModel = STATE.detect.combine || STATE.detect.merge ? "" : ` modelID = ${STATE.modelID} AND `;
+  const query = `SELECT id FROM species
+    WHERE ${restrictToModel} cname IN (SELECT value FROM json_each(?))
+  `;
+  const rows = await STATE.db.allAsync(query, JSON.stringify(names));
+  results.push(...rows.map(r => r.id));
   return results;
 }
 
 /**
- * Build an SQL fragment that filters species according to the current STATE.list selection.
+ * Build an SQL fragment and bound value that filter species for the active list.
  *
- * When STATE.list is "everything" the function returns an empty string. For other lists it resolves the set
- * of included species IDs (handling the special "birds" exclusion case and CNAMES with suffixes) and
- * returns an SQL snippet that restricts s.id to that set.
+ * For the `birds` and `Animalia` lists, the resolved list is treated as an
+ * exclusion. Manual records remain included regardless of the list.
  *
- * @returns {Promise<string>} An SQL fragment restricting species by id (for example " AND s.id IN (1,2) "),
- * or an empty string when no filtering is required.
+ * @param {string} [file] - File whose location and week should determine a location-based list.
+ * @returns {Promise<{SQL: string, param: string}|string>} SQL and its JSON-array parameter, or an empty string when an exclusion list removes nothing.
  */
 async function getSpeciesSQLAsync(file){
-  let not = "", SQL = "";
+  let not = "", SQL = "", param = '';
   const {list, modelLabels} = STATE;
-  
+  let typeOfList = 'Included';
   // If we don't have a file, use the first analysed file if available
   file ??=
     QUEUE.getAllPaths('pending')[0] ??
@@ -1636,20 +1652,29 @@ async function getSpeciesSQLAsync(file){
     QUEUE.getAllPaths('complete')[0];
   if (list !== 'everything') {
     let included = await getIncludedIDs(file);
-    if (["birds", 'Animalia'].includes(list)) {
+    if (list === "birds") {
       included = getExcluded(included);
-      if (!included.length) return SQL; // nothing filtered out
+      if (!included.length) return {SQL}; // nothing filtered out
+      typeOfList = 'Excluded';
       not = "NOT";
     }
     // Get the speciesID for all models
-    const result = await STATE.db.allAsync(`SELECT cname FROM species WHERE classIndex + 1 IN (${included}) AND modelID = ${STATE.modelID}`);
-    const cnames = result.map(row => row.cname);
+    // json is fastest here
+    const limitToModel = STATE.detect.combine || STATE.detect.merge ? "" : ` AND modelID = ${STATE.modelID} `;
+    const query = `
+      SELECT cname FROM species 
+      WHERE classIndex + 1 IN (SELECT value FROM json_each(?))
+      ${limitToModel}
+    `;
+    const jsonResult = await STATE.db.allAsync(query, JSON.stringify(included));
+    const cnames = jsonResult.map(row => row.cname);
     included = cnames.length ? await getMatchingIds(cnames) : [-1];
     DEBUG &&
-      console.log("included", included.length, "# labels", modelLabels.length);
-    SQL = ` AND (s.id ${not} IN (${included}) OR r.modelID = 0) `; // always include records with modelID 0 (manual records)
+      console.log(typeOfList, included.length, "# labels", modelLabels.length);
+    SQL = ` AND (s.id ${not} IN (SELECT value FROM json_each(?)) OR r.modelID = 0) `; // always include records with modelID 0 (manual records)
+    param = JSON.stringify(included);
   }
-  return SQL
+  return {SQL, param}
 }
 
 /**
@@ -1686,7 +1711,9 @@ async function addQueryQualifiers(stmt, range, caller) {
       stmt += ` AND 1 = 0 `;
     }
   } else {
-    stmt += await getSpeciesSQLAsync()
+    const res = await getSpeciesSQLAsync();
+    stmt += res.SQL;
+    if (res.SQL) params.push(res.param);
   }
   if (detect.nocmig) {
     stmt += ` AND isDaylight = ${detect.nocmig === 'day' ? 1 : 0} `;
@@ -1830,20 +1857,6 @@ const prepResultsStatement = async (
 
 
 /**
- * Split an array into consecutive chunks of the given size.
- * @param {Array} array - The array to split.
- * @param {number} size - Maximum size of each chunk; the final chunk may be smaller.
- * @returns {Array<Array>} An array of chunk arrays in the same order as the input.
- */
-function chunkArray(array, size) {
-  const result = [];
-  for (let i = 0; i < array.length; i += size) {
-      result.push(array.slice(i, i + size));
-  }
-  return result;
-}
-
-/**
  * Retrieves and merges metadata for a list of audio files from the database and in-memory cache.
  *
  * For each file name, fetches file details, associated location, and per-day durations from the database, then merges these with any existing in-memory metadata. Returns an object keyed by file name containing the combined metadata.
@@ -1852,98 +1865,98 @@ function chunkArray(array, size) {
  * @returns {Promise<Object>} An object mapping each file name to its metadata, including duration, start time, location, and completion status.
  */
 async function updateMetadata(fileNames) {
-  const batchSize = 10000;
-  const batches = chunkArray(fileNames, batchSize);
   const finalResult = {};
-  for (let batch of batches) {
-    // Build placeholders (?, ?, ?) dynamically based on number of file names
-    const placeholders = prepParams(batch);
-    if (STATE.library.location) {
-      const prefix = STATE.library.location + p.sep;
-      batch = batch.map(fileName => fileName.replace(prefix, '')  );
-    }
 
-    // 1. Get files and locations
-    const fileQuery = `
-        SELECT 
-            f.id,
-            f.name,
-            f.archiveName,
-            f.duration,
-            f.filestart as fileStart,
-            f.metadata,
-            f.locationID,
-            l.lat,
-            l.lon
-        FROM files f
-        LEFT JOIN locations l ON f.locationID = l.id
-        WHERE f.name IN (${placeholders}) OR f.archiveName IN (${placeholders})
-    `;
+  // Strip library location prefix if present
+  let names = fileNames;
+  if (STATE.library.location) {
+    const prefix = STATE.library.location + p.sep;
+    names = names.map(fileName => fileName.replace(prefix, ''));
+  }
 
-    const fileRows = await diskDB.allAsync(fileQuery, ...batch, ...batch);
+  const namesJSON = JSON.stringify(names);
 
-    if (fileRows.length === 0) {
-        continue
-    }
+  // 1. Get files and locations — match against name OR archiveName using json_each twice
+  const fileQuery = `
+      SELECT 
+          f.id,
+          f.name,
+          f.archiveName,
+          f.duration,
+          f.filestart as fileStart,
+          f.metadata,
+          f.locationID,
+          l.lat,
+          l.lon
+      FROM files f
+      LEFT JOIN locations l ON f.locationID = l.id
+      WHERE f.name IN (SELECT value FROM json_each(?))
+         OR f.archiveName IN (SELECT value FROM json_each(?))
+  `;
 
+  const fileRows = await diskDB.allAsync(fileQuery, namesJSON, namesJSON);
+
+  if (fileRows.length > 0) {
     // Extract file IDs for duration query
     const fileIDs = fileRows.map(row => row.id);
-    const durationPlaceholders = fileIDs.map(() => '?').join(', ');
+    const fileIDsJSON = JSON.stringify(fileIDs);
 
     // 2. Get durations
     const durationQuery = `
         SELECT day, duration, fileID 
         FROM duration 
-        WHERE fileID IN (${durationPlaceholders})
+        WHERE fileID IN (SELECT value FROM json_each(?))
     `;
-    const durationRows = await diskDB.allAsync(durationQuery, ...fileIDs);
+    const durationRows = await diskDB.allAsync(durationQuery, fileIDsJSON);
 
     // 3. Organise durations by fileID
     const durationMap = {};
     durationRows.forEach(row => {
-        if (!durationMap[row.fileID]) durationMap[row.fileID] = {};
-        durationMap[row.fileID][row.day] = row.duration;
+      if (!durationMap[row.fileID]) durationMap[row.fileID] = {};
+      durationMap[row.fileID][row.day] = row.duration;
     });
 
     // 4. Build object keyed by file name
-
     fileRows.forEach(row => {
-      let {name, archiveName, duration, fileStart, metadata, locationID, lat, lon} = row;
+      let { id, name, archiveName, duration, fileStart, metadata, locationID, lat, lon } = row;
 
       const complete = !!duration && !!fileStart;
       finalResult[name] = {
-            archiveName,
-            duration,
-            fileStart,
-            metadata,
-            locationID,
-            dateDuration: durationMap[row.id] || {},
-            lat,
-            lon,
-            isSaved: true,
-            isComplete: complete
-        };
+        archiveName,
+        duration,
+        fileStart,
+        metadata,
+        locationID,
+        dateDuration: durationMap[id] || {},
+        lat,
+        lon,
+        isSaved: true,
+        isComplete: complete
+      };
     });
   }
   // 5. Merge with METADATA
   for (const [fileName, metadataObj] of Object.entries(METADATA)) {
     if (finalResult[fileName]) {
-        // Shallow merge: overwrite keys in finalResult[fileName] with METADATA[fileName]
-        finalResult[fileName] = {
-            ...finalResult[fileName],
-            ...metadataObj
-        };
+      finalResult[fileName] = {
+        ...finalResult[fileName],
+        ...metadataObj
+      };
     } else {
-        // Add new entry if fileName not in finalResult
-        finalResult[fileName] = { ...metadataObj };
+      finalResult[fileName] = { ...metadataObj };
     }
   }
   return finalResult;
 }
 
+/**
+ * Recreate the temporary embedding table with the active model's vector dimension.
+ *
+ * @returns {Promise<void>} Resolves after the table is ready.
+ */
 const resetEmbeddings = async () =>{
   STATE.queryMetadata = undefined;
-  const dim = STATE.model === 'perch v2' ? 1536 : 1024;
+  const dim = STATE.model === 'perch v2' ? 1536 : STATE.model === 'birdnet3' ? 1280 : 1024;
   await createEmbeddingTable(memoryDB, tempPath, dim);
 }
 async function getEmbedding({file,cname, sname, max, threshold, queryRegion }){
@@ -2108,12 +2121,12 @@ async function onAnalyse({
 }
 
 /**
- * Stop ongoing audio processing and prediction, clear in-memory queues and transient tracking state, and (unless the model is "perch v2") restart prediction workers using the specified model.
+ * Stop ongoing audio processing and prediction, clear transient run state, and restart prediction workers.
  *
  * This sets the abort flag, clears file and prediction queues, cancels backlog intervals, terminates existing prediction workers, and spawns a fresh set of workers for the provided model identifier.
  *
  * @param {Object} params - Options for aborting and restarting.
- * @param {string} [params.model=STATE.model] - Model identifier to use when restarting prediction workers; if equal to `"perch v2"`, workers are not restarted.
+ * @param {string} [params.model=STATE.model] - Model identifier for the replacement workers.
  */
 function onAbort({ model = STATE.model }) {
   const run = STATE.currentRun;
@@ -2136,16 +2149,13 @@ function onAbort({ model = STATE.model }) {
     batchSize: BATCH_SIZE,
     backend: STATE.detect.backend})
   });
-  
 
   //restart the workers
-  if (model !== 'perch v2'){
-    terminateWorkers();
-    setTimeout(
-      () => spawnPredictWorkers(model, BATCH_SIZE, NUM_WORKERS),
-      200
-    );
-  }
+  terminateWorkers();
+  setTimeout(
+    () => spawnPredictWorkers(model, BATCH_SIZE, NUM_WORKERS, false),
+    200
+  );
 }
 
 const measureDurationWithFfmpeg = (src) => {
@@ -2402,8 +2412,7 @@ async function loadAudioFile({
               contents: audio,
               play: play,
               metadata: METADATA[file].metadata,
-            },
-            [audio.buffer]
+            }
           );
           let week;
 
@@ -2501,7 +2510,9 @@ async function sendDetections(file, start, end, goToRegion) {
   const customList = list === "custom";
   const confidence = customList ? 0 : detect.confidence;
   const params = [confidence, file, start, end];
-  const includedSQL = await getSpeciesSQLAsync(file);
+  const res = await getSpeciesSQLAsync(file);
+  const includedSQL = res.SQL
+  if (includedSQL) params.push(res.param);
 
   let SQL =     `
         WITH RankedRecords AS (
@@ -3000,6 +3011,12 @@ function createPredictSender(workerQueue) {
     return workerQueue.send(payload, transferList);
   };
 }
+/**
+ * Probe the first audio stream in a file.
+ *
+ * @param {string} file - Audio file to inspect.
+ * @returns {Promise<{audioCodec: string|null, sampleRate: number|null, channels: number|null}>} Stream codec, sample rate, and channel count.
+ */
 const getAudioCodec = (file) => {
   return new Promise((resolve, reject) => {
     ffmpeg.ffprobe("file:" + file, (err, metadata) => {
@@ -3016,11 +3033,31 @@ const getAudioCodec = (file) => {
       const sampleRate = audioStream?.sample_rate
                           ? parseInt(audioStream.sample_rate)
                           : null;
-      resolve({audioCodec, sampleRate});
+      const channels = audioStream?.channels
+                          ? parseInt(audioStream.channels)
+                          : null;           
+      resolve({audioCodec, sampleRate, channels});
     });
   });
 };
 
+/**
+ * Export an audio segment with the configured filters and encoding settings.
+ *
+ * Missing source files are resolved through the application's file lookup. If
+ * source and destination are the same, the original is replaced only after a
+ * successful temporary export.
+ *
+ * @param {Object} options - Export options.
+ * @param {string} options.file - Source audio path.
+ * @param {number} [options.start=0] - Segment start in seconds.
+ * @param {number} [options.end=WINDOW_SIZE] - Segment end in seconds.
+ * @param {Object} [options.meta={}] - Metadata passed to FFmpeg.
+ * @param {string} [options.format=STATE.audio.format] - Output format.
+ * @param {string} [options.folder] - Destination directory, defaulting to the temporary directory.
+ * @param {string} options.filename - Destination filename.
+ * @returns {Promise<string|undefined>} Exported path, or `undefined` when the source cannot be found.
+ */
 const bufferToAudio = async ({
   file = "",
   start = 0,
@@ -3071,7 +3108,6 @@ const bufferToAudio = async ({
   if (padding) {
     start = Math.max(0, start - 1);
     await setMetadata({ file });
-
     end = Math.min(METADATA[file].duration, end + 1);
   }
 
@@ -3097,34 +3133,7 @@ const bufferToAudio = async ({
       metadata: meta,
       additionalFilters: filters
     }).then(command => {
-    
 
-    command.on("codecData", async function (data) {
-      const channelStr = data.audio_details?.[2]?.toLowerCase() ?? '';
-      // Allow: mono (1ch), stereo/2ch (2ch), dual-mono
-      const isSafe = /^(mono|stereo|1[\s.]?0|2[\s.]?0|dual[\s-]?mono|1\s+channels?|2\s+channels?)$/
-        .test(channelStr);
-      if (format === "mp3" && !STATE.audio.downmix) {
-        if (channelStr && !isSafe) {
-          const i18n = {
-            en: "Cannot export multichannel audio to MP3. Either enable downmixing, or choose a different export format.",
-            da: "Kan ikke eksportere multikanalslyd til MP3. Aktiver enten nedmiksning, eller vælg et andet eksportformat.",
-            de: "Mehrkanal-Audio kann nicht als MP3 exportiert werden. Aktivieren Sie entweder das Downmixing oder wählen Sie ein anderes Exportformat.",
-            es: "No se puede exportar audio multicanal a MP3. Active la mezcla descendente o elija un formato de exportación diferente.",
-            fr: "Impossible d’exporter un audio multicanal en MP3. Activez le mixage vers le bas ou choisissez un autre format d’exportation.",
-            ja: "マルチチャンネル音声をMP3に書き出すことはできません。ダウンミックスを有効にするか、別の書き出し形式を選択してください。",
-            nl: "Kan geen meerkanaalsaudio exporteren naar MP3. Schakel downmixen in of kies een ander exportformaat.",
-            pt: "Não é possível exportar áudio multicanal para MP3. Ative a mixagem para baixo ou escolha um formato de exportação diferente.",
-            ru: "Невозможно экспортировать многоканальное аудио в MP3. Включите даунмиксинг или выберите другой формат экспорта.",
-            sv: "Kan inte exportera flerkanalsljud till MP3. Aktivera antingen nedmixning eller välj ett annat exportformat.",
-            zh: "无法将多声道音频导出为 MP3。请启用混缩，或选择其他导出格式。"
-          };
-          const error = i18n[STATE.locale] || i18n["en"];
-          generateAlert({ type: "error", message: error});
-          return reject(console.warn("Export polyWAV to mp3 attempted."))
-        }
-      }
-    })
     command.on("error", (err) => {
       if (samePath && fs.existsSync(tempDestination)) {
         try {
@@ -3165,7 +3174,48 @@ const bufferToAudio = async ({
   });
 };
 
+/**
+ * Export an audio segment or ask the UI to save the temporary export.
+ *
+ * Multichannel MP3 export is refused when downmixing is disabled, with a
+ * localized error shown to the user.
+ *
+ * @param {string} file - Source audio path.
+ * @param {number} start - Segment start in seconds.
+ * @param {number} end - Segment end in seconds.
+ * @param {string} filename - Output filename.
+ * @param {Object} metadata - Metadata passed to the encoder.
+ * @param {string} [folder] - Direct destination directory; when omitted, the UI receives a save request.
+ * @returns {Promise<void>} Resolves after export or after refusing an unsupported MP3 export.
+ */
 async function saveAudio(file, start, end, filename, metadata, folder) {
+  const {format, downmix} = STATE.audio;
+  if (format === 'mp3' && ! downmix){
+    // Do a polywav check
+    const source = fs.existsSync(file) ? file : await getWorkingFile(file).catch(() => null);
+    const {channels} = source
+      ? await getAudioCodec(source).catch(() => ({}))
+      : {};
+    if (channels > 2) {
+      const i18n = {
+            en: "Cannot export multichannel audio to MP3. Either enable downmixing, or choose a different export format.",
+            da: "Kan ikke eksportere multikanalslyd til MP3. Aktiver enten nedmiksning, eller vælg et andet eksportformat.",
+            de: "Mehrkanal-Audio kann nicht als MP3 exportiert werden. Aktivieren Sie entweder das Downmixing oder wählen Sie ein anderes Exportformat.",
+            es: "No se puede exportar audio multicanal a MP3. Active la mezcla descendente o elija un formato de exportación diferente.",
+            fr: "Impossible d’exporter un audio multicanal en MP3. Activez le mixage vers le bas ou choisissez un autre format d’exportation.",
+            ja: "マルチチャンネル音声をMP3に書き出すことはできません。ダウンミックスを有効にするか、別の書き出し形式を選択してください。",
+            nl: "Kan geen meerkanaalsaudio exporteren naar MP3. Schakel downmixen in of kies een ander exportformaat.",
+            pt: "Não é possível exportar áudio multicanal para MP3. Ative a mixagem para baixo ou escolha um formato de exportação diferente.",
+            ru: "Невозможно экспортировать многоканальное аудио в MP3. Включите даунмиксинг или выберите другой формат экспорта.",
+            sv: "Kan inte exportera flerkanalsljud till MP3. Aktivera antingen nedmixning eller välj ett annat exportformat.",
+            zh: "无法将多声道音频导出为 MP3。请启用混缩，或选择其他导出格式。"
+          };
+          const error = i18n[STATE.locale] || i18n["en"];
+          generateAlert({ type: "error", message: error});
+          console.warn("Export polyWAV to mp3 attempted.");
+          return
+    }
+  }
   filename = filename.replaceAll(":", "-");
   const convertedFilePath = await bufferToAudio({
     file,
@@ -3182,41 +3232,42 @@ async function saveAudio(file, start, end, filename, metadata, folder) {
       event: "audio-file-to-save",
       file: convertedFilePath,
       filename: filename,
-      extension: STATE.audio.format,
+      extension: format,
     });
   }
 }
 
 
 /**
- * Spawns multiple Web Workers for parallel AI model prediction.
+ * Ensure the requested number of prediction workers exist for a model.
  *
- * Initializes the specified number of prediction worker threads, each loading the given AI model (using "BirdNet2.4" for "birdnet"). Workers are configured with batch size and backend settings, and set up for asynchronous communication and error handling.
+ * Perch and BirdNET3 CPU thread settings are converted to worker counts unless
+ * adjustment is disabled. Existing workers are retained; only missing workers
+ * are created and sent their load configuration.
  *
- * @param {string} model - The AI model to load for prediction; "birdnet" uses the "BirdNet2.4" worker script.
+ * @param {string} model - Model identifier and worker script basename.
  * @param {number} batchSize - Number of items each worker processes per batch.
- * @param {number} toSpawn - Number of worker threads to spawn.
+ * @param {number} threads - Requested CPU-thread budget or, when adjustment is disabled, worker count.
+ * @param {boolean} [adjustThreads=true] - Whether to convert the thread budget for models with intra-op threading.
  */
-function spawnPredictWorkers(model, batchSize, toSpawn) {
-  const isPerch = model === 'perch v2';
-  // Perch worker cannot be terminated due to ONNX runtime global memory management,
-  // so we preserve it in STATE.perchWorker for reuse across model switches
-  if (! STATE.perchWorker?.length){
-    STATE.perchWorker = predictWorkers.filter(w => w.name === 'perch v2');
+function spawnPredictWorkers(model, batchSize, threads, adjustThreads = true) {
+  const currentThreads = predictWorkers.length;
+  if (adjustThreads) {
+  // Normallise threads across models
+    if (model === 'perch v2'){
+      // Perch v2 has 4 intraOp threads
+      threads = Math.max(1, Math.floor(threads / 4));
+    } else if (model === 'birdnet3') {
+      // BirdNET 3 has 2 intraOp threads
+      threads = Math.max(1, Math.floor(threads / 2));
+    }
   }
-
-  if (isPerch && STATE.perchWorker.length) {
-    predictWorkers = STATE.perchWorker;
-    setLabelState({regenerate: true})
-    return
-  } else if (STATE.perchWorker.length) {
-    predictWorkers = predictWorkers.filter(w => w.name !== 'perch v2');
-  }
-  const startAt = predictWorkers.length;
-  for (let i = startAt; i < startAt + toSpawn; i++) {
-    if (isPerch && i > startAt) break; // Perch v2 only needs one worker, even if multiple threads requested
-    const workerSrc = ['nocmig', 'chirpity', 'perch v2', 'nighthawk'].includes(model) ? model : "BirdNet2.4";
-    const worker = new Worker(`./js/models/${workerSrc}.js`, { type: "module" });
+  NUM_WORKERS = threads;
+  for (let i = currentThreads; i < threads; i++) {
+    const modelFile = 
+      ['birdnet3','chirpity','nighthawk','nocmig','perch v2'].includes(model)
+      ? model : 'birdnet';
+    const worker = new Worker(`./js/models/${modelFile}.js`, { type: "module" });
     // Web worker message event handler
     worker.onmessage = async (msg) => {
       await parseMessage(msg).catch((error) => {
@@ -3231,6 +3282,9 @@ function spawnPredictWorkers(model, batchSize, toSpawn) {
       predictWorkers.splice(i, 1);
       worker.terminate();
     };
+    worker.onmessageerror = (event) => {
+      console.error('Worker message error:', event);
+    };
     worker.name = model;
     predictWorkers.push(worker);
     DEBUG && console.log("loading a worker");
@@ -3241,19 +3295,23 @@ function spawnPredictWorkers(model, batchSize, toSpawn) {
       model,
       modelPath: STATE.modelPath,
       batchSize,
-      threads: toSpawn,
+      threads,
       backend: STATE.detect.backend,
       worker: i,
-      locale: STATE.locale.slice(0,2)
+      locale: STATE.locale.slice(0,2),
+      windowSize: WINDOW_SIZE,
     });
 
   }
 }
 
+/**
+ * Notify and terminate every prediction worker, then clear the worker list.
+ */
 const terminateWorkers = () => {
   predictWorkers.forEach((worker) => {
     worker.postMessage({message: 'terminate'})
-    if (worker.name !== 'perch v2') worker.terminate()
+    worker.terminate()
   });
   predictWorkers = []
 };
@@ -5032,8 +5090,15 @@ function recordRowToAllowedInput(row) {
 }
 
 /**
- *  Transfers data in memoryDB to diskDB
- * @returns {Promise<unknown>}
+ * Persist eligible in-memory files, metadata, and detections to the disk database.
+ *
+ * Detection rows are filtered by the active list, confidence, daylight, and
+ * custom-list settings. The operation is transactional and reports success or
+ * failure through application alerts.
+ *
+ * @param {Object} options - Save options.
+ * @param {string} options.file - File used when refreshing locations after a successful save.
+ * @returns {Promise<void>} Resolves after the transaction and UI notifications complete.
  */
 const onSave2DiskDB = async ({ file }) => {
   const t0 = Date.now();
@@ -5041,12 +5106,7 @@ const onSave2DiskDB = async ({ file }) => {
     generateAlert({ message: "NoOP" });
     return; // nothing to do. Also will crash if trying to update disk from disk.
   }
-  let filterClause = await getSpeciesSQLAsync();
 
-  if (STATE.detect.nocmig) {
-    const condition = STATE.detect.nocmig === 'day';
-    filterClause += ` AND isDaylight = ${condition} `;
-  }
   let response;
   await dbMutex.lock();
   let inserted = 0;
@@ -5084,6 +5144,13 @@ const onSave2DiskDB = async ({ file }) => {
     DEBUG &&
       console.log(response.changes + " date durations added to disk database");
     // now update records
+    let res = await getSpeciesSQLAsync();
+    let filterClause = res.SQL;
+    const param = res.param || '';
+    if (STATE.detect.nocmig) {
+      const condition = STATE.detect.nocmig === 'day';
+      filterClause += ` AND isDaylight = ${condition} `;
+    }
     const candidates =  await memoryDB.allAsync(`
       SELECT 
           r.position, r.fileID, r.speciesID, r.modelID, r.confidence, 
@@ -5092,7 +5159,7 @@ const onSave2DiskDB = async ({ file }) => {
       FROM records r
       JOIN species s ON r.speciesID = s.id
       JOIN files f ON r.fileID = f.id
-      ${filterClause}`);
+      ${filterClause}`,param);
     
     let allowed = [];
     if (STATE.list === 'custom') {
@@ -5106,32 +5173,42 @@ const onSave2DiskDB = async ({ file }) => {
 
     // Build bulk INSERT using filestart as stable identifier to resolve disk DB fileIDs
     if (allowed.length > 0) {
-      const batchSize = 2500;
-      for (let i = 0; i < allowed.length; i += batchSize) {
-        const batch = allowed.slice(i, i + batchSize);
-        const rowPlaceholders = batch.map(() =>
-          '(?,?,?,?,?,?,?,?,?,?,?)'
-        ).join(',');
-        const insertValues = batch.flatMap(row => [
-          row.position, row.speciesID, row.modelID, row.confidence,
-          row.comment ?? null, row.end, row.callCount ?? null,
-          row.isDaylight, row.reviewed, row.tagID ?? null, row.fileName
-        ]);
-        await memoryDB.runAsync(`
-          WITH v(position, speciesID, modelID, confidence,
-                comment, end, callCount, isDaylight, reviewed, tagID, fileName)
-          AS (VALUES ${rowPlaceholders})
-          INSERT OR IGNORE INTO disk.records (
-            position, speciesID, modelID, confidence,
-            comment, end, callCount, isDaylight, reviewed, tagID, fileID
-          )
-          SELECT v.position, v.speciesID, v.modelID, v.confidence,
-                v.comment, v.end, v.callCount, v.isDaylight, v.reviewed, v.tagID,
-                d.id
-          FROM v JOIN disk.files d ON v.fileName = d.name
-        `, ...insertValues);
-      }
-      inserted = allowed.length;
+      const rowsJSON = JSON.stringify(allowed.map(row => ({
+        position: row.position,
+        speciesID: row.speciesID,
+        modelID: row.modelID,
+        confidence: row.confidence,
+        comment: row.comment ?? null,
+        end: row.end,
+        callCount: row.callCount ?? null,
+        isDaylight: row.isDaylight,
+        reviewed: row.reviewed,
+        tagID: row.tagID ?? null,
+        fileName: row.fileName
+      })));
+
+      const insertResult = await memoryDB.runAsync(`
+        INSERT OR IGNORE INTO disk.records (
+          position, speciesID, modelID, confidence,
+          comment, end, callCount, isDaylight, reviewed, tagID, fileID
+        )
+        SELECT
+          json_extract(v.value, '$.position'),
+          json_extract(v.value, '$.speciesID'),
+          json_extract(v.value, '$.modelID'),
+          json_extract(v.value, '$.confidence'),
+          json_extract(v.value, '$.comment'),
+          json_extract(v.value, '$.end'),
+          json_extract(v.value, '$.callCount'),
+          json_extract(v.value, '$.isDaylight'),
+          json_extract(v.value, '$.reviewed'),
+          json_extract(v.value, '$.tagID'),
+          d.id
+        FROM json_each(?) v
+        JOIN disk.files d ON json_extract(v.value, '$.fileName') = d.name
+      `, rowsJSON);
+
+      inserted = insertResult?.changes ?? 0;
     }
     DEBUG && console.log(inserted + " records added to disk database");
     await memoryDB.runAsync("END");
@@ -5556,10 +5633,12 @@ const onFileDelete = async (fileName) => {
 /**
  * Updates species common names in the database based on provided label mappings.
  *
- * For each label in the format "speciesName_commonName", updates the corresponding species entry's common name (`cname`) in the database. Handles call type suffixes in common names and applies updates per model ID, ensuring that only changed values are written. All updates are performed within a single transaction for atomicity.
+ * Updates matching scientific names, including old-taxonomy equivalents, while
+ * retaining supported call-type suffixes from existing common names. All
+ * updates are performed within one transaction.
  *
  * @param {object} db - Database connection supporting async methods (`runAsync`, `prepare`, `finalize`).
- * @param {Array<string>} labels - Array of label strings in the format "speciesName_commonName".
+ * @param {string[]} labels - Scientific and localized common names separated by the active model's label delimiter.
  * @returns {Promise<void>} Resolves when all updates are committed.
  *
  * @throws {Error} If any database operation fails during the transaction.
@@ -5581,18 +5660,22 @@ async function _updateSpeciesLocale(db, labels) {
     for (const label of labels) {
       const [sname, translatedCname] = label.split(splitChar);
       labelMap.set(sname, translatedCname); // only one cname per sname in labels
+      if (NEW_TO_OLD_TAXONOMY[sname]) {
+        const oldSname = NEW_TO_OLD_TAXONOMY[sname];
+        labelMap.set(oldSname, translatedCname); // also map old sname to the same cname
+      }
     }
 
     // 2. Query all matching species rows
     const snames = [...labelMap.keys()];
-    const placeholders = snames.map(() => "?").join(",");
     const speciesRows = await db.allAsync(
-      `SELECT sname, cname, modelID FROM species WHERE sname IN (${placeholders})`,
-      ...snames
+      `SELECT sname, cname, modelID FROM species WHERE sname IN (SELECT value from json_each(?))`,
+      JSON.stringify(snames)
     );
 
     // 3. Helpers
-    const extractCallType = str => str.match(/\s+\([^)]+\)$|-$/u)?.[0] || "";
+    const extractCallType = str =>
+    str.match(/\s+\((?:call|flight call|song|booming)\)$|-$/u)?.[0] || "";
     // const stripCallType = str => str.replace(/\s+\([^)]+\)$|[^\p{L}\p{N}\s]+$/u, "");
 
     // 4. Determine required updates
@@ -5632,16 +5715,17 @@ async function _updateSpeciesLocale(db, labels) {
  *
  * Sets the new locale in the global state and updates species labels in both disk and memory databases. If requested, refreshes the application's results and summary to reflect the new locale.
  *
- * @param {string} locale - The locale identifier to set (e.g., "en-US").
- * @param {Object} labels - Mapping of species IDs to localized labels.
+ * @param {string} locale - Locale column suffix to select, such as `en` or `en_GB`.
+ * @param {string[]} labels - Label lines, either already paired or from the multilingual label CSV.
  * @param {boolean} refreshResults - Whether to refresh results and summary after updating the locale.
  */
 async function onUpdateLocale(locale, labels, refreshResults) {
   if (DEBUG) t0 = Date.now();
-  let db;
+  labels = prepareLocalLabels(labels, locale);
+  DEBUG && console.log(`Preparing labels took ${Date.now() - t0}ms `);
   try {
     STATE.update({ locale });
-    for (db of [diskDB, memoryDB]) {
+    for (const db of [diskDB, memoryDB]) {
       db.locale = locale;
       await _updateSpeciesLocale(db, labels);
     }
@@ -5654,6 +5738,33 @@ async function onUpdateLocale(locale, labels, refreshResults) {
     
   }
   await setLabelState({regenerate:true})
+}
+
+/**
+ * Select scientific and localized common-name columns from multilingual CSV rows.
+ *
+ * If the requested translation column is absent, English common names are
+ * used. Inputs without a `sci_name` header are returned unchanged.
+ *
+ * @param {string[]} labels - CSV rows including the header row.
+ * @param {string} locale - Locale suffix used to select `common_name_<locale>`.
+ * @returns {string[]} Scientific/common-name pairs, including the transformed header row.
+ */
+const prepareLocalLabels = (labels, locale) => {
+  if (!labels?.length) return [];
+  const headers = labels[0].split(",");
+  const names = ["sci_name", `common_name_${locale}`];
+  const indices = names.map(name => headers.indexOf(name));
+  const com_name_index = headers.indexOf("com_name");
+  if (indices[0] === -1 ) return labels;
+  if (indices[1] === -1)  {
+    locale !== 'en' && console.warn('Missing translation', `No translation available for ${locale}`)
+    indices[1] = com_name_index; // English fallback
+  }
+  return labels.map(row => {
+    const values = row.split(",");
+    return indices.map(index => values[index] || values[com_name_index]).join(","); // Use com_name if there is no translation for the locale
+  });
 }
 
 /**
@@ -5915,7 +6026,7 @@ async function _getNearbyLocations(lat, lon) {
 async function getIncludedIDs(file) {
   if (STATE.list === "everything") return [];
   let latitude, longitude, week;
-  const {list, local, lat, lon, useWeek, included, model, modelID, speciesMap} = STATE;
+  const {list, local, lat, lon, useWeek, included, model, modelID, speciesMap, detect} = STATE;
   if (
     list === "location" ||
     (list === "nocturnal" && local)
@@ -5993,7 +6104,7 @@ let LIST_CACHE = {};
 /**
  * Load and cache the species ID inclusion list for a given location and week and merge it into STATE.included.
  *
- * Requests an inclusion list from the list worker using the current model, labels, list settings and the provided
+ * Requests an inclusion list from the list worker using the current model, labels, list settings, selected taxonomic classes, and the provided
  * latitude/longitude/week (falling back to STATE values), caches the in-flight request to avoid duplicate calls,
  * merges the returned IDs into STATE.included, and emits warnings for any unrecognized labels reported by the worker.
  *
@@ -6025,6 +6136,7 @@ async function setIncludedIDs(lat, lon, week) {
       useWeek,
       localBirdsOnly,
       threshold,
+      classes: STATE.detect.classes,
     });
     // // Add the *label* id of "Unknown Sp." to all lists
     STATE.list !== "everything" 

@@ -279,7 +279,7 @@ const GLOBAL_ACTIONS = {
   F1: () => document.getElementById("navbarSettings").click(),
   F4: () =>  STATE.fileLoaded && (spec.wavesurfer && (config.FFT = spec.increaseFFT())),
   F5: () =>  STATE.fileLoaded && (spec.wavesurfer && (config.FFT = spec.reduceFFT())),
-  " ": (e) => { STATE.fileLoaded  && WSPlayPause()},
+  " ": async (e) => { STATE.fileLoaded  && await WSPlayPause()},
   Tab: (e) => {
     if ((e.metaKey || e.ctrlKey) && !PREDICTING && STATE.diskHasRecords) {
       // If you did this when predicting, your results would go straight to the archive
@@ -305,40 +305,10 @@ const GLOBAL_ACTIONS = {
 };
 
 /**
- * Returns a promise that resolves when the Wavesurfer instance is ready.
- *
- * Use this to ensure audio waveform rendering and related operations only proceed after initialization is complete.
- * 
- * @returns {Promise<void>} Resolves when the Wavesurfer instance emits the 'ready' event.
- */
-function waitForWavesurferReady() {
-  return new Promise(resolve => {
-    const wavesurfer = spec.wavesurfer;
-    if (wavesurfer.isReady) {
-      resolve();
-    } else {
-      const onReady = () => { 
-        wavesurfer.un('ready', onReady);
-        resolve();
-      };
-      wavesurfer.on('ready', onReady);
-    }
-  });
-}
-
-/**
  * Helper function to ensure play promise has resolved before calling ws.pause().
  * A workaround for https://github.com/katspaugh/wavesurfer.js/issues/4047
  */
-function WSPlayPause(){
-  waitForWavesurferReady().then(() => {
-    if (spec.wavesurfer.isPlaying() ){
-      spec.wavesurfer.once('audioprocess', () => spec.wavesurfer.pause() )
-    } else {
-      spec.wavesurfer.play() 
-    }
-  })
-}
+const WSPlayPause = async () => await spec.wavesurfer?.playPause();
 
 //Open Files from OS "open with"
 let OS_FILE_QUEUE = [];
@@ -2319,6 +2289,7 @@ const defaultConfig = {
   list: "birds",
   models: {
     birdnet: {displayName: 'BirdNET', backend: 'webgpu', list: 'birds', webgpu: {threads: 1, batchSize: 8}, tensorflow: {threads: null, batchSize: 8},  customListFile: ''},
+    birdnet3: {displayName: 'BirdNET+ (preview 3.1)', backend: 'webgpu', list: 'birds', webgpu: {threads: 1, batchSize: 8}, tensorflow: {threads: 2, batchSize: 8},  customListFile: '', windowSize: 3},
     chirpity: {displayName: 'Nocmig', backend: 'webgpu', list: 'birds', webgpu: {threads: 1, batchSize: 8}, tensorflow: {threads: null, batchSize: 8},  customListFile: ''},
     nocmig: {displayName: 'Nocmig V2 (Beta)', backend: 'webgpu', list: 'birds', webgpu: {threads: 1, batchSize: 8}, tensorflow: {threads: null, batchSize: 8},  customListFile: ''},
   },
@@ -2344,6 +2315,7 @@ const defaultConfig = {
     iucnScope: "Global",
     topRankin: 1,
     overlap: 0,
+    classes: ['Aves'],
   },
   filters: {
     active: false,
@@ -2377,6 +2349,12 @@ const defaultConfig = {
   keyAssignment: {},
 };
 let dirname, appPath, tempPath, systemLocale, isMac;
+
+/**
+ * Initialize application configuration, model workers, localization, and UI state after the window loads.
+ *
+ * @returns {Promise<void>} Resolves after startup wiring and initial UI rendering complete.
+ */
 window.onload = async () => {
 
   const [, , mac, paths] = await Promise.all([
@@ -2394,9 +2372,9 @@ window.onload = async () => {
   DOM.contentWrapper.classList.add("loaded");
 
   // Set default locale
-  systemLocale = systemLocale.replace("en-GB", "en_uk");
+  systemLocale = systemLocale.replace("en-GB", "en_GB");
   systemLocale =
-    systemLocale === "en_uk"
+    systemLocale === "en_GB"
       ? systemLocale
       : systemLocale.slice(0, 2).toLowerCase();
   if (STATE.translations.includes(systemLocale)) {
@@ -2418,8 +2396,9 @@ window.onload = async () => {
     config = JSON.parse(configFile);
     //fill in defaults - after updates add new items
     utils.syncConfig(config, defaultConfig);
+    // Migrate from old locale format if necessary
+    if (config.locale === "en_uk") config.locale = "en_GB";
   }
-
   const installDate = localStorage.getItem("installDate");
   const {appId, installedAt} = await window.electron.getInstallInfo(installDate);
   if (!installDate || ! isNaN(Number(installDate))) {
@@ -2482,9 +2461,18 @@ window.onload = async () => {
       modelPath = undefined;
     }
   }
+  if (config.selectedModel === 'birdnet3' && !isMember){
+    config.selectedModel = 'birdnet';
+  }
   const selectedModel = config.selectedModel;
+
+  // Set Local classes to include for BirdNET3
+  detect.classes.forEach(cls => {
+    const box = document.getElementById(cls);
+    if (box) box.checked = true 
+  });
+
   updateListOptions(selectedModel);
-  // debug && document.getElementById('dataset').classList.remove('d-none')
   isMember && updateModelOptions();
   
   worker.postMessage({
@@ -2529,7 +2517,8 @@ window.onload = async () => {
     threads,
     backend,
     list,
-    modelPath
+    modelPath,
+    windowSize: modelOptions.windowSize,
   });
 
   // set version
@@ -2557,7 +2546,7 @@ window.onload = async () => {
   // Localise UI
   i18n.localiseUI(DOM.locale.value).then((result) => (STATE.i18n = result));
   initialiseDatePicker(STATE, worker, config, resetResults, filterResults, generateToast);
-  STATE.picker.options.lang = DOM.locale.value.replace("_uk", "");
+  STATE.picker.options.lang = DOM.locale.value.replace("_GB", "");
 
   // remember audio notification setting
   DOM.audioNotification.checked = config.audio.notification;
@@ -2662,6 +2651,9 @@ window.onload = async () => {
   DOM.batchSizeSlider.max = Math.max(parseInt(160 / (24576 / GPU_RAM)), 32);
   DOM.threadSlider.value = config[config.models[config.selectedModel].backend].threads;
   DOM.numberOfThreads.textContent = DOM.threadSlider.value;
+  const windowSize = config.models['birdnet3'].windowSize;
+  DOM.windowSizeSlider.value = windowSize;
+  DOM.windowSizeValue.textContent = windowSize;
   DOM.defaultLat.value = config.latitude;
   DOM.defaultLon.value = config.longitude;
   place.innerHTML =
@@ -2732,7 +2724,9 @@ window.onload = async () => {
   pagination.init();
 };
 
-
+/**
+ * Attach the renderer's message listener after its worker channel is established.
+ */
 const setUpWorkerMessaging = () => {
   establishMessageChannel.then(() => {
     worker.addEventListener("message", async function (e) {
@@ -2895,10 +2889,7 @@ const setUpWorkerMessaging = () => {
         case "label-translation-needed": {
           // Called when the initial system locale isn't english
           let locale = args.locale;
-          let labelFile;
-          locale === "pt" && (locale = "pt_PT");
-          labelFile = p.join(dirname,`labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_${locale}.txt`);
-
+          const labelFile = getLabelFile();
           readLabels(labelFile);
           break;
         }
@@ -3059,6 +3050,17 @@ function removeOpenFile(file) {
 
   renderFilenamePanel();
 }
+
+/**
+ * Return the bundled multilingual BirdNET3 label CSV.
+ *
+ * @param {string} locale - Reserved for callers selecting a locale; the CSV contains all locales.
+ * @returns {string} Path to the bundled label CSV.
+ */
+
+const getLabelFile = () => {
+    return p.join(dirname, "BirdNET3/BirdNET3_geomodel_labels.csv");
+}
 /**
  * Display regions for detections that fall within the current spectrogram window.
  *
@@ -3195,8 +3197,15 @@ function getDateOfISOWeek(week, year) {
   return isoWeekStart;
 }
 
+/**
+ * Format an ISO week as a localized start-to-end date range.
+ *
+ * @param {number} week - ISO week number.
+ * @param {number} year - Year containing the ISO week.
+ * @returns {string|number} Localized range, or the original week when its date is invalid.
+ */
 function formatWeekRange(week, year) {
-  const locale = config.locale.replace("en_uk", "en-GB").replace('_', '-');
+  const locale = config.locale.replace("en_GB", "en-GB").replace('_', '-');
 
   const start = getDateOfISOWeek(week, year);
   if (isNaN(start.getTime())) return week;
@@ -3355,6 +3364,15 @@ function onChartData(args) {
   chartInstance = new Chart(chartCanvas, chartOptions);
 }
 
+/**
+ * Generate chart-axis labels for consecutive hours, days, or week numbers.
+ *
+ * @param {string} aggregation - Chart interval: `hour`, `day`, or `week`.
+ * @param {number} datapoints - Number of labels to generate.
+ * @param {number|string|Date} pointstart - Starting date for hour and day labels.
+ * @param {number} startX - First week number for week labels.
+ * @returns {Array<string|number>} Generated axis labels.
+ */
 function generateDateLabels(aggregation, datapoints, pointstart, startX) {
   const dateLabels = [];
   const startDate = new Date(pointstart);
@@ -3379,7 +3397,8 @@ function generateDateLabels(aggregation, datapoints, pointstart, startX) {
 function formatDate(date, aggregation) {
   const options = {};
   let formattedDate = "";
-  const locale = config.locale.replace("en_uk", "en-GB").replace('_', '-');
+  // Convert to BCP 47 language tag for Intl API (e.g., "en-US" instead of "en_US")
+  const locale = config.locale.replace('_', '-');
   if (aggregation === "week") {
     // Add 1 day to the startDate
     date.setHours(date.getDate() );
@@ -3549,12 +3568,17 @@ let spec = new ChirpityWS(
   GLOBAL_ACTIONS
 );
 
+/**
+ * Rebuild the available list-mode options for a model and persist a valid fallback when needed.
+ *
+ * @param {string} model - Model whose supported list modes should be displayed.
+ */
 const updateListOptions = (model) => {
   const select = document.getElementById('list-to-use');
   select.replaceChildren();
   let options;
   if (/perch/i.test(model)) {
-    options = ["birds", "Amphibia", "Insecta", "Mammalia", "Reptilia", "Animalia", "everything", "custom"]
+    options = ["location", "birds", "everything", "custom"]
   } else  {
     options = ["location", "nocturnal", "birds", "everything", "custom"];
   }
@@ -3572,16 +3596,16 @@ const updateListOptions = (model) => {
   }
 }
 
+/**
+ * Render the icon and tooltip for the configured species-list mode.
+ */
 const updateListIcon = () => {
   const LIST_MAP = i18n.get(i18n.LIST_MAP);
   const {list} = config;
   let node;
-  if (["custom", "Mammalia", "Insecta", "Animalia"].includes(list)) {
+  if (["custom"].includes(list)) {
     const iconName = {
-      custom: "fact_check",
-      Mammalia: "pets",
-      Insecta: "bug_report",
-      Animalia: "voice_over_off"
+      custom: "fact_check"
     }
     node = document.createElement("span");
     node.className = "material-symbols-outlined mt-1";
@@ -3589,7 +3613,7 @@ const updateListIcon = () => {
     node.style.height =  "1.6rem";
     node.textContent = iconName[list];
   } else {
-    if (!['location', 'birds', 'nocturnal', 'everything', 'Amphibia', "Reptilia"].includes(list)) return
+    if (!['location', 'birds', 'nocturnal', 'everything'].includes(list)) return
     node = document.createElement("img");
     node.className = "icon filter";
     node.setAttribute("src", `img/${list}.png`);
@@ -3604,12 +3628,23 @@ const updateListIcon = () => {
   DOM.listIcon.replaceChildren(node);
 };
 
+/**
+ * Render the selected model's logo, including the BirdNET3 preview badge.
+ *
+ * @param {string} model - Configured model identifier.
+ */
 const updateModelIcon = (model) => {
   let title;
+  let showVersion3 = false;
   switch (model) {
     case 'birdnet':
       title = "BirdNET";
       break;
+    case 'birdnet3':
+      title = "BirdNET+ (preview 3.1)";
+      model = 'birdnet';
+      showVersion3 = true;
+      break;      
     case 'chirpity':
       title = "Nocmig";
       break;
@@ -3636,21 +3671,29 @@ const updateModelIcon = (model) => {
   img.setAttribute("alt", title);
   img.setAttribute("title", title);
   DOM.modelIcon.replaceChildren(img); // Clear existing content
+  if (showVersion3) {
+    const badge = document.createElement("span");
+    badge.className = "position-absolute top-0 start-0 ms-2 mt-1 translate-middle badge rounded-pill";
+    badge.textContent = "+";
+    DOM.modelIcon.appendChild(badge);
+  }
 }
 
-DOM.listIcon.addEventListener("click", () => {
+DOM.listIcon.addEventListener("click", (e) => {
+  e.stopPropagation();
   if (PREDICTING) {
     generateToast({ message: "changeListBlocked", type: "warning" });
     return;
   }
   const model = config.selectedModel;
-  const keys = model !== 'perch v2' ? ["location", "nocturnal", "birds", "everything", "custom"] : ["birds", "Amphibia", "Insecta", "Mammalia", "Reptilia", "Animalia", "everything", "custom"];
+  const keys = model !== 'perch v2' ? ["location", "nocturnal", "birds", "everything", "custom"] : ["location", "birds", "everything", "custom"];
   const currentListIndex = keys.indexOf(config.list);
   const next = currentListIndex === keys.length - 1 ? 0 : currentListIndex + 1;
   config.list = keys[next];
   config.models[model].list = keys[next];
   updatePrefs("config.json", config);
   updateList();
+  setClassesUIState();
 });
 
 DOM.customListSelector.addEventListener("click", async () => {
@@ -3671,6 +3714,9 @@ DOM.customListSelector.addEventListener("click", async () => {
   }
 });
 
+/**
+ * Request that the analysis worker load the currently configured model.
+ */
 const loadModel = () => {
   PREDICTING = false;
   t0_warmup = Date.now();
@@ -3684,7 +3730,8 @@ const loadModel = () => {
     warmup,
     threads: config[backend].threads,
     backend,
-    modelPath
+    modelPath,
+    windowSize: config.models[selectedModel].windowSize,
   });
 };
 
@@ -3705,6 +3752,11 @@ const handleModelChange = async (model, reload = true) => {
   updateListIcon();
 }
 
+/**
+ * Apply a backend selection, refresh its controls, persist it, and reload the model.
+ *
+ * @param {string|Event} backend - Backend name or change event carrying the name.
+ */
 const handleBackendChange = (backend) => {
   backend = backend instanceof Event ? backend.target.value : backend;
   config.models[config.selectedModel].backend = backend;
@@ -3727,7 +3779,9 @@ const handleBackendChange = (backend) => {
   DOM.numberOfThreads.textContent = threads;
   DOM.batchSizeSlider.value = batchSize;
   DOM.batchSizeValue.textContent = batchSize;
+  updateThreadsSlider();
   updatePrefs("config.json", config);
+  modelSettingsDisplay();
   loadModel();
 };
 
@@ -3770,7 +3824,7 @@ const timelineToggle = (fromKeys) => {
 /**
  * Updates the currently selected record using a key assignment or sets the call count with a modifier key.
  *
- * If a key assignment exists for the pressed key, updates the corresponding field (species, label, or comment) in the active row and inserts the modified record. If Ctrl or Cmd is held, sets the call count to the key's numeric value (for members only). Does nothing if no row is selected.
+ * For members, a configured key updates the corresponding species, label, or comment; Ctrl or Cmd plus a number updates the call count. Does nothing when no row is selected or the user is not a member.
  *
  * @param {KeyboardEvent} e - The keyboard event triggering the update.
  */
@@ -3788,14 +3842,14 @@ function recordUpdate(e) {
     if (setCallCount && STATE.isMember){
       // Ctrl/Cmd + number to set call count
       newCallCount = Number(key);
-    } else {
+    } else if (assignment  && STATE.isMember) {
       const {column, value} = assignment;
       // If we set a new species, we want to give the record a 2000 confidence
       newName = column === "species" ? value : null;
       newConfidence = column === "species" ? 2000 : null;
       newLabel = column === "label" ? value : null;
       newComment = column === "comment" ? value : null;
-    }
+    } else { return }
     // Save record for undo
     const {species, start, end,  label, callCount, 
       comment, confidence, file, modelID
@@ -3818,6 +3872,12 @@ function recordUpdate(e) {
   }
 }
 
+/**
+ * Enable or disable settings that cannot change during analysis.
+ *
+ * @param {boolean} bool - Whether to disable the settings.
+ * @throws {Error} If a required control is absent from the DOM cache.
+ */
 function disableSettingsDuringAnalysis(bool) {
   const elements = [
     "modelToUse",
@@ -3832,7 +3892,8 @@ function disableSettingsDuringAnalysis(bool) {
     "contextAware",
     "sendFilteredAudio",
     "databaseLocationSelect",
-    "clearDatabaseLocation"
+    "clearDatabaseLocation",
+    "windowSizeSlider",
   ];
   elements.forEach((el) => {
     if (DOM[el]) DOM[el].disabled = bool;
@@ -4210,9 +4271,7 @@ const updateSummary = ({ summary = [], filterSpecies = "" }) => {
     summaryHTML += `<tr tabindex="-1" class="${selected}">
                 <td class="max">${iconizeScore(item.max)}</td>
                     <td class="cname not-allowed">
-                        <span class="cname">${item.cname}</span> <br><i>${
-      item.sname
-    }</i>
+        <span class="cname">${item.cname}</span> <br><i>${item.sname}</i>
                     </td>`;
 
     if (showIUCN) {
@@ -4253,10 +4312,7 @@ const updateSummary = ({ summary = [], filterSpecies = "" }) => {
   Array.from(tempDiv.childNodes).forEach((node) => fragment.appendChild(node));
 
   // Replace the contents of the #summaryTable
-  old_summary.replaceChildren(); // Clear existing children
-
-  old_summary.appendChild(fragment);
-
+  old_summary.replaceChildren(fragment); // Replace existing content
   showSummarySortIcon();
   setAutocomplete(selectedRow ? filterSpecies : "");
 
@@ -4325,7 +4381,7 @@ function onResultsComplete({ active = undefined, select = undefined } = {}) {
   }
 
   if (activeRow) {
-    utils.waitFor(() => STATE.fileLoaded).then(() => activeRow.click());
+    utils.waitFor(() => STATE.fileLoaded).then(() => activeRow?.click());
   }
   renderFilenamePanel();
   activateResultSort();
@@ -4561,11 +4617,16 @@ async function renderResult({
       callCount,
       isDaylight,
       reviewed,
-      model,
       modelID
     } = result;
-
+    let model = result.model;
     const isBatpack = /batpack/i.test(model ?? "");
+    const isBN3 = model === "birdnet3";
+    let bn3Badge = '';
+    if (isBN3) {
+      model = model.slice(0, -1);
+      bn3Badge = '<span class="position-absolute top-0 start-100 translate-middle badge rounded-pill text-dark fs-5 p-0">+</span>';
+    }
     const logo = isBatpack
       ? "batpack"
       : ['birdnet', 'nocmig', 'chirpity', 'perch', 'nighthawk', 'user'].includes(model)
@@ -4629,7 +4690,7 @@ async function renderResult({
             <td class="label ${hide}">${labelHTML}</td>
             <td class="comment text-end ${hide}">${commentHTML}</td>
             <td class="reviewed text-end ${hide}">${reviewHTML}</td>
-            <td class="text-end"><img class="model-logo" src="img/icon/${logo}_logo.png" title="${modelName}" alt="${modelName}"></td>
+            <td class="text-end"><span class="position-relative me-1"><img class="model-logo" src="img/icon/${logo}_logo.png" title="${modelName}" alt="${modelName}">${bn3Badge}</span></td>
             </tr>`;
   }
   updateResultTable(tr, isFromDB, selection);
@@ -4973,13 +5034,27 @@ function replaceCtrlWithCommand() {
   }
 }
 
+/**
+ * Render and show the included/excluded species modal for the active list.
+ *
+ * The modal records `included` for later export and filters the visible tab as
+ * the user types in its search field.
+ *
+ * @param {Object} options - Species-list details.
+ * @param {Object[]} options.included - Included species displayed and retained for export.
+ * @param {Object[]} [options.excluded] - Excluded species, if that tab is available.
+ * @param {string} [options.place] - Location name used in the list explanation.
+ * @returns {Promise<void>} Resolves after the modal is displayed.
+ */
 const populateSpeciesModal = async ({included, excluded, place}) => {
   const i18 = i18n.get(i18n.SpeciesList);
+  const headings = i18n.get(i18n.Headings);
+  i18.search = headings.search;
   const current_file_text =
     STATE.week !== -1 && STATE.week
       ? utils.interpolate(i18.week, { week: STATE.week })
       : "";
-  const model = config.models[config.selectedModel].displayName;
+  let model = config.models[config.selectedModel].displayName;
   const localBirdsOnly =
     config.local && config.selectedModel === "birdnet" && config.list === "nocturnal"
       ? i18.localBirds
@@ -4999,6 +5074,10 @@ const populateSpeciesModal = async ({included, excluded, place}) => {
     });
   }
   const includedList = generateBirdIDList(included);
+  const internalModel = config.selectedModel;
+  const classes = ["birdnet3","perch v2"].includes(internalModel) ? config.detect.classes.join(', ') : "";
+  const classesText = ["birdnet3","perch v2"].includes(internalModel) && ["nocturnal", "location", "birds"].includes(config.list) 
+    ? utils.interpolate(i18.classesText, { classes: classes }) : "";
   const depending =
     config.useWeek &&
     config.list === "location" &&
@@ -5011,13 +5090,13 @@ const populateSpeciesModal = async ({included, excluded, place}) => {
     listInUse: listLabel,
     location_filter_text: location_filter_text,
     localBirdsOnly: localBirdsOnly,
+    classesText,
     upTo: i18.upTo,
     count: included.length,
     depending: depending,
     includedList: includedList,
   });
-  let excludedContent = "",
-    disable = "";
+  let excludedContent = "", disable = "";
   if (excluded) {
     const excludedList = generateBirdIDList(excluded);
 
@@ -5030,21 +5109,82 @@ const populateSpeciesModal = async ({included, excluded, place}) => {
   } else {
     disable = " disabled";
   }
-  let modalContent = `
+let modalContent = `
+    <div class="d-flex align-items-start justify-content-between">
         <ul class="nav nav-tabs" id="myTab" role="tablist">
-        <li class="nav-item" role="presentation">
-        <button class="nav-link active" id="included-tab" data-bs-toggle="tab" data-bs-target="#included-tab-pane" type="button" role="tab" aria-controls="included-tab-pane" aria-selected="true">${i18.includedButton}</button>
-        </li>
-        <li class="nav-item" role="presentation">
-        <button class="nav-link" id="excluded-tab" data-bs-toggle="tab" data-bs-target="#excluded-tab-pane" type="button" role="tab" aria-controls="excluded-tab-pane" aria-selected="false" ${disable}>${i18.excludedButton}</button>
-        </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active"
+                    id="included-tab"
+                    data-bs-toggle="tab"
+                    data-bs-target="#included-tab-pane"
+                    type="button"
+                    role="tab"
+                    aria-controls="included-tab-pane"
+                    aria-selected="true">
+                    ${i18.includedButton}
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link"
+                    id="excluded-tab"
+                    data-bs-toggle="tab"
+                    data-bs-target="#excluded-tab-pane"
+                    type="button"
+                    role="tab"
+                    aria-controls="excluded-tab-pane"
+                    aria-selected="false"
+                    ${disable}>
+                    ${i18.excludedButton}
+                </button>
+            </li>
         </ul>
-        <div class="tab-content" id="myTabContent">
-        <div class="tab-pane fade show active" id="included-tab-pane" role="tabpanel" aria-labelledby="included-tab" tabindex="0" style="max-height: 50vh;overflow: auto">${includedContent}</div>
-        <div class="tab-pane fade" id="excluded-tab-pane" role="tabpanel" aria-labelledby="excluded-tab" tabindex="0" style="max-height: 50vh;overflow: auto">${excludedContent}</div>
+
+        <div class="input-group ms-3 me-3" style="width: 250px;">
+            <input type="search"
+                id="species-search"
+                class="form-control"
+                placeholder="&#x1F50E; ${i18.search}"
+                aria-label="Search species">
         </div>
-        `;
-  document.getElementById("speciesModalBody").innerHTML = modalContent;
+    </div>
+
+    <div class="tab-content" id="included-tabs">
+        <div class="tab-pane fade show active"
+            id="included-tab-pane"
+            role="tabpanel"
+            aria-labelledby="included-tab"
+            tabindex="0"
+            style="max-height: 50vh; overflow: auto">
+            ${includedContent}
+        </div>
+
+        <div class="tab-pane fade"
+            id="excluded-tab-pane"
+            role="tabpanel"
+            aria-labelledby="excluded-tab"
+            tabindex="0"
+            style="max-height: 50vh; overflow: auto">
+            ${excludedContent}
+        </div>
+    </div>
+`;
+
+document.getElementById("speciesModalBody").innerHTML = modalContent;
+
+document.getElementById("species-search").addEventListener("input", (event) => {
+    const search = event.target.value.trim().toLowerCase();
+
+    const activePane = document.querySelector("#included-tabs .tab-pane.active");
+
+    if (!activePane) return;
+
+    activePane.querySelectorAll("tbody>tr").forEach((item) => {
+        item.classList.toggle(
+            "d-none",
+            search && !item.textContent.toLowerCase().includes(search)
+        );
+    });
+});
   document.getElementById("speciesModalLabel").textContent = i18.title;
   const species = new bootstrap.Modal(document.getElementById("speciesModal"));
   species.show();
@@ -5132,7 +5272,7 @@ const changeNocmigMode = () => {
  * and range parameters. The filtering is applied only if the analysis has been completed.
  *
  * @param {Object} [options={}] - Filter configuration options.
- * @param {*} [options.species=isSpeciesViewFiltered(true)] - Criteria for filtering by species.
+ * @param {*} [options.species] - Species criterion. When omitted, the current species view is used; an explicitly supplied `undefined` is preserved.
  * @param {boolean} [options.updateSummary=true] - Flag indicating whether to update the summary after filtering.
  * @param {number} [options.offset] - Optional starting index for pagination.
  * @param {number} [options.limit=500] - Maximum number of results to process.
@@ -5160,14 +5300,25 @@ function filterResults({
     });
 }
 
+/**
+ * Disable thread selection for ONNX models using WebGPU.
+ */
+const updateThreadsSlider = () => {
+  const isOnnx = ['perch v2', 'birdnet3'].includes(config.selectedModel);
+  const isGPU = config.models[config.selectedModel].backend === 'webgpu';
+  DOM.threadSlider.disabled = isOnnx && isGPU;
+}
+
+/**
+ * Update model-specific settings visibility and availability for the active platform and backend.
+ */
 const modelSettingsDisplay = () => {
   // Sets system options according to model or machine capabilities
   // cf. setListUIState
   const chirpityOnly = document.querySelectorAll(
     ".chirpity-only, .chirpity-only-visible"
   );
-  const noMac = document.querySelectorAll(".no-mac");
-  const nodeOnly = document.querySelectorAll(".node-only");
+  const notOnnx = document.querySelectorAll(".not-onnx-gpu");
   if (!['chirpity', 'nocmig'].includes(config.selectedModel)) {
     // hide chirpity-only features
     chirpityOnly.forEach((element) => {
@@ -5188,6 +5339,7 @@ const modelSettingsDisplay = () => {
   }
   // Nighthawk
   const notNighthawk = document.querySelectorAll(".not-nh");
+
   if (config.selectedModel === 'nighthawk'){
     notNighthawk.forEach((element) => {
       element.classList.add("d-none");
@@ -5205,19 +5357,32 @@ const modelSettingsDisplay = () => {
       element.classList.remove("d-none");
     });
   }
+  // Hide threads slider for Onnx models
+  const model = config.selectedModel;
+  const backend = config.models[model].backend;
+  const onnxGPU = ['birdnet3', 'perch v2'].includes(model) && backend === 'webgpu';
+  notOnnx.forEach((element) => element.classList.toggle("d-none", onnxGPU));
 
+  const noMac = document.querySelectorAll(".no-mac");
   isMac && noMac.forEach((element) => element.classList.add("d-none"));
-  if (config.hasNode) {
-    nodeOnly.forEach((element) => element.classList.remove("d-none"));
-  } else {
-    nodeOnly.forEach((element) => element.classList.add("d-none"));
-  }
+  const nodeOnly = document.querySelectorAll(".node-only");
+  nodeOnly.forEach((element) => element.classList.toggle("d-none", !config.hasNode));
   // Hide train unless BirdNET (and a member)
   const blockTrain = config.selectedModel !== 'birdnet' || ! STATE.isMember;
   DOM.trainNav.classList.toggle('disabled', blockTrain);
-  const isPerch = config.selectedModel === 'perch v2';
-  DOM.threadSlider.disabled = isPerch;
+  updateThreadsSlider();
+  DOM.windowSize.classList.toggle('d-none', config.selectedModel !== 'birdnet3');
+  setClassesUIState();
 };
+
+/**
+ * Show taxonomic-class filters only for supported model and list combinations.
+ */
+const setClassesUIState = () => {
+  const showClasses = ["birdnet3", "perch v2"].includes(config.selectedModel) 
+    && ["location", "birds"].includes(config.list);
+  DOM.classes.classList.toggle('d-none', !showClasses);
+}
 
 const contextAwareIconDisplay = () => {
   const i18 = i18n.get(i18n.Titles);
@@ -5262,7 +5427,7 @@ diagnosticMenu.addEventListener("click", async function () {
   const backend = config.models[config.selectedModel].backend;
   DIAGNOSTICS["Model"] =
     DOM.modelToUse.options[DOM.modelToUse.selectedIndex].text;
-  DIAGNOSTICS["Backend"] = backend;
+  DIAGNOSTICS["Backend"] = backend.replace('tensorflow', 'CPU');
   DIAGNOSTICS["Batch size"] = config[backend].batchSize;
   DIAGNOSTICS["Threads"] = config[backend].threads;
   DIAGNOSTICS["Context"] = config.detect.contextAware;
@@ -5766,6 +5931,10 @@ document.addEventListener('input', (e) =>{
       DOM.numberOfThreads.textContent = DOM.threadSlider.value;
       break;
     }
+    case "window-size-slider": {
+      DOM.windowSizeValue.textContent = DOM.windowSizeSlider.value;
+      break;
+    }    
     case "gain": {
       DOM.gainAdjustment.textContent = DOM.gain.value + "dB";
       break;
@@ -6164,12 +6333,11 @@ async function handleUIClicks(e) {
         }
       }
       if (modelType === 'append'){
-        function findDuplicateLines(labelFile) {
-          const labels = new Set(fs.readFileSync(labelFile, 'utf8').split('\n').map(l => l.trim()));
+        function findDuplicateLines() {
+          const labels = new Set(LABELS.map(l => l.replace(',', '_')));
           return folders.filter(f => labels.has(f) && f !== '');
         }
-        const labelFile = p.join(dirname,`labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_${config.locale}.txt`)
-        const duplicates = findDuplicateLines(labelFile);
+        const duplicates = findDuplicateLines();
         if (duplicates.length){
           generateToast({message:`There are audio folders which have the same name as BirdNET labels. 
             When appending labels, the new labels must be unique:<br>
@@ -6361,7 +6529,7 @@ async function handleUIClicks(e) {
     // XC compare play/pause
     case "playComparison": {
       config.selectedModel.includes("batpack") && ws.setPlaybackRate(0.1, false);
-      ws.playPause();
+      await ws.playPause();
       break;
     }
     // Modal forms
@@ -6633,7 +6801,7 @@ async function handleUIClicks(e) {
       break;
     }
     case "playToggle": {
-      if (spec.wavesurfer) WSPlayPause();
+      if (spec.wavesurfer) await WSPlayPause();
         break;      
     }
     case "setCustomLocation": { setCustomLocation(false); break }
@@ -6718,7 +6886,7 @@ function showDBLocation(location) {
 /**
  * Updates the species list UI and synchronizes the active list with the worker.
  *
- * If a custom list is selected, loads labels from the specified custom list file. Otherwise, notifies the worker to update the list and optionally refresh results based on analysis state.
+ * If a custom list is selected, loads labels from the specified custom list file. Otherwise, notifies the worker of the list and selected taxonomic classes, and optionally refreshes results based on analysis state.
  */
 async function updateList() {
   updateListIcon();
@@ -6730,6 +6898,7 @@ async function updateList() {
     worker.postMessage({
       action: "update-list",
       list: config.list,
+      classes: config.detect.classes,
       refreshResults: STATE.analysisDone && STATE.mode !== 'chart',
     });
   }
@@ -7010,6 +7179,23 @@ document.addEventListener("change", async function (e) {
           config.list = element.value;
           config.models[config.selectedModel].list = element.value;
           updateList();
+          setClassesUIState();
+          break;
+        }
+        case "Aves":
+        case "Amphibia":
+        case "Insecta":
+        case "Mammalia":
+        case "Reptilia": {
+          const includedClasses = ["Aves", "Amphibia", "Insecta", "Mammalia", "Reptilia"]
+            .filter(cls => document.getElementById(cls)?.checked);
+
+          if (includedClasses.length === 0) {
+            document.getElementById("Aves").checked = true;
+            includedClasses.push("Aves");
+            }
+          config.detect.classes = includedClasses;
+          updateList();
           break;
         }
         case "locale": {
@@ -7021,7 +7207,7 @@ document.addEventListener("change", async function (e) {
               return;
             }
           } else {
-            labelFile = p.join(dirname,`labels/V2.4/BirdNET_GLOBAL_6K_V2.4_Labels_${element.value}.txt`);
+            labelFile = getLabelFile();
             i18n
               .localiseUI(DOM.locale.value)
               .then((result) => (STATE.i18n = result));
@@ -7062,6 +7248,17 @@ document.addEventListener("change", async function (e) {
           });
           break;
         }
+        case "window-size-slider": {
+          // change window size
+          DOM.windowSizeValue.textContent = DOM.windowSizeSlider.value;
+          const windowSize = DOM.windowSizeSlider.valueAsNumber;
+          config.models['birdnet3'].windowSize = windowSize;
+          worker.postMessage({
+            action: "change-window-size",
+            windowSize,
+          });
+          break;
+        }        
         case "batch-size": {
           DOM.batchSizeValue.textContent = DOM.batchSizeSlider.value;
           // get backend
@@ -7453,7 +7650,7 @@ async function createContextMenu(e) {
     const region = spec.checkForRegion(e, true);
     if (!region)  return
       // If we let the playback continue, the region may get wiped
-    if (spec.wavesurfer?.isPlaying()) WSPlayPause();
+    if (spec.wavesurfer?.isPlaying()) await WSPlayPause();
   }
   const i18 = i18n.get(i18n.Context);
   const target = e.target;
@@ -8977,6 +9174,14 @@ document.addEventListener("filter-labels", (e) => {
 });
 
 
+/**
+ * Rebuild a model selector from configuration.
+ *
+ * Custom-only selectors exclude bundled models. The main selector includes all
+ * models but disables BirdNET3 for non-members.
+ *
+ * @param {boolean} customOnly - Whether to populate only custom models.
+ */
 function updateModelOptions(customOnly){
   const formElement = customOnly ? 'custom-models' : 'model-to-use';
   const select = document.getElementById(formElement);
@@ -8985,12 +9190,13 @@ function updateModelOptions(customOnly){
   // Add options
   const modelOptions = customOnly 
     ? Object.fromEntries(Object.entries(config.models)
-    .filter(([model, _]) => !['nocmig', 'chirpity','birdnet'].includes(model)))
+    .filter(([model, _]) => !['nocmig', 'chirpity','birdnet', 'birdnet3'].includes(model)))
     : config.models;
   // Add new options from the object
   for (const [model, opt] of Object.entries(modelOptions)) {
     const option = document.createElement('option');
     option.value = model;
+    option.disabled = model === 'birdnet3' && !STATE.isMember; // Disable birdnet3 if not a member
     option.textContent = opt.displayName;
     select.appendChild(option);
   }

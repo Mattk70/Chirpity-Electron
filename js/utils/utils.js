@@ -50,7 +50,8 @@ function normaliseModels(models = {}, defaultModels = {}) {
  * Aligns a configuration object to the shape and keys of a default configuration.
  *
  * Mutates `config` in place by removing keys not present in `defaultConfig` and ensuring
- * every key in `defaultConfig` exists in `config`. When both values for a key are objects,
+ * every key in `defaultConfig` exists in `config`. Arrays are merged with the default
+ * values first and duplicates removed. When both values for a key are objects,
  * the function recurses to synchronize nested keys except for the `"keyAssignment"` key,
  * which is left unchanged. The `"models"` key is handled by calling `normaliseModels` to
  * merge per-model defaults instead of performing a recursive merge.
@@ -71,14 +72,23 @@ function syncConfig(config, defaultConfig) {
     if (!(key in config)) {
       config[key] = defaultConfig[key];
     } else if (
+      Array.isArray(config[key]) &&
+      Array.isArray(defaultConfig[key])
+    ) {
+      // detect.classes is a replaceable setting; other arrays are additive.
+      config[key] = key === "classes"
+        ? [...config[key]]
+        : [...new Set([...defaultConfig[key], ...config[key]])];
+    } else if (
       typeof config[key] === "object" &&
-      typeof defaultConfig[key] === "object" && 
-      // Allow unknown models keys
+      typeof defaultConfig[key] === "object" &&
+      config[key] !== null &&
+      defaultConfig[key] !== null &&
       key !== 'models'
     ) {
       // Recursively sync nested objects (but allow key assignment to be empty)
       key === "keyAssignment" || syncConfig(config[key], defaultConfig[key]);
-    } else if (key === 'models'){
+    } else if (key === 'models') {
       config[key] = normaliseModels(config[key], defaultConfig[key]);
     }
   });

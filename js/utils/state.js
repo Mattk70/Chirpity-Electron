@@ -4,6 +4,9 @@
 const sqlite3 = require("sqlite3");
 export class WorkerState {
 
+  /**
+   * Initialize worker state with analysis, filtering, model, and UI defaults.
+   */
   constructor() {
     (this.db = null),
     (this.mode = "analyse"), // archive, explore, chart
@@ -50,7 +53,8 @@ export class WorkerState {
       topRankin: 1,
       overlap: 0,
       mergeOverlaps: false,
-      dropSingles: false
+      dropSingles: false,
+      classes: ['Aves'],
     }),
     (this.chart = {
       range: { start: undefined, end: undefined },

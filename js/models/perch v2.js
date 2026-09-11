@@ -15,6 +15,14 @@ const numClasses = 14795;
 const DEBUG = false;
 let modelPath;
 
+/**
+ * Create the shared Perch inference session for a backend and fixed batch size.
+ *
+ * @param {string} mpath - Directory containing `perch_v2.onnx`.
+ * @param {string} backend - `webgpu` to prefer WebGPU, or another value to use CPU only.
+ * @param {number} batchSize - Fixed batch dimension supplied to ONNX Runtime.
+ * @returns {Promise<void>} Resolves when the session is ready.
+ */
 async function loadModel(mpath, backend, batchSize) {
   const gpu = backend === 'webgpu';
   const providers = gpu ? ['webgpu', 'cpu'] : ['cpu'];
@@ -25,8 +33,8 @@ async function loadModel(mpath, backend, batchSize) {
     'spatial_embedding': 'gpu-buffer',   // keep other outputs on GPU buffer to save copying effort
     'spectrogram': 'gpu-buffer'
   }
-  const threadOptions = gpu ? { intraOpNumThreads:1, interOpNumThreads: 1 } : {};
- const executionProviderConfig = gpu ? { webgpu: {  validationMode: 'disabled' } } : {};
+  const threadOptions = { intraOpNumThreads:4, interOpNumThreads: 1 };
+ const executionProviderConfig = gpu ? { webgpu: {  validationMode: 'basic' } } : {};
   const sessionOptions = { 
     executionProviders: providers,
     enableGraphCapture: true, 
@@ -36,6 +44,7 @@ async function loadModel(mpath, backend, batchSize) {
     enableCpuMemArena: true,
     freeDimensionOverrides,
     preferredOutputLocation,
+    logSeverityLevel: DEBUG ? 0 : 3,
   };
   const modelPath = path.join(mpath, 'perch_v2.onnx')
   session = await ort.InferenceSession.create(modelPath, sessionOptions);
@@ -59,7 +68,6 @@ onmessage = async (e) => {
           session = null;
         }
     
-        await loadModel(modelPath, backend, batchSize);
         break;
       }
       case "change-threads": {

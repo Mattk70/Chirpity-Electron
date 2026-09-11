@@ -394,7 +394,20 @@ const createDB = async ({file, diskDB, dbMutex}) => {
   return db;
 };
 
-
+/**
+ * Add a model and its labels to a database in one transaction.
+ *
+ * Built-in models load their bundled labels; custom models use
+ * `labelsLocation`. Invalid labels or database failures are rolled back and
+ * returned as the error object instead of being thrown.
+ *
+ * @param {Object} options - Model registration options.
+ * @param {string} options.model - Model name stored in the database.
+ * @param {Object} [options.db=diskDB] - Database that receives the model and species rows.
+ * @param {Object} options.dbMutex - Mutex used to serialize the transaction.
+ * @param {string} [options.labelsLocation] - Label file for a custom model.
+ * @returns {Promise<number|Error>} The new model ID, or the transaction error.
+ */
 const addNewModel = async ({model, db = diskDB, dbMutex, labelsLocation}) => {
   let modelID;
   try {
@@ -412,22 +425,35 @@ const addNewModel = async ({model, db = diskDB, dbMutex, labelsLocation}) => {
          "BirdNET_GLOBAL_6K_V2.4_Labels_en.txt");
         const fileContents = readFileSync(labelFile, "utf8");
           labels = fileContents.trim().split(/\r?\n/);
+    } else if (model === "birdnet3") {
+      const labelFile = path.join(__dirname, "BirdNET3",
+         "BirdNET3_geomodel_labels.csv");
+      const fileContents = readFileSync(labelFile, "utf8");
+      labels = fileContents
+              .trim()
+              .split(/\r?\n/)
+              .slice(1) // skip header
+              .map(line => {
+                const [sci_name, com_name, class_name] = line.split(",");
+                return `${sci_name}_${com_name}_${class_name}`;
+              });
     } else if (['chirpity', 'nocmig'].includes(model)){
       labels = JSON.parse(
         readFileSync(path.join(__dirname, `${model}_model_config.json`), "utf8")
       ).labels;
     } else {
       // Custom model
-      const labelFile = labelsLocation
+      const labelFile = labelsLocation;
       const fileContents = readFileSync(labelFile, "utf8");
       // Trim whitespace and split by new lines, ignoring empty lines
       labels = fileContents.split(/\r?\n/).map(line => line.trim()).filter(line => line.length);
     }
     const perch = model === 'perch v2';
+    const birdNET3 = model === 'birdnet3';
     const splitChar = perch ? '~' : '_'; // Perch uses ~, others use _
-    const expectedParts = perch ? 3 : 2; // Perch labels include Taxon
+    const expectedParts = perch || birdNET3 ? 3 : 2; // Perch labels include Taxon
     // Add Unknown Sp.
-    if (perch) labels.push(`Unknown Sp.${splitChar}Unknown Sp.${splitChar}None`);
+    if (perch || birdNET3) labels.push(`Unknown Sp.${splitChar}Unknown Sp.${splitChar}None`);
     else labels.push(`Unknown Sp.${splitChar}Unknown Sp.`);
 
     // Insert labels in batches to avoid exceeding SQLite parameter limits
