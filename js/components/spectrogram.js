@@ -222,7 +222,7 @@ export class ChirpityWS {
     this.undblclick = wavesurfer.on("dblclick", this.centreSpec);
     this.unclick = wavesurfer.on("click", () => this.REGIONS.clearRegions());
     this.unpause = wavesurfer.on("pause", this.pauseActions);
-    wavesurfer.on('decode', () => this.spectrogram.render());
+    this.undecode = wavesurfer.on('decode', () => this.spectrogram.render());
     
     this.unplay = wavesurfer.on("play", () => {
       if (config.selectedModel.includes('batpack')) {
@@ -232,9 +232,6 @@ export class ChirpityWS {
     });
 
     this.unfinish = wavesurfer.on("finish", () => {
-      const now = new Date().getTime();
-      if (now - this.finishTime < 20 ) return;
-      this.finishTime = now;
       const {windowLength, windowOffsetSecs, currentFile, currentFileDuration, openFiles} = STATE;
       const bufferEnd = windowOffsetSecs + windowLength;
       if (currentFileDuration > bufferEnd) {
@@ -257,14 +254,15 @@ export class ChirpityWS {
       }
     });
 
-    wavesurfer.on('destroy', () =>{
-      this.unload;
-      this.unready;
-      this.undblclick;
-      this.unclick;
-      this.unpause;
-      this.unplay;
-      this.unfinish;
+    wavesurfer.once('destroy', () =>{
+      this.unload();
+      this.unready();
+      this.undblclick();
+      this.unclick();
+      this.unpause();
+      this.unplay();
+      this.unfinish();
+      this.undecode();
     })
     // Show controls
     showElement(["controlsWrapper"]);
@@ -353,6 +351,7 @@ export class ChirpityWS {
       frequencyMax: scaledFrequencyMax,
       // noverlap: 128, Auto (the default) seems fine
       // gainDB: 50, Adjusts spec brightness without increasing volume
+      rendering: "windowed",
       labels: config.specLabels,
       labelsColor: this.wsTextColour(),
       labelsBackground: "rgba(0,0,0,0)",
