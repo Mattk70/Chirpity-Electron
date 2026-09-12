@@ -180,7 +180,7 @@ export class ChirpityWS {
         container: '#waveform',
         cursorColor: this.wsTextColour(config),
         cursorWidth: 2,
-        minPxPerSec: 10,
+        minPxPerSec: 2,
         height: 1,
         waveColor: 'transparent',
         progressColor: 'transparent',
@@ -217,12 +217,11 @@ export class ChirpityWS {
     });
     const wavesurfer = this.wavesurfer;
 
-    this.unload = wavesurfer.on('load', () => wavesurfer.isReady = false)
-    this.unready = wavesurfer.on('ready', () => wavesurfer.isReady = true)
-    this.undblclick = wavesurfer.on("dblclick", this.centreSpec);
-    this.unclick = wavesurfer.on("click", () => this.REGIONS.clearRegions());
-    this.unpause = wavesurfer.on("pause", this.pauseActions);
-    this.undecode = wavesurfer.on('decode', () => this.spectrogram.render());
+    wavesurfer.on('load', () => wavesurfer.isReady = false)
+    wavesurfer.on('ready', () => wavesurfer.isReady = true)
+    wavesurfer.on("dblclick", this.centreSpec);
+    wavesurfer.on("click", () => this.REGIONS.clearRegions());
+    wavesurfer.on("pause", this.pauseActions);
     
     this.unplay = wavesurfer.on("play", () => {
       if (config.selectedModel.includes('batpack')) {
@@ -254,16 +253,6 @@ export class ChirpityWS {
       }
     });
 
-    wavesurfer.once('destroy', () =>{
-      this.unload();
-      this.unready();
-      this.undblclick();
-      this.unclick();
-      this.unpause();
-      this.unplay();
-      this.unfinish();
-      this.undecode();
-    })
     // Show controls
     showElement(["controlsWrapper"]);
     // Resize canvas of spec and labels
@@ -313,7 +302,7 @@ export class ChirpityWS {
     const windowLength = STATE.windowLength;
     fftSamples ??= config?.FFT;
     config.debug && console.log("initializing spectrogram");
-    spectrogram && this.WSPluginPurge();
+    spectrogram?.destroy();
     if (!fftSamples) {
       if (windowLength < 5) {
         fftSamples = 256;
@@ -553,7 +542,6 @@ export class ChirpityWS {
   refreshTimeline = () => {
     const STATE = this.getState();
     this.timeline?.destroy();
-    this.WSPluginPurge();
     this.timeline = this.createTimeline(STATE.windowLength);
   };
 
@@ -738,8 +726,7 @@ export class ChirpityWS {
   async updateSpec({ buffer, play = false, position = 0 }) {
     
     DOM.spectrogramWrapper.classList.remove("d-none");
-    this.wavesurfer?.destroy();
-    this.wavesurfer = null;
+    this.spectrogram?.clearCache();
     if (!this.wavesurfer) await this.adjustDims(true);
     else {
       await this.loadBuffer(buffer);
@@ -748,22 +735,6 @@ export class ChirpityWS {
     this.wavesurfer.seekTo(position);
     if (play) this.wavesurfer.play();
   }
-
-  WSPluginPurge = () => {
-    const wavesurfer = this.wavesurfer;
-    // Destroy leaves the plugins in the plugin list.
-    // So, this is needed to remove plugins where the `wavesurfer` key is not null
-    // CONFIRMED against the actual 7.12.x Spectrogram source: destroy() does
-    // still set `this.wavesurfer = null`, so this filter continues to work
-    // as written. `wavesurfer.plugins` itself is an internal (not officially
-    // documented) array — I couldn't verify it from the wavesurfer.ts source
-    // directly (search access was down while researching this), so keep an
-    // eye on it across future version bumps.
-    wavesurfer &&
-      (wavesurfer.plugins = wavesurfer.plugins.filter(
-        (plugin) => plugin.wavesurfer !== null
-      ));
-  };
 
   /**
    * Creates and registers a new audio region on the waveform, optionally navigating to its start time.
@@ -949,9 +920,8 @@ export class ChirpityWS {
     const STATE = this.getState();
     const relativePosition = e.clientX / e.currentTarget.clientWidth;
     const time = relativePosition * STATE.windowLength;
-    const region = this.REGIONS?.regions.find(
-      (r) => r.start < time && r.end > time
-    );
+    const regions = this.REGIONS.getRegions();
+    const region = regions.find((r) => r.start < time && r.end > time);
     region && setActive && this.handlers.setActiveRegion(region, false);
     return region;
   }
