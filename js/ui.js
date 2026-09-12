@@ -7280,7 +7280,7 @@ document.addEventListener("change", async function (e) {
             colorMapFieldset.classList.add("d-none");
           }
           if (spec.wavesurfer && STATE.currentFile) {
-            spec.setColorMap() || await flushSpec()
+            spec.setColorMap();
           }
           break;
         }
@@ -7321,7 +7321,7 @@ document.addEventListener("change", async function (e) {
             alpha
           };
           if (spec.wavesurfer && STATE.currentFile) {
-            spec.setColorMap() || await flushSpec();     
+            spec.setColorMap();
           }
           break;
         }
@@ -7466,7 +7466,6 @@ document.addEventListener("change", async function (e) {
 
 const flushSpec = async () =>{
   spec.wavesurfer?.destroy();
-  DOM.waveElement.replaceChildren();
   spec = new ChirpityWS(
     () => STATE, // Returns the current state
     () => config, // Returns the current config

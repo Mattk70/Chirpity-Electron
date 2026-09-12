@@ -322,18 +322,7 @@ export class ChirpityWS {
     const {frequencyMin, frequencyMax} = config.audio;
     const scaledFrequencyMin = frequencyMin * scaleFactor;
     const scaledFrequencyMax = frequencyMax * scaleFactor;
-    // NOTE on migrating from spectrogram-windowed.esm.js: the current
-    // Spectrogram plugin source (checked against the live GitHub main
-    // branch) has no `rendering` option in its type definitions — instead
-    // it now does automatic lazy/scroll-based canvas rendering internally
-    // for wide spectrograms (splitting into multiple canvases and only
-    // drawing the visible range + a buffer). wavesurfer.js's own README
-    // mentions a `rendering: 'windowed'` option as a back-compat shim for
-    // the old
-    // plugin; if you see it accepted without effect, that's expected — the
-    // new default path likely already gives you the windowed behavior you
-    // were relying on. Worth profiling with your longest audio files to
-    // confirm performance holds up.
+
     return Spectrogram.create({
       windowFunc,
       frequencyMin: scaledFrequencyMin,
@@ -375,18 +364,12 @@ export class ChirpityWS {
   }
   setColorMap(){
     const config = this.getConfig();
-    const textColor = this.wsTextColour(config);
-    const wavesurfer = this.wavesurfer;
     const spectrogram = this.spectrogram;
-    // If the text color is not the same as the cursor color, don't change the colormap
-    // this is because a full reload of the spec will be needed (calling flushSpec)
-    if ( wavesurfer.options.cursorColor !== textColor ) return false
     // set colormap
     const colors = this.createColormap();
     spectrogram.colorMap = colors;
     spectrogram.alpha = config.customColormap.alpha;
     this.reload();
-    return true
   }
   ///////////////////////// Timeline Callbacks /////////////////////////
 
@@ -480,7 +463,6 @@ export class ChirpityWS {
     const secondaryLabelInterval = primaryLabelInterval <= 2 ? primaryLabelInterval / 2 : 0;
     const timeInterval = primaryLabelInterval / 10;
     const colour = this.wsTextColour();
-
     this.timeline = TimelinePlugin.create({
       insertPosition: "beforebegin",
       formatTimeCallback: this.formatTimeCallback,
@@ -696,12 +678,6 @@ export class ChirpityWS {
     const STATE = this.getState();
     audio ??= STATE.currentBuffer;
     const [blob, peaks, duration] = this.makeBlob(audio);
-    // Hack to prevent runaway accumulations. 7.12.x has shipped a number of
-    // plugin-lifecycle/memory fixes (e.g. "prevent TypeError when plugin is
-    // destroyed during active render") — worth testing whether this is
-    // still needed, since force-clearing `subscriptions` without calling the
-    // unsubscribe functions it holds is itself a (smaller) leak.
-    this.timeline.subscriptions = [];
     this.refreshTimeline();
     await this.wavesurfer.loadBlob(blob, peaks, duration);
   }
@@ -798,11 +774,11 @@ export class ChirpityWS {
    * @returns {(HTMLElement|undefined)} The styled <span> element containing the label text, or undefined if no label is provided.
    */
   formatLabel(label, color) {
+    if (!label) return;
     const config = this.getConfig();
     if (config.colormap === "gray") {
       color = color ? "purple" : "#666";
     }
-    if (!label) return;
     const labelEl = document.createElement("span");
     Object.assign(labelEl.style, {
       position: "absolute",
