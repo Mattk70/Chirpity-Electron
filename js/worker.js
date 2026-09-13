@@ -1561,28 +1561,6 @@ function getFileSQLAndParams(range) {
   }
   return [SQL, params];
 }
-/**
- * Compute indices between 1 and fullRange (inclusive) that are not present in the sorted `included` list.
- *
- * @param {number[]} included - Sorted array of indices to include.
- * @param {number} [fullRange=STATE.modelLabels.length] - Maximum index to check (inclusive).
- * @returns {number[]} Array of indices between 1 and `fullRange` (inclusive) that are not in `included`.
- */
-function getExcluded(included, fullRange = STATE.modelLabels.length) {
-  const missing = [];
-  let currentIndex = 0;
-
-  for (let i = 1; i <= fullRange; i++) {
-    // If the current value in the sorted list matches `i`, move to the next list item
-    if (currentIndex < included.length && included[currentIndex] === i) {
-      currentIndex++;
-    } else {
-      // Otherwise, `i` is missing
-      missing.push(i);
-    }
-  }
-  return missing;
-}
 
 
 /**
@@ -1642,7 +1620,7 @@ async function getMatchingIds(cnames) {
  * @returns {Promise<{SQL: string, param: string}|string>} SQL and its JSON-array parameter, or an empty string when an exclusion list removes nothing.
  */
 async function getSpeciesSQLAsync(file){
-  let not = "", SQL = "", param = '';
+  let SQL = "", param = '';
   const {list, modelLabels} = STATE;
   let typeOfList = 'Included';
   // If we don't have a file, use the first analysed file if available
@@ -1652,13 +1630,7 @@ async function getSpeciesSQLAsync(file){
     QUEUE.getAllPaths('complete')[0];
   if (list !== 'everything') {
     let included = await getIncludedIDs(file);
-    if (list === "birds") {
-      included = getExcluded(included);
-      if (!included.length) return {SQL}; // nothing filtered out
-      typeOfList = 'Excluded';
-      not = "NOT";
-    }
-    // Get the speciesID for all models
+    // Get the speciesID for relevant models
     // json is fastest here
     const limitToModel = STATE.detect.combine || STATE.detect.merge ? "" : ` AND modelID = ${STATE.modelID} `;
     const query = `
@@ -1671,7 +1643,7 @@ async function getSpeciesSQLAsync(file){
     included = cnames.length ? await getMatchingIds(cnames) : [-1];
     DEBUG &&
       console.log(typeOfList, included.length, "# labels", modelLabels.length);
-    SQL = ` AND (s.id ${not} IN (SELECT value FROM json_each(?)) OR r.modelID = 0) `; // always include records with modelID 0 (manual records)
+    SQL = ` AND (s.id IN (SELECT value FROM json_each(?)) OR r.modelID = 0) `; // always include records with modelID 0 (manual records)
     param = JSON.stringify(included);
   }
   return {SQL, param}
@@ -4523,9 +4495,11 @@ const getSummary = async ({
   if (interim && STATE.summaryRunning) return;
   try{
     STATE.summaryRunning = true;
+    const t0 = Date.now()
     const {sql, params} = await prepSummaryStatement();
     const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
     const rows = await STATE.db.allAsync(sql, ...params);
+    console.log(`getting summary took ${Date.now() - t0} ms`)
     const allowedRows =
       STATE.list === 'custom'
         ? rows.filter(allowedByList)
