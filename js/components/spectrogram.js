@@ -9,8 +9,7 @@ import { Context, get } from "../utils/i18n.js";
 const colormap = window.module.colormap;
 
 export class ChirpityWS {
-  constructor(container, getState, getConfig, handlers, actions) {
-    this.container = container;
+  constructor(getState, getConfig, handlers, actions) {
     this.getState = getState; // Function to get the current state
     this.getConfig = getConfig; // Function to get the current config
     this.handlers = handlers; // { postbufferUpdate }
@@ -21,6 +20,8 @@ export class ChirpityWS {
     this.audioContext = new AudioContext();
     this.sampleRate = 24_000;
     this.actions = actions;
+    // Wavesurfer hack to work around double event firing
+    this.finishTime = 0;
 
     this.specTooltip = this.specTooltip.bind(this);
     this.centreSpec = this.centreSpec.bind(this);
@@ -150,7 +151,10 @@ export class ChirpityWS {
     });
 
     // Clear label on modifying region
-    REGIONS.on("region-update", (r) => {
+    // NOTE: renamed from 'region-update' to 'region-updated' — confirm this
+    // against your installed version; if regions stopped clearing labels
+    // after a drag/resize, this was likely why.
+    REGIONS.on("region-updated", (r) => {
       r.setOptions({ content: " " });
       this.handlers.setActiveRegion(r, false);
     });
@@ -159,24 +163,28 @@ export class ChirpityWS {
     })
     return REGIONS;
   }
-
-  initWavesurfer = (container, plugins) => {
+  pauseActions = () => {
+    const wavesurfer = this.wavesurfer;
+    const position =
+        wavesurfer.getCurrentTime() / wavesurfer.getDuration();
+    // Pause event fired right before 'finish' event, so
+    // this is set to signal whether it was playing up to that point
+    if (position < 0.998) wavesurfer.isPaused = true;
+  }
+  initWavesurfer = (plugins) => {
     const config = this.getConfig();
     this.sampleRate = config.selectedModel.includes("batpack") 
       ? 256000
       : 24000;
     return WaveSurfer.create({
-        container,
-        // make waveform transparent
-        backgroundColor: "rgba(0,0,0,0)",
-        waveColor: "rgba(0,0,0,0)",
-        progressColor: "rgba(0,0,0,0)",
-        // but keep the playhead
+        container: '#waveform',
         cursorColor: this.wsTextColour(config),
         cursorWidth: 2,
-        height: "auto",
+        minPxPerSec: 2,
+        height: 1,
+        waveColor: 'transparent',
+        progressColor: 'transparent',
         sampleRate: this.sampleRate,
-        renderFunction: () => {}, // no need to render a waveform
         plugins
       });
   }
@@ -188,14 +196,15 @@ export class ChirpityWS {
       height != null && height > 0
         ? height
         : Math.min(config.specMaxHeight, this.maxHeight());
-    this.wavesurfer && this.wavesurfer.destroy();
+    if (this.wavesurfer) {
+      this.wavesurfer.destroy();
+    }
     this.REGIONS = this.initRegion();
-    this.spectrogram = this.initSpectrogram('#spectrogram', resolvedHeight);
+    this.spectrogram = this.initSpectrogram(resolvedHeight);
     this.timeline = this.createTimeline(windowLength);
     // Setup waveform and spec views
     const plugins = [this.spectrogram, this.timeline, this.REGIONS];
-    const container = document.getElementById("waveform");
-    this.wavesurfer = this.initWavesurfer(container, plugins);
+    this.wavesurfer = this.initWavesurfer(plugins);
 
     if (audio) {
       await this.loadBuffer(audio);
@@ -207,26 +216,21 @@ export class ChirpityWS {
       color: STATE.regionActiveColour,
     });
     const wavesurfer = this.wavesurfer;
+
     wavesurfer.on('load', () => wavesurfer.isReady = false)
     wavesurfer.on('ready', () => wavesurfer.isReady = true)
     wavesurfer.on("dblclick", this.centreSpec);
     wavesurfer.on("click", () => this.REGIONS.clearRegions());
-    wavesurfer.on("pause", () => {
-      const position =
-        wavesurfer.getCurrentTime() / wavesurfer.decodedData.duration;
-      // Pause event fired right before 'finish' event, so
-      // this is set to signal whether it was playing up to that point
-      if (position < 0.998) wavesurfer.isPaused = true;
-    });
+    wavesurfer.on("pause", this.pauseActions);
     
-    wavesurfer.on("play", () => {
+    this.unplay = wavesurfer.on("play", () => {
       if (config.selectedModel.includes('batpack')) {
         wavesurfer.setPlaybackRate(0.1, false);
       }
       wavesurfer.isPaused = false;
     });
 
-    wavesurfer.on("finish", () => {
+    this.unfinish = wavesurfer.on("finish", () => {
       const {windowLength, windowOffsetSecs, currentFile, currentFileDuration, openFiles} = STATE;
       const bufferEnd = windowOffsetSecs + windowLength;
       if (currentFileDuration > bufferEnd) {
@@ -289,14 +293,16 @@ export class ChirpityWS {
    * @param {number} [fftSamples] - The number of FFT samples used for analysis. Defaults to config.FFT or is computed based on window length.
    * @returns {Object} The initialized spectrogram instance.
    */
-  initSpectrogram(container, height, fftSamples) {
+  initSpectrogram(height, fftSamples) {
+    height ??= this.height;
+    this.height = height;
     const config = this.getConfig();
     const spectrogram = this.spectrogram;
     const STATE = this.getState();
     const windowLength = STATE.windowLength;
     fftSamples ??= config?.FFT;
     config.debug && console.log("initializing spectrogram");
-    spectrogram && this.WSPluginPurge();
+    spectrogram?.destroy();
     if (!fftSamples) {
       if (windowLength < 5) {
         fftSamples = 256;
@@ -316,13 +322,14 @@ export class ChirpityWS {
     const {frequencyMin, frequencyMax} = config.audio;
     const scaledFrequencyMin = frequencyMin * scaleFactor;
     const scaledFrequencyMax = frequencyMax * scaleFactor;
+
     return Spectrogram.create({
-      container,
       windowFunc,
       frequencyMin: scaledFrequencyMin,
       frequencyMax: scaledFrequencyMax,
       // noverlap: 128, Auto (the default) seems fine
       // gainDB: 50, Adjusts spec brightness without increasing volume
+      rendering: "full", // or "windowed",
       labels: config.specLabels,
       labelsColor: this.wsTextColour(),
       labelsBackground: "rgba(0,0,0,0)",
@@ -331,6 +338,7 @@ export class ChirpityWS {
       scale: "linear",
       colorMap,
       alpha,
+      useWebWorker: false,
     });
   }
 
@@ -356,19 +364,22 @@ export class ChirpityWS {
   }
   setColorMap(){
     const config = this.getConfig();
-    const textColor = this.wsTextColour(config);
-    const wavesurfer = this.wavesurfer;
     const spectrogram = this.spectrogram;
-    // If the text color is not the same as the cursor color, don't change the colormap
-    // this is because a full reload of the spec will be needed (calling flushSpec)
-    if ( wavesurfer.options.cursorColor !== textColor ) return false
     // set colormap
     const colors = this.createColormap();
     spectrogram.colorMap = colors;
     spectrogram.alpha = config.customColormap.alpha;
     this.reload();
-    return true
   }
+
+  setWindowFunction(){
+    const config = this.getConfig();
+    const spectrogram = this.spectrogram;
+    // set window function
+    spectrogram.windowFunc = config.customColormap.windowFn;
+    this.reload();
+  }
+
   ///////////////////////// Timeline Callbacks /////////////////////////
 
   /**
@@ -461,7 +472,6 @@ export class ChirpityWS {
     const secondaryLabelInterval = primaryLabelInterval <= 2 ? primaryLabelInterval / 2 : 0;
     const timeInterval = primaryLabelInterval / 10;
     const colour = this.wsTextColour();
-
     this.timeline = TimelinePlugin.create({
       insertPosition: "beforebegin",
       formatTimeCallback: this.formatTimeCallback,
@@ -523,7 +533,6 @@ export class ChirpityWS {
   refreshTimeline = () => {
     const STATE = this.getState();
     this.timeline?.destroy();
-    this.WSPluginPurge();
     this.timeline = this.createTimeline(STATE.windowLength);
   };
 
@@ -678,7 +687,6 @@ export class ChirpityWS {
     const STATE = this.getState();
     audio ??= STATE.currentBuffer;
     const [blob, peaks, duration] = this.makeBlob(audio);
-    this.timeline.subscriptions = []; // Hack to prevent runaway accumulations
     this.refreshTimeline();
     await this.wavesurfer.loadBlob(blob, peaks, duration);
   }
@@ -703,6 +711,7 @@ export class ChirpityWS {
   async updateSpec({ buffer, play = false, position = 0 }) {
     
     DOM.spectrogramWrapper.classList.remove("d-none");
+    this.spectrogram?.clearCache();
     if (!this.wavesurfer) await this.adjustDims(true);
     else {
       await this.loadBuffer(buffer);
@@ -711,16 +720,6 @@ export class ChirpityWS {
     this.wavesurfer.seekTo(position);
     if (play) this.wavesurfer.play();
   }
-
-  WSPluginPurge = () => {
-    const wavesurfer = this.wavesurfer;
-    // Destroy leaves the plugins in the plugin list.
-    // So, this is needed to remove plugins where the `wavesurfer` key is not null
-    wavesurfer &&
-      (wavesurfer.plugins = wavesurfer.plugins.filter(
-        (plugin) => plugin.wavesurfer !== null
-      ));
-  };
 
   /**
    * Creates and registers a new audio region on the waveform, optionally navigating to its start time.
@@ -758,7 +757,9 @@ export class ChirpityWS {
       // const newLabel = this.formatLabel(' / ' + label, colour);
       existingRegion.content.textContent += ' / ' + label;
     } else {
-      REGIONS.subscriptions = []; // hack to prevent massive accumulation bug in wavesurfer.js
+      // See the same note in loadBuffer() above — re-test whether this is
+      // still needed in 7.12.11.
+      REGIONS.subscriptions = [];
       REGIONS.addRegion({
         start: start,
         end: end,
@@ -782,11 +783,11 @@ export class ChirpityWS {
    * @returns {(HTMLElement|undefined)} The styled <span> element containing the label text, or undefined if no label is provided.
    */
   formatLabel(label, color) {
+    if (!label) return;
     const config = this.getConfig();
     if (config.colormap === "gray") {
       color = color ? "purple" : "#666";
     }
-    if (!label) return;
     const labelEl = document.createElement("span");
     Object.assign(labelEl.style, {
       position: "absolute",
@@ -877,7 +878,7 @@ export class ChirpityWS {
     const wavesurfer = this.wavesurfer;
     if (wavesurfer && !this.spectrogram) {
       wavesurfer.options.cursorColor = this.wsTextColour();
-      this.spectrogram = this.initSpectrogram('#spectrogram', height);
+      this.spectrogram = this.initSpectrogram(height);
       wavesurfer.registerPlugin(this.spectrogram);
       this.refreshTimeline();
       this.reload();
@@ -904,9 +905,8 @@ export class ChirpityWS {
     const STATE = this.getState();
     const relativePosition = e.clientX / e.currentTarget.clientWidth;
     const time = relativePosition * STATE.windowLength;
-    const region = this.REGIONS?.regions.find(
-      (r) => r.start < time && r.end > time
-    );
+    const regions = this.REGIONS.getRegions();
+    const region = regions.find((r) => r.start < time && r.end > time);
     region && setActive && this.handlers.setActiveRegion(region, false);
     return region;
   }
@@ -963,6 +963,7 @@ export class ChirpityWS {
         display: "block",
         visibility: "visible",
         opacity: 1,
+        'z-index': 5
       });
     }
   }
@@ -994,4 +995,3 @@ export class ChirpityWS {
     this.handlers.trackEvent({uuid: config.UUID, event: "Swipe", action: key, version: config.VERSION});
   }
 }
-

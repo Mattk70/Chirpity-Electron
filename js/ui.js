@@ -395,7 +395,7 @@ let animating = false;
 DOM.controlsWrapper.addEventListener("mousedown", (e) => {
   if (e.target.tagName !== "DIV") return;
   const startY = e.clientY;
-  const initialHeight = DOM.spectrogram.offsetHeight;
+  const initialHeight = DOM.waveElement.offsetHeight;
   let newHeight;
 
   const onMouseMove = (e) => {
@@ -3561,7 +3561,6 @@ function setActiveRegion(region, activateRow) {
 }
 
 let spec = new ChirpityWS(
-  "#waveform",
   () => STATE, // Returns the current state
   () => config, // Returns the current config
   { postBufferUpdate, trackEvent, setActiveRegion, onStateUpdate: state.update, updatePrefs },
@@ -3736,7 +3735,7 @@ const loadModel = () => {
 };
 
 const handleModelChange = async (model, reload = true) => {
-  flushSpec();
+  STATE.currentFile && await flushSpec();
   modelSettingsDisplay();
   DOM.customListFile.value = config.models[model].customListFile;
   DOM.customListFile.value
@@ -7281,7 +7280,7 @@ document.addEventListener("change", async function (e) {
             colorMapFieldset.classList.add("d-none");
           }
           if (spec.wavesurfer && STATE.currentFile) {
-            spec.setColorMap() || await flushSpec()
+            spec.setColorMap();
           }
           break;
         }
@@ -7292,7 +7291,7 @@ document.addEventListener("change", async function (e) {
               ...config.customColormap, 
               windowFn
             };
-          STATE.fileLoaded && await flushSpec();
+          STATE.fileLoaded && spec.setWindowFunction();
           break
         }
         case "loud-color":
@@ -7322,7 +7321,7 @@ document.addEventListener("change", async function (e) {
             alpha
           };
           if (spec.wavesurfer && STATE.currentFile) {
-            spec.setColorMap() || await flushSpec();     
+            spec.setColorMap();
           }
           break;
         }
@@ -7467,10 +7466,7 @@ document.addEventListener("change", async function (e) {
 
 const flushSpec = async () =>{
   spec.wavesurfer?.destroy();
-  DOM.waveElement.replaceChildren();
-  DOM.spectrogram.replaceChildren();
   spec = new ChirpityWS(
-    "#waveform",
     () => STATE, // Returns the current state
     () => config, // Returns the current config
     { postBufferUpdate, trackEvent, setActiveRegion, onStateUpdate: state.update, updatePrefs },
