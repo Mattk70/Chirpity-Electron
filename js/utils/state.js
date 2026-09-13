@@ -67,7 +67,9 @@ export class WorkerState {
       range: { start: undefined, end: undefined },
     }),
     (this.database = {
-      location: undefined
+      location: undefined,
+      summaryStmt: null,
+      summaryParams: null
     }),
     (this.model = undefined),
     (this.modelPath = undefined),

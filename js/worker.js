@@ -4255,6 +4255,8 @@ async function processNextFile({
     if (QUEUE.getSize('inProgress') === 0) {
       if (!STATE.selection) {
         await getSummary().catch(console.warn);
+        // Clear the prepared statement & params
+        resetSummaryStmt();
       }
       DEBUG && console.log("All files processed.");
       UI.postMessage({ event: "analysis-complete" });
@@ -4483,6 +4485,25 @@ function getBatchesToSend(duration) {
   return Math.max(1, Math.ceil(windows / BATCH_SIZE));
 }
 
+
+
+const resetSummaryStmt= () => {
+  Object.assign(STATE.database, {
+    summaryStmt: null,
+    summaryParams: null
+  });
+}
+async function getSummaryRows() {
+  const summaryStmt = STATE.database.summaryStmt;
+  let params = STATE.database.summaryParams;
+    if (!summaryStmt) {
+        const { sql, params } = await prepSummaryStatement();
+        STATE.database.summaryStmt = STATE.db.prepare(sql);
+        STATE.database.summaryParams = params;
+    }
+    return await summaryStmt.allAsync(...params);
+}
+
 const getSummary = async ({
   format,
   path,
@@ -4496,9 +4517,10 @@ const getSummary = async ({
   try{
     STATE.summaryRunning = true;
     const t0 = Date.now()
-    const {sql, params} = await prepSummaryStatement();
+    // const {sql, params} = await prepSummaryStatement();
     const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
-    const rows = await STATE.db.allAsync(sql, ...params);
+    // const rows = await STATE.db.allAsync(sql, ...params);
+    const rows = await getSummaryRows();
     console.log(`getting summary took ${Date.now() - t0} ms`)
     const allowedRows =
       STATE.list === 'custom'

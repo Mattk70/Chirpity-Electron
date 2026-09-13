@@ -5727,17 +5727,17 @@ const hideConfidenceSlider = () => {
   confidenceSliderDisplay.classList.add("d-none");
 };
 
-  /**
-   * Updates the threshold display and input values in both the filter and settings panels.
-   * @param {Event|number} e - The input event or numeric threshold value to display and set.
-   */
-  function showThreshold(e) {
-    const threshold = e instanceof Event ? e.target.valueAsNumber : e;
-    filterPanelThresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
-    settingsPanelThresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
-    filterPanelRangeInput.value = threshold;
-    settingsPanelRangeInput.value = threshold;
-  }
+/**
+ * Updates the threshold display and input values in both the filter and settings panels.
+ * @param {Event|number} e - The input event or numeric threshold value to display and set.
+ */
+function showThreshold(e) {
+  const threshold = e instanceof Event ? e.target.valueAsNumber : e;
+  filterPanelThresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
+  settingsPanelThresholdDisplay.innerHTML = `<b>${threshold}%</b>`;
+  filterPanelRangeInput.value = threshold;
+  settingsPanelRangeInput.value = threshold;
+}
 
 const showOverlap = (e) => {
   const overlap = e instanceof Event ? e.target.valueAsNumber : e * 100;  
