@@ -3735,7 +3735,7 @@ const loadModel = () => {
 };
 
 const handleModelChange = async (model, reload = true) => {
-  await flushSpec();
+  STATE.currentFile && await flushSpec();
   modelSettingsDisplay();
   DOM.customListFile.value = config.models[model].customListFile;
   DOM.customListFile.value
@@ -7291,7 +7291,7 @@ document.addEventListener("change", async function (e) {
               ...config.customColormap, 
               windowFn
             };
-          STATE.fileLoaded && await flushSpec();
+          STATE.fileLoaded && spec.setWindowFunction();
           break
         }
         case "loud-color":

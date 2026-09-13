@@ -329,7 +329,7 @@ export class ChirpityWS {
       frequencyMax: scaledFrequencyMax,
       // noverlap: 128, Auto (the default) seems fine
       // gainDB: 50, Adjusts spec brightness without increasing volume
-      rendering: "windowed",
+      rendering: "full", // or "windowed",
       labels: config.specLabels,
       labelsColor: this.wsTextColour(),
       labelsBackground: "rgba(0,0,0,0)",
@@ -371,6 +371,15 @@ export class ChirpityWS {
     spectrogram.alpha = config.customColormap.alpha;
     this.reload();
   }
+
+  setWindowFunction(){
+    const config = this.getConfig();
+    const spectrogram = this.spectrogram;
+    // set window function
+    spectrogram.windowFunc = config.customColormap.windowFn;
+    this.reload();
+  }
+
   ///////////////////////// Timeline Callbacks /////////////////////////
 
   /**
