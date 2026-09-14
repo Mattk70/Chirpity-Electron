@@ -2473,7 +2473,7 @@ window.onload = async () => {
   });
 
   updateListOptions(selectedModel);
-  isMember && updateModelOptions();
+  
   
   worker.postMessage({
     action: "update-state",
@@ -2899,6 +2899,10 @@ const setUpWorkerMessaging = () => {
           generateLocationList("explore-locations");
           generateLocationList("chart-locations");
           break;
+        }
+        case "model-list": {
+          // Handled by updateModelOptions
+          break
         }
         case "model-ready": {
           if (args.message === "Model failed to load") {
@@ -4086,6 +4090,7 @@ const showExpunge = () => {
 function onModelReady() {
   modelReady = true;
   updateList();
+  STATE.isMember && updateModelOptions();
   if (STATE.fileLoaded) {
     utils.enableMenuItem(["analyse"]);
     if (STATE.openFiles.length > 1)
@@ -6230,7 +6235,7 @@ async function handleUIClicks(e) {
     case "import-model": { showImport(); break }
     case "remove-model": {
       // Just present custom models to choose from
-      updateModelOptions('customOnly');
+      await updateModelOptions('customOnly');
       showExpunge();
       break;
     }
@@ -6420,7 +6425,7 @@ async function handleUIClicks(e) {
       config.list = 'everything';
       updatePrefs('config.json', config);
       updateList();
-      updateModelOptions();
+      await updateModelOptions();
       handleModelChange(modelName);
       select.value = modelName;
       select.dispatchEvent(new Event('change'));
@@ -6438,7 +6443,7 @@ async function handleUIClicks(e) {
       worker.postMessage({action:"expunge-model", model})
       delete config.models[model];
       config.selectedModel ===  model && (config.selectedModel = 'birdnet');
-      updateModelOptions();
+      await updateModelOptions();
       const modelSelect = document.getElementById("model-to-use");
       [...modelSelect.options].find((opt) => opt.value === model)?.remove();
       updatePrefs('config.json', config);
@@ -9178,7 +9183,9 @@ document.addEventListener("filter-labels", (e) => {
  *
  * @param {boolean} customOnly - Whether to populate only custom models.
  */
-function updateModelOptions(customOnly){
+async function updateModelOptions(customOnly){
+  const dbModels = await utils.requestFromWorker(worker, "get-models");
+  console.log('getting models')
   const formElement = customOnly ? 'custom-models' : 'model-to-use';
   const select = document.getElementById(formElement);
   // Update the model selector options
@@ -9188,8 +9195,10 @@ function updateModelOptions(customOnly){
     ? Object.fromEntries(Object.entries(config.models)
     .filter(([model, _]) => !['nocmig', 'chirpity','birdnet', 'birdnet3'].includes(model)))
     : config.models;
+  // Make sure the model is in *this* database
+  const validModels = Object.fromEntries(Object.entries(modelOptions).filter(([model, _]) => dbModels.includes(model)));
   // Add new options from the object
-  for (const [model, opt] of Object.entries(modelOptions)) {
+  for (const [model, opt] of Object.entries(validModels)) {
     const option = document.createElement('option');
     option.value = model;
     option.disabled = model === 'birdnet3' && !STATE.isMember; // Disable birdnet3 if not a member

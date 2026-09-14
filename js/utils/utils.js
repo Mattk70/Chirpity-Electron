@@ -301,7 +301,7 @@ function parseDuration(durationString) {
 function requestFromWorker(worker, action, payload = {}) {
   return new Promise((resolve, reject) => {
     const messageId = crypto.randomUUID(); //  unique string 
-    let timeoutId
+    let timeoutId;
     function handleMessage(event) {
       const { id, data, error } = event.data;
       if (id !== messageId) return;

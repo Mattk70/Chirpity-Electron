@@ -627,6 +627,10 @@ async function handleMessage(e) {
       getLocations(args);
       break;
     }
+    case "get-models": {
+      getModels(args);
+      break;
+    }
     case "manage-files": {
       try {
         if (!diskDB) throw new Error("No archive database is loaded");
@@ -3940,9 +3944,17 @@ const parsePredictions = async (response) => {
 };
 
 /**
- * Finalize merged detections for a file: flush in-memory detections, persist them when appropriate, send them to the UI, update the processing queue, and emit completion alerts if the run produced no detections.
+ * Finalize merged detections for a file: flush in-memory detections, 
+ * persist them when appropriate, send them to the UI, update the processing queue, 
+ * and emit completion alerts if the run produced no detections.
  *
- * If detections remain after flushing, this function inserts them into the disk database unless a selection is active, posts them to the UI, and requests an interim summary. It uses file metadata (latitude/longitude) and current STATE (model, detection settings, list) to determine persistence and alert behavior. When all queued files are complete and this worker produced no detections (global index === 0), it emits a `noDetections` or `noDetectionsDetailed2` alert depending on whether the run was a selection.
+ * If detections remain after flushing, this function inserts them into the disk database 
+ * unless a selection is active, posts them to the UI, and requests an interim summary. 
+ * It uses file metadata (latitude/longitude) and current STATE (model, detection settings, list)
+ *  to determine persistence and alert behavior. 
+ * When all queued files are complete and this worker produced no detections (global index === 0),
+ *  it emits a `noDetections` or `noDetectionsDetailed2` alert depending on whether the run was 
+ * a selection.
  *
  * @param {string} file - Path of the audio file whose detection processing is completing.
  */
@@ -4493,15 +4505,16 @@ const resetSummaryStmt= () => {
     summaryParams: null
   });
 }
-async function getSummaryRows() {
-  const summaryStmt = STATE.database.summaryStmt;
-  let params = STATE.database.summaryParams;
-    if (!summaryStmt) {
-        const { sql, params } = await prepSummaryStatement();
-        STATE.database.summaryStmt = STATE.db.prepare(sql);
-        STATE.database.summaryParams = params;
-    }
-    return await summaryStmt.allAsync(...params);
+async function getSummaryRows(cache) {
+  let { summaryStmt, summaryParams } = STATE.database;
+  if (!summaryStmt || !cache) {
+    const { sql, params } = await prepSummaryStatement();
+    summaryStmt = STATE.db.prepare(sql);
+    summaryParams = params;
+    STATE.database.summaryStmt = summaryStmt;
+    STATE.database.summaryParams = summaryParams;
+  }
+  return await summaryStmt.allAsync(...summaryParams);
 }
 
 const getSummary = async ({
@@ -4510,8 +4523,8 @@ const getSummary = async ({
   headers,
   species,
   active,
-  interim,
-  action,
+  interim = false,
+  action
 } = {}) => {
   if (interim && STATE.summaryRunning) return;
   try{
@@ -4520,7 +4533,7 @@ const getSummary = async ({
     // const {sql, params} = await prepSummaryStatement();
     const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
     // const rows = await STATE.db.allAsync(sql, ...params);
-    const rows = await getSummaryRows();
+    const rows = await getSummaryRows(interim);
     console.log(`getting summary took ${Date.now() - t0} ms`)
     const allowedRows =
       STATE.list === 'custom'
@@ -5966,7 +5979,15 @@ function getLocations({ file, db = STATE.db, id }) {
   });
 }
 
-
+async function getModels({id}){
+  const rows = await STATE.db.allAsync('SELECT name FROM models');
+  const models = rows.map(r => r.name);
+      UI.postMessage({
+      id,
+      event: "model-list",
+      data: models,
+    });
+}
 
 
 async function getNearbyLocationsCached(lat, lon) {
