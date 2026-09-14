@@ -374,7 +374,7 @@ let appVersionLoaded = new Promise((resolve, reject) => {
       resolve();
     })
     .catch((error) => {
-      console.log("Error getting app version:", error);
+      console.error("Error getting app version:", error);
       reject(error);
     });
 });
@@ -1438,7 +1438,7 @@ async function validateFileExistence(files, table, progressCallback = null, sign
       progressCallback(checked, files.length, missing);
     }
   }
-  console.log(`Checking ${files.length} files' existence took ${((Date.now() - t0)/1000).toFixed(0)} seconds`)
+  console.info('File exists check', `Checking ${files.length} files' existence took ${((Date.now() - t0)/1000).toFixed(0)} seconds`)
 }
 
   
@@ -2228,7 +2228,7 @@ function updatePrefs(file, data) {
         const hexData = jsonData;
         fs.writeFileSync(p.join(appPath, file), hexData);
       } catch (error) {
-        console.log(error);
+        console.error(error);
       }
     },
     {
@@ -2408,7 +2408,7 @@ window.onload = async () => {
       if (!isNaN(localDate) && localDate < new Date(installedAt).getTime())  {
         effectiveDate = new Date(localDate).toISOString();
       }
-      console.log('converting install date to', effectiveDate)
+      console.warn('converting install date to', effectiveDate)
     } 
     localStorage.setItem("installDate", effectiveDate)
   }
@@ -6799,7 +6799,7 @@ async function handleUIClicks(e) {
         if (err)
           generateToast({ type: "error", message: "noCallCache" }) &&
             config.debug &&
-            console.log("No XC cache found", err);
+            console.warn("No XC cache found", err);
         else generateToast({ message: "callCacheCleared" });
       });
       break;
@@ -8378,7 +8378,7 @@ async function getXCComparisons() {
       // Cache and render the results
       XCcache[sname] = filteredLists;
       updatePrefs("XCcache.json", XCcache);
-      console.log("XC response", filteredLists);
+      // console.log("XC response", filteredLists);
       renderComparisons(filteredLists, cname);
     });
     
@@ -8940,7 +8940,7 @@ document.addEventListener("labelsUpdated", (e) => {
   const tagObjects = tags.map((name, index) => ({ id: index, name }));
   const deleted = e.detail.deleted;
   if (deleted) {
-    console.log("Tag deleted:", deleted);
+    config.debug && console.log("Tag deleted:", deleted);
     worker.postMessage({ action: "delete-tag", deleted });
     STATE.tagsList = STATE.tagsList.filter((item) => item.name !== deleted);
   } else {
@@ -8949,7 +8949,7 @@ document.addEventListener("labelsUpdated", (e) => {
       (tag) => !STATE.tagsList.find((t) => t.name === tag.name)
     );
     STATE.tagsList = tags;
-    console.log("Tag updated:", alteredOrNew);
+    config.debug && console.log("Tag updated:", alteredOrNew);
     worker.postMessage({ action: "update-tag", alteredOrNew });
   }
   config.debug && console.log("Tags list:", STATE.tagsList);
@@ -9185,20 +9185,20 @@ document.addEventListener("filter-labels", (e) => {
  */
 async function updateModelOptions(customOnly){
   const dbModels = await utils.requestFromWorker(worker, "get-models");
-  console.log('getting models')
   const formElement = customOnly ? 'custom-models' : 'model-to-use';
   const select = document.getElementById(formElement);
   // Update the model selector options
   select.replaceChildren();
   // Add options
-  const modelOptions = customOnly 
-    ? Object.fromEntries(Object.entries(config.models)
-    .filter(([model, _]) => !['nocmig', 'chirpity','birdnet', 'birdnet3'].includes(model)))
-    : config.models;
-  // Make sure the model is in *this* database
-  const validModels = Object.fromEntries(Object.entries(modelOptions).filter(([model, _]) => dbModels.includes(model)));
+  const builtInModels = ['nocmig', 'chirpity', 'birdnet', 'birdnet3'];
+  const modelOptions = Object.fromEntries(
+    Object.entries(config.models).filter(([model]) =>
+      dbModels.includes(model) &&
+      (!customOnly || !builtInModels.includes(model))
+    )
+  );
   // Add new options from the object
-  for (const [model, opt] of Object.entries(validModels)) {
+  for (const [model, opt] of Object.entries(modelOptions)) {
     const option = document.createElement('option');
     option.value = model;
     option.disabled = model === 'birdnet3' && !STATE.isMember; // Disable birdnet3 if not a member
