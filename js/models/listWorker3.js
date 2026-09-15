@@ -122,7 +122,6 @@ const NOT_BIRDS = [
   "Tamias striatus_Eastern Chipmunk",
   "Tamiasciurus hudsonicus_Red Squirrel",
   "Vulpes vulpes_Red Fox",
-
   "Human vocal_Human vocal",
   "Human non-vocal_Human non-vocal",
   "Human whistle_Human whistle",
@@ -133,7 +132,7 @@ const NOT_BIRDS = [
   "Water Drops_Water Drops",
 ];
 
-const geomodelLabelFile = path.resolve('BirdNET3/BirdNET+_Geomodel_V3.0.3_Global_12K_Labels.txt');
+const geomodelLabelFile = path.resolve(__dirname, '../../BirdNET3/BirdNET+_Geomodel_V3.0.3_Global_12K_Labels.txt');
 
 
 
@@ -552,8 +551,8 @@ class Model {
  */
 async function _init_() {
   DEBUG && console.log(`List generating model received load instruction.`);
-  listModel = new Model( path.join(
-      __dirname, "..", "..", "BirdNET3/BirdNET+_Geomodel_V3.0.3_Global_12K_FP16.onnx"
+  listModel = new Model( path.resolve(
+      __dirname, "../../BirdNET3/BirdNET+_Geomodel_V3.0.3_Global_12K_FP16.onnx"
     ));
 
   await listModel.loadModel();
