@@ -1075,7 +1075,7 @@ async function savedFileCheckAsync(fileList) {
       let query = query1;
       const parameters = [JSON.stringify(names)];
 
-      if (libFiles.length) {
+      if (libraryFiles.length) {
         query += ` OR archiveName IN (SELECT value FROM json_each(?))`;
         parameters.push(JSON.stringify(libFiles));
       }

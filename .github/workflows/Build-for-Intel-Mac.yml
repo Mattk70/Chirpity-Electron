@@ -159,29 +159,6 @@ jobs:
             ./node_modules/@easepick/bundle/dist/index.umd.js
           rm -f ./node_modules/@easepick/bundle/dist/index.umd.js.bak
 
-      - name: Patch wavesurfer.js - handle AbortError in play()
-        run: |
-          node <<'EOF'
-          const fs = require('fs');
-          const path = require('path');
-          const filePath = path.resolve('./node_modules/wavesurfer.js/dist/player.js');
-          let contents = fs.readFileSync(filePath, 'utf8');
-          const patched = contents.replace(
-            /return this\.media\.play\(\);/,
-            `try {
-                        return this.media.play();
-                      } catch (err) {
-                        if (err instanceof DOMException && err.name === 'AbortError') return;
-                        throw err;
-                      }`
-          );
-          if (patched === contents) {
-            console.error('❌ Wavesurfer patch failed – pattern not found');
-            process.exit(1);
-          }
-          fs.writeFileSync(filePath, patched);
-          console.log('✅ Patched wavesurfer.js play()');
-          EOF
 
       - name: Switch tracking to production ID
         shell: bash
