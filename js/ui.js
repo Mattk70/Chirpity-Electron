@@ -1104,6 +1104,7 @@ const setDefaultLocation = () => {
     worker.postMessage({
       action: "update-list",
       list: "location",
+      species: isSpeciesViewFiltered(true),
     });
   }
   const button = document.getElementById("apply-location");
@@ -6901,6 +6902,7 @@ async function updateList() {
   } else {
     worker.postMessage({
       action: "update-list",
+      species: isSpeciesViewFiltered(true),
       list: config.list,
       classes: config.detect.classes,
       refreshResults: STATE.analysisDone && STATE.mode !== 'chart',
@@ -7579,6 +7581,7 @@ async function readLabels(labelFile, updating) {
       }
       worker.postMessage({
         action: "update-list",
+        species: isSpeciesViewFiltered(true),
         list: config.list,
         customLabels: labels,
         refreshResults: STATE.analysisDone && STATE.mode !== 'chart',

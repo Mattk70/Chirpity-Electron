@@ -12,7 +12,7 @@ let DEBUG = false;
  * @returns {string[]} Labels formatted as `scientific_common_class`.
  */
 function getBN3Labels() {
-  const labelFile = path.join(__dirname, "../../BirdNET3",
+  const labelFile = path.join(__dirname, "..", "..", "BirdNET3",
          "BirdNET3_geomodel_labels.csv");
   const fileContents = fs.readFileSync(labelFile, "utf8");
   return fileContents
@@ -552,9 +552,9 @@ class Model {
  */
 async function _init_() {
   DEBUG && console.log(`List generating model received load instruction.`);
-  listModel = new Model(
-      "BirdNET3/BirdNET+_Geomodel_V3.0.3_Global_12K_FP16.onnx"
-    );
+  listModel = new Model( path.join(
+      __dirname, "..", "..", "BirdNET3/BirdNET+_Geomodel_V3.0.3_Global_12K_FP16.onnx"
+    ));
 
   await listModel.loadModel();
   postMessage({ message: "list-model-ready" });

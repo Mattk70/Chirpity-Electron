@@ -886,9 +886,9 @@ async function handleMessage(e) {
       STATE.detect.classes = args.classes || STATE.detect.classes;
       await INITIALISED;
       await setLabelState({regenerate:true});
-
+      const species = args.species;
       
-      args.refreshResults && (await Promise.all([getSummary(), getResults()]));
+      args.refreshResults && (await Promise.all([getSummary({species}), getResults({species})]));
       break;
     }
     case "update-locale": {
@@ -4621,7 +4621,7 @@ async function getResultsRows(cache, species, limit, offset, topRankin, format) 
 
 const getResults = async ({
   species = undefined,
-  limit,
+  limit = STATE.limit,
   offset = undefined,
   topRankin = STATE.detect.topRankin,
   path = undefined,
@@ -4652,7 +4652,13 @@ const getResults = async ({
   //   format
   // );
   // let result = await STATE.db.allAsync(sql, ...params);
-  let result = await getResultsRows(cache, species,STATE.list === 'custom' ? Infinity : limit, offset, topRankin, format);
+  let result = await getResultsRows(
+    cache, 
+    species, 
+    STATE.list === 'custom' ? Infinity : limit, 
+    offset, 
+    topRankin, 
+    format);
   console.log(`GetResults took ${Date.now() - t0} ms`)
   // Apply custom list filtering
   if (STATE.list === 'custom'){
