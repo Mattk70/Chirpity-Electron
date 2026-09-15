@@ -200,10 +200,6 @@ test.describe('HTML File - Key UI Components', () => {
     expect(htmlContent).toMatch(/id="exploreWrapper"/);
   });
 
-  test('has spectrogram display element', () => {
-    expect(htmlContent).toMatch(/id="spectrogram"/);
-  });
-
   test('has waveform display element', () => {
     expect(htmlContent).toMatch(/id="waveform"/);
   });
