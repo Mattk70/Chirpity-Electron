@@ -1569,7 +1569,7 @@ async function sortFilesByTime(fileNames) {
  */
 async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults } = {}) {
   if (!filePaths.length) return;
-  if (STATE.mode === 'chart') showAnalyse()
+  if (STATE.mode !== 'analyse') showAnalyse()
 
   // Store the sanitised file list and Load First audio file
   pagination.reset();

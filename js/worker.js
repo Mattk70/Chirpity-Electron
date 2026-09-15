@@ -601,6 +601,7 @@ async function handleMessage(e) {
     }
     case "filter": {
       if (STATE.db) {
+        args.cache = true;
         args.updateSummary && (await getSummary(args));
         await getResults(args);
       }
@@ -925,6 +926,10 @@ async function handleMessage(e) {
           }
         }
       }
+      // Clear cached statements when changing an explore range (from datepicker.js)
+      // Or location
+      if (args.explore || Object.hasOwn(args, 'location')) resetStmts();
+      
       STATE.update(args);
       // Call new db functions when not initial state update (where UUID is sent)
       if (args.database && !args.UUID) {
@@ -938,6 +943,7 @@ async function handleMessage(e) {
       }
       if (args.labelFilters) {
         const species = args.species;
+        resetStmts();
         await Promise.all([
           getSummary({ species }),
           getResults({ species, offset: 0 }),
@@ -1183,6 +1189,7 @@ async function onChangeMode(mode) {
   if (!memoryDB){
     memoryDB = await createDB({file: null, diskDB, dbMutex});
   }
+  resetStmts()
   STATE.changeMode({
     mode: mode,
     disk: diskDB,
@@ -1664,10 +1671,10 @@ async function getSpeciesSQLAsync(file){
  * @returns {Array} A two-element array: [augmented SQL string, ordered parameters array] for use with a prepared statement.
  */
 
-async function addQueryQualifiers(stmt, range, caller) {
-  const {list, mode, explore, labelFilters, detect, location, selection} = STATE;
+async function addQueryQualifiers(stmt, params, range, caller) {
+  const {mode, explore, labelFilters, detect, location, selection} = STATE;
   
-  const params = list === "custom" ? [0] : [detect.confidence];
+  
   range ??= mode === "explore" ? explore.range : undefined;
   if (mode === 'archive' || range?.start){
     const [SQLtext, fileParams] = getFileSQLAndParams(range);
@@ -1719,13 +1726,16 @@ const prepSummaryStatement = async () => {
         JOIN species s ON s.id = r.speciesID
         WHERE confidence >=  ? `;
 
-  let [stmt, params] = await addQueryQualifiers(summaryStatement);
+  const param = (STATE.list === "custom" ? [0] : [detect.confidence])
+  let [stmt, params] = await addQueryQualifiers(summaryStatement, param);
+  
   summaryStatement = stmt;
   summaryStatement += `
     )
     SELECT cname, sname, confidence AS score, dateTime AS timestamp, callCount, modelID
     FROM ranked_records
-    WHERE ranked_records.rank <= ${topRankin}`;
+    WHERE ranked_records.rank <= ?`;
+  params.push(topRankin)
 
   return {sql: summaryStatement, params};
 };
@@ -1740,6 +1750,9 @@ const prepResultsStatement = async (
 ) => {
   const {mode, list, limit, explore, resultsMetaSortOrder, resultsSortOrder, detect, selection} = STATE;
   const partition = detect.merge ? '' : ', r.modelID'; 
+  const confidence = list === "custom" ? 0 : detect.confidence;
+  const param = [confidence, species, species];
+
   let resultStatement = `
     WITH ranked_records AS (
         SELECT 
@@ -1771,7 +1784,7 @@ const prepResultsStatement = async (
         JOIN files f ON r.fileID = f.id 
         JOIN models ON r.modelID = models.id
         LEFT JOIN tags ON r.tagID = tags.id
-        WHERE confidence >= ? 
+        WHERE confidence >= ? AND (? IS NULL OR cname = ?) 
         `;
   // // Prioritise selection ranges
   const range = selection?.start
@@ -1780,7 +1793,7 @@ const prepResultsStatement = async (
     ? explore.range
     : null;
 
-  let [stmt, params] = await addQueryQualifiers(resultStatement, range, 'results');
+  let [stmt, params] = await addQueryQualifiers(resultStatement, param, range, 'results');
   resultStatement = stmt;
 
   resultStatement += ` )
@@ -1811,10 +1824,7 @@ const prepResultsStatement = async (
     ranked_records 
     WHERE rank <= ? `;
   params.push(topRankin);
-  if (species) {
-    resultStatement += ` AND  cname = ? `;
-    params.push(species);
-  }
+
   // Because custom list doesn't limit the results, it can get v slow when the archive is large.
   // But, we can use the limit clause if the user is not using a custom list
   noLimit = list === 'custom' || noLimit;
@@ -2314,37 +2324,13 @@ async function locateFile(file) {
         message: "noDirectory",
         variables: { match: match[0] },
       });
-      // generateAlert({ type: "info", message: "cancelled" });
-      onAbort({ model: STATE.model })
+      QUEUE.any('inProgress') && onAbort({ model: STATE.model })
     }
     console.warn(error.message + " - Disk removed?"); // Expected that this happens when the directory doesn't exist
   }
   return null;
 }
 
-/**
- * Notifies the UI about a missing file entry in the database.
- *
- * This asynchronous function queries the disk database for a file record by its name.
- * If a record with an associated ID exists, it considers the file as missing and triggers an
- * error alert with the message "dbFileMissing" along with the file name in the alert variables.
- *
- * @async
- * @param {string} file - The name of the file to search for in the database.
- * @returns {Promise<void>} A promise that resolves once the alert has been generated.
- * @throws Propagates any errors encountered during the database query.
- */
-async function notifyMissingFile(file) {
-  let missingFile;
-  // Look for the file in the Archive
-  const row = await diskDB.getAsync("SELECT * FROM FILES WHERE name = ?", file);
-  if (row?.id) missingFile = file;
-  generateAlert({
-    type: "error",
-    message: "dbFileMissing",
-    variables: { file: missingFile },
-  });
-}
 
 /**
  * Loads an audio segment from a file, posts audio data and metadata to the UI, and triggers detection processing.
@@ -2388,7 +2374,7 @@ async function loadAudioFile({
               contents: audio,
               play: play,
               metadata: METADATA[file].metadata,
-            }
+            },
           );
           let week;
 
@@ -4267,8 +4253,8 @@ async function processNextFile({
     if (QUEUE.getSize('inProgress') === 0) {
       if (!STATE.selection) {
         await getSummary().catch(console.warn);
-        // Clear the prepared statement & params
-        resetSummaryStmt();
+        // Clear the prepared statements & params
+        resetStmts();
       }
       DEBUG && console.log("All files processed.");
       UI.postMessage({ event: "analysis-complete" });
@@ -4499,10 +4485,12 @@ function getBatchesToSend(duration) {
 
 
 
-const resetSummaryStmt= () => {
+const resetStmts = () => {
   Object.assign(STATE.database, {
     summaryStmt: null,
-    summaryParams: null
+    summaryParams: null,
+    resultsStmt: null,
+    resultsParams: null
   });
 }
 async function getSummaryRows(cache) {
@@ -4514,6 +4502,11 @@ async function getSummaryRows(cache) {
     STATE.database.summaryStmt = summaryStmt;
     STATE.database.summaryParams = summaryParams;
   }
+  // First param is always confidence
+  const {confidence, topRankin} = STATE.detect;
+  summaryParams[0] = STATE.list === 'custom' ? 0 : confidence;
+  // Last param is always topRankin
+  summaryParams[summaryParams.length - 1] = topRankin;
   return await summaryStmt.allAsync(...summaryParams);
 }
 
@@ -4524,7 +4517,8 @@ const getSummary = async ({
   species,
   active,
   interim = false,
-  action
+  action,
+  cache
 } = {}) => {
   if (interim && STATE.summaryRunning) return;
   try{
@@ -4533,7 +4527,7 @@ const getSummary = async ({
     // const {sql, params} = await prepSummaryStatement();
     const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
     // const rows = await STATE.db.allAsync(sql, ...params);
-    const rows = await getSummaryRows(interim);
+    const rows = await getSummaryRows(interim || cache);
     console.log(`getting summary took ${Date.now() - t0} ms`)
     const allowedRows =
       STATE.list === 'custom'
@@ -4585,6 +4579,32 @@ const getSummary = async ({
   }
 };
 
+
+async function getResultsRows(cache, species, limit, offset, topRankin, format) {
+  let { resultsStmt, resultsParams } = STATE.database;
+  if (!resultsStmt || !cache) {
+    const {sql, params} = await prepResultsStatement(
+      species,
+      limit === Infinity,
+      offset,
+      topRankin,
+      format
+    );
+    resultsStmt = STATE.db.prepare(sql);
+    resultsParams = params;
+    STATE.database.resultsStmt = resultsStmt;
+    STATE.database.resultsParams = resultsParams;
+  }
+  // Handle list and confidence changes
+  resultsParams[0] = STATE.list === 'custom' ? 0 : STATE.detect.confidence;
+  // Handle species filter changes
+  resultsParams[1] = resultsParams[2] = species;
+  // Handle pagination changes
+  if (limit !== Infinity) resultsParams[resultsParams.length - 1] = offset;
+  return await resultsStmt.allAsync(...resultsParams);
+}
+
+
 /**
  *
  * @param files: files to query for detections
@@ -4601,13 +4621,14 @@ const getSummary = async ({
 
 const getResults = async ({
   species = undefined,
-  limit = STATE.limit,
+  limit,
   offset = undefined,
   topRankin = STATE.detect.topRankin,
   path = undefined,
   format = undefined,
   active = undefined,
   position = undefined,
+  cache = false
 } = {}) => {
   let confidence = STATE.detect.confidence;
   if (position) {
@@ -4622,19 +4643,22 @@ const getResults = async ({
   else STATE.update({ globalOffset: offset });
 
   let index = offset;
-
-  const {sql, params} = await prepResultsStatement(
-    species,
-    limit === Infinity,
-    offset,
-    topRankin,
-    format
-  );
-
-  let result = await STATE.db.allAsync(sql, ...params);
+  const t0 = Date.now();
+  // const {sql, params} = await prepResultsStatement(
+  //   species,
+  //   limit === Infinity,
+  //   offset,
+  //   topRankin,
+  //   format
+  // );
+  // let result = await STATE.db.allAsync(sql, ...params);
+  let result = await getResultsRows(cache, species,STATE.list === 'custom' ? Infinity : limit, offset, topRankin, format);
+  console.log(`GetResults took ${Date.now() - t0} ms`)
   // Apply custom list filtering
   if (STATE.list === 'custom'){
+    const t1 = Date.now()
     result = result.map( (r) => allowedByList(r) ? r : null).filter(r => r !== null).slice(offset, offset + limit);
+    console.log(`Custom list wrangling took ${Date.now() - t1} ms`)
   }
   if (["text", "eBird", "Raven"].includes(format)) {
     await exportData(result, path, format);

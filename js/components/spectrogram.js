@@ -89,11 +89,13 @@ export class ChirpityWS {
 
   wsTextColour() {
     const config = this.getConfig();
-    return config.colormap === "custom"
-      ? config.customColormap.loud
+    const {loud, quiet} = config.customColormap;
+    const colors =  config.colormap === "custom"
+      ? [loud, quiet] 
       : config.colormap === "gray"
-      ? "#000"
-      : "#fff";
+      ? ["#000","#fff"]
+      : ["#fff","#000"];
+    return colors;
   }
 
   /**
@@ -178,7 +180,7 @@ export class ChirpityWS {
       : 24000;
     return WaveSurfer.create({
         container: '#waveform',
-        cursorColor: this.wsTextColour(config),
+        cursorColor: this.wsTextColour()[0],
         cursorWidth: 2,
         minPxPerSec: 2,
         height: 1,
@@ -331,8 +333,8 @@ export class ChirpityWS {
       // gainDB: 50, Adjusts spec brightness without increasing volume
       rendering: "full", // or "windowed",
       labels: config.specLabels,
-      labelsColor: this.wsTextColour(),
-      labelsBackground: "rgba(0,0,0,0)",
+      labelsColor: this.wsTextColour()[0],
+      labelsBackground: "transparent",
       height,
       fftSamples,
       scale: "linear",
@@ -369,6 +371,7 @@ export class ChirpityWS {
     const colors = this.createColormap();
     spectrogram.colorMap = colors;
     spectrogram.alpha = config.customColormap.alpha;
+    spectrogram.options.labelsColor = this.wsTextColour()[0]
     this.reload();
   }
 
@@ -473,7 +476,7 @@ export class ChirpityWS {
     const timeInterval = primaryLabelInterval / 10;
     const colour = this.wsTextColour();
     this.timeline = TimelinePlugin.create({
-      insertPosition: "beforebegin",
+      insertPosition: "afterend",
       formatTimeCallback: this.formatTimeCallback,
       timeInterval,
       primaryLabelInterval,
@@ -481,7 +484,8 @@ export class ChirpityWS {
       secondaryLabelOpacity: 0.5,
       style: {
         fontSize: "0.75rem",
-        color: colour,
+        color: colour[0],
+        background: colour[1],
       },
     });
     return this.wavesurfer
@@ -662,8 +666,13 @@ export class ChirpityWS {
     });
   }
   makeBlob(audio) {
+    // Extract the underlying buffer
+    const arrayBuffer = audio.buffer.slice(
+      audio.byteOffset,
+      audio.byteOffset + audio.byteLength
+    );
     // Recreate TypedArray
-    const int16Array = new Int16Array(audio.buffer);
+    const int16Array = new Int16Array(arrayBuffer);
     // Convert to Float32Array (Web Audio API uses Float32 samples)
     const float32Array = new Float32Array(int16Array.length);
     for (let i = 0; i < int16Array.length; i++) {
