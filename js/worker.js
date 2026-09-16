@@ -4590,16 +4590,25 @@ async function getResultsRows(cache, species, limit, offset, topRankin, format) 
     );
     resultsStmt = STATE.db.prepare(sql);
     resultsParams = params;
-    STATE.database.resultsStmt = resultsStmt;
-    STATE.database.resultsParams = resultsParams;
+    if (cache){
+      STATE.database.resultsStmt = resultsStmt;
+      STATE.database.resultsParams = resultsParams;
+    }
   }
-  // Handle list and confidence changes
+  // Handle bound parameter changes
+  // First param is always confidence
   resultsParams[0] = STATE.list === 'custom' ? 0 : STATE.detect.confidence;
   // Handle species filter changes
   resultsParams[1] = resultsParams[2] = species;
   // Handle pagination changes
-  if (limit !== Infinity) resultsParams[resultsParams.length - 1] = offset;
-  return await resultsStmt.allAsync(...resultsParams);
+  if (limit !== Infinity) {
+    resultsParams[resultsParams.length - 1] = offset;
+    resultsParams[resultsParams.length - 3] = topRankin;
+  } else {
+    resultsParams[resultsParams.length - 1] = topRankin;
+  }
+  return await resultsStmt.allAsync(...resultsParams); 
+
 }
 
 
@@ -4629,6 +4638,7 @@ const getResults = async ({
   cache = false
 } = {}) => {
   let confidence = STATE.detect.confidence;
+  const customList = STATE.list === 'custom';
   if (position) {
     offset = (position.page - 1) * limit;
     // We want to consistently move to the next record. If results are sorted by time, this will be row + 1.
@@ -4653,13 +4663,13 @@ const getResults = async ({
   let result = await getResultsRows(
     cache, 
     species, 
-    STATE.list === 'custom' ? Infinity : limit, 
+    customList ? Infinity : limit, 
     offset, 
     topRankin, 
     format);
   DEBUG && console.log(`GetResults took ${Date.now() - t0} ms`)
   // Apply custom list filtering
-  if (STATE.list === 'custom'){
+  if (customList){
     result = result.map( (r) => allowedByList(r) ? r : null).filter(r => r !== null).slice(offset, offset + limit);
   }
   if (["text", "eBird", "Raven"].includes(format)) {
@@ -4719,14 +4729,25 @@ const getResults = async ({
         }
       } else if (species && STATE.mode !== "explore") {
         // get a number for the circle
-        const { count } = await STATE.db.getAsync(
-          `SELECT COUNT(*) as count FROM records WHERE position = ?
-                AND confidence >= ? and fileID = ?`,
-          r.position,
-          confidence,
-          r.fileID
+        let qualifier = ''
+        const params = [r.position, customList ? 0 : confidence, r.fileID]
+        if (STATE.list !== 'everything'){
+          const result = await getSpeciesSQLAsync(r.file);
+          qualifier = result.SQL;
+          params.push(result.param)
+        }
+        let res = await STATE.db.allAsync(
+          `SELECT r.position * 1000 + f.filestart as timestamp, cname, confidence AS score, r.modelID FROM records r
+          JOIN species s ON r.speciesID = s.id
+          JOIN files f ON f.id = r.fileID
+          WHERE position = ?
+                AND confidence >= ? and fileID = ? ${qualifier}`,
+          ...params
         );
-        r.count = count;
+        if (customList) {
+          res = res.map(r => allowedByList(r)).filter(Boolean)
+        }
+        r.count = res.length;
         sendResult(++index, r, true);
       } else {
         sendResult(++index, r, true);

@@ -109,7 +109,7 @@ export class ChirpityWS {
    *   If the Shift key is pressed, all regions with the default color are removed; if the Ctrl/Cmd key is pressed,
    *   the clicked region is removed.
    * - "region-created": Marks a new region as active if it has no label (content) or its start time matches the current active region.
-   * - "region-update": Clears the region's label and sets the updated region as active.
+   * - "region-updated": Clears the region's label and sets the updated region as active.
    *
    * @returns {Object} The new RegionsPlugin instance.
    */
@@ -372,6 +372,7 @@ export class ChirpityWS {
     spectrogram.colorMap = colors;
     spectrogram.alpha = config.customColormap.alpha;
     spectrogram.options.labelsColor = this.wsTextColour()[0]
+    this.wavesurfer.setOptions({cursorColor: this.wsTextColour()[0]})
     this.reload();
   }
 
@@ -766,9 +767,6 @@ export class ChirpityWS {
       // const newLabel = this.formatLabel(' / ' + label, colour);
       existingRegion.content.textContent += ' / ' + label;
     } else {
-      // See the same note in loadBuffer() above — re-test whether this is
-      // still needed in 7.12.11.
-      REGIONS.subscriptions = [];
       REGIONS.addRegion({
         start: start,
         end: end,
@@ -856,7 +854,7 @@ export class ChirpityWS {
         } else {
           wavesurfer.setOptions({
             height: specHeight,
-            cursorColor: this.wsTextColour(),
+            cursorColor: this.wsTextColour()[0],
           });
           this.spectrogram.height = specHeight;
           await this.loadBuffer();
@@ -886,7 +884,7 @@ export class ChirpityWS {
   reInitSpec(height) {
     const wavesurfer = this.wavesurfer;
     if (wavesurfer && !this.spectrogram) {
-      wavesurfer.options.cursorColor = this.wsTextColour();
+      wavesurfer.setOptions({cursorColor: this.wsTextColour()[0]})
       this.spectrogram = this.initSpectrogram(height);
       wavesurfer.registerPlugin(this.spectrogram);
       this.refreshTimeline();

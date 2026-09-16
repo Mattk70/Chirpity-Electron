@@ -2011,7 +2011,7 @@ const Titles = {
     // },
     pt: {
         location: 'Espécies locais',
-        nocturnal: 'Chamadas noturnos',
+        nocturnal: 'Chamadas noturnas',
         birds: 'Todas as espécies',
         everything: 'Tudo',
         custom: 'Personalizado',
@@ -2026,9 +2026,9 @@ const Titles = {
         libraryLocationPH: "Nenhuma localização definida" 
     },
     ru: {
-        location: 'Местные птицы',
+        location: 'Местные виды',
         nocturnal: 'Ночные звуков',
-        birds: 'Все птицы',
+        birds: 'Все виды',
         everything: 'Все',
         custom: 'Пользовательский',
         timecode: "Таймкод",

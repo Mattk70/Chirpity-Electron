@@ -2295,7 +2295,7 @@ const defaultConfig = {
     nocmig: {displayName: 'Nocmig V2 (Beta)', backend: 'webgpu', list: 'birds', webgpu: {threads: 1, batchSize: 8}, tensorflow: {threads: null, batchSize: 8},  customListFile: ''},
   },
   local: true,
-  speciesThreshold: 0.03,
+  speciesThreshold: 0.5,
   useWeek: false,
   selectedModel: "birdnet",
   locale: "en",
@@ -6762,11 +6762,19 @@ async function handleUIClicks(e) {
       if (!PREDICTING) {
         const el = DOM.modelToUse;
         const numberOfOptions = el.options.length;
-        const currentListIndex = el.selectedIndex;
-        const next = currentListIndex === numberOfOptions - 1 ? 0 : currentListIndex + 1;
-        config.selectedModel = el.options[next].value;
-        el.selectedIndex = next;
-        handleModelChange(config.selectedModel)
+        const currentIndex = el.selectedIndex;
+
+        let next = (currentIndex + 1) % numberOfOptions;
+
+        while (el.options[next].disabled && next !== currentIndex) {
+          next = (next + 1) % numberOfOptions;
+        }
+
+        if (!el.options[next].disabled) {
+          config.selectedModel = el.options[next].value;
+          el.selectedIndex = next;
+          handleModelChange(config.selectedModel);
+        }
       }
       break;
     }
