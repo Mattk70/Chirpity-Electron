@@ -4523,12 +4523,10 @@ const getSummary = async ({
   if (interim && STATE.summaryRunning) return;
   try{
     STATE.summaryRunning = true;
-    const t0 = Date.now()
-    // const {sql, params} = await prepSummaryStatement();
+    const t0 = Date.now();
     const offset = species ? STATE.filteredOffset[species] : STATE.globalOffset;
-    // const rows = await STATE.db.allAsync(sql, ...params);
     const rows = await getSummaryRows(interim || cache);
-    console.log(`getting summary took ${Date.now() - t0} ms`)
+    DEBUG && console.log(`getting summary took ${Date.now() - t0} ms`)
     const allowedRows =
       STATE.list === 'custom'
         ? rows.filter(allowedByList)
@@ -4659,12 +4657,10 @@ const getResults = async ({
     offset, 
     topRankin, 
     format);
-  console.log(`GetResults took ${Date.now() - t0} ms`)
+  DEBUG && console.log(`GetResults took ${Date.now() - t0} ms`)
   // Apply custom list filtering
   if (STATE.list === 'custom'){
-    const t1 = Date.now()
     result = result.map( (r) => allowedByList(r) ? r : null).filter(r => r !== null).slice(offset, offset + limit);
-    console.log(`Custom list wrangling took ${Date.now() - t1} ms`)
   }
   if (["text", "eBird", "Raven"].includes(format)) {
     await exportData(result, path, format);

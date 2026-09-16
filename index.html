@@ -917,6 +917,33 @@
                                 <option value="custom">Custom</option>
                             </select>
                         </div>
+                        <div class="list-hidden" id="choose-file-container">
+                            <div class="col-auto input-group rounded p-2 pe-3">
+                                <button class="btn btn-outline-secondary" type="button" id="list-file-selector"> Select file</button>
+                                <input type="text" class="form-control" id="custom-list-location" aria-describedby="list-file-selector" placeholder="No custom list set" disabled="" readonly="">
+                                <span id="clear-custom-list" class="material-symbols-outlined btn btn-outline-secondary p-1" title="Clear custom list">clear</span>
+                            </div>
+                        </div>
+                        <div class="list-hidden pb-2" id="use-location-container">
+                            <div class="form-switch ms-2">
+                                <input class="form-check-input" type="checkbox" role="switch" id="local">
+                                <label class="form-check-label" for="local">Use Location settings</label>
+                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Use Location settings" id="Use Location settings-circle-help"  data-bs-content="When activated, the Nocturnal birds filter reports birds based on your location settings.">?</a>
+                            </div>
+                        </div>
+                        <div class="list-hidden" id="species-threshold-el">
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Species Threshold" id="Species Threshold-circle-help"  data-bs-content="Define the minimum eBird checklist frequency for species inclusion.
+                            If 'Adjust list for the week of the year' is enabled, the list will be adjusted to include species expected for the recording week.">?</a>
+                            <div class="pe-3 input-group rounded p-2 mb-1">
+                                <label class="input-group-text text-bg-dark" for="species-frequency-threshold">Species Threshold:</label>
+                                <input id="species-frequency-threshold" type="number" class="form-control" style="width: 30%;" value="0.03" step="0.01" min="0.01" max="1" aria-label="species frequency threshold" aria-describedby="species-frequency-threshold">
+                            </div>
+                            <div class="text-nowrap mt-2"><label class="ms-2 me-2" for="species-week">Adjust list for the week of the year</label>
+                                <span class="form-switch ms-2">
+                                    <input id="species-week" role="switch" type="checkbox" class="form-check-input form-check-inline">
+                                </span>
+                            </div>                                                                
+                        </div>
                         <fieldset class="border border-secondary rounded m-2 mb-0 p-2 w-50 d-none" id="classes">
                             <h6 id="additional-classes-title">Additional Classes</h6>
                             <div class="form-check">
@@ -939,33 +966,6 @@
                                 <label class="form-check-label" for="Reptilia">Reptilia</label>
                             </div>
                         </fieldset>
-                        <div class="list-hidden" id="choose-file-container">
-                            <div class="col-auto input-group rounded p-2 pe-3">
-                                <button class="btn btn-outline-secondary" type="button" id="list-file-selector"> Select file</button>
-                                <input type="text" class="form-control" id="custom-list-location" aria-describedby="list-file-selector" placeholder="No custom list set" disabled="" readonly="">
-                                <span id="clear-custom-list" class="material-symbols-outlined btn btn-outline-secondary p-1" title="Clear custom list">clear</span>
-                            </div>
-                        </div>
-                        <div class="list-hidden pb-2" id="use-location-container">
-                            <div class="form-switch ms-2">
-                                <input class="form-check-input" type="checkbox" role="switch" id="local">
-                                <label class="form-check-label" for="local">Use Location settings</label>
-                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Use Location settings" id="Use Location settings-circle-help"  data-bs-content="When activated, the Nocturnal birds filter reports birds based on your location settings.">?</a>
-                            </div>
-                        </div>
-                        <div class="advanced list-hidden" id="species-threshold-el">
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Species Threshold" id="Species Threshold-circle-help"  data-bs-content="Define the minimum eBird checklist frequency for species inclusion.
-                            If 'Adjust list for the week of the year' is enabled, the list will be adjusted to include species expected for the recording week.">?</a>
-                            <div class="pe-3 input-group rounded p-2 mb-1">
-                                <label class="input-group-text bg-dark text-warning" for="species-frequency-threshold">Species Threshold:</label>
-                                <input id="species-frequency-threshold" type="number" class="form-control" style="width: 30%;" value="0.03" step="0.01" min="0.01" max="1" aria-label="species frequency threshold" aria-describedby="species-frequency-threshold">
-                            </div>
-                            <div class="text-nowrap mt-2"><label class="ms-2 me-2" for="species-week">Adjust list for the week of the year</label>
-                                <span class="form-switch ms-2">
-                                    <input id="species-week" role="switch" type="checkbox" class="form-check-input form-check-inline">
-                                </span>
-                            </div>                                                                
-                        </div>
                     </div>
                     
                     <div class="form-group rounded p-2">

@@ -9196,7 +9196,7 @@ async function updateModelOptions(customOnly){
   const builtInModels = ['nocmig', 'chirpity', 'birdnet', 'birdnet3'];
   const modelOptions = Object.fromEntries(
     Object.entries(config.models).filter(([model]) =>
-      dbModels.includes(model) &&
+      (builtInModels.includes(model) || dbModels.includes(model)) &&
       (!customOnly || !builtInModels.includes(model))
     )
   );

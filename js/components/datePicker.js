@@ -174,7 +174,7 @@ function initialiseDatePicker(state, worker, config, resetResults, filterResults
       worker.postMessage({ action: "get-detected-species-list" });
     });
     picker.on("clear", (e) => {
-      console.log("Range Cleared!", JSON.stringify(e.detail));
+      //console.log("Range Cleared!", JSON.stringify(e.detail));
       if (element.id === "chartRange") {
         state.chart.range = { start: undefined, end: undefined };
         worker.postMessage({ action: "update-state", chart: state.chart });
@@ -206,7 +206,7 @@ function initialiseDatePicker(state, worker, config, resetResults, filterResults
     picker.on("click", (e) => {
       const el = e.target;
       if (el.classList.contains("cancel-button")) {
-        console.log("cancelled");
+        //console.log("cancelled");
       } else if (el.textContent === `${i18.midnight}`) {
         midnight = true;
         picker.setEndTime('00:00')
