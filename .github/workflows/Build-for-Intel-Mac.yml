@@ -134,6 +134,13 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Verify model files exist
+        run: |
+          if [ ! -f "./BirdNET3/BirdNET+_Geomodel_V3.0.3_Global_12K_FP16.onnx" ]; then
+            echo "❌ ONNX model file not found - BirdNET+_Geomodel_V3.0.3_Global_12K_FP16.onnx"
+            exit 1
+          fi
+          
       - name: Install dependencies
         run: |
           npm install
