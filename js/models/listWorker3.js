@@ -550,15 +550,8 @@ class Model {
  * @returns {Promise<void>} Resolves after the readiness message is posted.
  */
 async function _init_() {
-  const files = await fs.promises.readdir(__dirname);
-
-console.log("dirName: ", files);
-const testDir = path.resolve(__dirname, "../../");
-  const files2 = await fs.promises.readdir(testDir);
-
-console.log("supposed to be contents of Chirpity-Electron: ", files2);
 const netDir = path.resolve(
-      __dirname, "../../BirdNET3");
+      __dirname, "../../BirdNET3").replace('app.asar', 'app.asar.unpacked');
   const files3 = await fs.promises.readdir(netDir);
 
 console.log("supposed to be contents of BirdNET3: ", files3);
@@ -566,7 +559,7 @@ console.log("supposed to be contents of BirdNET3: ", files3);
   DEBUG && console.log(`List generating model received load instruction.`);
   listModel = new Model( path.resolve(
       __dirname, "../../BirdNET3/BirdNET+_Geomodel_V3.0.3_Global_12K_FP16.onnx"
-    ));
+    ).replace('app.asar', 'app.asar.unpacked'));
 
   await listModel.loadModel();
   postMessage({ message: "list-model-ready" });

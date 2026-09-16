@@ -1,5 +1,6 @@
 const ort = require ("onnxruntime-node");
 const fs = require("node:fs");
+const path = require("node:path");
 
 let session = null;
 let currentGeneration = 0;
@@ -41,7 +42,10 @@ async function loadModel(_mpath, backend, batchSize) {
     freeDimensionOverrides,
     preferredOutputLocation,
   };
-  const modelPath = './BirdNET3/birdnet_gem_webgpu_fast.onnx';
+  // const modelPath = './BirdNET3/birdnet_gem_webgpu_fast.onnx';
+  const modelPath = path.resolve(
+        __dirname, "../../BirdNET3/birdnet_gem_webgpu_fast.onnx"
+      ).replace('app.asar', 'app.asar.unpacked');
   session = await ort.InferenceSession.create(modelPath, sessionOptions);
   cancelled = false;
 }
