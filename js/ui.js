@@ -408,6 +408,8 @@ DOM.controlsWrapper.addEventListener("mousedown", (e) => {
       animating = true;
       requestAnimationFrame(() => {
         spec.adjustDims(true, newHeight);
+        // Lazy hack, but works
+        window.dispatchEvent(new Event("resize"));
         animating = false;
       });
     }
