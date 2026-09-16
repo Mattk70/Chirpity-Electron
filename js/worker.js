@@ -928,7 +928,9 @@ async function handleMessage(e) {
       }
       // Clear cached statements when changing an explore range (from datepicker.js)
       // Or location
-      if (args.explore || Object.hasOwn(args, 'location')) resetStmts();
+      if (args.explore
+          || Object.hasOwn(args, 'location')
+          || Object.hasOwn(args, 'resultsSortOrder') ) resetStmts();
       
       STATE.update(args);
       // Call new db functions when not initial state update (where UUID is sent)
