@@ -887,8 +887,8 @@ async function handleMessage(e) {
       await INITIALISED;
       await setLabelState({regenerate:true});
       const species = args.species;
-      
-      args.refreshResults && (await Promise.all([getSummary({species}), getResults({species})]));
+      resetStmts();
+      args.refreshResults && (await Promise.all([getSummary({species, cache: true}), getResults({species, cache: true})]));
       break;
     }
     case "update-locale": {
@@ -930,7 +930,9 @@ async function handleMessage(e) {
       // Or location
       if (args.explore
           || Object.hasOwn(args, 'location')
-          || Object.hasOwn(args, 'resultsSortOrder') ) resetStmts();
+          || Object.hasOwn(args, 'resultsSortOrder')
+          || (args.detect && Object.hasOwn(args.detect, 'nocmig'))
+         ) resetStmts();
       
       STATE.update(args);
       // Call new db functions when not initial state update (where UUID is sent)
@@ -1695,11 +1697,11 @@ async function addQueryQualifiers(stmt, params, range, caller) {
     } else {
       stmt += ` AND 1 = 0 `;
     }
-  } else {
-    const res = await getSpeciesSQLAsync();
-    stmt += res.SQL;
-    if (res.SQL) params.push(res.param);
-  }
+  } 
+  const res = await getSpeciesSQLAsync();
+  stmt += res.SQL;
+  if (res.SQL) params.push(res.param);
+  
   if (detect.nocmig) {
     stmt += ` AND isDaylight = ${detect.nocmig === 'day' ? 1 : 0} `;
   }
@@ -1745,12 +1747,12 @@ const prepSummaryStatement = async () => {
 
 const prepResultsStatement = async (
   species,
-  noLimit,
+  limit,
   offset,
   topRankin,
   format
 ) => {
-  const {mode, list, limit, explore, resultsMetaSortOrder, resultsSortOrder, detect, selection} = STATE;
+  const {mode, list, explore, resultsMetaSortOrder, resultsSortOrder, detect, selection} = STATE;
   const partition = detect.merge ? '' : ', r.modelID'; 
   const confidence = list === "custom" ? 0 : detect.confidence;
   const param = [confidence, species, species];
@@ -1829,7 +1831,7 @@ const prepResultsStatement = async (
 
   // Because custom list doesn't limit the results, it can get v slow when the archive is large.
   // But, we can use the limit clause if the user is not using a custom list
-  noLimit = list === 'custom' || noLimit;
+  const noLimit = limit === Infinity;
   const limitClause = noLimit  ? " " : " LIMIT ?  OFFSET ? ";
   noLimit || params.push(limit, offset);
   const metaSort = resultsMetaSortOrder
@@ -2071,7 +2073,7 @@ async function onAnalyse({
     if (retrieveFromDatabase) {
       if (circleClicked) {
         // handle circle here
-        await getResults({ topRankin: 5, offset: 0 });
+        await getResults({ topRankin: 5, offset: 0, cache: false });
       } else {
         await onChangeMode("archive");
         files.forEach((file) => {
@@ -2128,6 +2130,7 @@ function onAbort({ model = STATE.model }) {
     } catch (e) {
         console.error("Error occurred while cancelling worker queue", e);
     }
+    if (QUEUE.any('inProgress')) UI.postMessage({ event: "analysis-complete" });
     QUEUE.moveAll(['pending', 'inProgress'], 'complete');
   }
   // Tell workers to ignore results from any in-flight batches and stop processing
@@ -4498,6 +4501,7 @@ const resetStmts = () => {
 async function getSummaryRows(cache) {
   let { summaryStmt, summaryParams } = STATE.database;
   if (!summaryStmt || !cache) {
+    DEBUG && console.log('Regenerating summary SQL')
     const { sql, params } = await prepSummaryStatement();
     summaryStmt = STATE.db.prepare(sql);
     summaryParams = params;
@@ -4520,7 +4524,7 @@ const getSummary = async ({
   active,
   interim = false,
   action,
-  cache
+  cache = true
 } = {}) => {
   if (interim && STATE.summaryRunning) return;
   try{
@@ -4583,9 +4587,10 @@ const getSummary = async ({
 async function getResultsRows(cache, species, limit, offset, topRankin, format) {
   let { resultsStmt, resultsParams } = STATE.database;
   if (!resultsStmt || !cache) {
+    DEBUG && console.log('Regenerating results SQL')
     const {sql, params} = await prepResultsStatement(
       species,
-      limit === Infinity,
+      limit,
       offset,
       topRankin,
       format
@@ -4637,7 +4642,7 @@ const getResults = async ({
   format = undefined,
   active = undefined,
   position = undefined,
-  cache = false
+  cache = true
 } = {}) => {
   let confidence = STATE.detect.confidence;
   const customList = STATE.list === 'custom';
@@ -4654,14 +4659,7 @@ const getResults = async ({
 
   let index = offset;
   const t0 = Date.now();
-  // const {sql, params} = await prepResultsStatement(
-  //   species,
-  //   limit === Infinity,
-  //   offset,
-  //   topRankin,
-  //   format
-  // );
-  // let result = await STATE.db.allAsync(sql, ...params);
+
   let result = await getResultsRows(
     cache, 
     species, 
@@ -4669,7 +4667,6 @@ const getResults = async ({
     offset, 
     topRankin, 
     format);
-  DEBUG && console.log(`GetResults took ${Date.now() - t0} ms`)
   // Apply custom list filtering
   if (customList){
     result = result.map( (r) => allowedByList(r) ? r : null).filter(r => r !== null).slice(offset, offset + limit);
@@ -4694,6 +4691,20 @@ const getResults = async ({
       zh: "正在保存文件：",
     };
     const savingText = savingFiles[STATE.locale] || savingFiles["en"];
+    // Prepare circle statement
+    let qualifier = '';
+    let speciesParam;
+    if (STATE.list !== 'everything'){
+      const result = await getSpeciesSQLAsync();
+      qualifier = result.SQL;
+      speciesParam = result.param;
+    }
+    const circleStmt = STATE.db.prepare(`
+      SELECT r.position * 1000 + f.filestart as timestamp, cname, confidence AS score, r.modelID FROM records r
+        JOIN species s ON r.speciesID = s.id
+        JOIN files f ON f.id = r.fileID
+        WHERE position = ?
+        AND confidence >= ? and fileID = ? ${qualifier}`);
     for (let i = 0; i < result.length; i++) {
       count++;
       const r = result[i];
@@ -4730,26 +4741,16 @@ const getResults = async ({
             });
         }
       } else if (species && STATE.mode !== "explore") {
+        const t0 = Date.now();
         // get a number for the circle
-        let qualifier = ''
-        const params = [r.position, customList ? 0 : confidence, r.fileID]
-        if (STATE.list !== 'everything'){
-          const result = await getSpeciesSQLAsync(r.file);
-          qualifier = result.SQL;
-          params.push(result.param)
-        }
-        let res = await STATE.db.allAsync(
-          `SELECT r.position * 1000 + f.filestart as timestamp, cname, confidence AS score, r.modelID FROM records r
-          JOIN species s ON r.speciesID = s.id
-          JOIN files f ON f.id = r.fileID
-          WHERE position = ?
-                AND confidence >= ? and fileID = ? ${qualifier}`,
-          ...params
-        );
+        const params = [r.position, customList ? 0 : confidence, r.fileID];
+        speciesParam && params.push(speciesParam);
+        let res = await circleStmt.allAsync(...params);
         if (customList) {
           res = res.map(r => allowedByList(r)).filter(Boolean)
         }
         r.count = res.length;
+        DEBUG && console.log(`checking for the circle took ${Date.now() - t0} ms`)
         sendResult(++index, r, true);
       } else {
         sendResult(++index, r, true);
@@ -4796,6 +4797,7 @@ const getResults = async ({
         select: position?.start,
       });
   }
+  DEBUG && console.log(`GetResults took ${Date.now() - t0} ms`)
 };
 
 /**
@@ -6233,7 +6235,7 @@ async function setIncludedIDs(lat, lon, week) {
 
     if (STATE.included === undefined) STATE.included = {};
     STATE.included = merge(STATE.included, includedObject);
-    messages.splice(5) // Prevent spanning with 1000's messages, limit to 5
+    messages.splice(2) // Prevent spanning with 1000's messages, limit to 2
     messages.forEach((message) => {
       message.model = message.model.replace("chirpity", "Nocmig");
       generateAlert({

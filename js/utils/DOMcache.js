@@ -33,6 +33,7 @@ const DOM = {
   get controlsWrapper() { return this._controlsWrapper ??= document.getElementById("controlsWrapper") },
   get contextAware() { return this._contextAware ??= document.getElementById("context") },
   get contextAwareIcon() { return this._contextAwareIcon ??= document.getElementById("context-mode") },
+  get contextMenu() { return this._contextMenu ??= document.getElementById("context-menu") },
   get debugMode() { return this._debugMode ??= document.getElementById("debug-mode") },
   get defaultLat() { return this._defaultLat ??= document.getElementById("latitude") },
   get defaultLon() { return this._defaultLon ??= document.getElementById("longitude") },
@@ -94,9 +95,7 @@ const DOM = {
   get buyMeCoffee() {
     return document.getElementById("bmc-wbtn");
   },
-  get contextMenu() {
-    return document.getElementById("context-menu");
-  },
+
   get filename() {
     return document.getElementById("filename");
   },

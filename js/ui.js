@@ -7059,19 +7059,19 @@ document.addEventListener("change", async function (e) {
         }
         case "merge-overlaps": {
           config.detect.mergeOverlaps = element.checked;
-          worker.postMessage({ action: "update-state", detect: config.detect });
+          worker.postMessage({ action: "update-state", detect: {mergeOverlaps: element.checked} });
           break;
         }
         case "drop-uncertain": {
           config.detect.dropSingles = element.checked;
-          worker.postMessage({ action: "update-state", detect: config.detect });
+          worker.postMessage({ action: "update-state", detect: {dropSingles: element.checked} });
           break;
         }
         case "auto-load": {
           config.detect.autoLoad = element.checked;
           worker.postMessage({
             action: "update-state",
-            detect: config.detect,
+            detect: {autoLoad: element.checked},
           });
           break;
         }
@@ -8101,7 +8101,7 @@ document
       });
       buildFileMenu(contextMenuEvent);
     } else {
-      document.getElementById("context-menu").classList.remove("show");
+      DOM.contextMenu.classList.remove("show");
     }
   });
 
