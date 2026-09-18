@@ -1,7 +1,7 @@
 {
   "name": "Chirpity",
-  "version": "5.18.1",
-  "description": "Chirpity is a bioacoustics platform for the analysis of bird song and other wildlife sounds. It uses machine learning models to identify bird species from audio recordings.",
+  "version": "6.0.0",
+  "description": "Chirpity is a bioacoustics platform for the analysis of bird song and other wildlife sounds. It uses machine learning models to identify species from audio recordings.",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -51,6 +51,7 @@
     "pkg": {
       "license": "LICENSE.txt"
     },
+    "asarUnpack": ["BirdNET3/**/*.onnx"],
     "nsis": {
       "oneClick": false,
       "perMachine": true,
@@ -253,12 +254,15 @@
     "fluent-ffmpeg": "^2.1.2",
     "keytar": "^7.9.0",
     "lodash.merge": "^4.6.2",
-    "onnxruntime-node": "1.24.1",
+    "onnxruntime-node": "1.29.0",
     "p-limit": "3.1.0",
     "sqlite3": "6.0.1",
     "suncalc": "^1.9.0",
     "systeminformation": "^5.27.14",
     "utimes": "^5.2.1",
-    "wavesurfer.js": "7.9.5"
+    "wavesurfer.js": "7.12.12"
+  },
+  "optionalDependencies": {
+    "ntsuspend": "^1.0.2"
   }
 }

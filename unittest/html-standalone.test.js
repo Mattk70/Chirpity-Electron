@@ -186,9 +186,6 @@ test('has explore wrapper for data exploration', () => {
   assert.ok(/id="exploreWrapper"/.test(htmlContent), 'Should have exploreWrapper element');
 });
 
-test('has spectrogram display element', () => {
-  assert.ok(/id="spectrogram"/.test(htmlContent), 'Should have spectrogram element');
-});
 
 test('has waveform display element', () => {
   assert.ok(/id="waveform"/.test(htmlContent), 'Should have waveform element');

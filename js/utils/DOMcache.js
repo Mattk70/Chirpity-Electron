@@ -27,11 +27,13 @@ const DOM = {
   get batchSizeSlider() { return this._batchSizeSlider ??= document.getElementById("batch-size") },
   get batchSizeValue() { return this._batchSizeValue ??= document.getElementById("batch-size-value") },
   get chartsLink() { return this._chartsLink ??= document.getElementById("charts") },
+  get classes() { return this._classes ??= document.getElementById("classes") },
   get colourmap() { return this._colourmap ??= document.getElementById("colourmap") },
   get contentWrapper() { return this._contentWrapper ??= document.getElementById("contentWrapper") },
   get controlsWrapper() { return this._controlsWrapper ??= document.getElementById("controlsWrapper") },
   get contextAware() { return this._contextAware ??= document.getElementById("context") },
   get contextAwareIcon() { return this._contextAwareIcon ??= document.getElementById("context-mode") },
+  get contextMenu() { return this._contextMenu ??= document.getElementById("context-menu") },
   get debugMode() { return this._debugMode ??= document.getElementById("debug-mode") },
   get defaultLat() { return this._defaultLat ??= document.getElementById("latitude") },
   get defaultLon() { return this._defaultLon ??= document.getElementById("longitude") },
@@ -82,6 +84,9 @@ const DOM = {
   get suggestionsList() { return this._suggestionsList = document.getElementById('bird-suggestions') },
   get summaryTable() { return this._summaryTable ??= document.getElementById("summaryTable") },
   get threadSlider() { return this._threadSlider ??= document.getElementById("thread-slider") },
+  get windowSize() { return this._windowSize ??= document.getElementById("window-size") },
+  get windowSizeValue() { return this._windowSizeValue ??= document.getElementById("window-size-value") },
+  get windowSizeSlider() { return this._windowSizeSlider ??= document.getElementById("window-size-slider") },
   get timelineSetting() { return this._timelineSetting ??= document.getElementById("timelineSetting") },
   get trainNav() { return this._trainNav ??= document.getElementById("open-training") },
   get tooltipInstance() { return this._tooltipInstance ??= 
@@ -90,9 +95,7 @@ const DOM = {
   get buyMeCoffee() {
     return document.getElementById("bmc-wbtn");
   },
-  get contextMenu() {
-    return document.getElementById("context-menu");
-  },
+
   get filename() {
     return document.getElementById("filename");
   },
@@ -111,12 +114,7 @@ const DOM = {
   get summary() {
     return document.getElementById("summary");
   },
-  get specElement() {
-    return document.getElementById("spectrogram");
-  },
-  get specCanvasElement() {
-    return document.querySelector("#spectrogram canvas");
-  },
+
   get waveCanvasElement() {
     return document.querySelector("#waveform canvas");
   },

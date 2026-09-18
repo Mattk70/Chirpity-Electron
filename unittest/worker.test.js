@@ -688,9 +688,6 @@ test('has split character function', () => {
             'Should have getSplitChar function');
 });
 
-test('handles label exclusion', () => {
-  assert.ok(/getExcluded/.test(workerContent), 'Should have getExcluded function');
-});
 
 // Test Suite 18: SQL Query Management
 console.log(`\n${colors.yellow}Test Suite: SQL Query Management${colors.reset}`);

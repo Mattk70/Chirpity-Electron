@@ -1994,9 +1994,9 @@ window.onload = async () => {
   // Load preferences and override defaults
   [appPath, tempPath, systemLocale, dirname] = await getPaths();
   // Set default locale
-  systemLocale = systemLocale.replace("en-GB", "en_uk");
+  systemLocale = systemLocale.replace("en-GB", "en_GB");
   systemLocale =
-    systemLocale === "en_uk"
+    systemLocale === "en_GB"
       ? systemLocale
       : systemLocale.slice(0, 2).toLowerCase();
   if (STATE.translations.includes(systemLocale)) {
@@ -2763,7 +2763,7 @@ function getDateOfISOWeek(week, year) {
 }
 
 function formatWeekRange(week, year) {
-  const locale = config.locale.replace("en_uk", "en-GB").replace('_', '-');
+  const locale = config.locale.replace("en_GB", "en-GB").replace('_', '-');
 
   const start = getDateOfISOWeek(week, year);
   if (isNaN(start.getTime())) return week;
@@ -2946,7 +2946,7 @@ function generateDateLabels(aggregation, datapoints, pointstart, startX) {
 function formatDate(date, aggregation) {
   const options = {};
   let formattedDate = "";
-  const locale = config.locale.replace("en_uk", "en-GB").replace('_', '-');
+  const locale = config.locale.replace("en_GB", "en-GB").replace('_', '-');
   if (aggregation === "week") {
     // Add 1 day to the startDate
     date.setHours(date.getDate() );
