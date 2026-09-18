@@ -1054,11 +1054,12 @@ async function createCustomListMap(customLabels, splitOn, member) {
       confidence: confidence ? Number(confidence) * 1000 : null
     });
   }
-  await checkCustomCnames()
+  await checkCustomCnames();
 }
 
 async function checkCustomCnames(){
   const cnames = Object.keys(STATE.customLabelsMap);
+  if (!cnames.length) return;
   const values = cnames.map(() => "(?)").join(", ");
 
   const rows = await STATE.db.allAsync(`
