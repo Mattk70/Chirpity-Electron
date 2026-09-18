@@ -182,8 +182,8 @@ async function predictBatch(audio, keys) {
     const batchedIndices  = Array.from({ length });
     const batchedProbs  = Array.from({ length });
     const prediction = await session.run({ inputs: audio })
-    const flatID = prediction.label.cpuData; // Float32Array
-    const flatEmbeds = prediction.embedding.cpuData;
+    const flatID = prediction.label.data; // Float32Array
+    const flatEmbeds = prediction.embedding.data;
     const dim = prediction.embedding.dims[1]
     for (let b = 0; b < length; b++) {
       const offset = b * numClasses;

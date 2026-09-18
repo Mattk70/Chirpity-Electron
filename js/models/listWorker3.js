@@ -357,7 +357,7 @@ class Model {
         }
         const input = new ort.Tensor('float32', data, [batchSize, 3]);
         const output = await session.run({ input });
-        const probs = output.probabilities.cpuData;
+        const probs = output.probabilities.data;
         const nSpecies = probs.length / batchSize;
 
         // Compute maximum across all 48 weeks.
@@ -375,7 +375,7 @@ class Model {
       } else {
           this.mdata_input = new ort.Tensor('float32', [lat, lon, week], [1, 3]);
           const mdata_prediction = await session.run({ 'input': this.mdata_input });
-          mdata_probs = mdata_prediction.probabilities.cpuData;
+          mdata_probs = mdata_prediction.probabilities.data;
       }
       let count = 0; const model = this.model;
       for (let i = 0; i < mdata_probs.length; i++) {
