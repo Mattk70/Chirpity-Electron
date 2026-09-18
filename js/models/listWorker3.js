@@ -295,7 +295,7 @@ class Model {
       'probabilities': 'cpu'
     }
     const threadOptions = { intraOpNumThreads:4, interOpNumThreads: 2 };
-  const executionProviderConfig = gpu ? { webgpu: { validationMode: 'basic' } } : {};
+  const executionProviderConfig = { webgpu: { validationMode: 'basic' } };
     const sessionOptions = { 
       executionProviders: providers,
       enableGraphCapture: true, 
