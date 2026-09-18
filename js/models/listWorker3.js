@@ -31,105 +31,105 @@ DEBUG && console.log(BIRDNET3_LABELS.length, "labels loaded from BirdNET3 label 
 let listModel;
 
 const NOT_BIRDS = [
-  "Acris crepitans_Northern Cricket Frog",
-  "Acris gryllus_Southern Cricket Frog",
-  "Allonemobius allardi_Allard's Ground Cricket",
-  "Allonemobius tinnulus_Tinkling Ground Cricket",
-  "Allonemobius walkeri_Walker's Ground Cricket",
-  "Alouatta pigra_Mexican Black Howler Monkey",
-  "Amblycorypha alexanderi_Clicker Round-winged Katydid",
-  "Amblycorypha longinicta_Common Virtuoso Katydid",
-  "Amblycorypha oblongifolia_Oblong-winged Katydid",
-  "Amblycorypha rotundifolia_Rattler Round-winged Katydid",
-  "Anaxipha exigua_Say's Trig",
-  "Anaxyrus americanus_American Toad",
-  "Anaxyrus canorus_Yosemite Toad",
-  "Anaxyrus cognatus_Great Plains Toad",
-  "Anaxyrus fowleri_Fowler's Toad",
-  "Anaxyrus houstonensis_Houston Toad",
-  "Anaxyrus microscaphus_Arizona Toad",
-  "Anaxyrus quercicus_Oak Toad",
-  "Anaxyrus speciosus_Texas Toad",
-  "Anaxyrus terrestris_Southern Toad",
-  "Anaxyrus woodhousii_Woodhouse's Toad",
-  "Apis mellifera_Honey Bee",
-  "Atlanticus testaceus_Protean Shieldback",
-  "Canis latrans_Coyote",
-  "Canis lupus_Gray Wolf",
-  "Conocephalus brevipennis_Short-winged Meadow Katydid",
-  "Conocephalus fasciatus_Slender Meadow Katydid",
-  "Cyrtoxipha columbiana_Columbian Trig",
-  "Dryophytes andersonii_Pine Barrens Treefrog",
-  "Dryophytes arenicolor_Canyon Treefrog",
-  "Dryophytes avivoca_Bird-voiced Treefrog",
-  "Dryophytes chrysoscelis_Cope's Gray Treefrog",
-  "Dryophytes cinereus_Green Treefrog",
-  "Dryophytes femoralis_Pine Woods Treefrog",
-  "Dryophytes gratiosus_Barking Treefrog",
-  "Dryophytes squirellus_Squirrel Treefrog",
-  "Dryophytes versicolor_Gray Treefrog",
-  "Eleutherodactylus planirostris_Greenhouse Frog",
-  "Eunemobius carolinus_Carolina Ground Cricket",
-  "Eunemobius confusus_Confused Ground Cricket",
-  "Gastrophryne carolinensis_Eastern Narrow-mouthed Toad",
-  "Gastrophryne olivacea_Great Plains Narrow-mouthed Toad",
-  "Gryllus assimilis_Gryllus assimilis",
-  "Gryllus fultoni_Southern Wood Cricket",
-  "Gryllus pennsylvanicus_Fall Field Cricket",
-  "Gryllus rubens_Southeastern Field Cricket",
-  "Hyliola regilla_Pacific Chorus Frog",
-  "Incilius valliceps_Gulf Coast Toad",
-  "Lithobates catesbeianus_American Bullfrog",
-  "Lithobates clamitans_Green Frog",
-  "Lithobates palustris_Pickerel Frog",
-  "Lithobates sylvaticus_Wood Frog",
-  "Microcentrum rhombifolium_Greater Angle-wing",
-  "Miogryllus saussurei_Miogryllus saussurei",
-  "Neoconocephalus bivocatus_False Robust Conehead",
-  "Neoconocephalus ensiger_Sword-bearing Conehead",
-  "Neoconocephalus retusus_Round-tipped Conehead",
-  "Neoconocephalus robustus_Robust Conehead",
-  "Neonemobius cubensis_Cuban Ground Cricket",
-  "Odocoileus virginianus_White-tailed Deer",
-  "Oecanthus celerinictus_Fast-calling Tree Cricket",
-  "Oecanthus exclamationis_Davis's Tree Cricket",
-  "Oecanthus fultoni_Snowy Tree Cricket",
-  "Oecanthus nigricornis_Blackhorned Tree Cricket",
-  "Oecanthus niveus_Narrow-winged Tree Cricket",
-  "Oecanthus pini_Pine Tree Cricket",
-  "Oecanthus quadripunctatus_Four-spotted Tree Cricket",
-  "Orchelimum agile_Agile Meadow Katydid",
-  "Orchelimum concinnum_Stripe-faced Meadow Katydid",
-  "Orchelimum pulchellum_Handsome Meadow Katydid",
-  "Orocharis saltator_Jumping Bush Cricket",
-  "Phyllopalpus pulchellus_Handsome Trig",
-  "Pseudacris brimleyi_Brimley's Chorus Frog",
-  "Pseudacris clarkii_Spotted Chorus Frog",
-  "Pseudacris crucifer_Spring Peeper",
-  "Pseudacris feriarum_Upland Chorus Frog",
-  "Pseudacris nigrita_Southern Chorus Frog",
-  "Pseudacris ocularis_Little Grass Frog",
-  "Pseudacris ornata_Ornate Chorus Frog",
-  "Pseudacris streckeri_Strecker's Chorus Frog",
-  "Pseudacris triseriata_Striped Chorus Frog",
-  "Pterophylla camellifolia_Common True Katydid",
-  "Scaphiopus couchii_Couch's Spadefoot",
-  "Sciurus carolinensis_Eastern Gray Squirrel",
-  "Scudderia curvicauda_Curve-tailed Bush Katydid",
-  "Scudderia furcata_Fork-tailed Bush Katydid",
-  "Scudderia texensis_Texas Bush Katydid",
-  "Spea bombifrons_Plains Spadefoot",
-  "Tamias striatus_Eastern Chipmunk",
-  "Tamiasciurus hudsonicus_Red Squirrel",
-  "Vulpes vulpes_Red Fox",
-  "Human vocal_Human vocal",
-  "Human non-vocal_Human non-vocal",
-  "Human whistle_Human whistle",
-  "Power tools_Power tools",
-  "Ambient Noise_Ambient Noise",
-  "Church Bells_Church Bells",
-  "No call_No call",
-  "Water Drops_Water Drops",
+  "Acris crepitans", // Northern Cricket Frog
+  "Acris gryllus", // Southern Cricket Frog
+  "Allonemobius allardi", // Allard's Ground Cricket
+  "Allonemobius tinnulus", // Tinkling Ground Cricket
+  "Allonemobius walkeri", // Walker's Ground Cricket
+  "Alouatta pigra", // Mexican Black Howler Monkey
+  "Amblycorypha alexanderi", // Clicker Round-winged Katydid
+  "Amblycorypha longinicta", // Common Virtuoso Katydid
+  "Amblycorypha oblongifolia", // Oblong-winged Katydid
+  "Amblycorypha rotundifolia", // Rattler Round-winged Katydid
+  "Anaxipha exigua", // Say's Trig
+  "Anaxyrus americanus", // American Toad
+  "Anaxyrus canorus", // Yosemite Toad
+  "Anaxyrus cognatus", // Great Plains Toad
+  "Anaxyrus fowleri", // Fowler's Toad
+  "Anaxyrus houstonensis", // Houston Toad
+  "Anaxyrus microscaphus", // Arizona Toad
+  "Anaxyrus quercicus", // Oak Toad
+  "Anaxyrus speciosus", // Texas Toad
+  "Anaxyrus terrestris", // Southern Toad
+  "Anaxyrus woodhousii", // Woodhouse's Toad
+  "Apis mellifera", // Honey Bee
+  "Atlanticus testaceus", // Protean Shieldback
+  "Canis latrans", // Coyote
+  "Canis lupus", // Gray Wolf
+  "Conocephalus brevipennis", // Short-winged Meadow Katydid
+  "Conocephalus fasciatus", // Slender Meadow Katydid
+  "Cyrtoxipha columbiana", // Columbian Trig
+  "Dryophytes andersonii", // Pine Barrens Treefrog
+  "Dryophytes arenicolor", // Canyon Treefrog
+  "Dryophytes avivoca", // Bird-voiced Treefrog
+  "Dryophytes chrysoscelis", // Cope's Gray Treefrog
+  "Dryophytes cinereus", // Green Treefrog
+  "Dryophytes femoralis", // Pine Woods Treefrog
+  "Dryophytes gratiosus", // Barking Treefrog
+  "Dryophytes squirellus", // Squirrel Treefrog
+  "Dryophytes versicolor", // Gray Treefrog
+  "Eleutherodactylus planirostris", // Greenhouse Frog
+  "Eunemobius carolinus", // Carolina Ground Cricket
+  "Eunemobius confusus", // Confused Ground Cricket
+  "Gastrophryne carolinensis", // Eastern Narrow-mouthed Toad
+  "Gastrophryne olivacea", // Great Plains Narrow-mouthed Toad
+  "Gryllus assimilis", // Gryllus assimilis
+  "Gryllus fultoni", // Southern Wood Cricket
+  "Gryllus pennsylvanicus", // Fall Field Cricket
+  "Gryllus rubens", // Southeastern Field Cricket
+  "Hyliola regilla", // Pacific Chorus Frog
+  "Incilius valliceps", // Gulf Coast Toad
+  "Lithobates catesbeianus", // American Bullfrog
+  "Lithobates clamitans", // Green Frog
+  "Lithobates palustris", // Pickerel Frog
+  "Lithobates sylvaticus", // Wood Frog
+  "Microcentrum rhombifolium", // Greater Angle-wing
+  "Miogryllus saussurei", // Miogryllus saussurei
+  "Neoconocephalus bivocatus", // False Robust Conehead
+  "Neoconocephalus ensiger", // Sword-bearing Conehead
+  "Neoconocephalus retusus", // Round-tipped Conehead
+  "Neoconocephalus robustus", // Robust Conehead
+  "Neonemobius cubensis", // Cuban Ground Cricket
+  "Odocoileus virginianus", // White-tailed Deer
+  "Oecanthus celerinictus", // Fast-calling Tree Cricket
+  "Oecanthus exclamationis", // Davis's Tree Cricket
+  "Oecanthus fultoni", // Snowy Tree Cricket
+  "Oecanthus nigricornis", // Blackhorned Tree Cricket
+  "Oecanthus niveus", // Narrow-winged Tree Cricket
+  "Oecanthus pini", // Pine Tree Cricket
+  "Oecanthus quadripunctatus", // Four-spotted Tree Cricket
+  "Orchelimum agile", // Agile Meadow Katydid
+  "Orchelimum concinnum", // Stripe-faced Meadow Katydid
+  "Orchelimum pulchellum", // Handsome Meadow Katydid
+  "Orocharis saltator", // Jumping Bush Cricket
+  "Phyllopalpus pulchellus", // Handsome Trig
+  "Pseudacris brimleyi", // Brimley's Chorus Frog
+  "Pseudacris clarkii", // Spotted Chorus Frog
+  "Pseudacris crucifer", // Spring Peeper
+  "Pseudacris feriarum", // Upland Chorus Frog
+  "Pseudacris nigrita", // Southern Chorus Frog
+  "Pseudacris ocularis", // Little Grass Frog
+  "Pseudacris ornata", // Ornate Chorus Frog
+  "Pseudacris streckeri", // Strecker's Chorus Frog
+  "Pseudacris triseriata", // Striped Chorus Frog
+  "Pterophylla camellifolia", // Common True Katydid
+  "Scaphiopus couchii", // Couch's Spadefoot
+  "Sciurus carolinensis", // Eastern Gray Squirrel
+  "Scudderia curvicauda", // Curve-tailed Bush Katydid
+  "Scudderia furcata", // Fork-tailed Bush Katydid
+  "Scudderia texensis", // Texas Bush Katydid
+  "Spea bombifrons", // Plains Spadefoot
+  "Tamias striatus", // Eastern Chipmunk
+  "Tamiasciurus hudsonicus", // Red Squirrel
+  "Vulpes vulpes", // Red Fox
+  "Human vocal", // Human vocal
+  "Human non-vocal", // Human non-vocal
+  "Human whistle", // Human whistle
+  "Power tools", // Power tools
+  "Ambient Noise", // Ambient Noise
+  "Church Bells", // Church Bells
+  "No call", // No call
+  "Water Drops", // Water Drops
 ];
 
 const geomodelLabelFile = path.resolve(__dirname, '../../BirdNET3/BirdNET+_Geomodel_V3.0.3_Global_12K_Labels.txt');
@@ -289,10 +289,8 @@ class Model {
    * @param {number} batchSize - Fixed batch dimension supplied to ONNX Runtime.
    * @returns {Promise<void>} Resolves when the inference session and geographic labels are ready.
    */
-  async loadModel(mpath, backend, batchSize) {
-    const gpu = backend === 'webgpu';
-    const providers = gpu ? ['webgpu', 'cpu'] : ['cpu'];
-    const freeDimensionOverrides = { 'batch': batchSize };
+  async loadModel() {
+    const providers =  ['webgpu', 'cpu'];
     const   preferredOutputLocation = {
       'probabilities': 'cpu'
     }
@@ -305,7 +303,6 @@ class Model {
       executionProviderConfig,
       executionMode: 'parallel',
       enableCpuMemArena: true,
-      freeDimensionOverrides,
       preferredOutputLocation,
     };
     session = await ort.InferenceSession.create(this.appPath, sessionOptions);
@@ -339,6 +336,7 @@ class Model {
     threshold,
     localBirdsOnly,
   }) {
+    const t0 = Date.now();
     let includedIDs = [],
       messages = [];
     week = useWeek ? week : -1;
@@ -346,39 +344,39 @@ class Model {
       includedIDs = this.labels.map((_, index) => index);
     } else if (listType === "location") {
       DEBUG && console.log("lat", lat, "lon", lon, "week", week);
-    
-    let mdata_probs = new Float32Array(this.mdata_labels.length);
-    if (week < 1) {
-      // Yearly (week 0): max predictions across all 48 weeks
-      const batchSize = 48;
-      const data = new Float32Array(batchSize * 3);
-      for (let i = 0; i < batchSize; i++) {
-        data[i * 3]     = lat;      // column 0
-        data[i * 3 + 1] = lon;      // column 1
-        data[i * 3 + 2] = i + 1;    // column 2 (weeks 1-48)
-      }
-      const input = new ort.Tensor('float32', data, [batchSize, 3]);
-      const output = await session.run({ input });
-      const probs = output.probabilities.cpuData;
-      const nSpecies = probs.length / batchSize;
-
-      // Compute maximum across all 48 weeks.
-      for (let s = 0; s < nSpecies; s++) {
-        let maxProb = 0;
-        for (let w = 0; w < batchSize; w++) {
-          const prob = probs[w * nSpecies + s];
-          if (w === 0 || prob > maxProb) {
-            maxProb = prob;
-          }
+      
+      let mdata_probs = new Float32Array(this.mdata_labels.length);
+      if (week < 1) {
+        // Yearly (week 0): max predictions across all 48 weeks
+        const batchSize = 48;
+        const data = new Float32Array(batchSize * 3);
+        for (let i = 0; i < batchSize; i++) {
+          data[i * 3]     = lat;      // column 0
+          data[i * 3 + 1] = lon;      // column 1
+          data[i * 3 + 2] = i + 1;    // column 2 (weeks 1-48)
         }
-        mdata_probs[s] = maxProb;
+        const input = new ort.Tensor('float32', data, [batchSize, 3]);
+        const output = await session.run({ input });
+        const probs = output.probabilities.cpuData;
+        const nSpecies = probs.length / batchSize;
+
+        // Compute maximum across all 48 weeks.
+        for (let s = 0; s < nSpecies; s++) {
+          let maxProb = 0;
+          for (let w = 0; w < batchSize; w++) {
+            const prob = probs[w * nSpecies + s];
+            if (w === 0 || prob > maxProb) {
+              maxProb = prob;
+            }
+          }
+          mdata_probs[s] = maxProb;
+        }
+        DEBUG && console.log("Max probabilities across all weeks computed.", mdata_probs);
+      } else {
+          this.mdata_input = new ort.Tensor('float32', [lat, lon, week], [1, 3]);
+          const mdata_prediction = await session.run({ 'input': this.mdata_input });
+          mdata_probs = mdata_prediction.probabilities.cpuData;
       }
-      DEBUG && console.log("Max probabilities across all weeks computed.", mdata_probs);
-    } else {
-        this.mdata_input = new ort.Tensor('float32', [lat, lon, week], [1, 3]);
-        const mdata_prediction = await session.run({ 'input': this.mdata_input });
-        mdata_probs = mdata_prediction.probabilities.cpuData;
-    }
       let count = 0; const model = this.model;
       for (let i = 0; i < mdata_probs.length; i++) {
         const index = i; // mdata_probs.indexOf(mdata_probs_sorted[i]);
@@ -427,10 +425,17 @@ class Model {
     } else if (listType === "nocturnal") {
       // Get list of IDs of birds that call through the night or all the time. Exclude non-avian classes
       for (let i = 0; i < this.labels.length; i++) {
-        const item = this.labels[i];
+        let item = this.labels[i];
+        const itemList = item.split(/[_,]/);
+        let [latin, common, cls] = itemList;
+        if (this.birdnet3){
+          if (!this.classes.includes(cls)) continue;
+          latin = NEW_TO_OLD_TAXONOMY[latin] || latin;
+          item = `${latin},${common}`;
+        }
         if (
           ACTIVITY_INDEX[item] !== 1 &&
-          ! NOT_BIRDS.includes(item) &&
+          ! NOT_BIRDS.includes(latin) &&
           item.indexOf("(song)") === -1
         )
           includedIDs.push(i + 1);
@@ -491,11 +496,9 @@ class Model {
       }
     } else {
       // looking for birds (chirpity) or (birds or migrants) in the case of birdnet
-      // Function to extract the first element after splitting on '_'
 
       // Create a list of included labels' indices
       const t0 = Date.now();
-      const notBirdsFirstParts = NOT_BIRDS.map(this.getFirstElement);
 
       includedIDs = this.labels
         .map((label, index) => {
@@ -512,13 +515,14 @@ class Model {
             return index + 1;
           } else {
             // Check if the first part is in the notBirdsFirstParts array, or if it lacks spaces or contains underscores
-            const found = notBirdsFirstParts.includes(firstPart) || firstPart.indexOf(" ") === -1 || firstPart.indexOf("_") !== -1;
+            const found = NOT_BIRDS.includes(firstPart) || firstPart.indexOf(" ") === -1 || firstPart.indexOf("_") !== -1;
             return found ? null : index + 1;
           }
         })
         .filter((index) => index !== null);
       DEBUG && console.log("filtering took", Date.now() - t0, "ms");
     }
+    DEBUG && console.log(`List creation took ${Date.now() - t0} ms`)
     return [includedIDs.sort((a, b) => a - b), messages];
   }
 

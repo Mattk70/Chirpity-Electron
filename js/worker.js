@@ -4642,7 +4642,7 @@ const getResults = async ({
   format = undefined,
   active = undefined,
   position = undefined,
-  cache = true
+  cache = format === undefined, // Don't cache for exports
 } = {}) => {
   let confidence = STATE.detect.confidence;
   const customList = STATE.list === 'custom';
