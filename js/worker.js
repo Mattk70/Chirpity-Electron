@@ -1059,7 +1059,6 @@ async function createCustomListMap(customLabels, splitOn, member) {
 
 async function checkCustomCnames(){
   const cnames = Object.keys(STATE.customLabelsMap);
-
   const values = cnames.map(() => "(?)").join(", ");
 
   const rows = await STATE.db.allAsync(`
