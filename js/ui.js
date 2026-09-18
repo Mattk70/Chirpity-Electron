@@ -111,9 +111,9 @@ const GLOBAL_ACTIONS = {
       return
     }
     (e.ctrlKey || e.metaKey) && STATE.fileLoaded && spec.centreSpec()},
-  // D: (e) => {
-  //     if (( e.ctrlKey || e.metaKey)) worker.postMessage({ action: 'create-dataset' });
-  // },
+  D: (e) => {
+       if (e.ctrlKey || e.metaKey) document.getElementById('debug-mode').click()
+  },
   e: (e) => (e.ctrlKey || e.metaKey) && STATE.activeRegion && exportAudio(),
   g: (e) => (e.ctrlKey || e.metaKey) && showGoToPosition(),
   o: async (e) =>
