@@ -4614,7 +4614,11 @@ async function getResultsRows(cache, species, limit, offset, topRankin, format) 
   } else {
     resultsParams[resultsParams.length - 1] = topRankin;
   }
-  return await resultsStmt.allAsync(...resultsParams); 
+  try {
+    return await resultsStmt.allAsync(...resultsParams);
+  } finally {
+    if (!cache) resultsStmt.finalize();
+  }
 
 }
 
