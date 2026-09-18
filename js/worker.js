@@ -37,6 +37,7 @@ import { customURLEncode, installConsoleTracking, trackEvent as _trackEvent } fr
 import { onChartRequest, getIncludedLocations }  from "./components/charts.js";
 import {PCMChunker, PredictionWritable, createMultiWorkerQueue, FileQueueManager} from './utils/streams.js';
 import { NEW_TO_OLD_TAXONOMY } from "./utils/new_to_old_taxonomy.js";
+
 const { pipeline } = require("stream/promises");
 
 const dbMutex = new Mutex();
@@ -888,7 +889,7 @@ async function handleMessage(e) {
       await setLabelState({regenerate:true});
       const species = args.species;
       resetStmts();
-      args.refreshResults && (await Promise.all([getSummary({species, cache: true}), getResults({species, cache: true})]));
+      args.refreshResults && (await Promise.all([getSummary({species}), getResults({species})]));
       break;
     }
     case "update-locale": {
@@ -1052,6 +1053,35 @@ async function createCustomListMap(customLabels, splitOn, member) {
       end: end || null,
       confidence: confidence ? Number(confidence) * 1000 : null
     });
+  }
+  await checkCustomCnames();
+}
+
+async function checkCustomCnames(){
+  const cnames = Object.keys(STATE.customLabelsMap);
+  if (!cnames.length) return;
+  const values = cnames.map(() => "(?)").join(", ");
+
+  const rows = await STATE.db.allAsync(`
+    WITH custom_cnames(cname) AS (
+      VALUES ${values}
+    )
+    SELECT custom_cnames.cname
+    FROM custom_cnames
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM species s
+      WHERE s.modelID = ${STATE.modelID}
+      AND s.cname LIKE custom_cnames.cname || '%'
+    )
+  `, ...cnames);
+  const missing = []
+  for (const { cname } of rows) {
+    missing.push(cname)
+  }
+  if (missing.length) {
+    const cnames = ': ' + missing.join(', ');
+    generateAlert({message: 'noSpecies', type:'warning', variables: {cname: cnames}, autohide: false})
   }
 }
 

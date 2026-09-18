@@ -2050,8 +2050,6 @@ async function showExplore() {
     range: STATE.explore.range,
   });
   resetResults();
-  // Prevent scroll up hiding navbar
-  await spec.adjustDims();
 }
 
 /**
@@ -4392,6 +4390,7 @@ function onResultsComplete({ active = undefined, select = undefined } = {}) {
   }
   renderFilenamePanel();
   activateResultSort();
+  spec.adjustDims();
   STATE.paginationPending && pagination.show();
 }
 

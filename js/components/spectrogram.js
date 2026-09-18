@@ -832,12 +832,12 @@ export class ChirpityWS {
     const config = this.getConfig();
     const STATE = this.getState();
     const {footer, navPadding, contentWrapper, exploreWrapper, 
-      spectrogramWrapper, resultTableElement} = DOM;
+      spectrogramWrapper, resultTableElement, waveElement} = DOM;
     const wavesurfer = this.wavesurfer;
-    const hasExplicitHeight = newHeight != null && newHeight > 0;
-    let specOffset = 0;
+    const hasExplicitHeight = newHeight != null && newHeight > 20;
+    let specOffset = 0, specHeight;
     if (!spectrogramWrapper.classList.contains("d-none")) {
-      const specHeight = hasExplicitHeight
+      specHeight = hasExplicitHeight
         ? Math.max(1, newHeight)
         : Math.min(config.specMaxHeight, this.maxHeight());
       if (hasExplicitHeight) {
@@ -869,10 +869,12 @@ export class ChirpityWS {
     contentWrapper.style.height =
       (document.body.clientHeight - footerHeight - navHeight).toString() + "px";
     const contentHeight = contentWrapper.offsetHeight;
-    // + 2 for padding
+    // The wave element creates the timeline (20 px high) way before it loads the spec. 
+    specHeight = waveElement.offsetHeight !== 20  ? 0 : specHeight;
     const formOffset = exploreWrapper.offsetHeight;
     resultTableElement.style.height =
-      contentHeight - specOffset - formOffset + "px";
+      contentHeight 
+      - spectrogramWrapper.offsetHeight - specHeight - formOffset + "px";
   }
   /**
    * Reinitializes the spectrogram plugin if it has not been initialized.
