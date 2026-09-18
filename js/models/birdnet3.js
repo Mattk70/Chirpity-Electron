@@ -90,7 +90,7 @@ onmessage = async (e) => {
           await loadModel(modelPath, backend, batchSize);
           DEBUG && console.log(`Using backend: ${backend}`);
 
-          const labelFile = './BirdNET3/BirdNET3_geomodel_labels.csv';
+          const labelFile = path.resolve(__dirname, "../../BirdNET3/BirdNET3_geomodel_labels.csv");
           const fileContents = fs.readFileSync(labelFile, 'utf-8');
           labels = fileContents.trim().split(/\r?\n/);
           DEBUG && console.log(
