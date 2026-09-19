@@ -464,7 +464,7 @@ async function handleMessage(e) {
         })();  
         initialiseResolve();        // resolve INITIALISED
       } catch (err) {
-        console.error("Initialisation failed:", err);
+        console.error("Initialisation failed:", err.message);
         initialiseReject(err);      // propagate failure
       }
       break;

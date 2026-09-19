@@ -1,3 +1,11 @@
+try {
+  // tfjs-node check
+  require("@tensorflow/tfjs-node");
+  postMessage({ message: "tfjs-node", available: true });
+} catch (e) {
+  postMessage({ message: "tfjs-node", available: false });
+}
+
 import { NEW_TO_OLD_TAXONOMY } from "../utils/new_to_old_taxonomy.js";
 const ort = require ("onnxruntime-node");
 let session = null;
@@ -305,7 +313,14 @@ class Model {
       enableCpuMemArena: true,
       preferredOutputLocation,
     };
-    session = await ort.InferenceSession.create(this.appPath, sessionOptions);
+    try {
+      session = await ort.InferenceSession.create(this.appPath, sessionOptions);
+    } catch (e) {
+      // GPU fail ?
+      console.warn('List model failure: ', e.message)
+      sessionOptions.executionProviders = ['cpu']
+      session = await ort.InferenceSession.create(this.appPath, sessionOptions);
+    }
     this.mdata_labels = GEOMODEL_LABELS || [];
   }
 
