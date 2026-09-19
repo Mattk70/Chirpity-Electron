@@ -147,7 +147,10 @@ function checkpoint(db) {
  *   .then(() => console.log("Database closed successfully."))
  *   .catch(err => console.error("Error closing database:", err));
  */
-function closeDatabase(db) {
+async function closeDatabase(db, stmts) {
+  const {summaryStmt, resultsStmt} = stmts;
+  await summaryStmt?.finalize();
+  await resultsStmt?.finalize();
   return new Promise((resolve, reject) => {
     if (!db) resolve();
     else {
