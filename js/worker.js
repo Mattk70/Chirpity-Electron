@@ -1373,6 +1373,9 @@ async function spawnListWorker() {
           STATE.hasNode = false;
         }
         UI.postMessage({ event: "tfjs-node", hasNode: STATE.hasNode });
+      } else if (message === "no-onnx-gpu"){
+        UI.postMessage({event: "no-onnx-gpu"})
+        STATE.noOnnxGPU = true;
       }
     };
 
@@ -3286,6 +3289,8 @@ function spawnPredictWorkers(model, batchSize, threads, adjustThreads = true) {
     worker.name = model;
     predictWorkers.push(worker);
     DEBUG && console.log("loading a worker");
+    // Force birdnet3 to cpu if not supported on GPU
+    const backend = model === "birdnet3" && STATE.noOnnxGPU ? 'cpu' : STATE.detect.backend;
     worker.postMessage({
       message: "load",
       UUID: STATE.UUID,
@@ -3294,7 +3299,7 @@ function spawnPredictWorkers(model, batchSize, threads, adjustThreads = true) {
       modelPath: STATE.modelPath,
       batchSize,
       threads,
-      backend: STATE.detect.backend,
+      backend,
       worker: i,
       locale: STATE.locale.slice(0,2),
       windowSize: WINDOW_SIZE,

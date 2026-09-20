@@ -2959,6 +2959,12 @@ const setUpWorkerMessaging = () => {
           renderResult(args);
           break;
         }
+        case "no-onnx-gpu": {
+          config.models.birdnet3.backend = 'tensorflow';
+          if (config.selectedModel === 'birdnet3') document.getElementById('tensorflow').click()
+          updatePrefs('config.json', config)
+          break;
+        }
         // called when an analysis ends, or when the filesbeingprocessed list is empty
         case "processing-complete": {
           STATE.analysisDone = true;

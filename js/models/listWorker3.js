@@ -6,6 +6,16 @@ try {
   postMessage({ message: "tfjs-node", available: false });
 }
 
+async function supportsWebGPUFloat16() {
+  if (!navigator.gpu) return false;
+  try {
+    const adapter = await navigator.gpu.requestAdapter();
+    return !!adapter?.features.has("shader-f16");
+  } catch {
+    return false;
+  }
+}
+
 import { NEW_TO_OLD_TAXONOMY } from "../utils/new_to_old_taxonomy.js";
 const ort = require ("onnxruntime-node");
 let session = null;
@@ -298,7 +308,9 @@ class Model {
    * @returns {Promise<void>} Resolves when the inference session and geographic labels are ready.
    */
   async loadModel() {
-    const providers =  ['webgpu', 'cpu'];
+    const supportsF16 = await supportsWebGPUFloat16();
+    supportsF16 && postMessage({ message: "no-onnx-gpu" });
+    const providers =  supportsF16? ['webgpu', 'cpu'] : ['cpu'];
     const   preferredOutputLocation = {
       'probabilities': 'cpu'
     }
@@ -316,7 +328,6 @@ class Model {
     try {
       session = await ort.InferenceSession.create(this.appPath, sessionOptions);
     } catch (e) {
-      // GPU fail ?
       console.warn('List model failure: ', e.message)
       sessionOptions.executionProviders = ['cpu']
       session = await ort.InferenceSession.create(this.appPath, sessionOptions);
