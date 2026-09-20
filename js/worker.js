@@ -927,14 +927,15 @@ async function handleMessage(e) {
           }
         }
       }
-      // Clear cached statements when changing an explore range (from datepicker.js)
-      // Or location
-      if (args.explore
-          || Object.hasOwn(args, 'location')
-          || Object.hasOwn(args, 'resultsSortOrder')
-          || (args.detect && Object.hasOwn(args.detect, 'nocmig'))
-         ) resetStmts();
-      
+      // Clear cached SQL statements when changing an explore range (from datepicker.js),
+      // location or sortOrder
+      const resetKeys = ["location", "resultsSortOrder", "resultsMetaSortOrder"];
+      if (
+        args.explore ||
+        resetKeys.some(key => Object.hasOwn(args, key)) ||
+        Object.hasOwn(args.detect ?? {}, "nocmig")
+      ) resetStmts();
+            
       STATE.update(args);
       // Call new db functions when not initial state update (where UUID is sent)
       if (args.database && !args.UUID) {
@@ -971,7 +972,7 @@ ipcRenderer.on("new-client", async (event) => {
 ipcRenderer.on("close-database", async () => {
   try {
     await checkpoint(diskDB);
-    await closeDatabase(diskDB);
+    await closeDatabase(diskDB, STATE.database);
   } catch (error) {
     console.error("Error closing database:", error.message);
   } finally {
@@ -1588,7 +1589,7 @@ function getFileSQLAndParams(range) {
   } else {
     const files = QUEUE.getAllPaths();
     if (!files.length) {
-      console.warn('getFileAndSQLParams', 'QUEUE.getAllPaths() returned 0 files')
+      console.warn('getFileSQLAndParams', 'QUEUE.getAllPaths() returned 0 files')
       SQL += " AND 1 = 0 ";
       return [SQL, params];
     }
@@ -5240,7 +5241,7 @@ const onSave2DiskDB = async ({ file }) => {
     // now update records
     let res = await getSpeciesSQLAsync();
     let filterClause = res.SQL;
-    const param = res.param || '';
+    const params = res.param ? [res.param] : [];
     if (STATE.detect.nocmig) {
       const condition = STATE.detect.nocmig === 'day';
       filterClause += ` AND isDaylight = ${condition} `;
@@ -5253,7 +5254,7 @@ const onSave2DiskDB = async ({ file }) => {
       FROM records r
       JOIN species s ON r.speciesID = s.id
       JOIN files f ON r.fileID = f.id
-      ${filterClause}`,param);
+      ${filterClause}`,...params);
     
     let allowed = [];
     if (STATE.list === 'custom') {
