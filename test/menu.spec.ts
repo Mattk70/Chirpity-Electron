@@ -188,6 +188,16 @@ test(`Nocmig analyse works and second result is 61%`, async () => {
   expect(secondResult).toBe('61%');
 })
 
+test(`BirdNET+ analyse works and second result is 92%`, async () => {
+  // Set a custom timeout for this specific test (in milliseconds)
+  await runExampleAnalysis(page,'birdnet3');
+  const callID = page.locator('#speciesFilter').getByText('Redwing');
+  expect(callID).not.toBe(null)
+  const secondResult = await (await page.waitForSelector('#result2 span.confidence-row > span')).textContent()
+  console.log(secondResult, 'BirdNET+ second result');
+  expect(secondResult).toBe('92%');
+})
+
 test(`Perch works and second result is 35%`, async () => {
   // Import perch
   await  page.locator('#navbarTraining').click()

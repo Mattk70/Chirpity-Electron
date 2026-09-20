@@ -464,7 +464,7 @@ async function handleMessage(e) {
         })();  
         initialiseResolve();        // resolve INITIALISED
       } catch (err) {
-        console.error("Initialisation failed:", err);
+        console.error("Initialisation failed:", err.message);
         initialiseReject(err);      // propagate failure
       }
       break;
@@ -927,14 +927,15 @@ async function handleMessage(e) {
           }
         }
       }
-      // Clear cached statements when changing an explore range (from datepicker.js)
-      // Or location
-      if (args.explore
-          || Object.hasOwn(args, 'location')
-          || Object.hasOwn(args, 'resultsSortOrder')
-          || (args.detect && Object.hasOwn(args.detect, 'nocmig'))
-         ) resetStmts();
-      
+      // Clear cached SQL statements when changing an explore range (from datepicker.js),
+      // location or sortOrder
+      const resetKeys = ["location", "resultsSortOrder", "resultsMetaSortOrder"];
+      if (
+        args.explore ||
+        resetKeys.some(key => Object.hasOwn(args, key)) ||
+        Object.hasOwn(args.detect ?? {}, "nocmig")
+      ) resetStmts();
+            
       STATE.update(args);
       // Call new db functions when not initial state update (where UUID is sent)
       if (args.database && !args.UUID) {
@@ -971,7 +972,7 @@ ipcRenderer.on("new-client", async (event) => {
 ipcRenderer.on("close-database", async () => {
   try {
     await checkpoint(diskDB);
-    await closeDatabase(diskDB);
+    await closeDatabase(diskDB, STATE.database);
   } catch (error) {
     console.error("Error closing database:", error.message);
   } finally {
@@ -1372,6 +1373,9 @@ async function spawnListWorker() {
           STATE.hasNode = false;
         }
         UI.postMessage({ event: "tfjs-node", hasNode: STATE.hasNode });
+      } else if (message === "no-onnx-gpu"){
+        UI.postMessage({event: "no-onnx-gpu"})
+        STATE.noOnnxGPU = true;
       }
     };
 
@@ -1588,7 +1592,7 @@ function getFileSQLAndParams(range) {
   } else {
     const files = QUEUE.getAllPaths();
     if (!files.length) {
-      console.warn('getFileAndSQLParams', 'QUEUE.getAllPaths() returned 0 files')
+      console.warn('getFileSQLAndParams', 'QUEUE.getAllPaths() returned 0 files')
       SQL += " AND 1 = 0 ";
       return [SQL, params];
     }
@@ -3285,6 +3289,8 @@ function spawnPredictWorkers(model, batchSize, threads, adjustThreads = true) {
     worker.name = model;
     predictWorkers.push(worker);
     DEBUG && console.log("loading a worker");
+    // Force birdnet3 to cpu if not supported on GPU
+    const backend = model === "birdnet3" && STATE.noOnnxGPU ? 'cpu' : STATE.detect.backend;
     worker.postMessage({
       message: "load",
       UUID: STATE.UUID,
@@ -3293,7 +3299,7 @@ function spawnPredictWorkers(model, batchSize, threads, adjustThreads = true) {
       modelPath: STATE.modelPath,
       batchSize,
       threads,
-      backend: STATE.detect.backend,
+      backend,
       worker: i,
       locale: STATE.locale.slice(0,2),
       windowSize: WINDOW_SIZE,
@@ -5240,7 +5246,7 @@ const onSave2DiskDB = async ({ file }) => {
     // now update records
     let res = await getSpeciesSQLAsync();
     let filterClause = res.SQL;
-    const param = res.param || '';
+    const params = res.param ? [res.param] : [];
     if (STATE.detect.nocmig) {
       const condition = STATE.detect.nocmig === 'day';
       filterClause += ` AND isDaylight = ${condition} `;
@@ -5253,7 +5259,7 @@ const onSave2DiskDB = async ({ file }) => {
       FROM records r
       JOIN species s ON r.speciesID = s.id
       JOIN files f ON r.fileID = f.id
-      ${filterClause}`,param);
+      ${filterClause}`,...params);
     
     let allowed = [];
     if (STATE.list === 'custom') {
