@@ -1589,7 +1589,7 @@ function getFileSQLAndParams(range) {
   } else {
     const files = QUEUE.getAllPaths();
     if (!files.length) {
-      console.warn('getFileAndSQLParams', 'QUEUE.getAllPaths() returned 0 files')
+      console.warn('getFileSQLAndParams', 'QUEUE.getAllPaths() returned 0 files')
       SQL += " AND 1 = 0 ";
       return [SQL, params];
     }
