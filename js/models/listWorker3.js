@@ -309,7 +309,7 @@ class Model {
    */
   async loadModel() {
     const supportsF16 = await supportsWebGPUFloat16();
-    supportsF16 && postMessage({ message: "no-onnx-gpu" });
+    supportsF16 || postMessage({ message: "no-onnx-gpu" });
     const providers =  supportsF16? ['webgpu', 'cpu'] : ['cpu'];
     const   preferredOutputLocation = {
       'probabilities': 'cpu'
