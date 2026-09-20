@@ -2980,7 +2980,6 @@ const setUpWorkerMessaging = () => {
           if (!config.hasNode && config.models[config.selectedModel].backend !== "webgpu") {
             // No node? Not using webgpu? Force webgpu
             handleBackendChange("webgpu");
-            generateToast({ type: "warning", message: "noNode" });
             console.warn("tfjs-node could not be loaded, CPU is:", DIAGNOSTICS["CPU"]);
           }
           modelSettingsDisplay();
