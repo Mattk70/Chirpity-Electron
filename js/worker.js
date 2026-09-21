@@ -1377,6 +1377,8 @@ async function spawnListWorker() {
       } else if (message === "no-onnx-gpu"){
         UI.postMessage({event: "no-onnx-gpu"})
         STATE.noOnnxGPU = true;
+      } else if (message === 'model-load-failure' && process.platform === 'win32') {
+        generateAlert({message: 'noDLL', type: 'error'})
       }
     };
 

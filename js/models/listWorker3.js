@@ -328,9 +328,8 @@ class Model {
     try {
       session = await ort.InferenceSession.create(this.appPath, sessionOptions);
     } catch (e) {
-      console.warn('List model failure: ', e.message)
-      sessionOptions.executionProviders = ['cpu']
-      session = await ort.InferenceSession.create(this.appPath, sessionOptions);
+      console.warn('List model failure: ', e.message);
+      postMessage({message:'model-load-failure'})
     }
     this.mdata_labels = GEOMODEL_LABELS || [];
   }
