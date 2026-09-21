@@ -504,6 +504,7 @@ async function handleMessage(e) {
           const worker = predictWorkers.pop();
           worker.terminate();
         }
+        NUM_WORKERS += delta;
       }
       break;
     }
