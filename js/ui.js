@@ -79,6 +79,7 @@ window.addEventListener("rejectionhandled", function (event) {
 
 const state = new State();
 let STATE = state.state;
+window.STATE = STATE; // Expose state as a global for CI
 
 
 const GLOBAL_ACTIONS = {
@@ -4429,8 +4430,8 @@ function getRowFromStart(table, start) {
  */
 function onAnalysisComplete({ quiet }) {
   PREDICTING = false; powerSave(false);
-  disableSettingsDuringAnalysis(false);
   STATE.analysisDone = true;
+  disableSettingsDuringAnalysis(false);
   STATE.diskHasRecords && utils.enableMenuItem(["explore", "charts"]);
   if (quiet) return;
   // DIAGNOSTICS:

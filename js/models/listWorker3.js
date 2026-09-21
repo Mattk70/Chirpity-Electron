@@ -305,17 +305,17 @@ class Model {
    * @param {string} mpath - Reserved path argument; `appPath` from construction is used.
    * @param {string} backend - `webgpu` to prefer WebGPU, or another value to use CPU only.
    * @param {number} batchSize - Fixed batch dimension supplied to ONNX Runtime.
-   * @returns {Promise<void>} Resolves when the inference session and geographic labels are ready.
+    * @returns {Promise<boolean>} Whether the inference session and geographic labels are ready.
    */
   async loadModel() {
     const supportsF16 = await supportsWebGPUFloat16();
     supportsF16 || postMessage({ message: "no-onnx-gpu" });
-    const providers =  supportsF16? ['webgpu', 'cpu'] : ['cpu'];
+    const providers =  supportsF16 ? ['webgpu', 'cpu'] : ['cpu'];
     const   preferredOutputLocation = {
       'probabilities': 'cpu'
     }
     const threadOptions = { intraOpNumThreads:4, interOpNumThreads: 2 };
-  const executionProviderConfig = { webgpu: { validationMode: 'basic' } };
+    const executionProviderConfig = { webgpu: { validationMode: 'basic' } };
     const sessionOptions = { 
       executionProviders: providers,
       enableGraphCapture: true, 
@@ -325,14 +325,16 @@ class Model {
       enableCpuMemArena: true,
       preferredOutputLocation,
     };
+    session = null;
     try {
       session = await ort.InferenceSession.create(this.appPath, sessionOptions);
     } catch (e) {
-      console.warn('List model failure: ', e.message)
-      sessionOptions.executionProviders = ['cpu']
-      session = await ort.InferenceSession.create(this.appPath, sessionOptions);
+      console.warn('List model failure: ', e.message);
+      postMessage({message:'model-load-failure'})
+      return false;
     }
     this.mdata_labels = GEOMODEL_LABELS || [];
+    return true;
   }
 
   getFirstElement = (label) => label.split(this.splitChar)[0];
@@ -362,6 +364,9 @@ class Model {
     threshold,
     localBirdsOnly,
   }) {
+    if (!session) {
+      throw new Error("List model session is not available");
+    }
     const t0 = Date.now();
     let includedIDs = [],
       messages = [];
@@ -585,7 +590,8 @@ async function _init_() {
       __dirname, "../../BirdNET3/BirdNET+_Geomodel_V3.0.3_Global_12K_FP16.onnx"
     ).replace('app.asar', 'app.asar.unpacked'));
 
-  await listModel.loadModel();
+  const loaded = await listModel.loadModel();
+  if (!loaded) return;
   postMessage({ message: "list-model-ready" });
 };
 

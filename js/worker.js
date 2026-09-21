@@ -504,6 +504,7 @@ async function handleMessage(e) {
           const worker = predictWorkers.pop();
           worker.terminate();
         }
+        NUM_WORKERS = predictWorkers.length;
       }
       break;
     }
@@ -1376,6 +1377,8 @@ async function spawnListWorker() {
       } else if (message === "no-onnx-gpu"){
         UI.postMessage({event: "no-onnx-gpu"})
         STATE.noOnnxGPU = true;
+      } else if (message === 'model-load-failure' && process.platform === 'win32') {
+        generateAlert({message: 'noDLL', type: 'error'})
       }
     };
 
@@ -5853,6 +5856,8 @@ async function onUpdateLocale(locale, labels, refreshResults) {
 const prepareLocalLabels = (labels, locale) => {
   if (!labels?.length) return [];
   const headers = labels[0].split(",");
+  // Catch 'zh' without zh_CH
+  locale = locale.startsWith('zh') ? 'zh_CN' : locale;
   const names = ["sci_name", `common_name_${locale}`];
   const indices = names.map(name => headers.indexOf(name));
   const com_name_index = headers.indexOf("com_name");
