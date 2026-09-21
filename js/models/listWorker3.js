@@ -310,12 +310,12 @@ class Model {
   async loadModel() {
     const supportsF16 = await supportsWebGPUFloat16();
     supportsF16 || postMessage({ message: "no-onnx-gpu" });
-    const providers =  supportsF16? ['webgpu', 'cpu'] : ['cpu'];
+    const providers =  supportsF16 ? ['webgpu', 'cpu'] : ['cpu'];
     const   preferredOutputLocation = {
       'probabilities': 'cpu'
     }
     const threadOptions = { intraOpNumThreads:4, interOpNumThreads: 2 };
-  const executionProviderConfig = { webgpu: { validationMode: 'basic' } };
+    const executionProviderConfig = { webgpu: { validationMode: 'basic' } };
     const sessionOptions = { 
       executionProviders: providers,
       enableGraphCapture: true, 
