@@ -5857,7 +5857,7 @@ const prepareLocalLabels = (labels, locale) => {
   if (!labels?.length) return [];
   const headers = labels[0].split(",");
   // Catch 'zh' without zh_CH
-  locale = locale.replace('zh', 'zh_CN');
+  locale = locale.startsWith('zh') ? 'zh_CN' : locale;
   const names = ["sci_name", `common_name_${locale}`];
   const indices = names.map(name => headers.indexOf(name));
   const com_name_index = headers.indexOf("com_name");
