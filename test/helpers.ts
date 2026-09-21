@@ -38,8 +38,8 @@ async function openExampleFile(page: Page){
     // deal with debounce timer
     await page.waitForTimeout(300);
     await page.locator('#analyse').click()
-    // await page.locator('div.show > div.toast-header', { hasText: 'complete' }).waitFor({ state: 'visible', timeout: 60000 });
-    // await  page.locator('#resultTableContainer').waitFor({state: 'visible'})
+    await page.locator('div.show > div.toast-header', { hasText: 'complete' }).waitFor({ state: 'visible', timeout: 60000 });
+    await  page.locator('#resultTableContainer').waitFor({state: 'visible'})
     // Wait for the actual completion signal instead of toast/table visibility
     await page.waitForFunction(() => window.STATE.analysisDone === true, { timeout: 60000 });
 
