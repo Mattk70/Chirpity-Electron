@@ -4430,6 +4430,7 @@ function getRowFromStart(table, start) {
  */
 function onAnalysisComplete({ quiet }) {
   PREDICTING = false; powerSave(false);
+  STATE.analysisDone = true;
   disableSettingsDuringAnalysis(false);
   STATE.diskHasRecords && utils.enableMenuItem(["explore", "charts"]);
   if (quiet) return;
@@ -4460,7 +4461,6 @@ function onAnalysisComplete({ quiet }) {
     displayProgress({percent: 100});
     activateResultSort();
   }
-  STATE.analysisDone = true;
 }
 
 function removeNoEntry() {
