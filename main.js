@@ -211,7 +211,6 @@ console.warn = log.warn;
 console.error = log.error;
 autoUpdater.logger = log;
 autoUpdater.logger.transports.file.level = "info";
-autoUpdater.allowPrerelease = false; 
 const channel = `latest-${arch}`;
 log.info('channel:', channel)
 autoUpdater.channel = channel;
