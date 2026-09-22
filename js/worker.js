@@ -3340,11 +3340,14 @@ async function batchInsertRecords(cname, label, files, originalCname) {
   const t0 = Date.now();
   const {sql, params} = await prepResultsStatement(
     originalCname,
-    true,
+    Infinity,
     undefined,
     STATE.detect.topRankin
   );
-  const records = await STATE.db.allAsync(sql, ...params);
+  let records = await STATE.db.allAsync(sql, ...params);
+  if (STATE.list === 'custom'){
+    records = records.map( (r) => allowedByList(r) ? r : null).filter(r => r !== null);
+  }
   let count = 0;
 
   await dbMutex.lock();
