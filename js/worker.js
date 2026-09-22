@@ -1792,7 +1792,7 @@ const prepResultsStatement = async (
   const {mode, list, explore, resultsMetaSortOrder, resultsSortOrder, detect, selection} = STATE;
   const partition = detect.merge ? '' : ', r.modelID'; 
   const confidence = list === "custom" ? 0 : detect.confidence;
-  const param = [confidence, species, species];
+  const param = [confidence];
 
   let resultStatement = `
     WITH ranked_records AS (
@@ -1825,7 +1825,7 @@ const prepResultsStatement = async (
         JOIN files f ON r.fileID = f.id 
         JOIN models ON r.modelID = models.id
         LEFT JOIN tags ON r.tagID = tags.id
-        WHERE confidence >= ? AND (? IS NULL OR cname = ?) 
+        WHERE confidence >= ?
         `;
   // // Prioritise selection ranges
   const range = selection?.start
@@ -1839,7 +1839,8 @@ const prepResultsStatement = async (
 
   resultStatement += ` )
     SELECT 
-    position * 1000 + filestart as timestamp, 
+    dateTime, 
+    dateTime as timestamp,
     score,
     duration, 
     filestart, 
@@ -1863,8 +1864,8 @@ const prepResultsStatement = async (
     rank
     FROM 
     ranked_records 
-    WHERE rank <= ? `;
-  params.push(topRankin);
+    WHERE (? IS NULL OR cname = ?) AND rank <= ? `;
+  params.push(species, species, topRankin);
 
   // Because custom list doesn't limit the results, it can get v slow when the archive is large.
   // But, we can use the limit clause if the user is not using a custom list
@@ -3340,11 +3341,14 @@ async function batchInsertRecords(cname, label, files, originalCname) {
   const t0 = Date.now();
   const {sql, params} = await prepResultsStatement(
     originalCname,
-    true,
+    Infinity,
     undefined,
     STATE.detect.topRankin
   );
-  const records = await STATE.db.allAsync(sql, ...params);
+  let records = await STATE.db.allAsync(sql, ...params);
+  if (STATE.list === 'custom'){
+    records = records.map( (r) => allowedByList(r) ? r : null).filter(r => r !== null);
+  }
   let count = 0;
 
   await dbMutex.lock();
@@ -3352,19 +3356,14 @@ async function batchInsertRecords(cname, label, files, originalCname) {
     await db.runAsync("BEGIN");
     for (let i = 0; i < records.length; i++) {
       const item = records[i];
-      const { fileID, position, end, comment, callCount, modelID } =
-        item;
-      const { name } = await STATE.db.getAsync(
-        "SELECT name FROM files WHERE id = ?",
-        fileID
-      );
+      const { file, position, end, comment, callCount, modelID } = item;
       count += await onInsertManualRecord({
         cname,
         start: position,
         end,
         comment,
         count: callCount,
-        file: name,
+        file,
         label,
         batch: false,
         originalCname,
@@ -4644,14 +4643,17 @@ async function getResultsRows(cache, species, limit, offset, topRankin, format) 
   // Handle bound parameter changes
   // First param is always confidence
   resultsParams[0] = STATE.list === 'custom' ? 0 : STATE.detect.confidence;
-  // Handle species filter changes
-  resultsParams[1] = resultsParams[2] = species;
-  // Handle pagination changes
+  // Handle species filter and pagination changes
   if (limit !== Infinity) {
     resultsParams[resultsParams.length - 1] = offset;
     resultsParams[resultsParams.length - 3] = topRankin;
+    resultsParams[resultsParams.length - 4] = species;
+    resultsParams[resultsParams.length - 5] = species;
+
   } else {
     resultsParams[resultsParams.length - 1] = topRankin;
+    resultsParams[resultsParams.length - 2] = species;
+    resultsParams[resultsParams.length - 3] = species;
   }
   try {
     return await resultsStmt.allAsync(...resultsParams);
@@ -5987,12 +5989,12 @@ async function onSetLocation({
   // Update the files' locationid in the db
 
   if (fileLocationChanged) {
-    const CHUNK = 5000;
-    for (let i = 0; i < files.length; i += CHUNK) {
-      const slice = files.slice(i, i + CHUNK);
-      const placeholders = slice.map(() => "?").join(",");
-      await db.runAsync(`UPDATE files SET locationID = ? WHERE name IN (${placeholders})`,
-        id, ...slice)
+    for (const db of [diskDB, memoryDB]) {
+      await db.runAsync(
+        `UPDATE files SET locationID = ?
+        WHERE name IN (SELECT value FROM json_each(?))`,
+        id, JSON.stringify(files)
+      );
     }
   }
   if (locationsChanged)  {

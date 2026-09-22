@@ -1964,7 +1964,7 @@ function saveAnalyseState() {
 const clearLocationFilter = () =>   // Clear any species/location filters from explore/charts
   worker.postMessage({
     action: "update-state",
-    locationID: undefined,
+    location: undefined,
   });
 
 /**
@@ -2964,6 +2964,7 @@ const setUpWorkerMessaging = () => {
           config.models.birdnet3.backend = 'tensorflow';
           if (config.selectedModel === 'birdnet3') document.getElementById('tensorflow').click()
           updatePrefs('config.json', config)
+          console.info("Onnx GPU not available:", DIAGNOSTICS["GPUs"])
           break;
         }
         // called when an analysis ends, or when the filesbeingprocessed list is empty
@@ -4246,7 +4247,7 @@ function deepEqual(a, b) {
 }
 
 const updateSummary = ({ summary = [], filterSpecies = "" }) => {
-  if (deepEqual(STATE.summary, summary)) return
+
   STATE.summary = summary;
   const i18 = i18n.get(i18n.Headings);
   const showIUCN = config.detect.iucn;
