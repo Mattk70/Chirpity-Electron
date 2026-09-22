@@ -3355,19 +3355,14 @@ async function batchInsertRecords(cname, label, files, originalCname) {
     await db.runAsync("BEGIN");
     for (let i = 0; i < records.length; i++) {
       const item = records[i];
-      const { fileID, position, end, comment, callCount, modelID } =
-        item;
-      const { name } = await STATE.db.getAsync(
-        "SELECT name FROM files WHERE id = ?",
-        fileID
-      );
+      const { file, position, end, comment, callCount, modelID } = item;
       count += await onInsertManualRecord({
         cname,
         start: position,
         end,
         comment,
         count: callCount,
-        file: name,
+        file,
         label,
         batch: false,
         originalCname,
