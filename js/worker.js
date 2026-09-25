@@ -103,8 +103,6 @@ self.onerror = function (message, file, lineno, colno, error) {
   trackEvent(
     {uuid: STATE.UUID, event: "Unhandled Worker Error", action: message, name: customURLEncode(error?.stack), version: STATE.VERSION}
   );
-  if (message.includes("dynamic link library"))
-    generateAlert({ type: "error", message: "noDLL" });
   // Return false not to inhibit the default error handling
   return false;
 };
@@ -450,17 +448,21 @@ async function handleMessage(e) {
       STATE.detect.backend = backend;
       try {
         await (async () => {
-          LIST_WORKER = await spawnListWorker(); // this can change the backend if tfjs-node isn't available
-          DEBUG && console.log("List worker took", Date.now() - t0, "ms to load");
-          await onLaunch({
-            model,
-            batchSize,
-            threads,
-            backend,
-            list,
-            modelPath,
-            windowSize
-          });
+          LIST_WORKER = await spawnListWorker().catch(error => console.warn('Otherwise unhandled error spawning listworker', error.message));
+          try {
+            await onLaunch({
+              model,
+              batchSize,
+              threads,
+              backend,
+              list,
+              modelPath,
+              windowSize
+            });
+          } catch (e) {
+            generateAlert({message: `Model ${model} failed to load.`})
+            console.warn (`Model ${model} failed to load with ${backend} backend`, e.message || e)
+          }
         })();  
         initialiseResolve();        // resolve INITIALISED
       } catch (err) {
@@ -1347,7 +1349,7 @@ function checkNewModel(modelID){
 /**
  * Spawns a list worker and returns a function to interact with it.
  *
- * This asynchronous function creates a new Web Worker from "./js/models/listWorker3.js" and waits until the worker signals it is ready
+ * This asynchronous function creates a new Web Worker from "./js/models/geomodel.js" and waits until the worker signals it is ready
  * by sending a "list-model-ready" message. During initialization, if a "tfjs-node" message is received, it updates internal state and notifies the UI
  * about backend availability. Once the worker is ready, the function returns another function that sends a message to the worker under a mutex lock
  * and returns a Promise that resolves with the worker's response containing a result and supplemental messages.
@@ -1358,9 +1360,11 @@ function checkNewModel(modelID){
  *
  * @throws {Error} Propagates errors encountered during worker initialization or message handling.
  */
+
+
 async function spawnListWorker() {
   const worker_1 = await new Promise((resolve, reject) => {
-    const worker = new Worker("./js/models/listWorker3.js", { type: "module" });
+    const worker = new Worker("./js/models/geomodel.js", { type: "module" });
     worker.onmessage = function (event) {
       // Resolve the promise once the worker sends a message indicating it's ready
       const message = event.data.message;
@@ -1377,23 +1381,26 @@ async function spawnListWorker() {
       } else if (message === "no-onnx-gpu"){
         UI.postMessage({event: "no-onnx-gpu"})
         STATE.noOnnxGPU = true;
-      } else if (message === 'model-load-failure' && process.platform === 'win32') {
-        generateAlert({message: 'noDLL', type: 'error'})
+      } else if (message === 'onnxruntime-load-failure') {
+        generateAlert({message: 'noDLL', type: 'error', variables: {cause: event.data.cause || ''}});
+        console.warn('List model load failure: ', event.data.cause);
+      } else if (message === 'model-run-failure' && process.platform === 'win32') {
+        generateAlert({message: 'Model run failure', type: 'error'})
+        console.warn('List model run failure: ', event.data.cause);
       }
     };
 
     worker.onerror = function (error) {
+      console.warn('Unexpected listworker error:', error.message || error)
       reject(error);
     };
 
-    // Start the worker
-    worker.postMessage("start");
   });
   return function listWorker(message_1) {
     return new Promise((resolve_1, reject_1) => {
       worker_1.onmessage = function (event_1) {
-        const { result, messages } = event_1.data;
-        resolve_1({ result, messages });
+        const { result, messages, message } = event_1.data;
+        if (message === "your-list-sir") resolve_1({ result, messages });
       };
 
       worker_1.onerror = function (error_1) {
