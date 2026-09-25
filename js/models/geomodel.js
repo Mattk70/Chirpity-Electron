@@ -9,7 +9,7 @@ try {
 let ort;
 
 try {
-  ort = require("onnxruntime-noe");
+  ort = require("onnxruntime-node");
 } catch (e) {
   console.error("Failed to load onnxruntime-node:", e);
   postMessage({
@@ -405,7 +405,13 @@ class Model {
           data[i * 3 + 2] = i + 1;    // column 2 (weeks 1-48)
         }
         const input = new ort.Tensor('float32', data, [batchSize, 3]);
-        const output = await session.run({ input });
+        let output;
+        try {
+          output = await session.run({ input });
+        } catch (e) {
+          postMessage({message:'model-run-failure', cause: e.message || e, requestId})
+          return [this.labels.map((_, index) => index + 1), messages]
+        }
         const probs = output.probabilities.data;
         const nSpecies = probs.length / batchSize;
 
@@ -505,6 +511,7 @@ class Model {
           listType: "location",
           useWeek,
           threshold,
+          requestId
         });
         // Create a list of indices that appear in both lists
         includedIDs = additionalIDs.filter((id) => local_ids[0].includes(id));

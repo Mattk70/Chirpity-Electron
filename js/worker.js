@@ -1384,9 +1384,6 @@ async function spawnListWorker() {
       } else if (message === 'onnxruntime-load-failure') {
         generateAlert({message: 'noDLL', type: 'error', variables: {cause: event.data.cause || ''}});
         console.warn('List model load failure: ', event.data.cause);
-      } else if (message === 'model-run-failure' && process.platform === 'win32') {
-        generateAlert({message: 'Model run failure', type: 'error'})
-        console.warn('List model run failure: ', event.data.cause);
       }
     };
 
@@ -1406,6 +1403,7 @@ async function spawnListWorker() {
       pendingRequests.delete(responseRequestId);
       pending.resolve({ result, messages });
     } else if (message === "onnxruntime-load-failure" || message === "model-run-failure") {
+      generateAlert({message: 'No Geomodel', type: 'warning'});
       console.warn(`List model ${message}:`, cause);
     }
   };
