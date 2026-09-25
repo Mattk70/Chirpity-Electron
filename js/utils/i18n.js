@@ -32,7 +32,7 @@ const Toasts = { // UI.js
         badLocationUpdate: "There is an existing location at this latitude and longitude.",
         corruptFile: "<b>Corrupt file(s) encountered:</b> ${files}",
         noLoad: 'The ${model} model is not loaded. Restart Chirpity to continue. If you see this message repeatedly, it is likely your computer does not support AVX2 and Chirpity will not run on your system.',
-        noDLL: 'There has been an error loading the Geomodel. On Windows, the Geomodel used to generate local lists requires Mircosoft&apos;s Visual C++ 2019 runtime, which can be downloaded from <a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">here</a>.<br> ${cause}',
+        noDLL: 'There has been an error loading the Geomodel. On Windows, the Geomodel used to generate local lists requires Microsoft&apos;s Visual C++ 2019 runtime, which can be downloaded from <a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">here</a>.<br> ${cause}',
         noFile: "Cannot open: ${error}",
         ffmpeg: 'FFMPEG error extracting audio: ${error}',
         noNight: 'No detections. ${file} has no period within it where predictions would be given. <b>Tip:</b> To see detections in this file, disable Nocmig mode and run the analysis again.',
