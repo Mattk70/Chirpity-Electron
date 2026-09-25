@@ -6,6 +6,17 @@ try {
   postMessage({ message: "tfjs-node", available: false });
 }
 
+let ort;
+
+try {
+  ort = require("onnxruntime-node");
+} catch (e) {
+  console.error("Failed to load onnxruntime-node:", e);
+  postMessage({
+    message: "onnxruntime-load-failure",
+    cause: e.message
+  });
+}
 async function supportsWebGPUFloat16() {
   if (!navigator.gpu) return false;
   try {
@@ -17,7 +28,6 @@ async function supportsWebGPUFloat16() {
 }
 
 import { NEW_TO_OLD_TAXONOMY } from "../utils/new_to_old_taxonomy.js";
-const ort = require ("onnxruntime-node");
 let session = null;
 const fs = require("node:fs");
 const path = require("node:path");
@@ -225,7 +235,7 @@ listWorker.postMessage({message: 'get-list', model: 'chirpity', listType: 'locat
  */
 onmessage = async (e) => {
   DEBUG && console.log("got a message", e.data);
-  const { message } = e.data;
+  const { message, requestId } = e.data;
 
   try {
     switch (message) {
@@ -269,11 +279,13 @@ onmessage = async (e) => {
           useWeek,
           threshold,
           localBirdsOnly,
+          requestId,
         });
         postMessage({
           message: "your-list-sir",
           result: includedIDs,
           messages: messages,
+          requestId,
         });
         break;
       }
@@ -307,18 +319,18 @@ class Model {
    * @param {number} batchSize - Fixed batch dimension supplied to ONNX Runtime.
     * @returns {Promise<boolean>} Whether the inference session and geographic labels are ready.
    */
-  async loadModel() {
+  async loadModel(forceCPU) {
+    if (!ort) return 
     const supportsF16 = await supportsWebGPUFloat16();
     supportsF16 || postMessage({ message: "no-onnx-gpu" });
-    const providers =  supportsF16 ? ['webgpu', 'cpu'] : ['cpu'];
-    const   preferredOutputLocation = {
-      'probabilities': 'cpu'
-    }
-    const threadOptions = { intraOpNumThreads:4, interOpNumThreads: 2 };
+    const providers = forceCPU || !supportsF16
+      ? ['cpu']
+      : ['webgpu', 'cpu'];
+    const preferredOutputLocation = {'probabilities': 'cpu'}
+    const threadOptions = { intraOpNumThreads:2, interOpNumThreads: 2 };
     const executionProviderConfig = { webgpu: { validationMode: 'basic' } };
     const sessionOptions = { 
       executionProviders: providers,
-      enableGraphCapture: true, 
       ...threadOptions,
       executionProviderConfig,
       executionMode: 'parallel',
@@ -329,8 +341,12 @@ class Model {
     try {
       session = await ort.InferenceSession.create(this.appPath, sessionOptions);
     } catch (e) {
-      console.warn('List model failure: ', e.message);
-      postMessage({message:'model-load-failure'})
+      // Failed to create a WebGPU session, try loading the CPU EP
+      if (providers.includes('webgpu')) {
+        postMessage({ message: "no-onnx-gpu" });
+        return await this.loadModel(true)
+      }
+      postMessage({message:'model-load-failure', cause: e.message})
       return false;
     }
     this.mdata_labels = GEOMODEL_LABELS || [];
@@ -363,10 +379,8 @@ class Model {
     useWeek,
     threshold,
     localBirdsOnly,
+    requestId,
   }) {
-    if (!session) {
-      throw new Error("List model session is not available");
-    }
     const t0 = Date.now();
     let includedIDs = [],
       messages = [];
@@ -374,6 +388,10 @@ class Model {
     if (listType === "everything") {
       includedIDs = this.labels.map((_, index) => index);
     } else if (listType === "location") {
+      if (!(ort || session) ) {
+        postMessage({ message: "onnxruntime-load-failure", requestId });
+        return [this.labels.map((_, index) => index + 1), messages]
+      }
       DEBUG && console.log("lat", lat, "lon", lon, "week", week);
       
       let mdata_probs = new Float32Array(this.mdata_labels.length);
@@ -387,7 +405,13 @@ class Model {
           data[i * 3 + 2] = i + 1;    // column 2 (weeks 1-48)
         }
         const input = new ort.Tensor('float32', data, [batchSize, 3]);
-        const output = await session.run({ input });
+        let output;
+        try {
+          output = await session.run({ input });
+        } catch (e) {
+          postMessage({message:'model-run-failure', cause: e.message || e, requestId})
+          return [this.labels.map((_, index) => index + 1), messages]
+        }
         const probs = output.probabilities.data;
         const nSpecies = probs.length / batchSize;
 
@@ -405,7 +429,13 @@ class Model {
         DEBUG && console.log("Max probabilities across all weeks computed.", mdata_probs);
       } else {
           this.mdata_input = new ort.Tensor('float32', [lat, lon, week], [1, 3]);
-          const mdata_prediction = await session.run({ 'input': this.mdata_input });
+          let mdata_prediction;
+          try {
+            mdata_prediction = await session.run({ 'input': this.mdata_input });
+          } catch (e) {
+            postMessage({message:'model-run-failure', cause: e.message || e, requestId})
+            return [this.labels.map((_, index) => index + 1), messages]
+          }
           mdata_probs = mdata_prediction.probabilities.data;
       }
       let count = 0; const model = this.model;
@@ -481,6 +511,7 @@ class Model {
           listType: "location",
           useWeek,
           threshold,
+          requestId
         });
         // Create a list of indices that appear in both lists
         includedIDs = additionalIDs.filter((id) => local_ids[0].includes(id));
@@ -591,7 +622,7 @@ async function _init_() {
     ).replace('app.asar', 'app.asar.unpacked'));
 
   const loaded = await listModel.loadModel();
-  if (!loaded) return;
+
   postMessage({ message: "list-model-ready" });
 };
 

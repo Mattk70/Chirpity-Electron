@@ -57,6 +57,16 @@ sqlite3.Statement.prototype.getAsync = function (...params) {
   });
 };
 
+sqlite3.Statement.prototype.finalizeAsync = function () {
+  if (DEBUG) console.log("Finalizing statement");
+  return new Promise((resolve, reject) => {
+    this.finalize((err) => {
+      if (err) return reject(err, console.log(err));
+      resolve();
+    });
+  });
+};
+
 sqlite3.Database.prototype.getAsync = function (sql, ...params) {
   if (DEBUG) console.log("SQL\n", sql, "\nParams\n", params);
   return new Promise((resolve, reject) => {
@@ -149,8 +159,7 @@ function checkpoint(db) {
  */
 async function closeDatabase(db, stmts) {
   const {summaryStmt, resultsStmt} = stmts;
-  await summaryStmt?.finalize();
-  await resultsStmt?.finalize();
+  await Promise.allSettled([summaryStmt?.finalizeAsync(), resultsStmt?.finalizeAsync()]);
   return new Promise((resolve, reject) => {
     if (!db) resolve();
     else {
