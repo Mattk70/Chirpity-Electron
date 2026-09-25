@@ -159,7 +159,7 @@ function checkpoint(db) {
  */
 async function closeDatabase(db, stmts) {
   const {summaryStmt, resultsStmt} = stmts;
-  await Promise.all([summaryStmt?.finalizeAsync(), resultsStmt?.finalizeAsync()]);
+  await Promise.allSettled([summaryStmt?.finalizeAsync(), resultsStmt?.finalizeAsync()]);
   return new Promise((resolve, reject) => {
     if (!db) resolve();
     else {

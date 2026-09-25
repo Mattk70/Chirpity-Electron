@@ -9,7 +9,7 @@ try {
 let ort;
 
 try {
-  ort = require("onnxruntime-node");
+  ort = require("onnxruntime-noe");
 } catch (e) {
   console.error("Failed to load onnxruntime-node:", e);
   postMessage({
@@ -235,7 +235,7 @@ listWorker.postMessage({message: 'get-list', model: 'chirpity', listType: 'locat
  */
 onmessage = async (e) => {
   DEBUG && console.log("got a message", e.data);
-  const { message } = e.data;
+  const { message, requestId } = e.data;
 
   try {
     switch (message) {
@@ -279,11 +279,13 @@ onmessage = async (e) => {
           useWeek,
           threshold,
           localBirdsOnly,
+          requestId,
         });
         postMessage({
           message: "your-list-sir",
           result: includedIDs,
           messages: messages,
+          requestId,
         });
         break;
       }
@@ -339,9 +341,11 @@ class Model {
     try {
       session = await ort.InferenceSession.create(this.appPath, sessionOptions);
     } catch (e) {
-      // Failed to create the session, try loading the CPU EP
-      postMessage({ message: "no-onnx-gpu" });
-      if (!forceCPU) return await this.loadModel(true)
+      // Failed to create a WebGPU session, try loading the CPU EP
+      if (providers.includes('webgpu')) {
+        postMessage({ message: "no-onnx-gpu" });
+        return await this.loadModel(true)
+      }
       postMessage({message:'model-load-failure', cause: e.message})
       return false;
     }
@@ -375,6 +379,7 @@ class Model {
     useWeek,
     threshold,
     localBirdsOnly,
+    requestId,
   }) {
     const t0 = Date.now();
     let includedIDs = [],
@@ -383,9 +388,9 @@ class Model {
     if (listType === "everything") {
       includedIDs = this.labels.map((_, index) => index);
     } else if (listType === "location") {
-      if (!ort) {
-        postMessage({ message: "onnxruntime-load-failure"});
-        return [this.labels.map((_, index) => index), messages]
+      if (!(ort || session) ) {
+        postMessage({ message: "onnxruntime-load-failure", requestId });
+        return [this.labels.map((_, index) => index + 1), messages]
       }
       DEBUG && console.log("lat", lat, "lon", lon, "week", week);
       
@@ -422,8 +427,8 @@ class Model {
           try {
             mdata_prediction = await session.run({ 'input': this.mdata_input });
           } catch (e) {
-            postMessage({message:'model-run-failure', cause: e.message || e})
-            return [this.labels.map((_, index) => index), messages]
+            postMessage({message:'model-run-failure', cause: e.message || e, requestId})
+            return [this.labels.map((_, index) => index + 1), messages]
           }
           mdata_probs = mdata_prediction.probabilities.data;
       }

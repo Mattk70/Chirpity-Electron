@@ -1396,22 +1396,37 @@ async function spawnListWorker() {
     };
 
   });
+  const pendingRequests = new Map();
+  let requestId = 0;
+  worker_1.onmessage = function (event_1) {
+    const { result, messages, message, requestId: responseRequestId, cause } = event_1.data;
+    const pending = pendingRequests.get(responseRequestId);
+    if (!pending) return;
+    if (message === "your-list-sir") {
+      pendingRequests.delete(responseRequestId);
+      pending.resolve({ result, messages });
+    } else if (message === "onnxruntime-load-failure" || message === "model-run-failure") {
+      console.warn(`List model ${message}:`, cause);
+    }
+  };
+  worker_1.onerror = function (error_1) {
+    pendingRequests.forEach(({ reject }) => reject(error_1));
+    pendingRequests.clear();
+  };
+
   return function listWorker(message_1) {
     return new Promise((resolve_1, reject_1) => {
-      worker_1.onmessage = function (event_1) {
-        const { result, messages, message } = event_1.data;
-        if (message === "your-list-sir") resolve_1({ result, messages });
-      };
-
-      worker_1.onerror = function (error_1) {
-        reject_1(error_1);
-      };
+      const currentRequestId = ++requestId;
+      pendingRequests.set(currentRequestId, { resolve: resolve_1, reject: reject_1 });
 
       DEBUG && console.log("getting a list from the list worker");
       dbMutex
         .lock()
-        .then(() => worker_1.postMessage(message_1))
-        .catch(() => {})
+        .then(() => worker_1.postMessage({ ...message_1, requestId: currentRequestId }))
+        .catch((error_1) => {
+          pendingRequests.delete(currentRequestId);
+          reject_1(error_1);
+        })
         .finally(() => dbMutex.unlock());
     });
   };
