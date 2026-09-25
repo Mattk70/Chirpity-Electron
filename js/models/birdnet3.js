@@ -27,7 +27,8 @@ async function loadModel(_mpath, backend, batchSize) {
   const providers = gpu ? ['webgpu', 'cpu'] : ['cpu'];
   const freeDimensionOverrides = { 'batch': batchSize };
   const   preferredOutputLocation = {
-    'predictions': 'cpu'
+    'predictions': 'cpu',
+    'embeddings_out': 'cpu',
   }
   const threadOptions = { intraOpNumThreads:2, interOpNumThreads: 1 };
   const executionProviderConfig = gpu ? { webgpu: { validationMode: 'basic' } } : {};
@@ -204,6 +205,8 @@ async function predictBatch(audio, keys) {
     const flatID = prediction.predictions.data; // Float32Array
     const flatEmbeds = prediction.embeddings_out.data;
     const dim = prediction.embeddings_out.dims[1]
+    prediction.predictions.dispose();
+    prediction.embeddings_out.dispose();
     for (let b = 0; b < length; b++) {
       const offset = b * numClasses;
       const bOffset = b * dim;
