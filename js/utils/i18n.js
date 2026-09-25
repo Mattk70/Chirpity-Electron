@@ -32,7 +32,7 @@ const Toasts = { // UI.js
         badLocationUpdate: "There is an existing location at this latitude and longitude.",
         corruptFile: "<b>Corrupt file(s) encountered:</b> ${files}",
         noLoad: 'The ${model} model is not loaded. Restart Chirpity to continue. If you see this message repeatedly, it is likely your computer does not support AVX2 and Chirpity will not run on your system.',
-        noDLL: 'There has been an error loading the Geomodel. On Windows, the Geomodel used to generate local lists requires Microsoft&apos;s Visual C++ 2019 runtime, which can be downloaded from <a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">here</a>.<br> ${cause}',
+        noDLL: 'There has been an error loading the Geomodel. On Windows, the Geomodel used to generate local lists requires Microsoft&apos;s Visual C++ Redistributable runtime, which can be downloaded from <a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">here</a>.<br> ${cause}',
         noFile: "Cannot open: ${error}",
         ffmpeg: 'FFMPEG error extracting audio: ${error}',
         noNight: 'No detections. ${file} has no period within it where predictions would be given. <b>Tip:</b> To see detections in this file, disable Nocmig mode and run the analysis again.',
@@ -107,7 +107,7 @@ const Toasts = { // UI.js
 
         corruptFile: "<b><b>Der blev fundet beskadigede fil(er):</b></b> ${files}",
         noLoad: 'Modellen ${model} er ikke indlæst. Genstart Chirpity for at fortsætte. Hvis du ser denne besked gentagne gange, er det sandsynligt, at din computer ikke understøtter AVX2, og Chirpity vil ikke køre på dit system.',
-        noDLL: 'Der opstod en fejl under indlæsning af Geomodel. På Windows kræver Geomodel, som bruges til at generere lokale lister, Microsoft&apos;s Visual C++ 2019-runtime, som kan downloades <a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">her</a>.<br> ${cause}',
+        noDLL: 'Der opstod en fejl under indlæsning af Geomodel. På Windows kræver Geomodel, som bruges til at generere lokale lister, Microsoft&apos;s Visual C++ Redistributable-runtime, som kan downloades <a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">her</a>.<br> ${cause}',
         noFile: "Kan ikke åbne: ${error}",
         ffmpeg: 'FFMPEG-fejl ved udtrækning af lyd: ${error}',
         noNight: 'Ingen detektioner. ${file} har ikke noget tidsrum, hvor forudsigelser ville blive givet. <b>Tip:</b> For at se detektioner i denne fil, skal du deaktivere Nocmig-tilstand og køre analysen igen.',
@@ -182,7 +182,7 @@ const Toasts = { // UI.js
 
         corruptFile: "<b>Beschädigte Datei(en) gefunden:</b> ${files}",
         noLoad: 'Das Modell ${model} wurde nicht geladen. Starten Sie Chirpity neu, um fortzufahren. Wenn diese Nachricht wiederholt angezeigt wird, unterstützt Ihr Computer möglicherweise kein AVX2, und Chirpity wird auf Ihrem System nicht ausgeführt.',
-        noDLL: 'Beim Laden des Geomodells ist ein Fehler aufgetreten. Unter Windows benötigt das zur Erstellung lokaler Listen verwendete Geomodell die Microsoft Visual C++ 2019-Laufzeitumgebung, die <a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">hier</a> heruntergeladen werden kann.<br> ${cause}',
+        noDLL: 'Beim Laden des Geomodells ist ein Fehler aufgetreten. Unter Windows benötigt das zur Erstellung lokaler Listen verwendete Geomodell die Microsoft Visual C++ Redistributable-Laufzeitumgebung, die <a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">hier</a> heruntergeladen werden kann.<br> ${cause}',
         noFile: "Kann nicht öffnen: ${error}",
         ffmpeg: 'FFMPEG-Fehler bei der Extraktion von Audio: ${error}',
         noNight: 'Keine Detektionen. ${file} hat keinen Zeitraum, in dem Vorhersagen gegeben würden. <b>Tip:</b> Um Detektionen in dieser Datei zu sehen, deaktivieren Sie den Nocmig-Modus und führen Sie die Analyse erneut durch.',
@@ -257,7 +257,7 @@ const Toasts = { // UI.js
 
         corruptFile: "<b>Se encontraron archivos corruptos:</b> ${files}",
         noLoad: 'El modelo ${model} no está cargado. Reinicie Chirpity para continuar. Si ve este mensaje repetidamente es probable que su ordenador no sea compatible con AVX2 y que Chirpity no pueda ejecutarse en su sistema.',
-        noDLL: 'Se ha producido un error al cargar el Geomodel. En Windows, el Geomodel utilizado para generar listas locales requiere el entorno de ejecución de Microsoft Visual C++ 2019, que se puede descargar <a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">aquí</a>.<br> ${cause}',
+        noDLL: 'Se ha producido un error al cargar el Geomodel. En Windows, el Geomodel utilizado para generar listas locales requiere el entorno de ejecución de Microsoft Visual C++ Redistributable, que se puede descargar <a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">aquí</a>.<br> ${cause}',
         noFile: "No se puede abrir: ${error}",
         ffmpeg: 'Error de FFMPEG al extraer audio: ${error}',
         noNight: 'No se encontraron detecciones. ${file} no tiene un periodo en el que se puedan hacer predicciones. <b>Consejo:</b> Para ver detecciones en este archivo desactive el modo Nocmig y ejecute otra vez el análisis.',
@@ -332,7 +332,7 @@ const Toasts = { // UI.js
 
         corruptFile: "<b>Fichier(s) corrompu(s) détecté(s):</b> ${files}",
         noLoad: 'Le modèle ${model} n\'est pas chargé. Redémarrez Chirpity pour continuer. Si vous voyez ce message à plusieurs reprises, il est probable que votre ordinateur ne prenne pas en charge AVX2 et Chirpity ne fonctionnera pas sur votre système.',
-        noDLL: 'Une erreur s’est produite lors du chargement du Geomodel. Sous Windows, le Geomodel utilisé pour générer des listes locales nécessite le runtime Microsoft Visual C++ 2019, qui peut être téléchargé <a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">ici</a>.<br> ${cause}',
+        noDLL: 'Une erreur s’est produite lors du chargement du Geomodel. Sous Windows, le Geomodel utilisé pour générer des listes locales nécessite le runtime Microsoft Visual C++ Redistributable, qui peut être téléchargé <a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">ici</a>.<br> ${cause}',
         noFile: "Impossible d'ouvrir : ${error}",
         ffmpeg: 'Erreur FFMPEG lors de l\'extraction de l\'audio : ${error}',
         noNight: 'Aucune détection. ${file} ne contient pas de période où des prédictions pourraient être effectuées. <b>Astuce :</b> Pour voir les détections dans ce fichier, désactivez le mode nocmig et relancez l\'analyse.',
@@ -408,7 +408,7 @@ const Toasts = { // UI.js
 
         corruptFile: "<b>破損したファイルが見つかりました:</b> ${files}",
         noLoad: '${model}モデルがロードされていません。Chirpityを再起動して続行してください。このメッセージが繰り返し表示される場合、お使いのコンピュータがAVX2をサポートしていない可能性があります。',
-        noDLL: 'Geomodel の読み込み中にエラーが発生しました。Windows では、ローカルリストの生成に使用する Geomodel に Microsoft Visual C++ 2019 ランタイムが必要です。ランタイムは<a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">こちら</a>からダウンロードできます。<br> ${cause}',
+        noDLL: 'Geomodel の読み込み中にエラーが発生しました。Windows では、ローカルリストの生成に使用する Geomodel に Microsoft Visual C++ Redistributable ランタイムが必要です。ランタイムは<a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">こちら</a>からダウンロードできます。<br> ${cause}',
         noFile: "開くことができません: ${error}",
         ffmpeg: 'オーディオ抽出中のFFMPEGエラー: ${error}',
         noNight: '検出なし。${file}には予測が行われる期間が含まれていません。<b>ヒント:</b> このファイルで検出を表示するには、Nocmigモードを無効にして再度分析を実行してください。',
@@ -482,7 +482,7 @@ const Toasts = { // UI.js
 
         corruptFile: "<b>Beschadigde bestand(en) aangetroffen:</b> ${files}",
         noLoad: 'Het ${model} model is niet geladen. Herstart Chirpity om door te gaan. Als je dit bericht herhaaldelijk ziet, ondersteunt je computer waarschijnlijk geen AVX2 en zal Chirpity niet op je systeem werken.',
-        noDLL: 'Er is een fout opgetreden bij het laden van het Geomodel. In Windows vereist het Geomodel dat wordt gebruikt om lokale lijsten te genereren de Microsoft Visual C++ 2019-runtime, die <a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">hier</a> kan worden gedownload.<br> ${cause}',
+        noDLL: 'Er is een fout opgetreden bij het laden van het Geomodel. In Windows vereist het Geomodel dat wordt gebruikt om lokale lijsten te genereren de Microsoft Visual C++ Redistributable-runtime, die <a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">hier</a> kan worden gedownload.<br> ${cause}',
         noFile: "Kan niet openen: ${error}",
         ffmpeg: 'FFMPEG-fout bij het extraheren van audio: ${error}',
         noNight: 'Geen detecties. ${file} heeft geen periode waarin voorspellingen zouden worden gegeven. <b>Tip:</b> Om detecties in dit bestand te zien, schakel je de Nocmig-modus uit en voer je de analyse opnieuw uit.',
@@ -559,7 +559,7 @@ const Toasts = { // UI.js
 
         corruptFile: "<b>Ficheiro(s) corrompido(s) encontrado(s):</b> ${files}",
         noLoad: 'O modelo ${model} não está carregado. Reinicie o Chirpity para continuar. Se você ver esta mensagem repetidamente, é provável que seu computador não suporte AVX2 e o Chirpity não funcionará no seu sistema.',
-        noDLL: 'Ocorreu um erro ao carregar o Geomodel. No Windows, o Geomodel utilizado para gerar listas locais requer o runtime do Microsoft Visual C++ 2019, que pode ser descarregado <a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">aqui</a>.<br> ${cause}',
+        noDLL: 'Ocorreu um erro ao carregar o Geomodel. No Windows, o Geomodel utilizado para gerar listas locais requer o runtime do Microsoft Visual C++ Redistributable, que pode ser descarregado <a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">aqui</a>.<br> ${cause}',
         noFile: "Não é possível abrir: ${error}",
         ffmpeg: 'Erro FFMPEG ao extrair áudio: ${error}',
         noNight: 'Sem detecções. ${file} não possui um período dentro dele onde previsões seriam fornecidas. <b>Dica:</b> Para ver as detecções neste arquivo, desative o modo Nocmig e execute a análise novamente.',
@@ -637,7 +637,7 @@ const Toasts = { // UI.js
 
         corruptFile: "<b>Обнаружены повреждённые файлы:</b> ${files}",
         noLoad: 'Модель ${model} не загружена. Для продолжения работы перезапустите Chirpity. Если вы постоянно видите это сообщение, скорее всего, ваш компьютер не поддерживает AVX2 и Chirpity не будет работать в вашей системе.',
-        noDLL: 'Произошла ошибка при загрузке Geomodel. В Windows для Geomodel, используемого для создания локальных списков, требуется среда выполнения Microsoft Visual C++ 2019, которую можно скачать <a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">здесь</a>.<br> ${cause}',
+        noDLL: 'Произошла ошибка при загрузке Geomodel. В Windows для Geomodel, используемого для создания локальных списков, требуется среда выполнения Microsoft Visual C++ Redistributable, которую можно скачать <a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">здесь</a>.<br> ${cause}',
         noFile: "Не удается открыть: ${error}",
         ffmpeg: 'Ошибка FFMPEG при извлечении аудио: ${error}',
         noNight: 'Нет обнаружений. В ${file} нет периода, в течение которого можно было бы давать прогнозы. <b>Совет:</b> Чтобы увидеть обнаружения в этом файле, отключите режим Nocmig и запустите анализ еще раз.',
@@ -714,7 +714,7 @@ const Toasts = { // UI.js
 
         corruptFile: "<b>Skadade fil(er) påträffades:</b> ${files}",
         noLoad: 'Modellen ${model} är inte laddad. Starta om Chirpity för att fortsätta. Om du ser detta meddelande upprepade gånger, är det troligt att din dator inte stöder AVX2 och Chirpity kommer inte att fungera på ditt system.',
-        noDLL: 'Ett fel uppstod när Geomodel skulle läsas in. I Windows kräver Geomodel, som används för att skapa lokala listor, Microsoft Visual C++ 2019 Runtime, som kan laddas ner <a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">här</a>.<br> ${cause}',
+        noDLL: 'Ett fel uppstod när Geomodel skulle läsas in. I Windows kräver Geomodel, som används för att skapa lokala listor, Microsoft Visual C++ Redistributable Runtime, som kan laddas ner <a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">här</a>.<br> ${cause}',
         noFile: "Kan inte öppna: ${error}",
         ffmpeg: 'FFMPEG-fel vid extrahering av ljud: ${error}',
         noNight: 'Inga detektioner. ${file} har ingen period inom den där förutsägelser skulle göras. <b>Tips:</b> För att se detektioner i denna fil, inaktivera Nocmig-läget och kör analysen igen.',
@@ -791,7 +791,7 @@ const Toasts = { // UI.js
 
         corruptFile: "<b>发现损坏的文件:</b> ${files}",
         noLoad: '模型 ${model} 未加载。请重新启动 Chirpity 以继续。如果您重复看到此消息，可能是您的计算机不支持 AVX2，Chirpity 将无法在您的系统上运行。',
-        noDLL: '加载 Geomodel 时发生错误。在 Windows 上，用于生成本地列表的 Geomodel 需要 Microsoft Visual C++ 2019 运行时环境，可从<a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">此处</a>下载。<br> ${cause}',
+        noDLL: '加载 Geomodel 时发生错误。在 Windows 上，用于生成本地列表的 Geomodel 需要 Microsoft Visual C++ Redistributable 运行时环境，可从<a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">此处</a>下载。<br> ${cause}',
         noFile: "无法打开：${error}",
         ffmpeg: 'FFMPEG 提取音频时出错: ${error}',
         noNight: '没有检测到。${file} 中没有任何预测应该给出的时间段。<b>提示：</b> 若要查看此文件中的检测结果，请禁用 Nocmig 模式并重新运行分析。',
