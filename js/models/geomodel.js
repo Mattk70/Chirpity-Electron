@@ -14,7 +14,8 @@ try {
   console.error("Failed to load onnxruntime-node:", e);
   postMessage({
     message: "onnxruntime-load-failure",
-    cause: e.message
+    cause: e.message,
+    model: 'Geomodel'
   });
 }
 async function supportsWebGPUFloat16() {

@@ -1382,8 +1382,9 @@ async function spawnListWorker() {
         UI.postMessage({event: "no-onnx-gpu"})
         STATE.noOnnxGPU = true;
       } else if (message === 'onnxruntime-load-failure') {
-        generateAlert({message: 'noDLL', type: 'error', variables: {cause: event.data.cause || ''}});
-        console.warn('List model load failure: ', event.data.cause);
+        const {cause, model} = event.data;
+        generateAlert({message: 'noDLL', type: 'error', variables: {cause: cause || '', model}});
+        console.warn(`${model} load failure: `, cause);
       }
     };
 
@@ -4226,7 +4227,13 @@ async function parseMessage(e) {
       }
       break;
     }
-
+    case "onnxruntime-load-failure": {
+      const {cause, model} = response;
+      generateAlert({message: 'noDLL', type: 'error', variables: {cause: cause || '', model}});
+      console.warn(`${model} load failure: `, cause);
+      UI.postMessage({event: "model-ready", message: "Model failed to load"});
+      break;
+    }
     case "model-error": {
       if (!SEEN_MODEL_READY) {
         SEEN_MODEL_READY = true;

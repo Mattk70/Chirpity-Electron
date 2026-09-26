@@ -2910,6 +2910,7 @@ const setUpWorkerMessaging = () => {
           if (args.message === "Model failed to load") {
               DOM.loadingScreen.classList.add("d-none");
               APPLICATION_LOADED = true;
+              STATE.isMember && updateModelOptions();
           } else {
             onModelReady();
           }

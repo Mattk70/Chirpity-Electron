@@ -1,4 +1,17 @@
-const ort = require ("onnxruntime-node");
+let ort;
+
+try {
+  ort = require("onnxruntime-node");
+} catch (e) {
+  console.error("Failed to load onnxruntime-node:", e);
+  postMessage({
+    message: "onnxruntime-load-failure",
+    cause: e.message,
+    model: 'BirdNET+'
+  });
+  // Rethrow
+  throw(e)
+}
 const fs = require("node:fs");
 const path = require("node:path");
 
