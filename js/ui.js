@@ -2892,7 +2892,7 @@ const setUpWorkerMessaging = () => {
           // Called when the initial system locale isn't english
           let locale = args.locale;
           const labelFile = getLabelFile();
-          readLabels(labelFile);
+          readLabels({labelFile});
           break;
         }
         case "location-list": {
@@ -3719,7 +3719,7 @@ DOM.customListSelector.addEventListener("click", async () => {
     const customListFile = files.filePaths[0];
     config.models[config.selectedModel].customListFile = customListFile;
     DOM.customListFile.value = customListFile;
-    readLabels(customListFile, "list");
+    readLabels({labelFile:customListFile, updating:"list"});
     LIST_MAP = i18n.get(i18n.LIST_MAP);
     updatePrefs("config.json", config);
     localStorage.setItem("customList", customListFile);
@@ -3748,7 +3748,7 @@ const loadModel = () => {
 };
 
 const handleModelChange = async (model, reload = true) => {
-  STATE.currentFile && await flushSpec();
+  // STATE.currentFile && await flushSpec(); // Will need this for bats
   modelSettingsDisplay();
   DOM.customListFile.value = config.models[model].customListFile;
   DOM.customListFile.value
@@ -3762,6 +3762,14 @@ const handleModelChange = async (model, reload = true) => {
   updateListOptions(model);
   updateModelIcon(model);
   updateListIcon();
+  const {combine, merge} = config.detect;
+
+  DOM.resultTable.replaceChildren();
+  if (!(combine || merge)) {
+    resetRegions(true);
+    DOM.summaryTable.replaceChildren();
+    DOM.resultHeader.replaceChildren();
+  }
 }
 
 /**
@@ -4098,7 +4106,7 @@ const showExpunge = () => {
  */
 function onModelReady() {
   modelReady = true;
-  updateList();
+  updateList({refreshResults: false});
   STATE.isMember && updateModelOptions();
   if (STATE.fileLoaded) {
     utils.enableMenuItem(["analyse"]);
@@ -6910,19 +6918,21 @@ function showDBLocation(location) {
  *
  * If a custom list is selected, loads labels from the specified custom list file. Otherwise, notifies the worker of the list and selected taxonomic classes, and optionally refreshes results based on analysis state.
  */
-async function updateList() {
+async function updateList({refreshResults} = {}) {
   updateListIcon();
   setListUIState(config.list);
   pagination.reset();
+  refreshResults ??= STATE.analysisDone && STATE.mode !== 'chart';
   if (config.list === "custom") {
-    await readLabels(config.models[config.selectedModel].customListFile, "list");
+    const labelFile = config.models[config.selectedModel].customListFile;
+    await readLabels({labelFile, updating:"list", refreshResults});
   } else {
     worker.postMessage({
       action: "update-list",
       species: isSpeciesViewFiltered(true),
       list: config.list,
       classes: config.detect.classes,
-      refreshResults: STATE.analysisDone && STATE.mode !== 'chart',
+      refreshResults
     });
   }
 }
@@ -7243,7 +7253,7 @@ document.addEventListener("change", async function (e) {
           }
           config.locale = element.value;
           STATE.picker.options.lang = element.value.replace(/_.*$/, "");
-          readLabels(labelFile, "locale");
+          readLabels({labelFile, updating:"locale"});
           break;
         }
         case "local": {
@@ -7549,14 +7559,16 @@ function setListUIState(list) {
  *
  * @param {string} labelFile - Path or URL to the label file to load.
  * @param {string} [updating] - If set to `"list"`, update the custom species list; otherwise update locale labels.
+ * @param {boolean} refreshResults - whether to call for a new set of results with the new list
  */
-async function readLabels(labelFile, updating) {
+async function readLabels({labelFile, updating, refreshResults}) {
   try {
     const filecontents = await fs.promises.readFile(labelFile, "utf8");
     const labels = filecontents.trim().split(/\r?\n/);
     const unknown = `Unknown Sp.,Unknown Sp.`;
     const unknownPattern = /^Unknown Sp\.[,_~]Unknown Sp\.$/;
     if (!labels.some(l => unknownPattern.test(l))) labels.push(unknown);
+    refreshResults ??= STATE.analysisDone && STATE.mode !== 'chart';
     if (updating === "list") {
       const MAX_LABELS = 15_000;
       const lines = labels.length;
@@ -7574,7 +7586,7 @@ async function readLabels(labelFile, updating) {
         config.list = 'birds';
         config.models[config.selectedModel].list = 'birds';
         updatePrefs("config.json", config);
-        updateList()
+        updateList({refreshResults})
         return;
       }
 
@@ -7593,7 +7605,7 @@ async function readLabels(labelFile, updating) {
         config.list = 'birds';
         config.models[config.selectedModel].list = 'birds';
         updatePrefs("config.json", config);
-        updateList()
+        updateList({refreshResults})
         return;
       }
       worker.postMessage({
@@ -7601,7 +7613,7 @@ async function readLabels(labelFile, updating) {
         species: isSpeciesViewFiltered(true),
         list: config.list,
         customLabels: labels,
-        refreshResults: STATE.analysisDone && STATE.mode !== 'chart',
+        refreshResults, 
         member: STATE.isMember,
       });
       trackEvent({uuid:config.UUID, event: "UI", action: "Create", name: "Custom list", value: labels.length, version: VERSION});

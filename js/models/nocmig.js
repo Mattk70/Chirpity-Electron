@@ -166,7 +166,8 @@ onmessage = async (e) => {
       }
       case "terminate": {
         tf.backend().dispose();
-        self.close(); // Terminate the worker
+        postMessage({message: 'terminated'})
+        self.close()
       }
     }
   } catch (error) {

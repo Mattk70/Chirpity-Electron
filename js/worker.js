@@ -48,6 +48,7 @@ let METADATA = {};
 let index = 0, predictionStart;
 let sampleRate; // Should really make this a property of the model
 let predictWorkers = [];
+let modelLoadGeneration = 0;
 let UI;
 let initialiseResolve;
 let initialiseReject;
@@ -472,7 +473,7 @@ async function handleMessage(e) {
       break;
     }
     case "abort": {
-      onAbort(args);
+      await onAbort(args);
       break;
     }
     case "analyse": {
@@ -490,7 +491,7 @@ async function handleMessage(e) {
     } 
     case "change-batch-size": {
       BATCH_SIZE = args.batchSize;
-      onAbort({});
+      await onAbort({});
       await resetEstimates();
       break;
     }
@@ -589,7 +590,7 @@ async function handleMessage(e) {
     case "file-load-request": {
       const {preserveResults, file, model} = args;
       index = 0;
-      QUEUE.any('inProgress') && onAbort({model});
+      QUEUE.any('inProgress') && await onAbort({model});
       DEBUG && console.log("Worker received audio " + file);
       await loadAudioFile(args).catch((e) => {
         UI.postMessage({event: 'corrupt-file', file})
@@ -792,13 +793,14 @@ async function handleMessage(e) {
       break;
     }
     case "load-model": {
+      modelLoadGeneration++;
       const run = STATE.currentRun;
       if (run) {
         run.cancelled = true;
         run.abortController.abort();
         STATE.workerQueue?.cancelAll("Prediction aborted");
       }      
-      terminateWorkers();
+      await terminateWorkers();
       INITIALISED = await onLaunch(args);
       await resetEstimates();
       break;
@@ -2177,7 +2179,8 @@ async function onAnalyse({
  * @param {Object} params - Options for aborting and restarting.
  * @param {string} [params.model=STATE.model] - Model identifier for the replacement workers.
  */
-function onAbort({ model = STATE.model }) {
+async function onAbort({ model = STATE.model }) {
+  const loadGeneration = modelLoadGeneration;
   const run = STATE.currentRun;
   if (run) {
     run.cancelled = true;
@@ -2192,20 +2195,12 @@ function onAbort({ model = STATE.model }) {
     if (QUEUE.any('inProgress')) UI.postMessage({ event: "analysis-complete" });
     QUEUE.moveAll(['pending', 'inProgress'], 'complete');
   }
-  // Tell workers to ignore results from any in-flight batches and stop processing
-  predictWorkers.forEach(worker => {
-    worker.postMessage({
-    message: 'terminate', 
-    batchSize: BATCH_SIZE,
-    backend: STATE.detect.backend})
-  });
 
   //restart the workers
-  terminateWorkers();
-  setTimeout(
-    () => spawnPredictWorkers(model, BATCH_SIZE, NUM_WORKERS, false),
-    200
-  );
+  await terminateWorkers();
+  if (loadGeneration === modelLoadGeneration) {
+    spawnPredictWorkers(model, BATCH_SIZE, NUM_WORKERS, false);
+  }
 }
 
 const measureDurationWithFfmpeg = (src) => {
@@ -2388,7 +2383,7 @@ async function locateFile(file) {
         message: "noDirectory",
         variables: { match: match[0] },
       });
-      QUEUE.any('inProgress') && onAbort({ model: STATE.model })
+      QUEUE.any('inProgress') && await onAbort({ model: STATE.model })
     }
     console.warn(error.message + " - Disk removed?"); // Expected that this happens when the directory doesn't exist
   }
@@ -3337,11 +3332,66 @@ function spawnPredictWorkers(model, batchSize, threads, adjustThreads = true) {
  * Notify and terminate every prediction worker, then clear the worker list.
  */
 const terminateWorkers = () => {
-  predictWorkers.forEach((worker) => {
-    worker.postMessage({message: 'terminate'})
-    worker.terminate()
-  });
-  predictWorkers = []
+    return new Promise((resolve) => {
+        const workers = [...predictWorkers];
+        if (workers.length === 0) {
+            resolve();
+            return;
+        }
+
+        let terminated = 0;
+        const total = workers.length;
+
+        workers.forEach((worker) => {
+            const originalOnError = worker.onerror;
+            let timeout;
+            let settled = false;
+            const settle = (forceTerminate = false) => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timeout);
+                worker.removeEventListener('message', handler);
+                worker.onerror = originalOnError;
+                if (forceTerminate) {
+                    try {
+                        worker.terminate();
+                    } catch (error) {
+                        console.warn('Failed to terminate prediction worker:', error);
+                    }
+                }
+                terminated++;
+                const idx = predictWorkers.indexOf(worker);
+                if (idx !== -1) predictWorkers.splice(idx, 1);
+                if (terminated === total) {
+                    predictWorkers = predictWorkers.filter(
+                        (worker) => !workers.includes(worker)
+                    );
+                    resolve();
+                }
+            };
+            const handler = (event) => {
+                if (event.data?.message === 'terminated') {
+                    settle();
+                }
+            };
+
+            worker.addEventListener('message', handler);
+            worker.onerror = (event) => {
+                try {
+                    originalOnError?.call(worker, event);
+                } finally {
+                    settle(true);
+                }
+            };
+            timeout = setTimeout(() => settle(true), 5000);
+            try {
+                worker.postMessage({ message: 'terminate' });
+            } catch (error) {
+                console.warn('Failed to request prediction worker shutdown:', error);
+                settle(true);
+            }
+        });
+    });
 };
 
 /**
