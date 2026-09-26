@@ -3360,8 +3360,12 @@ const terminateWorkers = () => {
                     }
                 }
                 terminated++;
+                const idx = predictWorkers.indexOf(worker);
+                if (idx !== -1) predictWorkers.splice(idx, 1);
                 if (terminated === total) {
-                    predictWorkers = [];
+                    predictWorkers = predictWorkers.filter(
+                        (worker) => !workers.includes(worker)
+                    );
                     resolve();
                 }
             };

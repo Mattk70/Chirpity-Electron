@@ -6925,7 +6925,7 @@ async function updateList({refreshResults} = {}) {
   refreshResults ??= STATE.analysisDone && STATE.mode !== 'chart';
   if (config.list === "custom") {
     const labelFile = config.models[config.selectedModel].customListFile;
-    await readLabels({labelFile, updating:"list"});
+    await readLabels({labelFile, updating:"list", refreshResults});
   } else {
     worker.postMessage({
       action: "update-list",
