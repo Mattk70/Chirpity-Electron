@@ -472,7 +472,7 @@ async function handleMessage(e) {
       break;
     }
     case "abort": {
-      onAbort(args);
+      await onAbort(args);
       break;
     }
     case "analyse": {
@@ -490,7 +490,7 @@ async function handleMessage(e) {
     } 
     case "change-batch-size": {
       BATCH_SIZE = args.batchSize;
-      onAbort({});
+      await onAbort({});
       await resetEstimates();
       break;
     }
@@ -589,7 +589,7 @@ async function handleMessage(e) {
     case "file-load-request": {
       const {preserveResults, file, model} = args;
       index = 0;
-      QUEUE.any('inProgress') && onAbort({model});
+      QUEUE.any('inProgress') && await onAbort({model});
       DEBUG && console.log("Worker received audio " + file);
       await loadAudioFile(args).catch((e) => {
         UI.postMessage({event: 'corrupt-file', file})
@@ -798,7 +798,7 @@ async function handleMessage(e) {
         run.abortController.abort();
         STATE.workerQueue?.cancelAll("Prediction aborted");
       }      
-      terminateWorkers();
+      await terminateWorkers();
       INITIALISED = await onLaunch(args);
       await resetEstimates();
       break;
@@ -2177,7 +2177,7 @@ async function onAnalyse({
  * @param {Object} params - Options for aborting and restarting.
  * @param {string} [params.model=STATE.model] - Model identifier for the replacement workers.
  */
-function onAbort({ model = STATE.model }) {
+async function onAbort({ model = STATE.model }) {
   const run = STATE.currentRun;
   if (run) {
     run.cancelled = true;
@@ -2192,20 +2192,10 @@ function onAbort({ model = STATE.model }) {
     if (QUEUE.any('inProgress')) UI.postMessage({ event: "analysis-complete" });
     QUEUE.moveAll(['pending', 'inProgress'], 'complete');
   }
-  // Tell workers to ignore results from any in-flight batches and stop processing
-  predictWorkers.forEach(worker => {
-    worker.postMessage({
-    message: 'terminate', 
-    batchSize: BATCH_SIZE,
-    backend: STATE.detect.backend})
-  });
 
   //restart the workers
-  terminateWorkers();
-  setTimeout(
-    () => spawnPredictWorkers(model, BATCH_SIZE, NUM_WORKERS, false),
-    200
-  );
+  await terminateWorkers();
+  spawnPredictWorkers(model, BATCH_SIZE, NUM_WORKERS, false);
 }
 
 const measureDurationWithFfmpeg = (src) => {
@@ -2388,7 +2378,7 @@ async function locateFile(file) {
         message: "noDirectory",
         variables: { match: match[0] },
       });
-      QUEUE.any('inProgress') && onAbort({ model: STATE.model })
+      QUEUE.any('inProgress') && await onAbort({ model: STATE.model })
     }
     console.warn(error.message + " - Disk removed?"); // Expected that this happens when the directory doesn't exist
   }
@@ -3337,11 +3327,33 @@ function spawnPredictWorkers(model, batchSize, threads, adjustThreads = true) {
  * Notify and terminate every prediction worker, then clear the worker list.
  */
 const terminateWorkers = () => {
-  predictWorkers.forEach((worker) => {
-    worker.postMessage({message: 'terminate'})
-    worker.terminate()
-  });
-  predictWorkers = []
+    return new Promise((resolve) => {
+        if (predictWorkers.length === 0) {
+            resolve();
+            return;
+        }
+
+        let terminated = 0;
+        const total = predictWorkers.length;
+
+        predictWorkers.forEach((worker) => {
+            const handler = (event) => {
+                if (event.data?.message === 'terminated') {
+                    worker.removeEventListener('message', handler);
+
+                    terminated++;
+
+                    if (terminated === total) {
+                        predictWorkers = [];
+                        resolve();
+                    }
+                }
+            };
+
+            worker.addEventListener('message', handler);
+            worker.postMessage({ message: 'terminate' });
+        });
+    });
 };
 
 /**

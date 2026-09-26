@@ -14,6 +14,8 @@ try {
 }
 const fs = require("node:fs");
 const path = require("node:path");
+let inputTensor = null;
+let inputData = null;   // persistent Float32Array backing the tensor
 
 let session = null;
 let currentGeneration = 0;
@@ -26,6 +28,14 @@ const sampleRate = 32000;
 const numClasses = 11560;
 const DEBUG = false;
 let modelPath;
+
+// Create input tensor only once
+function ensureBuffers(force) {
+  if (!inputTensor || force) {
+    inputData = new Float32Array(batchSize * chunkLength);
+    inputTensor = new ort.Tensor('float32', inputData, [batchSize, chunkLength]);
+  }
+}
 
 /**
  * Create the shared BirdNET3 inference session for the requested backend and batch size.
@@ -90,10 +100,14 @@ onmessage = async (e) => {
           try { await session.release() } catch (e) { console.error(e) }
           session = null;
         }
+        postMessage({message: 'terminated'})
+        self.close()
         break;
       }
       case "change-window-size": {
         chunkLength = data.windowSize * sampleRate;
+        const force = true;
+        ensureBuffers(force)
         break;
       }
       case "load": {
@@ -102,6 +116,10 @@ onmessage = async (e) => {
           batchSize = data.batchSize;
           chunkLength = data.windowSize * sampleRate;
           await loadModel(modelPath, backend, batchSize);
+          ensureBuffers();
+          if (backend === 'webgpu') {
+            await session.run({ input: inputTensor }); // capture pass
+          }
           DEBUG && console.log(`Using backend: ${backend}`);
 
           const labelFile = path.resolve(__dirname, "../../BirdNET3/BirdNET3_geomodel_labels.csv");
@@ -173,18 +191,16 @@ onmessage = async (e) => {
  * @returns {ort.Tensor} A tensor shaped as batch size by the active chunk length.
  */
 const createAudioTensorBatch = (audioArray) => {
-    const batch = audioArray.length;
-    const data = new Float32Array(batch * chunkLength);
-    for (let i = 0; i < batch; i++) {
-      const audio = audioArray[i];
-      if (audio.length >= chunkLength) {
-        data.set(audio.subarray(0, chunkLength), i * chunkLength);
-      } else {
-        data.set(audio, i * chunkLength);
-        // remaining samples already zero (silence)
-      }
-    }
-    return new ort.Tensor('float32', data, [batch, chunkLength]);
+  ensureBuffers();
+  inputData.fill(0); // clear stale samples/padding from previous batch
+  for (let i = 0; i < audioArray.length; i++) {
+    const audio = audioArray[i];
+    const len = Math.min(audio.length, chunkLength);
+    inputData.set(audio.subarray(0, len), i * chunkLength);
+  }
+  // audioArray.length < batchSize just leaves trailing rows zeroed — fine,
+  // shape stays [batchSize, chunkLength] every time.
+  return inputTensor; // SAME tensor instance every call, contents mutated in place
 };
 
 /**

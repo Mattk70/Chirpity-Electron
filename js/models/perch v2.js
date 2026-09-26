@@ -15,6 +15,8 @@ try {
 
 const fs = require("node:fs");
 const path = require("node:path");
+let inputTensor = null;
+let inputData = null;   // persistent Float32Array backing the tensor
 
 let session = null;
 let currentGeneration = 0;
@@ -27,6 +29,14 @@ const sampleRate = 32000;
 const numClasses = 14795;
 const DEBUG = false;
 let modelPath;
+
+// Create input tensor only once
+function ensureBuffers() {
+  if (!inputTensor) {
+    inputData = new Float32Array(batchSize * chunkLength);
+    inputTensor = new ort.Tensor('float32', inputData, [batchSize, chunkLength]);
+  }
+}
 
 /**
  * Create the shared Perch inference session for a backend and fixed batch size.
@@ -80,7 +90,8 @@ onmessage = async (e) => {
           try { await session.release() } catch (e) { console.error(e) }
           session = null;
         }
-    
+        postMessage({message: 'terminated'})
+        self.close()
         break;
       }
       case "change-threads": {
@@ -92,6 +103,10 @@ onmessage = async (e) => {
           backend = data.backend;
           batchSize = data.batchSize;
           await loadModel(modelPath, backend, batchSize);
+          ensureBuffers();
+          if (backend === 'webgpu') {
+            await session.run({ inputs: inputTensor }); // capture pass
+          }
           DEBUG && console.log(`Using backend: ${backend}`);
 
           const labelFile = path.join(modelPath,"labels.txt");
@@ -157,18 +172,16 @@ onmessage = async (e) => {
 
 
 const createAudioTensorBatch = (audioArray) => {
-    const batch = audioArray.length;
-    const data = new Float32Array(batch * chunkLength);
-    for (let i = 0; i < batch; i++) {
-      const audio = audioArray[i];
-      if (audio.length >= chunkLength) {
-        data.set(audio.subarray(0, chunkLength), i * chunkLength);
-      } else {
-        data.set(audio, i * chunkLength);
-        // remaining samples already zero (silence)
-      }
-    }
-    return new ort.Tensor('float32', data, [batch, chunkLength]);
+  ensureBuffers();
+  inputData.fill(0); // clear stale samples/padding from previous batch
+  for (let i = 0; i < audioArray.length; i++) {
+    const audio = audioArray[i];
+    const len = Math.min(audio.length, chunkLength);
+    inputData.set(audio.subarray(0, len), i * chunkLength);
+  }
+  // audioArray.length < batchSize just leaves trailing rows zeroed — fine,
+  // shape stays [batchSize, chunkLength] every time.
+  return inputTensor; // SAME tensor instance every call, contents mutated in place
 };
 
 async function predictChunk(audioBuffer, startSamples) {
