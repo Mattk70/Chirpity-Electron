@@ -16,6 +16,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 let inputTensor = null;
 let inputData = null;   // persistent Float32Array backing the tensor
+let predictionQueue = Promise.resolve();
 
 let session = null;
 let currentGeneration = 0;
@@ -210,10 +211,13 @@ const createAudioTensorBatch = (audioArray) => {
  * @param {number[]} startSamples - Start offsets, in samples, for the chunks.
  * @returns {Promise<Array>} Processed timestamps, top class indices and probabilities, and embeddings.
  */
-async function predictChunk(audioBuffer, startSamples) {
-    const audioBatch = createAudioTensorBatch(audioBuffer);
-    const result = await predictBatch( audioBatch, startSamples );
-    return result;
+function predictChunk(audioBuffer, startSamples) {
+    const prediction = predictionQueue.then(() => {
+      const audioBatch = createAudioTensorBatch(audioBuffer);
+      return predictBatch(audioBatch, startSamples);
+    });
+    predictionQueue = prediction.catch(() => {});
+    return prediction;
 }
 
 /**

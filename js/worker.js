@@ -48,6 +48,7 @@ let METADATA = {};
 let index = 0, predictionStart;
 let sampleRate; // Should really make this a property of the model
 let predictWorkers = [];
+let modelLoadGeneration = 0;
 let UI;
 let initialiseResolve;
 let initialiseReject;
@@ -792,6 +793,7 @@ async function handleMessage(e) {
       break;
     }
     case "load-model": {
+      modelLoadGeneration++;
       const run = STATE.currentRun;
       if (run) {
         run.cancelled = true;
@@ -2178,6 +2180,7 @@ async function onAnalyse({
  * @param {string} [params.model=STATE.model] - Model identifier for the replacement workers.
  */
 async function onAbort({ model = STATE.model }) {
+  const loadGeneration = modelLoadGeneration;
   const run = STATE.currentRun;
   if (run) {
     run.cancelled = true;
@@ -2195,7 +2198,9 @@ async function onAbort({ model = STATE.model }) {
 
   //restart the workers
   await terminateWorkers();
-  spawnPredictWorkers(model, BATCH_SIZE, NUM_WORKERS, false);
+  if (loadGeneration === modelLoadGeneration) {
+    spawnPredictWorkers(model, BATCH_SIZE, NUM_WORKERS, false);
+  }
 }
 
 const measureDurationWithFfmpeg = (src) => {
@@ -3328,30 +3333,59 @@ function spawnPredictWorkers(model, batchSize, threads, adjustThreads = true) {
  */
 const terminateWorkers = () => {
     return new Promise((resolve) => {
-        if (predictWorkers.length === 0) {
+        const workers = [...predictWorkers];
+        if (workers.length === 0) {
             resolve();
             return;
         }
 
         let terminated = 0;
-        const total = predictWorkers.length;
+        const total = workers.length;
 
-        predictWorkers.forEach((worker) => {
+        workers.forEach((worker) => {
+            const originalOnError = worker.onerror;
+            let timeout;
+            let settled = false;
+            const settle = (forceTerminate = false) => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timeout);
+                worker.removeEventListener('message', handler);
+                worker.onerror = originalOnError;
+                if (forceTerminate) {
+                    try {
+                        worker.terminate();
+                    } catch (error) {
+                        console.warn('Failed to terminate prediction worker:', error);
+                    }
+                }
+                terminated++;
+                if (terminated === total) {
+                    predictWorkers = [];
+                    resolve();
+                }
+            };
             const handler = (event) => {
                 if (event.data?.message === 'terminated') {
-                    worker.removeEventListener('message', handler);
-
-                    terminated++;
-
-                    if (terminated === total) {
-                        predictWorkers = [];
-                        resolve();
-                    }
+                    settle();
                 }
             };
 
             worker.addEventListener('message', handler);
-            worker.postMessage({ message: 'terminate' });
+            worker.onerror = (event) => {
+                try {
+                    originalOnError?.call(worker, event);
+                } finally {
+                    settle(true);
+                }
+            };
+            timeout = setTimeout(() => settle(true), 5000);
+            try {
+                worker.postMessage({ message: 'terminate' });
+            } catch (error) {
+                console.warn('Failed to request prediction worker shutdown:', error);
+                settle(true);
+            }
         });
     });
 };

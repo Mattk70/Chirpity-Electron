@@ -17,6 +17,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 let inputTensor = null;
 let inputData = null;   // persistent Float32Array backing the tensor
+let predictionQueue = Promise.resolve();
 
 let session = null;
 let currentGeneration = 0;
@@ -105,7 +106,8 @@ onmessage = async (e) => {
           await loadModel(modelPath, backend, batchSize);
           ensureBuffers();
           if (backend === 'webgpu') {
-            await session.run({ inputs: inputTensor }); // capture pass
+            const prediction = await session.run({ inputs: inputTensor }); // capture pass
+            await disposeGPUTensors(prediction)
           }
           DEBUG && console.log(`Using backend: ${backend}`);
 
@@ -184,10 +186,13 @@ const createAudioTensorBatch = (audioArray) => {
   return inputTensor; // SAME tensor instance every call, contents mutated in place
 };
 
-async function predictChunk(audioBuffer, startSamples) {
-    const audioBatch = createAudioTensorBatch(audioBuffer);
-    const result = await predictBatch( audioBatch, startSamples );
-    return result;
+function predictChunk(audioBuffer, startSamples) {
+    const prediction = predictionQueue.then(() => {
+      const audioBatch = createAudioTensorBatch(audioBuffer);
+      return predictBatch(audioBatch, startSamples);
+    });
+    predictionQueue = prediction.catch(() => {});
+    return prediction;
 }
 
 
