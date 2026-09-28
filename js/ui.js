@@ -6819,6 +6819,11 @@ async function handleUIClicks(e) {
       ws.zoom(minPxPerSec);
       break;
     }
+    // Video capture
+    case "capture-start": {
+      await videoCapture(element);
+      break;
+    }
     case "clear-call-cache": {
       e.preventDefault();
       const data = fs.rm(p.join(appPath, "XCcache.json"), (err) => {
@@ -8171,6 +8176,7 @@ const loadingFiles = ({hide, content}) => {
   } else {
     loadingTimeout = setTimeout(() => {
       DOM.loading.querySelector("#loadingText").textContent = content;
+      DOM.loading.style.color = spec?.wsTextColour()[0] || 'black';
       DOM.loading.classList.remove("d-none");
     }, 500);
   }
@@ -9401,3 +9407,123 @@ function checkForIntelMacUpdates() {
     
 //   }
 // }
+
+let recorder, captureChunks = [], stream;
+
+async function videoCapture(btn) {
+  
+  const waveElement = document.getElementById('waveform');
+  const w = spec.wavesurfer;
+  
+  if (btn.classList.contains('text-danger')){
+    // Recording already
+    waveElement.style.cursor = '';
+    const waterMark = document.getElementById('watermark');
+    waterMark?.remove()
+    document.getElementById('hide-cursor')?.remove();
+    btn.classList.remove('text-danger');
+    w.pause();
+    recorder.stop(); 
+  }
+  else {
+    // Start recording
+    btn.classList.add('text-danger');
+    try {
+      waveElement.style.cursor = 'none';
+      // Get rid of region cursors
+      const style = document.createElement('style');
+      style.id = 'hide-cursor';
+      style.textContent = `
+        #waveform::part(region),
+        #waveform::part(region-handle),
+        #waveform::part(region-content),
+        #waveform *::part(region),
+        #waveform *::part(region-handle),
+        #waveform *::part(region-content) {
+          cursor: none !important;
+        }
+      `;
+      document.head.appendChild(style);
+      // Create a watermark
+      const waterMark = document.createElement('div');
+      waterMark.style.cssText = `
+      position:absolute; 
+      bottom:20px;
+      right:10px;
+      color:${spec.wsTextColour()[0]};
+      font-family: Garamond, serif;
+      font-style: italic;
+      font-size: 1.2rem;
+      z-index:5;
+      `;
+      waterMark.textContent = 'Created with Chirpity: https://chirpity.net';
+      waterMark.id = 'watermark';
+      waveElement.prepend(waterMark);
+      const playerEl = w.getMediaElement();
+      const audioTracks = playerEl.captureStream().getAudioTracks();
+
+      const display = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      const [videoTrack] = display.getVideoTracks();
+      await videoTrack.applyConstraints({cursor: 'never'})
+      await videoTrack.restrictTo(
+        await RestrictionTarget.fromElement(waveElement)
+      );
+      // // Needed to avoid window.resize weirdness for windows < 1260px wide
+      // await nextDprChange();          // wait for the 2 → 3 switch, if it happens
+      // await new Promise(r => setTimeout(r, 300));   // let the 100ms debounce + adjustDims finish
+      // await spec.adjustDims(true);    // in case the listener missed it; harmless if not needed
+      // //
+
+      stream = new MediaStream([videoTrack, ...audioTracks]);
+      recorder = new MediaRecorder(stream, { mimeType: 'video/mp4' });
+      captureChunks = [];
+      recorder.ondataavailable = (e) => e.data.size && captureChunks.push(e.data);
+      recorder.onstop = save;
+      // stop recording when playback ends (guard prevents double-stop on manual stop)
+      w.once('pause', () => {
+        if (btn.classList.contains('text-danger')) videoCapture(btn);
+      });
+      recorder.start();
+      await w.play(0, STATE.windowLength - 0.05); //Don't go all the way to the end
+
+
+      // was `track.onended`, which is undefined and threw an error after start()
+      videoTrack.onended = () => recorder.state !== 'inactive' && recorder.stop();
+
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  function save() {
+    stream.getTracks().forEach((t) => t.stop());
+    document.getElementById('hide-cursor')?.remove();
+    // 4. Turn the chunks into a file and trigger a download
+    const blob = new Blob(captureChunks, { type: 'video/mp4' });
+    captureChunks = [], stream = null, recorder = null;
+    const url = URL.createObjectURL(blob);
+    const a = Object.assign(document.createElement('a'), {
+      href: url,
+      download: 'chirpity-recording.mp4',
+    });
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+}
+
+function nextDprChange(timeout = 1000) {
+  return new Promise((resolve) => {
+    const start = window.devicePixelRatio;
+    const t = setTimeout(resolve, timeout);       // no change: carry on
+    const onResize = () => {
+      if (window.devicePixelRatio !== start) {
+        clearTimeout(t);
+        window.removeEventListener('resize', onResize);
+        resolve();
+      }
+    };
+    window.addEventListener('resize', onResize);
+  });
+}
