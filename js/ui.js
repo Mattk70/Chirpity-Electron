@@ -3027,6 +3027,9 @@ const setUpWorkerMessaging = () => {
           onWorkerLoadedAudio(args);
           break;
         }
+        case "ignore-me": {
+          break
+        }
         default: {
           generateToast({
             type: "error",
@@ -3441,6 +3444,9 @@ function formatDate(date, aggregation) {
 }
 
 window.addEventListener("resize", function () {
+  if (STATE.capturing){
+    return
+  }
   utils.waitForFinalEvent(
     async function () {
       await spec.adjustDims(true);
@@ -6821,6 +6827,7 @@ async function handleUIClicks(e) {
     }
     // Video capture
     case "capture-start": {
+      STATE.capturing = true;
       await videoCapture(element);
       break;
     }
@@ -9417,6 +9424,7 @@ async function videoCapture(btn) {
   
   if (btn.classList.contains('text-danger')){
     // Recording already
+    STATE.capturing = false;
     waveElement.style.cursor = '';
     const waterMark = document.getElementById('watermark');
     waterMark?.remove()
@@ -9426,6 +9434,7 @@ async function videoCapture(btn) {
     recorder.stop(); 
   }
   else {
+    STATE.capturing = true;
     // Start recording
     btn.classList.add('text-danger');
     try {
@@ -9464,21 +9473,16 @@ async function videoCapture(btn) {
 
       const display = await navigator.mediaDevices.getDisplayMedia({ video: true });
       const [videoTrack] = display.getVideoTracks();
-      await videoTrack.applyConstraints({cursor: 'never'})
       await videoTrack.restrictTo(
         await RestrictionTarget.fromElement(waveElement)
       );
-      // // Needed to avoid window.resize weirdness for windows < 1260px wide
-      // await nextDprChange();          // wait for the 2 → 3 switch, if it happens
-      // await new Promise(r => setTimeout(r, 300));   // let the 100ms debounce + adjustDims finish
-      // await spec.adjustDims(true);    // in case the listener missed it; harmless if not needed
-      // //
 
       stream = new MediaStream([videoTrack, ...audioTracks]);
-      recorder = new MediaRecorder(stream, { mimeType: 'video/mp4' });
+      recorder = new MediaRecorder(stream, { mimeType: 'video/mp4;codecs="avc3"' });
+
       captureChunks = [];
       recorder.ondataavailable = (e) => e.data.size && captureChunks.push(e.data);
-      recorder.onstop = save;
+      recorder.onstop = await save;
       // stop recording when playback ends (guard prevents double-stop on manual stop)
       w.once('pause', () => {
         if (btn.classList.contains('text-danger')) videoCapture(btn);
@@ -9495,13 +9499,16 @@ async function videoCapture(btn) {
     }
   };
 
-  function save() {
+  async function save() {
+    STATE.capturing = false;
     stream.getTracks().forEach((t) => t.stop());
     document.getElementById('hide-cursor')?.remove();
     // 4. Turn the chunks into a file and trigger a download
     const blob = new Blob(captureChunks, { type: 'video/mp4' });
+    const result = await utils.requestFromWorker(worker, 'process-video', {blob})
+    const processed = new Blob([result], { type: 'video/mp4' });
     captureChunks = [], stream = null, recorder = null;
-    const url = URL.createObjectURL(blob);
+    const url = URL.createObjectURL(processed);
     const a = Object.assign(document.createElement('a'), {
       href: url,
       download: 'chirpity-recording.mp4',
@@ -9513,17 +9520,3 @@ async function videoCapture(btn) {
   }
 }
 
-function nextDprChange(timeout = 1000) {
-  return new Promise((resolve) => {
-    const start = window.devicePixelRatio;
-    const t = setTimeout(resolve, timeout);       // no change: carry on
-    const onResize = () => {
-      if (window.devicePixelRatio !== start) {
-        clearTimeout(t);
-        window.removeEventListener('resize', onResize);
-        resolve();
-      }
-    };
-    window.addEventListener('resize', onResize);
-  });
-}

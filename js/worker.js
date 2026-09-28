@@ -654,6 +654,10 @@ async function handleMessage(e) {
       }
       break;
     }
+    case "process-video":{
+      onProcessVideo(args)
+      break;
+    }
     case "get-tags": {
       const result = await diskDB.allAsync("SELECT id, name FROM tags");
       UI.postMessage({ event: "tags", tags: result, init: true });
@@ -6728,5 +6732,33 @@ async function onDeleteModel(model){
     if (memoryTransactionStarted) await memoryDB.runAsync("PRAGMA foreign_keys = ON");
     dbMutex.unlock()
     generateAlert({message, type, model})
+  }
+}
+
+async function onProcessVideo({ id, blob }){
+  const buf = await blob.arrayBuffer();
+  const inPath = p.join(tempPath, `rec-in-${id}.mp4`);
+  const outPath = p.join(tempPath, `rec-out-${id}.mp4`);
+
+  try {
+    await fs.promises.writeFile(inPath, Buffer.from(buf));
+
+    await new Promise((resolve, reject) => {
+      ffmpeg(inPath)
+        .videoCodec('copy')                       // no video re-encode
+        .audioCodec('aac')
+        .audioBitrate('128k')
+        .outputOptions('-movflags +faststart')    // moov atom up front, better for playback
+        .on('error', (err, stdout, stderr) => reject(new Error(stderr || err.message)))
+        .on('end', resolve)
+        .save(outPath);
+    });
+
+    const out =  await fs.promises.readFile(outPath); // arrives in the renderer as a Uint8Array
+    const file =  out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength);
+    UI.postMessage({ id, event: "ignore-me", data: file }, [file] )
+  } finally {
+    // clean up both temp files, ignoring errors if one doesn't exist
+    await Promise.allSettled([fs.promises.unlink(inPath), fs.promises.unlink(outPath)]);
   }
 }
