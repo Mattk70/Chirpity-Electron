@@ -163,6 +163,8 @@ const GLOBAL_ACTIONS = {
       STATE.diskHasRecords && utils.enableMenuItem(["explore", "charts"]);
       generateToast({ message: "cancelled" });
       displayProgress({percent: 100, text:''})
+    } else if (STATE.capturing){
+      cancelVideoCapture()
     }
   },
   Home: () => {
@@ -395,29 +397,28 @@ let animating = false;
 // Mouse down event to start dragging
 DOM.controlsWrapper.addEventListener("mousedown", (e) => {
   if (e.target.tagName !== "DIV") return;
+  cancelVideoCapture();
   const startY = e.clientY;
   const initialHeight = DOM.waveElement.offsetHeight;
   let newHeight;
-
-  const onMouseMove = (e) => {
+  const adjust = (e) => {
     // Calculate the delta y (drag distance)
-    newHeight = initialHeight + e.clientY - startY;
-    // Clamp newHeight to ensure it doesn't exceed the available height
-    newHeight = Math.min(newHeight, spec.maxHeight(DOM));
+    // and clamp newHeight to ensure it doesn't exceed the available height
+    newHeight = Math.min(initialHeight + e.clientY - startY, spec.maxHeight(DOM));
     // Adjust the spectrogram dimensions accordingly
     if (!animating) {
       animating = true;
       requestAnimationFrame(() => {
         spec.adjustDims(true, newHeight);
-        // Lazy hack, but works
-        window.dispatchEvent(new Event("resize"));
         animating = false;
       });
     }
-  };
-  // Remove event listener on mouseup
-  const onMouseUp = () => {
-    document.removeEventListener("mousemove", onMouseMove);
+  }
+  const onMouseMove = (e) => adjust(e);
+  const onMouseUp = (e) => {
+    // Remove event listener on mouseup
+    document.removeEventListener('mousemove', onMouseMove)
+    adjust(e)
     trackEvent({uuid: config.UUID, event: "Drag", action: "Spec Resize", value: newHeight, version: config.VERSION});
   };
   // Attach event listeners for mousemove and mouseup
@@ -3426,17 +3427,12 @@ function formatDate(date, aggregation) {
     return weekNumber;
   } else if (aggregation === "day") {
     options.day = "numeric";
-    // options.weekday = "short";
     options.month = "short";
   } else if (aggregation === "hour") {
     const timeString = new Intl.DateTimeFormat(locale, {
       hour: 'numeric',
       hour12: true
     }).format(date);
-    // const hour = date.getHours();
-    // const period = hour >= 12 ? "PM" : "AM";
-    // const formattedHour = hour % 12 || 12; // Convert 0 to 12
-    // return `${formattedHour}${period}`;
     return timeString;
   }
   
@@ -9418,105 +9414,181 @@ function checkForIntelMacUpdates() {
 let recorder, captureChunks = [], stream;
 
 async function videoCapture(btn) {
-  
   const waveElement = document.getElementById('waveform');
-  const w = spec.wavesurfer;
-  
-  if (btn.classList.contains('text-danger')){
-    // Recording already
+  const ws = spec.wavesurfer;
+  if (!ws) return
+  let blocker;
+
+  if (btn.classList.contains('text-danger')) {
+    // Manual stop
     STATE.capturing = false;
-    waveElement.style.cursor = '';
     const waterMark = document.getElementById('watermark');
-    waterMark?.remove()
-    document.getElementById('hide-cursor')?.remove();
+    waterMark?.remove();
     btn.classList.remove('text-danger');
-    w.pause();
-    recorder.stop(); 
+    ws.pause();
+    if (recorder?.state !== 'inactive') {
+      recorder.stop();
+    }
+    return;
   }
-  else {
-    STATE.capturing = true;
-    // Start recording
-    btn.classList.add('text-danger');
-    try {
-      waveElement.style.cursor = 'none';
-      // Get rid of region cursors
-      const style = document.createElement('style');
-      style.id = 'hide-cursor';
-      style.textContent = `
-        #waveform::part(region),
-        #waveform::part(region-handle),
-        #waveform::part(region-content),
-        #waveform *::part(region),
-        #waveform *::part(region-handle),
-        #waveform *::part(region-content) {
-          cursor: none !important;
-        }
-      `;
-      document.head.appendChild(style);
-      // Create a watermark
-      const waterMark = document.createElement('div');
-      waterMark.style.cssText = `
-      position:absolute; 
-      bottom:20px;
-      right:10px;
-      color:${spec.wsTextColour()[0]};
+
+  STATE.capturing = true;
+  btn.classList.add('text-danger');
+
+  // Controller for this particular capture
+  STATE.captureAbortController = new AbortController();
+
+  try {
+    blocker = document.createElement('div');
+    blocker.style.cssText = `
+      position: absolute;
+      inset: 0;
+      z-index: 1000;
+      cursor: none;
+    `;
+    waveElement.parentElement.append(blocker);
+
+    const waterMark = document.createElement('div');
+    waterMark.style.cssText = `
+      position: absolute;
+      bottom: 20px;
+      right: 10px;
+      color: ${spec.wsTextColour()[0]};
       font-family: Garamond, serif;
       font-style: italic;
       font-size: 1.2rem;
-      z-index:5;
-      `;
-      waterMark.textContent = 'Created with Chirpity: https://chirpity.net';
-      waterMark.id = 'watermark';
-      waveElement.prepend(waterMark);
-      const playerEl = w.getMediaElement();
-      const audioTracks = playerEl.captureStream().getAudioTracks();
+      z-index: 5;
+    `;
+    waterMark.innerHTML = `Created with Chirpity: https://chirpity.net`;
+    waterMark.id = 'watermark';
+    waveElement.prepend(waterMark);
 
-      const display = await navigator.mediaDevices.getDisplayMedia({ video: true });
-      const [videoTrack] = display.getVideoTracks();
-      await videoTrack.restrictTo(
-        await RestrictionTarget.fromElement(waveElement)
-      );
+    const playerEl = ws.getMediaElement();
+    const audioTracks = playerEl.captureStream().getAudioTracks();
 
-      stream = new MediaStream([videoTrack, ...audioTracks]);
-      recorder = new MediaRecorder(stream, { mimeType: 'video/mp4;codecs="avc3"' });
+    const display = await navigator.mediaDevices.getDisplayMedia({
+      video: true
+    });
 
-      captureChunks = [];
-      recorder.ondataavailable = (e) => e.data.size && captureChunks.push(e.data);
-      recorder.onstop = await save;
-      // stop recording when playback ends (guard prevents double-stop on manual stop)
-      w.once('pause', () => {
-        if (btn.classList.contains('text-danger')) videoCapture(btn);
-      });
-      recorder.start();
-      await w.play(0, STATE.windowLength - 0.05); //Don't go all the way to the end
-
-
-      // was `track.onended`, which is undefined and threw an error after start()
-      videoTrack.onended = () => recorder.state !== 'inactive' && recorder.stop();
-
-    } catch (err) {
-      console.error(err);
+    // User may have resized while getDisplayMedia was pending
+    if (STATE.captureAbortController.signal.aborted) {
+      display.getTracks().forEach(t => t.stop());
+      return;
     }
-  };
 
-  async function save() {
+    const [videoTrack] = display.getVideoTracks();
+
+    await videoTrack.restrictTo(
+      await RestrictionTarget.fromElement(waveElement)
+    );
+
+    stream = new MediaStream([videoTrack, ...audioTracks]);
+
+    const mimeType = 'video/mp4;codecs="avc3"';
+    recorder = new MediaRecorder(stream, { mimeType });
+
+    captureChunks = [];
+
+    recorder.ondataavailable = (e) => {
+      if (e.data.size) captureChunks.push(e.data);
+    };
+
+    recorder.onstop = () => save(btn);
+
+    // Stop recording when playback ends
+    ws.once('pause', () => {
+      if (
+        btn.classList.contains('text-danger') &&
+        !STATE.captureAbortController.signal.aborted
+      ) {
+        videoCapture(btn);
+      }
+    });
+
+    // User cancelled/stopped display capture
+    videoTrack.onended = () => {
+      if (recorder.state !== 'inactive') {
+        recorder.stop();
+      }
+    };
+
+    // Handle abort
+    STATE.captureAbortController.signal.addEventListener('abort', () => {
+      if (recorder?.state !== 'inactive') {
+        recorder.stop();
+      }
+    }, { once: true });
+
+    recorder.start();
+
+    await ws.play(0, STATE.windowLength - 0.05);
+
+  } catch (err) {
+    console.error(err);
+
+    // Clean up if capture failed before recorder.onstop
+    blocker?.remove();
+    document.getElementById('watermark')?.remove();
+
+    stream?.getTracks().forEach(t => t.stop());
+
     STATE.capturing = false;
-    stream.getTracks().forEach((t) => t.stop());
+    btn.classList.remove('text-danger');
+  }
+  async function save(btn) {
+    btn.classList.remove('text-danger');
+    const aborted = STATE.captureAbortController?.signal.aborted;
+
+    STATE.capturing = false;
+
+    stream?.getTracks().forEach(t => t.stop());
+    stream = null;
+
+    document.getElementById('watermark')?.remove();
     document.getElementById('hide-cursor')?.remove();
-    // 4. Turn the chunks into a file and trigger a download
+
+    if (aborted) {
+      captureChunks = [];
+      recorder = null;
+      blocker.remove();
+      STATE.captureAbortController = null;
+      return;
+    }
+
+    blocker?.remove();
+
     const blob = new Blob(captureChunks, { type: 'video/mp4' });
-    const result = await utils.requestFromWorker(worker, 'process-video', {blob})
+
+    const result = await utils.requestFromWorker(
+      worker,
+      'process-video',
+      { blob },
+      30_000
+    );
+
     const processed = new Blob([result], { type: 'video/mp4' });
-    captureChunks = [], stream = null, recorder = null;
+
+    captureChunks = [];
+    recorder = null;
+    STATE.captureAbortController = null;
+
     const url = URL.createObjectURL(processed);
+
     const a = Object.assign(document.createElement('a'), {
       href: url,
-      download: 'chirpity-recording.mp4',
+      download: 'chirpity-recording.mp4'
     });
+
     document.body.appendChild(a);
     a.click();
     a.remove();
+
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 }
-
+function cancelVideoCapture() {
+  STATE.captureAbortController?.abort();
+  if (recorder?.state !== 'inactive') {
+    recorder?.stop();
+  }
+}

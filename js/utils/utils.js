@@ -298,7 +298,7 @@ function parseDuration(durationString) {
 }
 
 
-function requestFromWorker(worker, action, payload = {}) {
+function requestFromWorker(worker, action, payload = {}, timeout = 15_000) {
   return new Promise((resolve, reject) => {
     const messageId = crypto.randomUUID(); //  unique string 
     let timeoutId;
@@ -317,8 +317,8 @@ function requestFromWorker(worker, action, payload = {}) {
     // Set timeout to clean up listener and reject promise
    timeoutId = setTimeout(() => {
       worker.removeEventListener("message", handleMessage);
-      reject(new Error(`Worker request timed out for action: ${action}`));
-    }, 15_000); // 15 second timeout
+      reject(new Error('Timeout',`Worker request timed out for action: ${action} after ${timeout/1000}s`));
+    }, timeout); // Default 15 second timeout
 
     worker.addEventListener("message", handleMessage);
     worker.postMessage({ id: messageId, action, ...payload });

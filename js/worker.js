@@ -6743,16 +6743,24 @@ async function onProcessVideo({ id, blob }){
   try {
     await fs.promises.writeFile(inPath, Buffer.from(buf));
 
-    await new Promise((resolve, reject) => {
-      ffmpeg(inPath)
-        .videoCodec('copy')                       // no video re-encode
-        .audioCodec('aac')
-        .audioBitrate('128k')
-        .outputOptions('-movflags +faststart')    // moov atom up front, better for playback
-        .on('error', (err, stdout, stderr) => reject(new Error(stderr || err.message)))
-        .on('end', resolve)
-        .save(outPath);
-    });
+await new Promise((resolve, reject) => {
+  ffmpeg(inPath)
+    .videoCodec('libx264')
+    .outputOptions([
+      '-pix_fmt yuv420p',       // QuickTime requires this; some webm/vp inputs default to something else
+      '-profile:v high',        // 'main' or 'baseline' if you need older-device compatibility
+      '-level 4.0',
+      '-tag:v avc1',            // makes ffmpeg mux it as avc1 in the MP4 container
+      '-crf 30',                // quality target; lower = better/larger, 18 is visually near-lossless
+      '-preset veryfast',       // trade encode speed for file size; 'medium' is ffmpeg's default
+      '-movflags +faststart'
+    ])
+    .audioCodec('aac')
+    .audioBitrate('128k')
+    .on('error', (err, _stdout, stderr) => reject(new Error(stderr || err.message)))
+    .on('end', resolve)
+    .save(outPath);
+});
 
     const out =  await fs.promises.readFile(outPath); // arrives in the renderer as a Uint8Array
     const file =  out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength);
