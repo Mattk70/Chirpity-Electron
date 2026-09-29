@@ -399,7 +399,7 @@ DOM.controlsWrapper.addEventListener("mousedown", (e) => {
   if (e.target.tagName !== "DIV") return;
   cancelVideoCapture();
   const startY = e.clientY;
-  const initialHeight = DOM.waveElement.offsetHeight;
+  const initialHeight = DOM.waveElement.offsetHeight -20 /* timeline height */;
   let newHeight;
   const adjust = (e) => {
     // Calculate the delta y (drag distance)
@@ -9486,7 +9486,7 @@ async function videoCapture(btn) {
 
     stream = new MediaStream([videoTrack, ...audioTracks]);
 
-    const mimeType = 'video/mp4;codecs="avc3"';
+    const mimeType = 'video/mp4';
     recorder = new MediaRecorder(stream, { mimeType });
 
     captureChunks = [];
