@@ -518,7 +518,7 @@ function resetResults({
   clearResults = true,
 } = {}) {
   if (clearSummary) DOM.summaryTable.textContent = "";
-  if (clearPagination) pagination.hide();
+  if (clearPagination) pagination?.hide();
   resultsBuffer = DOM.resultTable.cloneNode(false);
   if (clearResults) {
     DOM.resultTable.textContent = "";
@@ -3768,6 +3768,7 @@ const handleModelChange = async (model, reload = true) => {
 
   DOM.resultTable.replaceChildren();
   if (!(combine || merge)) {
+    resetResults();
     resetRegions(true);
     DOM.summaryTable.replaceChildren();
     DOM.resultHeader.replaceChildren();
@@ -6071,6 +6072,7 @@ document.addEventListener("click", debounceClick(handleUIClicks));
  */
 async function handleUIClicks(e) {
   if (!APPLICATION_LOADED) return;
+  if (STATE.capturing) cancelVideoCapture();
   const element = e.target;
   const target = element.closest("[id]")?.id;
   const locale = config.locale.replace(/_.*$/, "");
@@ -9501,7 +9503,9 @@ async function videoCapture(btn) {
         btn.classList.contains('text-danger') &&
         !STATE.captureAbortController.signal.aborted
       ) {
-        videoCapture(btn);
+        if (recorder?.state !== 'inactive') {
+          recorder.stop();
+        }
       }
     });
 
@@ -9536,6 +9540,7 @@ async function videoCapture(btn) {
     btn.classList.remove('text-danger');
   }
   async function save(btn) {
+    const t0 = Date.now();
     btn.classList.remove('text-danger');
     const aborted = STATE.captureAbortController?.signal.aborted;
 
@@ -9578,7 +9583,7 @@ async function videoCapture(btn) {
       href: url,
       download: 'chirpity-recording.mp4'
     });
-
+    console.log(`Saving video took ${Date.now() - t0}ms`)
     document.body.appendChild(a);
     a.click();
     a.remove();
