@@ -2286,6 +2286,7 @@ const defaultConfig = {
     quietThreshold: 0.0,
     midThreshold: 0.5,
     windowFn: "hann",
+    scale: 'linear',
     alpha: 0.5
   },
   timeOfDay: true,
@@ -2573,7 +2574,9 @@ window.onload = async () => {
   DOM.toSlider.value = audio.frequencyMax;
   fillSlider(DOM.fromInput, DOM.toInput, "#C6C6C6", "#0d6efd", DOM.toSlider);
   checkFilteredFrequency();
-  // Window function & colormap
+  // Window function, colormap and scale
+   document.getElementById("scale").value =
+    config.customColormap.scale;
   document.getElementById("window-function").value =
     config.customColormap.windowFn;
   config.customColormap.windowFn === "gauss" &&
@@ -7338,6 +7341,7 @@ document.addEventListener("change", async function (e) {
           STATE.fileLoaded && spec.setWindowFunction();
           break
         }
+        case "scale":
         case "loud-color":
         case "mid-color":
         case "quiet-color":
@@ -7354,7 +7358,7 @@ document.addEventListener("change", async function (e) {
           const midThreshold = document.getElementById(
             "mid-color-threshold-slider"
           ).valueAsNumber;
-          // document.getElementById("color-threshold").textContent = threshold;
+          const scale = document.getElementById("scale").value;
           config.customColormap = {
             ...config.customColormap,
             loud,
@@ -7362,7 +7366,8 @@ document.addEventListener("change", async function (e) {
             quiet,
             quietThreshold,
             midThreshold,
-            alpha
+            alpha,
+            scale
           };
           if (spec.wavesurfer && STATE.currentFile) {
             spec.setColorMap();
@@ -9453,15 +9458,18 @@ async function videoCapture(btn) {
     const waterMark = document.createElement('div');
     waterMark.style.cssText = `
       position: absolute;
-      bottom: 20px;
+      top: 35px;
       right: 10px;
       color: ${spec.wsTextColour()[0]};
       font-family: Garamond, serif;
       font-style: italic;
       font-size: 1.2rem;
       z-index: 5;
+      text-align: right;
     `;
-    waterMark.innerHTML = `Created with Chirpity: https://chirpity.net`;
+    const scaleEl = document.getElementById('scale');
+    const scale = scaleEl.options[scaleEl.selectedIndex].text;
+    waterMark.innerHTML = `Created with Chirpity: https://chirpity.net<br>(${scale} scale)`;
     waterMark.id = 'watermark';
     waveElement.prepend(waterMark);
 
@@ -9486,7 +9494,7 @@ async function videoCapture(btn) {
 
     stream = new MediaStream([videoTrack, ...audioTracks]);
 
-    const mimeType = 'video/mp4';
+    const mimeType = 'video/mp4;codecs="avc3"';
     recorder = new MediaRecorder(stream, { mimeType });
 
     captureChunks = [];

@@ -319,7 +319,7 @@ export class ChirpityWS {
     }
     // set colormap
     const colorMap = this.createColormap();
-    const {windowFn:windowFunc, alpha} = config.customColormap;
+    const {windowFn:windowFunc, alpha, scale} = config.customColormap;
     const scaleFactor = config.selectedModel.includes('batpack') ? 10 : 1;
     const {frequencyMin, frequencyMax} = config.audio;
     const scaledFrequencyMin = frequencyMin * scaleFactor;
@@ -329,7 +329,7 @@ export class ChirpityWS {
       windowFunc,
       frequencyMin: scaledFrequencyMin,
       frequencyMax: scaledFrequencyMax,
-      // noverlap: 128, Auto (the default) seems fine
+      noverlap: fftSamples / 4,
       // gainDB: 50, Adjusts spec brightness without increasing volume
       rendering: "full", // or "windowed",
       labels: config.specLabels,
@@ -337,7 +337,7 @@ export class ChirpityWS {
       labelsBackground: "transparent",
       height,
       fftSamples,
-      scale: "linear",
+      scale,
       colorMap,
       alpha,
       useWebWorker: false,
@@ -372,6 +372,7 @@ export class ChirpityWS {
     spectrogram.colorMap = colors;
     spectrogram.alpha = config.customColormap.alpha;
     spectrogram.options.labelsColor = this.wsTextColour()[0]
+    spectrogram.scale = config.customColormap.scale;
     this.wavesurfer.setOptions({cursorColor: this.wsTextColour()[0]})
     this.reload();
   }
