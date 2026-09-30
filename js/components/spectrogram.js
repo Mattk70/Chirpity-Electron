@@ -319,7 +319,7 @@ export class ChirpityWS {
     }
     // set colormap
     const colorMap = this.createColormap();
-    const {windowFn:windowFunc, alpha, scale} = config.customColormap;
+    const {windowFunc, alpha, scale} = config.customColormap;
     const scaleFactor = config.selectedModel.includes('batpack') ? 10 : 1;
     const {frequencyMin, frequencyMax} = config.audio;
     const scaledFrequencyMin = frequencyMin * scaleFactor;
@@ -358,32 +358,47 @@ export class ChirpityWS {
       play: wavesurfer.isPlaying(),
     });
   }
+
   setRange({frequencyMin, frequencyMax}){
-    const spec = this.spectrogram
+    const spec = this.spectrogram;
     frequencyMin !== undefined && (spec.frequencyMin = frequencyMin);
     frequencyMax  !== undefined && (spec.frequencyMax = frequencyMax);
     this.reload()
   }
-  setColorMap(){
+
+createLabelsCanvas() {
+  const spec = this.spectrogram;
+  spec.labelsEl = document.createElement('canvas');
+  Object.assign(spec.labelsEl, {
+    part: 'spec-labels',
+  });
+  Object.assign(spec.labelsEl.style, {
+    position: 'absolute',
+    zIndex: 9,
+    width: '55px',
+    height: '100%',
+  });
+  spec.wrapper.appendChild(spec.labelsEl);
+}
+
+  setOptions() {
     const config = this.getConfig();
-    const spectrogram = this.spectrogram;
-    // set colormap
-    const colors = this.createColormap();
-    spectrogram.colorMap = colors;
-    spectrogram.alpha = config.customColormap.alpha;
-    spectrogram.options.labelsColor = this.wsTextColour()[0]
-    spectrogram.scale = config.customColormap.scale;
-    this.wavesurfer.setOptions({cursorColor: this.wsTextColour()[0]})
-    this.reload();
+    const { scale, alpha, windowFunc } = config.customColormap;
+    const colour = this.wsTextColour()[0];
+    Object.assign(this.spectrogram, {
+      colorMap: this.createColormap(),
+      alpha,
+      scale,
+      windowFunc
+    });
+    this.spectrogram.options.labelsColor = colour;
+    this.spectrogram.options.labels = config.specLabels;
+    this.wavesurfer.setOptions({ cursorColor: colour });
+    this.spectrogram.clearCache();
+    this.spectrogram.render();
+    // this.reload();
   }
 
-  setWindowFunction(){
-    const config = this.getConfig();
-    const spectrogram = this.spectrogram;
-    // set window function
-    spectrogram.windowFunc = config.customColormap.windowFn;
-    this.reload();
-  }
 
   ///////////////////////// Timeline Callbacks /////////////////////////
 

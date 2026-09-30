@@ -2119,10 +2119,6 @@ selectionTable.addEventListener("click", debounceClick(resultClick));
  * @returns {Promise<void>}
  */
 async function resultClick(e) {
-  if (!STATE.fileLoaded) {
-    console.warn("Cannot process click - no audio file is loaded");
-    return;
-  }
   let row = e.target.closest("tr");
   if (!row || row.classList.length === 0 || row.closest("#resultsHead")) {
     // 1. clicked and dragged, 2 no detections in file row 3. clicked a header
@@ -2285,7 +2281,7 @@ const defaultConfig = {
     quiet: "#000000",
     quietThreshold: 0.0,
     midThreshold: 0.5,
-    windowFn: "hann",
+    windowFunc: "hann",
     scale: 'linear',
     alpha: 0.5
   },
@@ -2578,8 +2574,8 @@ window.onload = async () => {
    document.getElementById("scale").value =
     config.customColormap.scale;
   document.getElementById("window-function").value =
-    config.customColormap.windowFn;
-  config.customColormap.windowFn === "gauss" &&
+    config.customColormap.windowFunc;
+  config.customColormap.windowFunc === "gauss" &&
     document.getElementById("alpha").classList.remove("d-none");
   config.colormap === "custom" &&
     document.getElementById("colormap-fieldset").classList.remove("d-none");
@@ -3468,11 +3464,8 @@ function handleKeyDownDeBounce(e) {
       e.stopPropagation();
   }
   if (
-    !(
-      el instanceof HTMLInputElement ||
-      el instanceof HTMLTextAreaElement ||
-      el instanceof CustomSelect
-    )
+    ![HTMLInputElement, HTMLSelectElement, HTMLTextAreaElement, CustomSelect]
+      .some(type => el instanceof type)
   ) {
     e.preventDefault();
     utils.waitForFinalEvent(
@@ -3828,9 +3821,8 @@ const setTimelinePreferences = () => {
 
 const timelineToggle = (fromKeys) => {
   if (fromKeys === true) {
-    DOM.timelineSetting.value === "timeOfDay"
-      ? (DOM.timelineSetting.value = "timecode")
-      : (DOM.timelineSetting.value = "timeOfDay");
+    DOM.timelineSetting.value =
+      DOM.timelineSetting.value === "timeOfDay" ? "timecode" : "timeOfDay";
   }
   config.timeOfDay = DOM.timelineSetting.value === "timeOfDay"; //toggle setting
   setTimelinePreferences();
@@ -7327,18 +7319,18 @@ document.addEventListener("change", async function (e) {
             colorMapFieldset.classList.add("d-none");
           }
           if (spec.wavesurfer && STATE.currentFile) {
-            spec.setColorMap();
+            spec.setOptions();
           }
           break;
         }
         case "window-function":{
-          const windowFn = document.getElementById("window-function").value;
-          document.getElementById("alpha").classList.toggle("d-none", windowFn !== "gauss")
+          const windowFunc = document.getElementById("window-function").value;
+          document.getElementById("alpha").classList.toggle("d-none", windowFunc !== "gauss")
           config.customColormap = {
               ...config.customColormap, 
-              windowFn
+              windowFunc
             };
-          STATE.fileLoaded && spec.setWindowFunction();
+          STATE.fileLoaded && spec.setOptions();
           break
         }
         case "scale":
@@ -7370,7 +7362,7 @@ document.addEventListener("change", async function (e) {
             scale
           };
           if (spec.wavesurfer && STATE.currentFile) {
-            spec.setColorMap();
+            spec.setOptions();
           }
           break;
         }
@@ -7394,9 +7386,17 @@ document.addEventListener("change", async function (e) {
           break;
         }
         case "spec-labels": {
-          config.specLabels = element.checked;
+          const useLabels = element.checked;
+          config.specLabels = useLabels;
           if (spec.wavesurfer && STATE.currentFile) {
-            await flushSpec()
+            if (useLabels) {
+              // await flushSpec()
+              spec.createLabelsCanvas();
+              spec.setOptions();
+             } else {
+              spec.spectrogram.labelsEl.remove();
+              spec.setOptions();
+             }
           }
           break;
         }
