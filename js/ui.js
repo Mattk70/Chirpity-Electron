@@ -1608,7 +1608,6 @@ async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults 
     STATE.openFiles = await sortFilesByTime(STATE.openFiles);
   }
   utils.showElement(["spectrogramWrapper"], false);
-  spec.reInitSpec(config.specMaxHeight);
   loadAudioFileSync({ filePath: STATE.openFiles[0], preserveResults });
   // Clear unsaved records warning
   window.electron.unsavedRecords(false);
@@ -1945,7 +1944,10 @@ const handleLocationFilterChange = (e) => {
 
 function saveAnalyseState() {
   if (["analyse", "archive"].includes(STATE.mode)) {
-    const active = activeRow?.rowIndex - 1 || null;
+    let active = null;
+    if (activeRow && activeRow.rowIndex > 0) {
+      active = activeRow?.rowIndex - 1
+    }
     // Store a reference to the current file
     STATE.currentAnalysis = {
       currentFile: STATE.currentFile,
@@ -2002,9 +2004,6 @@ async function showCharts() {
   });
   const locationFilter = await generateLocationList("chart-locations");
   locationFilter.addEventListener("change", handleLocationFilterChange);
-  // Prevent the wavesurfer error
-  spec.spectrogram && spec.spectrogram.destroy();
-  spec.spectrogram = null;
   utils.hideAll();
  
   utils.showElement(["recordsContainer"]);
@@ -2044,7 +2043,7 @@ async function showExplore() {
   locationFilter.addEventListener("change", handleLocationFilterChange);
   utils.hideAll();
   utils.showElement(["exploreWrapper", "spectrogramWrapper"], false);
-  spec.reInitSpec(config.specMaxHeight);
+
     // Analysis is done
   STATE.analysisDone = true;
   filterResults({
@@ -2066,36 +2065,39 @@ async function showExplore() {
 async function showAnalyse() {
   utils.disableMenuItem(["active-analysis"]);
   //Restore STATE
-  STATE = { ...STATE, ...STATE.currentAnalysis };
-  worker.postMessage({ action: "change-mode", mode: STATE.mode });
-  clearLocationFilter();
-  // Prevent the wavesurfer error
-  if (spec.spectrogram) {
-    spec.spectrogram.destroy();
-    spec.spectrogram = null;
+  if (STATE.currentAnalysis) {
+    for (const key of [
+      'currentFile',
+      'openFiles',
+      'offset',
+      'resultsSortOrder',
+      'resultsMetaSortOrder',
+      'summarySortOrder'
+    ])
+    if (key in STATE.currentAnalysis)
+      STATE[key] = STATE.currentAnalysis[key];
   }
+  resetRegions(true);
+  worker.postMessage({ action: "change-mode", mode: STATE.currentAnalysis.mode});
+  clearLocationFilter();
+
   utils.hideAll();
   if (STATE.currentFile) {
     utils.showElement(["spectrogramWrapper"], false);
-    spec.reInitSpec(config.specMaxHeight);
-    worker.postMessage({
-      action: "update-state",
-      resultsSortOrder: STATE.resultsSortOrder,
-      resultsMetaSortOrder: STATE.resultsMetaSortOrder,
-      summarySortOrder: STATE.summarySortOrder,
-    });
+
     if (STATE.analysisDone) {
+      pagination?.reset();
       filterResults({
-        species: STATE.species,
-        offset: STATE.offset,
-        active: STATE.active,
+        species: STATE.currentAnalysis.species,
+        offset: STATE.currentAnalysis.offset,
+        active: STATE.currentAnalysis.active,
         updateSummary: true,
       });
     } else {
-      clearActive();
       loadAudioFileSync({ filePath: STATE.currentFile });
     }
   }
+  STATE.currentAnalysis = null;
   resetResults();
 }
 
@@ -2283,7 +2285,10 @@ const defaultConfig = {
     midThreshold: 0.5,
     windowFunc: "hann",
     scale: 'linear',
-    alpha: 0.5
+    alpha: 0.5,
+    autoGain: false,
+    preemphasis: 0, // Pre-emphasis filter willl be 0 (false) or 6 (true)
+    rangeDB: 80, // Range in dB for the spectrogram
   },
   timeOfDay: true,
   list: "birds",
@@ -2579,7 +2584,7 @@ window.onload = async () => {
     document.getElementById("alpha").classList.remove("d-none");
   config.colormap === "custom" &&
     document.getElementById("colormap-fieldset").classList.remove("d-none");
-  const {loud, mid, quiet, quietThreshold, midThreshold, alpha} = config.customColormap;
+  const {loud, mid, quiet, quietThreshold, midThreshold, alpha, autoGain, preEmphasis, rangeDB} = config.customColormap;
   document.getElementById("quiet-color-threshold").textContent = quietThreshold;
   document.getElementById("quiet-color-threshold-slider").value = quietThreshold;
   document.getElementById("mid-color-threshold").textContent = midThreshold;
@@ -2589,6 +2594,9 @@ window.onload = async () => {
   document.getElementById("quiet-color").value = quiet;
   document.getElementById("alpha-slider").value = alpha;
   document.getElementById("alpha-value").textContent = alpha;
+  document.getElementById("autogain").checked = autoGain;
+  document.getElementById("preemphasis").checked = preEmphasis;
+  document.getElementById("range-db").value = rangeDB;
   
   // Audio preferences:
   DOM.gain.value = audio.gain;
@@ -6067,9 +6075,9 @@ document.addEventListener("click", debounceClick(handleUIClicks));
  */
 async function handleUIClicks(e) {
   if (!APPLICATION_LOADED) return;
-  if (STATE.capturing) cancelVideoCapture();
   const element = e.target;
   const target = element.closest("[id]")?.id;
+  if (STATE.capturing && target !== "capture-start") cancelVideoCapture();
   const locale = config.locale.replace(/_.*$/, "");
   switch (target) {
     // Spec outside of region
@@ -6820,7 +6828,6 @@ async function handleUIClicks(e) {
     }
     // Video capture
     case "capture-start": {
-      STATE.capturing = true;
       await videoCapture(element);
       break;
     }
@@ -7339,8 +7346,14 @@ document.addEventListener("change", async function (e) {
         case "quiet-color":
         case "mid-color-threshold-slider":
         case "quiet-color-threshold-slider":
+        case "autogain":
+        case "preemphasis":
+        case "range-db":
         case "alpha-slider": {
           const alpha = document.getElementById("alpha-slider").valueAsNumber;
+          const autoGain = document.getElementById("autogain").checked;
+          const preEmphasis = document.getElementById("preemphasis").checked ? 6 : 0;
+          const rangeDB = document.getElementById("range-db").valueAsNumber;
           const loud = document.getElementById("loud-color").value;
           const mid = document.getElementById("mid-color").value;
           const quiet = document.getElementById("quiet-color").value;
@@ -7359,6 +7372,9 @@ document.addEventListener("change", async function (e) {
             quietThreshold,
             midThreshold,
             alpha,
+            autoGain,
+            preEmphasis,
+            rangeDB,
             scale
           };
           if (spec.wavesurfer && STATE.currentFile) {
@@ -9469,13 +9485,12 @@ async function videoCapture(btn) {
     `;
     const scaleEl = document.getElementById('scale');
     const scale = scaleEl.options[scaleEl.selectedIndex].text;
-    waterMark.innerHTML = `Created with Chirpity: https://chirpity.net<br>(${scale} scale)`;
+    waterMark.innerHTML = `Created with Chirpity: https://chirpity.net<br>(${scale} spectrogram)`;
     waterMark.id = 'watermark';
     waveElement.prepend(waterMark);
 
     const playerEl = ws.getMediaElement();
-    const audioTracks = playerEl.captureStream().getAudioTracks();
-
+    const [audioTrack] = playerEl.captureStream().getAudioTracks();
     const display = await navigator.mediaDevices.getDisplayMedia({
       video: true
     });
@@ -9492,11 +9507,10 @@ async function videoCapture(btn) {
       await RestrictionTarget.fromElement(waveElement)
     );
 
-    stream = new MediaStream([videoTrack, ...audioTracks]);
+    stream = new MediaStream([videoTrack, audioTrack]);
 
-    const mimeType = 'video/mp4;codecs="avc3"';
+    const mimeType = 'video/mp4;codecs="avc3,mp4a.40.2"';
     recorder = new MediaRecorder(stream, { mimeType });
-
     captureChunks = [];
 
     recorder.ondataavailable = (e) => {
@@ -9532,18 +9546,14 @@ async function videoCapture(btn) {
     }, { once: true });
 
     recorder.start();
-
     await ws.play(0, STATE.windowLength - 0.05);
 
   } catch (err) {
     console.error(err);
-
     // Clean up if capture failed before recorder.onstop
     blocker?.remove();
     document.getElementById('watermark')?.remove();
-
     stream?.getTracks().forEach(t => t.stop());
-
     STATE.capturing = false;
     btn.classList.remove('text-danger');
   }
@@ -9558,7 +9568,6 @@ async function videoCapture(btn) {
     stream = null;
 
     document.getElementById('watermark')?.remove();
-    document.getElementById('hide-cursor')?.remove();
 
     if (aborted) {
       captureChunks = [];
@@ -9569,36 +9578,42 @@ async function videoCapture(btn) {
     }
 
     blocker?.remove();
-
+    
     const blob = new Blob(captureChunks, { type: 'video/mp4' });
+    let result;
+    try {
+      result = await utils.requestFromWorker(
+        worker,
+        'process-video',
+        { blob },
+        30_000
+      );
+    } catch (err) {
+      console.error('Error processing video:', err);
+      generateToast({
+        message: err.message || err,
+        type: 'error'
+      });
+    } finally {
+      captureChunks = [];
+      recorder = null;
+      STATE.captureAbortController = null;
+    }
+    if (!result) return;
 
-    const result = await utils.requestFromWorker(
-      worker,
-      'process-video',
-      { blob },
-      30_000
-    );
-
-    const processed = new Blob([result], { type: 'video/mp4' });
-
-    captureChunks = [];
-    recorder = null;
-    STATE.captureAbortController = null;
-
-    const url = URL.createObjectURL(processed);
-
+    const url = URL.createObjectURL(new Blob([result], { type: 'video/mp4' }));
     const a = Object.assign(document.createElement('a'), {
       href: url,
       download: 'chirpity-recording.mp4'
     });
-    console.log(`Saving video took ${Date.now() - t0}ms`)
+    console.info(`Saving video took ${Date.now() - t0}ms`);
     document.body.appendChild(a);
     a.click();
     a.remove();
-
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 }
+
 function cancelVideoCapture() {
   STATE.captureAbortController?.abort();
   if (recorder?.state !== 'inactive') {

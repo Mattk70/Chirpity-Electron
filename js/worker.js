@@ -177,8 +177,8 @@ const setupFfmpegCommand = async ({
 }) => {
 
   const command = ffmpeg("file:" + file)
-    .format(format);
-  if (channels) command.audioChannels(channels);
+    .format(format)
+    .audioChannels(channels);
   // todo: consider whether to expose bat model training
   const training = false;
   if (STATE.model.includes('batpack')) { 
@@ -2896,16 +2896,16 @@ const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sam
 
   // Validate start time
   if (isNaN(start)) throw new Error(`fetchAudioBuffer: start is NaN: ${start}`);
-
+  const channels = 1;
   return new Promise((resolve, reject) => {
-    const additionalFilters = setAudioFilters();
+    const additionalFilters = setAudioFilters(format, channels);
     setupFfmpegCommand({
       file,
       start,
       end,
       sampleRate,
       format,
-      channels: 1,
+      channels,
       additionalFilters,
     }).then(command => {
     const stream = command.pipe();
@@ -2944,7 +2944,7 @@ const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sam
  * If filters are not active, returns an empty array.
  * @returns {Array<Object>} An array of filter configuration objects representing an ffmpeg-style filter chain; empty if no filters are active.
  */
-function setAudioFilters(codec) {
+function setAudioFilters(codec, channels) {
   const {
     active,
     lowShelfAttenuation: attenuation,
@@ -2953,6 +2953,13 @@ function setAudioFilters(codec) {
     lowPassFrequency: lowPass,
     normalise
   } = STATE.filters;
+
+  const layoutPin = (channels) =>
+  channels === 1 ? "mono" :
+  channels === 2 ? "stereo" :
+  channels > 2 ? `${channels}c` :
+  "mono|stereo"; // unknown: keep the current behaviour
+
   const useAdvanced = !['pcm_s32le', 'pcm_s24le'].includes(codec);
   if (!active) return [];
 
@@ -2964,13 +2971,19 @@ function setAudioFilters(codec) {
     const options = {};
     if (highPass) options.hp = highPass;
     if (lowPass < 15_000) options.lp = lowPass;
+    // Give the IR the same number of channels as the audio
+    const copies = Array.from({ length: channels }, (_, i) => `c${i}=c0`).join('|');
+    const multi = channels > 1;
     // Use sinc + afir
     filters.push(
       {
         filter: 'sinc',
         options: { ...options, att: 80 },
-        outputs: 'ir'
+        outputs: multi ? undefined : 'ir'
       },
+      ...(multi
+        ? [{ filter: 'pan', options: `${channels}c|${copies}`, outputs: 'ir' }]
+        : []),
       { filter: 'afir', inputs: ['a', 'ir'] }
     );
   }
@@ -2995,6 +3008,9 @@ function setAudioFilters(codec) {
     filters.push({
       filter: "loudnorm",
       options: "TP=-3.0"
+    }, {
+      filter: "aformat",
+      options: `channel_layouts=${layoutPin(channels)}`
     });
   }
 
@@ -3128,7 +3144,7 @@ const bufferToAudio = async ({
   if (extension === '.' + format) {
     formatMap[format] = {...formatMap[format], ...await getAudioCodec(file)};
   }
-  const { audioCodec, soundFormat, sampleRate } = formatMap[format];
+  const { audioCodec, soundFormat, sampleRate, channels } = formatMap[format];
 
   if (padding) {
     start = Math.max(0, start - 1);
@@ -3137,10 +3153,10 @@ const bufferToAudio = async ({
   }
 
   return new Promise(function (resolve, reject) {
-    const filters = setAudioFilters(audioCodec);
+    const filters = setAudioFilters(audioCodec, channels);
     if (fade && padding) {
       filters.push(
-        { filter: "afade", options: `t=in:ss=${start}:d=1` },
+        { filter: "afade", options: `t=in:d=1` },
         { filter: "afade", options: `t=out:st=${end - start - 1}:d=1` }
       );
     }
@@ -3154,7 +3170,7 @@ const bufferToAudio = async ({
       audioQuality,
       audioCodec,
       format: soundFormat,
-      channels: downmix ? 1 : 0,
+      channels: downmix ? 1 : channels,
       metadata: meta,
       additionalFilters: filters
     }).then(command => {
@@ -6753,11 +6769,10 @@ await new Promise((resolve, reject) => {
       '-tag:v avc1',            // makes ffmpeg mux it as avc1 in the MP4 container
       '-crf 30',                // quality target; lower = better/larger, 18 is visually near-lossless
       '-preset veryfast',       // trade encode speed for file size; 'medium' is ffmpeg's default
-      '-movflags +faststart'
+      '-movflags +faststart'    // allows playback to start before the file is fully downloaded
     ])
-    .audioCodec('aac')
-    .audioBitrate('128k')
-    .on('error', (err, _stdout, stderr) => reject(new Error(stderr || err.message)))
+    .audioCodec('copy') // copy the audio stream without re-encoding
+    .on('error', (err) => reject(err))
     .on('end', resolve)
     .save(outPath);
 });
@@ -6765,7 +6780,14 @@ await new Promise((resolve, reject) => {
     const out =  await fs.promises.readFile(outPath); // arrives in the renderer as a Uint8Array
     const file =  out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength);
     UI.postMessage({ id, event: "ignore-me", data: file }, [file] )
-  } finally {
+  } catch (error) {
+      UI.postMessage({
+        id,
+        event: "ignore-me",
+        error: error.message
+      });
+  }
+  finally {
     // clean up both temp files, ignoring errors if one doesn't exist
     await Promise.allSettled([fs.promises.unlink(inPath), fs.promises.unlink(outPath)]);
   }

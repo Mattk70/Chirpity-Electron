@@ -309,7 +309,7 @@ function requestFromWorker(worker, action, payload = {}, timeout = 15_000) {
       worker.removeEventListener("message", handleMessage);
       clearTimeout(timeoutId); // Clear the timeout if we got a response
       if (error) {
-        reject(new Error(error));
+        reject(error);
       } else {
         resolve(data);
       }
@@ -317,7 +317,7 @@ function requestFromWorker(worker, action, payload = {}, timeout = 15_000) {
     // Set timeout to clean up listener and reject promise
    timeoutId = setTimeout(() => {
       worker.removeEventListener("message", handleMessage);
-      reject(new Error('Timeout',`Worker request timed out for action: ${action} after ${timeout/1000}s`));
+      reject(new Error(`Request timed out for action: ${action} after ${timeout/1000}s`));
     }, timeout); // Default 15 second timeout
 
     worker.addEventListener("message", handleMessage);

@@ -319,7 +319,7 @@ export class ChirpityWS {
     }
     // set colormap
     const colorMap = this.createColormap();
-    const {windowFunc, alpha, scale} = config.customColormap;
+    const {windowFunc, alpha, scale, autoGain, preEmphasis, rangeDB} = config.customColormap;
     const scaleFactor = config.selectedModel.includes('batpack') ? 10 : 1;
     const {frequencyMin, frequencyMax} = config.audio;
     const scaledFrequencyMin = frequencyMin * scaleFactor;
@@ -341,6 +341,9 @@ export class ChirpityWS {
       colorMap,
       alpha,
       useWebWorker: false,
+      autoGain,
+      preEmphasis,
+      rangeDB,
     });
   }
 
@@ -383,20 +386,24 @@ createLabelsCanvas() {
 
   setOptions() {
     const config = this.getConfig();
-    const { scale, alpha, windowFunc } = config.customColormap;
+    const { scale, alpha, windowFunc, autoGain, preEmphasis, rangeDB } = config.customColormap;
     const colour = this.wsTextColour()[0];
     Object.assign(this.spectrogram, {
       colorMap: this.createColormap(),
       alpha,
       scale,
-      windowFunc
+      windowFunc,
+      autoGain,
+      preEmphasis,
+      rangeDB,
     });
+    this.createTimeline();
+    this.REGIONS.clearRegions();
     this.spectrogram.options.labelsColor = colour;
     this.spectrogram.options.labels = config.specLabels;
     this.wavesurfer.setOptions({ cursorColor: colour });
     this.spectrogram.clearCache();
     this.spectrogram.render();
-    // this.reload();
   }
 
 
@@ -487,6 +494,8 @@ createLabelsCanvas() {
    * @returns {Object} The timeline plugin instance, either as a registered plugin with WaveSurfer or as a standalone object.
    */
   createTimeline(windowLength) {
+    windowLength ??= this.getState().windowLength;
+    this.timeline?.destroy();
     const interval = windowLength < 5 ? 0.5 : Math.ceil(windowLength / 5)
     const primaryLabelInterval = interval;
     const secondaryLabelInterval = primaryLabelInterval <= 2 ? primaryLabelInterval / 2 : 0;
@@ -899,16 +908,16 @@ createLabelsCanvas() {
    * If both conditions are met, it initializes the spectrogram using the configured maximum height
    * and registers it as a plugin with wavesurfer.
    */
-  reInitSpec(height) {
-    const wavesurfer = this.wavesurfer;
-    if (wavesurfer && !this.spectrogram) {
-      wavesurfer.setOptions({cursorColor: this.wsTextColour()[0]})
-      this.spectrogram = this.initSpectrogram(height);
-      wavesurfer.registerPlugin(this.spectrogram);
-      this.refreshTimeline();
-      this.reload();
-    }
-  }
+  // reInitSpec(height) {
+  //   const wavesurfer = this.wavesurfer;
+  //   if (wavesurfer && !this.spectrogram) {
+  //     wavesurfer.setOptions({cursorColor: this.wsTextColour()[0]})
+  //     this.spectrogram = this.initSpectrogram(height);
+  //     wavesurfer.registerPlugin(this.spectrogram);
+  //     this.refreshTimeline();
+  //     this.reload();
+  //   }
+  // }
 
   hideTooltip() {
     DOM.tooltip.style.visibility = "hidden";
