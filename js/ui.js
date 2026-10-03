@@ -163,6 +163,8 @@ const GLOBAL_ACTIONS = {
       STATE.diskHasRecords && utils.enableMenuItem(["explore", "charts"]);
       generateToast({ message: "cancelled" });
       displayProgress({percent: 100, text:''})
+    } else if (STATE.capturing){
+      cancelVideoCapture()
     }
   },
   Home: () => {
@@ -395,29 +397,28 @@ let animating = false;
 // Mouse down event to start dragging
 DOM.controlsWrapper.addEventListener("mousedown", (e) => {
   if (e.target.tagName !== "DIV") return;
+  cancelVideoCapture();
   const startY = e.clientY;
-  const initialHeight = DOM.waveElement.offsetHeight;
+  const initialHeight = DOM.waveElement.offsetHeight -20 /* timeline height */;
   let newHeight;
-
-  const onMouseMove = (e) => {
+  const adjust = (e) => {
     // Calculate the delta y (drag distance)
-    newHeight = initialHeight + e.clientY - startY;
-    // Clamp newHeight to ensure it doesn't exceed the available height
-    newHeight = Math.min(newHeight, spec.maxHeight(DOM));
+    // and clamp newHeight to ensure it doesn't exceed the available height
+    newHeight = Math.min(initialHeight + e.clientY - startY, spec.maxHeight(DOM));
     // Adjust the spectrogram dimensions accordingly
     if (!animating) {
       animating = true;
       requestAnimationFrame(() => {
         spec.adjustDims(true, newHeight);
-        // Lazy hack, but works
-        window.dispatchEvent(new Event("resize"));
         animating = false;
       });
     }
-  };
-  // Remove event listener on mouseup
-  const onMouseUp = () => {
-    document.removeEventListener("mousemove", onMouseMove);
+  }
+  const onMouseMove = (e) => adjust(e);
+  const onMouseUp = (e) => {
+    // Remove event listener on mouseup
+    document.removeEventListener('mousemove', onMouseMove)
+    adjust(e)
     trackEvent({uuid: config.UUID, event: "Drag", action: "Spec Resize", value: newHeight, version: config.VERSION});
   };
   // Attach event listeners for mousemove and mouseup
@@ -517,7 +518,7 @@ function resetResults({
   clearResults = true,
 } = {}) {
   if (clearSummary) DOM.summaryTable.textContent = "";
-  if (clearPagination) pagination.hide();
+  if (clearPagination) pagination?.hide();
   resultsBuffer = DOM.resultTable.cloneNode(false);
   if (clearResults) {
     DOM.resultTable.textContent = "";
@@ -1607,7 +1608,6 @@ async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults 
     STATE.openFiles = await sortFilesByTime(STATE.openFiles);
   }
   utils.showElement(["spectrogramWrapper"], false);
-  spec.reInitSpec(config.specMaxHeight);
   loadAudioFileSync({ filePath: STATE.openFiles[0], preserveResults });
   // Clear unsaved records warning
   window.electron.unsavedRecords(false);
@@ -1944,7 +1944,10 @@ const handleLocationFilterChange = (e) => {
 
 function saveAnalyseState() {
   if (["analyse", "archive"].includes(STATE.mode)) {
-    const active = activeRow?.rowIndex - 1 || null;
+    let active = null;
+    if (activeRow && activeRow.rowIndex > 0) {
+      active = activeRow?.rowIndex - 1
+    }
     // Store a reference to the current file
     STATE.currentAnalysis = {
       currentFile: STATE.currentFile,
@@ -2001,9 +2004,6 @@ async function showCharts() {
   });
   const locationFilter = await generateLocationList("chart-locations");
   locationFilter.addEventListener("change", handleLocationFilterChange);
-  // Prevent the wavesurfer error
-  spec.spectrogram && spec.spectrogram.destroy();
-  spec.spectrogram = null;
   utils.hideAll();
  
   utils.showElement(["recordsContainer"]);
@@ -2043,7 +2043,7 @@ async function showExplore() {
   locationFilter.addEventListener("change", handleLocationFilterChange);
   utils.hideAll();
   utils.showElement(["exploreWrapper", "spectrogramWrapper"], false);
-  spec.reInitSpec(config.specMaxHeight);
+
     // Analysis is done
   STATE.analysisDone = true;
   filterResults({
@@ -2065,36 +2065,39 @@ async function showExplore() {
 async function showAnalyse() {
   utils.disableMenuItem(["active-analysis"]);
   //Restore STATE
-  STATE = { ...STATE, ...STATE.currentAnalysis };
-  worker.postMessage({ action: "change-mode", mode: STATE.mode });
-  clearLocationFilter();
-  // Prevent the wavesurfer error
-  if (spec.spectrogram) {
-    spec.spectrogram.destroy();
-    spec.spectrogram = null;
+  if (STATE.currentAnalysis) {
+    for (const key of [
+      'currentFile',
+      'openFiles',
+      'offset',
+      'resultsSortOrder',
+      'resultsMetaSortOrder',
+      'summarySortOrder'
+    ])
+    if (key in STATE.currentAnalysis)
+      STATE[key] = STATE.currentAnalysis[key];
   }
+  resetRegions(true);
+  worker.postMessage({ action: "change-mode", mode: STATE.currentAnalysis.mode});
+  clearLocationFilter();
+
   utils.hideAll();
   if (STATE.currentFile) {
     utils.showElement(["spectrogramWrapper"], false);
-    spec.reInitSpec(config.specMaxHeight);
-    worker.postMessage({
-      action: "update-state",
-      resultsSortOrder: STATE.resultsSortOrder,
-      resultsMetaSortOrder: STATE.resultsMetaSortOrder,
-      summarySortOrder: STATE.summarySortOrder,
-    });
+
     if (STATE.analysisDone) {
+      pagination?.reset();
       filterResults({
-        species: STATE.species,
-        offset: STATE.offset,
-        active: STATE.active,
+        species: STATE.currentAnalysis.species,
+        offset: STATE.currentAnalysis.offset,
+        active: STATE.currentAnalysis.active,
         updateSummary: true,
       });
     } else {
-      clearActive();
       loadAudioFileSync({ filePath: STATE.currentFile });
     }
   }
+  STATE.currentAnalysis = null;
   resetResults();
 }
 
@@ -2118,10 +2121,6 @@ selectionTable.addEventListener("click", debounceClick(resultClick));
  * @returns {Promise<void>}
  */
 async function resultClick(e) {
-  if (!STATE.fileLoaded) {
-    console.warn("Cannot process click - no audio file is loaded");
-    return;
-  }
   let row = e.target.closest("tr");
   if (!row || row.classList.length === 0 || row.closest("#resultsHead")) {
     // 1. clicked and dragged, 2 no detections in file row 3. clicked a header
@@ -2284,8 +2283,12 @@ const defaultConfig = {
     quiet: "#000000",
     quietThreshold: 0.0,
     midThreshold: 0.5,
-    windowFn: "hann",
-    alpha: 0.5
+    windowFunc: "hann",
+    scale: 'linear',
+    alpha: 0.5,
+    autoGain: false,
+    preEmphasis: 0, // Pre-emphasis filter willl be 0 (false) or 6 (true)
+    rangeDB: 80, // Range in dB for the spectrogram
   },
   timeOfDay: true,
   list: "birds",
@@ -2572,14 +2575,16 @@ window.onload = async () => {
   DOM.toSlider.value = audio.frequencyMax;
   fillSlider(DOM.fromInput, DOM.toInput, "#C6C6C6", "#0d6efd", DOM.toSlider);
   checkFilteredFrequency();
-  // Window function & colormap
+  // Window function, colormap and scale
+   document.getElementById("scale").value =
+    config.customColormap.scale;
   document.getElementById("window-function").value =
-    config.customColormap.windowFn;
-  config.customColormap.windowFn === "gauss" &&
+    config.customColormap.windowFunc;
+  config.customColormap.windowFunc === "gauss" &&
     document.getElementById("alpha").classList.remove("d-none");
   config.colormap === "custom" &&
     document.getElementById("colormap-fieldset").classList.remove("d-none");
-  const {loud, mid, quiet, quietThreshold, midThreshold, alpha} = config.customColormap;
+  const {loud, mid, quiet, quietThreshold, midThreshold, alpha, autoGain, preEmphasis, rangeDB} = config.customColormap;
   document.getElementById("quiet-color-threshold").textContent = quietThreshold;
   document.getElementById("quiet-color-threshold-slider").value = quietThreshold;
   document.getElementById("mid-color-threshold").textContent = midThreshold;
@@ -2589,6 +2594,9 @@ window.onload = async () => {
   document.getElementById("quiet-color").value = quiet;
   document.getElementById("alpha-slider").value = alpha;
   document.getElementById("alpha-value").textContent = alpha;
+  document.getElementById("autogain").checked = autoGain;
+  document.getElementById("preemphasis").checked = preEmphasis;
+  document.getElementById("range-db").value = rangeDB;
   
   // Audio preferences:
   DOM.gain.value = audio.gain;
@@ -3027,6 +3035,9 @@ const setUpWorkerMessaging = () => {
           onWorkerLoadedAudio(args);
           break;
         }
+        case "ignore-me": {
+          break
+        }
         default: {
           generateToast({
             type: "error",
@@ -3423,17 +3434,12 @@ function formatDate(date, aggregation) {
     return weekNumber;
   } else if (aggregation === "day") {
     options.day = "numeric";
-    // options.weekday = "short";
     options.month = "short";
   } else if (aggregation === "hour") {
     const timeString = new Intl.DateTimeFormat(locale, {
       hour: 'numeric',
       hour12: true
     }).format(date);
-    // const hour = date.getHours();
-    // const period = hour >= 12 ? "PM" : "AM";
-    // const formattedHour = hour % 12 || 12; // Convert 0 to 12
-    // return `${formattedHour}${period}`;
     return timeString;
   }
   
@@ -3441,6 +3447,9 @@ function formatDate(date, aggregation) {
 }
 
 window.addEventListener("resize", function () {
+  if (STATE.capturing){
+    return
+  }
   utils.waitForFinalEvent(
     async function () {
       await spec.adjustDims(true);
@@ -3463,11 +3472,8 @@ function handleKeyDownDeBounce(e) {
       e.stopPropagation();
   }
   if (
-    !(
-      el instanceof HTMLInputElement ||
-      el instanceof HTMLTextAreaElement ||
-      el instanceof CustomSelect
-    )
+    ![HTMLInputElement, HTMLSelectElement, HTMLTextAreaElement, CustomSelect]
+      .some(type => el instanceof type)
   ) {
     e.preventDefault();
     utils.waitForFinalEvent(
@@ -3766,6 +3772,7 @@ const handleModelChange = async (model, reload = true) => {
 
   DOM.resultTable.replaceChildren();
   if (!(combine || merge)) {
+    resetResults();
     resetRegions(true);
     DOM.summaryTable.replaceChildren();
     DOM.resultHeader.replaceChildren();
@@ -3822,9 +3829,8 @@ const setTimelinePreferences = () => {
 
 const timelineToggle = (fromKeys) => {
   if (fromKeys === true) {
-    DOM.timelineSetting.value === "timeOfDay"
-      ? (DOM.timelineSetting.value = "timecode")
-      : (DOM.timelineSetting.value = "timeOfDay");
+    DOM.timelineSetting.value =
+      DOM.timelineSetting.value === "timeOfDay" ? "timecode" : "timeOfDay";
   }
   config.timeOfDay = DOM.timelineSetting.value === "timeOfDay"; //toggle setting
   setTimelinePreferences();
@@ -6071,6 +6077,7 @@ async function handleUIClicks(e) {
   if (!APPLICATION_LOADED) return;
   const element = e.target;
   const target = element.closest("[id]")?.id;
+  if (STATE.capturing && target !== "capture-start") cancelVideoCapture();
   const locale = config.locale.replace(/_.*$/, "");
   switch (target) {
     // Spec outside of region
@@ -6819,6 +6826,11 @@ async function handleUIClicks(e) {
       ws.zoom(minPxPerSec);
       break;
     }
+    // Video capture
+    case "capture-start": {
+      await videoCapture(element);
+      break;
+    }
     case "clear-call-cache": {
       e.preventDefault();
       const data = fs.rm(p.join(appPath, "XCcache.json"), (err) => {
@@ -7314,27 +7326,34 @@ document.addEventListener("change", async function (e) {
             colorMapFieldset.classList.add("d-none");
           }
           if (spec.wavesurfer && STATE.currentFile) {
-            spec.setColorMap();
+            spec.setOptions();
           }
           break;
         }
         case "window-function":{
-          const windowFn = document.getElementById("window-function").value;
-          document.getElementById("alpha").classList.toggle("d-none", windowFn !== "gauss")
+          const windowFunc = document.getElementById("window-function").value;
+          document.getElementById("alpha").classList.toggle("d-none", windowFunc !== "gauss")
           config.customColormap = {
               ...config.customColormap, 
-              windowFn
+              windowFunc
             };
-          STATE.fileLoaded && spec.setWindowFunction();
+          STATE.fileLoaded && spec.setOptions();
           break
         }
+        case "scale":
         case "loud-color":
         case "mid-color":
         case "quiet-color":
         case "mid-color-threshold-slider":
         case "quiet-color-threshold-slider":
+        case "autogain":
+        case "preemphasis":
+        case "range-db":
         case "alpha-slider": {
           const alpha = document.getElementById("alpha-slider").valueAsNumber;
+          const autoGain = document.getElementById("autogain").checked;
+          const preEmphasis = document.getElementById("preemphasis").checked ? 6 : 0;
+          const rangeDB = document.getElementById("range-db").valueAsNumber;
           const loud = document.getElementById("loud-color").value;
           const mid = document.getElementById("mid-color").value;
           const quiet = document.getElementById("quiet-color").value;
@@ -7344,7 +7363,7 @@ document.addEventListener("change", async function (e) {
           const midThreshold = document.getElementById(
             "mid-color-threshold-slider"
           ).valueAsNumber;
-          // document.getElementById("color-threshold").textContent = threshold;
+          const scale = document.getElementById("scale").value;
           config.customColormap = {
             ...config.customColormap,
             loud,
@@ -7352,10 +7371,14 @@ document.addEventListener("change", async function (e) {
             quiet,
             quietThreshold,
             midThreshold,
-            alpha
+            alpha,
+            autoGain,
+            preEmphasis,
+            rangeDB,
+            scale
           };
           if (spec.wavesurfer && STATE.currentFile) {
-            spec.setColorMap();
+            spec.setOptions();
           }
           break;
         }
@@ -7379,9 +7402,17 @@ document.addEventListener("change", async function (e) {
           break;
         }
         case "spec-labels": {
-          config.specLabels = element.checked;
+          const useLabels = element.checked;
+          config.specLabels = useLabels;
           if (spec.wavesurfer && STATE.currentFile) {
-            await flushSpec()
+            if (useLabels) {
+              // await flushSpec()
+              spec.createLabelsCanvas();
+              spec.setOptions();
+             } else {
+              spec.spectrogram.labelsEl.remove();
+              spec.setOptions();
+             }
           }
           break;
         }
@@ -8171,6 +8202,7 @@ const loadingFiles = ({hide, content}) => {
   } else {
     loadingTimeout = setTimeout(() => {
       DOM.loading.querySelector("#loadingText").textContent = content;
+      DOM.loading.style.color = spec?.wsTextColour()[0] || 'black';
       DOM.loading.classList.remove("d-none");
     }, 500);
   }
@@ -9401,3 +9433,192 @@ function checkForIntelMacUpdates() {
     
 //   }
 // }
+
+let recorder, captureChunks = [], stream;
+
+async function videoCapture(btn) {
+  const waveElement = document.getElementById('waveform');
+  const ws = spec.wavesurfer;
+  if (!ws) return
+  let blocker;
+  let display;
+
+  if (btn.classList.contains('text-danger')) {
+    // Manual stop
+    STATE.capturing = false;
+    const waterMark = document.getElementById('watermark');
+    waterMark?.remove();
+    btn.classList.remove('text-danger');
+    ws.pause();
+    if (recorder?.state !== 'inactive') {
+      recorder.stop();
+    }
+    return;
+  }
+
+  STATE.capturing = true;
+  btn.classList.add('text-danger');
+
+  // Controller for this particular capture
+  STATE.captureAbortController = new AbortController();
+
+  try {
+    blocker = document.createElement('div');
+    blocker.style.cssText = `
+      position: absolute;
+      inset: 0;
+      z-index: 1000;
+      cursor: none;
+    `;
+    waveElement.parentElement.append(blocker);
+
+    const waterMark = document.createElement('div');
+    waterMark.style.cssText = `
+      position: absolute;
+      top: 35px;
+      right: 10px;
+      color: ${spec.wsTextColour()[0]};
+      font-family: Garamond, serif;
+      font-style: italic;
+      font-size: 1.2rem;
+      z-index: 5;
+      text-align: right;
+    `;
+    const scaleEl = document.getElementById('scale');
+    const scale = scaleEl.options[scaleEl.selectedIndex].text;
+    waterMark.innerHTML = `Created with Chirpity: https://chirpity.net<br>(${scale} spectrogram)`;
+    waterMark.id = 'watermark';
+    waveElement.prepend(waterMark);
+
+    const playerEl = ws.getMediaElement();
+    const [audioTrack] = playerEl.captureStream().getAudioTracks();
+    display = await navigator.mediaDevices.getDisplayMedia({
+      video: true
+    });
+
+    // User may have resized while getDisplayMedia was pending
+    if (STATE.captureAbortController.signal.aborted) {
+      display.getTracks().forEach(t => t.stop());
+      return;
+    }
+
+    const [videoTrack] = display.getVideoTracks();
+    stream = new MediaStream([videoTrack, audioTrack]);
+
+    await videoTrack.restrictTo(
+      await RestrictionTarget.fromElement(waveElement)
+    );
+
+    const mimeType = 'video/mp4;codecs="avc3,mp4a.40.2"';
+    recorder = new MediaRecorder(stream, { mimeType });
+    captureChunks = [];
+
+    recorder.ondataavailable = (e) => {
+      if (e.data.size) captureChunks.push(e.data);
+    };
+
+    recorder.onstop = () => save(btn);
+
+    // Stop recording when playback ends
+    ws.once('pause', () => {
+      if (
+        btn.classList.contains('text-danger') &&
+        !STATE.captureAbortController.signal.aborted
+      ) {
+        if (recorder?.state !== 'inactive') {
+          recorder.stop();
+        }
+      }
+    });
+
+    // User cancelled/stopped display capture
+    videoTrack.onended = () => {
+      if (recorder.state !== 'inactive') {
+        recorder.stop();
+      }
+    };
+
+    // Handle abort
+    STATE.captureAbortController.signal.addEventListener('abort', () => {
+      if (recorder?.state !== 'inactive') {
+        recorder.stop();
+      }
+    }, { once: true });
+
+    recorder.start();
+    await ws.play(0, STATE.windowLength - 0.05);
+
+  } catch (err) {
+    console.error(err);
+    // Clean up if capture failed before recorder.onstop
+    blocker?.remove();
+    document.getElementById('watermark')?.remove();
+    stream?.getTracks().forEach(t => t.stop());
+    display?.getTracks().forEach(t => t.stop());
+    stream = null;
+    STATE.capturing = false;
+    btn.classList.remove('text-danger');
+  }
+  async function save(btn) {
+    const t0 = Date.now();
+    btn.classList.remove('text-danger');
+    const aborted = STATE.captureAbortController?.signal.aborted;
+
+    STATE.capturing = false;
+
+    stream?.getTracks().forEach(t => t.stop());
+    stream = null;
+
+    document.getElementById('watermark')?.remove();
+
+    if (aborted) {
+      captureChunks = [];
+      recorder = null;
+      blocker.remove();
+      STATE.captureAbortController = null;
+      return;
+    }
+
+    blocker?.remove();
+    
+    const blob = new Blob(captureChunks, { type: 'video/mp4' });
+    let result;
+    try {
+      result = await utils.requestFromWorker(
+        worker,
+        'process-video',
+        { blob },
+        30_000
+      );
+    } catch (err) {
+      console.error('Error processing video:', err);
+      generateToast({
+        message: err.message || err,
+        type: 'error'
+      });
+    } finally {
+      captureChunks = [];
+      recorder = null;
+      STATE.captureAbortController = null;
+    }
+    if (!result) return;
+
+    const url = URL.createObjectURL(new Blob([result], { type: 'video/mp4' }));
+    const a = Object.assign(document.createElement('a'), {
+      href: url,
+      download: 'chirpity-recording.mp4'
+    });
+    console.info(`Saving video took ${Date.now() - t0}ms`);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+}
+
+function cancelVideoCapture() {
+  STATE.captureAbortController?.abort();
+  if (recorder?.state !== 'inactive') {
+    recorder?.stop();
+  }
+}

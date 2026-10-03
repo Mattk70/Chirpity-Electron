@@ -77,7 +77,7 @@
     
             <!-- Spectrogram view -->
             <div class="w-100 d-none" id="spectrogramWrapper">
-                <div>
+                <div style="position:relative">
                     <div class="w-100" id="waveform"></div>
                 </div>
                 <!-- Controls view -->
@@ -95,6 +95,9 @@
                             <span class="align-middle d-none d-lg-inline-block">Pause</span>
                         </button>
                     </div>
+                    <span class="col-auto btn-group bg-dark pt-0 p-1 ms-2 me-2 text-nowrap" role="group">
+                        <button id="capture-start" class="p-1 btn btn-outline-secondary" title="Record"><span class="material-symbols-outlined ">fiber_manual_record</span></button>
+                    </span>
                     <div class="col-auto btn-group bg-dark pt-0 p-1 pe-2" role="group">
                         <button id="zoomIn" title="Zoom into the spectrogram (Keyboard Shortcut: + key)" class="btn btn-outline-secondary"
                         style="min-width: 3rem">
@@ -801,813 +804,922 @@
                 <button type="button" id="advanced" class="btn btn-secondary w-50">Advanced</button>
             </div>  
             <!-- Offcanvas -->
-            <form id="settingsForm" class="fs-6 form-floating">
-                <fieldset class="border border-secondary rounded m-2 mt-0 mb-0 p-2">
-                    
-                    <legend style="font-size: large;font-weight:bold">Detections</legend>
-                    <div>
-                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Model" id="Model-circle-help"  data-bs-content="Select whether to use the Nocmig model, optimised for Nocturnal Migration Calls in Europe, or BirdNET, which can detect over 6000 species across the globe.">?</a>
-                        <div class="pe-3 input-group rounded p-2 mb-1">
-                            <label class="ps-1 input-group-text col-5" for="model-to-use">Model:</label>
-                            <select class="form-select mb-0" id="model-to-use">
-                                <option value="birdnet">BirdNET</option>
-                                <option value="birdnet3" disabled>BirdNET+ (members preview)</option>
-                                <option value="chirpity">Nocmig</option>
-                                <option value="nocmig">Nocmig v2 (beta)</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-group rounded p-2 pe-0 mb-2 not-nh">
-                        <div class="form-check form-switch">
-                            <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="">
-                                <span class="pointer locked material-symbols-outlined">lock</span></a>
-                            <input class="locked form-check-input" type="checkbox" role="switch" id="combine-detections" disabled>
-                            <label class="form-check-label" for="combine-detections">Combine model detections</label>
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-html="true" data-bs-title="Combine model detections" id="Combine-circle-help"  data-bs-content="When enabled, repeating the analysis of open files with a different model will add the model's detections to the list. Note: during the new analysis, only the results of the current model will be shown">?</a>
-                        </div>
-                    </div>
-                    <div class="form-group rounded p-2 pe-0 mb-2 not-nh">
-                        <div class="form-check form-switch">
-                            <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="">
-                                <span class="pointer locked material-symbols-outlined">lock</span></a>
-                            <input class="locked form-check-input" type="checkbox" role="switch" id="merge-detections" disabled>
-                            <label class="form-check-label" for="merge-detections">Merge model detections</label>
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-html="true" data-bs-title="Merge model detections" id="Merge-circle-help"  data-bs-content="When enabled, detections for each model will be merged, only the detection with the highest confidence from the models will be displayed. Note: during the new analysis, only the results of the current model will be shown">?</a>
-                        </div>
-                    </div>                
-                    <div class="form-group rounded p-2 pe-0 mb-2">
-                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Confidence Threshold" id="Confidence Threshold-circle-help"  data-bs-content="Determines the minimum confidence required for results to be returned">?</a>
-                        <label for="confidence">Confidence threshold:</label>
-                        <div class="input-group">
-                            <input type="range" class="form-control-range w-75" id="confidence" min="5" max="100" step="5">
-                            <div class="input-group-append">
-                                <span class="input-group-text" id="confidence-value">50%</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="form-group rounded p-2 pe-0 mb-2">
-                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Overlap" id="Overlap-circle-help"  data-bs-content="Determines the amount successive detection windows will overlap">?</a>
-                        <label for="overlap">Overlap:</label>
-                        <div class="input-group">
-                            <input type="range" class="form-control-range w-75" id="overlap" min="0" max="90" step="10">
-                            <div class="input-group-append">
-                                <span class="input-group-text" id="overlap-value">50%</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="form-group rounded p-2 pe-0 mb-2">
-                        <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" role="switch" id="merge-overlaps">
-                            <label class="form-check-label" for="merge-overlaps">Merge Overlaps</label>
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-html="true" data-bs-title="Merge Overlaps" id="Merge Overlaps-circle-help"  data-bs-content="When enabled, will merge overlapping detections into a single detection.">?</a>
-                        </div>
-                    </div>
-                    <div class="form-group rounded p-2 pe-0 mb-2">
-                        <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" role="switch" id="drop-uncertain">
-                            <label class="form-check-label" for="drop-uncertain">Drop Uncertain</label>
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-html="true" data-bs-title="Drop Uncertain" id="Drop Uncertain-circle-help"  data-bs-content="When enabled, will apply postprocessing to remove less certain detections.">?</a>
-                        </div>
-                    </div>
-                    <div class="form-group rounded p-2 pe-0 mb-2 not-nh">
-                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Detections Per Segment" id="Detections Per Segment-circle-help"  data-bs-content="Select the maximum number of detections that will be shown in any 3 second period">?</a>
-                        <label for="top-rankin">Detections per segment:</label>
-                        <div class="input-group">
-                            <input type="range" class="form-control-range w-75" id="top-rankin" min="1" max="4" step="1">
-                            <div class="input-group-append">
-                                <span class="input-group-text" id="top-rankin-value">1</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="form-group rounded p-2 pe-0 mb-2" id="window-size">
-                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Window Size" id="Window Size-circle-help"  data-bs-content="Set the window size for analysis">?</a>
-                        <label for="window-size-slider">Window Size:</label>
-                        <div class="input-group">
-                            <input type="range" class="form-control-range w-75" id="window-size-slider" min="0.5" max="10" step="0.5">
-                            <div class="input-group-append">
-                                <span class="input-group-text" id="window-size-value">3</span>
-                            </div>
-                        </div>
-                    </div>                    
-                    <div class="advanced">
-                        
-                        <div class="chirpity-only">
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Context Mode" id="Context Mode-circle-help"  data-bs-content="When enabled, context mode adapts predictions by analysing the surrounding context.
-                                    It can only be changed prior to an analysis, and a low initial confidence threshold is recommended e.g 20-30%. Context mode is not available in the BirdNET model">?</a>
-                            <div class="form-group rounded p-2 mb-2">
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" role="switch" id="context">
-                                    <label class="form-check-label" for="context">
-                                        Context mode
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div>
-                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="List" id="List-circle-help"  data-bs-content="Filters the detections returned in results. Local Birds: excludes birds 
-                        unlikely to be found in your region. Nocturnal Calls: excludes bird song and species not known to call at night. The custom list allows you to upload a file listing the species to detect">?</a>
-                        <div class="pe-3 input-group rounded p-2 mb-1">
-                            <label class="ps-1 input-group-text col-5" for="list-to-use">List:</label>
-                            <select class="form-select mb-0" id="list-to-use">
-                                <option value="location">Local Birds</option>
-                                <option value="nocturnal">Nocturnal Calls</option>
-                                <option value="birds">Birds</option>
-                                <option value="everything">Everything</option>
-                                <option value="custom">Custom</option>
-                            </select>
-                        </div>
-                        <div class="list-hidden" id="choose-file-container">
-                            <div class="col-auto input-group rounded p-2 pe-3">
-                                <button class="btn btn-outline-secondary" type="button" id="list-file-selector"> Select file</button>
-                                <input type="text" class="form-control" id="custom-list-location" aria-describedby="list-file-selector" placeholder="No custom list set" disabled="" readonly="">
-                                <span id="clear-custom-list" class="material-symbols-outlined btn btn-outline-secondary p-1" title="Clear custom list">clear</span>
-                            </div>
-                        </div>
-                        <div class="list-hidden pb-2" id="use-location-container">
-                            <div class="form-switch ms-2">
-                                <input class="form-check-input" type="checkbox" role="switch" id="local">
-                                <label class="form-check-label" for="local">Use Location settings</label>
-                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Use Location settings" id="Use Location settings-circle-help"  data-bs-content="When activated, the Nocturnal birds filter reports birds based on your location settings.">?</a>
-                            </div>
-                        </div>
-                        <div class="list-hidden" id="species-threshold-el">
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Species Threshold" id="Species Threshold-circle-help"  data-bs-content="Define the minimum eBird checklist frequency for species inclusion.
-                            If 'Adjust list for the week of the year' is enabled, the list will be adjusted to include species expected for the recording week.">?</a>
-                            <div class="pe-3 input-group rounded p-2 mb-1">
-                                <label class="input-group-text text-bg-dark" for="species-frequency-threshold">Species Threshold:</label>
-                                <input id="species-frequency-threshold" type="number" class="form-control" style="width: 30%;" value="0.03" step="0.01" min="0.01" max="1" aria-label="species frequency threshold" aria-describedby="species-frequency-threshold">
-                            </div>
-                            <div class="text-nowrap mt-2"><label class="ms-2 me-2" for="species-week">Adjust list for the week of the year</label>
-                                <span class="form-switch ms-2">
-                                    <input id="species-week" role="switch" type="checkbox" class="form-check-input form-check-inline">
-                                </span>
-                            </div>                                                                
-                        </div>
-                        <fieldset class="border border-secondary rounded m-2 mb-0 p-2 w-50 d-none" id="classes">
-                            <h6 id="additional-classes-title">Additional Classes</h6>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="Aves">                                <label class="form-check-label" for="Aves">Aves</label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="Amphibia">
-                                <label class="form-check-label" for="Amphibia">Amphibia</label>
-                            </div>                            
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="Insecta">
-                                <label class="form-check-label" for="Insecta">Insecta</label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="Mammalia">
-                                <label class="form-check-label" for="Mammalia">Mammalia</label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="Reptilia">
-                                <label class="form-check-label" for="Reptilia">Reptilia</label>
-                            </div>
-                        </fieldset>
-                    </div>
-                    
-                    <div class="form-group rounded p-2">
-                        <div class="form-check form-switch ps-0">
-                            <button class="btn btn-primary" id="show-species">Show the species included</button>
-                        </div>
-                    </div>
-                    <div class="form-group rounded p-2 pe-0 mb-2">
-                        <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" role="switch" id="nocmig">
-                            <label class="form-check-label" for="nocmig">Only analyse night time periods.</label>
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Nocmig Mode" id="Nocmig Mode-circle-help"  data-bs-content="When enabled, this 'Nocmig mode' only searches for and only displays detections found during the night">?</a>
-                        </div>
-                    </div>
-                    <div class="form-group rounded p-2 pe-0 mb-2">
-                        <div class="form-check form-switch">
-                            <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="">
-                                <span class="pointer locked material-symbols-outlined">lock</span></a>
-                            <input class="locked form-check-input" type="checkbox" role="switch" id="auto-load" disabled>
-                            <label class="form-check-label" for="auto-load">Auto-load saved detections</label>
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Auto-load detections" id="Auto-load-circle-help"  data-bs-content="When enabled, saved detections are displayed immediately upon opening a file.">?</a>
-                        </div>
-                    </div>
-                    <div class="advanced">
-                        <hr>
-                        <div class="form-group rounded p-2 pe-0 mb-2">
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" role="switch" id="iucn">
-                                <label class="form-check-label" for="iucn">Show species IUCN Red List status in summary.</label>
-                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Red List Status" id="IUCN-circle-help"  
-                                    data-bs-content="When enabled, the latest Global IUCN assessment status is displayed for each species in the summary. The icon links to the assessment page on the IUCN website. The Assessment Scope will display the IUCN assessment of the species in that region (where available).">?</a>
-                            </div>
-                        </div>
-                    
-                        <div class="pe-3 input-group rounded p-2 mb-1">
-                            <label for="iucn-scope" class="input-group-text bg-dark text-warning">Assessment Scope:</label>
-                            <select class="form-select mb-0" id="iucn-scope">
-                                <option value="Global">Global</option>
-                                <option value="Europe">Europe</option>
-                                <option value="Mediterranean">Mediterranean</option>
-                            </select>
-                        </div>
+<style>
+/* Accordion headings that are real <legend> elements */
+#settingsAccordion > .accordion-item > .settings-toggle {
+    display: flex; align-items: center; justify-content: space-between;
+    float: left; width: 100%; margin: 0; padding: 1rem 1.25rem;
+    font-size: 1.25rem; font-weight: 700; line-height: 1.5;
+    cursor: pointer; user-select: none;
+    color: inherit; background-color: transparent;
+}
+#settingsAccordion > .accordion-item > .settings-toggle::after {
+    content: ""; flex-shrink: 0; width: 1.25rem; height: 1.25rem; margin-left: auto;
+    background-color: currentColor;
+    -webkit-mask: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23000' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") center / 1.25rem no-repeat;
+            mask: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23000' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") center / 1.25rem no-repeat;
+    transform: rotate(-180deg); transition: transform .2s ease-in-out;
+}
+#settingsAccordion > .accordion-item > .settings-toggle.collapsed::after { transform: none; }
+#settingsAccordion > .accordion-item > .settings-toggle:focus-visible {
+    outline: 2px solid var(--bs-primary); outline-offset: -2px;
+}
+#settingsAccordion > .accordion-item > .accordion-collapse { clear: both; }
+</style>
 
-                        <hr>
-                        <div class="form-group rounded text-center">
-                            <div class="form-check form-switch ps-2">
-                                <button class="btn btn-primary" id="clear-call-cache">Clear Reference Call Cache</button>
-                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Clear Call Cache" id="Clear Call Cache-circle-help"  data-bs-content="The data used for the reference call comparisons are cached. Clearing the cache will refresh the calls for each species the next time a comparison is requested">?</a>
-                            </div>
+<form id="settingsForm" class="fs-6 form-floating">
+<div class="accordion" id="settingsAccordion">
+
+    <!-- ===================== 1. DETECTIONS ===================== -->
+    <fieldset class="accordion-item text-bg-dark border-secondary">
+        <legend class="settings-toggle collapsed" role="button" tabindex="0" data-bs-toggle="collapse" data-bs-target="#collapse-detections" aria-expanded="false" aria-controls="collapse-detections">Detections</legend>
+        <div id="collapse-detections" data-bs-parent="#settingsAccordion" class="accordion-collapse collapse">
+            <div class="accordion-body p-2">
+
+                <div>
+                    <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Model" id="Model-circle-help"  data-bs-content="Select whether to use the Nocmig model, optimised for Nocturnal Migration Calls in Europe, or BirdNET, which can detect over 6000 species across the globe.">?</a>
+                    <div class="pe-3 input-group rounded p-2 mb-1">
+                        <label class="ps-1 input-group-text col-5" for="model-to-use">Model:</label>
+                        <select class="form-select mb-0" id="model-to-use">
+                            <option value="birdnet">BirdNET</option>
+                            <option value="birdnet3" disabled>BirdNET+ (members preview)</option>
+                            <option value="chirpity">Nocmig</option>
+                            <option value="nocmig">Nocmig v2 (beta)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group rounded p-2 pe-0 mb-2 not-nh">
+                    <div class="form-check form-switch">
+                        <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="">
+                            <span class="pointer locked material-symbols-outlined">lock</span></a>
+                        <input class="locked form-check-input" type="checkbox" role="switch" id="combine-detections" disabled>
+                        <label class="form-check-label" for="combine-detections">Combine model detections</label>
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-html="true" data-bs-title="Combine model detections" id="Combine-circle-help"  data-bs-content="When enabled, repeating the analysis of open files with a different model will add the model's detections to the list. Note: during the new analysis, only the results of the current model will be shown">?</a>
+                    </div>
+                </div>
+                <div class="form-group rounded p-2 pe-0 mb-2 not-nh">
+                    <div class="form-check form-switch">
+                        <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="">
+                            <span class="pointer locked material-symbols-outlined">lock</span></a>
+                        <input class="locked form-check-input" type="checkbox" role="switch" id="merge-detections" disabled>
+                        <label class="form-check-label" for="merge-detections">Merge model detections</label>
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-html="true" data-bs-title="Merge model detections" id="Merge-circle-help"  data-bs-content="When enabled, detections for each model will be merged, only the detection with the highest confidence from the models will be displayed. Note: during the new analysis, only the results of the current model will be shown">?</a>
+                    </div>
+                </div>
+                <div class="form-group rounded p-2 pe-0 mb-2">
+                    <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Confidence Threshold" id="Confidence Threshold-circle-help"  data-bs-content="Determines the minimum confidence required for results to be returned">?</a>
+                    <label for="confidence">Confidence threshold:</label>
+                    <div class="input-group">
+                        <input type="range" class="form-control-range w-75" id="confidence" min="5" max="100" step="5">
+                        <div class="input-group-append">
+                            <span class="input-group-text" id="confidence-value">50%</span>
                         </div>
                     </div>
-                    
-                    <fieldset class="advanced border border-secondary rounded m-2 mb-0 p-2 "> 
-                        <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content=""><span class="pointer locked material-symbols-outlined">lock</span></a>
-                        <span class="d-inline-flex float-end"><a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Keyboard assignment" id="Assign Keyboard-circle-help"  data-bs-content="Use number keys for rapid result tagging. Assign a species, label or predefined comment to a result">?</a></span>
-                        <legend style="font-size: small; font-weight:bold">
-                            Keyboard Assignment
-                        </legend>
-                        <div class="d-flex align-items-center mb-2 position-relative">
-                            <kbd class="text-bg-light ps-2 pe-2">1</kbd> 
-                            <select class="locked form-select w-50 ms-2" style="font-size: small" id="key1-column">
-                                <option value="">Unused</option>
-                                <option value="species">Species</option>
-                                <option value="label">Label</option>
-                                <option value="comment">Comment</option>
-                            </select>
-                            <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key1">
-                            <div id="bird-list-key1" class="suggestions list-group"></div>
-                        </div>
-                        <div class="d-flex align-items-center mb-2 position-relative">
-                            <kbd class="text-bg-light ps-2 pe-2">2</kbd> 
-                            <select class="locked form-select w-50 ms-2" style="font-size: small" id="key2-column">
-                                <option value="">Unused</option>
-                                <option value="species">Species</option>
-                                <option value="label">Label</option>
-                                <option value="comment">Comment</option>
-                            </select>
-                            <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key2">
-                            <div id="bird-list-key2" class="suggestions list-group"></div>
-                        </div>
-                        <div class="d-flex align-items-center mb-2 position-relative">
-                            <kbd class="text-bg-light ps-2 pe-2">3</kbd> 
-                            <select class="locked form-select w-50 ms-2" style="font-size: small" id="key3-column">
-                                <option value="">Unused</option>
-                                <option value="species">Species</option>
-                                <option value="label">Label</option>
-                                <option value="comment">Comment</option>
-                            </select>
-                            <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key3">
-                            <div id="bird-list-key3" class="suggestions list-group"></div>
-                        </div>
-                        <div class="d-flex align-items-center mb-2 position-relative">
-                            <kbd class="text-bg-light ps-2 pe-2">4</kbd> 
-                            <select class="locked form-select w-50 ms-2" style="font-size: small" id="key4-column">
-                                <option value="">Unused</option>
-                                <option value="species">Species</option>
-                                <option value="label">Label</option>
-                                <option value="comment">Comment</option>
-                            </select>
-                            <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key4">
-                            <div id="bird-list-key4" class="suggestions list-group"></div>
-                        </div>
-                        <div class="d-flex align-items-center mb-2 position-relative">
-                            <kbd class="text-bg-light ps-2 pe-2">5</kbd> 
-                            <select class="locked form-select w-50 ms-2" style="font-size: small" id="key5-column">
-                                <option value="">Unused</option>
-                                <option value="species">Species</option>
-                                <option value="label">Label</option>
-                                <option value="comment">Comment</option>
-                            </select>
-                            <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key5">
-                            <div id="bird-list-key5" class="suggestions list-group"></div>
-                        </div>
-                        <div class="d-flex align-items-center mb-2 position-relative">
-                            <kbd class="text-bg-light ps-2 pe-2">6</kbd> 
-                            <select class="locked form-select w-50 ms-2" style="font-size: small" id="key6-column">
-                                <option value="">Unused</option>
-                                <option value="species">Species</option>
-                                <option value="label">Label</option>
-                                <option value="comment">Comment</option>
-                            </select>
-                            <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key6">
-                            <div id="bird-list-key6" class="suggestions list-group"></div>
-                        </div>
-                        <div class="d-flex align-items-center mb-2 position-relative">
-                            <kbd class="text-bg-light ps-2 pe-2">7</kbd> 
-                            <select class="locked form-select w-50 ms-2" style="font-size: small" id="key7-column">
-                                <option value="">Unused</option>
-                                <option value="species">Species</option>
-                                <option value="label">Label</option>
-                                <option value="comment">Comment</option>
-                            </select>
-                            <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key7">
-                            <div id="bird-list-key7" class="suggestions list-group"></div>
-                        </div>
-                        <div class="d-flex align-items-center mb-2 position-relative">
-                            <kbd class="text-bg-light ps-2 pe-2">8</kbd> 
-                            <select class="locked form-select w-50 ms-2"  style="font-size: small" id="key8-column">
-                                <option value="">Unused</option>
-                                <option value="species">Species</option>
-                                <option value="label">Label</option>
-                                <option value="comment">Comment</option>
-                            </select>
-                            <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key8">
-                            <div id="bird-list-key8" class="suggestions list-group"></div>
-                        </div>
-                        <div class="d-flex align-items-center mb-2 position-relative">
-                            <kbd class="text-bg-light ps-2 pe-2">9</kbd> 
-                            <select class="locked form-select w-50 ms-2" style="font-size: small" id="key9-column">
-                                <option value="">Unused</option>
-                                <option value="species">Species</option>
-                                <option value="label">Label</option>
-                                <option value="comment">Comment</option>
-                            </select>
-                            <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key9">
-                            <div id="bird-list-key9" class="suggestions list-group"></div>
-                        </div>
-                        <div class="d-flex align-items-center mb-2 position-relative">
-                            <kbd class="text-bg-light ps-2 pe-2">0</kbd> 
-                            <select class="locked form-select w-50 ms-2" style="font-size: small" id="key0-column">
-                                <option value="">Unused</option>
-                                <option value="species">Species</option>
-                                <option value="label">Label</option>
-                                <option value="comment">Comment</option>
-                            </select>
-                            <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key0">
-                            <div id="bird-list-key0" class="suggestions list-group"></div>
-                        </div>
-                    </fieldset>    
-                </fieldset>
-                <fieldset class="border border-secondary rounded m-2 mb-0 p-2">
-                    <legend style="font-size: large;font-weight:bold">Default Location <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Default Location" id="Default Location-circle-help"  data-bs-content="Chirpity uses location information to determine the dawn and dusk times for recordings">?</a></legend>
-                    <div class="form-group rounded p-2 mb-2">
-                        <div class="input-group">
-                            <label class="input-group-text pe-2" for="latitude">Lat:</label>
-                            <input id="latitude" type="number" class="form-control ps-2 " placeholder="0.00" step="0.0001" max="90" min="-90" aria-label="Latitude" aria-describedby="latitude">
-                            <label class="input-group-text pe-2" for="longitude">Lon:</label>
-                            <input id="longitude" type="number" class="form-control ps-2" placeholder="0.00" step="0.0001"  max="180" min="-180" aria-label="Longitude" aria-describedby="longitude">
-                        </div>
-                        <div class="mt-1 float-end">
-                            <button class="btn btn-primary" id="apply-location">Set</button>
-                            <button class="btn btn-secondary" id="cancel-location">Cancel</button>
-                        </div>
-                        <div class="clearfix"></div>
-                        <div id="settingsMap" class="mt-2 border border-secondary rounded"></div>
-                        <div class="mt-2" id="place"></div>
-                    </div>
-                </fieldset>
-                <fieldset class="border border-secondary rounded m-2 mb-0 p-2">
-                    <legend style="font-size: large;font-weight:bold">System</legend>
-                    <div>
-                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Language" id="Language-circle-help"  data-bs-content="Select your preferred language for birds' common names">?</a>
-                        <div class="pe-3 input-group rounded p-2 mb-1">
-                            <label class="ps-1 input-group-text col-5" for="locale">Language:</label>
-                            <select class="form-select mb-0" id="locale">
-                                <option value="en_GB">English (UK) *</option>
-                                <option value="en">English (US)</option>
-                                <!-- <option value="bg">Български</option> -->
-                                <option value="ca">Català</option>
-                                <option value="cs">Čeština</option>
-                                <!-- <option value="cy">Cymraeg</option> -->
-                                <option value="da">Dansk *</option>
-                                <option value="de">Deutsch *</option>
-                                <option value="es">Español (España) *</option>
-                                <option value="es_EC">Español (Ecuador)</option>
-                                <option value="es_MX">Español (México)</option>
-                                <option value="et">Eesti</option>
-                                <option value="fa">فارسی</option>
-                                <option value="fi">Suomi</option>
-                                <option value="fr">Français *</option>
-                                <option value="hr">Hrvatski</option>
-                                <option value="it">Italiano</option>
-                                <option value="ja">日本語 *</option>
-                                <option value="lt">Lietuvių</option>
-                                <option value="nl">Nederlands *</option>
-                                <option value="no">Norsk</option>
-                                <option value="pl">Polski</option>
-                                <option value="pt_PT">Português (PT)*</option>
-                                <option value="pt_BR">Português (BR)</option>
-                                <option value="ro">Română</option>
-                                <option value="ru">Русский *</option>
-                                <option value="sk">Slovenčina</option>
-                                <option value="sr">Српски</option>
-                                <option value="sv">Svenska *</option>
-                                <option value="tr">Türkçe</option>
-                                <option value="uk">Українська</option>
-                                <option value="zh_CN">中文 *</option>
-                                <!-- <option value="custom">Custom</option> -->
-                            </select>
+                </div>
+                <div class="form-group rounded p-2 pe-0 mb-2">
+                    <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Overlap" id="Overlap-circle-help"  data-bs-content="Determines the amount successive detection windows will overlap">?</a>
+                    <label for="overlap">Overlap:</label>
+                    <div class="input-group">
+                        <input type="range" class="form-control-range w-75" id="overlap" min="0" max="90" step="10">
+                        <div class="input-group-append">
+                            <span class="input-group-text" id="overlap-value">50%</span>
                         </div>
                     </div>
-                    <div class="">
-                        <div class="p-0 node-only d-none">
-                            <div class="form-group rounded p-2 pe-0 mb-2">
-                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Backend" id="Backend-circle-help"  data-bs-content="The GPU backend can improve performance and reduce power consumption on some systems.">?</a>
-                                <div>
-                                    <label class="ps-0 fs-6 text-start form-check" for="backend">Backend: <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="">
-                                <span class="pointer locked material-symbols-outlined">lock</span></a></label>
-                                    <div class="form-check form-check-inline">
-                                        <label class="form-check-label" for="tensorflow">CPU</label>
-                                        <input class="form-check-input" type="radio" name="backend" id="tensorflow" value="tensorflow" checked="">
-                                    </div>
-                                    <div class="form-check form-check-inline">
-                                        <input class="form-check-input locked" type="radio" name="backend" id="webgpu" value="webgpu" disabled>
-                                        <label class="form-check-label" for="webgpu">GPU</label>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="advanced">
-                            <a class="circle not-onnx-gpu" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Threads" id="Threads-circle-help"  data-bs-content="The number of parallel analyses to run. By default, 
-                            this is set to the number of CPU cores on the machine for fastest performance. With the GPU backend, a lower number works better e.g. 1-3">?</a>
-                            <div class="form-group rounded p-2 pe-0 mb-2 not-onnx-gpu">
-                                <label for="thread-slider">Threads:</label>
-                                <div class="input-group">
-                                    <input type="range" class="form-control-range w-75" id="thread-slider" min="1" max="24">
-                                    <div class="input-group-append">
-                                        <span class="input-group-text" id="threads-value">12</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="advanced">
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Batch Size" id="Batch Size-circle-help"  data-bs-content="Optimising the batch size can increase processing speed on longer files.">?</a>
-                            <div class="form-group rounded p-2 pe-0 mb-2">
-                                <label for="batch-size">Batch Size:</label>
-                                <div class="input-group">
-                                    <input type="range" class="form-control-range w-75" id="batch-size" min="1" max="256">
-                                    <div class="input-group-append">
-                                        <span class="input-group-text" id="batch-size-value"></span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div>
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Audio notification" id="Audio notification-circle-help"  data-bs-content="When enabled, there will be a system notification when analyses that take over thirty seconds are finished.">?</a>
-                            <div class="pe-3 form-group rounded p-2 mb-2">
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" role="switch" id="audio-notification">
-                                    <label class="form-check-label" for="audio-notification">Enable analysis completion notifications</label>
-                                </div>
-                            </div>
-                        </div>
-                        <div>
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="File timestamp marks recording start" id="File-timestamp-circle-help"  data-bs-content="Some audio recorders, for example the Zoom H1 Essential, can set the file saved date and time to the beginning of the recording, rather than the end. 
-                                    If you have such a recorder selecting this option will fix the times shown for your detections.">?</a>
-                        
-                            <div class="form-group rounded p-2 mb-2">
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" role="switch" id="file-timestamp">
-                                    <label class="form-check-label" for="file-timestamp">
-                                        File timestamps mark recording start
-                                    </label>
-                                    
-                                </div>
-                            </div>
-                        </div>
-                        <div class="input-group rounded p-2" id="choose-database-location">
-                            <div class="col-auto pe-1">
-                                <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="">
-                                <span class="pointer locked material-symbols-outlined">lock</span></a>
-                            </div>
-                            <div class="col">
-                                <div class="input-group">
-                                    <button class="btn btn-outline-secondary text-warning locked disabled" type="button" id="database-location-select">
-                                        Database Location:</button>
-                                    <input type="text" class="form-control" id="database-location" aria-describedby="database-location-select" placeholder="Default" readonly>
-                                    <span id="clear-database-location" class="material-symbols-outlined btn btn-outline-secondary p-1" title="Clear custom database location">clear</span>
-                                </div>
-                            </div>
+                </div>
+                <div class="form-group rounded p-2 pe-0 mb-2">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" id="merge-overlaps">
+                        <label class="form-check-label" for="merge-overlaps">Merge Overlaps</label>
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-html="true" data-bs-title="Merge Overlaps" id="Merge Overlaps-circle-help"  data-bs-content="When enabled, will merge overlapping detections into a single detection.">?</a>
+                    </div>
+                </div>
+                <div class="form-group rounded p-2 pe-0 mb-2">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" id="drop-uncertain">
+                        <label class="form-check-label" for="drop-uncertain">Drop Uncertain</label>
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-html="true" data-bs-title="Drop Uncertain" id="Drop Uncertain-circle-help"  data-bs-content="When enabled, will apply postprocessing to remove less certain detections.">?</a>
+                    </div>
+                </div>
+                <div class="form-group rounded p-2 pe-0 mb-2 not-nh">
+                    <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Detections Per Segment" id="Detections Per Segment-circle-help"  data-bs-content="Select the maximum number of detections that will be shown in any 3 second period">?</a>
+                    <label for="top-rankin">Detections per segment:</label>
+                    <div class="input-group">
+                        <input type="range" class="form-control-range w-75" id="top-rankin" min="1" max="4" step="1">
+                        <div class="input-group-append">
+                            <span class="input-group-text" id="top-rankin-value">1</span>
                         </div>
                     </div>
-                    <div>
-                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Adjust font size" id="Adjust font size-circle-help"  data-bs-content="Change the global font size settings for the application.">?</a>
-                        <div class="pe-3 form-group rounded p-2 mb-2">
-                            <label for="font" class="form-label">Adjust font size: </label>
-                            <span  id="decreaseFont" class="material-symbols-outlined btn btn-outline-secondary p-1">text_decrease</span> 
-                            <span  id="increaseFont" class="material-symbols-outlined btn btn-outline-secondary p-1">text_increase</span>
+                </div>
+                <div class="form-group rounded p-2 pe-0 mb-2" id="window-size">
+                    <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Window Size" id="Window Size-circle-help"  data-bs-content="Set the window size for analysis">?</a>
+                    <label for="window-size-slider">Window Size:</label>
+                    <div class="input-group">
+                        <input type="range" class="form-control-range w-75" id="window-size-slider" min="0.5" max="10" step="0.5">
+                        <div class="input-group-append">
+                            <span class="input-group-text" id="window-size-value">3</span>
                         </div>
                     </div>
-                </fieldset>
-                <fieldset class="border border-secondary rounded m-2 mb-0 p-2">
-                    <legend style="font-size: large;font-weight:bold">Audio Preferences</legend>
-                    <div class="me-auto">
-                        <div class="advanced form-group rounded p-2 mb-2">
+                </div>
+                <div class="advanced">
+
+                    <div class="chirpity-only">
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Context Mode" id="Context Mode-circle-help"  data-bs-content="When enabled, context mode adapts predictions by analysing the surrounding context.
+                                It can only be changed prior to an analysis, and a low initial confidence threshold is recommended e.g 20-30%. Context mode is not available in the BirdNET model">?</a>
+                        <div class="form-group rounded p-2 mb-2">
                             <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" role="switch" id="send-filtered-audio-to-model">
-                                <label class="form-check-label" for="send-filtered-audio-to-model">
-                                    Send Filtered Audio for Analysis
+                                <input class="form-check-input" type="checkbox" role="switch" id="context">
+                                <label class="form-check-label" for="context">
+                                    Context mode
                                 </label>
-                                <a class="circle text-bg-danger" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Send Filtered Audio" id="Send Filtered Audio-circle-help"  data-bs-content="Sending High Pass or Low Shelf filtered audio to a model will usually have a negative impact on its accuracy. Use this option with caution!">?</a>
-                            </div>
-                        </div>
-                        <div class="form-group rounded p-2 mb-2">
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Volume Adjustment" id="Volume Adjustment-circle-help"  data-bs-content="Adjust the volume of audio to compensate for low recording levels.">?</a>
-                            <label for="gain" class="form-label">Volume Adjustment:</label>
-                            <div class="input-group me-0 p-0">
-                                <input type="range" class="form-control-range w-75" min="0" max="50" id="gain">
-                                <div class="input-group-append">
-                                    <span class="input-group-text" id="gain-adjustment">0</span>
-                                </div>
                             </div>
                         </div>
                     </div>
-                    <hr>
-                    <div class="form-group rounded p-2 mb-2">
-                        <div class="col form-check form-switch">
-                            <label class="form-check-label" for="normalise">Normalise Audio:</label>
-                            <input class="form-check-input" type="checkbox" role="switch" id="normalise">
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Normalise" id="Normalise-circle-help"  data-bs-content="When enabled, the audio you hear will be normalised, expanding the dynamic range.">?</a>
-                        </div>
-                    </div>
-                    <hr>
-                    <div class="me-auto">
-                        <div class="form-group rounded p-2 mb-2">
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="High Pass Filter" id="High Pass Filter-circle-help"  data-bs-content="When set, removes low frequency noise below the threshold.">?</a>
-                            <label for="highPassFrequency" class="form-label">
-                                High Pass filter:
-                            </label>
-                            <div class="input-group me-0 p-0">
-                                <input type="range" class="form-control-range w-75" min="0" max="15000" step="25" id="highPassFrequency">
-                                <div class="input-group-append">
-                                    <span class="input-group-text" id="HP-threshold">0</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="me-auto">
-                        <div class="form-group rounded p-2 mb-2">
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Low Pass Filter" id="Low Pass Filter-circle-help"  data-bs-content="When set, removes high frequency noise above the threshold.">?</a>
-                            <label for="lowPassFrequency" class="form-label">
-                                Low Pass filter:
-                            </label>
-                            <div class="input-group me-0 p-0">
-                                <input type="range" class="form-control-range w-75" min="0" max="15000" step="25" id="lowPassFrequency">
-                                <div class="input-group-append">
-                                    <span class="input-group-text" id="LP-threshold">15000Hz</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <hr>
-                    <h6>Low Shelf filter</h6>
-                    <div class="form-group rounded p-2 me-0 mb-2">
-                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Low Shelf Filter" id="Low Shelf Filter-circle-help"  data-bs-content="When used, attenuates low frequency noise below the cut-off frequency.">?</a>
-                        <label for="lowShelfFrequency" class="form-label">Cut-off Frequency:</label>
-                        <div class="input-group me-0 p-0">
-                            <input type="range" class="form-control-range w-75" min="0" max="2500" step="100" id="lowShelfFrequency">
-                            <div class="input-group-append">
-                                <span class="input-group-text" id="LowShelf-threshold">0</span>
-                            </div>
-                        </div>
-                        <label for="attenuation" class="form-label">Attenuation:</label>
-                        <div class="input-group me-0 p-0">
-                            <input type="range" class="form-control-range w-75" min="0" max="100" id="attenuation">
-                            <div class="input-group-append">
-                                <span class="input-group-text" id="attenuation-threshold">0 dB</span>
-                            </div>
-                        </div>
-                    </div>
-                    <hr>
-                    <h6 class="fs-6">Audio Export:</h6>
+                </div>
+                <div>
+                    <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="List" id="List-circle-help"  data-bs-content="Filters the detections returned in results. Local Birds: excludes birds 
+                    unlikely to be found in your region. Nocturnal Calls: excludes bird song and species not known to call at night. The custom list allows you to upload a file listing the species to detect">?</a>
                     <div class="pe-3 input-group rounded p-2 mb-1">
-                        <label for="format" class="ps-1 input-group-text col-5">Format:</label>
-                        <select class="form-select mb-0" id="format">
-                            <option value="wav">WAV</option>
-                            <option value="flac">FLAC</option>
-                            <option value="mp3">MP3</option>
-                            <option value="aac">AAC</option>
-                            <option value="opus">Opus</option>
-                        </select>
-                    </div>
-                    <div id="bitrate-container" class="pe-3 input-group rounded p-2 mb-1">
-                        <label for="bitrate" class="ps-1 input-group-text col-5">Bitrate:</label>
-                        <select class="form-select mb-0" id="bitrate">
-                            <option value="320">320 kbps</option>
-                            <option value="192">192 kbps</option>
-                            <option value="160">160 kbps</option>
-                            <option value="128">128 kbps (recommended)</option>
-                            <option value="96">96 kbps</option>
-                            <option value="64">64 kbps</option>
-                        </select>
-                    </div>
-                    <div id="quality-container" class="pe-3 input-group rounded p-2 mb-1">
-                        <label for="quality" class="input-group-text  col-6">Compression:</label>
-                        <select class="form-select mb-0" id="quality">
-                            <option value="0">0</option>
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                            <option value="3">3</option>
-                            <option value="4">4</option>
-                            <option value="5">5</option>
-                            <option value="6">6</option>
-                            <option value="7">7</option>
-                            <option value="8">8</option>
-                            <option value="9">9</option>
-                            <option value="10">10</option>
-                        </select>
-                    </div>
-                    <div class="pe-2 form-group rounded p-2 mb-2">
-                        <div class="form-check-inline w-75 form-switch">
-                            <input class="form-check-input" type="checkbox" role="switch" id="downmix">
-                            <label class="form-check-label" for="downmix">Convert to mono</label>
-                        </div>
-                        <a class="ms-auto circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Down mix" id="Down mix-circle-help"  data-bs-content="When enabled, exported audio will be downmixed to mono">?</a>
-                    </div>
-                    <div class="form-group rounded p-2 pe-0 mb-2">
-                        <div class="row pe-2">
-                            <label class="col-3" for="decorators">Decorators: </label>
-                            <div class="col-6 ">
-                                <div class="form-check-inline text-nowrap">
-                                    <input class="form-check-input" type="checkbox" id="padding" value="2" checked="">
-                                    <label class="form-check-label" for="padding">
-                                        Pad
-                                    </label>
-                                    <input class="form-check-input" type="checkbox" id="fade" disabled="" value="1">
-                                    <label class="form-check-label" for="fade">
-                                        Fade
-                                    </label>
-                                </div>
-                            </div>
-                            <div class="col-3">
-                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Decorators" id="Decorators-circle-help"  data-bs-content="'Pad' adds 2 seconds before and after a selection to the exported audio.
-                                'Fade' adds a 1 second fade effect to the start and end of the audio">?</a>
-                            </div>
-                        </div>
-                    </div>
-                    <hr>
-                    <a class="circle new-circle me-2" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Audio Library" id="Audio Library-circle-help"  
-                        data-bs-html="true" data-bs-sanitize="false" data-bs-content="Chirpity can organise your audio into a permanent library at a location of your choice, such as a data disk or network drive. Once saved, you can remove the original files, and all records will be viewable in the application.
-
-                        To save audio to the library, you can either go to the Records menu and choose 'Save Audio from Archive Results to Library', or enable the 'Add to Library on Save' option below.
-                        
-                        Files will be stored in the following structure:
-                        
-                        <p><code>Recording Site / Year / Month / Filename</code></p>
-                        'Lossy' audio requires about 1GB of storage per 24 hours, while 'Lossless' converts files to FLAC format, preserving original fidelity, bitrate, and channels, but roughly halving the file size.">?</a>
-                        <h6 class="fs-6">Audio Library</h6>
-                        
-                        <div class="input-group rounded p-2" id="choose-library-location">
-                            <div class="col">
-                                <div class="input-group">
-                                    <button class="btn btn-outline-secondary" type="button" id="library-location-select">Library Location:</button>
-                                    <input type="text" class="form-control" id="library-location" aria-describedby="library-location-select" placeholder="No location set" readonly>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="form-group rounded p-2 mb-2">
-                            <div class="col form-check form-switch">
-                                <label class="form-check-label" for="auto-library">Add to Library on Save</label>
-                                <input class="form-check-input" type="checkbox" role="switch" id="auto-library" disabled>
-                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Add to Library on Save" id="Add to Library on Save-circle-help"  data-bs-content="When enabled, audio files are added to the library location whenever detections are saved to the archive.">?</a>
-                            </div>
-                        </div>
-                        <div class="form-group rounded p-2 mb-2">
-                            <div class="col form-check form-switch">
-                                <label class="form-check-label" for="library-trim">Crop Library audio to night time periods</label>
-                                <input class="form-check-input" type="checkbox" role="switch" id="library-trim" disabled>
-                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Crop Library" id="Crop Library-circle-help"  data-bs-content="When enabled, audio files containing daylight periods are cropped, so the audio is only saved for nocturnal periods.">?</a>
-                            </div>
-                        </div>
-                        <div class="form-group rounded p-2 mb-2">
-                            <div class="col form-check form-switch">
-                                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Only save files with records" id="Clip Library-circle-help"  data-bs-content="When enabled, only audio files containing saved records are added to the library. 
-                                If you set your recorder to auto-increment files after a short period of time, enabling this setting will dramatically reduce the storage required if there are long periods without activity">?</a>
-                                <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="">
-                                        <span class="pointer locked material-symbols-outlined">lock</span></a>
-                                <input class="locked form-check-input" type="checkbox" role="switch" id="library-clips" disabled>
-                                <label class="form-check-label" for="library-clips">Only save files with records</label>
-                            </div>
-                        </div>
-                        <div class="input-group rounded p-2 mb-1">
-                            <label for="library-format" class="ps-1 input-group-text col-5">Library Format:</label>
-                            <select class="form-select mb-0" id="library-format">
-                                <option value="ogg">Lossy (recommended)</option>
-                                <option value="flac">Lossless</option>
-                            </select>
-                            
-                        </div>
-                    
-                </fieldset>
-                <fieldset class="border border-secondary rounded m-2 mb-0 p-2">
-                    <legend style="font-size: large;font-weight:bold">Spectrogram Preferences</legend>
-                    <div class="form-group rounded p-2 mb-2">
-                        <div class="col form-check form-switch">
-                            <label class="form-check-label" for="spec-labels">Display frequency labels:</label>
-                            <input class="form-check-input" type="checkbox" role="switch" id="spec-labels">
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Show frequency labels" id="Show frequency labels-circle-help"  data-bs-content="When enabled, the spectrogram will display the frequency on the left side.">?</a>
-                        </div>
-                    </div>
-                    <div class="form-group rounded p-2 mb-2">
-                        <div class="col form-check form-switch">
-                            <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content=""><span class="pointer locked material-symbols-outlined">lock</span></a>
-                            <input class="locked form-check-input" type="checkbox" role="switch" id="spec-detections" disabled>
-                            <label class="form-check-label" for="spec-detections">Show all detections</label>
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Show all detections" id="Show all detections-circle-help"  data-bs-content="When enabled, the spectrogram will highlight all the detections on screen.">?</a>
-                        </div>
-                    </div>
-                    <div class="pe-3 input-group rounded p-2 mb-1">
-                        <label for="colourmap" class="ps-1 input-group-text col-5">Colourmap:</label>
-                        <select class="form-select mb-0" id="colourmap">
+                        <label class="ps-1 input-group-text col-5" for="list-to-use">List:</label>
+                        <select class="form-select mb-0" id="list-to-use">
+                            <option value="location">Local Birds</option>
+                            <option value="nocturnal">Nocturnal Calls</option>
+                            <option value="birds">Birds</option>
+                            <option value="everything">Everything</option>
                             <option value="custom">Custom</option>
-                            <option value="igray">Greyscale</option>
-                            <option value="gray">Inverted Greyscale</option>
-                            <option value="bone">Bone</option>
-                            <option value="turbidity">Turbidity</option>
-                            <option value="chlorophyll">Chlorophyll</option>
-                            <option value="viridis">Viridis</option>
-                            <option value="cdom">CDom</option>
-                            <option value="temperature">Temperature</option>
-                            <option value="salinity">Salinity</option>
-                            <option value="roseus">Roseus</option>
-                            <option value="inferno">Inferno</option>
-                            <option value="magma">Magma</option>
-                            <option value="plasma">Plasma</option>
-                            <option value="hot">Hot</option>
-                            <option value="blackbody">Blackbody</option>
                         </select>
                     </div>
-                    <fieldset class="border border-secondary rounded m-2 p-2 d-none" id="colormap-fieldset">
-                        <div class="mt-2">
-                            <input class="form-input pointer" type="color" id="loud-color" value="#cc00ff">
-                            <label class="form-label pointer" for="loud-color">Peak colour</label><br>
-                            <input class="form-input pointer" type="color" id="mid-color" value="#000000">
-                            <label class="form-label pointer" for="mid-color">Mid colour</label><br>
-                            <input class="form-input pointer" type="color" id="quiet-color" value="#000000">
-                            <label class="form-label pointer" for="quiet-color">Quiet colour</label>
+                    <div class="list-hidden" id="choose-file-container">
+                        <div class="col-auto input-group rounded p-2 pe-3">
+                            <button class="btn btn-outline-secondary" type="button" id="list-file-selector"> Select file</button>
+                            <input type="text" class="form-control" id="custom-list-location" aria-describedby="list-file-selector" placeholder="No custom list set" disabled="" readonly="">
+                            <span id="clear-custom-list" class="material-symbols-outlined btn btn-outline-secondary p-1" title="Clear custom list">clear</span>
                         </div>
-                        <label for="quiet-color-threshold-slider" class="form-label">
-                            Quiet Cut-off:
-                        </label>
-                        <div class="input-group">
-                            <input type="range" class="form-control-range w-75" min="0" max="1" step="0.01" id="quiet-color-threshold-slider">
-                            <div class="input-group-append">
-                                <span class="input-group-text" id="quiet-color-threshold">0.0</span>
-                            </div>
+                    </div>
+                    <div class="list-hidden pb-2" id="use-location-container">
+                        <div class="form-switch ms-2">
+                            <input class="form-check-input" type="checkbox" role="switch" id="local">
+                            <label class="form-check-label" for="local">Use Location settings</label>
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Use Location settings" id="Use Location settings-circle-help"  data-bs-content="When activated, the Nocturnal birds filter reports birds based on your location settings.">?</a>
                         </div>
-                        <label for="mid-color-threshold-slider" class="form-label">
-                            Mid Position:
-                        </label>
-                        <div class="input-group">
-                            <input type="range" class="form-control-range w-75" min="0" max="1" step="0.01" id="mid-color-threshold-slider">
-                            <div class="input-group-append">
-                                <span class="input-group-text" id="mid-color-threshold">0.5</span>
-                            </div>
+                    </div>
+                    <div class="list-hidden" id="species-threshold-el">
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Species Threshold" id="Species Threshold-circle-help"  data-bs-content="Define the minimum eBird checklist frequency for species inclusion.
+                        If 'Adjust list for the week of the year' is enabled, the list will be adjusted to include species expected for the recording week.">?</a>
+                        <div class="pe-3 input-group rounded p-2 mb-1">
+                            <label class="input-group-text text-bg-dark" for="species-frequency-threshold">Species Threshold:</label>
+                            <input id="species-frequency-threshold" type="number" class="form-control" style="width: 30%;" value="0.03" step="0.01" min="0.01" max="1" aria-label="species frequency threshold" aria-describedby="species-frequency-threshold">
+                        </div>
+                        <div class="text-nowrap mt-2"><label class="ms-2 me-2" for="species-week">Adjust list for the week of the year</label>
+                            <span class="form-switch ms-2">
+                                <input id="species-week" role="switch" type="checkbox" class="form-check-input form-check-inline">
+                            </span>
+                        </div>
+                    </div>
+                    <fieldset class="border border-secondary rounded m-2 mb-0 p-2 w-50 d-none" id="classes">
+                        <h6 id="additional-classes-title">Additional Classes</h6>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="Aves">                                <label class="form-check-label" for="Aves">Aves</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="Amphibia">
+                            <label class="form-check-label" for="Amphibia">Amphibia</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="Insecta">
+                            <label class="form-check-label" for="Insecta">Insecta</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="Mammalia">
+                            <label class="form-check-label" for="Mammalia">Mammalia</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="Reptilia">
+                            <label class="form-check-label" for="Reptilia">Reptilia</label>
                         </div>
                     </fieldset>
-                    <fieldset class="border border-secondary rounded m-2 p-2" id="window-fieldset">
-                        <div class="pe-3 input-group rounded p-2 mb-1">
-                            <label for="window-function" class="ps-1 input-group-text col-5">Window function:</label>
-                            <select class="form-select mb-0" id="window-function">
-                                <option value="bartlett">Bartlett</option>
-                                <option value="bartlettHann">BartlettHann</option>
-                                <option value="blackman">Blackman</option>
-                                <option value="cosine">Cosine</option>
-                                <option value="gauss">Gauss</option>
-                                <option value="hamming">Hamming</option>
-                                <option value="hann">Hann</option>
-                                <option value="lanczoz">Lanczoz</option>
-                                <option value="rectangular">Rectangular</option>
-                                <option value="triangular">Triangular</option>
-                            </select>
+                </div>
+
+                <div class="form-group rounded p-2">
+                    <div class="form-check form-switch ps-0">
+                        <button class="btn btn-primary" id="show-species">Show the species included</button>
+                    </div>
+                </div>
+                <div class="form-group rounded p-2 pe-0 mb-2">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" id="nocmig">
+                        <label class="form-check-label" for="nocmig">Only analyse night time periods.</label>
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Nocmig Mode" id="Nocmig Mode-circle-help"  data-bs-content="When enabled, this 'Nocmig mode' only searches for and only displays detections found during the night">?</a>
+                    </div>
+                </div>
+                <div class="form-group rounded p-2 pe-0 mb-2">
+                    <div class="form-check form-switch">
+                        <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="">
+                            <span class="pointer locked material-symbols-outlined">lock</span></a>
+                        <input class="locked form-check-input" type="checkbox" role="switch" id="auto-load" disabled>
+                        <label class="form-check-label" for="auto-load">Auto-load saved detections</label>
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Auto-load detections" id="Auto-load-circle-help"  data-bs-content="When enabled, saved detections are displayed immediately upon opening a file.">?</a>
+                    </div>
+                </div>
+                <div class="advanced">
+                    <hr>
+                    <div class="form-group rounded p-2 pe-0 mb-2">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch" id="iucn">
+                            <label class="form-check-label" for="iucn">Show species IUCN Red List status in summary.</label>
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Red List Status" id="IUCN-circle-help"  
+                                data-bs-content="When enabled, the latest Global IUCN assessment status is displayed for each species in the summary. The icon links to the assessment page on the IUCN website. The Assessment Scope will display the IUCN assessment of the species in that region (where available).">?</a>
                         </div>
-                        <div id="alpha" class="pe-3 input-group rounded p-2 mb-1 d-none">
-                            <label for="alpha-slider" class="form-label">
-                                Gauss Alpha:
-                            </label>
-                            <div class="input-group">
-                                <input type="range" class="form-control-range w-75" min="0.01" max="1.0" step="0.01" id="alpha-slider">
-                                <div class="input-group-append">
-                                    <span class="input-group-text" id="alpha-value">0.5</span>
+                    </div>
+
+                    <div class="pe-3 input-group rounded p-2 mb-1">
+                        <label for="iucn-scope" class="input-group-text bg-dark text-warning">Assessment Scope:</label>
+                        <select class="form-select mb-0" id="iucn-scope">
+                            <option value="Global">Global</option>
+                            <option value="Europe">Europe</option>
+                            <option value="Mediterranean">Mediterranean</option>
+                        </select>
+                    </div>
+
+                    <hr>
+                    <div class="form-group rounded text-center">
+                        <div class="form-check form-switch ps-2">
+                            <button class="btn btn-primary" id="clear-call-cache">Clear Reference Call Cache</button>
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Clear Call Cache" id="Clear Call Cache-circle-help"  data-bs-content="The data used for the reference call comparisons are cached. Clearing the cache will refresh the calls for each species the next time a comparison is requested">?</a>
+                        </div>
+                    </div>
+                </div>
+
+                <fieldset class="advanced border border-secondary rounded m-2 mb-0 p-2 ">
+                    <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content=""><span class="pointer locked material-symbols-outlined">lock</span></a>
+                    <span class="d-inline-flex float-end"><a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Keyboard assignment" id="Assign Keyboard-circle-help"  data-bs-content="Use number keys for rapid result tagging. Assign a species, label or predefined comment to a result">?</a></span>
+                    <legend style="font-size: small; font-weight:bold">
+                        Keyboard Assignment
+                    </legend>
+                    <div class="d-flex align-items-center mb-2 position-relative">
+                        <kbd class="text-bg-light ps-2 pe-2">1</kbd> 
+                        <select class="locked form-select w-50 ms-2" style="font-size: small" id="key1-column">
+                            <option value="">Unused</option>
+                            <option value="species">Species</option>
+                            <option value="label">Label</option>
+                            <option value="comment">Comment</option>
+                        </select>
+                        <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key1">
+                        <div id="bird-list-key1" class="suggestions list-group"></div>
+                    </div>
+                    <div class="d-flex align-items-center mb-2 position-relative">
+                        <kbd class="text-bg-light ps-2 pe-2">2</kbd> 
+                        <select class="locked form-select w-50 ms-2" style="font-size: small" id="key2-column">
+                            <option value="">Unused</option>
+                            <option value="species">Species</option>
+                            <option value="label">Label</option>
+                            <option value="comment">Comment</option>
+                        </select>
+                        <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key2">
+                        <div id="bird-list-key2" class="suggestions list-group"></div>
+                    </div>
+                    <div class="d-flex align-items-center mb-2 position-relative">
+                        <kbd class="text-bg-light ps-2 pe-2">3</kbd> 
+                        <select class="locked form-select w-50 ms-2" style="font-size: small" id="key3-column">
+                            <option value="">Unused</option>
+                            <option value="species">Species</option>
+                            <option value="label">Label</option>
+                            <option value="comment">Comment</option>
+                        </select>
+                        <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key3">
+                        <div id="bird-list-key3" class="suggestions list-group"></div>
+                    </div>
+                    <div class="d-flex align-items-center mb-2 position-relative">
+                        <kbd class="text-bg-light ps-2 pe-2">4</kbd> 
+                        <select class="locked form-select w-50 ms-2" style="font-size: small" id="key4-column">
+                            <option value="">Unused</option>
+                            <option value="species">Species</option>
+                            <option value="label">Label</option>
+                            <option value="comment">Comment</option>
+                        </select>
+                        <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key4">
+                        <div id="bird-list-key4" class="suggestions list-group"></div>
+                    </div>
+                    <div class="d-flex align-items-center mb-2 position-relative">
+                        <kbd class="text-bg-light ps-2 pe-2">5</kbd> 
+                        <select class="locked form-select w-50 ms-2" style="font-size: small" id="key5-column">
+                            <option value="">Unused</option>
+                            <option value="species">Species</option>
+                            <option value="label">Label</option>
+                            <option value="comment">Comment</option>
+                        </select>
+                        <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key5">
+                        <div id="bird-list-key5" class="suggestions list-group"></div>
+                    </div>
+                    <div class="d-flex align-items-center mb-2 position-relative">
+                        <kbd class="text-bg-light ps-2 pe-2">6</kbd> 
+                        <select class="locked form-select w-50 ms-2" style="font-size: small" id="key6-column">
+                            <option value="">Unused</option>
+                            <option value="species">Species</option>
+                            <option value="label">Label</option>
+                            <option value="comment">Comment</option>
+                        </select>
+                        <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key6">
+                        <div id="bird-list-key6" class="suggestions list-group"></div>
+                    </div>
+                    <div class="d-flex align-items-center mb-2 position-relative">
+                        <kbd class="text-bg-light ps-2 pe-2">7</kbd> 
+                        <select class="locked form-select w-50 ms-2" style="font-size: small" id="key7-column">
+                            <option value="">Unused</option>
+                            <option value="species">Species</option>
+                            <option value="label">Label</option>
+                            <option value="comment">Comment</option>
+                        </select>
+                        <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key7">
+                        <div id="bird-list-key7" class="suggestions list-group"></div>
+                    </div>
+                    <div class="d-flex align-items-center mb-2 position-relative">
+                        <kbd class="text-bg-light ps-2 pe-2">8</kbd> 
+                        <select class="locked form-select w-50 ms-2"  style="font-size: small" id="key8-column">
+                            <option value="">Unused</option>
+                            <option value="species">Species</option>
+                            <option value="label">Label</option>
+                            <option value="comment">Comment</option>
+                        </select>
+                        <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key8">
+                        <div id="bird-list-key8" class="suggestions list-group"></div>
+                    </div>
+                    <div class="d-flex align-items-center mb-2 position-relative">
+                        <kbd class="text-bg-light ps-2 pe-2">9</kbd> 
+                        <select class="locked form-select w-50 ms-2" style="font-size: small" id="key9-column">
+                            <option value="">Unused</option>
+                            <option value="species">Species</option>
+                            <option value="label">Label</option>
+                            <option value="comment">Comment</option>
+                        </select>
+                        <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key9">
+                        <div id="bird-list-key9" class="suggestions list-group"></div>
+                    </div>
+                    <div class="d-flex align-items-center mb-2 position-relative">
+                        <kbd class="text-bg-light ps-2 pe-2">0</kbd> 
+                        <select class="locked form-select w-50 ms-2" style="font-size: small" id="key0-column">
+                            <option value="">Unused</option>
+                            <option value="species">Species</option>
+                            <option value="label">Label</option>
+                            <option value="comment">Comment</option>
+                        </select>
+                        <input type="text" disabled class="ms-2 form-control" style="font-size: small" id="key0">
+                        <div id="bird-list-key0" class="suggestions list-group"></div>
+                    </div>
+                </fieldset>
+
+            </div>
+        </div>
+    </fieldset>
+
+    <!-- ===================== 2. DEFAULT LOCATION ===================== -->
+    <fieldset class="accordion-item text-bg-dark border-secondary">
+        <legend class="settings-toggle collapsed" role="button" tabindex="0" data-bs-toggle="collapse" data-bs-target="#collapse-location" aria-expanded="false" aria-controls="collapse-location">Default Location</legend>
+        <div id="collapse-location" data-bs-parent="#settingsAccordion" class="accordion-collapse collapse">
+            <div class="accordion-body p-2">
+
+                <!-- help icon moved out of the heading (a button can't contain another interactive element) -->
+                <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Default Location" id="Default Location-circle-help"  data-bs-content="Chirpity uses location information to determine the dawn and dusk times for recordings">?</a>
+                <div class="form-group rounded p-2 mb-2">
+                    <div class="input-group">
+                        <label class="input-group-text pe-2" for="latitude">Lat:</label>
+                        <input id="latitude" type="number" class="form-control ps-2 " placeholder="0.00" step="0.0001" max="90" min="-90" aria-label="Latitude" aria-describedby="latitude">
+                        <label class="input-group-text pe-2" for="longitude">Lon:</label>
+                        <input id="longitude" type="number" class="form-control ps-2" placeholder="0.00" step="0.0001"  max="180" min="-180" aria-label="Longitude" aria-describedby="longitude">
+                    </div>
+                    <div class="mt-1 float-end">
+                        <button class="btn btn-primary" id="apply-location">Set</button>
+                        <button class="btn btn-secondary" id="cancel-location">Cancel</button>
+                    </div>
+                    <div class="clearfix"></div>
+                    <div id="settingsMap" class="mt-2 border border-secondary rounded"></div>
+                    <div class="mt-2" id="place"></div>
+                </div>
+
+            </div>
+        </div>
+    </fieldset>
+
+    <!-- ===================== 3. SYSTEM ===================== -->
+    <fieldset class="accordion-item text-bg-dark border-secondary">
+        <legend class="settings-toggle collapsed" role="button" tabindex="0" data-bs-toggle="collapse" data-bs-target="#collapse-system" aria-expanded="false" aria-controls="collapse-system">System</legend>
+        <div id="collapse-system" data-bs-parent="#settingsAccordion" class="accordion-collapse collapse">
+            <div class="accordion-body p-2">
+
+                <div>
+                    <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Language" id="Language-circle-help"  data-bs-content="Select your preferred language for birds' common names">?</a>
+                    <div class="pe-3 input-group rounded p-2 mb-1">
+                        <label class="ps-1 input-group-text col-5" for="locale">Language:</label>
+                        <select class="form-select mb-0" id="locale">
+                            <option value="en_GB">English (UK) *</option>
+                            <option value="en">English (US)</option>
+                            <!-- <option value="bg">Български</option> -->
+                            <option value="ca">Català</option>
+                            <option value="cs">Čeština</option>
+                            <!-- <option value="cy">Cymraeg</option> -->
+                            <option value="da">Dansk *</option>
+                            <option value="de">Deutsch *</option>
+                            <option value="es">Español (España) *</option>
+                            <option value="es_EC">Español (Ecuador)</option>
+                            <option value="es_MX">Español (México)</option>
+                            <option value="et">Eesti</option>
+                            <option value="fa">فارسی</option>
+                            <option value="fi">Suomi</option>
+                            <option value="fr">Français *</option>
+                            <option value="hr">Hrvatski</option>
+                            <option value="it">Italiano</option>
+                            <option value="ja">日本語 *</option>
+                            <option value="lt">Lietuvių</option>
+                            <option value="nl">Nederlands *</option>
+                            <option value="no">Norsk</option>
+                            <option value="pl">Polski</option>
+                            <option value="pt_PT">Português (PT)*</option>
+                            <option value="pt_BR">Português (BR)</option>
+                            <option value="ro">Română</option>
+                            <option value="ru">Русский *</option>
+                            <option value="sk">Slovenčina</option>
+                            <option value="sr">Српски</option>
+                            <option value="sv">Svenska *</option>
+                            <option value="tr">Türkçe</option>
+                            <option value="uk">Українська</option>
+                            <option value="zh_CN">中文 *</option>
+                            <!-- <option value="custom">Custom</option> -->
+                        </select>
+                    </div>
+                </div>
+                <div class="">
+                    <div class="p-0 node-only d-none">
+                        <div class="form-group rounded p-2 pe-0 mb-2">
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Backend" id="Backend-circle-help"  data-bs-content="The GPU backend can improve performance and reduce power consumption on some systems.">?</a>
+                            <div>
+                                <label class="ps-0 fs-6 text-start form-check" for="backend">Backend: <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="">
+                            <span class="pointer locked material-symbols-outlined">lock</span></a></label>
+                                <div class="form-check form-check-inline">
+                                    <label class="form-check-label" for="tensorflow">CPU</label>
+                                    <input class="form-check-input" type="radio" name="backend" id="tensorflow" value="tensorflow" checked="">
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input locked" type="radio" name="backend" id="webgpu" value="webgpu" disabled>
+                                    <label class="form-check-label" for="webgpu">GPU</label>
                                 </div>
                             </div>
                         </div>
-                    
-                        <div class="pe-3 input-group rounded p-2 mb-1">
-                            <label for="timelineSetting" class="ps-1 input-group-text col-5">Timeline:</label>
-                            <select class="form-select mb-0" id="timelineSetting">
-                                <option value="timecode">Timecode</option>
-                                <option value="timeOfDay">Time of day</option>
-                            </select>
-                        </div>
-                    </fieldset>
-                </fieldset>
-                <fieldset class="advanced border border-secondary rounded m-2 p-2">
-                    <legend class="pb-2" style="font-size: large;font-weight:bold;color: white">Advanced</legend>
-                    <div class=" col-auto form-group rounded p-2 mb-2">
-                        <div class="text-nowrap">   
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" role="switch" id="debug-mode">
-                                <label class="form-check-label me-2" for="debug-mode">Debug mode</label><a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Debug Mode" id="Debug Mode-circle-help"  data-bs-content="Enter debug mode (changes to this setting require a Chirpity relaunch to take effect)">?</a>
+                    </div>
+                    <div class="advanced">
+                        <a class="circle not-onnx-gpu" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Threads" id="Threads-circle-help"  data-bs-content="The number of parallel analyses to run. By default, 
+                        this is set to the number of CPU cores on the machine for fastest performance. With the GPU backend, a lower number works better e.g. 1-3">?</a>
+                        <div class="form-group rounded p-2 pe-0 mb-2 not-onnx-gpu">
+                            <label for="thread-slider">Threads:</label>
+                            <div class="input-group">
+                                <input type="range" class="form-control-range w-75" id="thread-slider" min="1" max="24">
+                                <div class="input-group-append">
+                                    <span class="input-group-text" id="threads-value">12</span>
+                                </div>
                             </div>
                         </div>
                     </div>
-                    <div class="col-auto form-group rounded p-2 mb-2">
-                        <div class="text-nowrap">
-                            <button class="btn btn-warning" id="reset-defaults">Reset to default settings</button>
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Default Settings" id="Default Settings-circle-help"  data-bs-content="Reset the configuration settings to their default values. N.B. Relaunch Chirpity to see changes, also, language settings will need to be re-set manually">?</a>
+                    <div class="advanced">
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Batch Size" id="Batch Size-circle-help"  data-bs-content="Optimising the batch size can increase processing speed on longer files.">?</a>
+                        <div class="form-group rounded p-2 pe-0 mb-2">
+                            <label for="batch-size">Batch Size:</label>
+                            <div class="input-group">
+                                <input type="range" class="form-control-range w-75" id="batch-size" min="1" max="256">
+                                <div class="input-group-append">
+                                    <span class="input-group-text" id="batch-size-value"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Audio notification" id="Audio notification-circle-help"  data-bs-content="When enabled, there will be a system notification when analyses that take over thirty seconds are finished.">?</a>
+                        <div class="pe-3 form-group rounded p-2 mb-2">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="audio-notification">
+                                <label class="form-check-label" for="audio-notification">Enable analysis completion notifications</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="File timestamp marks recording start" id="File-timestamp-circle-help"  data-bs-content="Some audio recorders, for example the Zoom H1 Essential, can set the file saved date and time to the beginning of the recording, rather than the end. 
+                                If you have such a recorder selecting this option will fix the times shown for your detections.">?</a>
+
+                        <div class="form-group rounded p-2 mb-2">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="file-timestamp">
+                                <label class="form-check-label" for="file-timestamp">
+                                    File timestamps mark recording start
+                                </label>
+
+                            </div>
+                        </div>
+                    </div>
+                    <div class="input-group rounded p-2" id="choose-database-location">
+                        <div class="col-auto pe-1">
+                            <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="">
+                            <span class="pointer locked material-symbols-outlined">lock</span></a>
+                        </div>
+                        <div class="col">
+                            <div class="input-group">
+                                <button class="btn btn-outline-secondary text-warning locked disabled" type="button" id="database-location-select">
+                                    Database Location:</button>
+                                <input type="text" class="form-control" id="database-location" aria-describedby="database-location-select" placeholder="Default" readonly>
+                                <span id="clear-database-location" class="material-symbols-outlined btn btn-outline-secondary p-1" title="Clear custom database location">clear</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Adjust font size" id="Adjust font size-circle-help"  data-bs-content="Change the global font size settings for the application.">?</a>
+                    <div class="pe-3 form-group rounded p-2 mb-2">
+                        <label for="font" class="form-label">Adjust font size: </label>
+                        <span  id="decreaseFont" class="material-symbols-outlined btn btn-outline-secondary p-1">text_decrease</span> 
+                        <span  id="increaseFont" class="material-symbols-outlined btn btn-outline-secondary p-1">text_increase</span>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </fieldset>
+
+    <!-- ===================== 4. AUDIO PREFERENCES ===================== -->
+    <fieldset class="accordion-item text-bg-dark border-secondary">
+        <legend class="settings-toggle collapsed" role="button" tabindex="0" data-bs-toggle="collapse" data-bs-target="#collapse-audio" aria-expanded="false" aria-controls="collapse-audio">Audio Preferences</legend>
+        <div id="collapse-audio" data-bs-parent="#settingsAccordion" class="accordion-collapse collapse">
+            <div class="accordion-body p-2">
+
+                <div class="me-auto">
+                    <div class="advanced form-group rounded p-2 mb-2">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch" id="send-filtered-audio-to-model">
+                            <label class="form-check-label" for="send-filtered-audio-to-model">
+                                Send Filtered Audio for Analysis
+                            </label>
+                            <a class="circle text-bg-danger" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Send Filtered Audio" id="Send Filtered Audio-circle-help"  data-bs-content="Sending High Pass or Low Shelf filtered audio to a model will usually have a negative impact on its accuracy. Use this option with caution!">?</a>
+                        </div>
+                    </div>
+                    <div class="form-group rounded p-2 mb-2">
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Volume Adjustment" id="Volume Adjustment-circle-help"  data-bs-content="Adjust the volume of audio to compensate for low recording levels.">?</a>
+                        <label for="gain" class="form-label">Volume Adjustment:</label>
+                        <div class="input-group me-0 p-0">
+                            <input type="range" class="form-control-range w-75" min="0" max="50" id="gain">
+                            <div class="input-group-append">
+                                <span class="input-group-text" id="gain-adjustment">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <hr>
+                <div class="form-group rounded p-2 mb-2">
+                    <div class="col form-check form-switch">
+                        <label class="form-check-label" for="normalise">Normalise Audio:</label>
+                        <input class="form-check-input" type="checkbox" role="switch" id="normalise">
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Normalise" id="Normalise-circle-help"  data-bs-content="When enabled, the audio you hear will be normalised, expanding the dynamic range.">?</a>
+                    </div>
+                </div>
+                <hr>
+                <div class="me-auto">
+                    <div class="form-group rounded p-2 mb-2">
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="High Pass Filter" id="High Pass Filter-circle-help"  data-bs-content="When set, removes low frequency noise below the threshold.">?</a>
+                        <label for="highPassFrequency" class="form-label">
+                            High Pass filter:
+                        </label>
+                        <div class="input-group me-0 p-0">
+                            <input type="range" class="form-control-range w-75" min="0" max="15000" step="25" id="highPassFrequency">
+                            <div class="input-group-append">
+                                <span class="input-group-text" id="HP-threshold">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="me-auto">
+                    <div class="form-group rounded p-2 mb-2">
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Low Pass Filter" id="Low Pass Filter-circle-help"  data-bs-content="When set, removes high frequency noise above the threshold.">?</a>
+                        <label for="lowPassFrequency" class="form-label">
+                            Low Pass filter:
+                        </label>
+                        <div class="input-group me-0 p-0">
+                            <input type="range" class="form-control-range w-75" min="0" max="15000" step="25" id="lowPassFrequency">
+                            <div class="input-group-append">
+                                <span class="input-group-text" id="LP-threshold">15000Hz</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <hr>
+                <h6>Low Shelf filter</h6>
+                <div class="form-group rounded p-2 me-0 mb-2">
+                    <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Low Shelf Filter" id="Low Shelf Filter-circle-help"  data-bs-content="When used, attenuates low frequency noise below the cut-off frequency.">?</a>
+                    <label for="lowShelfFrequency" class="form-label">Cut-off Frequency:</label>
+                    <div class="input-group me-0 p-0">
+                        <input type="range" class="form-control-range w-75" min="0" max="2500" step="100" id="lowShelfFrequency">
+                        <div class="input-group-append">
+                            <span class="input-group-text" id="LowShelf-threshold">0</span>
+                        </div>
+                    </div>
+                    <label for="attenuation" class="form-label">Attenuation:</label>
+                    <div class="input-group me-0 p-0">
+                        <input type="range" class="form-control-range w-75" min="0" max="100" id="attenuation">
+                        <div class="input-group-append">
+                            <span class="input-group-text" id="attenuation-threshold">0 dB</span>
+                        </div>
+                    </div>
+                </div>
+                <hr>
+                <h6 class="fs-6">Audio Export:</h6>
+                <div class="pe-3 input-group rounded p-2 mb-1">
+                    <label for="format" class="ps-1 input-group-text col-5">Format:</label>
+                    <select class="form-select mb-0" id="format">
+                        <option value="wav">WAV</option>
+                        <option value="flac">FLAC</option>
+                        <option value="mp3">MP3</option>
+                        <option value="aac">AAC</option>
+                        <option value="opus">Opus</option>
+                    </select>
+                </div>
+                <div id="bitrate-container" class="pe-3 input-group rounded p-2 mb-1">
+                    <label for="bitrate" class="ps-1 input-group-text col-5">Bitrate:</label>
+                    <select class="form-select mb-0" id="bitrate">
+                        <option value="320">320 kbps</option>
+                        <option value="192">192 kbps</option>
+                        <option value="160">160 kbps</option>
+                        <option value="128">128 kbps (recommended)</option>
+                        <option value="96">96 kbps</option>
+                        <option value="64">64 kbps</option>
+                    </select>
+                </div>
+                <div id="quality-container" class="pe-3 input-group rounded p-2 mb-1">
+                    <label for="quality" class="input-group-text  col-6">Compression:</label>
+                    <select class="form-select mb-0" id="quality">
+                        <option value="0">0</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                        <option value="6">6</option>
+                        <option value="7">7</option>
+                        <option value="8">8</option>
+                        <option value="9">9</option>
+                        <option value="10">10</option>
+                    </select>
+                </div>
+                <div class="pe-2 form-group rounded p-2 mb-2">
+                    <div class="form-check-inline w-75 form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" id="downmix">
+                        <label class="form-check-label" for="downmix">Convert to mono</label>
+                    </div>
+                    <a class="ms-auto circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Down mix" id="Down mix-circle-help"  data-bs-content="When enabled, exported audio will be downmixed to mono">?</a>
+                </div>
+                <div class="form-group rounded p-2 pe-0 mb-2">
+                    <div class="row pe-2">
+                        <label class="col-3" for="decorators">Decorators: </label>
+                        <div class="col-6 ">
+                            <div class="form-check-inline text-nowrap">
+                                <input class="form-check-input" type="checkbox" id="padding" value="2" checked="">
+                                <label class="form-check-label" for="padding">
+                                    Pad
+                                </label>
+                                <input class="form-check-input" type="checkbox" id="fade" disabled="" value="1">
+                                <label class="form-check-label" for="fade">
+                                    Fade
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-3">
+                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Decorators" id="Decorators-circle-help"  data-bs-content="'Pad' adds 2 seconds before and after a selection to the exported audio.
+                            'Fade' adds a 1 second fade effect to the start and end of the audio">?</a>
+                        </div>
+                    </div>
+                </div>
+                <hr>
+                <a class="circle new-circle me-2" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Audio Library" id="Audio Library-circle-help"  
+                    data-bs-html="true" data-bs-sanitize="false" data-bs-content="Chirpity can organise your audio into a permanent library at a location of your choice, such as a data disk or network drive. Once saved, you can remove the original files, and all records will be viewable in the application.
+
+                    To save audio to the library, you can either go to the Records menu and choose 'Save Audio from Archive Results to Library', or enable the 'Add to Library on Save' option below.
+                    
+                    Files will be stored in the following structure:
+                    
+                    <p><code>Recording Site / Year / Month / Filename</code></p>
+                    'Lossy' audio requires about 1GB of storage per 24 hours, while 'Lossless' converts files to FLAC format, preserving original fidelity, bitrate, and channels, but roughly halving the file size.">?</a>
+                <h6 class="fs-6">Audio Library</h6>
+
+                <div class="input-group rounded p-2" id="choose-library-location">
+                    <div class="col">
+                        <div class="input-group">
+                            <button class="btn btn-outline-secondary" type="button" id="library-location-select">Library Location:</button>
+                            <input type="text" class="form-control" id="library-location" aria-describedby="library-location-select" placeholder="No location set" readonly>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group rounded p-2 mb-2">
+                    <div class="col form-check form-switch">
+                        <label class="form-check-label" for="auto-library">Add to Library on Save</label>
+                        <input class="form-check-input" type="checkbox" role="switch" id="auto-library" disabled>
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Add to Library on Save" id="Add to Library on Save-circle-help"  data-bs-content="When enabled, audio files are added to the library location whenever detections are saved to the archive.">?</a>
+                    </div>
+                </div>
+                <div class="form-group rounded p-2 mb-2">
+                    <div class="col form-check form-switch">
+                        <label class="form-check-label" for="library-trim">Crop Library audio to night time periods</label>
+                        <input class="form-check-input" type="checkbox" role="switch" id="library-trim" disabled>
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Crop Library" id="Crop Library-circle-help"  data-bs-content="When enabled, audio files containing daylight periods are cropped, so the audio is only saved for nocturnal periods.">?</a>
+                    </div>
+                </div>
+                <div class="form-group rounded p-2 mb-2">
+                    <div class="col form-check form-switch">
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Only save files with records" id="Clip Library-circle-help"  data-bs-content="When enabled, only audio files containing saved records are added to the library. 
+                        If you set your recorder to auto-increment files after a short period of time, enabling this setting will dramatically reduce the storage required if there are long periods without activity">?</a>
+                        <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content="">
+                                <span class="pointer locked material-symbols-outlined">lock</span></a>
+                        <input class="locked form-check-input" type="checkbox" role="switch" id="library-clips" disabled>
+                        <label class="form-check-label" for="library-clips">Only save files with records</label>
+                    </div>
+                </div>
+                <div class="input-group rounded p-2 mb-1">
+                    <label for="library-format" class="ps-1 input-group-text col-5">Library Format:</label>
+                    <select class="form-select mb-0" id="library-format">
+                        <option value="ogg">Lossy (recommended)</option>
+                        <option value="flac">Lossless</option>
+                    </select>
+
+                </div>
+
+            </div>
+        </div>
+    </fieldset>
+
+    <!-- ===================== 5. SPECTROGRAM PREFERENCES ===================== -->
+    <fieldset class="accordion-item text-bg-dark border-secondary">
+        <legend class="settings-toggle collapsed" role="button" tabindex="0" data-bs-toggle="collapse" data-bs-target="#collapse-spectrogram" aria-expanded="false" aria-controls="collapse-spectrogram">Spectrogram Preferences</legend>
+        <div id="collapse-spectrogram" data-bs-parent="#settingsAccordion" class="accordion-collapse collapse">
+            <div class="accordion-body p-2">
+                <div class="form-group rounded p-2 mb-2">
+                    <div class="col form-check form-switch">
+                        <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content=""><span class="pointer locked material-symbols-outlined">lock</span></a>
+                        <input class="locked form-check-input" type="checkbox" role="switch" id="spec-detections" disabled>
+                        <label class="form-check-label" for="spec-detections">Show all detections</label>
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Show all detections" id="Show all detections-circle-help"  data-bs-content="When enabled, the spectrogram will highlight all the detections on screen.">?</a>
+                    </div>
+                </div>
+                <div class="form-group rounded p-2 mb-2">
+                    <div class="col form-check form-switch">
+                        <label class="form-check-label" for="spec-labels">Display frequency labels:</label>
+                        <input class="form-check-input" type="checkbox" role="switch" id="spec-labels">
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Show frequency labels" id="Show frequency labels-circle-help"  data-bs-content="When enabled, the spectrogram will display the frequency on the left side.">?</a>
+                    </div>
+                </div>
+                <div class="form-group rounded p-2 mb-2">
+                    <div class="col form-check form-switch">
+                        <label class="form-check-label" for="autogain">Auto Gain:</label>
+                        <input class="form-check-input" type="checkbox" role="switch" id="autogain">
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Auto Gain" id="Auto Gain-circle-help"  data-bs-content="When enabled, the spectrogram will automatically adjust its brightness, without changing the volume.">?</a>
+                    </div>
+                </div>
+                <div class="form-group rounded p-2 mb-2">
+                    <div class="col form-check form-switch">
+                        <label class="form-check-label" for="preemphasis">Pre-emphasis:</label>
+                        <input class="form-check-input" type="checkbox" role="switch" id="preemphasis">
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Pre-emphasis" id="Pre-emphasis-circle-help"  data-bs-content="When enabled, the spectrogram will apply Praat-style display pre-emphasis of 6dB per octave.">?</a>
+                    </div>
+                </div>
+                <div class="input-group rounded p-2 mb-1">
+                        <label class="input-group-text col-5" for="range-db">Dynamic Range:</label>
+                        <input class="form-control ps-2 col-1" type="number" id="range-db" min="40" max="120" step="10" value="80" style="max-width:8rem">
+                        <div class="input-group-append input-group-text ps-1 col-1 rounded-end">dB</div>
+                        <div class="col-4 text-end"><a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Dynamic Range" id="Dynamic Range-circle-help" data-bs-content="Sets the dynamic range for the spectrogram. Lower values suppress quieter sounds, such as background noise. [Default 80]">?</a></div>
+                </div>
+                <div class="pe-3 input-group rounded p-2 mb-1">
+                    <label for="colourmap" class="ps-1 input-group-text col-5">Colourmap:</label>
+                    <select class="form-select mb-0" id="colourmap">
+                        <option value="custom">Custom</option>
+                        <option value="igray">Greyscale</option>
+                        <option value="gray">Inverted Greyscale</option>
+                        <option value="bone">Bone</option>
+                        <option value="turbidity">Turbidity</option>
+                        <option value="chlorophyll">Chlorophyll</option>
+                        <option value="viridis">Viridis</option>
+                        <option value="cdom">CDom</option>
+                        <option value="temperature">Temperature</option>
+                        <option value="salinity">Salinity</option>
+                        <option value="roseus">Roseus</option>
+                        <option value="inferno">Inferno</option>
+                        <option value="magma">Magma</option>
+                        <option value="plasma">Plasma</option>
+                        <option value="hot">Hot</option>
+                        <option value="blackbody">Blackbody</option>
+                    </select>
+                </div>
+                <fieldset class="border border-secondary rounded m-2 p-2 d-none" id="colormap-fieldset">
+                    <div class="mt-2">
+                        <input class="form-input pointer" type="color" id="loud-color" value="#cc00ff">
+                        <label class="form-label pointer" for="loud-color">Peak colour</label><br>
+                        <input class="form-input pointer" type="color" id="mid-color" value="#000000">
+                        <label class="form-label pointer" for="mid-color">Mid colour</label><br>
+                        <input class="form-input pointer" type="color" id="quiet-color" value="#000000">
+                        <label class="form-label pointer" for="quiet-color">Quiet colour</label>
+                    </div>
+                    <label for="quiet-color-threshold-slider" class="form-label">
+                        Quiet Cut-off:
+                    </label>
+                    <div class="input-group">
+                        <input type="range" class="form-control-range w-75" min="0" max="1" step="0.01" id="quiet-color-threshold-slider">
+                        <div class="input-group-append">
+                            <span class="input-group-text" id="quiet-color-threshold">0.0</span>
+                        </div>
+                    </div>
+                    <label for="mid-color-threshold-slider" class="form-label">
+                        Mid Position:
+                    </label>
+                    <div class="input-group">
+                        <input type="range" class="form-control-range w-75" min="0" max="1" step="0.01" id="mid-color-threshold-slider">
+                        <div class="input-group-append">
+                            <span class="input-group-text" id="mid-color-threshold">0.5</span>
                         </div>
                     </div>
                 </fieldset>
-            </form>                        
+                <div class="pe-3 input-group rounded p-2 mb-1">
+                    <label for="window-function" class="ps-1 input-group-text col-5">Window function:</label>
+                    <select class="form-select mb-0" id="window-function">
+                        <option value="bartlett">Bartlett</option>
+                        <option value="bartlettHann">BartlettHann</option>
+                        <option value="blackman">Blackman</option>
+                        <option value="cosine">Cosine</option>
+                        <option value="gauss">Gauss</option>
+                        <option value="hamming">Hamming</option>
+                        <option value="hann">Hann</option>
+                        <option value="lanczoz">Lanczoz</option>
+                        <option value="rectangular">Rectangular</option>
+                        <option value="triangular">Triangular</option>
+                    </select>
+                </div>
+                <div class="pe-3 input-group rounded p-2 mb-1">
+                    <label for="scale" class="ps-1 input-group-text col-5">Scale:</label>
+                    <select class="form-select mb-0" id="scale">
+                        <option value="linear">Linear</option>
+                        <option value="logarithmic">Logarithmic</option>
+                        <option value="mel">Mel</option>
+                    </select>
+                </div>
+                <div id="alpha" class="pe-3 input-group rounded p-2 mb-1 d-none">
+                    <label for="alpha-slider" class="form-label">
+                        Gauss Alpha:
+                    </label>
+                    <div class="input-group">
+                        <input type="range" class="form-control-range w-75" min="0.01" max="1.0" step="0.01" id="alpha-slider">
+                        <div class="input-group-append">
+                            <span class="input-group-text" id="alpha-value">0.5</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="pe-3 input-group rounded p-2 mb-1">
+                    <label for="timelineSetting" class="ps-1 input-group-text col-5">Timeline:</label>
+                    <select class="form-select mb-0" id="timelineSetting">
+                        <option value="timecode">Timecode</option>
+                        <option value="timeOfDay">Time of day</option>
+                    </select>
+                </div>
+
+            </div>
+        </div>
+    </fieldset>
+
+    <!-- ===================== 6. ADVANCED ===================== -->
+    <!-- "advanced" class kept on the item so existing show/hide logic hides the whole entry -->
+    <fieldset class="accordion-item advanced text-bg-dark border-secondary">
+        <legend class="settings-toggle collapsed" role="button" tabindex="0" data-bs-toggle="collapse" data-bs-target="#collapse-advanced" aria-expanded="false" aria-controls="collapse-advanced">Advanced</legend>
+        <div id="collapse-advanced" data-bs-parent="#settingsAccordion" class="accordion-collapse collapse">
+            <div class="accordion-body p-2">
+
+                <div class=" col-auto form-group rounded p-2 mb-2">
+                    <div class="text-nowrap">   
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch" id="debug-mode">
+                            <label class="form-check-label me-2" for="debug-mode">Debug mode</label><a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Debug Mode" id="Debug Mode-circle-help"  data-bs-content="Enter debug mode (changes to this setting require a Chirpity relaunch to take effect)">?</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-auto form-group rounded p-2 mb-2">
+                    <div class="text-nowrap">
+                        <button class="btn btn-warning" id="reset-defaults">Reset to default settings</button>
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Default Settings" id="Default Settings-circle-help"  data-bs-content="Reset the configuration settings to their default values. N.B. Relaunch Chirpity to see changes, also, language settings will need to be re-set manually">?</a>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </fieldset>
+
+</div><!-- /#settingsAccordion -->
+</form>
+
+<script>
+// Make the legend toggles keyboard-accessible
+document.getElementById('settingsAccordion').addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('.settings-toggle')) {
+        e.preventDefault();
+        e.target.click();
+    }
+});
+</script>                        
         </div>
     </div>      
     <!-- The modal for the tour -->
@@ -2183,7 +2295,8 @@
 
     window.placeMap = placeMap;
     window.updateMap = updateMap;
-    
+    document.getElementById('collapse-location')
+      .addEventListener('shown.bs.collapse', () => map.invalidateSize());
 </script>
 </body>
 

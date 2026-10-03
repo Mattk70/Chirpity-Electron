@@ -73,6 +73,8 @@ body {
 
 #waveform {
   cursor: pointer;
+  /* Element Capture works best if the target is a stacking context / isolated */
+  isolation: isolate;
 }
 
 /* Wavesurfer custom styles */
@@ -84,9 +86,6 @@ body {
         z-index: 5;
 }
 
-.spec-labels {
-  width: 55px !important;
-}
 
 #primaryLogo {
   max-height: calc(40px * var(--font-size-scale));

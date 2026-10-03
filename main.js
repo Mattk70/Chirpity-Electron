@@ -576,7 +576,11 @@ app.whenReady().then(async () => {
   } else {
     ipcMain.handle("getVersion", () => version);
   }
-
+  // Allow screen recording
+  session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
+    // Capture the requesting frame itself (the "this tab" equivalent)
+    callback({ video: request.frame});
+  });
   // Set referer for openstreetmap
   const filter = {
     urls: ['https://tile.openstreetmap.org/*','https://*.tile.openstreetmap.org/*']
