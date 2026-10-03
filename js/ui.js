@@ -2287,7 +2287,7 @@ const defaultConfig = {
     scale: 'linear',
     alpha: 0.5,
     autoGain: false,
-    preemphasis: 0, // Pre-emphasis filter willl be 0 (false) or 6 (true)
+    preEmphasis: 0, // Pre-emphasis filter willl be 0 (false) or 6 (true)
     rangeDB: 80, // Range in dB for the spectrogram
   },
   timeOfDay: true,
@@ -9441,6 +9441,7 @@ async function videoCapture(btn) {
   const ws = spec.wavesurfer;
   if (!ws) return
   let blocker;
+  let display;
 
   if (btn.classList.contains('text-danger')) {
     // Manual stop
@@ -9491,7 +9492,7 @@ async function videoCapture(btn) {
 
     const playerEl = ws.getMediaElement();
     const [audioTrack] = playerEl.captureStream().getAudioTracks();
-    const display = await navigator.mediaDevices.getDisplayMedia({
+    display = await navigator.mediaDevices.getDisplayMedia({
       video: true
     });
 
@@ -9502,12 +9503,11 @@ async function videoCapture(btn) {
     }
 
     const [videoTrack] = display.getVideoTracks();
+    stream = new MediaStream([videoTrack, audioTrack]);
 
     await videoTrack.restrictTo(
       await RestrictionTarget.fromElement(waveElement)
     );
-
-    stream = new MediaStream([videoTrack, audioTrack]);
 
     const mimeType = 'video/mp4;codecs="avc3,mp4a.40.2"';
     recorder = new MediaRecorder(stream, { mimeType });
@@ -9554,6 +9554,8 @@ async function videoCapture(btn) {
     blocker?.remove();
     document.getElementById('watermark')?.remove();
     stream?.getTracks().forEach(t => t.stop());
+    display?.getTracks().forEach(t => t.stop());
+    stream = null;
     STATE.capturing = false;
     btn.classList.remove('text-danger');
   }

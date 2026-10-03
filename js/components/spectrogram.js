@@ -8,6 +8,22 @@ import { Context, get } from "../utils/i18n.js";
 
 const colormap = window.module.colormap;
 
+function hzToMel(hz) {
+  return 2595 * Math.log10(1 + hz / 700);
+}
+
+function melToHz(mel) {
+  return 700 * (Math.pow(10, mel / 2595) - 1);
+}
+
+function hzToLog(hz) {
+  return Math.log10(Math.max(1, hz));
+}
+
+function logToHz(logHz) {
+  return Math.pow(10, logHz);
+}
+
 export class ChirpityWS {
   constructor(getState, getConfig, handlers, actions) {
     this.getState = getState; // Function to get the current state
@@ -398,7 +414,7 @@ createLabelsCanvas() {
       rangeDB,
     });
     this.createTimeline();
-    this.REGIONS.clearRegions();
+    // this.REGIONS.clearRegions();
     this.spectrogram.options.labelsColor = colour;
     this.spectrogram.options.labels = config.specLabels;
     this.wavesurfer.setOptions({ cursorColor: colour });
@@ -962,7 +978,7 @@ createLabelsCanvas() {
     const config = this.getConfig();
     showHz = !config.specLabels;
     const i18 = get(Context);
-    const waveElement = event.target;
+    const waveElement = DOM.waveElement;
     // Update the tooltip content
     const tooltip = DOM.tooltip;
     tooltip.style.display = "none";
@@ -970,14 +986,30 @@ createLabelsCanvas() {
     const inRegion = this.checkForRegion(event, false);
     if (showHz || inRegion) {
       const specDimensions = waveElement.getBoundingClientRect();
-      const frequencyRange =
-        Number(config.audio.frequencyMax) - Number(config.audio.frequencyMin);
-      
-      const yPosition =
-        Math.round(
-          (specDimensions.bottom - event.clientY) *
-            (frequencyRange / specDimensions.height)
-        ) + Number(config.audio.frequencyMin);
+      const frequencyMin = Number(config.audio.frequencyMin);
+      const frequencyMax = Number(config.audio.frequencyMax);
+      const frequencyRange = frequencyMax - frequencyMin;
+      const relativeY = (specDimensions.bottom - event.clientY) / specDimensions.height;
+      let yPosition;
+
+      switch (config.customColormap.scale) {
+        case "mel": {
+          const melMin = hzToMel(frequencyMin);
+          const melMax = hzToMel(frequencyMax);
+          yPosition = melToHz(melMin + relativeY * (melMax - melMin)).toFixed(0);
+          break;
+        }
+        case "logarithmic": {
+          const logMin = hzToLog(frequencyMin);
+          const logMax = hzToLog(frequencyMax);
+          yPosition = logToHz(logMin + relativeY * (logMax - logMin)).toFixed(0);
+          break;
+        }
+        default:
+          yPosition =
+            Math.round(relativeY * frequencyRange) + frequencyMin;
+      }
+
       const pitchShifted = config.selectedModel.includes('batpack');
       const yPos = pitchShifted ? yPosition*10 : yPosition
       tooltip.textContent = `${i18.frequency}: ${yPos}Hz`;

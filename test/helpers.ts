@@ -1,9 +1,9 @@
-
 import { Page } from 'playwright';
 
 let page: Page;
 
 async function openExampleFile(page: Page){
+    await page.locator('#navBarFile').waitFor({state: 'visible'});
     await page.locator('#navBarFile').click()
     // deal with debounce timer
     await page.waitForTimeout(300);
@@ -13,8 +13,10 @@ async function openExampleFile(page: Page){
   
   async function changeSettings(page: Page, type: string, elementID: string, value: any, timeout: number){
     elementID = '#' + elementID;
-    await  page.locator('#navbarSettings').click();
-    // for Birdnet's 34%$
+    await page.locator('#navbarSettings').waitFor({state: 'visible'});
+    await page.locator('#navbarSettings').click();
+    // for Birdnet's 34%
+    await page.locator('#confidence').waitFor({state: 'visible'});
     await page.locator('#confidence').fill('30');
     if (type === 'select'){
       await page.selectOption(elementID, value);
@@ -34,7 +36,8 @@ async function openExampleFile(page: Page){
     await openExampleFile(page)
     await changeSettings(page,'select', 'model-to-use', model, 2000)
   
-    await  page.locator('#navbarAnalysis').click()
+    await page.locator('#navbarAnalysis').waitFor({state: 'visible'});
+    await page.locator('#navbarAnalysis').click()
     // deal with debounce timer
     await page.waitForTimeout(300);
     await page.locator('#analyse').click()
@@ -42,7 +45,7 @@ async function openExampleFile(page: Page){
       state: 'visible',
       timeout: 60000 // Wait up to 60 seconds for the toast header to become visible
     });
-    await  page.locator('#resultTableContainer').waitFor({state: 'visible'})
+    await page.locator('#resultTableContainer').waitFor({state: 'visible'})
   }
 
   export {changeSettings, openExampleFile, runExampleAnalysis}

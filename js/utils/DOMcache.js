@@ -108,9 +108,8 @@ const DOM = {
   get tooltip() {
     return document.getElementById("tooltip");
   },
-  get waveElement() {
-    return document.getElementById("waveform");
-  },
+  get waveElement() { return this._waveform ??= document.getElementById("waveform") },
+
   get summary() {
     return document.getElementById("summary");
   },

@@ -309,7 +309,7 @@ function requestFromWorker(worker, action, payload = {}, timeout = 15_000) {
       worker.removeEventListener("message", handleMessage);
       clearTimeout(timeoutId); // Clear the timeout if we got a response
       if (error) {
-        reject(error);
+        reject(error instanceof Error ? error : new Error(String(error)));
       } else {
         resolve(data);
       }
