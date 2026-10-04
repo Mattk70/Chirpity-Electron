@@ -9437,7 +9437,7 @@ function checkForIntelMacUpdates() {
 let recorder, captureChunks = [], stream;
 
 async function videoCapture(btn) {
-  const waveElement = document.getElementById('waveform');
+  const waveElement = DOM.waveElement;
   const ws = spec.wavesurfer;
   if (!ws) return
   let blocker;
@@ -9448,7 +9448,6 @@ async function videoCapture(btn) {
     STATE.capturing = false;
     const waterMark = document.getElementById('watermark');
     waterMark?.remove();
-    btn.classList.remove('text-danger');
     ws.pause();
     if (recorder?.state !== 'inactive') {
       recorder.stop();
@@ -9498,7 +9497,7 @@ async function videoCapture(btn) {
 
     // User may have resized while getDisplayMedia was pending
     if (STATE.captureAbortController.signal.aborted) {
-      display.getTracks().forEach(t => t.stop());
+      stream.getTracks().forEach(t => t.stop());
       return;
     }
 
@@ -9509,14 +9508,16 @@ async function videoCapture(btn) {
       await RestrictionTarget.fromElement(waveElement)
     );
 
-    const mimeType = 'video/mp4;codecs="avc3,mp4a.40.2"';
+    const mimeType = 'video/mp4;codecs="avc3"';
     recorder = new MediaRecorder(stream, { mimeType });
     captureChunks = [];
 
     recorder.ondataavailable = (e) => {
       if (e.data.size) captureChunks.push(e.data);
     };
-
+    recorder.onerror = (e) => {
+      console.error('Recorder error:', e.error);
+    }
     recorder.onstop = () => save(btn);
 
     // Stop recording when playback ends
@@ -9554,14 +9555,12 @@ async function videoCapture(btn) {
     blocker?.remove();
     document.getElementById('watermark')?.remove();
     stream?.getTracks().forEach(t => t.stop());
-    display?.getTracks().forEach(t => t.stop());
     stream = null;
     STATE.capturing = false;
-    btn.classList.remove('text-danger');
+    btn.classList.remove('text-danger', 'disabled');
   }
   async function save(btn) {
     const t0 = Date.now();
-    btn.classList.remove('text-danger');
     const aborted = STATE.captureAbortController?.signal.aborted;
 
     STATE.capturing = false;
@@ -9576,13 +9575,14 @@ async function videoCapture(btn) {
       recorder = null;
       blocker.remove();
       STATE.captureAbortController = null;
+      btn.classList.remove('text-danger', 'disabled');
       return;
     }
 
     blocker?.remove();
-    
     const blob = new Blob(captureChunks, { type: 'video/mp4' });
     let result;
+    
     try {
       result = await utils.requestFromWorker(
         worker,
@@ -9600,6 +9600,7 @@ async function videoCapture(btn) {
       captureChunks = [];
       recorder = null;
       STATE.captureAbortController = null;
+      btn.classList.remove('text-danger', 'disabled');
     }
     if (!result) return;
 
@@ -9621,4 +9622,5 @@ function cancelVideoCapture() {
   if (recorder?.state !== 'inactive') {
     recorder?.stop();
   }
+  STATE.capturing = false;
 }

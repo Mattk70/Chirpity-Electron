@@ -6760,7 +6760,7 @@ async function onProcessVideo({ id, blob }){
     await fs.promises.writeFile(inPath, Buffer.from(buf));
 
 await new Promise((resolve, reject) => {
-  ffmpeg(inPath)
+  ffmpeg("file:" + inPath)
     .videoCodec('libx264')
     .outputOptions([
       '-pix_fmt yuv420p',       // QuickTime requires this; some webm/vp inputs default to something else
@@ -6771,7 +6771,7 @@ await new Promise((resolve, reject) => {
       '-preset veryfast',       // trade encode speed for file size; 'medium' is ffmpeg's default
       '-movflags +faststart'    // allows playback to start before the file is fully downloaded
     ])
-    .audioCodec('copy') // copy the audio stream without re-encoding
+    .audioCodec('aac') // AAC is widely supported; you could also use 'libmp3lame' for MP3
     .on('error', (err) => reject(err))
     .on('end', resolve)
     .save(outPath);
