@@ -1554,14 +1554,6 @@
             <div class="accordion-body p-2">
                 <div class="form-group rounded p-2 mb-2">
                     <div class="col form-check form-switch">
-                        <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content=""><span class="pointer locked material-symbols-outlined">lock</span></a>
-                        <input class="locked form-check-input" type="checkbox" role="switch" id="spec-detections" disabled>
-                        <label class="form-check-label" for="spec-detections">Show all detections</label>
-                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Show all detections" id="Show all detections-circle-help"  data-bs-content="When enabled, the spectrogram will highlight all the detections on screen.">?</a>
-                    </div>
-                </div>
-                <div class="form-group rounded p-2 mb-2">
-                    <div class="col form-check form-switch">
                         <label class="form-check-label" for="spec-labels">Display frequency labels:</label>
                         <input class="form-check-input" type="checkbox" role="switch" id="spec-labels">
                         <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Show frequency labels" id="Show frequency labels-circle-help"  data-bs-content="When enabled, the spectrogram will display the frequency on the left side.">?</a>
@@ -1569,23 +1561,34 @@
                 </div>
                 <div class="form-group rounded p-2 mb-2">
                     <div class="col form-check form-switch">
+                        <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content=""><span class="pointer locked material-symbols-outlined">lock</span></a>
+                        <input class="locked form-check-input" type="checkbox" role="switch" id="spec-detections" disabled>
+                        <label class="form-check-label" for="spec-detections">Show all detections</label>
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Show all detections" id="Show all detections-circle-help"  data-bs-content="When enabled, the spectrogram will highlight all the detections on screen.">?</a>
+                    </div>
+                </div>
+                <div class="form-group rounded p-2 mb-2">
+                    <div class="form-check form-switch">
+                        <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content=""><span class="pointer locked material-symbols-outlined">lock</span></a>
+                        <input class="locked form-check-input" type="checkbox" role="switch" id="autogain" disabled>
                         <label class="form-check-label" for="autogain">Auto Gain:</label>
-                        <input class="form-check-input" type="checkbox" role="switch" id="autogain">
                         <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Auto Gain" id="Auto Gain-circle-help"  data-bs-content="When enabled, the spectrogram will automatically adjust its brightness, without changing the volume.">?</a>
                     </div>
                 </div>
                 <div class="form-group rounded p-2 mb-2">
                     <div class="col form-check form-switch">
+                        <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock" data-bs-sanitize="false" data-bs-html="true" data-bs-content=""><span class="pointer locked material-symbols-outlined">lock</span></a>
+                        <input class="locked form-check-input" type="checkbox" role="switch" id="preemphasis" disabled>
                         <label class="form-check-label" for="preemphasis">Pre-emphasis:</label>
-                        <input class="form-check-input" type="checkbox" role="switch" id="preemphasis">
                         <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Pre-emphasis" id="Pre-emphasis-circle-help"  data-bs-content="When enabled, the spectrogram will apply Praat-style display pre-emphasis of 6dB per octave.">?</a>
                     </div>
                 </div>
                 <div class="input-group rounded p-2 mb-1">
                         <label class="input-group-text col-5" for="range-db">Dynamic Range:</label>
-                        <input class="form-control ps-2 col-1" type="number" id="range-db" min="40" max="120" step="10" value="80" style="max-width:8rem">
+                        <input class="form-control ps-2 col-1 locked" type="number" id="range-db" min="40" max="120" step="10" value="80" style="max-width:8rem" disabled>
                         <div class="input-group-append input-group-text ps-1 col-1 rounded-end">dB</div>
-                        <div class="col-4 text-end"><a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Dynamic Range" id="Dynamic Range-circle-help" data-bs-content="Sets the dynamic range for the spectrogram. Lower values suppress quieter sounds, such as background noise. [Default 80]">?</a></div>
+                        <a tabindex="-1" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-title="Feature Locked" class="padlock col align-middle text-center" data-bs-sanitize="false" data-bs-html="true" data-bs-content=""><span class="pointer locked material-symbols-outlined">lock</span></a>
+                        <div class="col-3 text-end"><a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Dynamic Range" id="Dynamic Range-circle-help" data-bs-content="Sets the dynamic range for the spectrogram. Lower values suppress quieter sounds, such as background noise. [Default 80]">?</a></div>
                 </div>
                 <div class="pe-3 input-group rounded p-2 mb-1">
                     <label for="colourmap" class="ps-1 input-group-text col-5">Colourmap:</label>
@@ -1655,8 +1658,8 @@
                     <label for="scale" class="ps-1 input-group-text col-5">Scale:</label>
                     <select class="form-select mb-0" id="scale">
                         <option value="linear">Linear</option>
-                        <option value="logarithmic">Logarithmic</option>
-                        <option value="mel">Mel</option>
+                        <option class="locked" value="logarithmic" disabled>Logarithmic</option>
+                        <option class="locked" value="mel" disabled>Mel</option>
                     </select>
                 </div>
                 <div id="alpha" class="pe-3 input-group rounded p-2 mb-1 d-none">

@@ -2248,7 +2248,7 @@ const defaultConfig = {
     customModel: {location:'', type:'replace'},
     settings: {
       useCache: false,
-      lr: 0.0001,
+      lr: 0.001,
       hidden: 0,
       dropout: 0,
       epochs: 10,
@@ -2466,8 +2466,12 @@ window.onload = async () => {
       modelPath = undefined;
     }
   }
-  if (config.selectedModel === 'birdnet3' && !isMember){
-    config.selectedModel = 'birdnet';
+  if (!isMember){
+    config.selectedModel === 'birdnet3' && (config.selectedModel = 'birdnet');
+    config.customColormap.autoGain = false;
+    config.customColormap.scale = 'linear';
+    config.customColormap.preEmphasis = false;
+    config.customColormap.rangeDB = 80;
   }
   const selectedModel = config.selectedModel;
 
@@ -2645,13 +2649,13 @@ window.onload = async () => {
   document.getElementById("HP-threshold").textContent = formatHz(config.filters.highPassFrequency);
   document.getElementById("highPassFrequency").value = config.filters.highPassFrequency;
   const lowPass = document.getElementById("lowPassFrequency")
-  lowPass.value = Number(lowPass.max) - config.filters.lowPassFrequency;
-  document.getElementById("LP-threshold").textContent = formatHz(config.filters.lowPassFrequency);
-  document.getElementById("lowShelfFrequency").value = config.filters.lowShelfFrequency;
-  document.getElementById("LowShelf-threshold").textContent = formatHz(config.filters.lowShelfFrequency);
-  DOM.attenuation.value = -config.filters.lowShelfAttenuation;
+  lowPass.value = Number(lowPass.max) - filters.lowPassFrequency;
+  document.getElementById("LP-threshold").textContent = formatHz(filters.lowPassFrequency);
+  document.getElementById("lowShelfFrequency").value = filters.lowShelfFrequency;
+  document.getElementById("LowShelf-threshold").textContent = formatHz(filters.lowShelfFrequency);
+  DOM.attenuation.value = -filters.lowShelfAttenuation;
   document.getElementById("attenuation-threshold").textContent = DOM.attenuation.value + "dB";
-  DOM.sendFilteredAudio.checked = config.filters.sendToModel;
+  DOM.sendFilteredAudio.checked = filters.sendToModel;
   filterIconDisplay();
   if (config.models[config.selectedModel].backend === "webgpu") {
     DOM.threadSlider.max = 6;
@@ -9495,11 +9499,6 @@ async function videoCapture(btn) {
       video: true
     });
 
-    // User may have resized while getDisplayMedia was pending
-    if (STATE.captureAbortController.signal.aborted) {
-      stream.getTracks().forEach(t => t.stop());
-      return;
-    }
 
     const [videoTrack] = display.getVideoTracks();
     stream = new MediaStream([videoTrack, audioTrack]);
@@ -9508,6 +9507,11 @@ async function videoCapture(btn) {
       await RestrictionTarget.fromElement(waveElement)
     );
 
+    // User may have resized while getDisplayMedia was pending
+    if (STATE.captureAbortController.signal.aborted) {
+      tearDownCapture(btn, blocker, stream);
+      return;
+    }
     const mimeType = 'video/mp4;codecs="avc3"';
     recorder = new MediaRecorder(stream, { mimeType });
     captureChunks = [];
@@ -9547,17 +9551,12 @@ async function videoCapture(btn) {
     }, { once: true });
 
     recorder.start();
-    await ws.play(0, STATE.windowLength - 0.05);
+    await ws.play(null, STATE.windowLength - 0.05);
 
   } catch (err) {
     console.error(err);
     // Clean up if capture failed before recorder.onstop
-    blocker?.remove();
-    document.getElementById('watermark')?.remove();
-    stream?.getTracks().forEach(t => t.stop());
-    stream = null;
-    STATE.capturing = false;
-    btn.classList.remove('text-danger', 'disabled');
+    tearDownCapture(btn, blocker, stream);
   }
   async function save(btn) {
     const t0 = Date.now();
@@ -9571,15 +9570,9 @@ async function videoCapture(btn) {
     document.getElementById('watermark')?.remove();
 
     if (aborted) {
-      captureChunks = [];
-      recorder = null;
-      blocker.remove();
-      STATE.captureAbortController = null;
-      btn.classList.remove('text-danger', 'disabled');
+      tearDownCapture(btn, blocker, stream);
       return;
     }
-
-    blocker?.remove();
     const blob = new Blob(captureChunks, { type: 'video/mp4' });
     let result;
     
@@ -9597,10 +9590,7 @@ async function videoCapture(btn) {
         type: 'error'
       });
     } finally {
-      captureChunks = [];
-      recorder = null;
-      STATE.captureAbortController = null;
-      btn.classList.remove('text-danger', 'disabled');
+      tearDownCapture(btn, blocker, stream);
     }
     if (!result) return;
 
@@ -9622,5 +9612,16 @@ function cancelVideoCapture() {
   if (recorder?.state !== 'inactive') {
     recorder?.stop();
   }
+}
+
+function tearDownCapture(btn, blocker, stream) {
   STATE.capturing = false;
+  btn.classList.remove('text-danger', 'disabled');
+  blocker?.remove();
+  document.getElementById('watermark')?.remove();
+  stream?.getTracks().forEach(t => t.stop());
+  stream = null;
+  recorder = null;
+  captureChunks = [];
+  STATE.captureAbortController = null;
 }
