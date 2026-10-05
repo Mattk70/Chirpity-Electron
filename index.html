@@ -109,6 +109,8 @@
                     </div>
             <div class="col pe-1">
                 <div class="btn-group-rounded position-relative float-end" id="filter-panel">
+                    <span style="max-width: 70px" id="context-mode" title="Context Aware mode enabled"
+                    class="chirpity-only material-symbols-outlined btn btn-outline-secondary p-1 pt-2">swap_horiz</span>
                     <span style="max-width: 70px" id="model-icon" class="btn btn-outline-secondary p-1 d-none position-relative">
                         <img class="icon" src="img/icon/birdnet_logo.png" alt="BirdNET">
                     </span>
@@ -116,8 +118,6 @@
                     class="material-symbols-outlined btn btn-outline-secondary p-1 pt-2">nights_stay</span>
                     <span style="max-width: 70px" id="audioFiltersIcon" title="Audio filters applied"
                     class="material-symbols-outlined btn btn-outline-secondary p-1 pt-2">blur_on</span>
-                    <span style="max-width: 70px" id="context-mode" title="Context Aware mode enabled"
-                    class="chirpity-only material-symbols-outlined btn btn-outline-secondary p-1 pt-2">swap_horiz</span>
                     <span title="Adjust spectrogram frequency range" id="frequency-range"
                     class="material-symbols-outlined btn btn-outline-secondary p-1 pt-2">vertical_align_center</span>
                     <span style="max-width: 70px" id="list-icon" class="btn btn-outline-secondary p-1"><img
@@ -832,7 +832,7 @@
 
     <!-- ===================== 1. DETECTIONS ===================== -->
     <fieldset class="accordion-item text-bg-dark border-secondary">
-        <legend class="settings-toggle collapsed" role="button" tabindex="0" data-bs-toggle="collapse" data-bs-target="#collapse-detections" aria-expanded="false" aria-controls="collapse-detections">Detections</legend>
+        <legend class="settings-toggle collapsed" role="button" tabindex="0" data-bs-toggle="collapse" data-bs-target="#collapse-detections" aria-expanded="false" aria-controls="collapse-detections" id="detections-heading">Detections</legend>
         <div id="collapse-detections" data-bs-parent="#settingsAccordion" class="accordion-collapse collapse">
             <div class="accordion-body p-2">
 
