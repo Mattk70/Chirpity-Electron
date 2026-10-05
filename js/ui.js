@@ -3741,6 +3741,7 @@ DOM.customListSelector.addEventListener("click", async () => {
  */
 const loadModel = () => {
   PREDICTING = false;
+  modelReady = false;
   t0_warmup = Date.now();
   const {selectedModel, warmup} = config;
   const backend = isTestEnv ? 'tensorflow' : config.models[selectedModel].backend;
@@ -3924,6 +3925,7 @@ function disableSettingsDuringAnalysis(bool) {
     "databaseLocationSelect",
     "clearDatabaseLocation",
     "windowSizeSlider",
+    "startCapture",
   ];
   elements.forEach((el) => {
     if (DOM[el]) DOM[el].disabled = bool;
@@ -5376,14 +5378,7 @@ const modelSettingsDisplay = () => {
     notNighthawk.forEach((element) => {
       element.classList.add("d-none");
     });
-    // Turn off detect & combine
-    config.detect.combine = false;
-    config.detect.merge = false;
-    const combineEl = document.getElementById("combine-detections")
-    combineEl.checked = false;
-    combineEl.disabled = false;
-    document.getElementById("merge-detections").checked = false;
-    worker.postMessage({action: "update-state", detect: config.detect});
+
   } else {
     notNighthawk.forEach((element) => {
       element.classList.remove("d-none");
@@ -6787,7 +6782,7 @@ async function handleUIClicks(e) {
       break;
     }
     case "model-icon": {
-      if (!PREDICTING) {
+      if (!PREDICTING && modelReady) {
         const el = DOM.modelToUse;
         const numberOfOptions = el.options.length;
         const currentIndex = el.selectedIndex;

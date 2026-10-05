@@ -81,6 +81,7 @@ const DOM = {
   get spectrogram() { return this._spectrogram ??= document.getElementById("spectrogram") },
   get specLabels() { return this._specLabels ??= document.getElementById("spec-labels") },
   get specDetections() { return this._specDetections ??= document.getElementById("spec-detections") },
+  get startCapture() { return this._startCapture ??= document.getElementById("capture-start") },
   get suggestionsList() { return this._suggestionsList = document.getElementById('bird-suggestions') },
   get summaryTable() { return this._summaryTable ??= document.getElementById("summaryTable") },
   get threadSlider() { return this._threadSlider ??= document.getElementById("thread-slider") },
@@ -91,6 +92,7 @@ const DOM = {
   get trainNav() { return this._trainNav ??= document.getElementById("open-training") },
   get tooltipInstance() { return this._tooltipInstance ??= 
     new bootstrap.Tooltip(document.getElementById("copy-uuid")) },
+  get waveElement() { return this._waveform ??= document.getElementById("waveform") },
   get backendOptions() { return this._backendOptions ??= document.getElementsByName("backend") },
   get buyMeCoffee() {
     return document.getElementById("bmc-wbtn");
@@ -108,8 +110,6 @@ const DOM = {
   get tooltip() {
     return document.getElementById("tooltip");
   },
-  get waveElement() { return this._waveform ??= document.getElementById("waveform") },
-
   get summary() {
     return document.getElementById("summary");
   },
