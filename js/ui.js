@@ -2470,7 +2470,7 @@ window.onload = async () => {
     config.selectedModel === 'birdnet3' && (config.selectedModel = 'birdnet');
     config.customColormap.autoGain = false;
     config.customColormap.scale = 'linear';
-    config.customColormap.preEmphasis = false;
+    config.customColormap.preEmphasis = 0;
     config.customColormap.rangeDB = 80;
   }
   const selectedModel = config.selectedModel;
