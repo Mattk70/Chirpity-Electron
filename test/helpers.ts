@@ -67,17 +67,19 @@ async function importModel(page: Page, modelPath: string, name: string) {
 async function runExampleAnalysis(page: Page, model: string) {
   await openExampleFile(page);
   await changeSettings(page, 'select', 'model-to-use', model);
-
+ 
+  // Only the completion toast counts, not "file loaded" / "model loaded" etc.
+  const analysisComplete = page.locator('div.show > div.toast-body', {
+    hasText: /analysis complete/i,
+  });
+ 
   await click(page, '#navbarAnalysis');
-  await click(page, '#analyse');
-
-  // TODO: tighten this to the specific "analysis complete" toast (or a progress
-  // bar going hidden). `div.show > div.toast-header` matches ANY toast, so it can
-  // fire before results have settled.
-  await page
-    .locator('div.show > div.toast-header')
-    .first()
-    .waitFor({ state: 'visible', timeout: 90_000 });
+  // Start waiting in the same breath as the click so a fast toast can't be missed.
+  await Promise.all([
+    analysisComplete.first().waitFor({ state: 'visible', timeout: 90_000 }),
+    click(page, '#analyse'),
+  ]);
+ 
   await expect(page.locator('#resultTableContainer')).toBeVisible();
   await expect(page.locator('#result1')).toBeVisible();
 }
