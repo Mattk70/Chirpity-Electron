@@ -1,6 +1,7 @@
 import { Page } from 'playwright';
 import { expect } from '@playwright/test';
 import { click } from './click';
+import { toastMark, waitForToast } from './toasts';
 
 /** Open a Bootstrap dropdown and wait until it is actually open. */
 async function openDropdown(page: Page, toggleSelector: string) {
@@ -67,19 +68,14 @@ async function importModel(page: Page, modelPath: string, name: string) {
 async function runExampleAnalysis(page: Page, model: string) {
   await openExampleFile(page);
   await changeSettings(page, 'select', 'model-to-use', model);
- 
-  // Only the completion toast counts, not "file loaded" / "model loaded" etc.
-  const analysisComplete = page.locator('div.show > div.toast-body', {
-    hasText: /analysis complete/i,
-  });
- 
+
+  // Only toasts raised after this point count (matters if a test analyses twice).
+  const mark = await toastMark(page);
+
   await click(page, '#navbarAnalysis');
-  // Start waiting in the same breath as the click so a fast toast can't be missed.
-  await Promise.all([
-    analysisComplete.first().waitFor({ state: 'visible', timeout: 90_000 }),
-    click(page, '#analyse'),
-  ]);
- 
+  await click(page, '#analyse');
+  await waitForToast(page, /analysis complete/i, mark);
+
   await expect(page.locator('#resultTableContainer')).toBeVisible();
   await expect(page.locator('#result1')).toBeVisible();
 }

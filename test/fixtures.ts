@@ -6,6 +6,7 @@ import {
   ipcMainInvokeHandler,
   stubMultipleDialogs,
 } from 'electron-playwright-helpers';
+import { installToastRecorder } from './toasts';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -68,6 +69,8 @@ export const test = base.extend<Fixtures>({
     await page.waitForLoadState('load');
     // This is what the old beforeAll did NOT wait for.
     await page.locator('#loading-screen').waitFor({ state: 'hidden', timeout: 90_000 });
+
+    await installToastRecorder(page);
 
     await use(page);
   },
