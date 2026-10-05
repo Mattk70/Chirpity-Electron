@@ -15,6 +15,10 @@ async function openExampleFile(page: Page){
     elementID = '#' + elementID;
     await page.locator('#navbarSettings').waitFor({state: 'visible'});
     await page.locator('#navbarSettings').click();
+    // deal with debounce timer
+    await page.waitForTimeout(300);
+    await page.locator('#settingsAccordion').waitFor({state: 'visible'});
+    await page.locator('#detections-heading').click();
     // for Birdnet's 34%
     await page.locator('#confidence').waitFor({state: 'visible'});
     await page.locator('#confidence').fill('30');
