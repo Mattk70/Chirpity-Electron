@@ -1608,7 +1608,6 @@ async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults 
     STATE.openFiles = await sortFilesByTime(STATE.openFiles);
   }
   utils.showElement(["spectrogramWrapper"], false);
-  spec.reInitSpec(config.specMaxHeight);
   loadAudioFileSync({ filePath: STATE.openFiles[0], preserveResults });
   // Clear unsaved records warning
   window.electron.unsavedRecords(false);
@@ -1945,7 +1944,10 @@ const handleLocationFilterChange = (e) => {
 
 function saveAnalyseState() {
   if (["analyse", "archive"].includes(STATE.mode)) {
-    const active = activeRow?.rowIndex - 1 || null;
+    let active = null;
+    if (activeRow && activeRow.rowIndex > 0) {
+      active = activeRow?.rowIndex - 1
+    }
     // Store a reference to the current file
     STATE.currentAnalysis = {
       currentFile: STATE.currentFile,
@@ -2002,9 +2004,6 @@ async function showCharts() {
   });
   const locationFilter = await generateLocationList("chart-locations");
   locationFilter.addEventListener("change", handleLocationFilterChange);
-  // Prevent the wavesurfer error
-  spec.spectrogram && spec.spectrogram.destroy();
-  spec.spectrogram = null;
   utils.hideAll();
  
   utils.showElement(["recordsContainer"]);
@@ -2044,7 +2043,7 @@ async function showExplore() {
   locationFilter.addEventListener("change", handleLocationFilterChange);
   utils.hideAll();
   utils.showElement(["exploreWrapper", "spectrogramWrapper"], false);
-  spec.reInitSpec(config.specMaxHeight);
+
     // Analysis is done
   STATE.analysisDone = true;
   filterResults({
@@ -2066,36 +2065,39 @@ async function showExplore() {
 async function showAnalyse() {
   utils.disableMenuItem(["active-analysis"]);
   //Restore STATE
-  STATE = { ...STATE, ...STATE.currentAnalysis };
-  worker.postMessage({ action: "change-mode", mode: STATE.mode });
-  clearLocationFilter();
-  // Prevent the wavesurfer error
-  if (spec.spectrogram) {
-    spec.spectrogram.destroy();
-    spec.spectrogram = null;
+  if (STATE.currentAnalysis) {
+    for (const key of [
+      'currentFile',
+      'openFiles',
+      'offset',
+      'resultsSortOrder',
+      'resultsMetaSortOrder',
+      'summarySortOrder'
+    ])
+    if (key in STATE.currentAnalysis)
+      STATE[key] = STATE.currentAnalysis[key];
   }
+  resetRegions(true);
+  worker.postMessage({ action: "change-mode", mode: STATE.currentAnalysis.mode});
+  clearLocationFilter();
+
   utils.hideAll();
   if (STATE.currentFile) {
     utils.showElement(["spectrogramWrapper"], false);
-    spec.reInitSpec(config.specMaxHeight);
-    worker.postMessage({
-      action: "update-state",
-      resultsSortOrder: STATE.resultsSortOrder,
-      resultsMetaSortOrder: STATE.resultsMetaSortOrder,
-      summarySortOrder: STATE.summarySortOrder,
-    });
+
     if (STATE.analysisDone) {
+      pagination?.reset();
       filterResults({
-        species: STATE.species,
-        offset: STATE.offset,
-        active: STATE.active,
+        species: STATE.currentAnalysis.species,
+        offset: STATE.currentAnalysis.offset,
+        active: STATE.currentAnalysis.active,
         updateSummary: true,
       });
     } else {
-      clearActive();
       loadAudioFileSync({ filePath: STATE.currentFile });
     }
   }
+  STATE.currentAnalysis = null;
   resetResults();
 }
 
@@ -2246,7 +2248,7 @@ const defaultConfig = {
     customModel: {location:'', type:'replace'},
     settings: {
       useCache: false,
-      lr: 0.0001,
+      lr: 0.001,
       hidden: 0,
       dropout: 0,
       epochs: 10,
@@ -2283,7 +2285,10 @@ const defaultConfig = {
     midThreshold: 0.5,
     windowFunc: "hann",
     scale: 'linear',
-    alpha: 0.5
+    alpha: 0.5,
+    autoGain: false,
+    preEmphasis: 0, // Pre-emphasis filter willl be 0 (false) or 6 (true)
+    rangeDB: 80, // Range in dB for the spectrogram
   },
   timeOfDay: true,
   list: "birds",
@@ -2461,8 +2466,12 @@ window.onload = async () => {
       modelPath = undefined;
     }
   }
-  if (config.selectedModel === 'birdnet3' && !isMember){
-    config.selectedModel = 'birdnet';
+  if (!isMember){
+    config.selectedModel === 'birdnet3' && (config.selectedModel = 'birdnet');
+    config.customColormap.autoGain = false;
+    config.customColormap.scale = 'linear';
+    config.customColormap.preEmphasis = 0;
+    config.customColormap.rangeDB = 80;
   }
   const selectedModel = config.selectedModel;
 
@@ -2579,7 +2588,7 @@ window.onload = async () => {
     document.getElementById("alpha").classList.remove("d-none");
   config.colormap === "custom" &&
     document.getElementById("colormap-fieldset").classList.remove("d-none");
-  const {loud, mid, quiet, quietThreshold, midThreshold, alpha} = config.customColormap;
+  const {loud, mid, quiet, quietThreshold, midThreshold, alpha, autoGain, preEmphasis, rangeDB} = config.customColormap;
   document.getElementById("quiet-color-threshold").textContent = quietThreshold;
   document.getElementById("quiet-color-threshold-slider").value = quietThreshold;
   document.getElementById("mid-color-threshold").textContent = midThreshold;
@@ -2589,6 +2598,9 @@ window.onload = async () => {
   document.getElementById("quiet-color").value = quiet;
   document.getElementById("alpha-slider").value = alpha;
   document.getElementById("alpha-value").textContent = alpha;
+  document.getElementById("autogain").checked = autoGain;
+  document.getElementById("preemphasis").checked = preEmphasis;
+  document.getElementById("range-db").value = rangeDB;
   
   // Audio preferences:
   DOM.gain.value = audio.gain;
@@ -2637,13 +2649,13 @@ window.onload = async () => {
   document.getElementById("HP-threshold").textContent = formatHz(config.filters.highPassFrequency);
   document.getElementById("highPassFrequency").value = config.filters.highPassFrequency;
   const lowPass = document.getElementById("lowPassFrequency")
-  lowPass.value = Number(lowPass.max) - config.filters.lowPassFrequency;
-  document.getElementById("LP-threshold").textContent = formatHz(config.filters.lowPassFrequency);
-  document.getElementById("lowShelfFrequency").value = config.filters.lowShelfFrequency;
-  document.getElementById("LowShelf-threshold").textContent = formatHz(config.filters.lowShelfFrequency);
-  DOM.attenuation.value = -config.filters.lowShelfAttenuation;
+  lowPass.value = Number(lowPass.max) - filters.lowPassFrequency;
+  document.getElementById("LP-threshold").textContent = formatHz(filters.lowPassFrequency);
+  document.getElementById("lowShelfFrequency").value = filters.lowShelfFrequency;
+  document.getElementById("LowShelf-threshold").textContent = formatHz(filters.lowShelfFrequency);
+  DOM.attenuation.value = -filters.lowShelfAttenuation;
   document.getElementById("attenuation-threshold").textContent = DOM.attenuation.value + "dB";
-  DOM.sendFilteredAudio.checked = config.filters.sendToModel;
+  DOM.sendFilteredAudio.checked = filters.sendToModel;
   filterIconDisplay();
   if (config.models[config.selectedModel].backend === "webgpu") {
     DOM.threadSlider.max = 6;
@@ -3913,6 +3925,7 @@ function disableSettingsDuringAnalysis(bool) {
     "databaseLocationSelect",
     "clearDatabaseLocation",
     "windowSizeSlider",
+    "startCapture",
   ];
   elements.forEach((el) => {
     if (DOM[el]) DOM[el].disabled = bool;
@@ -6061,9 +6074,9 @@ document.addEventListener("click", debounceClick(handleUIClicks));
  */
 async function handleUIClicks(e) {
   if (!APPLICATION_LOADED) return;
-  if (STATE.capturing) cancelVideoCapture();
   const element = e.target;
   const target = element.closest("[id]")?.id;
+  if (STATE.capturing && target !== "capture-start") cancelVideoCapture();
   const locale = config.locale.replace(/_.*$/, "");
   switch (target) {
     // Spec outside of region
@@ -6814,7 +6827,6 @@ async function handleUIClicks(e) {
     }
     // Video capture
     case "capture-start": {
-      STATE.capturing = true;
       await videoCapture(element);
       break;
     }
@@ -7333,8 +7345,14 @@ document.addEventListener("change", async function (e) {
         case "quiet-color":
         case "mid-color-threshold-slider":
         case "quiet-color-threshold-slider":
+        case "autogain":
+        case "preemphasis":
+        case "range-db":
         case "alpha-slider": {
           const alpha = document.getElementById("alpha-slider").valueAsNumber;
+          const autoGain = document.getElementById("autogain").checked;
+          const preEmphasis = document.getElementById("preemphasis").checked ? 6 : 0;
+          const rangeDB = document.getElementById("range-db").valueAsNumber;
           const loud = document.getElementById("loud-color").value;
           const mid = document.getElementById("mid-color").value;
           const quiet = document.getElementById("quiet-color").value;
@@ -7353,6 +7371,9 @@ document.addEventListener("change", async function (e) {
             quietThreshold,
             midThreshold,
             alpha,
+            autoGain,
+            preEmphasis,
+            rangeDB,
             scale
           };
           if (spec.wavesurfer && STATE.currentFile) {
@@ -9415,17 +9436,17 @@ function checkForIntelMacUpdates() {
 let recorder, captureChunks = [], stream;
 
 async function videoCapture(btn) {
-  const waveElement = document.getElementById('waveform');
+  const waveElement = DOM.waveElement;
   const ws = spec.wavesurfer;
   if (!ws) return
   let blocker;
+  let display;
 
   if (btn.classList.contains('text-danger')) {
     // Manual stop
     STATE.capturing = false;
     const waterMark = document.getElementById('watermark');
     waterMark?.remove();
-    btn.classList.remove('text-danger');
     ws.pause();
     if (recorder?.state !== 'inactive') {
       recorder.stop();
@@ -9463,40 +9484,39 @@ async function videoCapture(btn) {
     `;
     const scaleEl = document.getElementById('scale');
     const scale = scaleEl.options[scaleEl.selectedIndex].text;
-    waterMark.innerHTML = `Created with Chirpity: https://chirpity.net<br>(${scale} scale)`;
+    waterMark.innerHTML = `Created with Chirpity: https://chirpity.net<br>(${scale} spectrogram)`;
     waterMark.id = 'watermark';
     waveElement.prepend(waterMark);
 
     const playerEl = ws.getMediaElement();
-    const audioTracks = playerEl.captureStream().getAudioTracks();
-
-    const display = await navigator.mediaDevices.getDisplayMedia({
+    const [audioTrack] = playerEl.captureStream().getAudioTracks();
+    display = await navigator.mediaDevices.getDisplayMedia({
       video: true
     });
 
-    // User may have resized while getDisplayMedia was pending
-    if (STATE.captureAbortController.signal.aborted) {
-      display.getTracks().forEach(t => t.stop());
-      return;
-    }
 
     const [videoTrack] = display.getVideoTracks();
+    stream = new MediaStream([videoTrack, audioTrack]);
 
     await videoTrack.restrictTo(
       await RestrictionTarget.fromElement(waveElement)
     );
 
-    stream = new MediaStream([videoTrack, ...audioTracks]);
-
+    // User may have resized while getDisplayMedia was pending
+    if (STATE.captureAbortController.signal.aborted) {
+      tearDownCapture(btn, blocker, stream);
+      return;
+    }
     const mimeType = 'video/mp4;codecs="avc3"';
     recorder = new MediaRecorder(stream, { mimeType });
-
     captureChunks = [];
 
     recorder.ondataavailable = (e) => {
       if (e.data.size) captureChunks.push(e.data);
     };
-
+    recorder.onerror = (e) => {
+      console.error('Recorder error:', e.error);
+    }
     recorder.onstop = () => save(btn);
 
     // Stop recording when playback ends
@@ -9526,24 +9546,15 @@ async function videoCapture(btn) {
     }, { once: true });
 
     recorder.start();
-
-    await ws.play(0, STATE.windowLength - 0.05);
+    await ws.play(null, STATE.windowLength - 0.05);
 
   } catch (err) {
     console.error(err);
-
     // Clean up if capture failed before recorder.onstop
-    blocker?.remove();
-    document.getElementById('watermark')?.remove();
-
-    stream?.getTracks().forEach(t => t.stop());
-
-    STATE.capturing = false;
-    btn.classList.remove('text-danger');
+    tearDownCapture(btn, blocker, stream);
   }
   async function save(btn) {
     const t0 = Date.now();
-    btn.classList.remove('text-danger');
     const aborted = STATE.captureAbortController?.signal.aborted;
 
     STATE.capturing = false;
@@ -9552,50 +9563,60 @@ async function videoCapture(btn) {
     stream = null;
 
     document.getElementById('watermark')?.remove();
-    document.getElementById('hide-cursor')?.remove();
 
     if (aborted) {
-      captureChunks = [];
-      recorder = null;
-      blocker.remove();
-      STATE.captureAbortController = null;
+      tearDownCapture(btn, blocker, stream);
       return;
     }
-
-    blocker?.remove();
-
     const blob = new Blob(captureChunks, { type: 'video/mp4' });
+    let result;
+    
+    try {
+      result = await utils.requestFromWorker(
+        worker,
+        'process-video',
+        { blob },
+        30_000
+      );
+    } catch (err) {
+      console.error('Error processing video:', err);
+      generateToast({
+        message: err.message || err,
+        type: 'error'
+      });
+    } finally {
+      tearDownCapture(btn, blocker, stream);
+    }
+    if (!result) return;
 
-    const result = await utils.requestFromWorker(
-      worker,
-      'process-video',
-      { blob },
-      30_000
-    );
-
-    const processed = new Blob([result], { type: 'video/mp4' });
-
-    captureChunks = [];
-    recorder = null;
-    STATE.captureAbortController = null;
-
-    const url = URL.createObjectURL(processed);
-
+    const url = URL.createObjectURL(new Blob([result], { type: 'video/mp4' }));
     const a = Object.assign(document.createElement('a'), {
       href: url,
       download: 'chirpity-recording.mp4'
     });
-    console.log(`Saving video took ${Date.now() - t0}ms`)
+    console.info(`Saving video took ${Date.now() - t0}ms`);
     document.body.appendChild(a);
     a.click();
     a.remove();
-
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 }
+
 function cancelVideoCapture() {
   STATE.captureAbortController?.abort();
   if (recorder?.state !== 'inactive') {
     recorder?.stop();
   }
+}
+
+function tearDownCapture(btn, blocker, stream) {
+  STATE.capturing = false;
+  btn.classList.remove('text-danger', 'disabled');
+  blocker?.remove();
+  document.getElementById('watermark')?.remove();
+  stream?.getTracks().forEach(t => t.stop());
+  stream = null;
+  recorder = null;
+  captureChunks = [];
+  STATE.captureAbortController = null;
 }
