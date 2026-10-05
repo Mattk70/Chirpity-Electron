@@ -3924,6 +3924,7 @@ function disableSettingsDuringAnalysis(bool) {
     "databaseLocationSelect",
     "clearDatabaseLocation",
     "windowSizeSlider",
+    "startCapture",
   ];
   elements.forEach((el) => {
     if (DOM[el]) DOM[el].disabled = bool;
