@@ -1,5 +1,6 @@
 import { test, expect, stubDialogs } from './fixtures';
 import { changeSettings, importModel, runExampleAnalysis } from './helpers';
+import { click } from './click';
 
 // No describe.configure({mode:'parallel'}) needed: every test has its own app + profile,
 // so tests are independent and safe to run in parallel (or not).
@@ -54,8 +55,8 @@ test('Perch works and second result is 35%', async ({ page }) => {
 
 test('Amend file start dialog contains date', async ({ page }) => {
   await runExampleAnalysis(page, 'chirpity');
-  await page.locator('#dropdownMenuButton').click({ button: 'right' });
-  await page.locator('#setFileStart').click();
+  await click(page, '#dropdownMenuButton', { button: 'right' });
+  await click(page, '#setFileStart');
   await expect(page.locator('#fileStart')).toHaveValue(
     new RegExp(String(new Date().getFullYear()))
   );

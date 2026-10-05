@@ -1,31 +1,32 @@
 import { Page } from 'playwright';
 import { expect } from '@playwright/test';
+import { click } from './click';
 
 /** Open a Bootstrap dropdown and wait until it is actually open. */
 async function openDropdown(page: Page, toggleSelector: string) {
   const toggle = page.locator(toggleSelector);
-  await toggle.click();
+  await click(page, toggle);
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 }
 
 async function openExampleFile(page: Page) {
   await openDropdown(page, '#navBarFile');
-  await page.locator('#open-file').click();
+  await click(page, '#open-file');
   await page.locator('#spectrogramWrapper').waitFor({ state: 'visible' });
 }
 
 async function openSettings(page: Page) {
-  await page.locator('#navbarSettings').click();
+  await click(page, '#navbarSettings');
   await expect(page.locator('#settingsAccordion')).toBeVisible();
   // The heading TOGGLES the section, so only click if it isn't already open.
   if (!(await page.locator('#confidence').isVisible())) {
-    await page.locator('#detections-heading').click();
+    await click(page, '#detections-heading');
   }
   await expect(page.locator('#confidence')).toBeVisible();
 }
 
 async function closeSettings(page: Page) {
-  await page.locator('#close-settings').click();
+  await click(page, '#close-settings');
   await expect(page.locator('#settingsAccordion')).toBeHidden();
 }
 
@@ -49,12 +50,12 @@ async function changeSettings(
 
 /** Import a model through the Training menu and wait until it is really usable. */
 async function importModel(page: Page, modelPath: string, name: string) {
-  await page.locator('#navbarTraining').click();
-  await page.locator('#import-model').click();
+  await click(page, '#navbarTraining');
+  await click(page, '#import-model');
   await expect(page.locator('#import-modal')).toBeVisible();
   await page.locator('#import-location').fill(modelPath, { force: true });
   await page.locator('#model-name').fill(name, { force: true });
-  await page.locator('#import').click();
+  await click(page, '#import');
 
   // Replaces waitForTimeout(3000): the modal must close AND the option must appear.
   await expect(page.locator('#import-modal')).toBeHidden({ timeout: 60_000 });
@@ -67,8 +68,8 @@ async function runExampleAnalysis(page: Page, model: string) {
   await openExampleFile(page);
   await changeSettings(page, 'select', 'model-to-use', model);
 
-  await page.locator('#navbarAnalysis').click();
-  await page.locator('#analyse').click();
+  await click(page, '#navbarAnalysis');
+  await click(page, '#analyse');
 
   // TODO: tighten this to the specific "analysis complete" toast (or a progress
   // bar going hidden). `div.show > div.toast-header` matches ANY toast, so it can
