@@ -12,5 +12,11 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   // Your run stopped after 2 failures and skipped 4 tests; 0 = run everything.
   maxFailures: 0,
-  use: { trace: 'retain-on-failure' },
+  use: { 
+    trace: 'retain-on-failure',
+    // Toggles bypassing Content-Security-Policy.
+    bypassCSP: true,
+    // Run browser in headless mode.
+    headless: true,
+  },
 });

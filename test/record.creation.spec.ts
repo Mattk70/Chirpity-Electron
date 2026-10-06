@@ -2,7 +2,7 @@ import { test, expect } from './fixtures';
 import { runExampleAnalysis } from './helpers';
 import { click } from './click';
 
-test('Can create/edit a manual record', async ({ page }) => {
+test('Can create/edit/save a manual record', async ({ page }) => {
   test.slow();
   await runExampleAnalysis(page, 'chirpity');
 
@@ -23,14 +23,16 @@ test('Can create/edit a manual record', async ({ page }) => {
   await page.locator('#record-comment').fill('a test comment');
   await click(page, '#record-add');
 
-  // NOTE: the person_add check was never awaited in the original, so it never ran.
-  // If this is what fails, print the row to see where the icon really is:
-  //   console.log(await page.locator('#result1').evaluate(el => el.outerHTML));
   await expect(page.locator('#result1 td.cname')).toHaveText(/person_add/);
   await expect(page.locator('#result1 td.comment span')).toHaveAttribute('title', 'a test comment');
   await expect(page.locator('#call-count')).toHaveValue('3');
 
   // Don't send the shortcut while the add-record dialog is still closing.
   await expect(page.locator('.modal.show')).toHaveCount(0);
-
+  await click(page, '#navbarRecords');
+  await click(page, '#save2db');
+    // File name turns blue once saved
+  await expect(page.locator('#filename span.filename')).toHaveClass(/text-info/, {
+    timeout: 10_000,
+  });
 });
