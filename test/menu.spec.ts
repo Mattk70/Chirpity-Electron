@@ -64,8 +64,8 @@ test('Amend file start dialog contains date', async ({ page }) => {
 
 test('Select inverted greyscale colourmap', async ({ page }) => {
   await runExampleAnalysis(page, 'chirpity');
-  await changeSettings(page, 'select', 'colourmap', 'igray');
-  await expect(page.locator('#colourmap')).toHaveValue('igray');
+  await changeSettings(page, 'select', '#spectrogram-heading', '#colourmap', 'gray');
+  await expect(page.locator('#colourmap')).toHaveValue('gray');
 });
 
 // The `test.describe.fixme('click fest…')` block from the original can be pasted back

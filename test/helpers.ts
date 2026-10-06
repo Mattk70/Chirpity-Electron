@@ -16,14 +16,14 @@ async function openExampleFile(page: Page) {
   await page.locator('#spectrogramWrapper').waitFor({ state: 'visible' });
 }
 
-async function openSettings(page: Page) {
+async function openSettings(page: Page, headingID: string, settingID: string) {
   await click(page, '#navbarSettings');
   await expect(page.locator('#settingsAccordion')).toBeVisible();
   // The heading TOGGLES the section, so only click if it isn't already open.
-  if (!(await page.locator('#confidence').isVisible())) {
-    await click(page, '#detections-heading');
+  if (!(await page.locator(settingID).isVisible())) {
+    await click(page, headingID);
   }
-  await expect(page.locator('#confidence')).toBeVisible();
+  await expect(page.locator(settingID)).toBeVisible();
 }
 
 async function closeSettings(page: Page) {
@@ -34,13 +34,13 @@ async function closeSettings(page: Page) {
 async function changeSettings(
   page: Page,
   type: 'select' | 'switch' | 'input',
-  elementID: string,
+  headingID: string,
+  settingID: string,
   value: any
 ) {
-  const el = page.locator('#' + elementID);
-  await openSettings(page);
-  // for BirdNET's 34%
-  await page.locator('#confidence').fill('30');
+  const el = page.locator(settingID);
+  await openSettings(page, headingID, settingID);
+
 
   if (type === 'select') await el.selectOption(value); // auto-waits for the option to exist
   else if (type === 'switch') await el.setChecked(value);
@@ -67,7 +67,9 @@ async function importModel(page: Page, modelPath: string, name: string) {
 
 async function runExampleAnalysis(page: Page, model: string) {
   await openExampleFile(page);
-  await changeSettings(page, 'select', 'model-to-use', model);
+  // for BirdNET's 34%
+  await changeSettings(page, 'input', '#detections-heading', '#confidence', '30');
+  await changeSettings(page, 'select', '#detections-heading', '#model-to-use', model);
 
   // Only toasts raised after this point count (matters if a test analyses twice).
   const mark = await toastMark(page);
