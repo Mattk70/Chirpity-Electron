@@ -1,33 +1,16 @@
-import { defineConfig } from '@playwright/test'
-
+import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   testDir: './test',
-  maxFailures: 2,
-  timeout: 120_000,
-  expect: {
-    timeout: 20_000,
-  },
+  fullyParallel: true,
+  // Each test launches Electron (+ ONNX models). A hosted macOS runner is small,
+  // so don't oversubscribe it.
   workers: 1,
-  use: {
-    // Maximum time each action such as `click()` can take. Defaults to 0 (no limit).
-    actionTimeout: 0,
-
-    // Name of the browser that runs tests. For example `chromium`, `firefox`, `webkit`.
-    //browserName: 'chromium',
-
-    // Toggles bypassing Content-Security-Policy.
-    bypassCSP: true,
-
-    // Channel to use, for example "chrome", "chrome-beta", "msedge", "msedge-beta".
-    //channel: 'chrome',
-
-    // Run browser in headless mode.
-    headless: true,
-
-    // Change the default data-testid attribute.
-    //testIdAttribute: 'pw-test-id',
-  },
-  
+  retries: process.env.CI ? 1 : 0,
+  // App launch (up to ~30s cold) now counts toward the test, so be generous.
+  timeout: 120_000,
+  expect: { timeout: 15_000 },
+  // Your run stopped after 2 failures and skipped 4 tests; 0 = run everything.
+  maxFailures: 0,
+  use: { trace: 'retain-on-failure' },
 });
-
