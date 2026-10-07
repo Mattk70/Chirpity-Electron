@@ -123,7 +123,7 @@ jobs:
       - name: Set up Python 3.12
         uses: actions/setup-python@v6
         with:
-          python-version: '3.12.6'
+          python-version: '3.12.x'
 
       - name: Install dependencies
         # npm audit fix is intentionally omitted: it mutates package-lock.json at
@@ -134,15 +134,15 @@ jobs:
           npm install
 
           
-      # - name: Move tensorflow.dll to napi-v10/v8 folder
-      #   if: runner.os == 'Windows'
-      #   shell: bash
-      #   run: |
-      #     cp ./node_modules/@tensorflow/tfjs-node/deps/lib/tensorflow.dll \
-      #        ./node_modules/@tensorflow/tfjs-node/lib/napi-v8/tensorflow.dll
-      #     ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v8/
-      #     ls -l ./node_modules/@tensorflow/tfjs-node/lib/
-      #     ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v10/
+      - name: Move tensorflow.dll to napi-v10/v8 folder
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          cp ./node_modules/@tensorflow/tfjs-node/deps/lib/tensorflow.dll \
+             ./node_modules/@tensorflow/tfjs-node/lib/napi-v8/tensorflow.dll
+          ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v8/
+          ls -l ./node_modules/@tensorflow/tfjs-node/lib/
+          ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v10/
 
       - name: check tfjs-node
         shell: bash
