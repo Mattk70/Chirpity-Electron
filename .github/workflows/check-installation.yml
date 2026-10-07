@@ -147,7 +147,7 @@ jobs:
       - name: check tfjs-node
         shell: bash
         run: |
-          - run: node -e "try{require('@tensorflow/tfjs-node');console.log('tfjs-node OK')}catch(e){console.error(e);process.exit(1)}"
+          node -e "try{require('@tensorflow/tfjs-node');console.log('tfjs-node OK')}catch(e){console.error(e);process.exit(1)}"
 
 
       - name: Set platform-specific ffmpeg vars
