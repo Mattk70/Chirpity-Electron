@@ -1,5 +1,5 @@
 import { test, expect, stubDialogs } from './fixtures';
-import { changeSettings, importModel, runExampleAnalysis } from './helpers';
+import { changeSettings, importModel, runExampleAnalysis, openExampleFile } from './helpers';
 import { click } from './click';
 
 // No describe.configure({mode:'parallel'}) needed: every test has its own app + profile,
@@ -9,16 +9,19 @@ const secondResult = (page: import('playwright').Page) =>
   page.locator('#result2 span.confidence-row > span').first();
 
 test('Page title is correct', async ({ page }) => {
+  console.log('Page title test');
   await expect(page).toHaveTitle('Chirpity');
 });
 
 test('BirdNET analyse works and second result is 34%', async ({ page }) => {
+  console.log('BirdNET analyse test');
   await runExampleAnalysis(page, 'birdnet');
   await expect(page.locator('#speciesFilter').getByText('Redwing').first()).toBeVisible();
   await expect(secondResult(page)).toHaveText('34%');
 });
 
 test('BirdNET finds a Chaffinch @ 78% | 76%', async ({ page, electronApp }) => {
+  console.log('BirdNET Chaffinch test');
   const chaffinch = process.env.CHAFFINCH_MP3_PATH;
   test.skip(!chaffinch, 'CHAFFINCH_MP3_PATH not set');
 
@@ -31,18 +34,21 @@ test('BirdNET finds a Chaffinch @ 78% | 76%', async ({ page, electronApp }) => {
 });
 
 test('Nocmig analyse works and second result is 61%', async ({ page }) => {
+  console.log('Nocmig analyse test');
   await runExampleAnalysis(page, 'chirpity');
   await expect(page.locator('#speciesFilter').getByText('Redwing (call)').first()).toBeVisible();
   await expect(secondResult(page)).toHaveText('61%');
 });
 
 test('BirdNET+ analyse works and second result is 92%', async ({ page }) => {
+  console.log('BirdNET+ analyse test');
   await runExampleAnalysis(page, 'birdnet3');
   await expect(page.locator('#speciesFilter').getByText('Redwing').first()).toBeVisible();
   await expect(secondResult(page)).toHaveText('92%');
 });
 
 test('Perch works and second result is 35%', async ({ page }) => {
+  console.log('Perch analyse test');
   const modelPath = process.env.PERCH_MODEL_PATH;
   test.skip(!modelPath, 'PERCH_MODEL_PATH not set');
 
@@ -54,6 +60,7 @@ test('Perch works and second result is 35%', async ({ page }) => {
 });
 
 test('Amend file start dialog contains date', async ({ page }) => {
+  console.log('Amend file start test');
   await runExampleAnalysis(page, 'chirpity');
   await click(page, '#dropdownMenuButton', { button: 'right' });
   await click(page, '#setFileStart');
@@ -63,7 +70,8 @@ test('Amend file start dialog contains date', async ({ page }) => {
 });
 
 test('Select inverted greyscale colourmap', async ({ page }) => {
-  await runExampleAnalysis(page, 'chirpity');
+  console.log('Select inverted greyscale colourmap test');
+  await openExampleFile(page);
   await changeSettings(page, 'select', '#spectrogram-heading', '#colourmap', 'gray');
   await expect(page.locator('#colourmap')).toHaveValue('gray');
 });
