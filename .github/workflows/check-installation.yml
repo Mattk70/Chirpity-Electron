@@ -118,12 +118,12 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '22'
+          node-version: '24.18.0'
 
-      - name: Set up Python 3.11
+      - name: Set up Python 3.12
         uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
+          python-version: '3.12.6'
 
       - name: Install dependencies
         # npm audit fix is intentionally omitted: it mutates package-lock.json at
@@ -134,13 +134,16 @@ jobs:
           npm install
 
           
-      - name: Move tensorflow.dll to napi-v10 folder
+      - name: Move tensorflow.dll to napi-v10/v8 folder
         if: runner.os == 'Windows'
         shell: bash
         run: |
           mv ./node_modules/@tensorflow/tfjs-node/deps/lib/tensorflow.dll \
+             ./node_modules/@tensorflow/tfjs-node/lib/napi-v8/tensorflow.dll
+          cp ./node_modules/@tensorflow/tfjs-node/deps/napi-v8/tensorflow.dll \
              ./node_modules/@tensorflow/tfjs-node/lib/napi-v10/tensorflow.dll
-          ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v10/tensorflow.dll
+          ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v8/
+          ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v10/
 
       - name: Set platform-specific ffmpeg vars
         shell: bash
