@@ -140,8 +140,6 @@ jobs:
         run: |
           mv ./node_modules/@tensorflow/tfjs-node/deps/lib/tensorflow.dll \
              ./node_modules/@tensorflow/tfjs-node/lib/napi-v8/tensorflow.dll
-          cp ./node_modules/@tensorflow/tfjs-node/lib/napi-v8/tensorflow.dll \
-             ./node_modules/@tensorflow/tfjs-node/lib/napi-v10/tensorflow.dll
           ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v8/
           ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v10/
 
