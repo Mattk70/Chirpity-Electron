@@ -384,7 +384,7 @@ let appVersionLoaded = new Promise((resolve, reject) => {
 
 // Expose modelReady as a global for CI
 window.modelReady = false;
-let modelReady = window.modelReady;
+
 let PREDICTING = false,
   app_t0 = Date.now();
 

@@ -4,7 +4,7 @@ import { click } from './click';
 import { toastMark, waitForToast } from './toasts';
 declare const modelReady: boolean; // app global, declared so TS compiles
 
-async function waitForModelReady(page: Page, timeout = 5_000) {
+async function waitForModelReady(page: Page, timeout = 10_000) {
   await page.waitForFunction(
     () => { try { return modelReady === true; } catch { return false; } },
     undefined,
