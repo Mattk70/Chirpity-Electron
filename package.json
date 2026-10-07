@@ -277,6 +277,6 @@
     "electron-winstaller@5.4.0": true,
     "core-js@3.29.1": true,
     "esbuild@0.28.2": true,
-    "@tensorflow/tfjs-node@4.22.0": true
+    "@tensorflow/tfjs-node": false
   }
 }
