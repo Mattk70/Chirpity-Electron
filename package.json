@@ -221,7 +221,7 @@
   "homepage": "https://chirpity.net",
   "overrides": {
     "tar": "^7.5.7"
-  } ,
+  },
   "devDependencies": {
     "@playwright/test": "^1.48.2",
     "@types/node": "^22.9.0",
@@ -267,5 +267,16 @@
   },
   "optionalDependencies": {
     "ntsuspend": "^1.0.2"
+  },
+  "allowScripts": {
+    "sqlite3@6.0.1": true,
+    "keytar@7.9.0": true,
+    "ntsuspend@1.0.2": true,
+    "onnxruntime-node@1.29.0": true,
+    "utimes@5.2.1": true,
+    "electron-winstaller@5.4.0": true,
+    "core-js@3.29.1": true,
+    "esbuild@0.28.2": true,
+    "@tensorflow/tfjs-node@4.22.0": true
   }
 }
