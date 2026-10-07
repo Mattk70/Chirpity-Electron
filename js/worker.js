@@ -1378,10 +1378,10 @@ async function spawnListWorker() {
       if (message === "list-model-ready") {
         return resolve(worker);
       } else if (message === "tfjs-node") {
-        STATE.hasNode = true;
+        STATE.hasNode = event.data.available;
         if (!event.data.available) {
+          console.error(event.data.error);
           STATE.detect.backend = "webgpu";
-          STATE.hasNode = false;
         }
         UI.postMessage({ event: "tfjs-node", hasNode: STATE.hasNode });
       } else if (message === "no-onnx-gpu"){
