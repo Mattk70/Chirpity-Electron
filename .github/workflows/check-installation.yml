@@ -103,7 +103,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        os: [windows-2025-vs2026, macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     env:
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
@@ -119,6 +119,11 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: '22'
+
+      - name: Upgrade node-gyp to latest (fixes build on Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: npm install -g node-gyp@13.1.0
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v6
