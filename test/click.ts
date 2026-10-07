@@ -2,7 +2,7 @@ import { Locator, Page } from 'playwright';
 
 // The app ignores a click that arrives within 250ms of the previous one.
 // Keep a margin over that.
-const DEBOUNCE_MS = 300;
+const DEBOUNCE_MS = 255;
 const lastClickAt = new WeakMap<Page, number>();
 
 /**

@@ -4,6 +4,7 @@ import { click } from './click';
 
 test('Can create/edit/save a manual record', async ({ page }) => {
   test.slow();
+  console.log('Create/edit/save manual record test');
   await runExampleAnalysis(page, 'chirpity');
 
   // One right-click, then wait for the menu item. A second right-click would land
