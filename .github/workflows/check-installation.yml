@@ -270,7 +270,7 @@ jobs:
 
       - name: Export Chaffinch.mp3 path for Playwright
         shell: bash
-        run: echo "CHAFFINCH_MP3_PATH=$PWD/chaffinch.mp3" >> $GITHUB_ENV
+        run: echo "CHAFFINCH_MP3_PATH=$GITHUB_WORKSPACE/chaffinch.mp3" >> $GITHUB_ENV
 
       - name: Test packaged application
         if: runner.os != 'Linux'
