@@ -7,6 +7,7 @@ import {
   stubMultipleDialogs,
 } from 'electron-playwright-helpers';
 import { installToastRecorder } from './toasts';
+import { sampleSystemMemory, formatSample } from './sysmem';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -28,7 +29,9 @@ export async function stubDialogs(app: ElectronApplication, openFile: string) {
 
 export const test = base.extend<Fixtures>({
   // One app per test, each with its own empty profile (config, archive DBs, models).
-  electronApp: async ({}, use) => {
+  electronApp: async ({}, use, testInfo) => {
+    const memStart = sampleSystemMemory();
+    console.log(`[sysmem] start "${testInfo.title}":`, formatSample(memStart));
     const userDataDir = fs.realpathSync(
       fs.mkdtempSync(path.join(os.tmpdir(), 'chirpity-e2e-'))
     );
@@ -43,10 +46,33 @@ export const test = base.extend<Fixtures>({
     const actual = await app.evaluate(({ app }) => app.getPath('userData'));
     expect(actual, 'app must use the isolated userData dir').toBe(userDataDir);
 
+    const proc = app.process();
     try {
       await use(app);
     } finally {
-      await app.close().catch(() => {});
+      // Memory snapshot per process (KB -> MB) to spot pressure in CI logs.
+      await app
+        .evaluate(({ app }) =>
+          app.getAppMetrics().map((m) => `${m.type}:${Math.round(m.memory.workingSetSize / 1024)}MB`)
+        )
+        .then((m) => console.log('[mem]', m.join(' ')))
+        .catch(() => {});
+
+      console.log(`[sysmem] end   "${testInfo.title}":`, formatSample(sampleSystemMemory(), memStart));
+
+      // Graceful quit first; if it hangs, kill so it can't linger into the next test.
+      let timer: NodeJS.Timeout | undefined;
+      await Promise.race([
+        app.close(),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error('app.close() timed out')), 15_000);
+        }),
+      ]).catch((e) => {
+        console.warn('[teardown]', e.message, '- killing app process');
+        proc.kill('SIGKILL');
+      });
+      clearTimeout(timer);
+
       fs.rmSync(userDataDir, { recursive: true, force: true });
     }
   },
