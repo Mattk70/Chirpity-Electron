@@ -1,9 +1,11 @@
 let tf, BACKEND, Model, LOCALE, DEBUG = false;
 try {
   tf = require("@tensorflow/tfjs-node");
-} catch {
+} catch (e) {
+  console.error("Error occurred while requiring @tensorflow/tfjs-node:", e);
   tf = require("@tensorflow/tfjs");
   BACKEND = "webgpu";
+  console.error("Error occurred while requiring @tensorflow/tfjs", e);
 }
 const fs = require("node:fs");
 const path = require("node:path");
