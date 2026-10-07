@@ -2,15 +2,15 @@ import { Page } from 'playwright';
 import { expect } from '@playwright/test';
 import { click } from './click';
 import { toastMark, waitForToast } from './toasts';
-// declare const modelReady: boolean; // app global, declared so TS compiles
+declare const modelReady: boolean; // app global, declared so TS compiles
 
-// async function waitForModelReady(page: Page, timeout = 60_000) {
-//   await page.waitForFunction(
-//     () => { try { return modelReady === true; } catch { return false; } },
-//     undefined,
-//     { timeout }
-//   );
-// }
+async function waitForModelReady(page: Page, timeout = 5_000) {
+  await page.waitForFunction(
+    () => { try { return modelReady === true; } catch { return false; } },
+    undefined,
+    { timeout }
+  );
+}
 
 /** Open a Bootstrap dropdown and wait until it is actually open. */
 async function openDropdown(page: Page, toggleSelector: string) {
@@ -79,7 +79,7 @@ async function runExampleAnalysis(page: Page, model: string) {
   // for BirdNET's 34%
   await changeSettings(page, 'input', '#detections-heading', '#confidence', '30');
   await changeSettings(page, 'select', '#detections-heading', '#model-to-use', model);
-  await page.waitForTimeout(3_000); // It can take a while to load the model
+  await waitForModelReady(page);
   // Only toasts raised after this point count (matters if a test analyses twice).
   const mark = await toastMark(page);
 
