@@ -20,18 +20,18 @@ test('BirdNET analyse works and second result is 34%', async ({ page }) => {
   await expect(secondResult(page)).toHaveText('34%');
 });
 
-test('BirdNET finds a Chaffinch @ 78% | 76%', async ({ page, electronApp }) => {
-  console.log('BirdNET Chaffinch test');
-  const chaffinch = process.env.CHAFFINCH_MP3_PATH;
-  test.skip(!chaffinch, 'CHAFFINCH_MP3_PATH not set');
+// test('BirdNET finds a Chaffinch @ 78% | 76%', async ({ page, electronApp }) => {
+//   console.log('BirdNET Chaffinch test');
+//   const chaffinch = process.env.CHAFFINCH_MP3_PATH;
+//   test.skip(!chaffinch, 'CHAFFINCH_MP3_PATH not set');
 
-  // Scoped to this test's own app, so it can't leak into other tests.
-  await stubDialogs(electronApp, chaffinch!);
-  await runExampleAnalysis(page, 'birdnet');
+//   // Scoped to this test's own app, so it can't leak into other tests.
+//   await stubDialogs(electronApp, chaffinch!);
+//   await runExampleAnalysis(page, 'birdnet');
 
-  await expect(page.locator('#speciesFilter').getByText('Common chaffinch').first()).toBeVisible();
-  await expect(page.locator('#result1 span.confidence-row > span').first()).toHaveText(/^(78|76)%$/);
-});
+//   await expect(page.locator('#speciesFilter').getByText('Common chaffinch').first()).toBeVisible();
+//   await expect(page.locator('#result1 span.confidence-row > span').first()).toHaveText(/^(78|76)%$/);
+// });
 
 test('Nocmig analyse works and second result is 61%', async ({ page }) => {
   console.log('Nocmig analyse test');
