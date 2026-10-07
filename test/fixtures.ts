@@ -79,7 +79,7 @@ export const test = base.extend<Fixtures>({
 
   // The visible UI window, fully loaded (loading screen gone).
   page: async ({ electronApp }, use) => {
-    const exampleFile = await ipcMainInvokeHandler(electronApp, 'getAudio');
+    const exampleFile = await ipcMainInvokeHandler(electronApp, 'getAudio') as string;
     await stubDialogs(electronApp, exampleFile);
 
     // The first window is the hidden worker; we want index.html.
