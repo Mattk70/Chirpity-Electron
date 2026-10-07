@@ -120,11 +120,6 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Upgrade node-gyp to latest (fixes build on Windows)
-        if: runner.os == 'Windows'
-        shell: bash
-        run: npm install -g node-gyp@13.1.0
-
       - name: Set up Python 3.11
         uses: actions/setup-python@v6
         with:
@@ -139,13 +134,13 @@ jobs:
           npm install
 
           
-      - name: Move tensorflow.dll to napi-v8 folder
+      - name: Move tensorflow.dll to napi-v10 folder
         if: runner.os == 'Windows'
         shell: bash
         run: |
           mv ./node_modules/@tensorflow/tfjs-node/deps/lib/tensorflow.dll \
-             ./node_modules/@tensorflow/tfjs-node/lib/napi-v8/tensorflow.dll
-          ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v8/tensorflow.dll
+             ./node_modules/@tensorflow/tfjs-node/lib/napi-v10/tensorflow.dll
+          ls -l ./node_modules/@tensorflow/tfjs-node/lib/napi-v10/tensorflow.dll
 
       - name: Set platform-specific ffmpeg vars
         shell: bash
