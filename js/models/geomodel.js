@@ -1,9 +1,11 @@
 try {
   // tfjs-node check
   require("@tensorflow/tfjs-node");
+  
   postMessage({ message: "tfjs-node", available: true });
 } catch (e) {
-  postMessage({ message: "tfjs-node", available: false });
+  console.error("Error occurred while requiring @tensorflow/tfjs-node:", e);
+  postMessage({ message: "tfjs-node", available: false, error: e.message });
 }
 
 let ort;
