@@ -163,8 +163,6 @@ const GLOBAL_ACTIONS = {
       STATE.diskHasRecords && utils.enableMenuItem(["explore", "charts"]);
       generateToast({ message: "cancelled" });
       displayProgress({percent: 100, text:''})
-    } else if (STATE.capturing){
-      cancelVideoCapture()
     }
   },
   Home: () => {
@@ -3521,6 +3519,7 @@ function handleKeyDown(e) {
   let action = e.key;
   if (!config) return;
   config.debug && console.log(`${action} key pressed`);
+  if (STATE.capturing) cancelVideoCapture();
   if (action in GLOBAL_ACTIONS) {
     DOM.contextMenu.classList.add("d-none");
     if (
@@ -9440,16 +9439,15 @@ let recorder, captureChunks = [], stream;
 async function videoCapture(btn) {
   const waveElement = DOM.waveElement;
   const ws = spec.wavesurfer;
-  if (!ws) return
+  if (!ws || ws.getCurrentTime() >= STATE.windowLength * 0.95 ) return
   let blocker;
   let display;
+  STATE.pixelProgress = null;
 
   if (btn.classList.contains('text-danger')) {
     // Manual stop
-    STATE.capturing = false;
-    const waterMark = document.getElementById('watermark');
-    waterMark?.remove();
     ws.pause();
+    STATE.pixelProgress = Math.ceil((ws.getCurrentTime() / STATE.windowLength) * (ws.getWidth() * window.devicePixelRatio));
     if (recorder?.state !== 'inactive') {
       recorder.stop();
     }
@@ -9472,24 +9470,6 @@ async function videoCapture(btn) {
     `;
     waveElement.parentElement.append(blocker);
 
-    const waterMark = document.createElement('div');
-    waterMark.style.cssText = `
-      position: absolute;
-      top: 35px;
-      right: 10px;
-      color: ${spec.wsTextColour()[0]};
-      font-family: Garamond, serif;
-      font-style: italic;
-      font-size: 1.2rem;
-      z-index: 5;
-      text-align: right;
-    `;
-    const scaleEl = document.getElementById('scale');
-    const scale = scaleEl.options[scaleEl.selectedIndex].text;
-    waterMark.innerHTML = `Created with Chirpity: https://chirpity.net<br>(${scale} spectrogram)`;
-    waterMark.id = 'watermark';
-    waveElement.prepend(waterMark);
-
     const playerEl = ws.getMediaElement();
     const [audioTrack] = playerEl.captureStream().getAudioTracks();
     display = await navigator.mediaDevices.getDisplayMedia({
@@ -9498,11 +9478,16 @@ async function videoCapture(btn) {
 
 
     const [videoTrack] = display.getVideoTracks();
-    stream = new MediaStream([videoTrack, audioTrack]);
 
     await videoTrack.restrictTo(
       await RestrictionTarget.fromElement(waveElement)
     );
+
+    // Wait for the the track aspect ratio and screenPixelRatio to settle
+    // Prevents a zoom switch in the video
+    await waitForStableVideoTrack(videoTrack);
+    stream = new MediaStream([videoTrack, audioTrack]);
+
 
     // User may have resized while getDisplayMedia was pending
     if (STATE.captureAbortController.signal.aborted) {
@@ -9558,13 +9543,8 @@ async function videoCapture(btn) {
   async function save(btn) {
     const t0 = Date.now();
     const aborted = STATE.captureAbortController?.signal.aborted;
-
-    STATE.capturing = false;
-
     stream?.getTracks().forEach(t => t.stop());
     stream = null;
-
-    document.getElementById('watermark')?.remove();
 
     if (aborted) {
       tearDownCapture(btn, blocker, stream);
@@ -9574,12 +9554,19 @@ async function videoCapture(btn) {
     let result;
     
     try {
+      const scaleEl = document.getElementById('scale');
+      const scale = scaleEl.options[scaleEl.selectedIndex].text;
+      const [color, shadow] = config.colormap === 'gray' ? ['black', 'white'] : ['white', 'black'];
+      if (blob.size){
       result = await utils.requestFromWorker(
         worker,
         'process-video',
-        { blob },
-        30_000
+          { blob, scale, color, shadow, crop: STATE.pixelProgress },
+          60_000
       );
+      } else {
+        throw new Error('No video frames captured')
+      }
     } catch (err) {
       console.error('Error processing video:', err);
       generateToast({
@@ -9615,10 +9602,28 @@ function tearDownCapture(btn, blocker, stream) {
   STATE.capturing = false;
   btn.classList.remove('text-danger', 'disabled');
   blocker?.remove();
-  document.getElementById('watermark')?.remove();
   stream?.getTracks().forEach(t => t.stop());
   stream = null;
   recorder = null;
   captureChunks = [];
   STATE.captureAbortController = null;
+}
+
+async function waitForStableVideoTrack(track) {
+  let previous;
+
+  for (let i = 0; i < 20; i++) {
+    const settings = track.getSettings();
+    const { screenPixelRatio, aspectRatio } = settings;
+    const current = `${screenPixelRatio}+${aspectRatio}`;
+
+    if (current === previous)
+      return;
+
+    previous = current;
+
+    await new Promise(requestAnimationFrame);
+  }
+
+  console.warn('Video track did not stabilise');
 }
