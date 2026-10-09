@@ -3194,7 +3194,7 @@ zh: {
     "use-noise": "混入背景噪声",
     "classifier-title": "分类器",
     "hidden-units": "隐藏单元",
-    dropout: "Dropout",
+    dropout: "随机失活率",
     train: "开始训练",
     "training-dismiss": "取消",
     },
