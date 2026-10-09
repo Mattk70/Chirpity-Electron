@@ -6761,52 +6761,8 @@ async function onProcessVideo({ id, blob, scale, color, shadow, crop }){
 
 await new Promise((resolve, reject) => {
   ffmpeg("file:" + inPath)
-    .videoCodec('libx264')
-    .outputOptions([
-      '-pix_fmt yuv420p',       // QuickTime requires this; some webm/vp inputs default to something else
-      '-profile:v high',        // 'main' or 'baseline' if you need older-device compatibility
-      '-level 4.0',
-      '-tag:v avc1',            // makes ffmpeg mux it as avc1 in the MP4 container
-      '-crf 22',                // quality target; lower = better/larger, 18 is visually near-lossless
-      '-preset medium',       // trade encode speed for file size; 'medium' is ffmpeg's default
-      '-movflags +faststart'    // allows playback to start before the file is fully downloaded
-    ])
-    .videoFilters([
-      ...(crop != null
-        ? [
-            {
-              // Drop the first frame (bypass zoom change)
-              filter: 'select',
-              options: "'gte(n,1)'"
-            },
-            {
-              // Reset timestamps so the dropped frame doesn't leave a gap
-              filter: 'setpts',
-              options: 'PTS-STARTPTS'
-            },
-            {
-              filter: 'crop',
-              options: { w: crop, x: 0, y: 0 }
-            }
-          ]
-        : []),
-      {
-        filter: 'drawtext',
-        options: {
-          fontfile: p.join(__dirname, './fonts/Verdana.ttf'),
-          text: `Created with Chirpity\\\\: https\\\\://chirpity.net\n(${scale} spectrogram)`,
-          x: 'w-text_w-20',
-          y: 70,
-          fontsize: 32,
-          fontcolor: color,
-          shadowcolor: shadow,
-          shadowx: 2,
-          shadowy: 2,
-          alpha: 'if(lt(t,1),0,if(lt(t,2.5),(t-1)/1.5,1))'
-        }
-      }
-    ])
-    .audioCodec('aac') // AAC is widely supported; you could also use 'libmp3lame' for MP3
+    .videoCodec('copy') // Viseo format is good
+    .audioCodec('aac') // AAC is widely supported - need to change from opus;
     .on('start', (commandLine) => {
       DEBUG && console.log('Spawned FFmpeg with command: ' + commandLine);
     })

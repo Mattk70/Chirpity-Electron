@@ -9470,22 +9470,42 @@ async function videoCapture(btn) {
     `;
     waveElement.parentElement.append(blocker);
 
+    const waterMark = document.createElement('div');
+    const [fg, bg] = spec.wsTextColour();
+    waterMark.style.cssText = `
+      position: absolute;
+      top: 25px;
+      left: 65px;
+      color: ${fg};
+      font-family: Verdana, sans;
+      font-style: italic;
+      font-size: 0.8rem;
+      z-index: 5;
+      background: ${utils.hexToRgb(bg, 0.5)};
+      border: 1px solid ${utils.hexToRgb(fg)};
+      border-radius: 0.5rem;
+      padding: 5px 10px;
+      opacity: 0;
+      transition: opacity 1.5s ease;
+    `;
+    const scaleEl = document.getElementById('scale');
+    const scale = scaleEl.options[scaleEl.selectedIndex].text;
+    waterMark.innerHTML = `https://chirpity.net (${scale} spectrogram)`;
+    waterMark.id = 'watermark';
+    waveElement.prepend(waterMark);
+
     const playerEl = ws.getMediaElement();
     const [audioTrack] = playerEl.captureStream().getAudioTracks();
-    display = await navigator.mediaDevices.getDisplayMedia({
-      video: true
-    });
-
-
+    const display = await navigator.mediaDevices.getDisplayMedia({ video: true });
     const [videoTrack] = display.getVideoTracks();
-
+    // Wait for the the track aspect ratio and screenPixelRatio to settle
+    // Prevents a zoom switch in the video
+    await waitForStableVideoTrack(videoTrack);
     await videoTrack.restrictTo(
       await RestrictionTarget.fromElement(waveElement)
     );
 
-    // Wait for the the track aspect ratio and screenPixelRatio to settle
-    // Prevents a zoom switch in the video
-    await waitForStableVideoTrack(videoTrack);
+
     stream = new MediaStream([videoTrack, audioTrack]);
 
 
@@ -9494,7 +9514,8 @@ async function videoCapture(btn) {
       tearDownCapture(btn, blocker, stream);
       return;
     }
-    const mimeType = 'video/mp4;codecs="avc3"';
+    const mimeType = 'video/mp4';
+    console.log(MediaRecorder.isTypeSupported(mimeType))
     recorder = new MediaRecorder(stream, { mimeType });
     captureChunks = [];
 
@@ -9533,6 +9554,8 @@ async function videoCapture(btn) {
     }, { once: true });
 
     recorder.start();
+    // Fade in watermark
+    requestAnimationFrame(() => waterMark.style.opacity = '1');
     await ws.play(null, STATE.windowLength - 0.05);
 
   } catch (err) {
@@ -9602,6 +9625,8 @@ function tearDownCapture(btn, blocker, stream) {
   STATE.capturing = false;
   btn.classList.remove('text-danger', 'disabled');
   blocker?.remove();
+  const waterMark = document.getElementById('watermark');
+  waterMark?.remove();
   stream?.getTracks().forEach(t => t.stop());
   stream = null;
   recorder = null;

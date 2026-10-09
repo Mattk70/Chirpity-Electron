@@ -579,7 +579,11 @@ app.whenReady().then(async () => {
   // Allow screen recording
   session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
     // Capture the requesting frame itself (the "this tab" equivalent)
-    callback({ video: request.frame});
+    if (request.frame && request.frame === request.frame.top) {
+      callback({ video: request.frame })
+    } else {
+      callback(null)
+    }
   });
   // Set referer for openstreetmap
   const filter = {
