@@ -119,7 +119,7 @@ const GLOBAL_ACTIONS = {
   g: (e) => (e.ctrlKey || e.metaKey) && showGoToPosition(),
   o: async (e) =>
     (e.ctrlKey || e.metaKey) && (await showOpenDialog("openFile")),
-  p: () => STATE.activeRegion && playRegion(),
+  p: async () => STATE.activeRegion && await playRegion(),
   q: (e) => e.metaKey && isMac && window.electron.exitApplication(),
   s: (e) =>
     (e.ctrlKey || e.metaKey) && document.getElementById("save2db").click(),
@@ -6041,7 +6041,7 @@ const handleAttenuationchange = () => {
  *
  * @returns {void}
  */
-function playRegion() {
+async function playRegion() {
   // Sanitise region (after zoom, start or end may be outside the windowlength)
   // I don't want to change the actual region length, so make a copy
   const region = spec.REGIONS.regions?.find(
@@ -6548,7 +6548,7 @@ async function handleUIClicks(e) {
     case "advanced": { changeSettingsMode(target); break }
 
     // Context-menu
-    case "play-region": { playRegion(); break }
+    case "play-region": { await playRegion(); break }
     case "context-analyse-selection": { getSelectionResults(); break}
     case "context-find-similar":{ showQueryModal(); break }
     case "context-create-clip": {
@@ -6828,7 +6828,7 @@ async function handleUIClicks(e) {
     }
     // Video capture
     case "capture-start": {
-      await videoCapture(element);
+      await videoCapture(e);
       break;
     }
     case "clear-call-cache": {
@@ -9441,13 +9441,10 @@ async function videoCapture(btn) {
   const ws = spec.wavesurfer;
   if (!ws || ws.getCurrentTime() >= STATE.windowLength * 0.95 ) return
   let blocker;
-  let display;
-  STATE.pixelProgress = null;
 
   if (btn.classList.contains('text-danger')) {
     // Manual stop
     ws.pause();
-    STATE.pixelProgress = Math.ceil((ws.getCurrentTime() / STATE.windowLength) * (ws.getWidth() * window.devicePixelRatio));
     if (recorder?.state !== 'inactive') {
       recorder.stop();
     }
@@ -9462,6 +9459,7 @@ async function videoCapture(btn) {
 
   try {
     blocker = document.createElement('div');
+    blocker.id = 'capture-blocker';
     blocker.style.cssText = `
       position: absolute;
       inset: 0;
@@ -9511,7 +9509,7 @@ async function videoCapture(btn) {
 
     // User may have resized while getDisplayMedia was pending
     if (STATE.captureAbortController.signal.aborted) {
-      tearDownCapture(btn, blocker, stream);
+      tearDownCapture(btn);
       return;
     }
     const mimeType = 'video/mp4';
@@ -9561,7 +9559,7 @@ async function videoCapture(btn) {
   } catch (err) {
     console.error(err);
     // Clean up if capture failed before recorder.onstop
-    tearDownCapture(btn, blocker, stream);
+    tearDownCapture(btn);
   }
   async function save(btn) {
     const t0 = Date.now();
@@ -9570,34 +9568,26 @@ async function videoCapture(btn) {
     stream = null;
 
     if (aborted) {
-      tearDownCapture(btn, blocker, stream);
+      tearDownCapture(btn);
       return;
     }
     const blob = new Blob(captureChunks, { type: 'video/mp4' });
     let result;
     
     try {
-      const scaleEl = document.getElementById('scale');
-      const scale = scaleEl.options[scaleEl.selectedIndex].text;
-      const [color, shadow] = config.colormap === 'gray' ? ['black', 'white'] : ['white', 'black'];
       if (blob.size){
-      result = await utils.requestFromWorker(
-        worker,
-        'process-video',
-          { blob, scale, color, shadow, crop: STATE.pixelProgress },
-          60_000
-      );
+        result = await utils.requestFromWorker( worker, 'process-video', { blob } );
       } else {
         throw new Error('No video frames captured')
       }
     } catch (err) {
-      console.error('Error processing video:', err);
+      console.error('Error processing video:', err.message);
       generateToast({
         message: err.message || err,
         type: 'error'
       });
     } finally {
-      tearDownCapture(btn, blocker, stream);
+      tearDownCapture(btn);
     }
     if (!result) return;
 
@@ -9621,9 +9611,10 @@ function cancelVideoCapture() {
   }
 }
 
-function tearDownCapture(btn, blocker, stream) {
+function tearDownCapture(btn) {
   STATE.capturing = false;
   btn.classList.remove('text-danger', 'disabled');
+  const blocker = document.getElementById('capture-blocker');
   blocker?.remove();
   const waterMark = document.getElementById('watermark');
   waterMark?.remove();
@@ -9635,20 +9626,17 @@ function tearDownCapture(btn, blocker, stream) {
 }
 
 async function waitForStableVideoTrack(track) {
-  let previous;
-
+  let previous, count = 0;
   for (let i = 0; i < 20; i++) {
     const settings = track.getSettings();
     const { screenPixelRatio, aspectRatio } = settings;
     const current = `${screenPixelRatio}+${aspectRatio}`;
 
-    if (current === previous)
-      return;
-
+    if (current === previous) {
+      if (++count === 3) return;
+    }
     previous = current;
-
     await new Promise(requestAnimationFrame);
   }
-
   console.warn('Video track did not stabilise');
 }

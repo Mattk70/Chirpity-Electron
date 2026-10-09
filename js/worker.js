@@ -6751,7 +6751,7 @@ async function onDeleteModel(model){
   }
 }
 
-async function onProcessVideo({ id, blob, scale, color, shadow, crop }){
+async function onProcessVideo({ id, blob }){
   const buf = await blob.arrayBuffer();
   const inPath = p.join(tempPath, `rec-in-${id}.mp4`);
   const outPath = p.join(tempPath, `rec-out-${id}.mp4`);
