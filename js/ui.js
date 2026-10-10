@@ -32,6 +32,7 @@ import * as utils from "./utils/utils.js";
 import { UIState as State } from "./utils/UIState.js";
 import { ChirpityWS } from './components/spectrogram.js';
 
+
 let LOCATIONS, pagination,
   locationID = undefined,
   loadingTimeout,
@@ -4251,21 +4252,21 @@ function updatePagination(species) {
   }
 }
 
-function deepEqual(a, b) {
-  if (a === b) return true;
-  if (typeof a !== "object" || typeof b !== "object" || a == null || b == null) {
-    return false;
-  }
-  const keysA = Object.keys(a);
-  const keysB = Object.keys(b);
-  if (keysA.length !== keysB.length) return false;
+async function loadSummaryImages() {
+    const images = document.querySelectorAll('img[data-sname]');
 
-  for (const key of keysA) {
-    if (!keysB.includes(key) || !deepEqual(a[key], b[key])) {
-      return false;
-    }
-  }
-  return true;
+    await Promise.all([...images].map(async img => {
+        try {
+            const [imagePath, license, by] = await window.electron.retrieveThumbnail(
+                img.dataset.sname
+            );
+            img.src = imagePath;
+            img.dataset.license = license;
+            img.dataset.by = by;
+        } catch (error) {
+            console.warn(`Failed to load thumbnail for ${img.dataset.sname}:`, error);
+        }
+    }));
 }
 
 const updateSummary = ({ summary = [], filterSpecies = "" }) => {
@@ -4273,6 +4274,7 @@ const updateSummary = ({ summary = [], filterSpecies = "" }) => {
   STATE.summary = summary;
   const i18 = i18n.get(i18n.Headings);
   const showIUCN = config.detect.iucn;
+  const showImage = true;
 
   // if (summary.length){
   let summaryHTML = summary.length
@@ -4304,11 +4306,14 @@ const updateSummary = ({ summary = [], filterSpecies = "" }) => {
     const selected = item.cname === filterSpecies ? " text-warning" : "";
     if (selected) selectedRow = i + 1;
     summaryHTML += `<tr tabindex="-1" class="${selected}">
-                ${showImage ? '<th scope="col"></th>' : ""}
+                ${showImage ? `<td scope="col"><img src="img/birds.png" 
+                  data-sname="${item.sname}" 
+                  data-cname="${item.cname}" 
+                  style="height: 40px;width: 60px; cursor: pointer;" 
+                  alt="${item.cname}"></td>` : ""
+                }
                 <td class="max">${iconizeScore(item.max)}</td>
-                    <td class="cname not-allowed">
-        <span class="cname">${item.cname}</span> <br><i>${item.sname}</i>
-                    </td>`;
+                <td class="cname not-allowed"><span class="cname">${item.cname}</span> <br><i>${item.sname}</i></td>`;
 
     if (showIUCN) {
       const species = IUCNtaxonomy[item.sname] || item.sname;
@@ -4343,12 +4348,14 @@ const updateSummary = ({ summary = [], filterSpecies = "" }) => {
 
   // Parse the new HTML into DOM nodes
   tempDiv.innerHTML = summaryHTML;
-
   // Move parsed child nodes into the fragment
   Array.from(tempDiv.childNodes).forEach((node) => fragment.appendChild(node));
 
   // Replace the contents of the #summaryTable
   old_summary.replaceChildren(fragment); // Replace existing content
+  if (showImage) {
+    loadSummaryImages().then(initialiseImagePopovers);
+  }
   showSummarySortIcon();
   setAutocomplete(selectedRow ? filterSpecies : "");
 
@@ -9643,4 +9650,43 @@ async function waitForStableVideoTrack(track) {
     await new Promise(requestAnimationFrame);
   }
   console.warn('Video track did not stabilise');
+}
+
+function initialiseImagePopovers() {
+  const images = document.querySelectorAll('img[data-by]');
+  const i18 = i18n.get(i18n.SpeciesList);
+    images.forEach(img => {
+        new bootstrap.Popover(img, {
+            trigger: 'hover focus',
+            placement: 'right',
+            container: 'body',
+            html: true,
+            title: () => img.dataset.cname,
+            content: () => {
+                // Escape values before inserting them into HTML
+                const escapeHTML = utils.escapeHTML;
+
+                return `
+                    <div class="text-center" style="min-width: 320px;">
+                        <img
+                            src="${escapeHTML(img.src)}"
+                            alt="${escapeHTML(img.dataset.cname)}"
+                            style="max-width: 300px; height: auto;"
+                            class="img-fluid rounded mb-2"
+                        >
+                        <div class="text-start small">
+                            <div><strong>${i18.sname}:</strong>
+                                <i>${escapeHTML(img.dataset.sname)}</i>
+                            </div>
+                            <div><strong>Licence:</strong>
+                                ${escapeHTML(img.dataset.license || 'N/A')}
+                            </div>
+                            <div><strong>Photographer:</strong>
+                                ${escapeHTML(img.dataset.by)}
+                            </div>
+                        </div>
+                    </div>`;
+            }
+        });
+    });
 }
