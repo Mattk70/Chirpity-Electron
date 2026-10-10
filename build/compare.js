@@ -9,6 +9,14 @@ const csvFile = path.join(__dirname, '../BirdNET3/BirdNET3_geomodel_labels.csv')
 const jsonOnlyFile = path.join(__dirname, 'json-only.json');
 const csvOnlyFile = path.join(__dirname, 'csv-only-aves.json');
 
+/**
+ * Compare image metadata with BirdNET scientific names, write sorted unmatched-name
+ * lists, and overwrite 2025-filtered.json with entries present in the CSV.
+ * The CSV-only list includes only Aves; JSON entries are matched against all classes.
+ *
+ * @returns {Promise<void>} Resolves after writing the files. Rejects on JSON parsing,
+ * CSV parser, or synchronous file I/O errors; completed writes are not rolled back.
+ */
 async function main() {
     // Load filtered JSON: scientific names are object keys
     const jsonData = JSON.parse(fs.readFileSync(jsonFile, 'utf8'));
