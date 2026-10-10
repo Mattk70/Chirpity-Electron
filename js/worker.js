@@ -6751,6 +6751,18 @@ async function onDeleteModel(model){
   }
 }
 
+/**
+ * Copy captured video into an MP4 with AAC audio and reply to the UI with its ArrayBuffer.
+ * File I/O and FFmpeg failures are sent as error replies; temporary-file deletion is
+ * attempted after processing, with deletion failures ignored.
+ *
+ * @param {Object} options - Video-processing request.
+ * @param {string} options.id - Request identifier used for the reply and temporary filenames.
+ * @param {Blob} options.blob - Captured MP4 to process.
+ * @returns {Promise<void>} Resolves after the reply and cleanup attempts.
+ * @throws {Error} Rejects if reading the input blob fails before processing, or sending
+ * an error reply fails.
+ */
 async function onProcessVideo({ id, blob }){
   const buf = await blob.arrayBuffer();
   const inPath = p.join(tempPath, `rec-in-${id}.mp4`);

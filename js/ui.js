@@ -3512,6 +3512,8 @@ function debounceClick(handler, delay = 250) {
  * hides the context menu, determines the active modifier key (Shift, Control, or Alt; defaults to "no"),
  * tracks the key press event with its modifier via a tracking function, and executes the corresponding action callback.
  * If the key is not mapped, invokes the fallback handler for number keys.
+ * Once configuration is available, any key handled here cancels an active video capture
+ * before its action is dispatched.
  *
  * @param {KeyboardEvent} e - The keyboard event triggered on key press.
  * @returns {void}
@@ -4254,6 +4256,15 @@ function updatePagination(species) {
 
 STATE.failedThumbnails = new Set();
 
+/**
+ * Populate summary thumbnails and their license and photographer data attributes.
+ * Retrieval failures leave the existing image in place and mark the species to be
+ * skipped on later calls for this UI session.
+ *
+ * @param {DocumentFragment} fragment - Summary markup with img[data-sname] elements.
+ * @returns {Promise<DocumentFragment>} The same fragment after retrieval attempts finish;
+ * this does not wait for the browser to decode the images.
+ */
 async function loadSummaryImages(fragment) {
     const images = fragment.querySelectorAll('img[data-sname]');
     const failed = STATE.failedThumbnails;
@@ -4274,6 +4285,16 @@ async function loadSummaryImages(fragment) {
     return fragment;
 }
 
+/**
+ * Store species totals and schedule replacement of the summary table after thumbnail
+ * retrieval. Refresh sorting, autocomplete, and pagination, and scroll to a selected species.
+ *
+ * @param {Object} options - Summary display options.
+ * @param {Array} [options.summary=[]] - Species totals; an empty array clears the table.
+ * @param {string} [options.filterSpecies=""] - Common name to highlight and use for pagination.
+ * @param {boolean} [options.finished=false] - Enable species pointer styling and image popovers.
+ * @returns {void} Returns before the asynchronous table replacement completes.
+ */
 const updateSummary = ({ summary = [], filterSpecies = "", finished = false }) => {
 
   STATE.summary = summary;
@@ -4356,6 +4377,10 @@ const updateSummary = ({ summary = [], filterSpecies = "", finished = false }) =
   tempDiv.innerHTML = summaryHTML;
   // Move parsed child nodes into the fragment
   Array.from(tempDiv.childNodes).forEach((node) => fragment.appendChild(node));
+  /**
+   * Insert the prepared summary, refresh its controls, and scroll to the selected species.
+   * @param {DocumentFragment} fragment - Summary nodes consumed by the table replacement.
+   */
   const finaliseSummary = (fragment) => {
     old_summary.replaceChildren(fragment);
     showSummarySortIcon();
@@ -4511,9 +4536,11 @@ function onAnalysisComplete({ quiet }) {
 
 /**
  * Refreshes the UI summary view after summary data is available, applying an optional species filter, updating the summary table rows and hover styling, and enabling or disabling related menu actions.
+ * A nonempty summary schedules a table replacement with image popovers; this function
+ * returns before that replacement completes. An empty summary leaves the table unchanged.
  *
  * @param {Object} options - Parameters for updating the summary view.
- * @param {*} [options.filterSpecies] - Optional species identifier or filter to restrict which species are shown in the summary.
+ * @param {string} [options.filterSpecies] - Common name to highlight and use for pagination; all summary rows remain visible.
  * @param {Array} [options.summary=[]] - Array of summary records to render in the summary table.
  */
 function onSummaryComplete({ filterSpecies = undefined, summary = [] }) {
@@ -6039,7 +6066,7 @@ const handleAttenuationchange = () => {
 /**
  * Plays the active audio region after sanitizing its boundaries.
  *
- * This function locates the active region from the global REGIONS object by matching the
+ * This function locates the active region from spec.REGIONS by matching the
  * region's start time with the global STATE.activeRegion. It then adjusts the region's start and
  * end times to ensure they fall within the valid playback window—ensuring the start is not
  * negative and the end does not exceed 99.5% of the windowLength to avoid triggering a finish
@@ -6051,11 +6078,13 @@ const handleAttenuationchange = () => {
  * - Initiates playback by calling the region's play() method.
  *
  * Global Dependencies:
- * - REGIONS: An object containing all audio regions.
+ * - spec.REGIONS: An object containing all audio regions.
  * - STATE.activeRegion: The currently active region used for matching.
- * - windowLength: A number representing the maximum playback window length.
+ * - STATE.windowLength: The playback window length in seconds.
  *
- * @returns {void}
+ * @returns {Promise<void>} Resolves after requesting playback, or without playing if no
+ * matching region exists. Does not wait for playback to finish.
+ * @throws {Error} Rejects if region lookup or the synchronous playback request throws.
  */
 async function playRegion() {
   // Sanitise region (after zoom, start or end may be outside the windowlength)
@@ -9452,6 +9481,17 @@ function checkForIntelMacUpdates() {
 
 let recorder, captureChunks = [], stream;
 
+/**
+ * Start recording the displayed spectrogram with audio, or stop an active recording.
+ * Playback restarts at zero and is requested through 0.05 seconds before the window end.
+ * Stopping attempts to process and download the captured MP4 unless capture was aborted.
+ * Setup and playback-start errors are caught and trigger capture cleanup.
+ *
+ * @param {HTMLElement} btn - Capture control; its text-danger class selects the stop action.
+ * @returns {Promise<void>} Resolves after starting playback or requesting a stop, or
+ * immediately if no player exists. Does not wait for recording or download completion.
+ * @throws {Error} Rejects on manual-stop errors, or if cleanup itself fails.
+ */
 async function videoCapture(btn) {
   const waveElement = DOM.waveElement;
   const ws = spec.wavesurfer;
@@ -9579,6 +9619,16 @@ async function videoCapture(btn) {
     // Clean up if capture failed before recorder.onstop
     tearDownCapture(btn);
   }
+  /**
+   * Stop capture tracks and, unless aborted, process the chunks and trigger an MP4 download.
+   * Empty captures and worker failures (including the 15-second timeout) produce an error
+   * toast; capture state is cleared after processing or an abort.
+   *
+   * @param {HTMLElement} btn - Capture control whose recording state is cleared.
+   * @returns {Promise<void>} Resolves after triggering a download or handling an abort or
+   * processing failure; does not wait for the file to be saved.
+   * @throws {Error} Rejects if track cleanup, UI cleanup, or download setup throws.
+   */
   async function save(btn) {
     const t0 = Date.now();
     const aborted = STATE.captureAbortController?.signal.aborted;
@@ -9629,6 +9679,11 @@ function cancelVideoCapture() {
   }
 }
 
+/**
+ * Reset capture state and controls, remove capture overlays, stop the shared stream's
+ * tracks, and discard buffered chunks. Does not call stop() on the recorder.
+ * @param {HTMLElement} btn - Capture control to restore after capture or cancellation.
+ */
 function tearDownCapture(btn) {
   STATE.capturing = false;
   btn.classList.remove('text-danger', 'disabled');
@@ -9643,6 +9698,15 @@ function tearDownCapture(btn) {
   STATE.captureAbortController = null;
 }
 
+/**
+ * Sample display-track settings on animation frames until three comparisons match the
+ * preceding sample's pixel and aspect ratios, or 20 samples have been checked. Matches
+ * need not be consecutive, and reaching the limit does not reject.
+ *
+ * @param {MediaStreamTrack} track - Display video track whose settings are sampled.
+ * @returns {Promise<void>} Resolves on enough matches or after the final frame wait.
+ * @throws {Error} Rejects if reading track settings fails.
+ */
 async function waitForStableVideoTrack(track) {
   let previous, count = 0;
   for (let i = 0; i < 20; i++) {
@@ -9659,6 +9723,11 @@ async function waitForStableVideoTrack(track) {
   console.warn('Video track did not stabilise');
 }
 
+/**
+ * Attach hover and focus popovers showing species images, names, licenses, and photographers.
+ * @param {DocumentFragment} fragment - Summary markup; only img[data-by] elements get popovers.
+ * @returns {DocumentFragment} The same fragment, ready for insertion into the summary table.
+ */
 function initialiseImagePopovers(fragment) {
   const images = fragment.querySelectorAll('img[data-by]');
   const i18 = i18n.get(i18n.SpeciesList);

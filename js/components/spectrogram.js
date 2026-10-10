@@ -935,6 +935,10 @@ createLabelsCanvas() {
   //   }
   // }
 
+  /**
+   * Hide the spectrogram tooltip and hide the recording button unless the pointer enters it.
+   * @param {MouseEvent} e - Mouseout event whose relatedTarget identifies the element entered.
+   */
   hideTooltip(e) {
     DOM.tooltip.style.visibility = "hidden";
     if (! DOM.startCaptureBtn.contains(e.relatedTarget))
@@ -977,6 +981,14 @@ createLabelsCanvas() {
     return `${regionLength}: ${length.toFixed(3)}s`;
   }
 
+  /**
+   * Reveal the recording button and update the pointer tooltip with frequency in Hz
+   * and, within a region, its time range or duration. Hide the tooltip outside regions
+   * when spectrogram labels are enabled.
+   *
+   * @param {MouseEvent} event - Pointer position over the waveform.
+   * @param {boolean} showHz - Ignored; frequency visibility is derived from config.specLabels.
+   */
   specTooltip(event, showHz) {
     const config = this.getConfig();
     showHz = !config.specLabels;
