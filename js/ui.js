@@ -4373,7 +4373,7 @@ const updateSummary = ({ summary = [], filterSpecies = "", finished = false }) =
   };
   if (showImage) {
     loadSummaryImages(fragment)
-      .then(initialiseImagePopovers)
+      .then(finished && initialiseImagePopovers)
       .then(finaliseSummary);
   } else {
     finaliseSummary(fragment);
