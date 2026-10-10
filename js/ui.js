@@ -4252,24 +4252,29 @@ function updatePagination(species) {
   }
 }
 
-async function loadSummaryImages() {
-    const images = document.querySelectorAll('img[data-sname]');
+STATE.failedThumbnails = new Set();
 
+async function loadSummaryImages(fragment) {
+    const images = fragment.querySelectorAll('img[data-sname]');
+    const failed = STATE.failedThumbnails;
     await Promise.all([...images].map(async img => {
+        const sname = img.dataset.sname;
+        if (failed.has(sname)) return;
         try {
-            const [imagePath, license, by] = await window.electron.retrieveThumbnail(
-                img.dataset.sname
-            );
+            const [imagePath, license, by] =
+                await window.electron.retrieveThumbnail(sname);
             img.src = imagePath;
             img.dataset.license = license;
             img.dataset.by = by;
         } catch (error) {
-            console.warn(`Failed to load thumbnail for ${img.dataset.sname}:`, error);
+            failed.add(sname);
+            console.warn(`Failed to load thumbnail for ${sname}:`, error);
         }
     }));
+    return fragment;
 }
 
-const updateSummary = ({ summary = [], filterSpecies = "" }) => {
+const updateSummary = ({ summary = [], filterSpecies = "", finished = false }) => {
 
   STATE.summary = summary;
   const i18 = i18n.get(i18n.Headings);
@@ -4305,15 +4310,16 @@ const updateSummary = ({ summary = [], filterSpecies = "" }) => {
     const item = summary[i];
     const selected = item.cname === filterSpecies ? " text-warning" : "";
     if (selected) selectedRow = i + 1;
+    const pointer = finished ? 'pointer' : 'not-allowed'
     summaryHTML += `<tr tabindex="-1" class="${selected}">
-                ${showImage ? `<td scope="col"><img src="img/birds.png" 
+                ${showImage ? `<td scope="col"><img src="img/not-found.png" 
                   data-sname="${item.sname}" 
                   data-cname="${item.cname}" 
                   style="height: 40px;width: 60px; cursor: pointer;" 
                   alt="${item.cname}"></td>` : ""
                 }
                 <td class="max">${iconizeScore(item.max)}</td>
-                <td class="cname not-allowed"><span class="cname">${item.cname}</span> <br><i>${item.sname}</i></td>`;
+                <td class="cname ${pointer}"><span class="cname">${item.cname}</span> <br><i>${item.sname}</i></td>`;
 
     if (showIUCN) {
       const species = IUCNtaxonomy[item.sname] || item.sname;
@@ -4350,28 +4356,31 @@ const updateSummary = ({ summary = [], filterSpecies = "" }) => {
   tempDiv.innerHTML = summaryHTML;
   // Move parsed child nodes into the fragment
   Array.from(tempDiv.childNodes).forEach((node) => fragment.appendChild(node));
+  const finaliseSummary = (fragment) => {
+    old_summary.replaceChildren(fragment);
+    showSummarySortIcon();
+    setAutocomplete(selectedRow ? filterSpecies : "");
+    updatePagination(filterSpecies);
 
-  // Replace the contents of the #summaryTable
-  old_summary.replaceChildren(fragment); // Replace existing content
+    // Scroll to the selected species
+    if (selectedRow) {
+      const table = document.getElementById("resultSummary");
+      table.rows[selectedRow].scrollIntoView({
+        behavior: "instant",
+        block: "center",
+      });
+    }
+  };
   if (showImage) {
-    loadSummaryImages().then(initialiseImagePopovers);
+    loadSummaryImages(fragment)
+      .then(initialiseImagePopovers)
+      .then(finaliseSummary);
+  } else {
+    finaliseSummary(fragment);
   }
-  showSummarySortIcon();
-  setAutocomplete(selectedRow ? filterSpecies : "");
-
-  
-  updatePagination(filterSpecies);
-
-  // scroll to the selected species
-  if (selectedRow) {
-    const table = document.getElementById("resultSummary");
-    table.rows[selectedRow].scrollIntoView({
-      behavior: "instant",
-      block: "center",
-    });
-  }
-  // }
 };
+
+
 
 /**
  * Finalizes result rendering and ensures an appropriate result row is activated in the UI.
@@ -4495,10 +4504,10 @@ function onAnalysisComplete({ quiet }) {
   }
 }
 
-function removeNoEntry() {
-  const summarySpecies = DOM.summary.querySelectorAll(".cname");
-  summarySpecies.forEach((row) => {row.classList.replace("not-allowed","pointer")} );
-}
+// function removeNoEntry() {
+//   const summarySpecies = DOM.summary.querySelectorAll(".cname");
+//   summarySpecies.forEach((row) => {row.classList.replace("not-allowed","pointer")} );
+// }
 
 /**
  * Refreshes the UI summary view after summary data is available, applying an optional species filter, updating the summary table rows and hover styling, and enabling or disabling related menu actions.
@@ -4508,7 +4517,7 @@ function removeNoEntry() {
  * @param {Array} [options.summary=[]] - Array of summary records to render in the summary table.
  */
 function onSummaryComplete({ filterSpecies = undefined, summary = [] }) {
-  if (summary.length) updateSummary({ summary: summary, filterSpecies: filterSpecies });
+  if (summary.length) updateSummary({ summary: summary, filterSpecies: filterSpecies, finished: true });
 
   // Add hover to the summary
   const summaryNode = document.getElementById("resultSummary");
@@ -4530,8 +4539,6 @@ function onSummaryComplete({ filterSpecies = undefined, summary = [] }) {
     ]);
   }
   if (STATE.currentFile) utils.enableMenuItem(["analyse"]);
-  // Add pointer icon to species summaries
-  removeNoEntry();
 }
 
 
@@ -9652,8 +9659,8 @@ async function waitForStableVideoTrack(track) {
   console.warn('Video track did not stabilise');
 }
 
-function initialiseImagePopovers() {
-  const images = document.querySelectorAll('img[data-by]');
+function initialiseImagePopovers(fragment) {
+  const images = fragment.querySelectorAll('img[data-by]');
   const i18 = i18n.get(i18n.SpeciesList);
     images.forEach(img => {
         new bootstrap.Popover(img, {
@@ -9689,4 +9696,5 @@ function initialiseImagePopovers() {
             }
         });
     });
+    return fragment
 }
