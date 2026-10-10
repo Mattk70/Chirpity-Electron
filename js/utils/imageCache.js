@@ -48,6 +48,7 @@ async function getAviCommonsImage(sciName) {
 }
 
 async function retrieveThumbnail(sciName) {
+    imageJSON ??= await parseImageJSON();
     const filePath = path.join(thumbnailDir, `${sciName}.jpg`);
 
     try {

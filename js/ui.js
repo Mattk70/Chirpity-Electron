@@ -4357,6 +4357,9 @@ const updateSummary = ({ summary = [], filterSpecies = "", finished = false }) =
   // Move parsed child nodes into the fragment
   Array.from(tempDiv.childNodes).forEach((node) => fragment.appendChild(node));
   const finaliseSummary = (fragment) => {
+    old_summary.querySelectorAll("img").forEach((img) => {
+      bootstrap.Popover.getInstance(img)?.dispose();
+    });
     old_summary.replaceChildren(fragment);
     showSummarySortIcon();
     setAutocomplete(selectedRow ? filterSpecies : "");
@@ -9531,7 +9534,6 @@ async function videoCapture(btn) {
       return;
     }
     const mimeType = 'video/mp4';
-    console.log(MediaRecorder.isTypeSupported(mimeType))
     recorder = new MediaRecorder(stream, { mimeType });
     captureChunks = [];
 
