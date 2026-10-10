@@ -4278,6 +4278,7 @@ const updateSummary = ({ summary = [], filterSpecies = "" }) => {
   let summaryHTML = summary.length
     ? `<table id="resultSummary" class="table table-dark p-1"><thead>
             <tr class="pointer col-auto text-nowrap">
+            ${showImage ? '<th scope="col"></th>' : ""}
             <th id="summary-max" scope="col"><span id="summary-max-icon" class="text-muted material-symbols-outlined summary-sort-icon d-none">sort</span>${
               i18.max
             }</th>
@@ -4303,6 +4304,7 @@ const updateSummary = ({ summary = [], filterSpecies = "" }) => {
     const selected = item.cname === filterSpecies ? " text-warning" : "";
     if (selected) selectedRow = i + 1;
     summaryHTML += `<tr tabindex="-1" class="${selected}">
+                ${showImage ? '<th scope="col"></th>' : ""}
                 <td class="max">${iconizeScore(item.max)}</td>
                     <td class="cname not-allowed">
         <span class="cname">${item.cname}</span> <br><i>${item.sname}</i>
