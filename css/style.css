@@ -130,7 +130,7 @@ span[id^="filename_"] {
   cursor: not-allowed;
 }
 #controlsWrapper {
-  cursor: move;
+  cursor: ns-resize;
 }
 
 #controlsWrapper .row,

@@ -106,17 +106,22 @@ const escapeHTML = str => str
   .replace(/"/g, "&quot;")
   .replace(/'/g, "&#39;");
 
-function hexToRgb(hex) {
-  // Remove the '#' character if present
-  hex = hex.replace(/^#/, "");
+function hexToRgb(hex, alpha) {
+  let r, g, b;
 
-  // Parse the hex string into individual RGB components
-  var r = parseInt(hex.substring(0, 2), 16);
-  var g = parseInt(hex.substring(2, 4), 16);
-  var b = parseInt(hex.substring(4, 6), 16);
-
-  // Return the RGB components as an array
-  return [r, g, b];
+  if (hex.length === 4) {
+    // Format #000
+    r = parseInt(hex[1] + hex[1], 16);
+    g = parseInt(hex[2] + hex[2], 16);
+    b = parseInt(hex[3] + hex[3], 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha || 1})`;
+  } else {
+    // format #000000 (colormaps)
+    r = parseInt(hex.slice(1, 3), 16);
+    g = parseInt(hex.slice(3, 5), 16);
+    b = parseInt(hex.slice(5, 7), 16);
+    return alpha ? `rgba(${r}, ${g}, ${b}, ${alpha})` : [r, g, b]; 
+  }
 }
 
 function interpolate(template, variables) {

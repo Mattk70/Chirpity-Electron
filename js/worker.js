@@ -6761,18 +6761,14 @@ async function onProcessVideo({ id, blob }){
 
 await new Promise((resolve, reject) => {
   ffmpeg("file:" + inPath)
-    .videoCodec('libx264')
-    .outputOptions([
-      '-pix_fmt yuv420p',       // QuickTime requires this; some webm/vp inputs default to something else
-      '-profile:v high',        // 'main' or 'baseline' if you need older-device compatibility
-      '-level 4.0',
-      '-tag:v avc1',            // makes ffmpeg mux it as avc1 in the MP4 container
-      '-crf 30',                // quality target; lower = better/larger, 18 is visually near-lossless
-      '-preset veryfast',       // trade encode speed for file size; 'medium' is ffmpeg's default
-      '-movflags +faststart'    // allows playback to start before the file is fully downloaded
-    ])
-    .audioCodec('aac') // AAC is widely supported; you could also use 'libmp3lame' for MP3
-    .on('error', (err) => reject(err))
+    .videoCodec('copy') // Viseo format is good
+    .audioCodec('aac') // AAC is widely supported - need to change from opus;
+    .on('start', (commandLine) => {
+      DEBUG && console.log('Spawned FFmpeg with command: ' + commandLine);
+    })
+    .on('error', (err) => {
+      reject(err)
+    })
     .on('end', resolve)
     .save(outPath);
 });

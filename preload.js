@@ -4,7 +4,7 @@ const colormap = require("colormap");
 const p = require("node:path");
 const SunCalc = require("suncalc");
 const si = require('systeminformation');
-
+const {retrieveThumbnail, initialiseImagePopovers} = require('./js/utils/imageCache.js');
 // We need to wait until the UI  is ready to receive the message before
 // sending the port. We create this promise in the preload, so it's guaranteed
 // to register the onload listener before the load event is fired.
@@ -73,7 +73,8 @@ contextBridge.exposeInMainWorld("electron", {
   powerSaveBlocker: (onOff) => ipcRenderer.send("powerSaveControl", onOff),
   debugMode: (onOff) => ipcRenderer.send("debug-mode", onOff),
   onFileOpen: (callback) => ipcRenderer.on('open-file', (event, filePath) => callback(filePath)),
-  MEMBERSHIP_API_ENDPOINT: () => process.env.MEMBERSHIP_API_ENDPOINT
+  MEMBERSHIP_API_ENDPOINT: () => process.env.MEMBERSHIP_API_ENDPOINT,
+  retrieveThumbnail,
 });
 
 

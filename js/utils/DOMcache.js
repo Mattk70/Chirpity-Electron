@@ -82,6 +82,7 @@ const DOM = {
   get specLabels() { return this._specLabels ??= document.getElementById("spec-labels") },
   get specDetections() { return this._specDetections ??= document.getElementById("spec-detections") },
   get startCapture() { return this._startCapture ??= document.getElementById("capture-start") },
+  get startCaptureBtn() { return this._startCaptureBtn ??= document.getElementById("capture-button") },
   get suggestionsList() { return this._suggestionsList = document.getElementById('bird-suggestions') },
   get summaryTable() { return this._summaryTable ??= document.getElementById("summaryTable") },
   get threadSlider() { return this._threadSlider ??= document.getElementById("thread-slider") },

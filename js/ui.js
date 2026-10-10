@@ -32,6 +32,7 @@ import * as utils from "./utils/utils.js";
 import { UIState as State } from "./utils/UIState.js";
 import { ChirpityWS } from './components/spectrogram.js';
 
+
 let LOCATIONS, pagination,
   locationID = undefined,
   loadingTimeout,
@@ -119,7 +120,7 @@ const GLOBAL_ACTIONS = {
   g: (e) => (e.ctrlKey || e.metaKey) && showGoToPosition(),
   o: async (e) =>
     (e.ctrlKey || e.metaKey) && (await showOpenDialog("openFile")),
-  p: () => STATE.activeRegion && playRegion(),
+  p: async () => STATE.activeRegion && await playRegion(),
   q: (e) => e.metaKey && isMac && window.electron.exitApplication(),
   s: (e) =>
     (e.ctrlKey || e.metaKey) && document.getElementById("save2db").click(),
@@ -163,8 +164,6 @@ const GLOBAL_ACTIONS = {
       STATE.diskHasRecords && utils.enableMenuItem(["explore", "charts"]);
       generateToast({ message: "cancelled" });
       displayProgress({percent: 100, text:''})
-    } else if (STATE.capturing){
-      cancelVideoCapture()
     }
   },
   Home: () => {
@@ -3521,6 +3520,7 @@ function handleKeyDown(e) {
   let action = e.key;
   if (!config) return;
   config.debug && console.log(`${action} key pressed`);
+  if (STATE.capturing) cancelVideoCapture();
   if (action in GLOBAL_ACTIONS) {
     DOM.contextMenu.classList.add("d-none");
     if (
@@ -4252,33 +4252,40 @@ function updatePagination(species) {
   }
 }
 
-function deepEqual(a, b) {
-  if (a === b) return true;
-  if (typeof a !== "object" || typeof b !== "object" || a == null || b == null) {
-    return false;
-  }
-  const keysA = Object.keys(a);
-  const keysB = Object.keys(b);
-  if (keysA.length !== keysB.length) return false;
+STATE.failedThumbnails = new Set();
 
-  for (const key of keysA) {
-    if (!keysB.includes(key) || !deepEqual(a[key], b[key])) {
-      return false;
-    }
-  }
-  return true;
+async function loadSummaryImages(fragment) {
+    const images = fragment.querySelectorAll('img[data-sname]');
+    const failed = STATE.failedThumbnails;
+    await Promise.all([...images].map(async img => {
+        const sname = img.dataset.sname;
+        if (failed.has(sname)) return;
+        try {
+            const [imagePath, license, by] =
+                await window.electron.retrieveThumbnail(sname);
+            img.src = imagePath;
+            img.dataset.license = license;
+            img.dataset.by = by;
+        } catch (error) {
+            failed.add(sname);
+            console.warn(`Failed to load thumbnail for ${sname}:`, error);
+        }
+    }));
+    return fragment;
 }
 
-const updateSummary = ({ summary = [], filterSpecies = "" }) => {
+const updateSummary = ({ summary = [], filterSpecies = "", finished = false }) => {
 
   STATE.summary = summary;
   const i18 = i18n.get(i18n.Headings);
   const showIUCN = config.detect.iucn;
+  const showImage = true;
 
   // if (summary.length){
   let summaryHTML = summary.length
     ? `<table id="resultSummary" class="table table-dark p-1"><thead>
             <tr class="pointer col-auto text-nowrap">
+            ${showImage ? '<th scope="col"></th>' : ""}
             <th id="summary-max" scope="col"><span id="summary-max-icon" class="text-muted material-symbols-outlined summary-sort-icon d-none">sort</span>${
               i18.max
             }</th>
@@ -4303,11 +4310,16 @@ const updateSummary = ({ summary = [], filterSpecies = "" }) => {
     const item = summary[i];
     const selected = item.cname === filterSpecies ? " text-warning" : "";
     if (selected) selectedRow = i + 1;
+    const pointer = finished ? 'pointer' : 'not-allowed'
     summaryHTML += `<tr tabindex="-1" class="${selected}">
+                ${showImage ? `<td scope="col"><img src="img/not-found.png" 
+                  data-sname="${item.sname}" 
+                  data-cname="${item.cname}" 
+                  style="height: 40px;width: 60px; cursor: pointer;" 
+                  alt="${item.cname}"></td>` : ""
+                }
                 <td class="max">${iconizeScore(item.max)}</td>
-                    <td class="cname not-allowed">
-        <span class="cname">${item.cname}</span> <br><i>${item.sname}</i>
-                    </td>`;
+                <td class="cname ${pointer}"><span class="cname">${item.cname}</span> <br><i>${item.sname}</i></td>`;
 
     if (showIUCN) {
       const species = IUCNtaxonomy[item.sname] || item.sname;
@@ -4342,28 +4354,36 @@ const updateSummary = ({ summary = [], filterSpecies = "" }) => {
 
   // Parse the new HTML into DOM nodes
   tempDiv.innerHTML = summaryHTML;
-
   // Move parsed child nodes into the fragment
   Array.from(tempDiv.childNodes).forEach((node) => fragment.appendChild(node));
-
-  // Replace the contents of the #summaryTable
-  old_summary.replaceChildren(fragment); // Replace existing content
-  showSummarySortIcon();
-  setAutocomplete(selectedRow ? filterSpecies : "");
-
-  
-  updatePagination(filterSpecies);
-
-  // scroll to the selected species
-  if (selectedRow) {
-    const table = document.getElementById("resultSummary");
-    table.rows[selectedRow].scrollIntoView({
-      behavior: "instant",
-      block: "center",
+  const finaliseSummary = (fragment) => {
+    old_summary.querySelectorAll("img").forEach((img) => {
+      bootstrap.Popover.getInstance(img)?.dispose();
     });
+    old_summary.replaceChildren(fragment);
+    showSummarySortIcon();
+    setAutocomplete(selectedRow ? filterSpecies : "");
+    updatePagination(filterSpecies);
+
+    // Scroll to the selected species
+    if (selectedRow) {
+      const table = document.getElementById("resultSummary");
+      table.rows[selectedRow].scrollIntoView({
+        behavior: "instant",
+        block: "center",
+      });
+    }
+  };
+  if (showImage) {
+    loadSummaryImages(fragment)
+      .then(finished && initialiseImagePopovers)
+      .then(finaliseSummary);
+  } else {
+    finaliseSummary(fragment);
   }
-  // }
 };
+
+
 
 /**
  * Finalizes result rendering and ensures an appropriate result row is activated in the UI.
@@ -4487,10 +4507,10 @@ function onAnalysisComplete({ quiet }) {
   }
 }
 
-function removeNoEntry() {
-  const summarySpecies = DOM.summary.querySelectorAll(".cname");
-  summarySpecies.forEach((row) => {row.classList.replace("not-allowed","pointer")} );
-}
+// function removeNoEntry() {
+//   const summarySpecies = DOM.summary.querySelectorAll(".cname");
+//   summarySpecies.forEach((row) => {row.classList.replace("not-allowed","pointer")} );
+// }
 
 /**
  * Refreshes the UI summary view after summary data is available, applying an optional species filter, updating the summary table rows and hover styling, and enabling or disabling related menu actions.
@@ -4500,7 +4520,7 @@ function removeNoEntry() {
  * @param {Array} [options.summary=[]] - Array of summary records to render in the summary table.
  */
 function onSummaryComplete({ filterSpecies = undefined, summary = [] }) {
-  if (summary.length) updateSummary({ summary: summary, filterSpecies: filterSpecies });
+  if (summary.length) updateSummary({ summary: summary, filterSpecies: filterSpecies, finished: true });
 
   // Add hover to the summary
   const summaryNode = document.getElementById("resultSummary");
@@ -4522,8 +4542,6 @@ function onSummaryComplete({ filterSpecies = undefined, summary = [] }) {
     ]);
   }
   if (STATE.currentFile) utils.enableMenuItem(["analyse"]);
-  // Add pointer icon to species summaries
-  removeNoEntry();
 }
 
 
@@ -6042,7 +6060,7 @@ const handleAttenuationchange = () => {
  *
  * @returns {void}
  */
-function playRegion() {
+async function playRegion() {
   // Sanitise region (after zoom, start or end may be outside the windowlength)
   // I don't want to change the actual region length, so make a copy
   const region = spec.REGIONS.regions?.find(
@@ -6549,7 +6567,7 @@ async function handleUIClicks(e) {
     case "advanced": { changeSettingsMode(target); break }
 
     // Context-menu
-    case "play-region": { playRegion(); break }
+    case "play-region": { await playRegion(); break }
     case "context-analyse-selection": { getSelectionResults(); break}
     case "context-find-similar":{ showQueryModal(); break }
     case "context-create-clip": {
@@ -9440,15 +9458,11 @@ let recorder, captureChunks = [], stream;
 async function videoCapture(btn) {
   const waveElement = DOM.waveElement;
   const ws = spec.wavesurfer;
-  if (!ws) return
+  if (!ws ) return;
   let blocker;
-  let display;
 
   if (btn.classList.contains('text-danger')) {
     // Manual stop
-    STATE.capturing = false;
-    const waterMark = document.getElementById('watermark');
-    waterMark?.remove();
     ws.pause();
     if (recorder?.state !== 'inactive') {
       recorder.stop();
@@ -9463,53 +9477,63 @@ async function videoCapture(btn) {
   STATE.captureAbortController = new AbortController();
 
   try {
+    ws.setTime(0)
+    // Add cursor over, but outside recorded area
     blocker = document.createElement('div');
+    blocker.id = 'capture-blocker';
     blocker.style.cssText = `
       position: absolute;
       inset: 0;
-      z-index: 1000;
+      z-index: 10;
       cursor: none;
     `;
     waveElement.parentElement.append(blocker);
 
     const waterMark = document.createElement('div');
+    const [fg, bg] = spec.wsTextColour();
     waterMark.style.cssText = `
       position: absolute;
-      top: 35px;
-      right: 10px;
-      color: ${spec.wsTextColour()[0]};
-      font-family: Garamond, serif;
+      top: 25px;
+      left: 65px;
+      color: ${fg};
+      font-family: Verdana, sans;
       font-style: italic;
-      font-size: 1.2rem;
+      font-size: 0.8rem;
       z-index: 5;
-      text-align: right;
+      background: ${utils.hexToRgb(bg, 0.5)};
+      border: 1px solid ${utils.hexToRgb(fg)};
+      border-radius: 0.5rem;
+      padding: 5px 10px;
+      opacity: 0;
+      transition: opacity 1.5s ease;
     `;
     const scaleEl = document.getElementById('scale');
     const scale = scaleEl.options[scaleEl.selectedIndex].text;
-    waterMark.innerHTML = `Created with Chirpity: https://chirpity.net<br>(${scale} spectrogram)`;
+    waterMark.innerHTML = `https://chirpity.net (${scale} spectrogram)`;
     waterMark.id = 'watermark';
     waveElement.prepend(waterMark);
 
     const playerEl = ws.getMediaElement();
     const [audioTrack] = playerEl.captureStream().getAudioTracks();
-    display = await navigator.mediaDevices.getDisplayMedia({
-      video: true
-    });
-
-
+    const display = await navigator.mediaDevices.getDisplayMedia();
     const [videoTrack] = display.getVideoTracks();
-    stream = new MediaStream([videoTrack, audioTrack]);
-
+    // Wait for the the track aspect ratio and screenPixelRatio to settle
+    // Prevents a zoom switch in the video
+    await waitForStableVideoTrack(videoTrack);
     await videoTrack.restrictTo(
       await RestrictionTarget.fromElement(waveElement)
     );
 
+
+    stream = new MediaStream([videoTrack, audioTrack]);
+
+
     // User may have resized while getDisplayMedia was pending
     if (STATE.captureAbortController.signal.aborted) {
-      tearDownCapture(btn, blocker, stream);
+      tearDownCapture(btn);
       return;
     }
-    const mimeType = 'video/mp4;codecs="avc3"';
+    const mimeType = 'video/mp4';
     recorder = new MediaRecorder(stream, { mimeType });
     captureChunks = [];
 
@@ -9548,46 +9572,42 @@ async function videoCapture(btn) {
     }, { once: true });
 
     recorder.start();
+    // Fade in watermark
+    requestAnimationFrame(() => waterMark.style.opacity = '1');
     await ws.play(null, STATE.windowLength - 0.05);
 
   } catch (err) {
     console.error(err);
     // Clean up if capture failed before recorder.onstop
-    tearDownCapture(btn, blocker, stream);
+    tearDownCapture(btn);
   }
   async function save(btn) {
     const t0 = Date.now();
     const aborted = STATE.captureAbortController?.signal.aborted;
-
-    STATE.capturing = false;
-
     stream?.getTracks().forEach(t => t.stop());
     stream = null;
 
-    document.getElementById('watermark')?.remove();
-
     if (aborted) {
-      tearDownCapture(btn, blocker, stream);
+      tearDownCapture(btn);
       return;
     }
     const blob = new Blob(captureChunks, { type: 'video/mp4' });
     let result;
     
     try {
-      result = await utils.requestFromWorker(
-        worker,
-        'process-video',
-        { blob },
-        30_000
-      );
+      if (blob.size){
+        result = await utils.requestFromWorker( worker, 'process-video', { blob } );
+      } else {
+        throw new Error('No video frames captured')
+      }
     } catch (err) {
-      console.error('Error processing video:', err);
+      console.error('Error processing video:', err.message);
       generateToast({
         message: err.message || err,
         type: 'error'
       });
     } finally {
-      tearDownCapture(btn, blocker, stream);
+      tearDownCapture(btn);
     }
     if (!result) return;
 
@@ -9611,14 +9631,72 @@ function cancelVideoCapture() {
   }
 }
 
-function tearDownCapture(btn, blocker, stream) {
+function tearDownCapture(btn) {
   STATE.capturing = false;
   btn.classList.remove('text-danger', 'disabled');
+  const blocker = document.getElementById('capture-blocker');
   blocker?.remove();
-  document.getElementById('watermark')?.remove();
+  const waterMark = document.getElementById('watermark');
+  waterMark?.remove();
   stream?.getTracks().forEach(t => t.stop());
   stream = null;
   recorder = null;
   captureChunks = [];
   STATE.captureAbortController = null;
+}
+
+async function waitForStableVideoTrack(track) {
+  let previous, count = 0;
+  for (let i = 0; i < 20; i++) {
+    const settings = track.getSettings();
+    const { screenPixelRatio, aspectRatio } = settings;
+    const current = `${screenPixelRatio}+${aspectRatio}`;
+
+    if (current === previous) {
+      if (++count === 3) return;
+    }
+    previous = current;
+    await new Promise(requestAnimationFrame);
+  }
+  console.warn('Video track did not stabilise');
+}
+
+function initialiseImagePopovers(fragment) {
+  const images = fragment.querySelectorAll('img[data-by]');
+  const i18 = i18n.get(i18n.SpeciesList);
+    images.forEach(img => {
+        new bootstrap.Popover(img, {
+            trigger: 'hover focus',
+            placement: 'right',
+            container: 'body',
+            html: true,
+            title: () => img.dataset.cname,
+            content: () => {
+                // Escape values before inserting them into HTML
+                const escapeHTML = utils.escapeHTML;
+
+                return `
+                    <div class="text-center" style="min-width: 320px;">
+                        <img
+                            src="${escapeHTML(img.src)}"
+                            alt="${escapeHTML(img.dataset.cname)}"
+                            style="max-width: 300px; height: auto;"
+                            class="img-fluid rounded mb-2"
+                        >
+                        <div class="text-start small">
+                            <div><strong>${i18.sname}:</strong>
+                                <i>${escapeHTML(img.dataset.sname)}</i>
+                            </div>
+                            <div><strong>${i18.licence}:</strong>
+                                ${escapeHTML(img.dataset.license || 'N/A')}
+                            </div>
+                            <div><strong>${i18.by}:</strong>
+                                ${escapeHTML(img.dataset.by)}
+                            </div>
+                        </div>
+                    </div>`;
+            }
+        });
+    });
+    return fragment
 }
