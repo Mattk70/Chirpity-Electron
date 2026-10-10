@@ -6828,7 +6828,7 @@ async function handleUIClicks(e) {
     }
     // Video capture
     case "capture-start": {
-      await videoCapture(e);
+      await videoCapture(element);
       break;
     }
     case "clear-call-cache": {
@@ -9439,7 +9439,7 @@ let recorder, captureChunks = [], stream;
 async function videoCapture(btn) {
   const waveElement = DOM.waveElement;
   const ws = spec.wavesurfer;
-  if (!ws || ws.getCurrentTime() >= STATE.windowLength * 0.95 ) return
+  if (!ws ) return;
   let blocker;
 
   if (btn.classList.contains('text-danger')) {
@@ -9458,12 +9458,14 @@ async function videoCapture(btn) {
   STATE.captureAbortController = new AbortController();
 
   try {
+    ws.setTime(0)
+    // Add cursor over, but outside recorded area
     blocker = document.createElement('div');
     blocker.id = 'capture-blocker';
     blocker.style.cssText = `
       position: absolute;
       inset: 0;
-      z-index: 1000;
+      z-index: 10;
       cursor: none;
     `;
     waveElement.parentElement.append(blocker);
@@ -9494,7 +9496,7 @@ async function videoCapture(btn) {
 
     const playerEl = ws.getMediaElement();
     const [audioTrack] = playerEl.captureStream().getAudioTracks();
-    const display = await navigator.mediaDevices.getDisplayMedia({ video: true });
+    const display = await navigator.mediaDevices.getDisplayMedia();
     const [videoTrack] = display.getVideoTracks();
     // Wait for the the track aspect ratio and screenPixelRatio to settle
     // Prevents a zoom switch in the video

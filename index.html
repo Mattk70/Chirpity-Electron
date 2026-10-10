@@ -78,6 +78,9 @@
             <!-- Spectrogram view -->
             <div class="w-100 d-none" id="spectrogramWrapper">
                 <div style="position:relative">
+                    <div class="bg-dark position-absolute" id="capture-button" style="top:1.75rem;right:0.5rem;z-index: 15;opacity: 0;transition: opacity 1.5s ease;">
+                        <button id="capture-start" class="p-1 btn btn-outline-secondary" title="Record"><span class="material-symbols-outlined ">fiber_manual_record</span></button>
+                    </div>
                     <div class="w-100" id="waveform"></div>
                 </div>
                 <!-- Controls view -->
@@ -95,9 +98,6 @@
                             <span class="align-middle d-none d-lg-inline-block">Pause</span>
                         </button>
                     </div>
-                    <span class="col-auto btn-group bg-dark pt-0 p-1 ms-2 me-2 text-nowrap" role="group">
-                        <button id="capture-start" class="p-1 btn btn-outline-secondary" title="Record"><span class="material-symbols-outlined ">fiber_manual_record</span></button>
-                    </span>
                     <div class="col-auto btn-group bg-dark pt-0 p-1 pe-2" role="group">
                         <button id="zoomIn" title="Zoom into the spectrogram (Keyboard Shortcut: + key)" class="btn btn-outline-secondary"
                         style="min-width: 3rem">
