@@ -9678,10 +9678,10 @@ function initialiseImagePopovers() {
                             <div><strong>${i18.sname}:</strong>
                                 <i>${escapeHTML(img.dataset.sname)}</i>
                             </div>
-                            <div><strong>Licence:</strong>
+                            <div><strong>${i18.licence}:</strong>
                                 ${escapeHTML(img.dataset.license || 'N/A')}
                             </div>
-                            <div><strong>Photographer:</strong>
+                            <div><strong>${i18.by}:</strong>
                                 ${escapeHTML(img.dataset.by)}
                             </div>
                         </div>
