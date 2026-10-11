@@ -8,6 +8,15 @@ const csvFile = path.join(__dirname, '../BirdNET3/BirdNET3_geomodel_labels.csv')
 
 const jsonOnlyFile = path.join(__dirname, 'json-only.json');
 const csvOnlyFile = path.join(__dirname, 'csv-only-aves.json');
+
+/**
+ * Compare image metadata with BirdNET scientific names, write sorted unmatched-name
+ * lists, and overwrite 2025-filtered.json with entries present in the CSV.
+ * The CSV-only list includes only Aves; JSON entries are matched against all classes.
+ *
+ * @returns {Promise<void>} Resolves after writing the files. Rejects on JSON parsing,
+ * CSV parser, or synchronous file I/O errors; completed writes are not rolled back.
+ */
 const { NEW_TO_OLD_TAXONOMY } = require("../js/utils/new_to_old_taxonomy.js");
 const OLD_TO_NEW_TAXONOMY = Object.fromEntries(
   Object.entries(NEW_TO_OLD_TAXONOMY).map(([newName, oldName]) => [oldName, newName])

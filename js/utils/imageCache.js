@@ -14,6 +14,10 @@ const userData = path.join(appData, 'Chirpity');
 const imageJsonPath = path.resolve(__dirname, '..', '..', 'BirdNET3', 'imageData', 'avicommons-2025-filtered.json');
 const thumbnailDir = path.join(userData, 'thumbnails', 'cached');
 let imageJSON = null;
+/**
+ * Read the bundled lookup of image metadata by scientific name.
+ * @returns {Promise<Object>} Parsed metadata, or an empty object if reading or parsing fails.
+ */
 async function parseImageJSON() {
     let imageJSON;
     try {
@@ -26,6 +30,15 @@ async function parseImageJSON() {
     return imageJSON
 }
 
+/**
+ * Download an AviCommons thumbnail and overwrite its file in the user thumbnail cache.
+ *
+ * @param {string} sciName - Exact scientific-name key in the bundled image metadata.
+ * @returns {Promise<Array>} Local JPEG path, license, and photographer, in that order.
+ * @throws {Error} Rejects if source metadata is missing or the HTTP response is unsuccessful,
+ * or if creating the cache directory, reading the response body, or writing the file fails.
+ * @throws {TypeError} Rejects on a network failure after the original fetch error is caught.
+ */
 async function getAviCommonsImage(sciName) {
     sciName = OLD_TO_NEW_TAXONOMY[sciName] || sciName;
     imageJSON ??= await parseImageJSON();
@@ -52,6 +65,14 @@ async function getAviCommonsImage(sciName) {
     return [filePath, license, by];
 }
 
+/**
+ * Return a cached thumbnail and its attribution, downloading it when cache access or
+ * metadata lookup fails. An existing file is downloaded again if metadata is not yet loaded.
+ *
+ * @param {string} sciName - Exact scientific-name key in the bundled image metadata.
+ * @returns {Promise<Array>} Local JPEG path, license, and photographer, in that order.
+ * @throws {Error} Rejects with download or cache-write errors from {@link getAviCommonsImage}.
+ */
 async function retrieveThumbnail(sciName) {
     imageJSON ??= await parseImageJSON();
     const filePath = path.join(thumbnailDir, `${sciName}.jpg`);
