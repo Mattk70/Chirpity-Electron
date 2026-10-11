@@ -4313,10 +4313,10 @@ const updateSummary = ({ summary = [], filterSpecies = "", finished = false }) =
     const pointer = finished ? 'pointer' : 'not-allowed'
     summaryHTML += `<tr tabindex="-1" class="${selected}">
                 ${showImage ? `<td scope="col"><img src="img/not-found.png" 
-                  data-sname="${item.sname}" 
-                  data-cname="${item.cname}" 
+                  data-sname="${utils.escapeHTML(item.sname)}" 
++                 data-cname="${utils.escapeHTML(item.cname)}" 
                   style="height: 40px;width: 60px; cursor: pointer;" 
-                  alt="${item.cname}"></td>` : ""
+                  alt="${utils.escapeHTML(item.cname)}"></td>` : ""
                 }
                 <td class="max">${iconizeScore(item.max)}</td>
                 <td class="cname ${pointer}"><span class="cname">${item.cname}</span> <br><i>${item.sname}</i></td>`;
@@ -4374,10 +4374,12 @@ const updateSummary = ({ summary = [], filterSpecies = "", finished = false }) =
       });
     }
   };
+  const token = (updateSummary.seq = (updateSummary.seq || 0) + 1);
   if (showImage) {
     loadSummaryImages(fragment)
-      .then(finished && initialiseImagePopovers)
-      .then(finaliseSummary);
+      .then((f) => (finished ? initialiseImagePopovers(f) : f))
+      .catch((err) => { console.warn("Summary image setup failed", err); return fragment; })
+      .then((f) => { if (token === updateSummary.seq) finaliseSummary(f); });
   } else {
     finaliseSummary(fragment);
   }

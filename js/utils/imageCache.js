@@ -40,7 +40,7 @@ async function getAviCommonsImage(sciName) {
 
     await fs.mkdir(thumbnailDir, { recursive: true });
 
-    const response = await fetch(url).catch(console.warn);
+    const response = await fetch(url);
 
     if (!response.ok) {
         throw new Error(`Failed to fetch image for ${sciName}: HTTP ${response.status}`);
