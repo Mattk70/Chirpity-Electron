@@ -134,7 +134,7 @@ jobs:
           npm install
 
           
-      - name: Move tensorflow.dll to napi-v10 folder
+      - name: Copy tensorflow.dll to napi-v8 folder
         if: runner.os == 'Windows'
         shell: bash
         run: |
