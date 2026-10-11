@@ -281,4 +281,4 @@ const NEW_TO_OLD_TAXONOMY =
   "Boreorana sylvatica":"Lithobates sylvaticus",
 };
 
-export { NEW_TO_OLD_TAXONOMY };
+module.exports = { NEW_TO_OLD_TAXONOMY };

@@ -2319,6 +2319,7 @@ const defaultConfig = {
     confidence: 45,
     iucn: true,
     iucnScope: "Global",
+    thumbnails: true,
     topRankin: 1,
     overlap: 0,
     classes: ['Aves'],
@@ -2622,6 +2623,7 @@ window.onload = async () => {
   document.getElementById("auto-load").checked = detect.autoLoad;
   document.getElementById("iucn").checked = detect.iucn;
   document.getElementById("iucn-scope").value = detect.iucnScope;
+  document.getElementById("thumbnails").checked = detect.thumbnails;
   handleModelChange(selectedModel, false)
   // Detection options
   const mergeSwitch = document.getElementById("merge-detections");
@@ -4278,10 +4280,8 @@ const updateSummary = ({ summary = [], filterSpecies = "", finished = false }) =
 
   STATE.summary = summary;
   const i18 = i18n.get(i18n.Headings);
-  const showIUCN = config.detect.iucn;
-  const showImage = true;
+  const {iucn:showIUCN, thumbnails: showImage} = config.detect;
 
-  // if (summary.length){
   let summaryHTML = summary.length
     ? `<table id="resultSummary" class="table table-dark p-1"><thead>
             <tr class="pointer col-auto text-nowrap">
@@ -7125,10 +7125,14 @@ document.addEventListener("change", async function (e) {
         }
         case "iucn": {
           config.detect.iucn = element.checked;
-          // resetRegions();
           refreshSummary();
           break;
         }
+        case "thumbnails": {
+          config.detect.thumbnails = element.checked;
+          refreshSummary();
+          break;
+        }        
         case "iucn-scope": {
           config.detect.iucnScope = element.value;
           refreshSummary();

@@ -8,7 +8,10 @@ const csvFile = path.join(__dirname, '../BirdNET3/BirdNET3_geomodel_labels.csv')
 
 const jsonOnlyFile = path.join(__dirname, 'json-only.json');
 const csvOnlyFile = path.join(__dirname, 'csv-only-aves.json');
-
+const { NEW_TO_OLD_TAXONOMY } = require("../js/utils/new_to_old_taxonomy.js");
+const OLD_TO_NEW_TAXONOMY = Object.fromEntries(
+  Object.entries(NEW_TO_OLD_TAXONOMY).map(([newName, oldName]) => [oldName, newName])
+);
 async function main() {
     // Load filtered JSON: scientific names are object keys
     const jsonData = JSON.parse(fs.readFileSync(jsonFile, 'utf8'));
@@ -46,6 +49,11 @@ async function main() {
         .filter(name => !jsonNames.has(name))
         .sort();
 
+    // Found in old taxonomy
+    const oldTaxa = [...jsonNames]
+        .filter(name => csvNames.has(NEW_TO_OLD_TAXONOMY[name]))
+        .sort();
+
     // Save unmatched names
     fs.writeFileSync(
         jsonOnlyFile,
@@ -66,6 +74,7 @@ async function main() {
     console.log();
     console.log(`In JSON but not in CSV: ${jsonOnly.length}`);
     console.log(`In CSV (Aves) but not in JSON: ${csvOnly.length}`);
+    console.log(`In CSV with different taxomonmy: ${oldTaxa.length}`);
     console.log();
     console.log(`Saved JSON-only names to: ${jsonOnlyFile}`);
     console.log(`Saved CSV-only Aves names to: ${csvOnlyFile}`);
@@ -75,7 +84,7 @@ async function main() {
     let removedCount = 0;
 
     for (const sciName of Object.keys(jsonData)) {
-        if (!csvNames.has(sciName)) {
+        if (!csvNames.has(sciName) && !oldTaxa.includes(sciName)) {
             delete jsonData[sciName];
             removedCount++;
         }

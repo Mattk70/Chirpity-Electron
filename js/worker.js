@@ -36,7 +36,7 @@ import {createEmbeddingTable, storeEmbeddings, queryEmbeddings} from './embeddin
 import { customURLEncode, installConsoleTracking, trackEvent as _trackEvent } from "./utils/tracking.js";
 import { onChartRequest, getIncludedLocations }  from "./components/charts.js";
 import {PCMChunker, PredictionWritable, createMultiWorkerQueue, FileQueueManager} from './utils/streams.js';
-import { NEW_TO_OLD_TAXONOMY } from "./utils/new_to_old_taxonomy.js";
+const { NEW_TO_OLD_TAXONOMY } = require("./js/utils/new_to_old_taxonomy.js");
 
 const { pipeline } = require("stream/promises");
 
