@@ -106,6 +106,14 @@ const escapeHTML = str => str
   .replace(/"/g, "&quot;")
   .replace(/'/g, "&#39;");
 
+/**
+ * Convert a #RGB or #RRGGBB color to RGB components or a CSS rgba() string.
+ *
+ * @param {string} hex - Hex color including the leading #; input is not validated.
+ * @param {number} [alpha] - Opacity, normally 0–1, without clamping. Zero is treated as omitted.
+ * @returns {number[]|string} #RGB always produces rgba(), defaulting to opacity 1.
+ * #RRGGBB produces rgba() only for a truthy alpha; otherwise it returns [r, g, b] in 0–255 units.
+ */
 function hexToRgb(hex, alpha) {
   let r, g, b;
 
