@@ -11,7 +11,8 @@ const csvOnlyFile = path.join(__dirname, 'csv-only-aves.json');
 
 /**
  * Compare image metadata with BirdNET scientific names, write sorted unmatched-name
- * lists, and overwrite 2025-filtered.json with entries present in the CSV.
+ * lists, and overwrite 2025-filtered.json with entries present in the CSV or
+ * mapped to a CSV name through NEW_TO_OLD_TAXONOMY.
  * The CSV-only list includes only Aves; JSON entries are matched against all classes.
  *
  * @returns {Promise<void>} Resolves after writing the files. Rejects on JSON parsing,
