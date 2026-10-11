@@ -30,7 +30,8 @@ async function supportsWebGPUFloat16() {
   }
 }
 
-import { NEW_TO_OLD_TAXONOMY } from "../utils/new_to_old_taxonomy.js";
+const { NEW_TO_OLD_TAXONOMY } = require("../utils/new_to_old_taxonomy.js");
+
 let session = null;
 const fs = require("node:fs");
 const path = require("node:path");

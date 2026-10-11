@@ -935,8 +935,11 @@ createLabelsCanvas() {
   //   }
   // }
 
-  hideTooltip() {
+  hideTooltip(e) {
     DOM.tooltip.style.visibility = "hidden";
+    if (! DOM.startCaptureBtn.contains(e.relatedTarget))
+      // Also hide record button
+      DOM.startCaptureBtn.style.opacity = 0;
   }
 
   /**
@@ -979,6 +982,8 @@ createLabelsCanvas() {
     showHz = !config.specLabels;
     const i18 = get(Context);
     const waveElement = DOM.waveElement;
+    // Show the recording button
+    DOM.startCaptureBtn.style.opacity = 1;
     // Update the tooltip content
     const tooltip = DOM.tooltip;
     tooltip.style.display = "none";

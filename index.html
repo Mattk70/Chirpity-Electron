@@ -78,6 +78,9 @@
             <!-- Spectrogram view -->
             <div class="w-100 d-none" id="spectrogramWrapper">
                 <div style="position:relative">
+                    <div class="bg-dark position-absolute" id="capture-button" style="top:1.75rem;right:0.5rem;z-index: 15;opacity: 0;transition: opacity 1.5s ease;">
+                        <button id="capture-start" class="p-1 btn btn-outline-secondary" title="Record"><span class="material-symbols-outlined ">fiber_manual_record</span></button>
+                    </div>
                     <div class="w-100" id="waveform"></div>
                 </div>
                 <!-- Controls view -->
@@ -95,9 +98,6 @@
                             <span class="align-middle d-none d-lg-inline-block">Pause</span>
                         </button>
                     </div>
-                    <span class="col-auto btn-group bg-dark pt-0 p-1 ms-2 me-2 text-nowrap" role="group">
-                        <button id="capture-start" class="p-1 btn btn-outline-secondary" title="Record"><span class="material-symbols-outlined ">fiber_manual_record</span></button>
-                    </span>
                     <div class="col-auto btn-group bg-dark pt-0 p-1 pe-2" role="group">
                         <button id="zoomIn" title="Zoom into the spectrogram (Keyboard Shortcut: + key)" class="btn btn-outline-secondary"
                         style="min-width: 3rem">
@@ -832,7 +832,7 @@
 
     <!-- ===================== 1. DETECTIONS ===================== -->
     <fieldset class="accordion-item text-bg-dark border-secondary">
-        <legend class="settings-toggle collapsed" role="button" tabindex="0" data-bs-toggle="collapse" data-bs-target="#collapse-detections" aria-expanded="false" aria-controls="collapse-detections" id="detections-heading">Detections</legend>
+        <legend class="settings-toggle collapsed fs-6" role="button" tabindex="0" data-bs-toggle="collapse" data-bs-target="#collapse-detections" aria-expanded="false" aria-controls="collapse-detections" id="detections-heading">Detections</legend>
         <div id="collapse-detections" data-bs-parent="#settingsAccordion" class="accordion-collapse collapse">
             <div class="accordion-body p-2">
 
@@ -1020,17 +1020,24 @@
                         <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Auto-load detections" id="Auto-load-circle-help"  data-bs-content="When enabled, saved detections are displayed immediately upon opening a file.">?</a>
                     </div>
                 </div>
+                <div class="form-group rounded p-2 pe-0 mb-2">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" id="thumbnails">
+                        <label class="form-check-label" for="thumbnails">Show species thumbnails in summary</label>
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Show Thumbnails" id="thumbnails-circle-help"  
+                            data-bs-content="When enabled, thumbnail images are downloaded (where available) and appear in the species summary.">?</a>
+                    </div>
+                </div>                
                 <div class="advanced">
                     <hr>
-                    <div class="form-group rounded p-2 pe-0 mb-2">
-                        <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" role="switch" id="iucn">
-                            <label class="form-check-label" for="iucn">Show species IUCN Red List status in summary.</label>
-                            <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Red List Status" id="IUCN-circle-help"  
-                                data-bs-content="When enabled, the latest Global IUCN assessment status is displayed for each species in the summary. The icon links to the assessment page on the IUCN website. The Assessment Scope will display the IUCN assessment of the species in that region (where available).">?</a>
-                        </div>
+                <div class="form-group rounded p-2 pe-0 mb-2">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" id="iucn">
+                        <label class="form-check-label" for="iucn">Show species IUCN Red List status in summary</label>
+                        <a class="circle" tabindex="-1" data-bs-toggle="popover" data-bs-trigger="hover" data-bs-title="Red List Status" id="IUCN-circle-help"  
+                            data-bs-content="When enabled, the latest Global IUCN assessment status is displayed for each species in the summary. The icon links to the assessment page on the IUCN website. The Assessment Scope will display the IUCN assessment of the species in that region (where available).">?</a>
                     </div>
-
+                </div>
                     <div class="pe-3 input-group rounded p-2 mb-1">
                         <label for="iucn-scope" class="input-group-text bg-dark text-warning">Assessment Scope:</label>
                         <select class="form-select mb-0" id="iucn-scope">
@@ -1173,7 +1180,7 @@
 
     <!-- ===================== 2. DEFAULT LOCATION ===================== -->
     <fieldset class="accordion-item text-bg-dark border-secondary">
-        <legend class="settings-toggle collapsed" role="button" tabindex="0" data-bs-toggle="collapse" data-bs-target="#collapse-location" aria-expanded="false" aria-controls="collapse-location">Default Location</legend>
+        <legend class="settings-toggle collapsed fs-6" role="button" tabindex="0" data-bs-toggle="collapse" data-bs-target="#collapse-location" aria-expanded="false" aria-controls="collapse-location">Default Location</legend>
         <div id="collapse-location" data-bs-parent="#settingsAccordion" class="accordion-collapse collapse">
             <div class="accordion-body p-2">
 
@@ -1201,7 +1208,7 @@
 
     <!-- ===================== 3. SYSTEM ===================== -->
     <fieldset class="accordion-item text-bg-dark border-secondary">
-        <legend class="settings-toggle collapsed" role="button" tabindex="0" data-bs-toggle="collapse" data-bs-target="#collapse-system" aria-expanded="false" aria-controls="collapse-system">System</legend>
+        <legend class="settings-toggle collapsed fs-6" role="button" tabindex="0" data-bs-toggle="collapse" data-bs-target="#collapse-system" aria-expanded="false" aria-controls="collapse-system">System</legend>
         <div id="collapse-system" data-bs-parent="#settingsAccordion" class="accordion-collapse collapse">
             <div class="accordion-body p-2">
 
@@ -1342,7 +1349,7 @@
 
     <!-- ===================== 4. AUDIO PREFERENCES ===================== -->
     <fieldset class="accordion-item text-bg-dark border-secondary">
-        <legend class="settings-toggle collapsed" role="button" tabindex="0" data-bs-toggle="collapse" data-bs-target="#collapse-audio" aria-expanded="false" aria-controls="collapse-audio">Audio Preferences</legend>
+        <legend class="settings-toggle collapsed fs-6" role="button" tabindex="0" data-bs-toggle="collapse" data-bs-target="#collapse-audio" aria-expanded="false" aria-controls="collapse-audio">Audio Preferences</legend>
         <div id="collapse-audio" data-bs-parent="#settingsAccordion" class="accordion-collapse collapse">
             <div class="accordion-body p-2">
 
@@ -1540,16 +1547,14 @@
                         <option value="ogg">Lossy (recommended)</option>
                         <option value="flac">Lossless</option>
                     </select>
-
                 </div>
-
             </div>
         </div>
     </fieldset>
 
     <!-- ===================== 5. SPECTROGRAM PREFERENCES ===================== -->
     <fieldset class="accordion-item text-bg-dark border-secondary">
-        <legend class="settings-toggle collapsed" role="button" tabindex="0" data-bs-toggle="collapse" data-bs-target="#collapse-spectrogram" aria-expanded="false" aria-controls="collapse-spectrogram" id="spectrogram-heading">Spectrogram Preferences</legend>
+        <legend class="settings-toggle collapsed fs-6" role="button" tabindex="0" data-bs-toggle="collapse" data-bs-target="#collapse-spectrogram" aria-expanded="false" aria-controls="collapse-spectrogram" id="spectrogram-heading">Spectrogram Preferences</legend>
         <div id="collapse-spectrogram" data-bs-parent="#settingsAccordion" class="accordion-collapse collapse">
             <div class="accordion-body p-2">
                 <div class="form-group rounded p-2 mb-2">
@@ -1688,7 +1693,7 @@
     <!-- ===================== 6. ADVANCED ===================== -->
     <!-- "advanced" class kept on the item so existing show/hide logic hides the whole entry -->
     <fieldset class="accordion-item advanced text-bg-dark border-secondary">
-        <legend class="settings-toggle collapsed" role="button" tabindex="0" data-bs-toggle="collapse" data-bs-target="#collapse-advanced" aria-expanded="false" aria-controls="collapse-advanced">Advanced</legend>
+        <legend class="settings-toggle collapsed fs-6" role="button" tabindex="0" data-bs-toggle="collapse" data-bs-target="#collapse-advanced" aria-expanded="false" aria-controls="collapse-advanced">Advanced</legend>
         <div id="collapse-advanced" data-bs-parent="#settingsAccordion" class="accordion-collapse collapse">
             <div class="accordion-body p-2">
 
