@@ -3857,6 +3857,18 @@
     "by": "許慶棠Ray",
     "code": "whgpig1"
   },
+  "Megaloprepia magnifica": {
+    "license": "CC0 2.0",
+    "key": "339539160",
+    "by": "Adam Jackson",
+    "code": "wofdov1"
+  },
+  "Ramphiculus occipitalis": {
+    "license": "CC BY-NC 2.0",
+    "key": "399229613",
+    "by": "kevinpearce",
+    "code": "ybfdov2"
+  },
   "Alectroenas pulcherrimus": {
     "license": "CC BY-NC 2.0",
     "key": "164454823",
@@ -9737,6 +9749,12 @@
     "by": "JJ Harrison",
     "code": "rekdot1"
   },
+  "Anarhynchus veredus": {
+    "license": "CC BY-NC 2.0",
+    "key": "121294440",
+    "by": "chiawentsai",
+    "code": "oriplo1"
+  },
   "Anarhynchus mongolus": {
     "license": "cc-by-nc",
     "key": "275143297",
@@ -9838,6 +9856,12 @@
     "key": "46029318",
     "by": "copper",
     "code": "whfplo1"
+  },
+  "Anarhynchus javanicus": {
+    "license": "CC BY-NC 2.0",
+    "key": "423658317",
+    "by": "abcdefgewing",
+    "code": "javplo1"
   },
   "Anarhynchus alexandrinus": {
     "license": "cc-by",

@@ -2319,6 +2319,7 @@ const defaultConfig = {
     confidence: 45,
     iucn: true,
     iucnScope: "Global",
+    thumbnails: true,
     topRankin: 1,
     overlap: 0,
     classes: ['Aves'],
@@ -2622,6 +2623,7 @@ window.onload = async () => {
   document.getElementById("auto-load").checked = detect.autoLoad;
   document.getElementById("iucn").checked = detect.iucn;
   document.getElementById("iucn-scope").value = detect.iucnScope;
+  document.getElementById("thumbnails").checked = detect.thumbnails;
   handleModelChange(selectedModel, false)
   // Detection options
   const mergeSwitch = document.getElementById("merge-detections");
@@ -4299,10 +4301,8 @@ const updateSummary = ({ summary = [], filterSpecies = "", finished = false }) =
 
   STATE.summary = summary;
   const i18 = i18n.get(i18n.Headings);
-  const showIUCN = config.detect.iucn;
-  const showImage = true;
+  const {iucn:showIUCN, thumbnails: showImage} = config.detect;
 
-  // if (summary.length){
   let summaryHTML = summary.length
     ? `<table id="resultSummary" class="table table-dark p-1"><thead>
             <tr class="pointer col-auto text-nowrap">
@@ -4334,10 +4334,10 @@ const updateSummary = ({ summary = [], filterSpecies = "", finished = false }) =
     const pointer = finished ? 'pointer' : 'not-allowed'
     summaryHTML += `<tr tabindex="-1" class="${selected}">
                 ${showImage ? `<td scope="col"><img src="img/not-found.png" 
-                  data-sname="${item.sname}" 
-                  data-cname="${item.cname}" 
+                  data-sname="${utils.escapeHTML(item.sname)}" 
++                 data-cname="${utils.escapeHTML(item.cname)}" 
                   style="height: 40px;width: 60px; cursor: pointer;" 
-                  alt="${item.cname}"></td>` : ""
+                  alt="${utils.escapeHTML(item.cname)}"></td>` : ""
                 }
                 <td class="max">${iconizeScore(item.max)}</td>
                 <td class="cname ${pointer}"><span class="cname">${item.cname}</span> <br><i>${item.sname}</i></td>`;
@@ -4382,6 +4382,9 @@ const updateSummary = ({ summary = [], filterSpecies = "", finished = false }) =
    * @param {DocumentFragment} fragment - Summary nodes consumed by the table replacement.
    */
   const finaliseSummary = (fragment) => {
+    old_summary.querySelectorAll("img").forEach((img) => {
+      bootstrap.Popover.getInstance(img)?.dispose();
+    });
     old_summary.replaceChildren(fragment);
     showSummarySortIcon();
     setAutocomplete(selectedRow ? filterSpecies : "");
@@ -4396,10 +4399,12 @@ const updateSummary = ({ summary = [], filterSpecies = "", finished = false }) =
       });
     }
   };
+  const token = (updateSummary.seq = (updateSummary.seq || 0) + 1);
   if (showImage) {
     loadSummaryImages(fragment)
-      .then(finished && initialiseImagePopovers)
-      .then(finaliseSummary);
+      .then((f) => (finished ? initialiseImagePopovers(f) : f))
+      .catch((err) => { console.warn("Summary image setup failed", err); return fragment; })
+      .then((f) => { if (token === updateSummary.seq) finaliseSummary(f); });
   } else {
     finaliseSummary(fragment);
   }
@@ -7151,10 +7156,14 @@ document.addEventListener("change", async function (e) {
         }
         case "iucn": {
           config.detect.iucn = element.checked;
-          // resetRegions();
           refreshSummary();
           break;
         }
+        case "thumbnails": {
+          config.detect.thumbnails = element.checked;
+          refreshSummary();
+          break;
+        }        
         case "iucn-scope": {
           config.detect.iucnScope = element.value;
           refreshSummary();
@@ -9570,8 +9579,7 @@ async function videoCapture(btn) {
       tearDownCapture(btn);
       return;
     }
-    const mimeType = 'video/mp4';
-    console.log(MediaRecorder.isTypeSupported(mimeType))
+    const mimeType = 'video/mp4;codecs="avc1"';
     recorder = new MediaRecorder(stream, { mimeType });
     captureChunks = [];
 

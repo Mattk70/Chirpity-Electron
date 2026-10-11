@@ -1,6 +1,10 @@
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
+const { NEW_TO_OLD_TAXONOMY } = require("./new_to_old_taxonomy.js");
+const OLD_TO_NEW_TAXONOMY = Object.fromEntries(
+  Object.entries(NEW_TO_OLD_TAXONOMY).map(([newName, oldName]) => [oldName, newName])
+);
 const appData = process.platform === 'win32'
     ? process.env.APPDATA
     : process.platform === 'darwin'
@@ -36,6 +40,7 @@ async function parseImageJSON() {
  * @throws {TypeError} Rejects on a network failure after the original fetch error is caught.
  */
 async function getAviCommonsImage(sciName) {
+    sciName = OLD_TO_NEW_TAXONOMY[sciName] || sciName;
     imageJSON ??= await parseImageJSON();
     const source = imageJSON?.[sciName];
 
@@ -48,7 +53,7 @@ async function getAviCommonsImage(sciName) {
 
     await fs.mkdir(thumbnailDir, { recursive: true });
 
-    const response = await fetch(url).catch(console.warn);
+    const response = await fetch(url);
 
     if (!response.ok) {
         throw new Error(`Failed to fetch image for ${sciName}: HTTP ${response.status}`);
@@ -69,6 +74,7 @@ async function getAviCommonsImage(sciName) {
  * @throws {Error} Rejects with download or cache-write errors from {@link getAviCommonsImage}.
  */
 async function retrieveThumbnail(sciName) {
+    imageJSON ??= await parseImageJSON();
     const filePath = path.join(thumbnailDir, `${sciName}.jpg`);
 
     try {
