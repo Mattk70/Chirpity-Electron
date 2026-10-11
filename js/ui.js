@@ -9539,7 +9539,7 @@ async function videoCapture(btn) {
       tearDownCapture(btn);
       return;
     }
-    const mimeType = 'video/mp4';
+    const mimeType = 'video/mp4;codecs="avc1"';
     recorder = new MediaRecorder(stream, { mimeType });
     captureChunks = [];
 
