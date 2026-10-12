@@ -8840,7 +8840,6 @@ async function membershipCheck() {
 
   const setLocks = () =>{
     document.getElementById("buy-me-coffee").classList.remove("d-none");
-
     config.keyAssignment = {};
     config.specDetections = false;
     config.detect.autoLoad = false;
@@ -8848,6 +8847,10 @@ async function membershipCheck() {
     config.detect.merge = false;
     config.library.clips = false;
     config.database.location = "";
+    config.customColormap.scale = 'linear';
+    config.customColormap.autoGain = false;
+    config.customColormap.preEmphasis = false;
+    config.customColormap.rangeDB = 80;
     // Set all backends to 'tensorflow'
     if (config.hasNode){
       Object.values(config.models).forEach(model => {
