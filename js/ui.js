@@ -8822,7 +8822,8 @@ async function membershipCheck() {
   const trialPeriod = await window.electron.trialPeriod();
   const installPeriod = now - installDate;
   const trialDaysLeft = Math.max(Math.ceil((trialPeriod - installPeriod)/86_400_000), 0)
-  const inTrial = installPeriod < trialPeriod && ! DIAGNOSTICS.CPU?.toLowerCase().includes('virtual');
+  const inTrial = installPeriod < trialPeriod 
+    && (isTestEnv || ! DIAGNOSTICS.CPU?.toLowerCase().includes('virtual'));
 
   const lockedElements = document.querySelectorAll(".locked, .unlocked");
   const unlockElements = (inTrial) => {
