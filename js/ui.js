@@ -4281,7 +4281,7 @@ async function loadSummaryImages(fragment) {
             img.dataset.by = by;
         } catch (error) {
             failed.add(sname);
-            console.warn(`Failed to load thumbnail for ${sname}:`, error);
+            console.warn(`Failed to load thumbnail:`, error);
         }
     }));
     return fragment;
