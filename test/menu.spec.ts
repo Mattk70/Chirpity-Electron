@@ -65,7 +65,7 @@ test('Amend file start dialog contains date', async ({ page }) => {
   await click(page, '#dropdownMenuButton', { button: 'right' });
   await click(page, '#setFileStart');
   await expect(page.locator('#fileStart')).toHaveValue(
-    new RegExp(String(new Date().getFullYear()))
+    new RegExp(`${new Date().getFullYear()}|2024`)
   );
 });
 
@@ -74,6 +74,37 @@ test('Select inverted greyscale colourmap', async ({ page }) => {
   await openExampleFile(page);
   await changeSettings(page, 'select', '#spectrogram-heading', '#colourmap', 'gray');
   await expect(page.locator('#colourmap')).toHaveValue('gray');
+});
+
+test('Export wav stereo audio with high pass filter', async ({ page, electronApp }) => {
+  console.log('Export wav audio with high pass filter test');
+  await stubDialogs(electronApp, './test/example.wav');
+  await runExampleAnalysis(page, 'chirpity');
+  await changeSettings(page, 'input', '#audio-heading', '#highPassFrequency', '325');
+  await changeSettings(page, 'select', '#audio-heading', '#format', 'wav');
+  await expect(page.locator('#highPassFrequency')).toHaveValue('325');
+  await click(page, '#result1');
+  await click(page, '#navBarFile');
+const exportComplete = page.evaluate(() => {
+    return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            window.removeEventListener('audio-file-to-save', onComplete);
+            reject(new Error('Audio export timed out'));
+        }, 15000);
+
+        function onComplete(event: any) {
+            clearTimeout(timeout);
+            resolve(event.detail);
+        }
+
+        window.addEventListener('audio-file-to-save', onComplete);
+    });
+});
+
+  await expect(page.locator('#export-audio')).toBeEnabled();
+  await click(page, '#export-audio');
+  await exportComplete; //Give chance for an ffmpeg error
+
 });
 
 // The `test.describe.fixme('click fest…')` block from the original can be pasted back

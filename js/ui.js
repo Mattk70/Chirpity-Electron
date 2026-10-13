@@ -1575,7 +1575,7 @@ async function sortFilesByTime(fileNames) {
  */
 async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults } = {}) {
   if (!filePaths.length) return;
-  if (STATE.mode !== 'analyse') showAnalyse()
+  if (STATE?.mode !== 'analyse') showAnalyse()
 
   // Store the sanitised file list and Load First audio file
   pagination.reset();
@@ -3186,6 +3186,11 @@ function getSpecies(target) {
  * @param {string} options.extension - The file extension to use for the saved file.
  */
 async function onSaveAudio({ file, filename, extension }) {
+  if (isTestEnv) {
+    window.dispatchEvent(new CustomEvent('audio-file-to-save', {
+      detail: filename
+    }));
+  }
   await window.electron.saveFile({
     file: file,
     filename: filename,
@@ -4281,7 +4286,7 @@ async function loadSummaryImages(fragment) {
             img.dataset.by = by;
         } catch (error) {
             failed.add(sname);
-            console.warn(`Failed to load thumbnail for ${sname}:`, error);
+            console.warn(`Failed to load thumbnail:`, error);
         }
     }));
     return fragment;
@@ -8822,7 +8827,8 @@ async function membershipCheck() {
   const trialPeriod = await window.electron.trialPeriod();
   const installPeriod = now - installDate;
   const trialDaysLeft = Math.max(Math.ceil((trialPeriod - installPeriod)/86_400_000), 0)
-  const inTrial = installPeriod < trialPeriod;
+  const inTrial = installPeriod < trialPeriod 
+    && ( ! DIAGNOSTICS.CPU?.toLowerCase().includes('virtual'));
 
   const lockedElements = document.querySelectorAll(".locked, .unlocked");
   const unlockElements = (inTrial) => {
@@ -8840,7 +8846,6 @@ async function membershipCheck() {
 
   const setLocks = () =>{
     document.getElementById("buy-me-coffee").classList.remove("d-none");
-
     config.keyAssignment = {};
     config.specDetections = false;
     config.detect.autoLoad = false;
@@ -8848,6 +8853,10 @@ async function membershipCheck() {
     config.detect.merge = false;
     config.library.clips = false;
     config.database.location = "";
+    config.customColormap.scale = 'linear';
+    config.customColormap.autoGain = false;
+    config.customColormap.preEmphasis = false;
+    config.customColormap.rangeDB = 80;
     // Set all backends to 'tensorflow'
     if (config.hasNode){
       Object.values(config.models).forEach(model => {
