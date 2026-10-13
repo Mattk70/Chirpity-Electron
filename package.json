@@ -208,9 +208,7 @@
       ],
       "verifyUpdateCodeSignature": false,
       "asar": true,
-      "icon": "./img/icon/icon.png",
-      "files": 
-      "!node_modules/@tensorflow/tfjs-node/deps/**/*"
+      "icon": "./img/icon/icon.png"
     }
   },
   "keywords": [
