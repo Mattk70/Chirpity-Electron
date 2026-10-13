@@ -168,11 +168,11 @@ jobs:
           echo "PLATFORM=$PLATFORM" >> $GITHUB_ENV
           echo "BINARY=$BINARY"     >> $GITHUB_ENV
 
-      - name: Overwrite FFmpeg binary
-        if: runner.os == 'macOS'
-        shell: bash
-        run: |
-          cp ./build/$PLATFORM/$BINARY ./node_modules/@ffmpeg-installer/$PLATFORM/$BINARY
+      # - name: Overwrite FFmpeg binary
+      #   if: runner.os == 'macOS'
+      #   shell: bash
+      #   run: |
+      #     cp ./build/$PLATFORM/$BINARY ./node_modules/@ffmpeg-installer/$PLATFORM/$BINARY
 
       - name: Patch fluent-ffmpeg - increase spawn timeout
         shell: bash
