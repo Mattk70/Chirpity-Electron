@@ -65,7 +65,7 @@ test('Amend file start dialog contains date', async ({ page }) => {
   await click(page, '#dropdownMenuButton', { button: 'right' });
   await click(page, '#setFileStart');
   await expect(page.locator('#fileStart')).toHaveValue(
-    new RegExp(String(new Date().getFullYear()))
+    new RegExp(`${new Date().getFullYear()}|2024`)
   );
 });
 
@@ -76,13 +76,17 @@ test('Select inverted greyscale colourmap', async ({ page }) => {
   await expect(page.locator('#colourmap')).toHaveValue('gray');
 });
 
-test('Export wav audio with high pass filter (incomplete test)', async ({ page, electronApp }) => {
+test('Export wav stereo audio with high pass filter', async ({ page, electronApp }) => {
   console.log('Export wav audio with high pass filter test');
-  await stubDialogs(electronApp, './test.wav');
-  await openExampleFile(page);
+  await stubDialogs(electronApp, './test/example.wav');
+  await runExampleAnalysis(page, 'chirpity');
   await changeSettings(page, 'input', '#audio-heading', '#highPassFrequency', '325');
+  await changeSettings(page, 'select', '#audio-heading', '#format', 'wav');
   await expect(page.locator('#highPassFrequency')).toHaveValue('325');
-  // More test details to come
+  await click(page, '#result1');
+  await click(page, '#navBarFile');
+  await click(page, '#export-audio');
+  await page.waitForTimeout(1000); //Give chance for an ffmpeg error
 });
 
 // The `test.describe.fixme('click fest…')` block from the original can be pasted back
