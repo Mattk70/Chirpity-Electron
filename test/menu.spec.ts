@@ -76,5 +76,14 @@ test('Select inverted greyscale colourmap', async ({ page }) => {
   await expect(page.locator('#colourmap')).toHaveValue('gray');
 });
 
+test('Export wav audio with high pass filter (incomplete test)', async ({ page, electronApp }) => {
+  console.log('Export wav audio with high pass filter test');
+  await stubDialogs(electronApp, './test.wav');
+  await openExampleFile(page);
+  await changeSettings(page, 'input', '#audio-heading', '#highPassFrequency', '325');
+  await expect(page.locator('#highPassFrequency')).toHaveValue('325');
+  // More test details to come
+});
+
 // The `test.describe.fixme('click fest…')` block from the original can be pasted back
 // here unchanged; it only needs `{ page }` in the test signature.
