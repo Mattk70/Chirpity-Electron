@@ -1575,7 +1575,7 @@ async function sortFilesByTime(fileNames) {
  */
 async function onOpenFiles({ filePaths = [], checkSaved = true, preserveResults } = {}) {
   if (!filePaths.length) return;
-  if (STATE.mode !== 'analyse') showAnalyse()
+  if (STATE?.mode !== 'analyse') showAnalyse()
 
   // Store the sanitised file list and Load First audio file
   pagination.reset();
@@ -3186,6 +3186,11 @@ function getSpecies(target) {
  * @param {string} options.extension - The file extension to use for the saved file.
  */
 async function onSaveAudio({ file, filename, extension }) {
+  if (isTestEnv) {
+    window.dispatchEvent(new CustomEvent('audio-file-to-save', {
+      detail: filename
+    }));
+  }
   await window.electron.saveFile({
     file: file,
     filename: filename,
