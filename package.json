@@ -115,7 +115,6 @@
       "!node_modules/@tensorflow/tfjs-node/deps/lib/tensorflow.lib",
       "!napi-v10/**/*",
       "!node_modules/@tensorflow/tfjs-node/build-tmp-napi-v8/**/*",
-      "!node_modules/@tensorflow/tfjs-node/deps/**/*",
       "!node_modules/@tensorflow/tfjs-node/node_modules/**/*",
       "!node_modules/@tensorflow/tfjs-node/python/**/*",
       "!node_modules/@tensorflow/tfjs-node/src/**/*",
@@ -210,7 +209,9 @@
       ],
       "verifyUpdateCodeSignature": false,
       "asar": true,
-      "icon": "./img/icon/icon.png"
+      "icon": "./img/icon/icon.png",
+      "files": 
+      "!node_modules/@tensorflow/tfjs-node/deps/**/*"
     }
   },
   "keywords": [
