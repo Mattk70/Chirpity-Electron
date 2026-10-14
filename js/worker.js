@@ -4186,23 +4186,20 @@ function filterDetectionsByRank(detections, topRankin) {
  * @param {number} lon - Longitude used to compute daylight for each detection timestamp.
  * @param {boolean} isCustomList - If true, apply additional per-result acceptance via allowedByList (skipped for selection mode).
  */
-async function sendResultsToUI (detections, file, modelID, lat, lon, isCustomList){
-  const {selection, detect, modelLabels, model} = STATE;
-  const {confidence, topRankin} = detect;
-  selection || (detections = filterDetectionsByRank(detections, topRankin));
+async function sendResultsToUI(detections, file, modelID, lat, lon, isCustomList) {
+  const { selection, detect, modelLabels, model } = STATE;
+  const { confidence: threshold, topRankin } = detect;
   const included = await getIncludedIDs(file).catch(console.warn);
   const metadata = METADATA[file];
-  const threshold = selection ? 50 : confidence;
-  
+
+  const filteredDetections = [];
+
   for (const det of detections) {
-    const {species, start, end, confidence} = det;
-    if (confidence < threshold) continue;
-    if (included.length && !included.includes(species + 1)) {
-      continue;
-    }
+    const { species, start, end, confidence } = det;
+    if (confidence < (selection ? 50 : threshold)) continue;
+    const [sname, cname] = modelLabels[species].split(getSplitChar());
+    if (included.length && !included.includes(species + 1)) continue;
     const timestamp = metadata.fileStart + start * 1000;
-    const [sname, cname] =
-      modelLabels[species].split(getSplitChar());
     const result = {
       timestamp,
       position: start,
@@ -4211,16 +4208,35 @@ async function sendResultsToUI (detections, file, modelID, lat, lon, isCustomLis
       cname,
       sname,
       isDaylight: isDuringDaylight(timestamp, lat, lon),
-      score: det.confidence,
+      score: confidence,
       model,
     };
-    if (isCustomList && !selection) {
-      if (!allowedByList(result)) continue;
-    }
+    if (isCustomList && !selection && !allowedByList(result)) continue;
+    filteredDetections.push(det);
+  }
+
+  const rankedDetections = selection
+    ? filteredDetections
+    : filterDetectionsByRank(filteredDetections, topRankin);
+
+  for (const det of rankedDetections) {
+    const { species, start, end, confidence: score } = det;
+    const [sname, cname] = modelLabels[species].split(getSplitChar());
+    const timestamp = metadata.fileStart + start * 1000;
+    const result = {
+      timestamp,
+      position: start,
+      end,
+      file,
+      cname,
+      sname,
+      isDaylight: isDuringDaylight(timestamp, lat, lon),
+      score,
+      model,
+    };
+
     sendResult(++index, result, false);
-    if (index > 499) {
-      setGetSummaryQueryInterval(NUM_WORKERS);
-    }
+    if (index > 499) setGetSummaryQueryInterval(NUM_WORKERS);
   }
 }
 /**
