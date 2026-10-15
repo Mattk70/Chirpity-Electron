@@ -156,23 +156,28 @@ jobs:
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             PLATFORM="win32-x64"
             BINARY="ffmpeg.exe"
+            PROBE="ffprobe.exe"
           elif [[ "$RUNNER_OS" == "macOS" ]]; then
             PLATFORM="darwin-arm64"
             chmod +x ./build/$PLATFORM/ffmpeg
             BINARY="ffmpeg"
+            PROBE="ffprobe"
           elif [[ "$RUNNER_OS" == "Linux" ]]; then
             PLATFORM="linux-x64"
             chmod +x ./build/$PLATFORM/ffmpeg
             BINARY="ffmpeg"
+            PROBE="ffprobe"
           fi
           echo "PLATFORM=$PLATFORM" >> $GITHUB_ENV
           echo "BINARY=$BINARY"     >> $GITHUB_ENV
+          echo "PROBE=$PROBE"       >> $GITHUB_ENV
 
-      # - name: Overwrite FFmpeg binary
-      #   if: runner.os == 'macOS'
-      #   shell: bash
-      #   run: |
-      #     cp ./build/$PLATFORM/$BINARY ./node_modules/@ffmpeg-installer/$PLATFORM/$BINARY
+      - name: Overwrite FFmpeg binaries
+        # if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          cp ./build/$PLATFORM/$BINARY ./node_modules/@ffmpeg-installer/$PLATFORM/$BINARY
+          cp ./build/$PLATFORM/$PROBE ./node_modules/@ffprobe-installer/$PLATFORM/$PROBE
 
       - name: Patch fluent-ffmpeg - increase spawn timeout
         shell: bash

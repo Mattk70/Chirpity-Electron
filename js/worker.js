@@ -1783,12 +1783,13 @@ async function addQueryQualifiers(stmt, params, range, caller) {
 const prepSummaryStatement = async () => {
   const { detect } = STATE;
   const topRankin = detect.topRankin;
+  const customList = STATE.list === 'custom';
 
   const partition = detect.merge ? '' : ', r.modelID';
   let summaryStatement = `
     WITH ranked_records AS (
-        SELECT r.position * 1000 + f.filestart as dateTime, r.confidence, f.name as file, f.archiveName, cname, sname, classIndex, COALESCE(callCount, 1) as callCount, isDaylight, tagID, r.modelID,
-        RANK() OVER (PARTITION BY fileID${partition}, r.position ORDER BY r.confidence DESC) AS rank
+        SELECT r.fileID, r.position, r.position * 1000 + f.filestart as dateTime, r.confidence, f.name as file, f.archiveName, cname, sname, classIndex, COALESCE(callCount, 1) as callCount, isDaylight, tagID, r.modelID
+        ${customList ? '' : `, RANK() OVER (PARTITION BY fileID${partition}, r.position ORDER BY r.confidence DESC) AS rank`}
         FROM records r
         JOIN files f ON f.id = r.fileID
         JOIN species s ON s.id = r.speciesID
@@ -1800,10 +1801,10 @@ const prepSummaryStatement = async () => {
   summaryStatement = stmt;
   summaryStatement += `
     )
-    SELECT cname, sname, confidence AS score, dateTime AS timestamp, callCount, modelID
+    SELECT fileID, position, cname, sname, confidence AS score, dateTime AS timestamp, callCount, modelID
     FROM ranked_records
-    WHERE ranked_records.rank <= ?`;
-  params.push(topRankin)
+    ${customList ? '' : 'WHERE ranked_records.rank <= ?'}`;
+  customList || params.push(topRankin);
 
   return {sql: summaryStatement, params};
 };
@@ -4186,23 +4187,20 @@ function filterDetectionsByRank(detections, topRankin) {
  * @param {number} lon - Longitude used to compute daylight for each detection timestamp.
  * @param {boolean} isCustomList - If true, apply additional per-result acceptance via allowedByList (skipped for selection mode).
  */
-async function sendResultsToUI (detections, file, modelID, lat, lon, isCustomList){
-  const {selection, detect, modelLabels, model} = STATE;
-  const {confidence, topRankin} = detect;
-  selection || (detections = filterDetectionsByRank(detections, topRankin));
+async function sendResultsToUI(detections, file, modelID, lat, lon, isCustomList) {
+  const { selection, detect, modelLabels, model } = STATE;
+  const { confidence: threshold, topRankin } = detect;
   const included = await getIncludedIDs(file).catch(console.warn);
   const metadata = METADATA[file];
-  const threshold = selection ? 50 : confidence;
-  
+
+  const filteredDetections = [];
+
   for (const det of detections) {
-    const {species, start, end, confidence} = det;
-    if (confidence < threshold) continue;
-    if (included.length && !included.includes(species + 1)) {
-      continue;
-    }
+    const { species, start, end, confidence } = det;
+    if (confidence < (selection ? 50 : threshold)) continue;
+    const [sname, cname] = modelLabels[species].split(getSplitChar());
+    if (included.length && !included.includes(species + 1)) continue;
     const timestamp = metadata.fileStart + start * 1000;
-    const [sname, cname] =
-      modelLabels[species].split(getSplitChar());
     const result = {
       timestamp,
       position: start,
@@ -4211,16 +4209,35 @@ async function sendResultsToUI (detections, file, modelID, lat, lon, isCustomLis
       cname,
       sname,
       isDaylight: isDuringDaylight(timestamp, lat, lon),
-      score: det.confidence,
+      score: confidence,
       model,
     };
-    if (isCustomList && !selection) {
-      if (!allowedByList(result)) continue;
-    }
+    if (isCustomList && !selection && !allowedByList(result)) continue;
+    filteredDetections.push(det);
+  }
+
+  const rankedDetections = selection
+    ? filteredDetections
+    : filterDetectionsByRank(filteredDetections, topRankin);
+
+  for (const det of rankedDetections) {
+    const { species, start, end, confidence: score } = det;
+    const [sname, cname] = modelLabels[species].split(getSplitChar());
+    const timestamp = metadata.fileStart + start * 1000;
+    const result = {
+      timestamp,
+      position: start,
+      end,
+      file,
+      cname,
+      sname,
+      isDaylight: isDuringDaylight(timestamp, lat, lon),
+      score,
+      model,
+    };
+
     sendResult(++index, result, false);
-    if (index > 499) {
-      setGetSummaryQueryInterval(NUM_WORKERS);
-    }
+    if (index > 499) setGetSummaryQueryInterval(NUM_WORKERS);
   }
 }
 /**
@@ -4646,9 +4663,35 @@ async function getSummaryRows(cache) {
   // First param is always confidence
   const {confidence, topRankin} = STATE.detect;
   summaryParams[0] = STATE.list === 'custom' ? 0 : confidence;
-  // Last param is always topRankin
-  summaryParams[summaryParams.length - 1] = topRankin;
+  if (STATE.list !== 'custom') {
+    summaryParams[summaryParams.length - 1] = topRankin;
+  }
   return await summaryStmt.allAsync(...summaryParams);
+}
+
+function rankCustomSummaryRows(rows, merge, topRankin) {
+  const partitions = new Map();
+  for (const row of rows) {
+    const key = JSON.stringify(
+      merge ? [row.fileID, row.position] : [row.fileID, row.modelID, row.position]
+    );
+    const partition = partitions.get(key) || [];
+    partition.push(row);
+    partitions.set(key, partition);
+  }
+
+  const rankedRows = [];
+  for (const partition of partitions.values()) {
+    partition.sort((a, b) => b.score - a.score);
+    let rank = 0;
+    partition.forEach((row, index) => {
+      if (index === 0 || row.score !== partition[index - 1].score) {
+        rank = index + 1;
+      }
+      if (rank <= topRankin) rankedRows.push(row);
+    });
+  }
+  return rankedRows;
 }
 
 const getSummary = async ({
@@ -4670,7 +4713,11 @@ const getSummary = async ({
     DEBUG && console.log(`getting summary took ${Date.now() - t0} ms`)
     const allowedRows =
       STATE.list === 'custom'
-        ? rows.filter(allowedByList)
+        ? rankCustomSummaryRows(
+            rows.filter(allowedByList),
+            STATE.detect.merge,
+            STATE.detect.topRankin
+          )
         : rows;
     let summary = Object.create(null);
 
