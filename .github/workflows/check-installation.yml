@@ -170,6 +170,7 @@ jobs:
           fi
           echo "PLATFORM=$PLATFORM" >> $GITHUB_ENV
           echo "BINARY=$BINARY"     >> $GITHUB_ENV
+          echo "PROBE=$PROBE"       >> $GITHUB_ENV
 
       - name: Overwrite FFmpeg binaries
         # if: runner.os == 'macOS'
