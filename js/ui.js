@@ -4879,13 +4879,14 @@ const deleteRecord = (e) => {
 };
 
 const deleteSpecies = (target) => {
+  const row = target.closest("tr");
   worker.postMessage({
     action: "delete-species",
     species: getSpecies(target),
+    active: row.rowIndex,
     speciesFiltered: isSpeciesViewFiltered(),
   });
   // Clear the record in the UI
-  const row = target.closest("tr");
   const table = document.getElementById("resultSummary");
   const rowClicked = row.rowIndex;
   table.deleteRow(rowClicked);
