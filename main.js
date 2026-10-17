@@ -566,6 +566,8 @@ if (!gotTheLock) {
 
 // This method will be called when Electron has finished loading
 app.whenReady().then(async () => {
+  // Clear the HTTP cache
+  await session.defaultSession.clearCache();
   // Update the userData path for portable app
   if (process.env.PORTABLE_EXECUTABLE_DIR) {
     app.setPath(
