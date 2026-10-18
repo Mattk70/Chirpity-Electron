@@ -518,12 +518,12 @@ function resetResults({
   clearPagination = true,
   clearResults = true,
 } = {}) {
-  if (clearSummary) DOM.summaryTable.textContent = "";
+  if (clearSummary) DOM.summaryTable.replaceChildren();
   if (clearPagination) pagination?.hide();
   resultsBuffer = DOM.resultTable.cloneNode(false);
   if (clearResults) {
-    DOM.resultTable.textContent = "";
-    DOM.resultHeader.textContent = "";
+    DOM.resultTable.replaceChildren();
+    DOM.resultHeader.replaceChildren();
   }
   predictions.clear();
 }
@@ -3780,12 +3780,9 @@ const handleModelChange = async (model, reload = true) => {
   document.getElementById(backend).checked = true;
 
   const {combine, merge} = config.detect;
-  DOM.resultTable.replaceChildren();
   if (!(combine || merge)) {
     resetResults();
     resetRegions(true);
-    DOM.summaryTable.replaceChildren();
-    DOM.resultHeader.replaceChildren();
   }
   if (reload) {
     handleBackendChange(backend);
@@ -4561,9 +4558,9 @@ function onSummaryComplete({ filterSpecies = undefined, summary = [], active }) 
       "saveCSV",
       "save-eBird",
       "save-summary",
-      "save-Raven",
-      "save2db",
+      "save-Raven"
     ];
+  STATE.mode === 'analyse' && menuItems.push("save2db")
   if (summary.length) {
     updateSummary({ 
       summary: summary,
