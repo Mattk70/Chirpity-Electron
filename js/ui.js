@@ -3778,14 +3778,8 @@ const handleModelChange = async (model, reload = true) => {
     : delete LIST_MAP.custom;
   const backend = config.models[model].backend;
   document.getElementById(backend).checked = true;
-  if (reload) {
-    handleBackendChange(backend);
-  }
-  updateListOptions(model);
-  updateModelIcon(model);
-  updateListIcon();
-  const {combine, merge} = config.detect;
 
+  const {combine, merge} = config.detect;
   DOM.resultTable.replaceChildren();
   if (!(combine || merge)) {
     resetResults();
@@ -3793,6 +3787,12 @@ const handleModelChange = async (model, reload = true) => {
     DOM.summaryTable.replaceChildren();
     DOM.resultHeader.replaceChildren();
   }
+  if (reload) {
+    handleBackendChange(backend);
+  }
+  updateListOptions(model);
+  updateModelIcon(model);
+  updateListIcon();
 }
 
 /**
@@ -4302,7 +4302,7 @@ async function loadSummaryImages(fragment) {
  * @param {boolean} [options.finished=false] - Enable species pointer styling and image popovers.
  * @returns {void} Returns before the asynchronous table replacement completes.
  */
-const updateSummary = ({ summary = [], filterSpecies = "", finished = false }) => {
+const updateSummary = ({ summary = [], filterSpecies = "", active = undefined, finished = false }) => {
 
   STATE.summary = summary;
   const i18 = i18n.get(i18n.Headings);
@@ -4334,7 +4334,9 @@ const updateSummary = ({ summary = [], filterSpecies = "", finished = false }) =
   const i18nIUCN = i18n.get(i18n.IUCNLabel);
   for (let i = 0; i < summary.length; i++) {
     const item = summary[i];
-    const selected = item.cname === filterSpecies ? " text-warning" : "";
+    const selected = (active !== undefined ? i + 1 === active : item.cname === filterSpecies)
+      ? " text-warning"
+      : "";
     if (selected) selectedRow = i + 1;
     const pointer = finished ? 'pointer' : 'not-allowed'
     summaryHTML += `<tr tabindex="-1" class="${selected}">
@@ -4553,28 +4555,30 @@ function onAnalysisComplete({ quiet }) {
  * @param {string} [options.filterSpecies] - Common name to highlight and use for pagination; all summary rows remain visible.
  * @param {Array} [options.summary=[]] - Array of summary records to render in the summary table.
  */
-function onSummaryComplete({ filterSpecies = undefined, summary = [] }) {
-  if (summary.length) updateSummary({ summary: summary, filterSpecies: filterSpecies, finished: true });
-
-  // Add hover to the summary
-  const summaryNode = document.getElementById("resultSummary");
-  if (summaryNode) {
-    summaryNode.classList.add("table-hover");
-  }
-  if (!PREDICTING || STATE.mode !== "analyse") activateResultSort();
-  if (summary.length) {
-    utils.enableMenuItem(["saveLabels", "saveCSV", "save-summary", "save-eBird", "save-Raven"]);
-    STATE.mode !== "explore" && utils.enableMenuItem(["save2db"]);
-  } else {
-    utils.disableMenuItem([
+function onSummaryComplete({ filterSpecies = undefined, summary = [], active }) {
+  const menuItems = [
       "saveLabels",
       "saveCSV",
       "save-eBird",
       "save-summary",
       "save-Raven",
       "save2db",
-    ]);
+    ];
+  if (summary.length) {
+    updateSummary({ 
+      summary: summary,
+      filterSpecies:filterSpecies,
+      active,
+      finished: true 
+    });
+    utils.enableMenuItem(menuItems);
+    // Add hover to the summary
+    const summaryNode = document.getElementById("resultSummary");
+    summaryNode?.classList.add("table-hover");
+  } else {
+    utils.disableMenuItem(menuItems);
   }
+  if (!PREDICTING || STATE.mode !== "analyse") activateResultSort();    
   if (STATE.currentFile) utils.enableMenuItem(["analyse"]);
 }
 
