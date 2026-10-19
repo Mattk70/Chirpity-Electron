@@ -518,12 +518,12 @@ function resetResults({
   clearPagination = true,
   clearResults = true,
 } = {}) {
-  if (clearSummary) DOM.summaryTable.textContent = "";
+  if (clearSummary) DOM.summaryTable.replaceChildren();
   if (clearPagination) pagination?.hide();
   resultsBuffer = DOM.resultTable.cloneNode(false);
   if (clearResults) {
-    DOM.resultTable.textContent = "";
-    DOM.resultHeader.textContent = "";
+    DOM.resultTable.replaceChildren();
+    DOM.resultHeader.replaceChildren();
   }
   predictions.clear();
 }
@@ -3778,21 +3778,18 @@ const handleModelChange = async (model, reload = true) => {
     : delete LIST_MAP.custom;
   const backend = config.models[model].backend;
   document.getElementById(backend).checked = true;
+
+  const {combine, merge} = config.detect;
+  if (!(combine || merge)) {
+    resetResults();
+    resetRegions(true);
+  }
   if (reload) {
     handleBackendChange(backend);
   }
   updateListOptions(model);
   updateModelIcon(model);
   updateListIcon();
-  const {combine, merge} = config.detect;
-
-  DOM.resultTable.replaceChildren();
-  if (!(combine || merge)) {
-    resetResults();
-    resetRegions(true);
-    DOM.summaryTable.replaceChildren();
-    DOM.resultHeader.replaceChildren();
-  }
 }
 
 /**
@@ -4302,7 +4299,7 @@ async function loadSummaryImages(fragment) {
  * @param {boolean} [options.finished=false] - Enable species pointer styling and image popovers.
  * @returns {void} Returns before the asynchronous table replacement completes.
  */
-const updateSummary = ({ summary = [], filterSpecies = "", finished = false }) => {
+const updateSummary = ({ summary = [], filterSpecies = "", active = undefined, finished = false }) => {
 
   STATE.summary = summary;
   const i18 = i18n.get(i18n.Headings);
@@ -4332,15 +4329,19 @@ const updateSummary = ({ summary = [], filterSpecies = "", finished = false }) =
     : "";
   let selectedRow = null;
   const i18nIUCN = i18n.get(i18n.IUCNLabel);
+  const selectedSpecies =
+      active !== undefined ? summary[active - 1]?.cname ?? "" : filterSpecies;
   for (let i = 0; i < summary.length; i++) {
     const item = summary[i];
-    const selected = item.cname === filterSpecies ? " text-warning" : "";
+    const selected = (active !== undefined ? i + 1 === active : item.cname === filterSpecies)
+      ? " text-warning"
+      : "";
     if (selected) selectedRow = i + 1;
     const pointer = finished ? 'pointer' : 'not-allowed'
     summaryHTML += `<tr tabindex="-1" class="${selected}">
                 ${showImage ? `<td scope="col"><img src="img/not-found.png" 
                   data-sname="${utils.escapeHTML(item.sname)}" 
-+                 data-cname="${utils.escapeHTML(item.cname)}" 
+                  data-cname="${utils.escapeHTML(item.cname)}" 
                   style="height: 40px;width: 60px; cursor: pointer;" 
                   alt="${utils.escapeHTML(item.cname)}"></td>` : ""
                 }
@@ -4392,8 +4393,8 @@ const updateSummary = ({ summary = [], filterSpecies = "", finished = false }) =
     });
     old_summary.replaceChildren(fragment);
     showSummarySortIcon();
-    setAutocomplete(selectedRow ? filterSpecies : "");
-    updatePagination(filterSpecies);
+    setAutocomplete(selectedRow ? selectedSpecies : "");
+    updatePagination(selectedSpecies);
 
     // Scroll to the selected species
     if (selectedRow) {
@@ -4553,28 +4554,30 @@ function onAnalysisComplete({ quiet }) {
  * @param {string} [options.filterSpecies] - Common name to highlight and use for pagination; all summary rows remain visible.
  * @param {Array} [options.summary=[]] - Array of summary records to render in the summary table.
  */
-function onSummaryComplete({ filterSpecies = undefined, summary = [] }) {
-  if (summary.length) updateSummary({ summary: summary, filterSpecies: filterSpecies, finished: true });
-
-  // Add hover to the summary
-  const summaryNode = document.getElementById("resultSummary");
-  if (summaryNode) {
-    summaryNode.classList.add("table-hover");
-  }
-  if (!PREDICTING || STATE.mode !== "analyse") activateResultSort();
-  if (summary.length) {
-    utils.enableMenuItem(["saveLabels", "saveCSV", "save-summary", "save-eBird", "save-Raven"]);
-    STATE.mode !== "explore" && utils.enableMenuItem(["save2db"]);
-  } else {
-    utils.disableMenuItem([
+function onSummaryComplete({ filterSpecies = undefined, summary = [], active }) {
+  const menuItems = [
       "saveLabels",
       "saveCSV",
       "save-eBird",
       "save-summary",
-      "save-Raven",
-      "save2db",
-    ]);
+      "save-Raven"
+    ];
+  STATE.mode === 'analyse' && menuItems.push("save2db")
+  if (summary.length) {
+    updateSummary({ 
+      summary: summary,
+      filterSpecies:filterSpecies,
+      active,
+      finished: true 
+    });
+    utils.enableMenuItem(menuItems);
+    // Add hover to the summary
+    const summaryNode = document.getElementById("resultSummary");
+    summaryNode?.classList.add("table-hover");
+  } else {
+    utils.disableMenuItem(menuItems);
   }
+  if (!PREDICTING || STATE.mode !== "analyse") activateResultSort();    
   if (STATE.currentFile) utils.enableMenuItem(["analyse"]);
 }
 
@@ -4879,13 +4882,14 @@ const deleteRecord = (e) => {
 };
 
 const deleteSpecies = (target) => {
+  const row = target.closest("tr");
   worker.postMessage({
     action: "delete-species",
     species: getSpecies(target),
+    active: row.rowIndex,
     speciesFiltered: isSpeciesViewFiltered(),
   });
   // Clear the record in the UI
-  const row = target.closest("tr");
   const table = document.getElementById("resultSummary");
   const rowClicked = row.rowIndex;
   table.deleteRow(rowClicked);

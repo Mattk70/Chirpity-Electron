@@ -576,6 +576,9 @@ app.whenReady().then(async () => {
   } else {
     ipcMain.handle("getVersion", () => version);
   }
+
+  // Clear the HTTP cache
+  await session.defaultSession.clearCache();
   // Allow screen recording
   session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
     // Capture the requesting frame itself (the "this tab" equivalent)

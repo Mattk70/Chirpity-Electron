@@ -4211,6 +4211,7 @@ async function sendResultsToUI(detections, file, modelID, lat, lon, isCustomList
       isDaylight: isDuringDaylight(timestamp, lat, lon),
       score: confidence,
       model,
+      modelID
     };
     if (isCustomList && !selection && !allowedByList(result)) continue;
     filteredDetections.push(det);
@@ -4234,6 +4235,7 @@ async function sendResultsToUI(detections, file, modelID, lat, lon, isCustomList
       isDaylight: isDuringDaylight(timestamp, lat, lon),
       score,
       model,
+      modelID
     };
 
     sendResult(++index, result, false);
@@ -5742,7 +5744,7 @@ async function onDelete({
  * @param {string} params.species - The common name of the species to delete records for.
  * @param {string} [params.speciesFiltered] - Used for UI highlighting; does not affect deletion logic.
  */
-async function onDeleteSpecies({species}) {
+async function onDeleteSpecies({species, active}) {
   const db = STATE.db;
   const params = [species];
   let SQL = `DELETE FROM records 
@@ -5784,6 +5786,7 @@ async function onDeleteSpecies({species}) {
     } else {
       UI.postMessage({ event: "unsaved-records" });
     }
+    await getSummary({active});
   }
 }
 
