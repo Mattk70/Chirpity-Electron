@@ -4329,6 +4329,8 @@ const updateSummary = ({ summary = [], filterSpecies = "", active = undefined, f
     : "";
   let selectedRow = null;
   const i18nIUCN = i18n.get(i18n.IUCNLabel);
+  const selectedSpecies =
+      active !== undefined ? summary[active - 1]?.cname ?? "" : filterSpecies;
   for (let i = 0; i < summary.length; i++) {
     const item = summary[i];
     const selected = (active !== undefined ? i + 1 === active : item.cname === filterSpecies)
@@ -4339,7 +4341,7 @@ const updateSummary = ({ summary = [], filterSpecies = "", active = undefined, f
     summaryHTML += `<tr tabindex="-1" class="${selected}">
                 ${showImage ? `<td scope="col"><img src="img/not-found.png" 
                   data-sname="${utils.escapeHTML(item.sname)}" 
-+                 data-cname="${utils.escapeHTML(item.cname)}" 
+                  data-cname="${utils.escapeHTML(item.cname)}" 
                   style="height: 40px;width: 60px; cursor: pointer;" 
                   alt="${utils.escapeHTML(item.cname)}"></td>` : ""
                 }
@@ -4391,8 +4393,8 @@ const updateSummary = ({ summary = [], filterSpecies = "", active = undefined, f
     });
     old_summary.replaceChildren(fragment);
     showSummarySortIcon();
-    setAutocomplete(selectedRow ? filterSpecies : "");
-    updatePagination(filterSpecies);
+    setAutocomplete(selectedRow ? selectedSpecies : "");
+    updatePagination(selectedSpecies);
 
     // Scroll to the selected species
     if (selectedRow) {
