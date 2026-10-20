@@ -9578,14 +9578,11 @@ async function videoCapture(btn) {
     const [videoTrack] = display.getVideoTracks();
     // Wait for the the track aspect ratio and screenPixelRatio to settle
     // Prevents a zoom switch in the video
-    await waitForStableVideoTrack(videoTrack);
     await videoTrack.restrictTo(
       await RestrictionTarget.fromElement(waveElement)
     );
 
-
     stream = new MediaStream([videoTrack, audioTrack]);
-
 
     // User may have resized while getDisplayMedia was pending
     if (STATE.captureAbortController.signal.aborted) {
@@ -9629,7 +9626,7 @@ async function videoCapture(btn) {
         recorder.stop();
       }
     }, { once: true });
-
+    await waitForStableVideoTrack(videoTrack);
     recorder.start();
     // Fade in watermark
     requestAnimationFrame(() => waterMark.style.opacity = '1');
@@ -9736,7 +9733,8 @@ async function waitForStableVideoTrack(track) {
     const current = `${screenPixelRatio}+${aspectRatio}`;
 
     if (current === previous) {
-      if (++count === 3) return;
+      console.warn('checking frame:', i)
+      if (++count === 10) return;
     }
     previous = current;
     await new Promise(requestAnimationFrame);
