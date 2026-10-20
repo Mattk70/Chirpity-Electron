@@ -9717,7 +9717,7 @@ function tearDownCapture(btn) {
 }
 
 /**
- * Sample display-track settings on animation frames until 10 comparisons match the
+ * Sample display-track settings on animation frames until 10 consecutive comparisons match the
  * preceding sample's pixel ratios, or 20 samples have been checked. Matches
  * need not be consecutive, and reaching the limit does not reject.
  *
@@ -9732,9 +9732,8 @@ async function waitForStableVideoTrack(track) {
     const current = screenPixelRatio || Date.now();
 
     if (current === previous) {
-      console.warn('checking frame:', i)
       if (++count === 10) return;
-    }
+    } else {count = 0}
     previous = current;
     await new Promise(requestAnimationFrame);
   }
