@@ -250,13 +250,26 @@ export class ChirpityWS {
 
     this.unfinish = wavesurfer.on("finish", () => {
       const {windowLength, windowOffsetSecs, currentFile, currentFileDuration, openFiles} = STATE;
-      const bufferEnd = windowOffsetSecs + windowLength;
+      const bufferBegin = windowOffsetSecs + windowLength;
+      const bufferEnd = bufferBegin + windowLength;
       if (currentFileDuration > bufferEnd) {
         this.handlers.postBufferUpdate({
-          begin: windowOffsetSecs + windowLength,
+          begin: bufferBegin,
           play: !wavesurfer.isPaused,
         });
-      } else if (!wavesurfer.isPaused) {
+      } else if (currentFileDuration > bufferBegin) {
+        // If remaining file duration > windowlength, start at 
+        // the end of the file - windowLength but play from the current position in the file
+        const adjustedBegin = currentFileDuration - windowLength;
+        const startSeconds = bufferBegin - adjustedBegin;
+        const position = startSeconds ? startSeconds / windowLength : 0;
+        this.handlers.postBufferUpdate({
+          begin: adjustedBegin,
+          play: !wavesurfer.isPaused,
+          position
+        });
+      } 
+      else if (!wavesurfer.isPaused) {
         const fileIndex = openFiles.indexOf(currentFile);
         if (fileIndex < openFiles.length - 1) {
           // Move to next file
