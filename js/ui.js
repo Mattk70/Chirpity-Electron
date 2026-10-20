@@ -9578,14 +9578,11 @@ async function videoCapture(btn) {
     const [videoTrack] = display.getVideoTracks();
     // Wait for the the track aspect ratio and screenPixelRatio to settle
     // Prevents a zoom switch in the video
-    await waitForStableVideoTrack(videoTrack);
     await videoTrack.restrictTo(
       await RestrictionTarget.fromElement(waveElement)
     );
 
-
     stream = new MediaStream([videoTrack, audioTrack]);
-
 
     // User may have resized while getDisplayMedia was pending
     if (STATE.captureAbortController.signal.aborted) {
@@ -9629,7 +9626,7 @@ async function videoCapture(btn) {
         recorder.stop();
       }
     }, { once: true });
-
+    await waitForStableVideoTrack(videoTrack);
     recorder.start();
     // Fade in watermark
     requestAnimationFrame(() => waterMark.style.opacity = '1');
@@ -9720,8 +9717,8 @@ function tearDownCapture(btn) {
 }
 
 /**
- * Sample display-track settings on animation frames until three comparisons match the
- * preceding sample's pixel and aspect ratios, or 20 samples have been checked. Matches
+ * Sample display-track settings on animation frames until 10 consecutive comparisons match the
+ * preceding sample's pixel ratios, or 20 samples have been checked. Matches
  * need not be consecutive, and reaching the limit does not reject.
  *
  * @param {MediaStreamTrack} track - Display video track whose settings are sampled.
@@ -9731,13 +9728,12 @@ function tearDownCapture(btn) {
 async function waitForStableVideoTrack(track) {
   let previous, count = 0;
   for (let i = 0; i < 20; i++) {
-    const settings = track.getSettings();
-    const { screenPixelRatio, aspectRatio } = settings;
-    const current = `${screenPixelRatio}+${aspectRatio}`;
+    const screenPixelRatio = track.getSettings()?.screenPixelRatio;
+    const current = screenPixelRatio || Date.now();
 
     if (current === previous) {
-      if (++count === 3) return;
-    }
+      if (++count === 10) return;
+    } else {count = 0}
     previous = current;
     await new Promise(requestAnimationFrame);
   }
