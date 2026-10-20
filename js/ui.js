@@ -9718,7 +9718,7 @@ function tearDownCapture(btn) {
 
 /**
  * Sample display-track settings on animation frames until 10 comparisons match the
- * preceding sample's pixel and aspect ratios, or 20 samples have been checked. Matches
+ * preceding sample's pixel ratios, or 20 samples have been checked. Matches
  * need not be consecutive, and reaching the limit does not reject.
  *
  * @param {MediaStreamTrack} track - Display video track whose settings are sampled.
