@@ -2067,19 +2067,12 @@ async function showAnalyse() {
   utils.disableMenuItem(["active-analysis"]);
   //Restore STATE
   if (STATE.currentAnalysis) {
-    for (const key of [
-      'currentFile',
-      'openFiles',
-      'offset',
-      'resultsSortOrder',
-      'resultsMetaSortOrder',
-      'summarySortOrder'
-    ])
-    if (key in STATE.currentAnalysis)
-      STATE[key] = STATE.currentAnalysis[key];
+    const { currentAnalysis, ...analysisState } = STATE.currentAnalysis;
+    Object.assign(STATE, analysisState);
   }
   resetRegions(true);
-  worker.postMessage({ action: "change-mode", mode: STATE.currentAnalysis.mode});
+
+  worker.postMessage({ action: "change-mode", mode: STATE.mode});
   clearLocationFilter();
 
   utils.hideAll();
@@ -2089,16 +2082,16 @@ async function showAnalyse() {
     if (STATE.analysisDone) {
       pagination?.reset();
       filterResults({
-        species: STATE.currentAnalysis.species,
-        offset: STATE.currentAnalysis.offset,
-        active: STATE.currentAnalysis.active,
+        species: STATE.species,
+        offset: STATE.offset,
+        active: STATE.active,
         updateSummary: true,
       });
     } else {
       loadAudioFileSync({ filePath: STATE.currentFile });
     }
   }
-  STATE.currentAnalysis = null;
+  delete STATE.currentAnalysis;
   resetResults();
 }
 
