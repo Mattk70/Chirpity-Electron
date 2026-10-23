@@ -1940,7 +1940,11 @@ const handleLocationFilterChange = (e) => {
     globalOffset: 0,
     filteredOffset: {},
   });
-  if (STATE.mode === "explore") filterResults();
+  if (STATE.mode === "explore"){
+    pagination?.clear(); 
+    resetResults();
+    filterResults();
+  } 
 };
 
 function saveAnalyseState() {

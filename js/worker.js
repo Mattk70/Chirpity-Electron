@@ -5540,13 +5540,28 @@ const getDetectedSpecies = async () => {
  */
 const getValidSpecies = async (file) => {
   const included = await getIncludedIDs(file); // classindex values
-  const locationID = METADATA[file]?.locationID ?? STATE.location?.id;
+  const meta = METADATA[file];
+  const lat = meta?.lat;
+  const lon = meta?.lon;
+  const i18 = {
+    en: 'this location was found in the current file&apos;s metadata',
+    da: 'denne placering blev fundet i den aktuelle fils metadata',
+    de: 'Dieser Speicherort wurde in den Metadaten der aktuellen Datei gefunden',
+    es: 'esta ubicación se encontró en los metadatos del archivo actual',
+    fr: 'cet emplacement a été trouvé dans les métadonnées du fichier actuel',
+    ja: 'この場所は現在のファイルのメタデータで見つかりました',
+    nl: 'deze locatie is gevonden in de metadata van het huidige bestand',
+    pt: 'esta localização foi encontrada nos metadados do ficheiro atual',
+    ru: 'это местоположение найдено в метаданных текущего файла',
+    sv: 'den här platsen hittades i den aktuella filens metadata',
+    zh: '此位置是在当前文件的元数据中找到的'
+  };
+  const locationID = meta?.locationID ?? STATE.location?.id;
   const {place} = locationID != undefined
     ? await STATE.db.getAsync(
         "SELECT place FROM locations WHERE id = ?",
-        locationID
-      )
-    : { place: STATE.place };
+        locationID )
+    : {place: lat && lon ? `${lat}, ${lon} (${i18[STATE.locale] || i18["en"]})` : STATE.place}
   const includedSpecies = [];
   const excludedSpecies = [];
   let customCnames = [], customCnamesWithCallType = [];

@@ -3620,7 +3620,7 @@ const SpeciesList = {
         week: '. The current file was saved in week <b>${week}</b>',
         weekSpecific: 'week-specific',
         threshold: '${weekSpecific} species filter threshold of <b>${speciesThreshold}</b>',
-        location: ' focused on <b>${place}</b>, with a ${species_filter_text}${current_file_text}',
+        location: ' centred on <b>${place}</b>, with a ${species_filter_text}${current_file_text}',
         depending: ', depending on the date of the file you analyse',
         upTo: ' up to ',
         classesText: ' including the following species&apos; Classes <b>"${classes}"</b>',
