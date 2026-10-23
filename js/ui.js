@@ -1942,8 +1942,9 @@ const handleLocationFilterChange = (e) => {
   });
   if (STATE.mode === "explore"){
     pagination?.clear(); 
+    const species = isSpeciesViewFiltered(true);
     resetResults();
-    filterResults();
+    filterResults({ species });
   } 
 };
 

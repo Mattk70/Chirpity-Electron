@@ -5557,11 +5557,15 @@ const getValidSpecies = async (file) => {
     zh: '此位置是在当前文件的元数据中找到的'
   };
   const locationID = meta?.locationID ?? STATE.location?.id;
-  const {place} = locationID != undefined
+  const {place} = (locationID != undefined
     ? await STATE.db.getAsync(
-        "SELECT place FROM locations WHERE id = ?",
+         "SELECT place FROM locations WHERE id = ?",
         locationID )
-    : {place: lat && lon ? `${lat}, ${lon} (${i18[STATE.locale] || i18["en"]})` : STATE.place}
+    : undefined) ?? {
+      place: Number.isFinite(lat) && Number.isFinite(lon)
+       ? `${lat}, ${lon} (${i18[STATE.locale] || i18["en"]})` 
+       : STATE.place
+    };
   const includedSpecies = [];
   const excludedSpecies = [];
   let customCnames = [], customCnamesWithCallType = [];
