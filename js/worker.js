@@ -3144,6 +3144,9 @@ const bufferToAudio = async ({
   const extension = p.extname(file).toLowerCase();
   if (extension === '.' + format) {
     formatMap[format] = {...formatMap[format], ...await getAudioCodec(file)};
+  } else {
+    const {sampleRate, channels} = await getAudioCodec(file);
+    formatMap[format] = {...formatMap[format], sampleRate, channels};
   }
   const { audioCodec, soundFormat, sampleRate, channels } = formatMap[format];
 
