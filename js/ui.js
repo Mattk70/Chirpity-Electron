@@ -547,6 +547,7 @@ function loadAudioFileSync({ filePath = "", preserveResults = false }) {
     position: 0,
     list: config.list, // list and warmup are passed to enable abort if file loaded during predictions
     warmup: config.warmup,
+    splitChannels: config.customColormap.splitChannels
   });
 }
 
@@ -570,6 +571,7 @@ const postBufferUpdate = ({
     play: play,
     resetSpec: resetSpec,
     goToRegion: goToRegion,
+    splitChannels: config.customColormap.splitChannels
   });
   // In case it takes a while:
   loadingFiles({hide:false})
@@ -2288,6 +2290,7 @@ const defaultConfig = {
     autoGain: false,
     preEmphasis: 0, // Pre-emphasis filter willl be 0 (false) or 6 (true)
     rangeDB: 80, // Range in dB for the spectrogram
+    splitChannels: false
   },
   timeOfDay: true,
   list: "birds",
@@ -2472,6 +2475,7 @@ window.onload = async () => {
     config.customColormap.scale = 'linear';
     config.customColormap.preEmphasis = 0;
     config.customColormap.rangeDB = 80;
+    config.customColormap.splitChannels = false;
   }
   const selectedModel = config.selectedModel;
 
@@ -2588,7 +2592,8 @@ window.onload = async () => {
     document.getElementById("alpha").classList.remove("d-none");
   config.colormap === "custom" &&
     document.getElementById("colormap-fieldset").classList.remove("d-none");
-  const {loud, mid, quiet, quietThreshold, midThreshold, alpha, autoGain, preEmphasis, rangeDB} = config.customColormap;
+  const {loud, mid, quiet, quietThreshold, midThreshold, alpha, 
+    autoGain, preEmphasis, rangeDB, splitChannels} = config.customColormap;
   document.getElementById("quiet-color-threshold").textContent = quietThreshold;
   document.getElementById("quiet-color-threshold-slider").value = quietThreshold;
   document.getElementById("mid-color-threshold").textContent = midThreshold;
@@ -2601,6 +2606,7 @@ window.onload = async () => {
   document.getElementById("autogain").checked = autoGain;
   document.getElementById("preemphasis").checked = preEmphasis;
   document.getElementById("range-db").value = rangeDB;
+  document.getElementById("split-channels").checked = splitChannels;
   
   // Audio preferences:
   DOM.gain.value = audio.gain;
@@ -4184,6 +4190,7 @@ async function onWorkerLoadedAudio({
   contents,
   play = false,
   metadata,
+  channels
 }) {
   loadingFiles({hide:true})
   const resetSpec = !STATE.currentFile;
@@ -4217,8 +4224,16 @@ async function onWorkerLoadedAudio({
     : new Date(0, 0, 0, 0, 0, 0, 0).getTime();
   STATE.bufferStartTime = new Date(initialTime + windowBegin * 1000);
   const sr = config.selectedModel.includes("batpack") ? 256_000 : 24_000
-  STATE.windowLength = contents.byteLength / (sr * 2);
+  STATE.windowLength = contents.byteLength / (sr * 2 * channels);
   resetRegions();
+  // Set the spectrogram channel count
+  if (spec?.channels !== channels){
+    if (spec.spectrogram){
+      spec.spectrogram.height *= spec.channels;
+      spec.spectrogram.height /= channels;
+    }
+    spec.channels = channels;
+  }
   await spec.updateSpec({
     buffer: STATE.currentBuffer,
     position,
@@ -7410,11 +7425,13 @@ document.addEventListener("change", async function (e) {
         case "autogain":
         case "preemphasis":
         case "range-db":
+        case "split-channels":
         case "alpha-slider": {
           const alpha = document.getElementById("alpha-slider").valueAsNumber;
           const autoGain = document.getElementById("autogain").checked;
           const preEmphasis = document.getElementById("preemphasis").checked ? 6 : 0;
           const rangeDB = document.getElementById("range-db").valueAsNumber;
+          const splitChannels = document.getElementById("split-channels").checked;
           const loud = document.getElementById("loud-color").value;
           const mid = document.getElementById("mid-color").value;
           const quiet = document.getElementById("quiet-color").value;
@@ -7436,7 +7453,8 @@ document.addEventListener("change", async function (e) {
             autoGain,
             preEmphasis,
             rangeDB,
-            scale
+            scale,
+            splitChannels
           };
           if (spec.wavesurfer && STATE.currentFile) {
             spec.setOptions();
@@ -8859,6 +8877,7 @@ async function membershipCheck() {
     config.customColormap.autoGain = false;
     config.customColormap.preEmphasis = false;
     config.customColormap.rangeDB = 80;
+    config.customColormap.splitChannels = false;
     // Set all backends to 'tensorflow'
     if (config.hasNode){
       Object.values(config.models).forEach(model => {

@@ -2418,11 +2418,12 @@ async function loadAudioFile({
   // region = false,
   play = false,
   goToRegion = true,
+  splitChannels = true
 }) {
   return new Promise((resolve, reject) => {
     if (file) {
-      fetchAudioBuffer({ file, start, end })
-        .then(([audio, start]) => {
+      fetchAudioBuffer({ file, start, end, splitChannels })
+        .then(([audio, start, channels]) => {
           if (!audio || audio.length === 0) {
             return reject({message: 'No audio data found in file'}) 
           }
@@ -2438,6 +2439,7 @@ async function loadAudioFile({
               contents: audio,
               play: play,
               metadata: METADATA[file].metadata,
+              channels
             },
           );
           let week;
@@ -2870,7 +2872,7 @@ async function processAudio(
  * @param {number} [params.end] - The end time in seconds.
  * @returns {Promise<Buffer[]>} - The audio buffer and start time.
  */
-const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sampleRate }) => {
+const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sampleRate, splitChannels }) => {
   if (!fs.existsSync(file)) {
     const result = await getWorkingFile(file);
     if (!result) throw new Error(`Cannot locate ${file}`);
@@ -2897,7 +2899,7 @@ const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sam
 
   // Validate start time
   if (isNaN(start)) throw new Error(`fetchAudioBuffer: start is NaN: ${start}`);
-  const channels = 1;
+  const {channels} = await getAudioCodec(file);
   return new Promise((resolve, reject) => {
     const additionalFilters = setAudioFilters(format, channels);
     setupFfmpegCommand({
@@ -2927,7 +2929,7 @@ const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sam
       const chunk = stream.read();
       if (chunk === null) {
         // Last chunk
-        resolve([concatenatedBuffer, start]);
+        resolve([concatenatedBuffer, start, channels]);
         stream.destroy();
       } else {
         concatenatedBuffer = concatenatedBuffer.length
