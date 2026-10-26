@@ -931,6 +931,7 @@ makeBlob(audio) {
       }
       if (STATE.currentFile && redraw) {
         // give the wrapper space for the transport controls and element padding/margins
+        this.height = specHeight;
         if (!wavesurfer) {
           await this.initAll({
             audio: STATE.currentBuffer,
@@ -1033,13 +1034,18 @@ makeBlob(audio) {
       const frequencyMin = Number(config.audio.frequencyMin);
       const frequencyMax = Number(config.audio.frequencyMax);
       const frequencyRange = frequencyMax - frequencyMin;
-      const relativeY = (specDimensions.bottom - event.clientY) / specDimensions.height;
+      const panelCount = this.spectrogram.options.splitChannels
+        ? this.channels
+        : 1;
+      const relativeY =
+        ((specDimensions.bottom - event.clientY) / specDimensions.height) *
+        panelCount;
       let yPosition;
       // Select the stacked channel and get the vertical position within it.
       // At the very top, keep the last channel's position at 1 rather than wrapping to 0.
-      const channelY = relativeY === 1
+      const channelY = relativeY === panelCount
         ? 1
-        : (relativeY * this.channels) % 1;
+        : relativeY % 1;
       switch (config.customColormap.scale) {
         case "mel": {
           const melMin = hzToMel(frequencyMin);

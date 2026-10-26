@@ -5389,6 +5389,7 @@ function filterResults({
   offset = undefined,
   limit = 500,
   range = undefined,
+  active
 } = {}) {
   // This allows you to pass {species: undefined} and override the default
   const effectiveSpecies = Object.hasOwn(arguments[0] ?? {}, 'species')
@@ -5402,6 +5403,7 @@ function filterResults({
       offset,
       limit,
       range,
+      active
     });
 }
 
