@@ -3620,7 +3620,7 @@ const SpeciesList = {
         week: '. The current file was saved in week <b>${week}</b>',
         weekSpecific: 'week-specific',
         threshold: '${weekSpecific} species filter threshold of <b>${speciesThreshold}</b>',
-        location: ' focused on <b>${place}</b>, with a ${species_filter_text}${current_file_text}',
+        location: ' centred on <b>${place}</b>, with a ${species_filter_text}${current_file_text}',
         depending: ', depending on the date of the file you analyse',
         upTo: ' up to ',
         classesText: ' including the following species&apos; Classes <b>"${classes}"</b>',
@@ -4243,7 +4243,7 @@ async function localiseUI(locale) {
                 // Some nested labels must be skipped
                 if (['tensorflow', 'webgpu', 'colourmap', 'window-function', 'timelineSetting', 'iucn-scope', 'library-format',
                      'loud-color', 'mid-color', 'quiet-color', "mid-color-threshold-slider", "quiet-color-threshold-slider",'bitrate', 
-                     'format', 'quality', 'species-week', 'show-species', 'advanced', 'basic'].includes(id)) return
+                     'format', 'quality', 'species-week', 'show-species', 'scale', 'advanced', 'basic'].includes(id)) return
                 // Set popOver title. It's in the div, or div parent div
                 let elements = label.parentNode.querySelectorAll('a');
                 if (elements.length === 0 && label.parentNode.parentNode) {

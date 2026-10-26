@@ -607,7 +607,11 @@ async function handleMessage(e) {
     case "filter": {
       if (STATE.db) {
         args.cache = true;
-        args.updateSummary && (await getSummary(args));
+        args.updateSummary &&
+          (await getSummary({
+            ...args,
+            active: args.summaryActive ?? args.active,
+          }));
         await getResults(args);
       }
       break;
@@ -2418,11 +2422,12 @@ async function loadAudioFile({
   // region = false,
   play = false,
   goToRegion = true,
+  splitChannels = true
 }) {
   return new Promise((resolve, reject) => {
     if (file) {
-      fetchAudioBuffer({ file, start, end })
-        .then(([audio, start]) => {
+      fetchAudioBuffer({ file, start, end, splitChannels })
+        .then(([audio, start, channels]) => {
           if (!audio || audio.length === 0) {
             return reject({message: 'No audio data found in file'}) 
           }
@@ -2438,6 +2443,7 @@ async function loadAudioFile({
               contents: audio,
               play: play,
               metadata: METADATA[file].metadata,
+              channels
             },
           );
           let week;
@@ -2870,7 +2876,7 @@ async function processAudio(
  * @param {number} [params.end] - The end time in seconds.
  * @returns {Promise<Buffer[]>} - The audio buffer and start time.
  */
-const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sampleRate }) => {
+const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sampleRate, splitChannels }) => {
   if (!fs.existsSync(file)) {
     const result = await getWorkingFile(file);
     if (!result) throw new Error(`Cannot locate ${file}`);
@@ -2897,7 +2903,7 @@ const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sam
 
   // Validate start time
   if (isNaN(start)) throw new Error(`fetchAudioBuffer: start is NaN: ${start}`);
-  const channels = 1;
+  const {channels} = await getAudioCodec(file);
   return new Promise((resolve, reject) => {
     const additionalFilters = setAudioFilters(format, channels);
     setupFfmpegCommand({
@@ -2927,7 +2933,7 @@ const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sam
       const chunk = stream.read();
       if (chunk === null) {
         // Last chunk
-        resolve([concatenatedBuffer, start]);
+        resolve([concatenatedBuffer, start, channels]);
         stream.destroy();
       } else {
         concatenatedBuffer = concatenatedBuffer.length
@@ -3144,6 +3150,9 @@ const bufferToAudio = async ({
   const extension = p.extname(file).toLowerCase();
   if (extension === '.' + format) {
     formatMap[format] = {...formatMap[format], ...await getAudioCodec(file)};
+  } else {
+    const {sampleRate, channels} = await getAudioCodec(file);
+    formatMap[format] = {...formatMap[format], sampleRate, channels};
   }
   const { audioCodec, soundFormat, sampleRate, channels } = formatMap[format];
 
@@ -5540,13 +5549,32 @@ const getDetectedSpecies = async () => {
  */
 const getValidSpecies = async (file) => {
   const included = await getIncludedIDs(file); // classindex values
-  const locationID = METADATA[file]?.locationID ?? STATE.location?.id;
-  const {place} = locationID != undefined
+  const meta = METADATA[file];
+  const lat = meta?.lat;
+  const lon = meta?.lon;
+  const i18 = {
+    en: 'this location was found in the current file&apos;s metadata',
+    da: 'denne placering blev fundet i den aktuelle fils metadata',
+    de: 'Dieser Speicherort wurde in den Metadaten der aktuellen Datei gefunden',
+    es: 'esta ubicación se encontró en los metadatos del archivo actual',
+    fr: 'cet emplacement a été trouvé dans les métadonnées du fichier actuel',
+    ja: 'この場所は現在のファイルのメタデータで見つかりました',
+    nl: 'deze locatie is gevonden in de metadata van het huidige bestand',
+    pt: 'esta localização foi encontrada nos metadados do ficheiro atual',
+    ru: 'это местоположение найдено в метаданных текущего файла',
+    sv: 'den här platsen hittades i den aktuella filens metadata',
+    zh: '此位置是在当前文件的元数据中找到的'
+  };
+  const locationID = meta?.locationID ?? STATE.location?.id;
+  const {place} = (locationID != undefined
     ? await STATE.db.getAsync(
-        "SELECT place FROM locations WHERE id = ?",
-        locationID
-      )
-    : { place: STATE.place };
+         "SELECT place FROM locations WHERE id = ?",
+        locationID )
+    : undefined) ?? {
+      place: Number.isFinite(lat) && Number.isFinite(lon)
+       ? `${lat}, ${lon} (${i18[STATE.locale] || i18["en"]})` 
+       : STATE.place
+    };
   const includedSpecies = [];
   const excludedSpecies = [];
   let customCnames = [], customCnamesWithCallType = [];

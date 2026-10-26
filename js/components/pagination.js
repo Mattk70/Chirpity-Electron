@@ -117,6 +117,11 @@ export class Pagination {
       this.container.classList.add("d-none");
     }
   }
+  clear() {
+    this.container.replaceChildren()
+    this.total = 0;
+    this.reset()
+  }
   getCurrentPage = () => {
     const species = this.handlers.isSpeciesViewFiltered(true);
     return species ? (this.speciesPage[species] || 1) : this.globalPage;

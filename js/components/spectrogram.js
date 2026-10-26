@@ -36,8 +36,6 @@ export class ChirpityWS {
     this.audioContext = new AudioContext();
     this.sampleRate = 24_000;
     this.actions = actions;
-    // Wavesurfer hack to work around double event firing
-    this.finishTime = 0;
 
     this.specTooltip = this.specTooltip.bind(this);
     this.centreSpec = this.centreSpec.bind(this);
@@ -348,7 +346,7 @@ export class ChirpityWS {
     }
     // set colormap
     const colorMap = this.createColormap();
-    const {windowFunc, alpha, scale, autoGain, preEmphasis, rangeDB} = config.customColormap;
+    const {windowFunc, alpha, scale, autoGain, preEmphasis, rangeDB, splitChannels} = config.customColormap;
     const scaleFactor = config.selectedModel.includes('batpack') ? 10 : 1;
     const {frequencyMin, frequencyMax} = config.audio;
     const scaledFrequencyMin = frequencyMin * scaleFactor;
@@ -364,7 +362,7 @@ export class ChirpityWS {
       labels: config.specLabels,
       labelsColor: this.wsTextColour()[0],
       labelsBackground: "transparent",
-      height,
+      height: splitChannels ? height / this.channels : height,
       fftSamples,
       scale,
       colorMap,
@@ -373,6 +371,7 @@ export class ChirpityWS {
       autoGain,
       preEmphasis,
       rangeDB,
+      splitChannels
     });
   }
 
@@ -415,8 +414,7 @@ createLabelsCanvas() {
 
   setOptions() {
     const config = this.getConfig();
-    const { scale, alpha, windowFunc, autoGain, preEmphasis, rangeDB } = config.customColormap;
-    const colour = this.wsTextColour()[0];
+    const { scale, alpha, windowFunc, autoGain, preEmphasis, rangeDB, splitChannels } = config.customColormap;
     Object.assign(this.spectrogram, {
       colorMap: this.createColormap(),
       alpha,
@@ -424,13 +422,20 @@ createLabelsCanvas() {
       windowFunc,
       autoGain,
       preEmphasis,
-      rangeDB,
+      rangeDB
     });
     this.createTimeline();
-    // this.REGIONS.clearRegions();
-    this.spectrogram.options.labelsColor = colour;
-    this.spectrogram.options.labels = config.specLabels;
+    const options = this.spectrogram.options;
+    const colour = this.wsTextColour()[0];
+    options.labels = config.specLabels;
+    options.labelsColor = colour;
     this.wavesurfer.setOptions({ cursorColor: colour });
+
+    if (options.splitChannels !== splitChannels) {
+      this.spectrogram.height *= splitChannels ? 1 / this.channels : this.channels;
+      options.splitChannels = splitChannels;
+      this.loadBuffer();
+    }
     this.spectrogram.clearCache();
     this.spectrogram.render();
   }
@@ -720,32 +725,55 @@ createLabelsCanvas() {
       position: 0.5,
     });
   }
-  makeBlob(audio) {
-    // Extract the underlying buffer
-    const arrayBuffer = audio.buffer.slice(
-      audio.byteOffset,
-      audio.byteOffset + audio.byteLength
-    );
-    // Recreate TypedArray
-    const int16Array = new Int16Array(arrayBuffer);
-    // Convert to Float32Array (Web Audio API uses Float32 samples)
-    const float32Array = new Float32Array(int16Array.length);
-    for (let i = 0; i < int16Array.length; i++) {
-      float32Array[i] = int16Array[i] / 32768; // Normalize from Int16 to Float32
+makeBlob(audio) {
+  const inputChannels = this.channels;
+  const splitChannels = Boolean(this.spectrogram.options.splitChannels);
+  const outputChannels = splitChannels ? inputChannels : 1;
+
+  const arrayBuffer = audio.buffer.slice(
+    audio.byteOffset,
+    audio.byteOffset + audio.byteLength
+  );
+  const int16Array = new Int16Array(arrayBuffer);
+  const frameCount = Math.floor(int16Array.length / inputChannels);
+
+  const audioBuffer = this.audioContext.createBuffer(
+    outputChannels,
+    frameCount,
+    this.sampleRate
+  );
+
+  if (splitChannels) {
+    for (let channel = 0; channel < inputChannels; channel++) {
+      const channelData = audioBuffer.getChannelData(channel);
+
+      for (let frame = 0; frame < frameCount; frame++) {
+        channelData[frame] =
+          int16Array[frame * inputChannels + channel] / 32768;
+      }
     }
-    // Create AudioBuffer using AudioContext
-    const audioBuffer = this.audioContext.createBuffer(
-      1,
-      float32Array.length,
-      this.sampleRate
-    ); // Mono channel
-    // Populate the AudioBuffer with float32Array data
-    audioBuffer.copyToChannel(float32Array, 0);
-    const blob = new Blob([audio], { type: "audio/wav" });
-    const peaks = [audioBuffer.getChannelData(0)];
-    const duration = audioBuffer.duration;
-    return [blob, peaks, duration];
+  } else {
+    const monoData = audioBuffer.getChannelData(0);
+
+    for (let frame = 0; frame < frameCount; frame++) {
+      let sum = 0;
+
+      for (let channel = 0; channel < inputChannels; channel++) {
+        sum += int16Array[frame * inputChannels + channel];
+      }
+
+      monoData[frame] = sum / inputChannels / 32768;
+    }
   }
+
+  const blob = new Blob([arrayBuffer], { type: "audio/wav" });
+  const peaks = Array.from(
+    { length: outputChannels },
+    (_, channel) => audioBuffer.getChannelData(channel)
+  );
+
+  return [blob, peaks, audioBuffer.duration];
+}
 
   async loadBuffer(audio) {
     const STATE = this.getState();
@@ -778,6 +806,9 @@ createLabelsCanvas() {
     this.spectrogram?.clearCache();
     if (!this.wavesurfer) await this.adjustDims(true);
     else {
+      if (!this.spectrogram.options.splitChannels) {
+        this.spectrogram.height = this.height;
+      }
       await this.loadBuffer(buffer);
     }
     
@@ -889,7 +920,7 @@ createLabelsCanvas() {
       spectrogramWrapper, resultTableElement, waveElement} = DOM;
     const wavesurfer = this.wavesurfer;
     const hasExplicitHeight = newHeight != null && newHeight > 20;
-    let specOffset = 0, specHeight;
+    let specHeight;
     if (!spectrogramWrapper.classList.contains("d-none")) {
       specHeight = hasExplicitHeight
         ? Math.max(1, newHeight)
@@ -900,12 +931,14 @@ createLabelsCanvas() {
       }
       if (STATE.currentFile && redraw) {
         // give the wrapper space for the transport controls and element padding/margins
+        this.height = specHeight;
         if (!wavesurfer) {
           await this.initAll({
             audio: STATE.currentBuffer,
             height: specHeight,
           });
         } else {
+          specHeight = this.spectrogram.options.splitChannels ? specHeight / this.channels : specHeight;
           wavesurfer.setOptions({
             height: specHeight,
             cursorColor: this.wsTextColour()[0],
@@ -914,7 +947,6 @@ createLabelsCanvas() {
           await this.loadBuffer();
         }
       }
-      specOffset = spectrogramWrapper.offsetHeight;
     }
 
     const footerHeight = footer.offsetHeight;
@@ -930,23 +962,6 @@ createLabelsCanvas() {
       contentHeight 
       - spectrogramWrapper.offsetHeight - specHeight - formOffset + "px";
   }
-  /**
-   * Reinitializes the spectrogram plugin if it has not been initialized.
-   *
-   * Checks if a global wavesurfer instance exists and the spectrogram is not already set up.
-   * If both conditions are met, it initializes the spectrogram using the configured maximum height
-   * and registers it as a plugin with wavesurfer.
-   */
-  // reInitSpec(height) {
-  //   const wavesurfer = this.wavesurfer;
-  //   if (wavesurfer && !this.spectrogram) {
-  //     wavesurfer.setOptions({cursorColor: this.wsTextColour()[0]})
-  //     this.spectrogram = this.initSpectrogram(height);
-  //     wavesurfer.registerPlugin(this.spectrogram);
-  //     this.refreshTimeline();
-  //     this.reload();
-  //   }
-  // }
 
   /**
    * Hide the spectrogram tooltip and hide the recording button unless the pointer enters it.
@@ -1019,25 +1034,34 @@ createLabelsCanvas() {
       const frequencyMin = Number(config.audio.frequencyMin);
       const frequencyMax = Number(config.audio.frequencyMax);
       const frequencyRange = frequencyMax - frequencyMin;
-      const relativeY = (specDimensions.bottom - event.clientY) / specDimensions.height;
+      const panelCount = this.spectrogram.options.splitChannels
+        ? this.channels
+        : 1;
+      const relativeY =
+        ((specDimensions.bottom - event.clientY) / specDimensions.height) *
+        panelCount;
       let yPosition;
-
+      // Select the stacked channel and get the vertical position within it.
+      // At the very top, keep the last channel's position at 1 rather than wrapping to 0.
+      const channelY = relativeY === panelCount
+        ? 1
+        : relativeY % 1;
       switch (config.customColormap.scale) {
         case "mel": {
           const melMin = hzToMel(frequencyMin);
           const melMax = hzToMel(frequencyMax);
-          yPosition = melToHz(melMin + relativeY * (melMax - melMin)).toFixed(0);
+          yPosition = melToHz(melMin + channelY * (melMax - melMin)).toFixed(0);
           break;
         }
         case "logarithmic": {
           const logMin = hzToLog(frequencyMin);
           const logMax = hzToLog(frequencyMax);
-          yPosition = logToHz(logMin + relativeY * (logMax - logMin)).toFixed(0);
+          yPosition = logToHz(logMin + channelY * (logMax - logMin)).toFixed(0);
           break;
         }
         default:
           yPosition =
-            Math.round(relativeY * frequencyRange) + frequencyMin;
+            Math.round(channelY * frequencyRange) + frequencyMin;
       }
 
       const pitchShifted = config.selectedModel.includes('batpack');

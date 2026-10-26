@@ -144,7 +144,7 @@ export class WorkerState {
             if (key === "confidence") updatedValues[key] *= 10;
             currentState[key] = updatedValues[key];
           }
-        } else if (!["action", "path", "temp", "lat", "lon"].includes(key)) {
+        } else if (!["action", "path", "temp", "lat", "lon", "thumbnails"].includes(key)) {
           //if (key.startsWith('_')) break
           console.warn(
             `Attempted to update state with invalid property: ${key}, ${updatedValues[key]} `
