@@ -2080,6 +2080,12 @@ async function showAnalyse() {
   resetRegions(true);
 
   worker.postMessage({ action: "change-mode", mode: STATE.mode});
+  worker.postMessage({
+    action: "update-state",
+    resultsSortOrder: STATE.resultsSortOrder,
+    resultsMetaSortOrder: STATE.resultsMetaSortOrder,
+    summarySortOrder: STATE.summarySortOrder,
+  });
   clearLocationFilter();
 
   utils.hideAll();
@@ -2092,6 +2098,10 @@ async function showAnalyse() {
         species: STATE.species,
         offset: STATE.offset,
         active: STATE.active,
+        summaryActive:
+          Number.isInteger(STATE.active) && STATE.active >= 0
+            ? STATE.active + 1
+            : undefined,
         updateSummary: true,
       });
     } else {
@@ -5382,6 +5392,8 @@ const changeNocmigMode = () => {
  * @param {number} [options.offset] - Optional starting index for pagination.
  * @param {number} [options.limit=500] - Maximum number of results to process.
  * @param {Object} [options.range] - Optional constraints to limit the range of filtered results.
+ * @param {number} [options.active] - Zero-based result row index to restore.
+ * @param {number} [options.summaryActive] - One-based summary row index to restore.
  */
 function filterResults({
   species,
@@ -5389,7 +5401,8 @@ function filterResults({
   offset = undefined,
   limit = 500,
   range = undefined,
-  active
+  active,
+  summaryActive
 } = {}) {
   // This allows you to pass {species: undefined} and override the default
   const effectiveSpecies = Object.hasOwn(arguments[0] ?? {}, 'species')
@@ -5403,7 +5416,8 @@ function filterResults({
       offset,
       limit,
       range,
-      active
+      active,
+      summaryActive
     });
 }
 

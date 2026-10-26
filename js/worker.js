@@ -607,7 +607,11 @@ async function handleMessage(e) {
     case "filter": {
       if (STATE.db) {
         args.cache = true;
-        args.updateSummary && (await getSummary(args));
+        args.updateSummary &&
+          (await getSummary({
+            ...args,
+            active: args.summaryActive ?? args.active,
+          }));
         await getResults(args);
       }
       break;
