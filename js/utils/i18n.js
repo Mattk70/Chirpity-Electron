@@ -4243,7 +4243,7 @@ async function localiseUI(locale) {
                 // Some nested labels must be skipped
                 if (['tensorflow', 'webgpu', 'colourmap', 'window-function', 'timelineSetting', 'iucn-scope', 'library-format',
                      'loud-color', 'mid-color', 'quiet-color', "mid-color-threshold-slider", "quiet-color-threshold-slider",'bitrate', 
-                     'format', 'quality', 'species-week', 'show-species', 'advanced', 'basic'].includes(id)) return
+                     'format', 'quality', 'species-week', 'show-species', 'scale', 'advanced', 'basic'].includes(id)) return
                 // Set popOver title. It's in the div, or div parent div
                 let elements = label.parentNode.querySelectorAll('a');
                 if (elements.length === 0 && label.parentNode.parentNode) {
