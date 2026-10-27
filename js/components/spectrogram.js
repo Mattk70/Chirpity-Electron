@@ -725,62 +725,19 @@ createLabelsCanvas() {
       position: 0.5,
     });
   }
-makeBlob(audio) {
-  const inputChannels = this.channels;
-  const splitChannels = Boolean(this.spectrogram.options.splitChannels);
-  const outputChannels = splitChannels ? inputChannels : 1;
-
-  const arrayBuffer = audio.buffer.slice(
-    audio.byteOffset,
-    audio.byteOffset + audio.byteLength
-  );
-  const int16Array = new Int16Array(arrayBuffer);
-  const frameCount = Math.floor(int16Array.length / inputChannels);
-
-  const audioBuffer = this.audioContext.createBuffer(
-    outputChannels,
-    frameCount,
-    this.sampleRate
-  );
-
-  if (splitChannels) {
-    for (let channel = 0; channel < inputChannels; channel++) {
-      const channelData = audioBuffer.getChannelData(channel);
-
-      for (let frame = 0; frame < frameCount; frame++) {
-        channelData[frame] =
-          int16Array[frame * inputChannels + channel] / 32768;
-      }
-    }
-  } else {
-    const monoData = audioBuffer.getChannelData(0);
-
-    for (let frame = 0; frame < frameCount; frame++) {
-      let sum = 0;
-
-      for (let channel = 0; channel < inputChannels; channel++) {
-        sum += int16Array[frame * inputChannels + channel];
-      }
-
-      monoData[frame] = sum / inputChannels / 32768;
-    }
+  makeBlob(audio) {
+    const arrayBuffer = audio.buffer.slice(
+      audio.byteOffset,
+      audio.byteOffset + audio.byteLength
+    );
+    return new Blob([arrayBuffer], { type: "audio/wav" });
   }
-
-  const blob = new Blob([arrayBuffer], { type: "audio/wav" });
-  const peaks = Array.from(
-    { length: outputChannels },
-    (_, channel) => audioBuffer.getChannelData(channel)
-  );
-
-  return [blob, peaks, audioBuffer.duration];
-}
 
   async loadBuffer(audio) {
     const STATE = this.getState();
     audio ??= STATE.currentBuffer;
-    const [blob, peaks, duration] = this.makeBlob(audio);
     this.refreshTimeline();
-    await this.wavesurfer.loadBlob(blob, peaks, duration);
+    await this.wavesurfer.loadBlob(this.makeBlob(audio));
   }
 
   /**
