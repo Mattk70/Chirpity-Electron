@@ -2225,7 +2225,7 @@ async function setFontSizeScale(doNotScroll) {
   doNotScroll ||
     decreaseBtn.scrollIntoView({ block: "center", behavior: "auto" });
   updatePrefs("config.json", config);
-  STATE.currentFile && await flushSpec();
+  if (STATE.currentFile) spec.adjustDims();
 }
 
 
