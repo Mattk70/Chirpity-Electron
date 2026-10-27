@@ -84,8 +84,12 @@ body {
 
 #waveform ::part(timeline) {
         z-index: 5;
+        
 }
 
+#waveform ::part(timeline-notch) {
+  justify-content: flex-start !important;
+}
 
 #primaryLogo {
   max-height: calc(40px * var(--font-size-scale));
@@ -412,7 +416,7 @@ footer {
   }
 
   #primary_nav_wrap:not(:hover) ul {
-    transition: all 0.4s;
+    transition: visibility 0.4s;
     transition-delay: 1s;
   }
 

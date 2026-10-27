@@ -501,13 +501,14 @@ createLabelsCanvas() {
         ].join(":");
       }
     }
-    if (STATE.windowLength <= 5) {
-      formattedTime += "." + milliseconds.toString();
-    } else {
-      milliseconds = (milliseconds / 1000).toFixed(1);
-      formattedTime += milliseconds.slice(1);
-    }
+    const len = STATE.windowLength;
+    milliseconds /= 1000;
+    let digits = 1;
+    if ( len <= 2) digits = 3;
+    else if (len <= 5) digits = 2;
+    else if (len >= 10) milliseconds = null;
 
+    formattedTime += milliseconds?.toFixed(digits).slice(1) || '';
     return formattedTime;
   };
 
@@ -530,7 +531,8 @@ createLabelsCanvas() {
   createTimeline(windowLength) {
     windowLength ??= this.getState().windowLength;
     this.timeline?.destroy();
-    const interval = windowLength < 5 ? 0.5 : Math.ceil(windowLength / 5)
+    const wl = windowLength;
+    const interval = wl < 2 ? 0.5 : wl < 5 ? 1 : Math.ceil(wl / 5)
     const primaryLabelInterval = interval;
     const secondaryLabelInterval = primaryLabelInterval <= 2 ? primaryLabelInterval / 2 : 0;
     const timeInterval = primaryLabelInterval / 10;
