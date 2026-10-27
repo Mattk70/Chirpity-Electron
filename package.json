@@ -52,7 +52,9 @@
       "license": "LICENSE.txt"
     },
     "asarUnpack": [
-      "BirdNET3/**/*.onnx"
+      "BirdNET3/**/*.onnx",
+      "node_modules/@ffmpeg-installer/**/ffmpeg*",
+      "node_modules/@ffprobe-installer/**/ffprobe*"
     ],
     "nsis": {
       "oneClick": false,
