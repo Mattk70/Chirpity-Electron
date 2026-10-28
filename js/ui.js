@@ -3784,7 +3784,6 @@ const loadModel = () => {
 };
 
 const handleModelChange = async (model, reload = true) => {
-  // STATE.currentFile && await flushSpec(); // Will need this for bats
   modelSettingsDisplay();
   DOM.customListFile.value = config.models[model].customListFile;
   DOM.customListFile.value
@@ -7501,7 +7500,6 @@ document.addEventListener("change", async function (e) {
           config.specLabels = useLabels;
           if (spec.wavesurfer && STATE.currentFile) {
             if (useLabels) {
-              // await flushSpec()
               spec.createLabelsCanvas();
               spec.setOptions();
              } else {
@@ -7624,19 +7622,6 @@ document.addEventListener("change", async function (e) {
   }
 });
 
-const flushSpec = async () =>{
-  spec.wavesurfer?.destroy();
-  spec = new ChirpityWS(
-    () => STATE, // Returns the current state
-    () => config, // Returns the current config
-    { postBufferUpdate, trackEvent, setActiveRegion, onStateUpdate: state.update, updatePrefs },
-    GLOBAL_ACTIONS
-  );
-  if (STATE.currentBuffer){
-    await spec.initAll({audio:STATE.currentBuffer, height: STATE.specMaxHeight})
-    spec.reload()
-  }
-}
 
 function callForChart() {
   const {species, range, location, aggregation, stackYears: byYear} = STATE.chart;
