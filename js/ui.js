@@ -1462,7 +1462,14 @@ async function validateFileExistence(files, table, progressCallback = null, sign
 
 /**
  * Opens the location editor for the current file or saved locations.
- * @param {boolean} [manage=false] - Whether to enable saved-location management controls.
+ * Reloads the saved-location list and starts refreshing the Explore location filter.
+ *
+ * @param {boolean} [manage=false] - If true, manage saved locations; if false, assign
+ * a saved location to the current file, with an option to apply it to all open files.
+ * @returns {Promise<void>} Resolves after modal setup, without waiting for user input
+ * or the Explore refresh.
+ * @throws {Error} Rejects if the saved-location request fails or receives no response
+ * within 15 seconds.
  */
 async function setCustomLocation(manage = false) {
   // Refresh location list
