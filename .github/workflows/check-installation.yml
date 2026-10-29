@@ -241,7 +241,6 @@ jobs:
           fi
 
       - name: Cache Perch model archive
-        if: runner.os != 'Linux'
         id: cache-perch
         uses: actions/cache@v5
         with:
@@ -249,7 +248,7 @@ jobs:
           key: perch-model-v2-7z
 
       - name: Download Perch Sound Model
-        if: runner.os != 'Linux' && steps.cache-perch.outputs.cache-hit != 'true'
+        if: steps.cache-perch.outputs.cache-hit != 'true'
         shell: bash
         run: |
           curl -L -o Perch.v2.7z \
@@ -258,12 +257,10 @@ jobs:
       - name: Extract Perch model
         # 7zip is pre-installed on all GitHub-hosted runners (Windows, macOS, Linux).
         # choco install 7zip is not needed.
-        if: runner.os != 'Linux'
         shell: bash
         run: 7z x "Perch.v2.7z" -o"$PWD"
 
       - name: Export Perch model path for Playwright
-        if: runner.os != 'Linux'
         shell: bash
         run: echo "PERCH_MODEL_PATH=$GITHUB_WORKSPACE/Perch v2" >> $GITHUB_ENV
 
@@ -277,6 +274,20 @@ jobs:
         shell: bash
         run: echo "CHAFFINCH_MP3_PATH=$GITHUB_WORKSPACE/chaffinch.mp3" >> $GITHUB_ENV
 
+      - name: Prepare Linux for Electron tests
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgtk-3-0t64 libnss3 libgbm1 libasound2t64 libxss1
+          # Ubuntu 24.04 AppArmor blocks Chromium's sandbox; allow user namespaces
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          
       - name: Test packaged application
-        if: runner.os != 'Linux'
-        run: npm test
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" npm test
+          else
+            npm test
+          fi
