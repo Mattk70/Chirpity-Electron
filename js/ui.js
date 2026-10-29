@@ -927,6 +927,7 @@ async function generateLocationList(elID, skipDefault = false) {
   const i18 = i18n.get(i18n.All);
 
   const el = document.getElementById(elID);
+  const selectedLocation = elID === "explore-locations" ? el.value : "";
   el.replaceChildren(); // clear options
   LOCATIONS ??= await utils.requestFromWorker(worker, "get-locations", {
     file: STATE.currentFile
@@ -950,6 +951,13 @@ async function generateLocationList(elID, skipDefault = false) {
     option.textContent = id === 0 ? place + '*': place;
     el.appendChild(option);
   });
+  if (elID === "explore-locations" && selectedLocation) {
+    if (LOCATIONS.some(({ id }) => String(id) === selectedLocation)) {
+      el.value = selectedLocation;
+    } else {
+      worker.postMessage({ action: "update-state", location: undefined });
+    }
+  }
   return el;
 }
 
@@ -1457,6 +1465,9 @@ async function validateFileExistence(files, table, progressCallback = null, sign
  * @param {boolean} [manage=false] - Whether to enable saved-location management controls.
  */
 async function setCustomLocation(manage = false) {
+  // Refresh location list
+  LOCATIONS = null;
+  generateLocationList("explore-locations");
   const savedLocationSelect = await generateLocationList("savedLocations", !manage);
   const latEl = document.getElementById("customLat");
   const lonEl = document.getElementById("customLon");
@@ -3784,7 +3795,6 @@ const loadModel = () => {
 };
 
 const handleModelChange = async (model, reload = true) => {
-  // STATE.currentFile && await flushSpec(); // Will need this for bats
   modelSettingsDisplay();
   DOM.customListFile.value = config.models[model].customListFile;
   DOM.customListFile.value
@@ -7501,7 +7511,6 @@ document.addEventListener("change", async function (e) {
           config.specLabels = useLabels;
           if (spec.wavesurfer && STATE.currentFile) {
             if (useLabels) {
-              // await flushSpec()
               spec.createLabelsCanvas();
               spec.setOptions();
              } else {
@@ -7624,19 +7633,6 @@ document.addEventListener("change", async function (e) {
   }
 });
 
-const flushSpec = async () =>{
-  spec.wavesurfer?.destroy();
-  spec = new ChirpityWS(
-    () => STATE, // Returns the current state
-    () => config, // Returns the current config
-    { postBufferUpdate, trackEvent, setActiveRegion, onStateUpdate: state.update, updatePrefs },
-    GLOBAL_ACTIONS
-  );
-  if (STATE.currentBuffer){
-    await spec.initAll({audio:STATE.currentBuffer, height: STATE.specMaxHeight})
-    spec.reload()
-  }
-}
 
 function callForChart() {
   const {species, range, location, aggregation, stackYears: byYear} = STATE.chart;
