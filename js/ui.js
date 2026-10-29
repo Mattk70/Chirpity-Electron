@@ -1457,6 +1457,7 @@ async function validateFileExistence(files, table, progressCallback = null, sign
  * @param {boolean} [manage=false] - Whether to enable saved-location management controls.
  */
 async function setCustomLocation(manage = false) {
+  // Refresh location list
   LOCATIONS = null;
   generateLocationList("explore-locations");
   const savedLocationSelect = await generateLocationList("savedLocations", !manage);
