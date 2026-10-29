@@ -176,6 +176,11 @@ jobs:
       - name: Run unit tests
         run: npm run unittest
 
+      - name: Work around stapling issue (actions/runner-images#14924)
+        run: |
+          echo "block return out quick proto udp from any to any port 443" | sudo pfctl -f -
+          sudo pfctl -E
+        
       - name: Build Electron application
         shell: bash
         env:

@@ -927,6 +927,7 @@ async function generateLocationList(elID, skipDefault = false) {
   const i18 = i18n.get(i18n.All);
 
   const el = document.getElementById(elID);
+  const selectedLocation = elID === "explore-locations" ? el.value : "";
   el.replaceChildren(); // clear options
   LOCATIONS ??= await utils.requestFromWorker(worker, "get-locations", {
     file: STATE.currentFile
@@ -950,6 +951,13 @@ async function generateLocationList(elID, skipDefault = false) {
     option.textContent = id === 0 ? place + '*': place;
     el.appendChild(option);
   });
+  if (elID === "explore-locations" && selectedLocation) {
+    if (LOCATIONS.some(({ id }) => String(id) === selectedLocation)) {
+      el.value = selectedLocation;
+    } else {
+      worker.postMessage({ action: "update-state", location: undefined });
+    }
+  }
   return el;
 }
 
