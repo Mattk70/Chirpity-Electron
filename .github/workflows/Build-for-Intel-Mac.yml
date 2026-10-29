@@ -182,7 +182,20 @@ jobs:
           ELECTRON_BUILD_ARCH: x64
         run: |
           chmod -Rv u+w ./node_modules
-          npm run build-mac-x64
+          for attempt in 1 2 3; do
+            echo "Build attempt $attempt of 3"
+            if npm run build-mac-x64; then
+              exit 0
+            fi
+
+            if [ "$attempt" -lt 3 ]; then
+              echo "Build failed; retrying in 15 seconds..."
+              sleep 15
+            fi
+          done
+
+          echo "Build failed after 3 attempts."
+          exit 1
 
       - name: Verify installer artifact
         shell: bash
