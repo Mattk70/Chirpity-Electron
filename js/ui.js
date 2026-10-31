@@ -2318,7 +2318,8 @@ const defaultConfig = {
     autoGain: false,
     preEmphasis: 0, // Pre-emphasis filter willl be 0 (false) or 6 (true)
     rangeDB: 80, // Range in dB for the spectrogram
-    splitChannels: false
+    splitChannels: true,
+    noverlap: 0.5
   },
   timeOfDay: true,
   list: "birds",
@@ -2504,6 +2505,7 @@ window.onload = async () => {
     config.customColormap.preEmphasis = 0;
     config.customColormap.rangeDB = 80;
     config.customColormap.splitChannels = false;
+    config.customColormap.noverlap = 0.5;
   }
   const selectedModel = config.selectedModel;
 
@@ -2621,7 +2623,7 @@ window.onload = async () => {
   config.colormap === "custom" &&
     document.getElementById("colormap-fieldset").classList.remove("d-none");
   const {loud, mid, quiet, quietThreshold, midThreshold, alpha, 
-    autoGain, preEmphasis, rangeDB, splitChannels} = config.customColormap;
+    autoGain, preEmphasis, rangeDB, splitChannels, noverlap} = config.customColormap;
   document.getElementById("quiet-color-threshold").textContent = quietThreshold;
   document.getElementById("quiet-color-threshold-slider").value = quietThreshold;
   document.getElementById("mid-color-threshold").textContent = midThreshold;
@@ -2635,6 +2637,8 @@ window.onload = async () => {
   document.getElementById("preemphasis").checked = preEmphasis;
   document.getElementById("range-db").value = rangeDB;
   document.getElementById("split-channels").checked = splitChannels;
+  document.getElementById("noverlap").value = noverlap;
+  document.getElementById("noverlap-value").innerHTML = `<b>${(noverlap*100).toFixed(0)}%</b>`;
   
   // Audio preferences:
   DOM.gain.value = audio.gain;
@@ -3608,7 +3612,7 @@ function setActiveRegion(region, activateRow) {
   }
   const { start, end, content } = region;
   // Clear active regions
-  spec.REGIONS.regions.forEach((r) =>
+  spec.REGIONS.getRegions().forEach((r) =>
     r.setOptions({
       color: STATE.regionColour,
       content: spec.formatLabel(r.content?.innerText),
@@ -5871,6 +5875,12 @@ function showThreshold(e) {
   settingsPanelRangeInput.value = threshold;
 }
 
+const showNoverlap = (e) => {
+  const overlap = (e instanceof Event ? e.target.valueAsNumber : e) * 100;  
+  document.getElementById('noverlap-value').innerHTML = `<b>${overlap.toFixed(0)}%</b>`;
+
+}
+
 const showOverlap = (e) => {
   const overlap = e instanceof Event ? e.target.valueAsNumber : e * 100;  
   document.getElementById('overlap-value').innerHTML = `<b>${overlap}%</b>`;
@@ -5999,7 +6009,7 @@ function updateDisplay(el, id, unit){
   display.textContent = value + (unit || '');
 }
 
-document.addEventListener('input', (e) =>{
+document.addEventListener("input", (e) =>{
   const el = e.target;
   const target = el.id;
   switch (target){
@@ -6039,6 +6049,10 @@ document.addEventListener('input', (e) =>{
     case "confidenceValue": {
       showThreshold(e)
       break;
+    }
+    case "noverlap": {
+      showNoverlap(e);
+      break; 
     }
     case "overlap": {
       showOverlap(e);
@@ -7459,12 +7473,14 @@ document.addEventListener("change", async function (e) {
         case "preemphasis":
         case "range-db":
         case "split-channels":
+        case "noverlap":
         case "alpha-slider": {
           const alpha = document.getElementById("alpha-slider").valueAsNumber;
           const autoGain = document.getElementById("autogain").checked;
           const preEmphasis = document.getElementById("preemphasis").checked ? 6 : 0;
           const rangeDB = document.getElementById("range-db").valueAsNumber;
           const splitChannels = document.getElementById("split-channels").checked;
+          const noverlap = document.getElementById("noverlap").valueAsNumber;
           const loud = document.getElementById("loud-color").value;
           const mid = document.getElementById("mid-color").value;
           const quiet = document.getElementById("quiet-color").value;
@@ -7487,7 +7503,8 @@ document.addEventListener("change", async function (e) {
             preEmphasis,
             rangeDB,
             scale,
-            splitChannels
+            splitChannels,
+            noverlap
           };
           if (spec.wavesurfer && STATE.currentFile) {
             spec.setOptions();
@@ -7517,13 +7534,9 @@ document.addEventListener("change", async function (e) {
           const useLabels = element.checked;
           config.specLabels = useLabels;
           if (spec.wavesurfer && STATE.currentFile) {
-            if (useLabels) {
-              spec.createLabelsCanvas();
-              spec.setOptions();
-             } else {
-              spec.spectrogram.labelsEl.remove();
-              spec.setOptions();
-             }
+            spec.spectrogram = spec.initSpectrogram();
+            spec.wavesurfer.registerPlugin(spec.spectrogram);
+            spec.reload();
           }
           break;
         }
@@ -8897,6 +8910,8 @@ async function membershipCheck() {
     config.customColormap.preEmphasis = false;
     config.customColormap.rangeDB = 80;
     config.customColormap.splitChannels = false;
+    config.customColormap.noverlap = 0.5;
+    document.getElementById('noverlap-value').innerHTML = `<b>50%</b>`;
     // Set all backends to 'tensorflow'
     if (config.hasNode){
       Object.values(config.models).forEach(model => {

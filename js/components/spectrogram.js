@@ -47,6 +47,7 @@ export class ChirpityWS {
     
     const {quiet, mid, loud, quietThreshold, midThreshold} = config.customColormap;
     const cmap = config.colormap;
+    this.colormap = cmap;
     const map =
       cmap === "custom"
         ? [
@@ -197,7 +198,7 @@ export class ChirpityWS {
         cursorColor: this.wsTextColour()[0],
         cursorWidth: 2,
         minPxPerSec: 2,
-        height: 1,
+        height: 'auto',
         waveColor: 'transparent',
         progressColor: 'transparent',
         sampleRate: this.sampleRate,
@@ -346,7 +347,7 @@ export class ChirpityWS {
     }
     // set colormap
     const colorMap = this.createColormap();
-    const {windowFunc, alpha, scale, autoGain, preEmphasis, rangeDB, splitChannels} = config.customColormap;
+    const {windowFunc, alpha, scale, autoGain, preEmphasis, rangeDB, splitChannels, noverlap} = config.customColormap;
     const scaleFactor = config.selectedModel.includes('batpack') ? 10 : 1;
     const {frequencyMin, frequencyMax} = config.audio;
     const scaledFrequencyMin = frequencyMin * scaleFactor;
@@ -356,18 +357,18 @@ export class ChirpityWS {
       windowFunc,
       frequencyMin: scaledFrequencyMin,
       frequencyMax: scaledFrequencyMax,
-      noverlap: fftSamples / 4,
+      noverlap: Math.round(fftSamples * noverlap),
       // gainDB: 50, Adjusts spec brightness without increasing volume
       rendering: "full", // or "windowed",
       labels: config.specLabels,
       labelsColor: this.wsTextColour()[0],
       labelsBackground: "transparent",
-      height: splitChannels ? height / this.channels : height,
+      height: this.adjustHeight(),
       fftSamples,
       scale,
       colorMap,
       alpha,
-      useWebWorker: false,
+      useWebWorker: true,
       autoGain,
       preEmphasis,
       rangeDB,
@@ -376,25 +377,25 @@ export class ChirpityWS {
   }
 
   reload() {
-    const wavesurfer = this.wavesurfer;
+    const ws = this.wavesurfer;
     const STATE = this.getState();
     const position = clamp(
-      wavesurfer.getCurrentTime() / STATE.windowLength,
+      ws.getCurrentTime() / STATE.windowLength,
       0,
       1
     );
     this.handlers.postBufferUpdate({
       begin: STATE.windowOffsetSecs,
       position: position,
-      play: wavesurfer.isPlaying(),
+      play: ws.isPlaying(),
     });
   }
 
   setRange({frequencyMin, frequencyMax}){
     const spec = this.spectrogram;
-    frequencyMin !== undefined && (spec.frequencyMin = frequencyMin);
-    frequencyMax  !== undefined && (spec.frequencyMax = frequencyMax);
-    this.reload()
+    frequencyMin !== undefined && spec.setOptions({frequencyMin});
+    frequencyMax  !== undefined && spec.setOptions({frequencyMax});
+    this.reload();
   }
 
 createLabelsCanvas() {
@@ -409,35 +410,44 @@ createLabelsCanvas() {
     width: '55px',
     height: '100%',
   });
-  spec.wrapper.appendChild(spec.labelsEl);
+  const wrapper = this.wavesurfer.getWrapper();
+  wrapper.appendChild(spec.labelsEl);
 }
+
+  adjustHeight = () => this.height / (this.getConfig().customColormap.splitChannels ? this.channels : 1);
 
   setOptions() {
     const config = this.getConfig();
-    const { scale, alpha, windowFunc, autoGain, preEmphasis, rangeDB, splitChannels } = config.customColormap;
-    Object.assign(this.spectrogram, {
-      colorMap: this.createColormap(),
-      alpha,
-      scale,
-      windowFunc,
-      autoGain,
-      preEmphasis,
-      rangeDB
-    });
-    this.createTimeline();
-    const options = this.spectrogram.options;
+    const colormap = config.colormap;
+    const fftSamples = this.spectrogram.options.fftSamples;
+    const { scale, alpha, windowFunc, autoGain, preEmphasis, rangeDB, splitChannels, noverlap } = config.customColormap;
     const colour = this.wsTextColour()[0];
-    options.labels = config.specLabels;
-    options.labelsColor = colour;
-    this.wavesurfer.setOptions({ cursorColor: colour });
+    const newHeight = this.adjustHeight();
+    const LABEL_COLOR_MAPS = new Set(['gray', 'custom']);
+    const labelsNeedRefresh = this.colormap !== colormap &&
+      (LABEL_COLOR_MAPS.has(this.colormap) ||
+        LABEL_COLOR_MAPS.has(colormap));
 
-    if (options.splitChannels !== splitChannels) {
-      this.spectrogram.height *= splitChannels ? 1 / this.channels : this.channels;
-      options.splitChannels = splitChannels;
-      this.loadBuffer();
+    this.createTimeline();
+    this.wavesurfer.setOptions({ cursorColor: colour});
+    if (labelsNeedRefresh) {
+      this.spectrogram = this.initSpectrogram();
+      this.wavesurfer.registerPlugin(this.spectrogram);
+    } else {
+      this.spectrogram.setOptions( {
+        colorMap: this.createColormap(),
+        alpha,
+        scale,
+        windowFunc,
+        autoGain,
+        preEmphasis,
+        rangeDB,
+        splitChannels,
+        height: newHeight,
+        noverlap: Math.round(fftSamples * noverlap),
+      });
     }
-    this.spectrogram.clearCache();
-    this.spectrogram.render();
+    this.reload();
   }
 
 
@@ -567,13 +577,17 @@ createLabelsCanvas() {
    
    */
   increaseFFT() {
-    const spectrogram = this.spectrogram;
-    if (spectrogram.fftSamples < 2048) {
-      spectrogram.fftSamples *= 2;
+    let fftSamples = this.spectrogram.options.fftSamples;
+    if (fftSamples < 2048) {
+      fftSamples *= 2;
+      const noverlap = Math.round(this.getConfig().customColormap.noverlap * fftSamples);
+      this.spectrogram.options.noverlap = noverlap;
+      this.spectrogram.setOptions({ fftSamples, noverlap });
+      this.spectrogram.options.fftSamples = fftSamples;
       this.reload();
-      console.log(spectrogram.fftSamples);
-      return spectrogram.fftSamples;
+      console.log(fftSamples);
     }
+    return fftSamples;
   }
 
   /**
@@ -587,13 +601,17 @@ createLabelsCanvas() {
    * @returns {void}
    */
   reduceFFT() {
-    const spectrogram = this.spectrogram;
-    if (spectrogram.fftSamples > 64) {
-      spectrogram.fftSamples /= 2;
+    let fftSamples = this.spectrogram.options.fftSamples;
+    if (fftSamples > 64) {
+      fftSamples /= 2;
+      this.spectrogram.options.fftSamples = fftSamples;
+      const noverlap = Math.round(this.getConfig().customColormap.noverlap * fftSamples);
+      this.spectrogram.options.noverlap = noverlap;
+      this.spectrogram.setOptions({ fftSamples, noverlap });
       this.reload();
-      console.log(spectrogram.fftSamples);
-      return spectrogram.fftSamples;
+      console.log(fftSamples);
     }
+    return fftSamples;
   }
 
   refreshTimeline = () => {
@@ -736,10 +754,19 @@ createLabelsCanvas() {
   }
 
   async loadBuffer(audio) {
+  const requestId = (this._loadBufferRequestId ?? 0) + 1;
+  this._loadBufferRequestId = requestId;
     const STATE = this.getState();
     audio ??= STATE.currentBuffer;
-    this.refreshTimeline();
+  try {
     await this.wavesurfer.loadBlob(this.makeBlob(audio));
+  } catch (error) {
+    const isStale = requestId !== this._loadBufferRequestId;
+    if (isStale && error?.name === 'AbortError') return;
+    throw error;
+  }
+  // Only the latest call reaches this point as a successful load.
+  this.refreshTimeline();
   }
 
   /**
@@ -765,9 +792,7 @@ createLabelsCanvas() {
     this.spectrogram?.clearCache();
     if (!this.wavesurfer) await this.adjustDims(true);
     else {
-      if (!this.spectrogram.options.splitChannels) {
-        this.spectrogram.height = this.height;
-      }
+      this.spectrogram.setOptions({height: this.adjustHeight()});
       await this.loadBuffer(buffer);
     }
     
@@ -899,10 +924,10 @@ createLabelsCanvas() {
         } else {
           specHeight = this.spectrogram.options.splitChannels ? specHeight / this.channels : specHeight;
           wavesurfer.setOptions({
-            height: specHeight,
             cursorColor: this.wsTextColour()[0],
           });
-          this.spectrogram.height = specHeight;
+          
+          this.spectrogram.setOptions({height: specHeight})
           await this.loadBuffer();
         }
       }

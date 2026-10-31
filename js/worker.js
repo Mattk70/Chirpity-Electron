@@ -2421,12 +2421,11 @@ async function loadAudioFile({
   position = 0,
   // region = false,
   play = false,
-  goToRegion = true,
-  splitChannels = true
+  goToRegion = true
 }) {
   return new Promise((resolve, reject) => {
     if (file) {
-      fetchAudioBuffer({ file, start, end, splitChannels })
+      fetchAudioBuffer({ file, start, end })
         .then(([audio, start, channels]) => {
           if (!audio || audio.length === 0) {
             return reject({message: 'No audio data found in file'}) 
@@ -2876,7 +2875,7 @@ async function processAudio(
  * @param {number} [params.end] - The end time in seconds.
  * @returns {Promise<Buffer[]>} - The audio buffer and start time.
  */
-const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sampleRate, splitChannels }) => {
+const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sampleRate }) => {
   if (!fs.existsSync(file)) {
     const result = await getWorkingFile(file);
     if (!result) throw new Error(`Cannot locate ${file}`);
