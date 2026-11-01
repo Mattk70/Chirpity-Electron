@@ -336,10 +336,8 @@ export class ChirpityWS {
     if (!fftSamples) {
       if (windowLength < 5) {
         fftSamples = 256;
-      } else if (windowLength <= 15) {
-        fftSamples = 512;
       } else {
-        fftSamples = 1024;
+        fftSamples = 512;
       }
     }
     if (!height) {
