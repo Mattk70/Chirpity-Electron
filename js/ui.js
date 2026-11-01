@@ -6163,7 +6163,7 @@ const handleAttenuationchange = () => {
 async function playRegion() {
   // Sanitise region (after zoom, start or end may be outside the windowlength)
   // I don't want to change the actual region length, so make a copy
-  const region = spec.REGIONS.regions?.find(
+  const region = spec.REGIONS.getRegions().find(
     (region) => region.start === STATE.activeRegion.start
   );
   if (region) {
@@ -8065,7 +8065,7 @@ recordEntryForm.addEventListener("submit", function (e) {
   let start, end;
   start = windowOffsetSecs + activeRegion.start;
   end = windowOffsetSecs + activeRegion.end;
-  const region = spec.REGIONS.regions.find(
+  const region = spec.REGIONS.getRegions().find(
     (region) => region.start === STATE.activeRegion.start
   );
   // You can still add a record if you cleared the regions
