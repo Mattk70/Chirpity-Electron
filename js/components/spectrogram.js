@@ -7,7 +7,7 @@ import { DOM } from "../utils/DOMcache.js";
 import { Context, get } from "../utils/i18n.js";
 
 const colormap = window.module.colormap;
-
+const zeroPaddingFactor = 2;
 function hzToMel(hz) {
   return 2595 * Math.log10(1 + hz / 700);
 }
@@ -202,6 +202,7 @@ export class ChirpityWS {
         waveColor: 'transparent',
         progressColor: 'transparent',
         sampleRate: this.sampleRate,
+        renderFunction: () => {}, // No need to render anything
         plugins
       });
   }
@@ -363,6 +364,7 @@ export class ChirpityWS {
       labelsBackground: "transparent",
       height: this.adjustHeight(),
       fftSamples,
+      fftSize: fftSamples * zeroPaddingFactor,
       scale,
       colorMap,
       alpha,
@@ -580,7 +582,8 @@ createLabelsCanvas() {
       fftSamples *= 2;
       const noverlap = Math.round(this.getConfig().customColormap.noverlap * fftSamples);
       this.spectrogram.options.noverlap = noverlap;
-      this.spectrogram.setOptions({ fftSamples, noverlap });
+      const fftSize = fftSamples * zeroPaddingFactor;
+      this.spectrogram.setOptions({ fftSamples, noverlap, fftSize });
       this.spectrogram.options.fftSamples = fftSamples;
       this.reload();
       console.log(fftSamples);
@@ -605,7 +608,8 @@ createLabelsCanvas() {
       this.spectrogram.options.fftSamples = fftSamples;
       const noverlap = Math.round(this.getConfig().customColormap.noverlap * fftSamples);
       this.spectrogram.options.noverlap = noverlap;
-      this.spectrogram.setOptions({ fftSamples, noverlap });
+      const fftSize = fftSamples * zeroPaddingFactor;
+      this.spectrogram.setOptions({ fftSamples, noverlap, fftSize });
       this.reload();
       console.log(fftSamples);
     }
