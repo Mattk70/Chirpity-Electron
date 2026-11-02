@@ -1741,7 +1741,7 @@ function postAnalyseMessage(args) {
   if (!PREDICTING) {
     // Start a timer
     t0_analysis = Date.now();
-    utils.disableMenuItem(["analyseSelection", "explore", "charts"]);
+    utils.disableMenuItem(["analyseSelection", "explore", "charts", "save2db"]);
     const selection = !!args.end;
     const filesInScope = args.filesInScope;
     if (!args.fromDB){
@@ -4606,7 +4606,7 @@ function onSummaryComplete({ filterSpecies = undefined, summary = [], active }) 
       "save-summary",
       "save-Raven"
     ];
-  STATE.mode === 'analyse' && menuItems.push("save2db")
+  
   if (summary.length) {
     updateSummary({ 
       summary: summary,
@@ -4614,6 +4614,7 @@ function onSummaryComplete({ filterSpecies = undefined, summary = [], active }) 
       active,
       finished: true 
     });
+    STATE.mode === 'analyse' && menuItems.push("save2db")
     utils.enableMenuItem(menuItems);
     // Add hover to the summary
     const summaryNode = document.getElementById("resultSummary");
