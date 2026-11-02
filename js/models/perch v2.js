@@ -139,6 +139,7 @@ onmessage = async (e) => {
             confidence,
             worker,
             resetResults,
+            queryMode,
             id,
             batchIndex
           } = data;
@@ -147,7 +148,9 @@ onmessage = async (e) => {
           const myGeneration = currentGeneration;
           const result = await predictChunk(
             chunks,
-            start
+            start,
+            selection,
+            queryMode
           );
           if (cancelled || myGeneration !== currentGeneration) {
             return; // Ignore stale results
@@ -186,10 +189,10 @@ const createAudioTensorBatch = (audioArray) => {
   return inputTensor; // SAME tensor instance every call, contents mutated in place
 };
 
-function predictChunk(audioBuffer, startSamples) {
+function predictChunk(audioBuffer, startSamples, selection, queryMode) {
     const prediction = predictionQueue.then(() => {
       const audioBatch = createAudioTensorBatch(audioBuffer);
-      return predictBatch(audioBatch, startSamples);
+      return predictBatch(audioBatch, startSamples, selection, queryMode);
     });
     predictionQueue = prediction.catch(() => {});
     return prediction;
@@ -207,7 +210,7 @@ async function disposeGPUTensors(prediction) {
  * - flat: Float32Array of length batchSize * numClasses (logits)
  * - batchSize, numClasses, sampleRate available in outer scope / params
  */
-async function predictBatch(audio, keys) {
+async function predictBatch(audio, keys, selection, queryMode) {
     const length = keys.length;
     const batchedEmbeds  = Array.from({ length });
     const batchedIndices  = Array.from({ length });
@@ -216,6 +219,46 @@ async function predictBatch(audio, keys) {
     const flatID = prediction.label.data; // Float32Array
     const flatEmbeds = prediction.embedding.data;
     const dim = prediction.embedding.dims[1]
+
+    if (selection) {
+      const maxProbabilities = new Float32Array(numClasses);
+
+      for (let b = 0; b < length; b++) {
+        const offset = b * numClasses;
+        const logits = flatID.subarray(offset, offset + numClasses);
+        const {probs, idx} = topK(logits);
+        for (let k = 0; k < idx.length; k++) {
+          const classIndex = idx[k];
+          if (probs[k] > maxProbabilities[classIndex]) {
+            maxProbabilities[classIndex] = probs[k];
+          }
+        }
+      }
+      const top = Array.from(maxProbabilities, (probability, index) => ({
+        probability,
+        index,
+      }))
+        .sort((a, b) => b.probability - a.probability)
+        .slice(0, 5);
+      const topIndices = top.map(({index}) => index);
+      const topProbabilities = top.map(({probability}) => probability);
+      const keysOut = [((keys[0] / sampleRate) * 1000) / 1000];
+      let embeddings = [];
+      if (queryMode) {
+        embeddings = Array.from({length}, (_, b) => {
+          const bOffset = b * dim;
+          const queryEmbedding = new Float32Array(
+            flatEmbeds.subarray(bOffset, bOffset + dim)
+          );
+          l2Normalize(queryEmbedding);
+          const f16 = new Float16Array(dim);
+          f16.set(queryEmbedding);
+          return f16;
+        });
+      }
+      disposeGPUTensors(prediction);
+      return [keysOut, [topIndices], [topProbabilities], embeddings];
+    }
     for (let b = 0; b < length; b++) {
       const offset = b * numClasses;
       const bOffset = b * dim;
@@ -257,4 +300,3 @@ function l2Normalize(vec) {
 
 const loadTopK = require("../utils/topKWASM.js");
 const { topK } = await loadTopK();
-

@@ -23,7 +23,6 @@ async function createEmbeddingTable(db, path, dim){
           fileID INTEGER NOT NULL,
           offset REAL NOT NULL,
           vectorIndex INTEGER NOT NULL,
-          FOREIGN KEY (fileID) REFERENCES files(id),
           UNIQUE(fileID, offset)
       );`)
   await db.runAsync('DELETE FROM embeddings');

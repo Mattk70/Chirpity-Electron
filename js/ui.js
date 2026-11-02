@@ -1741,7 +1741,7 @@ function postAnalyseMessage(args) {
   if (!PREDICTING) {
     // Start a timer
     t0_analysis = Date.now();
-    utils.disableMenuItem(["analyseSelection", "explore", "charts"]);
+    utils.disableMenuItem(["analyseSelection", "explore", "charts", "save2db"]);
     const selection = !!args.end;
     const filesInScope = args.filesInScope;
     if (!args.fromDB){
@@ -2316,9 +2316,10 @@ const defaultConfig = {
     scale: 'linear',
     alpha: 0.5,
     autoGain: false,
-    preEmphasis: 0, // Pre-emphasis filter willl be 0 (false) or 6 (true)
+    preEmphasis: 0, // Pre-emphasis filter will be 0 (false) or 6 (true)
     rangeDB: 80, // Range in dB for the spectrogram
-    splitChannels: false
+    splitChannels: true,
+    noverlap: 0.8
   },
   timeOfDay: true,
   list: "birds",
@@ -2504,6 +2505,7 @@ window.onload = async () => {
     config.customColormap.preEmphasis = 0;
     config.customColormap.rangeDB = 80;
     config.customColormap.splitChannels = false;
+    config.customColormap.noverlap = 0.5;
   }
   const selectedModel = config.selectedModel;
 
@@ -2621,7 +2623,7 @@ window.onload = async () => {
   config.colormap === "custom" &&
     document.getElementById("colormap-fieldset").classList.remove("d-none");
   const {loud, mid, quiet, quietThreshold, midThreshold, alpha, 
-    autoGain, preEmphasis, rangeDB, splitChannels} = config.customColormap;
+    autoGain, preEmphasis, rangeDB, splitChannels, noverlap} = config.customColormap;
   document.getElementById("quiet-color-threshold").textContent = quietThreshold;
   document.getElementById("quiet-color-threshold-slider").value = quietThreshold;
   document.getElementById("mid-color-threshold").textContent = midThreshold;
@@ -2635,6 +2637,8 @@ window.onload = async () => {
   document.getElementById("preemphasis").checked = preEmphasis;
   document.getElementById("range-db").value = rangeDB;
   document.getElementById("split-channels").checked = splitChannels;
+  document.getElementById("noverlap").value = noverlap;
+  document.getElementById("noverlap-value").innerHTML = `<b>${(noverlap*100).toFixed(0)}%</b>`;
   
   // Audio preferences:
   DOM.gain.value = audio.gain;
@@ -3608,7 +3612,7 @@ function setActiveRegion(region, activateRow) {
   }
   const { start, end, content } = region;
   // Clear active regions
-  spec.REGIONS.regions.forEach((r) =>
+  spec.REGIONS.getRegions().forEach((r) =>
     r.setOptions({
       color: STATE.regionColour,
       content: spec.formatLabel(r.content?.innerText),
@@ -4254,13 +4258,8 @@ async function onWorkerLoadedAudio({
   STATE.windowLength = contents.byteLength / (sr * 2 * channels);
   resetRegions();
   // Set the spectrogram channel count
-  if (spec?.channels !== channels){
-    if (spec.spectrogram){
-      spec.spectrogram.height *= spec.channels;
-      spec.spectrogram.height /= channels;
-    }
-    spec.channels = channels;
-  }
+  if (spec) spec.channels = channels;
+
   await spec.updateSpec({
     buffer: STATE.currentBuffer,
     position,
@@ -4602,7 +4601,7 @@ function onSummaryComplete({ filterSpecies = undefined, summary = [], active }) 
       "save-summary",
       "save-Raven"
     ];
-  STATE.mode === 'analyse' && menuItems.push("save2db")
+  
   if (summary.length) {
     updateSummary({ 
       summary: summary,
@@ -4610,6 +4609,7 @@ function onSummaryComplete({ filterSpecies = undefined, summary = [], active }) 
       active,
       finished: true 
     });
+    STATE.mode === 'analyse' && menuItems.push("save2db")
     utils.enableMenuItem(menuItems);
     // Add hover to the summary
     const summaryNode = document.getElementById("resultSummary");
@@ -5871,6 +5871,12 @@ function showThreshold(e) {
   settingsPanelRangeInput.value = threshold;
 }
 
+const showNoverlap = (e) => {
+  const overlap = (e instanceof Event ? e.target.valueAsNumber : e) * 100;  
+  document.getElementById('noverlap-value').innerHTML = `<b>${overlap.toFixed(0)}%</b>`;
+
+}
+
 const showOverlap = (e) => {
   const overlap = e instanceof Event ? e.target.valueAsNumber : e * 100;  
   document.getElementById('overlap-value').innerHTML = `<b>${overlap}%</b>`;
@@ -5999,7 +6005,7 @@ function updateDisplay(el, id, unit){
   display.textContent = value + (unit || '');
 }
 
-document.addEventListener('input', (e) =>{
+document.addEventListener("input", (e) =>{
   const el = e.target;
   const target = el.id;
   switch (target){
@@ -6039,6 +6045,10 @@ document.addEventListener('input', (e) =>{
     case "confidenceValue": {
       showThreshold(e)
       break;
+    }
+    case "noverlap": {
+      showNoverlap(e);
+      break; 
     }
     case "overlap": {
       showOverlap(e);
@@ -6149,7 +6159,7 @@ const handleAttenuationchange = () => {
 async function playRegion() {
   // Sanitise region (after zoom, start or end may be outside the windowlength)
   // I don't want to change the actual region length, so make a copy
-  const region = spec.REGIONS.regions?.find(
+  const region = spec.REGIONS.getRegions().find(
     (region) => region.start === STATE.activeRegion.start
   );
   if (region) {
@@ -7459,12 +7469,14 @@ document.addEventListener("change", async function (e) {
         case "preemphasis":
         case "range-db":
         case "split-channels":
+        case "noverlap":
         case "alpha-slider": {
           const alpha = document.getElementById("alpha-slider").valueAsNumber;
           const autoGain = document.getElementById("autogain").checked;
           const preEmphasis = document.getElementById("preemphasis").checked ? 6 : 0;
           const rangeDB = document.getElementById("range-db").valueAsNumber;
           const splitChannels = document.getElementById("split-channels").checked;
+          const noverlap = document.getElementById("noverlap").valueAsNumber;
           const loud = document.getElementById("loud-color").value;
           const mid = document.getElementById("mid-color").value;
           const quiet = document.getElementById("quiet-color").value;
@@ -7487,7 +7499,8 @@ document.addEventListener("change", async function (e) {
             preEmphasis,
             rangeDB,
             scale,
-            splitChannels
+            splitChannels,
+            noverlap
           };
           if (spec.wavesurfer && STATE.currentFile) {
             spec.setOptions();
@@ -7517,13 +7530,10 @@ document.addEventListener("change", async function (e) {
           const useLabels = element.checked;
           config.specLabels = useLabels;
           if (spec.wavesurfer && STATE.currentFile) {
-            if (useLabels) {
-              spec.createLabelsCanvas();
-              spec.setOptions();
-             } else {
-              spec.spectrogram.labelsEl.remove();
-              spec.setOptions();
-             }
+            spec.spectrogram = spec.initSpectrogram();
+            spec.wavesurfer.registerPlugin(spec.spectrogram);
+            spec.applyMask();
+            spec.reload();
           }
           break;
         }
@@ -8052,7 +8062,7 @@ recordEntryForm.addEventListener("submit", function (e) {
   let start, end;
   start = windowOffsetSecs + activeRegion.start;
   end = windowOffsetSecs + activeRegion.end;
-  const region = spec.REGIONS.regions.find(
+  const region = spec.REGIONS.getRegions().find(
     (region) => region.start === STATE.activeRegion.start
   );
   // You can still add a record if you cleared the regions
@@ -8897,6 +8907,8 @@ async function membershipCheck() {
     config.customColormap.preEmphasis = false;
     config.customColormap.rangeDB = 80;
     config.customColormap.splitChannels = false;
+    config.customColormap.noverlap = 0.5;
+    document.getElementById('noverlap-value').innerHTML = `<b>50%</b>`;
     // Set all backends to 'tensorflow'
     if (config.hasNode){
       Object.values(config.models).forEach(model => {

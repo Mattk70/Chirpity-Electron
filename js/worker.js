@@ -2421,12 +2421,11 @@ async function loadAudioFile({
   position = 0,
   // region = false,
   play = false,
-  goToRegion = true,
-  splitChannels = true
+  goToRegion = true
 }) {
   return new Promise((resolve, reject) => {
     if (file) {
-      fetchAudioBuffer({ file, start, end, splitChannels })
+      fetchAudioBuffer({ file, start, end })
         .then(([audio, start, channels]) => {
           if (!audio || audio.length === 0) {
             return reject({message: 'No audio data found in file'}) 
@@ -2876,7 +2875,7 @@ async function processAudio(
  * @param {number} [params.end] - The end time in seconds.
  * @returns {Promise<Buffer[]>} - The audio buffer and start time.
  */
-const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sampleRate, splitChannels }) => {
+const fetchAudioBuffer = async ({ file = "", start = 0, end, format = 'wav', sampleRate }) => {
   if (!fs.existsSync(file)) {
     const result = await getWorkingFile(file);
     if (!result) throw new Error(`Cannot locate ${file}`);
@@ -3048,6 +3047,7 @@ function createPredictSender(workerQueue) {
       start: chunkStarts,
       duration: endTime,
       resetResults: !STATE.selection,
+      queryMode: !!STATE.queryMetadata,
       context: STATE.detect.contextAware,
       confidence: STATE.detect.confidence,
       chunks: channelDataArray,
@@ -3724,24 +3724,48 @@ const generateInsertQuery = async (detections, file, modelID) => {
 
 async function prepareQuery(query){
   const {cname, max, threshold} = STATE.queryMetadata;
+  const matches = await queryEmbeddings(memoryDB, query, max, threshold);
+  for (let i = 0; i < matches.length; i++){
+    const [fileID, offset, score] = matches[i];
+    const row = await STATE.db.getAsync(
+      'SELECT name AS file FROM files WHERE id = ?',
+      fileID);
+    if (! row) continue
+    const {file} = row;
+    const detection = {start: offset, end: offset + WINDOW_SIZE, species: 1, confidence: Math.round(score*1000)}
+    await generateInsertQuery([detection], file, 0, false);
+  }
+  STATE.selection = false;
+  await Promise.all([getResults({species: cname}), getSummary({species: cname})])
+}
+
+async function completeQueryBatch(file) {
+  predictionsReceived[file]++;
+  if (predictionsReceived[file] < (batchesToSend[file] || 1)) return;
+
+  const queryMetadata = STATE.queryMetadata;
   try {
-    const matches = await queryEmbeddings(memoryDB, query, max, threshold);
-    for (let i = 0; i < matches.length; i++){
-      const [fileID, offset, score] = matches[i];
-      const row = await STATE.db.getAsync(
-        'SELECT name AS file FROM files WHERE id = ?',
-        fileID);
-      if (! row) continue
-      const {file} = row;
-      const detection = {start: offset, end: offset + WINDOW_SIZE, species: 1, confidence: Math.round(score*1000)}
-      await generateInsertQuery([detection], file, 0, false);
+    if (queryMetadata?.embeddingCount) {
+      const queryEmbedding = queryMetadata.embeddingSum;
+      for (let d = 0; d < queryEmbedding.length; d++) {
+        queryEmbedding[d] /= queryMetadata.embeddingCount;
+      }
+      let norm = 0;
+      for (const value of queryEmbedding) norm += value * value;
+      norm = Math.sqrt(norm);
+      if (norm > 0) {
+        for (let d = 0; d < queryEmbedding.length; d++) {
+          queryEmbedding[d] /= norm;
+        }
+      }
+      await prepareQuery(queryEmbedding);
     }
-    STATE.selection = false;
-    await Promise.all([getResults({species: cname}), getSummary({species: cname})])
   } finally {
     STATE.queryMetadata = undefined;
+    updateQueue(file);
   }
 }
+
 /**
  * Update in-memory detection merging state from a batch of model predictions and return any completed detections.
  *
@@ -3965,12 +3989,10 @@ const parsePredictions = async (response) => {
   const predictionLength =
     STATE.model.includes("batpack") ? 0.3 : WINDOW_SIZE;
   if (!latestResult.length) {
-    predictionsReceived[file]++;
     if (STATE.queryMetadata) {
-      if (predictionsReceived[file] >= (batchesToSend[file] || 1)) {
-        updateQueue(file);
-      }
+      await completeQueryBatch(file);
     } else {
+      predictionsReceived[file]++;
       enqueueDetectionUpdate(file, batchIndex, () => []);
     }
     return worker;
@@ -3990,19 +4012,20 @@ const parsePredictions = async (response) => {
   */
 
   if (STATE.queryMetadata) {
-    if (!embeddingsBatch?.length) {
-      predictionsReceived[file]++;
-      if (predictionsReceived[file] >= (batchesToSend[file] || 1)) {
-        updateQueue(file);
+    if (embeddingsBatch?.length) {
+      const queryMetadata = STATE.queryMetadata;
+      const dim = embeddingsBatch[0].length;
+      queryMetadata.embeddingSum ??= new Float32Array(dim);
+      for (const embedding of embeddingsBatch) {
+        for (let d = 0; d < dim; d++) {
+          queryMetadata.embeddingSum[d] += embedding[d];
+        }
       }
-      return worker;
+      queryMetadata.embeddingCount =
+        (queryMetadata.embeddingCount || 0) + embeddingsBatch.length;
     }
 
-    await prepareQuery(embeddingsBatch[0]);
-    predictionsReceived[file]++;
-    if (predictionsReceived[file] >= (batchesToSend[file] || 1)) {
-      updateQueue(file);
-    }
+    await completeQueryBatch(file);
     return worker;
   }
 
@@ -5065,10 +5088,6 @@ async function exportData(result, filename, format, headers) {
   };
   let formattedValues = [];
   const BATCH_SIZE = 10_000;
-  // For Raven
-  let previousFile = null,
-    cumulativeOffset = 0,
-    fileDurations = {};
   const { writeToPath } = require("@fast-csv/format");
   if (format === 'summary'){
     formattedValues = result.map(item => {
@@ -5083,6 +5102,75 @@ async function exportData(result, filename, format, headers) {
     const { ExportFormatter } = require("./js/utils/exportFormatter.js");
     const formatter = new ExportFormatter(STATE);
     const locationMap = await formatter.getAllLocations();
+    let ravenOffsets;
+    if (format === "Raven") {
+      const filePaths = STATE.openFiles?.length
+        ? STATE.openFiles
+        : QUEUE.getAllPaths();
+      const archivePrefix = STATE.library.location
+        ? STATE.library.location + p.sep
+        : "";
+      const getArchiveName = file =>
+        archivePrefix && file.startsWith(archivePrefix)
+          ? file.slice(archivePrefix.length)
+          : file;
+      const archiveNames = filePaths.map(getArchiveName);
+      const fileRows = filePaths.length
+        ? await STATE.db.allAsync(`
+            SELECT name, archiveName, duration, filestart
+            FROM files
+            WHERE name IN (SELECT value FROM json_each(?))
+               OR archiveName IN (SELECT value FROM json_each(?))
+            ORDER BY filestart, id
+          `, JSON.stringify(filePaths), JSON.stringify(archiveNames))
+        : [];
+      const filesByName = new Map(
+        fileRows.map(row => [row.name, {
+          name: row.name,
+          duration: row.duration,
+          filestart: row.filestart,
+        }])
+      );
+      const databaseNames = new Set(fileRows.map(row => row.name));
+      const databaseArchiveNames = new Set(
+        fileRows.map(row => row.archiveName).filter(Boolean)
+      );
+
+      for (const file of filePaths) {
+        const metadata = METADATA[file];
+        if (!metadata) continue;
+        const archiveName = getArchiveName(file);
+        const hasDatabaseRow =
+          databaseNames.has(file) || databaseArchiveNames.has(archiveName);
+        if (!hasDatabaseRow && !filesByName.has(file)) {
+          filesByName.set(file, {
+            name: file,
+            duration: metadata.duration,
+            filestart: metadata.fileStart,
+          });
+        }
+      }
+
+      for (const item of result) {
+        if (!filesByName.has(item.file)) {
+          filesByName.set(item.file, {
+            name: item.file,
+            duration: item.duration,
+            filestart: item.filestart,
+          });
+        }
+      }
+
+      const timeline = [...filesByName.values()].sort((a, b) =>
+        (a.filestart ?? Infinity) - (b.filestart ?? Infinity)
+      );
+      ravenOffsets = new Map();
+      let offset = 0;
+      for (const file of timeline) {
+        ravenOffsets.set(file.name, offset);
+        offset += file.duration || 0;
+      }
+    }
     // CSV export. Format the values
     for (let i = 0; i < result.length; i += BATCH_SIZE) {
       const batch = result.slice(i, i + BATCH_SIZE);
@@ -5090,17 +5178,7 @@ async function exportData(result, filename, format, headers) {
         batch.map(async (item, index) => {
           if (format === "Raven") {
             item = { ...item, selection: index + i +  1 }; // Add a selection number for Raven
-            if (item.file !== previousFile) {
-              // Positions need to be cumulative across files in Raven
-              // todo?: fix bug where offsets are out due to intervening fles without recorods
-              if (previousFile !== null) {
-                cumulativeOffset += result.find(
-                  (r) => r.file === previousFile
-                ).duration;
-              }
-              previousFile = item.file;
-            }
-            item.offset = cumulativeOffset;
+            item.offset = ravenOffsets.get(item.file);
           }
           return formatter[formatFunctions[format]](item, locationMap);
         })

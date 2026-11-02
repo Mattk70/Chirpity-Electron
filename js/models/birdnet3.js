@@ -148,9 +148,9 @@ onmessage = async (e) => {
             start,
             fileStart,
             file,
-            confidence,
             worker,
             resetResults,
+            queryMode,
             id,
             batchIndex
           } = data;
@@ -159,7 +159,9 @@ onmessage = async (e) => {
           const myGeneration = currentGeneration;
           const result = await predictChunk(
             chunks,
-            start
+            start,
+            selection,
+            queryMode
           );
           if (cancelled || myGeneration !== currentGeneration) {
             return; // Ignore stale results
@@ -211,10 +213,10 @@ const createAudioTensorBatch = (audioArray) => {
  * @param {number[]} startSamples - Start offsets, in samples, for the chunks.
  * @returns {Promise<Array>} Processed timestamps, top class indices and probabilities, and embeddings.
  */
-function predictChunk(audioBuffer, startSamples) {
+function predictChunk(audioBuffer, startSamples, selection, queryMode) {
     const prediction = predictionQueue.then(() => {
       const audioBatch = createAudioTensorBatch(audioBuffer);
-      return predictBatch(audioBatch, startSamples);
+      return predictBatch(audioBatch, startSamples, selection, queryMode);
     });
     predictionQueue = prediction.catch(() => {});
     return prediction;
@@ -229,7 +231,7 @@ function predictChunk(audioBuffer, startSamples) {
  * @param {number[]} keys - Sample offsets corresponding to the batch rows.
  * @returns {Promise<Array>} A tuple of timestamps, class-index arrays, probability arrays, and float16 embeddings.
  */
-async function predictBatch(audio, keys) {
+async function predictBatch(audio, keys, selection, queryMode) {
     const length = keys.length;
     const batchedEmbeds  = Array.from({ length });
     const batchedIndices  = Array.from({ length });
@@ -240,6 +242,37 @@ async function predictBatch(audio, keys) {
     const dim = prediction.embeddings_out.dims[1]
     prediction.predictions.dispose();
     prediction.embeddings_out.dispose();
+
+    if (selection) {
+      // Track the highest score seen for each class across all batch items.
+      const maxLogits = new Float32Array(numClasses).fill(-Infinity);
+
+      for (let b = 0; b < length; b++) {
+        const offset = b * numClasses;
+        const logits = flatID.subarray(offset, offset + numClasses);
+        for (let c = 0; c < numClasses; c++) {
+          const logit = logits[c];
+          if (logit > maxLogits[c]) maxLogits[c] = logit;
+        }
+      }
+      const top = topKProbs(maxLogits);
+      const keysOut = [((keys[0] / sampleRate) * 1000) / 1000];
+      let embeddings = [];
+      if (queryMode) {
+        embeddings = Array.from({length}, (_, b) => {
+          const bOffset = b * dim;
+          const queryEmbedding = new Float32Array(
+            flatEmbeds.subarray(bOffset, bOffset + dim)
+          );
+          l2Normalize(queryEmbedding);
+          const f16 = new Float16Array(dim);
+          f16.set(queryEmbedding);
+          return f16;
+        });
+      }
+      return [keysOut, [top.idx], [top.probs], embeddings];
+    }
+
     for (let b = 0; b < length; b++) {
       const offset = b * numClasses;
       const bOffset = b * dim;
@@ -360,4 +393,3 @@ function l2Normalize(vec) {
   }
   return vec;
 }
-
