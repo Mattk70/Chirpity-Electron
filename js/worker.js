@@ -3724,24 +3724,48 @@ const generateInsertQuery = async (detections, file, modelID) => {
 
 async function prepareQuery(query){
   const {cname, max, threshold} = STATE.queryMetadata;
+  const matches = await queryEmbeddings(memoryDB, query, max, threshold);
+  for (let i = 0; i < matches.length; i++){
+    const [fileID, offset, score] = matches[i];
+    const row = await STATE.db.getAsync(
+      'SELECT name AS file FROM files WHERE id = ?',
+      fileID);
+    if (! row) continue
+    const {file} = row;
+    const detection = {start: offset, end: offset + WINDOW_SIZE, species: 1, confidence: Math.round(score*1000)}
+    await generateInsertQuery([detection], file, 0, false);
+  }
+  STATE.selection = false;
+  await Promise.all([getResults({species: cname}), getSummary({species: cname})])
+}
+
+async function completeQueryBatch(file) {
+  predictionsReceived[file]++;
+  if (predictionsReceived[file] < (batchesToSend[file] || 1)) return;
+
+  const queryMetadata = STATE.queryMetadata;
   try {
-    const matches = await queryEmbeddings(memoryDB, query, max, threshold);
-    for (let i = 0; i < matches.length; i++){
-      const [fileID, offset, score] = matches[i];
-      const row = await STATE.db.getAsync(
-        'SELECT name AS file FROM files WHERE id = ?',
-        fileID);
-      if (! row) continue
-      const {file} = row;
-      const detection = {start: offset, end: offset + WINDOW_SIZE, species: 1, confidence: Math.round(score*1000)}
-      await generateInsertQuery([detection], file, 0, false);
+    if (queryMetadata?.embeddingCount) {
+      const queryEmbedding = queryMetadata.embeddingSum;
+      for (let d = 0; d < queryEmbedding.length; d++) {
+        queryEmbedding[d] /= queryMetadata.embeddingCount;
+      }
+      let norm = 0;
+      for (const value of queryEmbedding) norm += value * value;
+      norm = Math.sqrt(norm);
+      if (norm > 0) {
+        for (let d = 0; d < queryEmbedding.length; d++) {
+          queryEmbedding[d] /= norm;
+        }
+      }
+      await prepareQuery(queryEmbedding);
     }
-    STATE.selection = false;
-    await Promise.all([getResults({species: cname}), getSummary({species: cname})])
   } finally {
     STATE.queryMetadata = undefined;
+    updateQueue(file);
   }
 }
+
 /**
  * Update in-memory detection merging state from a batch of model predictions and return any completed detections.
  *
@@ -3965,12 +3989,10 @@ const parsePredictions = async (response) => {
   const predictionLength =
     STATE.model.includes("batpack") ? 0.3 : WINDOW_SIZE;
   if (!latestResult.length) {
-    predictionsReceived[file]++;
     if (STATE.queryMetadata) {
-      if (predictionsReceived[file] >= (batchesToSend[file] || 1)) {
-        updateQueue(file);
-      }
+      await completeQueryBatch(file);
     } else {
+      predictionsReceived[file]++;
       enqueueDetectionUpdate(file, batchIndex, () => []);
     }
     return worker;
@@ -3990,19 +4012,20 @@ const parsePredictions = async (response) => {
   */
 
   if (STATE.queryMetadata) {
-    if (!embeddingsBatch?.length) {
-      predictionsReceived[file]++;
-      if (predictionsReceived[file] >= (batchesToSend[file] || 1)) {
-        updateQueue(file);
+    if (embeddingsBatch?.length) {
+      const queryMetadata = STATE.queryMetadata;
+      const dim = embeddingsBatch[0].length;
+      queryMetadata.embeddingSum ??= new Float32Array(dim);
+      for (const embedding of embeddingsBatch) {
+        for (let d = 0; d < dim; d++) {
+          queryMetadata.embeddingSum[d] += embedding[d];
+        }
       }
-      return worker;
+      queryMetadata.embeddingCount =
+        (queryMetadata.embeddingCount || 0) + embeddingsBatch.length;
     }
 
-    await prepareQuery(embeddingsBatch[0]);
-    predictionsReceived[file]++;
-    if (predictionsReceived[file] >= (batchesToSend[file] || 1)) {
-      updateQueue(file);
-    }
+    await completeQueryBatch(file);
     return worker;
   }
 

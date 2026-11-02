@@ -259,20 +259,16 @@ async function predictBatch(audio, keys, selection, queryMode) {
       const keysOut = [((keys[0] / sampleRate) * 1000) / 1000];
       let embeddings = [];
       if (queryMode) {
-        const queryEmbedding = new Float32Array(dim);
-        for (let b = 0; b < length; b++) {
+        embeddings = Array.from({length}, (_, b) => {
           const bOffset = b * dim;
-          for (let d = 0; d < dim; d++) {
-            queryEmbedding[d] += flatEmbeds[bOffset + d];
-          }
-        }
-        for (let d = 0; d < dim; d++) {
-          queryEmbedding[d] /= length;
-        }
-        l2Normalize(queryEmbedding);
-        const f16 = new Float16Array(dim);
-        f16.set(queryEmbedding);
-        embeddings = [f16];
+          const queryEmbedding = new Float32Array(
+            flatEmbeds.subarray(bOffset, bOffset + dim)
+          );
+          l2Normalize(queryEmbedding);
+          const f16 = new Float16Array(dim);
+          f16.set(queryEmbedding);
+          return f16;
+        });
       }
       return [keysOut, [top.idx], [top.probs], embeddings];
     }
