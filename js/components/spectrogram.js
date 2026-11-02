@@ -426,7 +426,7 @@ export class ChirpityWS {
       this.wavesurfer.registerPlugin(this.spectrogram);
       this.applyMask()
     } else {
-      const options = { ...this.spectrogram.options,
+      const options = {
         colorMap: this.createColormap(),
         alpha,
         scale,
@@ -440,7 +440,7 @@ export class ChirpityWS {
         noverlap: noverlapRounded,
       }
       this.spectrogram.setOptions( options );
-      this.spectrogram.options = options;
+      this.spectrogram.options = { ...this.spectrogram.options, ...options };
     }
     this.reload();
   }
