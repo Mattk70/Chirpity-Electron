@@ -416,6 +416,7 @@ export class ChirpityWS {
     const { scale, alpha, windowFunc, autoGain, preEmphasis, rangeDB, splitChannels, noverlap } = config.customColormap;
     const colour = this.wsTextColour()[0];
     const newHeight = this.adjustHeight();
+    const noverlapRounded = Math.round(fftSamples * noverlap);
     const LABEL_COLOR_MAPS = new Set(['gray', 'custom']);
     const labelsNeedRefresh = this.colormap !== colormap &&
       (LABEL_COLOR_MAPS.has(this.colormap) ||
@@ -428,18 +429,21 @@ export class ChirpityWS {
       this.wavesurfer.registerPlugin(this.spectrogram);
       this.applyMask()
     } else {
-      this.spectrogram.setOptions( {
+      const options = { ...this.spectrogram.options,
         colorMap: this.createColormap(),
         alpha,
         scale,
+        fftSamples,
         windowFunc,
         autoGain,
         preEmphasis,
         rangeDB,
         splitChannels,
         height: newHeight,
-        noverlap: Math.round(fftSamples * noverlap),
-      });
+        noverlap: noverlapRounded,
+      }
+      this.spectrogram.setOptions( options );
+      this.spectrogram.options = options;
     }
     this.reload();
   }
