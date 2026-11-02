@@ -5064,10 +5064,6 @@ async function exportData(result, filename, format, headers) {
   };
   let formattedValues = [];
   const BATCH_SIZE = 10_000;
-  // For Raven
-  let previousFile = null,
-    cumulativeOffset = 0,
-    fileDurations = {};
   const { writeToPath } = require("@fast-csv/format");
   if (format === 'summary'){
     formattedValues = result.map(item => {
@@ -5082,6 +5078,73 @@ async function exportData(result, filename, format, headers) {
     const { ExportFormatter } = require("./js/utils/exportFormatter.js");
     const formatter = new ExportFormatter(STATE);
     const locationMap = await formatter.getAllLocations();
+    let ravenOffsets;
+    if (format === "Raven") {
+      const filePaths = STATE.openFiles ?? QUEUE.getAllPaths();
+      const archivePrefix = STATE.library.location
+        ? STATE.library.location + p.sep
+        : "";
+      const getArchiveName = file =>
+        archivePrefix && file.startsWith(archivePrefix)
+          ? file.slice(archivePrefix.length)
+          : file;
+      const archiveNames = filePaths.map(getArchiveName);
+      const fileRows = filePaths.length
+        ? await STATE.db.allAsync(`
+            SELECT name, archiveName, duration, filestart
+            FROM files
+            WHERE name IN (SELECT value FROM json_each(?))
+               OR archiveName IN (SELECT value FROM json_each(?))
+            ORDER BY filestart, id
+          `, JSON.stringify(filePaths), JSON.stringify(archiveNames))
+        : [];
+      const filesByName = new Map(
+        fileRows.map(row => [row.name, {
+          name: row.name,
+          duration: row.duration,
+          filestart: row.filestart,
+        }])
+      );
+      const databaseNames = new Set(fileRows.map(row => row.name));
+      const databaseArchiveNames = new Set(
+        fileRows.map(row => row.archiveName).filter(Boolean)
+      );
+
+      for (const file of filePaths) {
+        const metadata = METADATA[file];
+        if (!metadata) continue;
+        const archiveName = getArchiveName(file);
+        const hasDatabaseRow =
+          databaseNames.has(file) || databaseArchiveNames.has(archiveName);
+        if (!hasDatabaseRow && !filesByName.has(file)) {
+          filesByName.set(file, {
+            name: file,
+            duration: metadata.duration,
+            filestart: metadata.fileStart,
+          });
+        }
+      }
+
+      for (const item of result) {
+        if (!filesByName.has(item.file)) {
+          filesByName.set(item.file, {
+            name: item.file,
+            duration: item.duration,
+            filestart: item.filestart,
+          });
+        }
+      }
+
+      const timeline = [...filesByName.values()].sort((a, b) =>
+        (a.filestart ?? Infinity) - (b.filestart ?? Infinity)
+      );
+      ravenOffsets = new Map();
+      let offset = 0;
+      for (const file of timeline) {
+        ravenOffsets.set(file.name, offset);
+        offset += file.duration || 0;
+      }
+    }
     // CSV export. Format the values
     for (let i = 0; i < result.length; i += BATCH_SIZE) {
       const batch = result.slice(i, i + BATCH_SIZE);
@@ -5089,17 +5152,7 @@ async function exportData(result, filename, format, headers) {
         batch.map(async (item, index) => {
           if (format === "Raven") {
             item = { ...item, selection: index + i +  1 }; // Add a selection number for Raven
-            if (item.file !== previousFile) {
-              // Positions need to be cumulative across files in Raven
-              // todo?: fix bug where offsets are out due to intervening fles without recorods
-              if (previousFile !== null) {
-                cumulativeOffset += result.find(
-                  (r) => r.file === previousFile
-                ).duration;
-              }
-              previousFile = item.file;
-            }
-            item.offset = cumulativeOffset;
+            item.offset = ravenOffsets.get(item.file);
           }
           return formatter[formatFunctions[format]](item, locationMap);
         })

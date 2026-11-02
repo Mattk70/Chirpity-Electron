@@ -2316,10 +2316,10 @@ const defaultConfig = {
     scale: 'linear',
     alpha: 0.5,
     autoGain: false,
-    preEmphasis: 0, // Pre-emphasis filter willl be 0 (false) or 6 (true)
+    preEmphasis: 0, // Pre-emphasis filter will be 0 (false) or 6 (true)
     rangeDB: 80, // Range in dB for the spectrogram
     splitChannels: true,
-    noverlap: 0.5
+    noverlap: 0.8
   },
   timeOfDay: true,
   list: "birds",
@@ -7537,6 +7537,7 @@ document.addEventListener("change", async function (e) {
           if (spec.wavesurfer && STATE.currentFile) {
             spec.spectrogram = spec.initSpectrogram();
             spec.wavesurfer.registerPlugin(spec.spectrogram);
+            spec.applyMask();
             spec.reload();
           }
           break;

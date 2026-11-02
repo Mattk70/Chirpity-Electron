@@ -257,7 +257,7 @@ export class ChirpityWS {
           begin: bufferBegin,
           play: !wavesurfer.isPaused,
         });
-      } else if (currentFileDuration > bufferBegin) {
+      } else if (currentFileDuration > bufferBegin && currentFileDuration - bufferBegin > 0.1) {
         // If remaining file duration > windowlength, start at 
         // the end of the file - windowLength but play from the current position in the file
         const adjustedBegin = currentFileDuration - windowLength;
@@ -334,13 +334,8 @@ export class ChirpityWS {
     fftSamples ??= config?.FFT;
     config.debug && console.log("initializing spectrogram");
     spectrogram?.destroy();
-    if (!fftSamples) {
-      if (windowLength < 5) {
-        fftSamples = 256;
-      } else {
-        fftSamples = 512;
-      }
-    }
+    fftSamples ??= 256;
+
     if (!height) {
       height = fftSamples / 2;
     }
@@ -398,23 +393,19 @@ export class ChirpityWS {
     this.reload();
   }
 
-createLabelsCanvas() {
-  const spec = this.spectrogram;
-  spec.labelsEl = document.createElement('canvas');
-  Object.assign(spec.labelsEl, {
-    part: 'spec-labels',
-  });
-  Object.assign(spec.labelsEl.style, {
-    position: 'absolute',
-    zIndex: 9,
-    width: '55px',
-    height: '100%',
-  });
-  const wrapper = this.wavesurfer.getWrapper();
-  wrapper.appendChild(spec.labelsEl);
-}
 
   adjustHeight = () => this.height / (this.getConfig().customColormap.splitChannels ? this.channels : 1);
+  
+  applyMask() {
+    const container = DOM.spectrogramWrapper.querySelector('.waveform-container');
+    // + 20 for the timeline height, which is not included in the spectrogram height
+    container.style.height = (this.height + 20) + 'px';
+    container.style.backgroundColor = this.wsTextColour()[1];
+    this.spectrogram.once('ready', () => {
+      container.style.height = null;
+      container.style.backgroundColor = null;
+    });
+  }
 
   setOptions() {
     const config = this.getConfig();
@@ -433,6 +424,7 @@ createLabelsCanvas() {
     if (labelsNeedRefresh) {
       this.spectrogram = this.initSpectrogram();
       this.wavesurfer.registerPlugin(this.spectrogram);
+      this.applyMask()
     } else {
       this.spectrogram.setOptions( {
         colorMap: this.createColormap(),
@@ -1001,11 +993,10 @@ createLabelsCanvas() {
    * when spectrogram labels are enabled.
    *
    * @param {MouseEvent} event - Pointer position over the waveform.
-   * @param {boolean} showHz - Ignored; frequency visibility is derived from config.specLabels.
-   */
-  specTooltip(event, showHz) {
+  */
+  specTooltip(event) {
     const config = this.getConfig();
-    showHz = !config.specLabels;
+    const showHz = !config.specLabels;
     const i18 = get(Context);
     const waveElement = DOM.waveElement;
     // Show the recording button
