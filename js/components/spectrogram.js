@@ -8,6 +8,7 @@ import { Context, get } from "../utils/i18n.js";
 
 const colormap = window.module.colormap;
 const zeroPaddingFactor = 2;
+
 function hzToMel(hz) {
   return 2595 * Math.log10(1 + hz / 700);
 }
@@ -331,13 +332,9 @@ export class ChirpityWS {
     this.height = height;
     const config = this.getConfig();
     const spectrogram = this.spectrogram;
-    const STATE = this.getState();
-    const windowLength = STATE.windowLength;
-    fftSamples ??= config?.FFT;
+    fftSamples ??= config?.FFT ?? 512;
     config.debug && console.log("initializing spectrogram");
     spectrogram?.destroy();
-    fftSamples ??= 256;
-
     if (!height) {
       height = fftSamples / 2;
     }
