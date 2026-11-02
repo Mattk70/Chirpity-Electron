@@ -150,6 +150,7 @@ onmessage = async (e) => {
             file,
             worker,
             resetResults,
+            queryMode,
             id,
             batchIndex
           } = data;
@@ -159,7 +160,8 @@ onmessage = async (e) => {
           const result = await predictChunk(
             chunks,
             start,
-            selection
+            selection,
+            queryMode
           );
           if (cancelled || myGeneration !== currentGeneration) {
             return; // Ignore stale results
@@ -211,10 +213,10 @@ const createAudioTensorBatch = (audioArray) => {
  * @param {number[]} startSamples - Start offsets, in samples, for the chunks.
  * @returns {Promise<Array>} Processed timestamps, top class indices and probabilities, and embeddings.
  */
-function predictChunk(audioBuffer, startSamples, selection) {
+function predictChunk(audioBuffer, startSamples, selection, queryMode) {
     const prediction = predictionQueue.then(() => {
       const audioBatch = createAudioTensorBatch(audioBuffer);
-      return predictBatch(audioBatch, startSamples, selection);
+      return predictBatch(audioBatch, startSamples, selection, queryMode);
     });
     predictionQueue = prediction.catch(() => {});
     return prediction;
@@ -229,7 +231,7 @@ function predictChunk(audioBuffer, startSamples, selection) {
  * @param {number[]} keys - Sample offsets corresponding to the batch rows.
  * @returns {Promise<Array>} A tuple of timestamps, class-index arrays, probability arrays, and float16 embeddings.
  */
-async function predictBatch(audio, keys, selection) {
+async function predictBatch(audio, keys, selection, queryMode) {
     const length = keys.length;
     const batchedEmbeds  = Array.from({ length });
     const batchedIndices  = Array.from({ length });
@@ -255,7 +257,24 @@ async function predictBatch(audio, keys, selection) {
       }
       const top = topKProbs(maxLogits);
       const keysOut = [((keys[0] / sampleRate) * 1000) / 1000];
-      return [keysOut, [top.idx], [top.probs], []];
+      let embeddings = [];
+      if (queryMode) {
+        const queryEmbedding = new Float32Array(dim);
+        for (let b = 0; b < length; b++) {
+          const bOffset = b * dim;
+          for (let d = 0; d < dim; d++) {
+            queryEmbedding[d] += flatEmbeds[bOffset + d];
+          }
+        }
+        for (let d = 0; d < dim; d++) {
+          queryEmbedding[d] /= length;
+        }
+        l2Normalize(queryEmbedding);
+        const f16 = new Float16Array(dim);
+        f16.set(queryEmbedding);
+        embeddings = [f16];
+      }
+      return [keysOut, [top.idx], [top.probs], embeddings];
     }
 
     for (let b = 0; b < length; b++) {
@@ -378,4 +397,3 @@ function l2Normalize(vec) {
   }
   return vec;
 }
-

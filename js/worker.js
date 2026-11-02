@@ -3047,6 +3047,7 @@ function createPredictSender(workerQueue) {
       start: chunkStarts,
       duration: endTime,
       resetResults: !STATE.selection,
+      queryMode: !!STATE.queryMetadata,
       context: STATE.detect.contextAware,
       confidence: STATE.detect.confidence,
       chunks: channelDataArray,
@@ -5080,7 +5081,9 @@ async function exportData(result, filename, format, headers) {
     const locationMap = await formatter.getAllLocations();
     let ravenOffsets;
     if (format === "Raven") {
-      const filePaths = STATE.openFiles ?? QUEUE.getAllPaths();
+      const filePaths = STATE.openFiles?.length
+        ? STATE.openFiles
+        : QUEUE.getAllPaths();
       const archivePrefix = STATE.library.location
         ? STATE.library.location + p.sep
         : "";

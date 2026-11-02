@@ -4258,13 +4258,8 @@ async function onWorkerLoadedAudio({
   STATE.windowLength = contents.byteLength / (sr * 2 * channels);
   resetRegions();
   // Set the spectrogram channel count
-  if (spec?.channels !== channels){
-    if (spec.spectrogram){
-      spec.spectrogram.height *= spec.channels;
-      spec.spectrogram.height /= channels;
-    }
-    spec.channels = channels;
-  }
+  if (spec) spec.channels = channels;
+
   await spec.updateSpec({
     buffer: STATE.currentBuffer,
     position,

@@ -224,8 +224,9 @@ export class ChirpityWS {
     const plugins = [this.spectrogram, this.timeline, this.REGIONS];
     this.wavesurfer = this.initWavesurfer(plugins);
 
+    let loadIsCurrent = true;
     if (audio) {
-      await this.loadBuffer(audio);
+      loadIsCurrent = (await this.loadBuffer(audio)) !== false;
     }
     DOM.colourmap.value = config.colormap;
     // Set click event that removes all REGIONS
@@ -287,7 +288,7 @@ export class ChirpityWS {
     // Show controls
     showElement(["controlsWrapper"]);
     // Resize canvas of spec and labels
-    await this.adjustDims(true);
+    const dimensionsAreCurrent = await this.adjustDims(false);
     // remove the tooltip
     DOM.tooltip?.remove();
 
@@ -306,6 +307,7 @@ export class ChirpityWS {
       passive: true,
     });
     wave.addEventListener("mouseout", this.hideTooltip);
+    return loadIsCurrent && dimensionsAreCurrent !== false;
   };
 
   /**
@@ -756,11 +758,13 @@ export class ChirpityWS {
     await this.wavesurfer.loadBlob(this.makeBlob(audio));
   } catch (error) {
     const isStale = requestId !== this._loadBufferRequestId;
-    if (isStale && error?.name === 'AbortError') return;
+    if (isStale && error?.name === 'AbortError') return false;
     throw error;
   }
+  if (requestId !== this._loadBufferRequestId) return false;
   // Only the latest call reaches this point as a successful load.
   this.refreshTimeline();
+  return true;
   }
 
   /**
@@ -778,20 +782,24 @@ export class ChirpityWS {
    * @param {AudioBuffer|*} options.buffer - The audio buffer to be visualized.
    * @param {boolean} [options.play=false] - If true, starts playback immediately after the update.
    * @param {number} [options.position=0] - Normalized playback position (between 0 and 1) to seek to.
-   * @returns {Promise<void>} A promise that resolves once the spectrogram and timeline update process is complete.
+   * @returns {Promise<boolean>} `false` if this update was superseded; otherwise `true` after the spectrogram update completes.
    */
   async updateSpec({ buffer, play = false, position = 0 }) {
-    
+    const requestId = (this._updateSpecRequestId ?? 0) + 1;
+    this._updateSpecRequestId = requestId;
     DOM.spectrogramWrapper.classList.remove("d-none");
     this.spectrogram?.clearCache();
-    if (!this.wavesurfer) await this.adjustDims(true);
-    else {
+    let loadIsCurrent;
+    if (!this.wavesurfer) {
+      loadIsCurrent = (await this.adjustDims(true)) !== false;
+    } else {
       this.spectrogram.setOptions({height: this.adjustHeight()});
-      await this.loadBuffer(buffer);
+      loadIsCurrent = (await this.loadBuffer(buffer)) !== false;
     }
-    
+    if (!loadIsCurrent || requestId !== this._updateSpecRequestId) return false;
     this.wavesurfer.seekTo(position);
     if (play) this.wavesurfer.play();
+    return true;
   }
 
   /**
@@ -911,10 +919,11 @@ export class ChirpityWS {
         // give the wrapper space for the transport controls and element padding/margins
         this.height = specHeight;
         if (!wavesurfer) {
-          await this.initAll({
+          const loadIsCurrent = await this.initAll({
             audio: STATE.currentBuffer,
             height: specHeight,
           });
+          if (loadIsCurrent === false) return false;
         } else {
           specHeight = this.spectrogram.options.splitChannels ? specHeight / this.channels : specHeight;
           wavesurfer.setOptions({
@@ -922,7 +931,8 @@ export class ChirpityWS {
           });
           
           this.spectrogram.setOptions({height: specHeight})
-          await this.loadBuffer();
+          const loadIsCurrent = await this.loadBuffer();
+          if (loadIsCurrent === false) return false;
         }
       }
     }
@@ -939,6 +949,7 @@ export class ChirpityWS {
     resultTableElement.style.height =
       contentHeight 
       - spectrogramWrapper.offsetHeight - specHeight - formOffset + "px";
+    return true;
   }
 
   /**
