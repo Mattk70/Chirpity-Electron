@@ -58,6 +58,11 @@ function extractWaveMetadata(filePath, getDuration = false) {
             }
 
             currentOffset += 8; // Move past the chunk header
+            const advanceToNextChunk = () => {
+              if (chunkSize % 2 !== 0) currentOffset += 1;
+              currentOffset += chunkSize;
+              readNextChunk();
+            };
 
             if (chunkId === "guan") {
               // GUANO chunk found, read its content
@@ -72,7 +77,9 @@ function extractWaveMetadata(filePath, getDuration = false) {
                 guanoText += guanoBuffer.toString("utf-8");
                 const guano = _parseMetadataText(guanoText);
                 metadata["guano"] = guano;
+                advanceToNextChunk();
               });
+              return;
             } else if (chunkId === "bext") {
               // GUANO chunk found, read its content
               const bextBuffer = Buffer.alloc(chunkSize);
@@ -123,11 +130,11 @@ function extractWaveMetadata(filePath, getDuration = false) {
                     delete metadata.bext[key];
                   }
                 }
+                advanceToNextChunk();
               });
+              return;
             }
-            if (chunkSize % 2 !== 0) currentOffset += 1;
-            currentOffset += chunkSize;
-            readNextChunk(); // Continue reading after skipping the data chunk
+            advanceToNextChunk(); // Continue reading after skipping the data chunk
           });
         }
         // Start reading chunks after the RIFF header

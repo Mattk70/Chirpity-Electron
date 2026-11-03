@@ -50,6 +50,15 @@ else
     total_failed=$((total_failed + 1))
 fi
 
+echo -e "${CYAN}Running Metadata Tests...${NC}"
+if node unittest/metadata-standalone.test.js; then
+    echo -e "${GREEN}Metadata tests PASSED${NC}"
+    total_passed=$((total_passed + 1))
+else
+    echo -e "${RED}Metadata tests FAILED${NC}"
+    total_failed=$((total_failed + 1))
+fi
+
 echo ""
 echo "======================================"
 echo "Overall Test Suite Results"
