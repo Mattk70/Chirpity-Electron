@@ -8340,6 +8340,30 @@ const loadingFiles = ({hide, content}) => {
     }, 500);
   }
 }
+const toastContainersWithHandlers = new WeakSet();
+
+function setupToastContainerHandlers(container) {
+  if (toastContainersWithHandlers.has(container)) return;
+  toastContainersWithHandlers.add(container);
+
+  container.addEventListener("click", (event) => {
+    const clearAllButton = event.target.closest("[data-clear-all-toasts]");
+    if (!clearAllButton) return;
+
+    container.querySelectorAll(".toast").forEach((toastElement) => {
+      bootstrap.Toast.getInstance(toastElement)?.dispose();
+      toastElement.remove();
+    });
+  });
+
+  container.addEventListener("hidden.bs.toast", (event) => {
+    const toastElement = event.target.closest(".toast");
+    if (!toastElement || !container.contains(toastElement)) return;
+    bootstrap.Toast.getInstance(toastElement)?.dispose();
+    toastElement.remove();
+  });
+}
+
 /**
  * Displays a toast notification in the UI with optional localization, icon, and notification sound.
  *
@@ -8380,6 +8404,7 @@ function generateToast({
   // add option to locate a missing file
   message += locate;
   const domEl = document.getElementById("toastContainer");
+  setupToastContainerHandlers(domEl);
 
   const wrapper = document.createElement("div");
   // Add toast attributes
@@ -8416,9 +8441,17 @@ function generateToast({
   button.setAttribute("data-bs-dismiss", "toast");
   button.setAttribute("aria-label", "Close");
 
+  const clearAllButton = document.createElement("button");
+  clearAllButton.type = "button";
+  clearAllButton.className =
+    "btn btn-sm btn-outline-secondary text-body-secondary text-decoration-none text-nowrap p-1 me-2";
+  clearAllButton.textContent = i18n.get(i18n.Context).clearAll;
+  clearAllButton.setAttribute("data-clear-all-toasts", "");
+
   // Append elements to toastHeader
   toastHeader.appendChild(iconSpan);
   toastHeader.appendChild(strong);
+  toastHeader.appendChild(clearAllButton);
   toastHeader.appendChild(button);
 
   // Create toast body
