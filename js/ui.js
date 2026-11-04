@@ -2155,20 +2155,21 @@ async function resultClick(e) {
     // 1. clicked and dragged, 2 no detections in file row 3. clicked a header
     return;
   }
-  const {file, start, end, cname:label} = unpackNameAttr(row);
+  const file = activateResultRow(row, this.closest("#results"));
+  if (e.target.classList.contains("circle")) {
+    await utils.waitFor(() => STATE.fileLoaded && STATE.currentFile === file);
+    getSelectionResults(true);
+  }
+}
 
+function activateResultRow(row, loadRegion) {
+  const {file, start, end, cname:label} = unpackNameAttr(row);
   if (activeRow) activeRow.classList.remove("table-active");
   row.classList.add("table-active");
   activeRow = row;
   activeRow.scrollIntoView({ behavior: "instant", block: "nearest",  inline: "nearest" });
-  if (this.closest("#results")) {
-    // Don't do this after "analyse selection"
-    loadResultRegion({ file, start, end, label });
-  }
-  if (e.target.classList.contains("circle")) {
-    await utils.waitFor(() => STATE.fileLoaded);
-    getSelectionResults(true);
-  }
+  if (loadRegion) loadResultRegion({ file, start, end, label });
+  return file;
 }
 
 /**
@@ -7826,6 +7827,20 @@ async function createContextMenu(e) {
   }
   const i18 = i18n.get(i18n.Context);
   const target = e.target;
+  const resultRow = target.closest("#resultTableBody")
+    ? target.closest("tr")
+    : null;
+  const result = resultRow && unpackNameAttr(resultRow);
+  const resultRegionMatches =
+    result &&
+    result.file === STATE.currentFile &&
+    STATE.activeRegion &&
+    Math.abs(
+      STATE.activeRegion.start + STATE.windowOffsetSecs - result.start
+    ) < 0.001 &&
+    Math.abs(
+      STATE.activeRegion.end + STATE.windowOffsetSecs - result.end
+    ) < 0.001;
   if (target.closest("#sort-label")) {
     if (STATE.isMember) filterLabels(e);
     return;
@@ -7847,11 +7862,21 @@ async function createContextMenu(e) {
     // Lets check if the summary needs to be filtered
     if (
       (inSummary && !target.closest("tr").classList.contains("text-warning")) ||
-      (target.closest("#resultTableBody") &&
-        !target.closest("tr").classList.contains("table-active"))
+      (resultRow && !resultRegionMatches)
     ) {
-      target.click(); // Wait for file to load
-      await utils.waitFor(() => STATE.fileLoaded);
+      if (resultRow) {
+        const file = activateResultRow(resultRow, true);
+        await utils.waitFor(
+          () => STATE.fileLoaded && STATE.currentFile === file
+        );
+        if (!STATE.fileLoaded || STATE.currentFile !== file) {
+          console.warn("Could not load result file for context menu", file);
+          return;
+        }
+      } else {
+        target.click();
+        await utils.waitFor(() => STATE.fileLoaded);
+      }
     }
   }
   if (!STATE.activeRegion && !inSummary) return;
