@@ -30,19 +30,24 @@ async function run() {
   fs.writeFileSync(filePath, Buffer.concat([header, body]));
 
   const guanoOffset = 12 + audioData.length + 8;
-  const originalOpen = fs.promises.open;
-  fs.promises.open = async function (file, ...args) {
-    const handle = await originalOpen.call(this, file, ...args);
-    if (file === filePath) {
-      const read = handle.read.bind(handle);
-      handle.read = async (...readArgs) => {
-        if (readArgs[3] === guanoOffset) {
-          await new Promise((resolve) => setTimeout(resolve, 50));
-        }
-        return read(...readArgs);
-      };
+  const originalOpen = fs.open;
+  const originalRead = fs.read;
+  const watchedFds = new Set();
+  fs.open = function (file, ...args) {
+    const callback = args.pop();
+    return originalOpen.call(this, file, ...args, (err, fd) => {
+      if (!err && file === filePath) watchedFds.add(fd);
+      callback(err, fd);
+    });
+  };
+  fs.read = function (fd, buffer, offset, length, position, callback) {
+  if (watchedFds.has(fd) && position === guanoOffset) {
+      return setTimeout(
+        () => originalRead.call(this, fd, buffer, offset, length, position, callback),
+        50
+      );
     }
-    return handle;
+    return originalRead.call(this, fd, buffer, offset, length, position, callback);
   };
 
   try {
@@ -50,7 +55,8 @@ async function run() {
     assert.equal(metadata.guano.Make, "TestRecorder");
     console.log("✓ waits for delayed GUANO chunk reads before returning");
   } finally {
-    fs.promises.open = originalOpen;
+    fs.open = originalOpen;
+    fs.read = originalRead;
     fs.unlinkSync(filePath);
   }
 }

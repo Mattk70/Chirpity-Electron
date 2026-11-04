@@ -2158,6 +2158,7 @@ async function resultClick(e) {
   const file = activateResultRow(row, this.closest("#results"));
   if (e.target.classList.contains("circle")) {
     await utils.waitFor(() => STATE.fileLoaded && STATE.currentFile === file);
+    if (STATE.currentFile !== file) return;
     getSelectionResults(true);
   }
 }
@@ -7862,7 +7863,7 @@ async function createContextMenu(e) {
     // Lets check if the summary needs to be filtered
     if (
       (inSummary && !target.closest("tr").classList.contains("text-warning")) ||
-      (resultRow && !resultRegionMatches)
+      (resultRow && (resultRow !== activeRow || !resultRegionMatches))
     ) {
       if (resultRow) {
         const file = activateResultRow(resultRow, true);
