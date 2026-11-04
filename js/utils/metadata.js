@@ -8,8 +8,10 @@ const fs = require("node:fs");
 
 /**
  * Scan a WAV file and extract GUANO and BWF `bext` metadata without reading the entire file into memory.
+ * Scanning stops at a zero-size chunk.
  * @param {string} filePath - Path to the WAV file to scan.
- * @returns {Promise<object>} An object containing found metadata; `guano` and/or `bext` keys are present when those chunks are found, or an empty object if no metadata was extracted.
+ * @param {boolean} [getDuration=false] - Currently ignored; duration is not returned.
+ * @returns {Promise<object>} An object containing `guano` and/or `bext` keys for nonzero chunks read before scanning stops, or an empty object if no metadata was extracted. The promise rejects on file open or read errors and invalid WAV headers.
  */
 function extractWaveMetadata(filePath, getDuration = false) {
   let metadata = {}, guanoText = "";
