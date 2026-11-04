@@ -25,6 +25,17 @@ if (isX11) {
 }
 process.env["TF_ENABLE_ONEDNN_OPTS"] = "1";
 
+ipcMain.handle('getPath', () => app.getPath("userData"));
+ipcMain.handle('getAppPath', () => app.getAppPath());
+ipcMain.handle('trialPeriod', () => 14*24*3600*1000); // 14 days
+ipcMain.handle('getLocale', () => app.getLocale());
+ipcMain.handle('getTemp', () => app.getPath('temp'));
+ipcMain.handle('isMac', () => isMac);
+ipcMain.handle('getAudio', () => path.join(__dirname.replace('app.asar', ''), 'Help', 'example.mp3'));
+ipcMain.handle('exitApplication', () => app.quit()); 
+ipcMain.handle('getInstallInfo', (_e, date) => getInstallInfo(date));
+
+
 // Set the AppUserModelID (to prevent the two pinned icons bug)
 app.setAppUserModelId('com.electron.chirpity');
 const version = app.getVersion();
@@ -395,15 +406,7 @@ process.on("uncaughtException", (err) => {
   app.quit();
 });
 
-ipcMain.handle('getPath', () => userData);
-ipcMain.handle('getAppPath', () => app.getAppPath());
-ipcMain.handle('trialPeriod', () => 14*24*3600*1000); // 14 days
-ipcMain.handle('getLocale', () => app.getLocale());
-ipcMain.handle('getTemp', () => app.getPath('temp'));
-ipcMain.handle('isMac', () => isMac);
-ipcMain.handle('getAudio', () => path.join(__dirname.replace('app.asar', ''), 'Help', 'example.mp3'));
-ipcMain.handle('exitApplication', () => app.quit()); 
-ipcMain.handle('getInstallInfo', (_e, date) => getInstallInfo(date));
+
 
 let mainWindow;
 let workerWindow;
