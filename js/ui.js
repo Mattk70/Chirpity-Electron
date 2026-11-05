@@ -8461,6 +8461,7 @@ function generateToast({
 
   const clearAllButton = document.createElement("button");
   clearAllButton.type = "button";
+  clearAllButton.id = "clearAllToasts"; // not used for lookup, only logging
   clearAllButton.className =
     "btn btn-sm btn-outline-secondary text-body-secondary text-decoration-none text-nowrap p-1 me-2";
   clearAllButton.textContent = i18n.get(i18n.Context).clearAll;
