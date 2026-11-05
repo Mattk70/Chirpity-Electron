@@ -5897,7 +5897,6 @@ async function onDeleteSpecies({species, active}) {
 }
 
 async function onDeleteConfidence({start, end, species, confidence, modelID}) {
-  // Implement the logic for deleting by confidence here
   const db = STATE.db;
   let SQL = `DELETE FROM records
               WHERE rowid IN (

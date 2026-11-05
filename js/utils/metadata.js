@@ -8,8 +8,10 @@ const fs = require("node:fs");
 
 /**
  * Scan a WAV file and extract GUANO and BWF `bext` metadata without reading the entire file into memory.
+ * Scanning stops at a zero-size chunk.
  * @param {string} filePath - Path to the WAV file to scan.
- * @returns {Promise<object>} An object containing found metadata; `guano` and/or `bext` keys are present when those chunks are found, or an empty object if no metadata was extracted.
+ * @param {boolean} [getDuration=false] - Currently ignored; duration is not returned.
+ * @returns {Promise<object>} An object containing `guano` and/or `bext` keys for nonzero chunks read before scanning stops, or an empty object if no metadata was extracted. The promise rejects on file open or read errors and invalid WAV headers.
  */
 function extractWaveMetadata(filePath, getDuration = false) {
   let metadata = {}, guanoText = "";
@@ -58,6 +60,11 @@ function extractWaveMetadata(filePath, getDuration = false) {
             }
 
             currentOffset += 8; // Move past the chunk header
+            const advanceToNextChunk = () => {
+              if (chunkSize % 2 !== 0) currentOffset += 1;
+              currentOffset += chunkSize;
+              readNextChunk();
+            };
 
             if (chunkId === "guan") {
               // GUANO chunk found, read its content
@@ -72,7 +79,9 @@ function extractWaveMetadata(filePath, getDuration = false) {
                 guanoText += guanoBuffer.toString("utf-8");
                 const guano = _parseMetadataText(guanoText);
                 metadata["guano"] = guano;
+                advanceToNextChunk();
               });
+              return;
             } else if (chunkId === "bext") {
               // GUANO chunk found, read its content
               const bextBuffer = Buffer.alloc(chunkSize);
@@ -123,11 +132,11 @@ function extractWaveMetadata(filePath, getDuration = false) {
                     delete metadata.bext[key];
                   }
                 }
+                advanceToNextChunk();
               });
+              return;
             }
-            if (chunkSize % 2 !== 0) currentOffset += 1;
-            currentOffset += chunkSize;
-            readNextChunk(); // Continue reading after skipping the data chunk
+            advanceToNextChunk(); // Continue reading after skipping the data chunk
           });
         }
         // Start reading chunks after the RIFF header

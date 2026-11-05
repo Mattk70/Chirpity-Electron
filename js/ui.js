@@ -2142,9 +2142,10 @@ const selectionTable = document.getElementById("selectionResultTableBody");
 selectionTable.addEventListener("click", debounceClick(resultClick));
 
 /**
- * Activates a result row and loads the corresponding audio region when a result table row is clicked.
+ * Activates a clicked result row and loads its audio region for the main results table.
  *
- * If the clicked element is a "circle", waits for the audio file to finish loading before retrieving selection results.
+ * For a "circle" click, waits for the row's file to load or for the retry limit
+ * to be reached, then requests selection results.
  *
  * @param {Event} e - The click event on a result row.
  * @returns {Promise<void>}
@@ -2155,20 +2156,29 @@ async function resultClick(e) {
     // 1. clicked and dragged, 2 no detections in file row 3. clicked a header
     return;
   }
-  const {file, start, end, cname:label} = unpackNameAttr(row);
+  const file = activateResultRow(row, this.closest("#results"));
+  if (e.target.classList.contains("circle")) {
+    await utils.waitFor(() => STATE.fileLoaded && STATE.currentFile === file);
+    if (STATE.currentFile !== file) return;
+    getSelectionResults(true);
+  }
+}
 
+/**
+ * Highlights and scrolls to a result row, optionally loading its audio region.
+ *
+ * @param {HTMLElement} row - Result row containing the file and region metadata.
+ * @param {boolean} loadRegion - Whether to load the row's audio region.
+ * @returns {string} The row's file path.
+ */
+function activateResultRow(row, loadRegion) {
+  const {file, start, end, cname:label} = unpackNameAttr(row);
   if (activeRow) activeRow.classList.remove("table-active");
   row.classList.add("table-active");
   activeRow = row;
   activeRow.scrollIntoView({ behavior: "instant", block: "nearest",  inline: "nearest" });
-  if (this.closest("#results")) {
-    // Don't do this after "analyse selection"
-    loadResultRegion({ file, start, end, label });
-  }
-  if (e.target.classList.contains("circle")) {
-    await utils.waitFor(() => STATE.fileLoaded);
-    getSelectionResults(true);
-  }
+  if (loadRegion) loadResultRegion({ file, start, end, label });
+  return file;
 }
 
 /**
@@ -7796,13 +7806,15 @@ function filterLabels(e) {
  *
  * This asynchronous function handles user interactions for generating a context menu
  * in the spectrogram interface. It performs the following actions:
- * - Pauses any ongoing audio playback via the spec.wavesurfer instance to prevent interference.
+ * - Pauses playback when a spectrogram interaction identifies a region.
  * - Stops the propagation of the triggering event.
  * - Checks and adjusts for region detection within the spectrogram.
  * - Determines the context (e.g., summary, selection, or results) of the click and sets
  *   visibility flags for specific menu items.
- * - If necessary, triggers a click on the target element to load or update the active row
- *   and awaits the file load completion.
+ * - For a result row whose file or region does not match the active region, activates
+ *   the row and waits for its file; returns early if that file is still not loaded
+ *   when the wait ends. Region boundaries match when both differ by less than
+ *   0.001 seconds. A summary target may be clicked to update the selection.
  * - Constructs the HTML for the context menu with options such as playing a region,
  *   analyzing a selection, creating/editing a manual record, exporting a clip, comparing,
  *   or deleting records.
@@ -7813,7 +7825,7 @@ function filterLabels(e) {
  *
  * @async
  * @param {Event} e - The event object that triggers the context menu (typically a MouseEvent).
- * @returns {Promise<void>} Resolves once the context menu is setup and positioned.
+ * @returns {Promise<void>} Resolves after scheduling menu positioning, or on an early return.
  */
 async function createContextMenu(e) {
   if (!STATE.fileLoaded) return;
@@ -7826,6 +7838,20 @@ async function createContextMenu(e) {
   }
   const i18 = i18n.get(i18n.Context);
   const target = e.target;
+  const resultRow = target.closest("#resultTableBody")
+    ? target.closest("tr")
+    : null;
+  const result = resultRow && unpackNameAttr(resultRow);
+  const resultRegionMatches =
+    result &&
+    result.file === STATE.currentFile &&
+    STATE.activeRegion &&
+    Math.abs(
+      STATE.activeRegion.start + STATE.windowOffsetSecs - result.start
+    ) < 0.001 &&
+    Math.abs(
+      STATE.activeRegion.end + STATE.windowOffsetSecs - result.end
+    ) < 0.001;
   if (target.closest("#sort-label")) {
     if (STATE.isMember) filterLabels(e);
     return;
@@ -7847,11 +7873,21 @@ async function createContextMenu(e) {
     // Lets check if the summary needs to be filtered
     if (
       (inSummary && !target.closest("tr").classList.contains("text-warning")) ||
-      (target.closest("#resultTableBody") &&
-        !target.closest("tr").classList.contains("table-active"))
+      (resultRow && (resultRow !== activeRow || !resultRegionMatches))
     ) {
-      target.click(); // Wait for file to load
-      await utils.waitFor(() => STATE.fileLoaded);
+      if (resultRow) {
+        const file = activateResultRow(resultRow, true);
+        await utils.waitFor(
+          () => STATE.fileLoaded && STATE.currentFile === file
+        );
+        if (!STATE.fileLoaded || STATE.currentFile !== file) {
+          console.warn("Could not load result file for context menu", file);
+          return;
+        }
+      } else {
+        target.click();
+        await utils.waitFor(() => STATE.fileLoaded);
+      }
     }
   }
   if (!STATE.activeRegion && !inSummary) return;
@@ -8315,10 +8351,41 @@ const loadingFiles = ({hide, content}) => {
     }, 500);
   }
 }
+const toastContainersWithHandlers = new WeakSet();
+
+/**
+ * Installs toast cleanup handlers once per container. Hidden toasts are removed;
+ * a clear-all click removes every toast in the container. Any corresponding
+ * Bootstrap toast instances are disposed.
+ *
+ * @param {HTMLElement} container - Container holding the toasts.
+ */
+function setupToastContainerHandlers(container) {
+  if (toastContainersWithHandlers.has(container)) return;
+  toastContainersWithHandlers.add(container);
+
+  container.addEventListener("click", (event) => {
+    const clearAllButton = event.target.closest("[data-clear-all-toasts]");
+    if (!clearAllButton) return;
+
+    container.querySelectorAll(".toast").forEach((toastElement) => {
+      bootstrap.Toast.getInstance(toastElement)?.dispose();
+      toastElement.remove();
+    });
+  });
+
+  container.addEventListener("hidden.bs.toast", (event) => {
+    const toastElement = event.target.closest(".toast");
+    if (!toastElement || !container.contains(toastElement)) return;
+    bootstrap.Toast.getInstance(toastElement)?.dispose();
+    toastElement.remove();
+  });
+}
+
 /**
  * Displays a toast notification in the UI with optional localization, icon, and notification sound.
  *
- * The toast can be customized by type (info, warning, error), message variables, and autohide behavior. For certain messages, such as analysis completion after a long duration, it may also trigger a desktop notification or play a sound if enabled in the configuration.
+ * The toast can be customized by type (info, warning, error), message variables, and autohide behavior. Its clear-all button removes all toasts in the container. For certain messages, such as analysis completion after a long duration, it may also trigger a desktop notification or play a sound if enabled in the configuration.
  *
  * @param {Object} [options] - Toast configuration options.
  * @param {string} [options.message] - The message key or text to display.
@@ -8355,6 +8422,7 @@ function generateToast({
   // add option to locate a missing file
   message += locate;
   const domEl = document.getElementById("toastContainer");
+  setupToastContainerHandlers(domEl);
 
   const wrapper = document.createElement("div");
   // Add toast attributes
@@ -8391,9 +8459,18 @@ function generateToast({
   button.setAttribute("data-bs-dismiss", "toast");
   button.setAttribute("aria-label", "Close");
 
+  const clearAllButton = document.createElement("button");
+  clearAllButton.type = "button";
+  clearAllButton.id = "clearAllToasts"; // not used for lookup, only logging
+  clearAllButton.className =
+    "btn btn-sm btn-outline-secondary text-body-secondary text-decoration-none text-nowrap p-1 me-2";
+  clearAllButton.textContent = i18n.get(i18n.Context).clearAll;
+  clearAllButton.setAttribute("data-clear-all-toasts", "");
+
   // Append elements to toastHeader
   toastHeader.appendChild(iconSpan);
   toastHeader.appendChild(strong);
+  toastHeader.appendChild(clearAllButton);
   toastHeader.appendChild(button);
 
   // Create toast body
