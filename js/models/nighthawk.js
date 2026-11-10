@@ -128,6 +128,13 @@ onmessage = async (e) => {
       }
       case "terminate": {
         abortController.abort();
+        tf.dispose([
+          Model.model,
+          Model.one,
+          Model.two,
+          Model.scalarFive,
+        ]);
+        tf.disposeVariables();
         tf.backend().dispose();
         postMessage({message: 'terminated'})
         self.close()

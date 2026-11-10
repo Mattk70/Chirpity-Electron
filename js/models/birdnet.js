@@ -12,6 +12,11 @@ import { BaseModel } from "./BaseModel.js";
 const {stft} = require("./custom-ops.js");
 import abortController from '../utils/abortController.js';
 
+const sessionTensors = new Set();
+function track(t) {
+  sessionTensors.add(t);
+  return t;
+}
 
 onmessage = async (e) => {
   const data = e.data;
@@ -71,11 +76,11 @@ onmessage = async (e) => {
           if (bgIndex !== -1){
             const maskArray = new Array(labels.length).fill(1);
             maskArray[bgIndex] = 0;
-            Model.bgMask = tf.tensor1d(maskArray)
+            Model.bgMask = track(tf.tensor1d(maskArray));
           }
           try {
             await Model.loadModel("layers");
-
+console.log("Model loaded successfully: ", tf.memory().numTensors);
             await Model.warmUp(batch);
             BACKEND = tf.getBackend();
             postMessage({
@@ -148,6 +153,14 @@ onmessage = async (e) => {
       }
       case "terminate": {
         abortController.abort();
+        tf.dispose([
+          Model.one,
+          Model.two,
+          Model.scalarFive,
+          ...sessionTensors
+        ]);
+        Model.model.dispose();
+        tf.disposeVariables();
         tf.backend().dispose();
         postMessage({message: 'terminated'})
         self.close()
@@ -218,10 +231,10 @@ class MelSpecLayerSimple extends tf.layers.Layer {
     this.frameLength = config.frameLength;
     this.fmin = config.fmin;
     this.fmax = config.fmax;
-    this.melFilterbank = tf.tensor2d(config.melFilterbank);
+    this.melFilterbank = track(tf.tensor2d(config.melFilterbank));
     this.mels = config.melFilterbank;
-    this.two = tf.scalar(2);
-    this.one = tf.scalar(1);
+    this.two = track(tf.scalar(2));
+    this.one = track(tf.scalar(1));
   }
 
   build(inputShape) {
