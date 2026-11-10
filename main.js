@@ -711,7 +711,7 @@ app.whenReady().then(async () => {
     });
     
     workerWindow.webContents.once('render-process-gone', (e, details) => {
-        DEBUG && console.log(details);
+        console.log(details);
         const dialogOpts = {
             type: 'warning',
             title: 'Crash report',

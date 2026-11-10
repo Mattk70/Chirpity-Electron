@@ -165,9 +165,19 @@ onmessage = async (e) => {
         break;
       }
       case "terminate": {
+        tf.dispose([
+          myModel.one,
+          myModel.two,
+          myModel.scalarFive,
+        ]);
+        myModel.model?.dispose();
+        tf.disposeVariables();
         tf.backend().dispose();
-        postMessage({message: 'terminated'})
-        self.close()
+        setTimeout(() => {
+          postMessage({message: 'terminated'});
+          self.close();
+        }, 1000);
+        break;
       }
     }
   } catch (error) {
@@ -261,8 +271,6 @@ class ChirpityModel extends BaseModel {
     TensorBatch.dispose();
 
     const finalPrediction = newPrediction || prediction;
-    // const finalPrediction = finalRawPrediction.mul(this.mask);
-    // finalRawPrediction.dispose();
     const { indices, values } = tf.topk(finalPrediction, 5, true);
 
     const [topIndices, topValues] = await Promise.all([
