@@ -170,11 +170,14 @@ onmessage = async (e) => {
           myModel.two,
           myModel.scalarFive,
         ]);
-        myModel.model.dispose();
+        myModel.model?.dispose();
         tf.disposeVariables();
         tf.backend().dispose();
-        postMessage({message: 'terminated'})
-        self.close()
+        setTimeout(() => {
+          postMessage({message: 'terminated'});
+          self.close();
+        }, 1000);
+        break;
       }
     }
   } catch (error) {

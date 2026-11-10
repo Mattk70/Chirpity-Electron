@@ -159,11 +159,14 @@ console.log("Model loaded successfully: ", tf.memory().numTensors);
           Model.scalarFive,
           ...sessionTensors
         ]);
-        Model.model.dispose();
+        Model.model?.dispose();
         tf.disposeVariables();
         tf.backend().dispose();
-        postMessage({message: 'terminated'})
-        self.close()
+        setTimeout(() => {
+          postMessage({message: 'terminated'});
+          self.close();
+        }, 1000);
+        break;
       }
     }
   } catch (error) {

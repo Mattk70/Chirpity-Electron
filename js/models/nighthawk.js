@@ -129,15 +129,17 @@ onmessage = async (e) => {
       case "terminate": {
         abortController.abort();
         tf.dispose([
-          Model.model,
           Model.one,
           Model.two,
           Model.scalarFive,
         ]);
+        Model.model?.dispose();
         tf.disposeVariables();
         tf.backend().dispose();
-        postMessage({message: 'terminated'})
-        self.close()
+        setTimeout(() => {
+          postMessage({message: 'terminated'});
+          self.close();
+        }, 1000);
         break;
       }
     }
