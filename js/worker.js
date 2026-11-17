@@ -3315,9 +3315,10 @@ function spawnPredictWorkers(model, batchSize, threads, adjustThreads = true) {
   }
   NUM_WORKERS = threads;
   for (let i = currentThreads; i < threads; i++) {
-    const modelFile = 
+    let modelFile = 
       ['birdnet3','chirpity','nighthawk','nocmig','perch v2'].includes(model)
       ? model : 'birdnet';
+    modelFile = modelFile.replace('birdnet3', 'birdnet3 copy');
     const worker = new Worker(`./js/models/${modelFile}.js`, { type: "module" });
     // Web worker message event handler
     worker.onmessage = async (msg) => {

@@ -1738,13 +1738,17 @@ const showQueryModal = () => {
  * @param {boolean} [args.fromDB=false] - If true, indicates the request originates from database navigation (affects UI state handling).
  */
 function postAnalyseMessage(args) {
-  if (!PREDICTING) {
-    // Start a timer
+  if (PREDICTING) {
+    generateToast({ type: "warning", message: "analysisUnderway" });
+    return;
+  }
+
+  utils.waitFor(() => modelReady, 500).then(() => {
     t0_analysis = Date.now();
     utils.disableMenuItem(["analyseSelection", "explore", "charts", "save2db"]);
     const selection = !!args.end;
     const filesInScope = args.filesInScope;
-    if (!args.fromDB){
+    if (!args.fromDB) {
       PREDICTING = true;
       powerSave(true);
       disableSettingsDuringAnalysis(true);
@@ -1754,20 +1758,20 @@ function postAnalyseMessage(args) {
       analyseReset();
       refreshResultsView();
       resetResults();
-      // change result header to indicate deactivation
-      DOM.resultHeader.classList.replace("text-bg-dark", "text-bg-secondary");
+      DOM.resultHeader.classList.replace(
+        "text-bg-dark",
+        "text-bg-secondary"
+      );
     }
     worker.postMessage({
       action: "analyse",
       start: args.start,
       end: args.end,
-      filesInScope: filesInScope,
+      filesInScope,
       reanalyse: args.reanalyse,
       circleClicked: args.fromDB,
     });
-  } else {
-    generateToast({ type: "warning", message: "analysisUnderway" });
-  }
+  })
 }
 
 let openStreetMapTimer,
