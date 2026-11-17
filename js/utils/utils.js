@@ -344,10 +344,10 @@ function requestFromWorker(worker, action, payload = {}, timeout = 15_000) {
  * The check function is evaluated every 10 milliseconds, up to 250 times.
  *
  * @param {Function} checkFn - A function that is repeatedly called until it returns a truthy value.
+ * @param {number} [maxRetries=250] - The maximum number of times to call checkFn before resolving the Promise.
  * @returns {Promise<void>} Resolves when {@link checkFn} returns a truthy value or after the maximum retries.
  */
-function waitFor(checkFn) {
-  let maxRetries = 250;
+function waitFor(checkFn, maxRetries = 250) {
   let retryCount = 0;
   return new Promise((resolve) => {
     let interval = setInterval(() => {
@@ -361,7 +361,7 @@ function waitFor(checkFn) {
   });
 }
 
-// Not Harlem, but Fisher-Yates shuffle - used for xc call selection
+// Fisher-Yates shuffle - used for xc call selection
 function shuffle(array) {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));

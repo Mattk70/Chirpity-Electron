@@ -31,7 +31,7 @@ const Toasts = { // UI.js
         modelPathNotFound: "The model path specified (${modelPath}) could not be found. Reverting to BirdNET model.",
         badLocationUpdate: "There is an existing location at this latitude and longitude.",
         corruptFile: "<b>Corrupt file(s) encountered:</b> ${files}",
-        noLoad: 'The ${model} model is not loaded. Restart Chirpity to continue. If you see this message repeatedly, it is likely your computer does not support AVX2 and Chirpity will not run on your system.',
+        noLoad: 'The ${model} model has not loaded.',
         noDLL: 'Unable to load ${model}. On Windows, this model requires a recent version of Microsoft&apos;s Visual C++ Redistributable runtime, which can be downloaded from <a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">here</a>.<br><b>Error details:</b><br> ${cause}',
         noFile: "Cannot open: ${error}",
         ffmpeg: 'FFMPEG error extracting audio: ${error}',
@@ -106,7 +106,7 @@ const Toasts = { // UI.js
         badLocationUpdate: "Der findes allerede en placering på denne bredde- og længdegrad.",
 
         corruptFile: "<b><b>Der blev fundet beskadigede fil(er):</b></b> ${files}",
-        noLoad: 'Modellen ${model} er ikke indlæst. Genstart Chirpity for at fortsætte. Hvis du ser denne besked gentagne gange, er det sandsynligt, at din computer ikke understøtter AVX2, og Chirpity vil ikke køre på dit system.',
+        noLoad: 'Modellen ${model} er ikke indlæst.',
         noDLL: 'Kunne ikke indlæse ${model}. På Windows kræver denne model en nyere version af Microsoft&apos;s Visual C++ Redistributable-runtime, som kan downloades fra <a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">her</a>.<br><b>Fejloplysninger:</b><br> ${cause}',
         noFile: "Kan ikke åbne: ${error}",
         ffmpeg: 'FFMPEG-fejl ved udtrækning af lyd: ${error}',
@@ -181,7 +181,7 @@ const Toasts = { // UI.js
         badLocationUpdate: "An diesem Breitengrad und Längengrad existiert bereits ein Standort.",
 
         corruptFile: "<b>Beschädigte Datei(en) gefunden:</b> ${files}",
-        noLoad: 'Das Modell ${model} wurde nicht geladen. Starten Sie Chirpity neu, um fortzufahren. Wenn diese Nachricht wiederholt angezeigt wird, unterstützt Ihr Computer möglicherweise kein AVX2, und Chirpity wird auf Ihrem System nicht ausgeführt.',
+        noLoad: "Das Modell ${model} ist nicht geladen.",
         noDLL: '${model} konnte nicht geladen werden. Unter Windows benötigt dieses Modell eine aktuelle Version der Microsoft Visual C++ Redistributable-Laufzeitumgebung, die <a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">hier</a> heruntergeladen werden kann.<br><b>Fehlerdetails:</b><br> ${cause}',
         noFile: "Kann nicht öffnen: ${error}",
         ffmpeg: 'FFMPEG-Fehler bei der Extraktion von Audio: ${error}',
@@ -256,7 +256,7 @@ const Toasts = { // UI.js
         badLocationUpdate: "Ya existe una ubicación en esta latitud y longitud.",
 
         corruptFile: "<b>Se encontraron archivos corruptos:</b> ${files}",
-        noLoad: 'El modelo ${model} no está cargado. Reinicie Chirpity para continuar. Si ve este mensaje repetidamente es probable que su ordenador no sea compatible con AVX2 y que Chirpity no pueda ejecutarse en su sistema.',
+        noLoad: 'El modelo ${model} no está cargado.',
         noDLL: 'No se ha podido cargar ${model}. En Windows, este modelo requiere una versión reciente del entorno de ejecución Microsoft Visual C++ Redistributable, que se puede descargar desde <a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">aquí</a>.<br><b>Detalles del error:</b><br> ${cause}',
         noFile: "No se puede abrir: ${error}",
         ffmpeg: 'Error de FFMPEG al extraer audio: ${error}',
@@ -331,7 +331,7 @@ const Toasts = { // UI.js
         badLocationUpdate: "Il existe déjà un emplacement à cette latitude et longitude.",
 
         corruptFile: "<b>Fichier(s) corrompu(s) détecté(s):</b> ${files}",
-        noLoad: 'Le modèle ${model} n\'est pas chargé. Redémarrez Chirpity pour continuer. Si vous voyez ce message à plusieurs reprises, il est probable que votre ordinateur ne prenne pas en charge AVX2 et Chirpity ne fonctionnera pas sur votre système.',
+        noLoad: 'Le modèle ${model} n\'est pas chargé.',
         noDLL: 'Impossible de charger ${model}. Sous Windows, ce modèle nécessite une version récente du runtime Microsoft Visual C++ Redistributable, qui peut être téléchargée depuis <a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">ici</a>.<br><b>Détails de l’erreur :</b><br> ${cause}',
         noFile: "Impossible d'ouvrir : ${error}",
         ffmpeg: 'Erreur FFMPEG lors de l\'extraction de l\'audio : ${error}',
@@ -407,7 +407,7 @@ const Toasts = { // UI.js
         badLocationUpdate: "この緯度と経度には既に位置が存在します。",
 
         corruptFile: "<b>破損したファイルが見つかりました:</b> ${files}",
-        noLoad: '${model}モデルがロードされていません。Chirpityを再起動して続行してください。このメッセージが繰り返し表示される場合、お使いのコンピュータがAVX2をサポートしていない可能性があります。',
+        noLoad: '${model} が読み込まれていません。',
         noDLL: '${model} を読み込めませんでした。Windows では、このモデルに Microsoft Visual C++ Redistributable ランタイムの最新バージョンが必要です。<a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">こちら</a>からダウンロードできます。<br><b>エラーの詳細：</b><br> ${cause}',
         noFile: "開くことができません: ${error}",
         ffmpeg: 'オーディオ抽出中のFFMPEGエラー: ${error}',
@@ -481,7 +481,7 @@ const Toasts = { // UI.js
         badLocationUpdate: "Er is al een locatie op deze breedte- en lengtegraad.",
 
         corruptFile: "<b>Beschadigde bestand(en) aangetroffen:</b> ${files}",
-        noLoad: 'Het ${model} model is niet geladen. Herstart Chirpity om door te gaan. Als je dit bericht herhaaldelijk ziet, ondersteunt je computer waarschijnlijk geen AVX2 en zal Chirpity niet op je systeem werken.',
+        noLoad: 'Het ${model} model is niet geladen.',
         noDLL: '${model} kan niet worden geladen. In Windows vereist dit model een recente versie van de Microsoft Visual C++ Redistributable-runtime, die <a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">hier</a> kan worden gedownload.<br><b>Foutdetails:</b><br> ${cause}',
         noFile: "Kan niet openen: ${error}",
         ffmpeg: 'FFMPEG-fout bij het extraheren van audio: ${error}',
@@ -558,7 +558,7 @@ const Toasts = { // UI.js
         badLocationUpdate: "Já existe uma localização nesta latitude e longitude.",
 
         corruptFile: "<b>Ficheiro(s) corrompido(s) encontrado(s):</b> ${files}",
-        noLoad: 'O modelo ${model} não está carregado. Reinicie o Chirpity para continuar. Se você ver esta mensagem repetidamente, é provável que seu computador não suporte AVX2 e o Chirpity não funcionará no seu sistema.',
+        noLoad: 'O modelo ${model} não está carregado.',
         noDLL: 'Não foi possível carregar ${model}. No Windows, este modelo requer uma versão recente do runtime Microsoft Visual C++ Redistributable, que pode ser descarregada a partir <a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">daqui</a>.<br><b>Detalhes do erro:</b><br> ${cause}',
         noFile: "Não é possível abrir: ${error}",
         ffmpeg: 'Erro FFMPEG ao extrair áudio: ${error}',
@@ -636,7 +636,7 @@ const Toasts = { // UI.js
         badLocationUpdate: "На этой широте и долготе уже существует местоположение.",
 
         corruptFile: "<b>Обнаружены повреждённые файлы:</b> ${files}",
-        noLoad: 'Модель ${model} не загружена. Для продолжения работы перезапустите Chirpity. Если вы постоянно видите это сообщение, скорее всего, ваш компьютер не поддерживает AVX2 и Chirpity не будет работать в вашей системе.',
+        noLoad: 'Модель ${model} не загружена.',
         noDLL: 'Не удалось загрузить ${model}. В Windows для этой модели требуется последняя версия среды выполнения Microsoft Visual C++ Redistributable, которую можно скачать <a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">здесь</a>.<br><b>Подробности ошибки:</b><br> ${cause}',
         noFile: "Не удается открыть: ${error}",
         ffmpeg: 'Ошибка FFMPEG при извлечении аудио: ${error}',
@@ -713,7 +713,7 @@ const Toasts = { // UI.js
         badLocationUpdate: "Det finns redan en plats på denna latitud och longitud.",
 
         corruptFile: "<b>Skadade fil(er) påträffades:</b> ${files}",
-        noLoad: 'Modellen ${model} är inte laddad. Starta om Chirpity för att fortsätta. Om du ser detta meddelande upprepade gånger, är det troligt att din dator inte stöder AVX2 och Chirpity kommer inte att fungera på ditt system.',
+        noLoad: 'Modellen ${model} är inte laddad.',
         noDLL: 'Det gick inte att läsa in ${model}. I Windows kräver den här modellen en aktuell version av Microsoft Visual C++ Redistributable Runtime, som kan laddas ner <a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">här</a>.<br><b>Feldetaljer:</b><br> ${cause}',
         noFile: "Kan inte öppna: ${error}",
         ffmpeg: 'FFMPEG-fel vid extrahering av ljud: ${error}',
@@ -790,7 +790,7 @@ const Toasts = { // UI.js
         badLocationUpdate: "此纬度和经度上已存在一个位置。",
 
         corruptFile: "<b>发现损坏的文件:</b> ${files}",
-        noLoad: '模型 ${model} 未加载。请重新启动 Chirpity 以继续。如果您重复看到此消息，可能是您的计算机不支持 AVX2，Chirpity 将无法在您的系统上运行。',
+        noLoad: '模型 ${model} 未加载。',
         noDLL: '无法加载 ${model}。在 Windows 上，此模型需要较新版本的 Microsoft Visual C++ Redistributable 运行时，可从<a href="https://aka.ms/vc14/vc_redist.x64.exe" target="_blank">此处</a>下载。<br><b>错误详情：</b><br> ${cause}',
         noFile: "无法打开：${error}",
         ffmpeg: 'FFMPEG 提取音频时出错: ${error}',

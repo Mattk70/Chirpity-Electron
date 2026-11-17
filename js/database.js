@@ -438,15 +438,17 @@ const addNewModel = async ({model, db = diskDB, dbMutex, labelsLocation}) => {
         const fileContents = readFileSync(labelFile, "utf8");
           labels = fileContents.trim().split(/\r?\n/);
     } else if (model === "birdnet3") {
+      // const labelFile = path.join(__dirname, "BirdNET3",
+      //    "BirdNET3_geomodel_labels.csv");BirdNET+_V3.0_Global_12K_Labels
       const labelFile = path.join(__dirname, "BirdNET3",
-         "BirdNET3_geomodel_labels.csv");
+         "BirdNET+_V3.0_Global_12K_Labels.csv");
       const fileContents = readFileSync(labelFile, "utf8");
       labels = fileContents
               .trim()
               .split(/\r?\n/)
               .slice(1) // skip header
               .map(line => {
-                const [sci_name, com_name, class_name] = line.split(",");
+                const [,,sci_name, com_name, class_name] = line.split(",");
                 return `${sci_name}_${com_name}_${class_name}`;
               });
     } else if (['chirpity', 'nocmig'].includes(model)){
