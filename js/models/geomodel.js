@@ -52,7 +52,7 @@ function getBN3Labels() {
     .split(/\r?\n/)
     .slice(1) // skip header
     .map(line => {
-      const [,,sci_name, com_name, class_name] = line.split(",");
+      const [sci_name, com_name, class_name] = line.split(",");
       return `${sci_name}_${com_name}_${class_name}`;
     });
 }
