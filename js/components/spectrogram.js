@@ -362,7 +362,7 @@ export class ChirpityWS {
       scale,
       colorMap,
       alpha,
-      useWebWorker: true,
+      useWebWorker: false,
       autoGain,
       preEmphasis,
       rangeDB,

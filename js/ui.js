@@ -3140,7 +3140,7 @@ function removeOpenFile(file) {
  */
 
 const getLabelFile = () => {
-    return p.join(dirname, "BirdNET3/BirdNET3_geomodel_labels.csv");
+    return p.join(dirname, "BirdNET3/BirdNET+_V3.0_Global_12K_Labels.csv");
 }
 /**
  * Display regions for detections that fall within the current spectrogram window.

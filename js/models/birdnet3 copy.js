@@ -21,7 +21,6 @@ let predictionQueue = Promise.resolve();
 let session = null;
 let currentGeneration = 0;
 let cancelled = false;
-let labels;
 let backend;
 let chunkLength = 96000; // 3 seconds at 32kHz
 let batchSize = 8;
@@ -66,9 +65,8 @@ async function loadModel(_mpath, backend, batchSize) {
     freeDimensionOverrides,
     preferredOutputLocation,
   };
-  // const modelPath = './BirdNET3/birdnet_gem_webgpu_fast.onnx';
   const modelPath = path.resolve(
-        __dirname, "../../BirdNET3/BirdNET+_V3.0_Global_12K_FP16_pruned_conv1d_powfix.onnx"
+        __dirname, "../../BirdNET3/BirdNET+_V3.0_Global_12K_FP16_conv1d_powfix.onnx"
       ).replace('app.asar', 'app.asar.unpacked');
   session = await ort.InferenceSession.create(modelPath, sessionOptions);
   cancelled = false;
@@ -77,7 +75,7 @@ async function loadModel(_mpath, backend, batchSize) {
 /**
  * Handle model lifecycle, window-size, and prediction messages from the parent worker.
  *
- * Load requests post model metadata and labels; prediction requests post ranked
+ * Load requests post model metadata; prediction requests post ranked
  * results unless cancellation made them stale.
  *
  * @param {MessageEvent} e - Worker message containing the requested operation and payload.
@@ -120,22 +118,15 @@ onmessage = async (e) => {
           if (backend === 'webgpu') {
             await session.run({ input: inputTensor }); // capture pass
           }
-          DEBUG && console.log(`Using backend: ${backend}`);
-
-          const labelFile = path.resolve(__dirname, "../../BirdNET3/BirdNET+_V3.0_Global_12K_Labels.csv");
-          const fileContents = fs.readFileSync(labelFile, 'utf-8');
-          labels = fileContents.trim().split(/\r?\n/);
           DEBUG && console.log(
-              `Model received load instruction. Using batch size ${batchSize}`
+              `Using backend: ${backend}`,`Model received load instruction. Using batch size ${batchSize}`
             );
-
         }
         postMessage({
         message: "model-ready",
         sampleRate,
         chunkLength,
         backend,
-        labels,
         worker,
         });
 

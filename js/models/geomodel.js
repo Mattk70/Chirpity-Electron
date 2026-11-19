@@ -52,7 +52,7 @@ function getBN3Labels() {
     .split(/\r?\n/)
     .slice(1) // skip header
     .map(line => {
-      const [,,sci_name, com_name, class_name] = line.split(",");
+      const [sci_name, com_name, class_name] = line.split(",");
       return `${sci_name}_${com_name}_${class_name}`;
     });
 }
@@ -164,7 +164,7 @@ const NOT_BIRDS = [
   "Water Drops", // Water Drops
 ];
 
-const geomodelLabelFile = path.resolve(__dirname, '../../BirdNET3/BirdNET+_Geomodel_V3.0.3_Global_12K_Labels.txt');
+const geomodelLabelFile = path.resolve(__dirname, '../../BirdNET3/BirdNET+_Geomodel_V3.0.5_Global_14K_Labels.txt');
 
 
 
@@ -325,6 +325,7 @@ class Model {
    */
   async loadModel(forceCPU) {
     if (!ort) return 
+forceCPU = true;
     const supportsF16 = await supportsWebGPUFloat16();
     supportsF16 || postMessage({ message: "no-onnx-gpu" });
     const providers = forceCPU || !supportsF16
@@ -459,7 +460,7 @@ class Model {
           // Use the reduce() method to accumulate the indices of species containing the latin name
           const foundIndices = this.labels.reduce(
             (indices, element, index) => {
-              const latinName = this.getFirstElement(element)
+              const latinName = this.getFirstElement(element);
               if (latinName === oldLatin) indices.push(index);
               return indices;
             },
@@ -588,7 +589,7 @@ class Model {
         .filter((index) => index !== null);
       DEBUG && console.log("filtering took", Date.now() - t0, "ms");
     }
-    DEBUG && console.log(`List creation took ${Date.now() - t0} ms`)
+    console.log(`List creation took ${Date.now() - t0} ms`)
     return [includedIDs.sort((a, b) => a - b), messages];
   }
 
@@ -622,7 +623,7 @@ class Model {
 async function _init_() {
   DEBUG && console.log(`List generating model received load instruction.`);
   listModel = new Model( path.resolve(
-      __dirname, "../../BirdNET3/BirdNET+_Geomodel_V3.0.3_Global_12K_FP16.onnx"
+      __dirname, "../../BirdNET3/BirdNET+_Geomodel_V3.0.5_Global_14K_FP16.onnx"
     ).replace('app.asar', 'app.asar.unpacked'));
 
   const loaded = await listModel.loadModel();

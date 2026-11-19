@@ -2,6 +2,13 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "Python Debugger: Current File",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal"
+    },
+    {
       "name": "Debug Main Process",
       "type": "node",
       "request": "launch",
@@ -10,7 +17,7 @@
       "windows": {
         "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron.cmd"
       },
-      "args" : ["."],
+      "args": ["."],
       "outputCapture": "std"
     }
   ]
