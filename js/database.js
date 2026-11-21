@@ -437,11 +437,10 @@ const addNewModel = async ({model, db = diskDB, dbMutex, labelsLocation}) => {
          "BirdNET_GLOBAL_6K_V2.4_Labels_en.txt");
         const fileContents = readFileSync(labelFile, "utf8");
           labels = fileContents.trim().split(/\r?\n/);
-    } else if (model === "birdnet3") {
-      // const labelFile = path.join(__dirname, "BirdNET3",
-      //    "BirdNET3_geomodel_labels.csv");BirdNET+_V3.0_Global_12K_Labels
+    } else if (model === "birdnet3" || model === "birdnet+") {
+      const filename = model === "birdnet3" ? "BirdNET3_geomodel_labels.csv" : "BirdNET+_V3.0_Global_12K_Labels.csv";
       const labelFile = path.join(__dirname, "BirdNET3",
-         "BirdNET+_V3.0_Global_12K_Labels.csv");
+         filename);
       const fileContents = readFileSync(labelFile, "utf8");
       labels = fileContents
               .trim()
@@ -463,7 +462,7 @@ const addNewModel = async ({model, db = diskDB, dbMutex, labelsLocation}) => {
       labels = fileContents.split(/\r?\n/).map(line => line.trim()).filter(line => line.length);
     }
     const perch = model === 'perch v2';
-    const birdNET3 = model === 'birdnet3';
+    const birdNET3 = model === 'birdnet3' || model === 'birdnet+';
     const splitChar = perch ? '~' : '_'; // Perch uses ~, others use _
     const expectedParts = perch || birdNET3 ? 3 : 2; // Perch labels include Taxon
     // Add Unknown Sp.

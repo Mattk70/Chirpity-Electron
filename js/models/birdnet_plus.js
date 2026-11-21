@@ -25,7 +25,7 @@ let backend;
 let chunkLength = 96000; // 3 seconds at 32kHz
 let batchSize = 8;
 const sampleRate = 32000;
-const numClasses = 11725;
+let numClasses;
 const DEBUG = false;
 let modelPath;
 
@@ -45,7 +45,12 @@ function ensureBuffers(force) {
  * @param {number} batchSize - Fixed batch dimension supplied to ONNX Runtime.
  * @returns {Promise<void>} Resolves when the session is ready.
  */
-async function loadModel(_mpath, backend, batchSize) {
+async function loadModel(model, backend, batchSize) {
+  const modelFile = model === 'birdnet+' 
+    ? 'BirdNET+_V3.0_Global_12K_FP16_conv1d_powfix'
+    : 'birdnet_gem_webgpu_fast';
+  modelPath = path.resolve(__dirname, `../../BirdNET3/${modelFile}.onnx`);
+  modelPath = modelPath.replace('app.asar', 'app.asar.unpacked');
   const gpu = backend === 'webgpu';
   const providers = gpu ? ['webgpu', 'cpu'] : ['cpu'];
   const freeDimensionOverrides = { 'batch': batchSize };
@@ -65,9 +70,6 @@ async function loadModel(_mpath, backend, batchSize) {
     freeDimensionOverrides,
     preferredOutputLocation,
   };
-  const modelPath = path.resolve(
-        __dirname, "../../BirdNET3/BirdNET+_V3.0_Global_12K_FP16_conv1d_powfix.onnx"
-      ).replace('app.asar', 'app.asar.unpacked');
   session = await ort.InferenceSession.create(modelPath, sessionOptions);
   cancelled = false;
 }
@@ -113,7 +115,10 @@ onmessage = async (e) => {
           backend = data.backend;
           batchSize = data.batchSize;
           chunkLength = data.windowSize * sampleRate;
-          await loadModel(modelPath, backend, batchSize);
+          
+          const model = data.model;
+          numClasses = model === 'birdnet+' ? 11725 : 11560;
+          await loadModel(model, backend, batchSize);
           ensureBuffers();
           if (backend === 'webgpu') {
             await session.run({ input: inputTensor }); // capture pass

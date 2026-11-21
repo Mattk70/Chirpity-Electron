@@ -2340,6 +2340,7 @@ const defaultConfig = {
   models: {
     birdnet: {displayName: 'BirdNET', backend: 'webgpu', list: 'birds', webgpu: {threads: 1, batchSize: 8}, tensorflow: {threads: null, batchSize: 8},  customListFile: ''},
     birdnet3: {displayName: 'BirdNET+ (preview 3.1)', backend: 'webgpu', list: 'birds', webgpu: {threads: 1, batchSize: 8}, tensorflow: {threads: 2, batchSize: 8},  customListFile: '', windowSize: 3},
+    'birdnet+': {displayName: 'BirdNET+', backend: 'webgpu', list: 'birds', webgpu: {threads: 1, batchSize: 8}, tensorflow: {threads: 2, batchSize: 8},  customListFile: '', windowSize: 3},
     chirpity: {displayName: 'Nocmig', backend: 'webgpu', list: 'birds', webgpu: {threads: 1, batchSize: 8}, tensorflow: {threads: null, batchSize: 8},  customListFile: ''},
     nocmig: {displayName: 'Nocmig V2 (Beta)', backend: 'webgpu', list: 'birds', webgpu: {threads: 1, batchSize: 8}, tensorflow: {threads: null, batchSize: 8},  customListFile: ''},
   },
@@ -2513,7 +2514,7 @@ window.onload = async () => {
     }
   }
   if (!isMember){
-    config.selectedModel === 'birdnet3' && (config.selectedModel = 'birdnet');
+    config.selectedModel.test(/^birdnet.+$/) && (config.selectedModel = 'birdnet');
     config.customColormap.autoGain = false;
     config.customColormap.scale = 'linear';
     config.customColormap.preEmphasis = 0;
@@ -2718,7 +2719,7 @@ window.onload = async () => {
   DOM.batchSizeSlider.max = Math.max(parseInt(160 / (24576 / GPU_RAM)), 32);
   DOM.threadSlider.value = config[config.models[config.selectedModel].backend].threads;
   DOM.numberOfThreads.textContent = DOM.threadSlider.value;
-  const windowSize = config.models['birdnet3'].windowSize;
+  const windowSize = config.models[config.selectedModel].windowSize ?? 3;
   DOM.windowSizeSlider.value = windowSize;
   DOM.windowSizeValue.textContent = windowSize;
   DOM.defaultLat.value = config.latitude;
@@ -3028,7 +3029,10 @@ const setUpWorkerMessaging = () => {
         }
         case "no-onnx-gpu": {
           config.models.birdnet3.backend = 'tensorflow';
-          if (config.selectedModel === 'birdnet3') document.getElementById('tensorflow').click()
+          config.models['birdnet+'].backend = 'tensorflow';
+          if (includes(['birdnet3', 'birdnet+'], config.selectedModel)) {
+            document.getElementById('tensorflow').click();
+          }
           updatePrefs('config.json', config)
           console.info("Onnx GPU not available:", DIAGNOSTICS["GPUs"])
           break;
@@ -3140,7 +3144,10 @@ function removeOpenFile(file) {
  */
 
 const getLabelFile = () => {
-    return p.join(dirname, "BirdNET3/BirdNET+_V3.0_Global_12K_Labels.csv");
+    const filename = config.selectedModel === "birdnet3" 
+      ? "BirdNET3_geomodel_labels.csv" 
+      : "BirdNET+_V3.0_Global_12K_Labels.csv";
+    return p.join(dirname, `BirdNET3/${filename}`);
 }
 /**
  * Display regions for detections that fall within the current spectrogram window.
@@ -3723,11 +3730,11 @@ const updateModelIcon = (model) => {
     case 'birdnet':
       title = "BirdNET";
       break;
-    case 'birdnet3':
-      title = "BirdNET+ (preview 3.1)";
+    case /birdnet.+/i.test(model):
+      title = model === 'birdnet3' ? "BirdNET3 (preview 3.1)" : "BirdNET+";
       model = 'birdnet';
       showVersion3 = true;
-      break;      
+      break;
     case 'chirpity':
       title = "Nocmig";
       break;
@@ -4766,7 +4773,7 @@ async function renderResult({
     } = result;
     let model = result.model;
     const isBatpack = /batpack/i.test(model ?? "");
-    const isBN3 = model === "birdnet3";
+    const isBN3 = /birdnet.+/i.test(model ?? "");
     let bn3Badge = '';
     if (isBN3) {
       model = model.slice(0, -1);
@@ -5221,8 +5228,8 @@ const populateSpeciesModal = async ({included, excluded, place}) => {
   }
   const includedList = generateBirdIDList(included);
   const internalModel = config.selectedModel;
-  const classes = ["birdnet3","perch v2"].includes(internalModel) ? config.detect.classes.join(', ') : "";
-  const classesText = ["birdnet3","perch v2"].includes(internalModel) && ["nocturnal", "location", "birds"].includes(config.list) 
+  const classes = ["birdnet3", "birdnet+", "perch v2"].includes(internalModel) ? config.detect.classes.join(', ') : "";
+  const classesText = ["birdnet3", "birdnet+", "perch v2"].includes(internalModel) && ["nocturnal", "location", "birds"].includes(config.list) 
     ? utils.interpolate(i18.classesText, { classes: classes }) : "";
   const depending =
     config.useWeek &&
@@ -5456,7 +5463,7 @@ function filterResults({
  * Disable thread selection for ONNX models using WebGPU.
  */
 const updateThreadsSlider = () => {
-  const isOnnx = ['perch v2', 'birdnet3'].includes(config.selectedModel);
+  const isOnnx = ['perch v2', 'birdnet3', 'birdnet+'].includes(config.selectedModel);
   const isGPU = config.models[config.selectedModel].backend === 'webgpu';
   DOM.threadSlider.disabled = isOnnx && isGPU;
 }
@@ -5505,7 +5512,7 @@ const modelSettingsDisplay = () => {
   // Hide threads slider for Onnx models
   const model = config.selectedModel;
   const backend = config.models[model].backend;
-  const onnxGPU = ['birdnet3', 'perch v2'].includes(model) && backend === 'webgpu';
+  const onnxGPU = ['birdnet3', 'birdnet+', 'perch v2'].includes(model) && backend === 'webgpu';
   notOnnx.forEach((element) => element.classList.toggle("d-none", onnxGPU));
 
   const noMac = document.querySelectorAll(".no-mac");
@@ -5516,7 +5523,7 @@ const modelSettingsDisplay = () => {
   const blockTrain = config.selectedModel !== 'birdnet' || ! STATE.isMember;
   DOM.trainNav.classList.toggle('disabled', blockTrain);
   updateThreadsSlider();
-  DOM.windowSize.classList.toggle('d-none', config.selectedModel !== 'birdnet3');
+  DOM.windowSize.classList.toggle('d-none', !['birdnet3', 'birdnet+'].includes(config.selectedModel));
   setClassesUIState();
 };
 
@@ -5524,7 +5531,7 @@ const modelSettingsDisplay = () => {
  * Show taxonomic-class filters only for supported model and list combinations.
  */
 const setClassesUIState = () => {
-  const showClasses = ["birdnet3", "perch v2"].includes(config.selectedModel) 
+  const showClasses = ["birdnet3", "birdnet+", "perch v2"].includes(config.selectedModel) 
     && ["location", "birds"].includes(config.list);
   DOM.classes.classList.toggle('d-none', !showClasses);
 }
@@ -7430,7 +7437,8 @@ document.addEventListener("change", async function (e) {
           // change window size
           DOM.windowSizeValue.textContent = DOM.windowSizeSlider.value;
           const windowSize = DOM.windowSizeSlider.valueAsNumber;
-          config.models['birdnet3'].windowSize = windowSize;
+          const selectedModel = config.selectedModel;
+          config.models[selectedModel].windowSize = windowSize;
           worker.postMessage({
             action: "change-window-size",
             windowSize,
@@ -9450,7 +9458,7 @@ async function updateModelOptions(customOnly){
   // Update the model selector options
   select.replaceChildren();
   // Add options
-  const builtInModels = ['nocmig', 'chirpity', 'birdnet', 'birdnet3'];
+  const builtInModels = ['nocmig', 'chirpity', 'birdnet', 'birdnet3', 'birdnet+'];
   const modelOptions = Object.fromEntries(
     Object.entries(config.models).filter(([model]) =>
       (builtInModels.includes(model) || dbModels.includes(model)) &&
@@ -9461,7 +9469,7 @@ async function updateModelOptions(customOnly){
   for (const [model, opt] of Object.entries(modelOptions)) {
     const option = document.createElement('option');
     option.value = model;
-    option.disabled = model === 'birdnet3' && !STATE.isMember; // Disable birdnet3 if not a member
+    option.disabled = ['birdnet3', 'birdnet+'].includes(model) && !STATE.isMember; // Disable birdnet3 and birdnet+ if not a member
     option.textContent = opt.displayName;
     select.appendChild(option);
   }

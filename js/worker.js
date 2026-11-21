@@ -497,7 +497,7 @@ async function handleMessage(e) {
     }
     case "change-threads": {
       const threads = args.threads;
-      const onnxGPU = ['birdnet3', 'perch v2'].includes(STATE.model) && STATE.detect.backend === 'webgpu';
+      const onnxGPU = ['birdnet3', 'birdnet+', 'perch v2'].includes(STATE.model) && STATE.detect.backend === 'webgpu';
       if (onnxGPU) return; // ONNX GPU models only work with 1 thread
       const delta = threads - predictWorkers.length;
       if (delta > 0) {
@@ -1323,7 +1323,8 @@ async function onLaunch({
     ? memoryDB
     : diskDB;
   STATE.update({ db });
-  const onnxGPU = (perch || STATE.model === 'birdnet3') && STATE.detect.backend === 'webgpu';
+  const onnxGPU = (perch || ['birdnet3', 'birdnet+'].includes(STATE.model)) 
+    && STATE.detect.backend === 'webgpu';
   threads = onnxGPU ? 1 : threads;
   spawnPredictWorkers(model, batchSize, threads);
 }
@@ -2016,7 +2017,9 @@ async function updateMetadata(fileNames) {
  */
 const resetEmbeddings = async () =>{
   STATE.queryMetadata = undefined;
-  const dim = STATE.model === 'perch v2' ? 1536 : STATE.model === 'birdnet3' ? 1280 : 1024;
+  const dim = STATE.model === 'perch v2' 
+    ? 1536 
+    : ['birdnet3', 'birdnet+'].includes(STATE.model) ? 1280 : 1024;
   await createEmbeddingTable(memoryDB, tempPath, dim);
 }
 async function getEmbedding({file,cname, sname, max, threshold, queryRegion }){
@@ -3292,7 +3295,7 @@ async function saveAudio(file, start, end, filename, metadata, folder) {
 /**
  * Ensure the requested number of prediction workers exist for a model.
  *
- * Perch and BirdNET3 CPU thread settings are converted to worker counts unless
+ * Perch and BirdNET3/BirdNET+ CPU thread settings are converted to worker counts unless
  * adjustment is disabled. Existing workers are retained; only missing workers
  * are created and sent their load configuration.
  *
@@ -3308,7 +3311,7 @@ function spawnPredictWorkers(model, batchSize, threads, adjustThreads = true) {
     if (model === 'perch v2'){
       // Perch v2 has 4 intraOp threads
       threads = Math.max(1, Math.floor(threads / 4));
-    } else if (model === 'birdnet3') {
+    } else if (['birdnet3', 'birdnet+'].includes(model)) {
       // BirdNET 3 has 2 intraOp threads
       threads = Math.max(1, Math.floor(threads / 2));
     }
@@ -3316,9 +3319,11 @@ function spawnPredictWorkers(model, batchSize, threads, adjustThreads = true) {
   NUM_WORKERS = threads;
   for (let i = currentThreads; i < threads; i++) {
     let modelFile = 
-      ['birdnet3','chirpity','nighthawk','nocmig','perch v2'].includes(model)
+      ['birdnet3','birdnet+','chirpity','nighthawk','nocmig','perch v2'].includes(model)
       ? model : 'birdnet';
-    modelFile = modelFile.replace('birdnet3', 'birdnet3 copy');
+    if (['birdnet+', 'birdnet3'].includes(model)) {
+      modelFile = 'birdnet_plus';
+    }
     const worker = new Worker(`./js/models/${modelFile}.js`, { type: "module" });
     // Web worker message event handler
     worker.onmessage = async (msg) => {
@@ -3340,8 +3345,9 @@ function spawnPredictWorkers(model, batchSize, threads, adjustThreads = true) {
     worker.name = model;
     predictWorkers.push(worker);
     DEBUG && console.log("loading a worker");
-    // Force birdnet3 to cpu if not supported on GPU
-    const backend = model === "birdnet3" && STATE.noOnnxGPU ? 'cpu' : STATE.detect.backend;
+    // Force birdnet3 / birdnet+ to cpu if not supported on GPU
+    const backend = ['birdnet3', 'birdnet+'].includes(STATE.model) && STATE.noOnnxGPU 
+          ? 'cpu' : STATE.detect.backend;
     worker.postMessage({
       message: "load",
       UUID: STATE.UUID,

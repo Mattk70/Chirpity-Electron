@@ -43,9 +43,11 @@ let DEBUG = false;
  *
  * @returns {string[]} Labels formatted as `scientific_common_class`.
  */
-function getBN3Labels() {
-  const labelFile = path.join(__dirname, "..", "..", "BirdNET3",
-         "BirdNET+_V3.0_Global_12K_Labels.csv");
+function getLabels(model) {
+  const filename = model === "birdnet3" 
+    ? "BirdNET3_geomodel_labels.csv" 
+    : "BirdNET+_V3.0_Global_12K_Labels.csv";
+  const labelFile = path.resolve(__dirname, "../../", "BirdNET3", filename);
   const fileContents = fs.readFileSync(labelFile, "utf8");
   return fileContents
     .trim()
@@ -56,11 +58,10 @@ function getBN3Labels() {
       return `${sci_name}_${com_name}_${class_name}`;
     });
 }
-const BIRDNET3_LABELS = getBN3Labels();
-DEBUG && console.log(BIRDNET3_LABELS.length, "labels loaded from BirdNET3 label file");
-
 //GLOBALS
 let listModel;
+const BIRDNET3_LABELS = getLabels('birdnet3');
+const BIRDNETPLUS_LABELS = getLabels('birdnet+');
 
 const NOT_BIRDS = [
   "Acris crepitans", // Northern Cricket Frog
@@ -252,8 +253,10 @@ onmessage = async (e) => {
         listModel.classes = classes?.length ? classes : ['Aves'];
         const perch = model === "perch v2";
         const birdnet3 = model === "birdnet3";
+        const birdnetPlus = model === "birdnet+";
         listModel.perch = perch;
         listModel.birdnet3 = birdnet3;
+        listModel.birdnetPlus = birdnetPlus;
         listModel.splitChar = perch ? /[~,]/ : /[_,]/;
         if (perch) {
           PERCH_LABELS ??= loadLabels(path.join(modelPath, 'labels.txt'));
@@ -267,6 +270,8 @@ onmessage = async (e) => {
           }
         } else if (birdnet3) {
           listModel.labels = BIRDNET3_LABELS;
+        } else if (birdnetPlus) {
+          listModel.labels = BIRDNETPLUS_LABELS;
         } else {
           listModel.labels = labels;
         }
@@ -456,7 +461,7 @@ forceCPU = true;
           const latin = this.mdata_labels[index].split("~")[0];
           // Translate new-taxonomy name -> old-taxonomy name, if it was renamed.
           // If it's not in the map, the name is unchanged between the two lists.
-          const oldLatin = !['birdnet3', 'perch v2'].includes(model) ? NEW_TO_OLD_TAXONOMY[latin] || latin : latin;
+          const oldLatin = !['birdnet3', 'birdnet+', 'perch v2'].includes(model) ? NEW_TO_OLD_TAXONOMY[latin] || latin : latin;
           // Use the reduce() method to accumulate the indices of species containing the latin name
           const foundIndices = this.labels.reduce(
             (indices, element, index) => {
@@ -469,7 +474,7 @@ forceCPU = true;
           const classes = listModel.classes;
           foundIndices.forEach((index) => {
             // Exclude unselected classes for birdnet3 & perch
-            if (["birdnet3", "perch v2"].includes(model) && !classes.some(cls => this.labels[index].includes(cls))) return;
+            if (["birdnet3", "birdnet+", "perch v2"].includes(model) && !classes.some(cls => this.labels[index].includes(cls))) return;
             includedIDs.push(index + 1);
             count++;
             DEBUG &&
