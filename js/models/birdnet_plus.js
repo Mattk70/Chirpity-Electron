@@ -52,7 +52,7 @@ async function loadModel(model, backend, batchSize) {
   modelPath = path.resolve(__dirname, `../../BirdNET3/${modelFile}.onnx`);
   modelPath = modelPath.replace('app.asar', 'app.asar.unpacked');
   const gpu = backend === 'webgpu';
-  const providers = gpu ? ['webgpu', 'cpu'] : ['cpu'];
+  const providers = gpu ? ['webgpu'] : ['cpu'];
   const freeDimensionOverrides = { 'batch': batchSize };
   const   preferredOutputLocation = {
     'predictions': 'cpu',
@@ -66,7 +66,7 @@ async function loadModel(model, backend, batchSize) {
     executionMode: 'sequential',
     enableCpuMemArena: true,
     enableGraphCapture: true,
-    graphOptimizationLevel: 'disabled',
+    graphOptimizationLevel: 'all',
     freeDimensionOverrides,
     preferredOutputLocation,
   };
@@ -106,8 +106,7 @@ onmessage = async (e) => {
       }
       case "change-window-size": {
         chunkLength = data.windowSize * sampleRate;
-        const force = true;
-        ensureBuffers(force)
+        ensureBuffers(true);
         break;
       }
       case "load": {
@@ -115,11 +114,10 @@ onmessage = async (e) => {
           backend = data.backend;
           batchSize = data.batchSize;
           chunkLength = data.windowSize * sampleRate;
-          
+          ensureBuffers(true);
           const model = data.model;
           numClasses = model === 'birdnet+' ? 11725 : 11560;
           await loadModel(model, backend, batchSize);
-          ensureBuffers();
           if (backend === 'webgpu') {
             await session.run({ input: inputTensor }); // capture pass
           }
