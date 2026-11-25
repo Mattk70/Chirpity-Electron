@@ -673,10 +673,9 @@ async function handleMessage(e) {
           .map(id => Number(id))
           .filter(id => Number.isInteger(id));
         if (!fileIDs.length) break;
-        const placeholders = fileIDs.map(() => "?").join(",");
-        const result = await diskDB.runAsync(
-          "DELETE FROM files WHERE id IN (" + placeholders + ")",
-          ...fileIDs
+        await diskDB.runAsync(
+          "DELETE FROM files WHERE id IN (SELECT value FROM json_each(?))",
+          JSON.stringify(fileIDs)
         );
         if (result?.changes) {
           const numberOfFiles = result.changes;
@@ -702,20 +701,19 @@ async function handleMessage(e) {
         if (!fileIDs.length) break;
         const oldValue = args.oldValue;
         const newValue = args.newValue;
-        const placeholders = fileIDs.map(() => "?").join(",");
         const sql = `UPDATE files SET name = REPLACE(name, ?, ?)
-            WHERE id IN (${placeholders})
+            WHERE id IN (SELECT value FROM json_each(?))
               AND instr(name, ?) > 0`;
         const diskSql = `UPDATE disk.files SET name = REPLACE(name, ?, ?)
-            WHERE id IN (${placeholders})
+            WHERE id IN (SELECT value FROM json_each(?))
               AND instr(name, ?) > 0`;
 
         let result;
         await dbMutex.lock();
         try {
           await memoryDB.runAsync("BEGIN");
-          const diskResult = await memoryDB.runAsync(diskSql, oldValue, newValue, ...fileIDs, oldValue);
-          const memoryResult = await memoryDB.runAsync(sql, oldValue, newValue, ...fileIDs, oldValue);
+          const diskResult = await memoryDB.runAsync(diskSql, oldValue, newValue, JSON.stringify(fileIDs), oldValue);
+          const memoryResult = await memoryDB.runAsync(sql, oldValue, newValue, JSON.stringify(fileIDs) , oldValue);
 
           if (diskResult.changes !== memoryResult.changes) {
             throw new Error(
@@ -1603,8 +1601,6 @@ const getFilesInDirectory = async (dir) => {
   return files;
 };
 
-const prepParams = (list) => "?".repeat(list.length).split("").join(",");
-
 /**
  * Constructs an SQL filter clause and parameter list for file record queries based on date range and application mode.
  *
@@ -1754,8 +1750,8 @@ async function addQueryQualifiers(stmt, params, range, caller) {
     (stmt += SQLtext), params.push(...fileParams);
   }
   if (labelFilters.length) {
-    stmt += ` AND tagID in (${prepParams(labelFilters)}) `;
-    params.push(...labelFilters);
+    stmt += ` AND tagID in (SELECT value FROM json_each(?)) `;
+    params.push(JSON.stringify(labelFilters));
   }
   if (selection && caller === 'results') {
     // Only ever 1 file in Queue
@@ -5866,10 +5862,8 @@ async function onDeleteSpecies({species, active}) {
     const filePaths = STATE.openFiles;
     if (!filePaths.length) return;
     const rows = await db.allAsync(
-      `SELECT id FROM files WHERE NAME IN (${prepParams(
-        filePaths
-      )})`,
-      ...filePaths
+      `SELECT id FROM files WHERE NAME IN (SELECT value FROM json_each(?))`,
+      JSON.stringify(filePaths)
     );
     if (!rows.length) return;
     const ids = rows.map((row) => row.id).join(",");
@@ -6618,8 +6612,8 @@ async function convertAndOrganiseFiles(threadLimit = 4) {
       generateAlert({ message: "libraryUpToDate" });
       return;
     }
-    query += `${keyword} f.name IN (${prepParams(files)})`;
-    params.push(...files);
+    query += `${keyword} f.name IN (SELECT value FROM json_each(?))`;
+    params.push(JSON.stringify(files));
   }
   t0 = Date.now();
   const rows = await db.allAsync(query, ...params);
