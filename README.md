@@ -5,7 +5,7 @@
 
 
 
-Desktop application to identify bird vocalisations in lengthy audio files. Uses either <a href="https://github.com/kahst/BirdNET-Analyzer">BirdNET</a> or a native AI model tuned for the calls of nocturnal migrants.
+Desktop application to identify bird and other animal vocalisations in lengthy audio files. Uses <a href="https://github.com/kahst/BirdNET-Analyzer">BirdNET</a> by default, with other models tuned for specific use cases available as options.
 
 Author: Matthew Kirkland
 
