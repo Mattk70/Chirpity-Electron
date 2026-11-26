@@ -27,7 +27,7 @@ let batchSize = 8;
 const sampleRate = 32000;
 let numClasses;
 const DEBUG = false;
-let modelPath;
+let modelPath, embeddingsName;
 
 // Create input tensor only once
 function ensureBuffers(force) {
@@ -46,9 +46,14 @@ function ensureBuffers(force) {
  * @returns {Promise<void>} Resolves when the session is ready.
  */
 async function loadModel(model, backend, batchSize) {
-  const modelFile = model === 'birdnet+' 
-    ? 'BirdNET+_V3.0_Global_12K_FP16_conv1d_powfix'
-    : 'birdnet_gem_webgpu_fast';
+  let modelFile;
+  if (model === 'birdnet+') {
+    modelFile = 'model_fp16_gpu';
+    embeddingsName = 'embeddings';
+  } else {
+    modelFile = 'birdnet_gem_webgpu_fast';
+    embeddingsName = 'embeddings_out';
+  }
   modelPath = path.resolve(__dirname, `../../BirdNET3/${modelFile}.onnx`);
   modelPath = modelPath.replace('app.asar', 'app.asar.unpacked');
   const gpu = backend === 'webgpu';
@@ -56,7 +61,7 @@ async function loadModel(model, backend, batchSize) {
   const freeDimensionOverrides = { 'batch': batchSize };
   const   preferredOutputLocation = {
     'predictions': 'cpu',
-    'embeddings_out': 'cpu',
+    [embeddingsName]: 'cpu',
   }
   const threadOptions = { intraOpNumThreads:2, interOpNumThreads: 1 };
   const sessionOptions = { 
@@ -231,10 +236,10 @@ async function predictBatch(audio, keys, selection, queryMode) {
     const batchedProbs  = Array.from({ length });
     const prediction = await session.run({ input: audio })
     const flatID = prediction.predictions.data; // Float32Array
-    const flatEmbeds = prediction.embeddings_out.data;
-    const dim = prediction.embeddings_out.dims[1]
+    const flatEmbeds = prediction[embeddingsName].data;
+    const dim = prediction[embeddingsName].dims[1]
     prediction.predictions.dispose();
-    prediction.embeddings_out.dispose();
+    prediction[embeddingsName].dispose();
 
     if (selection) {
       // Track the highest score seen for each class across all batch items.
